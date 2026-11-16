@@ -10529,5 +10529,865 @@
     "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
     "sourceBlob": "04fd8aa57aebbbce65873d5a1aee5ee47a2a593c",
     "retirementProof": "No cases retired; no trace re-recorded."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/approved-population-returns.test.ts",
+    "outcome": "migrated",
+    "target": "test/approved-population-returns.test.ts",
+    "decision": "CI21 SD-NAMED: The shipped population projection and perch-body documents keep their exact wire bytes through format parse, canonical encode, platform-family routing and SDK named-blob admission, and partial native guests refuse. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "`the complete ${name} retains native, decoded and canonical wire identity`",
+      "projection and perch reject partial native guests without touching the general body binding"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "5984ff2bcb7e099e9f3e1e81619eeeb7d1b68cba",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/author-discovery.test.ts",
+    "outcome": "migrated",
+    "target": "test/author-discovery.test.ts",
+    "decision": "CI21 SD-PRODUCT: A freshly scaffolded author project builds a discovery.json the engine page revives into its own card (slug, spawn, SVG thumb), and card names cannot inject markup while seeds change the thumb. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "an author project builds with discovery a page revives to itself",
+      "a card can't carry markup out of a name, and shards differ by seed"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "5bb7eeeea4ead460b6fb4d8ea8ef650fd5bc0748",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/author-errors.test.ts",
+    "outcome": "migrated",
+    "target": "test/author-errors.test.ts",
+    "decision": "CI21 SD-PRODUCT: An author outside the tree (no lockfile, no public/) can build, and the real CLI names the section, field, misspelt section, top-level field and misspelt flag in its errors. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "a folder with no lockfile takes the tools' validation revision",
+      "a project with no public/ builds",
+      "a bad row names its section and field",
+      "a misspelt section is named",
+      "a bad top-level field is named",
+      "a misspelt build flag is named"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "67817e11878f7ce538fc3bc79369caac96611034",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/author-lut-sampling.test.ts",
+    "outcome": "migrated",
+    "target": "test/author-lut-sampling.test.ts",
+    "decision": "CI21 SD-BAKE: The author colour-LUT sampler uses the same 33-cube texel-centre transform as the engine's runtime LUT, returning a fresh object each time. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "native cube storage and author texel centres retain the fitted 33-cube contract"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "370ffd5ccdfd1282cc2d3377ae9d7996bc4a83c7",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/author-placement-parity.test.ts",
+    "outcome": "migrated",
+    "target": "test/author-placement-parity.test.ts",
+    "decision": "CI21 SD-BAKE: The SDK's copies of RNG, noise, annulus geometry, specimen keys, site floors and placement types match the engine's native arithmetic and data contracts bit for bit. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "author placement types preserve the complete native data contract",
+      "author RNG and every noise operation match native arithmetic exactly",
+      "authored annuli preserve every native attribute and triangle byte",
+      "specimen keys preserve insertion order, Unicode and JSON number spelling",
+      "author site floors retain every native coordinate, optional field and signed zero"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "94746e812870f60cc5729bb752d96ab9088f4055",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/bake-collider-kernels.test.ts",
+    "outcome": "migrated",
+    "target": "test/bake-collider-kernels.test.ts",
+    "decision": "CI21 SD-BAKE: The SDK's collider bake kernels (pose, placed geometry, world hull, support points) reproduce the engine's native collider bytes, and run in a fresh Node realm under the renderer guard. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "successive author poses retain every native matrix, channel rounding and relative hull bit",
+      "support selection retains numeric strided reads, duplicate ties and stable first-vertex order",
+      "all author collider kernels execute beneath the unchanged native renderer guard"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "48875c423e4040016670241b1a2dfdf03731671a",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/build-cache-report.test.ts",
+    "outcome": "migrated",
+    "target": "test/build-cache-report.test.ts",
+    "decision": "CI21 SD-TOOL: Build-cache counters count only validated payloads across cold, disk and in-process generation, the AS and Zstd caches keep exact bytes through corruption and failed storage, and chunked child reports merge once without eating stderr. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "actual cold, disk and in-process generation paths count only validated payloads and successful populations",
+      "real AS and Zstd caches retain exact bytes across hit, corruption repair and failed storage",
+      "reports label non-invocation, distinguish cast/map paths and do not leak between phases",
+      "chunked child reports aggregate once while all ordinary stderr remains exact",
+      "missing or duplicate author reports and partial product failures stay explicitly incomplete",
+      "cast slot identities share only the exact reviewed cast report family"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "76340ca4c8a0acb74ef4e4379b92f8f5b4778a53",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/channel-programs-gather.test.ts",
+    "outcome": "migrated",
+    "target": "test/channel-programs-gather.test.ts",
+    "decision": "CI21 SD-SCRIPT: SDK-authored client channel programs run on the gather host with first-read order, alias sharing, signed zero, atomic refusal of missing, non-finite or over-cap reads with recovery, private recurrence and clock refusal. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "aliases preserve first-read order, distinct bindings and signed zero on every frame",
+      "missing, nonfinite and over-cap reads refuse atomically and recover with unchanged restoration",
+      "mixed external observations retain the original snapshot and refusal path",
+      "unchanged borrowed values still advance each private recurrence",
+      "zero-read lanes keep exact empty-vector admission",
+      "unchanged borrowed values retain clock refusal and recovery",
+      "getter reentry keeps the existing shared snapshot and first-read order"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "3128c51200b2e75e550bd6f6ab23504e1a4feb95",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/client-runtime-declaration.test.ts",
+    "outcome": "migrated",
+    "target": "test/client-runtime-declaration.test.ts",
+    "decision": "CI21 SD-PRODUCT: A compiled client-plan runtime keeps its exact authority, cost and binds with no source entry: the format refuses a source entry, the output writer refuses executable runtime files and ships no stubs, and output transport preserves cost/binds. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "compiled ownership retains the exact authority and measured charge with no source entry",
+      "built-in manifest policy emits only the platform constructor and keeps CSS and ownership",
+      "compiled output refuses real runtime code and ships no declaration stubs",
+      "actual output transport preserves compiled cost and binds while refusing a hidden TS inventory"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "d914c6f07ab576b5c7aa1a5b40530d4fa36cbbfa",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/decision-body-ops.test.ts",
+    "outcome": "migrated",
+    "target": "test/decision-body-ops.test.ts",
+    "decision": "CI21 SD-SCRIPT: Decision scripts compiled by the SDK get generated Body/Collider identities whose body ops commit atomically at the fixed-step boundary on the engine DecisionHost; undeclared authority, the spawn allowance, forged restores and ungranted intent or foreign-player reads all refuse. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "generated body ops use declared identities and commit atomically at the existing fixed-step boundary",
+      "refuses undeclared body or collider authority before any command publishes: %s",
+      "body spawning shares the existing four-spawn allowance",
+      "restoring forged body boolean or reserved fields refuses the complete staged call",
+      "pre-extension scripts keep the exact saved mechanical declaration",
+      "parsed and compiled programs omit unused additive maps from product JSON",
+      "requested player intent requires an explicit read capability",
+      "requested motion grants observation of only the lent player: %s"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "6f44637bee54c05bbb49a933327ac19cf8e12781",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/decision-product.test.ts",
+    "outcome": "migrated",
+    "target": "test/decision-product.test.ts",
+    "decision": "CI21 SD-PRODUCT: A v1 decision script's explicit ABI and pages contract flows from the SDK (named blob, platform section, project build) through the writer, disk validator, untrusted browser admission and native worker; unlisted modules, conflicting contracts, legacy host mixing and memory understatement refuse. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "native workers admit explicitly declared v1 sections without inferring an ABI",
+      "source and in-memory named bytes retain explicit contracts, without an index ABI field",
+      "writer, disk validator and untrusted browser use the exact verified sim/scripts contract",
+      "project build carries source declaration contracts and their bound moves through its real writer",
+      "unlisted modules, conflicting contracts, legacy host mixing and memory understatement refuse",
+      "runtime-owned encounters admit numeric fields only for their actual sim guest"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "be274b8f40d7993624ee3346366d6081e775c4ac",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/faceted-ao-scope.test.ts",
+    "outcome": "migrated",
+    "target": "test/faceted-ao-scope.test.ts",
+    "decision": "CI21 SD-BAKE: The author's faceted-AO scope installs an AO bake table into the engine voxel-AO cache only for its synchronous body, nests, drains on failure or a thenable, and falls back on malformed tables. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "native AO tables are scoped, nested and returned values keep their identity",
+      "AO table ownership drains on the original failure and on a thenable refusal",
+      "malformed AO inputs keep the original uncached compilation fallback"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "9a9b679f4d94336f64aa68d6fc9c267d84f32632",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/generated-isolated-declarations.test.ts",
+    "outcome": "migrated",
+    "target": "test/generated-isolated-declarations.test.ts",
+    "decision": "CI21 SD-TOOL: The discovery and shard-composition generators emit TypeScript that passes isolatedDeclarations because of one explicit annotation, without changing runtime output. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "the discovery producer emits isolated manifest declarations",
+      "the composition producer emits isolated placed shard declarations"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "a8987b358cfe44653793f8f09152c549849e6a9e",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/glb-embedded-images.test.ts",
+    "outcome": "migrated",
+    "target": "test/glb-embedded-images.test.ts",
+    "decision": "CI21 SD-BAKE: SDK named-blob admission charges WebP paint and every RGBA8 mip of the storm-roc rig without changing it, keeps per-texture mip costs and the GLB allocation cap, and refuses malformed image documents. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "normal admission charges original WebP paint and every RGBA8 mip without changing the rig",
+      "embedded admission refuses %s before loader allocation",
+      "texture uses retain independent mip costs and refuse aggregate allocation beyond the existing GLB cap",
+      "an untextured document has zero embedded image cost",
+      "omitted sampler fields retain the original full-mip allocation floor",
+      "combined geometry and image allocations retain the existing GLB cap and blob cost floor"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "d3bde48b64e06412565b55b85febc51de1f2ad73",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/golden-board-colour.test.ts",
+    "outcome": "migrated",
+    "target": "test/golden-board-colour.test.ts",
+    "decision": "CI21 SD-TOOL: The golden-board colour guard flags exposure and saturation shifts (including the reported Nalati ground/sky sample) but not small motion or channel swaps, refuses empty samples, and never reads art/. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "golden colour guard flags exposure and saturation shifts without flagging small motion"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "1c6c76a149ef556dbbf6730b5a0da15c9e48c2fc",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/import-bundle.test.ts",
+    "outcome": "migrated",
+    "target": "test/import-bundle.test.ts",
+    "decision": "CI21 SD-TOOL: The raw-module bundle importer keeps Unicode, native imports and calls under concurrency, removes only its own modules on syntax, evaluation or async failures, and keeps compiler function text tied to original input identities after cleanup. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "concurrent raw modules preserve Unicode, native imports and calls after source cleanup",
+      "syntax, evaluation and top-level asynchronous failures remove only their owned modules",
+      "compiler function text keeps original input identities after cleanup: %s"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "fa11b2bf3f0397957a56f6dd36048c9f6cfbce74",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/json-output-guard.test.ts",
+    "outcome": "migrated",
+    "target": "test/json-output-guard.test.ts",
+    "decision": "CI21 SD-TOOL: Shared JSON output serialization refuses byte values (even disguised as numbers), foreign native buffers, new undeclared output paths and linked paths before it writes, admits exact existing debt, always re-checks unchanged bytes, and an isolated policy keeps only declared allowances. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "an isolated policy retains only declared allowances and still validates the full source",
+      "shared JSON serialization refuses byte values before their numeric disguise",
+      "shared JSON serialization refuses foreign native buffers before publishing an output",
+      "shared writer admits exact existing debt, refuses new paths and never skips checking unchanged bytes",
+      "SDK JSON recipes refuse encoded and raw bytes before creating an output",
+      "SDK JSON path admission refuses %s links",
+      "SDK multi-file admission checks all JSON before writing any binary sibling",
+      "SDK explicit byte products stay binary and cannot disguise JSON at a .json path"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "de7914cb780bede0d629f54323b782caff8e2fd0",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/mover-swell-parity.test.ts",
+    "outcome": "migrated",
+    "target": "test/mover-swell-parity.test.ts",
+    "decision": "CI21 SD-BAKE: The SDK's swell mover driver damps and rows exactly as the engine sea does at every depth. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "the author swell driver damps and rows as the engine sea does"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "121806d5ff435a01a5296e8173948acb62563d3f",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/music-export-midi.test.ts",
+    "outcome": "migrated",
+    "target": "test/music-export-midi.test.ts",
+    "decision": "CI21 SD-TOOL: export-midi writes the complete original theme, trailer30 and trailer15 MIDI files (exact bytes, sha256, note counts, all eight tracks) without transformed module transport, and an unknown arrangement is refused without publishing output. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "`${original.name} exports the complete original MIDI without transformed module transport`",
+      "an unknown arrangement refuses without publishing an output"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "0cef49e4f1b611474bc3b9726230d44fcfd58edb",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/native-assembly.test.ts",
+    "outcome": "migrated",
+    "target": "test/native-assembly.test.ts",
+    "decision": "CI21 SD-PRODUCT: A native-assembly plan is plain data in install order, is a registered server-only platform family, ships through the SDK server class, and the engine headless loader dispatches it ahead of sim/runtime-plan (worker included); a tampered plan invalidates the product. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "admits plain data plans in declared install order and refuses anything else",
+      "is a registered platform family for server names only, and held-melee stays its own schema",
+      "ships through the server class and takes the dispatch ahead of sim/runtime-plan, on the worker too"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "a840604f5b1729c34cb195e7a874031bc2b6d21f",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/native-triangle-field.test.ts",
+    "outcome": "migrated",
+    "target": "test/native-triangle-field.test.ts",
+    "decision": "CI21 SD-BAKE: The SDK's native triangular height field matches the format's column-major clamped triangle law bit for bit (detached copies, signed zero), refuses bad samples, and runs under the renderer guard. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "the original column-major triangular law retains every diagonal, clamped edge and numeric bit",
+      "native triangular author intake refuses incomplete, nonfinite and over-cap samples",
+      "the bounded triangular field stays available under the original native renderer guard"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "74c861b1b38aa0c33385d9f13d0667557408721b",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/new-project.test.ts",
+    "outcome": "migrated",
+    "target": "test/new-project.test.ts",
+    "decision": "CI21 SD-PRODUCT: The public new --empty scaffold builds from repo/src, admits original actors/moves, rejects repeated new, and emits no runtime source. Obsolete monorepo layout assertions are explicitly retired under J186 below.",
+    "originalTests": [
+      "new projects build v2 from build-only data without a custom runtime"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "73d147fe0bea7e3ac992d3cee75d8bbdc65f4bdd",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "J186 obsolete assertions removed inside the preserved case: old monorepo source census/layout lint, README phrase and retired boss-test pointer. Scaffold/build/admitted actors/moves roundtrip, repeat-new and no-runtime controls retained."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/original-script-order.test.ts",
+    "outcome": "migrated",
+    "target": "test/original-script-order.test.ts",
+    "decision": "CI21 SD-SCRIPT: Decision-script admission keeps the original wire order and every script value, and wire restoration refuses changed, omitted or extra fields. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "original wire order survives admission without changing any script value",
+      "original wire restoration refuses changes, omitted fields and extra fields"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "5785ddf847b618be02bae42c611365a69ba45320",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/platform-file-families.test.ts",
+    "outcome": "migrated",
+    "target": "test/platform-file-families.test.ts",
+    "decision": "CI21 SD-TOOL: Registered platform file families (casts, fabric weld, quest services) admit only the exact name and defining type pair without mutating values, named-JSON routes follow nested documents and cycles, and the gate and census admit only registered families with hash, schema and route evidence. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "complete cast and fabric weld roots register without admitting neighbouring private names",
+      "shared names require the defining type and keep private neighbours custom",
+      "native family admission refuses forged values without rewriting accepted bytes",
+      "emitted routes follow nested documents, shared descendants and cycles",
+      "gate and census exclude only admitted families and retain hash, schema and route evidence"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "576f3920485c4aca280092dcbfa26e8eb4d50a9d",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/product-build-times.test.ts",
+    "outcome": "migrated",
+    "target": "test/product-build-times.test.ts",
+    "decision": "CI21 SD-TOOL: Saved per-product build durations only reorder the build queue (unknown and tied jobs stable, input unmutated), merge across builds, survive corrupt or unwritable hints, and the ordered six-worker pool avoids a long final tail. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "hints change only queue order and preserve unknown/tied jobs without mutating input",
+      "saved durations merge across builds and corrupt/unwritable hints never block work",
+      "strict validation seeds an empty runner without overwriting an observed build",
+      "observed queue avoids a long final tail under the same six-worker bound"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "218c8d6481af2ea84b77d925414a333fa7e614d2",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/product-map-publish.test.ts",
+    "outcome": "migrated",
+    "target": "test/product-map-publish.test.ts",
+    "decision": "CI21 SD-PRODUCT: The public map alias is published only from a product's verified map bytes under the current world key, refusing a stale key, changed image bytes or a changed receipt. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "the public map alias comes only from verified product map bytes with the current world key"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "6ce74524927b5260cfb44023786b03caa738a7de",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/program-discovery.test.ts",
+    "outcome": "migrated",
+    "target": "test/program-discovery.test.ts",
+    "decision": "CI21 SD-TOOL: Discovery refresh keeps the old module when a receipt refuses, initializes only from a valid complete product, replaces atomically under an open reader, admits only a current matching product, emits computed modes and bindings with no source imports, allows program values only at data-binding slots, and a receipt-owned GPU table registers both tier choices. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "discovery refresh retains the complete old module when its current receipt refuses",
+      "missing discovery stays absent on refusal and is initialized only from a valid complete product",
+      "discovery replacement is atomic for an already-open reader and leaves no staging file",
+      "program discovery admits only a current product with matching index and values",
+      "emission inlines computed modes and ordered bindings without source imports",
+      "authored metadata permits program values only at data binding slots",
+      "a receipt-owned GPU table emits the existing native callback and registers both original tier choices"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "763f15082f1968f1ab809afacb0d15e3b0d729c8",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/project-sections.test.ts",
+    "outcome": "migrated",
+    "target": "test/project-sections.test.ts",
+    "decision": "CI21 SD-PRODUCT: Root-mapped project sections carry actual mover rows into the shardfile and refuse conflicting, undeclared, unknown or executable values, and the real sidecar pipeline emits one canonical world/movers section without importing the config. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "root-mapped sections preserve actual mover rows and refuse conflicting or unknown fields",
+      "the real sidecar pipeline emits one canonical section from declared data without a config import"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "523c02102ed51115a51e76018191ed5cf75795b8",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-creature-look-json.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-creature-look-json.test.ts",
+    "decision": "CI21 SD-NAMED: Both packed creature-look names bind the one original schema, keep authored bytes through SDK admission, product wire reads insert no consumer-owned defaults, and invalid rows or missing contracts refuse. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "both existing look names bind one original schema and preserve authored bytes",
+      "wire reads do not promise or insert defaults owned by the native consumer",
+      "invalid packed look rows and missing contracts still refuse"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "07408ad866d8f5184ad1b2b1a3548b5ebb09be91",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-dressing-json.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-dressing-json.test.ts",
+    "decision": "CI21 SD-NAMED: The phone and desktop scene-dressing names keep their defining native contract and raw wire defaults through SDK admission and the product reader, full-root checks refuse malformed rows, and missing or foreign metadata refuses before any body read. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "%s keeps its complete defining native contract and raw wire defaults",
+      "$name native full-root checks still refuse malformed rows",
+      "$name metadata $kind refuses before any body read",
+      "%s existing product reader retains omitted native defaults on decoded wire rows"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "564790e76a81fe468d48611bbb6b446b9b512a55",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-field-json.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-field-json.test.ts",
+    "decision": "CI21 SD-NAMED: Scene field ids register under the existing defining scene-buffer schema: author admission keeps bytes and binary members, native references and binary-extent refusals hold, and ids stay flat with no nested alias or traversal. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "field ids share the existing defining buffer contract without changing bytes or binary members",
+      "field registration retains native references and independent binary extent refusal",
+      "field ids stay bounded with no nested alias or traversal contract"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "9b3974dd28236973872f7faac6f758e3100c0156",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-ground-aliases.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-ground-aliases.test.ts",
+    "decision": "CI21 SD-NAMED: Population-field and streamed-cover ground aliases register under their native roots and keep the complete root and original JSON bytes through author and product admission; a private physics alias stays unregistered. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "`${root.name} preserves the complete native root and original JSON bytes`",
+      "`${root.name} refuses ${kind} provenance before payload`",
+      "unapproved private Pine owner aliases remain outside registration"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "401a249cb7636d729c4f93977463eb6e3ddbaa01",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-native-aliases.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-native-aliases.test.ts",
+    "decision": "CI21 SD-NAMED: World-scene, scene-buffer, forest-page, posed-library and scene-weld aliases keep their native root and bytes through registration; private names and the other withdrawn welds are not captured. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "%s keeps its exact native root, input and canonical payload",
+      "`${root.source}: %s rejects missing/foreign metadata before its resource read`",
+      "%s refuses incomplete or extended weld roots",
+      "alias registration does not capture private names or the other withdrawn welds"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "5c2d556a1af492a83dcf2750d65020b38cde3276",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-placement-json.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-placement-json.test.ts",
+    "decision": "CI21 SD-NAMED: All world-scene placement namespaces bind one placement schema; author admission keeps every payload byte, draw and cull value; cross-field checks survive; checked and trusted reads keep decoded values; a family read refuses missing provenance before its reader runs. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "all placement namespaces bind the same original format object and provenance",
+      "registered author admission preserves every payload byte, draw and cull value",
+      "the original cross-field and reference-shape checks survive structural schema admission",
+      "checked and trusted reads retain original decoded placement values",
+      "a family read refuses missing provenance before its asset reader runs"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "6c7533b24ce954f90e1685c1aedfe1cda8385015",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-quest-native.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-quest-native.test.ts",
+    "decision": "CI21 SD-NAMED: Quest step rows, hint rows and the chapter wake register natively: the defining root, input and wire bytes are kept, semantic and reference refusals hold, metadata is checked before any read, and negative zero survives the JSON encoder. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "`${root.name} keeps the defining native root, input and original wire bytes`",
+      "`${root.name} keeps all semantic identity and reference refusals`",
+      "`${root.name} refuses missing and foreign defining metadata before a read`",
+      "quest roots retain negative zero before the unchanged original JSON encoder"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "d5c47bf8ee27142b3546bcd24d06cceda4f750a9",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-quest-page.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-quest-page.test.ts",
+    "decision": "CI21 SD-NAMED: Every quest-page interaction name uses the shared native schema and keeps its payload bytes, its duplicate, unknown-field and unsafe-path refusals, metadata-before-read refusal, canonical built reads and native external semantics. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "all original page names use the shared native schema and preserve payload bytes",
+      "every name keeps native duplicate, unknown-field and unsafe-path refusals",
+      "missing or foreign metadata refuses before any registered payload read",
+      "built reads retain canonical parsing and external reads retain native semantics"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "18036df4be0111c1a95d6f594428faf8b016151e",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-scene-facts.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-scene-facts.test.ts",
+    "decision": "CI21 SD-NAMED: Living-page sites and fixed-draw rows register with their whole native root and encoded bytes; withheld living envelopes and the withdrawn welds stay unregistered. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "`${root.name} preserves its whole native root and encoded bytes`",
+      "`${root.name} rejects ${kind} provenance before reading payload`",
+      "the withheld living envelopes and withdrawn 62 welds remain unregistered"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "983c252e8a7c60259aa2b67bea17b69a3a6737bd",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-scene-json.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-scene-json.test.ts",
+    "decision": "CI21 SD-NAMED: World-scene and scene-bake-source names register without capturing other families, refuse nested, empty and oversized ids, and refuse absent or foreign defining metadata before any resource read. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "%s retains its defining hierarchy parser and payload bytes",
+      "scene names refuse nested, empty and oversized ids without capturing other families",
+      "scene admission refuses absent or foreign defining metadata before resource reads"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "4bb75c26d7468d68c7690cdaf64a1f143e9f9027",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-scene-model-json.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-scene-model-json.test.ts",
+    "decision": "CI21 SD-NAMED: Scene model catalogues bind their shared schema without rewriting the wire; reads keep consumer-owned defaults and mutable authored data; catalogue identity and LOD laws stay mandatory at named admission. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "scene catalogues bind their original shared schema without rewriting the wire",
+      "catalogue reads retain consumer-owned defaults and mutable authored data",
+      "catalogue identity and LOD laws remain mandatory at named admission"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "e1f812e03615f503c2d2258c7110b8a72d90704c",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-scene-sources.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-scene-sources.test.ts",
+    "decision": "CI21 SD-NAMED: Both scene-source families (model and baked) that the SDK emits attach exact platform metadata and keep their bytes; the native reader refuses a malformed cold pool before publishing any model library. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "both actual source families attach exact platform metadata and preserve bytes",
+      "the native reader refuses a malformed cold pool before publishing any model library"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "4cd92b33baad84859d9b2ef81f5d58586cbb8ece",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/runtime-files.test.ts",
+    "outcome": "migrated",
+    "target": "test/runtime-files.test.ts",
+    "decision": "CI21 SD-TOOL: Keep exact ceiling raises/refusals and third-party default controls. The checked-in policy census now scans every actual SDK source shard and requires Template, replacing the obsolete monorepo Pine/Driftwood directory list.",
+    "originalTests": [
+      "a ceiling falls freely and rises only with a matching new raises line",
+      "the build refuses a shard above its ceiling; projects without first-party provenance keep 128",
+      "the checked-in ceilings are self-consistent and every first-party shard fits its own"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "91bc4ce78b896e343fe6f130bc67608afcfc53fb",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "J186: the old monorepo Pine/Driftwood source-location census is obsolete after those shards moved to owning repos; it counted absent folders as zero. Its preserved case now checks every actual SDK source shard. The complete generic ceiling/raise/refusal assertions remain. Separate shard-owned source censuses are recorded as a row36 follow-up; no whole case retired."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/scene-surface-intake.test.ts",
+    "outcome": "migrated",
+    "target": "test/scene-surface-intake.test.ts",
+    "decision": "CI21 SD-NAMED: Surface intake hints keep legacy world-scene surface rows byte-compatible (no default field added) and the load hint stays closed to 'placement'. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "surface intake hints keep legacy rows byte-compatible and remain closed"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "8527c1e96ee317570b72bf773312d77a9237668d",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/shard-discovery.test.ts",
+    "outcome": "migrated",
+    "target": "test/shard-discovery.test.ts",
+    "decision": "CI21 SD-PRODUCT: A manifest's bindings become discovery data while shard-code bindings refuse; the reader runs only its own named calls, refuses another shard or a failed answer, and serves a homed shard's images from its own origin. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "a manifest's bindings become data, and what names shard code refuses",
+      "a document names only the reader's own calls",
+      "a read refuses another shard and a failed answer, and a homed shard names its images there",
+      "a shard on another origin shows its images from there, past the format's page URLs"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "01f76af8141e7fb6582fb0097e37779c2c8d3b40",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/shardfile-inputs.test.ts",
+    "outcome": "migrated",
+    "target": "test/shardfile-inputs.test.ts",
+    "decision": "CI21 SD-TOOL: Shard build input receipts key step keys, explicit inputs, native-bundled modules, sync and async reads, negative probes and directory inventories, but not cached files; they refuse concurrent source edits and crossed replay scopes, and invalidate on new precedence entries or package-main changes. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "receipts include step keys and explicit inputs without depending on cached files",
+      "keys native-bundled modules, sync and async reads, negative probes and real directory inventories only",
+      "keeps another revision from replacing a matching captured read set",
+      "keys compiler writes, refuses concurrent source edits and rejects incomplete traces",
+      "replay keeps an earlier observation and refuses a crossed product scope",
+      "keys workspace installation while complete receipts own SDK and format source freshness",
+      "invalidates when a new native directory entry can take precedence",
+      "keeps package metadata as content when native resolution changes its main entry",
+      "rechecks absent descendants after a file parent becomes a directory",
+      "keys existence probes without treating them as source-content reads",
+      "separates unselected resolution candidates from loaded source bytes",
+      "keeps %s compiler dependencies in their proper identity domain",
+      "keeps native compiler execution %s separate from raw runtime bytes",
+      "keys an explicitly executed author declaration separately from runtime source: %s",
+      "guards function text after the native bundle execution boundary: %s",
+      "injected input inventory receipts observe nested additions and removals without reading payloads"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "849cc1c975eb38cd083be9185978da0cd99652fd",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/sheep-file-contract.test.ts",
+    "outcome": "migrated",
+    "target": "test/sheep-file-contract.test.ts",
+    "decision": "CI21 SD-NAMED: The complete sheep species-actors file keeps native, decoded and canonical wire identity; both page modes, pose fields, skeletons and guests refuse incomplete children; factored metadata keeps the full return grammars; unsafe inputs refuse before any accessor is read. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "the complete sheep file retains original native, decoded and canonical wire identity",
+      "both sheep page modes, pose fields, skeletons and complete guests refuse incomplete children",
+      "factored sheep metadata retains the complete original return grammars",
+      "unsafe sheep inputs refuse before any accessor is read"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "32f9ad379d36bdac58a053d85f99ac33d2808c97",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/species-admission.test.ts",
+    "outcome": "migrated",
+    "target": "test/species-admission.test.ts",
+    "decision": "CI21 SD-NAMED: A species named file (actors/sheep.json) is admitted by schema at author time and at product read before any native catalogue allocation; malformed draws, pivots, parts, look-book rows and controls refuse on both sides. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "species named-file admission precedes native catalogue allocation"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "019b932c32bc607a7e1c1d8ba6d799722eb15538",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/template-product-reader.test.ts",
+    "outcome": "migrated",
+    "target": "test/template-product-reader.test.ts",
+    "decision": "CI21 SD-PRODUCT: Browser tools rebuild the real Template product written by the SDK and resolve every immutable asset to its original bytes. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "Template browser tools reconstruct the real product and resolve every immutable asset"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "be961c74da4172fbdc0dac7cccc42095a3c5e063",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/tile-bake-report.test.ts",
+    "outcome": "migrated",
+    "target": "test/tile-bake-report.test.ts",
+    "decision": "CI21 SD-TOOL: Tile bake reporting keeps exact costs and inclusive caps (one extra unit is flagged), true-yaw/pitch frustum and 3D box distance, strict 20% sightline and 5% thin-far cutoffs, a Nine-only exact baseline, a 4 MB chunk refusal, hold-cell advice, and refuses tampered section or envelope bytes. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "A/D keep exact costs, legal zero error and inclusive cap boundaries; one extra unit is flagged",
+      "frustum orientation uses actual yaw/pitch and full3D box distance, including vertical separation",
+      "sightline cutoff is strictly20percent; spanning counts one part only above4tiles",
+      "Nine-only baseline is exact by coordinate and ring; other advisory shards cannot fail it",
+      "new chunk bytes refuse only above4MB; oversized3Dheight is reported without falsifying original geometry",
+      "thin far level cutoff is strictly5percent and malformed cameras refuse",
+      "hold-cell advice distinguishes dense vertical content from small spread-out sightline warnings",
+      "verified reader refuses tampered section/envelope bytes and old all-product debt guard remains independent"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "9ce01891cb7a6edce83a0ae4877838307647fb7f",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/uniform-tile-grid.test.ts",
+    "outcome": "migrated",
+    "target": "test/uniform-tile-grid.test.ts",
+    "decision": "CI21 SD-BAKE: The scene and authored-GLB bake emitters declare all 64 L0 squares without changing any occupied payload or props row, and replacement refuses; explicit zero-cost squares satisfy streamer readiness with no fetch, allocation or publication; empty classification keeps first-row lookup. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "scene emitter adds 64 metadata squares without changing any occupied payload or props row",
+      "authored GLB emitter declares vacant L0 squares while models remain sparse and replacement refuses",
+      "explicit zero-cost squares satisfy readiness without fetch, allocation or publication",
+      "empty classification preserves nonempty costs and first-row lookup semantics"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "b37038021184ed4425c2662fc84edd6fe5735540",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired: two producer cases in SDK; two reader cases preserved in engine test/uniform-tile-readiness.test.ts at 8481ca0f54ac12412de2b25f5befef0d24346079."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/whole-prop-shadows.test.ts",
+    "outcome": "migrated",
+    "target": "src/sharddev/bake/whole-prop-shadows.test.ts",
+    "decision": "CI21 SD-BAKE: An explicit receiveShadow (true, false or unset) on a whole prop baked by the SDK survives into the installed whole-tile meshes, defaulting to true. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "whole tile rendering preserves explicit receiveShadow=%s and its default"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "c35c9f27dca513c2557764acba57d0f894423175",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/world-scene-placement-pages.test.ts",
+    "outcome": "migrated",
+    "target": "test/world-scene-placement-pages.test.ts",
+    "decision": "CI21 SD-NAMED: The SDK pages world-scene placements, keeping full serialized rows, declared order, one deterministic member per id and authored key order; world admission keeps the global 128 cap and 15 per page; tier filtering never shares an inactive page; audio borrows only an identity-checked member; reads need exact provenance. Destination uses the declared engine dependency and blocking SDK discovery.",
+    "originalTests": [
+      "pages preserve complete serialized rows, declared order and one deterministic member per original id",
+      "page metadata names the complete native root and preserves the old individual contract",
+      "publication retains authored row key order rather than the validator projection order",
+      "world admission keeps the original global 128 cap and bounds every page member at 15",
+      "tier filtering retains exactly the same ordered active placements and never shares an inactive page",
+      "complete native page admission refuses duplicate, unknown, malformed and executable rows",
+      "large native pose lists retain their bounds and refuse accessors before reading them",
+      "audio borrows only an identity-checked member after admitting the complete page",
+      "page publication and external reads require exact provenance before any transport"
+    ],
+    "sourceRevision": "bcbb228888d78076ec745b9216f132c669268e83",
+    "sourceBlob": "67f4807b9f4001acf13ee8213404220f2b40923f",
+    "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+    "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
   }
 ]
