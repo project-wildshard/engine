@@ -54,6 +54,12 @@
     }
    },
    "known": []
+  },
+  "_template": {
+   "row": "TEMPLATE-E2E TC-E5c (Template rev 8, TC-M4b): a one-shard page (`?chunk=_template`) installs a data shard's movers only through a client plan, so it builds no collider for the lift; a grid cell does (TC-E5b). Closing TC-E5c deletes this line",
+   "known": [
+    "template.lift (wood): 1 server collider(s) near the page's player with no page match, e.g. [7, 0, 2, 10, 0, 5]"
+   ]
   }
  }
 }

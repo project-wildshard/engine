@@ -23,6 +23,8 @@ const at = (y: number): MoverPose => ({ position: { x: 4, y, z: 4 }, euler: { x:
 
 test('a data cell\'s lift stands where the wire poses it, and poses its look', { timeout: 60_000 }, async () => {
   const shard = (await loadHeadlessProduct(builtProduct('_template'))).shardfile;
+  // Template rev 8 ships its own lift (TC-M4b); this test drives a fixed one of the same id, so it takes the product's place.
+  const others = shard.movers.filter(mover => mover.id !== LIFT);
   expect(hasDeclaredClientPage(shard)).toBe(false); // the plain data path: no client plan installs its movers
   const rest = { at: { x: 4, y: 0, z: 4 }, euler: { x: 0, y: 0, z: 0 } };
   const motion = { driver: { kind: 'track' }, trigger: { kind: 'shared', field: 101, equals: 1 },
@@ -32,7 +34,7 @@ test('a data cell\'s lift stands where the wire poses it, and poses its look', {
   const physics = new Physics(await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))), scope = new Scope('cell');
   const looked: number[] = [], look = { pose: (pose: MoverPose) => { looked.push(pose.position.y); } };
   wirePage.moverLooks.set(moverLookKey('cell', LIFT), look); wirePage.movers.set(LIFT, look); // the neighbour panel drew first
-  const cell = installDataCellMovers({ movers: [...shard.movers, ...movers] }, { physics, scope }, 'cell');
+  const cell = installDataCellMovers({ movers: [...others, ...movers] }, { physics, scope }, 'cell');
   expect(wirePage.movers.get(LIFT)).toBe(look); // not the wire's until the feet enter
   cell?.claim();
   physics.step();
@@ -57,7 +59,7 @@ test('a data cell\'s lift stands where the wire poses it, and poses its look', {
   const rapier = physics.R, a = { physics: new Physics(rapier), scope: new Scope('a') }, b = { physics: new Physics(rapier), scope: new Scope('b') };
   const seen: string[] = [];
   for (const id of ['a', 'b']) wirePage.moverLooks.set(moverLookKey(id, LIFT), { pose: () => { seen.push(id); } });
-  const rows = { movers: [...shard.movers, ...movers] }, cellA = installDataCellMovers(rows, a, 'a'), cellB = installDataCellMovers(rows, b, 'b');
+  const rows = { movers: [...others, ...movers] }, cellA = installDataCellMovers(rows, a, 'a'), cellB = installDataCellMovers(rows, b, 'b');
   cellA?.claim(); // admitted after A, B never takes A's rows
   wirePage.movers.get(LIFT)?.pose(at(3), {}); a.physics.step(); b.physics.step();
   expect(floorBelow(a.physics, 4, 4, 10, 20)).toBeCloseTo(3.1, 2);

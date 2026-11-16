@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "330c55a02c8b16d13c4ee934248947bfeb70f4c559d1297a7c86e9a35e953d9a",
+  "catalogueHash": "8117d4adc6b830c24d3eb14021603323bc1550f7680818ce4a7c6d58d51971d8",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -914,8 +914,8 @@
       {
         "slug": "template",
         "name": "Template shard",
-        "revision": 7,
-        "hash": "21ad259ab42e851556ff5ddc943b87c1a00b880d10225c9c287fd5d22a60742a"
+        "revision": 8,
+        "hash": "5d1f95f17fb0a7681fab74aa029618e1bd2d22976a4051d8432c939ace60316f"
       }
     ],
     "missing": []
@@ -1079,9 +1079,9 @@
     },
     {
       "slug": "template",
-      "revision": 7,
-      "hash": "21ad259ab42e851556ff5ddc943b87c1a00b880d10225c9c287fd5d22a60742a",
-      "bytes": 16310272
+      "revision": 8,
+      "hash": "5d1f95f17fb0a7681fab74aa029618e1bd2d22976a4051d8432c939ace60316f",
+      "bytes": 16329728
     }
   ]
 }
