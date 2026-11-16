@@ -493,19 +493,31 @@ try {
         return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: pressed ? 'heal, Retry: the world loads' : 'heal: the world loads' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen, injection, shot, notes: await onScreen(page) };
       } finally { await heal(); await entered.context.close(); }
     },
-    // FM6: the Cache API refuses with QuotaExceededError (an injection at the public boundary, labelled; never a full disk)
+    // FM6: Chromium exercises native origin quota. WebKit's public Cache API refusal is explicitly injected.
     storageFull: async item => {
-      const entered = await fresh(() => { Cache.prototype.put = () => Promise.reject(new DOMException('failmode-proof injected quota refusal', 'QuotaExceededError')); });
-      const { page } = entered;
+      const entered = engine === 'chromium' ? await fresh() : await fresh(() => { Cache.prototype.put = () => Promise.reject(new DOMException('failmode-proof injected quota refusal', 'QuotaExceededError')); });
+      const { page, context } = entered;
+      const cdp = engine === 'chromium' ? await context.newCDPSession(page) : null;
+      let injection = /** @type {object} */ ({ cachePut: 'WebKit injected QuotaExceededError (page realm only; not native quota)' });
       try {
-        const started = Date.now(); await page.goto(URL_PLAY);
+        if (cdp !== null) {
+          await cdp.send('Storage.overrideQuotaForOrigin', { origin: PAGE_ORIGIN, quotaSize: 1 });
+          const quota = await cdp.send('Storage.getUsageAndQuota', { origin: PAGE_ORIGIN });
+          if (!quota.overrideActive || quota.quota !== 1) return { outcome: 'harness-fail', reason: 'native origin quota was not actually applied', injection: quota };
+          injection = { kind: 'native Chromium origin quota', bytes: quota.quota, overrideActive: quota.overrideActive };
+        }
+        const started = Date.now(); await page.goto(URL_PLAY, { waitUntil: 'domcontentloaded' });
+        // The line exists while downloading. Waiting for control before observing it misses a truthful transient screen.
+        const seen = await screen(page, item.screen, 60_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'line');
+        const result = await judged(seen, item, page);
         await intoWorld(entered, 90_000).catch(() => undefined);
-        const seen = await screen(page, item.screen, 10_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'line');
-        const result = await judged(seen, item, page), playing = await recovered(page, 15_000);
-        const injection = { cachePut: 'QuotaExceededError (page realm only; the service worker is not injected)' };
+        const playing = await recovered(page, 15_000);
         if (result.outcome !== 'pass') return { ...result, injection, shot };
         return playing ? { ...result, injection, shot, recovery: 'plays on from memory' } : { outcome: 'ui-fail', reason: 'the world never played', seen, injection, shot };
-      } finally { await entered.context.close(); }
+      } finally {
+        if (cdp !== null) { await cdp.send('Storage.overrideQuotaForOrigin', { origin: PAGE_ORIGIN }); await cdp.detach(); }
+        await entered.context.close();
+      }
     },
     // FM4b mode 42: the device clock 2 min ahead; the Doctor measures it against the page's host
     clockSkew: async item => {

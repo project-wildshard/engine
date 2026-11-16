@@ -14,7 +14,14 @@ async function server(send) {
   const address=host.address();
   if(typeof address==='string'||address===null)throw new Error('No owned native port');
   host.once('connection',send);
-  return {url:`ws://127.0.0.1:${String(address.port)}/`,close:()=>new Promise((resolve,reject)=>{host.close(error=>{if(error)reject(error);else resolve(undefined);});})};
+  return {url:`ws://127.0.0.1:${String(address.port)}/`,close:async()=>{
+    const closed = once(host, 'close', {signal: AbortSignal.timeout(2000)}); host.close();
+    try { await closed; } catch (error) {
+      const forced = once(host, 'close', {signal: AbortSignal.timeout(2000)});
+      for (const client of host.clients) client.terminate();
+      await forced; throw new Error('Owned native sockets required forced cleanup', {cause:error});
+    }
+  }};
 }
 const modern=await server(socket=>{new SocketTransport(socket).close('full',{code:'queue',position:3});});
 try {

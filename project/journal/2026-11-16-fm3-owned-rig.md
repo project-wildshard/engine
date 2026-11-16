@@ -25,3 +25,13 @@ harness failure. Fixture stamps bind key/build/release/API origin, inputs
 claim fresh directories, requests stay on the owned loopback origins, and
 uncaught page exceptions refuse qualification. Baselines remain honest
 nonzero censuses. The two-browser census is running; hosted CI is owed.
+
+Urgent stale-shell priority checkpoint: a temporary npm-distributed native
+Postgres 18.6 binary under this lane's scratch unblocked the real fresh
+cluster/data-directory/drained-port proof. Public failmode-rig-proof.mjs
+passes with an explicit binary directory. Both native proof lifetimes are
+bounded. The download quota runner now applies/readbacks Chromium's actual
+1-byte origin quota and observes the transient loading screen before control;
+WebKit's page-realm Cache API injection stays labelled. That browser quota
+change is not yet qualified. The running census was intentionally stopped
+for Jake's 10:17 stale-shell regression; no incomplete census earns a tick.
