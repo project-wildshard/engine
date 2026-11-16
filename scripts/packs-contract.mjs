@@ -140,7 +140,7 @@ async function hostedProof(directory,result) {
   assert.equal(process.env.RUNNER_ENVIRONMENT,'github-hosted','No self-hosted cook');
   await import('./bake-loader.mjs');
   const {folderStore}=await import('../src/cook/game/packStore.ts');
-  const {indexKey}=await import('../src/cook/game/cookWorker.ts');
+  const {collectGarbage,indexKey}=await import('../src/cook/game/cookWorker.ts');
   const baseline=join(directory,'baseline');mkdirSync(baseline,{recursive:true});
   /** @param {PublisherConfig} config @param {NodeJS.Signals|null} signal */
   const publish=(config,signal=null)=>{const file=join(config.directory,'config.json');writeFileSync(file,JSON.stringify(config));return runChild([import.meta.filename,'--publish',file],{},signal);};
@@ -210,10 +210,13 @@ async function hostedProof(directory,result) {
   }
   await store.put('loose/obsolete.bin',original,{type:'application/octet-stream',cache:'no-store'});
   for(const row of await store.list(''))utimesSync(join(gc,'store',row.key),new Date(0),new Date(0));
+  const before=(await store.list('')).map(row=>row.key);
+  await assert.rejects(collectGarbage(store,['manual-only'],1e12,Date.now(),undefined,channels.flatMap(row=>row.builds)),/keep list misses channel builds/u);
+  assert.deepEqual((await store.list('')).map(row=>row.key),before,'An incomplete channel keep list must delete nothing');
   const text=await runChild(['--import','./scripts/bake-loader.mjs','scripts/cook-worker.mjs','gc','manual-only'],{COOK_STORE_DIR:join(gc,'store')});
   const last=text.trim().split('\n').at(-1);assert.ok(last);const report=JSON.parse(last);assert.equal(report.channels.length,3);
   for(const key of kept)assert.ok(await store.has(key),`A channel's build was collected: ${key}`);
-  assert.equal(await store.has('loose/obsolete.bin'),false);result.cf9={channels:report.channels,retained:kept.length,deleted:report.deleted};
+  assert.equal(await store.has('loose/obsolete.bin'),false);result.cf9={channels:report.channels,incompleteRefused:true,refusalDeletedNothing:true,retained:kept.length,deleted:report.deleted};
   rmSync(gc,{recursive:true,force:true});rmSync(baseline,{recursive:true,force:true});
 }
 
