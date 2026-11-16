@@ -63,10 +63,15 @@ interface NativePackBinding {
   readonly keeps: (item: string) => boolean;
   readonly grant: (item: string, count: number) => boolean;
   readonly debit: (item: string, count: number) => boolean;
+  readonly counts: () => Readonly<Record<string, number>>;
 }
 const nativePacks = new WeakMap<SimHost, Map<string, NativePackBinding>>();
 /** Whether an entered native owner registered this pack. */
 export function hasNativeInventory(host: SimHost, id: string): boolean { return nativePacks.get(host)?.has(id) === true; }
+/** Every registered pack's stacks on this host, by pack id (meta NEW-SHARD-E2E F27: an author proof reports them). */
+export function nativeInventories(host: SimHost): Record<string, Record<string, number>> {
+  return Object.fromEntries([...nativePacks.get(host) ?? []].map(([id, pack]) => [id, { ...pack.counts() }]));
+}
 /** Whether this registered pack admits a harvest kind, without changing it. */
 export function nativeInventoryKeeps(host: SimHost, id: string, item: string): boolean {
   return nativePacks.get(host)?.get(id)?.keeps(item) === true;
@@ -103,6 +108,7 @@ export class NativeInventory<K extends string> {
         keeps: item => profile.kinds.some(entry => entry === item),
         grant: (item, count) => this.add(v.parse(kind, item), count),
         debit: (item, count) => this.take(v.parse(kind, item), count),
+        counts: () => this.snapshot().counts,
       });
       nativePacks.set(host, packs);
     }

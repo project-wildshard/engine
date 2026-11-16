@@ -50,6 +50,8 @@ import { floorBelow } from "@wildshard/engine/physics/query";
 import { playerSeats } from './playerSeats';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { installDeclaredTalks } from '../shardfile/declaredTalks';
+import { pressTalk, talkPress, tapeTargets } from '../shardfile/talkPress';
+import { nativeInventories } from '../../../shared/game/inventoryLaw';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { installShardfileColliders, shardfileColliderIds } from "../../../shared/game/shardfile/collisionBindings";
 import { validateMeshCollisionAssets } from "@wildshard/format/meshCollisionAssets";
@@ -669,7 +671,12 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     };
     const interact = (id: string, player: string = first.id): boolean => {
       const row = shard.targets.interactions.find(target => target.id === id);
-      if (row === undefined) throw new Error('Unknown authored interaction');
+      if (row === undefined) {
+        // F27: a tape talks to a quest-giver (`<talk>`) and answers it (`<talk>:<choice>`) on the page's own claims
+        const talk = talkPress(shard, quest, id, player);
+        if (talk === null) throw new Error(`Unknown authored interaction ${id}; this shard's targets: ${tapeTargets(shard, quest, player).join(', ') || 'none'}`);
+        return talk.kind === 'press' ? pressTalk(host, talk.claim, player) : talk.kind === 'open';
+      }
       if (selectedInteraction(player) !== id) return false;
       if (decisions?.interact(id) === true) return true;
       if (lane === undefined) throw new Error('Interaction requires an admitted scene lane');
@@ -716,13 +723,15 @@ export interface AuthoredGridProof {
   version: 1; ticks: number; checkpointTick: number;
   grid: { reserveBeforePhysics: true; runtimeFence: true; refusedSave: true; restored: true; frozenTicks: 5; loads: 2; leasesAfterDispose: 0 };
   ledger: { facts: { name: string; actorId: string; tick: number }[]; granted: number; durableReload: true; duplicateStable: true };
+  /** F27: every native pack's stacks when the tape ends, by pack id */
+  inventory: Record<string, Record<string, number>>;
 }
 /** Fixed native author workflow: real grid residency, checkpoint refusal/restore and quest-owned Ledger filing.
  * The SDK supplies admitted commands, never facts, owner identities, reward catalogue entries or host modules.
  * Profile storage is a serialized SaveStore test port; this proves the atomic contract, not browser quota availability.
  */
 export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts,
-  plan: { ticks: number; checkpointTick: number; requiredFacts: readonly string[] },
+  plan: { ticks: number; checkpointTick: number; requiredFacts: readonly string[]; requiredItems?: Readonly<Record<string, number>> },
   inputAt: (tick: number, sim: ShardfileSimulation) => SimCommand | undefined): Promise<AuthoredGridProof> {
   if (source.runtime !== null || !Number.isInteger(plan.ticks) || plan.ticks < 1 || plan.ticks > 4096
     || !Number.isInteger(plan.checkpointTick) || plan.checkpointTick < 1 || plan.checkpointTick > plan.ticks) throw new Error('Invalid author proof');
@@ -798,13 +807,19 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     });
     for (const fact of filed) { const receipt = owner.record(fact); insist(receipt.status !== 'pending', 'ledger write pending'); if (receipt.status === 'granted') granted++; }
     for (const name of plan.requiredFacts) insist(filed.some(fact => fact.name === name), `native fact missing: ${name}`);
+    // F27: the packs as the tape left them; a required stack short of its count names what the packs hold
+    const inventory = nativeInventories(resident.host);
+    for (const [item, count] of Object.entries(plan.requiredItems ?? {})) {
+      const held = Object.values(inventory).reduce((sum, pack) => sum + (pack[item] ?? 0), 0);
+      insist(held >= count, `inventory holds ${String(held)} of ${item}, the tape requires ${String(count)}; packs: ${JSON.stringify(inventory)}`);
+    }
     const state = JSON.stringify(owner.state()), reloaded = ledger();
     insist(JSON.stringify(reloaded.state()) === state, 'serialized profile reload diverged');
     for (const fact of filed) insist(reloaded.record(fact).status === 'duplicate', 'ledger replay duplicated reward');
     insist(JSON.stringify(reloaded.state()) === state, 'duplicate filing changed profile');
     return { version: 1 as const, ticks: plan.ticks, checkpointTick: plan.checkpointTick,
       grid: { reserveBeforePhysics: true as const, runtimeFence: true as const, refusedSave: true as const, restored: true as const, frozenTicks: 5 as const, loads: 2 as const, leasesAfterDispose: 0 as const },
-      ledger: { facts, granted, durableReload: true as const, duplicateStable: true as const } };
+      ledger: { facts, granted, durableReload: true as const, duplicateStable: true as const }, inventory };
   } finally {
     baseline.dispose(); grid.dispose();
     insist(allocator.entries().length === 0, 'residency leak after disposal');

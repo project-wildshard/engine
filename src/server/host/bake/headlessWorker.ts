@@ -115,14 +115,17 @@ await runTickWorker(async raw => {
       return { tick: sim.host.state.tick, snapshot: serializer.serialize(snapshotSimHostBytes(sim.host)), effects, fuelUsed: fuelUsed + decisionFuel, scriptMicros, ...(sim.decisions === undefined ? {} : { decisions: sim.decisions.publication() }) };
     },
     authorProof: plan => proveAuthoredGrid(shard, payload.assets, ports,
-      { ticks: plan.tape.length, checkpointTick: plan.checkpointTick, requiredFacts: plan.requiredFacts },
+      { ticks: plan.tape.length, checkpointTick: plan.checkpointTick, requiredFacts: plan.requiredFacts, ...(plan.requiredItems === undefined ? {} : { requiredItems: plan.requiredItems }) },
       (tick, resident) => {
         const input = plan.tape[tick]; if (input === undefined) throw new Error('Missing author tape tick');
         const numeric = new Map<string, number>(); let player: SimCommand | undefined;
         for (const command of input) {
           if (command.kind === 'player') { if (player !== undefined) throw new Error('Multiple player commands'); player = simPlayerCommand(command); }
           else if(command.kind==='launcher')throw new Error('Launcher input requires a native bolt owner');
-        else if (command.kind === 'interact') resident.interact(command.id);
+        else if (command.kind === 'interact') {
+            // F27: a refused id names its tape tick, so an author finds the row
+            try { resident.interact(command.id); } catch (error) { throw new Error(`tape tick ${String(tick)}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+          }
           else if (command.kind === 'script') { if (!resident.actors.has(command.actorId)) throw new Error('Unknown command actor'); numeric.set(command.actorId, command.value); }
           else { if (resident.lane === undefined) throw new Error('Event requires a script lane'); resident.lane.enqueue({ type: command.type, target: command.target, value: command.value }); }
         }

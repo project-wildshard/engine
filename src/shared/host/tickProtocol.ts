@@ -78,6 +78,8 @@ export const AuthorProofPlanSchema: v.GenericSchema<BoundedAuthorProofPlanInput,
   tape: v.pipe(v.array(v.pipe(v.array(TickCommandSchema), v.maxLength(1024))), v.minLength(1), v.maxLength(4096)),
   checkpointTick: v.pipe(natural, v.minValue(1)),
   requiredFacts: v.pipe(v.array(text), v.minLength(1), v.maxLength(128)),
+  // F27: stacks the players' packs must hold when the tape ends (item id to at least this many, summed over packs)
+  requiredItems: v.exactOptional(v.pipe(v.record(text, v.pipe(natural, v.minValue(1))), v.check(rows => Object.keys(rows).length <= 128, 'At most 128 required items'))),
 }), v.check(plan => plan.checkpointTick <= plan.tape.length && new Set(plan.requiredFacts).size === plan.requiredFacts.length, 'Checkpoint inside tape and distinct required facts'));
 /** Author-owned input; the host derives every filed fact from real quest completion. */
 export type AuthorProofPlan = v.InferOutput<typeof AuthorProofPlanSchema>;
@@ -88,6 +90,8 @@ export const AuthorProofReportSchema: v.GenericSchema<BoundedAuthorProofReportIn
     restored: v.literal(true), frozenTicks: v.literal(5), loads: v.literal(2), leasesAfterDispose: v.literal(0) }),
   ledger: v.strictObject({ facts: v.pipe(v.array(v.strictObject({ name: text, actorId: text, tick: natural })), v.maxLength(1024)),
     granted: natural, durableReload: v.literal(true), duplicateStable: v.literal(true) }),
+  // F27: every native pack's stacks when the tape ends, by pack id
+  inventory: v.pipe(v.record(text, v.pipe(v.record(text, v.pipe(finite, v.minValue(0))), v.check(rows => Object.keys(rows).length <= 1024, 'Bounded pack'))), v.check(rows => Object.keys(rows).length <= 64, 'Bounded packs')),
 });
 /** Detached evidence: booleans are published only after the native assertions succeed. */
 export type AuthorProofReport = v.InferOutput<typeof AuthorProofReportSchema>;
@@ -210,6 +214,7 @@ interface BoundedAuthorProofPlanFields {
     tape: BoundedTickCommand[][];
     checkpointTick: number;
     requiredFacts: string[];
+    requiredItems?: Record<string, number>;
 }
 type BoundedAuthorProofPlan = { [Key in keyof BoundedAuthorProofPlanFields]: BoundedAuthorProofPlanFields[Key] };
 type BoundedAuthorProofReportInput = BoundedAuthorProofReport;
@@ -236,6 +241,7 @@ interface BoundedAuthorProofReportFields {
         durableReload: true;
         duplicateStable: true;
     };
+    inventory: Record<string, Record<string, number>>;
 }
 type BoundedAuthorProofReport = { [Key in keyof BoundedAuthorProofReportFields]: BoundedAuthorProofReportFields[Key] };
 type BoundedWorkerRequestInput = BoundedWorkerRequest;

@@ -1306,6 +1306,7 @@
     "src/server/game/shardfile/declaredClimate.ts": "server",
     "src/server/game/shardfile/declaredKitItems.ts": "server",
     "src/server/game/shardfile/declaredTalks.ts": "server",
+    "src/server/game/shardfile/talkPress.ts": "server",
     "src/server/game/shardfile/groupRuntime.ts": "server",
     "src/server/game/shardfile/homeKeeper.ts": "server",
     "src/server/game/shardfile/installedSides.ts": "server",
