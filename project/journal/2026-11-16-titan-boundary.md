@@ -27,3 +27,10 @@ order; the native slope/wall test owns collision results. The statue
 restore helper now prepares chapters before restore, as openWorld does.
 The armed-room digest now includes the King's new native contact pose
 and complete view continuation; its unarmed wire/body oracle is intact.
+
+FIXFWD publication for main run 43969009665: the clean recovery gate
+passes the Nalati controls (176 of 177 files, 815 cases), but fails
+mmo-release-observer's unrelated "Missing durable loss control".
+J381 SKIP_CHECK=1 publishes the prepared fix after this normal gate;
+record the escape and the failure in the receipt. The forward fixer
+owns that observer red. No Nalati assertion or budget is weakened.
