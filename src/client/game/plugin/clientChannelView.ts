@@ -2,8 +2,8 @@
 // generators so their initial poses and instance matrices cannot drift.
 import { BufferAttribute, BufferGeometry, InstancedMesh, Material, Matrix4, Mesh, Object3D, Quaternion, Vector3 } from 'three';
 import { compileTubeCurve, parseClientChannels, type ClientChannelProgram } from '@wildshard/format/clientChannels';
-import type { MoverPose } from '@wildshard/engine/physics/mover';
 import { createClientChannels, type ClientTubeFrame, type ClientConnectorFrame, type ClientChannelObservation } from '../../../shared/game/plugin/channels';
+import * as moverPose from '@wildshard/format/moverPose';
 
 function clientInstance(value: unknown): value is InstancedMesh {
   return value instanceof InstancedMesh && value.geometry instanceof BufferGeometry
@@ -117,19 +117,5 @@ export function createClientChannelView(input: unknown, targets: ReadonlyMap<str
     ...(lane.connectors === undefined ? {} : { connectors: lane.connectors }) });
 }
 
-/** Copy only the fixed mover ABI's published observations, never its world or module memory. */
-export function moverChannelValues(reads: readonly string[], pose: MoverPose, fields: Readonly<Record<number, number>>): number[] {
-  return reads.map(read => {
-      if (read === 'enabled') return Number(pose.enabled);
-      if (read.startsWith('position.')) {
-        const axis = read.slice(9); if (axis === 'x' || axis === 'y' || axis === 'z') return pose.position[axis];
-      }
-      if (read.startsWith('euler.')) {
-        const axis = read.slice(6); if (axis === 'x' || axis === 'y' || axis === 'z') return pose.euler[axis];
-      }
-      const field = /^field\.([1-6])$/u.exec(read), key = field?.[1];
-      const value = key === undefined ? undefined : fields[Number(key)];
-      if (value === undefined) throw new Error('Missing copied mover field');
-      return value;
-  });
-}
+/** Copy only the fixed mover ABI's published observations, never its world or module memory: format's (SDK-SPLIT SP5c). */
+export const moverChannelValues: typeof moverPose.moverChannelValues = moverPose.moverChannelValues;

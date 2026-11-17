@@ -1,4 +1,5 @@
 import { readWholePartition } from '../shardfile/wholeGeometryPieces';
+import type { WholeGeometryPiece as FormatWholeGeometryPiece } from '@wildshard/format/wholePartition';
 import { materialColourGraph } from '@wildshard/engine/render/graph/colourFunction';
 import { isJsonData } from '@wildshard/format/json';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
@@ -1746,10 +1747,8 @@ export interface WholeGeometryView {
 }
 /** A verified subset of one original draw. Ordinals identify its exact source
  * vertices and triangles; completeness belongs to the full-model reader. */
-export interface WholeGeometryPiece extends WholeGeometryView {
-  readonly part: string; readonly vertices: readonly number[]; readonly triangles: readonly number[];
-  readonly vertexCount: number; readonly indexCount: number; readonly layout: string;
-}
+/** format's piece shape over three's geometry and matrix (SDK-SPLIT SP5b) */
+export interface WholeGeometryPiece extends FormatWholeGeometryPiece<BufferGeometry, Matrix4>, WholeGeometryView {}
 class WholeGeometryAssembler {
   private readonly groups = new Map<string, { output: BufferGeometry; matrix: Matrix4; seen: Uint8Array; triangles: Uint8Array; layout: string }>();
   add(node: Mesh, ownership: 'borrow' | 'take' = 'borrow'): void {

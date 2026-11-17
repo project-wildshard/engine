@@ -15,6 +15,7 @@ import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { GRID_HAZE, type FarLookRuntime } from '../../../shared/game/grid/farProxy';
 import { NEAR_GRAIN_SIZE, nearGrainBytes } from './nearGrain';
 import { installFarImpostor, type FarImpostorData } from './farImpostorView';
+import * as roadLight from '@wildshard/format/roadLight';
 
 /**
  * SF23 / G90: how far (m) the foot of a proxy's border skirt steps in from the cell edge. The skirt keeps its top on the
@@ -36,7 +37,7 @@ export const FAR_STRATA = { bed: 3.8, contrast: 0.19, block: 11, fade: [1200, 22
  * shard brings its sky light), so every shaded cliff drew as a pitch-black 100 m slab beside the road; with the floor a
  * shaded face is the rock's own colour dimmed (×0.8) and a sunlit one only slightly brighter than before.
  */
-export const FAR_CLIFF_FLOOR = 0.8;
+export const FAR_CLIFF_FLOOR: typeof roadLight.FAR_CLIFF_FLOOR = roadLight.FAR_CLIFF_FLOOR;
 
 /**
  * G342 near round 5 (sp-o67's open row 2: a surface finer than per-vertex colour): the near placeholder's grain. Its

@@ -3,13 +3,14 @@ import { MathUtils, Vector3 } from "three";
 import * as v from "valibot";
 import * as npcs from '@wildshard/format/npcs';
 import * as graphContracts from '@wildshard/format/questGraph';
+import * as interactTable from '@wildshard/format/interactTable';
 
 import type { NpcDef } from "@wildshard/engine/quest/core";
 import type { SimHost } from "@wildshard/engine/sim";
 import { DeclaredQuests } from "../quest/declared";
 import { questBooks } from '@wildshard/engine/quest/players';
-import { playerInteractionRules, bindHeadlessPrompts, createHeadlessPromptPicker, type HeadlessPrompt, type PromptRegistration, eyeReaches, installInteractionRows, InteractionRules, parseInteractionRows, type InteractionRowsData, type InteractionSpot } from "../quest/interactionRows";
-import { autoFlag, type InteractTable } from "@wildshard/engine/world/interact/types";
+import { playerInteractionRules, bindHeadlessPrompts, createHeadlessPromptPicker, type HeadlessPrompt, type PromptRegistration, eyeReaches, installInteractionRows, InteractionRules, type InteractionRowsData, type InteractionSpot } from "../quest/interactionRows";
+import type { InteractTable } from "@wildshard/engine/world/interact/types";
 import { bindInteractionState, type Flags } from "@wildshard/engine/world/interact/flags";
 import type { QuestData } from "@wildshard/format/quests";
 import { NativeQuestProps } from '../quest/nativeProps';
@@ -234,21 +235,9 @@ export function installQuestGraph(host: SimHost, rows: QuestGraphRows, ports: Qu
     } };
 }
 
-/** Compile the flag effects of latched levers, pickups and benches from the engine's authored table. Geometry, inventory,
- * sitting, prompt ordering and LOS remain with their existing owners; unsupported kinds refuse instead of losing effects. */
-export function compileQuestTable(table: InteractTable, bindings: readonly { readonly id: string; readonly act: number }[]): InteractionRowsData {
-  return parseInteractionRows({ marks: [], rows: bindings.map(binding => {
-    const matches = table.rows.filter(row => row.id === binding.id), row = matches[0];
-    if (matches.length !== 1 || row === undefined || !(row.kind === 'pickup' || row.kind === 'bench' || row.kind === 'lever' && row.latch === true)) {
-      throw new Error(`Unsupported quest table action ${binding.id}`);
-    }
-    const flag = autoFlag(row);
-    if (flag === null) throw new Error(`Missing quest table flag ${binding.id}`);
-    const needs = [...(row.showWhen === undefined ? [] : [row.showWhen]), ...(row.requires === undefined ? [] : [row.requires]),
-      ...(row.kind === 'bench' ? [] : [{ none: [flag] }])];
-    return { id: row.id, act: binding.act, at: row.id, needs, sets: [flag, ...(row.kind === 'lever' ? [] : row.sets ?? [])] };
-  }) });
-}
+/** Compile the flag effects of latched levers, pickups and benches from the engine's authored table: format's law
+ * (SDK-SPLIT SP5c). Unsupported kinds refuse instead of losing effects. */
+export const compileQuestTable: typeof interactTable.compileQuestTable = interactTable.compileQuestTable;
 
 /** Preflight table/spot identity before borrowing the native interaction states.
  * Each value retains its actual captured spot. Iteration follows the table's

@@ -1,10 +1,10 @@
 import { BufferAttribute, BufferGeometry, Float16BufferAttribute, InterleavedBufferAttribute, type Mesh, type TypedArray } from 'three';
 import * as v from 'valibot';
+import * as channelLaw from '@wildshard/format/nativeGeometryChannels';
 
-/** Portable accessor metadata for one original typed application channel. */
-export const NativeAttributeSchema: v.GenericSchema<BoundedNativeAttributeInput, BoundedNativeAttribute> = v.strictObject({ semantic: v.string(), storage: v.picklist(['Float32Array', 'Float16Array', 'Uint16Array', 'Uint32Array', 'Int16Array', 'Int8Array', 'Uint8Array']), normalized: v.boolean(), itemSize: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(4)) });
-/** Original application channel names mapped to their exact stored accessors. */
-export const NativeAttributesSchema: v.GenericSchema<BoundedNativeAttributesInput, BoundedNativeAttributes> = v.record(v.string(), NativeAttributeSchema);
+/** The stored channel table: format's law (SDK-SPLIT SP5b), the identical defining format schemas. */
+export const NativeAttributeSchema: typeof channelLaw.NativeAttributeSchema = channelLaw.NativeAttributeSchema;
+export const NativeAttributesSchema: typeof channelLaw.NativeAttributesSchema = channelLaw.NativeAttributesSchema;
 const semantics: Readonly<Record<string, string>> = { POSITION: 'position', NORMAL: 'normal', COLOR_0: 'color', TEXCOORD_0: 'uv', TANGENT: 'tangent' };
 
 /** iPhone downloads I3: a padded channel (a 16-bit grid position has an 8-byte stride) reads back interleaved; its stored
@@ -95,20 +95,3 @@ export function restoreDrawnChannels(node: Mesh): void {
     if (channel !== name) geometry.deleteAttribute(channel);
   }
 }
-
-/** Complete admitted data, independent of validator implementation metadata. */
-type BoundedNativeAttributeInput = BoundedNativeAttribute;
-interface BoundedNativeAttributeFields {
-    semantic: string;
-    storage: "Float32Array" | "Float16Array" | "Uint16Array" | "Uint32Array" | "Int16Array" | "Int8Array" | "Uint8Array";
-    normalized: boolean;
-    itemSize: number;
-}
-type BoundedNativeAttribute = { [Key in keyof BoundedNativeAttributeFields]: BoundedNativeAttributeFields[Key] };
-type BoundedNativeAttributesInput = BoundedNativeAttributes;
-type BoundedNativeAttributes = Record<string, {
-        semantic: string;
-        storage: "Float32Array" | "Float16Array" | "Uint16Array" | "Uint32Array" | "Int16Array" | "Int8Array" | "Uint8Array";
-        normalized: boolean;
-        itemSize: number;
-    }>;

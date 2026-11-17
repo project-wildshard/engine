@@ -250,7 +250,7 @@ export interface ChunkForest {
   /** how each species of the set is planted, in draw order (needed with `species`; E405: the level's own) */
   speciesTraits?: readonly TreeSpeciesTraits[];
   /**
-   * The understory (src/shared/engine/world/forest/placement.ts placeUndergrowth; PINE-HOLLOW PH-L8): × the fern and shrub caps (and their
+   * The understory (shard-pine-hollow src/generators/floorPlacements.ts; PINE-HOLLOW PH-L8): × the fern and shrub caps (and their
    * candidate counts); `fernCanopy` lets ferns fill the dense shade outside the fern-cluster noise (≥ 5 trunks in 12 m).
    * Omitted = the engine's counts.
    */

@@ -2,11 +2,12 @@ import { Euler, Quaternion } from 'three';
 import type { Physics } from './Physics';
 import { groups } from './groups';
 import { tagCollider, tagOf } from './surface';
+import type * as moverPose from '@wildshard/format/moverPose';
 
-/** Local boxes for a script-owned platform; the physics layer alone constructs Rapier descriptors. */
-export interface MoverBox { x: number; y: number; z: number; hx: number; hy: number; hz: number; rot: { x: number; y: number; z: number; w: number } }
-/** Published mover pose, in the world's local frame; Euler order is always YXZ. */
-export interface MoverPose { position: { x: number; y: number; z: number }; euler: { x: number; y: number; z: number }; enabled: boolean }
+/** A script-owned platform's local boxes and its published pose (Euler order YXZ): format's (SDK-SPLIT SP5c); the physics
+ *  layer alone constructs Rapier descriptors. */
+export type MoverBox = moverPose.MoverBox;
+export type MoverPose = moverPose.MoverPose;
 /** A kinematic deck moves before the world step and carries the existing CharacterMotor without another collision path. */
 export class KinematicMover {
   readonly body: ReturnType<Physics['world']['getRigidBody']>;

@@ -6,8 +6,9 @@ export const CHUNK_HALF: number = contentBounds.CHUNK_HALF;
 /** The page camera's vertical field of view at boot (degrees): what a level draws with until a weapon of its kit writes its own. */
 export const CAMERA_FOV = 72;
 export const CHUNK_DEPTH = 100;       // metres of rock under the surface (the floating slab)
-export const ROAD_WIDTH = 15;         // entry road at each edge midpoint
-export const ROAD_LENGTH = 60;        // must be >= 50m into the chunk
+/** The entry road's width and how far it runs in (metres): format's grid law (SDK-SPLIT SP5a). */
+export const ROAD_WIDTH: number = contentBounds.ROAD_WIDTH;
+export const ROAD_LENGTH: number = contentBounds.ROAD_LENGTH;
 /** Legal midpoint entry opening, independent from the boulevard's width (metres). */
 export const ENTRY_WIDTH: 8 = contentBounds.ENTRY_WIDTH;
 /** Neutral platform asphalt reserved inside each legal midpoint entry (metres). */

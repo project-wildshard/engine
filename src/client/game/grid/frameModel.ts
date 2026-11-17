@@ -15,6 +15,8 @@
  *   way round the day.
  */
 
+import * as roadLight from '@wildshard/format/roadLight';
+
 /** How wide (m) the frame's blend is at the cell edge, centred on the line: 8 m in, 8 m out. */
 export const FRAME_BAND = 16;
 
@@ -45,13 +47,7 @@ export const HIGHWAY_LOOK: { readonly grade: RegionGrade; readonly fogDesaturate
  * - `sun`: the key light (compass degrees, its colour, its intensity) and the glow it puts in the dome;
  * - `hemi`, `env`, `fogSun`: the fill, the environment's intensity and the fog's in-scatter colour under it.
  */
-export const ROAD_SKY = {
-  air: [0.95, 0.56, 0.44] as const, mid: [0.58, 0.46, 0.8] as const, zenith: [0.1, 0.24, 0.72] as const,
-  line: [0.25, 1.1, 1.4] as const, grid: [0.3, 0.85, 1.1] as const, gridStrength: 0.3, void: [0.17, 0.17, 0.27] as const,
-  sun: { azimuth: 70, elevation: 13, colour: [1, 0.8, 0.66] as const, intensity: 2.4, glow: [1, 0.62, 0.42] as const },
-  hemi: { sky: [0.6, 0.62, 0.86] as const, ground: [0.42, 0.36, 0.34] as const, intensity: 1.1 },
-  env: 0.7, fogSun: [1, 0.72, 0.56] as const,
-} as const;
+export const ROAD_SKY: typeof roadLight.ROAD_SKY = roadLight.ROAD_SKY;
 
 /** A grade with every field present (the frame's blended grade). */
 export interface FullGrade { readonly exposure: number; readonly saturation: number; readonly contrast: number; readonly tint: readonly [number, number, number] }
