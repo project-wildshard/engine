@@ -12,3 +12,6 @@ Three real Vitest files share a barrier in the dispatch proof. The old
 config peaked at two and failed. The new config reaches three ordinary,
 one native and two legacy workers. Widths zero and four fail before any
 file starts. Every owned process group is drained.
+
+The packed workflow's planner proof unit runs these dispatch controls
+with the same Vitest configuration as an ordinary CI shard.

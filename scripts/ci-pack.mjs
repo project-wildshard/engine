@@ -102,7 +102,7 @@ function commandOf(unit,charged){
   if(unit.name==='static')return {command:['bash','scripts/ci-static.sh',process.env.CI_STATIC_MODE??'code'],env};
   if(unit.name==='e2e')return {command:['bash','-c','bash scripts/ci-playwright-install.sh --only-shell chromium && pnpm test:e2e && node --test test/title-layout-browser.proof.mjs test/settings-tabs-browser.proof.mjs'],env};
   if(unit.name==='plan-proofs')return {command:['bash','-c',['node scripts/engine-ci-membership-proof.ts','node scripts/engine-order-proof.mjs','node scripts/module-cache-proof.mjs',
-    'python3 scripts/cpu-census-proof.py','node scripts/engine-ci-proof.mjs','node scripts/engine-ci-proof.mjs tmp/engine-ci-budget-proof --import','node scripts/ci-shard-wall-proof.mjs'].join(' && ')],env};
+    'python3 -I scripts/engine-ci-width-proof.py','python3 scripts/cpu-census-proof.py','node scripts/engine-ci-proof.mjs','node scripts/engine-ci-proof.mjs tmp/engine-ci-budget-proof --import','node scripts/ci-shard-wall-proof.mjs'].join(' && ')],env};
   if(unit.name==='quarantine')return {command:['node','scripts/test-quarantine.mjs','--shard=1/1'],env};
   // BROWSER-TESTS-BENCH BB2 (J231): Chromium installs in the background while Ring 1 cooks and builds.
   if(unit.name==='products')return {command:['bash','-c','bash scripts/ci-browser.sh start && bash scripts/ring1.sh cook-step && bash scripts/ring1.sh build && bash scripts/ci-browser.sh wait && bash scripts/ring1.sh boot'],env};
