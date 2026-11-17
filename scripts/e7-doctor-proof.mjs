@@ -4,6 +4,7 @@ import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from 'playwright';
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {PRIVATE_HEALTH_SKIPPED,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
+import {doctorRowsOK} from './doctor-proof-rows.mjs';
 import {SOCKET_READY,SOCKET_RELIABLE,SOCKET_PING} from '../src/shared/engine/net/socketFrames.ts';
 
 const [base,build,key]=process.argv.slice(2),human=process.argv.includes('--human-static'),origin=new URL(base).origin;
@@ -47,15 +48,12 @@ if(human){console.log('PASS human Doctor static publication',JSON.stringify({bui
    await page.goto(new URL('/?doctor',base).href,{waitUntil:'load',timeout:90000});await page.waitForURL(url=>url.pathname==='/doctor/',{timeout:15000});
    await page.locator('#ws-doctor:not([data-running])[data-verdict]').waitFor({timeout:120000});
    const rows=await page.locator('.ws-doc-row').evaluateAll(nodes=>nodes.map(node=>{if(!(node instanceof HTMLElement))throw new Error('Doctor row must be an HTML element');return{id:node.dataset.check,state:node.dataset.state,value:node.querySelector('.ws-doc-value')?.textContent,ms:node.querySelector('.ws-doc-ms')?.textContent};}));
-   assert.deepEqual(rows.map(row=>row.id),['page','release','packs','server','join','latency','browser']);// SB20 (336f2cb1): on rooms-staging the page skips the private health; Join proves the door. That row is a skip, every other a pass.
-   const privateServer=new URL(socket).host==='rooms-staging.wildshard.io';
-   assert.ok(rows.every(row=>row.state==='pass'||(privateServer&&row.id==='server'&&row.state==='skip')),JSON.stringify(rows));
+   assert.ok(doctorRowsOK(rows,socket),JSON.stringify(rows));
    const serverRow=rows.find(row=>row.id==='server')?.value??'';
    // D7: on rooms-staging the page can't read /health, so the row says reachable; the tailnet health reads before and after prove the build.
-   if(privateServer)assert.ok(['rooms-staging.wildshard.io reachable · health is private','rooms-staging.wildshard.io · health is private, Join checks the door'].includes(serverRow),serverRow);
-   else assert.ok(serverRow.includes(build.slice(0,7)),'Opaque reachability cannot replace a matching server');
+   if(new URL(socket).host!=='rooms-staging.wildshard.io')assert.ok(serverRow.includes(build.slice(0,7)),'Opaque reachability cannot replace a matching server');
    await page.getByRole('button',{name:'Copy report',exact:true}).click();await page.getByRole('button',{name:'Copied',exact:true}).waitFor({timeout:5000});
-   const copied=await page.evaluate(()=>navigator.clipboard.readText());const reportAt=Date.parse(/^Wildshard connection doctor · ([^\n]+)/u.exec(copied)?.[1]??'');assert.ok(reportAt>=started&&reportAt<=Date.now(),'Clipboard must contain this run’s fresh native report');assert.ok(copied.includes(`build ${build}`));assert.ok(copied.includes('result all pass'));for(const row of rows)assert.ok(copied.includes(`${String(row.id)} · ${String(row.state)}`));
+   const copied=await page.evaluate(()=>navigator.clipboard.readText());const reportAt=Date.parse(/^Wildshard connection doctor · ([^\n]+)/u.exec(copied)?.[1]??'');assert.ok(reportAt>=started&&reportAt<=Date.now(),'Clipboard must contain this run’s fresh native report');assert.ok(copied.includes(`build ${build}`));assert.ok(copied.includes('result all pass'));for(const row of rows)assert.ok(copied.includes(`${row.id} · ${row.state}`));
    assert.equal(prefixes.filter(prefix=>prefix===SOCKET_RELIABLE).length,1);assert.equal(prefixes.includes(SOCKET_READY),false);assert.ok(prefixes.some(prefix=>prefix===SOCKET_PING));assert.ok(prefixes.every(prefix=>prefix===SOCKET_RELIABLE||prefix===SOCKET_PING));
    await context.close();
    // D7: the page's own fetch of the private rooms /health is a 404 with no CORS header; exactly those lines are listed, not failed.

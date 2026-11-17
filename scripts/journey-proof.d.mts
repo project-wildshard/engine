@@ -2,7 +2,7 @@ import type { Page } from 'playwright';
 
 /** What the player sees at one sample (scripts/journey-proof.mjs `screenNow`). */
 export interface Screen {
-  readonly doc: number; readonly path: string;
+  readonly doc: number | string; readonly origin?: number; readonly path: string;
   readonly shell: boolean; readonly title: boolean; readonly select: boolean;
   readonly loading: boolean; readonly bar: boolean; readonly hud: boolean; readonly modal: boolean;
 }

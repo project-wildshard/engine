@@ -1,0 +1,7 @@
+# Release proof identity and private health
+
+v32 staging96 reached play in every J386 run, but warm WebKit was judged to have changed documents while still at Shard Select. The proof used rounded performance.timeOrigin as identity and retained only screen labels, so its report cannot distinguish clock variation from navigation. Test-first counterexamples show that the same document can be misclassified and a new document at the same rounded origin can be missed. Give each sampled Document a private stable token, retain the raw origin as diagnostic data and save full samples. Actual replacement documents still fail the same judge; do not excuse the original failed gate until fresh native evidence is reviewed.
+
+The Doctor native witness has six pass rows and an explicit private-health skip. The proof expected all seven pass, contrary to the current app contract. Accept only that exact private-health reason on the staging host; join, packs, release, page, latency and browser must all pass. Keep the independent private health build/serial checks and verify the clipboard's real per-row state. A captured-witness test failed before the predicate change; tampered states and reasons still fail.
+
+Settings proof opacity handling is scratch-only. No deployed application bytes or release branch are changed by these proof fixes. Original logs and screenshots remain in codex-ms-v032, production stays v31 pending all corrected native gates.

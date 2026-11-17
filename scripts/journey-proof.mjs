@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 
 /** @typedef {import('playwright').Page} Page */
-/** @typedef {{ doc: number, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean }} Screen */
+/** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean, origin?: number }} Screen */
 /** @typedef {{ t: number, s: Screen | null }} Sample */
 /** @typedef {{ at: number, text: string }} Problem */
 
@@ -22,9 +22,13 @@ export const PHONE = Object.freeze({
   userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Mobile/15E148 Safari/604.1',
 });
 
-/** Runs in the page: what the player sees right now. Plain DOM reads only, so it works on any build (no harness probe).
+/** Runs in the page: what the player sees right now. No app probes; a private document identity distinguishes actual navigation from clock rounding.
  * @returns {Screen} */
 export function screenNow() {
+  // A rounded clock is not a document identity. A replacement document gets a new token even if its rounded origin matches.
+  const key = Symbol.for('wildshard.journey.document'), held = Reflect.get(document, key);
+  const doc = typeof held === 'string' ? held : crypto.randomUUID();
+  if (held === undefined) Object.defineProperty(document, key, { value: doc });
   /** @param {Element} el */
   const seen = (el) => {
     const rect = el.getBoundingClientRect();
@@ -41,7 +45,7 @@ export function screenNow() {
   const load = [...document.querySelectorAll('.ws-load:not(.hide)')].find(seen);
   const loadHeight = load === undefined ? 0 : load.getBoundingClientRect().height;
   return {
-    doc: Math.round(performance.timeOrigin), path: location.pathname + location.search,
+    doc, origin: performance.timeOrigin, path: location.pathname + location.search,
     shell: shown('[data-title-shell]'), title: shown('.ws-main:not(.hide)'), select: shown('.ws-menu:not(.hide)'),
     loading: load !== undefined && loadHeight >= innerHeight * 0.8, bar: load !== undefined && loadHeight < innerHeight * 0.8,
     hud: shown('.ws-touch') || shown('.ws-minimap'), modal: shown('#wsdrop, .ws-err, .ws-fail'),
@@ -234,7 +238,7 @@ async function cli() {
         const path = [];
         for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t)}:${l}`); }
         const ok = problems.length === 0;
-        report.push({ browser: name, run, ok, problems, path: path.join(' '), errors });
+        report.push({ browser: name, run, ok, problems, path: path.join(' '), errors, samples });
         if (!ok) failed = true;
         console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${run}: ${path.join(' ')}`);
         for (const p of problems) console.log(`  - ${String(p.at)} ms: ${p.text}`);
