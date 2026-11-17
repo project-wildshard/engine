@@ -21,6 +21,7 @@ import { firstPartyInstance } from '../../../shared/game/grid/instances';
 import { game } from '../shard/registry';
 import { installShards, shards } from '../shard/list';
 import type { ShardManifest } from '../shard/manifest';
+import { dataPointer, hybridPointer } from '../shard/pointer';
 import { toLevelSpec } from '../shard/spec';
 import { shardFromDiscovery } from '../shard/discovery';
 import { ownInlineCandidate } from './inlineOwner';
@@ -56,9 +57,9 @@ export interface PageResidencyBoot {
 /** GC13: the page's playing envelope: the phone tier's 1.0 GB (G65), else the shared caps' */
 export function pagePlayingBytes(tier: Tier = TIER): number { return tier === 'phone' ? PHONE_PLAYING_BYTES : CONTENT_CAPS.playing; }
 
-export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'shardfile' | 'runtimeCost'>, configuredSlug?: string, memory: MemoryAdmission = new PageMemoryAdmission()): PageResidencyBoot {
+export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'shardfile' | 'gridShardfile' | 'clientPlanRuntime' | 'runtimeCost'>, configuredSlug?: string, memory: MemoryAdmission = new PageMemoryAdmission()): PageResidencyBoot {
   const mode = bootPageMode(configuredSlug ?? manifest.slug);
-  const measuredHome = configuredSlug === undefined && manifest.shardfile === undefined;
+  const measuredHome = configuredSlug === undefined && dataPointer(manifest) === undefined;
   if (mode !== 'grid' && (!measuredHome || manifest.runtimeCost === undefined)) return { mode, instance: null, memory };
   const instance = mode === 'grid' ? pageGridInstance() : manifest.slug;
   if (instance === null) throw new Error('Grid residency requires the consumed home instance');
@@ -162,8 +163,9 @@ export async function inlineHybridArrival(source: Shardfile, options: Pick<Folde
   if (typeof load !== 'object' || load === null || Reflect.get(load, '$call') !== 'planEntry') throw new Error('Inline hybrid requires its discovery client-plan entry');
   const manifest = discover(document), discoveredIdentity = manifest.slug.replace(/^_/u, '');
   if (discoveredIdentity !== folder) throw new Error('Inline hybrid discovery identity differs');
-  const descriptor = manifest.gridShardfile === undefined ? undefined : new URL(manifest.gridShardfile, options.base);
-  if (manifest.shardfile !== undefined || descriptor === undefined || descriptor.origin !== url.origin
+  // OF8: the hybrid names its descriptor once, as `shardfile` or (until M9) `gridShardfile`; naming both is refused.
+  const pointer = manifest.gridShardfile ?? manifest.shardfile, descriptor = pointer === undefined ? undefined : new URL(pointer, options.base);
+  if (manifest.shardfile !== undefined && manifest.gridShardfile !== undefined || descriptor === undefined || descriptor.origin !== url.origin
     || descriptor.pathname !== `/shardfiles/${folder}/shard.json` || descriptor.search !== '' || descriptor.hash !== '') {
     throw new Error('Inline hybrid discovery must name its own same-origin descriptor');
   }
@@ -186,11 +188,12 @@ function selectSource(source: ShardManifest, firstParty: boolean): ShardManifest
  * A trusted preparation barrier may overlap admission, but precedes every live binding and publication. */
 export async function installManifestShardfile(manifest: ShardManifest, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
-  if (manifest.shardfile === undefined) {
+  const hybrid = hybridPointer(manifest);
+  if (manifest.shardfile === undefined || hybrid !== undefined) {
     // Transitional entries bootstrap their native terrain before admitting the world plugin.
     // Read only the receipted header here; never retain an admission or pin its transport to the page owner.
-    if (!options.firstParty || manifest.gridShardfile === undefined) return manifest;
-    const url = new URL(manifest.gridShardfile, options.base);
+    if (!options.firstParty || hybrid === undefined) return manifest;
+    const url = new URL(hybrid, options.base);
     if (url.origin !== new URL(options.base).origin || url.search !== '' || url.hash !== '') throw new Error('Manifest shardfile must be an unqualified same-origin source');
     const source = await readFolderDescriptor({ ...options, base: new URL('.', url).href, descriptorPath: url.pathname });
     const { slug: authoredIdentity } = source.identity, expectedIdentity = manifest.slug.replace(/^_/u, '');

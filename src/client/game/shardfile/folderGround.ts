@@ -5,6 +5,7 @@ import { clientGround } from '../../../shared/game/shardfile/clientGround';
 import { firstPartyDescriptor, runtimeFolder, slugRuntimeFolder, type RuntimeFolder } from './runtimeFolder';
 import { selectedLevel } from '@wildshard/engine/level/selection';
 import { findShard } from '../shard/registry';
+import { hybridPointer } from '../shard/pointer';
 
 /**
  * The game session's required-ground loader (E434: `startSession` installs it; importing this module installs nothing). A
@@ -33,7 +34,7 @@ export function installFolderGround(): () => void {
  *  only for the selected level of a compiled client page entered as its shardfile (keyed by its slug). */
 export function standaloneHybrid(key: string): Promise<RuntimeFolder> | null {
   const manifest = findShard(key);
-  if (manifest?.gridShardfile === undefined || manifest.clientPlanRuntime !== true || selectedLevel()?.id !== key) return null;
+  if (manifest === undefined || hybridPointer(manifest) === undefined || manifest.clientPlanRuntime !== true || selectedLevel()?.id !== key) return null;
   return firstPartyDescriptor(key).then(runtimeFolder);
 }
 

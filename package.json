@@ -1073,6 +1073,7 @@
     "./game/systems/audio/silentScore": "./src/client/game/systems/audio/silentScore.ts",
     "./game/quest/interactionRows": "./src/shared/game/quest/interactionRows.ts",
     "./game/shard/titleList": "./src/client/game/shard/titleList.ts",
+    "./game/shard/pointer": "./src/client/game/shard/pointer.ts",
     "./game/shard/list": "./src/client/game/shard/list.ts",
     "./game/plugin/bakedGeometry": "./src/client/game/plugin/bakedGeometry.ts",
     "./game/plugin/geometry": "./src/client/game/plugin/geometry.ts",

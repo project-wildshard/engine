@@ -57,6 +57,7 @@ import { installGridTravellerCombat } from '../../../shared/game/grid/travellerC
 import { gridHomeSim, gridCells, type GridHomeSimulation } from '../plugin/context';
 import { gateEnters } from './cellPresence';
 import { findShard } from '../shard/registry';
+import { hybridPointer } from '../shard/pointer';
 import { gridPostCosts, gridShardfileFolder, prioritizeGridFolder, type GridFolderMetadata } from './folders';
 import { preparationAdmission, type GridAdmissionMetadata } from './preparationAdmission';
 import { gridPostPairRefusal } from '../../../shared/game/grid/postPairs';
@@ -683,7 +684,7 @@ export class LiveGridSession {
 
   private bundle(cell: GridCell): ReadinessBundle {
     const manifest = findShard(cell.slug);
-    if (manifest?.gridShardfile !== undefined && manifest.clientPlanRuntime === true) return { criticalWireBytes: 2_000_000, hybridWireBytes: 2_000_000, decodeSeconds: 1, runtimeParseSeconds: 1 };
+    if (manifest !== undefined && hybridPointer(manifest) !== undefined && manifest.clientPlanRuntime === true) return { criticalWireBytes: 2_000_000, hybridWireBytes: 2_000_000, decodeSeconds: 1, runtimeParseSeconds: 1 };
     return { criticalWireBytes: findShard(cell.slug)?.shardfile === undefined ? 0 : 2_000_000, hybridWireBytes: 0, decodeSeconds: 1, runtimeParseSeconds: 0 };
   }
 

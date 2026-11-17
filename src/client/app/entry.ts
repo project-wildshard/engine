@@ -2,6 +2,7 @@
 import '@wildshard/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-unassigned-import -- evaluated for its effect: the app identity is installed before any other module body runs (E414)
 import './identity';
+import { dataPointer } from '@wildshard/engine/game/shard/pointer';
 import { findTitleManifest, installTitleManifests, readTitleRows, titleManifests, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
 import { bareSlug, installedCatalogue, installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
@@ -638,7 +639,7 @@ async function startSelected(): Promise<void> {
     if (path === 'shardfile') modules('client');
     if (path === 'grid') modules('grid');
     // Hybrid shardfile entries retain real TypeScript stages until their page is data-only.
-    loading.setPath(loadingPath(path, game.shard.boot?.steps, path === 'shardfile' && source === null && game.shard.shardfile === undefined));
+    loading.setPath(loadingPath(path, game.shard.boot?.steps, path === 'shardfile' && source === null && dataPointer(game.shard) === undefined));
     const bindings: Parameters<typeof installShardfileFolder>[2] = {
       imageOwner,
       instance: page.instance ?? (source === null ? 'template-solo' : `standalone-${source.identity.slug}`), catalogue: [], items: declaredKitItemFamilies(), voices: declaredWeaponVoices,
@@ -660,7 +661,7 @@ async function startSelected(): Promise<void> {
     previousImages?.dispose();
     const [{ installKitSpecies }, { installKitIcons, BAG_ICONS }, { installPickupCatalogue, preparePickupCatalogue },
       { default: PICKUP_CATALOGUE }, { installKitProps }, { STARTER_BAG_ITEMS }, { HOVERBOARD_TOOL }, { sharedCombatCues }] = await imports.ready();
-    if (source !== null || manifest.shardfile !== undefined) document.documentElement.classList.remove('title-first');
+    if (source !== null || dataPointer(manifest) !== undefined) document.documentElement.classList.remove('title-first');
     installKitSpecies();
     installKitIcons();
     const [{browserContentHash},{publicBytes},{readContent}] = await Promise.all([import('@wildshard/engine/game/shardfile/folder'),import('@wildshard/engine/boot/tables'),import('@wildshard/engine/boot/contentRead')]);

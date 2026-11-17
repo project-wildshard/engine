@@ -3,6 +3,7 @@ import { configureLevel, selectedLevel } from '@wildshard/engine/level/selection
 import { type ShardContext, type PageMode, ShardPlugin } from '../plugin/context';
 
 import type { ShardManifest } from '../shard/manifest';
+import { hybridPointer } from '../shard/pointer';
 import { toLevelSpec } from '../shard/spec';
 import { EmptyEquipment } from '../shardfile/emptyEquipment';
 import { emptyLook } from '../shardfile/emptyLook';
@@ -13,9 +14,9 @@ import type { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 /** G226/G258: every grid home is an owned region, so leaving it releases the whole world before the next loads; the page
  * is the neutral shell (T7: no grid page boots a borrowed home world, and nothing caps the live worlds by count). A home
  * that cannot be owned (neither admitted data nor a compiled client page) refuses to boot. Standalone pages: false. */
-export function useOwnedGridHome(mode: PageMode, manifest: Pick<ShardManifest, 'slug' | 'clientPlanRuntime' | 'gridShardfile'>, source?: Parameters<typeof hasDeclaredClientPage>[0]): boolean {
+export function useOwnedGridHome(mode: PageMode, manifest: Pick<ShardManifest, 'slug' | 'clientPlanRuntime' | 'shardfile' | 'gridShardfile'>, source?: Parameters<typeof hasDeclaredClientPage>[0]): boolean {
   if (mode !== 'grid') return false;
-  const owned = manifest.clientPlanRuntime === true && manifest.gridShardfile !== undefined
+  const owned = manifest.clientPlanRuntime === true && hybridPointer(manifest) !== undefined
     || source !== undefined && source.runtime !== undefined;
   if (!owned) throw new Error(`Grid home ${manifest.slug} cannot be an owned region (no admitted data or compiled client page)`);
   return true;

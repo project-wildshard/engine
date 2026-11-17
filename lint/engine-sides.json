@@ -919,6 +919,7 @@
     "src/client/game/shard/manifest.ts": "client",
     "src/client/game/shard/pageBoot.ts": "client",
     "src/client/game/shard/pagePolicy.ts": "client",
+    "src/client/game/shard/pointer.ts": "client",
     "src/client/game/shard/registry.ts": "client",
     "src/client/game/shard/retainedHooks.ts": "client",
     "src/client/game/shard/scopedRuntime.ts": "client",
