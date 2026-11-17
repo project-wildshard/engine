@@ -50,9 +50,9 @@ test('a visited root must name the exact current index hash before offline migra
   const f = fixture(), root = 'https://cache.test/shardfiles/world/shard.json?v=aaaaaaaa';
   const key = 'https://cache.test/shardfiles/world/__visited_shardfile__';
   const source = { format: 'wildshard.shardfile', formatVersion: 2, identity: { slug: 'old-visit' } };
-  f.stores.set('ws-shardfile-products-v2', new Map([[key, Response.json({ firstParty: true, source, validation: { indexHash: 'b'.repeat(64) } })]]));
+  f.stores.set('ws-shardfile-products-v2', new Map([[key, Response.json({ source, validation: { indexHash: 'b'.repeat(64) } })]]));
   expect(await legacyAsset(f.storage, root, hash)).toBeUndefined();
-  f.stores.get('ws-shardfile-products-v2')?.set(key, Response.json({ firstParty: true, source, validation: { indexHash: hash } }));
+  f.stores.get('ws-shardfile-products-v2')?.set(key, Response.json({ source, validation: { indexHash: hash } }));
   const bytes = await readAsset(root, undefined, { fetch: () => Promise.reject(new TypeError('Offline')),
     legacy: { read: () => legacyAsset(f.storage, root, hash), store: f.storage } });
   expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual(source);

@@ -15,7 +15,6 @@ import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { builtIndexHash } from '@wildshard/format/builtIndexes';
 
 import { acceptValidatedCost } from '@wildshard/format/deviceMemoryCost';
-import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 import { saves } from '@wildshard/engine/saves/runtime';
 import { contentHash } from '../../../shared/game/shardfile/contentHash';
 import { packOrLoose, packReads } from '../../../shared/game/shardfile/packReads';
@@ -34,7 +33,7 @@ const HASH = /^[a-f0-9]{64}$/u;
 const MAX_FILE_BYTES = 25_000_000;
 const descriptorDecoder = new TextDecoder('utf-8', { fatal: true });
 /** A visited product is published after every immutable asset selected for entry passes admission. */
-export interface CachedFolder { source: unknown; firstParty: boolean; validation?: ValidationReceipt }
+export interface CachedFolder { source: unknown; validation?: ValidationReceipt }
 /** Storage is injected so offline admission uses the same path in browsers and tests. */
 export interface FolderCache {
   product: (key: string) => Promise<CachedFolder | null>;
@@ -334,7 +333,7 @@ export async function readFolderDescriptor(options: FolderOptions, declaredUrl?:
     if ('error' in held) throw held.error;
     visited = held.value;
   }
-  if (options.offline && (visited === null || visited === undefined || (options.firstParty && !visited.firstParty))) throw new Error('Shardfile has not been visited offline');
+  if (options.offline && (visited === null || visited === undefined)) throw new Error('Shardfile has not been visited offline');
   let input: unknown = visited?.source;
   if (options.offline && indexHash !== null) await checkedDescriptorWire(validationSourceBytes(input), { ...options, descriptorHash: indexHash });
   if (!options.offline) {
@@ -344,11 +343,11 @@ export async function readFolderDescriptor(options: FolderOptions, declaredUrl?:
       const held = await cached;
       if ('error' in held) throw held.error;
       const previous = held.value;
-      if (previous === null || previous === undefined || options.firstParty && !previous.firstParty) throw wire.failure;
+      if (previous === null || previous === undefined) throw wire.failure;
       await preflightFolder(previous, options.pause);
       if (!isOutputIndex(previous.source)) throw new Error('Cached shardfile requires a format-2 rebuild');
       // The visited JSON is canonicalized by the same writer as publication;
-      // neither its saved receipt nor its firstParty flag replaces hash checks.
+      // its saved receipt never replaces hash checks (OF10a1: one cache, keyed by content hash, no provenance).
       await checkedDescriptorWire(validationSourceBytes(previous.source), options);
       const source = await readFolderInput(previous.source, { ...options, offline: true });
       options.revalidateAfterControl?.(async () => {
@@ -691,7 +690,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
       await cacheRows(sectionFiles, options.cacheBatch === true, async section => { if (!await present(section.hash, section.bytes)) complete = false; });
       if (complete && remaining.length === 0 && descriptor !== undefined) {
         try {
-          await cache.putFolder(base, { source: descriptor.index, firstParty: options.firstParty,
+          await cache.putFolder(base, { source: descriptor.index,
             ...(revisionKey === null ? {} : { validation: { revision: revisionKey, sourceHash, indexHash: descriptor.indexHash, worst } }) });
           // iPhone downloads I10: a stored product is worth keeping, so ask once a page for persistent storage (the
           // browser may evict the content cache otherwise); the answer shows in Settings ▸ Debug's storage line
@@ -708,42 +707,8 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   progress('complete', `Product admitted · ${reference}`);
   await options.pause?.();
   const deferredDescriptor = outputDescriptor(source);
-  const completeCache = deferredDescriptor === undefined ? undefined : folderCacheCompletion(source, options, selected, remaining, { source: deferredDescriptor.index, firstParty: options.firstParty,
+  const completeCache = deferredDescriptor === undefined ? undefined : folderCacheCompletion(source, options, selected, remaining, { source: deferredDescriptor.index,
     ...(revisionKey === null ? {} : { validation: { revision: revisionKey, sourceHash, indexHash: deferredDescriptor.indexHash, worst } }) });
   trace?.mark('finish');
   return { source, assets, cached: cached !== null && cached !== undefined, ...(options.firstParty ? { releaseTransport: transportRelease(source, assets, options), releasePreparedTransport: transportRelease(source, assets, options, true), ...completeCache === undefined ? {} : { completeCache } } : {}), ...(options.firstParty ? {} : { instance: await externalShardInstance(base, source.identity.slug, options.hash) }) };
-}
-/** Strict external adapters share the service worker's URL store. First-party
- * browser reads use native fetch, without a page index, leases or worker. */
-export function browserFolderCache(storage: Pick<CacheStorage, 'open'>,
-  preparation: Pick<FolderOptions, 'pause' | 'parseJson'> = {}): FolderCache {
-  const open = () => storage.open(assetCacheName());
-  const folderUrl = (base: string) => new URL('__visited_shardfile__', base).href;
-  const assetUrl = (base: string, hash: string): string => {
-    if (!HASH.test(hash)) throw new Error('Invalid content hash');
-    return new URL(`/__ws_external_content__/${hash}`, base).href;
-  };
-  const put = async (base: string, hash: string, bytes: Uint8Array): Promise<boolean> => {
-    try { await (await open()).put(assetUrl(base, hash), new Response(Uint8Array.from(bytes))); return true; }
-    catch { return false; }
-  };
-  return {
-    product: async (base) => {
-      const response = await (await open()).match(folderUrl(base)); if (response === undefined) return null;
-      const bytes = await boundedResponse(response, limits.sourceBytes);
-      await preparation.pause?.();
-      const value: unknown = preparation.parseJson === undefined ? JSON.parse(descriptorDecoder.decode(bytes)) : await preparation.parseJson(bytes);
-      await preflightFolder(value, preparation.pause);
-      if (typeof value !== 'object' || value === null || !('source' in value) || !('firstParty' in value) || typeof value.firstParty !== 'boolean') throw new Error('Invalid visited shardfile cache');
-      const rawValidation = 'validation' in value ? value.validation : undefined;
-      const validation = typeof rawValidation === 'object' && rawValidation !== null && 'sourceHash' in rawValidation && typeof rawValidation.sourceHash === 'string' ? readValidationReceipt(rawValidation, rawValidation.sourceHash) : null;
-      return { source: value.source, firstParty: value.firstParty, ...(validation === null ? {} : { validation }) };
-    },
-    asset: async (base, hash) => {
-      const response = await (await open()).match(assetUrl(base, hash));
-      return response === undefined ? null : boundedResponse(response, MAX_FILE_BYTES);
-    },
-    putAsset: put, putAssetBackground: put,
-    putFolder: async (base, product) => { await (await open()).put(folderUrl(base), Response.json(product)); },
-  };
 }

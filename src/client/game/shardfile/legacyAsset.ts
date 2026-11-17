@@ -21,8 +21,8 @@ export async function legacyAsset(storage: LegacyStorage, url: string, hash: str
     const response = await (await storage.open(name)).match(new URL('__visited_shardfile__', new URL('.', address)).href);
     if (response?.status !== 200) { void response?.body?.cancel().catch(() => undefined); continue; }
     const value: unknown = JSON.parse(new TextDecoder().decode(await readContentResponse(response, limits.sourceBytes)));
-    if (typeof value !== 'object' || value === null || !('firstParty' in value) || value.firstParty !== true
-      || !('validation' in value) || typeof value.validation !== 'object' || value.validation === null
+    // OF10a1: any visited entry whose index hashes to the asked hash, whoever wrote it (no provenance)
+    if (typeof value !== 'object' || value === null || !('validation' in value) || typeof value.validation !== 'object' || value.validation === null
       || !('indexHash' in value.validation) || value.validation.indexHash !== hash || !('source' in value)) continue;
     return Response.json(value.source);
   }

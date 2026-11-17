@@ -67,13 +67,6 @@ export const GATES: readonly Gate[] = [
     refs: { [FOLDER]: 6, [RUNTIME_FOLDER]: 2, [GRID_FOLDERS]: 2, [DESCRIPTOR]: 2 },
   },
   {
-    id: 'cache-provenance', verdict: 'delete',
-    what: 'The visited-folder cache records provenance: an external page uses the browser folder cache and our own '
-      + 'does not, and offline our own page refuses an entry an external page wrote.',
-    replacedBy: 'One cache keyed by content hash; provenance is not recorded.',
-    refs: { [FOLDER]: 14, [RUNTIME_FOLDER]: 4, 'src/client/game/shardfile/legacyAsset.ts': 2 },
-  },
-  {
     id: 'identity', verdict: 'delete',
     what: 'An outside shard may not take one of our reserved slugs, and must carry its admitted save instance; ours '
       + 'derive theirs from the slug.',

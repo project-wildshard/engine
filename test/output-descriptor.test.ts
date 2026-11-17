@@ -102,11 +102,10 @@ test('a rejected descriptor request uses a checked revisit, never elapsed time',
   } finally { vi.useRealTimers(); }
 });
 
-test('a failed request cannot admit an absent, foreign, changed or incomplete visited product', async () => {
-  for (const refused of ['absent', 'foreign', 'changed', 'catalogue', 'incomplete'] as const) {
+test('a failed request cannot admit an absent, changed or incomplete visited product', async () => {
+  for (const refused of ['absent', 'changed', 'catalogue', 'incomplete'] as const) {
     const f = fixture(), store = cacheStore(), opts = options(f.wires, store.cache);
     if (refused !== 'absent') await admitFolder(await readFolderDescriptor(opts), opts);
-    if (refused === 'foreign') await store.cache.putFolder(base, { source: f.index, firstParty: false });
     if (refused === 'incomplete') store.bytes.clear();
     const held: FolderOptions = { ...opts, ...(refused === 'changed' ? { descriptorHash: 'f'.repeat(64) } : {}),
       ...(refused === 'catalogue' ? { built: { indexes: new Set<string>(), stale: () => Promise.resolve() } } : {}), fetch: () => Promise.reject(new TypeError('Native connection failed')) };
@@ -700,7 +699,7 @@ test('an older visit this build no longer parses is compared by its state lineag
     if (typeof payload !== 'object' || payload === null) throw new Error('Spawn section is not an object');
     const bytes = encodeCanonicalJson({ ...payload, public: 'legacy' }), ref = hashImmutableBytes(bytes);
     const sections = old.index.sections.map(value => value === section ? { ...value, hash: ref, bytes: bytes.length } : value);
-    return { visited: { source: { ...old.index, sections }, firstParty: true },
+    return { visited: { source: { ...old.index, sections } },
       bytes: new Map([...old.index.sections.flatMap(value => { const b = old.wires.get(value.path); return b === undefined ? [] : [[value.hash, b] as const]; }), [ref, bytes]]) };
   };
   const seed = (store: ReturnType<typeof cacheStore>, revision: number): void => {
@@ -1208,16 +1207,17 @@ test('build-addressed descriptor bytes and caller digests retain exact refusal b
   }finally{release();}
 });
 
-test('offline build-addressed products retain complete-index and visited-origin verification',async()=>{
+test('offline build-addressed products retain complete-index verification and read any visited entry that hashes',async()=>{
   const f=fixture(),store=cacheStore(),opts=options(f.wires,store.cache);
   await admitFolder(await readFolderDescriptor(opts),opts);
   const release=installIndexReceipt(f.index,new URL('shard.json',base).pathname),fetcher=vi.fn<FolderOptions['fetch']>();
   try{
     expect(await readFolderDescriptor({...opts,offline:true,fetch:fetcher})).toStrictEqual(f.source);
-    await store.cache.putFolder(base,{source:fixture(false,10).index,firstParty:true});
+    await store.cache.putFolder(base,{source:fixture(false,10).index});
     await expect(readFolderDescriptor({...opts,offline:true,fetch:fetcher})).rejects.toThrow('descriptor hash mismatch');
-    await store.cache.putFolder(base,{source:f.index,firstParty:false});
-    await expect(readFolderDescriptor({...opts,offline:true,fetch:fetcher})).rejects.toThrow('not been visited offline');
+    // OF10a1: one cache, no provenance: any visited entry that hashes is read offline, whoever wrote it
+    await store.cache.putFolder(base,{source:f.index});
+    expect(await readFolderDescriptor({...opts,offline:true,fetch:fetcher})).toStrictEqual(f.source);
     expect(fetcher).not.toHaveBeenCalled();
   }finally{release();}
 });

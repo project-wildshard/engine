@@ -21,7 +21,7 @@ import { outputDescriptor } from '../../../shared/game/shardfile/outputDescripto
 import { ktx2TranscodeSupport } from '@wildshard/engine/core/ktx2';
 import { splatDrawTier } from '@wildshard/engine/boot/gpuFiles';
 import { TIER, TIER_CONFIG } from '@wildshard/engine/core/tier';
-import { readFolderDescriptor, browserContentHash, browserFolderCache, type AdmittedFolder, type FolderOptions } from './folder';
+import { readFolderDescriptor, browserContentHash, type AdmittedFolder, type FolderOptions } from './folder';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { runtimeBoundWorldFiles } from '../../../shared/game/plugin/runtimeRows';
 import { clientMaterials } from './clientMaterials';
@@ -134,7 +134,6 @@ export function browserShardfileOptions(base: string, firstParty = false): Folde
     ...(firstParty ? { fetchRange: (url: string, start: number, end: number, priority?: 'low') => waitFor(`Fetch pack range ${start}-${end}`, fetch(contentURL(url), { headers: { Range: `bytes=${start}-${end}` }, ...(priority === undefined ? {} : { priority }) }), 'file') } : {}),
     pause, cacheBatch: true,
     ...(firstParty && builtIndexes !== null ? { built: { indexes: builtIndexes, stale: staleRecovery } } : {}),
-    ...(firstParty || typeof caches === 'undefined' ? {} : { cache: browserFolderCache(caches, { pause, ...(parseJson === undefined ? {} : { parseJson }) }) }),
   };
 }
 
@@ -207,7 +206,8 @@ interface FolderEntry {
 const folderRequests = new Map<string, Promise<FolderEntry>>();
 const foldersByIndex = new Map<string, FolderEntry>();
 const folderCompletions = new WeakMap<ShardFolder, (scope: Scope) => Promise<void>>();
-function folderPolicy(options: FolderOptions): string { return `${options.firstParty ? 'first' : 'external'}|${options.offline ? 'offline' : 'online'}`; }
+/** OF10a1: one cache for every shard (the service worker's), so a product's key names its connectivity, never its provenance. */
+function folderPolicy(options: FolderOptions): string { return options.offline ? 'offline' : 'online'; }
 function folderRequestKey(options: FolderOptions): string { return `${new URL('.', options.base).href}|${options.descriptorHash ?? ''}|${folderPolicy(options)}`; }
 function liveFolderOwner(scope: Scope | null): scope is Scope { return scope !== null && !scope.disposed; }
 function retireFolder(entry: FolderEntry): void {
@@ -241,7 +241,7 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
           let prepared: Promise<ReturnType<typeof folderCacheCompletion>> | undefined;
           const receipt = descriptor.receipt;
           folderCompletions.set(entry.product, async owner => {
-            prepared ??= tierFolderFilesPaced(source, 'phone', options.pause, options.splatTier).then(selected => folderCacheCompletion(source, options, selected, lateFiles(source, selected), { source: descriptor.index, firstParty: options.firstParty,
+            prepared ??= tierFolderFilesPaced(source, 'phone', options.pause, options.splatTier).then(selected => folderCacheCompletion(source, options, selected, lateFiles(source, selected), { source: descriptor.index,
               validation: { revision: receipt.revision, sourceHash: receipt.sourceHash, indexHash: descriptor.indexHash, worst: receipt.worst } }));
             const complete = await prepared; await complete?.(owner);
           });
