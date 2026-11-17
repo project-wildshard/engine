@@ -27,10 +27,6 @@ const INCLUDED = /^(?:(?:src\/|(?:admin\/|drafts\/)?test\/).+\.test\.ts|test\/.+
 // durations, and Vitest's startup with the import-graph walk takes ~5 s.
 const LOAD_SECONDS = 0.5;
 const STARTUP_SECONDS = 5;
-// G498: these seconds-long lifecycle checks run on every push, even for
-// unrelated source changes and a fully exhausted related-test budget.
-export const QUICK_TESTS = ['test/grid-reentry.test.ts'];
-
 /** Required push guards, including pushes without related sources.
  * @param {readonly string[]} changed @returns {string[]} */
 export function pushGuards(changed) {
@@ -158,7 +154,7 @@ if (isMain) {
   /** @type {Record<string, string[]>} */
   const products = JSON.parse(readFileSync(registryPath, 'utf8'));
   const live = process.argv.includes('--live');
-  const required = live ? [] : [...new Set([...QUICK_TESTS, ...scriptScenarioTests(changed, scenarios), ...folderReaderTests(changed, products).filter(test => existsSync(resolve(ROOT, test)))])];
+  const required = live ? [] : [...new Set([...scriptScenarioTests(changed, scenarios), ...folderReaderTests(changed, products).filter(test => existsSync(resolve(ROOT, test)))])];
   const selection = live ? liveTestSelection(ROOT, [...new Set([...related, ...sources.filter(file => INCLUDED.test(file))])], products, changed) : { run: related, deferred: [] };
   for (const row of selection.deferred) console.error(`gate-related-tests: CI only ${row.test} (${row.reason})`);
   const allowed = new Set(selection.run);

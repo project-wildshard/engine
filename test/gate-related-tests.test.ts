@@ -7,7 +7,7 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 import {join, resolve} from 'node:path';
 import {BROWSER_TESTS, LOCAL_FILE_SECONDS, MAIN_PUSH_SPLIT, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, mainPushed, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
 import {provesCode} from '../scripts/ci-proof-jobs.mjs';
-import { capRelated, folderReaderTests, scriptScenarioTests, QUICK_TESTS, pushGuards, forceRerunTriggers } from '../scripts/gate-related-tests.mjs';
+import { capRelated, folderReaderTests, scriptScenarioTests, pushGuards, forceRerunTriggers } from '../scripts/gate-related-tests.mjs';
 
 const durations = new Map([['test/slow.test.ts', 40], ['test/cheap.test.ts', 1], ['test/mid.test.ts', 8], ['test/cover-grid.test.ts', 30]]);
 const related = [...durations.keys()];
@@ -71,11 +71,6 @@ it('preserves author-source edges for tests consuming complete disk products', (
   expect(folderReaderTests(['src/sharddev/project.ts'], registry)).toEqual(Object.keys(registry));
   expect(folderReaderTests(['scripts/test-folders.json'], registry)).toEqual(Object.keys(registry));
   expect(folderReaderTests(['src/shards/far-reach/data/rows.json', 'docs/ENGINE.md'], registry)).toEqual([]);
-});
-
-it('keeps all grid re-entry quick checks on an unrelated push with no budget', () => {
-  expect(QUICK_TESTS).toEqual(['test/grid-reentry.test.ts']);
-  expect(capRelated([], ['docs/ENGINE.md'], new Map(), 0, 1, QUICK_TESTS).run).toEqual([...QUICK_TESTS].sort());
 });
 
 // DEV-SPEED DS9 (J222/J240): the split pre-push and the landing's hosted-green reuse.

@@ -1,4 +1,3 @@
 [
-  "test/grid-reentry.test.ts",
   "test/native-oracle.test.ts"
 ]

@@ -16087,5 +16087,135 @@
       }
     ],
     "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/map-owner-proofs.json"
+  },
+  {
+    "repo": "engine",
+    "file": "test/grid-reentry.test.ts",
+    "outcome": "migrated",
+    "sourceRevision": "6b346fe8a4981597cbf786c8eb1a07445ae69e5d",
+    "sourceBlob": "56645b1407b160bfc4edb1797c73fc5e5a1c7ac4",
+    "decision": "NP2/J232: Move all ten G498 product cases and both owner partitions of the generic DB1 case to blocking CI in the product repos.",
+    "originalTests": [
+      "_template: evict and re-enter with kit, held items and quest progress",
+      "pastel-plain: evict and re-enter with kit, held items and quest progress",
+      "ink-cel-valley: evict and re-enter with kit, held items and quest progress",
+      "nalati-grasslands: evict and re-enter with kit, held items and quest progress",
+      "pine-hollow: evict and re-enter with kit, held items and quest progress",
+      "driftwood-isle: evict and re-enter with kit, held items and quest progress",
+      "far-reach: evict and re-enter with kit, held items and quest progress",
+      "sunscar-dunes: evict and re-enter with kit, held items and quest progress",
+      "brasscap-mesa: evict and re-enter with kit, held items and quest progress",
+      "nine-dragon-stack: evict and re-enter with kit, held items and quest progress",
+      "generic grid data destinations restore exact modules with one installation"
+    ],
+    "ownerProofs": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "7d226347a16bbaba4eb6758af3ffa0b0cbbfef0a",
+        "run": 44025570240,
+        "targetPath": "test/ci21-grid-reentry.test.mjs",
+        "targetBlob": "5aeef8ec2b24d9aad1201c02c3a87b8d709d01ca",
+        "products": [
+          "_template",
+          "pastel-plain",
+          "ink-cel-valley"
+        ],
+        "generic": true,
+        "cases": 4,
+        "raw": "grid-sdk14.log"
+      },
+      {
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "b69a54d8d93433123fbf2e1608df78d2a8640121",
+        "run": 44019954034,
+        "targetPath": "test/ci21-grid-reentry.test.mjs",
+        "targetBlob": "5aeef8ec2b24d9aad1201c02c3a87b8d709d01ca",
+        "products": [
+          "nalati-grasslands"
+        ],
+        "generic": false,
+        "cases": 1,
+        "raw": "grid-nalati.log"
+      },
+      {
+        "repository": "project-wildshard/shard-pine-hollow",
+        "revision": "98a585d2985b8bf5571322743ed6eed67c2d8d61",
+        "run": 44019953527,
+        "targetPath": "test/ci21-grid-reentry.test.mjs",
+        "targetBlob": "5aeef8ec2b24d9aad1201c02c3a87b8d709d01ca",
+        "products": [
+          "pine-hollow"
+        ],
+        "generic": false,
+        "cases": 1,
+        "raw": "grid-pine.log"
+      },
+      {
+        "repository": "project-wildshard/shard-driftwood",
+        "revision": "7a5bf19a4dbb9ab623a29a44d80476fcc6947345",
+        "run": 44019952666,
+        "targetPath": "test/ci21-grid-reentry.test.mjs",
+        "targetBlob": "5aeef8ec2b24d9aad1201c02c3a87b8d709d01ca",
+        "products": [
+          "driftwood-isle"
+        ],
+        "generic": false,
+        "cases": 1,
+        "raw": "grid-driftwood.log"
+      },
+      {
+        "repository": "project-wildshard/shard-sky-reach",
+        "revision": "7596566e10a2dfb82781ce758d5b04d8da552efd",
+        "run": 44019952297,
+        "targetPath": "test/ci21-grid-reentry.test.mjs",
+        "targetBlob": "5aeef8ec2b24d9aad1201c02c3a87b8d709d01ca",
+        "products": [
+          "far-reach"
+        ],
+        "generic": false,
+        "cases": 1,
+        "raw": "grid-sky.log"
+      },
+      {
+        "repository": "project-wildshard/shard-dunes",
+        "revision": "20fdc346a787ba6d7349544c493da3912c41562e",
+        "run": 44019956274,
+        "targetPath": "test/ci21-grid-reentry.test.mjs",
+        "targetBlob": "5aeef8ec2b24d9aad1201c02c3a87b8d709d01ca",
+        "products": [
+          "sunscar-dunes"
+        ],
+        "generic": false,
+        "cases": 1,
+        "raw": "grid-dunes.log"
+      },
+      {
+        "repository": "project-wildshard/shard-brasscap",
+        "revision": "151704a67f4f9e52a20b2fc26934190cd0422d05",
+        "run": 44020360368,
+        "targetPath": "test/ci21-grid-reentry.test.mjs",
+        "targetBlob": "5aeef8ec2b24d9aad1201c02c3a87b8d709d01ca",
+        "products": [
+          "brasscap-mesa"
+        ],
+        "generic": true,
+        "cases": 2,
+        "raw": "grid-brasscap.log"
+      },
+      {
+        "repository": "project-wildshard/shard-nine-dragon",
+        "revision": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+        "run": 44013668599,
+        "targetPath": "test/ci21-runtime/grid-reentry.test.ts",
+        "targetBlob": "5703932afc2ba168f0ff6df1626061d9cbcaeca9",
+        "products": [
+          "nine-dragon-stack"
+        ],
+        "generic": false,
+        "cases": 1,
+        "raw": "../ci21-nine-c7/hosted-runtime-results.json"
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/grid-owner-proofs.json"
   }
 ]
