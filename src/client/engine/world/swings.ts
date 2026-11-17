@@ -100,9 +100,10 @@ export class SwingField {
 
   get count(): number { return this.swings.length; }
 
-  /** still every swing in the shared uniforms (the page left) */
+  /** still every swing in the shared uniforms and at rest (the page left; a grid cell's swings start from rest when entered again) */
   dispose(): void {
     for (const tilt of this.uniforms.wsSwingTilt.value) tilt.set(0, 0, 0, 1);
+    for (const swing of this.swings) { swing.ax = 0; swing.az = 0; swing.vx = 0; swing.vz = 0; }
     this.last.clear();
   }
 

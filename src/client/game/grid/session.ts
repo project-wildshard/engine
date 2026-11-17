@@ -243,7 +243,7 @@ export interface GridSessionState {
   /** SF25 / G66: each shardfile neighbour's client-script life (frozen cells breathe and graze) */
   readonly life: readonly NeighbourLifeCell[];
   /** SS-SHIPb: each data cell's detail layers, swings and splash */
-  readonly sceneLife?: readonly CellSceneLifeCell[];
+  readonly sceneLife: readonly CellSceneLifeCell[];
   /** G342 / G385: the near-placeholder tier's cells and resident bytes */
   readonly near: NearPlaceholderState;
 }
@@ -853,7 +853,8 @@ export class GridSession {
     } };
     // SF25 / G66: frozen neighbours look alive (presentation-only client scripts; their sims never step here)
     this.life = new NeighbourLife({ scope: host.scope, simulation: (id) => this.live?.lifeRegion(id), active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id });
-    this.sceneLife = new CellSceneLife({ scope: host.scope, phone: TIER === 'phone', feet: host.feet, active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id });
+    // its feet in the scene's home frame: the player stands in the active frame's metres (live.ts worldFeet), the cell roots in the home's
+    this.sceneLife = new CellSceneLife({ scope: host.scope, phone: TIER === 'phone', feet: () => { const at = this.world(); return { x: at.x - home.origin.x, y: host.feet().y, z: at.z - home.origin.z }; }, active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id });
     // one late system for the grid (the page's onLate takes one label): the alive neighbours, then the one frame's weights
     const prepareView = host.prepareView;
     this.panels = new NeighbourPanels({ scope: host.scope, region: (id) => this.live?.panelRegion(id), ...(prepareView === undefined ? {} : { prepare: prepareView }) });

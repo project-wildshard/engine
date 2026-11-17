@@ -78,6 +78,33 @@ test('two copies of one product share its uniforms, so their swings hold still',
   expect(leaned(swings)).toBe(0);
 });
 
+test('a second copy admitted while the first leans stills it and never moves its pivots', async () => {
+  windUniforms.uGust.value = 1;
+  const { life, swings, scope } = await page([cell('mossgate', 320)], { x: 300, y: 0, z: 0 }, { id: 'mossgate' });
+  for (let i = 0; i < 60 * 5; i++) life.late(1 / 60);
+  expect(leaned(swings)).toBeGreaterThan(0.005);
+  const root = new Group(); root.position.set(480, 0, 0);
+  await life.admit(cell('mossgate-2', 480), root, shard(), noAssets, { materials: new Map(), swings });
+  expect(leaned(swings)).toBe(0);
+  expect(swings.wsSwingPivot.value[0]?.toArray()).toEqual([312, 2.6, 3.3, 1]);
+  for (let i = 0; i < 60; i++) life.late(1 / 60);
+  expect(leaned(swings)).toBe(0);
+  expect(life.state().map((row) => row.swings)).toEqual([0, 0]);
+  scope.dispose();
+});
+
+test('a cell entered again starts its swings from rest', async () => {
+  windUniforms.uGust.value = 0;
+  const feet = { x: 320 - 8 - 2, y: 0.8, z: 3.3 }, active: { id: string | null } = { id: 'mossgate' };
+  const { life, swings } = await page([cell('mossgate', 320)], feet, active);
+  for (let i = 0; i < 60; i++) { feet.x += 4 / 60; life.late(1 / 60); }
+  expect(leaned(swings)).toBeGreaterThan(0.02);
+  active.id = 'road'; life.late(1 / 60);
+  feet.x += 20; active.id = 'mossgate'; life.late(1 / 60);
+  // one frame from rest leans at most a frame's worth, never the old kick
+  expect(leaned(swings)).toBeLessThan(0.01);
+});
+
 test('a runtime cell or a cell with nothing to sway has no scene life', () => {
   expect(hasCellSceneLife(shard())).toBe(true);
   expect(hasCellSceneLife(shard({ runtime: { version: 1 } }))).toBe(false);

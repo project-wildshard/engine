@@ -7,3 +7,7 @@ staging (bundle patched in the route) showed zero `SwingField`s and eight compil
 
 `grid/cellSceneLife.ts` installs them per admitted data cell beside `NeighbourLife`, stepped only while entered (G663).
 Copies of one slug share one material set and so one swing uniform set, so a twice-placed slug keeps its swings still.
+
+Review fixes (same day): the feet the cells read are home-frame scene metres (world feet minus the home origin, as the
+border shimmer reads them), a second copy of a product stills the first before its field could rewrite the shared pivots,
+each cell has its own scope, detail layers are built on first entry, and `SwingField.dispose` zeroes its state.
