@@ -103,7 +103,10 @@ describe('session brief: line cap', () => {
       GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
       GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t',
     };
-    const git = (...args) => assert.equal(spawnSync('git', args, { cwd: repo, env }).status, 0, args.join(' '));
+    const git = (...args) => {
+      const result = spawnSync('git', args, { cwd: repo, env, encoding: 'utf8' });
+      assert.equal(result.status, 0, `${args.join(' ')}: ${result.stderr}`);
+    };
     const write = (path, text) => {
       mkdirSync(dirname(join(repo, path)), { recursive: true });
       writeFileSync(join(repo, path), text);

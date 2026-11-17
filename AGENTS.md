@@ -85,7 +85,9 @@ Landing from a worktree (mode 2; J290, LAND-SIMPLIFY J249/J258; meta `docs/plans
  - Land: `WS_LANE_NAME=<lane> node scripts/land.mjs` from the worktree. **J400: local gate is the default.**
    Rebase onto origin/main, regenerate stamps, then push main through the complete local gate plus CSS inside
    a test slot. No plan-branch push and no hosted wait. A lost FF race rebases and gates the new tree again.
-   WL22's environment/lease policy is reused; patch-id carry never substitutes for testing the rebased tree.
+   WL22's environment/lease policy is reused. An authenticated completed full proof and
+   a disjoint incoming main delta permit all static checks plus the delta's affected tests. Overlap, changed
+   branch content or missing proof keeps the complete gate (J400 FL5b).
    `--hosted` (or `WS_LAND_MODE=hosted`) retains the old hosted fallback below; `--local` selects local explicitly.
    `--no-preflight` affects only the hosted preflight, never the full local gate. Options: `--timeout=MIN` (CI wait, 60),
    `--rounds=N` (tries at the main push, 5), `--poll=S` (30), `--keep` (keep the worktree and branch). Don't commit

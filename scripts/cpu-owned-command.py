@@ -145,13 +145,21 @@ def group_members(group, previous):
                      if valid_record(record) and record['group'] == group and same_process(record)]
     if not authenticated:
         return []
-    inventory, _present = identity_backend().processes()
+    _inventory, present = identity_backend().processes()
     members = {record['pid']: record for record in authenticated}
-    for process in inventory.values():
-        if process.uid != os.getuid() or process.zombie:
+    for pid in present:
+        if pid <= 0:
+            continue  # Darwin listallpids can include the kernel sentinel.
+        # The machine census can race unrelated process exit/exec. Only
+        # members of this authenticated private group need a fresh identity.
+        # A live but unreadable member still refuses; never ignore it.
+        try:
+            if os.getpgid(pid) != group:
+                continue
+        except ProcessLookupError:
             continue
-        record = process_record(process.pid)
-        if record is not None and record['group'] == group:
+        record = process_record(pid)
+        if record is not None and record['uid'] == os.getuid() and record['group'] == group:
             members[record['pid']] = record
             if len(members) > 512:
                 raise RuntimeError('Owned CPU command group exceeds its inventory cap')

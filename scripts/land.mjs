@@ -18,6 +18,7 @@ import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {GitHubLimitError,backoffMs,ghFailure,readerEnv} from './gh-limit.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 import {assertNoLocalCandidates} from './local-candidates.ts';
+import {beginLocalHook} from './land-hook-ack.mjs';
 
 /** The hosted workflows a landing needs green, by workflow name (J195, J240). */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
@@ -79,14 +80,19 @@ function remoteRejection(output){
 
 /** Run git with its stderr shown live (the pre-push's progress) and kept, for the receipt's cause.
  * @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} env
- * @returns {Promise<{status:number,stdout:string,stderr:string,interrupted:boolean}>} */
+ * @returns {Promise<{status:number,stdout:string,stderr:string,interrupted:boolean,hookGreen:boolean}>} */
 function gitTee(cwd,args,env){
  return new Promise(_resolve=>{
   // WL22's keepalive policy also belongs to the parent SSH session: the
   // pre-push may spend minutes in a full gate before Git sends main.
+  /** @type {NodeJS.ProcessEnv} */
   const network={...env,GIT_SSH_COMMAND:env.GIT_SSH_COMMAND??'ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes'};
+  const localHead=/^local:([a-f0-9]{40})$/u.exec(env.WS_LAND_MAIN_PUSH??'')?.[1];
+  const ack=localHead===undefined?null:beginLocalHook(cwd,localHead);
+  Reflect.deleteProperty(network,'WS_LAND_HOOK_ACK');
+  if(ack!==null)network.WS_LAND_HOOK_ACK=ack.token;
   const groups=process.platform!=='win32',child=spawn('git',args,{cwd,env:network,stdio:['ignore','pipe','pipe'],detached:groups});
-  let stdout='',stderr='',interrupted=false;
+  let stdout='',stderr='',interrupted=false,settled=false;
   /** @type {ReturnType<typeof setTimeout>|undefined} */let forced;
   const signal=(/** @type {NodeJS.Signals} */kind)=>{
    try{if(groups&&child.pid!==undefined)process.kill(-child.pid,kind);else child.kill(kind);}
@@ -95,8 +101,9 @@ function gitTee(cwd,args,env){
   const stop=()=>{interrupted=true;signal('SIGTERM');forced??=setTimeout(()=>{signal('SIGKILL');},10000);};
   process.once('SIGTERM',stop);process.once('SIGINT',stop);
   const finish=(/** @type {number} */status,/** @type {string} */error='')=>{
+   if(settled)return;settled=true;
    clearTimeout(forced);process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);
-   _resolve({status,stdout,stderr:`${stderr}${error}`,interrupted});
+   _resolve({status,stdout,stderr:`${stderr}${error}`,interrupted,hookGreen:ack?.finish()??false});
   };
   child.stdout.on('data',chunk=>{stdout+=String(chunk);});
   child.stderr.on('data',chunk=>{process.stderr.write(chunk);stderr=`${stderr}${String(chunk)}`.slice(-(1<<16));});
@@ -780,15 +787,20 @@ class Landing{
 
  /** Fast-forward main to HEAD. Refuses before pushing unless origin/main is
   * an ancestor; the refspec has no `+` and no force flag ever.
-  * @param {boolean} carried @param {boolean} [local] @returns {Promise<'landed'|'moved'>} */
- async pushMain(carried,local=false){
+  * @param {boolean} carried @param {boolean} [local]
+  * @param {{baseMain:string,testedHead:string,incomingMain:string,head:string}|null} [delta]
+  * @returns {Promise<'landed'|'moved'>} */
+ async pushMain(carried,local=false,delta=null){
   const head=this.holds('before the merge'),main=this.fetchMain();
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
   const args=mainPushArgs(head);
   this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${local?'; full local gate (J400)':carried?'; static pre-push on the rebased tree, no Vitest (LS3)':'; the hosted-green SHA, no local gate'}`);
   // LS3 (J258): the pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
+  /** @type {NodeJS.ProcessEnv} */
   const env={...this.env,WS_LAND_MAIN_PUSH:`${local?'local':carried?'carried':'exact'}:${head}`};
+  Reflect.deleteProperty(env,'WS_LOCAL_LAND_DELTA');
+  if(local&&delta!==null)env.WS_LOCAL_LAND_DELTA=JSON.stringify(delta);
   if(local)Reflect.deleteProperty(env,'SKIP_CHECK');
   const result=await gitTee(this.root,args,env);
   if(result.status===0)return 'landed';
@@ -796,8 +808,10 @@ class Landing{
   const now=this.fetchMain();
   if(isAncestor(this.root,head,now))return 'landed';
   const rejected=remoteRejection(result.stdout)!==undefined;
-  if(!result.interrupted&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
-  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(result.stderr,result.stdout);
+  if(!result.interrupted&&(!local||result.hookGreen)&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
+  const hook=local&&!result.hookGreen?`${result.stderr}\n${result.stdout}`:result.stderr;
+  const porcelain=local&&!result.hookGreen?'':result.stdout;
+  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(hook,porcelain);
   this.receipt(`STOP main push of ${short(head)} refused: ${cause}`);
   throw new StopError(`main push of ${short(head)} refused: ${cause}\nFix forward and run land again.`);
  }
@@ -909,18 +923,24 @@ class Landing{
  }
 
  /** J400: the real pre-push owns the complete local gate. No plan ref is published.
-  * A lost FF race rebases and gates the new tree, never carrying a patch-id proof.
+  * A lost FF race may compose a real full-tree proof with a disjoint delta.
+  * The gate authenticates it; missing/overlapping evidence keeps the full suite.
   * WL22's gate-before-lock principle applies: there is no shared main lock while testing.
   * @param {string} base */
  async runLocal(base){
   let main=base;
+  /** @type {{baseMain:string,testedHead:string,incomingMain:string,head:string}|null} */let delta=null;
   for(let round=1;round<=this.options.rounds;round++){
-   if(await this.pushMain(false,true)==='landed')return this.landed('local','full local gate; no hosted branch run',round,main);
+   const testedHead=this.head(),baseMain=main;
+   if(await this.pushMain(false,true,delta)==='landed')return this.landed('local','local full proof plus verified delta when disjoint; no hosted branch run',round,main);
    main=this.fetchMain();
-   this.say('moved',`main moved to ${short(main)}; rebase and repeat the full local gate`);
+   this.say('moved',`main moved to ${short(main)}; rebase, then verify the prior full proof and incoming delta`);
    this.rebase(main);
    this.pinsOnce();
    this.regenerate();
+   // Reuse the directly completed full basis and check the cumulative main
+   // delta on later races; never turn a composed receipt into a full basis.
+   delta={baseMain:delta?.baseMain??baseMain,testedHead:delta?.testedHead??testedHead,incomingMain:main,head:this.head()};
   }
   throw new StopError(`main kept moving after ${this.options.rounds} local-gate attempts; nothing landed`);
  }

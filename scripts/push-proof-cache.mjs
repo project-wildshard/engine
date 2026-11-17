@@ -31,7 +31,7 @@ const measurementSchema=v.object({profile:v.string(),captured:v.string(),machine
   owner:v.nullable(ownerSchema),lease:v.nullable(leaseSchema)});
 const receiptSchema=v.object({version:v.literal(2),tree:v.string(),runtime:v.string(),run:v.string(),commit:v.string(),
   finished:v.string(),seconds:v.number(),mode:v.picklist(['full','related','docs']),files:v.array(v.string()),exclusions:exclusionsSchema,
-  measurement:v.optional(measurementSchema)});
+  measurement:v.optional(measurementSchema),inherited:v.optional(v.object({run:v.string(),commit:v.string()}))});
 
 /** Optional measurement only: an unavailable kernel/lease probe never changes cache admission.
  * @param {string} profile @param {NodeJS.ProcessEnv} env */
@@ -145,18 +145,35 @@ export function readPushProof(context,selection){
   return null;
 }
 
+/** Authenticate an earlier full tree with this checkout's actual current
+ * runtime, exclusions, installed bytes, pins and publishing scope.
+ * @param {NonNullable<ReturnType<typeof capturePushTree>>} context
+ * @param {string} commit */
+export function readPriorFullProof(context,commit){
+ if(!/^[a-f0-9]{40}$/u.test(commit))return null;
+ try{
+  /** @param {string[]} args */
+  const git=args=>execFileSync('git',args,{cwd:context.root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+  const tree=git(['rev-parse',`${commit}^{tree}`]),name=`${tree}-${context.runtime}.json`;
+  const previous={...context,tree,commit,file:resolve(context.root,git(['rev-parse','--git-path',`wildshard-push-proofs/${name}`])),
+   sharedFile:context.sharedFile===null?null:resolve(dirname(context.sharedFile),name)};
+  return readPushProof(previous,{mode:'full',files:[]});
+ }catch{return null;}
+}
+
 /** Call only after the complete selected gate succeeds and a second clean-tree capture agrees.
  * @param {NonNullable<ReturnType<typeof capturePushTree>>} context
- * @param {{mode:'full'|'related'|'docs',files:string[]}} selection @param {number} seconds */
-export function writePushProof(context,selection,seconds){
+ * @param {{mode:'full'|'related'|'docs',files:string[]}} selection @param {number} seconds
+ * @param {{run:string,commit:string}} [inherited] */
+export function writePushProof(context,selection,seconds,inherited){
   if(JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions)||!scopeLive(context.exclusions))throw new Error('Push proof exclusion scope changed while checking; rerun the full gate');
   const measurement=producerMeasurement(context.profile,context.producerEnv);
   const proof={version:2,tree:context.tree,runtime:context.runtime,run:randomUUID(),commit:context.commit,
     finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files,exclusions:context.exclusions,
-    measurement};
+    measurement,...(inherited===undefined?{}:{inherited})};
   mkdirSync(dirname(context.file),{recursive:true});
   const temporary=`${context.file}.${process.pid}`;writeFileSync(temporary,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(temporary,context.file);
-  if(selection.mode==='full'&&context.sharedFile!==null){
+  if(selection.mode==='full'&&inherited===undefined&&context.sharedFile!==null){
     mkdirSync(dirname(context.sharedFile),{recursive:true,mode:0o700});
     const shared=`${context.sharedFile}.${process.pid}.tmp`;writeFileSync(shared,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(shared,context.sharedFile);
   }

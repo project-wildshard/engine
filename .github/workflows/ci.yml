@@ -335,26 +335,50 @@ jobs:
 
   nine-ring1-build:
     # NB6 needs full Nine; the packed products unit installs only its server
-    # slice. Keep its standalone props check and measured street workload
-    # blocking, without promoting or rewriting any pin or NB8/NB23 target.
-    needs: products
-    if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' }}
+    # slice. Preserve the standalone props check and measured street workload
+    # policy without promoting or rewriting any pin or NB8/NB23 target.
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      code-run: ${{ steps.code.outputs.run }}
     env:
       WS_LANE_NAME: nine-ring1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: ./.github/actions/ring-setup
+      # J400: classify here, beside products, rather than wait for its full
+      # packed share. Its failure still gates the workflow independently.
+      # Retain exact branch reuse and docs-only proof policy.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+      - id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-exact-reuse.mjs ci.yml
+      - id: paths
+        if: steps.reuse.outputs.reused != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-selection.mjs
+      - id: code
+        if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
+        run: echo "run=true" >> "$GITHUB_OUTPUT"
+      - if: steps.code.outputs.run == 'true'
+        uses: ./.github/actions/ring-setup
       - name: Own the benchmark scratch folder
+        if: steps.code.outputs.run == 'true'
         run: node scripts/scratch-dir.mjs nine-ring1 'NB6 pinned Nine load and street ratchet'
       - name: Build full pinned Nine
+        if: steps.code.outputs.run == 'true'
         run: node scripts/nine-ring1.mjs build
       - name: Archive the exact measured client
+        if: steps.code.outputs.run == 'true'
         run: tar -cf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview dist
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - if: steps.code.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nine-ring1-client
           path: tmp/nine-ring1/client.tar
@@ -365,8 +389,8 @@ jobs:
     # Each real boot consumes the exact producer bytes under its own cap.
     # Hosted Metal is virtualized: keep street evidence visible until a real
     # GPU runner is wired in. Producer and the props load probe still block.
-    needs: [products, nine-ring1-build]
-    if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' }}
+    needs: nine-ring1-build
+    if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ matrix.kind == 'street' }}
     # Fixed-run load took 261 s; street hit the old cap at 317 s.

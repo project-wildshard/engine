@@ -75,13 +75,21 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
     if(landMain==='local'){
       // Land owns main-watch after this main-only push. Release/tag
       // observations cannot use this exact single-main-ref marker.
-      // No push refs means conservative FULL selection in push-checks, never
-      // DS9's related/split path or the known-red allowance. Retain the normal
-      // lease and environment policy used by WL22; no patch-id carry on rebase.
+      // No push refs keeps full selection unless push-checks authenticates a
+      // prior full proof and disjoint incoming delta. Never DS9's split or
+      // known-red allowance. Keep WL22's real lease; no patch-id-only carry.
+      /** @type {NodeJS.ProcessEnv} */
       const full={...env,WS_LOCAL_LAND_HEAD:process.env.WS_LAND_MAIN_PUSH?.slice(6)??'',WS_LANE_NAME:(process.env.WS_LANE_NAME===''?undefined:process.env.WS_LANE_NAME)??'local-land'};Reflect.deleteProperty(full,'WS_PUSH_REFS');
+      Reflect.deleteProperty(full,'WS_LAND_HOOK_ACK');
+      if(process.env.WS_LOCAL_LAND_DELTA!==undefined)full.WS_LOCAL_LAND_DELTA=process.env.WS_LOCAL_LAND_DELTA;
       const ran=spawn('python3',['scripts/heavy-lane.py','full-test','--checkout-scope','--',process.execPath,'scripts/land-local-gate.mjs'],{cwd:root,env:full,stdio:'inherit'});
       process.on('SIGINT',()=>ran.kill('SIGINT'));process.on('SIGTERM',()=>ran.kill('SIGTERM'));
-      process.exit(await new Promise(done=>{ran.once('error',()=>done(1));ran.once('close',code=>done(code??1));}));
+      const code=await new Promise(done=>{ran.once('error',()=>done(1));ran.once('close',value=>done(value??1));});
+      if(code===0){
+        const {completeLocalHook}=await import('../scripts/land-hook-ack.mjs');
+        completeLocalHook(root,full.WS_LOCAL_LAND_HEAD??'',process.env.WS_LAND_HOOK_ACK);
+      }
+      process.exit(code);
     }
     if(landMain==='exact'){
       console.error('  - land main push (exact, LS3): the SHA branch CI proved; no local gate');

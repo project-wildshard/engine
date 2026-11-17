@@ -10,6 +10,7 @@ import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
 import {gateEnvironment} from '../scripts/push-environment.mjs';
 import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
+import {localDeltaPlan} from '../scripts/local-land-delta.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
@@ -140,6 +141,15 @@ async function main(){
   /** @type {{mode:'full'|'related'|'docs',files:string[],reason:string,tests?:string[]}} */
   let selection=pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS,process.cwd());
   const context=capturePushTree(profile,env),proof=context===null?null:readPushProof(context,selection);
+  /** @type {unknown} */let basis=null;
+  if(!split&&context!==null&&process.env.WS_LOCAL_LAND_HEAD===context.commit&&process.env.WS_LOCAL_LAND_DELTA){
+    try{basis=JSON.parse(process.env.WS_LOCAL_LAND_DELTA);}catch{ /* Malformed evidence keeps the full gate. */ }
+  }
+  const delta=localDeltaPlan(context,basis);
+  if(delta.eligible&&delta.selection!==null){
+    selection=delta.selection;
+    console.error(`  - local disjoint delta: ${delta.reason}; ${selection.files.join(', ')}`);
+  }else if(basis!==null)console.error(`  - local delta refused: ${delta.reason}; complete full gate retained`);
   console.error(`  - tests: ${selection.mode}; ${selection.reason}; ${selection.files.length} changed paths${split?'; split gate (DS9): hosted CI runs the full suite, browser and timing files':''}`);
   if(proof!==null){
     console.error(`  - exact-tree green reuse: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
@@ -150,11 +160,16 @@ async function main(){
     // A split full-mode gate ran no complete suite, so it proves nothing reusable.
     if(context!==null&&!(split&&selection.mode==='full')){
       if(after===null||after.tree!==context.tree||after.runtime!==context.runtime)throw new Error('Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree');
-      const recorded=writePushProof(context,selection,seconds);console.error(`  - saved exact-tree proof run ${recorded.run} (${selection.mode})`);
+      const current=delta.eligible?localDeltaPlan(after,basis):null;
+      if(delta.eligible&&(!current?.eligible||current.proof?.run!==delta.proof?.run))throw new Error('Prior full proof changed or expired during the delta gate; rerun the full gate');
+      // Only authenticated disjoint composition covers the complete new tree.
+      const covered=delta.eligible?{mode:/** @type {const} */('full'),files:[]}:selection;
+      const recorded=writePushProof(context,covered,seconds,delta.eligible&&delta.proof!==null?{run:delta.proof.run,commit:delta.proof.commit}:undefined);
+      console.error(`  - saved exact-tree proof run ${recorded.run} (${covered.mode})${delta.eligible?`; inherited full ${delta.proof?.run} plus incoming delta`:''}`);
     }
   };
   console.error(`  - full push budget ${JSON.stringify(PUSH_BUDGET)}; nice ${getPriority()}; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
-  if(selection.mode==='docs'){
+  if(selection.mode==='docs'&&!delta.eligible){
     const result=await parallelChecks([
       {name:'lint (docs-only)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
       {name:'format:check (docs-only; history scan already green)',commands:[['pnpm','run','--silent','format:check']]},
@@ -187,13 +202,15 @@ async function main(){
   const report=localReport??(knownRed?resolve('tmp',`push-known-red-${process.pid}.json`):undefined);
   if(report!==undefined&&env.WS_PUSH_TIMINGS===undefined)mkdirSync(dirname(report),{recursive:true});
   const reporters=report===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${report}`];
-  const vitest=local===null
+  const vitest=delta.eligible&&selection.mode==='docs'
+    ?(selection.tests?.length?[{name:'vitest (incoming docs readers)',commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...selection.tests,...reporters]]}]:[])
+    :local===null
     ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]]}]
     :local.length===0?[]:[{name:`vitest (split ${selection.mode}: ${local.length} local)`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...local,...reporters]]}];
   // With known reds on, Vitest runs beside the static lane, not inside it: a Vitest red must not stop the static checks,
   // since a known red still lets the push go when everything else is green.
   const [rest,tests]=await Promise.all([
-    parallelChecks([...staticChecks(),{name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},...(knownRed?[]:vitest)],{env}),
+    parallelChecks([...staticChecks(),...(delta.eligible&&selection.mode==='docs'?[{name:'check:parity (incoming docs)',commands:[['pnpm','run','--silent','check:parity']]}]:[]),{name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},...(knownRed?[]:vitest)],{env}),
     knownRed?parallelChecks(vitest,{env}):Promise.resolve({ok:true,seconds:0,results:[],timedOut:false}),
   ]);
   let result={...rest,ok:rest.ok&&tests.ok,results:[...rest.results,...tests.results]},tolerated=false;

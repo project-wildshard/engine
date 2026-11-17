@@ -109,8 +109,10 @@ while read old new ref; do echo "$ref $new" >> "$PUSHED_LOG"; done
 const PRE_PUSH = `#!/bin/sh
 refs=$(cat)
 echo "land=\${WS_LAND_MAIN_PUSH:-0} $refs" >> "$PREPUSH_LOG"
+[ -n "\${WS_LOCAL_LAND_DELTA:-}" ] && printf '%s\\n' "$WS_LOCAL_LAND_DELTA" >> "$PREPUSH_DELTA_LOG"
 [ -f "$PREPUSH_FAIL" ] && { echo "pre-push: planted red check"; exit 1; }
 case "$refs" in *refs/heads/main*) if [ -f "$PREPUSH_RACE" ]; then rm "$PREPUSH_RACE"; sh "$RACE_SCRIPT"; fi ;; esac
+[ -n "\${WS_LAND_HOOK_ACK:-}" ] && node "$ACK_SCRIPT"
 exit 0
 `;
 
@@ -121,12 +123,12 @@ function fixture() {
   const root = mkdtempSync(resolve('tmp/codex-netlag', 'land-'));
   roots.push(root);
   const remote = join(root, 'remote.git'), repo = join(root, 'engine'), peer = join(root, 'peer'), bin = join(root, 'bin'), hooks = join(root, 'hooks');
-  const files = { pushed: join(root, 'pushed.log'), gh: join(root, 'gh.log'), prepush: join(root, 'prepush.log'), receipts: join(root, 'receipts.log'), state: join(root, 'gh-state.json'), fail: join(root, 'prepush-fail'), race: join(root, 'prepush-race'), raceScript: join(root, 'race.sh') };
+  const files = { pushed: join(root, 'pushed.log'), gh: join(root, 'gh.log'), prepush: join(root, 'prepush.log'), delta: join(root, 'delta.log'), receipts: join(root, 'receipts.log'), state: join(root, 'gh-state.json'), fail: join(root, 'prepush-fail'), race: join(root, 'prepush-race'), raceScript: join(root, 'race.sh') };
   const env: NodeJS.ProcessEnv = {
     ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'Land', GIT_AUTHOR_EMAIL: 'land@example.test', GIT_COMMITTER_NAME: 'Land', GIT_COMMITTER_EMAIL: 'land@example.test',
     PATH: `${bin}:${process.env['PATH'] ?? ''}`, FAKE_GH_STATE: files.state, PUSHED_LOG: files.pushed, PREPUSH_LOG: files.prepush,
-    PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript,
+    PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript, PREPUSH_DELTA_LOG: files.delta, ACK_SCRIPT: resolve('scripts/land-hook-ack.mjs'),
     WS_LAND_REPO: 'project-wildshard/fixture', WS_FLAKE_STRIKES: join(root, 'strikes.jsonl'), WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
     WS_SESSION_KEEP_ROOT: join(root, 'session-keep'),
     // MF12: never mint a real reader App token from a fixture, even on a machine that has the App's key.
@@ -259,6 +261,19 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['ls-tree', 'main', '--', 'src/local.ts'])).toBe('');
   }, 60_000);
 
+  test('FL5b: a red hook printing sample Git rejection text cannot retry as a green race', () => {
+    const f = fixture(); f.env['WS_LAND_MODE'] = 'local';
+    const wt = f.worktree('red-porcelain');
+    f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
+    writeFileSync(f.files.raceScript, readFileSync(f.peerScript('src/racer.ts', null, 'export const racer = 3;'), 'utf8'));
+    writeFileSync(join(f.root, 'hooks/pre-push'), '#!/bin/sh\ncat >> "$PREPUSH_LOG"\nsh "$RACE_SCRIPT"\nprintf "To /sample.git\\n!\\tHEAD:refs/heads/main\\t[remote rejected] (sample)\\nDone\\n"\necho "pre-push RED planted failure" >&2\nexit 1\n');
+    chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
+    expect(f.land(wt).status).toBe(1);
+    expect(prepushLines(f)).toHaveLength(1);
+    expect(f.read(f.files.receipts)).toContain('pre-push RED planted failure');
+    expect(f.git(f.remote, ['ls-tree', 'main', '--', 'src/local.ts'])).toBe('');
+  }, 60_000);
+
   test('J400: remote rejection after a green race cannot blame a passing CPU control', () => {
     const f = fixture();
     f.env['WS_LAND_MODE'] = 'local';
@@ -284,6 +299,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.land(wt).status).toBe(1);
     expect(f.remoteMain()).toBe(before);
     rmSync(f.files.fail);
+    const testedHead = f.git(wt, ['rev-parse', 'HEAD']);
     writeFileSync(f.files.raceScript, readFileSync(f.peerScript('src/racer.ts', null, 'export const racer = 3;'), 'utf8'));
     writeFileSync(f.files.race, '');
     const result = f.land(wt);
@@ -294,6 +310,9 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(lines[1]).not.toBe(lines[2]);
     expect(f.git(wt, ['show', 'HEAD:src/racer.ts'])).toContain('racer = 3');
     expect(f.read(f.files.gh)).toBe('');
+    const deltas = f.read(f.files.delta).trim().split('\n').map(line => JSON.parse(line) as { baseMain: string; testedHead: string; incomingMain: string; head: string });
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0]).toEqual({ baseMain: before, testedHead, incomingMain: f.git(f.peer, ['rev-parse', 'HEAD']), head: f.git(wt, ['rev-parse', 'HEAD']) });
   }, 60_000);
   test('MF12: a spent GitHub quota is waited out, not read as "no hosted ci run", and the plan lands', () => {
     const f = fixture(), wt = f.worktree('quota');
@@ -1307,6 +1326,33 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     // EV3b: ci.yml runs boundaries alone in its own job; the planner weighs it at its measured 258-392 s (p50 320).
     expect(names(packUnits(runUnits(0, ['boundaries']), 1))).toEqual([['boundaries']]);
     expect(runUnits(0, ['boundaries'])[0]).toMatchObject({ seconds: 320, blocking: true });
+  });
+
+  test('J400: Nine builds beside products and consumes only its own exact artifact', () => {
+    const text = readFileSync('.github/workflows/ci.yml', 'utf8');
+    const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
+    const build = jobs.get('nine-ring1-build') ?? '', observe = jobs.get('nine-ring1') ?? '';
+    expect(build).not.toMatch(/^ {4}needs:/mu);
+    expect(build).toContain('node scripts/ci-exact-reuse.mjs ci.yml');
+    expect(build).toContain('node scripts/ci-selection.mjs');
+    expect(build).toContain("steps.paths.outputs.docs != 'true'");
+    expect(build).toContain('code-run: ${{ steps.code.outputs.run }}');
+    expect(observe).toMatch(/^ {4}needs: nine-ring1-build$/mu);
+    expect(observe).toContain("needs.nine-ring1-build.outputs.code-run == 'true'");
+    expect(observe).not.toContain('needs.products');
+    for (const job of [build, observe]) expect(job).toContain('name: nine-ring1-client');
+    expect([...observe.matchAll(/uses: actions\/download-artifact@/gu)]).toHaveLength(1);
+    expect(build).toContain('node scripts/nine-ring1.mjs build');
+    expect(observe).toContain("node scripts/nine-ring1.mjs ${{ matrix.kind == 'load' && 'boot' || 'bench' }}");
+    // Observed free-runner budgets: the previous dependency chain took
+    // products496 + build216 + observation317 seconds, despite packed max571.
+    const costs = new Map([['products', 496], ['nine-ring1-build', 216], ['nine-ring1', 317]]);
+    const finish = (name: string): number => {
+      const needs = /^ {4}needs: (.+)$/mu.exec(jobs.get(name) ?? '')?.[1];
+      const parents = needs === undefined ? [] : needs.replaceAll(/[\[\]]/gu, '').split(',').map(value => value.trim());
+      return (costs.get(name) ?? 0) + Math.max(0, ...parents.map(finish));
+    };
+    expect(Math.max(571, finish('nine-ring1'))).toBeLessThanOrEqual(11 * 60);
   });
 
   test('J400 reserves T1 time on share nine and covers each existing unit once', () => {
