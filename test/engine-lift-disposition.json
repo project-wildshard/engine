@@ -13325,5 +13325,172 @@
     "sourceBlob": "ec4fdb0fe3b7c8331c2bcc3a551459af31011dd5",
     "destinationRevision": "shard-sky-reach@545eb3775786e2e5d1b1cbbae37f208fbd33fa7a + shard-dunes@00d9d01d0616c4462d15e304bfef781ff7efce3d",
     "retirementProof": "Hosted shard-sky-reach 44009915340 green on 545eb37757 (blob 0aa4466d59ee74faab04e41a10baed074dbd2033); Hosted shard-dunes CI run 44012089991 green on 00d9d01d06 (pnpm test:shards blocking, engine 0.1.32 pin 1e910630). (blob b7e1d00bbf4ceb6d6e1e10ca1c587d96dc48bb38)."
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-authored-manifest.test.ts",
+    "outcome": "migrated",
+    "target": "test/nine-authored-manifest.test.ts",
+    "ring": 1,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "test('Nine compiles a data-only entry without retired runtime imports', () => {",
+      "test('each computed boot binding refuses an absent current-product value', () => {"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "09aa313c1ea0a46282829da9f19ed55fc1e766b8",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "72c3fa727a41f46badda91a7ce056958598f3f1a",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 2,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-decal-binary.test.ts",
+    "outcome": "migrated",
+    "target": "test/nine-decal-binary.test.ts",
+    "ring": 1,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "for(const tier of ['phone','desktop'] as const)test(`${tier} decal uses the original PNG, costs and native pixels through declared file intake`,async()=>{"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "c980c969186d5cc8d206beb6f8ecf7d011ee2d1f",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "13a7f9dbf87da035641d7e5a0cd3f6ada1893bc1",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 2,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-geometry-writer.test.ts",
+    "outcome": "migrated",
+    "target": "test/nine-geometry-writer.test.ts",
+    "ring": 1,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "test('the writer retains typed vertex bytes, normalization, padding and index deltas', () => {",
+      "test('unsupported storage refuses with a precise diagnostic and no written blocks', () => {"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "ac221d7d88ad29eaec13177ff35933994a85ea48",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "b8332b60f085a89c4dc4793302072f94ff3db6df",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 2,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-product-inputs.test.ts",
+    "outcome": "migrated",
+    "target": "test/nine-product-inputs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "test('owned inputs compose the supplied view contract', () => {",
+      "test('the declaration factory admits supplied inputs instead of consulting a generated file', () => {"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "6f6602084e06a232ac4855468e4867d42878454b",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "6d9a25fce33ad0125ee4864cf4c70cec91b0509f",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 2,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-slab-bake.test.ts",
+    "outcome": "migrated",
+    "target": "test/nine-slab-bake.test.ts",
+    "ring": 1,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "test('Nine staged slabs equal the complete original fine joins, with bounded uploads and frozen bounds', async () => {"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "94f01c76f0bfbac99b84108f2b4695676414449d",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "4a79b39bd17e4f623cd76ddea6b82cbcf53fbc80",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 1,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-source-rows.test.ts",
+    "outcome": "migrated",
+    "target": "test/nine-source-rows.test.ts",
+    "ring": 1,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "test.each(originals)('$id preserves the original complete row payload', row => {"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "27bad9ade237f35ba8efbc1ae87da714cd72d1c9",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "497b1a5708fe7659c9dfb75790e4dc758074fa9e",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 10,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-headless-assembly.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-runtime/nine-headless-assembly.test.ts",
+    "ring": 2,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "test('the product ships the facts the fixture lent, as server files only', async () => {",
+      "test('a client locks a hook and rides it over the wire, and the save holds the crossing', async () => {"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "0c86aa18dce9804dd399c5e9a2f2b7fd06a33efb",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "a4740055d0a34802f99722386ef1dec3446d44e7",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 2,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-verb-tape.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-runtime/nine-verb-tape.test.ts",
+    "ring": 2,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "test('QB17 real LOCK and ZIP rise under the ring; the former flat path fails that rule',async()=>{",
+      "test('the negative native control cannot be used with another product',async()=>{"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "613f352338dda68f0ac39451aa2a43550b29de58",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "1d2b00e5db767de3ef15226f59ae9a551517e718",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 2,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-nine-dragon",
+    "file": "test/nine-walk-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-runtime/nine-walk-verbs.test.ts",
+    "ring": 2,
+    "decision": "CI21 C7/J232: every Nine case passes in its blocking owner source or post-build runtime suite. No cases retired. NB20 rail clearance is independently checked while predecessor byte pins remain intact; engine 0.1.32 entry proof needs 28 fewer ticks.",
+    "originalTests": [
+      "for(const id of ['stairs','street','well-rim'])test(`Nine ${id} follows the listed route on actual capsule collision`,async()=>{"
+    ],
+    "sourceRevision": "66e4edb1405d026efecc17552a531187ff47f805",
+    "sourceBlob": "23d925b136e1839dc43005b703153e89cda349e7",
+    "destinationCommit": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+    "destinationBlob": "aca79f9c9c12bc2063a8d46d6c95bf756eb1294c",
+    "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
+    "originalCases": 3,
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
   }
 ]
