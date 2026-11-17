@@ -997,7 +997,8 @@ try {
         });
         const { page } = entered;
         let navigations = 0;
-        page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
+        // a document load, not a same-document history step (the game's own replaceState also fires framenavigated)
+        page.on('domcontentloaded', () => { navigations++; });
         try {
           await page.goto(URL_PLAY); await intoWorld(entered);
           const retireAt = Date.now() + 25_000, settled = navigations;
