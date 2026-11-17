@@ -138,3 +138,20 @@ The broader117case/12file matrix, full types/lint pass (119distinct cases
 with the two added recovery controls). No repeated full local gate ran.
 The review's injected-port note is deliberate: layered ports must lend
 actual target binding; old flat/injected contracts remain supported.
+
+## SP5 rebase and format 0.16 qualification
+
+A stale watchdog carried the closed codex-netlag brief. Its current
+handoff confirms TS22d is DONE and DS4c belongs to pagesize. This lane
+keeps ONE-FORMAT ownership and the coordinator's M1-first/SA25a land order.
+
+Rebased17commits onto c6750bd1, which contains SP5's94f7fd6f. The two
+package/lock conflicts retain main's actual format0.16 registry pin and
+wire gitHosted provenance, replacing both the old temporary archive and
+our intermediate0.15 pin. No peer source was changed or main pushed.
+The rebased runtime source is3172f5903. Frozen installation, full types,
+game lint and121focused cases/13files pass, including the wire-lock
+controls. Both dedicated main and cellWorker production targets build
+against moved format exports through the normal heavy-lane admission:
+29.47s, output tmp/codex-te2e/m2-format16-server. This is a server build
+proof; no client visual or full local land is claimed.
