@@ -88,5 +88,6 @@ export const NATIVE_CONTENTION_SUITES = [
  * budget before collection. Split gates leave these files to hosted CI. */
 export const CPU_EXCLUSIVE_TESTS = [
   'test/net-bots.test.ts', 'test/net-bots-driftwood.test.ts', 'test/cook-cpu-limit.test.ts',
+  'test/layer-interest-grid.test.ts',
   ...NATIVE_CONTENTION_SUITES,
 ] as const;
