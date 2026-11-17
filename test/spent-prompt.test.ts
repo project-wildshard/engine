@@ -11,8 +11,8 @@ import { declaredKitItemFamilies, declaredLever } from '../src/client/game/plugi
 import { installDeclaredTargets, spentUses } from '../src/client/game/shard/declaredTargets';
 
 // TE-ENG6: a use target whose action can no longer run drops its prompt (and so the touch USE band, which shows the picked
-// prompt; a spent one keeps its place with no reach, so the pick order never changes). Rows only: Mossgate's brazier A names its own lit condition in `unless`; a kit.lever's rack (TE-ENG2) needs no row,
-// the page knows its lever is in hand. Rows that name neither keep their prompt whatever the fields say.
+// prompt; a spent one keeps its place with no reach, so the pick order never changes). Rows only: Mossgate's brazier A names its own lit condition in `unless`; a kit.lever's rack (TE-ENG2) is never spent: the server
+// restocks a lever in hand on its take (TC-E1d). Rows that name neither keep their prompt whatever the fields say.
 type Targets = Shardfile['targets'];
 interface Mossgate { readonly interactions: Targets['interactions']; readonly conditions: Shardfile['hooks']['conditions'] }
 interface LeverFixture { readonly row: Extract<Shardfile['items']['rows'][number], { kind: 'weapon' }>; readonly interaction: Targets['interactions'][number]; readonly itemActions: NonNullable<Targets['itemActions']> }
@@ -48,7 +48,7 @@ test('Mossgate: "Light brazier A" shows until A is lit, then is gone; the hut do
   expect(run.labels()).toEqual([]);
 });
 
-test('A kit.lever rack: "Take the rifle" shows until the server says it is taken', () => {
+test('A kit.lever rack: "Take the rifle" stays once taken, the server restocks it (TC-E1d)', () => {
   const family = declaredKitItemFamilies().get('kit.lever');
   if (family?.kind !== 'weapon') throw new Error('kit.lever is a weapon family');
   const scope = new Scope('lever');
@@ -59,9 +59,8 @@ test('A kit.lever rack: "Take the rifle" shows until the server says it is taken
   if (held === null) throw new Error('kit.lever builds a DeclaredLever');
   const run = page(source([...mossgate.interactions, lever.interaction], lever.itemActions), item => item === held.row.id && held.taken);
   expect(run.labels()).toContain('Take the rifle');
-  held.mirror(6, 12, false, true); run.frame(); // the server's owned `.taken` line
-  expect(run.labels()).not.toContain('Take the rifle');
-  expect(run.labels()).toEqual(['Open hut door', 'Light brazier A']);
+  held.mirror(6, 12, false, true); run.frame(); // the server's owned `.taken` line: its take restocks now (TC-SHIP-d)
+  expect(run.labels()).toEqual(['Open hut door', 'Light brazier A', 'Take the rifle']);
   run.scope.dispose(); scope.dispose();
 });
 

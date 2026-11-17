@@ -8,23 +8,20 @@ import { syncTargetColliders } from '../../../shared/game/shardfile/targets';
 import { rackMeleeRows } from '../../../shared/game/shardfile/items';
 
 type Interaction = ShardTargets['interactions'][number];
-/** The family whose rack take a held copy spends (TE-ENG2's lever-action). */
-const LEVER_FAMILY = 'kit.lever';
 
 /**
  * TE-ENG6: whether a declared use target can no longer run, so its prompt (and the touch USE band) goes. Two rules, both
- * from rows: the row's `unless` names a `hooks.conditions` row that holds now (a lit brazier), or its scene takes a
- * kit.lever this player already holds (a rack after the take). Any other row is never spent, so native and older rows
- * are unchanged.
+ * from rows: the row's `unless` names a `hooks.conditions` row that holds now (a lit brazier), or its scene takes a racked
+ * melee weapon this player already holds (TC-E4c: the server spends that rack). A kit.lever's take is never spent: the
+ * server restocks a lever already in hand on its take (TC-E1d), so a rack, an ammo box or a strongbox keeps its prompt.
+ * Any other row is never spent, so native and older rows are unchanged.
  */
 export function spentUses(source: Pick<Shardfile, 'targets' | 'hooks' | 'items'>, ports: {
   read: (scope: 'shared' | 'player', fieldId: number) => number; taken: (item: string) => boolean;
 }): (row: Interaction) => boolean {
   const conditions = new Map(source.hooks.conditions.map(row => [row.id, row]));
-  const levers = new Set<string>(source.items.rows.flatMap(row => row.kind === 'weapon' && row.family === LEVER_FAMILY ? [row.id] : []));
-  // TEMPLATE-E2E TC-E4c: a racked melee weapon's rack is spent once it is taken, as a lever's is
   const racked = rackMeleeRows(source);
-  const takes = new Map((source.targets.itemActions ?? []).flatMap(row => row.action === 3 && (levers.has(row.item) || racked.has(row.item)) ? [[row.scene, row.item] as const] : []));
+  const takes = new Map((source.targets.itemActions ?? []).flatMap(row => row.action === 3 && racked.has(row.item) ? [[row.scene, row.item] as const] : []));
   for (const row of source.targets.interactions) if (row.unless !== undefined && !conditions.has(row.unless)) throw new Error(`Missing declared condition ${row.unless}`);
   return row => {
     const condition = row.unless === undefined ? undefined : conditions.get(row.unless);
