@@ -11,6 +11,8 @@ import { addBakedTerrainCollider } from '@wildshard/engine/physics/terrainTiles'
 import { retireTerrain } from '@wildshard/engine/physics/terrain';
 import { timeClientPreparation } from './preparationTiming';
 import { wirePage } from './wirePage';
+import { installRaceClock } from './raceClock';
+import { RaceClockChip } from '@wildshard/engine/quest/view/ui';
 import { installDataPageMovers } from './dataPageMovers';
 import { installDataPageBodies } from './touchViews';
 import { admitClientPlan, installClientPhase, type AdmittedClientPlan, type ClientPhase } from './clientPlan';
@@ -532,6 +534,9 @@ export class ShardfileClient {
     }
     const ledger = new Ledger(ctx.app.saves, [{ id: identity.instance, shard: identity.shard }], [{ shard: identity.shard, revision: identity.revision, rules: source.ledger }], this.bindings.catalogue);
     // The server's ledger decides, and a page keeps its word where Progress reads: a feat counts and tells once, off its receipt.
+    // SHARD-SOURCE SS-MS1a3: a declared race's clock, off this player's race lines
+    const races = source.quests.races ?? [];
+    if (races.length > 0) installRaceClock(races, { system: ctx.system, line: name => wirePage.line(name), tick: () => wirePage.tick(), view: new RaceClockChip(ctx.scope) });
     wirePage.facts(ctx.scope, (name, id) => {
       const rule = source.ledger.find(row => row.fact === name);
       if (rule === undefined) return;

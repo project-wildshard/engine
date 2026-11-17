@@ -27,6 +27,16 @@
 @keyframes ws-quest-pulse { 0% { box-shadow: 0 0 0 1px rgba(143, 227, 255, 0.9), 0 0 22px rgba(143, 227, 255, 0.65); border-color: var(--ws-cyan); } 100% { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.28); border-color: var(--ws-cyan-line); } }
 #hud.intro .ws-quest-obj { display: none; }
 
+/* ── the race clock (SHARD-SOURCE SS-MS1a3): one glass chip at the top centre while a timed run runs, then its time and best ── */
+.ws-quest-race {
+  position: absolute; left: 50%; top: 18px; transform: translate(-50%, -6px); padding: 4px 12px; white-space: nowrap;
+  font-family: var(--ws-mono); font-size: 14px; line-height: 1.2; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; color: var(--ws-text);
+  background: var(--ws-glass); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none;
+}
+.ws-quest-race.show { opacity: 1; transform: translate(-50%, 0); }
+#hud.intro .ws-quest-race { display: none; }
+
 /* ── dialogue: a glass panel above the touch bar / the bottom of the screen ── */
 .ws-quest-talk { position: absolute; z-index: calc(var(--ws-layer-hud) + 7); left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); width: min(92vw, 560px); transform: translate(-50%, 12px); opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; padding: 12px 16px 12px 16px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 14px 40px rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .ws-quest-talk.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }

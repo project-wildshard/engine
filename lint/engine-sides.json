@@ -930,6 +930,7 @@
     "src/client/game/shardfile/client.ts": "client",
     "src/client/game/shardfile/dataPageMovers.ts": "client",
     "src/client/game/shardfile/declaredTalks.ts": "client",
+    "src/client/game/shardfile/raceClock.ts": "client",
     "src/client/game/shardfile/clientAmbientLife.ts": "client",
     "src/client/game/shardfile/clientAssets.ts": "client",
     "src/client/game/shardfile/clientBossFight.ts": "client",

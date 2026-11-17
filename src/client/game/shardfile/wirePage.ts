@@ -123,6 +123,8 @@ export class WirePage {
   readonly offstage: Record<string, number> = {};
   unbuilt(what: string): void { this.offstage[what] = (this.offstage[what] ?? 0) + 1; }
 
+  /** The latest frame's server tick, or null before one. */
+  tick(): number | null { return this.client?.latest?.tick ?? null; }
   /** One of this player's lines as the server last said it: 0 for none. */
   line(name: string): number { return this.client?.owned.get(name) ?? 0; }
   /** Run `use` once there is a client, now or later, until `scope` ends. What it returns runs when `scope` does. */

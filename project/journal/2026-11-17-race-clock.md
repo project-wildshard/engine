@@ -16,3 +16,12 @@ runs their own. The owned lines `race:<id>` (running start tick),
 My first `finish` name shadowed the dialogue `finish(id, player)`: the
 test caught it ("Unknown quest player [object Object]"); the race
 methods are `finishRace` and `lapseRaces`.
+
+## The page shows the clock (SHARD-SOURCE SS-MS1a3)
+
+`installRaceClock` reads the race lines off the wire page each frame:
+while `race:<id>` is up it counts from that tick to the latest frame's
+tick (`wirePage.tick()`), and when `.runs` rises it shows the finish
+time and the best for five seconds in a glass chip at the top centre
+(`RaceClockChip`). A page that joins after a finish records the count
+first and shows nothing stale.

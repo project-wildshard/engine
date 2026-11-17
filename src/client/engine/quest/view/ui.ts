@@ -104,6 +104,17 @@ export class ObjectiveLine {
 /** One answer a dialogue node offers: its label, and what taking it does. */
 export interface DialogueChoice { readonly label: string; readonly pick: () => void }
 
+/** SHARD-SOURCE SS-MS1a3: the race clock, a slim glass chip at the top centre: the running time, then the finish time and the best. */
+export class RaceClockChip {
+  readonly scope: Scope;
+  readonly root: HTMLDivElement = el('div', 'ws-quest-race');
+  constructor(owner: Scope) { this.scope = uiScope('race-clock', owner); mountUi(this.root, this.scope, hudRoot()); }
+  show(text: string | null): void {
+    if (text !== null) this.root.textContent = text;
+    this.root.classList.toggle('show', text !== null);
+  }
+}
+
 export class DialogueBox {
   readonly root: HTMLDivElement = el('div', 'ws-quest-talk');
   private name = el('div', 'ws-quest-talk-name', this.root);
