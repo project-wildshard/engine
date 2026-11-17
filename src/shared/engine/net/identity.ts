@@ -14,7 +14,8 @@ export interface NetIdentity { readonly player: string; readonly name: string }
 export const GUEST: NetIdentity = { player: 'guest', name: 'Guest' };
 /** An identity fit for the room; the Name is cleaned there, server-side, with chat. */
 export const NetIdentitySchema: v.GenericSchema<NetIdentity> = v.strictObject({
-  player: v.pipe(v.string(), v.regex(/^[a-zA-Z0-9._:-]{1,128}$/u)),
+  // MP2.2c: or a signed-in page's join ticket, which the door checks (`server/host/dedicated/ticket.ts`).
+  player: v.pipe(v.string(), v.regex(/^(?:[a-zA-Z0-9._:-]{1,128}|ticket:[0-9a-f]{32}\.device:[A-Za-z0-9-]{1,64}\.[0-9]{1,12}\.[0-9a-f]{128})$/u)),
   name: v.pipe(v.string(), v.minLength(1), v.maxLength(MAX_NAME_LENGTH)),
 });
 

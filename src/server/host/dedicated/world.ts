@@ -13,7 +13,8 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { cleanName } from '@wildshard/engine/net/chatFilter';
 import { NetIdentitySchema } from '@wildshard/engine/net/identity';
-import { decodeFirstMessage } from '@wildshard/wire/handshake';
+import { PLAYER_TICKET_PUBLIC_KEY, admit } from './ticket';
+import { decodeFirstMessage, encodeHello } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { decodeEnter, encodeArrive, encodeCountdown, encodeEnter, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
@@ -91,6 +92,8 @@ export interface PlayerSaves {
   /** Actual durable transaction observations. Memory-only stores omit this capability. */
   onSave?: (listener: (status: PersistenceStatus) => void) => () => void;
   report: (report: ChatReport, shard: string) => boolean;
+  /** MP2.2d: move a device's guest progress to an account with none; whether anything moved. Left out, nothing is claimed. */
+  claim?: (device: string, account: string) => Promise<boolean>;
   /** MP2.4: claim a cleaned Name for this device and answer what everyone reads (`Name#1234`). Left out, the Name goes as typed. */
   name?: (device: string, name: string) => Promise<string>;
   /** Wait for what is on its way, at most `ms`. */
@@ -126,6 +129,8 @@ export interface WorldOptions {
   readonly voiceIce?: () => Promise<readonly VoiceIceServer[]>;
   /** VH10: which forwarded header a loopback proxy may set (`doorTrust`); `caddy` when absent. */
   readonly trustProxy?: TrustProxy;
+  /** MP2.2c: the api-server's join-ticket key, SPKI DER hex; the pinned `PLAYER_TICKET_PUBLIC_KEY` when absent. */
+  readonly ticketKey?: string;
   /** VH10: the pages a browser may open a socket from; `null` is any. The game's own hosts when absent. */
   readonly allowedOrigins?: readonly string[] | null;
   /**
@@ -490,8 +495,14 @@ export class World {
       });
     } finally { this.finds.delete(id); scope.dispose(); }
   }
+  /** MP2.2d: a device's guest progress to the account a ticket seats; a failed claim leaves both as they were and the join goes on. */
+  private async claim(device: string, account: string): Promise<void> {
+    try { if (await this.options.saves.claim?.(device, account) === true) this.options.log({ at: 'saves.claimed' }); }
+    catch (error) { this.options.log({ at: 'saves.claim-failed', error: error instanceof Error ? error.message : String(error) }); }
+  }
   /** The join: check, find where they stand, let them load, seat them. */
-  private async hello(end: SocketTransport, bytes: ArrayBuffer, goto: string | null): Promise<void> {
+  private async hello(end: SocketTransport, sent: ArrayBuffer, goto: string | null): Promise<void> {
+    let bytes = sent;
     const view = new Uint8Array(bytes);
     // WR5 (5.5, J54 replaced): the door reads the v1 bootstrap. A v0.1.x hello or an older major reloads, a newer major
     // retries, and the minor window is one either way; builds no longer have to match.
@@ -502,7 +513,16 @@ export class World {
     if (hello.minor !== WIRE_MINOR && Math.abs(hello.minor - WIRE_MINOR) > 1) { this.refuse('stale-build'); end.close(hello.minor > WIRE_MINOR ? 'retry' : 'reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
-    const device = said.output.player, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
+    // MP2.2c: a live join ticket seats its account; anything else, the device it names.
+    const admitted = await admit(said.output.player, this.options.ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, Date.now());
+    if (admitted === undefined) { this.refuse('identity'); end.close('refused'); return; }
+    const { seat } = admitted;
+    // MP2.2d: the first sign-in from a device with guest progress moves it to the account, once (`saves/claim.ts`).
+    if (admitted.from !== undefined) await this.claim(admitted.from, seat);
+    if (!end.isOpen || this.draining) return;
+    // The cells read the seat, never the ticket: the hello they get names it (the ticket is a bearer credential, kept nowhere).
+    if (seat !== said.output.player) bytes = encodeHello({ ...hello, player: seat }).slice().buffer;
+    const device = seat, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
     // ZE9c: a zone entry this device's last socket left mid-load, while its road still holds the body: it goes on into the cell, as a goto
     const redial = this.redials.get(device);
     this.redials.delete(device);
