@@ -1841,6 +1841,7 @@
     "src/shared/game/shardfile/dataCreaturePorts.ts": "shared",
     "src/shared/game/shardfile/entryOwners.ts": "shared",
     "src/shared/game/shardfile/fileInputs.ts": "shared",
+    "src/shared/game/shardfile/gates.ts": "shared",
     "src/shared/game/shardfile/identity.ts": "shared",
     "src/shared/game/shardfile/items.ts": "shared",
     "src/shared/game/shardfile/ktx2Targets.ts": "shared",
