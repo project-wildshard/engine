@@ -61,7 +61,10 @@ def fixture(work, leak):
     signal.signal(signal.SIGTERM, interrupted)
     try:
         wait_for(lambda: all((work / f'{kind}-ready').exists() for kind in kinds))
-        (work / 'ready').write_text(json.dumps([child.pid for child in children]))
+        # Readers open the PID list as soon as ready exists.
+        pending = work / 'ready.partial'
+        pending.write_text(json.dumps([child.pid for child in children]))
+        pending.replace(work / 'ready')
         wait_for(lambda: (work / 'go').exists())
         if not leak:
             for child in children:
