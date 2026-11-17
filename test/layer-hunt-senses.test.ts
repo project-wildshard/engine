@@ -3,34 +3,12 @@ import { expect, test } from "vitest";
 import { parse, object, boolean, number } from "valibot";
 import type { CreatureSenses } from "@wildshard/format/creatureLayers";
 import { parseRows } from "@wildshard/format/rows";
-import { HuntTuningSchema } from "@wildshard/format/speciesPrograms";
 import { createShardfileSim } from "../src/server/game/plugin/simulation";
 import { loadRapier } from "../src/shared/engine/physics/rapier";
 import { addPiece } from "../src/shared/engine/physics/pieces";
-import { groundFixture } from "./fixtures/plain-ground";
-import { FIXTURE_HUNT_TUNING } from "./fixtures/hunt-tuning";
+import { huntFixture as source } from "./fixtures/layer-hunt";
 
 const rapier = loadRapier(readFileSync("public/assets/physics/rapier.wasm"));
-function source(senses?: CreatureSenses) {
-  const shard = groundFixture(),
-    species = shard.rows.species[0],
-    spawn = shard.creatures.spawns[0];
-  if (species === undefined || spawn === undefined) throw new Error("Missing actual hunt source");
-  species.temperament = {
-    brain: "hunt",
-    reaction: "aggressive",
-    leash: 200,
-    assist: 0,
-    home: { speed: 2, stop: 0.5 },
-    tuning: parse(HuntTuningSchema, { ...FIXTURE_HUNT_TUNING, hp: 117, noticeRate: 1 }),
-  };
-  if (senses !== undefined) species.senses = senses;
-  shard.creatures.brains = [];
-  spawn.brain = null;
-  shard.spawn = { x: 0, y: 0, z: 0, yaw: 0 }; // seven metres in front
-  shard.rows = parseRows(shard.rows);
-  return shard;
-}
 const memorySchema = object({ memory: object({ sensed: boolean(), awareness: number() }) });
 function memory(host: ReturnType<typeof createShardfileSim>["host"]) {
   const saved = host.adapters.get("brain.fixture.actor")?.snapshot();

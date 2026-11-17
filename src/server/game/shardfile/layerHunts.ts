@@ -12,6 +12,7 @@ import { bindCreatureSenses } from './creatureSenses';
 
 const finite = v.pipe(v.number(), v.finite());
 const Saved = v.strictObject({ contract: v.string(), clock: finite, memory: v.unknown(),
+  target: v.exactOptional(v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(128)))),
   noise: v.strictObject({ seen: v.boolean(), speed: finite, prev: v.tuple([finite, finite, finite]) }),
   sight: v.array(v.nullable(v.boolean())),
 });
@@ -61,15 +62,29 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
   });
   for (const { spawn, actor, id, species, perception, contract } of prepared) {
     const player = new Vector3().copy(host.nearestPlayer(actor.position).position);
+    let selected: string | null = null, observed: ReturnType<SimHost['nearestPlayer']> | undefined;
+    const observe = () => {
+      if (perception === undefined) observed = host.nearestPlayer(actor.position);
+      else {
+        observed = selected === null ? undefined : host.players.get(selected);
+        if (observed === undefined || !observed.health.alive || host.parked.has(observed.id)
+          || (actor.state !== 'charge' && actor.state !== 'stalk' && actor.state !== 'flee')) {
+          observed = perception.nearest(); selected = observed?.id ?? null;
+        }
+        if (observed !== undefined) host.focusPlayer(observed.id);
+      }
+      if (observed !== undefined) player.copy(observed.position);
+    };
     const hunt = new StalkerBrain<AnimalSim>({ pattern: 'hunt', config: { rng: host.rng.stream('ai'),
       fight: {}, faunaTuning: () => undefined, species: () => species }, player, sampleTerrain: () => undefined,
       ports: { ground, nav: () => null, reach: (body, target) => canReach(body, target, host.physics),
         wanderGoal: () => null, unaware: () => {
-          const nearest = host.nearestPlayer(actor.position);
-          return !nearest.health.alive || perception?.notices(nearest) === false;
+          if (perception === undefined) return !host.nearestPlayer(actor.position).health.alive;
+          return observed === undefined || !observed.health.alive || host.parked.has(observed.id);
         },
         now: () => host.clock.now * 1000, sound: () => undefined,
-        charge: (body, damage) => { const target = host.nearestPlayer(body.position);
+        charge: (body, damage) => { const target = perception === undefined ? host.nearestPlayer(body.position) : observed;
+          if (target === undefined || (perception !== undefined && (!target.health.alive || host.parked.has(target.id)))) return;
           host.combat.hit({ source: body.combatActor(), sourceTags: [`creature.${spawn.species}`], target: target.health,
             amount: damage, point: body.position.clone(), dir: new Vector3().subVectors(target.position, body.position).normalize(), cause: { kind: body.kind, label: body.label } }); },
       } });
@@ -82,28 +97,38 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       player, noise, sight, reach: (body, target) => canReach(body, target, host.physics), brainDt: (body, urgent) => host.brainDt(body, urgent) });
     host.onStep(id, dt => {
       if (!host.bodyPresent(actor.entityId)) return;
-      player.copy(host.nearestPlayer(actor.position).position);
+      observe();
       hunt.beginTick(dt); clock += dt; cadence.observe(dt); cadence.decide();
       const bodyDt = host.bodyDt(actor.entityId);
       if (bodyDt > 0 && actor.alive && !actor.stunned && !actor.harnessHold && actor.state === 'charge') hunt.advanceCharge(actor, bodyDt, player);
     }, { snapshot: () => JSON.stringify({ contract, clock, memory: huntMemoryCodec.save(memory),
+      ...(perception === undefined ? {} : { target: selected !== null && host.players.has(selected) ? selected : null }),
       noise: { seen: noise.seen, speed: noise.speed, prev: noise.prev.toArray() }, sight }),
     restore: saved => {
       if (typeof saved !== 'string') throw new Error('Invalid layer hunt continuation');
       const state = v.parse(Saved, JSON.parse(saved));
       if (state.contract !== contract || state.sight.length !== 1) throw new Error('Incompatible layer hunt continuation');
+      if (perception === undefined ? state.target !== undefined : state.target === undefined || (state.target !== null && !host.players.has(state.target)))
+        throw new Error('Incompatible sensed hunt target continuation');
       huntMemoryCodec.restore(memory, state.memory);
       hunt.beginTick(state.clock - clock); clock = state.clock;
       noise.seen = state.noise.seen; noise.speed = state.noise.speed; noise.prev.set(...state.noise.prev); sight[0] = state.sight[0] ?? null;
+      selected = state.target ?? null;
     } });
     host.onStep(`${id}.contact`, () => {
       if (host.bodyDt(actor.entityId) <= 0 || !actor.alive || actor.stunned || actor.harnessHold || actor.state !== 'charge') return;
-      player.copy(host.nearestPlayer(actor.position).position); hunt.chargeContact(actor, player);
+      observe(); hunt.chargeContact(actor, player);
     }, undefined, 'afterBodies');
     host.events.on('damage.dealt', ({ req, killed }) => {
       if (req.target !== actor.combatActor()) return;
       if (species.reaction === 'neutral' && (req.source === 'env' || host.players.get(req.source.id)?.health !== req.source)) return;
-      player.copy(host.nearestPlayer(actor.position).position); cadence.damaged(req.target, killed);
+      if (perception !== undefined) {
+        const source = req.source === 'env' ? undefined : host.players.get(req.source.id);
+        observed = source !== undefined && source.health === req.source ? source : host.nearestPlayer(actor.position);
+        selected = observed.id; player.copy(observed.position);
+        if (!host.parked.has(observed.id)) host.focusPlayer(observed.id);
+      } else observe();
+      cadence.damaged(req.target, killed);
     }, host.scope);
   }
 }
