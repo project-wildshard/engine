@@ -27,7 +27,9 @@ const mirror = (): void => {
   if (typeof document === 'undefined') return;
   try { document.documentElement.toggleAttribute('data-dev', on); } catch { /* a stub document with no root element */ }
 };
-mirror();
+// FM1b: at load the mirror only adds. A second copy of this module in its own bundle (online.js, whose saves have no storage)
+// reads "off" and must not take the page's Developer mark away: index.html set it from the saved key; only setDev removes it.
+if (on) mirror();
 
 export function isDev(): boolean { return on; }
 

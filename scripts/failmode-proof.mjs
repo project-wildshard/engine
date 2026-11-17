@@ -710,7 +710,7 @@ try {
     try {
       await page.goto(URL_PLAY); await intoWorld(entered);
       const list = page.locator('[data-kind="gallery"]');
-      const openGallery = async () => {
+      const openGallery = async (again = true) => {
         if (await list.isVisible().catch(() => false)) return;
         const filter = page.locator('.ws-gmenu.show .ws-dbg-filter:visible').first();
         if (!await filter.isVisible().catch(() => false)) {
@@ -724,7 +724,10 @@ try {
           if (await tools.evaluate(node => node.classList.contains('folded')).catch(() => false)) await tools.locator('.ws-gmenu-cardtitle').first().click({ timeout: 10_000 });
         }
         await filter.fill('Failure screens');
-        await page.locator('.ws-gmenu.show .ws-dbg-row:visible', { hasText: 'Failure screens' }).locator('.ws-dbg-action:visible').first().click({ timeout: 10_000 });
+        const opened = await page.locator('.ws-gmenu.show .ws-dbg-row:visible', { hasText: 'Failure screens' }).locator('.ws-dbg-action:visible').first().click({ timeout: 10_000 }).then(() => true, () => false);
+        // a screen that left the menu behind something (a page the prototype drew over it): close the menu and walk in again, once
+        if (!opened && again) { for (let tries = 0; tries < 3 && await page.locator('.ws-gmenu.show').isVisible().catch(() => false); tries++) await page.keyboard.press('Escape'); await openGallery(false); return; }
+        if (!opened) throw new Error('the Failure screens row could not be opened');
         await list.waitFor({ state: 'visible', timeout: 15_000 });
       };
       for (const size of [{ width: 402, height: 874 }, { width: 1440, height: 900 }]) {
