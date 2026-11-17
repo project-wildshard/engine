@@ -33,7 +33,7 @@ export function steerFrame(input: readonly number[]): Pick<MoverFrame, 'steer' |
 /** A detached next state; the existing world validates and commits it before publishing collision or views. */
 export interface MoverAdvance { readonly entity: ScriptEntity; readonly effects: readonly ScriptEffect[] }
 const tau = 2 * Math.PI;
-const wrap = (angle: number): number => angle - Math.floor(angle / tau + 0.5) * tau;
+const wrap = (angle: number): number => Math.max(-Math.PI, Math.min(Math.PI, angle - Math.floor(angle / tau + 0.5) * tau)); // fields hold [-π, π] exactly
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const clamp = (x: number): number => Math.min(1, Math.max(0, x));
 function sine(value: number): number {

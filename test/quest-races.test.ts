@@ -124,5 +124,7 @@ test('a finish and a lapse lower the race\'s resets, so a second run counts its 
     steps(host, Math.ceil(CAP / FIXED_STEP) + 2);
     expect(quests.race('arch', player)?.running).toBeNull();
     expect(flags.has('run.mid')).toBe(false); // a lapse lowers it too
+    flags.set('run.mid'); flags.set('run.go'); // a gate crossed before the run does not count in it
+    expect(flags.has('run.mid')).toBe(false);
   } finally { host.dispose(); }
 });

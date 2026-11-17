@@ -110,7 +110,7 @@ export class DeclaredQuests {
         if (!on || this.books.restoring) return;
         for (const race of races) {
           const run = runs.get(race.id); if (run === undefined) continue;
-          if (flag === race.start) { run.running = this.host.state.tick; book.flags.set(race.stop, false); }
+          if (flag === race.start) { run.running = this.host.state.tick; for (const lowered of [race.stop, ...race.resets ?? []]) book.flags.set(lowered, false); } // a run counts only gates crossed in it
           else if (flag === race.stop && run.running !== null) this.finishRace(book, race, run);
         }
       });

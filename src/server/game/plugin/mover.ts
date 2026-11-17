@@ -324,9 +324,11 @@ export class MoverRuntime {
   takeRideTransitions(id: string): readonly MoverRideTransition[] { return this.rideEvents.get(id)?.splice(0) ?? []; }
   /** Borrow the same declared prompts on the page; the native command names are the stable mover ids. */
   ridePrompts(): Interactable[] {
-    const busy = (): boolean => this.riding();
-    return this.data.flatMap(row => row.carry?.prompts.map((prompt, end): Interactable => ({ position: new Vector3(...this.promptAt(row, prompt.at)),
-      get radius() { return busy() ? 0 : prompt.radius; }, label: prompt.label,
+    const busy = (): boolean => this.riding(), at = (row: MoverData[number], local: readonly [number, number, number]): Vector3 => new Vector3(...this.promptAt(row, local));
+    // a steer vehicle's board prompt shows while it is free and its leave prompt while it is ridden; both ride with it (SS-MS2a1b)
+    const shown = (row: MoverData[number], end: number): boolean => row.driver?.kind === 'steer' ? this.riding(row.id) === (end === 1) : !busy();
+    return this.data.flatMap(row => row.carry?.prompts.map((prompt, end): Interactable => ({ get position() { return at(row, prompt.at); },
+      get radius() { return shown(row, end) ? prompt.radius : 0; }, label: prompt.label,
       wireId: carryPrompt(row.id, end), onInteract: () => { this.command(row.id, end === 0 ? 1 : 2); } })) ?? []);
   }
   /** A carry prompt where it stands now: a steer vehicle's prompts ride with it (SS-MS2a1b), every other carry's are fixed. */
@@ -358,7 +360,11 @@ export class MoverRuntime {
     for (const [id, carry] of this.carryPoses) {
       const named = this.riders.get(id), rider = host.players.get(named ?? this.nativeOwner);
       if (!carry.riding) this.riders.delete(id);
-      if (rider === undefined) continue; // left the world mid-ride: the boat goes on without them
+      if (rider === undefined) {
+        // left the world mid-ride: the boat goes on without them; a steer vehicle is let go, so another can board it
+        if (carry.riding && this.data.some(row => row.id === id && row.driver?.kind === 'steer')) { this.pending.set(id, 2); }
+        continue;
+      }
       rider.position.set(...carry.at); rider.motor.resetAt(rider.position); rider.velocity.y = 0; rider.fall.grounded = false; if (!carry.riding) rider.yaw = carry.yaw;
     }
     this.carryPoses.clear();

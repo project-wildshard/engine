@@ -43,9 +43,13 @@ test('a riderless land-sail stands; its rider boards, steers a curve, boosts and
     expect(motion.pose(row.id).position).toEqual({ x: 0, y: 1, z: 0 });
     expect(motion.riding(row.id)).toBe(false);
 
+    const [board, leave] = motion.ridePrompts();
+    expect([board?.radius, leave?.radius]).toEqual([3, 0]); // free: only the board prompt shows
     motion.command(row.id, 1); run(host, 1, 0, 0);
     expect(motion.riding(row.id)).toBe(true); expect(motion.carrying()).toBe(true);
+    expect([board?.radius, leave?.radius]).toEqual([0, 3]); // ridden: only the leave prompt shows
     run(host, 60, 0, -1); // forward is -z at heading 0
+    expect(leave?.position.z).toBeCloseTo(motion.pose(row.id).position.z, 9); // the prompts ride with the vehicle
     const straight = motion.pose(row.id).position;
     expect(straight.z).toBeLessThan(-4); expect(Math.abs(straight.x)).toBeLessThan(1e-9); expect(straight.y).toBe(1);
     expect(leadPlayer(host).position.distanceTo({ x: straight.x, y: straight.y + carry.seat, z: straight.z } as never)).toBeLessThan(0.2);
