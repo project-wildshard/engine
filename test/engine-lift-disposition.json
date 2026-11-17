@@ -13176,5 +13176,93 @@
     "sourceRevision": "f9a2dd4c2925714e89c06218f953a599a6fb4389",
     "sourceBlob": "093f69907e0fd52c80fd539a637a800656498337",
     "retirementProof": "Historical source deletion: sharddev3c8ee599759c6cb50bf6ba5481991634795fa901; engine HR9 already removed the census. SDK runtime/syntax proof would otherwise require reviving removed production code."
+  },
+  {
+    "repo": "shard-sky-reach",
+    "file": "test/scripts/far-reach-roc.test.ts",
+    "outcome": "migrated",
+    "target": "test/scripts/far-reach-roc.test.ts",
+    "decision": "CI21 C8 verified destination landing (mini-ci21b): every original case and assertion runs in shard-sky-reach blocking pnpm test:shards on engine 0.1.32; no cases retired. Public builtProduct/scriptScenario imports only.",
+    "originalTests": [
+      "Roc published guest chooses three phases and resumes without replaying gameplay"
+    ],
+    "sourceRevision": "777bc5a01c80b8b3d56e986a98910d58bd25f91b",
+    "sourceBlob": "54ce757b690a2583635d4d8f0ea4e66198ce51ba",
+    "destinationRevision": "545eb3775786e2e5d1b1cbbae37f208fbd33fa7a",
+    "retirementProof": "Hosted shard-sky-reach CI run 44009915340 green on 545eb37757 (ring-2 job: pnpm test:shards 26 files, each ported file passed). Destination blob 7ff8828daf72d63fd948d54215376f5e2d0cc846."
+  },
+  {
+    "repo": "shard-sky-reach",
+    "file": "test/sky-original-rigs.test.ts",
+    "outcome": "migrated",
+    "target": "test/sky-original-rigs.test.ts",
+    "decision": "CI21 C8 verified destination landing (mini-ci21b): every original case and assertion runs in shard-sky-reach blocking pnpm test:shards on engine 0.1.32; no cases retired. Public immutable import; the 2 MB phone storm-roc oracle (sha256 70e5655f, a retired build output) is frozen under test/fixtures/sky-rigs, and the test creates tmp/ before mkdtemp.",
+    "originalTests": [
+      "complete original rig oracles work with neither retired handoff and reject corrupted frozen bytes"
+    ],
+    "sourceRevision": "777bc5a01c80b8b3d56e986a98910d58bd25f91b",
+    "sourceBlob": "679f207fbe14b2569313318f7cbdc06ac3977fab",
+    "destinationRevision": "545eb3775786e2e5d1b1cbbae37f208fbd33fa7a",
+    "retirementProof": "Hosted shard-sky-reach CI run 44009915340 green on 545eb37757 (ring-2 job: pnpm test:shards 26 files, each ported file passed). Destination blob e73348ed57913b2ca99cc66987480d38cda3d73c."
+  },
+  {
+    "repo": "shard-sky-reach",
+    "file": "test/sky-prepared-model-product.test.ts",
+    "outcome": "migrated",
+    "target": "test/sky-prepared-model-product.test.ts",
+    "decision": "CI21 C8 verified destination landing (mini-ci21b): every original case and assertion runs in shard-sky-reach blocking pnpm test:shards on engine 0.1.32; no cases retired. Public engine/SDK imports; the shard source root is src/ where engine had src/shards/far-reach.",
+    "originalTests": [
+      "the SDK-built product publishes receipt-backed geometry and discovery",
+      "all original tiles admit from owned output with no project asset files"
+    ],
+    "sourceRevision": "777bc5a01c80b8b3d56e986a98910d58bd25f91b",
+    "sourceBlob": "7c0d4f5d5d4959ef884153eeec82396d0bb61e74",
+    "destinationRevision": "545eb3775786e2e5d1b1cbbae37f208fbd33fa7a",
+    "retirementProof": "Hosted shard-sky-reach CI run 44009915340 green on 545eb37757 (ring-2 job: pnpm test:shards 26 files, each ported file passed). Destination blob ba2edab07ffadbadb6caffd80f7caea27abd1175."
+  },
+  {
+    "repo": "shard-sky-reach",
+    "file": "test/sky-roost-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/sky-roost-verbs.test.ts",
+    "decision": "CI21 C8 verified destination landing (mini-ci21b): every original case and assertion runs in shard-sky-reach blocking pnpm test:shards on engine 0.1.32; no cases retired. Installed-engine loader. Runner sky-roost-run.ts, SkyTape (test/proof/far-reach/tape.ts) and the far-reach proof worker moved with it; the session takes the shard sky-verbs prepare module by URL (engine 0.1.32 productSession); physics from the installed engine rapier package (identical bytes).",
+    "originalTests": [
+      "Sky earns the roost with actual fan swings, while the same walk without swings cannot"
+    ],
+    "sourceRevision": "777bc5a01c80b8b3d56e986a98910d58bd25f91b",
+    "sourceBlob": "2befefdbcba45aecd35c5cdb5af7b0d32a4e26bf",
+    "destinationRevision": "545eb3775786e2e5d1b1cbbae37f208fbd33fa7a",
+    "retirementProof": "Hosted shard-sky-reach CI run 44009915340 green on 545eb37757 (ring-2 job: pnpm test:shards 26 files, each ported file passed). Destination blob a9d0092b0f1b06425aa795125d089573dfd10dfb."
+  },
+  {
+    "repo": "shard-sky-reach",
+    "file": "test/sky-quest-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/sky-quest-verbs.test.ts",
+    "decision": "CI21 C8 verified destination landing (mini-ci21b): every original case and assertion runs in shard-sky-reach blocking pnpm test:shards on engine 0.1.32; no cases retired. Installed-engine loader. Runner sky-verbs-run.ts moved with it; as sky-roost-verbs for session and physics.",
+    "originalTests": [
+      "Sky priority verbs use real movement, actions and fresh native replay",
+      "Sky gust verbs use real movement, actions and fresh native replay"
+    ],
+    "sourceRevision": "777bc5a01c80b8b3d56e986a98910d58bd25f91b",
+    "sourceBlob": "d1a5c943348539a6f5e8a3b2ac2474a396b5ade9",
+    "destinationRevision": "545eb3775786e2e5d1b1cbbae37f208fbd33fa7a",
+    "retirementProof": "Hosted shard-sky-reach CI run 44009915340 green on 545eb37757 (ring-2 job: pnpm test:shards 26 files, each ported file passed). Destination blob 2177c3f7002f6b83831d9026e45b8e09fa84c9a8."
+  },
+  {
+    "repo": "shard-sky-reach",
+    "file": "test/sky-progression-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/sky-progression-verbs.test.ts",
+    "decision": "CI21 C8 verified destination landing (mini-ci21b): every original case and assertion runs in shard-sky-reach blocking pnpm test:shards on engine 0.1.32; no cases retired. Installed-engine loader; same runner as sky-roost-verbs.",
+    "originalTests": [
+      "Sky turns all three vanes through real GUSTs; movement alone cannot turn them",
+      "Sky earns the winch after the roost and vanes; omitting USE cannot raise the bridge",
+      "Sky defeats the Storm Roc with actual fan contacts and exact fresh-worker replay"
+    ],
+    "sourceRevision": "777bc5a01c80b8b3d56e986a98910d58bd25f91b",
+    "sourceBlob": "530604bdd324fcfd847642ea2b7973498de41e91",
+    "destinationRevision": "545eb3775786e2e5d1b1cbbae37f208fbd33fa7a",
+    "retirementProof": "Hosted shard-sky-reach CI run 44009915340 green on 545eb37757 (ring-2 job: pnpm test:shards 26 files, each ported file passed). Destination blob 66488833009adbe2fb06c7d94f51848ff4be563e."
   }
 ]

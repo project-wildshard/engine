@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 test.each([
   'ground-borrowed-body', 'matriarch-borrowed-body', 'roc-borrowed-body',
   'template-strikes-hurt', 'scripts/ground-encounters', 'scripts/sunscar-matriarch',
-  'scripts/far-reach-roc', 'scripts/skitterer-pack',
+  'scripts/skitterer-pack',
   'mover-carry',
 ])('%s consumes an existing product without building an app or starting a server', name => {
   const source = readFileSync(`test/${name}.test.ts`, 'utf8');
