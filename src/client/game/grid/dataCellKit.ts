@@ -79,7 +79,8 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   // TEMPLATE-E2E TC-E4: a melee weapon on a rack follows its owned taken line the same way
   // the server's set exactly (never the loadout primary). A kit with no primary whose first weapon is racked still draws it
   // in hand (a kit cannot lock its first); the server refuses its blows until it is taken
-  const onRacks = rackMeleeRows(source), racked = new Set(weapons.filter(weapon => onRacks.has(weapon.id)));
+  // by the row's id (`weapon.sword-iron`), as the server's taken line names it, not the page's (`declared.weapon.sword-iron`)
+  const onRacks = rackMeleeRows(source), racked = new Set(weapons.filter(weapon => onRacks.has(weapon.row.id)));
   app.addContentSystem({ id: 'grid.data-cell-kit', phase: 'update', run: (dt, t) => {
     for (const lever of levers) {
       if (wirePage.client !== null && here()) {
@@ -89,7 +90,7 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
       if (lever.taken && !kit.has(lever.id)) { kit.unlock(lever.id); kit.select(lever.id); }
     }
     if (wirePage.client !== null && here()) for (const weapon of racked) {
-      if (wirePage.line(takenLine(weapon.id)) <= 0) continue;
+      if (wirePage.line(takenLine(weapon.row.id)) <= 0) continue;
       racked.delete(weapon); if (!kit.has(weapon.id)) { kit.unlock(weapon.id); kit.select(weapon.id); }
     }
     kit.update(dt, t);
