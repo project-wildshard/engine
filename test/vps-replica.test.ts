@@ -112,7 +112,7 @@ function box(bundleSha?: string) {
     PATH: process.env['PATH'] ?? '', WILDSHARD_REPLICA_TEST: root, WILDSHARD_REPLICA_TEST_KEY: publicKey,
     WILDSHARD_REPLICA_TEST_SYSTEMCTL: stand('systemctl', '[ "$1" = is-active ] && exit "${ACTIVE:-3}"; exit 0'),
     WILDSHARD_REPLICA_TEST_TAILSCALE: stand('tailscale', 'echo 100.70.1.2'),
-    WILDSHARD_REPLICA_TEST_SYSTEMD_RUN: stand('systemd-run', `[ "$1" = --unit=wildshard-replica-door ] && exit 0; cat "${root}/replica/release.json" > "${root}/seen-release.json"; ls "${root}/replica/server" > "${root}/seen-server"; echo '{"at":"worker","p95":1}'`),
+    WILDSHARD_REPLICA_TEST_SYSTEMD_RUN: stand('systemd-run', `[ "$1" = --unit=wildshard-replica-door ] && exit 0; cat "${root}/replica/release.json" > "${root}/seen-release.json"; ls -l "${root}/replica/release.json" | cut -c1-10 > "${root}/seen-mode"; ls "${root}/replica/server" > "${root}/seen-server"; echo '{"at":"worker","p95":1}'`),
     WILDSHARD_REPLICA_TEST_CHMOD: stand('chmod', 'exit 0'),
   }
   return { root, env, calls: () => readFileSync(log, 'utf8') }
@@ -120,7 +120,8 @@ function box(bundleSha?: string) {
 
 test('start fetches the signed bundle, runs it as the fixed sandboxed unit, streams its lines and leaves nothing', () => {
   const { root, env, calls } = box()
-  const run = spawnSync('node', [REPLICA, 'start', '600', '4', '32', 'driftwood-isle'], { encoding: 'utf8', env })
+  // The box's login.defs UMASK is 027: the replica's dynamic user must still read its release file.
+  const run = spawnSync('bash', ['-c', 'umask 027; exec node "$@"', 'node', REPLICA, 'start', '600', '4', '32', 'driftwood-isle'], { encoding: 'utf8', env })
   expect(run.status, run.stderr).toBe(0)
   const lines = run.stdout.trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
   expect(lines[0]).toMatchObject({ at: 'replica', build, serial: 98, host: '100.70.1.2', port: 18796, cpus: '9-12' })
@@ -133,6 +134,7 @@ test('start fetches the signed bundle, runs it as the fixed sandboxed unit, stre
   expect(asked).not.toContain('planted-staging-secret')
   expect(readFileSync(join(root, 'seen-server'), 'utf8')).toContain('main.mjs')
   expect(JSON.parse(JSON.parse(readFileSync(join(root, 'seen-release.json'), 'utf8')).body)).toMatchObject({ channel: 'production', engineBuild: build })
+  expect(readFileSync(join(root, 'seen-mode'), 'utf8').trim()).toBe('-rw-r--r--')
   expect(existsSync(join(root, 'replica'))).toBe(false)
 })
 

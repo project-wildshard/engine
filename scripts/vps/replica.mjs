@@ -16,7 +16,7 @@
 // Nothing a channel's user can write is read (Codex J206): no bundle folder, no pulled release.json.
 import { spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -177,7 +177,9 @@ async function main() {
   // Root's files, readable by the replica's dynamic user and written by nobody else.
   exec('/usr/bin/chmod', ['-R', 'u=rwX,go=rX', FOLDER]);
   const own = replicaRelease(release);
+  // The box's UMASK 027 would leave it 0640 root's, unreadable by the replica's dynamic user (MP1.2.d3's first run), so the mode is set.
   writeFileSync(join(FOLDER, 'release.json'), own.text, { mode: 0o644 });
+  chmodSync(join(FOLDER, 'release.json'), 0o644);
 
   const words = unitArgs({ ...bounds, host, publicKey: own.publicKey, folder: FOLDER }), door = doorArgs({ seconds: bounds.seconds, host });
   if (exec('/usr/bin/systemd-run', door).status !== 0) { end(); stop(`${DOOR} did not open ${host}:${String(PORT)}`); }
