@@ -135,10 +135,15 @@ try {
   const guardFaults = /** @type {string[]} */ ([]);
   let pageFaults = /** @type {string[]} */ ([]);
   const URL_PLAY = `${PAGE_ORIGIN}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-  /** A fresh device: its own context, Developer on, its errors and visibility changes kept. @param {() => void} [init] */
-  const fresh = async init => {
+  /** A fresh device: its own context, Developer on, its errors and visibility changes kept.
+   *  `observe`: the off-fixture guard watches instead of routing. Playwright's routing disables the HTTP cache, and Chromium then hands
+   *  a service worker every read as `cache: 'no-store'`, which sw.js rightly sends to the network: a warmed page could never launch
+   *  offline under it (FM5 mode 1). An off-fixture request there is still a guard fault, seen rather than refused.
+   *  @param {() => void} [init] @param {{ observe?: boolean }} [how] */
+  const fresh = async (init, how = {}) => {
     const context = await /** @type {import('playwright').Browser} */ (launched).newContext(phone), errors = /** @type {string[]} */ ([]);
-    await context.route('**/*', async route => {
+    if (how.observe === true) context.on('request', request => { if (!allowedOrigins.has(new URL(request.url()).origin)) guardFaults.push('saw an off-fixture HTTP request (observe-only guard)'); });
+    else await context.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (allowedOrigins.has(url.origin)) await route.continue();
       else { guardFaults.push('refused off-fixture HTTP request'); await route.abort('blockedbyclient'); }
@@ -489,7 +494,7 @@ try {
     },
     // J298: a world the device holds loads offline and says so
     offlineLaunch: async item => {
-      const entered = await fresh(); const { page, context } = entered;
+      const entered = await fresh(undefined, { observe: true }); const { page, context } = entered;
       try {
         await page.goto(URL_PLAY); await intoWorld(entered);
         // a first visit's worker takes control from the next load (no clients.claim on a world page): a second online visit is the warm one.
@@ -498,15 +503,18 @@ try {
         if (!await controlling()) { await page.waitForFunction(async () => (await navigator.serviceWorker?.getRegistration())?.active !== undefined, undefined, { timeout: 60_000 }).catch(() => undefined); await page.goto(URL_PLAY); await intoWorld(entered); }
         const controlled = await controlling();
         if (!controlled) return { outcome: 'unsupported', reason: `${engine}: no controlling service worker after the warm visit, so nothing can launch offline` };
-        // the worker precaches its build's code after control (DL1): wait until what it holds stops growing, not a fixed 3 s
+        // the worker precaches its build's code after control (DL1): wait until the page's caches stop growing, not a fixed 3 s
         let held = -1;
         for (let still = 0, tries = 0; still < 3 && tries < 90; tries++) {
           await sleep(1000);
-          const entries = await page.evaluate(async () => (await window.__ws_sw?.version())?.entries ?? 0).catch(() => 0);
+          const entries = await page.evaluate(async () => { let n = 0; for (const name of await caches.keys()) n += (await (await caches.open(name)).keys()).length; return n; }).catch(() => 0);
           still = entries > 0 && entries === held ? still + 1 : 0; held = entries;
         }
+        if (process.env['FM_TRACE'] === '1') console.log('  [warm]', held, JSON.stringify(await page.evaluate(async () => {
+          const out = {}; for (const name of await caches.keys()) { const keys = await (await caches.open(name)).keys(); out[name] = [keys.length, keys.map(k => new URL(k.url).pathname).filter(p => /boot-tables|packs-/.test(p))]; } return out;
+        }).catch(error => String(error))));
         await context.setOffline(true);
-        const loopbackCut = await cutLoopback(false), injection = { warmed: true, setOffline: true, ...loopbackCut ? { loopbackCut } : {} };
+        const loopbackCut = await cutLoopback(false), injection = { warmed: true, setOffline: true, guard: 'observe-only (routing would disable the HTTP cache)', ...loopbackCut ? { loopbackCut } : {} };
         const started = Date.now(); await page.goto(URL_PLAY).catch(() => undefined);
         await intoWorld(entered, 60_000).catch(() => undefined);
         const seen = await screen(page, item.screen, 15_000, started), shot = seen === null ? await shoot(page, item.id, 'missing') : await shoot(page, item.id, 'card');
@@ -707,10 +715,24 @@ try {
       const list = page.locator('[data-kind="gallery"]');
       const openGallery = async () => {
         if (await list.isVisible().catch(() => false)) return;
-        const filter = page.locator('.ws-gmenu.show .ws-dbg-filter').first();
-        if (!await filter.isVisible().catch(() => false)) await settingsTab(page, 'dev');
+        const filter = page.locator('.ws-gmenu.show .ws-dbg-filter:visible').first();
+        if (!await filter.isVisible().catch(() => false)) {
+          // the gallery is Developer only (E140): System's Developer switch shows the Dev tab, whose cards open folded
+          await settingsTab(page, 'system');
+          const devTab = page.locator('.ws-gmenu.show [data-sv-tab="dev"]').first();
+          if (!await devTab.isVisible().catch(() => false)) await page.locator('.ws-gmenu.show .ws-gmenu-label', { hasText: /^Developer$/u }).locator('xpath=following-sibling::button[1]').first().click({ timeout: 10_000 });
+          await devTab.click({ timeout: 10_000 });
+          // the gallery's row is a Developer tool ('tools' group), in the Developer card
+          const tools = page.locator('.ws-gmenu.show .ws-gmenu-card.fold', { has: page.locator('.ws-gmenu-cardtitle', { hasText: /^Developer/u }) }).first();
+          if (await tools.evaluate(node => node.classList.contains('folded')).catch(() => false)) await tools.locator('.ws-gmenu-cardtitle').first().click({ timeout: 10_000 });
+        }
+        if (process.env['FM_TRACE'] === '1') console.log('  [gallery]', JSON.stringify(await page.evaluate(() => ({
+          tabs: [...document.querySelectorAll('.ws-gmenu.show [data-sv-tab]')].map(n => n.getAttribute('data-sv-tab') + (n.hidden ? ':hidden' : '') + (n.getAttribute('aria-selected') === 'true' ? ':on' : '')),
+          filters: [...document.querySelectorAll('.ws-dbg-filter')].map(n => { const r = n.getBoundingClientRect(); return (n.closest('.ws-gmenu.show') ? 'in ' : 'out ') + String(r.width) + 'x' + String(r.height); }),
+          cards: [...document.querySelectorAll('.ws-gmenu.show .ws-gmenu-card.fold')].map(n => (n.querySelector('.ws-gmenu-cardtitle')?.textContent ?? '') + (n.classList.contains('folded') ? ':folded' : '') + (n.hidden ? ':hidden' : '')),
+        })).catch(error => String(error))));
         await filter.fill('Failure screens');
-        await page.locator('.ws-dbg-row', { hasText: 'Failure screens' }).locator('.ws-dbg-action').first().click({ timeout: 10_000 });
+        await page.locator('.ws-gmenu.show .ws-dbg-row:visible', { hasText: 'Failure screens' }).locator('.ws-dbg-action:visible').first().click({ timeout: 10_000 });
         await list.waitFor({ state: 'visible', timeout: 15_000 });
       };
       for (const size of [{ width: 402, height: 874 }, { width: 1440, height: 900 }]) {
@@ -733,7 +755,7 @@ try {
     } finally { await entered.context.close(); }
     const ok = walked.length > 0 && walked.every(row => row.opened && row.closed);
     writeFileSync(join(out, 'gallery.json'), JSON.stringify({ schema: 'failmode-gallery/1', sha, engine, browser: browserVersion, build: fixture.build, at: new Date().toISOString(),
-      entries: new Set(walked.map(row => row.id)).size, taps: 'menu Escape/Debug, filter, row Open, entry, ✕ Close', ok, walked }, null, 1));
+      entries: new Set(walked.map(row => row.id)).size, taps: 'menu Escape, System Developer switch, Dev tab, Developer card, filter, row Open, entry, ✕ Close', ok, walked }, null, 1));
     rows.push({ mode: 'FM1b', id: 'gallery', owner: 'FM1b', screen: 'gallery', inject: 'none', ms: 0, ...ok ? { outcome: 'pass' } : { outcome: 'ui-fail', reason: 'an entry did not open or close' } });
   }
   let lastPlay = 0;

@@ -93,11 +93,7 @@ export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedF
   // PZ12: a change of the document's isolation is a new worker (empty on a channel that is not isolated: its id is unchanged)
   if (Object.keys(documentHeaders).length > 0) digest.update(JSON.stringify(documentHeaders));
   // The build's server book with its code: a device that adopts a build and goes offline can still read a server class it holds.
-  // FM5 mode 1 (OFFLINE J298): with no content base the packs book is the page's own; without it a warmed world can't start offline
-  // (its spawn download reads the book first). With a base it moves to the content list below, as before.
-  const pageBooks = base === '' && packsBook !== undefined ? [packsBook.url] : [];
-  if (pageBooks.length > 0 && packsBook !== undefined) digest.update(packsBook.url).update(packsBook.bytes);
-  let files = [...hashed, ...portraits, ...serverBook === undefined ? [] : [serverBook.url], ...pageBooks], shellList = shell.filter(url => !portraits.includes(url));
+  let files = [...hashed, ...portraits, ...serverBook === undefined ? [] : [serverBook.url]], shellList = shell.filter(url => !portraits.includes(url));
   let content: string[] = [];
   if (base !== '') {
     if (packsBook !== undefined) digest.update(packsBook.url).update(packsBook.bytes);
