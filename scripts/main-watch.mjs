@@ -167,7 +167,7 @@ export function liveIo(env=process.env){
     runs:()=>sharedRuns(runsCache,()=>{
       /** @type {Run[]} */let prior=[];
       try{const kept=JSON.parse(readFileSync(runsCache,'utf8')).runs;if(Array.isArray(kept))prior=kept;}catch{/* First fetch. */}
-      const judged=new Set(readState(state)?.judged??[]);
+      const judged=new Set(readState(state)?.judged);
       return /** @type {Run[]} */(JSON.parse(read(['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs)
         .filter(row=>row.event==='push'||row.event==='workflow_dispatch').map(row=>{
           if(!finished(row)||row.conclusion==='success'||judged.has(row.id))return row;
@@ -177,7 +177,8 @@ export function liveIo(env=process.env){
             // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
             // the jobs, rather than that workflow timestamp, say whether any work actually started.
             const jobs=/** @type {{started_at:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
-            return {...row,started:jobs.some(job=>job.started_at!==null)};
+            row.started=jobs.some(job=>job.started_at!==null);
+            return row;
           }
           const kept=prior.find(old=>old.id===row.id&&old.blockingChecked===true&&(old.run_attempt??1)===(row.run_attempt??1));
           if(kept!==undefined)return kept;
