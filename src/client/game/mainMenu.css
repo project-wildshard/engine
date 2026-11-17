@@ -1,57 +1,52 @@
-/* ─── the Wildshard main menu (SF21a, G79 / G88; src/client/game/mainMenu.ts) ─── prefix ws-main- ───
-   Jake's board B: a full-bleed first-person crossroads hero, the WILDSHARD logo top left, two big side-by-side navy-glass
-   cards SHARD SELECT / INFINITE WILDSHARD low on the screen, a small SETTINGS under them. Developer off: one wide card.
-   It stacks over today's shard deck (.ws-menu), which SHARD SELECT reveals; the build chip stays the shell's own. */
+/* ─── the Wildshard main menu (MAIN-SCREEN, J399 board B; src/client/game/mainMenu.ts) ─── prefix ws-main- ───
+   Full bleed: the crossroads hero is the whole screen, the WILDSHARD logo top left, one filled ice-cyan ENTER THE MMO (the
+   one loud thing), a quieter outlined ZONE SELECT under it, then SETTINGS and the DEV switch. It stacks over the zone deck
+   (.ws-menu), which ZONE SELECT reveals; the build chip stays the shell's own. Check connection is Settings ▸ System's. */
 .ws-title-stack { position: absolute; inset: 0; pointer-events: auto; transition: opacity 0.6s ease; }
 .ws-title-stack.hide { opacity: 0; pointer-events: none; }
-/* STAGING-BUGBASH SB18 (J385): the main menu and SHARD SELECT cut in one frame. The main menu sits above the deck, so its 0.3 s
+/* STAGING-BUGBASH SB18 (J385): the main menu and ZONE SELECT cut in one frame. The main menu sits above the deck, so its 0.3 s
    fade-out showed it again for 300 ms after the Name prompt's SKIP */
 .ws-title-stack > .ws-menu { transition: none; }
-.ws-main { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 3); container-type: size; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; color: var(--ws-text); }
+/* one grid: the head over the hero's top, the foot under it; the hero spans the head and the room between them, and on a
+   landscape screen the foot too (cover: a 16:9 shot already shows every zone) */
+.ws-main { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 3); container-type: size; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); overflow: hidden; color: var(--ws-text); background: #0b1622; }
 .ws-main.hide { opacity: 0; pointer-events: none; }
-.ws-main .ws-main-hero { position: absolute; inset: 0; background-size: cover; background-position: 50% 30%; background-color: #0b1622; pointer-events: none; }
-.ws-main::before { content: ''; position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 1); pointer-events: none; background: linear-gradient(180deg, rgba(6, 10, 18, 0.42) 0%, rgba(6, 10, 18, 0) 22%, rgba(6, 10, 18, 0) 55%, rgba(6, 10, 18, 0.5) 100%); }
-.ws-main .ws-main-head, .ws-main .ws-main-foot { position: relative; z-index: calc(var(--ws-layer-hud) + 2); }
-/* the open WHAT'S NEW panel hangs from the head over the hero (and the cards on a short screen): the head paints above the foot */
-.ws-main .ws-main-head { z-index: calc(var(--ws-layer-hud) + 3); }
-.ws-main .ws-main-head { padding: calc(18px + env(safe-area-inset-top, 0px)) 24px 0; }
+.ws-main .ws-main-hero { grid-row: 1 / 4; grid-column: 1; position: relative; pointer-events: none; background-color: #0b1622; background-image: var(--ws-hero-landscape); background-size: cover; background-position: 50% 50%; background-repeat: no-repeat; }
+.ws-main::before { content: ''; position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 1); pointer-events: none; background: linear-gradient(180deg, rgba(6, 10, 18, 0.42) 0%, rgba(6, 10, 18, 0) 22%, rgba(6, 10, 18, 0) 50%, rgba(6, 10, 18, 0.72) 100%); }
+.ws-main .ws-main-head, .ws-main .ws-main-foot { position: relative; grid-column: 1; z-index: calc(var(--ws-layer-hud) + 2); }
+/* the open WHAT'S NEW panel hangs from the head over the hero (and the buttons on a short screen): the head paints above the foot */
+.ws-main .ws-main-head { grid-row: 1; z-index: calc(var(--ws-layer-hud) + 3); padding: calc(18px + env(safe-area-inset-top, 0px)) 24px 0; }
 .ws-main .ws-main-logo { font-family: var(--ws-display); font-weight: 700; font-size: 44px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase; color: #eaf8ff; text-shadow: 0 0 18px rgba(143, 227, 255, 0.45), 0 4px 24px rgba(0, 0, 0, 0.55); }
 .ws-main .ws-main-logo::after { content: ''; display: block; width: 52px; height: 3px; margin-top: 10px; background: var(--ws-cyan); box-shadow: 0 0 10px var(--ws-cyan); }
 .ws-main .ws-main-notice { box-sizing: border-box; max-width: min(440px, calc(100vw - 32px)); margin-top: 22px; padding: 10px 12px; border: 1px solid rgba(255, 181, 71, 0.55); background: rgba(13, 27, 38, 0.9); color: #f3e5cd; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); font: 11px/1.5 var(--ws-mono); white-space: pre-line; }
-.ws-main .ws-main-foot { display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 60px); }
-/* G341 (Jake's pick of G338): a portrait screen shows the landscape hero as a band across the middle on the plain menu
-   background, the logo and WHAT'S NEW above it, the cards and SETTINGS below it, no scrim over the image; the band takes the
-   room between them. A landscape screen keeps the full-bleed hero with the cards over it. */
-.ws-main .ws-main-hero { background-position: 50% 50%; background-image: var(--ws-hero-landscape); }
+.ws-main .ws-main-foot { grid-row: 3; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 40px); }
+/* J399 (Jake: "we zoomed in way too much on the hero art. and you no longer see like nalati and all the other zones"): a
+   portrait screen draws the square hero the screen's width, never cover-cropped to its middle column, so the whole 5 × 5 shows,
+   Nalati's row included. It sits on the room above the buttons and runs 56 px under ENTER THE MMO, where it fades into the
+   menu's navy; above it the sky carries on in the shot's own colours (its top row: the edge #5d6387, the middle #71799d), so
+   a tall screen reads as one picture behind the logo. test/title-layout-browser.proof.mjs holds this at 402 × 874 and 402 × 654. */
 @media (orientation: portrait) {
-  .ws-main { background: #0b1622; }
-  .ws-main::before { display: none; }
-  .ws-main .ws-main-head { order: 0; flex: none; }
-  /* G344: the square hero fills the phone's width. Jake 2026-11-10 ("The hero is so fucking tiny on the main menu"): it was a
-     1:1 box that alone gave up height, so each row added under the cards (Check connection, 3a19ab3) came out of it and the
-     WHAT'S NEW line took the rest, a 131 px strip on a 402 × 654 Safari page. Now it takes all the room the rows leave
-     (cover crops it), and on a short screen the gaps and the cards give up height first (cqh: .ws-main's own height),
-     keeping it at least 30% of the screen at 402 × 654 (test/title-layout-browser.proof.mjs). */
-  .ws-main .ws-main-hero { order: 1; position: relative; inset: auto; flex: 1 1 0; align-self: stretch; width: 100%; min-height: 0; margin: clamp(8px, 1.6cqh, 18px) 0; background-image: var(--ws-hero-square); background-size: cover; background-repeat: no-repeat; }
-  .ws-main .ws-main-foot { order: 2; flex: none; padding-top: 0; gap: clamp(12px, 1.9cqh, 22px); }
+  .ws-main::before { background: linear-gradient(180deg, rgba(6, 10, 18, 0.38) 0%, rgba(6, 10, 18, 0) 16%); }
+  .ws-main .ws-main-hero { grid-row: 1 / 3; margin-bottom: -56px; background-image: var(--ws-hero-square), linear-gradient(90deg, #5d6387 0%, #71799d 50%, #5d6387 100%);
+    background-size: 100% auto, 100% auto, 100% 100%; background-position: 50% 100%, 50% 100%, 0 0; }
+  /* the shot's top edge into the carried-on sky: one band of the same sky, faded in and out over the seam (cqw: the screen) */
+  .ws-main .ws-main-hero::before { content: ''; position: absolute; left: 0; right: 0; bottom: calc(100cqw - 70px); height: 120px; background: linear-gradient(90deg, #5d6387 0%, #71799d 50%, #5d6387 100%); -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 45%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 45%, transparent 100%); }
+  .ws-main .ws-main-hero::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 120px; background: linear-gradient(180deg, rgba(11, 22, 34, 0) 0%, rgba(11, 22, 34, 0.75) 55%, #0b1622 100%); }
 }
-.ws-main .ws-main-cards { display: flex; gap: 12px; width: min(560px, 100%); }
-.ws-main .ws-main-card { position: relative; flex: 1 1 0; min-width: 0; aspect-ratio: 1 / 0.86; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 14px 8px; appearance: none; -webkit-appearance: none; background: rgba(9, 22, 36, 0.86); border: 1px solid rgba(143, 227, 255, 0.4); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); color: var(--ws-cyan); cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: background 0.2s, box-shadow 0.2s, border-color 0.2s; }
-.ws-main .ws-main-cards.one .ws-main-card { aspect-ratio: 1 / 0.43; }
-.ws-main .ws-main-card[hidden] { display: none; }
-/* the four cyan corner brackets of the board's cards */
-.ws-main .ws-main-card::before, .ws-main .ws-main-card::after { content: ''; position: absolute; inset: -3px; pointer-events: none; border: 2px solid var(--ws-cyan);
-  -webkit-mask: linear-gradient(#000 0 0) top left / 16px 16px no-repeat, linear-gradient(#000 0 0) top right / 16px 16px no-repeat, linear-gradient(#000 0 0) bottom left / 16px 16px no-repeat, linear-gradient(#000 0 0) bottom right / 16px 16px no-repeat;
-  mask: linear-gradient(#000 0 0) top left / 16px 16px no-repeat, linear-gradient(#000 0 0) top right / 16px 16px no-repeat, linear-gradient(#000 0 0) bottom left / 16px 16px no-repeat, linear-gradient(#000 0 0) bottom right / 16px 16px no-repeat; }
-.ws-main .ws-main-card::after { display: none; }
+.ws-main .ws-main-cards { display: flex; flex-direction: column; gap: 12px; width: min(480px, 100%); }
+.ws-main .ws-main-card { position: relative; box-sizing: border-box; min-width: 0; min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 10px 16px; appearance: none; -webkit-appearance: none; background: rgba(9, 22, 36, 0.82); border: 1px solid rgba(143, 227, 255, 0.5); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); color: var(--ws-cyan); cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background 0.2s, box-shadow 0.2s, border-color 0.2s; }
+.ws-main .ws-main-card b { font-family: var(--ws-display); font-weight: 700; font-size: 22px; line-height: 1.1; letter-spacing: 0.18em; text-indent: 0.18em; text-align: center; text-transform: uppercase; color: #bdeeff; }
 .ws-main .ws-main-icon { display: flex; color: var(--ws-cyan); filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.45)); }
-.ws-main .ws-main-icon svg { width: 96px; height: 72px; }
-.ws-main .ws-main-card b { font-family: var(--ws-display); font-weight: 700; font-size: 22px; line-height: 1.12; letter-spacing: 0.14em; text-indent: 0.14em; text-align: center; text-transform: uppercase; color: #bdeeff; }
-.ws-main .ws-main-grid b { max-width: 9em; }
-/* G61 E1: SHARD SELECT's small amber tag, hung on the card's top right corner so it clears the icon and the name at phone width */
-.ws-main .ws-main-card-exp { position: absolute; top: -8px; right: -5px; padding: 3px 7px; font-style: normal; font-family: var(--ws-mono); font-size: 9px; line-height: 1; letter-spacing: 0.16em; color: var(--ws-amber); background: #140d02; border: 1px solid var(--ws-amber); }
+.ws-main .ws-main-icon svg { width: 40px; height: 30px; }
 .ws-main .ws-main-card:hover, .ws-main .ws-main-card:focus-visible { outline: none; background: rgba(14, 34, 52, 0.9); border-color: var(--ws-cyan); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 28px rgba(143, 227, 255, 0.3); }
 .ws-main .ws-main-card:active, .ws-main .ws-main-card[aria-busy="true"] { background: rgba(22, 48, 70, 0.92); }
+/* J387: "a call to action that's like enter the MMO": the one filled button, ice cyan with navy words and a live dot */
+.ws-main .ws-main-mmo { flex-direction: column; gap: 8px; min-height: 92px; padding: 14px 16px; background: linear-gradient(180deg, #c8f2ff 0%, #9be6ff 100%); border-color: #eaf8ff; box-shadow: 0 0 26px rgba(143, 227, 255, 0.42), 0 12px 40px rgba(0, 0, 0, 0.45); }
+.ws-main .ws-main-mmo b { font-size: 32px; letter-spacing: 0.16em; text-indent: 0.16em; color: #071420; }
+.ws-main .ws-main-mmo small { display: flex; white-space: nowrap; align-items: center; gap: 10px; font: 500 11px/1 var(--ws-mono); letter-spacing: 0.24em; text-indent: 0.24em; text-transform: uppercase; color: rgba(7, 20, 32, 0.78); }
+.ws-main .ws-main-live { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #13a45a; box-shadow: 0 0 8px rgba(19, 164, 90, 0.7); }
+.ws-main .ws-main-mmo:hover, .ws-main .ws-main-mmo:focus-visible { background: linear-gradient(180deg, #dcf7ff 0%, #b0ecff 100%); border-color: #ffffff; box-shadow: 0 0 34px rgba(143, 227, 255, 0.6), 0 12px 40px rgba(0, 0, 0, 0.45); }
+.ws-main .ws-main-mmo:active, .ws-main .ws-main-mmo[aria-busy="true"] { background: linear-gradient(180deg, #9be6ff 0%, #7fd6f5 100%); }
 .ws-main .ws-main-settings { min-width: 150px; min-height: 44px; box-sizing: border-box; touch-action: manipulation; padding: 10px 22px; appearance: none; -webkit-appearance: none; background: rgba(9, 22, 36, 0.86); border: 1px solid var(--ws-cyan-line); outline: 1px solid rgba(143, 227, 255, 0.18); outline-offset: 3px; font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.24em; text-indent: 0.24em; text-transform: uppercase; color: var(--ws-cyan); cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
 .ws-main .ws-main-settings:focus-visible { border-color: var(--ws-cyan); }
 /* E483: SETTINGS and the compact DEV switch share one row; the switch wears SETTINGS' frame and a small track whose knob
@@ -64,9 +59,6 @@
 .ws-main .ws-main-dev.on .ws-main-dev-track { border-color: var(--ws-amber); background: rgba(255, 181, 71, 0.18); }
 .ws-main .ws-main-dev.on .ws-main-dev-track::after { transform: translateX(12px); background: var(--ws-amber); box-shadow: 0 0 6px var(--ws-amber); }
 .ws-main .ws-main-dev:focus-visible { border-color: var(--ws-cyan); }
-/* E7.5 prep: an online build's Check connection, a row of its own under SETTINGS and DEV */
-.ws-main .ws-main-doctor { margin-top: 10px; min-width: 0; width: min(100%, 336px); }
-.ws-main .ws-main-doctor-dot { display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); vertical-align: middle; }
 /* SF60 / G214 (Jake: B, art/menu/round-12-whats-new/B-banner*.jpg): the WHAT'S NEW banner under the logo, src/client/game/whatsNewBanner.ts.
    Folded: one navy-glass line with the cards' corner brackets, a cyan dot, WHAT'S NEW, the engine version and short commit
    ("V0.1.5 · A8144A5", Jake 2026-11-10) and a ▾. Open: a panel drops over the hero, under the line, with the engine line, the
@@ -93,26 +85,29 @@
 .ws-main .ws-whatsnew-list li::before { content: ''; position: absolute; left: 2px; top: calc(3px + 0.7em - 4px); width: 7px; height: 7px; background: var(--ws-cyan); transform: rotate(45deg); }
 .ws-main .ws-whatsnew-hide { display: block; margin: 6px 0 0 auto; padding: 6px 0; appearance: none; -webkit-appearance: none; background: none; border: 0; font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--ws-cyan); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .ws-main .ws-whatsnew-hide:focus-visible { outline: 1px solid var(--ws-cyan); }
-/* Jake 2026-11-10 (the tiny hero, above): on a portrait screen the rows under the hero give up height before it does */
+/* Jake 2026-11-10 (the tiny hero): on a portrait screen the rows under the hero give up height before it does */
 @media (orientation: portrait) {
   .ws-main .ws-whatsnew { margin-top: clamp(12px, 1.8cqh, 22px); }
-  /* the board's 1 : 0.86 cards (1 : 0.43 alone), no taller than a fifth of the screen; 132 px still holds the icon and two lines */
-  .ws-main .ws-main-card { aspect-ratio: auto; height: clamp(132px, 20cqh, calc((min(560px, 100cqw - 32px) - 12px) * 0.43)); }
-  .ws-main .ws-main-cards.one .ws-main-card { aspect-ratio: auto; height: clamp(132px, 20cqh, calc(min(560px, 100cqw - 32px) * 0.43)); }
-  .ws-main .ws-main-doctor { margin-top: 0; }
+  /* a short portrait screen (402 × 654: Safari's toolbars) gives up gaps and button height before it gives up hero */
+  .ws-main .ws-main-foot { gap: clamp(12px, 2cqh, 18px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(20px, 4.6cqh, 40px)); }
+  .ws-main .ws-main-mmo { min-height: clamp(76px, 10.5cqh, 92px); }
 }
 @media (max-width: 420px) {
   .ws-main .ws-main-logo { font-size: 36px; }
-  .ws-main .ws-main-icon svg { width: 78px; height: 58px; }
-  .ws-main .ws-main-card b { font-size: 18px; }
+  .ws-main .ws-main-mmo b { font-size: 28px; }
+  .ws-main .ws-main-mmo small { font-size: 10px; letter-spacing: 0.2em; text-indent: 0.2em; }
+  .ws-main .ws-main-select b { font-size: 20px; }
 }
 @media (orientation: landscape) and (max-height: 500px) {
   .ws-main .ws-main-head { padding: calc(10px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-left, 0px)) 0; }
   .ws-main .ws-main-logo { font-size: 28px; }
-  .ws-main .ws-main-foot { gap: 10px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); }
-  .ws-main .ws-main-cards { width: min(520px, 100%); }
-  .ws-main .ws-main-card, .ws-main .ws-main-cards.one .ws-main-card { aspect-ratio: auto; height: 34vh; gap: 8px; }
-  .ws-main .ws-main-icon svg { width: 60px; height: 45px; }
+  .ws-main .ws-main-foot { gap: 10px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); }
+  .ws-main .ws-main-cards { flex-direction: row; width: min(640px, 100%); }
+  .ws-main .ws-main-card { flex: 1 1 0; }
+  .ws-main .ws-main-mmo { min-height: 64px; gap: 6px; padding: 8px 12px; }
+  .ws-main .ws-main-mmo b { font-size: 22px; }
+  .ws-main .ws-main-mmo small { font-size: 9px; letter-spacing: 0.14em; text-indent: 0.14em; white-space: nowrap; }
+  .ws-main .ws-main-select b { font-size: 18px; }
   .ws-main .ws-whatsnew { max-width: 440px; margin: 10px 0 0; }
   .ws-main .ws-whatsnew-head { min-height: 32px; }
   .ws-main .ws-whatsnew-body { max-height: 38vh; overflow-y: auto; }

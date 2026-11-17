@@ -65,7 +65,9 @@ test('the title keeps a big hero, a short build label clear of the logo, and the
             return { vh: innerHeight, logo: box(range), pill: pill === null ? null : box(pill),
               pillText: document.querySelector('.ws-update [data-el="text"]')?.textContent ?? '',
               boxBuild: document.querySelector('.ws-whatsnew-build')?.textContent ?? '', hero: box(one('.ws-main-hero')),
-              rows: ['.ws-main-cards', '.ws-main-settings', '.ws-main-dev', '.ws-main-doctor'].map(selector => box(one(selector))),
+              heroSize: getComputedStyle(one('.ws-main-hero')).backgroundSize.split(',')[0]?.trim() ?? '', vw: innerWidth,
+              doctor: document.querySelector('.ws-main-doctor') !== null,
+              rows: ['.ws-main-mmo', '.ws-main-select', '.ws-main-settings', '.ws-main-dev'].map(selector => box(one(selector))),
               notes: [...document.querySelectorAll('.ws-whatsnew-list li')].filter(li => li instanceof HTMLElement && li.offsetParent !== null).map(li => li.textContent),
               panel: body instanceof HTMLElement && !body.hidden ? box(body) : null };
           });
@@ -80,15 +82,24 @@ test('the title keeps a big hero, a short build label clear of the logo, and the
           assert.equal(layout.boxBuild, label.toUpperCase(), where);
           assert.notEqual(layout.pill, null, where);
           if (layout.pill !== null) assert.equal(overlaps(layout.pill, layout.logo), false, `${where}: the pill runs onto the logo`);
-          // every card and button whole on screen, none on another or on the hero
+          // every button whole on screen and none on another
           for (const [i, row] of layout.rows.entries()) {
             assert.ok(row.b <= layout.vh, `${where}: row ${String(i)} runs off the screen`);
-            if (portrait) assert.equal(overlaps(row, layout.hero), false, `${where}: row ${String(i)} covers the hero`);
+            for (const other of layout.rows.slice(i + 1)) assert.equal(overlaps(row, other), false, `${where}: row ${String(i)} overlaps another`);
           }
-          const [cards, settings] = layout.rows;
-          if (cards !== undefined && settings !== undefined) assert.equal(overlaps(cards, settings), false, where);
-          // the hero is at least 30% of a portrait phone, whether or not the changelog is open
-          if (portrait) assert.ok(layout.hero.h / layout.vh >= 0.3, `${where}: the hero is ${String(Math.round(layout.hero.h))} px`);
+          // MAIN-SCREEN MS2 (J399, board B): full bleed, and Check connection lives in Settings ▸ System
+          assert.equal(layout.doctor, false, `${where}: Check connection is on the main screen`);
+          const [mmo] = layout.rows;
+          if (portrait && mmo !== undefined) {
+            // Jake: "we zoomed in way too much on the hero art … you no longer see like nalati and all the other zones": on a
+            // phone the square hero is drawn the screen's width, never cover-cropped to its middle column
+            assert.equal(layout.heroSize, '100% auto', `${where}: the hero is drawn ${layout.heroSize}`);
+            assert.ok(Math.abs(layout.hero.r - layout.hero.x - layout.vw) <= 1, `${where}: the hero is not the screen's width`);
+            // it runs under the buttons (full bleed), and the art above ENTER THE MMO is at least 30% of the screen
+            assert.ok(layout.hero.b > mmo.y, `${where}: the hero stops above the buttons`);
+            const imageTop = Math.max(0, layout.hero.b - layout.vw);
+            assert.ok((mmo.y - imageTop) / layout.vh >= 0.3, `${where}: ${String(Math.round(mmo.y - imageTop))} px of hero above the buttons`);
+          } else assert.ok(layout.hero.h >= layout.vh - 1, `${where}: the hero is not full bleed`);
           // opening the box shows this version's bullets, exactly, on screen; folded, none
           assert.deepEqual(layout.notes, open ? release.notes : [], where);
           if (open) {

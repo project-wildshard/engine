@@ -110,8 +110,6 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     onExplore: (card) => { dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onExplore(card); } });
   const s = GAME_STRINGS.mainMenu;
   const dev = mode().developer;
-  // E7.5 prep: a build stamped with a world (`__WS_WORLD__`, as clientWorker.ts reads it) offers the Connection doctor on its title
-  const online = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined;
 
   const root = document.createElement('div');
   root.className = 'ws-title-stack';
@@ -129,7 +127,6 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
         <button class="ws-main-settings" type="button">${s.settings}</button>
         <button class="ws-main-dev${dev ? ' on' : ''}" type="button" role="switch" aria-checked="${dev}" aria-label="${s.developerLabel}"><i class="ws-main-dev-track" aria-hidden="true"></i>${s.developer}</button>
       </div>
-      ${online ? `<div class="ws-main-row"><button class="ws-main-settings ws-main-doctor" type="button"><i class="ws-main-doctor-dot" aria-hidden="true"></i>${s.checkConnection}</button></div>` : ''}
     </div>`;
   const hero = required(main, '.ws-main-hero', HTMLElement);
   hero.style.setProperty('--ws-hero-landscape', `url('${opts.fullHero === false ? FIRST_HERO : MAIN_MENU_HERO}'), url('${FIRST_HERO}')`);
@@ -236,10 +233,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     });
   };
   deck.onTap(required(main, '.ws-main-settings', HTMLButtonElement), () => { opts.onSettings(); });
-  // E7.5 prep (Jake, 2026-11-09): the title opens the Connection doctor's own page, past the service worker (`sw=0`). The title
-  // holds no session and no loading report, so this is the plain navigation errorScreen.ts's openDoctorPage makes in play.
-  const doctor = main.querySelector('.ws-main-doctor');
-  if (doctor instanceof HTMLButtonElement) deck.onTap(doctor, () => { leaveTitle(); location.assign('/doctor/?sw=0&from=title'); });
+  // MS2 (J399, board B): CHECK CONNECTION left the main screen; Settings ▸ System's Connection doctor row opens the same page
   // E483 (Jake: "a better dev toggle … without having to go to the settings page"; E140's ask): the same live switch as
   // Settings ▸ Developer. Both title paths rebuild on the change (StartTitle / HUD `onDev`) on this screen, so the menu, the
   // ZONE SELECT's locked cards follow it at once.
