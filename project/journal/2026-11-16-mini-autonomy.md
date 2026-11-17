@@ -16,3 +16,4 @@
   on macos-15, one row per proof in the run summary plus live-status. Hosted runners are off the tailnet, so the two
   e7 proofs take `WS_PRIVATE_HEALTH=skip` (staging-proof-lines.mjs `privateHealthURL`) and say they skipped the box's
   private /health; Doctor takes `--engine=` to run one browser per runner.
+- MA4 first run 43995224677 (v0.1.32 `12886742` went live on staging mid-run): journeys PASS on both browsers, live PASS on WebKit; Doctor failed on both because SB20 (`336f2cb1`) made the page's server row a skip ("health is private, Join checks the door") and the proof still wanted every row pass. The proof now takes that one skip on rooms-staging. Chromium's live proof hit a real page error on v32: "Frame scheduling is unavailable in this host" (meta mini QA).
