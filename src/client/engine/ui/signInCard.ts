@@ -1,7 +1,7 @@
 import type { Scope } from '../../../shared/engine/app/scope';
 import { saveEnvironment } from '../../../shared/engine/saves/environment';
 import { engineString } from '../../../shared/engine/strings';
-import { addPasskey, linkIn, pageLogin, passkeySignIn, passkeysHere, redeemLink, sendLink, signedIn, signOut, type LinkSent, type LoginPorts } from '../net/playerLogin';
+import { addPasskey, deleteMine, exportMine, linkIn, pageLogin, passkeySignIn, passkeysHere, redeemLink, sendLink, signedIn, signOut, type Deleted, type LinkSent, type LoginPorts } from '../net/playerLogin';
 import { installViewport } from '../core/viewport';
 import { listenPage } from '../input/dom';
 import './styles/signInCard.css';
@@ -26,6 +26,23 @@ export interface SignInOptions {
   readonly note?: string;
   /** Tests: the API and storage the card talks to. */
   readonly ports?: LoginPorts;
+  /** MP2.5c: where the player's saves are (the world's door) and this device's id; without it the card offers no data rows. */
+  readonly account?: AccountPorts;
+}
+
+/** MP2.5c: what Download my data and Delete account need beyond the API. */
+export interface AccountPorts {
+  /** The door's HTTP origin, or undefined on a build with no world. */
+  readonly door: () => Promise<string | undefined>;
+  readonly device: () => string;
+  /** Hand the viewer a file. */
+  readonly save: (name: string, text: string) => void;
+}
+const DELETED: Record<Deleted, string> = { deleted: 's_signin_deleted', playing: 's_signin_delete_playing', failed: 's_signin_account_failed' } as const;
+/** A file download from the page. */
+export function saveFile(name: string, text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' })), link = document.createElement('a');
+  link.href = url; link.download = name; link.click(); // the URL stays until the page goes: revoking it at once can cancel the download
 }
 
 const SENT: Record<LinkSent, string> = { sent: 's_signin_sent', busy: 's_signin_busy', off: 's_signin_off', failed: 's_signin_failed' } as const;
@@ -101,7 +118,7 @@ function signedOutRows(own: Scope, ports: LoginPorts, say: (line: string) => voi
   return rows;
 }
 
-function signedInRows(own: Scope, ports: LoginPorts, say: (line: string) => void, done: () => void): HTMLElement[] {
+function signedInRows(own: Scope, ports: LoginPorts, say: (line: string) => void, done: (line?: string) => void, account?: AccountPorts): HTMLElement[] {
   const who = make('p', 'ws-signin-who', engineString('s_signin_as', [signedIn(ports)?.email ?? ''])), rows: HTMLElement[] = [who];
   if (passkeysHere()) {
     const add = button('ws-signin-alt', engineString('s_signin_add_passkey'), 'add-passkey');
@@ -112,7 +129,33 @@ function signedInRows(own: Scope, ports: LoginPorts, say: (line: string) => void
   const out = button('ws-signin-alt', engineString('s_signin_out'), 'out');
   own.listen(out, 'click', () => { signOut(ports); done(); });
   rows.push(out);
+  if (account !== undefined) rows.push(...accountRows(own, ports, account, say, done));
   return rows;
+}
+
+/** MP2.5c: Download my data (both halves, one file) and Delete account (two taps: door, API, signed out). */
+function accountRows(own: Scope, ports: LoginPorts, account: AccountPorts, say: (line: string) => void, done: (line?: string) => void): HTMLElement[] {
+  const download = button('ws-signin-alt', engineString('s_signin_export'), 'export'), remove = button('ws-signin-alt ws-signin-delete', engineString('s_signin_delete'), 'delete');
+  const exporting = async (): Promise<void> => {
+    download.disabled = true;
+    const data = await exportMine(ports, await account.door(), account.device());
+    download.disabled = false;
+    if (data === undefined) { say(engineString('s_signin_account_failed')); return; }
+    account.save(`wildshard-account-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2));
+    say(engineString('s_signin_exported'));
+  };
+  let armed = false;
+  const deleting = async (): Promise<void> => {
+    if (!armed) { armed = true; remove.textContent = engineString('s_signin_delete_confirm'); return; }
+    remove.disabled = true;
+    const result = await deleteMine(ports, await account.door(), account.device());
+    remove.disabled = false; armed = false; remove.textContent = engineString('s_signin_delete');
+    if (result === 'deleted') done(engineString(DELETED[result] as 's_signin_deleted'));
+    else say(engineString(DELETED[result] as 's_signin_deleted'));
+  };
+  own.listen(download, 'click', () => { void exporting(); });
+  own.listen(remove, 'click', () => { void deleting(); });
+  return [download, remove];
 }
 
 /** Open the card. Resolves when it closes (Close, a tap outside, Esc, or `scope` ending). */
@@ -127,10 +170,10 @@ export function openSignIn(scope: Scope, options: SignInOptions): Promise<void> 
   box.append(card);
   const say = (line: string): void => { note.textContent = line; note.hidden = line === ''; };
   const draw = (): void => {
-    const rows = signedIn(ports) === undefined ? signedOutRows(own, ports, say, changed) : signedInRows(own, ports, say, changed);
+    const rows = signedIn(ports) === undefined ? signedOutRows(own, ports, say, changed) : signedInRows(own, ports, say, changed, options.account);
     body.replaceChildren(...rows); box.dataset['signedIn'] = String(signedIn(ports) !== undefined);
   };
-  function changed(): void { say(''); draw(); options.changed?.(); }
+  function changed(line = ''): void { say(line); draw(); options.changed?.(); }
   say(options.note ?? ''); draw();
   installViewport();
   own.ownNode(box); options.parent.append(box);

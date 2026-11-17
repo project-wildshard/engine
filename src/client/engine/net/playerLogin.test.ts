@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { heldTicket, linkIn, redeemLink, refreshTicket, sendLink, signedIn, signOut, ticketed, type LoginPorts } from './playerLogin';
+import { deleteMine, doorOf, exportMine, heldTicket, linkIn, redeemLink, refreshTicket, sendLink, signedIn, signOut, ticketed, type LoginPorts } from './playerLogin';
 
 // MMO-PLAN MP2.2e1: the page's sign-in client against a stand-in for api-server's player routes.
 const DEVICE = 'device:0b6f1a52-7f4e-4d7a-9a1c-3c2b1d0e9f87', NOW = 1_800_000_000_000, API = 'https://api.test';
@@ -70,5 +70,57 @@ describe('player sign-in on the page', () => {
     await redeemLink(refused, 'wsl_abcdefgh12345678');
     expect(await refreshTicket(refused, DEVICE)).toBeUndefined();
     expect(signedIn(refused), 'a 401 signs out').toBeUndefined();
+  });
+});
+
+// MMO-PLAN MP2.5c: a signed-in page takes its data away, or deletes it: the door's saves (with a join ticket) and the API's account
+// (with the session). Delete asks the door first, so a player still in the world keeps everything, then the API, then signs out.
+describe('a player\'s own data', () => {
+  const DOOR = 'https://rooms.test', live = ticketOf(DEVICE, NOW / 1000 + 3600);
+  interface Heard { readonly url: string; readonly authorization: string | undefined; readonly method: string | undefined }
+  function account(answers: Record<string, () => Response>): LoginPorts & { readonly heard: Heard[] } {
+    const held = new Map<string, string>([['wildshard.player.session', JSON.stringify({ session: 'wss_s', email: 'a@b.co' })]]), heard: Heard[] = [];
+    return {
+      api: API, now: () => NOW, heard,
+      storage: { getItem: key => held.get(key) ?? null, setItem: (key, value) => { held.set(key, value); }, removeItem: key => { held.delete(key); } },
+      fetch: (input, init) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        heard.push({ url, authorization: (init?.headers as Record<string, string> | undefined)?.['authorization'], method: init?.method });
+        const route = answers[url] ?? (url.endsWith('/api/players/ticket') ? (): Response => ok({ ticket: live, expiresAt: '' }) : undefined);
+        return Promise.resolve(route === undefined ? new Response('', { status: 404 }) : route());
+      },
+    };
+  }
+
+  test('doorOf: the rooms socket\'s own host, over https', () => {
+    expect(doorOf('wss://rooms-staging.wildshard.io/')).toBe('https://rooms-staging.wildshard.io');
+    expect(doorOf('ws://127.0.0.1:8790')).toBe('http://127.0.0.1:8790');
+    expect(doorOf('nonsense')).toBeUndefined();
+  });
+
+  test('export: both halves in one file, the door asked with a join ticket and the API with the session', async () => {
+    const ports = account({ [`${DOOR}/account/export`]: () => ok({ player: { id: 'account:plr_x' } }), [`${API}/api/players/me/export`]: () => ok({ player: { email: 'a@b.co' } }) });
+    expect(await exportMine(ports, DOOR, DEVICE)).toEqual({ api: { player: { email: 'a@b.co' } }, game: { player: { id: 'account:plr_x' } } });
+    expect(ports.heard.find(row => row.url === `${DOOR}/account/export`)?.authorization).toBe(`Ticket ${live}`);
+    expect(ports.heard.find(row => row.url === `${API}/api/players/me/export`)?.authorization).toBe('Bearer wss_s');
+    const nothing = account({ [`${API}/api/players/me/export`]: () => ok({ player: {} }) });
+    expect(await exportMine(nothing, DOOR, DEVICE), 'nothing saved on the server yet').toEqual({ api: { player: {} }, game: null });
+    expect(await exportMine(account({}), DOOR, DEVICE), 'the API refused: no file').toBeUndefined();
+  });
+
+  test('delete: the door, then the API, then the page signs out; a player in the world is told to leave first', async () => {
+    const order: string[] = [];
+    const ports = account({ [`${DOOR}/account/delete`]: () => { order.push('door'); return ok({ deleted: true }); }, [`${API}/api/players/me/delete`]: () => { order.push('api'); return ok({ deleted: true }); } });
+    expect(await deleteMine(ports, DOOR, DEVICE)).toBe('deleted');
+    expect(order).toEqual(['door', 'api']);
+    expect(signedIn(ports), 'signed out').toBeUndefined();
+    const playing = account({ [`${DOOR}/account/delete`]: () => new Response('', { status: 409 }), [`${API}/api/players/me/delete`]: () => ok({ deleted: true }) });
+    expect(await deleteMine(playing, DOOR, DEVICE)).toBe('playing');
+    expect(playing.heard.some(row => row.url.endsWith('/api/players/me/delete')), 'the API is never asked').toBe(false);
+    expect(signedIn(playing), 'still signed in').toBeDefined();
+    const down = account({ [`${API}/api/players/me/delete`]: () => ok({ deleted: true }) });
+    expect(await deleteMine(down, DOOR, DEVICE), 'a door that fails stops it').toBe('failed');
+    const solo = account({ [`${API}/api/players/me/delete`]: () => ok({ deleted: true }) });
+    expect(await deleteMine(solo, undefined, DEVICE), 'a build with no world deletes the account only').toBe('deleted');
   });
 });

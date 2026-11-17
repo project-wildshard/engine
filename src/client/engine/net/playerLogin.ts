@@ -149,3 +149,43 @@ export async function addPasskey(ports: LoginPorts, game: string): Promise<boole
     return response !== undefined && (await post(ports, '/api/players/passkeys', { response }, { session }))?.status === 201;
   } catch { return false; }
 }
+
+// MMO-PLAN MP2.5c (delete and export): a signed-in player's own data lives in two places, the door's saves (engine
+// `host/dedicated/accountRoutes.ts`, asked with this device's join ticket) and the API's account (asked with the session).
+/** The door's HTTP origin beside its rooms socket (`wss://rooms…` → `https://rooms…`), or undefined. */
+export function doorOf(socket: string): string | undefined {
+  try {
+    const url = new URL(socket);
+    if (url.protocol !== 'wss:' && url.protocol !== 'ws:') return undefined;
+    return `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}`;
+  } catch { return undefined; }
+}
+async function askDoor(ports: LoginPorts, door: string, route: string, device: string): Promise<Response | undefined> {
+  const ticket = await ticketBeforeJoin(ports, device);
+  if (ticket === undefined) return undefined;
+  try { return await ports.fetch(`${door}${route}`, { method: 'POST', headers: { authorization: `Ticket ${ticket}` } }); } catch { return undefined; }
+}
+/** Both halves of the player's data for one file: `game` is null when the door has nothing (or no door). Undefined: the API refused. */
+export async function exportMine(ports: LoginPorts, door: string | undefined, device: string): Promise<{ readonly api: unknown; readonly game: unknown } | undefined> {
+  const session = signedIn(ports)?.session;
+  if (session === undefined) return undefined;
+  const api = await json(await post(ports, '/api/players/me/export', {}, { session }));
+  if (api === undefined) return undefined;
+  const game = door === undefined ? undefined : await json(await askDoor(ports, door, '/account/export', device));
+  return { api, game: game ?? null };
+}
+/** How a delete went: everything gone and signed out, refused while the player is in the world, or stopped (nothing more deleted). */
+export type Deleted = 'deleted' | 'playing' | 'failed';
+/** Delete the player's saves at the door, then the API account, then sign the page out. A build with no world has only the account. */
+export async function deleteMine(ports: LoginPorts, door: string | undefined, device: string): Promise<Deleted> {
+  const session = signedIn(ports)?.session;
+  if (session === undefined) return 'failed';
+  if (door !== undefined) {
+    const saves = await askDoor(ports, door, '/account/delete', device);
+    if (saves?.status === 409) return 'playing';
+    if (saves?.ok !== true) return 'failed';
+  }
+  if ((await post(ports, '/api/players/me/delete', {}, { session }))?.ok !== true) return 'failed';
+  signOut(ports);
+  return 'deleted';
+}

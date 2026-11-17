@@ -25,3 +25,10 @@
 - `accountRoutes.ts`: `POST /account/export` and `/account/delete` on the door's HTTP server, `Authorization: Ticket <ticket>`
   checked offline like a hello; game origins only (`ALLOWED_ORIGINS`); delete answers 409 while the account is in the world
   (`World.isPlaying`), and a deleted account is forgotten by the claim skip so it can be claimed into again.
+
+## MP2.5c the ACCOUNT card's data rows
+
+- Signed in, the card adds Download my data (one JSON file: the API's export and the door's) and Delete account (two taps; the door
+  first, so a player still in the world keeps everything, then the API, then the page signs out).
+- The door is read on the tap from the signed release file (`client/game/accountDoor.ts`), believed only when the signature holds,
+  since the join ticket goes there. The game layer can't import `shared/host/releaseRows`, so it reads only `socket` itself.
