@@ -16217,5 +16217,46 @@
       }
     ],
     "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/grid-owner-proofs.json"
+  },
+  {
+    "repo": "engine",
+    "file": "test/native-oracle.test.ts",
+    "outcome": "migrated",
+    "sourceRevision": "1a9fdc62adfc3c6c3c3302156d402cb8fb4fdd29",
+    "sourceBlob": "06d68e9e94ea5850fc9281cebbf7f0f3f5566222",
+    "decision": "NP3/J232: Move all five original fenced native oracle cases to the shard that owns each wire. NP1 and CI21 C7 prove both partitions in blocking CI.",
+    "originalTests": [
+      "the fenced typed Nine oracle retains the complete former shipping wire",
+      "a divergent cached parent cannot supply native policy facts",
+      "the fenced typed Nalati oracle retains every former boot byte",
+      "the fenced typed Nalati oracle retains every former assembly byte",
+      "the fenced typed Nine oracle retains every former constants byte"
+    ],
+    "ownerProofs": [
+      {
+        "repository": "project-wildshard/shard-nine-dragon",
+        "revision": "0694ed5a084e46a3b8f166be1df3e5d103558a64",
+        "targetPath": "test/nine-native-oracle.test.ts",
+        "targetBlob": "5c0fc32c354138c43a7cd68842b56e480d5181ad",
+        "run": 44013668599,
+        "originalTests": [
+          "the fenced typed Nine oracle retains the complete former shipping wire",
+          "a divergent cached parent cannot supply native policy facts",
+          "the fenced typed Nine oracle retains every former constants byte"
+        ]
+      },
+      {
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "526c80afb2742c5d04a6dd1df9c31800e5b21eeb",
+        "targetPath": "test/ci21-candidate/nalati-native-oracle.test.ts",
+        "targetBlob": "2c0c0d9f63ae876248c92aea4331f48a32c0864c",
+        "run": 44164488676,
+        "originalTests": [
+          "the fenced typed Nalati oracle retains every former boot byte",
+          "the fenced typed Nalati oracle retains every former assembly byte"
+        ]
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/nalati-oracle-inputs.json"
   }
 ]
