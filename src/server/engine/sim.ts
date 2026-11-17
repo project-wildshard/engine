@@ -783,6 +783,8 @@ export class SimHost {
   }
   /** Timed attack targets are host state; snapshot restoration must reconnect them before replay. */
   attackTargets(): readonly [string, string][] { return [...this.targetIds]; }
+  /** Read an existing native action's target without copying the whole roster. */
+  attackTarget(id: string): string | undefined { return this.targetIds.get(id); }
   restoreAttackTargets(entries: readonly (readonly [string, string])[]): void { this.targetIds.clear(); for (const [id, target] of entries) this.targetIds.set(id, target); }
   dispose(): void {
     if (this.disposed) return; this.disposed = true;

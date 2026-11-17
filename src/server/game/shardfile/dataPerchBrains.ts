@@ -16,6 +16,7 @@ import { Vector3 } from 'three';
 import { preparePerchBody } from '../population/perchBody';
 import { stepPerchBodyRoot } from '../../../shared/game/population/perchRoot';
 import { installPerchBodyPools } from './perchBodyPools';
+import { bindCreatureSenses } from './creatureSenses';
 
 interface PerchPreparationPorts {
   readonly scope?: Scope;
@@ -92,6 +93,7 @@ export function dataPerchBrains(host: SimHost, shard: Shardfile, assets: Readonl
   lendPerchClosure(host.scope, assets, catalogue);
   const byId = new Map(catalogue.map(row => [row.id, row]));
   const spawns = new Map(shard.creatures.spawns.map(row => [row.id, row]));
+  const species = new Map(shard.rows.species.map(row => [row.id, row]));
   const pools = installPerchBodyPools(host, catalogue, shard.rows);
   const strikes = new Map(shard.rows.strikes.map(({ weight, speed, ...row }) =>
     [row.id, { ...row, motion: { speed }, weight: () => weight }]));
@@ -106,6 +108,7 @@ export function dataPerchBrains(host: SimHost, shard: Shardfile, assets: Readonl
     if (spawn === undefined || row === undefined || strike === undefined || habitat === undefined || spawn.home === undefined)
       throw new Error('Missing declared per-spawn perch body');
     const home = spawn.home, rng = host.rng.stream('spawn');
+    const input = species.get(spawn.species)?.senses, senses = bindCreatureSenses(host, actor, input);
     const herd: AnimalSim[] | null = spawn.group === undefined ? null : shard.creatures.spawns
       .filter(candidate => candidate.group === spawn.group && candidate.perchBody === row.id)
       .map(candidate => { const body = host.entities.get(candidate.id); if (body === undefined) throw new Error('Missing perch herd body'); return body; });
@@ -138,8 +141,13 @@ export function dataPerchBrains(host: SimHost, shard: Shardfile, assets: Readonl
     const cooldown = host.rng.stream(row.policy.attackStream ?? 'ai');
     const prepared = preparePerchBody(actor, context, strike, ReturnProgram.native(host, row.program), row.policy, cooldown);
     const observe = (dt: number) => {
-      const player = host.nearestPlayer(actor.position);
-      selected = player.health.alive && !host.parked.has(player.id) ? player : undefined;
+      // The native attack record already saves the target of an ongoing bite
+      // or throw. Turning during that action must not acquire a different one.
+      const target = input === undefined || actor.attackPhase < 0 ? undefined : host.attackTarget(actor.entityId);
+      const retained = target === undefined ? undefined : host.players.get(target);
+      const player = retained?.health.alive === true && !host.parked.has(retained.id) ? retained : senses.nearest();
+      selected = player !== undefined && player.health.alive && !host.parked.has(player.id) ? player : undefined;
+      if (input !== undefined && selected !== undefined) host.focusPlayer(selected.id);
       context.dt = dt; context.player = selected?.position ?? actor.position; context.calm = selected === undefined;
       return prepared.observe(context);
     };

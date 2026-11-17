@@ -63,17 +63,31 @@ function nativeRegistration<P>(id: string, actor: AnimalSim, divisor: number, br
   } } };
 }
 function mutableRegistration<P>(id: string, actor: AnimalSim, divisor: number,
-  brain: SimStateAdapter & { think: (ports: P) => void; act: (ports: P) => void }, recipe: DeclaredBrainRecipe<P>, host: SimHost, home?: ShardCreatureHome, phaseOffset?: number): Registration {
+  brain: SimStateAdapter & { readonly state: string; think: (ports: P) => void; act: (ports: P) => void }, recipe: DeclaredBrainRecipe<P>, host: SimHost, home?: ShardCreatureHome, phaseOffset?: number): Registration {
   const contract = JSON.stringify({ version: 1, divisor, ...(home === undefined ? {} : { home }), ...(phaseOffset === undefined ? {} : { phaseOffset }) });
+  const sensed = recipe.nearest !== undefined && recipe.bindTarget !== undefined;
+  let selected: string | null = null;
+  if (sensed) recipe.bindTarget?.(() => {
+    let player = selected === null ? undefined : host.players.get(selected);
+    // The original policy phase owns retention. Perception gates a fresh
+    // graze/orbit/patrol/drift acquisition, not an already committed action.
+    if (player === undefined || !player.health.alive || host.parked.has(player.id)
+      || brain.state === 'graze' || brain.state === 'circle' || brain.state === 'glide' || brain.state === 'drift') {
+      player = recipe.nearest?.(); selected = player?.id ?? null;
+    }
+    return player;
+  });
   return { id, run: () => {
     if (!actor.alive) return;
     const decisionDt = host.brainDt(actor.entityId, false, divisor);
     if (decisionDt > 0) brain.think(recipe.observe(decisionDt));
     const bodyDt = host.bodyDt(actor.entityId);
     if (bodyDt > 0) { brain.act(recipe.observe(bodyDt)); recipe.body(bodyDt); }
-  }, adapter: { snapshot: () => [contract, brain.snapshot()], restore: saved => {
-    if (!Array.isArray(saved) || saved.length !== 2 || saved[0] !== contract || saved[1] === undefined) throw new Error('Incompatible native policy cadence continuation');
+  }, adapter: { snapshot: () => sensed ? [contract, brain.snapshot(), selected !== null && host.players.has(selected) ? selected : null] : [contract, brain.snapshot()], restore: saved => {
+    if (!Array.isArray(saved) || saved.length !== (sensed ? 3 : 2) || saved[0] !== contract || saved[1] === undefined
+      || (sensed && saved[2] !== null && (typeof saved[2] !== 'string' || !host.players.has(saved[2])))) throw new Error('Incompatible native policy cadence continuation');
     brain.restore(saved[1]);
+    if (sensed) selected = typeof saved[2] === 'string' ? saved[2] : null;
   } } };
 }
 /** Preflight every actor, declaration and native port before registering any callback; restore installs without running recipes. */

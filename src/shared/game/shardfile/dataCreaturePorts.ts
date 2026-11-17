@@ -63,7 +63,8 @@ export function bindPlayerColumns(host: Pick<SimHost, 'players' | 'parked' | 'fo
 }
 
 /** Default data-only herd and diver recipes over one real host; injected native recipes remain separate. */
-export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardCreatures['spawns'] = [], borrowedImpulse?: (velocity: Vector3) => void): {
+export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardCreatures['spawns'] = [], borrowedImpulse?: (velocity: Vector3) => void,
+  acquire?: (actor: AnimalSim) => (() => ReturnType<SimHost['nearestPlayer']> | undefined) | undefined): {
   brains: DeclaredBrainPorts; groups: DeclaredGroupPorts; install: () => void;
 } {
   let used = false;
@@ -82,14 +83,34 @@ export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardC
   const speedOf = (actor: AnimalSim): number => company.get(foe(actor).id)?.speed ?? motion.speed;
   const calm = (actor: AnimalSim): boolean => !foe(actor).health.alive;
   const reach = (actor: AnimalSim): boolean => canReach(actor, foe(actor).position, host.physics);
-  const hurt = (actor: AnimalSim, damage: number, tags: StrikeSpec['tags'], moveId: string): void => {
-    const target = foe(actor);
-    if (!actor.alive || !target.health.alive) return;
+  const hit = (actor: AnimalSim, target: ReturnType<SimHost['nearestPlayer']> | undefined, damage: number, tags: StrikeSpec['tags'], moveId: string): void => {
+    if (!actor.alive || target === undefined || !target.health.alive) return;
     point.copy(target.position); point.y += 1.2;
     from.copy(actor.position); from.y += actor.dims.bodyY * actor.scale;
     direction.subVectors(point, from).normalize();
     host.combat.hit({ source: actor.combatActor(), sourceTags: tags, target: target.health,
       amount: damage, point, dir: direction, from, moveId });
+  };
+  const hurt = (actor: AnimalSim, damage: number, tags: StrikeSpec['tags'], moveId: string): void => { hit(actor, foe(actor), damage, tags, moveId); };
+  // Each native recipe borrows one actual-player observation. Groups retain
+  // their existing perception ports; neither path creates another policy.
+  const observation = (actor: AnimalSim) => {
+    const nearest = acquire?.(actor), read = nearest ?? (() => foe(actor));
+    let bound: (() => ReturnType<SimHost['nearestPlayer']> | undefined) | undefined;
+    let selected: ReturnType<SimHost['nearestPlayer']> | undefined;
+    return {
+      observe: (dt: number) => {
+        selected = bound === undefined ? read() : bound();
+        if (nearest !== undefined && selected !== undefined) host.focusPlayer(selected.id);
+        return { dt, player: selected?.position ?? actor.position, calm: selected === undefined || !selected.health.alive };
+      },
+      reach: (body: AnimalSim) => nearest === undefined ? reach(body) : selected !== undefined && canReach(body, selected.position, host.physics),
+      hurt: (damage: number, tags: StrikeSpec['tags'], moveId: string) => {
+        if (nearest === undefined) hurt(actor, damage, tags, moveId); else hit(actor, selected, damage, tags, moveId);
+      },
+      binding: nearest === undefined ? {} : { nearest,
+        bindTarget: (target: () => ReturnType<SimHost['nearestPlayer']> | undefined) => { bound = target; } },
+    };
   };
   const inBounds = (x: number, z: number, margin: number): boolean => Math.abs(x) <= 250 - margin && Math.abs(z) <= 250 - margin;
   const normalY = (x: number, z: number): number => {
@@ -106,10 +127,11 @@ export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardC
     used = true;
     const strike = strikes.get(id);
     if (strike === undefined) throw new Error('Unresolved data-host diver strike');
-    return { strike, observe: (dt: number) => ({ dt, player: foe(actor).position, calm: calm(actor),
+    const target = observation(actor);
+    return { ...target.binding, strike, observe: (dt: number) => ({ ...target.observe(dt),
       mayAttack: (body: AnimalSim) => host.events.ask('ai.mayAttack', body),
-      claim: (body: AnimalSim) => host.events.ask('ai.claim', body), reach,
-      hurt: (damage: number) => { hurt(actor, damage, strike.tags, strike.id); },
+      claim: (body: AnimalSim) => host.events.ask('ai.claim', body), reach: target.reach,
+      hurt: (damage: number) => { target.hurt(damage, strike.tags, strike.id); },
       flight: { steer: (body: AnimalSim, yaw: number, speed: number, altitude: number, turn: number) => { body.fly(yaw, speed, altitude, turn); } },
     }), body: () => { confine(actor); } };
   };
@@ -119,26 +141,28 @@ export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardC
       if (home === undefined) throw new Error('Missing authored data-host ram home');
       if (strike === undefined) throw new Error('Unresolved data-host ram strike');
       used = true;
-      return { strike, observe: dt => ({ dt, home, player: foe(actor).position, calm: calm(actor),
-        rng: host.rng.stream('ai'), reach, claim: body => host.events.ask('ai.claim', body),
-        hurt: damage => { hurt(actor, damage, strike.tags, strike.id); },
-        strikeHit: selected => { hurt(actor, selected.damage, selected.tags, selected.id); },
+      const target = observation(actor);
+      return { ...target.binding, strike, observe: dt => ({ ...target.observe(dt), home,
+        rng: host.rng.stream('ai'), reach: target.reach, claim: body => host.events.ask('ai.claim', body),
+        hurt: damage => { target.hurt(damage, strike.tags, strike.id); },
+        strikeHit: selected => { target.hurt(selected.damage, selected.tags, selected.id); },
       }), body: () => undefined };
     }, challengeGrazer: (actor, row) => {
       const phaseOffset = phases.get(actor.entityId), charge = strikes.get(row.charge), close = strikes.get(row.close);
       if (phaseOffset === undefined) throw new Error('Missing authored data-host circle phase');
       if (charge === undefined || close === undefined) throw new Error('Unresolved data-host challenge strikes');
       used = true;
-      return { charge, close, observe: dt => ({ dt, t: host.clock.now, phaseOffset, player: foe(actor).position,
-        calm: calm(actor), reach, claim: body => host.events.ask('ai.claim', body),
+      const target = observation(actor);
+      return { ...target.binding, charge, close, observe: dt => ({ ...target.observe(dt), t: host.clock.now, phaseOffset,
+        reach: target.reach, claim: body => host.events.ask('ai.claim', body),
         hurt: () => { throw new Error('Missing selected data-host challenge strike'); },
-        strikeHit: selected => { hurt(actor, selected.damage, selected.tags, selected.id); },
+        strikeHit: selected => { target.hurt(selected.damage, selected.tags, selected.id); },
         steer: (body, yaw, speed, turn) => { body.setMotion(yaw, speed, turn); },
       }), body: () => undefined };
     }, burstFlyer: (actor, row) => {
       if (forces === undefined) throw new Error('Missing borrowed data-host player impulse');
       const recipe = diver(actor, row.strike);
-      return { strike: recipe.strike, body: recipe.body, observe: dt => ({ ...recipe.observe(dt),
+      return { ...recipe, observe: dt => ({ ...recipe.observe(dt),
         shove: forces.directed,
       }) };
     }, orbitDiver: (actor, row) => diver(actor, row.strike), patrolDiver: (actor, row) => diver(actor, row.strike) },
