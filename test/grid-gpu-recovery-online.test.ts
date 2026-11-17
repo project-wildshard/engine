@@ -55,3 +55,22 @@ test('offline, a recovery still needs its checkpoint to land first', () => {
   expect(owner.prepareRecovery('gpu')).toBe(true);
   expect(gridRecovery(store).consume(assembly)).toMatchObject({ kind: 'resume', record: { reason: 'gpu' } });
 });
+
+// STAGING-BUGBASH SB41 (opus-closeout1, staging v0.1.36, SENTRY-TRIAGE S22): the S13 reload kept the world but put the player
+// on the road at (285,0), not on Driftwood's pier at (1,-194), 2 of 2. On a wire the server decides crossings, so the page can
+// stand in its home with no entered region (`current()` null); the place was saved as `road` and the resume took the home's
+// road lane. Where the feet stand inside a cell, that cell-local place is what the reload resumes.
+test('a GPU recovery from the pier, with no region entered, resumes on the pier, not the road', () => {
+  const { owner, store } = session({ wired: true, checkpoint: false });
+  const pier = { x: (home?.origin.x ?? 0) + 1, y: 2.02, z: (home?.origin.z ?? 0) - 194 };
+  Reflect.set(owner, 'live', { current: () => null, worldFeet: () => pier, followServer: () => undefined });
+  expect(owner.prepareRecovery('gpu')).toBe(true);
+  expect(gridRecovery(store).consume(assembly)).toMatchObject({ kind: 'resume', record: { instance: home?.instance,
+    saved: { instance: home?.instance, location: { kind: 'cell', x: 1, y: 2.02, z: -194 } } } });
+});
+
+test('on the road between cells the recovery still resumes on the road', () => {
+  const { owner, store } = session({ wired: true, checkpoint: false });
+  expect(owner.prepareRecovery('gpu')).toBe(true);
+  expect(gridRecovery(store).consume(assembly)).toMatchObject({ kind: 'resume', record: { saved: { location: { kind: 'road' } } } });
+});

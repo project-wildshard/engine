@@ -536,9 +536,11 @@ export class LiveGridSession {
 
   /** Where this page stands, which is the cell its next boot opens in. On a wire it's all a page saves. */
   saveLocation(): boolean {
-    const current = this.live.current(), cell = current === null ? this.ports.home : this.ports.assembly.cell(current);
-    const feet = this.worldFeet();
-    const inside = this.ports.assembly.at(feet.x, feet.z)?.instance === current;
+    // SB41: on a wire the server decides crossings, so the page can stand in a cell with no region entered (`current` null):
+    // the cell under the feet is still where it stands, and the reload's owned-home entry admits it before the resume
+    const current = this.live.current(), feet = this.worldFeet(), standing = this.ports.assembly.at(feet.x, feet.z);
+    const cell = current !== null ? this.ports.assembly.cell(current) : standing ?? this.ports.home;
+    const inside = standing?.instance === cell.instance;
     const local = this.ports.assembly.local(feet, cell);
     return gridRecovery(this.page.saves).save(this.ports.assembly, cell, this.recoveryRoad(), inside
       ? { kind: 'cell', ...local, yaw: this.page.traveller.yaw } : { kind: 'road' });
