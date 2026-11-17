@@ -197,18 +197,17 @@ try {
       arrived = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { x: Number(p.position.x.toFixed(2)), z: Number(p.position.z.toFixed(2)), yaw: Number(p.yaw.toFixed(3)) }; });
       // settled where it arrived (the fresh boot below stands at the same pose for as long)
       await sleep(SETTLE_MS); controlMB = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
-      // the new home's origin in world feet: on the road the player's own position is the road's frame (online it rebinds there)
+      // the new home's origin in world feet, read inside it (on the road the player's own position is the road's frame online)
       const homeAt = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
+      // out onto the road: the feet in no cell (online the player's own position is the road's frame once it steps out)
       for (const ends = Date.now() + 20_000; Date.now() < ends;) {
-        const x = (await state()).x - homeAt.x;
-        if (dir * x < -HALF - 5) { walkedOut = true; break; }
+        if ((await state()).inside === null) { walkedOut = true; break; }
         await face(dir * Math.PI / 2); await page.keyboard.down('KeyW'); await sleep(400); await page.keyboard.up('KeyW');
       }
       await page.screenshot({ path: join(out, `${tag}-walked-out.png`) });
       // ZE10d: the old home is walled now: 2 m into Driftwood's buffer its gate counts 5 (then straight back out, so it never reaches 0)
       if (walkedOut) {
-        const frame = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
-        const driftwoodEdge = frame.x - dir * (pitch - HALF);
+        const driftwoodEdge = homeAt.x - dir * (pitch - HALF);
         await walkTo(driftwoodEdge - dir * 2);
         // the gate's state is read before the shot (a full-size shot can outlast a count's second), and the walker steps straight back
         // out: the count must never reach 0 here (a second entry would overlap the memory reads below)
