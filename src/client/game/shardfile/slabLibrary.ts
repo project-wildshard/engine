@@ -5,6 +5,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { ownSceneResource } from '@wildshard/engine/app/sceneOwnership';
 import { workSlice } from '@wildshard/engine/core/workSlice';
+import { gpuOnlyAttributes } from '@wildshard/engine/core/gpuOnly';
 import { nativeWholeGeometry } from '@wildshard/engine/models/nativeGeometry';
 import type { WorldScenesSection } from '@wildshard/format/worldScenes';
 import type { WorldSceneSlabChunk, WorldSceneSlabFile, WorldSceneSlabKey, WorldSceneSlabLibrary } from '@wildshard/format/worldSceneSlabs';
@@ -22,6 +23,8 @@ type SlabTile = WorldSceneSlabLibrary['tiles'][number];
 /** the bake's tag on each slab mesh (`sharddev/bake/slabs.ts`): its key, tile and place in its file */
 const SlabTag = v.object({ key: v.string(), tile: v.number(), chunk: v.number() });
 const EMPTY: ReadonlySet<number> = new Set();
+/** MG10: the gpu-only label of slab chunks, whose channels but position leave the CPU once uploaded (a lost context reloads) */
+export const SLAB_GPU_ONLY = 'slab chunks';
 const EMPTY_KEYS: ReadonlySet<string> = new Set();
 /** NB8: each phone chunk geometry's leaf tree (`slabRanges.ts`): built on a read in play before its first upload; a read
  *  under the loader's settle (Nine's whole resident bank, ~0.2 s at CPU x4 on NB1's readyFrame) waits in LATE and is
@@ -203,6 +206,10 @@ async function readSlabChunks(owner: Scope, product: ShardFolder, tile: number, 
       const [x0, y0, z0, x1, y1, z1] = row.box, [sx, sy, sz, radius] = row.sphere;
       geometry.boundingBox = new Box3(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1));
       geometry.boundingSphere = new Sphere(new Vector3(sx, sy, sz), radius);
+      // MG10 (J410): every channel but position goes once uploaded; what reads after that (leaf trees, far levels, picking)
+      // reads only position and the index, and the channels it copies it copied above. A chunk merged before its upload
+      // drops nothing: its merge copies the channels and the merged geometry is released below instead
+      gpuOnlyAttributes(geometry, SLAB_GPU_ONLY);
       out.push(geometry);
     }
     await admitted.releaseTransport([file.file]); live();
@@ -288,6 +295,7 @@ export class SlabLibrary {
       }
       const { box, sphere } = mergedSlabBounds(at.map(index => rows[index] ?? { box: [], sphere: [] }));
       geometry.boundingBox = box; geometry.boundingSphere = sphere;
+      gpuOnlyAttributes(geometry, SLAB_GPU_ONLY);
       ownSceneResource(geometry, scope);
       // its leaf tree is a sliced job after the loader's settle (`drainLate`), never a long task on the read
       if (TIER_CONFIG.slabRanges) { LATE.add(geometry); facedTree(geometry); }

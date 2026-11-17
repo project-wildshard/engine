@@ -21,3 +21,8 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
 - Nine's peak (~970 MB at `finish`) carries 475-625 MB of JS heap, most of it garbage: 1.2 GB is allocated on the main
   thread before ready (valibot ~240 MB, graph GLSL emission ~140, placement pages ~110, boot-trace writes ~170).
 - `saveStorage.setItem` validated each write twice (its own `jsonSchema` parse, then the slot's): boot-trace writes 173 -> 91 MB.
+- Since 02aef688 a GLB channel is a view into its file's bytes, so `gpuOnlyAttributes` releasing `normal` etc. freed nothing
+  while the kept `position`/index still viewed the same file. Kept channels now get their own bytes when something is
+  released. Nine's slab chunks (merged on the phone) now release every channel but position and the index: buffers reachable
+  from Nine's scene at ready 117 -> 53 MB. The loading peak did not move outside noise (Nine 970 -> 937 MB, 3 valid runs each;
+  Sky Reach 555 -> 551): the peak there is garbage and the wasm tier-up, not these arrays.

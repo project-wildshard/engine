@@ -295,3 +295,20 @@ test('retirement during native preparation leaves no exposed or leaked instance'
     expect(f.anchor.layers.mask).toBe(0); expect(prepare).toHaveBeenCalledOnce();
   } finally { finish(); f.close(); }
 });
+
+// MEMORY-GATES MG10 (J410): a chunk's channels but position leave the CPU once uploaded (Nine's slabs held ~64 MB of them at
+// ready); position and the index stay for the leaf trees, far levels and picking, and the release is gated on the upload
+test('a drawn chunk keeps position and index on the CPU and gives up its other channels once uploaded', async () => {
+  for (const merge of [false, true]) {
+    const f = fixture(true, undefined, undefined, false, merge), first = f.owner.child('first');
+    try {
+      await f.content.attach(0, first);
+      const geometry = geometryOf(f.anchor.children[0]), normal = geometry.getAttribute('normal'), position = geometry.getAttribute('position');
+      if (!(normal instanceof BufferAttribute) || !(position instanceof BufferAttribute)) throw new Error('Expected plain channels');
+      expect(normal.array.length).toBeGreaterThan(0);
+      position.onUploadCallback(); normal.onUploadCallback(); geometry.index?.onUploadCallback();
+      expect(normal.array).toHaveLength(0); expect(normal.count).toBeGreaterThan(0);
+      expect(position.array.length).toBeGreaterThan(0); expect(geometry.index?.array.length).toBeGreaterThan(0);
+    } finally { f.close(); }
+  }
+});

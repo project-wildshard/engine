@@ -97,7 +97,13 @@ export function gpuOnlyAttributes(g: BufferGeometry, label: string, keep: readon
     releasedAs.set(a, `${label}.${name}`);
     a.onUpload(releaseCpuCopy);
   }
-  if (bytes > 0) markGpuOnly(label);
+  if (bytes > 0) {
+    markGpuOnly(label);
+    // MG10 (J410): a channel read in place from its file's bytes (02aef688) is a view that keeps the whole file alive, so
+    // a released channel freed nothing while a kept one still viewed the same bytes. What stays gets its own bytes now,
+    // before the upload, and the file goes once every released channel is on the GPU.
+    for (const kept of [...keep.map(name => g.getAttribute(name)), g.index]) if (kept instanceof BufferAttribute && kept.array.byteLength < kept.array.buffer.byteLength) kept.array = kept.array.slice();
+  }
   return bytes;
 }
 
