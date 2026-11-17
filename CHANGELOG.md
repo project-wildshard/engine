@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.36 (2026-11-17)
+
+- Progress resets once before the MMO opens; sign-in and settings carry over.
+- Older clients update once to the new progress epoch.
+- Fix mobile sign-in closing immediately after its opening tap.
+
 ## v0.1.35 (2026-11-17)
 
 - Keep Template coins and goods when leaving and returning to a room.
