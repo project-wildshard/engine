@@ -24,3 +24,9 @@
   golden through the engine's `Rng` and sim streams, and checks forest
   and collider placement through the engine wrappers (and into Rapier)
   give format's numbers bit for bit.
+- vite stays 8.3.0: 8.3.8 writes the startup-data JSON chunk's source map
+  with no `sources`, so `scripts/app-build/bootModules.ts` (which finds a
+  boot root through the map) refuses `pickupCatalogue.json` and
+  `build:game` fails. hono and @hono/node-server keep their fixed pins.
+  Bundle with the laws moved: code 16,087,065 -> 16,093,212 bytes
+  (+0.04%), the whole page +0.1%.
