@@ -5,7 +5,7 @@
 /** @typedef {{ scenario: string, key: string, severity: Severity, text: string, source: 'check' | 'vision', frame?: string, video?: string }} Finding */
 /** @typedef {import('./scenarios.mjs').ScenarioResult} ScenarioResult */
 /** @typedef {{ build?: string, describe?: string, clientVersion?: string, minClient?: string }} Version */
-/** @typedef {{ release: string, version: Version, build?: string, lastTimeToPlay?: Record<string, number> }} CheckContext */
+/** @typedef {{ release: string, version: Version, build?: string, lastTimeToPlay?: Record<string, number>, checkVersion?: boolean }} CheckContext */
 
 /** The journey judge's words that are not P1 on their own: no play is P0, a modal is named by its own check. */
 const NOT_P1 = /^never reached play|^an error or drop modal opened$/u;
@@ -54,7 +54,7 @@ export function checkScenario(s, ctx) {
   if (s.oldCache === undefined) add('drop', 'P1', dropped.length === 0, `a drop modal opened on the way into play (${dropped.join(', ')})`);
   const v = ctx.version;
   const named = (ctx.build === undefined || v.build === ctx.build) && v.describe === ctx.release;
-  add('version', 'P1', named, `/version.json names ${v.build?.slice(0, 8) ?? 'no build'} ${v.describe ?? 'no describe'}, not ${ctx.build?.slice(0, 8) ?? ''} ${ctx.release} (SB7)`.replaceAll(/ {2,}/gu, ' '));
+  if (ctx.checkVersion !== false) add('version', 'P1', named, `/version.json names ${v.build?.slice(0, 8) ?? 'no build'} ${v.describe ?? 'no describe'}, not ${ctx.build?.slice(0, 8) ?? ''} ${ctx.release} (SB7)`.replaceAll(/ {2,}/gu, ' '));
   // the old cache (K1, K2): the candidate on the first page, a forced update's wipe, the save kept
   if (s.oldCache !== undefined) {
     const { before, after, minClient } = s.oldCache;
@@ -82,7 +82,7 @@ export function checkScenario(s, ctx) {
   const closes = s.events.filter((e) => e.kind === 'wsclose').map((e) => `${String(e.code)}${typeof e.reason === 'string' && e.reason !== '' ? ` ${e.reason}` : ''}`);
   add('strip', 'P2', strip.length === 0, `a RECONNECTING strip ${String(Math.round(((strip[0]?.at ?? 0) - (firstPlay ?? 0)) / 1000))} s into play (SB31)${closes.length > 0 ? `; socket closes ${closes.slice(0, 3).join(', ')}` : ''}`);
   const ttp = timeToPlay(s), last = ctx.lastTimeToPlay?.[s.id];
-  if (ttp !== undefined && last !== undefined) add('slow-play', 'P2', ttp <= last * 1.3, `time to play ${(ttp / 1000).toFixed(1)} s, over 30% slower than the last release's ${(last / 1000).toFixed(1)} s (SB32b)`);
+  if (ttp !== undefined && last !== undefined && s.oldCache === undefined && s.id !== 'K1' && s.id !== 'K2') add('slow-play', 'P2', ttp <= last * 1.3, `time to play ${(ttp / 1000).toFixed(1)} s, over 30% slower than the last release's ${(last / 1000).toFixed(1)} s (SB32b)`);
   const long = firstPlay === null ? [] : s.events.filter((e) => e.kind === 'longtask' && e.at >= firstPlay && Number(e.ms) >= 2000);
   add('long-task', 'P2', long.length === 0, `a ${String(Number(long[0]?.ms ?? 0))} ms long task after arrival (SB32)`);
   return checks;
@@ -114,8 +114,10 @@ export const holds = (findings) => findings.some((f) => f.severity === 'P0' || f
  * @param {readonly ScenarioResult[]} scenarios @param {CheckContext} ctx
  */
 export function verdictOf(scenarios, ctx) {
+  // /version.json is one fact per run: checked on the first scenario that ran, not five times
+  const first = scenarios.find((s) => s.status !== 'skip');
   const rows = scenarios.map((s) => {
-    const checks = checkScenario(s, ctx);
+    const checks = checkScenario(s, { ...ctx, checkVersion: s === first });
     const ttp = timeToPlay(s);
     return { scenario: s, checks, findings: findingsOf(s, checks), ...(ttp === undefined ? {} : { timeToPlay: ttp }) };
   });

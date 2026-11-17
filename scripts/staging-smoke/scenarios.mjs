@@ -46,11 +46,17 @@ export function smokeProbes() {
   const native = window.requestAnimationFrame.bind(window);
   let gate = -1, next = 0;
   /* oxlint-disable promise/prefer-await-to-callbacks -- requestAnimationFrame's callbacks are the API being capped */
-  /** @param {FrameRequestCallback} cb @returns {FrameRequestCallback} */
-  const step = (cb) => (t) => {
-    if (t === gate || t >= next) { if (t !== gate) { gate = t; next = t + 1000 / 61; } cb(t); } else native(step(cb));
+  // a deferred callback gets a new native id: keep the first id pointing at the live one, so cancelAnimationFrame still works
+  const cancel = window.cancelAnimationFrame.bind(window);
+  /** @type {Map<number, number>} */
+  const live = new Map();
+  let ids = 0;
+  /** @param {number} id @param {FrameRequestCallback} cb @returns {FrameRequestCallback} */
+  const track = (id, cb) => (t) => {
+    if (t === gate || t >= next) { live.delete(id); if (t !== gate) { gate = t; next = t + 1000 / 61; } cb(t); } else live.set(id, native(track(id, cb)));
   };
-  window.requestAnimationFrame = (cb) => native(step(cb));
+  window.requestAnimationFrame = (cb) => { const id = ++ids; live.set(id, native(track(id, cb))); return id; };
+  window.cancelAnimationFrame = (id) => { const n = live.get(id); if (n !== undefined) { cancel(n); live.delete(id); } };
   /* oxlint-enable promise/prefer-await-to-callbacks */
   try {
     new PerformanceObserver((list) => { for (const e of list.getEntries()) if (e.duration >= 200) say({ kind: 'longtask', ms: Math.round(e.duration) }); })

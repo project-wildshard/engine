@@ -27,7 +27,7 @@ test('a clean run is one receipt line and no board', () => {
 test('one P2 writes board.html with that finding first', () => {
   const out = join(OUT, 'p2');
   mkdirSync(out, { recursive: true });
-  const verdict = { ...clean, findings: [{ scenario: 'K4', key: 'strip', severity: 'P2' as const, text: 'a RECONNECTING strip 12 s into play (SB31)', source: 'check' as const }], bugbash: { added: ['SB41'], seenAgain: [] } };
+  const verdict = { ...clean, findings: [{ scenario: 'K4', key: 'strip', severity: 'P2' as const, text: 'a RECONNECTING strip 12 s into play (SB31)', source: 'check' as const }], bugbash: { added: ['SB41'], seenAgain: [], rowOf: { 'K4/strip': 'SB41' } } };
   expect(isClean(verdict)).toBe(false);
   const file = writeBoard(verdict, { out });
   expect(file).toBe(join(out, 'board.html'));

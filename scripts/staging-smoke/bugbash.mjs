@@ -25,12 +25,14 @@ const cell = (text) => text.replaceAll('|', '/').replaceAll('\n', ' ');
  * @param {string} plan the STAGING-BUGBASH plan's text
  * @param {readonly Finding[]} findings
  * @param {{ release: string, build?: string }} run
- * @returns {{ text: string, added: string[], seenAgain: string[] }}
+ * @returns {{ text: string, added: string[], seenAgain: string[], rowOf: Record<string, string> }}
  */
 export function bugbashRows(plan, findings, { release, build }) {
   const lines = plan.split('\n');
   /** @type {string[]} */
   const added = [], seenAgain = [];
+  /** @type {Record<string, string>} the SB row each finding's `scenario/key` went to */
+  const rowOf = {};
   /** @type {string[]} */
   const rows = [];
   let next = Math.max(0, ...[...plan.matchAll(/\bSB(\d+)/gu)].map((m) => Number(m[1]))) + 1;
@@ -41,13 +43,16 @@ export function bugbashRows(plan, findings, { release, build }) {
       const line = lines[open] ?? '';
       const at = line.lastIndexOf(' | ', line.length - 3);
       lines[open] = `${line.slice(0, at)} Seen again on ${release}${build === undefined ? '' : ` (\`${build.slice(0, 8)}\`)`}.${line.slice(at)}`;
-      seenAgain.push(line.split(' | ')[0]?.replace('| ', '') ?? '');
+      const id = line.split(' | ')[0]?.replace('| ', '') ?? '';
+      seenAgain.push(id);
+      rowOf[`${f.scenario}/${f.key}`] = id;
       continue;
     }
     const id = `SB${String(next++)}`;
     const where = [f.frame === undefined ? '' : `frame \`${f.frame}\``, f.video === undefined ? '' : `clip \`${f.video}\``].filter(Boolean).join(', ');
     rows.push(`| ${id} | **${cell(f.text)} (${f.severity}, found by staging smoke ${release}, ${f.scenario}).** ${token}${where === '' ? '' : `; ${where}`}. Scenario? ${scenarioAnswer(f)}. | The staging smoke passes \`${f.key}\` in ${f.scenario}, or a T1 test holds the fix. |`);
     added.push(id);
+    rowOf[`${f.scenario}/${f.key}`] = id;
   }
   if (rows.length > 0) {
     const letters = [...plan.matchAll(/^### Group ([A-Z]):/gmu)].map((m) => m[1] ?? 'A');
@@ -61,5 +66,5 @@ export function bugbashRows(plan, findings, { release, build }) {
     while (insert > 0 && (lines[insert - 1] ?? '').trim() === '') insert--;
     lines.splice(insert, 0, ...group);
   }
-  return { text: lines.join('\n'), added, seenAgain };
+  return { text: lines.join('\n'), added, seenAgain, rowOf };
 }

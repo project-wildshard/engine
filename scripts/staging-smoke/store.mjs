@@ -71,17 +71,18 @@ export function keepRun(store, release, out, verdict) {
   return dir;
 }
 
-/** The newest saved profile pair for `origin`: a dir per browser and the note of the storage they held when saved.
- * @param {string} store @param {string} origin @returns {{ dir: string, note: ProfileNote } | undefined} */
-export function newestProfiles(store, origin) {
+/** The newest saved profile pair for `origin` from a release other than `release` (a re-run of a held release must start
+ * from the release before it, not from its own profiles, already on the candidate).
+ * @param {string} store @param {string} origin @param {string} [release] @returns {{ dir: string, note: ProfileNote } | undefined} */
+export function newestProfiles(store, origin, release) {
   if (!existsSync(store)) return undefined;
-  const rows = readdirSync(store).flatMap((release) => {
-    const note = join(store, release, 'profiles', 'note.json');
+  const rows = readdirSync(store).flatMap((name) => {
+    const note = join(store, name, 'profiles', 'note.json');
     if (!existsSync(note)) return [];
     try {
       /** @type {ProfileNote} */
       const parsed = JSON.parse(readFileSync(note, 'utf8'));
-      return parsed.origin === origin ? [{ dir: join(store, release, 'profiles'), note: parsed, mtime: statSync(note).mtimeMs }] : [];
+      return parsed.origin === origin && parsed.release !== release ? [{ dir: join(store, name, 'profiles'), note: parsed, mtime: statSync(note).mtimeMs }] : [];
     } catch { return []; }
   }).sort((a, b) => b.mtime - a.mtime);
   const row = rows[0];
@@ -89,7 +90,8 @@ export function newestProfiles(store, origin) {
 }
 
 /**
- * Save this run's K1 and K2 profiles as the next release's old cache, and drop every older pair (only the latest is kept).
+ * Save this run's K1 and K2 profiles as the next release's old cache. Two pairs stay: this release's and the newest other
+ * release's (what a re-run of this release starts from); older pairs go.
  * @param {string} store @param {ProfileNote} note @param {Partial<Record<'chromium' | 'webkit', string>>} profiles
  */
 export function saveProfiles(store, note, profiles) {
@@ -98,10 +100,11 @@ export function saveProfiles(store, note, profiles) {
   mkdirSync(dir, { recursive: true });
   for (const [browser, path] of Object.entries(profiles)) if (path !== undefined && existsSync(path)) cpSync(path, join(dir, browser), { recursive: true });
   writeFileSync(join(dir, 'note.json'), `${JSON.stringify(note, null, 1)}\n`);
+  const keep = newestProfiles(store, note.origin, note.release)?.dir;
   if (existsSync(store)) {
     for (const release of readdirSync(store)) {
       const other = join(store, release, 'profiles');
-      if (release !== note.release && existsSync(other)) rmSync(other, { recursive: true, force: true });
+      if (release !== note.release && other !== keep && existsSync(other)) rmSync(other, { recursive: true, force: true });
     }
   }
   return dir;

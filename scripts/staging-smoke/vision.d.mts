@@ -17,8 +17,9 @@ export function visionPrompt({ sheet, scenario, title, last, release, bullets }:
 /** The last JSON object in a model reply, checked. @param {string} text @returns {Omit<Vision, 'scenario'> | undefined} */
 export function parseVision(text: string): Omit<Vision, "scenario"> | undefined;
 /**
- * Ask Claude about one sheet. `claude` is whatever is first on PATH (the test puts a stub there). The call runs in the sheet's
- * folder (outside any repo, so no project instructions load) with only the Read tool.
+ * Ask Claude about one sheet. `claude` is whatever is first on PATH (the test puts a stub there). The call runs from
+ * ~/.cache/wildshard/plan-artifacts (outside every repo, so no project instructions load), with only the Read tool and the
+ * sheet's folder (`cwd`) added.
  * @param {string} prompt @param {string} cwd @param {{ claude?: string, timeoutMs?: number }} [o] @returns {Omit<Vision, 'scenario'>}
  */
 export function askClaude(prompt: string, cwd: string, { claude, timeoutMs }?: {

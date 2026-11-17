@@ -17,15 +17,21 @@ import { newestProfiles, saveProfiles } from '../scripts/staging-smoke/store.mjs
 const ROOT = resolve('tmp/staging-smoke-profiles-test');
 const HANDOFF = process.env['WS_SMOKE_HANDOFF']?.split(',');
 
-test('only the latest profile pair is kept, and only the same origin restores it', () => {
+test('two pairs stay (this release and the one before), a re-run starts from the one before, and only the same origin restores', () => {
   const store = join(ROOT, 'unit');
   rmSync(store, { recursive: true, force: true });
   const fake = (name: string) => { const dir = join(ROOT, 'src', name); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'Cookies'), name); return dir; };
   const state = { caches: ['shell'], databases: ['wildshard-saves@1'] };
   saveProfiles(store, { release: 'v0.1.33', origin: 'https://staging.wildshard.io', clientVersion: '0.1.33', states: { webkit: state } }, { chromium: fake('c33'), webkit: fake('w33') });
   saveProfiles(store, { release: 'v0.1.34', origin: 'https://staging.wildshard.io', clientVersion: '0.1.34', states: { webkit: state } }, { chromium: fake('c34'), webkit: fake('w34') });
+  saveProfiles(store, { release: 'v0.1.35', origin: 'https://staging.wildshard.io', clientVersion: '0.1.35', states: { webkit: state } }, { chromium: fake('c35'), webkit: fake('w35') });
   expect(existsSync(join(store, 'v0.1.33', 'profiles'))).toBe(false);
-  const newest = newestProfiles(store, 'https://staging.wildshard.io');
+  expect(existsSync(join(store, 'v0.1.34', 'profiles'))).toBe(true);
+  // a re-run of v0.1.35 starts from v0.1.34, and saving again keeps v0.1.34
+  expect(newestProfiles(store, 'https://staging.wildshard.io', 'v0.1.35')?.note.release).toBe('v0.1.34');
+  saveProfiles(store, { release: 'v0.1.35', origin: 'https://staging.wildshard.io', clientVersion: '0.1.35', states: { webkit: state } }, { chromium: fake('c35'), webkit: fake('w35') });
+  expect(existsSync(join(store, 'v0.1.34', 'profiles'))).toBe(true);
+  const newest = newestProfiles(store, 'https://staging.wildshard.io', 'v0.1.35');
   expect(newest?.note.release).toBe('v0.1.34');
   expect(readFileSync(join(newest?.dir ?? '', 'webkit', 'Cookies'), 'utf8')).toBe('w34');
   expect(newestProfiles(store, 'http://127.0.0.1:4400')).toBeUndefined();
@@ -71,6 +77,6 @@ test.skipIf(HANDOFF === undefined)('two builds: the first run saves the profiles
     }
     expect(lines.join('\n')).toContain('old cache: v-old profiles');
     expect(newestProfiles(store, url)?.note.release).toBe('v-new');
-    expect(existsSync(join(store, 'v-old', 'profiles'))).toBe(false);
+    expect(existsSync(join(store, 'v-old', 'profiles'))).toBe(true);
   } finally { stop(); writeFileSync(versionFile, original); }
 }, 900_000);

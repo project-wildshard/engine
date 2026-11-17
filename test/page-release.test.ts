@@ -18,7 +18,7 @@ const build = 'a'.repeat(40);
 const journeysOn = (on: string = build) => JOURNEY_GATE.cards.flatMap(card => JOURNEY_GATE.browsers.flatMap(browser =>
   JOURNEY_GATE.runs.map(run => ({card, browser, run, build: on, ok: true, at: '2026-11-17T05:00:00.000Z'}))));
 /** STAGING-SMOKE SM5: a staging smoke verdict for `on`, clean unless `hold`. */
-const smokeOn = (on: string = build, hold = false) => ({build: on, hold, findings: hold ? [{scenario: 'K3', key: 'journey', severity: 'P1', text: 'the main menu came back after Enter World'}] : []});
+const smokeOn = (on: string = build, hold = false) => ({build: on, url: CHANNELS.staging.origin, scenarios: ['K1', 'K2', 'K3', 'K4', 'K5'].map(id => ({id, status: id === 'K1' ? 'skip' : 'ran'})), hold, findings: hold ? [{scenario: 'K3', key: 'journey', severity: 'P1', text: 'the main menu came back after Enter World'}] : []});
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
 const key = publicKey.export({format: 'der', type: 'spki'}).toString('hex');
 const token = ['host', 'credential', 'marker'].join('-');
@@ -292,6 +292,12 @@ test('production go-live needs a clean staging smoke verdict for this build', as
   await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*verdict is for bbbbbbbb, not aaaaaaaa/u);
   deps.smoke = smokeOn(build, true);
   await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*holds: P1 K3 the main menu came back after Enter World/u);
+  deps.smoke = {...smokeOn(), url: 'http://127.0.0.1:4400'};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*ran on http:\/\/127\.0\.0\.1:4400/u);
+  deps.smoke = {...smokeOn(), scenarios: [{id: 'K3', status: 'ran'}]};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*K4 missing, K5 missing/u);
+  deps.smoke = {...smokeOn(), scenarios: smokeOn().scenarios.map(s => s.id === 'K4' ? {...s, status: 'crashed'} : s)};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*K4 crashed/u);
   deps.smoke = {problem: 'tmp/smoke/verdict.json: ENOENT'};
   await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*ENOENT/u);
   expect(calls).not.toContain('goLive');

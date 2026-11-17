@@ -8,7 +8,8 @@
 //        [--bugbash <meta docs/plans/STAGING-BUGBASH-PLAN.md>]   SM6: write each finding as a row (commit it with meta-push)
 //
 // Headless and muted, WebKit at 402x874 (iPhone 17 Pro) with touch, Chromium only for K1; one browser at a time; rAF capped at
-// 60 fps; one clip per scenario. Only GETs leave the page. The hard checks (checks.mjs) give each finding a severity; a P0
+// 60 fps; one clip per scenario. Every HTTP request but a GET is aborted (the game's WebSockets pass: K1-K5 join worlds on
+// staging); routing also bypasses the browser's HTTP cache, so a warm leg is the worker's cache, not the HTTP cache. The hard checks (checks.mjs) give each finding a severity; a P0
 // or P1 sets `hold` (production go-live refuses, SM5) and the exit code to 1.
 // Output: <out>/<K>/ (frames, clip), <out>/verdict.json (build, release, scenarios[].checks[], findings[], hold), and the run
 // kept per release in the store (SM3). A clean run (no findings, vision same or baseline) appends one receipt line to
@@ -67,7 +68,7 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
   mkdirSync(out, { recursive: true });
   const origin = new URL(url).origin;
   // SM4: K1 and K2 start from the newest saved profile pair for this origin
-  const saved = store === undefined ? undefined : newestProfiles(store, origin);
+  const saved = store === undefined ? undefined : newestProfiles(store, origin, release);
   if (saved !== undefined) log(`old cache: ${saved.note.release} profiles (${saved.note.build?.slice(0, 8) ?? '?'}, client ${saved.note.clientVersion ?? '?'})`);
   /** @param {'chromium' | 'webkit'} browser */
   const oldFor = (browser) => {
@@ -110,7 +111,7 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
   if (bugbash !== undefined && findings.length > 0) {
     const rows = bugbashRows(readFileSync(bugbash, 'utf8'), findings, { release, ...(version.build === undefined ? {} : { build: version.build }) });
     writeFileSync(bugbash, rows.text);
-    Object.assign(verdict, { bugbash: { added: rows.added, seenAgain: rows.seenAgain } });
+    Object.assign(verdict, { bugbash: { added: rows.added, seenAgain: rows.seenAgain, rowOf: rows.rowOf } });
     log(`STAGING-BUGBASH: new ${rows.added.join(', ') || 'none'}; seen again ${rows.seenAgain.join(', ') || 'none'}`);
   }
   writeFileSync(join(out, 'verdict.json'), `${JSON.stringify(verdict, null, 1)}\n`);

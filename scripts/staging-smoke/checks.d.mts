@@ -57,4 +57,5 @@ export type CheckContext = {
     version: Version;
     build?: string;
     lastTimeToPlay?: Record<string, number>;
+    checkVersion?: boolean;
 };

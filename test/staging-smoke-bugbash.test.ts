@@ -32,6 +32,7 @@ test('one new row in a new group, one seen-again line on the open row', () => {
   const { text, added, seenAgain } = bugbashRows(PLAN, findings, { release: 'v0.1.35', build: 'c'.repeat(40) });
   expect(added).toEqual(['SB41']);
   expect(seenAgain).toEqual(['SB40']);
+  expect(bugbashRows(PLAN, findings, { release: 'v0.1.35' }).rowOf).toEqual({ 'K3/strip': 'SB40', 'K4/long-task': 'SB41' });
   const lines = text.split('\n');
   expect(lines.find(l => l.startsWith('| SB40 |'))).toMatch(/Seen again on v0\.1\.35 \(`cccccccc`\)\. \| The staging smoke passes/u);
   const group = lines.indexOf('### Group F: found by staging smoke v0.1.35 (`cccccccc`)');

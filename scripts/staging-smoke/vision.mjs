@@ -5,12 +5,15 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
 import { KEYFRAMES } from './scenarios.mjs';
 
 /** @typedef {'same' | 'changed' | 'regressed' | 'baseline' | 'error'} VisionVerdict */
 /** @typedef {{ scenario: string, verdict: VisionVerdict, severity?: 'P0' | 'P1' | 'P2', bullet?: string, line: string, sheet?: string }} Vision */
 
 export const VISION_MODEL = 'claude-opus-5-5';
+/** Where the call runs: outside every repo, so no project instructions or hooks load (the sheet's folder is added for Read). */
+const VISION_CWD = join(homedir(), '.cache/wildshard/plan-artifacts');
 const CELL = { w: 268, h: 583 };
 
 /**
@@ -61,8 +64,9 @@ export function parseVision(text) {
 }
 
 /**
- * Ask Claude about one sheet. `claude` is whatever is first on PATH (the test puts a stub there). The call runs in the sheet's
- * folder (outside any repo, so no project instructions load) with only the Read tool.
+ * Ask Claude about one sheet. `claude` is whatever is first on PATH (the test puts a stub there). The call runs from
+ * ~/.cache/wildshard/plan-artifacts (outside every repo, so no project instructions load), with only the Read tool and the
+ * sheet's folder (`cwd`) added.
  * @param {string} prompt @param {string} cwd @param {{ claude?: string, timeoutMs?: number }} [o] @returns {Omit<Vision, 'scenario'>}
  */
 export function askClaude(prompt, cwd, { claude = 'claude', timeoutMs = 240_000 } = {}) {
@@ -70,7 +74,7 @@ export function askClaude(prompt, cwd, { claude = 'claude', timeoutMs = 240_000 
   let out;
   try {
     out = execFileSync(claude, ['-p', prompt, '--model', VISION_MODEL, '--output-format', 'json', '--tools', 'Read', '--allowedTools', 'Read',
-      '--no-session-persistence', '--strict-mcp-config', '--disable-slash-commands'], { cwd, encoding: 'utf8', timeout: timeoutMs, stdio: ['ignore', 'pipe', 'pipe'] });
+      '--add-dir', cwd, '--no-session-persistence', '--strict-mcp-config', '--disable-slash-commands'], { cwd: VISION_CWD, encoding: 'utf8', timeout: timeoutMs, stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (error) {
     return { verdict: 'error', line: `claude -p failed: ${error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error)}` };
   }

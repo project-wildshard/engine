@@ -417,8 +417,12 @@ async function productionGates(phase, deps, refuse) {
 }
 
 /**
- * @typedef {{ build?: string, hold?: boolean, findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string }} SmokeVerdict
+ * @typedef {{ build?: string, url?: string, hold?: boolean, scenarios?: readonly { id?: string, status?: string }[],
+ *   findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string }} SmokeVerdict
  */
+
+/** The staging smoke's five kept scenarios (meta STAGING-SMOKE SM0). */
+export const SMOKE_SCENARIOS = Object.freeze(['K1', 'K2', 'K3', 'K4', 'K5']);
 
 /**
  * STAGING-SMOKE SM5 (J398: a P0 or P1 holds prod): why a staging smoke verdict does not let `build` go live, or undefined.
@@ -428,6 +432,12 @@ export function smokeGap(smoke, build) {
   if (smoke === undefined) return 'no --smoke verdict';
   if (smoke.problem !== undefined) return smoke.problem;
   if (smoke.build !== build) return `the verdict is for ${smoke.build?.slice(0, 8) ?? 'no build'}, not ${build.slice(0, 8)}`;
+  // a full run on staging: not a local build of the same commit, not `--only`, no crashed scenario; only K1 and K2 may skip
+  // (they seed the old-cache profile on a first run)
+  if (smoke.url !== CHANNELS.staging.origin) return `the verdict ran on ${smoke.url ?? 'no url'}, not ${CHANNELS.staging.origin}`;
+  const ran = new Map((smoke.scenarios ?? []).map(s => [s.id, s.status]));
+  const missing = SMOKE_SCENARIOS.filter(id => ran.get(id) !== 'ran' && !(ran.get(id) === 'skip' && (id === 'K1' || id === 'K2')));
+  if (missing.length > 0) return `scenarios not run cleanly: ${missing.map(id => `${id} ${ran.get(id) ?? 'missing'}`).join(', ')}`;
   if (smoke.hold !== false) {
     const held = (smoke.findings ?? []).filter(f => f.severity === 'P0' || f.severity === 'P1').map(f => `${f.severity ?? ''} ${f.scenario ?? ''} ${f.text ?? ''}`.trim());
     return `it holds: ${held.join('; ') || 'hold is not false'}`;

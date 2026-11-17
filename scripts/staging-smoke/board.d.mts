@@ -5,7 +5,7 @@
 /**
  * @typedef {{ release: string, build?: string, url?: string, at?: string, seconds: number, last?: string, hold: boolean,
  *   scenarios: { id: string, title: string, status: string, reason?: string, seconds: number, timeToPlay?: number, frames: Record<string, string>, video?: string }[],
- *   findings: BoardFinding[], vision?: BoardVision[], bugbash?: { added: string[], seenAgain: string[] } }} BoardVerdict
+ *   findings: BoardFinding[], vision?: BoardVision[], bugbash?: { added: string[], seenAgain: string[], rowOf?: Record<string, string> } }} BoardVerdict
  */
 /** True when nothing changed: no findings and every vision verdict same or baseline. @param {BoardVerdict} v */
 export function isClean(v: BoardVerdict): boolean;
@@ -53,5 +53,6 @@ export type BoardVerdict = {
     bugbash?: {
         added: string[];
         seenAgain: string[];
+        rowOf?: Record<string, string>;
     };
 };

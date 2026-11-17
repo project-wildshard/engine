@@ -29,14 +29,16 @@ export function storedFrame(dir: string, id: string, name: string): string | und
  * @param {string} store @param {string} release @param {string} out @param {any} verdict
  */
 export function keepRun(store: string, release: string, out: string, verdict: any): string;
-/** The newest saved profile pair for `origin`: a dir per browser and the note of the storage they held when saved.
- * @param {string} store @param {string} origin @returns {{ dir: string, note: ProfileNote } | undefined} */
-export function newestProfiles(store: string, origin: string): {
+/** The newest saved profile pair for `origin` from a release other than `release` (a re-run of a held release must start
+ * from the release before it, not from its own profiles, already on the candidate).
+ * @param {string} store @param {string} origin @param {string} [release] @returns {{ dir: string, note: ProfileNote } | undefined} */
+export function newestProfiles(store: string, origin: string, release?: string): {
     dir: string;
     note: ProfileNote;
 } | undefined;
 /**
- * Save this run's K1 and K2 profiles as the next release's old cache, and drop every older pair (only the latest is kept).
+ * Save this run's K1 and K2 profiles as the next release's old cache. Two pairs stay: this release's and the newest other
+ * release's (what a re-run of this release starts from); older pairs go.
  * @param {string} store @param {ProfileNote} note @param {Partial<Record<'chromium' | 'webkit', string>>} profiles
  */
 export function saveProfiles(store: string, note: ProfileNote, profiles: Partial<Record<"chromium" | "webkit", string>>): string;

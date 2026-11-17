@@ -10,7 +10,7 @@ import { basename, join } from 'node:path';
 /**
  * @typedef {{ release: string, build?: string, url?: string, at?: string, seconds: number, last?: string, hold: boolean,
  *   scenarios: { id: string, title: string, status: string, reason?: string, seconds: number, timeToPlay?: number, frames: Record<string, string>, video?: string }[],
- *   findings: BoardFinding[], vision?: BoardVision[], bugbash?: { added: string[], seenAgain: string[] } }} BoardVerdict
+ *   findings: BoardFinding[], vision?: BoardVision[], bugbash?: { added: string[], seenAgain: string[], rowOf?: Record<string, string> } }} BoardVerdict
  */
 
 /** True when nothing changed: no findings and every vision verdict same or baseline. @param {BoardVerdict} v */
@@ -53,9 +53,7 @@ export function writeBoard(v, { out, lastDir }) {
   for (const s of v.scenarios) {
     if (s.video !== undefined && existsSync(s.video)) { const name = `${s.id}${s.video.endsWith('.webm') ? '.webm' : '.mp4'}`; copyFileSync(s.video, join(out, 'clips', name)); clips[s.id] = `clips/${name}`; }
   }
-  const sb = new Map();
-  const added = [...(v.bugbash?.added ?? [])];
-  for (const f of v.findings) sb.set(f, added.shift());
+  const sb = new Map(v.findings.map((f) => [f, v.bugbash?.rowOf?.[`${f.scenario}/${f.key}`]]));
   const findings = v.findings.map((f) => {
     const s = v.scenarios.find((x) => x.id === f.scenario);
     const frame = f.sheet ?? f.frame;

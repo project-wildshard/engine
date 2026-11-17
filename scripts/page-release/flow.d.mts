@@ -57,7 +57,8 @@ export interface JourneyRow { card: string; browser: string; run: string; build?
 export const JOURNEY_GATE: Readonly<{ cards: string[]; browsers: string[]; runs: string[] }>;
 export function journeyRows(report: unknown): JourneyRow[];
 export function journeyGaps(journeys: readonly JourneyRow[] | undefined, build: string): string[];
-export interface SmokeVerdict { build?: string; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }
+export const SMOKE_SCENARIOS: readonly string[];
+export interface SmokeVerdict { build?: string; url?: string; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }
 export function smokeGap(smoke: SmokeVerdict | undefined, build: string): string | undefined;
 export const PACKS_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;

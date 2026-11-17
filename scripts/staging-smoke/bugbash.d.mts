@@ -12,7 +12,7 @@ export function scenarioAnswer(f: Finding): string;
  * @param {string} plan the STAGING-BUGBASH plan's text
  * @param {readonly Finding[]} findings
  * @param {{ release: string, build?: string }} run
- * @returns {{ text: string, added: string[], seenAgain: string[] }}
+ * @returns {{ text: string, added: string[], seenAgain: string[], rowOf: Record<string, string> }}
  */
 export function bugbashRows(plan: string, findings: readonly Finding[], { release, build }: {
     release: string;
@@ -21,6 +21,7 @@ export function bugbashRows(plan: string, findings: readonly Finding[], { releas
     text: string;
     added: string[];
     seenAgain: string[];
+    rowOf: Record<string, string>;
 };
 export function smokeKey(f: Pick<Finding, "scenario" | "key">): string;
 export type Finding = import("./checks.mjs").Finding;
