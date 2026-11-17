@@ -366,7 +366,9 @@ jobs:
     needs: [products, nine-ring1-build]
     if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 5
+    # Fixed-run load took 261 s; street hit the old cap at 317 s.
+    # Include cold entry, the full 60 s sample and install/archive headroom.
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
