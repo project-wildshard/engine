@@ -10,3 +10,7 @@ passes, so retain both snapshots in the refusal to diagnose the exact
 hosted client. The invariant and deadline are unchanged. A focused
 test verifies unchanged state passes and real player movement still
 fails with both before and after positions.
+
+Restore only the two globals the fixture changes. A broad Vitest
+unstub removed shared setup's localStorage and broke the next test;
+the ordinary push gate caught that fixture leak before publication.
