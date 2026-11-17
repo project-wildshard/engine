@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { Bone, BufferAttribute, BufferGeometry, Euler, Float32BufferAttribute, Group, Matrix4, MeshStandardMaterial, Quaternion, Skeleton, SkinnedMesh, Vector3, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
 import { PATCH_ORDER, patchShader } from '../render/shaderPatches';
-import { BakedHerd, bakeGait, bakedMaterial, bakedPosition, type GaitPose } from './bakedHerd';
+import { BakedHerd, GaitRecorder, bakeGait, bakedMaterial, bakedPosition, type GaitPose } from './bakedHerd';
 
 /** A deer-sized quadruped: a 7-bone spine along +z and four 3-bone legs (19 bones, 20 with the head), 8 vertices per
  *  bone, half of them shared with the parent; under a moved, turned root and a scaled mesh node, as a GLB scene is. */
@@ -93,7 +93,7 @@ test('the bake leaves the skeleton at rest', () => {
 
 test('thirty deer are one instanced mesh with its own depth material, and freeing it keeps the source', () => {
   const { mesh } = quadruped();
-  const herd = new BakedHerd(mesh, bakeGait(mesh, gait, { frames: 16, seconds: 1 / HZ }), 32, new MeshStandardMaterial());
+  const herd = new BakedHerd(mesh.geometry, bakeGait(mesh, gait, { frames: 16, seconds: 1 / HZ }), 32, new MeshStandardMaterial());
   for (let i = 0; i < 30; i++) herd.place(i, new Vector3(i * 2.6, 0, -60), 0.3, 1, i / 30);
   herd.update(1.25);
   expect(herd.mesh.count).toBe(30);
@@ -118,4 +118,26 @@ test('the baked material swaps the skinning chunks after the material\'s own pat
   expect(shader.vertexShader).toContain('// source patch');
   expect(Object.keys(shader.uniforms)).toEqual(['bakeTex', 'bakeFrames', 'bakeCycles']);
   expect(baked.customProgramCacheKey()).toContain('baked-herd');
+});
+
+test('a gait recorded from the live rig, slot by slot at its phase, is the bake of the same poser', () => {
+  const { root, mesh } = quadruped();
+  const baked = bakeGait(mesh, gait, { frames: 16, seconds: 1 / HZ });
+  const recorder = new GaitRecorder(mesh.skeleton.bones.length, 16);
+  const rest = mesh.skeleton.bones.map((b) => b.quaternion.clone());
+  // the rig walks on: phases arrive out of order and repeat; each slot keeps its first sample
+  for (const f of [3, 0, 3, 15, 7, ...Array.from({ length: 16 }, (_, k) => k)]) {
+    const phase = f / 16 + 1e-6;
+    if (!recorder.wants(phase + 2)) continue;
+    expect(recorder.done).toBe(false);
+    gait(mesh.skeleton.bones, rest, phase / HZ); root.updateMatrixWorld(true);
+    recorder.record(mesh, root, phase + 2);
+  }
+  expect(recorder.done).toBe(true);
+  expect(recorder.wants(0.5)).toBe(false);
+  const recorded = recorder.bake(1 / HZ);
+  let worst = 0;
+  recorded.data.forEach((v, i) => { worst = Math.max(worst, Math.abs(v - (baked.data[i] ?? 0))); });
+  expect(worst).toBeLessThan(1e-4);
+  expect(() => new GaitRecorder(3, 4).record(mesh, root, 0)).toThrow(/another skeleton/u);
 });

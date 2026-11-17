@@ -18,3 +18,13 @@
   (31 skinned), 62 triangles, render CPU p95 0.6-0.8 ms vs skinned 1.5 ms, GPU 0.11 ms.
   First shot was dark: the views are shot over clear black, so filtered texels are
   premultiplied; the card divides by alpha.
+- CC54b/CC55b: `entities/creatureLods.ts` picks a far creature's draw by tier bands:
+  rig < animalBakedDist (phone 40) < baked herd < animalHideDist (150) < cards <
+  animalSpriteDist (phone 300, desktop 600). The herd's gait is RECORDED from the
+  model's own walking rigs (GaitRecorder, one slot per gait phase), so a far deer shows
+  what its poser gives at its own phase; until every slot is filled far deer stay rigs.
+  Herd-drawn rigs stop posing (RowBodiesDraw.posesLive) and go to layer mask 0 (their
+  kit still draws). Material: AnimalFactory.herdMaterial (the far herd's own-fur path,
+  white, tint by instance colour). Cards are shot from a rest rig in a plain standard
+  copy of its coat: the rig's shaders read the sky's cascades. Desktop baked band off.
+  AnimalView already had `gaitPhase`, so M2's AnimalView is untouched.

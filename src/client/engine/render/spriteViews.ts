@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { app } from '../app/runtime';
 
 /** ONE-FORMAT CC55: a creature's views for its far cards (entities/herdSprites.ts), shot once into one atlas row. */
 export interface SpriteViews {
@@ -41,4 +42,10 @@ export function bakeSpriteViews(renderer: THREE.WebGLRenderer, object: THREE.Obj
   renderer.setClearColor(before.colour, before.alpha); renderer.setRenderTarget(before.target);
   scene.remove(object); holder?.add(object); object.position.copy(at); object.quaternion.copy(turn); object.updateMatrixWorld(true);
   return { texture: target.texture, views, width: half * 2, height: half * 2, offsetY: centre.y - half };
+}
+
+/** `object`'s views shot with the page's renderer; null before it has one (a headless sim, a test). */
+export function shootViews(object: THREE.Object3D, opts: { readonly views: number; readonly size: number }): SpriteViews | null {
+  const renderer = app.render?.renderer;
+  return renderer === undefined ? null : bakeSpriteViews(renderer, object, opts);
 }

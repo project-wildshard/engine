@@ -15,6 +15,9 @@ export const TIER_TABLE = {
     // animal draws (Animal.setDrawLod): fur / hard / eye within animalEyeDist, eyes in the hard material to animalOneDrawDist,
     // then the whole body in the fur material — 3 → 2 → 1 draws per animal
     animalEyeDist: 45, animalOneDrawDist: 100,
+    // ONE-FORMAT CC53/CC54/CC55 (creatureLods.ts): past animalBakedDist a model's walking animals draw as its baked herd,
+    // one draw (30 deer: 31 draws → 2 on the bench); from animalHideDist to animalSpriteDist as its cards. 0 = off
+    animalBakedDist: 40, animalSpriteDist: 300,
     // the far herd (farHerd.ts): past this, a rig is drawn in one draw per model with every other far animal; 0 = off (the
     // phone hides its animals at 150 m). Tried at 100 (cd9034c1d8): Nalati's rigs never batch (no vertex colours) and
     // only one stood in 100–150 m, while every coloured rig spawned would reserve GPU pages (Pine: 25 on the desktop)
@@ -84,6 +87,8 @@ export const TIER_TABLE = {
     // a same-instant A/B at the gate / cabin / lookout / shore (scripts: every rig forced to the LOD, then back) moved
     // no pixel past the frame-to-frame noise, next to an animal too
     animalEyeDist: 60, animalOneDrawDist: 150,
+    // the desktop keeps its rigs and far herd (animalFarBatchDist); cards past its 400 m hide distance
+    animalBakedDist: 0, animalSpriteDist: 600,
     // PH-P2: ~100 one-draw rigs at 150–400 m were 90–120 draws at the gate / lookout — the far herd draws them per model
     animalFarBatchDist: 150,
     // PH-P2: and the generated hulls at every distance — their batch draws the same pixels near as far (one group, no shells)

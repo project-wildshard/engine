@@ -41,6 +41,8 @@ export interface RowBodiesDraw {
   beginDraw: (camera: PerspectiveCamera | null) => void;
   reach: (a: Animal, from: Vector3, asleep: (a: Animal) => boolean) => void;
   draw: (a: Animal, index: number, distanceSquared: number) => void;
+  /** ONE-FORMAT CC54b: false while a far draw (a baked herd, cards) shows it, so its bones are not posed */
+  posesLive?: (a: Animal, distanceSquared: number) => boolean;
   endDraw: (animals: readonly Animal[], count: number, dt: number) => void;
   bloodBurst: (at: Vector3, dir: Vector3, strength: number) => void;
   /** DL24: hidden rigs of these models, parked for the level's life, for the boot's first-frame warm draws */
@@ -205,7 +207,7 @@ export class RowBodies {
       if (a.concealed) { draw.sleep(a); continue; }
       const d2 = a.position.distanceToSquared(viewPos);
       a.poseEvery = poseEvery(d2);
-      if (!a.harnessHold && dt > 0) a.update(dt, t, d2 < ANIM_LOD * ANIM_LOD);
+      if (!a.harnessHold && dt > 0) a.update(dt, t, d2 < ANIM_LOD * ANIM_LOD && (draw.posesLive?.(a, d2) ?? true));
       draw.draw(a, i, d2);
     }
     if (frameCost.on) frameCost.sub('pose', start);

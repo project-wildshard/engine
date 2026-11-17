@@ -121,7 +121,7 @@ async function main(): Promise<void> {
     };
   } else if (mode === 'baked') {
     const bake = bakeGait(deerMesh, (bones, rest, t) => { poseGait(bones, rest, t, 0); }, { frames: 32, seconds: 1 / GAIT_HZ });
-    const herd = new BakedHerd(deerMesh, bake, n, (deerMesh.material as THREE.Material).clone());
+    const herd = new BakedHerd(deerMesh.geometry, bake, n, (deerMesh.material as THREE.Material).clone());
     spots.forEach((s, i) => { herd.place(i, new THREE.Vector3(s.x, 0, s.z), s.yaw, 1, s.seed); });
     scene.add(herd.mesh);
     tick = (t) => { herd.update(t); };

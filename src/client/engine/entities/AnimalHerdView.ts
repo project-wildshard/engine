@@ -21,6 +21,8 @@ import { AnimalGroup } from './animalMatrices';
 import { attachShadowCaster } from './animalShadow';
 import { publishShellLevels } from './animalShells';
 import { FarHerd, type FarMember } from './farHerd';
+import { CreatureLods, type LodTier } from './creatureLods';
+import { shootViews, type SpriteViews } from '../render/spriteViews';
 import { speciesDef } from '../../../shared/engine/entities/species/registry';
 
 /** the live WORLD physics, read in one place (blood decals) */
@@ -195,6 +197,13 @@ export class AnimalHerdView implements RowBodiesDraw {
   private readonly farHerd = new FarHerd<FarRig>((m) => this.factory.farMaterial(m.model), { keyOf: (m) => this.factory.farKey(m.model),
     pageSlots: () => TIER_CONFIG.animalFarPageSlots });
   private readonly farRigs = new Map<Animal, FarRig>();
+  /** ONE-FORMAT CC54b / CC55b: the baked herds and cards past the live rigs (creatureLods.ts) */
+  private readonly lods = new CreatureLods<AnimalModel>({
+    geometry: (m) => m.geometry, material: (m) => this.factory.herdMaterial(m), views: (m) => this.lodViews(m),
+  });
+  private lodTier: LodTier = { baked: 0, hide: 0, sprite: 0 };
+  /** the rigs a far draw shows: their own layers, while theirs are 0 (what hangs on their bones still draws) */
+  private readonly lodMasks = new Map<Animal, number>();
   /** the rigs holding a far-herd slot now (holdFarSlot) */
   private readonly farHeld = new Set<Animal>();
   /** PH-P2: the casting animals' shadows per model (farHerd.ts { shadow }), within animalShadowDist */
@@ -232,7 +241,7 @@ export class AnimalHerdView implements RowBodiesDraw {
   }
 
   finish(): void {
-    this.group.add(this.farHerd.group, this.shadowHerd.group);
+    this.group.add(this.farHerd.group, this.shadowHerd.group, this.lods.group);
     if (this.group.parent !== this.scene) this.scene.add(this.group);
   }
 
@@ -299,7 +308,7 @@ export class AnimalHerdView implements RowBodiesDraw {
   hide(a: Animal): void { a.mesh.visible = false; }
 
   remove(a: Animal): void {
-    this.holdFarSlot(a, false); this.farRigs.delete(a); this.casters.delete(a);
+    this.holdFarSlot(a, false); this.farRigs.delete(a); this.casters.delete(a); this.lodMasks.delete(a);
     a.mesh.removeFromParent();
   }
 
@@ -338,6 +347,30 @@ export class AnimalHerdView implements RowBodiesDraw {
     if (TIER_CONFIG.animalFarBatchDist > 0) this.farHerd.begin(camera);
     this.herdShadows = (this.shadowBatch ?? TIER_CONFIG.animalShadowBatch) && this.pbr;
     if (this.herdShadows) this.shadowHerd.begin(null);
+    this.lodTier = { baked: TIER_CONFIG.animalBakedDist, hide: TIER_CONFIG.animalHideDist, sprite: TIER_CONFIG.animalSpriteDist };
+    this.lods.begin();
+  }
+
+  /** ONE-FORMAT CC54b: whether `a` poses its bones: not while its model's baked herd or cards draw it */
+  posesLive(a: Animal, d2: number): boolean {
+    const model = this.rigs.get(a)?.model;
+    return model === undefined || this.lods.posesLive(a, model, d2, this.lodTier);
+  }
+
+  /** CC55b: `model`'s card views, shot once from a rest rig in a plain lit copy of its coat (the rig's own shaders read
+   *  the sky's cascades, which the shot's scene does not have) */
+  private lodViews(model: AnimalModel): SpriteViews | null {
+    const rig = this.factory.instantiate(model, 0.5), fur = rig.materials[0];
+    const plain = new THREE.MeshStandardMaterial({ map: fur !== undefined && 'map' in fur ? fur.map : null, color: fur?.color ?? 0xffffff, roughness: 0.9 });
+    rig.mesh.material = plain;
+    try { return shootViews(rig.mesh, { views: 8, size: 128 }); } finally { plain.dispose(); rig.mesh.skeleton.dispose(); }
+  }
+
+  /** the far draw shows `a` (true) or its rig does (false): the rig's layers go to 0 and back */
+  private lodShows(a: Animal, shown: boolean): void {
+    const mask = this.lodMasks.get(a);
+    if (shown && mask === undefined) { this.lodMasks.set(a, a.mesh.layers.mask); a.mesh.layers.mask = 0; (this.casters.get(a) ?? a.mesh).castShadow = false; }
+    else if (!shown && mask !== undefined) { a.mesh.layers.mask = mask; this.lodMasks.delete(a); }
   }
 
   reach(a: Animal, from: THREE.Vector3, asleep: (a: Animal) => boolean): void {
@@ -351,12 +384,17 @@ export class AnimalHerdView implements RowBodiesDraw {
     const farD = TIER_CONFIG.animalFarBatchDist, far2 = farD > 0 ? farD * farD : Infinity;
     // draw / shadow distance by tier: a deer at 150 m is a few pixels on a phone, and only near animals shadow
     // … shrinking away over the last 15 % of the draw distance rather than blinking out at it (E117: no pop)
-    const hide = TIER_CONFIG.animalHideDist;
-    // … except a pinned body (a boss row's): a 19 m boss must not vanish mid-fight past the phone's 150 m
-    const fade = a.drawPinned || d2 < (hide * 0.85) ** 2 ? 1 : Math.max(0, Math.min(1, (hide - Math.sqrt(d2)) / (hide * 0.15)));
-    a.mesh.visible = fade > 0;
+    const hide = TIER_CONFIG.animalHideDist, cards = this.lodTier.sprite > hide;
+    // … except a pinned body (a boss row's): a 19 m boss must not vanish mid-fight past the phone's 150 m; with cards
+    // past it (CC55b) the rig stays whole to the hide distance and the card takes over there
+    const fade = a.drawPinned || cards || d2 < (hide * 0.85) ** 2 ? 1 : Math.max(0, Math.min(1, (hide - Math.sqrt(d2)) / (hide * 0.15)));
+    a.mesh.visible = fade > 0 && d2 < hide * hide;
     const sc = a.scale * fade * fade * (3 - 2 * fade);
     if (a.mesh.scale.x !== sc) a.mesh.scale.setScalar(sc);
+    const made = this.rigs.get(a);
+    const lod = made === undefined ? 'rig' : this.lods.draw(a, made.model, d2, this.lodTier, made.fur?.color);
+    this.lodShows(a, lod === 'baked' || lod === 'card');
+    if (lod !== 'rig') { if (lod === 'none') (this.casters.get(a) ?? a.mesh).castShadow = false; return; }
     const fr = this.farRigs.get(a);
     // the rig's cull sphere: the model's bind-pose sphere + 0.6 m, as AnimalFactory.instantiate pads it
     const radius = fr === undefined ? 0 : ((fr.model.geometry.boundingSphere?.radius ?? 3) + 0.6) * a.scale;
@@ -386,6 +424,7 @@ export class AnimalHerdView implements RowBodiesDraw {
   endDraw(animals: readonly Animal[], count: number, dt: number): void {
     if (TIER_CONFIG.animalFarBatchDist > 0) this.farHerd.end();
     if (this.herdShadows) this.shadowHerd.end();
+    this.lods.end();
     publishShellLevels(animals, this.shellIdx, this.shellDist, count);
     this.blood.update(worldTime.realDt || dt); // blood keeps flying through a hit-stop (worldTime, Game.hitStop)
     if (this.debug) this.updateDebug(animals);

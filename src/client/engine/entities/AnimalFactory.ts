@@ -677,6 +677,10 @@ export class AnimalFactory {
     return family;
   }
 
+  /** ONE-FORMAT CC54b: a fresh body material for `model`'s baked herd (creatureLods.ts), patched as a rig's fur, white
+   *  (each copy's tint is its instance colour); null for a look the herd cannot draw (its rigs stay) */
+  herdMaterial(model: AnimalModel): THREE.Material | null { return this.ownFarMaterial(model); }
+
   private ownFarMaterial(model: AnimalModel): THREE.Material | null {
     if (!model.render.furRim || model.rim === undefined || model.hull?.overgrown === true) return null;
     const fur = model.fur.clone();
