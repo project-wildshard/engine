@@ -116,7 +116,7 @@ export function browserShardfileOptions(base: string, firstParty = false): Folde
     entryTransport()?.expand(); return result;
   };
   return { ...(parseJson === undefined ? {} : { parseJson }), base, firstParty, ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
-    ...(firstParty ? { firstPartyRead } : {}),
+    firstPartyRead,
     backgroundFetch: (url, signal) => fetch(contentURL(resolve(url)), { priority: 'low', ...(signal === undefined ? {} : { signal }) }),
     fetch: (url, signal) => waitFor(`Read ${folderResourceRole(url, base)}`, (async () => {
       if (spawn !== undefined) return fetch(contentURL(resolve(url)), signal === undefined ? {} : {signal});
@@ -131,7 +131,7 @@ export function browserShardfileOptions(base: string, firstParty = false): Folde
       if (folderControlsReady) void refresh();
       else pageScope.listen(document, 'ws:control-ready', () => { void refresh(); }, { once: true });
     },
-    ...(firstParty ? { fetchRange: (url: string, start: number, end: number, priority?: 'low') => waitFor(`Fetch pack range ${start}-${end}`, fetch(contentURL(url), { headers: { Range: `bytes=${start}-${end}` }, ...(priority === undefined ? {} : { priority }) }), 'file') } : {}),
+    fetchRange: (url: string, start: number, end: number, priority?: 'low') => waitFor(`Fetch pack range ${start}-${end}`, fetch(contentURL(url), { headers: { Range: `bytes=${start}-${end}` }, ...(priority === undefined ? {} : { priority }) }), 'file'),
     pause, cacheBatch: true,
     ...(builtIndexes !== null ? { built: { indexes: builtIndexes, stale: staleRecovery } } : {}),
   };

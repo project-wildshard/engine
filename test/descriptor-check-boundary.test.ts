@@ -101,8 +101,6 @@ test('browser products need a build proof and bundle no checked host intake', as
   expect(fetch).not.toHaveBeenCalled();
   expect(()=>loaded.admitFolder(structuredClone(source), unprovedOptions)).toThrow('build-owned reader');
   expect(fetch).not.toHaveBeenCalled();
-  expect(()=>loaded.admitFolder(index, { ...options, firstParty: false })).toThrow('build-owned reader');
-  expect(fetch).not.toHaveBeenCalled();
   await expect(loaded.readCheckedOutputIndex(index)).rejects.toThrow('server validation');
   const value = {rows:{},urls:{}}, jsonBytes = encode(value), jsonHash = hashImmutableBytes(jsonBytes);
   const jsonInput = { slug: source.identity.slug, revision: 1, shardfile: source, sections: values,

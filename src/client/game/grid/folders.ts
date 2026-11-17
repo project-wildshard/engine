@@ -50,7 +50,7 @@ function builtGridIndex(input: unknown, hash: string, options: FolderOptions): i
   return typeof input === 'object' && input !== null && (options.firstPartyRead!==undefined||options.built?.indexes.has(hash) === true);
 }
 async function readGridFolderIndex(url: string, identity: string, options: FolderOptions): Promise<GridFolderIndex> {
-  const native=options.firstParty?options.firstPartyRead:undefined,address=new URL(url);
+  const native=options.firstPartyRead,address=new URL(url);
   const declared=options.descriptorHash??builtIndexHash(address.pathname)??undefined;
   if(native!==undefined&&declared!==undefined)address.searchParams.set('v',declared.slice(0,8));
   const bytes = native===undefined?await boundedResponse(await options.fetch(url), limits.sourceBytes):await native(address.href,undefined,undefined,declared);
@@ -125,7 +125,7 @@ function gridSectionAddress(at: GridFolderIndex, path: string, hash: string): st
 }
 /** The build-owned reader a first-party product reads through (undefined: the checked network and content-cache path). */
 function nativeRead(options: FolderOptions): FolderOptions['firstPartyRead'] {
-  return options.firstParty ? options.firstPartyRead : undefined;
+  return options.firstPartyRead;
 }
 /** One hash-verified section of the index, parsed (null when the index has none). */
 async function readGridSection(at: GridFolderIndex, name: string): Promise<unknown> {

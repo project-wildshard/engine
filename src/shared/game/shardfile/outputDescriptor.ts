@@ -259,9 +259,9 @@ export async function resolveOutputDescriptor(input: unknown, reader: OutputDesc
       if (bytes.length !== section.bytes || await reader.hash(bytes) !== section.hash) throw new Error('Cached shardfile section hash or size mismatch');
       reader.cacheHit?.(section.path, section.hash, bytes.length);
     }
-    if (reader.firstParty === true) await reader.pause?.();
+    await reader.pause?.();
     const value: unknown = reader.parseJson === undefined ? JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) : await reader.parseJson(bytes);
-    if (reader.firstParty === true) await reader.pause?.();
+    await reader.pause?.();
     return [section.name, value];
   };
   // Each section is independently bounded; launch the complete inventory in

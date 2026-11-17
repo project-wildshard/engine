@@ -38,7 +38,6 @@ const CLIENT_SOURCE = 'src/client/game/shardfile/clientSource.ts';
 // OF15 renames this file; until then its path is the one place the ledger names the retired word.
 const PLAN_PAGE = 'src/client/game/shardfile/hybrid.ts';
 const DESCRIPTOR = 'src/shared/game/shardfile/outputDescriptor.ts';
-const GRID_FOLDERS = 'src/client/game/grid/folders.ts';
 /** OF10b: each dangerous gate is one deprecated function here; its sites call it by name. */
 export const DANGEROUS_GATES = 'src/shared/game/shardfile/dangerousGates.ts';
 
@@ -53,19 +52,12 @@ export const GATES: readonly Gate[] = [
       'src/client/game/grid/regionalRuntime.ts': 1, 'src/client/game/shard/declaredEntry.ts': 1 },
   },
   {
-    id: 'native-read', verdict: 'delete',
-    what: 'Our own product reads its files with direct and range fetches, paced section parses and pinned transport, '
-      + 'instead of the shared folder reads an upload uses.',
-    replacedBy: 'One read path for every shard, from the CDN with the same admission.',
-    refs: { [FOLDER]: 6, [RUNTIME_FOLDER]: 2, [GRID_FOLDERS]: 2, [DESCRIPTOR]: 2 },
-  },
-  {
     id: 'identity', verdict: 'delete',
     what: 'An outside shard may not take one of our reserved slugs, and must carry its admitted save instance; ours '
       + 'derive theirs from the slug.',
     replacedBy: 'Identity and the save instance come from admission for every shard; the api-server owns slugs per account '
       + '(check it refuses another account\'s slug before OF10a deletes the reserved list).',
-    refs: { [FOLDER]: 1, [CLIENT_SOURCE]: 2 },
+    refs: { [FOLDER]: 2, [CLIENT_SOURCE]: 2 },
   },
   {
     id: 'catalogue-manifest', verdict: 'delete',

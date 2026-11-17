@@ -8,3 +8,6 @@
   index hash), so every provenance check in front of them goes. The build reader stays the host's
   capability; the stale-client check now covers a product whose path the verdict table lists (its
   own catalogue and placed uploads' cook rows), so an unlisted product is never "stale".
+- OF10a4 native-read: every browser product gets the build reader, pack range reads and the paced
+  section parse; the reader is the host's capability, not a provenance grant. (Corrected the ledger:
+  identity had 2 folder.ts references, the `instance` at admission's end.)

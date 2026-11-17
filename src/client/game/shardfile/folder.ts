@@ -172,7 +172,7 @@ function transportRelease(source: Shardfile, assets: Map<string, Uint8Array>, op
     const released: string[] = [];
     // Online grid readers already verify cache misses fetched from the immutable product URL.
     // Do not pin the whole grid in the bounded disk cache; offline owners still require durable bytes.
-    const canFetch = options.firstParty&&options.firstPartyRead!==undefined || reread === 'cache-or-fetch' && !options.offline;
+    const canFetch = options.firstPartyRead!==undefined || reread === 'cache-or-fetch' && !options.offline;
     if (cache === undefined && !canFetch) return released;
     const releasing = prepared ? files : await (bound ??= releasable());
     for (const ref of requested) {
@@ -230,7 +230,7 @@ async function readBoundedResponse(response: Response, maximum: number, read?: (
 }
 function resolveDescriptor(input: unknown, options: FolderOptions, lineage = false, background = false): Promise<unknown> {
   const base = new URL('.', options.base).href, cache = options.cache, backgroundStore = cache?.putAssetBackground;
-  const builtRead=options.firstParty?options.firstPartyRead:undefined;
+  const builtRead=options.firstPartyRead;
   if(builtRead!==undefined)return resolveOutputDescriptor(input,{
     firstParty:true,offline:options.offline,deferAssetDeclarations:true,hash:options.hash,
     built:{read:(path,bytes,hash)=>builtRead(new URL(path,base).href,bytes,undefined,hash),
@@ -321,7 +321,7 @@ export async function readFolderDescriptor(options: FolderOptions, declaredUrl?:
   const indexHash = url.pathname.endsWith('/shard.json') ? builtIndexHash(url.pathname) : null;
   if (indexHash !== null && options.descriptorHash !== undefined && options.descriptorHash !== indexHash) throw new Error('Shardfile descriptor hash mismatch');
   if (indexHash !== null) url.searchParams.set('v', indexHash.slice(0, 8));
-  const builtRead=options.firstParty?options.firstPartyRead:undefined;
+  const builtRead=options.firstPartyRead;
   if(builtRead!==undefined)return timeClientPreparation(new URL('.',url).pathname,'product.source',async()=>{
     const bytes=await builtRead(url.href,undefined,undefined,options.descriptorHash??indexHash??undefined);
     await options.pause?.();
@@ -385,7 +385,7 @@ type AdmissionPhase = 'visited' | 'sections' | 'source' | 'files' | 'costs' | 's
  * Refill at most sixteen immutable read slots after verification. A refusal stops
  * new reads and drains started work before authored-order refusal or publication. */
 export function admitFolder(input: unknown, options: FolderOptions): Promise<AdmittedFolder> {
-  const builtRead=options.firstParty?options.firstPartyRead:undefined;
+  const builtRead=options.firstPartyRead;
   if(builtRead!==undefined)return timeClientPreparation(new URL('.',options.base).pathname,'product.read',()=>readBuiltFolder(input,options,builtRead));
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned reader');
   const trace = clientPreparationBatch<AdmissionPhase>(options.descriptorPath ?? options.base, 'admission-phases',
@@ -716,5 +716,5 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   const completeCache = deferredDescriptor === undefined ? undefined : folderCacheCompletion(source, options, selected, remaining, { source: deferredDescriptor.index,
     ...(revisionKey === null ? {} : { validation: { revision: revisionKey, sourceHash, indexHash: deferredDescriptor.indexHash, worst } }) });
   trace?.mark('finish');
-  return { source, assets, cached: cached !== null && cached !== undefined, ...(options.firstParty ? { releaseTransport: transportRelease(source, assets, options), releasePreparedTransport: transportRelease(source, assets, options, true), ...completeCache === undefined ? {} : { completeCache } } : {}), ...(options.firstParty ? {} : { instance: await externalShardInstance(base, source.identity.slug, options.hash) }) };
+  return { source, assets, cached: cached !== null && cached !== undefined, releaseTransport: transportRelease(source, assets, options), releasePreparedTransport: transportRelease(source, assets, options, true), ...completeCache === undefined ? {} : { completeCache }, ...(options.firstParty ? {} : { instance: await externalShardInstance(base, source.identity.slug, options.hash) }) };
 }
