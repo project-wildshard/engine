@@ -31,3 +31,9 @@ level exemption. The original verified captain fixture now retains
 absence. A real native captain actor with an empty replicated species id
 keeps its level-exempt 24-damage hit; explicit false caps it to 20 and true
 retains 24. All seven cap controls pass. No second review round was run.
+
+Registry format0.14 replaces the temporary archive. Frozen installation,
+all type projects, seven cap controls and both released-wire controls pass.
+The install had reintroduced gitHosted into the released wire subdirectory
+resolution; the existing red-first lock control caught it locally and its
+resolution was restored without weakening the assertion.
