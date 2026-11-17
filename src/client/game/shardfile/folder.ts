@@ -520,14 +520,15 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   await options.pause?.();
   await options.reserve?.(source);
   await options.pause?.();
-  // Only an exact build validation receipt can replace byte-by-byte validation
-  // of unselected alternatives. Keep the complete descriptor for verified late
-  // reads and a later device tier; unknown, critical and shared references stay.
-  const selected = options.firstParty && receipt !== null && options.tier !== undefined
+  // Only an exact validation receipt (the build's, or this device's own from a
+  // complete earlier admission) can replace byte-by-byte validation of unselected
+  // alternatives; every product with one gets its tier (ONE-FORMAT OF10a2). Keep the
+  // complete descriptor for verified late reads and a later device tier.
+  const selected = receipt !== null && options.tier !== undefined
     ? await tierFolderFilesPaced(source, options.tier, options.pause, options.splatTier) : source.files;
-  // Untrusted/unreceipted products retain complete byte validation. The exact
-  // first-party phone receipt permits lazy tile reads through ClientAssets.
-  const files = options.firstParty && receipt !== null && options.tier === 'phone'
+  // Unreceipted products retain complete byte validation. An exact phone
+  // receipt permits lazy tile reads through ClientAssets.
+  const files = receipt !== null && options.tier === 'phone'
     ? controlFiles(await playLibrarySourcePaced(source, options.pause), selected) : selected;
   const remaining = files === selected ? [] : deferredFiles(source, selected, new Set(files.map(file => file.hash)));
   const refs = [...files.map((file) => ({ ref: file.hash, cap: file.compressed })), ...source.requires.commons.map((hash) => ({ ref: `commons:${hash}`, cap: source.requires.commonsWire[hash] ?? 0 }))];

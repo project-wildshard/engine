@@ -1352,3 +1352,17 @@ test('the browser cannot fall back to Node admission when its native build reade
     await expect(resolveOutputDescriptor(f.index,{firstParty:true,offline:false,read:()=>Promise.resolve(new Uint8Array()),hash:native.hash})).rejects.toThrow('build-owned reader');
   }finally{vi.unstubAllEnvs();}
 });
+
+test('ONE-FORMAT OF10a2: an outside product with this device\'s own receipt gets its tier selection, as ours does', async () => {
+  const row = fixture(true), store = cacheStore();
+  // a validator revision lets this device keep its own receipt; the build's verdict is never read for an outside product
+  const restore = installIndexReceipt(row.index), tiers = vi.spyOn(await import('../src/client/game/shardfile/folderCost'), 'tierFolderFilesPaced');
+  try {
+    const online: FolderOptions = { ...options(row.wires, store.cache), firstParty: false };
+    await admitFolder(await readFolderDescriptor(online), online);
+    expect(store.product()?.validation).toBeDefined();
+    expect(tiers).not.toHaveBeenCalled(); // no tier asked, and no receipt yet: every byte is validated
+    const phone = await admitFolder(null, { ...online, offline: true, tier: 'phone', fetch: () => Promise.reject(new Error('Offline network')) });
+    expect(tiers).toHaveBeenCalledWith(phone.source, 'phone', undefined, undefined);
+  } finally { tiers.mockRestore(); restore(); }
+});

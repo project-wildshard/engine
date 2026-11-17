@@ -71,13 +71,7 @@ export const GATES: readonly Gate[] = [
     what: 'The visited-folder cache records provenance: an external page uses the browser folder cache and our own '
       + 'does not, and offline our own page refuses an entry an external page wrote.',
     replacedBy: 'One cache keyed by content hash; provenance is not recorded.',
-    refs: { [FOLDER]: 14, [RUNTIME_FOLDER]: 2, 'src/client/game/shardfile/legacyAsset.ts': 2 },
-  },
-  {
-    id: 'tier-files', verdict: 'delete',
-    what: 'Only our own product with a receipt gets per-tier file selection and the phone\'s paced late files.',
-    replacedBy: 'Every shard gets tier selection from its own declared tiers.',
-    refs: { [FOLDER]: 2, [RUNTIME_FOLDER]: 2 },
+    refs: { [FOLDER]: 14, [RUNTIME_FOLDER]: 4, 'src/client/game/shardfile/legacyAsset.ts': 2 },
   },
   {
     id: 'identity', verdict: 'delete',

@@ -237,11 +237,11 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
         const assets = new ClientAssets(source, new Map(), options);
         entry = { source, assets, options, key, owners: new Set(), requests: new Set(),
           product: shardFolderData(source, base, ref => assets.read(ref), descriptor?.receipt === undefined, options.firstParty) };
-        if (options.firstParty && options.tier === 'phone' && descriptor?.receipt !== undefined && source.late !== undefined) {
+        if (options.tier === 'phone' && descriptor?.receipt !== undefined && source.late !== undefined) {
           let prepared: Promise<ReturnType<typeof folderCacheCompletion>> | undefined;
           const receipt = descriptor.receipt;
           folderCompletions.set(entry.product, async owner => {
-            prepared ??= tierFolderFilesPaced(source, 'phone', options.pause, options.splatTier).then(selected => folderCacheCompletion(source, options, selected, lateFiles(source, selected), { source: descriptor.index, firstParty: true,
+            prepared ??= tierFolderFilesPaced(source, 'phone', options.pause, options.splatTier).then(selected => folderCacheCompletion(source, options, selected, lateFiles(source, selected), { source: descriptor.index, firstParty: options.firstParty,
               validation: { revision: receipt.revision, sourceHash: receipt.sourceHash, indexHash: descriptor.indexHash, worst: receipt.worst } }));
             const complete = await prepared; await complete?.(owner);
           });

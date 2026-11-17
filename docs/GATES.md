@@ -7,15 +7,14 @@ A gate is engine code that treats one shard differently from another by where it
 **delete** gates are not dangerous and go with the provenance option (OF10a). **dangerous** gates are renamed
 `dangerousX` (OF10b) and replaced by a budget tier (OF10c).
 
-11 gates: 7 delete (72 provenance references), 4 dangerous (3).
+10 gates: 6 delete (70 provenance references), 4 dangerous (3).
 
 | Gate | Verdict | What it does | Harm | Replaced by | Where |
 |---|---|---|---|---|---|
 | provenance-flag | delete | The provenance option itself: its field on `FolderOptions` and on a client-plan resident, `browserShardfileOptions`'s argument, and the literal `true` our client-plan shards, the grid prefetch and the server pass. | none | Nothing: with every other gate gone the option carries no meaning, so it goes (OF10a). | 16 references in 10 files |
 | built-receipt | delete | Our own product skips per-file schema checks on its build's validation receipt (built indexes, `isBuildValidatedOutput`, `builtValidationReceipt`, built JSON); an upload is checked file by file. | none | Every shard takes the upload's checks; a check result may be cached by content hash (bundling only as a cache). | 14 references in 4 files |
 | native-read | delete | Our own product reads its files with direct and range fetches, paced section parses and pinned transport, instead of the shared folder reads an upload uses. | none | One read path for every shard, from the CDN with the same admission. | 12 references in 4 files |
-| cache-provenance | delete | The visited-folder cache records provenance: an external page uses the browser folder cache and our own does not, and offline our own page refuses an entry an external page wrote. | none | One cache keyed by content hash; provenance is not recorded. | 18 references in 3 files |
-| tier-files | delete | Only our own product with a receipt gets per-tier file selection and the phone's paced late files. | none | Every shard gets tier selection from its own declared tiers. | 4 references in 2 files |
+| cache-provenance | delete | The visited-folder cache records provenance: an external page uses the browser folder cache and our own does not, and offline our own page refuses an entry an external page wrote. | none | One cache keyed by content hash; provenance is not recorded. | 20 references in 3 files |
 | identity | delete | An outside shard may not take one of our reserved slugs, and must carry its admitted save instance; ours derive theirs from the slug. | none | Identity and the save instance come from admission for every shard; the api-server owns slugs per account (check it refuses another account's slug before OF10a deletes the reserved list). | 3 references in 2 files |
 | catalogue-manifest | delete | The built-in catalogue path: a manifest's `shardfile` descriptor needs our own provenance, and selection keeps the other catalogue shards only for our own source. | none | The catalogue lists uploads; a selected shard is admitted like any upload. | 5 references in 1 files |
 | runtime-admission (`dangerousUnbudgetedRuntime`) | dangerous | A shard that declares a `runtime` is admitted only as our own (`folder.ts`, inline arrival, and the data-only source paths that refuse any runtime). | A runtime binds a native module compiled into the engine bundle (one shard's TypeScript), which runs with no CPU, memory or bandwidth limit of its own. | OF10c: the shard's tier CPU and memory limits, metered on the runtime's module. | 1 references in 1 files, 4 named lines |
