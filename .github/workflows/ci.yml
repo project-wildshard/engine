@@ -275,7 +275,9 @@ jobs:
         env:
           WS_LANE_NAME: template-e2e-ci
           WS_T1_BUILD_DIR: dist
-        run: node scripts/t1-batch.mjs
+        # The packed product boot installs full Chromium with --no-shell.
+        # T1's default launch needs the headless shell on this same runner.
+        run: bash scripts/ci-playwright-install.sh --only-shell chromium && node scripts/t1-batch.mjs
       - name: Keep Template A receipt
         if: always() && steps.pack.outputs.products == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

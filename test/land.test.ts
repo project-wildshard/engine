@@ -1273,6 +1273,9 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(producer).toContain('job: [9]');
     expect(packed).toContain('--jobs=9 --job=${{ matrix.job }}');
     expect(packed).toContain('node scripts/t1-batch.mjs');
+    // Products boot full Chromium; Template's default Playwright launch
+    // separately needs the headless shell even on a cold producer cache.
+    expect(packed).toContain('bash scripts/ci-playwright-install.sh --only-shell chromium && node scripts/t1-batch.mjs');
     expect(packed + producer).not.toMatch(/^ {4}needs:/mu);
     for (const suite of ['A', 'B', 'C', 'D']) expect(packed).toContain('name: template-e2e-' + suite);
     expect(packed).not.toContain('continue-on-error: true');
