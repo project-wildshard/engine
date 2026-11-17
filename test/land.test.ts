@@ -773,6 +773,9 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
   }, 60_000);
 
   test('DS22: the pre-push cause, read from its output', () => {
+    // Git may forward a hook's stdout separately from its own stderr.
+    expect(prePushCause("error: failed to push some refs to 'x'\n", 'pre-push: planted red check\n'))
+      .toBe('pre-push: planted red check');
     expect(prePushCause('  - lint RED in 3.0 s\nerror: failed to push some refs to \'x\'\n')).toBe('lint RED in 3.0 s');
     expect(prePushCause('file:///x/run-checks.mjs:63\nError: Push target requires a clean checked tree; enqueue a committed immutable checkout\n    at capturePushTree (x)\nerror: failed to push some refs to \'x\'\n'))
       .toBe('Push target requires a clean checked tree; enqueue a committed immutable checkout');

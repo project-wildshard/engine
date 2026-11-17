@@ -51,18 +51,20 @@ function dirtFix(code,path,branch){
 /** Git's own lines in a refused push's output, never the hook's cause. */
 const GIT_OWN=/^error: failed to push some refs|^To \S+$|^hint: |^Done$|^!\s/u;
 /** Prefer an actual remote rejection, otherwise the hook's first RED or last
- * thrown error. Git forwards hook output on stderr even under --porcelain.
+ * thrown error. Git may forward hook output on either stream under --porcelain.
  * Keep Git's stdout separate from hook stderr, which can print sample trailers.
  * @param {string} output @param {string} [porcelain] @returns {string} */
 export function prePushCause(output,porcelain=''){
  // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
- const lines=output.split('\n').map(line=>line.replaceAll(/\u001B\[[0-9;]*m/gu,'').trim()).filter(line=>line!=='');
+ const plain=(/** @type {string} */text)=>text.split('\n').map(line=>line.replaceAll(/\u001B\[[0-9;]*m/gu,'').trim()).filter(line=>line!=='');
+ const lines=plain(output);
  const hook=lines.filter(line=>!GIT_OWN.test(line));
  const pick=remoteRejection(porcelain)
   ??hook.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
   ??hook.findLast(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
   ??lines.find(line=>/^!\s.*\[(?:remote )?rejected\]/u.test(line))
-  ??hook.at(-1);
+  ??hook.at(-1)
+  ??plain(porcelain).filter(line=>!GIT_OWN.test(line)).at(-1);
  return pick===undefined?'no output':pick.slice(0,300);
 }
 
