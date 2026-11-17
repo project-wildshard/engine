@@ -156,7 +156,7 @@ export class HeldPolearm<P extends HeldPolearmProfile = HeldPolearmProfile> exte
     this.arcPos = new Float32Array(this.projectile.arcPoints * 3);
     this.view = opts.view;this.law=new PolearmDecision<AimTarget>(opts.program,w.game.levelScope);this.presentation=opts.presentation;
     this.contactLaw=new PolearmContact<AimTarget>({raycast:targets===undefined?null:(origin,dir,max)=>targets.raycast(origin,dir,max),
-      contact:(animal,amount,point,dir,from,moveId)=>this.contact(animal,amount,point,dir,from,moveId),same:(animal,target)=>this.same(animal,target),
+      contact:(animal,amount,point,dir,from,moveId,part)=>this.contact(animal,amount,point,dir,from,moveId,false,part),same:(animal,target)=>this.same(animal,target),
       struck:(hit,killed)=>{this.onHit?.(hit.animal.kind,false,killed);this.onImpact?.('flesh',hit.point);}},this.law);
     this.viewOwner=opts.owner??w.game.levelScope;
     this.readGeometry=typeof opts.geometry==='function'?opts.geometry:undefined;
@@ -167,7 +167,7 @@ export class HeldPolearm<P extends HeldPolearmProfile = HeldPolearmProfile> exte
       worldHit: (from, to, radius) => worldHit(from, to, radius),
       raycast: targets === undefined ? null : (origin, dir, max) => targets.raycast(origin, dir, max),
       strike: (hit, dmg, dir) => {
-        const killed = hit.animal.applyDamage(dmg, hit.point, dir);
+        const killed = hit.part === undefined ? hit.animal.applyDamage(dmg, hit.point, dir) : hit.animal.applyDamage(dmg, hit.point, dir, hit.part);
         if (!killed) hit.animal.stagger?.(_v2.set(dir.x, 0, dir.z).normalize(), this.projectile.stagger);
         this.onHit?.(hit.animal.kind, hit.headshot, killed);
         this.onImpact?.('flesh', hit.point);

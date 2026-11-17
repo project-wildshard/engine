@@ -33,10 +33,10 @@ export abstract class Melee<P extends MeleeProfile = MeleeProfile> extends Weapo
     this.blocks.melee = melee(combat);
   }
   protected contact(target: TargetAnimal, amount: number, point: Vector3, dir: Vector3, from: Vector3,
-    moveId: string, coverChecked = false): DamageDealt | null {
+    moveId: string, coverChecked = false, part?: string): DamageDealt | null {
     return this.combat.hit({ source: 'env', sourceTags: ['actor.player', this.row.id, 'dmg.melee',
       ...(coverChecked ? ['cover.checked' as const] : [])], target: meleeActor(target), amount,
-      point, dir, from, weaponId: this.row.id, moveId });
+      point, dir, from, weaponId: this.row.id, moveId, ...(part === undefined ? {} : { part, headshot: part === 'head' }) });
   }
   protected onSwingStart(_move: Move): void { /* Rung-2 weapons add a behavior at the same input edge. */ }
   protected onMoveHit(_move: Move, _killed: boolean): void { /* Optional subclass bookkeeping. */ }

@@ -521,16 +521,17 @@ export class SweptMelee extends Melee {
     return bladeInReach(_aimOrigin, this.reach, app.aimTargets, targetRadius);
   }
   private strike(move: Move, hit: TargetHit): void {
+    if (hit.multiplier === 0) return;
     this.aimPose(_aimOrigin, _aimRotation);
     this.aimRay(_aimOrigin, _fwd);
     // strike direction = the sweep (across the forward, the move's way), not the ray: the flinch reads as a side-on blow;
     // an overhead chop (sweep ≈ 0) drives forward and down
     _v2.copy(_fwd).applyAxisAngle(Y_AXIS, Math.PI / 2);                                       // the player's left
     sweptStrikeDirection(_v1, _fwd, _v2, move.sweep);
-    const dmg = Math.round(this.moveDamage(move));
+    const dmg = Math.round(this.moveDamage(move) * (hit.multiplier ?? 1));
     const point = _hitPoint.copy(hit.point); // the raycast result object is reused by the next ray
     const animal = hit.animal;
-    const result = this.contact(hit.animal, dmg, point, _v1, _aimOrigin, `move.${move.name}`, true);
+    const result = this.contact(hit.animal, dmg, point, _v1, _aimOrigin, `move.${move.name}`, true, hit.part);
     if (!result) return;
     const killed = result.killed;
     animal.hitFlash?.(move === this.mv.heavy ? 1 : 0.8); // the white hit flash (C5, Animal.ts)

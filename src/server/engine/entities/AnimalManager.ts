@@ -155,7 +155,7 @@ export interface AnimalDraw {
   bloodBurst: (at: Vector3, dir: Vector3, strength: number) => void;
 }
 
-export interface AnimalHit { animal: Animal; point: Vector3; distance: number; headshot: boolean; damage: number }
+export interface AnimalHit { animal: Animal; point: Vector3; distance: number; headshot: boolean; damage: number; part?: string; multiplier?: number }
 /** a species' own sound id (SpeciesDef.sounds); the engine names none (E405) */
 type AnimalSound = string;
 
@@ -649,7 +649,10 @@ export class AnimalManager {
     const h = this.hitResult ??= { animal: hit.creature, point: new Vector3(), distance: 0, headshot: false, damage: 0 };
     h.animal = hit.creature; h.distance = hit.distance; h.headshot = hit.head;
     h.point.copy(hit.point);
-    h.damage = this.damageFor(hit.head, h.point.distanceTo(this.playerPos));
+    if (hit.multiplier === undefined) { delete h.part; delete h.multiplier; }
+    else { h.part = hit.part; h.multiplier = hit.multiplier; }
+    h.damage = hit.multiplier === 0 ? 0 : hit.multiplier === undefined ? this.damageFor(hit.head, h.point.distanceTo(this.playerPos))
+      : this.damageFor(false, h.point.distanceTo(this.playerPos)) * hit.multiplier;
     return h;
   }
 
@@ -695,7 +698,8 @@ export class AnimalManager {
 
   /** Convenience: apply a raycast hit with its modelled damage. Returns true if it died. */
   hit(hit: AnimalHit, dir: Vector3): boolean {
-    return hit.animal.applyDamage(hit.damage, hit.point, dir);
+    if (hit.multiplier === 0) return false;
+    return hit.part === undefined ? hit.animal.applyDamage(hit.damage, hit.point, dir) : hit.animal.applyDamage(hit.damage, hit.point, dir, hit.part);
   }
 
   /** every applyDamage lands here: blood, sounds, AI reaction, kill event */

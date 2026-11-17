@@ -6,6 +6,7 @@ import { sstep } from '../../player/viewmodelTextures';
 import type { Targets, TargetHit } from '../types';
 import type { ImpactSurface } from '../../../../shared/engine/combat/Weapon';
 import { instantSpreadDegrees, shotSpread } from '../../../../shared/engine/combat/shotSpread';
+import { rangedTargetDamage, applyTargetDamage } from '../../../../shared/engine/combat/targetDamage';
 
 export interface HitscanProfile { range: number; damageScale: number; spreadAds: number; spreadHip: number; spreadRadius: 'linear' | 'sqrt'; movingSpread: number; movingAimReduction: number }
 export interface HitscanResult { point: THREE.Vector3; direction: THREE.Vector3; surface: ImpactSurface | null; hit: TargetHit | null; killed: boolean }
@@ -24,6 +25,9 @@ export function hitscan(aim: (origin: THREE.Vector3, direction: THREE.Vector3) =
   if (hit) { dist = hit.distance; surface = 'flesh'; }
   const point = end.copy(origin).addScaledVector(direction, dist);
   let killed = false;
-  if (surface === 'flesh' && hit) { point.copy(hit.point); killed = hit.animal.applyDamage(hit.animal.damageFor(hit.headshot, hit.distance) * profile.damageScale, hit.point, direction); }
+  if (surface === 'flesh' && hit) {
+    point.copy(hit.point);
+    if (hit.multiplier !== 0) killed = applyTargetDamage(hit, rangedTargetDamage(hit, hit.distance) * profile.damageScale, direction);
+  }
   return { point, direction, surface, hit, killed };
 }

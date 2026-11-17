@@ -349,9 +349,10 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
    * happen through `onDamaged`, so calling this directly is enough. A variant's `mods.damageTaken` scales BODY hits
    * (Old Ironhide shrugs off 40 %); a headshot always lands in full — `onDamaged` gets the amount actually dealt.
    */
-  override applyDamage(amount: number, hitPoint: THREE.Vector3, dir: THREE.Vector3): boolean {
+  override applyDamage(amount: number, hitPoint: THREE.Vector3, dir: THREE.Vector3, part?: string): boolean {
     if (!this.alive) return false;
-    return app.combat.hit({ source: 'env', sourceTags: ['dmg.legacy', 'cover.checked'], target: this.combatActor(), amount, point: hitPoint, dir })?.killed ?? false;
+    return app.combat.hit({ source: 'env', sourceTags: ['dmg.legacy', 'cover.checked'], target: this.combatActor(), amount, point: hitPoint, dir,
+      ...(part === undefined ? {} : { part, headshot: part === 'head' }) })?.killed ?? false;
   }
 
   override get dims(): AnimalModel['dims'] { return this.model.dims; }
