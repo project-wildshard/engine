@@ -33,7 +33,7 @@ export function uploadActivator(ports: UploadActivationPorts): (notice: UploadAc
     const instances = rows.map(row => row.instance);
     await ports.open(instances);
     if (instances.some(instance => !ports.opened(instance))) throw new Error('Upload placement has not opened');
-    // Existing occupied rooms keep their normal lifetime; new rooms can use the verified preloaded product.
+    // F48: an open room of this slug starts over on the preloaded product once no live player is in it (`cellHost.ts`).
     return {...notice, build: ports.build, preloaded: true, instances};
   };
 }

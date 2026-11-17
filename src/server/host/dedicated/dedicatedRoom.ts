@@ -468,6 +468,8 @@ export class DedicatedRoom implements CrossTarget {
     }
     for (const [body, left] of this.departed) if (now - left >= FORGET_PAID_MS) { this.departed.delete(body); this.forgetPaid(body); }
   }
+  /** F48: every seat whose link is down goes now, its save written, as its hold running out would; a redial is seated from that save. */
+  letHeldGo(): void { for (const seat of this.seats.values()) if (seat.transport === null) this.leave(seat, 'hold'); }
   /** Everyone goes, as at SIGTERM: their last checkpoint now, and a close that says a restart is why. */
   drain(leave = false): void {
     for (const seat of this.seats.values()) {

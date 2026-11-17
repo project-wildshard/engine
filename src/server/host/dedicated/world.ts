@@ -277,7 +277,7 @@ export class World {
     this.openRoads();
   }
   /** SP20: publish the new placement hashes to every live worker before acknowledging activation.
-   * Occupied rooms keep their lifetime; the next room boot uses the exact newly preloaded hash. */
+   * F48: each worker starts an open room of a moved hash over on it once no live player is in it (`cellHost.ts`). */
   async activateCells(cells: readonly string[]): Promise<readonly string[]> {
     if (this.draining) throw new Error('The world is draining');
     const updates = [...this.up].map(link => {

@@ -44,7 +44,7 @@ function gridNames(): GridNames {
 export function placeCell(row: PlacedCell): boolean {
   const { shards, cells, spots } = gridNames(), [x, z] = row.cell, spot = `${String(x)},${String(z)}`;
   if (shards.has(row.instance)) {
-    // SA47: a new upload moves the cell's hash; a room booted from now on (a restarted worker) opens that one.
+    // SA47: a new upload moves the cell's hash; F48: its open room starts over on it once no live player is in it (`cellHost.ts`).
     if (cells.get(row.slug) === row.instance && spots.get(spot) === row.instance) { if (row.hash !== undefined) hashes.set(row.slug, row.hash); return false; }
     throw new Error(`${row.instance} is already placed elsewhere`);
   }

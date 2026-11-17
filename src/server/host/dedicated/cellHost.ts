@@ -9,7 +9,7 @@ import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { DedicatedRoom, type DedicatedRoomRoad } from './dedicatedRoom';
-import { cellShard, gridAssembly, gridCell, placeCell, roadName } from './gridCells';
+import { cellShard, gridAssembly, gridCell, placeCell, placedHash, roadName } from './gridCells';
 import { RoadRoom } from './roadRoom';
 import { applyMotion } from '@wildshard/engine/game/grid/simulation';
 import { placedStrips } from '@wildshard/engine/game/grid/voidFloor';
@@ -112,10 +112,17 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const emptyMs = options.emptyMs ?? EMPTY_MS;
   /** GC15 (3): cells a seat from another worker's road is arriving in: none starts over meanwhile (review SHOULD). */
   const arrivals = new Set<Cell>();
+  /**
+   * F48 (mini QA 11-16 row 75): cells whose shard a new upload (SP20 activation, a `place` order) moved past the hash their world booted
+   * from. A grid cell never starts over on its own (SC5), so without this an open room kept the old upload until a box restart while
+   * pages loaded the new one. Each starts over on the new upload at its first moment with no live seat: at once when nobody is in it,
+   * else when its last live player goes. A live player is never cut off; a held seat is let go, its save written.
+   */
+  const revised = new Set<Cell>();
   /** Set by `drain`: the worker is closing, so an arrival is refused (the client retries on the next one). */
   let drained = false;
-  /** `startOver`, once it is made below: a start-over opens a cell, and a cell's room says when it emptied. */
-  const later = { startOver: (_cell: Cell, _since: number): void => undefined };
+  /** `startOver` and `renew`, once they are made below: a start-over opens a cell, and a cell's room says when it emptied. */
+  const later = { startOver: (_cell: Cell, _since: number): void => undefined, renew: (_cell: Cell): void => undefined };
   /** Someone stood in this world: it has something to start over from. A refused seat never got this far. */
   /** SC10 (J328): when each room last had nobody in it, from its boot or its last leave. */
   const asleep = new Map<DedicatedRoom, number>();
@@ -134,9 +141,13 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const since = cell.emptySince = diagnosticNow();
     if (cell.used) scope.timeout(emptyMs, () => { later.startOver(cell, since); });
   };
+  /** F48: the shardfile hash each world booted from (its placement's, `placedHash`; none for a build's own product). */
+  const bootedFrom = new WeakMap<DedicatedRoom, string | undefined>();
+  /** F48: a new upload moved this cell's hash past the one its world booted from. */
+  const stale = (cell: Cell): boolean => bootedFrom.get(cell.room) !== placedHash(cellShard(cell.slug));
   // GO3: a row names cells by grid instance; each loads its shard's pack.
   const open = async (slug: string): Promise<DedicatedRoom> => {
-    const shard = cellShard(slug), begun = diagnosticNow(), input = await options.load(shard), onto = seams(slug);
+    const shard = cellShard(slug), hash = placedHash(shard), begun = diagnosticNow(), input = await options.load(shard), onto = seams(slug);
     rapier ??= input.rapier;
     const room: DedicatedRoom = await DedicatedRoom.boot({ slug: shard, cell: slug, build: options.build, bootId: options.bootId(), input, now: options.roomNow ?? diagnosticNow, ...(onto === undefined ? {} : { road: onto }),
       post: news => {
@@ -146,6 +157,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
       reports: { file: report => { post({ kind: 'report', slug, report }); } }, ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }),...(options.playtest===true?{playtest:row=>{post({kind:'playtest',slug,row});}}:{}) });
     // SC4: its first ticks now, while nobody is in it, not on its first player's arrival.
     for (let tick = 0; tick < WARM_TICKS; tick++) room.tick();
+    bootedFrom.set(room, hash);
     asleep.set(room, diagnosticNow());
     post({ kind: 'cell', slug, ms: diagnosticNow() - begun });
     options.booted?.(slug, room);
@@ -154,6 +166,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const step = (): void => {
     const begun = diagnosticNow();
     try {
+      for (const cell of revised) later.renew(cell);
       for (const { slug, room } of cells.values()) {
         if (room.taken === 0) continue;
         const at = diagnosticNow();
@@ -187,15 +200,29 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const origin = crossing?.assembly.cells.find(row => [cell.slug].includes(row.instance))?.origin;
     return arrivals.has(cell) || (origin !== undefined && road?.near(origin, CHUNK_HALF + NEAR_M) === true);
   };
-  const restart = async (cell: Cell): Promise<void> => {
-    if (disposed || cell.room.taken > 0) return;
+  const restart = async (cell: Cell, revising = false): Promise<void> => {
+    if (disposed || (revising ? drained || !stale(cell) : cell.room.taken > 0)) return;
+    // F48: a live player came back while this waited its turn; its last live player's going starts it over
+    if (revising && cell.room.taken > cell.room.holding) { revised.add(cell); return; }
     // review SHOULD: a start-over queued behind others looks again when its turn comes, since a walker may have come near meanwhile
-    if (walkerNear(cell)) { const since = cell.emptySince; scope.timeout(NEAR_RETRY_MS, () => { later.startOver(cell, since); }); return; }
+    if (walkerNear(cell)) { const since = cell.emptySince; scope.timeout(NEAR_RETRY_MS, () => { if (revising) revised.add(cell); else later.startOver(cell, since); }); return; }
     try {
+      // F48: a held seat goes as its hold running out would (its save written), so its page's redial seats in the new upload's world
+      if (revising) cell.room.letHeldGo();
       const old = cell.room, room = await open(cell.slug);
       if (disposed) { room.dispose(); return; }
       cell.room = room; old.dispose(); cell.used = false; cell.emptySince = diagnosticNow();
-    } catch (error) { console.warn(JSON.stringify({ at: 'cell.start-over-failed', slug: cell.slug, error: error instanceof Error ? error.message : String(error) })); }
+      if (revising) console.info(JSON.stringify({ at: 'cell.revised', slug: cell.slug, hash: bootedFrom.get(room) }));
+      // An upload that landed while this one booted starts it over again
+      if (stale(cell)) revised.add(cell);
+    } catch (error) { console.warn(JSON.stringify({ at: 'cell.start-over-failed', slug: cell.slug, revising, error: error instanceof Error ? error.message : String(error) })); }
+  };
+  later.renew = (cell: Cell): void => {
+    if (disposed || drained || cell.waking !== null || cell.room.taken > cell.room.holding) return;
+    revised.delete(cell);
+    if (!stale(cell)) return;
+    const job = overs.then(() => restart(cell, true)).finally(() => { if (cell.waking === job) cell.waking = null; });
+    cell.waking = job; overs = job;
   };
   /** A cell everyone left starts over. An arrival meanwhile waits for it (`settled`). A timer can fire a little early by this clock, so it looks again. */
   later.startOver = (cell: Cell, since: number): void => {
@@ -236,6 +263,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     let laid: (() => void) | undefined;
     try {
       for (const row of order.cells) placeCell(row);
+      for (const cell of cells.values()) if (stale(cell)) revised.add(cell);
       const was = crossing?.assembly, grown = gridAssembly();
       if (crossing !== undefined && was !== undefined && was !== grown) {
         const { strips, seams: more } = placedStrips(grown, was), fresh = grown.cells.slice(was.cells.length);
