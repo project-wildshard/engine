@@ -84,7 +84,8 @@ function conflicts(root: string, folder: string, local: ReadonlyMap<string, Uint
   for (const [path, body] of local) {
     insideTree(root, path);
     const target = join(root, path);
-    if ((others.has(path) || (!own.has(path) && existsSync(target))) && (!existsSync(target) || hash(readFileSync(target)) !== hash(body))) {
+    if (!others.has(path) && !own.has(path) && existsSync(target)) throw new Error(`Local product conflicts with an unowned existing mount: ${path}`);
+    if (others.has(path) && (!existsSync(target) || hash(readFileSync(target)) !== hash(body))) {
       throw new Error(`Local product conflicts with another owner: ${path}`);
     }
   }

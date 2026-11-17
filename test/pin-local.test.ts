@@ -130,3 +130,13 @@ test('CI refuses explicit local admission and ignores even malformed local prove
   const refused = await cli(root, ['install', '--from-dir', source], {CI: 'true'});
   expect(refused.output).toContain('CI installs published pins'); expect(refused.status).not.toBe(0);
 });
+
+test('an unowned existing mount remains untouched even when its bytes match', async () => {
+  const {root, source} = fixture(), target = join(root, 'public/assets/local-proof/shared.json');
+  mkdirSync(dirname(target), {recursive: true}); writeFileSync(target, '{}');
+  const refused = await cli(root, ['install', '--from-dir', source]);
+  expect(refused.status).not.toBe(0);
+  expect(refused.output).toContain('unowned existing mount');
+  expect(readFileSync(target, 'utf8')).toBe('{}');
+  expect(existsSync(join(root, LOCAL_CANDIDATES))).toBe(false);
+});

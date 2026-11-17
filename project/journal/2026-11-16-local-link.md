@@ -52,3 +52,9 @@ as the normal engine job does. The world proof now reads physics from
 the frozen Rapier dependency instead of a generated public copy, so a
 clean source checkout needs no unrelated boot generation. Fifteen
 CI=true cases pass, with a raw JSON report retained.
+
+Final LL4 review found an ownership edge: identical bytes do not make
+an unowned public mount ours. Refuse that collision too, so restoring
+pins cannot delete another lane's pre-existing file. A real CLI case
+preserves its bytes and leaves provenance absent. Sixteen CI=true
+cases pass.
