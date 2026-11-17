@@ -1,0 +1,122 @@
+// Meta STAGING-SMOKE SM3: the Opus vision judge. After the hard checks, one `claude -p --model claude-opus-5-5` call per
+// scenario looks at a two-row contact sheet (the last release's six keyframes over this one's, ffmpeg) with the release's
+// changelog bullets, and answers `same`, `changed` (named by a bullet) or `regressed` (a severity and one line). No previous
+// frames: `baseline`, and no call. Five calls a release at most; each reads one ~1600x1170 JPEG and a short prompt.
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { KEYFRAMES } from './scenarios.mjs';
+
+/** @typedef {'same' | 'changed' | 'regressed' | 'baseline' | 'error'} VisionVerdict */
+/** @typedef {{ scenario: string, verdict: VisionVerdict, severity?: 'P0' | 'P1' | 'P2', bullet?: string, line: string, sheet?: string }} Vision */
+
+export const VISION_MODEL = 'claude-opus-5-5';
+const CELL = { w: 268, h: 583 };
+
+/**
+ * A two-row sheet: `top` (last release) over `bottom` (this one), one column per keyframe; a missing frame is black.
+ * @param {readonly (string | undefined)[]} top @param {readonly (string | undefined)[]} bottom @param {string} out
+ */
+export function contactSheet(top, bottom, out) {
+  mkdirSync(dirname(out), { recursive: true });
+  /** @type {string[]} */
+  const inputs = [];
+  for (const path of [...top, ...bottom]) {
+    if (path !== undefined && existsSync(path)) inputs.push('-i', path);
+    else inputs.push('-f', 'lavfi', '-i', `color=c=black:s=${String(CELL.w)}x${String(CELL.h)}:d=1`);
+  }
+  const n = KEYFRAMES.length;
+  const scaled = Array.from({ length: n * 2 }, (_, i) => `[${String(i)}:v]scale=${String(CELL.w)}:${String(CELL.h)},setsar=1[s${String(i)}]`);
+  const row = (/** @type {number} */ from, /** @type {string} */ name) => `${Array.from({ length: n }, (_, i) => `[s${String(from + i)}]`).join('')}hstack=inputs=${String(n)}[${name}]`;
+  const graph = [...scaled, row(0, 'top'), row(n, 'bottom'), '[top][bottom]vstack=inputs=2,pad=iw:ih+8:0:4[out]'].join(';');
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...inputs, '-filter_complex', graph, '-map', '[out]', '-frames:v', '1', '-q:v', '4', out], { stdio: 'ignore' });
+  return out;
+}
+
+/** The prompt for one scenario. @param {{ sheet: string, scenario: string, title: string, last: string, release: string, bullets: readonly string[] }} o */
+export function visionPrompt({ sheet, scenario, title, last, release, bullets }) {
+  return [
+    `Read the image ${sheet}. It is a contact sheet from an automated phone smoke test of a browser game (scenario ${scenario}, ${title}).`,
+    `Top row: the last release, ${last}. Bottom row: this release, ${release}. Columns, left to right: ${KEYFRAMES.join(', ')} (title screen, Shard Select, loading card, 1 s into play, 10 s into play, the last frame). A black cell is a frame that was not captured.`,
+    `This release's changelog bullets:\n${bullets.length === 0 ? '(none)' : bullets.map((b) => `- ${b}`).join('\n')}`,
+    'Compare each bottom cell with the one above it. Ignore small differences: camera angle, the player position, time of day, animation phase, particles.',
+    'Answer "same" when nothing a player would notice differs; "changed" when a visible difference is explained by one changelog bullet (quote it in "bullet");',
+    '"regressed" when the bottom row looks broken or worse with no bullet explaining it: a menu or blank where the world was, an error, missing HUD, missing or',
+    'untextured world, a wrong screen. Severity: P0 blocks play, P1 looks broken, P2 polish.',
+    'Reply with only one JSON object, no prose: {"verdict":"same"|"changed"|"regressed","severity":"P0"|"P1"|"P2"|null,"bullet":string|null,"line":"one short sentence"}',
+  ].join('\n');
+}
+
+/** The last JSON object in a model reply, checked. @param {string} text @returns {Omit<Vision, 'scenario'> | undefined} */
+export function parseVision(text) {
+  const matches = text.match(/\{[^{}]*"verdict"[^{}]*\}/gu);
+  const raw = matches?.at(-1);
+  if (raw === undefined) return undefined;
+  try {
+    const v = JSON.parse(raw);
+    if (!['same', 'changed', 'regressed'].includes(v.verdict)) return undefined;
+    const severity = ['P0', 'P1', 'P2'].includes(v.severity) ? v.severity : v.verdict === 'regressed' ? 'P1' : undefined;
+    return { verdict: v.verdict, line: String(v.line ?? ''), ...(severity === undefined || v.verdict !== 'regressed' ? {} : { severity }), ...(typeof v.bullet === 'string' && v.bullet !== '' ? { bullet: v.bullet } : {}) };
+  } catch { return undefined; }
+}
+
+/**
+ * Ask Claude about one sheet. `claude` is whatever is first on PATH (the test puts a stub there). The call runs in the sheet's
+ * folder (outside any repo, so no project instructions load) with only the Read tool.
+ * @param {string} prompt @param {string} cwd @param {{ claude?: string, timeoutMs?: number }} [o] @returns {Omit<Vision, 'scenario'>}
+ */
+export function askClaude(prompt, cwd, { claude = 'claude', timeoutMs = 240_000 } = {}) {
+  /** @type {string} */
+  let out;
+  try {
+    out = execFileSync(claude, ['-p', prompt, '--model', VISION_MODEL, '--output-format', 'json', '--tools', 'Read', '--allowedTools', 'Read',
+      '--no-session-persistence', '--strict-mcp-config', '--disable-slash-commands'], { cwd, encoding: 'utf8', timeout: timeoutMs, stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (error) {
+    return { verdict: 'error', line: `claude -p failed: ${error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error)}` };
+  }
+  /** @type {string} */
+  let text = out;
+  try { const wrapped = JSON.parse(out); if (typeof wrapped.result === 'string') text = wrapped.result; } catch { /* plain text */ }
+  return parseVision(text) ?? { verdict: 'error', line: `no verdict in the reply: ${text.slice(0, 160)}` };
+}
+
+/** The release's changelog bullets from CHANGELOG.md (`## vX.Y.Z (date)` then `- ` lines). @param {string} file @param {string} release */
+export function changelogBullets(file, release) {
+  if (!existsSync(file)) return [];
+  const lines = readFileSync(file, 'utf8').split('\n');
+  const start = lines.findIndex((l) => l.startsWith(`## ${release} `) || l === `## ${release}`);
+  if (start === -1) return [];
+  /** @type {string[]} */
+  const bullets = [];
+  for (const line of lines.slice(start + 1)) { if (line.startsWith('## ')) break; if (line.startsWith('- ')) bullets.push(line.slice(2).trim()); }
+  return bullets;
+}
+
+/**
+ * The vision pass over every scenario that ran: a sheet each against the last release's frames, then one call.
+ * @param {{ scenarios: readonly { id: string, title: string, status: string, frames: Record<string, string> }[], release: string,
+ *   last?: { release: string, dir: string }, bullets: readonly string[], out: string, claude?: string }} o @returns {Vision[]}
+ */
+export function visionPass({ scenarios, release, last, bullets, out, claude }) {
+  return scenarios.filter((s) => s.status !== 'skip').map((s) => {
+    const before = last === undefined ? [] : KEYFRAMES.map((k) => { const p = join(last.dir, s.id, 'frames', `${k}.jpg`); return existsSync(p) ? p : undefined; });
+    if (last === undefined || before.every((p) => p === undefined)) return { scenario: s.id, verdict: /** @type {const} */ ('baseline'), line: 'no frames from a previous release: these are the baseline' };
+    const sheet = contactSheet(before, KEYFRAMES.map((k) => s.frames[k]), join(out, s.id, 'sheet.jpg'));
+    const answer = askClaude(visionPrompt({ sheet, scenario: s.id, title: s.title, last: last.release, release, bullets }), dirname(sheet), claude === undefined ? {} : { claude });
+    /** @type {Vision} */
+    const row = { scenario: s.id, verdict: answer.verdict, line: answer.line, sheet };
+    if (answer.severity !== undefined) row.severity = answer.severity;
+    if (answer.bullet !== undefined) row.bullet = answer.bullet;
+    return row;
+  });
+}
+
+/** Regressions as findings (severity from the model, P1 when it gave none). @param {readonly Vision[]} vision */
+export function visionFindings(vision) {
+  return vision.filter((v) => v.verdict === 'regressed').map((v) => {
+    /** @type {import('./checks.mjs').Finding & { sheet?: string }} */
+    const f = { scenario: v.scenario, key: 'vision', severity: v.severity ?? 'P1', text: `vision: ${v.line}`, source: 'vision' };
+    if (v.sheet !== undefined) { f.frame = v.sheet; f.sheet = v.sheet; }
+    return f;
+  });
+}

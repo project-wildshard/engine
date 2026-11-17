@@ -4,7 +4,7 @@
 // cut by the SM0 audit to five scenarios (K1 to K5, scenarios.mjs), about 6 minutes a run.
 //
 //   node scripts/staging-smoke.mjs --url <candidate> --release vX.Y.Z [--only K3[,K4]] [--out <dir>] [--card <slug>]
-//        [--deeplink <slug>] [--watch <s>] [--store <dir>]
+//        [--deeplink <slug>] [--watch <s>] [--store <dir>] [--changelog <CHANGELOG.md>] [--no-vision]
 //
 // Headless and muted, WebKit at 402x874 (iPhone 17 Pro) with touch, Chromium only for K1; one browser at a time; rAF capped at
 // 60 fps; one clip per scenario. Only GETs leave the page. The hard checks (checks.mjs) give each finding a severity; a P0
@@ -20,7 +20,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { SCENARIOS, runScenario } from './staging-smoke/scenarios.mjs';
-import { verdictOf } from './staging-smoke/checks.mjs';
+import { holds, verdictOf, worstFirst } from './staging-smoke/checks.mjs';
+import { keepRun, lastRelease, STORE } from './staging-smoke/store.mjs';
+import { changelogBullets, visionFindings, visionPass } from './staging-smoke/vision.mjs';
 
 /** The whole run's budget (SM8 (d)): over this the runner warns. */
 export const RUN_BUDGET_S = 600;
@@ -46,9 +48,12 @@ export async function served(url) {
  * Run the smoke and write <out>/verdict.json.
  * @param {{ url: string, release: string, out: string, only?: readonly string[], card?: string, deepLink?: string, watchMs?: number, budgetMs?: number,
  *   build?: string, lastTimeToPlay?: Record<string, number>, oldProfiles?: Partial<Record<'chromium' | 'webkit', string>>,
- *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, log?: (line: string) => void }} options
+ *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, store?: string, vision?: boolean, changelog?: string,
+ *   log?: (line: string) => void }} options
+ * `store` (the CLI's default: ~/.cache/wildshard/plan-artifacts/staging-smoke) keeps the run and gives the last release's
+ * frames and times; without one the run is kept only in `out` and the vision pass has no baseline (no calls).
  */
-export async function runSmoke({ url, release, out, only, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, log = console.log }) {
+export async function runSmoke({ url, release, out, only, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, store, vision = true, changelog = resolve('CHANGELOG.md'), log = console.log }) {
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The staging smoke joins worlds: staging or local only, never production');
   const pw = await import('playwright');
   const started = Date.now();
@@ -69,16 +74,23 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
     for (const line of problems) log(`  - ${line}`);
   }
   const seconds = (Date.now() - started) / 1000;
-  const judged = verdictOf(scenarios, { release, version, ...(build === undefined ? {} : { build }), ...(lastTimeToPlay === undefined ? {} : { lastTimeToPlay }) });
-  for (const f of judged.findings) log(`  ${f.severity} ${f.scenario} ${f.key}: ${f.text}`);
+  const last = store === undefined ? undefined : lastRelease(store, release);
+  const times = lastTimeToPlay ?? last?.timeToPlay;
+  const judged = verdictOf(scenarios, { release, version, ...(build === undefined ? {} : { build }), ...(times === undefined ? {} : { lastTimeToPlay: times }) });
+  // SM3: the Opus vision pass, against the last release's keyframes
+  const looks = vision ? visionPass({ scenarios, release, ...(last === undefined ? {} : { last }), bullets: changelogBullets(changelog, release), out }) : [];
+  for (const v of looks) log(`  vision ${v.scenario}: ${v.verdict}${v.severity === undefined ? '' : ` ${v.severity}`} ${v.line}`);
+  const findings = [...judged.findings, ...visionFindings(looks)].sort(worstFirst);
+  for (const f of findings) log(`  ${f.severity} ${f.scenario} ${f.key}: ${f.text}`);
   const verdict = {
     url, release, ...(version.build === undefined ? {} : { build: version.build }), ...(version.describe === undefined ? {} : { describe: version.describe }),
     version, at: new Date().toISOString(), seconds,
-    scenarios: judged.rows.map(({ scenario, checks, timeToPlay }) => ({ ...scenario, checks, ...(timeToPlay === undefined ? {} : { timeToPlay }) })),
-    findings: judged.findings, hold: judged.hold,
+    scenarios: judged.rows.map(({ scenario, checks, timeToPlay }) => Object.assign(scenario, { checks, timeToPlay })),
+    ...(last === undefined ? {} : { last: last.release }), vision: looks, findings, hold: holds(findings),
   };
   writeFileSync(join(out, 'verdict.json'), `${JSON.stringify(verdict, null, 1)}\n`);
-  log(`staging-smoke ${release}: ${verdict.hold ? 'HOLD' : 'no hold'}, ${String(judged.findings.length)} findings, ${String(scenarios.length)} scenarios in ${seconds.toFixed(0)} s${seconds > RUN_BUDGET_S ? ` WARNING: over the ${String(RUN_BUDGET_S / 60)}-minute budget (SM8)` : ''}`);
+  if (store !== undefined) log(`kept in ${keepRun(store, release, out, verdict)}`);
+  log(`staging-smoke ${release}: ${verdict.hold ? 'HOLD' : 'no hold'}, ${String(findings.length)} findings, ${String(scenarios.length)} scenarios in ${seconds.toFixed(0)} s${seconds > RUN_BUDGET_S ? ` WARNING: over the ${String(RUN_BUDGET_S / 60)}-minute budget (SM8)` : ''}`);
   return verdict;
 }
 
@@ -92,6 +104,7 @@ async function cli() {
   const watch = args.get('watch');
   const verdict = await runSmoke({
     url, release, out, ...(only === undefined ? {} : { only }), ...(watch === undefined ? {} : { watchMs: Number(watch) * 1000 }),
+    store: args.get('store') ?? STORE, vision: !args.has('no-vision'), ...(args.has('changelog') ? { changelog: resolve(String(args.get('changelog'))) } : {}),
     ...(args.has('card') ? { card: String(args.get('card')) } : {}), ...(args.has('deeplink') ? { deepLink: String(args.get('deeplink')) } : {}),
   });
   process.exitCode = verdict.hold ? 1 : 0;

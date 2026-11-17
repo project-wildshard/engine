@@ -1,3 +1,4 @@
 # Staging smoke (meta STAGING-SMOKE, J398)
 
 - SM1/SM2 (opus-smoke): scripts/staging-smoke.mjs runs K1-K5 headless, one browser at a time, and checks.mjs gives each finding P0/P1/P2; hold on P0/P1. K3-K5 clean on a local build (46/21/18 s); a menu-loop stub fails K3. Browser tests run only by name (WS_SMOKE_BROWSER=1, WS_SMOKE_BUILD=<url>). Surprise: a zero-height .ws-title-stack is not "visible" to Playwright, so the stub needed it sized.
+- SM3: store.mjs keeps each run (6 keyframes per scenario, clips, verdict.json, time-to-play.json) in ~/.cache/wildshard/plan-artifacts/staging-smoke/<release>/, last 5 releases. vision.mjs makes a two-row ffmpeg sheet (last over this) and asks `claude -p --model claude-opus-5-5` (Read tool only, run in the store folder so no project instructions load) for same/changed/regressed; regressions join findings. Tested with a stub claude on PATH.
