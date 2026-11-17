@@ -224,7 +224,9 @@ const readScreen = () => {
   const seen = (/** @type {Element | null} */ node) => { for (let at = node; at instanceof HTMLElement; at = at.parentElement) { const style = getComputedStyle(at); if (Number(style.opacity) < 0.05 || style.visibility === 'hidden') return false; } return true; };
   const title = main instanceof HTMLElement && main.offsetParent !== null && seen(main);
   // OF21: the online shell's link cards (FM4, `linkScreens.ts` `card`: "You're offline") are `ws-link` with a `data-failmode`
-  const fail = [...document.querySelectorAll('[class^="ws-fail"],[class*=" ws-fail"],.ws-link-scrim[data-failmode]')].find(node => node instanceof HTMLElement && node.offsetParent !== null);
+  const fail = [...document.querySelectorAll('[class^="ws-fail"],[class*=" ws-fail"],.ws-link-scrim[data-failmode]')].find(node => node instanceof HTMLElement && (node.offsetParent !== null
+    // a fixed scrim (the link card) has no offsetParent: shown means it has boxes
+    || node.matches('.ws-link-scrim') && node.getClientRects().length > 0));
   const world = /** @type {{ __wildshard?: { world?: { player?: unknown } } }} */ (/** @type {unknown} */ (window)).__wildshard?.world;
   /** @type {string | null | undefined} */ let grid;
   // the probe's area (T2E-1b): a grid cell's instance, null between cells (the road); a one-shard page's area has no instance

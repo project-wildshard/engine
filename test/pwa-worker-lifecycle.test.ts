@@ -705,6 +705,19 @@ test('OF21: offline, a named content read the content cache misses is answered b
   expect(await (await worker.dispatch('fetch', { request: new Request(`${base}${fresh.slice(1)}`) }))?.text()).toBe(`cdn:${base}${fresh.slice(1)}`);
 });
 
+test('OF21: the offline page copy is looked up by the key\'s version, never a bare copy another build kept', async () => {
+  const f = fixture(() => Promise.reject(new TypeError('Failed to fetch')));
+  const worker = f.load('A', [], [], { base, versions: { '/shardfiles/fx/shard.json': '0123abcd' } });
+  const assets = await f.open(ASSET_CACHE_NAME);
+  await assets.put(url('/shardfiles/fx/shard.json'), new Response('older build'));
+  await expect(worker.dispatch('fetch', { request: new Request(`${base}shardfiles/fx/shard.json`) })).rejects.toThrow('Failed to fetch');
+  await assets.put(url('/shardfiles/fx/shard.json?v=0123abcd'), new Response('this build'));
+  expect(await (await worker.dispatch('fetch', { request: new Request(`${base}shardfiles/fx/shard.json`) }))?.text()).toBe('this build');
+  // an HTML answer or a partial body kept there is never served
+  await assets.put(url('/assets/boot-tables-0123abcd.json'), new Response('<html>', { headers: { 'content-type': 'text/html' } }));
+  await expect(worker.dispatch('fetch', { request: new Request(`${base}assets/boot-tables-0123abcd.json`) })).rejects.toThrow('Failed to fetch');
+});
+
 test('PZ10: no activate deletes ws-content-v1', async () => {
   const f = fixture(request => Promise.resolve(typed(`cdn:${request.url}`, 'cors')));
   const first = f.load('A', ['/b/A/a-aaaaaaaa.js'], [], { base });

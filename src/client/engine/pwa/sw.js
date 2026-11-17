@@ -475,7 +475,7 @@ async function contentRead(request) {
       catch { return await fetch(request); }
     }
   } catch (error) {
-    const copy = key === request.url ? undefined : await pageCopy(request.url, key);
+    const copy = key === request.url || request.signal.aborted ? undefined : await pageCopy(request.url, key);
     if (copy !== undefined) return copy;
     throw error;
   }
@@ -486,7 +486,9 @@ async function contentRead(request) {
 /** OFFLINE OF21: a content read the network can't answer (offline) is answered by this origin's copy of the same named file,
  *  when the asset cache holds one. The precache keeps the boot tables, and the spawn download keeps a level's members, under
  *  their page URLs (J138), so a reopen offline after a short online visit holds every byte its entry reads, though the content
- *  cache never saw them. Only a content-named or versioned file (its key differs from its URL): the same name is the same bytes.
+ *  cache never saw them. Only a content-named or versioned file (its key differs from its URL), looked up by the key's own name
+ *  and `?v=`: the same name is the same bytes. Only when the network fails (offline, or a CDN that can't answer): online reads are
+ *  unchanged, and the hit is not promoted into the content cache.
  *  @param {string} href @param {string} key */
 async function pageCopy(href, key) {
   if (CONTENT_URL === undefined) return undefined;
@@ -494,10 +496,9 @@ async function pageCopy(href, key) {
   const path = address.pathname.slice(CONTENT_URL.pathname.length - 1);
   try {
     const assets = await store(ASSETS);
-    for (const search of new Set([address.search, keyed.search])) {
-      const held = await assets.match(new URL(`${path}${search}`, self.location.origin).href, MATCH);
-      if (held !== undefined && held.status === 200 && !isHtml(held)) return held;
-    }
+    // the key's own identity only (the content-named path, or its `?v=`): a bare page copy of a versioned name may be another build's
+    const held = await assets.match(new URL(`${path}${keyed.search}`, self.location.origin).href, MATCH);
+    if (held !== undefined && held.status === 200 && !isHtml(held)) return held;
   } catch { /* storage denial: the read fails as it would have */ }
   return undefined;
 }
