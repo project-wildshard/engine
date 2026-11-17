@@ -54,3 +54,12 @@ queue clock begins at room start, after gate startup, so the review's
 whole-gate wait concern does not apply. Actual build refusal now fails
 the observer immediately. Both failed observations drained all owned
 CPU rows; neither is a complete-gate verdict.
+
+Exact hosted6a9c5bef0a run43999993957 refused the borrowed proof in
+both attempts. Its hard-coded private capacity3 exceeded the runner's
+actual budget2; the production guard correctly refused. Derive proof
+capacity from the real machine budget, optionally lower it for controls,
+and derive borrower slots from the validated parent. Preserve all12
+actual ownership/loss/reclaim controls. Exercise native/one/two-slot
+private ledgers, including both usable and absent spare capacity. This
+changes only the fixture; no production guard or deadline changes.

@@ -26,8 +26,10 @@ def until(predicate):
 
 if sys.argv[1] == 'borrower':
     root, marker, mode = Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4]
+    budget = admission.ancestor_cpu_budget()
+    assert budget is not None
     entry = {'token': uuid.uuid4().hex, 'pid': os.getpid(), 'holder': os.getpid(),
-             'owner': os.getppid(), 'repo': str(root), 'slots': 2, 'ownedCommand': owned.ownership()}
+             'owner': os.getppid(), 'repo': str(root), 'slots': budget['slots'], 'ownedCommand': owned.ownership()}
     admission.register_borrowed_cpu(root, entry)
     if mode == 'ordinary':
         command = ('import time;from pathlib import Path;p=Path(' + repr(str(marker)) + ');'
@@ -50,6 +52,11 @@ if sys.argv[1] == 'borrower':
 
 root = Path(sys.argv[1]).resolve() / ('run-' + str(os.getpid()))
 root.mkdir(parents=True)
+maximum = max(1, (os.cpu_count() or 1) - 2)
+limit = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+assert limit > 0
+capacity = min(3, maximum, limit)
+parent_slots = min(2, max(1, capacity - 1))
 children, sockets, groups, controls = [], [], [], []
 try:
     for label in ('direct-release', 'broker-release', 'direct-loss', 'broker-loss'):
@@ -61,7 +68,7 @@ try:
         env.update(WS_CPU_ROOT=str(work), WS_HEAVY_SCHEDULER_ROOT=str(work))
         if mode == 'direct':
             parent = subprocess.Popen([sys.executable, str(scripts / 'cpu-admission.py'),
-                                       'hold', '--slots=2', '--capacity=3'],
+                                       'hold', '--slots=' + str(parent_slots), '--capacity=' + str(capacity)],
                                       env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             children.append(parent)
             proof = json.loads(parent.stdout.readline())
@@ -70,13 +77,13 @@ try:
                 assert parent.wait(timeout=5) == 0
         else:
             parent = subprocess.Popen([sys.executable, str(scripts / 'cpu-broker.py'),
-                                       '--root', str(work), '--capacity=3'],
+                                       '--root', str(work), '--capacity=' + str(capacity)],
                                       env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             children.append(parent)
             server = json.loads(parent.stdout.readline())
             client = socket.create_connection(('127.0.0.1', server['port']), timeout=5)
             sockets.append(client)
-            client.sendall((json.dumps({'token': server['token'], 'slots': 2, 'repo': str(work),
+            client.sendall((json.dumps({'token': server['token'], 'slots': parent_slots, 'repo': str(work),
                                        'pid': os.getpid()}) + '\n').encode())
             with client.makefile('rb') as reader:
                 proof = json.loads(reader.readline())
@@ -92,13 +99,13 @@ try:
         children.append(borrower)
         until(marker.exists)
         state = json.loads((work / 'queue.json').read_text())
-        assert len(state['cpuActive']) == 2 and admission.reserved_slots(state['cpuActive']) == 2
+        assert len(state['cpuActive']) == 2 and admission.reserved_slots(state['cpuActive']) == parent_slots
         assert state['cpuQueue'] == []
         spare = {'token': uuid.uuid4().hex, 'pid': os.getpid(), 'holder': os.getpid(),
                  'owner': os.getppid(), 'repo': str(work), 'slots': 1}
-        assert admission.acquire_cpu(work, spare, 3, time.monotonic() + 10)
+        assert admission.acquire_cpu(work, spare, capacity, time.monotonic() + 10) == (capacity > parent_slots)
         assert admission.release_cpu(work, spare['token'])
-        controls.append(label + ': actual nested command adds no budget or FIFO wait; spare slot remains usable')
+        controls.append(label + ': actual nested command adds no budget or FIFO wait; spare admission matches available capacity')
         marker.with_suffix('.finish').write_text('finish')
         assert borrower.wait(timeout=5) == 0
         assert [row['token'] for row in json.loads((work / 'queue.json').read_text())['cpuActive']] == [proof['lease']]
@@ -117,12 +124,12 @@ try:
         else:
             parent.kill()
             parent.wait(timeout=5)
-        exclusive = {**spare, 'token': uuid.uuid4().hex, 'slots': 3}
-        assert not admission.acquire_cpu(work, exclusive, 3, time.monotonic() + 10)
+        exclusive = {**spare, 'token': uuid.uuid4().hex, 'slots': capacity}
+        assert not admission.acquire_cpu(work, exclusive, capacity, time.monotonic() + 10)
         until(lambda: not owned.same_process(root_record))
         assert owned.same_process(descendant)
-        assert not admission.acquire_cpu(work, exclusive, 3, time.monotonic() + 10)
-        until(lambda: admission.acquire_cpu(work, exclusive, 3, time.monotonic() + 10))
+        assert not admission.acquire_cpu(work, exclusive, capacity, time.monotonic() + 10)
+        until(lambda: admission.acquire_cpu(work, exclusive, capacity, time.monotonic() + 10))
         assert not owned.same_process(descendant)
         assert borrower.wait(timeout=5) == 0
         assert admission.release_cpu(work, exclusive['token'])
@@ -140,4 +147,5 @@ finally:
 
 assert all(owned.group_stopped(record['group']) for record in groups)
 print(json.dumps({'controls': controls, 'bothActualProviders': True,
-                  'noSecondCpuBudget': True, 'allChildrenDrained': True}))
+                  'noSecondCpuBudget': True, 'allChildrenDrained': True,
+                  'capacity': capacity, 'parentSlots': parent_slots}))
