@@ -22,6 +22,7 @@ import { fetchSignedRelease, releaseToDial, type ReleaseKeep } from './release';
 import { releaseScreens, stagingMark } from './releaseScreens';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
+import { saveScreens } from './saveScreens';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { installBrowserScopeEnvironment } from '@wildshard/engine/app/view/scopeEnvironment';
 
@@ -58,7 +59,7 @@ export interface OnlineConfig {
 /** What the link tells the page. */
 export interface OnlineView {
   readonly link: (state: LinkState, reason?: string) => void;
-  /** Actual per-client save observations. An older server or a memory store leaves this unknown. FM8s owns presentation. */
+  /** Actual per-client save observations. An older server or a memory store leaves this unknown. FM8s shows them (saveScreens.ts). */
   readonly persistence?: (fact: PersistenceWord) => void;
   /** WR5 (5.5, the cut): a refusal before any frame; the page reloads only if version.json names another build. */
   readonly cut?: (reason: string) => void;
@@ -416,13 +417,16 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     // FM4b modes 21 and 22: the Slow and Unstable chips read the link's own measurements
     stats: () => shellNow?.client.stats,
   });
+  // FM8s: the server's own save facts (late, failing) and the hold on Leave the world while a save isn't confirmed
+  const saves = saveScreens(scope);
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(loadedNow); void leaving.reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
   // GO4: a grid page re-enters the grid in the seat's cell: the tap that brought it here comes along (QA row 16), and the URL stays bare.
   const regrid = (cell: string): void => { entering(loadedNow); leaving.unload(`online seat in another grid cell (${cell})`); gridNow?.reenter(cell); };
   const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
-    link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
+    link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); if (state === 'ended' && reason === 'reload') void ended(); },
+    persistence: fact => { saves.fact(fact); },
     // The cut (5.5): an old server refused a v1 hello. Reload only into another build; on this one, the server is updating.
     cut: () => { void leaving.reloadStale(); },
     countdown: said => { screens.countdown(said); preload(); },

@@ -6,6 +6,7 @@ import { LedgerBook, type LedgerFiling } from '@wildshard/engine/net/ledgerBook'
 import { NetRoom, type NetTickInput } from '@wildshard/engine/net/room';
 import { SimNetWorld } from '@wildshard/engine/net/simWorld';
 import type { Transport } from '@wildshard/engine/net/transport';
+import { SAVE_CHECKPOINT_MS } from '@wildshard/engine/net/persistenceWord';
 import { saves } from '@wildshard/engine/saves/runtime';
 import type { SimHost } from '@wildshard/engine/sim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
@@ -42,7 +43,7 @@ const ARRIVAL_LIFT = 8, ARRIVAL_SKIN = 0.05;
 /** How often a seat's clean checkpoints are looked for, in ticks. */
 const CHECK_TICKS = 30;
 /** E7.4: a change waits this long for more of its kind, and a seated player writes this often whatever happens. */
-const DEBOUNCE_MS = 1000, EVERY_MS = 60_000;
+const DEBOUNCE_MS = 1000, EVERY_MS = SAVE_CHECKPOINT_MS;
 
 /** A player who holds a seat, with or without a live link. */
 interface Seat {

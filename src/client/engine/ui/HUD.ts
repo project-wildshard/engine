@@ -304,6 +304,8 @@ export class HUD {
     // the touch PAUSE button (TouchControls) and a released pointer lock; Escape (and M / I) is the menu's own key listener,
     // gated by `keyGate` below (E130 — the HUD's Esc here opened the menu the menu's listener then closed, E32)
     this.scope.listen(document, 'ws:pause', () => { if (this.entered) this.setPaused(!this.paused); });
+    // FM8s: the save-failed card's Leave the world goes the pause menu's way out (EXIT TO MAIN), held cards and all
+    this.scope.listen(document, 'ws:exit-to-main', () => { this.exitToMenu(); });
     // the page went to the background (core/GpuRecovery.ts): pause, never unpause
     this.scope.listen(document, 'ws:background', () => { if (this.entered && !this.paused) this.setPaused(true); });
     // QB8: the error modal pauses the world under it; its KEEP PLAYING resumes only a pause the modal itself made
@@ -689,9 +691,13 @@ export class HUD {
   /** Pause → main menu hands the session back to its host. A host without that port keeps its local intro. */
   exitToMenu(): void {
     if (!this.entered || this.intro) return;
-    if (this.onExitToMain !== undefined) {
-      this.entered = false;
-      this.onExitToMain();
+    const leave = this.onExitToMain;
+    if (leave !== undefined) {
+      const go = (): void => { if (!this.entered) return; this.entered = false; leave(); };
+      // FM8s (mode 30b): an online page whose server hasn't confirmed the latest save holds the player's own Leave the world on its
+      // hold card (online/saveScreens.ts, its own bundle, so a cancelable event); the card calls `go` later, or Keep playing never does
+      if (!document.dispatchEvent(new CustomEvent('ws:leave-world', { cancelable: true, detail: { go } }))) return;
+      go();
       return; // The replacement document owns cleanup; even menu.close disposes scopes.
     }
     this._menu?.close(true);

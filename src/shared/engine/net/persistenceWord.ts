@@ -10,6 +10,8 @@ export interface PersistenceWord {
 /** Other optional version-one status branches can be ignored independently. */
 export interface PersistenceEnvelope extends Readonly<Record<string, unknown>> { readonly v: 1; readonly persistence: PersistenceWord }
 export const WORLD_STATUS_MAX_BYTES = 512;
+/** A seated player's save is written at least this often (the room's checkpoint), so a page that heard none for longer knows it is late. */
+export const SAVE_CHECKPOINT_MS = 60_000;
 const Fact = v.strictObject({ code: v.picklist(['save-confirmed', 'save-failed']),
   sequence: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   scope: v.pipe(v.string(), v.regex(/^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u), v.maxLength(64)) });

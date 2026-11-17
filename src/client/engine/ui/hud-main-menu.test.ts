@@ -26,6 +26,19 @@ test('main-menu exit delegates once without rebuilding a title over the retired 
   invoke('exitToMenu', hud); expect(leave).toHaveBeenCalledOnce();
 });
 
+test('FM8s: a held Leave the world (a late save) stays in play until its card says go', () => {
+  const hud = fixture(), leave = vi.fn<() => void>(); hud.onExitToMain = leave;
+  const held: { go?: () => void } = {};
+  const hold = (event: Event): void => { if (event instanceof CustomEvent) { event.preventDefault(); held.go = (event.detail as { go: () => void }).go; } };
+  document.addEventListener('ws:leave-world', hold);
+  try {
+    invoke('exitToMenu', hud);
+    expect(hud.entered).toBe(true); expect(leave).not.toHaveBeenCalled();
+    held.go?.(); held.go?.();
+    expect(hud.entered).toBe(false); expect(leave).toHaveBeenCalledOnce();
+  } finally { document.removeEventListener('ws:leave-world', hold); }
+});
+
 test('practice returns to Explore without retiring the session', () => {
   const hud = fixture(), leave = vi.fn<() => void>(); hud.onExitToMain = leave;
   invoke('exitToExplore', hud);
