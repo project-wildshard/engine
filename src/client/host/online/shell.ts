@@ -23,6 +23,12 @@ import { releaseScreens, stagingMark } from './releaseScreens';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { installBrowserScopeEnvironment } from '@wildshard/engine/app/view/scopeEnvironment';
+
+// online.js is a bundle of its own with its own copy of the scope environment, and the page loads it without `identity.js`
+// (clientWorker `onlineModule`, oneWayIn `onlineGate`), so its presenters' `scope.raf` (FailureTelemetry measuring a link
+// chip) met the bare host's throw: v0.1.32 staging raised the error card on every Unstable connection chip (meta mini QA 86).
+installBrowserScopeEnvironment();
 
 /** `ready` with this byte is a clean quit: the door drops the body at once instead of holding it (server `socketPump.ts` `LEAVE_FLAG`). */
 const LEAVE_FLAG = 1;
