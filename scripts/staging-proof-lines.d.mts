@@ -6,3 +6,5 @@ export function playerNameSource(name: string): string;
 export function isPlayerName(shown: string, name: string): boolean;
 export function chatLinePattern(name: string, text: string): RegExp;
 export function guardStagingSockets(allowed: string): void;
+export function privateHealthURL(env?: NodeJS.ProcessEnv): string | undefined;
+export const PRIVATE_HEALTH_SKIPPED: string;
