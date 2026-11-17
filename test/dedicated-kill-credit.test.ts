@@ -40,9 +40,9 @@ function bookOf(room: DedicatedRoom, device: string): QuestBook {
 }
 const bounty = (book: QuestBook): boolean | undefined => book.quests.find(quest => quest.def.id === 'brasscap.camp-1.bounty')?.isComplete;
 /** `device` fells every camp-1 bandit with its own blows. */
-function clearCamp(room: DedicatedRoom, device: string): void {
+function clearCamp(room: DedicatedRoom, device: string, ids: readonly string[] = CAMP): void {
   const source = room.bodyOf(device); if (source === undefined) throw new Error('No body');
-  for (const id of CAMP) {
+  for (const id of ids) {
     const body = room.host.entities.get(id); if (body === undefined) throw new Error(`No ${id}`);
     room.host.combat.hit({ source: source.health, sourceTags: [], target: body.combatActor(), amount: 10_000, point: new Vector3(), dir: new Vector3() });
   }
@@ -86,4 +86,21 @@ test('a respawned bandit clears the world\'s death, and the killer keeps its cre
   expect(bounty(bookOf(room, 'a')), 'and its bounty: no quest walks back').toBe(true);
   expect(holds(bookOf(room, 'b').flags, CLEAR)).toBe(false);
   quit(first);
+});
+
+// The same bug on the Template (opus-brassgun17, staging): a fresh player saw all four Mossgate mosslings already dead.
+test('on the Template, a fresh player sees none of another player\'s mossling kills, on either seat', { timeout: 120_000 }, async () => {
+  const PACK = ['mossling:1', 'mossling:2', 'mossling:3', 'mossling:4'], DEAD = PACK.map(id => `dead:${id}`);
+  const room = await DedicatedRoom.boot({ slug: '_template', build: '', bootId: 'kill-credit-template', input: await shippedInput('_template'), now: () => clock, post });
+  rooms.push(room);
+  const first = enter(room, 'a'), watcher = enter(room, 'c'); tick(room, 5);
+  clearCamp(room, 'a', PACK);
+  expect(DEAD.map(flag => bookOf(room, 'a').flags.has(flag))).toEqual([true, true, true, true]);
+  expect(DEAD.map(flag => bookOf(room, 'c').flags.has(flag)), 'a second seat that stood by').toEqual([false, false, false, false]);
+  const left = quit(first); tick(room, 2);
+  expect(readBack(left)?.book.flags).toEqual(expect.arrayContaining(DEAD));
+  enter(room, 'b'); tick(room, 5);
+  expect(room.bodyOf('b')?.id).toBe('actor.player');
+  expect(DEAD.map(flag => bookOf(room, 'b').flags.has(flag)), 'a fresh player on the lead seat').toEqual([false, false, false, false]);
+  quit(watcher);
 });
