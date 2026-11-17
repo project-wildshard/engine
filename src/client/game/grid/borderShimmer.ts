@@ -9,7 +9,8 @@
  *
  * One draw for every border (a ribbon per side) plus the panel's two quads, shown only while a status is up.
  */
-import { AdditiveBlending, BufferAttribute, BufferGeometry, CanvasTexture, Color, DoubleSide, Group, Mesh, MeshBasicMaterial, type Object3D, PlaneGeometry, SRGBColorSpace, ShaderMaterial } from 'three';
+import { AdditiveBlending, BufferAttribute, BufferGeometry, type Camera, CanvasTexture, Color, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, type Object3D, PlaneGeometry, SRGBColorSpace, ShaderMaterial, Vector3 } from 'three';
+import { drawNeutral } from '@wildshard/engine/render/drawNeutral';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import type { StripProfile } from '@wildshard/engine/sim/strips';
 import type { LookScope } from '../../../shared/game/grid/roadLayout';
@@ -23,6 +24,8 @@ export type CrossingSaveStatus = 'saving' | 'failed' | null;
 export interface BorderShimmerState { readonly borders: number; readonly status: CrossingSaveStatus }
 
 const SEGMENTS = 64, HEIGHT = 1.5, FOOT = 0.25, PANEL_RANGE = 40, CYAN = new Color(0x8fe3ff);
+/** the shimmer fades out between these many metres from the eye (across the ground) and is discarded past the second */
+const FADE_FROM = 70, FADE_TO = 150;
 /** Within this many metres of the eye the ribbon stays a line: its foot glow thins with the distance, its rise fades. */
 const CLOSE = 12;
 /** The crossing's refusal when its source checkpoint is not durable (`GridCrossing.step`). */
@@ -52,7 +55,7 @@ varying vec2 vUv;
 varying vec3 vWorld;
 void main() {
   float d = length(vWorld.xz - cameraPosition.xz);
-  float near = 1.0 - smoothstep(70.0, 150.0, d);
+  float near = 1.0 - smoothstep(${FADE_FROM.toFixed(1)}, ${FADE_TO.toFixed(1)}, d);
   if (near <= 0.0) discard;
   float h = vUv.y; // metres above the line's foot
   // up close the ribbon stands across the view (a road socket's lip is a few metres from it): its foot glow keeps the
@@ -134,6 +137,7 @@ export function installBorderShimmer(input: { readonly cells: readonly ShimmerCe
     uniforms: { uColour: { value: CYAN }, uTime } });
   const line = new Mesh(ribbons(cells), material);
   line.name = 'grid-border-shimmer-line'; line.frustumCulled = false; line.renderOrder = 2;
+  cullFarSides(line, cells.length * 4);
   const labelMaterial = new MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, toneMapped: false, side: DoubleSide });
   const panel = new Mesh(new PlaneGeometry(2.4, 0.6), labelMaterial);
   panel.name = 'grid-border-save'; panel.renderOrder = 5; panel.visible = false;
@@ -182,4 +186,61 @@ function groundNear(cells: readonly ShimmerCell[], x: number, z: number): number
     return Math.max(0, row.heights[Math.max(0, Math.min(row.heights.length - 1, Math.round(f)))] ?? 0);
   }
   return 0;
+}
+
+/** NINE-DRAGON-BENCHMAX NB8 (mini-nb8h): the indices, in order, of the sides (of `count`, side k's ends at
+ *  `ends[k * 4 ..]` as x0, z0, x1, z1) with some point within `reach` of (x, z) across the ground. */
+export function nearShimmerSides(ends: Float32Array, count: number, x: number, z: number, reach: number): number[] {
+  const near: number[] = [];
+  for (let k = 0; k < count; k++) {
+    const x0 = ends[k * 4] ?? 0, z0 = ends[k * 4 + 1] ?? 0, dx = (ends[k * 4 + 2] ?? 0) - x0, dz = (ends[k * 4 + 3] ?? 0) - z0;
+    const length = dx * dx + dz * dz, t = length > 0 ? Math.max(0, Math.min(1, ((x - x0) * dx + (z - z0) * dz) / length)) : 0;
+    const ox = x0 + dx * t - x, oz = z0 + dz * t - z;
+    if (ox * ox + oz * oz <= reach * reach) near.push(k);
+  }
+  return near;
+}
+
+/** how far the eye may move from where the near sides were last chosen before they are chosen again (each pick keeps
+ *  every side within the fade's end of any eye that close) */
+const SHIMMER_SLACK = 20;
+/**
+ * NB8 (mini-nb8h): draw only the sides some of whose ribbon is within the fade's end of the eye. The fragment shader
+ * discards everything past `FADE_TO` across the ground, so the far sides cost their vertices and nothing on screen: a Nine
+ * frame drew all 50 cells' 200 sides, 12.8 k triangles. The near sides are written to the front of the index and the
+ * draw range is cut to them; they are chosen again only once the eye has moved `SHIMMER_SLACK` from the last choice, with
+ * that much spare reach, so the index is rarely uploaded. With no side near, the nearest one draws (a real draw keeps the
+ * program warm).
+ */
+function cullFarSides(line: Mesh, sides: number): void {
+  const geometry = line.geometry, index = geometry.index, position = geometry.getAttribute('position');
+  if (index === null || sides === 0) return;
+  const full = Uint32Array.from(index.array), perSide = SEGMENTS * 6, verts = (SEGMENTS + 1) * 2, ends = new Float32Array(sides * 4);
+  // each side's foot ends in the line's own frame (the ribbon stands over its foot: its points share their ground position)
+  for (let k = 0; k < sides; k++) {
+    ends[k * 4] = position.getX(k * verts); ends[k * 4 + 1] = position.getZ(k * verts);
+    ends[k * 4 + 2] = position.getX(k * verts + SEGMENTS * 2); ends[k * 4 + 3] = position.getZ(k * verts + SEGMENTS * 2);
+  }
+  const eye = new Vector3(), inverse = new Matrix4(), at = new Vector3(Infinity, 0, Infinity);
+  let drawn: number[] = [];
+  line.onBeforeRender = drawNeutral((_renderer: unknown, _scene: unknown, camera: Camera): void => {
+    // the eye in the line's frame, and the world's metres in that frame's (its least axis scale: never too little reach)
+    const e = line.matrixWorld.elements, scale = Math.min(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10]));
+    camera.getWorldPosition(eye).applyMatrix4(inverse.copy(line.matrixWorld).invert());
+    const slack = SHIMMER_SLACK / scale;
+    if (Math.hypot(eye.x - at.x, eye.z - at.z) <= slack) return;
+    at.copy(eye);
+    let near = nearShimmerSides(ends, sides, eye.x, eye.z, (FADE_TO + SHIMMER_SLACK) / scale);
+    if (near.length === 0) {
+      let best = 0, bestD = Infinity;
+      for (let k = 0; k < sides; k++) { const d = Math.hypot((ends[k * 4] ?? 0) + (ends[k * 4 + 2] ?? 0) - 2 * eye.x, (ends[k * 4 + 1] ?? 0) + (ends[k * 4 + 3] ?? 0) - 2 * eye.z); if (d < bestD) { bestD = d; best = k; } }
+      near = [best];
+    }
+    if (near.length === drawn.length && near.every((k, i) => k === drawn[i])) return;
+    drawn = near;
+    const out = index.array;
+    near.forEach((k, i) => { out.set(full.subarray(k * perSide, (k + 1) * perSide), i * perSide); });
+    index.needsUpdate = true;
+    geometry.setDrawRange(0, near.length * perSide);
+  });
 }
