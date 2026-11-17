@@ -9,7 +9,7 @@
 //     frame's wait beyond its work and the cap, src/shared/engine/core/frameCost.ts), draws and triangles.
 // Indicative, not a phone: calibrate against the plan's phone table before trusting a ranking (NB1's done-when).
 //   scripts/browser-lane.sh node scripts/loading-flow/benchmax.mjs --base <url> [--shard 'Nine'] [--throttle 4]
-//     [--seconds 60] [--dpr 2] [--json <out.json>] [--profile <cpuprofile.json>]
+//     [--seconds 60] [--dpr 2] [--json <out.json>] [--profile <cpuprofile.json>] [--route auto|spin|nine]
 //   --window 1496x717@2: a desktop window (Jake's Mac, 2992x1434 device pixels) on the desktop tier instead of the phone (NB5).
 //   --dpr: the render scale the game draws at (Graphics' saved pick; the viewport stays a 2x phone); NB5 reads 1 and 2.
 //   --seconds 600: NINE-DRAGON-BENCHMAX NB5's sustained run, printed per minute.
@@ -24,12 +24,21 @@ import { bootTimelineEntries, clockMarkExpression, profileAnchor, profileIdle, s
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
   seconds: { type: 'string', default: '60' }, json: { type: 'string' }, profile: { type: 'string' },
-  dpr: { type: 'string', default: '2' }, window: { type: 'string' }, 'warm-base': {type: 'string'}, 'assert-home-spans': {type: 'boolean', default: false} } });
+  dpr: { type: 'string', default: '2' }, window: { type: 'string' }, 'warm-base': {type: 'string'}, 'assert-home-spans': {type: 'boolean', default: false}, route: { type: 'string', default: 'auto' } } });
 if (values.base === undefined) { console.error('usage: benchmax.mjs --base <url> [--shard <card title regex>] [--throttle 4] [--seconds 60] [--dpr 2] [--json <file>] [--profile <file>]'); process.exit(2); }
 // --window <css W>x<css H>@<scale>: a desktop browser window instead of the phone (NB5, Jake's Mac: 1496x717@2 is 2992x1434), desktop tier
 const desktop = /^(\d+)x(\d+)@([\d.]+)$/u.exec(values.window ?? '');
 if (values.window !== undefined && desktop === null) { console.error('--window wants <W>x<H>@<scale>, e.g. 1496x717@2'); process.exit(2); }
 const base = values.base.replace(/\/$/u, ''), shard = new RegExp(values.shard ?? 'Nine', 'iu'), throttle = Number(values.throttle), seconds = Number(values.seconds);
+// NB8 (mini-nb8k): the play's route. `spin` is NB1's first one: forward, turning 0.008 rad a 16 ms tick. On Nine at boost it
+// wedged the board in an alley at (21.6, 17.3), a nearly all-wall view, for a third to half of the minute, so its p95 frames
+// measured a stuck camera. `nine` follows Nine's streets (world x / z; on the minimap north +z is up, -x right; the shard's
+// bounds stop the board at z 19.6, so the north street is out): the square, the south street to z -95 and back, the
+// stair-street to x 36 and back, stopping at each waypoint and facing the next; a stuck board (under 1 m in a second) is put
+// on the waypoint it was heading for, and the run prints how often. `--route auto` (the default) takes `nine` on Nine, `spin`
+// elsewhere; `--route spin` reproduces the old numbers.
+/** @type {Record<string, { points: [number, number][], reach: number } | null>} */
+const ROUTES = { spin: null, nine: { reach: 6, points: [[3, -20], [6, -60], [5, -95], [6, -60], [3, -20], [3, 3], [20, 5], [36, 5], [20, 5], [3, 3]] } };
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
@@ -145,14 +154,50 @@ try {
   })()`);
 
   // the play: walk 10 s, then the hoverboard at boost; the game's own frame ring, read every 250 ms
-  await page.evaluate(`(() => { const w = window.__wildshard.world, input = w.game.app.input, p = w.player, t0 = performance.now();
-    const step = () => { const s = (performance.now() - t0) / 1000; if (s >= ${seconds}) { input.setHeld('move.forward', false); p.hoverBoost = false; return; }
-      input.setHeld('move.forward', true); p.yaw += 0.008; if (s >= 10) { if (!p.hover) p.setHover(true); p.hoverBoost = true; } setTimeout(step, 16); };
+  const route = ROUTES[values.route === 'auto' ? (shard.test('Nine') ? 'nine' : 'spin') : values.route ?? 'spin'];
+  if (route === undefined) throw new Error(`--route wants auto, spin or one of ${Object.keys(ROUTES).join(', ')}`);
+  await page.evaluate(`(() => { const w = window.__wildshard.world, input = w.game.app.input, p = w.player, t0 = performance.now(), route = ${JSON.stringify(route)};
+    const nav = window.__benchRoute = { name: ${JSON.stringify(values.route === 'auto' ? (shard.test('Nine') ? 'nine' : 'spin') : values.route)}, reached: 0, stuck: [], path: [] };
+    let at = 0, last = t0, check = { t: t0, x: p.position.x, z: p.position.z };
+    // put the player at rest at (x, y, z) facing yaw; the page and the worker's server both hear it (the server owns the
+    // position). y is the feet's: a built floor (Nine's is at 125 m) is not the ground spawn() would find under it
+    const put = (x, y, z, yaw) => { p.spawn(x, z, yaw, y); p.link?.place?.(x, y, z, yaw); p.velocity.set(0, 0, 0); };
+    const step = () => { const now = performance.now(), s = (now - t0) / 1000, dt = Math.min(0.1, (now - last) / 1000); last = now;
+      if (s >= ${seconds}) { input.setHeld('move.forward', false); p.hoverBoost = false; return; }
+      if (s >= 10) { if (!p.hover) p.setHover(true); p.hoverBoost = true; }
+      if (route === null) { input.setHeld('move.forward', true); p.yaw += 0.008; }
+      else {
+        // follow the street: steer at the next waypoint, turning at most 8 rad/s, forward held. The board at boost keeps
+        // its speed through a turn (up to 56 m/s, it would slide into the next wall), so reaching a waypoint (within its
+        // radius) stops the player there, facing the next: every leg starts the same way
+        const [tx, tz] = route.points[at % route.points.length], dx = tx - p.position.x, dz = tz - p.position.z;
+        input.setHeld('move.forward', true);
+        if (Math.hypot(dx, dz) < route.reach) {
+          const [nx, nz] = route.points[(at + 1) % route.points.length], { x, y, z } = p.position;
+          put(x, y, z, Math.atan2(-(nx - x), -(nz - z))); at++; nav.reached++; check = { t: now, x, z };
+        } else {
+          const want = Math.atan2(-dx, -dz), turn = ((want - p.yaw) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+          p.yaw += Math.max(-8 * dt, Math.min(8 * dt, turn));
+        }
+        // recover when stuck: under 1 m in a second (not while the board comes out at 10 s) puts the player 2 m above the
+        // waypoint it was heading for, facing the next
+        if (s >= 10 && s < 12.5) check = { t: now, x: p.position.x, z: p.position.z };
+        else if (now - check.t >= 1000) {
+          if (Math.hypot(p.position.x - check.x, p.position.z - check.z) < 1) {
+            const [nx, nz] = route.points[(at + 1) % route.points.length];
+            nav.stuck.push([Math.round(s * 10) / 10, Math.round(p.position.x * 10) / 10, Math.round(p.position.z * 10) / 10]);
+            put(tx, p.position.y + 2, tz, Math.atan2(-(nx - tx), -(nz - tz))); at++; nav.reached++;
+          }
+          check = { t: now, x: p.position.x, z: p.position.z };
+        }
+      }
+      setTimeout(step, 16); };
     step();
     const g = w.game, rows = window.__benchRows = []; let seen = g.frameCount;
     const read = () => { const n = g.frameCount - seen; seen = g.frameCount;
       for (let k = Math.min(n, g.frameMs.length); k >= 1; k--) { const i = (g.frameI - k + g.frameMs.length) % g.frameMs.length;
         rows.push([performance.now() - t0, g.frameMs[i], g.updateMs[i] + g.renderMs[i], g.lastFrame.calls, g.lastFrame.triangles]); }
+      const nav = window.__benchRoute; nav.path.push([Math.round(performance.now() - t0), +p.position.x.toFixed(1), +p.position.z.toFixed(1), +p.yaw.toFixed(2), g.lastFrame.triangles]);
       if (performance.now() - t0 < ${seconds * 1000}) setTimeout(read, 250); };
     read(); })()`);
   await sleep(seconds * 1000 + 1500);
@@ -168,7 +213,7 @@ try {
       const to = Math.min(span, from + 60_000), rs = rows.filter(r => r[0] >= from && r[0] < to);
       minutes.push({ ...sum(rows, from, to), draws95: pct(rs.map(r => r[3]), 0.95), tris95: pct(rs.map(r => r[4]), 0.95) });
     }
-    return { minutes, scriptMemory: w.scriptMemory?.() ?? window.__wildshard?.scriptMemory?.() ?? null, all: sum(rows, 0, span), tens, draws: w.game.lastFrame.calls, triangles: w.game.lastFrame.triangles, dpr: devicePixelRatio, pixelRatio: w.game.renderer.getPixelRatio() };
+    return { route: window.__benchRoute, minutes, scriptMemory: w.scriptMemory?.() ?? window.__wildshard?.scriptMemory?.() ?? null, all: sum(rows, 0, span), tens, draws: w.game.lastFrame.calls, triangles: w.game.lastFrame.triangles, dpr: devicePixelRatio, pixelRatio: w.game.renderer.getPixelRatio() };
   })()`);
 
   // NB5: what the shadow pass submits (the frame's draws and triangles with the shadow map redrawn, then held)
@@ -241,6 +286,7 @@ try {
   console.log(`script memory bank: at control ${bank(load.scriptMemory)} · after play ${bank(play.scriptMemory)}`);
   console.log(`readyFrame unlogged >= 100 ms: ${load.readyGaps.length === 0 ? 'none' : load.readyGaps.map((/** @type {{ ms: number, from: number }} */ g) => `${s(g.ms)} at +${s(g.from)}`).join(', ')}`);
   console.log(`play ${seconds} s: ${f(play.all.fps)} fps · frame p50 ${f(play.all.p50)} / p95 ${f(play.all.p95)} ms · gpu~ p50 ${f(play.all.gpu50)} / p95 ${f(play.all.gpu95)} ms · ${play.draws} draws · ${(play.triangles / 1e6).toFixed(2)} M tris · pixel ratio ${play.pixelRatio}`);
+  console.log(`route ${play.route.name}: ${play.route.reached} waypoints reached · ${play.route.stuck.length} stuck recoveries${play.route.stuck.length === 0 ? '' : ` (${play.route.stuck.slice(0, 6).map((/** @type {number[]} */ r) => `${r[0]} s at ${r[1]}, ${r[2]}`).join('; ')})`}`);
   console.log('triangles by material (visible, in view):'); for (const row of where) console.log(`  ${row.name.padEnd(48)} ${(row.tris / 1e6).toFixed(3)} M · ${row.draws} draws`);
   console.log(`shadow pass: ${shadow.draws} of ${shadow.allDraws} draws · ${(shadow.triangles / 1e6).toFixed(2)} of ${(shadow.allTriangles / 1e6).toFixed(2)} M tris`);
   play.minutes.forEach((/** @type {{ fps: number, p95: number, gpu95: number, draws95: number, tris95: number }} */ m, /** @type {number} */ i) => { console.log(`  minute ${String(i + 1).padStart(2)}: ${f(m.fps)} fps · p95 ${f(m.p95)} ms · gpu~ p95 ${f(m.gpu95)} ms · draws p95 ${m.draws95} · tris p95 ${(m.tris95 / 1e6).toFixed(2)} M`); });
