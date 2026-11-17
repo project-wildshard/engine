@@ -1365,6 +1365,7 @@
     "src/server/game/shardfile/perchBodyPools.ts": "server",
     "src/server/game/shardfile/groundTemperament.ts": "server",
     "src/server/game/shardfile/creatureLayers.ts": "server",
+    "src/server/game/shardfile/creatureSenses.ts": "server",
     "src/server/game/shardfile/creatureTemperament.ts": "server",
     "src/server/game/shardfile/dataCreatureBands.ts": "server",
     "src/server/game/shardfile/layerHunts.ts": "server",
