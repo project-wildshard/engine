@@ -3,11 +3,11 @@ import { Vector3 } from 'three';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { StalkerBrain } from '../src/shared/engine/ai/stalker';
 import { Rng } from '../src/shared/engine/core/rng';
-import type { HuntGround, HuntTuning } from '../src/shared/engine/ai/huntPattern';
+import { huntMemoryCodec, type HuntGround, type HuntTuning } from '../src/shared/engine/ai/huntPattern';
 import { FIXTURE_HUNT_TUNING } from './fixtures/hunt-tuning';
 
-function fixture(reaction: 'passive' | 'skittish' | undefined, stalk: boolean, telegraphed = false) {
-  const body = new AnimalSim({ kind: 'fixture.hunter', label: 'Hunter', variant: 'plain', rarity: 'common', hp: 60, aggressive: true,
+function fixture(reaction: 'passive' | 'skittish' | 'neutral' | undefined, stalk: boolean, telegraphed = false) {
+  const body = new AnimalSim({ kind: 'fixture.hunter', label: 'Hunter', variant: 'plain', rarity: 'common', hp: 60, aggressive: reaction !== 'neutral',
     dims: { bodyY: 1, bodyHalfLen: 0.5, bodyRadius: 0.3, headRadius: 0.3, legLen: 0.5, feet: [], halfWidth: 0.4 },
     mods: { speed: 1, chargeDist: 1, damageTaken: 1, chargeDamage: 12, relentless: false } },
   1, 1, 'fixture.actor', { heightAt: () => 0, random: () => 0.5 });
@@ -20,7 +20,7 @@ function fixture(reaction: 'passive' | 'skittish' | undefined, stalk: boolean, t
     wetAt: () => false, trees: () => [], treeless: () => true, terrain: () => true, chunkHalf: 250 };
   const brain = new StalkerBrain<AnimalSim>({ pattern: 'hunt', player, sampleTerrain: () => undefined,
     config: { rng, fight: { telegraphed }, faunaTuning: () => undefined,
-      species: () => ({ aggressive: true, tuning, chargeWindup: 0, notice: 9, ...(reaction === undefined ? {} : { reaction }) }) },
+      species: () => ({ aggressive: reaction !== 'neutral', tuning, chargeWindup: 0, notice: 9, ...(reaction === undefined ? {} : { reaction }) }) },
     ports: { ground, nav: () => null, reach: () => true, wanderGoal: () => null, unaware: () => false,
       now: () => 0, sound: () => undefined, charge: (_body, damage) => { hits.push(damage); } } });
   brain.adopt(body, 0, 0);
@@ -69,4 +69,37 @@ test.each([false, true])('skittish bolts at its authored notice radius without s
   f.hit(); expect(f.body.state).toBe('flee');
   for (let i = 0; i < 100; i++) f.step();
   expect(f.hits).toEqual([]);
+});
+
+test.each([false, true])('neutral notices without attacking, then retaliates after a hit, stalk=%s', stalk => {
+  const f = fixture('neutral', stalk);
+  f.player.z = 8;
+  for (let i = 0; i < 100; i++) { f.step(); expect(f.body.state).not.toBe('charge'); expect(f.body.state).not.toBe('stalk'); }
+  expect(f.hits).toEqual([]);
+  f.hit(); expect(f.body.hp).toBe(59); expect(f.body.state).toBe('charge');
+  f.player.z = 1; f.step(); expect(f.hits).toEqual([12]);
+});
+
+test.each([false, true])('neutral retaliates inside its authored crowd distance, stalk=%s', stalk => {
+  const f = fixture('neutral', stalk);
+  f.player.z = 6.1;
+  for (let i = 0; i < 100; i++) f.step();
+  expect(f.hits).toEqual([]); expect(f.body.state).not.toBe('stalk');
+  f.player.z = 5.9; f.step(); expect(f.body.state).toBe('charge');
+  f.player.z = 1; f.step(); expect(f.hits).toEqual([12]);
+});
+
+test('neutral provocation survives its owned continuation without extending legacy memory', () => {
+  const f = fixture('neutral', true), legacy = fixture(undefined, true), resumed = fixture('neutral', true);
+  f.player.z = 8; f.hit();
+  const memory = f.brain.memory(f.body), old = legacy.brain.memory(legacy.body), restored = resumed.brain.memory(resumed.body);
+  if (memory === undefined || old === undefined || restored === undefined) throw new Error('Missing hunt memory');
+  const saved = huntMemoryCodec.save(memory);
+  expect(saved['provoked']).toBe(true); expect(Object.hasOwn(huntMemoryCodec.save(old), 'provoked')).toBe(false);
+  huntMemoryCodec.restore(restored, saved); resumed.body.restore(f.body.snapshot()); resumed.rng.restore(f.rng.snapshot());
+  resumed.player.copy(f.player);
+  for (let i = 0; i < 30; i++) { f.step(); resumed.step(); }
+  expect(resumed.body.snapshot()).toEqual(f.body.snapshot());
+  expect(huntMemoryCodec.save(restored)).toEqual(huntMemoryCodec.save(memory));
+  expect(resumed.rng.snapshot()).toEqual(f.rng.snapshot());
 });

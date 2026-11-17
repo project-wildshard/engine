@@ -22,3 +22,11 @@ and panic trigger; a larger stalk or old sight radius cannot pull them
 outside that authored range. Without an explicit senses layer, use the
 existing authored hunting sight range. Both stalk/no-stalk controls
 failed before the change; passive and omitted-reaction controls remain.
+
+CC5a3: neutral animals may observe without stalking or charging. A
+real damage notification or entry inside the authored panic distance
+permits retaliation. Only neutral hunts add a provoked flag to their
+owned memory; generic save/restore keeps that flag, while the original
+native codec fields and draw order stay unchanged. The flag clears
+when a stalk gives up or a fleeing animal reaches safety. Red-first
+controls cover both tuning shapes, both provocations and continuation.
