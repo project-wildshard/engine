@@ -5,6 +5,7 @@
 //
 //   node scripts/staging-smoke.mjs --url <candidate> --release vX.Y.Z [--only K3[,K4]] [--out <dir>] [--card <slug>]
 //        [--deeplink <slug>] [--watch <s>] [--store <dir>] [--changelog <CHANGELOG.md>] [--no-vision]
+//        [--bugbash <meta docs/plans/STAGING-BUGBASH-PLAN.md>]   SM6: write each finding as a row (commit it with meta-push)
 //
 // Headless and muted, WebKit at 402x874 (iPhone 17 Pro) with touch, Chromium only for K1; one browser at a time; rAF capped at
 // 60 fps; one clip per scenario. Only GETs leave the page. The hard checks (checks.mjs) give each finding a severity; a P0
@@ -17,12 +18,13 @@
 //   (c) the T1 suite (src/e2e/t1) or the J386 gate (verify-staging.sh) cannot hold it, and
 //   (d) it adds at most 45 s, keeping the whole run under 10 minutes.
 // Otherwise it becomes a hard check in an existing scenario, or an engine T1 test.
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { SCENARIOS, runScenario } from './staging-smoke/scenarios.mjs';
 import { holds, verdictOf, worstFirst } from './staging-smoke/checks.mjs';
 import { keepRun, lastRelease, newestProfiles, saveProfiles, STORE } from './staging-smoke/store.mjs';
 import { changelogBullets, visionFindings, visionPass } from './staging-smoke/vision.mjs';
+import { bugbashRows } from './staging-smoke/bugbash.mjs';
 
 /** The whole run's budget (SM8 (d)): over this the runner warns. */
 export const RUN_BUDGET_S = 600;
@@ -48,12 +50,12 @@ export async function served(url) {
  * Run the smoke and write <out>/verdict.json.
  * @param {{ url: string, release: string, out: string, only?: readonly string[], card?: string, deepLink?: string, watchMs?: number, budgetMs?: number,
  *   build?: string, lastTimeToPlay?: Record<string, number>, oldProfiles?: Partial<Record<'chromium' | 'webkit', string>>,
- *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, store?: string, vision?: boolean, changelog?: string,
+ *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, store?: string, vision?: boolean, changelog?: string, bugbash?: string,
  *   log?: (line: string) => void }} options
  * `store` (the CLI's default: ~/.cache/wildshard/plan-artifacts/staging-smoke) keeps the run and gives the last release's
  * frames and times; without one the run is kept only in `out` and the vision pass has no baseline (no calls).
  */
-export async function runSmoke({ url, release, out, only, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, store, vision = true, changelog = resolve('CHANGELOG.md'), log = console.log }) {
+export async function runSmoke({ url, release, out, only, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, store, vision = true, changelog = resolve('CHANGELOG.md'), bugbash, log = console.log }) {
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The staging smoke joins worlds: staging or local only, never production');
   const pw = await import('playwright');
   const started = Date.now();
@@ -100,6 +102,13 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
     scenarios: judged.rows.map(({ scenario, checks, timeToPlay }) => Object.assign(scenario, { checks, timeToPlay })),
     ...(last === undefined ? {} : { last: last.release }), vision: looks, findings, hold: holds(findings),
   };
+  // SM6: every finding becomes a STAGING-BUGBASH row, or a "seen again" line on its open row (the caller commits the file)
+  if (bugbash !== undefined && findings.length > 0) {
+    const rows = bugbashRows(readFileSync(bugbash, 'utf8'), findings, { release, ...(version.build === undefined ? {} : { build: version.build }) });
+    writeFileSync(bugbash, rows.text);
+    Object.assign(verdict, { bugbash: { added: rows.added, seenAgain: rows.seenAgain } });
+    log(`STAGING-BUGBASH: new ${rows.added.join(', ') || 'none'}; seen again ${rows.seenAgain.join(', ') || 'none'}`);
+  }
   writeFileSync(join(out, 'verdict.json'), `${JSON.stringify(verdict, null, 1)}\n`);
   // SM4: this run's K1 and K2 profiles are the next release's old cache (only the latest pair is kept)
   const k1 = scenarios.find((s) => s.id === 'K1'), k2 = scenarios.find((s) => s.id === 'K2');
@@ -128,7 +137,7 @@ async function cli() {
   const watch = args.get('watch');
   const verdict = await runSmoke({
     url, release, out, ...(only === undefined ? {} : { only }), ...(watch === undefined ? {} : { watchMs: Number(watch) * 1000 }),
-    store: args.get('store') ?? STORE, vision: !args.has('no-vision'), ...(args.has('changelog') ? { changelog: resolve(String(args.get('changelog'))) } : {}),
+    store: args.get('store') ?? STORE, ...(args.has('bugbash') ? { bugbash: resolve(String(args.get('bugbash'))) } : {}), vision: !args.has('no-vision'), ...(args.has('changelog') ? { changelog: resolve(String(args.get('changelog'))) } : {}),
     ...(args.has('card') ? { card: String(args.get('card')) } : {}), ...(args.has('deeplink') ? { deepLink: String(args.get('deeplink')) } : {}),
   });
   process.exitCode = verdict.hold ? 1 : 0;
