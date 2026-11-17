@@ -35,11 +35,11 @@ export function bootMemoryVerdict(marks, liveBytes, limits = {}) {
   const releasedFloor = limits.releasedFloor ?? NINE_RELEASED_FLOOR_BYTES, liveCeiling = limits.liveCeiling ?? NINE_LIVE_CEILING_BYTES;
   /** @type {string[]} */ const faults = [];
   const dropped = marks.find(row => row.operation === 'download:members-dropped');
-  const held = typeof dropped?.detail['held'] === 'number' ? dropped.detail['held'] : null;
+  const held = typeof dropped?.detail.held === 'number' ? dropped.detail.held : null;
   if (held === null) faults.push('boot memory: no download:members-dropped mark with its held count');
   else if (held > 0) faults.push(`boot memory: ${String(held)} spawn parts still held past the download step`);
   const released = marks.filter(row => row.operation === 'memory:geometry-released')
-    .reduce((sum, row) => sum + (typeof row.detail['bytes'] === 'number' ? row.detail['bytes'] : 0), 0);
+    .reduce((sum, row) => sum + (typeof row.detail.bytes === 'number' ? row.detail.bytes : 0), 0);
   if (released < releasedFloor) faults.push(`boot memory: released ${(released / 1e6).toFixed(1)} MB of drawn geometry, under the ${(releasedFloor / 1e6).toFixed(0)} MB floor`);
   if (!(liveBytes <= liveCeiling)) faults.push(`boot memory: live heap ${(liveBytes / 1e6).toFixed(0)} MB at control, over the ${(liveCeiling / 1e6).toFixed(0)} MB ceiling`);
   return { held, released, live: liveBytes, faults };
