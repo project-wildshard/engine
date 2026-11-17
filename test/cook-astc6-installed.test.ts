@@ -2,8 +2,16 @@
 import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
+// oxlint-disable-next-line import/no-nodejs-modules -- The retry control serves only its own package on loopback.
+import { createServer } from 'node:http';
+// oxlint-disable-next-line import/no-nodejs-modules -- npm verifies the owned registry tarball against this digest.
+import { createHash } from 'node:crypto';
 import { expect, test } from 'vitest';
 import { runCommitJobs } from '../scripts/precommit-jobs.mjs';
+
+// npm defaults to a five-minute request timeout, longer than this proof's existing ninety-second command clock.
+const INSTALL_ARGS = ['install', '--ignore-scripts', '--omit=dev', '--no-audit', '--no-fund', '--package-lock=false',
+  '--prefer-offline', '--fetch-retries=1', '--fetch-retry-mintimeout=1000', '--fetch-retry-maxtimeout=5000', '--fetch-timeout=15000'];
 
 /** Keep subprocess clocks live while Vitest enforces the case clock; drain each owned tree before removing its files. */
 function installedCommands(root: string, signal: AbortSignal) {
@@ -88,7 +96,7 @@ test('a freshly installed engine tarball completes a full ASTC phone cook', asyn
     if (archive === undefined) throw new Error('npm pack returned no archive');
     const project = join(root, 'project'); mkdirSync(project);
     writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'installed-cook-proof', private: true, type: 'module', dependencies: { '@wildshard/engine': `file:../${archive}` } }));
-    const installed = await commands.run('install', 'npm', ['install', '--ignore-scripts', '--omit=dev', '--no-audit', '--no-fund', '--package-lock=false'], project);
+    const installed = await commands.run('install', 'npm', INSTALL_ARGS, project);
     expect(installed.status, installed.stderr).toBe(0);
     cpSync('test/fixtures/installedCook.mjs', join(project, 'proof.mjs'));
     const worker = join(project, 'node_modules/@wildshard/engine/src/cook/game/astc6Wasm.ts');
@@ -107,6 +115,47 @@ test('a freshly installed engine tarball completes a full ASTC phone cook', asyn
     expect(JSON.parse(cooked.stdout)).toMatchObject({ slug: 'installed-cook', manifests: 4, phoneEncoded: true });
   } finally { await commands.close(); }
 }, 120_000);
+
+test('a stalled registry request retries inside the installed cook command budget', async ({signal, onTestFinished}) => {
+  const root = mkdtempSync(resolve('tmp/cook-astc6-registry-'));
+  const commands = installedCommands(root, signal); onTestFinished(commands.close);
+  const name = 'installed-cook-network-fixture', version = '1.0.0';
+  const source = join(root, 'source'), project = join(root, 'project'); mkdirSync(source); mkdirSync(project);
+  writeFileSync(join(source, 'package.json'), JSON.stringify({name, version}));
+  writeFileSync(join(source, 'sentinel.txt'), 'real installed package');
+  writeFileSync(join(project, 'package.json'), JSON.stringify({name: 'registry-proof', private: true, dependencies: {[name]: version}}));
+  let base = '', requests = 0;
+  let archive: Uint8Array = new Uint8Array();
+  const server = createServer((request, response) => {
+    if (request.url === `/${name}`) {
+      requests++;
+      if (requests === 1) return; // A real request stays open until npm's own fetch deadline expires.
+      response.setHeader('content-type', 'application/json');
+      response.end(JSON.stringify({name, 'dist-tags': {latest: version}, versions: {[version]: {name, version,
+        dist: {tarball: `${base}/fixture.tgz`, shasum: createHash('sha1').update(archive).digest('hex')}}}}));
+    } else if (request.url === '/fixture.tgz') response.end(archive);
+    else { response.statusCode = 404; response.end(); }
+  });
+  try {
+    const packed = await commands.run('fixture-pack', 'npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', root], source);
+    expect(packed.status, packed.stderr).toBe(0);
+    const filename = (JSON.parse(packed.stdout) as {filename: string}[])[0]?.filename;
+    if (filename === undefined) throw new Error('Missing registry fixture tarball');
+    archive = readFileSync(join(root, filename));
+    await new Promise<void>(done => { server.listen(0, '127.0.0.1', done); });
+    const address = server.address(); if (address === null || typeof address === 'string') throw new Error('Missing registry fixture address');
+    base = `http://127.0.0.1:${address.port}`;
+    const installed = await commands.run('registry-retry', 'npm', [...INSTALL_ARGS, '--registry', base, '--cache', join(root, 'cache')], project);
+    expect(installed.status, installed.stderr).toBe(0);
+    expect(requests).toBeGreaterThanOrEqual(2);
+    expect(readFileSync(join(project, 'node_modules', name, 'sentinel.txt'), 'utf8')).toBe('real installed package');
+  } finally {
+    try {
+      server.closeAllConnections();
+      if (server.listening) await new Promise<void>((done, reject) => { server.close(error => { if (error) reject(error); else done(); }); });
+    } finally { await commands.close(); }
+  }
+});
 
 for (const mode of ['timeout', 'abort']) test(`installed commands ${mode} a TERM-resistant child without blocking the case clock`, async ({signal, onTestFinished}) => {
   const root = mkdtempSync(resolve('tmp/cook-astc6-timeout-'));
