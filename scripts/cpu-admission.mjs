@@ -1,14 +1,14 @@
 import {spawn,spawnSync} from 'node:child_process';
 import {resolve as resolvePath} from 'node:path';
 import {realpathSync} from 'node:fs';
-import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 import * as v from 'valibot';
 import {holdBrokerCpu} from './cpu-broker.mjs';
 
 const grantSchema=v.object({lease:v.string(),slots:v.number(),capacity:v.number(),queueSeconds:v.number()});
 export const PARENT_CONTEXT = 'WS_CPU_PARENT_GRANT';
-const admissionScript=fileURLToPath(new URL('cpu-admission.py',import.meta.url));
+// A filesystem companion, not a Vite asset URL in DOM workers.
+const admissionScript=resolvePath(import.meta.dirname,'cpu-admission.py');
 
 /** A real scheduler child holds the grant until its owner's pipe closes.
  * @param {number|'all'} slots @param {{root?:string,capacity?:number,repo?:string,inherit?:boolean,buildWork?:boolean,browser?:boolean}} [options] */

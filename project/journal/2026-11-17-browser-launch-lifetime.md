@@ -73,3 +73,32 @@ recovery and sign-in); the existing census failed first and both imports
 now use the bridge. The census also belongs to full static lint, so a
 disjoint-main delta gate always checks this global policy. Commit-only
 path lint retains its isolation from peers' loose working files.
+
+The first complete local land stopped after 860.6 seconds in Vitest.
+The saved JSON names 209 failed file suites: 207 DOM setup failures share
+the CPU companion path, road-surface-assets rejects the changed baker's
+provenance, and headless-direct-worker's deferred-run subprocess reaches
+its existing fence. Browser-lane's ten cases and each of the three
+preview-lease files passed in that same gate.
+
+Vite treated new URL('cpu-admission.py', import.meta.url) as an asset URL
+inside DOM workers. Resolve the filesystem companion from import.meta.dirname
+instead. Three representative DOM files plus the real foreign-cwd CPU
+control now pass, 26 cases. The unchanged headless worker file passes all
+three cases in isolation in 29.85 seconds; its deadline is unchanged.
+
+An actually admitted road rebake reproduced both shipped KTX2 files byte
+for byte (211919 and 385931 bytes). Every asset and encoder record matches;
+only the changed baker's source hash needs updating. No texture changed.
+Final repair lint and typecheck pass. A focused rerun covers the exact
+207 failed DOM paths plus road-surface-assets, rather than another full
+suite: all 208 files and 1055 cases pass in 710 seconds. The canonical
+scratch failure manifest names every one of the original 209 files.
+
+Jake explicitly authorized one J381 hatch push after these repairs and
+focused evidence, followed by two or three real lanes' browser launches
+before the ALL LANES note. No second complete gate, machine activation or
+live announcement has occurred. Current land.mjs strips SKIP_CHECK from
+local lands; the next owner must use an explicit, truthfully audited hatch
+without fabricating an authenticated full proof. SKIP_BUDGET=1 on this
+repair commit skips only the commit clock; installed checks still run.
