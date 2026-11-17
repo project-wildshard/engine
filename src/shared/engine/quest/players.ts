@@ -3,23 +3,29 @@ import { Flags, type FlagListener } from '../world/interact/flags';
 import { QuestState, type QuestDef } from './core';
 import type { QuestProgress } from './progress';
 
+/** SB34 (J106, J105, Q-CC36): a death is kill credit, each helper's own. The world keeps its own record of the body under the
+ *  same name for world rules (a brain's `until`, a decision's flag read); no player's book reads that record. */
+export const CREDIT_PREFIX = 'dead:';
+/** Whether a flag is kill credit. */
+export const isCredit = (flag: string): boolean => flag.startsWith(CREDIT_PREFIX);
+
 /**
- * P1-E3.3: one player's flags over the world's. A flag a quest row writes (`QuestBooks.claim`) is that player's own; any
- * other flag in the host's book was raised by the world (a death, a boss's fall, a timed rule) and everyone reads it. The
- * lead's book stays the host's, so a one-player room is exactly today's. A write here is always the player's own.
+ * P1-E3.3: one player's flags over the world's. A flag a quest row writes (`QuestBooks.claim`) is that player's own, and so is
+ * a death (SB34a): its credit lands here when this player helped. Any other flag in the host's book was raised by the world (a
+ * boss's fall, a timed rule) and everyone reads it. A write here is always the player's own.
  */
 export class PlayerFlags extends Flags {
   private readonly world: Flags;
   private readonly claimed: ReadonlySet<string>;
   constructor(world: Flags, claimed: ReadonlySet<string>) { super(world.level, false); this.world = world; this.claimed = claimed; }
-  private seesWorld(flag: string): boolean { return !this.claimed.has(flag) && this.world.has(flag); }
+  private worlds(flag: string): boolean { return !this.claimed.has(flag) && !isCredit(flag); }
   /** What this player raised, not what it reads from the world: its save. */
   get own(): string[] { return super.all; }
-  override has(flag: string): boolean { return super.has(flag) || this.seesWorld(flag); }
-  override get all(): string[] { return [...new Set([...super.all, ...this.world.all.filter(flag => !this.claimed.has(flag))])]; }
+  override has(flag: string): boolean { return super.has(flag) || (this.worlds(flag) && this.world.has(flag)); }
+  override get all(): string[] { return [...new Set([...super.all, ...this.world.all.filter(flag => this.worlds(flag))])]; }
   override count(prefix: string): number { let n = 0; for (const flag of this.all) if (flag.startsWith(prefix)) n++; return n; }
   override onChange(fn: FlagListener): () => void {
-    const own = super.onChange(fn), world = this.world.onChange((flag, on) => { if (!this.claimed.has(flag) && !super.has(flag)) fn(flag, on); });
+    const own = super.onChange(fn), world = this.world.onChange((flag, on) => { if (this.worlds(flag) && !super.has(flag)) fn(flag, on); });
     return () => { own(); world(); };
   }
 }
@@ -27,7 +33,11 @@ export class PlayerFlags extends Flags {
 /** One player's continuation beside its flags; `read` and `write` carry detached JSON text. */
 export interface QuestBookPart { readonly read: () => string; readonly write: (saved: string) => void }
 /** What a saved book holds. */
-export interface QuestBookSaved { player: string; flags: string[]; quests: ReturnType<QuestState['snapshot']>[]; parts: Record<string, string> }
+export interface QuestBookSaved {
+  player: string; flags: string[]; quests: ReturnType<QuestState['snapshot']>[]; parts: Record<string, string>;
+  /** SB34a: its flags hold its own kill credit. A book saved before read every death the world recorded, and still does once. */
+  credited?: true;
+}
 /** One player's quest state. */
 export class QuestBook {
   readonly player: string;
@@ -50,7 +60,7 @@ export class QuestBook {
   save(): QuestBookSaved {
     if (!(this.flags instanceof PlayerFlags)) throw new Error('The lead\'s book is the host\'s');
     return { player: this.player, flags: this.flags.own.sort((a, b) => a.localeCompare(b)), quests: this.quests.map(quest => quest.snapshot()),
-      parts: Object.fromEntries([...this.parts].map(([id, part]) => [id, part.read()])) };
+      parts: Object.fromEntries([...this.parts].map(([id, part]) => [id, part.read()])), credited: true };
   }
   /** Each part's text, as `restore` reads them. */
   exported(): Record<string, string> { return Object.fromEntries([...this.parts].map(([id, part]) => [id, part.read()])); }
@@ -118,17 +128,18 @@ export class QuestBooks {
   progressOf(id: string, since: number): QuestProgressRead | null {
     if (!this.host.players.has(id)) return null;
     const book = this.of(id), { flags } = book;
-    return book.version === since ? null : { version: book.version, rows: book.quests.map(quest => quest.progress()), flags: [...new Set([...this.shown, ...this.claimed])].filter(flag => flags.has(flag)) };
+    return book.version === since ? null : { version: book.version, rows: book.quests.map(quest => quest.progress()),
+      flags: [...new Set([...this.shown, ...this.claimed, ...flags.all.filter(isCredit)])].filter(flag => flags.has(flag)) };
   }
   /** One player's book as any seat can read it back (E7.4): what a player carries out of a room, whichever seat they held. */
   exportOf(id: string): QuestBookSaved {
     const book = this.of(id), own = book.flags instanceof PlayerFlags ? book.flags.own : book.flags.all.filter(flag => this.personal(flag));
-    return { player: id, flags: own.sort((a, b) => a.localeCompare(b)), quests: book.quests.map(quest => quest.snapshot()), parts: book.exported() };
+    return { player: id, flags: own.sort((a, b) => a.localeCompare(b)), quests: book.quests.map(quest => quest.snapshot()), parts: book.exported(), credited: true };
   }
   /** Put an exported book on this player's seat. The lead's flags are the world's too, and those stay; a saved flag is theirs wherever they sit. */
-  importOf(id: string, saved: QuestBookSaved): void {
-    const book = this.of(id);
-    this.claim(saved.flags);
+  importOf(id: string, read: QuestBookSaved): void {
+    const book = this.of(id), saved = this.credited(read);
+    this.claim(saved.flags.filter(flag => !isCredit(flag)));
     this.restoring = true;
     try { book.restore(book === this.lead ? { ...saved, flags: [...book.flags.all.filter(flag => !this.personal(flag)), ...saved.flags] } : saved); } finally { this.restoring = false; }
   }
@@ -139,7 +150,11 @@ export class QuestBooks {
   }
   restore(saved: readonly QuestBookSaved[] | undefined): void {
     this.restoring = true;
-    try { for (const row of saved ?? []) this.of(row.player).restore(row); } finally { this.restoring = false; }
+    try { for (const row of saved ?? []) this.of(row.player).restore(this.credited(row)); } finally { this.restoring = false; }
+  }
+  /** SB34a: a book saved before kill credit was each player's read every death the world held; it keeps reading those, once. */
+  private credited(saved: QuestBookSaved): QuestBookSaved {
+    return saved.credited === true ? saved : { ...saved, flags: [...new Set([...saved.flags, ...this.host.flags.all.filter(isCredit)])], credited: true };
   }
 }
 

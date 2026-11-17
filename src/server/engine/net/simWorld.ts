@@ -6,7 +6,7 @@ import { actRoutes } from '../../../shared/engine/sim/actRoutes';
 import { CombatWire, type CombatEvent } from './combatWire';
 import { keepHitHistory } from './hitHistory';
 import type { LedgerFiling } from './ledgerBook';
-import { questBooks, type QuestProgressRead } from '../../../shared/engine/quest/players';
+import { isCredit, questBooks, type QuestProgressRead } from '../../../shared/engine/quest/players';
 import { encounterRows } from '../../../shared/engine/sim/encounterRows';
 import { ANIMAL_CLASS, ENCOUNTER_CLASS, FLAG_CLASS, PLAYER_CLASS, SCRIPT_CLASS, STATE_CLASS } from '../../../shared/engine/net/netSchemas';
 import { NET_POSE, shardRows, type FightViewCall, type StandingLook } from '../../../shared/engine/sim/shardRows';
@@ -123,8 +123,8 @@ export class SimNetWorld implements NetWorld {
     for (const [id, read] of bodies) visitor.entity(id, SCRIPT_CLASS, read());
     if (state !== null) for (const row of state()) visitor.entity(`${STATE_PREFIX}${row.name}`, STATE_CLASS, row);
     for (const read of world.values()) for (const row of read()) visitor.entity(`${STATE_PREFIX}${row.name}`, STATE_CLASS, row);
-    // only the world's: a flag a quest row wrote is its player's alone (J106), and reaches that client as a phase event
+    // only the world's: a flag a quest row wrote is its player's alone (J106), and so is kill credit (SB34a): both reach that client as phase events
     const books = questBooks(host);
-    for (const flag of host.flags.all) if (!books.personal(flag)) visitor.entity(`${FLAG_PREFIX}${flag}`, FLAG_CLASS, flag);
+    for (const flag of host.flags.all) if (!books.personal(flag) && !isCredit(flag)) visitor.entity(`${FLAG_PREFIX}${flag}`, FLAG_CLASS, flag);
   }
 }

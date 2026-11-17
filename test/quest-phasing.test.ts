@@ -64,8 +64,10 @@ test('a player who dies keeps its quest progress', () => {
 
 test('the flags a whole room sees are the world\'s, never a player\'s', () => {
   const { host } = room(), seen: string[] = [];
-  host.flags.set('open:gate'); host.flags.set('dead:wolf');
+  host.flags.set('open:gate'); host.flags.set('dead:wolf'); host.flags.set('lit:beacon');
   new SimNetWorld(host).visit({ entity: id => { if (id.startsWith(FLAG_PREFIX)) seen.push(id.slice(FLAG_PREFIX.length)); } });
-  expect(seen).toContain('dead:wolf');
+  expect(seen).toContain('lit:beacon');
   expect(seen).not.toContain('open:gate');
+  // SB34a: a death is each helper's credit, told to that client as a phase event, not the world's for every client
+  expect(seen).not.toContain('dead:wolf');
 });

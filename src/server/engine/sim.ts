@@ -11,8 +11,8 @@ import { FIXED_STEP } from '../../shared/engine/core/fixedStep';
 import { AnimalSim, type AnimalSimSpec } from '../../shared/engine/entities/AnimalSim';
 import { StrikeRunner, type StrikeSpec } from '../../shared/engine/ai/strikes';
 import { canReach } from '../../shared/engine/ai/reach';
-import { CombatPipeline } from '../../shared/engine/combat/pipeline';
-import { DamageBook } from './combat/damageBook';
+import { CombatPipeline, type DamageRequest } from '../../shared/engine/combat/pipeline';
+import { DamageBook, landedBy } from './combat/damageBook';
 import { RespawnBook } from './sim/respawn';
 import type { PlayerHealth } from '../../shared/engine/combat/health';
 import { Physics } from '../../shared/engine/physics/Physics';
@@ -27,7 +27,7 @@ import type { Rapier } from '../../shared/engine/physics/rapier';
 import { groups } from '../../shared/engine/physics/groups';
 import { tagCollider } from '../../shared/engine/physics/surface';
 import { Flags } from '../../shared/engine/world/interact/flags';
-import type { QuestBookSaved } from '../../shared/engine/quest/players';
+import { CREDIT_PREFIX, questBooks, type QuestBookSaved } from '../../shared/engine/quest/players';
 import { QuestState, type QuestDef } from '../../shared/engine/quest/core';
 import type { DayCycle, DayCycleClock, DayCycleSpec } from '../../shared/engine/world/dayCycle';
 import { clockDayPhase, clockPeriod, wrapClock, type DayClockState } from '../../shared/engine/sim/dayClock';
@@ -288,7 +288,8 @@ export class SimHost {
     this.strikes.set(this.lead.id, this.lead.strike);
     this.weapons.set(this.lead.id, { ...level.weapon, weight: () => 1 });
     for (const spawn of level.entities) this.createActor(spawn);
-    this.events.on('actor.died', ({ actor }) => { this.flags.set(`dead:${actor.id}`); }, this.scope);
+    // SB34a: the world keeps its record of the body; the kill is credit in the book of each player who helped
+    this.events.on('actor.died', ({ actor, req }) => { this.flags.set(`${CREDIT_PREFIX}${actor.id}`); this.credit(actor.id, req); }, this.scope);
     this.events.on('damage.dealt', ({ req, dealt }) => { this.damage.record(req, dealt, this.players); }, this.scope);
     this.scope.onDispose(() => {
       this.disposed = true;
@@ -345,6 +346,18 @@ export class SimHost {
       this.strikes.get(source)?.cancel(); this.entities.get(source)?.cancelAttack(); this.targetIds.delete(source);
     }
     return true;
+  }
+  /**
+   * SB34a (J106, J105, Q-CC36): who a death counts for. Each player with a meaningful share of its damage, as loot reads it; for
+   * a body no page is kept on (a target post), the player whose blow felled it; for a death no player had a hand in (the world, an
+   * NPC), everyone present, as the world's flag reached them before. The lead's book is the host's, which the world's record is.
+   */
+  private credit(id: string, req: DamageRequest | undefined): void { // a scripted death may carry no blow
+    if (this.players.size === 0) return;
+    let credited = this.damage.meaningful(id).filter(player => this.players.has(player));
+    if (credited.length === 0) { const by = req === undefined ? null : landedBy(req, this.players); credited = by === null ? [...this.players.keys()] : [by]; }
+    const books = questBooks(this), flag = `${CREDIT_PREFIX}${id}`;
+    for (const player of credited) books.of(player).flags.set(flag);
   }
   /** The living player nearest `point`, else the nearest of the dead: who a creature there is dealing with. */
   nearestPlayer(point: { readonly x: number; readonly y: number; readonly z: number }): PlayerSim {

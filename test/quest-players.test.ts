@@ -1,5 +1,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture uses shipped Rapier bytes.
 import { readFileSync } from 'node:fs';
+import { Vector3 } from 'three';
 import { beforeAll, expect, test } from 'vitest';
 import type { QuestState } from '../src/shared/engine/quest/core';
 import { questBooks } from '../src/shared/engine/quest/players';
@@ -39,10 +40,13 @@ test('a player who walks into a region raises its own flag, and no one else\'s',
   expect(books.lead.flags).toBe(host.flags);
 });
 
-test('a world flag reaches every book, and finishing pays the player who finished', () => {
+test('kill credit finishes a player\'s quest, and finishing pays the player who finished', () => {
   const { host, paid } = room(), bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 }), books = questBooks(host);
   put(host, bot.id, 40); host.step();
+  // SB34a: a death is credit in the book of each player who helped (sim.ts `credit`); the world's record reaches no book
   host.flags.set('dead:wolf'); host.step();
+  expect(walk(books.of(bot.id).quests)?.current?.id).toBe('kill');
+  books.of(bot.id).flags.set('dead:wolf'); books.lead.flags.set('dead:wolf'); host.step();
   expect(walk(books.of(bot.id).quests)?.isComplete).toBe(true);
   expect(books.of(bot.id).flags.has('quest:walk')).toBe(true);
   expect(host.flags.has('quest:walk')).toBe(false);
@@ -92,4 +96,49 @@ test('a graph and its interaction step give a player one set of rules', () => {
   first(bot.id).run('talk');
   expect(second(bot.id).has('talked:elder')).toBe(true);
   expect(snapshotSimHost(host).books?.[0]?.parts['marks:talk']).toBeDefined();
+});
+
+// SB34a (J106, J105, Q-CC36): a kill is credit in the book of each player who helped, never the room's for everyone.
+const CAMP = { flags: ['dead:boar:1', 'quest:camp'], quests: [{ id: 'camp', title: 'Clear the camp', steps: [{ id: 'boar', objective: 'Kill the boar', done: { all: ['dead:boar:1'] } }],
+  completeFlag: 'quest:camp', onComplete: { coins: 5 } }], triggers: [], dialogue: [] };
+const strike = (host: SimHost, by: string, amount: number): void => {
+  const body = host.entities.get('boar:1'), source = host.players.get(by);
+  if (body === undefined || source === undefined) throw new Error('Missing fixture');
+  host.combat.hit({ source: source.health, sourceTags: [], target: body.combatActor(), amount, point: new Vector3(), dir: new Vector3() });
+  host.step();
+};
+const camp = (quests: readonly QuestState[]): QuestState | undefined => quests.find(quest => quest.def.id === 'camp');
+
+test('only the player who killed moves its camp step and bounty; one who stood by gets no credit', () => {
+  const host = createSimHost(SIM_LEVEL, { rapier }), paid: [string, number][] = [];
+  new DeclaredQuests(host, CAMP, { coins: (amount, entity) => { paid.push([entity, amount]); } });
+  const bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 }), books = questBooks(host), lead = leadPlayer(host).id;
+  strike(host, bot.id, 1000);
+  expect(host.flags.has('dead:boar:1'), 'the world keeps its record').toBe(true);
+  expect(camp(books.of(bot.id).quests)?.isComplete).toBe(true);
+  expect(books.of(bot.id).flags.has('dead:boar:1')).toBe(true);
+  expect(paid.filter(([entity]) => entity !== lead)).toEqual([[bot.id, 5]]);
+  // a second seat that stood by is told nothing of it
+  const idle = host.addPlayer('bot:2', { x: 0, y: 1, z: 0 }); host.step();
+  expect(books.of(idle.id).flags.has('dead:boar:1')).toBe(false);
+  expect(camp(books.of(idle.id).quests)?.current?.id).toBe('boar');
+  expect(questBooks(host).progressOf(idle.id, -1)?.flags).not.toContain('dead:boar:1');
+  expect(questBooks(host).progressOf(bot.id, -1)?.flags).toContain('dead:boar:1');
+  expect(lead).toBe('actor.player');
+});
+
+test('every player with a meaningful share of the damage is credited, and a second seat\'s old save keeps what it read', () => {
+  const host = createSimHost(SIM_LEVEL, { rapier }), paid: [string, number][] = [];
+  new DeclaredQuests(host, CAMP, { coins: (amount, entity) => { paid.push([entity, amount]); } });
+  const one = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 }), two = host.addPlayer('bot:2', { x: 0, y: 1, z: 0 }), books = questBooks(host);
+  strike(host, one.id, 30); strike(host, two.id, 200);
+  expect([one.id, two.id].map(id => books.of(id).flags.has('dead:boar:1'))).toEqual([true, true]);
+  expect(paid.map(([entity]) => entity).filter(entity => entity !== books.lead.player).sort()).toEqual([one.id, two.id]);
+  const saved = snapshotSimHost(host);
+  expect(saved.books?.every(book => book.credited === true)).toBe(true);
+  // a save from before SB34a: its books read the world's deaths, so they keep reading them
+  const legacy = { ...saved, books: (saved.books ?? []).map(({ credited: _, ...book }) => ({ ...book, flags: book.flags.filter(flag => !flag.startsWith('dead:')) })) };
+  const restored = restoreSimHost(SIM_LEVEL, { rapier }, legacy, fresh => { new DeclaredQuests(fresh, CAMP, { coins: () => undefined }); });
+  expect(questBooks(restored).of(one.id).flags.has('dead:boar:1')).toBe(true);
+  expect(camp(questBooks(restored).of(one.id).quests)?.isComplete).toBe(true);
 });
