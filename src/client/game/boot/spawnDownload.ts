@@ -175,6 +175,9 @@ function installMemberLayer(): boolean {
     if (held !== null) return held;
     // SA48: a slug placed after the build keeps its loose files (its header, DL18) in the cook's store, under its upload
     const loose = placedLoose(url.pathname, url.search);
+    // Placed sections live in their whole-level parts, not their loose folder.
+    // Ask that verified inventory before an absent loose probe emits a404.
+    if (loose !== undefined) { const packed = await partMember(url); if (packed !== null) return packed; }
     const response = loose === undefined ? await network(input, init) : await native(loose, {...(request === undefined ? {} : {signal: request.signal}), ...init});
     if (response.status !== 404 && !/\btext\/html\b/iu.test(response.headers.get('content-type') ?? '')) return response;
     return await partMember(url) ?? response;
