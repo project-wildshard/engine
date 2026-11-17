@@ -21,3 +21,7 @@
   token '<'"); the proof's `--prepare --next` now runs the release's carry step (MF2). And a retired build's quick reconnect
   (under the banner's 2 s) never reached `tooOld.refuse('reconnect')`, which only ran once the banner showed: redial now asks
   `mayDial` before every dial, and the shell's answer is the too-old check, so the refusal comes before any dial.
+- Review fixes (one `claude -p` pass over the branch): a GO7 goto from a held seat was put in the full world's line behind
+  devices holding none, since `taken` still counts the mover's seat until its old cell's `left` arrives; a mover now skips the
+  line (test in `one-way-in.test.ts`). And the rig front's `retarget` left a browser's pooled keep-alive connection on the
+  old page host; it now closes the old connections after a 1 s drain.

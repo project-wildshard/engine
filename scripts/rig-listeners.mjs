@@ -34,10 +34,13 @@ export async function rigFront(listen = 0) {
     if (!Number.isInteger(next) || next < 1 || next > 65535 || next === port) throw new Error('A rig front needs a distinct bound backend port');
     clear(); target = { host: '127.0.0.1', port: next };
   },
-  /** New connections go to `next`; open ones stay on the old backend and drain (a page host's swap, with no downtime). */
-  retarget: (/** @type {number} */ next) => {
+  /** New connections go to `next`; open ones finish what is in flight on the old backend for `drainMs`, then close, so a browser's
+   *  pooled keep-alive connection never reaches the old backend after that (a page host's swap, with no downtime). */
+  retarget: (/** @type {number} */ next, drainMs = 1000) => {
     if (!Number.isInteger(next) || next < 1 || next > 65535 || next === port) throw new Error('A rig front needs a distinct bound backend port');
     target = { host: '127.0.0.1', port: next };
+    const old = [...sockets];
+    setTimeout(() => { for (const socket of old) socket.destroy(); }, drainMs).unref();
   }, pointSocket: (/** @type {string} */ path) => {
     if (Buffer.byteLength(path) >= 104 || !lstatSync(path).isSocket()) throw new Error('A rig front needs a short owned Unix socket path');
     clear(); target = { path };

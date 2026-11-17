@@ -140,6 +140,21 @@ test('the hosting read answers within its deadline, the module import included',
   expect(await worldHosted(undefined)).toBe(false);
 });
 
+test('FM7b2: a goto from a held seat brings its own seat, so a full world\'s line never takes it', { timeout: 120_000 }, async () => {
+  bench = await roomBench({ cells: ['driftwood-isle', 'template-2'], saves: memoryPlayerSaves(), workers: 1, seats: 1 });
+  const first = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:mover');
+  expect(await first.arrived()).toBe(true);
+  const waiting = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:waiting');
+  await vi.waitFor(() => { expect(waiting.closedWith).toMatchObject({ code: 'queue', position: 1 }); }, { timeout: 10_000 });
+  first.drop();
+  await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(true); }, { timeout: 10_000 });
+  const moved = bot(`${bench.url}?chunk=template-2`, 'bench', 'device:mover');
+  expect(await moved.arrived(), JSON.stringify(bench.lines.slice(-4))).toBe(true);
+  expect(JSON.parse(moved.resume ?? '{}')).toMatchObject({ cell: 'template-2' });
+  expect(moved.closedWith, 'never put in the line behind a device that holds no seat').toBeNull();
+  expect(bench.crashes).toEqual([]);
+});
+
 test('a seat held in another cell lets go on a goto, and the late leave never unseats the new one', { timeout: 120_000 }, async () => {
   bench = await roomBench({ cells: ['driftwood-isle', 'template-2'], saves: memoryPlayerSaves(), workers: 1 });
   const first = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:mover');

@@ -599,6 +599,8 @@ export class World {
     this.devicePlayer(end, { name: this.names.get(device) ?? typed, body });
     // GC15: a seat mid-crossing is in neither cell for the door to ask: the client dials again in a moment.
     if (this.crossings.has(device)) { end.close('retry'); return; }
+    // FM7b2: a goto from a held seat brings that seat with it; the line is for devices that hold none
+    let mover = false;
     if (holding !== undefined) {
       // MP2.4: a body the room holds keeps the Name it was seated with; a new Name is claimed on the next fresh join, never here,
       // so the reservation and what everyone reads can't part.
@@ -608,7 +610,8 @@ export class World {
       // GO7: Shard select chose another cell this world opens. The held body leaves cleanly (saved), and the door admits them there.
       const moving = aim !== null && cellName(aim) !== holding && this.links.has(cellName(aim));
       // `leaveHeld` transfers the hello it is given, and this hello still seats them in the new cell: it gets a copy.
-      if (found.held && moving) this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes.slice(0));
+      mover = found.held && moving;
+      if (mover) this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes.slice(0));
       else if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
     }
     // FM7b2: Title from a full world's line is the page's clean quit; its ticket goes at once
@@ -616,7 +619,8 @@ export class World {
     if (!end.isOpen || this.draining) return;
     this.pending.get(device)?.end.close('replaced');
     // FM7b2: a full world's line, in the door's order; a freed seat is held for its head. The place rides FM7b1's close facts.
-    const turn = this.queue.turn(device, this.options.seats - this.taken, Date.now());
+    // (`taken` still counts a mover's own seat until its old cell's `left` arrives)
+    const turn = mover ? { admit: true } as const : this.queue.turn(device, this.options.seats - this.taken, Date.now());
     if (!turn.admit) {
       this.refuse('full');
       end.close('full', { code: 'queue', ...(turn.position === undefined ? {} : { position: turn.position }), ...(turn.etaMs === undefined ? {} : { etaMs: turn.etaMs }) });

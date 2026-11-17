@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { fork } from 'node:child_process';
-import { createServer } from 'node:http';
+import { Agent, createServer, get as httpGet } from 'node:http';
 import { test } from 'vitest';
 import { childListener, databaseFront, listenLoopback, rigFront } from '../../scripts/rig-listeners.mjs';
 
@@ -19,6 +19,34 @@ test('two owned fronts forward actual HTTP across child replacements', async () 
     assert.equal(await (await fetch(`http://127.0.0.1:${fronts[1].port}`)).text(), '1');
   } finally {
     await Promise.all(fronts.map(front => front.close()));
+    await Promise.all(servers.map(async server => { server.closeAllConnections(); await server[Symbol.asyncDispose](); }));
+  }
+});
+
+test('a retarget swaps backends with no downtime, and a pooled keep-alive connection never reaches the old one after the drain', async () => {
+  const servers = [];
+  const front = await rigFront();
+  try {
+    const ports = [];
+    for (const name of ['old', 'new']) {
+      const server = createServer((_request, response) => { response.end(name); }); servers.push(server);
+      ports.push(await listenLoopback(server));
+    }
+    front.point(ports[0]);
+    const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+    /** @returns {Promise<string>} */
+    const get = () => new Promise((resolve, reject) => {
+      httpGet({ host: '127.0.0.1', port: front.port, agent }, response => { let body = ''; response.on('data', chunk => { body += String(chunk); }); response.on('end', () => { resolve(body); }); }).on('error', reject);
+    });
+    assert.equal(await get(), 'old');
+    front.retarget(ports[1], 200);
+    // a new connection reaches the new backend at once; after the drain the pooled one does too
+    assert.equal(await fetch(`http://127.0.0.1:${front.port}`, { headers: { connection: 'close' } }).then(response => response.text()), 'new');
+    await new Promise(resolve => { setTimeout(resolve, 400); });
+    assert.equal(await get(), 'new');
+    agent.destroy();
+  } finally {
+    await front.close();
     await Promise.all(servers.map(async server => { server.closeAllConnections(); await server[Symbol.asyncDispose](); }));
   }
 });
