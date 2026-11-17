@@ -15,7 +15,7 @@ export function workerEnvironment(source=process.env){
  * @param {NodeJS.ProcessEnv} [source] */
 export function gateEnvironment(source=process.env){
  /** @type {NodeJS.ProcessEnv} */const env=workerEnvironment(source);
- for(const key of ['CI','GITHUB_ACTIONS','GITHUB_SHA','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','WS_PUSH_REFS','WS_PUSH_DESTINATION','WS_PUSH_TIMINGS',
+ for(const key of ['CI','GITHUB_ACTIONS','GITHUB_SHA','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','WS_PUSH_REFS','WS_PUSH_DESTINATION','WS_PUSH_TIMINGS','WS_ROOM_REPORT',
   'WS_HEAVY_ROOT','WS_HEAVY_TOKEN','WS_HEAVY_TICKET','WS_HEAVY_SCHEDULER_ROOT'])if(source[key]!==undefined)env[key]=source[key];
  return env;
 }

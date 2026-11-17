@@ -17,6 +17,8 @@ import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../
 import { netTickCommands } from '../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../src/shared/host/tickProtocol';
 import { builtProduct } from '../../src/test/game/builtProduct';
+// oxlint-disable-next-line import/no-nodejs-modules -- A real child validates its actual ancestor without weakening the scheduler's strict ancestry rule.
+import { execFileSync } from 'node:child_process';
 
 // P1-E5.2a (MMO-REQUIREMENTS B4, M9): a full room. 32 players on a real shard, each a NetClient over its own DirectLoopback
 // on the real codec, in one SimHost. Only the bots' fingers are fake. Tick p95 is the measured number; set
@@ -92,7 +94,10 @@ export function run(live: TrustedHeadlessResident): { tierSkipsPerFrame: number;
 /** TEST-SPEED TS5: the 32-player tick proof, moved verbatim; net-bots.test.ts runs Sunscar, net-bots-driftwood.test.ts Driftwood. */
 export function roomTickCases(slugs: readonly string[]): void {
 test.each(slugs)('32 players on %s hold a 60 Hz tick', async slug => {
-  const live = await resident(slug), result = run(live);
+  const live = await resident(slug);
+  roomEvent(slug, 'start');
+  const result = run(live);
+  roomEvent(slug, 'end');
   live.dispose();
   const line = `room ${slug} ${PLAYERS} players ${result.creatures} creatures: tick p50 ${result.p50.toFixed(2)} ms, p95 ${result.p95.toFixed(2)} ms, p99 ${result.p99.toFixed(2)} ms, max ${result.max.toFixed(2)} ms, down ${(result.downPerClient / 1024).toFixed(1)} KB/s per client`;
   console.info(line);
@@ -103,4 +108,17 @@ test.each(slugs)('32 players on %s hold a 60 Hz tick', async slug => {
   expect(result.rowsSeen).toBeGreaterThanOrEqual(PLAYERS - 1); // everyone else, within a client's view of the crowd
   expect(result.p95).toBeLessThan(TICK_BUDGET_MS);
 }, 180_000);
+}
+
+/** Opt-in observation surrounds the unchanged tick loop. Keep the existing
+ * metrics report shape and all original clocks/assertions unchanged. */
+function roomEvent(slug: string, phase: 'start' | 'end'): void {
+  const report = process.env['WS_ROOM_REPORT'];
+  if (report === undefined) return;
+  const started = performance.now();
+  // The API intentionally accepts strict ancestors, not the caller itself.
+  // Its actual child can inspect this worker's still-held file grant.
+  const program = `import {ancestorCpuBudget,cpuRoot} from ${JSON.stringify(new URL('../../scripts/cpu-admission.mjs', import.meta.url).href)};import {readFileSync} from 'node:fs';import {join} from 'node:path';const budget=ancestorCpuBudget();const state=JSON.parse(readFileSync(join(cpuRoot(),'queue.json'),'utf8'));console.log(JSON.stringify({budget,queuedOwnedPids:state.cpuQueue.filter(row=>row.ownedCommand?.child===null).map(row=>row.pid)}));`;
+  const observation: unknown = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', program], {encoding: 'utf8', timeout: 5000}));
+  writeFileSync(`${report}.events.jsonl`, `${JSON.stringify({slug, phase, at: Date.now(), pid: process.pid, observationMs: performance.now() - started, observation})}\n`, {flag: 'a'});
 }
