@@ -626,6 +626,8 @@ export function formatJsonSchema(schema: GenericSchema, target: 'draft-07' | 'dr
     overrideSchema: ({ valibotSchema }) => customSchemas.get(valibotSchema),
     overrideAction: ({ valibotAction, jsonSchema, errors }) => {
       if (postIdentityTransforms.has(valibotAction)) return jsonSchema;
+      // format 0.21.0 (SHARD-SOURCE SS-MS2a2): a steer sail's wind blows toward some direction: not every axis zero
+      if (valibotAction.type === 'some_item' && 'message' in valibotAction && valibotAction.message === 'a wind push needs a direction') return { ...jsonSchema, not: { items: { const: 0 } } };
       // Exact one-pass sample transforms retain the original wire grammar; JSON numbers are finite.
       if (valibotAction === SkinPoseLayerSchema.entries.times.pipe[1]) return { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 4097 };
       if (valibotAction === SkinPoseLayerSchema.entries.tracks.pipe[0].item.entries.values.pipe[1]) return { type: 'array', items: { type: 'number' }, maxItems: 300000 };
