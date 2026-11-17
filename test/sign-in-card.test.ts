@@ -2,7 +2,9 @@
 import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import type { LoginPorts } from '../src/client/engine/net/playerLogin';
-import { openSignIn, SIGN_IN_SWITCHES, takeLink } from '../src/client/engine/ui/signInCard';
+import { openSignIn, SIGN_IN_SWITCHES, takeLink, type LinkHold } from '../src/client/engine/ui/signInCard';
+
+const noHold: LinkHold = { take: () => undefined };
 
 // MMO-PLAN MP2.2e2: the title's sign-in card sends a link, takes a `#login=` link back, shows who is signed in and signs out.
 // Google and X stay behind their switches (MP2.2f).
@@ -48,17 +50,27 @@ test('signed out, the card mails a link and says so; Google and X stay off', asy
 test('a mailed link back on the page signs it in once, and the card signs out', async () => {
   const scope = new Scope('sign-in'), api = ports();
   const page = { pathname: '/', search: '', hash: '#zone=driftwood&login=wsl_abcdefgh12345678' }, replaced: string[] = [];
-  const note = await takeLink(api, page, url => { replaced.push(url); page.hash = new URL(url, 'http://x').hash; });
-  expect(note).toBe('Signed in as ann@b.co');
+  const note = await takeLink(api, page, url => { replaced.push(url); page.hash = new URL(url, 'http://x').hash; }, noHold);
+  expect(note, 'MP2.2g: the card says who once, in its who line, not again in its note').toBe('');
   expect(replaced, 'the token leaves the address').toEqual(['/#zone=driftwood']);
-  expect(await takeLink(api, page, url => { replaced.push(url); }), 'a reload spends nothing').toBeUndefined();
+  expect(await takeLink(api, page, url => { replaced.push(url); }, noHold), 'a reload spends nothing').toBeUndefined();
   expect(api.asked.filter(line => line.includes('redeem')), 'one redeem').toHaveLength(1);
   let changes = 0;
   void openSignIn(scope, { parent: document.body, ports: api, note: note ?? '', changed: () => { changes++; } });
   expect(card().dataset['signedIn']).toBe('true');
   expect(card().querySelector('.ws-signin-who')?.textContent).toBe('Signed in as ann@b.co');
+  expect(card().textContent.split('Signed in as').length - 1, 'MP2.2g: "Signed in as" shows once').toBe(1);
   card().querySelector<HTMLButtonElement>('[data-signin="out"]')?.click();
   expect(card().dataset['signedIn'], 'signed out, the card asks again').toBe('false');
   expect(changes).toBe(1);
   scope.dispose();
+});
+
+test('MP2.2g: a link the boot took off the address (index.html\'s login door) is spent from where it waits, once', async () => {
+  const api = ports(), page = { pathname: '/', search: '', hash: '' }, replaced: string[] = [];
+  const token = `wsl_${'abcd'.repeat(4)}`, waiting = [token], hold: LinkHold = { take: () => waiting.shift() };
+  expect(await takeLink(api, page, url => { replaced.push(url); }, hold)).toBe('');
+  expect(replaced, 'the address had nothing left to take').toEqual([]);
+  expect(api.asked, 'the waiting token is the one spent').toEqual([`/api/login/email/redeem {"token":"${token}"}`]);
+  expect(await takeLink(api, page, url => { replaced.push(url); }, hold), 'spent once').toBeUndefined();
 });

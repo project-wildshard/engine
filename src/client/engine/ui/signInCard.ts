@@ -9,8 +9,8 @@ import './styles/signInCard.css';
 /**
  * MMO-PLAN MP2.2e2 (MP2.2, J213): the title's sign-in card. Signed out: an email field and Email me a link, and a passkey button
  * where the browser can do passkeys; Google and X sit behind their switches (`SIGN_IN_SWITCHES`), off until Jake's ids exist
- * (MP2.2f). Signed in: who, Add a passkey, Sign out. The mailed link comes back as `#login=wsl_…` on the game's page; the title
- * spends it (`takeLink`) and opens the card on its answer. A signed-in page joins as its account (`net/playerLogin.ts`).
+ * (MP2.2f). Signed in: who, Add a passkey, Sign out. The mailed link comes back as `#login=wsl_…` on the game's page; index.html's
+ * login door takes it off the address at boot (MP2.2g) and the title spends it (`takeLink`) and opens the card on its answer. A signed-in page joins as its account (`net/playerLogin.ts`).
  *
  *   openSignIn(scope, { parent: document.body, changed })   // the main menu's SIGN IN
  */
@@ -45,14 +45,37 @@ export function titleLogin(): LoginPorts | undefined {
 /** Whether this page is signed in. */
 export function titleSignedIn(): boolean { const ports = titleLogin(); return ports !== undefined && signedIn(ports) !== undefined; }
 
-/** The line the card shows for a spent link, after taking `#login=…` off the address so a reload never spends it twice. */
-export async function takeLink(ports: LoginPorts, page: Pick<Location, 'hash' | 'pathname' | 'search'> = location, replace: (url: string) => void = url => { history.replaceState(history.state, '', url); }): Promise<string | undefined> {
-  const token = linkIn(page.hash);
+/** Where a mailed link's token waits once the boot took it off the address (index.html's login door). */
+export interface LinkHold { readonly take: () => string | undefined }
+const LINK_KEY = 'wildshard.player.link';
+/** This tab's session storage, as the login door left it; each token is taken once. */
+export const sessionLinkHold: LinkHold = {
+  take: () => {
+    try {
+      // oxlint-disable-next-line wildshard/no-raw-save -- the tab-scoped key index.html's login door writes before any save service exists
+      const token = sessionStorage.getItem(LINK_KEY) ?? undefined;
+      // oxlint-disable-next-line wildshard/no-raw-save -- spent once: the key goes as it is read
+      sessionStorage.removeItem(LINK_KEY);
+      return token;
+    } catch { return undefined; }
+  },
+};
+
+/**
+ * Spend a mailed link: the token the login door kept, or a `#login=…` still in the address (a page from before the door), taken
+ * off it first so a reload never spends it twice. Undefined: no link. '' when it signed the page in (the card's who line says
+ * who: MP2.2g's "Signed in as" once), else the line saying the link was used or expired.
+ */
+export async function takeLink(ports: LoginPorts, page: Pick<Location, 'hash' | 'pathname' | 'search'> = location, replace: (url: string) => void = url => { history.replaceState(history.state, '', url); }, hold: LinkHold = sessionLinkHold): Promise<string | undefined> {
+  const inAddress = linkIn(page.hash);
+  if (inAddress !== undefined) {
+    const hash = page.hash.replace(/(?:^#|&)login=[^&]*/u, '').replace(/^&/u, '#');
+    replace(`${page.pathname}${page.search}${hash === '#' ? '' : hash}`);
+  }
+  const token = hold.take() ?? inAddress;
   if (token === undefined) return undefined;
-  const hash = page.hash.replace(/(?:^#|&)login=[^&]*/u, '').replace(/^&/u, '#');
-  replace(`${page.pathname}${page.search}${hash === '#' ? '' : hash}`);
   const kept = await redeemLink(ports, token);
-  return kept === undefined ? engineString('s_signin_link_used') : engineString('s_signin_as', [kept.email]);
+  return kept === undefined ? engineString('s_signin_link_used') : '';
 }
 
 function signedOutRows(own: Scope, ports: LoginPorts, say: (line: string) => void, done: () => void): HTMLElement[] {

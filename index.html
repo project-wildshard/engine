@@ -38,6 +38,19 @@
         location.replace(`/doctor/?${query}`);
       })();
     </script>
+    <script data-login-door>
+      // MMO-PLAN MP2.2g: a mailed sign-in link lands as `#login=wsl_…`, a one-time bearer token. It leaves the address here, before
+      // the boot-timing collector (which posts the address to the service worker) or any module reads it, and waits in this tab's
+      // session storage for the title to spend it (src/client/engine/ui/signInCard.ts `takeLink`).
+      (() => {
+        if (document.documentElement.dataset.secureDoor === 'moving') return; // the https page takes it
+        const found = /(?:^#|&)login=(wsl_[A-Za-z0-9_-]{8,128})(?=&|$)/u.exec(location.hash);
+        if (found === null) return;
+        try { sessionStorage.setItem('wildshard.player.link', found[1]); } catch { /* no storage: the link is lost, never left in the address */ }
+        const hash = location.hash.replace(/(?:^#|&)login=[^&]*/u, '').replace(/^&/u, '#');
+        history.replaceState(history.state, '', location.pathname + location.search + (hash === '#' ? '' : hash));
+      })();
+    </script>
     <script data-boot-timing>
       // LS1: local, bounded, data-only history, installed before any module.
       (() => {
