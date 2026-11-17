@@ -19,16 +19,16 @@ const carry = {
   surface: { level: 0, bankRamp: 0, bob: [0, 0], pitch: [0, 0], roll: [0, 0, 0] },
   prompts: [{ at: [0, 0, 0], radius: 3, label: 'Board the land-sail' }, { at: [0, 0, 0], radius: 3, label: 'Leave the land-sail' }],
 };
-function sailRow(): MoverData[number] {
-  const lowered = lowerMoverMotion({ trigger, driver: steer }, { at, euler });
+function sailRow(driver: object = steer): MoverData[number] {
+  const lowered = lowerMoverMotion({ trigger, driver }, { at, euler });
   const [row] = parseMovers([{ id: 'land-sail', entity: 7, module: lowered.module, execution: 'native', kind: 'channel', at, euler,
-    enabled: true, boxes: [], trigger, driver: steer, carry, input: lowered.input }]);
+    enabled: true, boxes: [], trigger, driver, carry, input: lowered.input }]);
   if (row === undefined) throw new Error('Missing land-sail'); return row;
 }
 const level = { ...SIM_LEVEL, entities: [] }, row = sailRow();
-function install(host: SimHost): MoverRuntime {
+function install(host: SimHost, sail = row): MoverRuntime {
   const source = emptyShardfile({ slug: 'steer-test', name: 'Steer', author: 'Test', revision: 1, seed: 3 });
-  return new MoverScriptDriver([row], host).install(host, { content: source, assets: new Map(),
+  return new MoverScriptDriver([sail], host).install(host, { content: source, assets: new Map(),
     rules: { fields: {}, archetypes: [], events: [], maxEntities: 32 } }, { id: 'steer-test', drive: true });
 }
 const run = (host: SimHost, ticks: number, moveX: number, moveZ: number, boost = false): void => {
@@ -72,5 +72,25 @@ test('a riderless land-sail stands; its rider boards, steers a curve, boosts and
     expect(Math.hypot(leadPlayer(host).position.x - landing.x, leadPlayer(host).position.z - landing.z)).toBeLessThan(0.6);
     run(host, 60, 0, -1); const stood = motion.pose(row.id).position; run(host, 30, 0, -1);
     expect(motion.pose(row.id).position).toEqual(stood); // riderless again: it stands
+  } finally { host.dispose(); }
+});
+
+// SS-MS2a2: the look's wind pushes a sail along its heading. Heading 0 goes toward -z: a wind toward -z is behind it.
+test('the same stick goes further downwind than up, and a let-go sail is not pushed (SS-MS2a2)', async () => {
+  const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
+  const travel = (toward?: readonly [number, number]): number => {
+    const host = createSimHost(level, { rapier }), motion = install(host, toward === undefined ? row : sailRow({ ...steer, wind: { toward, push: 3 } }));
+    try {
+      motion.command(row.id, 1); run(host, 1, 0, 0); run(host, 60, 0, -1);
+      return -motion.pose(row.id).position.z;
+    } finally { host.dispose(); }
+  };
+  const calm = travel(), down = travel([0, -2]), up = travel([0, 5]), across = travel([1, 0]);
+  expect(down).toBeGreaterThan(calm + 2.5); expect(up).toBeLessThan(calm - 2.5); // 3 m/s for about a second, either way
+  expect(across).toBeCloseTo(calm, 9); // a side wind adds nothing along the heading
+  const host = createSimHost(level, { rapier }), motion = install(host, sailRow({ ...steer, wind: { toward: [0, -1], push: 3 } }));
+  try {
+    motion.command(row.id, 1); run(host, 1, 0, 0); run(host, 60, 0, 0); // ridden, stick let go: the furled sail does not move
+    expect(motion.pose(row.id).position).toEqual({ x: 0, y: 1, z: 0 });
   } finally { host.dispose(); }
 });

@@ -82,8 +82,12 @@ export class MoverMechanic {
       const target = throttle * driver.speed * (stick?.boost === true ? driver.boost : 1), change = driver.accel * frame.dt;
       speed = speed < target ? Math.min(target, speed + change) : Math.max(target, speed - change);
       yaw = wrap(yaw - turn * driver.turn * frame.dt);
-      const [x0, y0, z0] = before.position, step = speed * frame.dt;
-      const x = Math.max(-COORD, Math.min(COORD, x0 - Math.sin(yaw) * step)), z = Math.max(-COORD, Math.min(COORD, z0 - Math.cos(yaw) * step));
+      // SS-MS2a2: a sail's wind push adds along the heading as far as the stick opens it (a let-go sail is furled):
+      // straight downwind the full push, across none, upwind it holds the vehicle back, never past a stand
+      const forwardX = -Math.sin(yaw), forwardZ = -Math.cos(yaw), wind = driver.wind;
+      const along = wind === undefined ? 0 : throttle * wind.push * (wind.toward[0] * forwardX + wind.toward[1] * forwardZ) / Math.hypot(...wind.toward);
+      const [x0, y0, z0] = before.position, step = Math.max(0, speed + along) * frame.dt;
+      const x = Math.max(-COORD, Math.min(COORD, x0 + forwardX * step)), z = Math.max(-COORD, Math.min(COORD, z0 + forwardZ * step));
       // a ground follower keeps its last height over a gap; a level vehicle keeps its rest height
       const y = !driver.ground ? motion.at.y : frame.ground !== undefined && Number.isFinite(frame.ground) ? Math.max(-COORD, Math.min(COORD, frame.ground)) : y0;
       position(x, y, z); field(1, 0); field(STEER_FIELDS.yaw, yaw); field(3, 0); field(4, 1);
