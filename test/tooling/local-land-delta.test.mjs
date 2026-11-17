@@ -6,6 +6,7 @@ import {chmodSync,mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay in this lane's scratch.
 import {join,resolve} from 'node:path';
 import {capturePushTree,readPushProof,writePushProof} from '../../scripts/push-proof-cache.mjs';
+import {installProofFixture} from '../../scripts/proof-fixture-install.mjs';
 import * as deltaPlanner from '../../scripts/local-land-delta.mjs';
 const {localDeltaPlan}=deltaPlanner;
 
@@ -20,7 +21,7 @@ function fixture(mode='full'){
  const git=(...args)=>execFileSync('git',args,{cwd:root,env,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
  const put=(file,text)=>{mkdirSync(join(root,file,'..'),{recursive:true});writeFileSync(join(root,file),text);};
  const commit=(file,text)=>{put(file,text);git('add','--',file);git('-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','--quiet','-m','fixture');return git('rev-parse','HEAD');};
- git('init','--quiet','-b','main');commit('.gitignore','tmp/\n');commit('src/a.ts','export const a=1;');
+ git('init','--quiet','-b','main');installProofFixture(root);commit('.gitignore','tmp/\n');commit('src/a.ts','export const a=1;');
  const baseMain=commit('src/b.ts','export const b=1;');
  const testedHead=commit('src/a.ts','export const a=2;');
  const context=capturePushTree('delta-fixture',proofEnv,root);if(context===null)throw new Error('Missing clean fixture proof context');

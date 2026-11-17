@@ -4,13 +4,14 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {capturePushTree,readPushProof,writePushProof} from './push-proof-cache.mjs';
+import {installProofFixture} from './proof-fixture-install.mjs';
 
 const directory=resolve(process.argv[2]??'tmp/push-cache-proof');mkdirSync(directory,{recursive:true});
 const work=mkdtempSync(join(directory,'run-'));
 try{
   /** @param {string[]} args */
   const git=args=>execFileSync('git',['-c','user.name=Cache proof','-c','user.email=proof@example.test',...args],{cwd:work,encoding:'utf8'}).trim();
-  git(['init','--quiet']);writeFileSync(join(work,'source.ts'),'export const value=1;');git(['add','source.ts']);git(['commit','--quiet','-m','base']);
+  git(['init','--quiet']);installProofFixture(work);writeFileSync(join(work,'source.ts'),'export const value=1;');git(['add','source.ts']);git(['commit','--quiet','-m','base']);
   const env={PATH:process.env.PATH},full={mode:/** @type {const} */('full'),files:['source.ts']};
   const first=capturePushTree('proof-v1',env,work);assert.ok(first);assert.equal(readPushProof(first,full),null);
   assert.equal(spawnSync(process.execPath,['-e','process.exitCode=0']).status,0);

@@ -1,3 +1,4 @@
+import {installProofFixture} from './proof-fixture-install.mjs';
 // Real Git policy introduction, actual clock expiry and a restored failing test.
 import assert from 'node:assert/strict';
 import {execFileSync,spawnSync} from 'node:child_process';
@@ -20,7 +21,7 @@ function fixture(name,seconds){
  const env={...process.env,GIT_COMMITTER_DATE:new Date(admitted).toISOString()};
  /** @param {string[]} args */
  const git=args=>execFileSync('git',['-c','user.name=Exclusion proof','-c','user.email=proof@example.test',...args],{cwd:repo,env,encoding:'utf8'}).trim();
- git(['init','--quiet','--initial-branch=main']);
+ git(['init','--quiet','--initial-branch=main']);installProofFixture(repo);
  const inventory=join(repo,'test/lift-pending.json'),policyFile=join(repo,'test/lift-pending-policy.json');
  const files='["test/hidden.test.mjs"]\n';writeFileSync(inventory,files);
  const policy={schema:1,owner:'codex-mock',registeredAt:new Date(admitted).toISOString(),deadline,inventorySha256:createHash('sha256').update(files).digest('hex'),reason:'Disposable real exclusion policy with immutable introducing Git timestamp for cache expiry proof.'};writeFileSync(policyFile,JSON.stringify(policy));

@@ -1,3 +1,4 @@
+import {installProofFixture} from './proof-fixture-install.mjs';
 // Real Git and kernel owner fixtures; no suite, push or network request.
 import assert from 'node:assert/strict';
 import {execFileSync,spawnSync} from 'node:child_process';
@@ -14,7 +15,7 @@ try{
  const env={PATH:originalPath,GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_NOSYSTEM:'1'};
  /** @param {string[]} args */
  const git=args=>execFileSync('git',['-c','user.name=Owner fixture','-c','user.email=owner@example.test',...args],{cwd:root,env,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
- git(['init','--quiet']);writeFileSync(join(root,'value.ts'),'export const value=1;');git(['add','value.ts']);git(['commit','--quiet','-m','seed']);
+ git(['init','--quiet']);installProofFixture(root);writeFileSync(join(root,'value.ts'),'export const value=1;');git(['add','value.ts']);git(['commit','--quiet','-m','seed']);
  const bin=join(root,'.git','probe-bin'),log=join(root,'.git','probe.log');mkdirSync(bin);
  for(const [name,tool] of [['python3',tools.python],['ps',tools.ps]]){
   writeFileSync(join(bin,name),`#!${process.execPath}\nimport{appendFileSync}from'node:fs';import{spawnSync}from'node:child_process';appendFileSync(${JSON.stringify(log)},${JSON.stringify(`${name}\n`)});const result=spawnSync(${JSON.stringify(tool)},process.argv.slice(2),{stdio:'inherit'});if(result.error)throw result.error;process.exit(result.status??1);`,{mode:0o700});

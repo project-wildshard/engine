@@ -1,3 +1,4 @@
+import {installProofFixture} from './proof-fixture-install.mjs';
 // Outside-hook actual Git/loader/CLI integration, no test bodies or timers.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -8,7 +9,7 @@ import {readLiftPending} from './lift-pending.mjs';
 import {dateLiftBatches} from './lift-pending-batches.mjs';
 import {capturePushTree,readPushProof,writePushProof} from './push-proof-cache.mjs';
 
-const started=performance.now(),base=resolve('tmp/lift-pending-batches');mkdirSync(base,{recursive:true});
+const started=performance.now(),base=resolve(process.argv.find(arg=>arg.startsWith('--out='))?.slice(6)??'tmp/lift-pending-batches');mkdirSync(base,{recursive:true});
 const root=mkdtempSync(join(base,'run-')),published=`${root}-published.git`;
 const cacheEnabled=!process.argv.includes('--without-cache');
 /** @param {string[]} args @param {string} [date] */
@@ -27,7 +28,7 @@ function put(){
 try{
  mkdirSync(join(root,'test'));mkdirSync(join(root,'scripts'));
  for(const name of ['lift-pending.mjs','lift-pending-batches.mjs','lift-pending-schedule.mjs'])copyFileSync(`scripts/${name}`,join(root,'scripts',name));
- git(['init','--quiet','--initial-branch=main']);git(['init','--bare','--quiet',published]);git(['remote','add','origin',published]);put();
+ git(['init','--quiet','--initial-branch=main']);installProofFixture(root);git(['init','--bare','--quiet',published]);git(['remote','add','origin',published]);put();
  for(const file of files)writeFileSync(join(root,file),'// Actual inherited source path, never executed by this policy proof.\n');
  git(['add','test','scripts']);git(['commit','--quiet','-m','original inventory'],'2026-11-09T01:00:00Z');
  policy.extension={rule:'J200',decidedBy:'Jake',decidedAt:'2026-11-10',decision:'Actual proof first extension',deadline:'2026-11-12T01:00:00Z',evidence:'Actual Git first extension control',reason:'One fixed extension for inherited migration debt, not execution qualification.'};put();commit('2026-11-10T01:00:00Z','first extension');
@@ -36,7 +37,7 @@ try{
   {id:'ONE',owner:'codex-mock',members:[b],requires:['CI21-H1'],windowHours:48,deadline:null},
   {id:'TWO',owner:'codex-mock',members:[c],requires:['CI21-H1','CI21-H2'],windowHours:48,deadline:null},
  ]});policy.batchSchedule=batchSchedule;put();commit('2026-11-10T02:00:00Z','dated per-batch policy');
- const cli=spawnSync(process.execPath,['scripts/lift-pending.mjs'],{cwd:root,encoding:'utf8'});assert.equal(cli.status,0,cli.stderr);assert.equal(JSON.parse(cli.stdout).excluded,3);
+ const cli=spawnSync(process.execPath,['--import=data:text/javascript,Date.now=()=>Date.parse("2026-11-13T02:00:00Z")','scripts/lift-pending.mjs'],{cwd:root,encoding:'utf8'});assert.equal(cli.status,0,cli.stderr);assert.equal(JSON.parse(cli.stdout).excluded,3);
  // Policy observation dates only, never a game/test clock. Exercise the actual
  // cached-proof API across the transition and the first batch's exact cutoff.
  const clock=Date.now,selection=/** @type {{mode:'full',files:string[]}} */({mode:'full',files:[]});
@@ -62,7 +63,7 @@ try{
   if(waiting){assert.equal(git(['rev-parse','HEAD^{tree}']),waiting.tree);assert.equal(readPushProof(waiting,selection),null,'A same-tree missing landing receipt must invalidate reuse');}
  }finally{Date.now=clock;}
  assert.throws(()=>read('2026-11-15T02:00:00Z'),/first receipt and derived batch dates are required/u);
- execFileSync(process.execPath,['scripts/lift-pending-schedule.mjs'],{cwd:root});
+ execFileSync(process.execPath,['--import=data:text/javascript,Date.now=()=>Date.parse("2026-11-15T02:00:00Z")','scripts/lift-pending-schedule.mjs'],{cwd:root});
  Object.assign(policy,JSON.parse(readFileSync(join(root,'test/lift-pending-policy.json'),'utf8')));put();commit('2026-11-15T01:01:00Z','record first landing');
  assert.equal(/** @type {typeof batchSchedule} */(policy.batchSchedule).landings['CI21-H1']?.commit,first);
  const landed=read('2026-11-16T02:00:00Z');assert.equal(landed.batches.find(item=>item.id==='ONE')?.deadline,'2026-11-17T01:00:00.000Z');assert.deepEqual(landed.batches.find(item=>item.id==='TWO')?.waitingFor,['CI21-H2']);
@@ -117,13 +118,13 @@ try{
  writeFileSync(join(root,'enabler-two'),'actual second enabler source');git(['add','enabler-two']);git(['commit','--quiet','-m','second enabler source'],'2026-11-18T01:00:00Z');const second=git(['rev-parse','HEAD']);git(['push','--quiet','origin','HEAD:main']);
  fork('rebased-closure',(dir,run)=>{
   run(['commit','--quiet','--allow-empty','-m',`close H2\n\nCI21-Enabler: CI21-H2 ${second}`]);
-  execFileSync(process.execPath,['scripts/lift-pending-schedule.mjs'],{cwd:dir});run(['commit','--quiet','-am','date H2']);
+  execFileSync(process.execPath,['--import=data:text/javascript,Date.now=()=>Date.parse("2026-11-15T02:00:00Z")','scripts/lift-pending-schedule.mjs'],{cwd:dir});run(['commit','--quiet','-am','date H2']);
   const before=run(['rev-parse','HEAD']);writeFileSync(join(root,'independent-advance'),'another lane');git(['add','independent-advance']);git(['commit','--quiet','-m','another lane advances main'],'2026-11-18T01:02:00Z');
   run(['pull','--quiet','--rebase','origin','main']);assert.notEqual(run(['rev-parse','HEAD']),before);
   assert.equal(readLiftPending(dir,Date.parse('2026-11-19T01:00:00Z')).deadline,'2026-11-20T01:00:00.000Z','A real queued-style rebase preserves the published enabler clock');
  },'2026-11-18T01:03:00Z');
  git(['commit','--allow-empty','--quiet','-m',`integrate H2\n\nCI21-Enabler: CI21-H2 ${second}`],'2026-11-18T01:00:30Z');
- execFileSync(process.execPath,['scripts/lift-pending-schedule.mjs'],{cwd:root});
+ execFileSync(process.execPath,['--import=data:text/javascript,Date.now=()=>Date.parse("2026-11-15T02:00:00Z")','scripts/lift-pending-schedule.mjs'],{cwd:root});
  Object.assign(policy,JSON.parse(readFileSync(join(root,'test/lift-pending-policy.json'),'utf8')));put();commit('2026-11-18T01:01:00Z','record second landing');
  assert.equal(/** @type {typeof batchSchedule} */(policy.batchSchedule).landings['CI21-H2']?.commit,second);
  assert.equal(read('2026-11-19T01:00:00Z').deadline,'2026-11-20T01:00:00.000Z');

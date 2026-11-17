@@ -7,7 +7,7 @@ import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../scripts/push-budget.mjs';
 import {logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../scripts/push-local-split.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
-import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
+import {capturePushTree,pushProofDisposition,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
 import {gateEnvironment} from '../scripts/push-environment.mjs';
 import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
 import {discoverLocalDeltaPlan,localDeltaPlan} from '../scripts/local-land-delta.mjs';
@@ -161,16 +161,21 @@ async function main(){
     return;
   }
   const record=seconds=>{
+    // A full fallback actually reruns every check, so it starts fresh proof
+    // lineage even when an older delta basis admitted the attempt.
+    const composed=delta.eligible&&selection.mode!=='full';
     const after=capturePushTree(profile,env);
     // A split full-mode gate ran no complete suite, so it proves nothing reusable.
     if(context!==null&&!(split&&selection.mode==='full')){
-      if(after===null||after.tree!==context.tree||after.runtime!==context.runtime)throw new Error('Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree');
-      const current=delta.eligible?planDelta(after):null;
-      if(delta.eligible&&(!current?.eligible||current.proof?.run!==delta.proof?.run))throw new Error('Prior full proof changed or expired during the delta gate; rerun the full gate');
+      const disposition=pushProofDisposition(context,after,{full:!split&&selection.mode==='full',inherited:composed});
+      if(disposition==='uncached'){console.error('  - full gate green; installed inputs unavailable for a reusable receipt; no proof saved');return;}
+      if(after===null)throw new Error('Missing checked tree');
+      const current=composed?planDelta(after):null;
+      if(composed&&(!current?.eligible||current.proof?.run!==delta.proof?.run))throw new Error('Prior full proof changed or expired during the delta gate; rerun the full gate');
       // Only authenticated disjoint composition covers the complete new tree.
-      const covered=delta.eligible?{mode:/** @type {const} */('full'),files:[]}:selection;
-      const recorded=writePushProof(context,covered,seconds,delta.eligible&&delta.proof!==null?{run:delta.proof.run,commit:delta.proof.commit}:undefined);
-      console.error(`  - saved exact-tree proof run ${recorded.run} (${covered.mode})${delta.eligible?`; inherited full ${delta.proof?.run} plus incoming delta`:''}`);
+      const covered=composed?{mode:/** @type {const} */('full'),files:[]}:selection;
+      const recorded=writePushProof(context,covered,seconds,composed&&delta.proof!==null?{run:delta.proof.run,commit:delta.proof.commit}:undefined);
+      console.error(`  - saved exact-tree proof run ${recorded.run} (${covered.mode})${composed?`; inherited full ${delta.proof?.run} plus incoming delta`:''}`);
     }
   };
   console.error(`  - full push budget ${JSON.stringify(PUSH_BUDGET)}; nice ${getPriority()}; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);

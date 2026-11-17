@@ -14,6 +14,7 @@ import { runInNewContext } from 'node:vm';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
+import { installProofFixture } from '../scripts/proof-fixture-install.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
 import { CHECK_CSS, failedJobs, failureLine, flakyFiles, localGateHatch, mainPushArgs, parseArgs, PINS_LEDGER, preflightSteps, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
 const LAND = resolve('scripts/land.mjs');
@@ -459,6 +460,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
   test('FL9: a restarted real land discovers its completed pre-rebase gate', () => {
     const f = fixture(); f.env['WS_LAND_MODE'] = 'local';
     const wt = f.worktree('proof-restart');
+    installProofFixture(wt);
     const tip = f.commit(wt, 'src/feature.ts', 'export const feature = 42;', 'feat: feature');
     const cache = JSON.stringify(resolve('scripts/push-proof-cache.mjs'));
     const delta = JSON.stringify(resolve('scripts/local-land-delta.mjs'));

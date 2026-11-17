@@ -118,12 +118,28 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
   const exclusions=exclusionScope(cwd);
   const dependencies=pushDependencyIdentity(cwd,env);
-  const runtime=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,dependencies,pins:pinned.key})).digest('hex');
+  const execution=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,pins:pinned.key})).digest('hex');
+  const runtime=createHash('sha256').update(JSON.stringify({execution,dependencies})).digest('hex');
   // Captures also serve pre-lease reuse and after-check comparisons. Retain
   // only the publication inputs; discarded captures need no kernel probe.
-  return {tree,commit,runtime,root:resolve(cwd),exclusions,dependencies,profile,
+  return {tree,commit,runtime,execution,root:resolve(cwd),exclusions,dependencies,profile,
     producerEnv:{WS_HEAVY_ROOT:env.WS_HEAVY_ROOT,WS_HEAVY_TOKEN:env.WS_HEAVY_TOKEN},
     sharedFile:dependencies===null?null:sharedProofFile(cwd,env,tree,runtime),file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
+}
+
+/** Only a directly completed full gate can publish without a reusable input
+ * observation. Source/policy changes and positive byte changes still refuse.
+ * @param {{tree:string,execution:string,runtime:string,dependencies:string|null}} before
+ * @param {{tree:string,execution:string,runtime:string,dependencies:string|null}|null} after
+ * @param {{full:boolean,inherited:boolean}} options */
+export function pushProofDisposition(before,after,options){
+ if(after===null||after.tree!==before.tree||after.execution!==before.execution)throw new Error('Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree');
+ if(after.runtime===before.runtime)return 'record';
+ if(before.dependencies===null||after.dependencies===null){
+  if(options.full&&!options.inherited)return 'uncached';
+  throw new Error('Full proof inputs unavailable; rerun the complete gate');
+ }
+ throw new Error('Installed inputs changed during the gate; rerun the exact tree');
 }
 
 /** A partial result covers only its own complete selection, never a full fallback.

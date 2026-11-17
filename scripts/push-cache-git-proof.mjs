@@ -1,3 +1,4 @@
+import {installProofFixture} from './proof-fixture-install.mjs';
 // Actual Git pre-push must reuse the same checked tree and compiler environment.
 import assert from 'node:assert/strict';
 import {execFileSync,spawnSync} from 'node:child_process';
@@ -11,7 +12,7 @@ try{
  const env={...process.env};for(const key of Object.keys(env))if(key.startsWith('GIT_'))Reflect.deleteProperty(env,key);
  /** @param {string[]} args */
  const git=args=>execFileSync('git',['-c','user.name=Git cache proof','-c','user.email=proof@example.test',...args],{cwd:repo,env,encoding:'utf8'}).trim();
- git(['init','--quiet']);git(['init','--bare','--quiet',remote]);
+ git(['init','--quiet']);installProofFixture(repo);git(['init','--bare','--quiet',remote]);
  writeFileSync(join(repo,'value.json'),'{"value":1}');git(['add','value.json']);git(['commit','--quiet','-m','fixture']);git(['remote','add','origin',remote]);
  const budget=pathToFileURL(resolve('.githooks/push-checks.mjs')).href,cache=pathToFileURL(resolve('scripts/push-proof-cache.mjs')).href;
  const runner=join(work,'gate.mjs'),hook=join(repo,'.git/hooks/pre-push');

@@ -6,6 +6,7 @@ import {chmodSync,mkdirSync,mkdtempSync,rmSync,symlinkSync,truncateSync,writeFil
 // oxlint-disable-next-line import/no-nodejs-modules -- Owned fixture paths.
 import {dirname,join,resolve} from 'node:path';
 import {pushDependencyIdentity} from '../../scripts/push-dependencies.mjs';
+import {installProofFixture} from '../../scripts/proof-fixture-install.mjs';
 import {capturePushTree,writePushProof} from '../../scripts/push-proof-cache.mjs';
 import {discoverLocalDeltaPlan,localDeltaPlan} from '../../scripts/local-land-delta.mjs';
 
@@ -28,11 +29,13 @@ function fixture(global=true){
  put(join(root,'package.json'),JSON.stringify({name:'proof-consumer',type:'module',packageManager:'pnpm@10.34.9',dependencies:{fixture:'1.0.0'}}));
  put(join(root,'pnpm-lock.yaml'),lock);
  put(join(root,'node_modules/.pnpm/lock.yaml'),lock.replace('resolution: {','resolution: {gitHosted: true, '));
+ if(global)put(join(root,'node_modules/.modules.yaml'),JSON.stringify({storeDir:join(root,'store'),packageManager:'pnpm@10.34.9'}));
  const binary=join(root,'bin/pnpm');put(binary,`#!/usr/bin/env node\nif(process.argv.slice(2).join(' ')!=='store path')process.exit(2);console.log(${JSON.stringify(join(root,'store'))});\n`);chmodSync(binary,0o755);
  const env={PATH:`${join(root,'bin')}:${process.env.PATH??''}`,CI:'',GITHUB_ACTIONS:'',GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_NOSYSTEM:'1'};
  const git=(...args)=>execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@example.test',...args],{cwd:root,env,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
  const commit=()=>{git('add','--','.');git('commit','--quiet','-m','fixture');return git('rev-parse','HEAD');};
  const runtime=()=>execFileSync(process.execPath,['-e',"console.log(require('fixture'))"],{cwd:root,env,encoding:'utf8'}).trim();
+ installProofFixture(root);
  return {root,put,env,git,commit,leaf,runtime,lock};
 }
 test.each([false,true])('managed pnpm lock metadata permits the actual installed graph (global %s)',global=>{
@@ -54,6 +57,13 @@ test('managed snapshot tolerance never hides a changed resolution or live alias'
 test('an oversized installed file is refused before a large allocation',()=>{
  const f=fixture();expect(pushDependencyIdentity(f.root,f.env)).not.toBeNull();
  truncateSync(f.leaf,256*1024*1024+1);
+ expect(pushDependencyIdentity(f.root,f.env)).toBeNull();
+},30000);
+test('an undeclared working source alias cannot remain outside the identity',()=>{
+ const f=fixture(),before=pushDependencyIdentity(f.root,f.env);expect(before).not.toBeNull();
+ f.put(join(f.root,'extra/package.json'),'{"name":"extra","main":"index.cjs"}');f.put(join(f.root,'extra/index.cjs'),'module.exports=7;');
+ symlinkSync(join(f.root,'extra'),join(f.root,'node_modules/extra'),'dir');
+ expect(execFileSync(process.execPath,['-e',"console.log(require('extra'))"],{cwd:f.root,env:f.env,encoding:'utf8'}).trim()).toBe('7');
  expect(pushDependencyIdentity(f.root,f.env)).toBeNull();
 },30000);
 test('a managed-global full proof survives a real separate rebase',()=>{
@@ -101,3 +111,17 @@ test('one passed full proof carries four consecutive disjoint main rebases',()=>
  for(const row of rounds){expect(row.recovered).toBe(true);expect(row.run).toBe(full.run);expect(row.files).toEqual(['src/b.ts']);}
  expect({fullGates,staticAndAffected}).toEqual({fullGates:1,staticAndAffected:4});
 },60000);
+
+test('reachable npm package bytes bind while node_modules compiler cache output stays stable',()=>{
+ const f=fixture(false),consumer=join(f.root,'consumer');
+ f.put(join(consumer,'package.json'),'{"name":"nested-consumer"}');
+ f.put(join(f.root,'node_modules/.package-lock.json'),'{"lockfileVersion":3}');
+ f.put(join(f.root,'node_modules/npm-extra/package.json'),'{"name":"npm-extra","exports":"./index.cjs"}');
+ const source=join(f.root,'node_modules/npm-extra/index.cjs');f.put(source,'module.exports=1;');
+ const before=pushDependencyIdentity(consumer,f.env);expect(before).not.toBeNull();
+ f.put(join(f.root,'node_modules/.cache/compiler/result.json'),'{"derived":1}');
+ f.put(join(f.root,'node_modules/.DS_Store'),'finder output');
+ f.put(join(f.root,'node_modules/.ignored/old-package/index.js'),'derived ignored install');
+ expect(pushDependencyIdentity(consumer,f.env)).toBe(before);
+ f.put(source,'module.exports=2;');expect(pushDependencyIdentity(consumer,f.env)).not.toBe(before);
+},30000);

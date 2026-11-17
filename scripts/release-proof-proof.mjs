@@ -1,3 +1,4 @@
+import {installProofFixture} from './proof-fixture-install.mjs';
 // Manual outer-edge proof: real installed package, Git clones and release CLI.
 import assert from 'node:assert/strict';
 import {execFileSync,spawnSync} from 'node:child_process';
@@ -39,11 +40,11 @@ else {
  mkdirSync(join(producer,'scripts'));symlinkSync(join(engine,'scripts/release-check.mjs'),join(producer,'scripts/release-check.mjs'));copyFileSync(join(engine,'scripts/push-budget.mjs'),join(producer,'scripts/push-budget.mjs'));
  mkdirSync(join(producer,'.githooks'));const entry=join(engine,'.githooks/run-checks.mjs'),hook=join(producer,'.githooks/pre-push');
  writeFileSync(hook,`#!/usr/bin/env node\nimport{readFileSync}from'node:fs';import{spawnSync}from'node:child_process';const p=spawnSync(process.execPath,[${JSON.stringify(entry)},'push'],{env:{...process.env,WS_PUSH_REFS:readFileSync(0,'utf8')},stdio:'inherit'});process.exitCode=p.status??1;\n`);chmodSync(hook,0o755);
- install(producer,false);git(producer,['add','package.json','pnpm-lock.yaml','.gitignore','value.mjs','value-check.mjs','scripts/release-check.mjs','scripts/push-budget.mjs','.githooks/pre-push']);git(producer,['commit','--quiet','-m','actual complete fixture']);git(producer,['remote','add','origin',remote]);git(producer,['push','--quiet','origin','main']);
+ install(producer,false);installProofFixture(producer);git(producer,['add','package.json','pnpm-lock.yaml','.gitignore','value.mjs','value-check.mjs','scripts/release-check.mjs','scripts/push-budget.mjs','.githooks/pre-push']);git(producer,['commit','--quiet','-m','actual complete fixture']);git(producer,['remote','add','origin',remote]);git(producer,['push','--quiet','origin','main']);
  const writer=join(work,'write.mjs'),cache=pathToFileURL(join(engine,'scripts/push-proof-cache.mjs')).href,budget=pathToFileURL(join(engine,'.githooks/push-checks.mjs')).href;
  writeFileSync(writer,`import assert from'node:assert/strict';import{execFileSync}from'node:child_process';import{writeFileSync}from'node:fs';import{pushEnvironment}from${JSON.stringify(budget)};import{capturePushTree,writePushProof}from${JSON.stringify(cache)};const env=pushEnvironment(),before=capturePushTree('full-v1',env);assert.ok(before);execFileSync('pnpm',['run','--silent','check'],{env,stdio:'pipe'});const after=capturePushTree('full-v1',env);assert.ok(after);assert.equal(before.tree,after.tree);assert.equal(before.runtime,after.runtime);const proof=writePushProof(before,{mode:process.argv[3]??'full',files:['value.mjs']},.1);writeFileSync(process.argv[2],JSON.stringify(proof));`);
  const receipt=join(work,'receipt.json');execFileSync(process.execPath,[writer,receipt],{cwd:producer,env:{...env,PWD:producer},stdio:'pipe'});
- mkdirSync(dirname(receiver));git(work,['clone','--quiet','--branch=main',remote,receiver]);install(receiver,true);
+ mkdirSync(dirname(receiver));git(work,['clone','--quiet','--branch=main',remote,receiver]);install(receiver,true);installProofFixture(receiver);
  // The queue really deletes its producer snapshot. No .git receipt remains.
  rmSync(producer,{recursive:true,force:true});
  let result=probe();assert.equal(result.status,0,`A separately installed clone must reuse the surviving full proof: ${result.stderr}`);

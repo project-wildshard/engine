@@ -5,6 +5,7 @@ import {mkdirSync,mkdtempSync,readFileSync,renameSync,rmSync,writeFileSync,realp
 import {dirname,join,relative,resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {homedir} from 'node:os';
+import {installProofFixture} from './proof-fixture-install.mjs';
 
 const selected=process.argv.find(arg=>arg.startsWith('--reader='))?.slice(9)??'scripts/push-dependencies.mjs';
 const toolOnly=process.argv.includes('--case=tools');
@@ -20,6 +21,7 @@ try{
  writeFileSync(join(work,'package.json'),JSON.stringify({name:'dependency-proof',private:true,type:'module',packageManager:'pnpm@10.34.9',binDependenciesInstaller:`pnpm --cache-dir=${cache} --config.enableGlobalVirtualStore=false --offline`,dependencies:{valibot:version,'npm-bin-deps':'2.1.0'},binDependencies:{'npm-bin-deps':'2.1.0'}}));
  writeFileSync(join(work,'pnpm-workspace.yaml'),'packages: []\nenableGlobalVirtualStore: false\n');
  pnpm(work,['install','--offline','--ignore-workspace','--config.enableGlobalVirtualStore=false']);
+ installProofFixture(work);
  const module=fileURLToPath(execFileSync(process.execPath,['--input-type=module','-e','console.log(import.meta.resolve("valibot"))'],{cwd:work,env,encoding:'utf8'}).trim());
  const folder=join(dirname(module),'framing-proof');mkdirSync(folder);
  const a=join(folder,'a.mjs'),b=join(folder,'b.txt'),body='export const value=1;\n',tail='real installed payload';
