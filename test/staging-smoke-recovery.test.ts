@@ -33,5 +33,22 @@ test.skipIf(process.env['WS_SMOKE_BROWSER'] !== '1')('an old recovery reaches ti
       <button class="ws-main-settings" onclick="window.picked='settings'">Settings</button>`);
     await page.locator(SEL.settings).tap();
     expect(await page.evaluate(() => Reflect.get(window, 'picked'))).toBe('settings');
+    // A resumed HUD may be laid out underneath a loading card, then return to title without a usable Pause.
+    await page.setContent(`<button class="ws-main-select" hidden>Zone Select</button>
+      <button class="ws-touch-pause" onclick="window.pauseTapped=true">Pause</button>
+      <div class="ws-load" style="position:fixed;inset:0;z-index:100;background:black">Loading</div>`);
+    page.setDefaultTimeout(2000);
+    let loadingRecoveries = 0;
+    const title = oldProfileTitle(page, { onRecovery: async () => { loadingRecoveries++; } });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      document.querySelector('.ws-load')?.remove();
+      document.querySelector<HTMLElement>('.ws-touch-pause')!.hidden = true;
+      document.querySelector<HTMLElement>('.ws-main-select')!.hidden = false;
+    });
+    await title;
+    expect(await page.evaluate(() => Reflect.get(window, 'pauseTapped'))).toBeUndefined();
+    expect(loadingRecoveries).toBe(0);
+    expect(await page.locator('.ws-main-select').isVisible()).toBe(true);
   } finally { await browser.close(); }
-}, 30_000);
+}, 600_000);

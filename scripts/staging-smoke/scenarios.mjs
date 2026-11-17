@@ -197,21 +197,30 @@ export async function clearDrop(page) {
  * @param {Page} page @param {{onDrop?: () => void, onRecovery?: () => Promise<void>}} [options] */
 export async function oldProfileTitle(page, { onDrop = () => undefined, onRecovery = () => Promise.resolve() } = {}) {
   const back = '.ws-title-stack[data-screen="select"] .ws-menu-back';
-  await page.waitForFunction((selectors) => selectors.some((selector) => [...document.querySelectorAll(selector)].some((element) => {
-    const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && getComputedStyle(element).visibility !== 'hidden';
-  })), [SEL.titleSelect, SEL.dropDismiss, SEL.pause, SEL.exit, back], { timeout: 90_000 });
-  const resumed = await page.locator(SEL.pause).isVisible() || await page.locator(SEL.exit).isVisible();
-  if (resumed || await page.locator(SEL.dropDismiss).isVisible()) await onRecovery();
-  if (await clearDrop(page)) onDrop();
-  // The main screen can remain visibly rendered but inert behind an active restored deck. Back is the real way out.
-  if (await page.locator(back).isVisible()) await page.locator(back).tap();
-  else if (await page.locator(SEL.titleSelect).isVisible()) return;
-  else {
-    if (!(await page.locator(SEL.exit).isVisible())) await page.locator(SEL.pause).tap();
-    await page.locator(SEL.exit).tap();
+  const controls = [SEL.dropDismiss, back, SEL.exit, SEL.pause, SEL.titleSelect];
+  let recovered = false;
+  for (let step = 0; step < 8; step++) {
+    // A laid-out HUD or menu can still be covered by the loading card. Wait for a real hit target, then choose again.
+    const ready = await page.waitForFunction((selectors) => selectors.find((selector) => [...document.querySelectorAll(selector)].some((element) => {
+      if (element.closest('[inert]') !== null || element.matches(':disabled')) return false;
+      const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+      if (rect.width <= 0 || rect.height <= 0 || style.visibility === 'hidden') return false;
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return hit !== null && element.contains(hit);
+    })) ?? false, controls, { timeout: 90_000 });
+    const selector = await ready.jsonValue();
+    await ready.dispose();
+    if (typeof selector !== 'string') throw new Error('Old profile has no actionable title control');
+    if (selector === SEL.titleSelect) return;
+    if (!recovered && [SEL.dropDismiss, SEL.pause, SEL.exit].includes(selector)) {
+      recovered = true;
+      await onRecovery();
+      continue; // a recovery capture can cross a transition; choose the current hit target again
+    }
+    if (selector === SEL.dropDismiss) { if (await clearDrop(page)) onDrop(); }
+    else await page.locator(selector).tap();
   }
-  await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 });
+  throw new Error('Old profile did not return to title through its controls');
 }
 
 /**
