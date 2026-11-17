@@ -54,6 +54,20 @@ test('the room keeps who a client says it is, cleans the Name, and refuses an id
   room.dispose(); host.dispose();
 });
 
+test('MP2.2g: a game server refuses a raw join ticket; only the door reads one, and its cells get the seat', async () => {
+  const host = createSimHost(SIM_LEVEL, { rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) });
+  const room = new NetRoom({ world: new SimNetWorld(host), step: () => { host.step(); } }), link = directLoopback(), seat = directLoopback();
+  const raw = `ticket:${'0'.repeat(32)}.device:phone.1800000000.${'a'.repeat(128)}`;
+  const ticketed = room.join(link.server), client = new NetClient(link.client), seated = room.join(seat.server), account = new NetClient(seat.client);
+  client.hello('', { player: raw, name: 'Ann' }); link.pump();
+  account.hello('', { player: 'account:plr_0123456789abcdef0123456789abcdef', name: 'Ann' }); seat.pump();
+  room.open(); link.pump(); seat.pump();
+  expect(client.closed, 'a bearer credential is never a player id here').toBe('refused');
+  expect(room.identityOf(ticketed)).toBeNull();
+  expect(room.identityOf(seated)?.player, 'the seat the door hands its cells').toBe('account:plr_0123456789abcdef0123456789abcdef');
+  room.dispose(); host.dispose();
+});
+
 test('the filter takes whole words through look-alikes and stretching, and only them', () => {
   expect(filterWords('you ass, sh1t F-U-C-K fuuuck b!tch')).toBe('you ***, **** F-U-C-K ****** *****');
   expect(filterWords('classic assassin bass Scunthorpe')).toBe('classic assassin bass Scunthorpe');

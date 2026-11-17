@@ -356,6 +356,9 @@ export class NetRoom {
     if (this.required.some(id => !hello.capabilities.includes(id))) { this.stats.refused++; client.transport.close('reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.stats.refused++; client.transport.close('refused'); return; }
+    // MP2.2g: a join ticket is a bearer credential only the dedicated door reads (`host/dedicated/ticket.ts`); the cells it seats get
+    // the account, never the ticket. One reaching a game server raw is refused, so it is never kept or shown as a player id.
+    if (said.output.player.startsWith('ticket:')) { this.stats.refused++; client.transport.close('refused'); return; }
     const identity = { player: said.output.player, name: this.world.nameOf?.(client.player.id) ?? cleanName(said.output.name) };
     if (this.world.identified?.(client.player.id, identity) === false) { this.stats.refused++; this.drop(client); return; }
     client.identity = identity;
