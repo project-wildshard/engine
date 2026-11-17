@@ -5,7 +5,7 @@ import type { Actor } from '@wildshard/engine/combat/pipeline';
 
 interface Position { readonly x: number; readonly y: number; readonly z: number }
 /** An existing controller retains its own decisions and continuation. */
-export interface TemperamentBrain { readonly run: (dt: number, acquire?: boolean) => void; readonly adapter: SimStateAdapter; readonly provoke?: (target: string) => void; readonly reset?: () => void; readonly notice?: number; readonly escapeSpeed?: number; readonly crowd?: number; readonly install?: () => () => void }
+export interface TemperamentBrain { readonly run: (dt: number, acquire?: boolean) => void; readonly adapter: SimStateAdapter; readonly provoke?: (target: string) => void; readonly reset?: () => void; readonly origin?: Position; readonly notice?: number; readonly escapeSpeed?: number; readonly crowd?: number; readonly install?: () => () => void }
 /** Social membership shares identities, never a second decision controller. */
 export interface CreatureSocialGroup { readonly id: string; readonly members: ReadonlySet<Actor> }
 
@@ -14,6 +14,7 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
   temperament: CreatureTemperament, source: TemperamentBrain, target: () => Position | undefined, group?: CreatureSocialGroup): TemperamentBrain {
   const [x, y, z] = at, territory = temperament.territorial, leash = Math.min(temperament.leash, territory ?? temperament.leash);
   const speed = temperament.home.speed, stop = temperament.home.stop;
+  const origin = source.origin ?? actor.position;
   const contract = JSON.stringify({ at, temperament, ...(group === undefined ? {} : { group: group.id, members: [...group.members].map(member => member.id).sort() }) });
   const initial = source.adapter.snapshot(), reaction = temperament.reaction, pack = temperament.pack === true, assist = temperament.assist;
   const passive = reaction === 'passive' || reaction === 'skittish', flee = temperament.flee;
@@ -49,8 +50,8 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
     return () => { scope.dispose(); };
   }, run: dt => {
     if (!actor.alive) { returning = false; frightened = false; ambushing = temperament.ambush === true; source.run(dt); return; }
-    const player = host.nearestPlayer(actor.position), fromPlayer = actor.position.distanceToSquared(player.position);
-    const distance = Math.hypot(actor.position.x - x, actor.position.y - y, actor.position.z - z), foe = target();
+    const player = host.nearestPlayer(origin), fromPlayer = (origin.x - player.position.x) ** 2 + (origin.y - player.position.y) ** 2 + (origin.z - player.position.z) ** 2;
+    const distance = Math.hypot(origin.x - x, origin.y - y, origin.z - z), foe = target();
     if (distance > leash || (foe !== undefined && Math.hypot(foe.x - x, foe.y - y, foe.z - z) > leash)) returning = true;
     if (reaction === 'skittish' && player.health.alive && fromPlayer < (source.notice ?? 0) ** 2) frightened = true;
     if (!returning && (frightened || (flee !== undefined && actor.hp <= actor.maxHp * flee))) {
@@ -61,7 +62,7 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
       returning = true;
     }
     if (ambushing && !returning) {
-      if (!player.health.alive || actor.position.distanceToSquared(player.position) > (source.notice ?? 0) ** 2) {
+      if (!player.health.alive || fromPlayer > (source.notice ?? 0) ** 2) {
         host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack(); actor.state = 'hide'; actor.setStrafe(0); actor.setMotion(actor.yaw, 0, 3); return;
       }
       ambushing = false;

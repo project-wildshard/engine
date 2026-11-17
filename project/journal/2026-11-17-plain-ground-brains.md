@@ -91,3 +91,27 @@ pending/active exact continuation. Combined54cases across7files pass.
 Two test-helper types were corrected after the first full typecheck.
 Main is still held. Coordinator now prioritizes the held M1 SDK land over
 more M2; leave this source committed locally for the later combined land.
+
+## CC5b5c: guardian layers and the three-family matrix
+
+Eight actual guardian policy cases fail before wiring. The same layer
+owner now wraps the native guardian. Its real floor/rise memory initializes
+on the first tick even when flight suppresses native decisions. The body
+continues exactly once each tick, using the original lift law's upward
+direction while fleeing. Construction and restore still run no gameplay.
+
+The first matrix found one real crowd failure: the hidden body's2.3m lift
+was being measured as distance to a close player. A borrowed live floor
+origin now supplies guardian perception and home distance; pursue and
+skirmisher retain their physical origin. This also lets a buried guardian
+finish a home return rather than remain2.3m above its stop threshold.
+No second root or attack clock is introduced.
+
+Eighteen guardian controls cover reactions, crowd/real-hit selection,
+leash/heal/rearm, territory, social radius, ambush, active strike cancel,
+first-flight rise, hidden home return and exact rising/attack/sinking
+continuations. Combined110cases/11files include the existing pursuit layer
+and all native/default/restore controls. Full types and lint pass. M1 SDK
+remains first when its external release/Opus gates clear. Engine lands in
+the coordinator's MMO,SP5,main-screen,SA25a,ONE-FORMAT order; mode1 stays
+held. No main push or new land was started for these source rows.

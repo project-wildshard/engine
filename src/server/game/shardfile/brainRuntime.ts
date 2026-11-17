@@ -148,9 +148,25 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
         }
         break;
       }
-      case 'guardian':
+      case 'guardian': {
         if (ports.guardian === undefined) throw new Error('Missing native brain port');
-        registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new GuardianBrain(actor, spec), ports.guardian(actor, host, spec), host)); break;
+        const brain = new GuardianBrain(actor, spec), recipe = ports.guardian(actor, host, spec), layer = layers?.get(row.species);
+        if (layer === undefined) registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, brain, recipe, host));
+        else {
+          const native = bindGroundTemperament(host, actor, spec.thinkDivisor, brain, recipe);
+          // Native root lift moves the body below its floor; perception/home use the floor origin.
+          const origin = { get x() { return actor.position.x; }, get y() { return actor.position.y - actor.yOffset; }, get z() { return actor.position.z; } };
+          const policy = bindCreatureTemperament(host, actor, row.at, layer.temperament,
+            { ...native, origin, notice: layer.senses?.notice ?? spec.wakeRadius, escapeSpeed: spec.speed },
+            () => native.target()?.position, row.group === undefined ? undefined : social.get(row.group));
+          registrations.push({ id, ...policy, run: dt => {
+            // Even a layer's first-frame flight needs the native owner to initialize its root memory.
+            if (actor.alive && !actor.mem['init']) brain.think({ ...recipe.observe(0), calm: true });
+            policy.run(dt); if (actor.alive) recipe.body(dt);
+          } });
+        }
+        break;
+      }
       case 'perch-hunter':
         if (ports.perchHunter === undefined) throw new Error('Missing native brain port');
         registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new PerchHunterBrain(actor, spec), ports.perchHunter(actor, host), host)); break;

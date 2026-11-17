@@ -106,7 +106,7 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
       actions: [{ state: 2, phase: binding.phase, effect: 'contact', once: { key: 'hit', value: 1, test: 'falsy' } }] },
     { decide: () => undefined, effects: new Map([['contact', binding.hit]]) });
     return { observe, bindTarget: binding.bindTarget, body: dt => {
-      stepCreatureLift(actor, dt, 1.5, 1.5, declaration.hideOffset, 6);
+      stepCreatureLift(actor, dt, 1.5, 1.5, declaration.hideOffset, 6, actor.state === 'flee' ? 'up' : undefined);
       action.act(observe(dt));
     } };
   } };
