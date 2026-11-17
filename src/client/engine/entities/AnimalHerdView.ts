@@ -318,7 +318,7 @@ export class AnimalHerdView implements RowBodiesDraw {
   /** whether `a` can be drawn from `from`: shown, awake and within animalHideDist */
   private inFarReach(a: Animal, from: THREE.Vector3, asleep: (a: Animal) => boolean): boolean {
     const hide = TIER_CONFIG.animalHideDist;
-    return !a.hidden && !asleep(a) && a.position.distanceToSquared(from) < hide * hide;
+    return !a.hidden && !a.concealed && !asleep(a) && a.position.distanceToSquared(from) < hide * hide;
   }
 
   /**

@@ -16,7 +16,7 @@ function rowBody(): Animal {
   mesh.add(body);
   const rig: AnimalRig = { mesh, bones: { body, head }, materials: [fur] };
   const dims = { bodyY: 1, bodyHalfLen: 1.2, bodyRadius: 0.5, halfWidth: 0.5, legLen: 0.8 };
-  const species = { label: 'Bear', rig: 'custom', aggressive: true, animate: (): void => undefined };
+  const species = { label: 'Bear', rig: 'custom', aggressive: true, lockable: true, animate: (): void => undefined };
   const model = { kind: 'bear', variant: 'base', species, variantDef: { id: 'base', label: '', rarity: 'common', hp: 100 },
     dims, fur, hard: fur } as unknown as AnimalModel;
   const animal = new Animal(rig, model, 1);
@@ -26,6 +26,18 @@ function rowBody(): Animal {
 
 const row = (hp: number, alive = hp > 0): Parameters<Animal['showRow']>[0] =>
   ({ x: 0, y: 0, z: 0, yaw: 0, state: 'idle', attack: 0, flinch: 0, strafe: 0, brace: 0, hp, alive, rise: 0, act: 0 });
+
+test('a fully hidden row conceals its body and lock target, while guardian sinking remains visible', () => {
+  const animal = rowBody();
+  animal.showRow({ ...row(100), state: 'hide' }, 1 / 60);
+  expect(animal.mesh.visible).toBe(false); expect(animal.lockable).toBe(false);
+  animal.showRow({ ...row(100), state: 'hide', rise: 0.5 }, 1 / 60);
+  expect(animal.mesh.visible).toBe(true); expect(animal.lockable).toBe(true);
+  animal.showRow({ ...row(100), state: 'rise', rise: 0.7 }, 1 / 60);
+  expect(animal.mesh.visible).toBe(true);
+  animal.showRow({ ...row(100), state: 'stalk' }, 1 / 60);
+  expect(animal.mesh.visible).toBe(true); expect(animal.lockable).toBe(true);
+});
 
 test('a drop in a row-driven body\'s hp is a hit this page sees, whoever landed it', () => {
   const bear = rowBody();

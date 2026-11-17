@@ -34,6 +34,8 @@ export interface RowBodiesDraw {
   rig: (kind: AnimalKind, variant: string, rigSeed: number, seed: number, scale: number, id: string) => { actor: Animal; flight: SpeciesFlight | undefined };
   adopt: (a: Animal, player: Vector3, asleep: (a: Animal) => boolean) => void;
   hide: (a: Animal) => void;
+  /** Conceal the body and its retained shadow until the next normal draw. */
+  sleep: (a: Animal) => void;
   remove: (a: Animal) => void;
   trample: (animals: readonly Animal[], player: Vector3) => void;
   beginDraw: (camera: PerspectiveCamera | null) => void;
@@ -200,6 +202,7 @@ export class RowBodies {
       if (a === undefined) continue;
       draw.reach(a, viewPos, awake);
       if (a.hidden) continue;
+      if (a.concealed) { draw.sleep(a); continue; }
       const d2 = a.position.distanceToSquared(viewPos);
       a.poseEvery = poseEvery(d2);
       if (!a.harnessHold && dt > 0) a.update(dt, t, d2 < ANIM_LOD * ANIM_LOD);

@@ -66,6 +66,7 @@ export interface MinimapAnimal {
   rarity?: string;
   position: { x: number; z: number };
   alive?: boolean;
+  concealed?: boolean;
   hp?: number;
   maxHp?: number;
   state?: string;
@@ -439,7 +440,7 @@ export class Minimap {
     const dot = 1.75 * this.dpr, outline = this.dpr;
     ctx.lineWidth = outline;
     for (const a of animals) {
-      if (a.alive === false || (a.hp !== undefined && a.hp <= 0) || a.mem?.['hidden'] === 1) continue;
+      if (a.concealed === true || a.alive === false || (a.hp !== undefined && a.hp <= 0) || a.mem?.['hidden'] === 1) continue;
       const dx = a.position.x - pos.x, dz = a.position.z - pos.z;
       if (dx * dx + dz * dz > VIEW_RADIUS * VIEW_RADIUS) continue;
       const sx = c - dx * k, sy = c - dz * k;
@@ -503,7 +504,7 @@ export class Minimap {
     let h = fold(fold(fold(fold(fold(FNV_SEED, Math.round(pos.x * k * 2)), Math.round(pos.z * k * 2)), Math.round(deg * 2)), this.size), Math.round(alpha * 100));
     let pulse = false;
     for (const a of animals) {
-      if (a.alive === false || (a.hp !== undefined && a.hp <= 0) || a.mem?.['hidden'] === 1) continue;
+      if (a.concealed === true || a.alive === false || (a.hp !== undefined && a.hp <= 0) || a.mem?.['hidden'] === 1) continue;
       const dx = a.position.x - pos.x, dz = a.position.z - pos.z;
       if (dx * dx + dz * dz > VIEW_RADIUS * VIEW_RADIUS) continue;
       h = fold(fold(fold(h, Math.round(dx * k)), Math.round(dz * k)), a.rarity === 'legendary' ? 2 : a.rarity === 'rare' ? 1 : 0);

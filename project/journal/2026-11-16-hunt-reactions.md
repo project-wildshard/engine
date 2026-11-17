@@ -83,3 +83,19 @@ the scoped damage listener and optional territory constraint; failed
 registration rolls those effects back with the ordinary step callbacks.
 The lifetime control checks that preparation leaves the previous
 constraint intact, then checks its restoration after the host ends.
+
+CC5b4a: an authored ambush waits in the existing hide state until its
+notice radius or an actual hit reveals it. The wrapper saves its
+dormant/revealed flag and rearms it after home reset. Row-driven view
+concealment removes the body, lock target, shadow/far batch and map/HUD
+position; it does not overwrite the existing native hidden flag.
+Guardian sinking keeps drawing while its replicated rise is positive.
+
+Three controls fail first, then real-server notice/hit, dormant and
+revealed restores, and actual row-body visibility/lock controls pass.
+The existing guardian emergence and corpse hit-flash paths remain.
+
+J381, CC5b4a: normal commit lint/format/types passed but exceeded the
+8s elapsed gate at17.5s on the shared machine. SKIP_BUDGET=1 retains
+those real checks and bypasses only the clock. Recorded in the plan
+and codex-te2e receipt; no implementation validation is disabled.

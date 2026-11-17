@@ -72,6 +72,50 @@ function packing() {
   }) };
 }
 
+function ambushing() {
+  const shard = pursuing(20), row = shard.rows.species[0];
+  if (row?.temperament === undefined) throw new Error('Missing fixture temperament');
+  row.temperament.ambush = true; row.senses = { notice: 9 };
+  return shard;
+}
+
+test('an ambusher waits hidden outside notice, then reveals and pursues', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const sim = createShardfileSim(ambushing(), new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = sim.host.nearestPlayer(body.position), start = body.position.clone();
+    for (let i = 0; i < 60; i++) sim.host.step();
+    expect(body.state).toBe('hide'); expect(body.position.distanceTo(start)).toBeLessThan(0.01);
+    player.position.set(0, 0, 8); player.motor?.resetAt(player.position);
+    for (let i = 0; i < 60; i++) sim.host.step();
+    expect(body.state).toBe('stalk'); expect(body.position.z).toBeGreaterThan(1);
+  } finally { sim.host.dispose(); }
+});
+
+test.each([false, true])('ambush dormant/revealed continuation restores exactly, revealed=%s', async revealed => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = ambushing();
+  const first = createShardfileSim(shard, new Map(), { rapier }), resumed = prepareShardfileSimRestore(shard, new Map(), { rapier });
+  try {
+    const body = first.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    for (let i = 0; i < 12; i++) first.host.step();
+    if (revealed) {
+      const player = first.host.nearestPlayer(body.position);
+      first.host.combat.hit({ source: player.health, sourceTags: player.health.tags, target: body.combatActor(), amount: 1,
+        point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+      for (let i = 0; i < 6; i++) first.host.step();
+    }
+    expect(body.state).toBe(revealed ? 'stalk' : 'hide');
+    resumed.restore(snapshotSimHost(first.host));
+    for (let i = 0; i < 60; i++) { first.host.step(); resumed.host.step(); }
+    expect(resumed.host.entities.get(body.entityId)?.snapshot()).toEqual(body.snapshot());
+    expect(resumed.host.adapters.get('brain.fixture.actor')?.snapshot()).toEqual(first.host.adapters.get('brain.fixture.actor')?.snapshot());
+    expect(resumed.host.rng.snapshot()).toEqual(first.host.rng.snapshot());
+  } finally { resumed.host.dispose(); first.host.dispose(); }
+});
+
 test('a real hit assists only the authored pack members inside 14m', async () => {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const sim = createShardfileSim(packing(), new Map(), { rapier });
