@@ -141,6 +141,7 @@ if sys.argv[1].endswith('/preview-server.mjs'):
     try: server=http.server.HTTPServer(('127.0.0.1',port),http.server.SimpleHTTPRequestHandler)
     except OSError:
         print('preview-server: listen EADDRINUSE',flush=True); sys.exit(1)
+    print('Local: http://127.0.0.1:'+str(server.server_address[1])+'/',flush=True)
     server.serve_forever()
 if sys.argv[1].endswith('/build-mirror.mjs'):
     import pathlib,re
@@ -148,10 +149,13 @@ if sys.argv[1].endswith('/build-mirror.mjs'):
         assert len(sys.argv)==4 and re.fullmatch('[0-9a-f]{{40}}',sys.argv[3]), sys.argv
         sys.exit(0) # Admission has no slot/reservation; the real guard has its own tests.
     root=pathlib.Path(os.environ['FIXTURE_ROOT'])
-    rows=list((root/'registry').glob('[0-9]*'))
+    rows=list((root/'registry').glob(os.environ.get('SERVE_RESERVED_KEY','[0-9]*')))
     assert len(rows)==1 and rows[0].read_text().split()[0]==str(os.getppid()), rows
     assert '--slot' not in sys.argv
     (root/'mirror-entered').touch()
+    if os.environ.get('FIXTURE_MOVE_HEAD'):
+        subprocess=__import__('subprocess')
+        subprocess.run(['git','-C',str(root),'-c','user.name=fixture','-c','user.email=fixture@example.invalid','commit','--quiet','--allow-empty','-m','fixture after admission'],check=True)
     if os.environ.get('FIXTURE_MIRROR_FAIL'): sys.exit(124)
     command=sys.argv[sys.argv.index('--')+1:]
     os.execvp(command[0],command)
@@ -312,6 +316,26 @@ else:
         self.assertNotEqual(first_port, second_port)
         self.assertEqual(len((self.root / 'build-count').read_text().splitlines()), 2)
 
+    def test_os_assigned_starts_use_actual_ports_without_port_locks(self):
+        first, second = self.launch(0), self.launch(0)
+        first_port, _, _ = self.finish(first)
+        second_port, _, _ = self.finish(second)
+        self.assertGreater(first_port, 0)
+        self.assertGreater(second_port, 0)
+        self.assertNotEqual(first_port, second_port)
+        self.assertEqual(list((self.root / 'registry').glob('.port-*.lock')), [])
+        self.assertFalse((self.root / 'registry/0').exists())
+        self.assertEqual(list((self.root / 'registry').glob('building-*')), [])
+
+    def test_head_os_assigned_start_keeps_owned_mirror_handoff(self):
+        self.env['FIXTURE_MOVE_HEAD'] = '1'
+        port, row, stderr = self.finish(self.launch(0, '--head'))
+        self.assertGreater(port, 0)
+        self.assertTrue((self.root / 'mirror-entered').exists())
+        self.assertIn(self.sha, stderr)
+        self.assertFalse((Path(row[2]) / '.shared-preview').exists())
+        self.assertEqual(list((self.root / 'registry').glob('.port-*.lock')), [])
+
     def test_pinned_lanes_share_one_build_and_release_only_their_use(self):
         port = self.port()
         first = self.launch(port, '--head', owner='lane-a')
@@ -416,6 +440,15 @@ else:
         self.assertNotEqual(process.returncode, 0, stderr)
         self.assertEqual(list((self.root / 'registry').glob('[0-9]*')), [])
         self.assertEqual(list((self.root / 'registry').glob('.port-lease-*')), [])
+
+    def test_os_assigned_build_failure_releases_pending_metadata(self):
+        self.command('pnpm', '#!/bin/sh\nexit 1\n')
+        process = self.launch(0)
+        _, stderr = process.communicate(timeout=10)
+        self.assertNotEqual(process.returncode, 0, stderr)
+        self.assertEqual(list((self.root / 'registry').glob('building-*')), [])
+        self.assertEqual(list((self.root / 'registry').glob('[0-9]*')), [])
+        self.assertEqual(list((self.root / 'registry').glob('.port-*')), [])
 
     def test_post_build_conflict_reuses_finished_dist(self):
         port = self.port()

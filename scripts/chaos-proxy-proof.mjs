@@ -123,6 +123,24 @@ async function launch(work, target, extra = []) {
     throw new Error(`Proxy CLI readiness failed: ${errors}`, { cause: error })
   }
 }
+
+await test('CLI accepts standard port zero and reports actual owned listeners', { timeout: 10_000 }, async () => {
+  const base = absolute('tmp/codex-pagesize/proxy-port'); mkdirSync(base, { recursive: true });
+  const work = mkdtempSync(join(base, 'case-'));
+  const upstream = createServer((_request, response) => { response.end('owned upstream'); });
+  const listening = once(upstream, 'listening'); upstream.listen(0, '127.0.0.1'); await listening;
+  const address = upstream.address(); assert.ok(address !== null && typeof address === 'object');
+  /** @type {Awaited<ReturnType<typeof launch>>|undefined} */ let proxy;
+  try {
+    proxy = await launch(work, `http://127.0.0.1:${address.port}`, ['--port', '0']);
+    assert.ok(Number(new URL(proxy.ready.pageOrigin).port) > 0);
+    assert.ok(Number(new URL(proxy.ready.worldOrigin).port) > 0);
+    assert.equal(await (await fetch(proxy.ready.pageOrigin)).text(), 'owned upstream');
+  } finally {
+    await retire([() => proxy?.close(), () => new Promise(resolve => { upstream.close(resolve); }),
+      () => { rmSync(work, { recursive: true, force: true }); }]);
+  }
+});
 /** @param {string} origin */
 async function socket(origin) {
   const address = new URL(origin)

@@ -93,14 +93,16 @@ while [ $# -gt 0 ]; do
     *) echo "serve-build.sh: unknown option $1" >&2; exit 64;;
   esac
 done
+EPHEMERAL=0
+[[ "$PORT" =~ ^0+$ ]] && EPHEMERAL=1
 # Resolve once before queueing. Later HEAD movement must not change a waiting
 # request's source; the mirror child receives the same full pinned SHA.
 if [ $HEAD_ONLY -eq 1 ]; then
-  REV="${SERVE_SHARED_SHA:-$(git -C "$REPO" rev-parse --verify "$REV^{commit}")}" || exit 1
+  REV="${SERVE_PINNED_SHA:-${SERVE_SHARED_SHA:-$(git -C "$REPO" rev-parse --verify "$REV^{commit}")}}" || exit 1
   if [ -z "${SERVE_IN_MIRROR:-}" ]; then
     node "$REPO/scripts/build-mirror.mjs" authorize "$REV" >/dev/null || exit 2
   fi
-  if [ -z "${SERVE_SHARED_SHA:-}" ]; then
+  if [ -z "${SERVE_SHARED_SHA:-}" ] && [ "$EPHEMERAL" -eq 0 ]; then
     exec python3 "$REPO/scripts/serve-shared-preview.py" run "$REG" "$REV" "$MODE" "$CALLER" bash "$0" "${ARGS[@]}"
   fi
   # G620: the first pinned build contains every product, so every later lane's
@@ -143,7 +145,7 @@ REQUESTED_PORT="$PORT"; PORT_END=4999
 if [ -n "$PORT" ]; then
   [[ "$PORT" =~ ^[0-9]{1,5}$ ]] || { echo 'serve-build: invalid port' >&2; exit 64; }
   PORT=$((10#$PORT))
-  [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || { echo 'serve-build: invalid port' >&2; exit 64; }
+  [ "$PORT" -ge 0 ] && [ "$PORT" -le 65535 ] || { echo 'serve-build: invalid port' >&2; exit 64; }
   PORT_START=$PORT; PORT_END=65535
 else PORT_START=4400; fi
 
@@ -151,7 +153,12 @@ else PORT_START=4400; fi
 # into builders or detached previews. The helper also exits if its owner dies.
 if [ -n "${SERVE_RESERVED_PORT:-}" ]; then
   PORT="$SERVE_RESERVED_PORT"; stamp="${SERVE_RESERVED_STAMP:?}"
-  PORT_CHANNEL="${SERVE_RESERVED_CHANNEL:?}"; PORT_LEASE_OWNER=""
+  RESERVATION_KEY="${SERVE_RESERVED_KEY:-$PORT}"
+  [[ "$RESERVATION_KEY" =~ ^([0-9]+|building-[0-9]+)$ ]] || { echo 'serve-build: invalid reservation identity' >&2; exit 64; }
+  PORT_CHANNEL="${SERVE_RESERVED_CHANNEL:-}"; PORT_LEASE_OWNER=""
+  [ "$EPHEMERAL" -eq 1 ] || PORT_CHANNEL="${SERVE_RESERVED_CHANNEL:?}"
+elif [ "$EPHEMERAL" -eq 1 ]; then
+  PORT_CHANNEL=""; PORT_LEASE_OWNER=""
 else
   PORT_CHANNEL="$(mktemp -d "$REG/.port-lease-XXXXXX")" || exit 1
   mkfifo "$PORT_CHANNEL/commands" "$PORT_CHANNEL/replies" || exit 1
@@ -168,7 +175,8 @@ close_port_lease() {
 cleanup_reservation() {
   [ -n "${PREVIEW_PID:-}" ] && kill -TERM -- "-$PREVIEW_PID" 2>/dev/null
   close_port_lease
-  [ -n "${PORT:-}" ] && [ -f "$REG/$PORT" ] && grep -q "^$$ " "$REG/$PORT" && rm "$REG/$PORT"
+  local key="${RESERVATION_KEY:-${PORT:-}}"
+  [ -n "$key" ] && [ -f "$REG/$key" ] && grep -q "^$$ " "$REG/$key" && rm "$REG/$key"
   return 0
 }
 trap cleanup_reservation EXIT
@@ -181,26 +189,28 @@ port_lease() {
 }
 reserve_port() { # caller holds the registry lock; the OS lease stays held after unlock
   local p rc
+  if [ "$EPHEMERAL" -eq 1 ]; then PORT=0; RESERVATION_KEY="building-$$"; return 0; fi
   for ((p=PORT_START; p<=PORT_END; p++)); do
     [ -f "$REG/$p" ] && continue
     lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1 && continue
-    if port_lease "$p"; then PORT=$p; return 0; else rc=$?; fi
+    if port_lease "$p"; then PORT=$p; RESERVATION_KEY=$p; return 0; else rc=$?; fi
     [ "$rc" = 1 ] || return "$rc"
   done
   return 1
 }
 publish_reservation() { # atomic rows cannot be mistaken for dead, partially written owners
-  local entry="$REG/.entry-$PORT-$$"
-  if [ -n "${SERVE_SHARED_SHA:-}" ]; then
+  local key="${RESERVATION_KEY:-$PORT}" entry
+  entry="$REG/.entry-$key-$$"
+  if [ -n "${SERVE_SHARED_SHA:-}" ] && [ "$EPHEMERAL" -eq 0 ]; then
     mkdir -p "$BASE/$stamp" || return
     printf '%s\n' "$SERVE_SHARED_SHA" > "$BASE/$stamp/.shared-preview" || return
   fi
   printf '%s %s %s %s %s\n' "$1" "$2" "$BASE/$stamp" "$CALLER" "$3" > "$entry" || return
-  mv "$entry" "$REG/$PORT"
+  mv "$entry" "$REG/$key"
 }
 if [ -n "${SERVE_RESERVED_PORT:-}" ]; then
   # The outer shell owns the OS lease until this mirror child has finished.
-  read -r reserved_pid _ < "$REG/$PORT" || exit 1
+  read -r reserved_pid _ < "$REG/$RESERVATION_KEY" || exit 1
   [ "$reserved_pid" = "${SERVE_RESERVATION_PID:?}" ] && kill -0 "$reserved_pid" 2>/dev/null || { echo 'serve-build: lost preview reservation before mirror admission' >&2; exit 1; }
   publish_reservation "$$" "$(( $(date +%s) + 3600 ))" "$NAME(building)" || exit 1
 else
@@ -225,6 +235,7 @@ while :; do
     reserve_port || { unlock; echo 'serve-build: no free preview port' >&2; exit 1; }
     # reserve it: this shell holds the entry until the preview's pid replaces it (an exit before that drops it)
     stamp="$(date +%Y%m%d-%H%M%S)-$PORT"
+    [ "$EPHEMERAL" -eq 1 ] && stamp="$stamp-$$"
     publish_reservation "$$" "$(( $(date +%s) + 3600 ))" "$NAME(building)" || { unlock; exit 1; }
     unlock; break
   fi
@@ -257,8 +268,8 @@ fi
 # Preview admission precedes mirror admission. The parent keeps its reservation
 # and port lease across the child; a failed mirror wait is returned once.
 if [ $HEAD_ONLY -eq 1 ] && [ -z "${SERVE_IN_MIRROR:-}" ]; then
-  SERVE_IN_MIRROR=1 SERVE_RESERVED_PORT="$PORT" SERVE_RESERVED_STAMP="$stamp" \
-    SERVE_RESERVED_CHANNEL="$PORT_CHANNEL" SERVE_RESERVATION_PID="$$" \
+  SERVE_IN_MIRROR=1 SERVE_PINNED_SHA="$REV" SERVE_RESERVED_PORT="$PORT" SERVE_RESERVED_STAMP="$stamp" \
+    SERVE_RESERVED_CHANNEL="$PORT_CHANNEL" SERVE_RESERVED_KEY="$RESERVATION_KEY" SERVE_RESERVATION_PID="$$" \
     node "$REPO/scripts/build-mirror.mjs" run "$REV" -- bash "$REPO/scripts/serve-build.sh" "${ARGS[@]}"
   exit $?
 fi
@@ -355,19 +366,36 @@ preview_owns_port() {
 # Retry only listener conflicts, with one startup budget and the same dist.
 # No build work lives in this loop and no foreign listener is stopped.
 deadline=$((SECONDS + 30))
+adopt_os_port() {
+  local bound="$1" previous="$RESERVATION_KEY"
+  lock "$deadline" || return 2
+  if [ -e "$REG/$bound" ]; then unlock; return 1; fi
+  if ! [ -f "$REG/$previous" ] || ! grep -q "^$$ " "$REG/$previous"; then unlock; return 2; fi
+  mv "$REG/$previous" "$REG/$bound" || { unlock; return 2; }
+  PORT="$bound"; RESERVATION_KEY="$bound"
+  unlock
+}
 while :; do
   : > "$BASE/$stamp/preview.log"
   start_preview || exit 1
   PREVIEW_PID=$pid
-  ready=0
+  ready=0; candidate_busy=0
   while [ "$SECONDS" -lt "$deadline" ]; do
     kill -0 "$pid" 2>/dev/null || break
+    if [ "$EPHEMERAL" -eq 1 ] && [ "$PORT" -eq 0 ]; then
+      bound="$(sed -nE 's/.*Local: +http:\/\/127\.0\.0\.1:([0-9]+)\/.*/\1/p' "$BASE/$stamp/preview.log" | sed -n '$p')"
+      if [[ "$bound" =~ ^[0-9]+$ ]] && [ "$bound" -gt 0 ] && [ "$bound" -le 65535 ]; then
+        adopt_os_port "$bound"; adopted=$?
+        if [ "$adopted" -eq 1 ]; then candidate_busy=1; break; fi
+        [ "$adopted" -eq 0 ] || exit 1
+      fi
+    fi
     if preview_owns_port && curl --fail --silent --output /dev/null "http://127.0.0.1:$PORT/"; then ready=1; break; fi
     grep -Eq 'EADDRINUSE|[Pp]ort .*already in use' "$BASE/$stamp/preview.log" && break
     sleep 0.5
   done
   [ "$ready" -eq 1 ] && break
-  conflict=0
+  conflict=$candidate_busy
   if ! preview_owns_port && lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then conflict=1; fi
   grep -Eq 'EADDRINUSE|[Pp]ort .*already in use' "$BASE/$stamp/preview.log" && conflict=1
   kill -TERM -- "-$pid" 2>/dev/null || true
@@ -377,10 +405,10 @@ while :; do
     tail -30 "$BASE/$stamp/preview.log" >&2
     exit 1
   fi
-  old_port=$PORT; PORT_START=$((PORT + 1))
+  old_port=$PORT; old_key="$RESERVATION_KEY"; PORT_START=$((PORT + 1))
   lock "$deadline" || exit 124
   if ! reserve_port; then unlock; echo 'serve-build: no free retry port' >&2; exit 1; fi
-  [ -f "$REG/$old_port" ] && grep -q "^$$ " "$REG/$old_port" && rm "$REG/$old_port"
+  if [ "$old_key" != "$RESERVATION_KEY" ] && [ -f "$REG/$old_key" ] && grep -q "^$$ " "$REG/$old_key"; then rm "$REG/$old_key"; fi
   publish_reservation "$$" "$(( $(date +%s) + 3600 ))" "$NAME(starting)" || { unlock; exit 1; }
   unlock
   echo "serve-build: port $old_port became busy; reusing finished dist on $PORT" >&2

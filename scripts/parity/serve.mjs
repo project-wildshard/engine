@@ -4,7 +4,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { linkNodeModules } from '../link-node-modules.mjs';
-import { createServer } from 'node:net';
 import { get } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
@@ -27,8 +26,6 @@ export function exportTree(root, sha) {
   linkNodeModules(root,tree); // E432: @wildshard/* → this export
   return {tree,cleanup:()=>rmSync(dir,{recursive:true,force:true})};
 }
-/** @returns {Promise<number>} */
-async function freePort() { const s=createServer();await new Promise((resolve,reject)=>{s.once('error',reject);s.listen(0,'127.0.0.1',()=>resolve(undefined));}); const a=s.address();if(!a || typeof a==='string') throw new Error('no preview port'); await new Promise((resolve,reject)=>{s.close((e)=>{if(e)reject(e);else resolve(undefined);});});return a.port; }
 /** A bounded native HTTP readiness probe. Avoid undici's macOS socket QoS failure before browser capture.
  * @param {string} url @param {number} [timeoutMs] @returns {Promise<boolean>} */
 export function previewReady(url, timeoutMs=1000) {
@@ -43,12 +40,14 @@ export function previewReady(url, timeoutMs=1000) {
 export async function serve(tree,sha,built=false,{signal,telemetryDir}={}) {
   signal?.throwIfAborted();
   if(!built)buildTree(tree,sha);
-  const port=await freePort();
   // the host's plain preview server serves any tree's built bytes with that tree's _headers (D24)
   const server=fileURLToPath(new URL('../preview-server.mjs',import.meta.url));
-  const child=spawn(process.execPath,[server,'--root',tree,'--host','127.0.0.1','--port',String(port),...(telemetryDir === undefined ? [] : ['--telemetry-dir',telemetryDir])],{cwd:tree,stdio:['ignore','pipe','pipe'],detached:true});
+  const child=spawn(process.execPath,[server,'--root',tree,'--host','127.0.0.1','--port','0',...(telemetryDir === undefined ? [] : ['--telemetry-dir',telemetryDir])],{cwd:tree,stdio:['ignore','pipe','pipe','ipc'],detached:true});
   let startup='';child.stdout.on('data',(chunk)=>{startup+=String(chunk);});child.stderr.on('data',(chunk)=>{startup+=String(chunk);});
-  const url=`http://127.0.0.1:${port}`;
+  let url='';
+  child.on('message', message => {
+    if(typeof message==='object'&&message!==null&&'kind' in message&&message.kind==='preview-ready'&&'pid' in message&&message.pid===child.pid&&'port' in message&&typeof message.port==='number'&&Number.isInteger(message.port)&&message.port>0&&message.port<=65535) url=`http://127.0.0.1:${message.port}`;
+  });
   /** @type {Promise<void>} */
   const exited = new Promise(resolve => { child.once('close', () => { resolve(); }); });
   /** @type {Promise<void>|null} */ let closing = null;
@@ -65,7 +64,7 @@ export async function serve(tree,sha,built=false,{signal,telemetryDir}={}) {
   if (signal?.aborted) abort();
   // Serve the completed bytes with production headers, without importing the build's generation plugins again.
   const deadline=Date.now()+120000;
-  try {while(Date.now()<deadline){signal?.throwIfAborted();if(child.exitCode!==null) throw new Error(`preview exited: ${startup}`);if(await previewReady(`${url}/version.json`,Math.min(1000,Math.max(1,deadline-Date.now())))) return {url,close:()=>{void close();},closed:exited};await new Promise((resolve)=>{setTimeout(resolve,100);});} throw new Error(`preview never served: ${startup}`);}catch(e){await close();throw e;}
+  try {while(Date.now()<deadline){signal?.throwIfAborted();if(child.exitCode!==null) throw new Error(`preview exited: ${startup}`);if(url!==''&&await previewReady(`${url}/version.json`,Math.min(1000,Math.max(1,deadline-Date.now())))) return {url,close:()=>{void close();},closed:exited};await new Promise((resolve)=>{setTimeout(resolve,100);});} throw new Error(`preview never served: ${startup}`);}catch(e){await close();throw e;}
 }
 /** @param {string} path @returns {unknown} */
 export function readJson(path) {return existsSync(path) ? JSON.parse(readFileSync(path,'utf8')) : undefined;}

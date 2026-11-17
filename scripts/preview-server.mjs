@@ -248,9 +248,17 @@ const server = createServer((req, res) => {
   if (req.method === 'HEAD') res.end(); else createReadStream(file).pipe(res);
 });
 server.on('error', error => { console.error(`preview-server: ${error.message}`); process.exit(1); });
+if (process.send !== undefined) {
+  process.once('disconnect', () => { server.close(); process.exit(0); });
+  process.once('error', () => { server.close(); process.exit(1); });
+}
 server.listen(port, host, () => {
   const address = server.address(), bound = typeof address === 'object' && address !== null ? address.port : port;
   console.log(`preview-server: local telemetry records ${telemetryDirectory}`);
   console.log(`  ➜  Local:   http://${host}:${bound}/`);
+  if (process.send !== undefined) {
+    if (!process.connected) { server.close(); process.exit(0); }
+    process.send({ kind: 'preview-ready', pid: process.pid, port: bound });
+  }
 });
 process.on('SIGTERM', () => { server.close(); process.exit(0); });

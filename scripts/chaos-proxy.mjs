@@ -4,7 +4,9 @@ import { openChaosProxy } from './chaos-proxy-core.mjs'
 
 /** @type {Map<string,string>} */
 const values = new Map()
-for (const arg of process.argv.slice(2)) {
+const args = process.argv.slice(2)
+for (let index = 0; index < args.length; index++) {
+  const arg = args[index] === '--port' ? `--port=${args[++index] ?? ''}` : args[index] ?? ''
   const match = /^--([\w-]+)=(.+)$/u.exec(arg)
   if (
     match?.[1] === undefined ||
@@ -19,6 +21,7 @@ if (
     key =>
       ![
         'work',
+        'port',
         'page-upstream',
         'release-upstream',
         'world-upstream',
@@ -33,6 +36,12 @@ if (
   !values.has('work')
 )
   throw new Error('Explicit --work and known fixture options are required')
+if (values.has('port')) {
+  if (values.get('port') !== '0' || ['page-port', 'world-port', 'tls-port'].some(key => values.has(key) && values.get(key) !== '0'))
+    throw new Error('--port 0 requests OS-assigned listeners; use explicit named port options for fixed ports')
+  values.delete('port')
+  for (const key of ['page-port', 'world-port', 'tls-port']) values.set(key, '0')
+}
 const options = {
   work: values.get('work') ?? '',
   ...Object.fromEntries(
