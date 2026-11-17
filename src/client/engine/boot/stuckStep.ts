@@ -52,11 +52,14 @@ export interface StuckCard { readonly dataset: Readonly<Record<string, string | 
  *  the verified bytes read, the files done or the bytes streamed (`data-streamed-bytes`: a part's chunks as they arrive,
  *  before its members verify, src/client/game/boot/spawnDownload.ts) do, and each beat of a wait for a seat in a full world
  *  (`data-seat-wait`, J178: that wait is the world's, and no hang). A card whose PLAY is up (`data-ready`, set only while
- *  Loading waits for PLAY) waits on the player. No card: the boot is still in its modules. */
+ *  Loading waits for PLAY) waits on the player, as a page with its recovery page or Name prompt up does. No card: the boot is
+ *  still in its modules. */
 export function progressOfCard(card: StuckCard | null, page?: Pick<ParentNode, 'querySelector'>): StuckProgress {
   // A mounted recovery page has already replaced the loader with an actionable explanation.
   // Its owner removes the marker on recovery/disposal; a badge or an ordinary pending boot never owns this wait.
-  const recovery = page !== undefined && page.querySelector('[data-boot-wait="recovery"]') !== null;
+  // QA 11-16 mini row 85: the Name prompt a joining page shows (namePrompt.ts `askNameToJoin`, inside the "server" step) waits on
+  // the player too: a minute spent typing a Name is no hang, and it tripped the watchdog on the hosted iOS Simulator.
+  const recovery = page !== undefined && page.querySelector('[data-boot-wait="recovery"], [data-boot-wait="player"]') !== null;
   if (card === null) return { step: 'modules', signature: 'modules', ...(recovery ? { player: true } : {}) };
   const data = card.dataset, step = data['step'] ?? 'modules';
   return { step, signature: [step, data['setup'] ?? '', data['readBytes'] ?? '', data['spawnFilesDone'] ?? '', data['streamedBytes'] ?? '', data['seatWait'] ?? ''].join('|'),

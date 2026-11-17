@@ -78,7 +78,7 @@ export function showNamePrompt(scope: Scope, options: NamePromptOptions): Promis
   const own = scope.child('name-prompt');
   const box = make('form', 'ws-name'), card = make('div', 'ws-name-card'), input = field(options.current ?? '');
   const error = make('p', 'ws-name-error'), go = make('button', 'ws-name-go', engineString('s_name_go')), skip = make('button', 'ws-name-skip', engineString('s_name_skip'));
-  box.id = 'ws-name-box'; box.noValidate = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+  box.id = 'ws-name-box'; box.dataset['bootWait'] = 'player'; box.noValidate = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
   const label = make('label', 'ws-name-ask', engineString('s_name_ask')); label.htmlFor = input.id = 'ws-name-field';
   error.setAttribute('role', 'alert'); error.hidden = true;
   go.type = 'submit'; skip.type = 'button'; skip.dataset['name'] = 'skip';
