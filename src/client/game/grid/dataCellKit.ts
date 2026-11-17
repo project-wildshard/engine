@@ -17,7 +17,7 @@ import { EquipmentService } from '@wildshard/engine/combat/EquipmentService';
 import type { Weapon } from '@wildshard/engine/combat/Weapon';
 import { playerModes } from '@wildshard/engine/player/modes';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { installDeclaredItems, leverLines, rackMeleeRows, takenLine } from '../../../shared/game/shardfile/items';
+import { installDeclaredItems, leverLines, rackMeleeRows, rackToolRows, takenLine } from '../../../shared/game/shardfile/items';
 import { declaredItemIcon, declaredKitItemFamilies, declaredLever } from '../plugin/weaponFamily';
 import { itemScene } from '../shardfile/clientItems';
 import { loadItemModels } from '../shardfile/itemModels';
@@ -47,7 +47,7 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   };
   const items = installDeclaredItems(source.items, { scope: entry, actorId: actor.id, input: app.input, bindings: app.input.bindings,
     observation: { get mode() { return playerModes(player).current(); }, get item() { return app.equipment?.current.row.id ?? null; }, get flags() { return wirePage.client === null ? [] : [...wirePage.client.flags()]; } },
-    families: declaredKitItemFamilies(), models, icon: declaredItemIcon, racked: rackMeleeRows(source),
+    families: declaredKitItemFamilies(), models, icon: declaredItemIcon, racked: new Set([...rackMeleeRows(source), ...rackToolRows(source)]),
     aim: () => ({ origin: camera.getWorldPosition(new Vector3()), direction: camera.getWorldDirection(new Vector3()) }),
     // SR11 (C9): on the wire an item request is the scene the server takes it by
     relay: (item, action) => { const scene = itemScene(source, item, action); if (scene === undefined || wirePage.client === null) return false; wirePage.send(scene); return true; },
@@ -81,6 +81,7 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   // in hand (a kit cannot lock its first); the server refuses its blows until it is taken
   // by the row's id (`weapon.sword-iron`), as the server's taken line names it, not the page's (`declared.weapon.sword-iron`)
   const onRacks = rackMeleeRows(source), racked = new Set(weapons.filter(weapon => onRacks.has(weapon.row.id)));
+  const onStands = rackToolRows(source), stands = new Set(items.tools.filter(tool => onStands.has(tool.row.id)));
   app.addContentSystem({ id: 'grid.data-cell-kit', phase: 'update', run: (dt, t) => {
     for (const lever of levers) {
       if (wirePage.client !== null && here()) {
@@ -92,6 +93,11 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
     if (wirePage.client !== null && here()) for (const weapon of racked) {
       if (wirePage.line(takenLine(weapon.row.id)) <= 0) continue;
       racked.delete(weapon); if (!kit.has(weapon.id)) { kit.unlock(weapon.id); kit.select(weapon.id); }
+    }
+    // SHARD-SOURCE SS-GF1a1a: a tool on a stand is in the kit locked until its taken line says this player took it
+    if (wirePage.client !== null && here()) for (const tool of stands) {
+      if (wirePage.line(takenLine(tool.row.id)) <= 0) continue;
+      stands.delete(tool); if (!kit.has(tool.id)) kit.unlock(tool.id);
     }
     kit.update(dt, t);
   } }, entry);

@@ -19,7 +19,7 @@ import type { AimCommand } from '@wildshard/engine/input/commands';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
-import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, rackMeleeRows, SERVER_KIT_FAMILIES, takenLine, type LeverProfile } from '../../../shared/game/shardfile/items';
+import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, rackMeleeRows, rackToolRows, SERVER_KIT_FAMILIES, takenLine, type LeverProfile } from '../../../shared/game/shardfile/items';
 import { playerSeats, type PlayerSeat } from '../plugin/playerSeats';
 import { nativeRangedHit } from '../plugin/nativeItems';
 import { installStatusEffects } from './statusEffects';
@@ -100,8 +100,10 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
   if (flagged.length > 0) questBooks(host).claim(flagged);
   // TEMPLATE-E2E TC-E4 (J361: Mossgate's sword is found on a rack): a melee weapon a rack takes starts on that rack, per player
   const rackMelee = rackMeleeRows(shard);
+  // SHARD-SOURCE SS-GF1a1a: a tool the loadout does not carry and a stand takes starts on that stand, per player
+  const rackTools = rackToolRows(shard), onRacks = new Set([...rackMelee, ...rackTools]);
   // A rack's prompt arrives by its own id (the page's wire id): a lever's or a racked melee weapon's names its scene
-  const leverPrompts = new Map(shard.targets.interactions.flatMap(row => (shard.targets.itemActions ?? []).some(action => action.scene === row.scene && (levers.has(action.item) || rackMelee.has(action.item))) ? [[row.id, row.scene] as const] : []));
+  const leverPrompts = new Map(shard.targets.interactions.flatMap(row => (shard.targets.itemActions ?? []).some(action => action.scene === row.scene && (levers.has(action.item) || onRacks.has(action.item))) ? [[row.id, row.scene] as const] : []));
   const fields = (shard.targets.itemFields ?? []).flatMap(row => {
     const field = shard.state.player.find(entry => entry.id === row.fieldId);
     return field === undefined || field.privacy === 'host' ? [] : [{ item: row.item, name: field.name, property: row.property }];
@@ -132,7 +134,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
       const seat: LeverSeat = { act: new RangedAction.Cycle(store, { magazine: profile.magazine, reload: profile.reload, ...profile.lever }), store, taken: id === primary, sinceEmpty: 99 };
       return [id, seat] as const;
     }));
-    const racked = new Set(rackMelee);
+    const racked = new Set(onRacks);
     return { runtimes, levers: seated, racked,
       step: dt => {
         for (const runtime of runtimes.values()) runtime.step(host.state.tick, dt);
@@ -146,7 +148,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         }
       },
       snapshot: (): SimValue => ({ ...Object.fromEntries([...runtimes].map(([id, runtime]) => [id, runtime.snapshot()])), ...Object.fromEntries([...seated].map(([id, seat]) => [id, leverSnapshot(seat)])),
-        ...(rackMelee.size === 0 ? {} : { [RACKED]: [...racked].sort() }) }),
+        ...(onRacks.size === 0 ? {} : { [RACKED]: [...racked].sort() }) }),
       restore: value => {
         if (!isStates(value)) throw new Error('Invalid declared kit item continuation');
         // A player's document can come from an older room (E7.4): its tick is that room's. The runtime's tick only orders steps,
@@ -156,7 +158,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         for (const [id, seat] of seated) { const saved: unknown = value[id]; if (saved !== undefined) restoreLever(seat, saved); if (id === primary) seat.taken = true; }
         // A save from before TC-E4 has no rack list: its weapons stay on their racks, as a fresh player's do.
         const saved: unknown = value[RACKED];
-        if (Array.isArray(saved)) { racked.clear(); for (const id of saved) if (typeof id === 'string' && rackMelee.has(id)) racked.add(id); }
+        if (Array.isArray(saved)) { racked.clear(); for (const id of saved) if (typeof id === 'string' && onRacks.has(id)) racked.add(id); }
       } };
   });
   // Joined: a save made before this owner existed restores, and its items start fresh.
@@ -171,10 +173,10 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
       out.set(field.name, field.property === 'fuel' ? Math.round(runtime.remainingFuel * FUEL_STEPS) / FUEL_STEPS : Number(runtime.lightOn));
     }
   });
-  if (rackMelee.size > 0) publishOwned(host, 'items.declared-rack', (id, out) => {
+  if (onRacks.size > 0) publishOwned(host, 'items.declared-rack', (id, out) => {
     const player = host.players.get(id); if (player === undefined) return;
     const { racked } = seats.of(player);
-    for (const item of rackMelee) out.set(takenLine(item), Number(!racked.has(item)));
+    for (const item of onRacks) out.set(takenLine(item), Number(!racked.has(item)));
   });
   if (levers.size > 0) publishOwned(host, 'items.declared-lever', (id, out) => {
     const player = host.players.get(id); if (player === undefined) return;
@@ -277,8 +279,18 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         raise(id, row);
         return true;
       }
+      // SS-GF1a1a: 3 takes a tool off its stand into the kit, lit and full; a later take refills it and never puts it out
+      if (taker !== undefined && row.action === 3 && rackTools.has(row.item)) {
+        const runtime = seats.of(taker).runtimes.get(row.item);
+        if (runtime === undefined || !near(taker, scene)) return true;
+        seats.of(taker).racked.delete(row.item);
+        safely(() => { runtime.queue(4); if (!runtime.lightOn && !runtime.snapshot().pending.some(command => command.action === 3)) runtime.queue(3); });
+        raise(id, row);
+        return true;
+      }
       const player = taker, runtime = player === undefined ? undefined : seats.of(player).runtimes.get(row.item);
-      if (player === undefined || runtime === undefined) return true;
+      // a tool still on its stand takes no other use (a refill, a toggle) until it is taken
+      if (player === undefined || runtime === undefined || seats.of(player).racked.has(row.item)) return true;
       let queued = false;
       safely(() => { runtime.queue(row.action); queued = true; });
       // a flag is the prompt's: the player stands at a prompt that names it, and the item takes the use

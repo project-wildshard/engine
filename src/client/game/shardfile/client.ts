@@ -80,7 +80,7 @@ import { buildYield } from '@wildshard/engine/core/workSlice';
 import { clientScene, handledItemInputs, itemScene } from './clientItems';
 import { installShardfileColliders } from '../../../shared/game/shardfile/collisionBindings';
 import type { ClientAssets } from './clientAssets';
-import { installDeclaredItems, leverLines, rackMeleeRows, takenLine, type DeclaredItems } from '../../../shared/game/shardfile/items';
+import { installDeclaredItems, leverLines, rackMeleeRows, rackToolRows, takenLine, type DeclaredItems } from '../../../shared/game/shardfile/items';
 import { declaredLever } from '../plugin/weaponFamily';
 import { runtimeBoundWorldFiles, withoutRuntimeRows } from "../../../shared/game/plugin/runtimeRows";
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -456,7 +456,7 @@ export class ShardfileClient {
     runtime.buildEquipment = () => {
       // a retained (grid) runtime's item input contexts are entered-only (installPageItemContexts), so copies never collide
       const retained = retainsRuntimeServices(ctx); if (retained) installPageItemContexts(ctx, source);
-      const items = installDeclaredItems(source.items, { scope: ctx.scope, actorId: actor.id, input: ctx.app.input, bindings: ctx.app.input.bindings, ...(retained ? { contexts: 'runtime' as const } : {}), observation: { get mode() { const actorPlayer = ctx.game.runtime?.world?.player; return actorPlayer === undefined ? 'foot' : playerModes(actorPlayer).current(); }, get item() { return ctx.app.equipment?.current.row.id ?? null; }, get flags() { return runtime.hooks.questFlags?.() ?? []; } }, families: this.bindings.items, models: this.itemModels, icon: this.bindings.icon, racked: rackMeleeRows(source),
+      const items = installDeclaredItems(source.items, { scope: ctx.scope, actorId: actor.id, input: ctx.app.input, bindings: ctx.app.input.bindings, ...(retained ? { contexts: 'runtime' as const } : {}), observation: { get mode() { const actorPlayer = ctx.game.runtime?.world?.player; return actorPlayer === undefined ? 'foot' : playerModes(actorPlayer).current(); }, get item() { return ctx.app.equipment?.current.row.id ?? null; }, get flags() { return runtime.hooks.questFlags?.() ?? []; } }, families: this.bindings.items, models: this.itemModels, icon: this.bindings.icon, racked: new Set([...rackMeleeRows(source), ...rackToolRows(source)]),
         aim: () => ({ origin: world.game.camera.getWorldPosition(new Vector3()), direction: world.game.camera.getWorldDirection(new Vector3()) }),
         relay: (item, action) => relayItem(source, item, action),
         runtime: (row) => ({ actor, combat: ctx.app.combat, active: () => ctx.app.state === 'play' && !world.freeCamera,
@@ -662,15 +662,28 @@ export class ShardfileClient {
     };
     // TEMPLATE-E2E TC-E4b: a melee weapon on a rack starts locked; its owned taken line (or, off the wire, its rack's scene) unlocks it
     const onRacks = rackMeleeRows(source), racked = new Set([items.primary, items.secondary, ...items.extras].filter((weapon): weapon is NonNullable<typeof weapon> => weapon !== null && onRacks.has(weapon.row.id)));
-    const takeRacked = (item: string): boolean => {
+    // SHARD-SOURCE SS-GF1a1a: a tool on a stand is in the kit locked; its taken line (or, off the wire, its stand's scene) unlocks
+    // it, and off the wire the scene lights it full here as the server's take does
+    const onStands = rackToolRows(source), stands = new Set(items.tools.filter(tool => onStands.has(tool.row.id)));
+    const takeRacked = (item: string, here = false): boolean => {
+      const tool = [...stands].find(entry => entry.row.id === item);
+      if (tool !== undefined) {
+        stands.delete(tool); play.weapons.unlock(tool.id);
+        const held = items.runtimes.get(item);
+        if (here && held !== undefined) { held.queue(4); if (!held.lightOn) held.queue(3); }
+        return true;
+      }
+      if (onStands.has(item)) { const held = items.runtimes.get(item); if (here && held !== undefined) held.queue(4); return true; }
       const weapon = [...racked].find(entry => entry.row.id === item); if (weapon === undefined) return false;
       racked.delete(weapon); play.weapons.unlock(weapon.id); play.weapons.select(weapon.id);
       return true;
     };
-    takenHere = item => levers.some(lever => lever.row.id === item && lever.taken) || onRacks.has(item) && ![...racked].some(weapon => weapon.row.id === item);
-    const scene = clientScene(source, items.runtimes, () => undefined, (item, action) => relayItem(source, item, action) || takeHere(item, action) || action === 3 && takeRacked(item));
-    if (levers.length > 0 || racked.size > 0) ctx.system({ id: 'shardfile.lever-lines', phase: 'update', run: () => {
+    takenHere = item => levers.some(lever => lever.row.id === item && lever.taken) || onRacks.has(item) && ![...racked].some(weapon => weapon.row.id === item)
+      || onStands.has(item) && ![...stands].some(tool => tool.row.id === item);
+    const scene = clientScene(source, items.runtimes, () => undefined, (item, action) => relayItem(source, item, action) || takeHere(item, action) || action === 3 && takeRacked(item, true));
+    if (levers.length > 0 || racked.size > 0 || stands.size > 0) ctx.system({ id: 'shardfile.lever-lines', phase: 'update', run: () => {
       if (wirePage.client !== null) for (const weapon of racked) if (wirePage.line(takenLine(weapon.row.id)) > 0) takeRacked(weapon.row.id);
+      if (wirePage.client !== null) for (const tool of stands) if (wirePage.line(takenLine(tool.row.id)) > 0) takeRacked(tool.row.id);
       for (const lever of levers) {
         if (wirePage.client !== null) {
           const lines = leverLines(lever.row.id);

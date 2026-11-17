@@ -57,7 +57,8 @@ export interface DeclaredItemPorts {
   bindings?: Pick<InputService['bindings'], 'describe'>;
   /** A page on the wire (SR11, C9): an item request goes to the server's runtime, and none queues here. False: no wire, it queues here. */
   relay?: (item: string, action: ItemAction) => boolean;
-  /** TEMPLATE-E2E TC-E4b: melee rows that start on a rack (`rackMeleeRows`): locked in the page's kit until taken, as a lever is. */
+  /** TEMPLATE-E2E TC-E4b: melee rows that start on a rack (`rackMeleeRows`): locked in the page's kit until taken, as a lever is.
+   *  SS-GF1a1a: and tools on a stand (`rackToolRows`): in the kit, locked (not drawn, not used) until taken. */
   racked?: ReadonlySet<string>;
 }
 /** Merge a trusted shard's own item families over the kit's, refusing a foreign or shadowing name. */
@@ -106,6 +107,13 @@ export function takenLine(id: string): string { return `${id}.taken`; }
 export function rackMeleeRows(shard: { readonly items: { readonly rows: readonly { readonly id: string; readonly kind?: string; readonly family?: string }[]; readonly loadout: { readonly primary: string | null } }; readonly targets: { readonly itemActions?: readonly { readonly item: string; readonly action: number }[] | undefined } }): ReadonlySet<string> {
   const melee = new Set(shard.items.rows.filter(row => row.kind === 'weapon' && row.family === 'kit.melee').map(row => row.id));
   return new Set((shard.targets.itemActions ?? []).flatMap(row => row.action === 3 && melee.has(row.item) && row.item !== shard.items.loadout.primary ? [row.item] : []));
+}
+/** SHARD-SOURCE SS-GF1a1a: the declared tools a stand hands over (an item scene's take, action 3) that the loadout does not
+ *  carry (a spirit lantern found on its stand). Each starts on its stand for every player; the take puts it in that player's
+ *  kit, lit and full. */
+export function rackToolRows(shard: { readonly items: { readonly rows: readonly { readonly id: string; readonly kind?: string }[]; readonly loadout: { readonly tools: readonly string[] } }; readonly targets: { readonly itemActions?: readonly { readonly item: string; readonly action: number }[] | undefined } }): ReadonlySet<string> {
+  const tools = new Set(shard.items.rows.filter(row => row.kind === 'tool' && !shard.items.loadout.tools.includes(row.id)).map(row => row.id));
+  return new Set((shard.targets.itemActions ?? []).flatMap(row => row.action === 3 && tools.has(row.item) ? [row.item] : []));
 }
 /** Normal equipment factory result plus authoritative fixed-step runtimes, scoped to the one session. */
 export interface DeclaredItems {
@@ -184,7 +192,8 @@ export function installDeclaredItems(input: unknown, ports: DeclaredItemPorts): 
     const primary = data.loadout.primary === null ? null : weapons.get(data.loadout.primary) ?? null;
     const secondary = data.loadout.secondary === null ? null : weapons.get(data.loadout.secondary) ?? null;
     return { primary, secondary, extras: [...weapons.values()].filter((w) => w !== primary && w !== secondary), tools: [...tools.values()], order: [...weapons.values()].map((w) => w.id), runtimes,
-      install: (equipment) => { for (const w of weapons.values()) if (!locked.has(w.row.id)) equipment.unlock(w.id); for (const id of data.loadout.tools) { const t = tools.get(id); if (t !== undefined) equipment.add(t, { locked: false }); } },
+      install: (equipment) => { for (const w of weapons.values()) if (!locked.has(w.row.id)) equipment.unlock(w.id); for (const id of data.loadout.tools) { const t = tools.get(id); if (t !== undefined) equipment.add(t, { locked: false }); }
+        for (const [id, t] of tools) if (!(data.loadout.tools as readonly string[]).includes(id) && ports.racked?.has(id) === true) equipment.add(t, { locked: true }); },
       step: (tick, dt) => { if (!scope.disposed) for (const runtime of runtimes.values()) runtime.step(tick, dt); } };
   } catch (error) { scope.dispose(); throw error; }
 }
