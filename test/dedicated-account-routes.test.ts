@@ -110,6 +110,7 @@ test('review S3: a live join ticket deletes and exports nothing; only a fresh co
 test('review S3: a confirm never seats a hello, and a join ticket is never a confirm', async () => {
   const key = keys();
   expect(await admit(ticket(key.privateKey), key.spkiHex, Date.now()), 'a confirm as a hello is refused').toBeUndefined();
+  expect(await admit('deleted:0b6f1a52-7f4e-4d7a-9a1c-3c2b1d0e9f87', key.spkiHex, Date.now()), 'review: an anonymous ledger is nobody\'s seat').toBeUndefined();
   expect(await confirmed(joinTicket(key.privateKey), key.spkiHex, Date.now())).toBeUndefined();
   expect(await confirmed(ticket(key.privateKey), key.spkiHex, Date.now())).toBe(ACCOUNT);
 });

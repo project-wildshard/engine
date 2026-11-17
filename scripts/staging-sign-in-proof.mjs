@@ -33,11 +33,12 @@ const kv = args => execFileSync(join(ROOT, 'node_modules/.bin/wrangler'), ['kv',
 /** Quoted-printable, as the mail's text part is sent. @param {string} text */
 const unquote = text => text.replaceAll(/[=]\r?\n/gu, '').replaceAll(/[=](?<hex>[0-9A-F]{2})/gu, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)));
 
-/** The link in the newest mail for the address sent after `since`, waiting up to two minutes. @param {string} since */
-async function linkAfter(since) {
+/** The mail keys for the address now. */
+const mailKeys = () => new Set(/** @type {{ name: string }[]} */ (JSON.parse(kv(['list', '--prefix', `mail/${EMAIL}/`]))).map(key => key.name));
+/** The link in the newest mail for the address not in `before`, waiting up to two minutes. @param {Set<string>} before */
+async function linkAfter(before) {
   for (let tries = 0; tries < 24; tries++) {
-    const keys = /** @type {{ name: string }[]} */ (JSON.parse(kv(['list', '--prefix', `mail/${EMAIL}/`]))).map(key => key.name).filter(name => name.slice(-24) > since).sort();
-    const newest = keys.at(-1);
+    const newest = [...mailKeys()].filter(name => !before.has(name)).sort().at(-1);
     if (newest !== undefined) {
       const link = /(?<link>https:\/\/\S+?#login=wsl_[\w-]+)/u.exec(unquote(kv(['get', newest])))?.groups?.link;
       if (link !== undefined) return link;
@@ -56,13 +57,15 @@ for (const engine of engines) {
     const version = await page.evaluate(async () => (await (await fetch('/version.json', { cache: 'no-store' })).json()).clientVersion);
     note(`${engine}: staging page up`, true, { version });
     await page.locator('.ws-main-signin').click();
-    const since = new Date().toISOString();
+    const before = mailKeys();
     await page.locator('#ws-signin .ws-signin-email').fill(EMAIL);
     await page.locator('#ws-signin .ws-signin-send').click();
     await page.locator('#ws-signin .ws-signin-note', { hasText: 'Check your email' }).waitFor({ timeout: 15_000 });
     note(`${engine}: the card mailed a link`, true);
-    const link = await linkAfter(since);
-    note(`${engine}: the link arrived in the real inbox`, link.startsWith(`${PAGE}/`));
+    const link = await linkAfter(before);
+    // a link for any other page (prod) is never opened
+    if (!link.startsWith(`${PAGE}/`)) throw new Error('the mailed link is not for the page under test');
+    note(`${engine}: the link arrived in the real inbox`, true);
     await page.goto(link, { waitUntil: 'load' });
     const who = page.locator('#ws-signin .ws-signin-who');
     await who.waitFor({ timeout: 150_000 });

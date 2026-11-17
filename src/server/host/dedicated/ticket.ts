@@ -39,7 +39,8 @@ async function signed(text: string, signature: string, spkiHex: string | undefin
  */
 export async function admit(player: string, spkiHex: string | undefined, nowMs: number): Promise<Admission | undefined> {
   const groups = TICKET.exec(player)?.groups;
-  if (groups === undefined) return player.startsWith('account:') || player.startsWith('ticket:') || player.startsWith('confirm:') ? undefined : { seat: player };
+  // a deleted or expired player's anonymous ledger (`deleted:`, MP2.5f/g) is nobody's to play as
+  if (groups === undefined) return ['account:', 'ticket:', 'confirm:', 'deleted:'].some(kind => player.startsWith(kind)) ? undefined : { seat: player };
   const { signed: text = '', player: id = '', device = '', expires = '0', signature = '' } = groups;
   const live = Number(expires) * 1000 > nowMs && await signed(text, signature, spkiHex);
   return live ? { seat: `account:plr_${id}`, from: device } : { seat: device };
