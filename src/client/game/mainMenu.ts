@@ -207,7 +207,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const play = (): void => { void named(enterPlay); };
   deck.onTap(selectCard, play);
   // FM4 9b/10b: the title's gate (a world build's) may hold the MMO's entry too, until the world is back
-  const enterMmo = (): void => { void named(() => { const go = (): void => { dropFirstPlay(); onGrid(); leaveTitle(); }; if (deckOpts.gate === undefined) go(); else deckOpts.gate(go); }); };
+  const enterMmo = (): void => { void named(() => { const go = (): void => { dropFirstPlay(); onGrid(); leaveTitle(); }; if (deckOpts.gate === undefined) go(); else void deckOpts.gate(go); }); };
   deck.onTap(mmoCard, enterMmo);
   // S2: only the player's last product, after the title paints; a first visit reads nothing. This is verified
   // disk prefetch, never world construction or a hidden offline-size scan. It shows nothing (QB2).

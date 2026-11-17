@@ -157,17 +157,15 @@ async function onlineGate(): Promise<OnlineGate> {
 }
 /** FM4 9b/10b: the title's Enter world on a world build asks the world first (online.js `titleEnter`): a restart this tab heard and a
  *  quiet world, or a move due in the last 15 s, holds the tap on a card that joins by itself. No world (preview, solo): no gate. */
-export function titleEntryGate(world: unknown, gate: () => Promise<OnlineGate> = onlineGate): ((go: () => void) => void) | undefined {
+export function titleEntryGate(world: unknown, gate: () => Promise<OnlineGate> = onlineGate): ((go: () => void) => Promise<void>) | undefined {
   if (typeof world !== 'object' || world === null || !('release' in world) || !('key' in world)) return undefined;
   const { release, key } = world;
   if (typeof release !== 'string' || typeof key !== 'string') return undefined;
-  return go => {
-    void (async (): Promise<void> => {
-      let online: OnlineGate;
-      try { online = await gate(); } catch { go(); return; }
-      if (online.titleEnter === undefined) { go(); return; }
-      await online.titleEnter({ release, key }, go);
-    })();
+  return async go => {
+    let online: OnlineGate;
+    try { online = await gate(); } catch { go(); return; }
+    if (online.titleEnter === undefined) { go(); return; }
+    await online.titleEnter({ release, key }, go);
   };
 }
 /** The door's word read as grid or not and the shards it opens, or null when no word came (unreachable, stalled, closed before its word). */

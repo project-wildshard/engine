@@ -456,11 +456,11 @@ try {
       const entered = await fresh(); const { page } = entered;
       try {
         await page.goto(URL_PLAY); await intoWorld(entered);
-        const before = await control();
-        await arm(item.id, [{ route: 'socket', kind: 'close', code: 4005, reason: 'restart' }]);
+        const before = await control(), named = item.id.replace('/', '-');
+        await arm(named, [{ route: 'socket', kind: 'close', code: 4005, reason: 'restart' }]);
         for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
         if (await matchedSince(before, 'socket') === 0) return { outcome: 'harness-fail', reason: 'the restart close matched nothing' };
-        await arm(`${item.id}-held`, [{ route: 'socket', kind: 'refuse-upgrade', code: 503 }]);
+        await arm(`${named}-held`, [{ route: 'socket', kind: 'refuse-upgrade', code: 503 }]);
         const heard = await screen(page, 'restart', 10_000);
         if (heard === null) return { outcome: 'harness-fail', reason: 'the page never showed the in-world restart banner', notes: await onScreen(page) };
         await page.goto(`${PAGE_ORIGIN}/?mute=1&nolock=1`);

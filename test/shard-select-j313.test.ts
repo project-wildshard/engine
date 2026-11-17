@@ -80,3 +80,24 @@ test('J313: the title summary counts Mossgate for a player, since its catalogue 
   expect(view.earned).toBe(2);
   expect(view.lines.some(({ slug }) => slug === 'brasscap-mesa')).toBe(false);
 });
+
+// FM4 9b/10b (meta MMO-FAILURE-MODES-PLAN; review of plan/mfm2): a world build's title gate may hold ENTER WORLD while it asks the world.
+test('a gated ENTER WORLD stays busy while the gate asks, and enters the card tapped even if the deck moved meanwhile', async () => {
+  installTitleManifests(ROWS);
+  let release: () => void = () => undefined, enter: () => void = () => undefined;
+  const entered: string[] = [];
+  const deck = buildTitleDeck({ cards: titleCards(false, () => null, () => null), active: null, onEnter: (card) => { entered.push(card.slug); },
+    onExplore: () => undefined, onSettings: () => undefined, mode: () => PLAYER,
+    gate: (go) => new Promise<void>((resolve) => { enter = go; release = resolve; }) });
+  document.body.append(deck.root); decks.push(deck);
+  const play = deck.root.querySelector<HTMLButtonElement>('.ws-menu-play');
+  deck.select(deck.cards.findIndex((card) => card.slug === 'pine-hollow'), false);
+  play?.click();
+  expect(play?.getAttribute('aria-busy')).toBe('true');
+  deck.select(0, false);
+  enter(); release();
+  await Promise.resolve(); await Promise.resolve();
+  expect(play?.getAttribute('aria-busy')).toBeNull();
+  await new Promise((resolve) => { setTimeout(resolve, 50); });
+  expect(entered).toEqual(['pine-hollow']);
+});

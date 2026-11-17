@@ -297,8 +297,13 @@ async function showPageTitle(refusal = ''): Promise<void> {
   // FM4 9b/10b: on a world build, Enter world asks the world first and may hold on a card until it is back (no title weight: the
   // gate's code loads on the tap)
   const world = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__;
-  const gate = world === undefined ? undefined : (go: () => void): void => {
-    void import('@wildshard/engine/game/grid/oneWayIn').then(({ titleEntryGate }) => { const held = titleEntryGate(world); if (held === undefined) go(); else held(go); return undefined; }, () => { go(); });
+  let asking: Promise<void> | null = null;
+  const gate = world === undefined ? undefined : (go: () => void): Promise<void> => {
+    // one tap at a time: a second tap while the first is asked or held enters nothing
+    asking ??= import('@wildshard/engine/game/grid/oneWayIn')
+      .then(({ titleEntryGate }) => { const held = titleEntryGate(world); if (held === undefined) { go(); return undefined; } return held(go); }, () => { go(); })
+      .finally(() => { asking = null; });
+    return asking;
   };
   let menu: ReturnType<typeof buildTitleMenu> | undefined;
   // the composition root wires the game's main menu (over its shard deck) into the engine's title (E405)

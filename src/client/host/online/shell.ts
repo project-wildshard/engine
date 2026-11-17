@@ -438,7 +438,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   let seated = false, wasLive = false;
   const tooOld = tooOldScreens(scope, { update: () => { entering(loadedNow); void leaving.reloadByHand(); } });
   const retention = retentionWatch(scope, { build: link.build, release: () => fetchSignedRelease(at, key), retention: expected => fetchCodeRetention(key, expected),
-    changed: view => { tooOld.retention(view); if (!seated) tooOld.refuse('boot'); } });
+    changed: view => { tooOld.retention(view); if (!seated && tooOld.refuse('boot')) void shellNow?.leave(); } });
   void retention.check();
   scope.listen(window, 'ws-live-build', () => { void retention.check(); });
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
@@ -449,7 +449,8 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => {
       waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); tooOld.link(state === 'live');
-      if (state === 'reconnecting' && wasLive) tooOld.refuse('reconnect');
+      // FM5b3: a refused reconnect or boot ends the link too (no redial, the body leaves), so nobody stands in the world behind the page
+      if (state === 'reconnecting' && wasLive && tooOld.refuse('reconnect')) void shellNow?.leave();
       // FM4 9b: a restart this tab heard explains a quiet world to the title's Enter world; a live link ends it
       if (state === 'live') clearRestart(); else if (shellNow?.why() === 'restart') noteRestart();
       wasLive = state === 'live';

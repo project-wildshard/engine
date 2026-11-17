@@ -124,7 +124,8 @@ export function saveScreens(scope: Scope, parent: HTMLElement = document.body): 
     box.append(body, facts, make('p', 'ws-link-auto', 'With Leave when saved, you leave by yourself as soon as the server confirms a save.'), buttons(own, [
       { label: 'Leave when saved', primary: true, busy: 'Waiting for the save…', act: () => { waiting = go; } },
       { label: 'Leave now', act: () => { waiting = null; close(); go(); } },
-      { label: 'Keep playing', act: () => { waiting = null; close(); } },
+      // while saves fail, Keep playing here is the same answer as on the failed card: the lasting warning, not the card again
+      { label: 'Keep playing', act: () => { waiting = null; close(); if (failing.size > 0) dismissed = true; } },
     ]));
     parent.append(root); freePointer();
     open = { scope: own, root, kind: 'hold', paint };
@@ -174,7 +175,9 @@ export function saveScreens(scope: Scope, parent: HTMLElement = document.body): 
       sample();
     },
     link: next => {
-      if (next && !live) since = diagnosticNow();
+      // back after a drop: the facts said while it was down were never heard, so old failures say nothing about now (a reseat
+      // needs the pending write to land first)
+      if (next && !live) { since = diagnosticNow(); failing.clear(); }
       live = next;
       sample();
     },

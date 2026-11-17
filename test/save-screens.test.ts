@@ -135,6 +135,28 @@ test('while the link is down the link screens speak: no save chip, Leave is not 
   expect(shown('save-slow')).not.toBeNull();
 });
 
+test('review: Keep playing on the hold card while saves fail leaves the lasting warning, not the failed card a second later', () => {
+  const saves = saveScreens(scope);
+  saves.fact(confirmed(1)); saves.fact(failed(2));
+  vi.advanceTimersByTime(SAVE_FAILED_MS + 1000);
+  click(shown('save-failed'), 'Keep playing');
+  leave(() => undefined);
+  click(shown('save-slow-blocked'), 'Keep playing');
+  vi.advanceTimersByTime(3000);
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(shown('save-failed')?.textContent).toContain('Not saving');
+});
+
+test('review: back after a drop, failures heard before it say nothing about now: no failed card on reconnect', () => {
+  const saves = saveScreens(scope);
+  saves.fact(confirmed(1)); saves.fact(failed(2));
+  saves.link(false);
+  vi.advanceTimersByTime(SAVE_FAILED_MS * 3);
+  saves.link(true);
+  vi.advanceTimersByTime(1000);
+  expect(shown('save-failed')).toBeNull();
+});
+
 test('a scope that ends takes its chip, cards and the leave hold with it', () => {
   const saves = saveScreens(scope), go = vi.fn<() => void>();
   saves.fact(failed(1));

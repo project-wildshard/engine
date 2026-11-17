@@ -28,3 +28,8 @@
   `titleEnter`). Only observed causes hold the tap: a restart this tab heard (sessionStorage mark,
   cleared on live) and a quiet world, or the world's own `moving.inS` (new in the first word while
   a grace runs) inside 15 s. Re-asks every 8 s, under the door's 10 sockets a minute.
+- Review fixes (claude -p, NO-GO with six findings): Keep playing on the hold card while saves fail
+  no longer brings the failed card back; a reconnect forgets failures heard before the drop; a
+  too-old refusal at reconnect or boot also leaves the world (no redial, no body behind the page);
+  a draft card opens in the tap's turn; a gated entry enters the card tapped and keeps ENTER WORLD
+  busy while it asks; one tap at a time through the title gate.

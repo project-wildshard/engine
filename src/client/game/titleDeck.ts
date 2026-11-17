@@ -142,8 +142,9 @@ export interface TitleDeckOptions {
   /** SA36: the `/slug/<slug>` page's one card. ENTER WORLD reads `play` over `hint`; `closed` (a slug with no grid cell)
    *  disables it and says why in the hint's place (Jake, grill Q16: the card and hero, Play disabled) */
   readonly single?: { readonly play: string; readonly hint: string; readonly closed?: string };
-  /** runs on ENTER WORLD's tap before the entry (the slug page's first-play name ask); `go` enters */
-  readonly gate?: (go: () => void) => void;
+  /** runs on ENTER WORLD's tap before the entry (the slug page's first-play name ask, a world build's FM4 title hold); `go` enters the
+   *  card tapped. A returned promise keeps ENTER WORLD busy until it settles. */
+  readonly gate?: (go: () => void) => void | Promise<void>;
 }
 
 export interface TitleDeck {
@@ -357,8 +358,8 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     return true;
   };
   /** ENTER WORLD, or a key: the shard's one entry (its shardfile, G531 / LD5). The card it started entering, if any (MG5) */
-  const activate = (): TitleCard | null => {
-    const c = entries[index];
+  const activate = (at: number = index): TitleCard | null => {
+    const c = entries[at];
     // A draft opens on the drafts site (J16, J19): FOLLOW THE BUILD shows its teaser, DRAFT MODE its pages (Developer on there).
     if (c?.draft) { window.open(c.draft.url, '_blank', 'noopener'); return null; }
     return c?.shard && enter(c) ? c.shard : null;
@@ -389,7 +390,17 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   // a click that only follows the title's SHARD SELECT tap lands where that tap was, not on a card or dot (QC2)
   cardEls.forEach((e, i) => { listenDom(scope, e, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev) && i !== index && performance.now() - swipedAt > 400) select(i); }); });
   dots.forEach((d, i) => { listenDom(scope, d, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev)) select(i); }); });
-  onTap(required(root, '.ws-menu-play'), () => { if (opts.gate === undefined) activate(); else opts.gate(() => { activate(); }); });
+  // a draft opens its tab in the tap's own turn (a popup blocker drops a late one); a gated entry enters the card tapped, even if the
+  // deck moved while the gate asked, and ENTER WORLD stays busy meanwhile
+  const playButton = required(root, '.ws-menu-play');
+  onTap(playButton, () => {
+    const at = index;
+    if (opts.gate === undefined || entries[at]?.draft) { activate(at); return; }
+    const asked = opts.gate(() => { activate(at); });
+    if (!(asked instanceof Promise)) return;
+    playButton.setAttribute('aria-busy', 'true');
+    void asked.finally(() => { playButton.removeAttribute('aria-busy'); });
+  });
   onTap(required(root, '.ws-menu-explore'), () => { const c = entries[index]; if (c?.shard && canExplore(c, mode())) opts.onExplore(c.shard); });
   onTap(required(root, '.ws-menu-settings'), opts.onSettings);
   // QA row 25's Developer pixel card is gone: Settings ▸ Graphics ▸ Pixel density is the one pixel control (MG8, Jake ~23:45)
