@@ -11,7 +11,7 @@ import { learnPlacedCells } from '../src/client/game/grid/placedCells';
 import { placedContent, type PlacedContentPorts } from '../src/client/game/grid/placedContent';
 import { clearPlacedSpawns, placedLoose, placedSpawn } from '../src/client/game/boot/placedSpawn';
 import { entryProgramsURL, setSpawnPacks, startSpawnDownload } from '../src/client/game/boot/spawnDownload';
-import { installTitleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
+import { installTitleManifests, titleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { cookReceipt } from '../src/cook/game/cookJob';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
@@ -38,8 +38,17 @@ const INDEX = { version: 1, build: BUILD, slug: SLUG, hash: HASH, header: `shard
   keys: [`shardfiles/${SLUG}/shard.json`, `programs/${SLUG}.json`, `loose/${HASH}/shardfiles/${SLUG}/shard.json`, `loose/${HASH}/programs/${SLUG}.json`], loose: `loose/${HASH}/`, server: { files: 1, bytes: 1 }, proof: 'proved', seconds: 1, verdict: VERDICT };
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-/** The placement file, the API's entry and the store; `index` and `body` stand in for what the store holds. */
-function store(index: (asked: string) => Response = () => json(INDEX), body: (row: typeof ROWS[number]) => string = row => row.body, cells: readonly unknown[] = [CELL]): typeof fetch & { readonly asked: string[] } {
+// HERO-GATE HG4: the hero the upload carried, as the cook copies it: a discovery document whose card names three mounted images
+const IMAGE = (n: string): string => `/shardfiles/${SLUG}/blobs/image/${n.repeat(64)}.jpg`;
+const HERO = { thumb: IMAGE('1'), portrait: IMAGE('2'), landscape: IMAGE('3') };
+const LOOSE = (path: string): string => `loose/${HASH}/${path.slice(1)}`;
+const DISCOVERY_AT = `${PACKS}${LOOSE(`/shardfiles/${SLUG}/discovery.json`)}`;
+const HEROED = { ...INDEX, keys: [...INDEX.keys, LOOSE(`/shardfiles/${SLUG}/discovery.json`), ...Object.values(HERO).map(LOOSE)] };
+
+/** The placement file, the API's entry and the store; `index` and `body` stand in for what the store holds, `discovery` for the
+ *  upload's discovery document (HG4). */
+function store(index: (asked: string) => Response = () => json(INDEX), body: (row: typeof ROWS[number]) => string = row => row.body, cells: readonly unknown[] = [CELL],
+  discovery: () => Response = () => json({ version: 1, slug: SLUG, data: { card: HERO } })): typeof fetch & { readonly asked: string[] } {
   const asked: string[] = [];
   const answer = function (this: unknown, url: string | URL | Request): Promise<Response> {
     if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
@@ -48,6 +57,7 @@ function store(index: (asked: string) => Response = () => json(INDEX), body: (ro
     if (at === URL_AT) return Promise.resolve(new Response(placement(cells)));
     if (at === ENTRY_AT) return Promise.resolve(json({ slug: SLUG, name: 'Glass Orchard' }));
     if (at.startsWith(`${INDEX_AT}?t=`)) return Promise.resolve(index(at));
+    if (at === DISCOVERY_AT) return Promise.resolve(discovery());
     const row = ROWS.find(item => `${PACKS}${item.url.slice(1)}` === at);
     return Promise.resolve(row === undefined ? new Response('', { status: 404 }) : new Response(body(row)));
   };
@@ -131,6 +141,33 @@ test('SA48: no hash, no index yet, junk, another build\'s, slug\'s or bytes\' in
     expect(gridSlugs(), why).toHaveLength(25);
     expect(placedSpawn(SLUG), why).toBeUndefined();
     expect(verdicts(), why).toHaveLength(1);
+  }
+});
+
+test('HERO-GATE HG4: a placed card wears the hero its upload carried, from the cook\'s copy of its discovery card', async () => {
+  const read = await learn(store(() => json(HEROED)));
+  expect(read).toMatchObject({ carded: [SLUG] });
+  const row = titleManifests().find(item => item.slug === SLUG);
+  expect(row?.card).toEqual({ thumb: `${PACKS}${LOOSE(HERO.thumb)}`, portrait: `${PACKS}${LOOSE(HERO.portrait)}`, landscape: `${PACKS}${LOOSE(HERO.landscape)}` });
+  expect(row?.status, 'a player\'s card').toBe('live');
+});
+
+test('HERO-GATE HG4: a placed slug with no hero keeps its cell, its card Developer only', async () => {
+  const data = 'data:image/svg+xml,%3Csvg%2F%3E';
+  for (const [why, fetch] of [
+    ['no discovery in the cook\'s keys', store()],
+    ['the generated card', store(() => json(HEROED), undefined, undefined, () => json({ data: { card: { thumb: data, portrait: data, landscape: data } } }))],
+    ['an image the cook did not copy', store(() => json({ ...HEROED, keys: HEROED.keys.filter(key => !key.endsWith(`${'3'.repeat(64)}.jpg`)) }))],
+    ['another shard\'s image', store(() => json(HEROED), undefined, undefined, () => json({ data: { card: { ...HERO, thumb: '/shardfiles/driftwood-isle/blobs/image/' + '1'.repeat(64) + '.jpg' } } }))],
+    ['no discovery document (404)', store(() => json(HEROED), undefined, undefined, () => json({ error: 'no' }, 404))],
+    ['junk', store(() => json(HEROED), undefined, undefined, () => new Response('<html>'))],
+  ] as const) {
+    installCatalogue(PIN); installTitleManifests(TITLE); clearPlacedSpawns();
+    const read = await learn(fetch);
+    expect(read, why).toMatchObject({ carded: [SLUG] });
+    expect(gridSlugs(), why).toContain(SLUG);
+    expect(placedSpawn(SLUG), why).toBeDefined();
+    expect(titleManifests().find(item => item.slug === SLUG)?.status, why).toBe('hidden');
   }
 });
 

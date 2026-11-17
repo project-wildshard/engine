@@ -5,6 +5,10 @@
 // `addCookedShards` would have written (the entry and whole-level addresses, the store as their home, whether it recorded programs),
 // with the page's admission row for its header (`folderVerdict`'s, believed only under this page's own validator revision). Any
 // failure (no index yet, a 404, junk, another build's or slug's index, another validator) gives nothing, and the slug stays out.
+// HERO-GATE HG4 (Jake, 2026-11-17 ~14:32 Cancún: "in zone select there are zones without hero images that's bad"): the cook copies
+// the upload's discovery document and its card's images beside the rest (`loose/<hash>/shardfiles/<slug>/`); a card of three images
+// the index lists is the zone's hero. Anything else (none, the generated `data:` card, an image the cook did not copy, junk) is no
+// hero: the content still enters, and `placedCells.ts` keeps the slug off Shard Select.
 import * as v from 'valibot';
 import { bareSlug } from '../../../shared/game/grid/catalogueSlot';
 import { readSpawnManifest, readSpawnManifestAddress, type SpawnManifestAddress } from '../../../shared/game/shardfile/spawnManifest';
@@ -22,8 +26,10 @@ const IndexSchema = v.object({ version: v.literal(1), build: v.string(), slug: v
   verdict: v.optional(v.looseObject({ revision: hex, sourceHash: v.string(), indexHash: hex, residentBytes: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
     postCost: v.looseObject({}), worst: v.optional(v.unknown()) })) });
 
-/** What a placed slug needs to enter: its spawn rows and its header's admission row. */
-export interface PlacedContent { readonly spawn: PlacedSpawn; readonly verdict: Readonly<Record<string, unknown>> | null }
+/** HG4: a hero's three images, by address. */
+export interface PlacedHero { readonly thumb: string; readonly portrait: string; readonly landscape: string }
+/** What a placed slug needs to enter: its spawn rows and its header's admission row; and its hero (HG4), when the upload carried one. */
+export interface PlacedContent { readonly spawn: PlacedSpawn; readonly verdict: Readonly<Record<string, unknown>> | null; readonly card?: PlacedHero }
 export interface PlacedContentPorts {
   readonly fetch: typeof fetch;
   readonly signal: AbortSignal;
@@ -42,6 +48,23 @@ async function bounded(response: Response, cap: number): Promise<Uint8Array<Arra
   return body;
 }
 const decode = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+
+/** A discovery document is a few KB of rows; only its card is read. */
+const DISCOVERY_BYTES = 256 * 1024;
+const DiscoveryCard = v.object({ data: v.object({ card: v.object({ thumb: v.string(), portrait: v.string(), landscape: v.string() }) }) });
+/** HG4: the hero the cook copied for `product` at `loose`, or undefined for none. Never throws. */
+async function cookedHero(product: string, index: Readonly<{ loose: string; keys: readonly string[] }>, read: (path: string) => Promise<Uint8Array>,
+  at: (path: string) => string): Promise<PlacedHero | undefined> {
+  try {
+    const listed = new Set(index.keys), discovery = `${index.loose}shardfiles/${product}/discovery.json`;
+    if (!listed.has(discovery)) return undefined;
+    const { card } = v.parse(DiscoveryCard, decode(await read(discovery))).data;
+    const image = new RegExp(`^/shardfiles/${product}/blobs/image/[a-f0-9]{64}\\.(?:jpe?g|png|webp)$`, 'u');
+    const slot = (url: string): string | undefined => image.test(url) && listed.has(`${index.loose}${url.slice(1)}`) ? at(`${index.loose}${url.slice(1)}`) : undefined;
+    const thumb = slot(card.thumb), portrait = slot(card.portrait), landscape = slot(card.landscape);
+    return thumb === undefined || portrait === undefined || landscape === undefined ? undefined : { thumb, portrait, landscape };
+  } catch { return undefined; }
+}
 
 /** The cook's content for `slug` at `hash`, or undefined for anything but this build's index of these bytes. Never throws. */
 export async function placedContent(slug: string, hash: string, ports: PlacedContentPorts): Promise<PlacedContent | undefined> {
@@ -69,8 +92,10 @@ export async function placedContent(slug: string, hash: string, ports: PlacedCon
     const entry = pick('entry');
     if (entry.phone === undefined || entry.desktop === undefined) return undefined;
     const verdict = index.verdict === undefined ? null : { ...index.verdict, path: `/${index.header}` };
+    const fetched = async (path: string): Promise<Uint8Array> => bounded(await read(at(path), { credentials: 'omit', redirect: 'error', signal: ports.signal }), DISCOVERY_BYTES);
+    const card = await cookedHero(product, index, fetched, at);
     return { spawn: { slug: product, entry, whole: pick('whole'), base: ports.packs, loose: at(index.loose),
-      programs: index.keys.includes(`${index.loose}programs/${product}.json`) }, verdict };
+      programs: index.keys.includes(`${index.loose}programs/${product}.json`) }, verdict, ...(card === undefined ? {} : { card }) };
   } catch { return undefined; }
 }
 

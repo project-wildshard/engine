@@ -16,7 +16,7 @@ import type { Json, jsonSlot } from '@wildshard/engine/saves/slots';
 import { GRID_RADIUS } from '@wildshard/format/contentBounds';
 import { PLACEMENT_PUBLIC_KEY, PlacementSchema, SignedPlacementSchema, placementsURL, type PlacementFile } from '../../../shared/game/grid/placementRows';
 import { installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
-import { findTitleManifest, installTitleManifests, titleManifests } from '../shard/titleList';
+import { findTitleManifest, installTitleManifests, titleManifests, type TitleManifest } from '../shard/titleList';
 import { catalogueCards } from './placedCards';
 import { installPlacedContent, placedContent, type PlacedContent } from './placedContent';
 import { parseGridCatalogue } from '../../../shared/game/grid/catalogue';
@@ -141,6 +141,10 @@ const cookContent = (url: string, read: typeof fetch): NonNullable<PlacedPorts['
   return hash === undefined || typeof build !== 'string' ? Promise.resolve(undefined)
     : placedContent(slug, hash, { fetch: read, signal, packs: new URL('/', url).href, build, validator: typeof validator === 'string' ? validator : null });
 };
+/** HERO-GATE HG4: a carded slug wears the hero its upload carried (`placedContent.ts`); one with none keeps its cell and its
+ *  `?chunk=` way in, but its plain card is Developer only (`hidden`): a player never sees a zone without its picture. */
+const heroed = (row: TitleManifest, content: PlacedContent | undefined): TitleManifest =>
+  content?.card === undefined ? { ...row, status: 'hidden' } : { ...row, card: content.card };
 /** After every row's `order`, so a carded shard is last in the deck. */
 const nextOrder = (rows: readonly { readonly order?: number }[]): number => rows.reduce((top, row) => Math.max(top, row.order ?? 0), rows.length) + 1;
 /** Read the file at `url` and install the build's catalogue with its cells. Never throws: anything but a believed file keeps the build's
@@ -224,7 +228,7 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     unknown.forEach((slug, n) => { const found = contents[n]; if (found !== undefined) cooked.set(slug, found); });
     if (cards.length === 0 || wentOn()) return built;
     const carded = new Set(cards.filter(row => cooked.has(row.slug)).map(row => row.slug)), more = addPlacedCells(placed.document, file, slug => carded.has(slug));
-    const opened = new Set(more.added.map(cell => cell.slug)), rows = cards.filter(row => opened.has(row.slug));
+    const opened = new Set(more.added.map(cell => cell.slug)), rows = cards.filter(row => opened.has(row.slug)).map(row => heroed(row, cooked.get(row.slug)));
     for (const slug of opened) { const found = cooked.get(slug); if (found !== undefined) installPlacedContent(found); }
     if (more.added.length > 0) installCatalogue(more.document);
     if (rows.length > 0) installTitleManifests([...titleManifests(), ...rows]);

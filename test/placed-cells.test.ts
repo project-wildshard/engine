@@ -52,7 +52,8 @@ const routes = (table: Record<string, (init?: RequestInit) => Response | Promise
   return Object.assign(answer, { asked }) as typeof fetch & { readonly asked: string[] };
 };
 /** SA48: a carded slug enters only with the cook's content; these SA46 tests are about its card, so its content is a stand-in. */
-const STAND_IN: PlacedContent = { spawn: { slug: 'new-author-shard', entry: {}, whole: {}, base: 'https://packs.example/', loose: 'https://packs.example/loose/x/', programs: false }, verdict: null };
+const HERO_ART = { thumb: 'https://packs.example/loose/x/t.jpg', portrait: 'https://packs.example/loose/x/p.jpg', landscape: 'https://packs.example/loose/x/l.jpg' };
+const STAND_IN: PlacedContent = { spawn: { slug: 'new-author-shard', entry: {}, whole: {}, base: 'https://packs.example/', loose: 'https://packs.example/loose/x/', programs: false }, verdict: null, card: HERO_ART };
 const cooked = (): Promise<PlacedContent> => Promise.resolve(STAND_IN);
 const PIN = catalogueBeforePlacements;
 const ART = { thumb: '/t.jpg', portrait: '/p.jpg', landscape: '/l.jpg' };
@@ -164,7 +165,20 @@ test('SA46: a placed slug the build has no card for is carded from its catalogue
   expect(cards()).toEqual(['driftwood-isle', 'new-author-shard']);
   const card = titleCards(false, () => null, () => null, () => true)[1];
   expect(card).toMatchObject({ slug: 'new-author-shard', name: 'Glass Orchard' });
-  expect(card?.thumbnail).toMatch(/^data:image\/svg\+xml,/u);
+  // HERO-GATE HG4: its art is the hero its upload carried, from the cook
+  expect(card?.thumbnail).toBe(HERO_ART.thumb);
+  const cell = oneWayIn({ online: true, hosted: true, slug: 'new-author-shard', kept: false }, new GridAssembly(player));
+  expect(cell).toMatchObject({ instance: 'new-author-shard', cell: [1, 3] });
+});
+
+test('HERO-GATE HG4: a placed slug whose upload carried no hero keeps its cell and `?chunk=`, its card Developer only', async () => {
+  const { card: _card, ...heroless } = STAND_IN;
+  const fetch = routes({ [ENTRY_AT]: () => json(ENTRY) });
+  const read = await learnPlacedCells(URL_AT, { keep: device, fetch, publicKey: api.hex, api: API, content: () => Promise.resolve(heroless) });
+  expect(read).toEqual({ added: FRESH, left: [], serial: 1, carded: ['new-author-shard'] });
+  expect(gridSlugs()).toHaveLength(26);
+  expect(cards(), 'no plain card for a player').toEqual(['driftwood-isle']);
+  expect(titleCards(true, () => null, () => null, () => true).map(card => [card.slug, card.badge]), 'a developer\'s').toContainEqual(['new-author-shard', 'Developer only']);
   const cell = oneWayIn({ online: true, hosted: true, slug: 'new-author-shard', kept: false }, new GridAssembly(player));
   expect(cell).toMatchObject({ instance: 'new-author-shard', cell: [1, 3] });
 });
