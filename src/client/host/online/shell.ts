@@ -23,6 +23,9 @@ import { releaseScreens, stagingMark } from './releaseScreens';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
 import { saveScreens } from './saveScreens';
+import { retentionWatch } from './retentionWatch';
+import { tooOldScreens } from './tooOldScreens';
+import { fetchCodeRetention } from './codeRetention';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { installBrowserScopeEnvironment } from '@wildshard/engine/app/view/scopeEnvironment';
 
@@ -419,13 +422,26 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   });
   // FM8s: the server's own save facts (late, failing) and the hold on Leave the world while a save isn't confirmed
   const saves = saveScreens(scope);
+  // FM5b: is this page's own code still carried (signed /code-retention.json against a fresh release, at boot and on each update
+  // poll)? Retired: a banner in play, and the too-old page at the next zone entry, reconnect or before the first seat
+  let seated = false, wasLive = false;
+  const tooOld = tooOldScreens(scope, { update: () => { entering(loadedNow); void leaving.reloadByHand(); } });
+  const retention = retentionWatch(scope, { build: link.build, release: () => fetchSignedRelease(at, key), retention: expected => fetchCodeRetention(key, expected),
+    changed: view => { tooOld.retention(view); if (!seated) tooOld.refuse('boot'); } });
+  void retention.check();
+  scope.listen(window, 'ws-live-build', () => { void retention.check(); });
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(loadedNow); void leaving.reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
   // GO4: a grid page re-enters the grid in the seat's cell: the tap that brought it here comes along (QA row 16), and the URL stays bare.
   const regrid = (cell: string): void => { entering(loadedNow); leaving.unload(`online seat in another grid cell (${cell})`); gridNow?.reenter(cell); };
   const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
-    link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); if (state === 'ended' && reason === 'reload') void ended(); },
+    link: (state, reason) => {
+      waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); tooOld.link(state === 'live');
+      if (state === 'reconnecting' && wasLive) tooOld.refuse('reconnect');
+      wasLive = state === 'live';
+      if (state === 'ended' && reason === 'reload') void ended();
+    },
     persistence: fact => { saves.fact(fact); },
     // The cut (5.5): an old server refused a v1 hello. Reload only into another build; on this one, the server is updating.
     cut: () => { void leaving.reloadStale(); },
@@ -448,6 +464,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   // a tap the world must hear waits for the link: the hold card says so, and the tap is never sent late
   shell.client.gateActions(what => screens.allow(what));
   void settled(shell.booted, leaving);
+  void shell.booted.then(() => { seated = true; return undefined; });
   const chat = chatLines(scope, shell.client, document.body, screens.holdChat);
   voiceUi(scope, new VoiceChat(scope, shell.voice), chat);
   scope.listen(window,'pagehide',()=>{shell.flushRecords();});
@@ -460,6 +477,6 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   });
   return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); },
     // ZE10d2: from the door's `arrive` every dial asks for the cell entered (ZE9c seats a redial in the hold there)
-    enter: async cell => { const pose = await shell.enter?.(cell) ?? null; if (pose !== null) goto = cell; return pose; },
+    enter: async cell => { if (tooOld.refuse('zone')) return null; const pose = await shell.enter?.(cell) ?? null; if (pose !== null) goto = cell; return pose; },
     adopt: next => { loadedNow = next.loaded; gridNow = next.grid; goto = next.grid.cell; shell.rehome?.(next.grid.cell); } };
 }

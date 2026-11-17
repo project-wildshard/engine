@@ -13,3 +13,9 @@
   the rig's database port. `hold` lets a connection start (through its first ReadyForQuery) and
   then keeps every query, so a write is late and never fails (pg's 3 s connect timeout would
   otherwise turn a held new connection into a failure); `refuse` drops every connection.
+- FM5b1-3 mode 24: `retentionWatch.ts` reads the signed `/code-retention.json` against a fresh
+  verified release at boot and on each `ws-live-build` (the 5-minute/foreground poll); only a
+  verified matching file says retired, and a 404, failed read or bad signature never undoes one.
+  `tooOldScreens.ts`: a banner in play (countdown only from a signed `retireAt`, else "at the
+  next load"; it never navigates), and the `too-old` page at the next zone entry, reconnect or
+  before the first seat. Update is the Play-here reload, once.
