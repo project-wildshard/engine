@@ -139,9 +139,10 @@ try {
    *  `observe`: the off-fixture guard watches instead of routing. Playwright's routing disables the HTTP cache, and Chromium then hands
    *  a service worker every read as `cache: 'no-store'`, which sw.js rightly sends to the network: a warmed page could never launch
    *  offline under it (FM5 mode 1). An off-fixture request there is still a guard fault, seen rather than refused.
-   *  @param {() => void} [init] @param {{ observe?: boolean }} [how] */
+   *  `desktop`: a 1440×900 desktop browser instead of the phone (a phone context held landscape shows the portrait-only card).
+   *  @param {() => void} [init] @param {{ observe?: boolean, desktop?: boolean }} [how] */
   const fresh = async (init, how = {}) => {
-    const context = await /** @type {import('playwright').Browser} */ (launched).newContext(phone), errors = /** @type {string[]} */ ([]);
+    const context = await /** @type {import('playwright').Browser} */ (launched).newContext(how.desktop === true ? { viewport: { width: 1440, height: 900 } } : phone), errors = /** @type {string[]} */ ([]);
     if (how.observe === true) context.on('request', request => { if (!allowedOrigins.has(new URL(request.url()).origin)) guardFaults.push('saw an off-fixture HTTP request (observe-only guard)'); });
     else await context.route('**/*', async route => {
       const url = new URL(route.request().url());
@@ -704,9 +705,11 @@ try {
 
   // FM1b: the Developer gallery, by real taps only (the menu, the filter, the row's Open, each entry, its ✕)
   if (galleryWalk) {
-    const entered = await fresh(); const { page } = entered;
     /** @type {{ id: string, size: string, opened: boolean, closed: boolean, shot?: string, ms: number }[]} */
     const walked = [];
+    // the phone at 402×874 and a desktop browser at 1440×900, each its own device
+    for (const size of [{ width: 402, height: 874 }, { width: 1440, height: 900 }]) {
+    const entered = await fresh(undefined, { desktop: size.width > 500 }); const { page } = entered;
     try {
       await page.goto(URL_PLAY); await intoWorld(entered);
       const list = page.locator('[data-kind="gallery"]');
@@ -727,11 +730,10 @@ try {
         const opened = await page.locator('.ws-gmenu.show .ws-dbg-row:visible', { hasText: 'Failure screens' }).locator('.ws-dbg-action:visible').first().click({ timeout: 10_000 }).then(() => true, () => false);
         // a screen that left the menu behind something (a page the prototype drew over it): close the menu and walk in again, once
         if (!opened && again) { for (let tries = 0; tries < 3 && await page.locator('.ws-gmenu.show').isVisible().catch(() => false); tries++) await page.keyboard.press('Escape'); await openGallery(false); return; }
-        if (!opened) throw new Error('the Failure screens row could not be opened');
+        if (!opened) { await shoot(page, 'gallery-row', 'stuck'); throw new Error('the Failure screens row could not be opened'); }
         await list.waitFor({ state: 'visible', timeout: 15_000 });
       };
-      for (const size of [{ width: 402, height: 874 }, { width: 1440, height: 900 }]) {
-        await page.setViewportSize(size);
+      {
         await openGallery();
         const ids = await list.locator('button[data-failmode]').evaluateAll(nodes => nodes.map(node => node instanceof HTMLElement ? node.dataset.failmode ?? '' : ''));
         for (const id of ids) {
@@ -748,6 +750,7 @@ try {
         }
       }
     } finally { await entered.context.close(); }
+    }
     const ok = walked.length > 0 && walked.every(row => row.opened && row.closed);
     writeFileSync(join(out, 'gallery.json'), JSON.stringify({ schema: 'failmode-gallery/1', sha, engine, browser: browserVersion, build: fixture.build, at: new Date().toISOString(),
       entries: new Set(walked.map(row => row.id)).size, taps: 'menu Escape, System Developer switch, Dev tab, Developer card, filter, row Open, entry, ✕ Close', ok, walked }, null, 1));
