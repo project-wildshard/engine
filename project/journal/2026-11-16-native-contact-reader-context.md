@@ -37,3 +37,15 @@ The install added gitHosted to the retained wire subdirectory entry; its
 existing refusal test caught this. Restored the canonical path-only
 resolution and verified frozen install plus both original wire controls.
 No wire assertion or source/asset admission contract was weakened.
+
+Full local preflight: 523 files/2536 cases passed, nine cases skipped;
+one file's six cook checks reached MeshoptDecoder before its async
+module was ready. The focused pre-fix run passed, exposing a setup race
+rather than a stable semantic failure. The test now awaits the defining
+prepareAssetDecoders contract before synchronous folder admission; all
+six original controls pass. No assertion or admission check changed.
+
+J381 hatch on retry: --no-preflight avoids repeating that 1087-second
+related suite after its only failing setup was corrected. Earlier
+static gates and the repaired six checks are green; the normal pre-push
+and exact hosted CI still gate the rebased branch.

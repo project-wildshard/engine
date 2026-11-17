@@ -1,11 +1,14 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the six actual pinned products by their folder.
 import {join} from 'node:path';
-import {describe, expect, it} from 'vitest';
+import {beforeAll, describe, expect, it} from 'vitest';
 import {productTarball} from '../src/cook/game/productTarball';
 import {validateShardfileFolder} from '@wildshard/format/shardfileValidation';
+import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
 import {readTar} from '@wildshard/format/tar';
 import {checkShardfile} from '../src/server/host/checkShardfile';
 import {hashOf} from './fixtures/cookWorkerHarness';
+
+beforeAll(prepareAssetDecoders);
 
 /** SP19b: actual pinned bytes and the shared full check used by the cook. */
 describe('the six built shards through the full check gate', () => {
