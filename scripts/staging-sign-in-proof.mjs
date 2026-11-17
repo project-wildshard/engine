@@ -11,7 +11,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from './browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const work = process.argv.slice(2).find(value => !value.startsWith('--')) ?? '';
@@ -49,7 +49,7 @@ async function linkAfter(before) {
 }
 
 for (const engine of engines) {
-  /** @type {import('playwright').Page | undefined} */
+  /** @type {Awaited<ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>> | undefined} */
   let page;
   const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS] });
   try {
