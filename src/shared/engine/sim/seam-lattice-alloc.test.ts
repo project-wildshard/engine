@@ -5,6 +5,8 @@
 // a filtered copy of the kept rows per candidate, a fresh array per visited triangle and closures per colour transform.
 // Garbage is not free on a phone: JavaScriptCore grows its heap with the allocation rate. This pins the bytes a seam
 // allocates while it is built, and the exact mesh it builds.
+// oxlint-disable-next-line import/no-unassigned-import -- Match the simulation realm before evaluating seam constants.
+import '../core/portableMathFirst';
 // oxlint-disable-next-line import/no-nodejs-modules -- the sampling heap profiler is read from V8 itself.
 import { Session } from 'node:inspector/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- one digest over the built meshes.
@@ -13,8 +15,8 @@ import { expect, test } from 'vitest';
 import { cornerSeamGeometry, seamGeometrySteps, type SeamFeature, type SeamGeometry } from './seamGeometry';
 import type { StripCorner, StripMesh, StripProfile } from './strips';
 
-// Pinned on the code before SB38's allocation cut: the cut must not move a vertex, a colour or a triangle.
-const GOLDEN = '59097bd18789654147b24ccb6d9cc0f00aca92c60dbcaca391c7c65208426168';
+// Replay the pre-SB38 lattice (8af8cb73) with the same portable Math. Native trig rounds differently on x64 and arm64.
+const GOLDEN = '80eb37f5c18215a28d1605a0e7c6ed737ec6ed83d7c776b1cf094f00a5075952';
 // Measured 934 MiB a seam before SB38 (7.7 s for four), 85 MiB after (1.4 s): no filtered row copy a candidate,
 // no array a visited triangle, no closures or scratch arrays a triangle error.
 const BUDGET = 160 * 1048576;
