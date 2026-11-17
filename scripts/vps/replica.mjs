@@ -82,7 +82,7 @@ export function unitArgs(run) {
     'PrivateDevices=yes', 'NoNewPrivileges=yes', 'ProtectKernelTunables=yes', 'ProtectKernelModules=yes', 'ProtectKernelLogs=yes',
     'ProtectControlGroups=yes', 'ProtectClock=yes', 'ProtectHostname=yes', 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6',
     'RestrictNamespaces=yes', 'RestrictSUIDSGID=yes', 'LockPersonality=yes', 'SystemCallFilter=@system-service', 'CapabilityBoundingSet=',
-    'UMask=0077'];
+    'UMask=0077', 'MemoryHigh=5G', 'OOMScoreAdjust=1000'];
   return [`--unit=${UNIT}`, '--collect', '--pipe', '--quiet', '--service-type=exec', ...properties.flatMap(value => ['-p', value]),
     ...Object.entries(env).flatMap(([name, value]) => ['--setenv', `${name}=${value}`]), '/usr/bin/node', join(run.folder, 'server', 'main.mjs')];
 }
@@ -132,7 +132,7 @@ async function fetchCapped(url, limit) {
   return Buffer.concat(parts);
 }
 const UNITS = [`${UNIT}.service`, `${DOOR}.socket`, `${DOOR}.service`];
-const active = () => UNITS.some(unit => exec('/usr/bin/systemctl', ['is-active', '--quiet', unit]).status === 0);
+const running = () => exec('/usr/bin/systemctl', ['is-active', '--quiet', `${UNIT}.service`]).status === 0;
 const end = () => { exec('/usr/bin/systemctl', ['stop', ...UNITS]); rmSync(FOLDER, { recursive: true, force: true }); };
 
 async function main() {
@@ -145,7 +145,19 @@ async function main() {
   }
   const bounds = verb === 'start' ? limits(args) : null;
   if (bounds === null) stop('usage: replica.mjs start <seconds 60-3900> <workers 1-4> <seats 1-64> <cells> | stop');
-  if (active()) stop(`${UNIT} is already running: one replica at a time (stop it with: sudo wildshard-config replica stop)`);
+  // One start at a time, held for the whole run: a second waits for nothing and stops, so it never wipes the first's folder
+  // or stops its units (flock -E 75 on a lock in /run, which a reboot clears).
+  if (test === undefined && process.env.WILDSHARD_REPLICA_LOCKED !== '1') {
+    const locked = spawnSync('/usr/bin/flock', ['-n', '-E', '75', `/run/${UNIT}.lock`, process.execPath, process.argv[1] ?? '', ...process.argv.slice(2)],
+      { stdio: 'inherit', env: { ...CLEAN, WILDSHARD_REPLICA_LOCKED: '1' } });
+    if (locked.status === 75) stop(`another replica start holds /run/${UNIT}.lock: one replica at a time`);
+    return locked.status ?? 1;
+  }
+  if (running()) stop(`${UNIT} is already running: one replica at a time (stop it with: sudo wildshard-config replica stop)`);
+  // Under the lock with no replica running, a door or folder left by a killed start is stale: it goes first.
+  end();
+  const host = exec('/usr/bin/tailscale', ['ip', '-4']).stdout?.trim().split('\n')[0] ?? '';
+  if (!/^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$/u.test(host)) stop(`the box has no tailnet address (${host || 'none'}): the replica's door opens only there`);
 
   const releaseUrl = stagingEnv('RELEASE_URL'), origin = stagingEnv('BUNDLE_ORIGIN');
   if (releaseUrl === undefined || origin === undefined) stop('staging.env names no RELEASE_URL or BUNDLE_ORIGIN');
@@ -167,7 +179,6 @@ async function main() {
   const own = replicaRelease(release);
   writeFileSync(join(FOLDER, 'release.json'), own.text, { mode: 0o644 });
 
-  const host = exec('/usr/bin/tailscale', ['ip', '-4']).stdout?.trim().split('\n')[0] ?? '';
   const words = unitArgs({ ...bounds, host, publicKey: own.publicKey, folder: FOLDER }), door = doorArgs({ seconds: bounds.seconds, host });
   if (exec('/usr/bin/systemd-run', door).status !== 0) { end(); stop(`${DOOR} did not open ${host}:${String(PORT)}`); }
   // The first stdout line says which build runs, so mmo-bots.mjs checks it against the bots' own before a hello.

@@ -64,7 +64,7 @@ test("the replica's one-off release is production's shape for staging's build, u
 
 test('the unit is sandboxed, bounded, on staging CPUs and the tailnet, and holds no secret of the box', () => {
   const words = unitArgs({ seconds: 1900, workers: 4, seats: 32, cells: 'driftwood-isle', host: '100.70.1.2', publicKey: 'ab', folder: '/var/lib/wildshard-replica' })
-  for (const word of ['--unit=wildshard-replica', '--collect', '--pipe', 'DynamicUser=yes', 'AllowedCPUs=9-12', 'MemoryMax=6G', 'RuntimeMaxSec=1900',
+  for (const word of ['--unit=wildshard-replica', '--collect', '--pipe', 'DynamicUser=yes', 'AllowedCPUs=9-12', 'MemoryMax=6G', 'RuntimeMaxSec=1900', 'OOMScoreAdjust=1000',
     'ProtectSystem=strict', 'NoNewPrivileges=yes', 'CapabilityBoundingSet=', 'HOST=127.0.0.1', 'PORT=18797', 'DATABASE_URL=memory:',
     'RELEASE_CHANNEL=production', 'RELEASE_PUBLIC_KEY=ab', 'SENTRY_DSN=', 'TELEMETRY_URL=', 'ERRORS_URL=', 'WORLD_SEATS=32', 'WORLD_WORKERS=4'])
     expect(words, word).toContain(word)
@@ -175,4 +175,14 @@ test('wildshard-config replica passes only checked words to the root-owned helpe
     expect(run.stderr).toContain('usage: wildshard-config replica start')
   }
   expect(existsSync(seen)).toBe(false)
+})
+
+test('with no tailnet address the start stops before any fetch, and leaves no folder', () => {
+  const { root, env, calls } = box()
+  const run = spawnSync('node', [REPLICA, 'start', '600', '4', '32', 'driftwood-isle'], { encoding: 'utf8',
+    env: { ...env, WILDSHARD_REPLICA_TEST_TAILSCALE: '/usr/bin/true' } })
+  expect(run.status).toBe(1)
+  expect(run.stderr).toContain('no tailnet address')
+  expect(calls()).not.toContain('systemd-run')
+  expect(existsSync(join(root, 'replica'))).toBe(false)
 })

@@ -20,3 +20,5 @@
   the build from cook-release.env and points cook.env at its stub API (the unit's own
   api.wildshard.io row would win otherwise). PASS: blank box to two serving channels and a
   cooking worker on the global store.
+- Review (claude -p): MUST fixed: --box arms `replica stop` only after its own replica line. SHOULDs:
+  flock over the whole start, stale door cleanup, tailnet check before fetch, OOMScoreAdjust=1000.

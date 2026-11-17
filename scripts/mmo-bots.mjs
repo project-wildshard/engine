@@ -71,7 +71,7 @@ if (botsOnHost && remote === undefined) throw new Error('--bots-on-host needs --
 // so the lane never runs an ssh command of its own there. The helper bounds it to 3,900 s: the run plus 7 minutes to boot.
 const box = values.box, BOX = 'wildshard-agent', BOX_SLACK = 420;
 if (box && (mode !== 'replica' || remote !== undefined || values.database !== 'memory:' || values['server-from'] !== undefined || values.spread
-  || Number(values.workers) > 4 || Number(values.seats) > 64 || Number(values.seconds ?? 120) + BOX_SLACK > 3900))
+  || !/^[1-4]$/u.test(values.workers) || !/^\d{1,2}$/u.test(values.seats) || Number(values.seats) > 64 || Number(values.seconds ?? 120) + BOX_SLACK > 3900))
   throw new Error('--box is a replica on memory saves from the signed staging bundle: no --remote, --server-from or --spread, 4 workers, 64 seats, 3,480 s at most');
 if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
@@ -205,10 +205,11 @@ if (mode === 'replica') {
   const log = join(work, 'server.jsonl');
   /** `--box`: the replica's own first line names the build it runs, which must be the bots'. */
   let boxBuild = '';
+  // Armed only once this run's own replica has said it started: a refused start (another lane's bench) must never stop that bench.
+  const boxStop = () => { try { execFileSync('ssh', ['-o', 'BatchMode=yes', BOX, 'sudo -n /usr/local/sbin/wildshard-config replica stop'], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 60_000 }); } catch { /* already gone */ } };
   if (box) {
     room = spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, BOX, `sudo -n /usr/local/sbin/wildshard-config replica start --seconds ${String(seconds + BOX_SLACK)}`
       + ` --workers ${values.workers} --seats ${values.seats} --cells ${values.cells}`], { stdio: ['ignore', 'pipe', 'pipe'] });
-    remoteStop = () => { try { execFileSync('ssh', ['-o', 'BatchMode=yes', BOX, 'sudo -n /usr/local/sbin/wildshard-config replica stop'], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 60_000 }); } catch { /* already gone */ } };
     note({ step: 'box', host: BOX, via: 'wildshard-config replica' });
   }
   else if (remote === undefined) room = spawn(process.execPath, [join(served, 'main.mjs')], { cwd: served, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -239,7 +240,7 @@ if (mode === 'replica') {
     writeFileSync(log, chunk, { flag: 'a' }); buffer += chunk.toString();
     for (let end = buffer.indexOf('\n'); end >= 0; end = buffer.indexOf('\n')) {
       const line = buffer.slice(0, end); buffer = buffer.slice(end + 1);
-      try { const row = JSON.parse(line); if (row.at === 'replica') boxBuild = String(row.build); if (row.at === 'worker') { ready = true; readings.push(row); } } catch { /* kept in the log */ }
+      try { const row = JSON.parse(line); if (row.at === 'replica' && box) { boxBuild = String(row.build); remoteStop = boxStop; } if (row.at === 'worker') { ready = true; readings.push(row); } } catch { /* kept in the log */ }
     }
   });
   room.stderr?.on('data', (/** @type {Buffer} */ chunk) => { writeFileSync(log, chunk, { flag: 'a' }); });

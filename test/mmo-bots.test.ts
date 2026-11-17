@@ -173,3 +173,11 @@ test("MP1.2.d: the box replica's tailnet door takes forwarded bots, and nothing 
   const staging = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'staging', '--box'], { encoding: 'utf8', timeout: 10_000 });
   expect(staging.status).not.toBe(0);
 });
+
+test("MP1.2.d: a refused box start never stops another lane's replica", () => {
+  // `replica stop` is armed only by this run's own replica line, never before the start is known to be ours.
+  expect(driver.split('remoteStop = boxStop').length).toBe(2);
+  expect(driver).toContain("if (row.at === 'replica' && box) { boxBuild = String(row.build); remoteStop = boxStop; }");
+  const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', '--box', '--workers', '1;id'], { encoding: 'utf8', timeout: 10_000 });
+  expect(run.status).not.toBe(0);
+});
