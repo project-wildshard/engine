@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
-import { memoryWarningChip, residentOverLimit } from './memoryWarning';
+import { memoryWarningChip, memoryWarningLines, residentOverLimit } from './memoryWarning';
 
 test('history retains a worst-location estimate while the HUD filters it by entered shard', () => {
   const memory = new MemoryAdmission(() => true);
@@ -37,4 +37,20 @@ test('the chip uses the owner and stage of the largest loading or playing excess
   // G628 M4: the grid's memory strip takes only the resident excess; the cold estimate is no line
   expect(residentOverLimit(memory)).toEqual([{ owner: 'second', overBytes: 200_000_000 }]);
   memory.dispose(); expect(residentOverLimit(memory)).toEqual([]);
+});
+
+test('the report keeps numeric totals and skips the cold-boot breakdown without NaN', () => {
+  const memory = new MemoryAdmission(() => true);
+  memory.accept({ stage: 'actual', owner: 'fixture', id: 'fixture:boot', claimedBytes: 1, accountedBytes: 1,
+    playingBytes: 2, loadingBytes: 3, playingCap: 1, loadingCap: 1,
+    categories: { l0: 1_000_000, l1: 0, far: 0, libraries: 0, sims: 0, commons: 0, overlap: 0,
+      boot: { heldSpawnParts: 2_000_000, largestDecode: 3_000_000, shaderCompile: 4_000_000,
+        farSlabIndices: 5_000_000, paintArrayGpu: 6_000_000, paintArrayStaging: 7_000_000 } } });
+  const row = memory.reports()[0]; if (row === undefined) throw new Error('Missing actual report');
+  const lines = memoryWarningLines(row);
+  expect(lines).toContain('L0 1.000 MB');
+  expect(lines.some(line => line.startsWith('BOOT'))).toBe(false);
+  expect(lines.join('\n')).not.toContain('NaN');
+  const legacy = memoryWarningLines({ ...row, categories: { l0: 1_000_000, l1: 0, far: 0, libraries: 0, sims: 0, commons: 0, overlap: 0, boot: undefined } });
+  expect(legacy.join('\n')).not.toContain('NaN'); memory.dispose();
 });
