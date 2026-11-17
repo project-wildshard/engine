@@ -9,4 +9,4 @@ import {readerEnv} from './gh-limit.mjs';
 
 const result=spawnSync('gh',process.argv.slice(2),{stdio:'inherit',env:readerEnv()});
 if(result.error)process.stderr.write(`gh-read: ${result.error.message}\n`);
-process.exit(result.status??1);
+process.exitCode=result.status??1;
