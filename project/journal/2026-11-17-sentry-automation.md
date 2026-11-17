@@ -10,3 +10,13 @@
   `<environment>-automation`, at most 20 distinct events a page; a screen report
   (the card) skips the cap. `test/sentry-automated-faults.test.ts` drives the
   Nalati pair through `systemFault` and the error modal; red before.
+
+## The online GPU recovery went to the title (SENTRY-TRIAGE S13)
+
+- `scripts/gpu-recovery-proof.mjs` on staging v0.1.34 (desktop Chromium,
+  Driftwood, wiped canvases plus `loseContext`) reloaded to `/` without
+  `?glreload` and landed on the title. `bindWire` sets
+  `checkpointsSuppressed`, so `prepareRecovery` refused on every online page.
+  On a wire it now writes where the page stands (`saveLocation`); offline
+  still needs the checkpoint. Red first:
+  `test/grid-gpu-recovery-online.test.ts`.
