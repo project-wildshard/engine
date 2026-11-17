@@ -78,10 +78,6 @@
   "test/quest-step-native-parity.test.ts",
   "test/quest-step-pine-native-parity.test.ts",
   "test/scripts/ground-encounters.test.ts",
-  "test/scripts/skitterer-pack.test.ts",
-  "test/scripts/sunscar-matriarch.test.ts",
-  "test/signal-quest-verbs.test.ts",
-  "test/sky-signal-fixed-layouts.test.ts",
   "test/template-generation.test.ts",
   "test/template-source-layout.test.ts"
 ]

@@ -13264,5 +13264,66 @@
     "sourceBlob": "530604bdd324fcfd847642ea2b7973498de41e91",
     "destinationRevision": "545eb3775786e2e5d1b1cbbae37f208fbd33fa7a",
     "retirementProof": "Hosted shard-sky-reach CI run 44009915340 green on 545eb37757 (ring-2 job: pnpm test:shards 26 files, each ported file passed). Destination blob 66488833009adbe2fb06c7d94f51848ff4be563e."
+  },
+  {
+    "repo": "shard-dunes",
+    "file": "test/scripts/skitterer-pack.test.ts",
+    "outcome": "migrated",
+    "target": "test/skitterer-pack.test.ts",
+    "decision": "CI21 C9 verified destination landing (mini-ci21b): every original case and assertion runs in shard-dunes blocking pnpm test:shards on engine 0.1.32; no cases retired. Public engine/SDK imports; physics bytes from the installed engine rapier package (identical bytes).",
+    "originalTests": [
+      "one pack row surfaces, ring-runs, retreats and burrows with independent seeded actor state",
+      "native pack uses one module, real contacts and an exact fresh-host continuation"
+    ],
+    "sourceRevision": "a05466fcd1e3380950b7f4ba122faed190d4469f",
+    "sourceBlob": "2eee9aa09d587022fa44e2f0ce7c89d76d106774",
+    "destinationRevision": "00d9d01d0616c4462d15e304bfef781ff7efce3d",
+    "retirementProof": "Hosted shard-dunes CI run 44012089991 green on 00d9d01d06 (pnpm test:shards blocking, engine 0.1.32 pin 1e910630). Destination blob d924db91e36e6929ee5caa42cc211dda96909168."
+  },
+  {
+    "repo": "shard-dunes",
+    "file": "test/scripts/sunscar-matriarch.test.ts",
+    "outcome": "migrated",
+    "target": "test/scripts/sunscar-matriarch.test.ts",
+    "decision": "CI21 C9 verified destination landing (mini-ci21b): every original case and assertion runs in shard-dunes blocking pnpm test:shards on engine 0.1.32; no cases retired. Public builtProduct/scriptScenario imports only; scenario creation moved to beforeAll (as far-reach-roc did) so each unchanged 2 s body times gameplay only.",
+    "originalTests": [
+      "the published Matriarch guest flies, grounds and restores without replaying effects",
+      "a retried fight in the storm starts circling at its kept phase"
+    ],
+    "sourceRevision": "a05466fcd1e3380950b7f4ba122faed190d4469f",
+    "sourceBlob": "edd0df93c831755e7dc0769d5a85519b42c95080",
+    "destinationRevision": "00d9d01d0616c4462d15e304bfef781ff7efce3d",
+    "retirementProof": "Hosted shard-dunes CI run 44012089991 green on 00d9d01d06 (pnpm test:shards blocking, engine 0.1.32 pin 1e910630). Destination blob 5ddabb041e6b6b9ac638e6a470d7f090a1dcd6fb."
+  },
+  {
+    "repo": "shard-dunes",
+    "file": "test/signal-quest-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/signal-quest-verbs.test.ts",
+    "decision": "CI21 C9 verified destination landing (mini-ci21b): every original case and assertion runs in shard-dunes blocking pnpm test:shards on engine 0.1.32; no cases retired. Installed-engine loader. Runner signal-story-run.ts and the SignalTape witness (test/proof/sunscar-dunes/witness.ts) moved with it; the replay keeps the original no-folder HeadlessSimulation harness (engine 0.1.32 productSession with the built folder diverges at tick ~9300, reported).",
+    "originalTests": [
+      "Signal earns the full quest and a bounded Matriarch storm retry through real input replay"
+    ],
+    "sourceRevision": "a05466fcd1e3380950b7f4ba122faed190d4469f",
+    "sourceBlob": "99cb8c5a0a716de7f9e985832bb700c59d6b35cb",
+    "destinationRevision": "00d9d01d0616c4462d15e304bfef781ff7efce3d",
+    "retirementProof": "Hosted shard-dunes CI run 44012089991 green on 00d9d01d06 (pnpm test:shards blocking, engine 0.1.32 pin 1e910630). Destination blob e3726215faf53112e19189dc7615dd1e9405001b."
+  },
+  {
+    "repo": "shard-sky-reach+shard-dunes",
+    "file": "test/sky-signal-fixed-layouts.test.ts",
+    "outcome": "migrated",
+    "target": "shard-sky-reach:test/sky-fixed-layouts.test.ts + shard-dunes:test/sunscar-fixed-palette.test.ts",
+    "decision": "CI21 C8/C9 verified split landing (mini-ci21b): the Sky cases run in shard-sky-reach, the sunscar-dunes row of the discovery loop in shard-dunes, both blocking pnpm test:shards; no cases retired. The engine app-build manifest reader takes a src/shards/<slug> root, so each test links one in tmp; skyProductBoot is skyBootInventory since SA11.",
+    "originalTests": [
+      "caller mutations cannot alter another source palette",
+      "Sky compiles the complete layout without runtime mirrors",
+      "far-reach discovery lends fixed palette JSON without executable authoring",
+      "sunscar-dunes discovery lends fixed palette JSON without executable authoring"
+    ],
+    "sourceRevision": "a05466fcd1e3380950b7f4ba122faed190d4469f",
+    "sourceBlob": "ec4fdb0fe3b7c8331c2bcc3a551459af31011dd5",
+    "destinationRevision": "shard-sky-reach@545eb3775786e2e5d1b1cbbae37f208fbd33fa7a + shard-dunes@00d9d01d0616c4462d15e304bfef781ff7efce3d",
+    "retirementProof": "Hosted shard-sky-reach 44009915340 green on 545eb37757 (blob 0aa4466d59ee74faab04e41a10baed074dbd2033); Hosted shard-dunes CI run 44012089991 green on 00d9d01d06 (pnpm test:shards blocking, engine 0.1.32 pin 1e910630). (blob b7e1d00bbf4ceb6d6e1e10ca1c587d96dc48bb38)."
   }
 ]
