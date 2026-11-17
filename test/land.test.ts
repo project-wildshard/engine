@@ -432,6 +432,16 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(wt, ['show', 'HEAD:src/racer.ts'])).toContain('racer = 3');
   }, 60_000);
 
+  test('FL10: a real hook terminal stderr wins over passing stdout controls', () => {
+    const f = fixture(); f.env['WS_LAND_MODE'] = 'local';
+    const wt = f.worktree('proof-cause'); f.commit(wt, 'src/feature.ts', 'export {};', 'feat: feature');
+    writeFileSync(join(f.root, 'hooks/pre-push'), '#!/bin/sh\ncat >/dev/null\necho "Error: Inherited CPU grant is unavailable or is not an actual ancestor grant"\necho "Error: Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree" >&2\nexit 1\n');
+    const before = f.remoteMain(), result = f.land(wt);
+    expect(result.status).toBe(1); expect(f.remoteMain()).toBe(before);
+    expect(f.read(f.files.receipts)).toContain('refused: Checked tree or runtime changed during the gate');
+    expect(f.read(f.files.receipts)).not.toContain('refused: Inherited CPU grant');
+  }, 60_000);
+
   test('FL9: a restarted real land discovers its completed pre-rebase gate', () => {
     const f = fixture(); f.env['WS_LAND_MODE'] = 'local';
     const wt = f.worktree('proof-restart');

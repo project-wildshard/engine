@@ -9,6 +9,12 @@ import { parallelChecks } from '../.githooks/push-checks.mjs';
 import { prePushCause } from '../scripts/land.mjs';
 import { gateReport, printGateReport } from '../scripts/gate-report.mjs';
 
+test('FL10: a terminal proof refusal wins over passing CPU negative controls', () => {
+  const actual = 'Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree';
+  const output = `Error: Inherited CPU grant is unavailable or is not an actual ancestor grant\n  - vitest (full) green in 1200 s\n  - push lane green in 1209 s\nError: ${actual}\n    at record (push-checks.mjs:162:89)\nheavy-lane: finished full-test in 1211.41s\nerror: failed to push some refs\n`;
+  expect(prePushCause(output)).toBe(actual);
+});
+
 test('local gate keeps a JSON report and names assertion and setup failures', () => {
   mkdirSync('tmp', { recursive: true });
   const work = mkdtempSync(resolve('tmp/gate-report-'));

@@ -843,7 +843,9 @@ class Landing{
   if(isAncestor(this.root,head,now))return 'landed';
   const rejected=remoteRejection(result.stdout)!==undefined;
   if(!result.interrupted&&(!local||result.hookGreen)&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
-  const hook=local&&!result.hookGreen?`${result.stderr}\n${result.stdout}`:result.stderr;
+  // Passing controls print expected errors on stdout. A terminal hook error
+  // on stderr must follow those controls when selecting the final exception.
+  const hook=local&&!result.hookGreen?`${result.stdout}\n${result.stderr}`:result.stderr;
   const porcelain=local&&!result.hookGreen?'':result.stdout;
   const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(hook,porcelain);
   this.receipt(`STOP main push of ${short(head)} refused: ${cause}`);
