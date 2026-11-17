@@ -40,13 +40,11 @@ test('a player who walks into a region raises its own flag, and no one else\'s',
   expect(books.lead.flags).toBe(host.questFlags); // SB34b: the host's flags, but its kill credit is its own
 });
 
-test('kill credit finishes a player\'s quest, and finishing pays the player who finished', () => {
+test('a death everyone present was credited with finishes their quests, and finishing pays the player who finished', () => {
   const { host, paid } = room(), bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 }), books = questBooks(host);
   put(host, bot.id, 40); host.step();
-  // SB34a: a death is credit in the book of each player who helped (sim.ts `credit`); the world's record reaches no book
-  host.flags.set('dead:wolf'); host.step();
-  expect(walk(books.of(bot.id).quests)?.current?.id).toBe('kill');
-  books.of(bot.id).flags.set('dead:wolf'); books.lead.flags.set('dead:wolf'); host.step();
+  // SB34a: a death no body claims (a scripted flag) is credit for everyone present, at the next tick
+  host.flags.set('dead:wolf'); host.step(); host.step();
   expect(walk(books.of(bot.id).quests)?.isComplete).toBe(true);
   expect(books.of(bot.id).flags.has('quest:walk')).toBe(true);
   expect(host.flags.has('quest:walk')).toBe(false);
@@ -185,4 +183,16 @@ test('a version 3 save on the wire reads up: the lead\'s credit is the world\'s 
   const restored = restoreSimHost(SIM_LEVEL, { rapier }, decodeSimSnapshot(JSON.stringify(old)), fresh => { new DeclaredQuests(fresh, CAMP, { coins: () => undefined }); });
   expect(questBooks(restored).of(bot.id).flags.has('dead:boar:1')).toBe(true);
   expect(questBooks(restored).lead.flags.has('dead:boar:1'), 'as a version 3 lead read it').toBe(true);
+});
+
+test('a death\'s other flags (a boss\'s deadFlag, a shard\'s death effect) are the killers\' credit; one no death claims is everyone\'s present', () => {
+  const host = createSimHost(SIM_LEVEL, { rapier }), books = questBooks(host);
+  const bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 }), idle = host.addPlayer('bot:2', { x: 0, y: 1, z: 0 });
+  host.events.on('damage.dealt', ({ killed }) => { if (killed) host.flags.set('dead:captain'); }, host.scope); // nativeWake's deadFlag
+  host.events.on('actor.died', () => { host.flags.set('dead:sailor'); }, host.scope); // a death effect's flag
+  strike(host, bot.id, 1000);
+  expect(['dead:boar:1', 'dead:captain', 'dead:sailor'].map(flag => books.of(bot.id).flags.has(flag))).toEqual([true, true, true]);
+  expect(['dead:boar:1', 'dead:captain', 'dead:sailor'].map(flag => books.of(idle.id).flags.has(flag))).toEqual([false, false, false]);
+  host.flags.set('dead:chapter'); host.step();
+  expect([books.lead.player, bot.id, idle.id].map(id => books.of(id).flags.has('dead:chapter'))).toEqual([true, true, true]);
 });

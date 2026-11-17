@@ -27,3 +27,8 @@ owner made the store, and a player's own fall is nobody's kill.
 SB34c: a respawn (`dataRespawn` revive, a home keeper's refill) clears
 the world's `dead:<id>`, so world rules see the body alive; players'
 credit stays in their books, so no quest walks back.
+
+Review MUST: a boss's `deadFlag` and a shard's death-effect flags are
+credit-shaped world writes no body id names. One raised while a death
+is told goes to its killers; one no death claims goes to everyone
+present at the next tick.

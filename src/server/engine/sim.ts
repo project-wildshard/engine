@@ -27,7 +27,7 @@ import type { Rapier } from '../../shared/engine/physics/rapier';
 import { groups } from '../../shared/engine/physics/groups';
 import { tagCollider } from '../../shared/engine/physics/surface';
 import { Flags } from '../../shared/engine/world/interact/flags';
-import { CREDIT_PREFIX, LeadFlags, questBooks, type QuestBookSaved } from '../../shared/engine/quest/players';
+import { CREDIT_PREFIX, isCredit, LeadFlags, questBooks, type QuestBookSaved } from '../../shared/engine/quest/players';
 import { QuestState, type QuestDef } from '../../shared/engine/quest/core';
 import type { DayCycle, DayCycleClock, DayCycleSpec } from '../../shared/engine/world/dayCycle';
 import { clockDayPhase, clockPeriod, wrapClock, type DayClockState } from '../../shared/engine/sim/dayClock';
@@ -292,7 +292,13 @@ export class SimHost {
     this.weapons.set(this.lead.id, { ...level.weapon, weight: () => 1 });
     for (const spawn of level.entities) this.createActor(spawn);
     // SB34a: the world keeps its record of the body; the kill is credit in the book of each player who helped
-    this.events.on('actor.died', ({ actor, req }) => { this.flags.set(`${CREDIT_PREFIX}${actor.id}`); this.credit(actor.id, req); }, this.scope);
+    this.events.on('actor.died', ({ actor, req }) => { this.credit(actor.id, req); }, this.scope);
+    // A death's other flags (a boss's `deadFlag`, a shard's death effect) are kill credit too: the killers' when raised as a
+    // body dies, else everyone present's at the next tick, as the world's flag reached them before.
+    this.flags.onChange((flag, on) => {
+      if (!on || this.crediting || !isCredit(flag)) return;
+      if (this.dying === null) this.loose.add(flag); else this.give(this.dying, flag);
+    });
     this.events.on('damage.dealt', ({ req, dealt }) => { this.damage.record(req, dealt, this.players); }, this.scope);
     this.scope.onDispose(() => {
       this.disposed = true;
@@ -356,11 +362,31 @@ export class SimHost {
    * NPC), everyone present, as the world's flag reached them before.
    */
   private credit(id: string, req: DamageRequest | undefined): void { // a scripted death may carry no blow
+    const flag = `${CREDIT_PREFIX}${id}`;
+    this.crediting = true;
+    try { this.flags.set(flag); } finally { this.crediting = false; }
     if (this.players.size === 0 || this.players.has(id)) return; // a player's fall is nobody's kill
     let credited = this.damage.meaningful(id).filter(player => this.players.has(player));
     if (credited.length === 0) { const by = req === undefined ? null : landedBy(req, this.players); credited = by === null ? [...this.players.keys()] : [by]; }
-    const books = questBooks(this), flag = `${CREDIT_PREFIX}${id}`;
-    for (const player of credited) books.of(player).flags.set(flag);
+    this.give(credited, flag);
+    for (const raised of this.loose) this.give(credited, raised);
+    this.loose.clear(); this.dying = credited;
+  }
+  /** The players credited for the death being told now, and credit-shaped world flags raised away from any death. */
+  private dying: readonly string[] | null = null;
+  private readonly loose = new Set<string>();
+  private crediting = false;
+  private give(players: readonly string[], flag: string): void {
+    const books = questBooks(this);
+    for (const player of players) if (this.players.has(player)) books.of(player).flags.set(flag);
+  }
+  /** A tick's close: a death's telling is over, and a credit flag no death claimed is everyone's present. */
+  private settleCredit(): void {
+    this.dying = null;
+    if (this.loose.size === 0 || this.players.size === 0) return;
+    const everyone = [...this.players.keys()];
+    for (const raised of this.loose) this.give(everyone, raised);
+    this.loose.clear();
   }
   /** The living player nearest `point`, else the nearest of the dead: who a creature there is dealing with. */
   nearestPlayer(point: { readonly x: number; readonly y: number; readonly z: number }): PlayerSim {
@@ -546,8 +572,9 @@ export class SimHost {
   stepExternal(): void {
     if (this.disposed || this.embedded) throw new Error('External regional player is not bound');
     this.lead.followExternal();
-    this.events.beginFrame(); this.clock.tick(FIXED_STEP);
+    this.settleCredit(); this.events.beginFrame(); this.clock.tick(FIXED_STEP);
     this.stepSystems(); this.events.flush('fixed.post');
+    this.dying = null;
   }
   /** Preflight a fixed-step registration without installing a callback or consuming any simulation state. */
   hasStep(id: string): boolean { return this.callbacks.has(id) || this.afterCallbacks.has(id); }
@@ -624,7 +651,7 @@ export class SimHost {
     const { commanded } = this;
     this.commanded = null;
     for (const player of present.values()) player.take(commands?.get(player.id), commanded?.still.has(player.id) === true);
-    this.events.beginFrame(); this.clock.tick(FIXED_STEP);
+    this.settleCredit(); this.events.beginFrame(); this.clock.tick(FIXED_STEP);
     for (const player of present.values()) player.input();
     if (this.boardHandles.length > 0) this.syncBoardColliders();
     this.physics.step();
@@ -633,11 +660,12 @@ export class SimHost {
     this.stepSystems();
     for (const player of present.values()) player.health.update(FIXED_STEP);
     this.events.flush('fixed.post');
+    this.dying = null;
   }
   /** Called once by the client's fixed.post slot; it never advances physics, clock, player or event phases. */
   stepEmbedded(): void {
     if (this.disposed || !this.embedded) throw new Error('Invalid borrowed simulation step');
-    this.stepSystems();
+    this.settleCredit(); this.stepSystems();
   }
   private stepSystems(): void {
     this.state.tick++;
