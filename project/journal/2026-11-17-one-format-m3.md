@@ -12,3 +12,9 @@
   0.7 ms against an empty scene's 0.6 ms (the p95 is harness noise; the herd adds
   ~0.1 ms). Tests: baked frames match three's live skinning to 1e-4; mid-frame gap
   under 0.1 m on a deer-sized quadruped.
+- CC55a: `render/spriteViews.ts` shoots a rig's rest pose from 8 bearings into one
+  atlas row; `entities/herdSprites.ts` draws a model's far animals as one instanced,
+  upright, camera-facing card that picks the nearest view. Bench 150/200/300 m: 2 draws
+  (31 skinned), 62 triangles, render CPU p95 0.6-0.8 ms vs skinned 1.5 ms, GPU 0.11 ms.
+  First shot was dark: the views are shot over clear black, so filtered texels are
+  premultiplied; the card divides by alpha.

@@ -15,6 +15,8 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { poseEvery } from '../../src/shared/engine/entities/poseCadence';
 import { BakedHerd, bakeGait } from '../../src/client/engine/entities/bakedHerd';
+import { HerdSprites } from '../../src/client/engine/entities/herdSprites';
+import { bakeSpriteViews } from '../../src/client/engine/render/spriteViews';
 
 type Mode = 'skinned' | 'baked' | 'sprite';
 interface BenchResult {
@@ -124,7 +126,10 @@ async function main(): Promise<void> {
     scene.add(herd.mesh);
     tick = (t) => { herd.update(t); };
   } else {
-    throw new Error(`mode ${mode} is not built yet`);
+    const sprites = new HerdSprites(bakeSpriteViews(renderer, proto, { views: 8, size: 128 }), n);
+    spots.forEach((s, i) => { sprites.place(i, new THREE.Vector3(s.x, 0, s.z), s.yaw, 1); });
+    scene.add(sprites.mesh);
+    tick = () => { sprites.update(); };
   }
 
   const cpu: number[] = [], pose: number[] = [], gpu: number[] = [], interval: number[] = [];
