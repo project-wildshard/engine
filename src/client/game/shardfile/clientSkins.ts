@@ -44,9 +44,10 @@ export interface ClientSkin {
 }
 
 const PROPERTIES = new Set(['position', 'quaternion', 'scale']);
-function sampled(clip: AnimationClip): SampledClip['tracks'] {
+function sampled(clip: AnimationClip, joints: readonly Bone[]): SampledClip['tracks'] {
+  const names = new Map(joints.map(bone => [bone.uuid, bone.name]));
   return clip.tracks.map((track: KeyframeTrack) => {
-    const dot = track.name.lastIndexOf('.'), bone = track.name.slice(0, dot), property = track.name.slice(dot + 1);
+    const dot = track.name.lastIndexOf('.'), target = track.name.slice(0, dot), bone = names.get(target) ?? target, property = track.name.slice(dot + 1);
     if (dot <= 0 || !PROPERTIES.has(property)) throw new Error(`skin clip ${clip.name}: unsupported track ${track.name}`);
     if (track.getInterpolation() !== InterpolateLinear) throw new Error(`skin clip ${clip.name}: sampled tracks are linear`);
     // a quaternion track's linear factory slerps (QuaternionLinearInterpolant)
@@ -118,7 +119,7 @@ async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLoo
     const clips = new Map<ClipName, SampledClip>();
     for (const [name, clip] of player.rig.clips) {
       const layers = binding.poseLayers?.[name];
-      clips.set(name, { duration: clip.duration, tracks: sampled(clip), layers: layers === undefined ? null : compileSkinPoseLayers(layers, joints.map((bone) => bone.name)) });
+      clips.set(name, { duration: clip.duration, tracks: sampled(clip, joints), layers: layers === undefined ? null : compileSkinPoseLayers(layers, joints.map((bone) => bone.name)) });
     }
     // Instances use sampled tracks; the temporary player's mixer never plays.
     // Keep its mesh/skeleton scope-owned, but release unused actions/bindings.

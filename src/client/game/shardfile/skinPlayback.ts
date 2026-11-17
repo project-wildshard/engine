@@ -9,7 +9,9 @@
  *   const skin = await loadSkin(bytes, row, binding, material);   // admitted, bound, posed at the clip's first frame
  *   skin.play('walk'); skin.update(dt);                            // per frame, as the engine's rigs do
  */
-import { Float32BufferAttribute, type BufferGeometry, type Material, type Object3D, type SkinnedMesh } from 'three';
+import { Float32BufferAttribute, PropertyBinding, type BufferGeometry, type Material, type Object3D, type SkinnedMesh } from 'three';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as v from 'valibot';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { bindRig, prepareRigLoader, type ClipName, type RigInstance } from '@wildshard/engine/anim/rig';
 import { AnimMachine } from '@wildshard/engine/anim/machine';
@@ -40,6 +42,37 @@ export interface SkinPlayer {
 
 const isSkin = (node: Object3D): node is SkinnedMesh => (node as Partial<SkinnedMesh>).isSkinnedMesh === true;
 const materialName = (mesh: SkinnedMesh): string => (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material)?.name ?? '';
+
+const SourceNames = v.object({ nodes: v.array(v.object({ name: v.optional(v.string()) })) });
+/** The parser's associations retain original node identity after Three sanitizes
+ * names. Bind renamed animation targets by UUID so dots and colliding sanitized
+ * spellings never become a PropertyBinding path. The GLB remains untouched. */
+function restoreSkinNames(file: GLTF, sockets: readonly string[]): void {
+  const raw: unknown = file.parser.json, source = v.parse(SourceNames, raw);
+  const joints = new Set<Object3D>();
+  file.scene.traverse(node => { if (isSkin(node)) for (const bone of node.skeleton.bones) joints.add(bone); });
+  const requested = new Set(sockets), seen = new Map<string, Object3D>();
+  const names: { node: Object3D; original: string }[] = [];
+  file.scene.traverse(node => {
+    const index = file.parser.associations.get(node)?.nodes, original = index === undefined ? undefined : source.nodes[index]?.name;
+    if (joints.has(node) && (original === undefined || original === '')) throw new Error('skin joint has no original node identity');
+    if (original === undefined || (!joints.has(node) && !requested.has(original))) return;
+    if (seen.has(original) && seen.get(original) !== node) throw new Error(`ambiguous skin node ${original}`);
+    seen.set(original, node); names.push({ node, original });
+  });
+  const renamed = new Map<string, Object3D>();
+  for (const { node, original } of names) if (node.name !== original) {
+    if (renamed.has(node.name)) throw new Error(`ambiguous loaded skin node ${node.name}`);
+    renamed.set(node.name, node);
+  }
+  for (const clip of file.animations) for (const track of clip.tracks) {
+    const path = PropertyBinding.parseTrackName(track.name), node = renamed.get(path.nodeName);
+    if (node === undefined) continue;
+    if (path.objectName !== undefined || path.objectIndex !== undefined || path.propertyIndex !== undefined) throw new Error(`unsupported renamed skin track ${track.name}`);
+    track.name = `${node.uuid}.${path.propertyName}`;
+  }
+  for (const { node, original } of names) node.name = original;
+}
 
 /**
  * One skinned mesh from a GLB mesh's primitives (TE-ENG10): three loads each primitive as its own SkinnedMesh on the one
@@ -101,6 +134,7 @@ export async function loadSkin(glb: Uint8Array, row: SkinRow, binding: SkinBindi
   cost.decoded += skinLayerDecoded(binding.poseLayers ?? {}, row.rig.joints[0]?.length ?? 0);
   if (cost.gpu > row.cost.gpu || cost.decoded > row.cost.decoded || cost.triangles > row.cost.triangles || cost.draws > row.cost.draws) throw new Error(`skin ${row.id}: cost above its declaration`);
   const file = await (await prepareRigLoader()).createRigLoader().parseBytesAsync(glb, '');
+  restoreSkinNames(file, row.rig.sockets);
   const meshes: SkinnedMesh[] = []; file.scene.traverse((node) => { if (isSkin(node)) meshes.push(node); });
   // a GLB mesh's primitives (one per GLB material) load as sibling skinned meshes: merged into the first, grouped by `parts`
   const mesh = meshes[0], node = meshes.length > 1 ? mesh?.parent : mesh;
