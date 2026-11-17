@@ -5,6 +5,7 @@ import type { Rng } from '../core/rng';
 import type { FightRules } from '../level/spec';
 import type { HerdPlan } from '../level/data';
 import type { Navmesh } from '../physics/navmesh';
+import type { CreatureTemperament } from '@wildshard/format/creatureLayers';
 import { creatureSoundDefaults, rollVariant, speciesDef, variantOf, type SpeciesDef, type VariantDef, type VariantTable } from '../entities/species/registry';
 import { AggressionDirector } from './director';
 import { reengage, backoffPoint, aroundPoint, RING_DEFAULT, BACKOFF_MAX_T, BREAK_OFF_HP, BREAK_OFF_CHANCE, RULES_CD_HIT, RULES_CD_MISS } from '../entities/fightRules';
@@ -279,7 +280,8 @@ export interface HuntConfig {
   species?: (kind: string) => HuntSpecies;
 }
 /** The species fields the hunting brain reads: a registered SpeciesDef and a renderer-free SpeciesRow both satisfy it. */
-export type HuntSpecies = Pick<SpeciesDef, 'aggressive' | 'tuning' | 'sounds' | 'think' | 'walkSpeed' | 'chargeSpeed' | 'chargeWindup' | 'ringRadius'>;
+export type HuntSpecies = Pick<SpeciesDef, 'aggressive' | 'tuning' | 'sounds' | 'think' | 'walkSpeed' | 'chargeSpeed' | 'chargeWindup' | 'ringRadius'>
+  & { readonly reaction?: CreatureTemperament['reaction'] };
 
 /** A spawn's rolls on the shared stream, in order: the variant (when rolled), the scale, the rig seed and the body seed. */
 export interface SpawnRolls { variant: VariantDef; scale: number; rigSeed: number; seed: number }
@@ -471,6 +473,7 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
     if (a.stunned) { br.chargeCd = Math.max(0, br.chargeCd - dt); a.setMotion(a.yaw, 0, 1); a.lookTarget.copy(player); a.lookWeight = 1; this.confine(a); return; }   // staggered by a sword blow: the AI holds (the charge cooldown still ticks)
     const rng = this.rng;
     const sp = this.species(a.kind);
+    if (sp.reaction === 'passive' && (a.state === 'stalk' || a.state === 'charge')) this.enter(a, br, 'flee');
     const charger = a.aggressive;                 // charges instead of only fleeing
     const T = this.tuningFor(a);
     const M = a.mods;
@@ -603,6 +606,7 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
   advanceCharge(a: A, dt: number, player: Vector3): void {
     const br = this.memories.get(a); if (!br) return;
     const sp = this.species(a.kind), M = a.mods, T = this.tuningFor(a);
+    if (sp.reaction === 'passive') { this.enter(a, br, 'flee'); return; }
     const dx = player.x - a.position.x, dz = player.z - a.position.z, dPlayer = Math.hypot(dx, dz);
     if (br.windup > 0) {
       // melee shard: the telegraph — stand, face the player, head down, paw (Animal.poseWindup); then run
@@ -632,6 +636,7 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
   /** a charge reached the player: the damage, the grunt, the cooldown, and back to stalk (hunters) / flee (a boar wheels away) */
   private chargeHit(a: A, br: HuntMemory): void {
     const T = this.tuningFor(a), sp = this.species(a.kind);
+    if (sp.reaction === 'passive') { this.enter(a, br, 'flee'); return; }
     this.ports.charge(a, a.mods.chargeDamage);
     this.ports.sound(sp.sounds?.call ?? fallbackSound(true, 'call'), a);
     br.chargeCd = this.rules !== null ? Math.max(RULES_CD_HIT, T.stalk?.rechargeCd ?? 0) : T.stalk !== undefined ? T.stalk.rechargeCd : a.mods.relentless ? 2 : 6;   // Old Ironhide wheels round and comes again
@@ -703,10 +708,12 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
     return Math.abs(rel) <= arc;
   }
 
-  private enter(a: A, br: HuntMemory, s: AnimalState): void {
+  private enter(a: A, br: HuntMemory, requested: AnimalState): void {
     const rng = this.rng, g = this.ground;
     const T = this.tuningFor(a);
     const sp = this.species(a.kind);
+    const s = sp.reaction === 'passive' && (requested === 'stalk' || requested === 'charge') ? 'flee' : requested;
+    if (s !== requested) a.cancelAttack();
     const from = a.state;
     if (this.rules !== null) {
       if (s === 'charge' && !this.tokens.take(a)) {
@@ -833,7 +840,9 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
   /** A hit that did not kill (not a self-thinking species): a wounded animal bolts at once; chargers may turn on you; hunters come for you. */
   hurt(a: A): void {
     const br = this.memories.get(a);
-    if (br === undefined || a.state === 'charge' || a.scripted) return;
+    if (br === undefined || a.scripted) return;
+    if (this.species(a.kind).reaction === 'passive') { this.enter(a, br, 'flee'); a.cancelAttack(); return; }
+    if (a.state === 'charge') return;
     // a wounded animal bolts at once — no freeze; a boar this close turns on you instead
     const T = this.tuningFor(a);
     br.wary = T.waryTime;
