@@ -60,7 +60,7 @@ const boxServed=file=>{const health=record(file);return {build:text(health.build
 export async function readLive(get=getJson){
  /** @type {<T>(url:string,shape:(value:unknown)=>T,errors:string[])=>Promise<T|undefined>} */
  const read=async(url,shape,errors)=>{try{return shape(await get(url));}catch(error){errors.push(reason(error));return undefined;}};
- /** @param {string} channel @param {{release?:string,page?:string,box?:string}} urls @returns {Promise<Channel>} */
+ /** @param {string} name @param {{release?:string,page?:string,box?:string}} urls @returns {Promise<Channel>} */
  const channel=async(name,urls)=>{
   /** @type {string[]} */ const errors=[];
   const [page,server,box]=await Promise.all([
