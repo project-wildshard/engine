@@ -253,6 +253,9 @@ export class ScriptHost {
     // Retained events occupy the same allowance as deliveries and newly emitted events.
     this.tick = tick; used.events = retained.length; this.pending = retained; return events;
   }
+  /** Take back events a caller read straight from its own call's result (an item hook's answer): nothing else delivers
+   *  them, so left queued each would hold one of the lane's event slots for good (TEMPLATE-E2E TC-SHIP-e2). */
+  consumed(events: readonly ScriptEvent[]): void { if (events.length > 0) this.pending = this.pending.filter(event => !events.includes(event)); }
   /** Drop what is queued for entities that have left, so it holds no allowance and no save names them. */
   forget(handles: readonly number[]): void { if (handles.length > 0) this.pending = this.pending.filter(event => !handles.includes(event.target)); }
   /** Queue a declared gameplay/scene event for the next script tick, under the same bounded event allowance. */

@@ -36,6 +36,9 @@ export function scriptItemHook(host: ScriptHost, module: string, entity: number,
     || host.world.actor(seat) !== actorId) throw new Error('Item hook requires its host-bound owner');
   return (input) => {
     const call = host.call(module, seat, [input.tick, input.dt, input.action, entity, input.fuel, input.cooldown]);
+    // The answer is read here and nowhere else: no schedule runs the item's entity to take it, so it leaves the queue now.
+    // Kept, every swing held one of the lane's 32 event slots and the 33rd in a room trapped and froze the item (TC-SHIP-e2).
+    host.consumed(call.events);
     if (!call.ok || call.events.length !== 1) return null;
     const request = call.events[0];
     if (request === undefined || request.type !== event || request.target !== entity || request.value !== input.action) return null;
