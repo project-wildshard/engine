@@ -105,7 +105,7 @@ test('the dial names the goto cell; the door reads only a well-formed one', () =
   expect([gotoCell('/'), gotoCell('/?chunk=driftwood-isle'), gotoCell('/?chunk=template-2&x=1'), gotoCell('/?chunk=../etc'), gotoCell(undefined)])
     .toEqual([null, 'driftwood-isle', 'template-2', null, null]);
   const source = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
-  expect(source, 'a grid page asks for its booted cell only when Shard select sent it there').toMatch(/pageGoto\(\) === booted \? \{ goto: true \}/u);
+  expect(source, 'a grid page asks for its booted cell only when Shard select sent it there').toMatch(/gridOf\(booted, pageGoto\(\) === booted\)/u);
 });
 
 test('the door seats a goto in the cell it names, over the player\'s last place; a cell it doesn\'t open falls back to that place', { timeout: 120_000 }, async () => {
