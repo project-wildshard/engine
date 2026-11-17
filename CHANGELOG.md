@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.34 (2026-11-17)
+
+- Fix repeated Template whip attacks and melee hits on large enemies.
+- Keep kill credit with each player and correct zone names on the minimap.
+- Prepare newly published zones before a staging release goes live.
+
 ## v0.1.33 (2026-11-16)
 
 - Fix Pine Hollow loading and world entry.
