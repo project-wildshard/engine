@@ -38,6 +38,9 @@ export interface NeighbourLifePorts {
   readonly scope: Scope;
   readonly simulation: (instance: string) => NeighbourRegion | undefined;
   readonly active: (instance: string) => boolean;
+  /** A public shared state field the server sends for the cell, by its declared name: only where the wire stands (TC-SHIP-d2:
+   *  Brasscap's Wyrm glows its gullet and tells its strike from these; a lane with no state view refused the whole cell). */
+  readonly field?: (instance: string, name: string) => number | undefined;
 }
 /** One cell's readout. */
 export interface NeighbourLifeCell { readonly instance: string; readonly creatures: number; readonly frozen: boolean; readonly views: ClientScriptViewState; readonly failed: string | null }
@@ -151,7 +154,16 @@ export class NeighbourLife {
       if (view === undefined) return { position: [0, 0, 0], frozen };
       const p = view.mesh.position; return { position: [p.x, p.y, p.z], frozen };
     };
-    const scripts = createShardfileClientScripts(source, assets, { actorId: 'actor.neighbour', observe });
+    // the page's view of the cell's public shared state: the wire's row, else the declared default until one arrives (a
+    // player-scope or private field has no grid-page reader and reads its default; a string default reads as missing)
+    const viewField = (_actor: string, scope: 'shared' | 'player', name: string): number | undefined => {
+      const row = source.state[scope].find((field) => field.name === name);
+      if (row === undefined || row.privacy === 'host' || (scope === 'shared' && row.privacy !== 'public')) return undefined;
+      const value = scope === 'shared' ? this.ports.field?.(instance, name) : undefined;
+      if (value !== undefined || typeof row.default === 'string') return value;
+      return typeof row.default === 'boolean' ? Number(row.default) : row.default;
+    };
+    const scripts = createShardfileClientScripts(source, assets, { actorId: 'actor.neighbour', observe, state: { viewField } });
     try {
       const targets = scripts.targets.map(({ entity, target }): ClientScriptViewTarget => {
         const view = target.kind === 'creature' ? creatures.get(target.id) : undefined;

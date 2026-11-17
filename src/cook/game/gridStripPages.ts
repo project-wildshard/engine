@@ -12,7 +12,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { StripPackWriter } from './stripPack';
 import { gridLookBytes } from './encodedBytes';
 import type { GeneratedStrip } from '@wildshard/engine/sim/strips';
-import { GRID_STRIP_FEATURE_KINDS, decodeCompiledGridBlock, mergeGridBlocks, parseCompiledGridDirectory, parseCompiledGridHeader, type CompiledGridAddress, type CompiledGridDirectory, type CompiledGridHeader, type CompiledGridSelector, type DecodedGridBlock } from '../../shared/game/grid/compiledStrips';
+import { GRID_STRIP_FEATURE_KINDS, decodeCompiledGridBlock, mergeGridBlocks, parseCompiledGridDirectory, parseCompiledGridHeader, parseCompiledGridShapeIndex, type CompiledGridAddress, type CompiledGridDirectory, type CompiledGridHeader, type CompiledGridSelector, type DecodedGridBlock } from '../../shared/game/grid/compiledStrips';
 import { seamMeshSteps } from '../../shared/game/grid/seamGeometry';
 import { BrotliSizeCache } from './brotliSizeCache.mjs';
 
@@ -25,8 +25,9 @@ export interface CompiledGridArtifact { readonly address: CompiledGridAddress; r
 export interface CompiledGridBlockFile { readonly block: string; readonly header: CompiledGridArtifact; readonly body: CompiledGridArtifact }
 /** One home's road as a build row: `added` is the wire of its directory and its blocks, `set` the whole block set's ratchet. */
 export interface GridStripWireRow { readonly source: string; readonly home: string; readonly slug: string; readonly added: number; readonly set: number; readonly included: boolean; readonly outer: boolean }
-/** One seam source's whole native road and the homes that read it. */
-export interface GridStripSource { readonly source: string; readonly pitch: number; readonly strips: readonly GeneratedStrip[];
+/** One seam source's whole native road and the homes that read it. `keys` (SB38e): each strip's shape key
+ *  (`platformShapeKeys`, in the same order); when every source has them the build writes the shape index. */
+export interface GridStripSource { readonly source: string; readonly pitch: number; readonly strips: readonly GeneratedStrip[]; readonly keys?: readonly string[];
   readonly homes: readonly { readonly instance: string; readonly slug: string; readonly origin: { readonly x: number; readonly z: number } }[] }
 export interface CompiledGridBuild {
   readonly geometry?: CompiledGridSelector; readonly files: readonly CompiledGridAddress[]; readonly rows: readonly GridStripWireRow[];
@@ -150,6 +151,13 @@ export function encodeGridStripBlock(block: string, strips: readonly { readonly 
   return { block, header, body };
 }
 
+/** Exact shape equality: words, features and turn-in (placement is each strip's own). */
+function certifyShape(strip: GeneratedStrip, shape: GeneratedStrip): void {
+  for (const field of ['positions', 'colours', 'indices'] as const) if (!sameWords(strip.mesh[field], shape.mesh[field])) throw new Error('Grid shape key names two shapes');
+  if (!isDeepStrictEqual(JSON.parse(new TextDecoder().decode(json({ features: strip.features, turnIn: strip.turnIn ?? null }))),
+    JSON.parse(new TextDecoder().decode(json({ features: shape.features, turnIn: shape.turnIn ?? null }))))) throw new Error('Grid shape key names two shapes');
+}
+
 /** Exact strip equality: order, ids, original words, placement, features and duplicates. */
 function certifyStrips(decoded: readonly GeneratedStrip[], strips: readonly GeneratedStrip[]): void {
   if (decoded.length !== strips.length) throw new Error('Grid strip bake changed its order');
@@ -187,6 +195,9 @@ export function writeGridStripBlocks(root: string, seams: string, sources: reado
   if (new Set(sources.map(row => row.source)).size !== sources.length) throw new Error('Grid strip source is not deterministic');
   const blocks: CompiledGridBlockFile[] = [], blockIndex = new Map<string, number>(), decodedBlocks: DecodedGridBlock[] = [];
   const homes: CompiledGridDirectory['homes'][number][] = [], owners: { readonly source: string; readonly home: string; readonly slug: string }[] = [];
+  // SB38e: shape key hash -> the first block row holding its words, and the native strip that row was certified against.
+  const indexed = sources.length > 0 && sources.every(source => source.keys?.length === source.strips.length);
+  const shapeRows = new Map<string, { readonly block: number; readonly row: number; readonly strip: GeneratedStrip }>();
   for (const source of [...sources].sort((a, b) => a.source.localeCompare(b.source))) {
     const groups = new Map<string, { strip: GeneratedStrip; order: number }[]>();
     for (const [order, strip] of source.strips.entries()) {
@@ -202,6 +213,15 @@ export function writeGridStripBlocks(root: string, seams: string, sources: reado
         decodedBlocks.push(decodeCompiledGridBlock(JSON.parse(new TextDecoder().decode(file.header.bytes)), file.body.bytes));
       }
       sourceBlocks.set(key, index);
+      if (!indexed) continue;
+      for (const [row, { strip, order }] of rows.entries()) {
+        const shape = source.keys?.[order]; if (shape === undefined) throw new Error('Missing grid shape key');
+        const named = hash(new TextEncoder().encode(shape)), previous = shapeRows.get(named);
+        // A shape key names one shape: every strip under it carries the same words, features and turn-in.
+        if (previous !== undefined) { certifyShape(strip, previous.strip); continue; }
+        if (decodedBlocks[index]?.strips[row]?.strip.id !== strip.id) throw new Error('Grid shape index row differs');
+        shapeRows.set(named, { block: index, row, strip });
+      }
     }
     for (const home of [...source.homes].sort((a, b) => a.instance.localeCompare(b.instance))) {
       const within = (x: number, z: number): boolean => Math.abs(x - home.origin.x) <= reach && Math.abs(z - home.origin.z) <= reach;
@@ -219,11 +239,15 @@ export function writeGridStripBlocks(root: string, seams: string, sources: reado
       homes.push(row); owners.push({ source: source.source, home: home.instance, slug: home.slug });
     }
   }
-  const book = { version: 2 as const, blocks: blocks.map(file => ({ header: file.header.address, body: file.body.address })), homes };
+  const shapeIndex = { version: 1 as const, shapes: [...shapeRows].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([named, row]) => [named, row.block, row.row] as const) };
+  const shapes = indexed && blocks.length > 0 ? artifact(json(shapeIndex), 'json', 'book') : undefined;
+  if (shapes !== undefined) parseCompiledGridShapeIndex(JSON.parse(new TextDecoder().decode(shapes.bytes)), blocks.length);
+  const book = { version: 2 as const, blocks: blocks.map(file => ({ header: file.header.address, body: file.body.address })), homes,
+    ...(shapes === undefined ? {} : { shapes: shapes.address }) };
   parseCompiledGridDirectory(JSON.parse(new TextDecoder().decode(json(book))));
   const directory = artifact(json(book), 'json', 'book');
   const files = new Map<string, CompiledGridArtifact>();
-  for (const file of blocks.length === 0 ? [] : [directory, ...blocks.flatMap(block => [block.header, block.body])]) {
+  for (const file of blocks.length === 0 ? [] : [directory, ...(shapes === undefined ? [] : [shapes]), ...blocks.flatMap(block => [block.header, block.body])]) {
     const previous = files.get(file.address.url);
     if (previous !== undefined && previous.address.sha256 !== file.address.sha256) throw new Error('Grid strip content URL collision');
     files.set(file.address.url, file);

@@ -3,7 +3,7 @@ import { unzlibSync } from 'fflate';
 import { GeometryPackData, PackedGeometryRowsSchema, type PackedGeometryRows } from '@wildshard/format/geometryPack';
 import type { Scope } from '@wildshard/engine/app/scope';
 
-import type { GeneratedStrip, PlatformCell, StripMesh, StripProfile } from '@wildshard/engine/sim/strips';
+import { platformShapeKeys, type GeneratedStrip, type PlatformCell, type PlatformShape, type StripMesh, type StripProfile } from '@wildshard/engine/sim/strips';
 import { edgeProfileJson } from '@wildshard/engine/sim/edgeProfiles';
 import type { ResidencyAllocator } from './allocator';
 import { readGridAssetBytes } from './gridAssetBytes';
@@ -28,7 +28,10 @@ export interface CompiledGridSelector { readonly directory: CompiledGridAddress;
 export interface CompiledGridBlock { readonly header: CompiledGridAddress; readonly body: CompiledGridAddress }
 /** One home under one seam source: the blocks (indices into `blocks`) its initial ring and its outer road read. */
 export interface CompiledGridHome { readonly source: string; readonly home: string; readonly initial: readonly number[]; readonly outer: readonly number[] }
-export interface CompiledGridDirectory { readonly version: 2; readonly blocks: readonly CompiledGridBlock[]; readonly homes: readonly CompiledGridHome[] }
+/** `shapes`: the shape index (SB38e), read only when a home's live inputs miss every source row. */
+export interface CompiledGridDirectory { readonly version: 2; readonly blocks: readonly CompiledGridBlock[]; readonly homes: readonly CompiledGridHome[]; readonly shapes?: CompiledGridAddress }
+/** SB38e: each baked shape key's SHA-256 and the block row (block index, row in its header's strips) that holds its words. */
+export interface CompiledGridShapeIndex { readonly version: 1; readonly shapes: readonly (readonly [string, number, number])[] }
 export interface CompiledGridHeader {
   readonly version: 2; readonly block: string; readonly rows: PackedGeometryRows;
   readonly surfaces: readonly string[];
@@ -49,7 +52,24 @@ const address = (extension: 'json' | 'bin') => v.strictObject({ url: v.pipe(v.st
 const blockList = v.pipe(v.array(v.pipe(natural, v.maxValue(4095))), v.maxLength(4096));
 const directorySchema = v.strictObject({ version: v.literal(2),
   blocks: v.pipe(v.array(v.strictObject({ header: address('json'), body: address('bin') })), v.maxLength(4096)),
-  homes: v.pipe(v.array(v.strictObject({ source: hash, home: text, initial: blockList, outer: blockList })), v.maxLength(1024)) });
+  homes: v.pipe(v.array(v.strictObject({ source: hash, home: text, initial: blockList, outer: blockList })), v.maxLength(1024)),
+  shapes: v.exactOptional(address('json')) });
+const shapeIndexSchema = v.strictObject({ version: v.literal(1),
+  shapes: v.pipe(v.array(v.tuple([hash, v.pipe(natural, v.maxValue(4095)), v.pipe(natural, v.maxValue(255))])), v.maxLength(65_536)) });
+/** The build and runtime share one shape index admission: sorted unique keys, every row inside the directory's blocks. */
+export function parseCompiledGridShapeIndex(input: unknown, blocks: number): CompiledGridShapeIndex {
+  const index = v.parse(shapeIndexSchema, input);
+  for (const [at, [key, block]] of index.shapes.entries()) {
+    if (block >= blocks) throw new Error('Grid shape index names a missing block');
+    if (at > 0 && (index.shapes[at - 1]?.[0] ?? '') >= key) throw new Error('Grid shape index is not sorted');
+  }
+  return index;
+}
+/** One shape key's index name. */
+export async function gridShapeKeyHash(key: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)));
+  return Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
+}
 /** The build and runtime share one bounded directory admission: every block index names a block. */
 export function parseCompiledGridDirectory(input: unknown): CompiledGridDirectory {
   const book = v.parse(directorySchema, input);
@@ -107,7 +127,7 @@ interface DecodedGridStrips { readonly strips: readonly GeneratedStrip[]; readon
 
 // Only these public decoders or the verified file reader admit this private
 // snapshot. Keep all binary/feature/finite checks in the same steps.
-function* blockSteps(header: CompiledGridHeader, bytes: Uint8Array, nativeLook?: Uint8Array): Generator<void, DecodedGridBlock> {
+function* blockSteps(header: CompiledGridHeader, bytes: Uint8Array, nativeLook?: Uint8Array, withLook = true): Generator<void, DecodedGridBlock> {
   if (header.rows.geometries.length !== header.shapes.length) throw new Error('Grid strip block layout differs');
   const featureStart = Math.ceil(header.rows.bytes / 8) * 8;
   const featureEnd = header.look?.offset ?? bytes.length;
@@ -149,7 +169,7 @@ function* blockSteps(header: CompiledGridHeader, bytes: Uint8Array, nativeLook?:
     result.push({ strip: { id: strip.id, mesh, features: shape.features, ...(metadata.turnIn === undefined ? {} : { turnIn: metadata.turnIn }), duplicates }, order: strip.order });
   }
   const look = header.look;
-  if (look === undefined) return { strips: result, colours: false };
+  if (look === undefined || !withLook) return { strips: result, colours: false };
   const vertices = result.reduce((sum, row) => sum + row.strip.mesh.positions.length / 3, 0);
   const decodedBytes = vertices * (look.colours === true ? 24 : 12);
   if (look.offset % 4 !== 0 || look.vertices !== vertices || decodedBytes > 16 * 1024 * 1024) throw new Error('Grid strip look layout differs');
@@ -242,8 +262,15 @@ async function inflateGridLook(bytes: Uint8Array, expected: number, scope: Scope
 }
 
 /** Read and decode one phase's blocks for `home` (`key` names its charges), then merge what `within` keeps. */
-async function readGridBlocks(blocks: readonly CompiledGridBlock[], key: string, home: string, owner: GridStripOwner, read: GridStripFetch,
+function readGridBlocks(blocks: readonly CompiledGridBlock[], key: string, home: string, owner: GridStripOwner, read: GridStripFetch,
   pause: () => Promise<void>, within: (x: number, z: number) => boolean): Promise<DecodedGridStrips> {
+  return decodeGridBlocks(blocks, key, home, owner, read, pause, decoded => mergeGridBlocks(decoded, within));
+}
+
+/** Read and decode these blocks under `key`'s charges; `finish` makes the published result (its arrays keep the source charge).
+ *  `retain: false` (SB38e's seeds): no look, and `finish` copies what it keeps, so every charge ends with the read. */
+async function decodeGridBlocks<T>(blocks: readonly CompiledGridBlock[], key: string, home: string, owner: GridStripOwner, read: GridStripFetch,
+  pause: () => Promise<void>, finish: (decoded: readonly DecodedGridBlock[]) => T, retain = true): Promise<T> {
   liveGridOwner(owner.scope);
   const abort = new AbortController(), forget = owner.scope.capture('disposers', () => { abort.abort(); });
   const reservations: { readonly release: () => void }[] = [];
@@ -264,7 +291,7 @@ async function readGridBlocks(blocks: readonly CompiledGridBlock[], key: string,
     const wire = await Promise.all(blocks.map(async block => { const [header, body] = await Promise.all([fetchAsset(block.header), fetchAsset(block.body)]); return { header, body }; }));
     liveGridOwner(owner.scope);
     const metadata = wire.map(({ header }) => parseCompiledGridHeader(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(header))));
-    const lookBytes = metadata.reduce((sum, row) => sum + (row.look?.codec === 'deflate' ? row.look.vertices * (row.look.colours === true ? 24 : 12) + 1 : 0), 0);
+    const lookBytes = retain ? metadata.reduce((sum, row) => sum + (row.look?.codec === 'deflate' ? row.look.vertices * (row.look.colours === true ? 24 : 12) + 1 : 0), 0) : 0;
     if (lookBytes > 0) {
       if (lookBytes > 16 * 1024 * 1024 + blocks.length) throw new Error('Grid strip look layout differs');
       sourceLeases.push(reserve('look-source', lookBytes));
@@ -274,11 +301,11 @@ async function readGridBlocks(blocks: readonly CompiledGridBlock[], key: string,
     for (const [index, row] of metadata.entries()) {
       const body = wire[index]?.body; if (body === undefined) throw new Error('Missing grid strip block');
       let nativeLook: Uint8Array | undefined;
-      if (row.look?.codec === 'deflate' && typeof DecompressionStream !== 'undefined') {
+      if (retain && row.look?.codec === 'deflate' && typeof DecompressionStream !== 'undefined') {
         nativeLook = await inflateGridLook(body.subarray(row.look.offset), row.look.vertices * (row.look.colours === true ? 24 : 12), owner.scope);
       }
       liveGridOwner(owner.scope);
-      const steps = blockSteps(row, body, nativeLook);
+      const steps = blockSteps(row, body, nativeLook, retain);
       try {
         for (;;) {
           liveGridOwner(owner.scope); const step = steps.next();
@@ -288,8 +315,8 @@ async function readGridBlocks(blocks: readonly CompiledGridBlock[], key: string,
       } finally { steps.return({ strips: [], colours: false }); }
     }
     liveGridOwner(owner.scope);
-    const merged = mergeGridBlocks(decoded, within);
-    published = true;
+    const merged = finish(decoded);
+    published = retain;
     return merged;
   } finally {
     abort.abort(); forget(); for (const reservation of reservations) reservation.release();
@@ -315,11 +342,32 @@ function deferredGridBlocks(blocks: readonly CompiledGridBlock[], home: string, 
 /** The charge key of one home's phase. */
 export function gridStripPageKey(home: string, phase: GridStripPhase): string { return phase === 'outer' ? `${home}:outer` : home; }
 
+/** SB38e: a home whose live inputs miss every baked source: the build's shapes its strips still name, by shape key. */
+export interface CompiledGridSeeds { readonly seeds: ReadonlyMap<string, PlatformShape> }
+interface GridStripInput { readonly cells: readonly PlatformCell[]; readonly empty: StripProfile }
+
 /** Optional exact-input baked road. A home with no row uses native construction; corrupt declared data refuses. `within`
  * selects the phase's strips by origin (the session's ring for initial, its complement for outer); an initial read may
  * continue to the outer blocks later, keeping the complement, and each new read still fingerprints its actual inputs. */
-export async function readCompiledGridStrips(selector: CompiledGridSelector | undefined, input: { readonly cells: readonly PlatformCell[]; readonly empty: StripProfile }, home: string,
+export async function readCompiledGridStrips(selector: CompiledGridSelector | undefined, input: GridStripInput, home: string,
   owner: GridStripOwner, read: GridStripFetch, pause: () => Promise<void>, within: (x: number, z: number) => boolean, phase: GridStripPhase = 'initial'): Promise<CompiledGridRead | null> {
+  const result = await readGridStrips(selector, input, home, owner, read, pause, within, phase, false);
+  return result === null || 'seeds' in result ? null : result;
+}
+
+/**
+ * `readCompiledGridStrips`, and on a source miss (placements changed since the build: J379's auto-placed uploads) the
+ * build's shapes for every strip `within` keeps whose shape key is unchanged, from only the blocks that hold them
+ * (SB38e). The page seeds native construction with them (`generatePlatformSliced`'s `known`), so it certifies and builds
+ * only the shapes beside a changed cell; every strip is still placed exactly as native placement does.
+ */
+export function readGridStripsOrSeeds(selector: CompiledGridSelector | undefined, input: GridStripInput, home: string,
+  owner: GridStripOwner, read: GridStripFetch, pause: () => Promise<void>, within: (x: number, z: number) => boolean, phase: GridStripPhase = 'initial'): Promise<CompiledGridRead | CompiledGridSeeds | null> {
+  return readGridStrips(selector, input, home, owner, read, pause, within, phase, true);
+}
+
+async function readGridStrips(selector: CompiledGridSelector | undefined, input: GridStripInput, home: string, owner: GridStripOwner, read: GridStripFetch,
+  pause: () => Promise<void>, within: (x: number, z: number) => boolean, phase: GridStripPhase, seeds: boolean): Promise<CompiledGridRead | CompiledGridSeeds | null> {
   const key = gridStripPageKey(home, phase);
   if (selector === undefined || !selector.homes.includes(home)) return null;
   liveGridOwner(owner.scope);
@@ -331,10 +379,53 @@ export async function readCompiledGridStrips(selector: CompiledGridSelector | un
       readGridAssetBytes(selector.directory, url => read(url, abort.signal), 'strips'), platformGeometrySource(input.cells, input.empty)]);
     liveGridOwner(owner.scope);
     const book = parseCompiledGridDirectory(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(directory)));
-    const row = book.homes.find(entry => entry.source === source && entry.home === home); if (row === undefined) return null;
     const pick = (indices: readonly number[]): CompiledGridBlock[] => indices.map(index => { const block = book.blocks[index]; if (block === undefined) throw new Error('Grid strip directory names a missing block'); return block; });
+    const row = book.homes.find(entry => entry.source === source && entry.home === home);
+    if (row === undefined) {
+      if (!seeds || book.shapes === undefined) return null;
+      directoryLease.release(); directoryLease = undefined;
+      try { return await readGridSeeds(book.shapes, book.blocks.length, pick, input, key, home, owner, read, abort.signal, pause, within); }
+      catch (error) {
+        liveGridOwner(owner.scope);
+        // Seeds only save work: a refused, corrupt or deferred read keeps the page's native construction, as before SB38e.
+        console.warn(`[grid] ${home} builds its road natively: baked shapes unread`, error);
+        return null;
+      }
+    }
     const decoded = await readGridBlocks(pick(row[phase]), key, home, owner, read, pause, within); liveGridOwner(owner.scope);
     const outer = phase === 'initial' && row.outer.length > 0 ? pick(row.outer) : undefined;
     return { ...decoded, ...(outer === undefined ? {} : { readOuter: deferredGridBlocks(outer, home, owner, read, (x, z) => !within(x, z)) }) };
   } finally { abort.abort(); forget(); directoryLease?.release(); }
+}
+
+/** The baked shapes these live inputs still name, or null when they name none (or native construction would refuse them). */
+async function readGridSeeds(shapeIndex: CompiledGridAddress, blockCount: number, pick: (indices: readonly number[]) => CompiledGridBlock[], input: GridStripInput,
+  key: string, home: string, owner: GridStripOwner, read: GridStripFetch, signal: AbortSignal, pause: () => Promise<void>,
+  within: (x: number, z: number) => boolean): Promise<CompiledGridSeeds | null> {
+  let keys: readonly string[];
+  try { keys = platformShapeKeys(input.cells, input.empty, within); }
+  catch { return null; } // native construction reports these inputs (and takes its road-level fallback) as before
+  const byHash = new Map<string, string>();
+  for (const shape of new Set(keys)) byHash.set(await gridShapeKeyHash(shape), shape);
+  liveGridOwner(owner.scope);
+  const lease = reserveGridSource(owner, key, home, 'shapes', shapeIndex.bytes * 2);
+  const hits: { readonly key: string; readonly block: number; readonly row: number }[] = [];
+  try {
+    const bytes = await readGridAssetBytes(shapeIndex, url => read(url, signal), 'strips'); liveGridOwner(owner.scope);
+    const index = parseCompiledGridShapeIndex(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)), blockCount);
+    for (const [named, block, row] of index.shapes) { const shape = byHash.get(named); if (shape !== undefined) hits.push({ key: shape, block, row }); }
+  } finally { lease.release(); }
+  if (hits.length === 0) return null;
+  const blocks = [...new Set(hits.map(hit => hit.block))].sort((a, b) => a - b), at = new Map(blocks.map((block, index) => [block, index]));
+  return decodeGridBlocks(pick(blocks), key, home, owner, read, pause, decoded => {
+    const shapes = new Map<string, PlatformShape>();
+    for (const hit of hits) {
+      const strip = decoded[at.get(hit.block) ?? -1]?.strips[hit.row]?.strip; if (strip === undefined) throw new Error('Grid shape index names a missing row');
+      // own copies: the block bodies (often another source's, elsewhere on the grid) are garbage once this returns
+      const { positions, colours, indices } = strip.mesh;
+      shapes.set(hit.key, { mesh: { positions: positions.slice(), colours: colours.slice(), indices: indices.slice() }, features: strip.features,
+        ...(strip.turnIn === undefined ? {} : { turnIn: strip.turnIn }) });
+    }
+    return { seeds: shapes };
+  }, false);
 }
