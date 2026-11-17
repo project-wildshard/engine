@@ -4,7 +4,11 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
 import { join, resolve } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
+
+// Every check runs the real harden.sh, about 0.5 s on a quiet Mac and 6 s under a land gate's load (17 to 19); SC2 runs it four
+// times and passed 30 s in the 2026-11-17 10:04 UTC gate (opus-mainscreen). The budget follows the work, not the load.
+vi.setConfig({ testTimeout: 120_000 });
 
 // VPS-HARDENING VH1: `harden.sh --check` against the box the 2026-11-09 audit found, as stub commands and a made-up root
 // filesystem. Its container proof is scripts/vps-harden-proof.sh; it never runs on the VPS from here.
