@@ -19,7 +19,7 @@ test('a tool on a stand starts locked in the page\'s kit and works once unlocked
   const input = { bind: () => undefined, held: () => false, register: () => undefined, has: () => true };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The kit's runtimes strike at nothing here.
   const runtime = (row: { readonly hook: unknown }): ItemPorts => ({ actor: { id: 'actor.player', alive: true }, combat: { hit: () => null }, targets: () => [], hook: row.hook === null ? null : (command: { action: number }) => command.action, effect: () => undefined, active: () => true }) as unknown as ItemPorts;
-  const kitFor = (source: Shardfile): { kit: EquipmentService; tool: { readonly id: unknown; enabled: boolean } } => {
+  const kitFor = (source: Shardfile): { kit: EquipmentService; tool: { readonly id: unknown; enabled: boolean; readonly model?: { visible: boolean } } } => {
     const items = installDeclaredItems(source.items, { scope, actorId: 'actor.player', input, families: declaredKitItemFamilies(), icon: () => 'sword' as never, aim: () => aim, runtime,
       racked: new Set([...rackMeleeRows(source), ...rackToolRows(source)]), observation: { mode: 'foot', item: null, flags: [] } });
     const weapons = [items.primary, items.secondary, ...items.extras].filter(weapon => weapon !== null);
@@ -33,8 +33,12 @@ test('a tool on a stand starts locked in the page\'s kit and works once unlocked
   const stand = kitFor(shard);
   expect(stand.kit.has(stand.tool.id as never)).toBe(false);
   expect(stand.tool.enabled).toBe(false);
+  stand.kit.update(1 / 60, 0);
+  expect(stand.tool.model?.visible).toBe(false); // not drawn in the off hand while it hangs on its stand
   stand.kit.unlock(stand.tool.id as never); // the taken line's (or the stand's scene's) unlock
   expect(stand.tool.enabled).toBe(true);
+  stand.kit.update(1 / 60, 1 / 60);
+  expect(stand.tool.model?.visible).toBe(true);
   const carried = kitFor(base);
   expect(carried.kit.has(carried.tool.id as never)).toBe(true);
   scope.dispose();

@@ -331,12 +331,15 @@ class DeclaredLantern extends Tool {
     this.flame = new Mesh(band, glow); this.flame.visible = false; this.model.add(this.flame);
     ports.scope.onDispose(() => { band.dispose(); glow.dispose(); });
     this.light = new PointLight(0xffe1aa, 0, 8); this.model.add(this.light);
+    // SHARD-SOURCE SS-GF1a1b: hidden until the kit first steps it; a lantern still on its stand is locked, so never stepped
+    this.model.visible = false;
     ports.scope.onDispose(() => { this.light.dispose(); });
     ports.runtime.observe(ports.scope, (phase) => { if (phase === 'light') this.equipEvents?.emit('tool.used', { id: row.id, phase: ports.runtime.lightOn ? 'on' : 'off' }); });
   }
   override install(ctx: EquipContext): void { super.install(ctx); ctx.scope.onDispose(() => { this.ports.scope.dispose(); }); }
   update(_dt: number, _t: number): void {
     const lit = this.ports.runtime.lightOn;
+    this.model.visible = true;
     this.light.intensity = lit ? this.spec.intensity : 0;
     this.flame.visible = lit;
     keepInFrame(this.model, this.ports.view.position);
