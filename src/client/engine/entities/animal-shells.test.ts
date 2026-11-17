@@ -22,3 +22,17 @@ test('publication retains the frame roster bound while an owner changes the rost
   publishShellLevels(animals, new Int32Array(4).fill(-1), new Float64Array(4), 4);
   expect(calls).toEqual([0, 1, 2]);
 });
+
+test('a fur shell is bound before it joins a rig already in the scene', async () => {
+  const { AnimalFactory } = await import('./AnimalFactory');
+  const { Bone, BufferGeometry, MeshPhysicalMaterial, Skeleton, SkinnedMesh } = await import('three');
+  const geometry = new BufferGeometry(), body = new SkinnedMesh(geometry);
+  body.bind(new Skeleton([new Bone()]));
+  const seen: number[] = [];
+  body.addEventListener('childadded', ({ child }) => { if (child instanceof SkinnedMesh) seen.push(child.skeleton.bones.length); });
+  const factory: unknown = Object.create(AnimalFactory.prototype);
+  if (!(factory instanceof AnimalFactory)) throw new Error('Missing factory');
+  const shells = factory.createShells({ mesh: body }, { geometry, shells: [new MeshPhysicalMaterial(), new MeshPhysicalMaterial()] });
+  expect(seen).toEqual([1, 1]);
+  expect(shells.every((shell) => shell.skeleton === body.skeleton && shell.parent === body)).toBe(true);
+});

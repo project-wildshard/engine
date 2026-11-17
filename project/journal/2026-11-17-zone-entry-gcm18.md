@@ -6,3 +6,13 @@
   one socket, no reload, B saw A frozen 10.5 s then gone, C saw A arrive 5 m away. Its failing runs were the harness: several
   WebGL pages in one headless browser starve a page's game loop while its socket keeps receiving at 60/s, and four clients on
   one IP meet the door's 4-socket cap.
+
+## Fur shells bind before they join the rig (opus-gcm18, 2026-11-17 ~00:55 Cancun)
+
+Every staging entry into Nalati (v0.1.33) showed the error card:
+`grid.runtime.nalati-grasslands.animals` threw "reading 'bones'", then
+`render` threw "reading 'update'". `createShells` added each shell to a
+rig already in the cell before binding it, so the cell clip's
+`childadded` watch (`borrowsBones`) and the renderer met a SkinnedMesh
+with no skeleton. Shells now bind first; `animal-shells.test.ts` is red
+on the old order.

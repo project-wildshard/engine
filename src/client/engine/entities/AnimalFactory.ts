@@ -601,14 +601,16 @@ export class AnimalFactory {
   }
 
   /** Fur-shell meshes for one rig: SHELL_LAYERS SkinnedMeshes sharing geometry + skeleton, parented to the body mesh, all hidden. [] in 'toon'. */
-  createShells(rig: AnimalRig, model: AnimalModel): THREE.SkinnedMesh[] {
+  createShells(rig: Pick<AnimalRig, 'mesh'>, model: Pick<AnimalModel, 'geometry' | 'shells'>): THREE.SkinnedMesh[] {
     const out: THREE.SkinnedMesh[] = [];
     for (const mat of model.shells) {
       const sh = new THREE.SkinnedMesh(model.geometry, mat);
       sh.castShadow = false; sh.receiveShadow = true;
       sh.frustumCulled = false; sh.visible = false;
-      rig.mesh.add(sh);
+      // bound before it joins the tree: a rig already in a cell fires the cell clip's childadded watch at once, and a shell
+      // with no skeleton yet threw there and in the renderer (staging v0.1.33, Nalati: "reading 'bones'", the animal system off)
       sh.bind(rig.mesh.skeleton, rig.mesh.bindMatrix);
+      rig.mesh.add(sh);
       out.push(sh);
     }
     return out;
