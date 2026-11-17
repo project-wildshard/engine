@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
 import { extname, join, resolve } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "../scripts/browser-playwright.mjs";
 import { build } from 'vite';
 import { expect, test } from 'vitest';
 import type { NetCommand } from '@wildshard/wire/netCommand';

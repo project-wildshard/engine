@@ -1,7 +1,7 @@
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
+import {mkdir,readFile} from 'node:fs/promises';
+import {join} from 'node:path';
 import {setImmediate} from 'node:timers/promises';
-import {chromium, type Browser, type Request, type Response} from 'playwright';
+import {chromium, type Browser, type Request, type Response} from "../browser-playwright.mjs";
 import {nativeBodyBytes} from './native-body.ts';
 import {NativeSizeLedger, type NativeSizeObservation} from './native-sizes.ts';
 import {record, type Profile} from './model.ts';
@@ -19,23 +19,19 @@ export async function launchChromium(directory: string, profile: Profile): Promi
   const link = profile.down > 0 ? await startSharedLink(profile.down) : null;
   const conditions = {offline: false as const, latency: profile.latency, downloadThroughput: link === null ? profile.down : -1, uploadThroughput: profile.up};
   // <-loopback> drops Chromium's implicit loopback bypass, so 127.0.0.1 previews take the link too.
-  const child = spawn(chromium.executablePath(), ['--headless=new', '--remote-debugging-port=0',
-    `--user-data-dir=${directory}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions',
+  const server = await chromium.launchServer({executablePath:chromium.executablePath(),headless:true,args:['--remote-debugging-port=0',
+    '--no-first-run', '--no-default-browser-check', '--disable-extensions',
     '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', ...KEYCHAIN_ARGS,
-    ...link === null ? [] : [`--proxy-server=${link.proxy}`, '--proxy-bypass-list=<-loopback>'], 'about:blank'], {stdio: ['ignore', 'ignore', 'pipe']});
+    ...link === null ? [] : [`--proxy-server=${link.proxy}`, '--proxy-bypass-list=<-loopback>']]});
+  const child=server.process();
   let socket: WebSocket | undefined;
   try {
-    const endpoint = await new Promise<string>((resolve, reject) => {
-      let output = '';
-      const timer = setTimeout(() => reject(new Error('Chromium CDP endpoint deadline')), 15_000);
-      child.once('error', error => {clearTimeout(timer); reject(error);});
-      child.once('exit', code => {clearTimeout(timer); reject(new Error(`Chromium exited ${code}`));});
-      child.stderr.on('data', (chunk: Buffer) => {
-        output += chunk.toString();
-        const match = /DevTools listening on (ws:\/\/[^\s]+)/u.exec(output)?.[1];
-        if (match !== undefined) {clearTimeout(timer); resolve(match);}
-      });
-    });
+    const profileDirectory=child.spawnargs.find(arg=>arg.startsWith('--user-data-dir='))?.slice('--user-data-dir='.length);
+    if(profileDirectory===undefined)throw new Error('Owned Chromium profile is unavailable');
+    const [port]=(await readFile(join(profileDirectory,'DevToolsActivePort'),'utf8')).split('\n');
+    const version=record(await(await fetch(`http://127.0.0.1:${port}/json/version`)).json());
+    const endpoint=version['webSocketDebuggerUrl'];
+    if(typeof endpoint!=='string')throw new Error('Owned Chromium CDP endpoint is unavailable');
     const ws = new WebSocket(endpoint); socket = ws;
     await new Promise<void>((resolve, reject) => {ws.addEventListener('open', () => resolve(), {once: true});
       ws.addEventListener('error', () => reject(new Error('CDP socket error')), {once: true});});
@@ -104,10 +100,10 @@ export async function launchChromium(directory: string, profile: Profile): Promi
       return native.observe(request, response);
     }, workerNetwork: () => workers > 0, link, conditions, close: async () => {
       try {await browser.close();} finally {
-        ws.close(); child.kill();
+        ws.close(); await server.close();
         for (const command of pending.values()) {clearTimeout(command.timer); command.reject(new Error('CDP closed'));}
         await link?.close();
       }
     }};
-  } catch (error) {socket?.close(); child.kill(); await link?.close(); throw error;}
+  } catch (error) {socket?.close(); await server.close(); await link?.close(); throw error;}
 }

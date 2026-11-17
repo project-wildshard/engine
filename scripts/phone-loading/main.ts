@@ -45,7 +45,7 @@ if (!Number.isFinite(afterControl) || afterControl < 0) throw new Error('Invalid
 const playS = values.play === undefined ? null : Number(values.play);
 if (playS !== null && (!Number.isInteger(playS) || playS < 11)) throw new Error('--play takes whole seconds, at least 11 (walk 10 s, then boost)');
 process.env['PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS'] = '1';
-const {webkit, devices} = await import('playwright');
+const {webkit, devices} = await import("../browser-playwright.mjs");
 function command(file: string, args: string[], env: NodeJS.ProcessEnv = process.env): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(file, args, {env, stdio: ['ignore', 'pipe', 'inherit']});

@@ -2,7 +2,7 @@ import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { devices, webkit } from 'playwright';
+import { devices, webkit } from "../browser-playwright.mjs";
 import { soakInspector } from '../soak/inspector.mjs';
 import { answerApi, bootLifecycleDiagnostic } from './boot-smoke.mjs';
 import { saveFixtureCode } from '../debug-settings.mjs';

@@ -46,7 +46,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { createServer } from 'node:http';
 import { createServer as createNetServer } from 'node:net';
 import { join, resolve as resolvePath } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { ALL_SHARDS, DECK_SHARDS, gridPlaces, judge, OPEN_PLOTS, pathOf, screenKey, servedCounts } from './offline-proof-rules.mjs';

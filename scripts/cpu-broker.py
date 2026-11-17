@@ -35,11 +35,17 @@ async def serve(root, capacity):
             slots = capacity if weight == 'all' else weight
             if type(slots) is not int or not 1 <= slots <= capacity or not isinstance(repo, str) or len(repo) > 8192:
                 raise ValueError('Invalid CPU broker request')
+            browser = request.get('browser', False)
+            if type(browser) is not bool or browser and slots != min(4, capacity):
+                raise ValueError('Invalid browser CPU request')
             holder = request.get('pid')
             if holder is not None and (type(holder) is not int or not 1 < holder < 2 ** 31):
                 raise ValueError('Invalid CPU broker request')
             # FL30: the holder is the client process, the owner this broker's parent (the run); either gone frees it.
             entry = {'token': uuid.uuid4().hex, 'pid': os.getpid(), 'owner': os.getppid(), 'repo': str(Path(repo).resolve()), 'slots': slots}
+            if browser:
+                entry['browser'] = True
+                entry['browserWeight'] = slots
             if holder is not None:
                 entry['holder'] = holder
             began = time.monotonic()

@@ -7,7 +7,7 @@
 // Loopback only: the walker is placed by the in-page harness pose (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 

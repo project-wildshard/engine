@@ -1,7 +1,7 @@
 // Manual E7 Doctor proof. J205: live checks only on staging; human checks are static.
 import assert from 'node:assert/strict';
 import {createPublicKey,verify} from 'node:crypto';
-import {chromium,webkit,devices} from 'playwright';
+import {chromium,webkit,devices} from "./browser-playwright.mjs";
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {PRIVATE_HEALTH_SKIPPED,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
 import {doctorRowsOK} from './doctor-proof-rows.mjs';

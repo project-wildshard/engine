@@ -1,7 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises'
 
-import { devices, expect, test as base } from '@playwright/test'
-
+import { devices } from '../../../scripts/browser-playwright.mjs'
+import { expect, test as base } from '../../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { recordBars } from '../../../scripts/loading-card-recorder.mjs'
 import { inPlay } from './probe.ts'

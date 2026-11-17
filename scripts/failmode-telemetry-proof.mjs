@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { dirname, join, resolve as absolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { claimFixture } from './online-rig-owned.mjs';
 

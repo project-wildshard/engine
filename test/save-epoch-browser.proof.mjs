@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { rolldown } from 'rolldown';
 import { resolve as resolvePath } from 'node:path';
-import { chromium, webkit, devices } from 'playwright';
+import { chromium, webkit, devices } from "../scripts/browser-playwright.mjs";
 
 const entry = resolvePath('epoch-proof-entry.ts');
 const compiler = await rolldown({ input: entry, platform: 'browser', plugins: [{ name: 'epoch-proof-entry', resolveId(id) { if (id === entry) return entry; return null; }, load(id) { if (id === entry) return `

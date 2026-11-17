@@ -32,7 +32,7 @@ import { basename, join, resolve as resolvePath } from 'node:path';
 import { saveFixture } from './debug-settings.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
-const { chromium } = await import('playwright');
+const { chromium } = await import("./browser-playwright.mjs");
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const argv = process.argv.slice(2);
 const flag = (n, d) => { const a = argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };

@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { chromium } from "../browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 
 // Launched under browser-lane.sh: Chromium's ancestry holds exactly one machine-wide slot.

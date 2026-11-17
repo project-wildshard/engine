@@ -8,7 +8,7 @@
 // pier and with the player moved to the chunk's corner.
 // Serves a built dist with vite preview, or reads a running build:
 //   node scripts/webkit-render-smoke.mjs --dist=<dir> | --url=http://127.0.0.1:4405/   (through scripts/browser-lane.sh)
-import { webkit, devices } from 'playwright';
+import { webkit, devices } from "./browser-playwright.mjs";
 import { preview } from 'vite';
 import { resolve as resolvePath } from 'node:path';
 import { saveFixture } from './debug-settings.mjs';

@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { devices, webkit } from 'playwright';
+import { devices, webkit } from "./browser-playwright.mjs";
 
 const [originsFile, candidate, workArg, selected = 'v022', style = 'browser'] = process.argv.slice(2);
 if (!originsFile || !candidate || !workArg) throw new Error('force-update-proof <legacy origins JSON> <candidate origin> <fresh work> [v019|v022|v023] [browser|standalone]');

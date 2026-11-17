@@ -1,5 +1,5 @@
-import { devices, expect, test as base } from '@playwright/test'
-
+import { devices } from '../../../scripts/browser-playwright.mjs'
+import { expect, test as base } from '../../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { openT1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
 import { enterTemplate } from './fixtures.ts'

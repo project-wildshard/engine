@@ -15,7 +15,7 @@ import {
 } from 'node:fs'
 import { resolve as resolvePath, join } from 'node:path'
 
-import { chromium, webkit, devices } from 'playwright'
+import { chromium, webkit, devices } from "./browser-playwright.mjs"
 
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs'
 import { saveFixture, debugSettings } from './debug-settings.mjs'

@@ -10,7 +10,7 @@
 // made its seams (`seams`: the loading card's `Terrain seams` lines; `batches` is native generation on the page, ZE4's miss).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 

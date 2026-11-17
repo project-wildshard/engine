@@ -10,7 +10,7 @@
 //   scripts/browser-lane.sh node scripts/no-astc-boot.mjs --base=http://127.0.0.1:4401/ [--slug=pine-hollow] [--out=tmp/no-astc]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { frameFailure, screenshotPixels } from './parity/black-frame.mjs';
 

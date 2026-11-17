@@ -9,7 +9,7 @@
 import { createReadStream, existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve as resolveFile, sep } from 'node:path';
-import { devices, chromium, webkit } from 'playwright';
+import { devices, chromium, webkit } from "./browser-playwright.mjs";
 import { build } from 'vite';
 import { rapierAlias } from '../vite/rapier.ts';
 import { codeDirectory, stampBuildHtml } from './app-build/buildIdentity.mjs';

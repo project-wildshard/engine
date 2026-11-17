@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "../scripts/browser-playwright.mjs";
 import { build } from 'vite';
 import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
 

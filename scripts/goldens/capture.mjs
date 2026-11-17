@@ -17,7 +17,7 @@
 // later, and the server drops it on a pose: `board` asks, then waits for the answer, so a press never lands after the pose
 // and turns the board back on. ON_FOOT: a board that shows in the frame. It stows Sky's fan and fills its hover decks, and
 // its goldens have neither, so a player hovering there for its streaming steps off for the shot.
-import {chromium,webkit,devices} from 'playwright';
+import {chromium,webkit,devices} from "../browser-playwright.mjs";
 import {existsSync,readFileSync,statSync,writeFileSync,mkdirSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import {saveFixture,developerSettings,hideDeveloperOverlays,levelDownloadFixtures,NAME_ASKED} from '../debug-settings.mjs';

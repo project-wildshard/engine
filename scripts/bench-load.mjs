@@ -13,13 +13,12 @@
 //   pnpm bench -- --url=https://play.wildshard.io   # live site, no build
 //   pnpm bench -- --compare progress/bench/a.json progress/bench/b.json
 import { spawn, execSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve as resolvePath, basename, join } from 'node:path';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
-const { chromium } = await import('playwright');
+const { chromium } = await import("./browser-playwright.mjs");
 
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const OUT_DIR = resolvePath(ROOT, 'progress/bench');
@@ -167,7 +166,7 @@ const COLLECT = `(() => {
 // worker target: a raw browser-level session auto-attaches to every service_worker target and
 // applies the current network preset there too. PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS makes
 // the worker's own fetches visible on context 'requestfinished' so they can be counted as net bytes.
-const { browser, chrome, swThrottle } = await launchBrowser();
+const { browser, swThrottle, close:closeBrowser } = await launchBrowser();
 /** @type {Record<string, number>} */
 let assetIndex = {}; // /assets/<path> → bytes, the size of a response the SW served from its cache (Resource Timing reports 0/0 for those)
 try { assetIndex = await (await fetch(`${URL_BASE}/asset-index.json`, { cache: 'no-store' })).json(); } catch { /* no asset index: SW-served responses count as 0 bytes */ }
@@ -190,12 +189,15 @@ try {
       } finally { await within(ctx.close(), 10_000); }
     }
   }
-} finally { await within(browser.close(), 10_000); chrome.kill(); cleanup(); }
+} finally { await within(browser.close(), 10_000); await closeBrowser(); cleanup(); }
 
 async function launchBrowser() {
-  const udd = mkdtempSync(join(tmpdir(), 'wildshard-bench-'));
   const gpuArgs = GPU === 'swiftshader' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--use-angle=metal', '--ignore-gpu-blocklist'];
-  const chromeProc = spawn(chromium.executablePath(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${udd}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio', ...gpuArgs, ...KEYCHAIN_ARGS, 'about:blank'], { stdio: 'ignore' });
+  const server=await chromium.launchServer({executablePath:chromium.executablePath(),headless:true,args:['--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio', ...gpuArgs, ...KEYCHAIN_ARGS]});
+  const chromeProc=server.process();
+  const udd=chromeProc.spawnargs.find(arg=>arg.startsWith('--user-data-dir='))?.slice('--user-data-dir='.length);
+  try {
+  if(udd===undefined)throw new Error('Owned browser profile is unavailable');
   const portFile = join(udd, 'DevToolsActivePort');
   await waitFor(() => existsSync(portFile) && readFileSync(portFile, 'utf8').split('\n')[0] > 0, 15_000, 'chromium did not open its DevTools port');
   const port = readFileSync(portFile, 'utf8').split('\n')[0].trim();
@@ -222,7 +224,8 @@ async function launchBrowser() {
   await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
   const cdpBrowser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   const throttle = async (net) => { current = net; for (const s of swSessions) await apply(s).catch(() => undefined); };
-  return { browser: cdpBrowser, chrome: chromeProc, swThrottle: throttle };
+  return { browser: cdpBrowser, swThrottle: throttle, close:()=>server.close() };
+  }catch(error){await server.close();throw error;}
 }
 
 async function runOnce(ctx, cond, cache, label) {

@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve as resolvePath, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { devices } from 'playwright';
+import { devices } from "./browser-playwright.mjs";
 import { launchMemoryBrowser } from './chromium-memory-browser.mjs';
 import { saveFixture } from './debug-settings.mjs';
 

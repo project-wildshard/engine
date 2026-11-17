@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve } from 'node:path';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from "../scripts/browser-playwright.mjs";
 import { build } from 'vite';
 import { engineRelease } from '../scripts/changelog.mjs';
 import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../../scripts/browser-test.mjs'
 
 test('serves the app and shows the empty status', async ({
   page,

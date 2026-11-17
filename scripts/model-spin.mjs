@@ -86,7 +86,7 @@ export class ErrorOverlay extends HTMLElement {}
 const url = new URL(BASE);
 for (const [k, v] of Object.entries({ chunk: SHARD, tier: 'phone', touch: '1', mute: '1', nolock: '1', sw: '0', explore: 'model' })) url.searchParams.set(k, v);
 
-const { chromium } = await import('playwright');
+const { chromium } = await import("./browser-playwright.mjs");
 const scratch = resolvePath(import.meta.dirname, '../tmp'); mkdirSync(scratch, { recursive: true });
 const work = mkdtempSync(join(scratch, 'model-spin-'));
 /** @type {import('playwright').Browser|undefined} */

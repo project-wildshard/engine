@@ -259,7 +259,7 @@ async function cli() {
   // SB3: --prime <dir> starts each browser from a saved profile (<dir>/<browser>), an old shell as Jake's phone holds one
   const prime = args.get('prime');
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The journey proof joins a world: staging or local only');
-  const pw = await import('playwright');
+  const pw = await import('./browser-playwright.mjs');
   // SB3: the build staging serves, read before and after; a run whose build moved under it names none (the gate skips it)
   const served = async () => { try { return String((await (await fetch(`${url}/version.json`, { cache: 'no-store' })).json()).build); } catch { return undefined; } };
   const before = await served();

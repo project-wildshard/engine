@@ -167,7 +167,7 @@ def _prune(entry, pending, active):
 def reserved_slots(active):
     """A live ancestor covers its borrowed commands; orphaned commands charge themselves."""
     tokens = {row['token']: row for row in active}
-    roots = {}
+    roots, browser_weights = {}, {}
     for row in active:
         cursor, seen = row, set()
         while cursor.get('borrowedFrom') in tokens:
@@ -176,7 +176,9 @@ def reserved_slots(active):
             seen.add(cursor['token'])
             cursor = tokens[cursor['borrowedFrom']]
         roots[cursor['token']] = cursor['slots']
-    return sum(roots.values())
+        if row.get('browser') is True:
+            browser_weights[cursor['token']] = browser_weights.get(cursor['token'], 0) + row['browserWeight']
+    return sum(max(slots, browser_weights.get(token, 0)) for token, slots in roots.items())
 
 
 def acquire_cpu(root, entry, capacity, deadline):
@@ -191,12 +193,22 @@ def acquire_cpu(root, entry, capacity, deadline):
         kept = {row['pid'] for row in pending + active}
         for row, why in reclaimed:
             _stop(row, why, kept)
+        if entry.get('borrowedFrom') is not None and not any(row['token'] == entry['borrowedFrom'] for row in active):
+            raise RuntimeError(PARENT_REFUSAL)
         if not any(row['token'] == entry['token'] for row in pending):
             entry['ticket'] = state.setdefault('cpuNext', 0)
             state['cpuNext'] += 1
             pending.append(entry)
-        head = min(pending, key=lambda row: row['ticket'])
-        if head['token'] != entry['token'] or reserved_slots(active) + entry['slots'] > capacity:
+        # J402: a browser waiting for its two-owner resource must not hold up
+        # ordinary CPU work behind it. Eligible requests retain FIFO order.
+        browser_full = sum(row.get('browser') is True for row in active) >= 2
+        eligible = [row for row in pending if not browser_full or row.get('browser') is not True]
+        if not eligible:
+            return False
+        # A browser spending an already-held ancestor budget cannot wait
+        # behind a fresh CPU request blocked by that same ancestor.
+        head = min(eligible, key=lambda row: (row.get('borrowedFrom') is None, row['ticket']))
+        if head['token'] != entry['token'] or reserved_slots(active + [entry]) > capacity:
             return False
         pending[:] = [row for row in pending if row['token'] != entry['token']]
         active.append(entry)
@@ -457,7 +469,7 @@ def hold_build_work(repo):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['hold', 'run', 'inspect-parent', 'borrow', 'build-work'])
+    parser.add_argument('mode', choices=['hold', 'run', 'inspect-parent', 'borrow', 'build-work', 'browser'])
     parser.add_argument('--slots', default='1')
     parser.add_argument('--repo', default=os.getcwd())
     parser.add_argument('--capacity', type=int)
@@ -487,7 +499,7 @@ def main():
         except KeyboardInterrupt:
             return 130
     try:
-        ancestor = ancestor_cpu_budget() if args.mode == 'run' else None
+        ancestor = ancestor_cpu_budget() if args.mode in ('run', 'browser') else None
     except RuntimeError:
         print(PARENT_REFUSAL, file=sys.stderr)
         return 2
@@ -495,7 +507,7 @@ def main():
     capacity = args.capacity if args.capacity is not None else ancestor['capacity'] if ancestor is not None else maximum
     if not 1 <= capacity <= maximum:
         parser.error('capacity may only lower the machine budget')
-    slots = capacity if args.slots == 'all' else int(args.slots)
+    slots = min(4, capacity) if args.mode == 'browser' else capacity if args.slots == 'all' else int(args.slots)
     if not 1 <= slots <= capacity or args.mode == 'run' and not command:
         parser.error('give a valid weight and a command for run')
     root = Path(os.environ.get('WS_CPU_ROOT', os.environ.get('WS_HEAVY_SCHEDULER_ROOT', str(Path.home() / '.wildshard-heavy-lanes')))).resolve()
@@ -503,6 +515,12 @@ def main():
     owner = os.getppid()
     # The process that started this one holds the grant (its pipe) and owns the run.
     entry = {'token': uuid.uuid4().hex, 'pid': os.getpid(), 'holder': owner, 'owner': owner, 'repo': str(Path(args.repo).resolve()), 'slots': slots}
+    if args.mode == 'browser':
+        entry['browser'] = True
+        entry['browserWeight'] = slots
+        if ancestor is not None and ancestor['slots'] >= slots:
+            entry['borrowedFrom'] = json.loads(os.environ[PARENT_CONTEXT])['lease']
+            entry['slots'] = ancestor['slots']
     began = time.monotonic()
     deadline = began + 300
     child = None
@@ -513,7 +531,7 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
     try:
-        if ancestor is not None:
+        if ancestor is not None and args.mode == 'run':
             if capacity != ancestor['capacity'] or slots > ancestor['slots']:
                 raise RuntimeError('Inherited CPU budget cannot satisfy this workload')
             # Nested command wrappers spend the verified held budget, never
@@ -534,10 +552,18 @@ def main():
             if time.monotonic() >= deadline:
                 raise TimeoutError('CPU admission exceeded five minutes waiting for owned work')
             time.sleep(.01)
-        if args.mode == 'hold':
+        if args.mode in ('hold', 'browser'):
             print(json.dumps({'lease': entry['token'], 'slots': slots, 'capacity': capacity, 'queueSeconds': time.monotonic() - began}), flush=True)
             # The actual worker owns this pipe. EOF releases even after a kill.
-            sys.stdin.buffer.read()
+            if args.mode == 'browser' and entry.get('borrowedFrom') is not None:
+                while True:
+                    if select.select([sys.stdin], [], [], .5)[0]:
+                        if not os.read(sys.stdin.fileno(), 1):
+                            break
+                    if ancestor_cpu_budget() != ancestor:
+                        raise RuntimeError(PARENT_REFUSAL)
+            else:
+                sys.stdin.buffer.read()
             return 0
         env = {**os.environ, 'WS_CPU_SLOTS': str(slots),
                PARENT_CONTEXT: parent_cpu_context({'lease': entry['token']}, owner_pid=owner)}
@@ -552,7 +578,7 @@ def main():
         print(str(error), file=sys.stderr)
         return 1
     finally:
-        if ancestor is None:
+        if ancestor is None or args.mode == 'browser':
             release_cpu(root, entry['token'])
 
 

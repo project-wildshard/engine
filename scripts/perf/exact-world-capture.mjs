@@ -1,5 +1,5 @@
 // Run through browser-lane.sh against an immutable serve-build.sh --rev preview.
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "../browser-playwright.mjs";
 import * as v from 'valibot';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

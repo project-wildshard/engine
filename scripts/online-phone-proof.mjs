@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import * as v from 'valibot';
 import { saveFixtureCode } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';

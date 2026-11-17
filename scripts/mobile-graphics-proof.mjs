@@ -13,7 +13,7 @@
 // Headless only; our own local build only. Exit 1 when a step fails.
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { devices, webkit } from 'playwright';
+import { devices, webkit } from "./browser-playwright.mjs";
 
 /** @param {string} key @param {string} fallback */
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;

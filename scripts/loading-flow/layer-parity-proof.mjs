@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { parseArgs } from 'node:util';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from "../browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, size: { type: 'string', default: '512' },

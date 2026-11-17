@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
-import {chromium} from 'playwright';
+import {chromium} from "../browser-playwright.mjs";
 import {KEYCHAIN_ARGS} from '../chromium-keychain.mjs';
 import {requireSweepDocumentBuild} from './target.mjs';
 

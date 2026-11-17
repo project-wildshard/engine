@@ -11,7 +11,7 @@
 // staging (an online seat can't be placed) only Driftwood is walked to its east entryway from the spawn. Never production (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 

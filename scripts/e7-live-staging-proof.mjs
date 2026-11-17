@@ -1,7 +1,7 @@
 // Manual live proof. J205: staging only; never an agent socket on production.
 import assert from 'node:assert/strict';
 import {createPublicKey,verify} from 'node:crypto';
-import {chromium,webkit,devices} from 'playwright';
+import {chromium,webkit,devices} from "./browser-playwright.mjs";
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {saveFixture} from './debug-settings.mjs';
 import {PRIVATE_HEALTH_SKIPPED,chatLinePattern,guardStagingSockets,playerNameSource,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';

@@ -7,7 +7,7 @@
 // 402x874 layout, headless, real GPU. Red first on d6f24d8a: 420 frames frozen (the whole 7 s hold) on desktop.
 //
 //   scripts/browser-lane.sh node scripts/quest-complete-proof.mjs --base=http://127.0.0.1:4400/ [--layout=desktop|phone|both]
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';

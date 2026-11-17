@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { enterPage, intoWorld, openRig } from './online-rig.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';

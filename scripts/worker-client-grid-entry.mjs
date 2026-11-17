@@ -1,7 +1,7 @@
 /** @typedef {import('./types/worker-page').WorkerWindow} WorkerWindow */
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from "./browser-playwright.mjs";
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

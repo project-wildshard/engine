@@ -47,12 +47,13 @@ export async function startCpuBroker(options={}){
 }
 
 /** A connection is the file's grant lifetime; the owner must await close before reuse.
- * @param {string} address @param {number|'all'} slots @param {string} repo */
-export async function holdBrokerCpu(address,slots,repo){
+ * @param {string} address @param {number|'all'} slots @param {string} repo
+ * @param {{browser?:boolean,signal?:AbortSignal}} [options] */
+export async function holdBrokerCpu(address,slots,repo,options={}){
  const endpoint=v.parse(endpointSchema,JSON.parse(address));
  const socket=createConnection({host:'127.0.0.1',port:endpoint.port});
  let buffer='',granted=false,closing=false;
- socket.once('connect',()=>{socket.write(`${JSON.stringify({...endpoint,slots,repo,pid:process.pid})}\n`);});
+ socket.once('connect',()=>{socket.write(`${JSON.stringify({...endpoint,slots,repo,pid:process.pid,...(options.browser?{browser:true}:{})})}\n`);});
  /** @type {Promise<v.InferOutput<typeof grantSchema>>} */
  const admission=new Promise((resolve,reject)=>{
   socket.once('error',reject);socket.once('close',()=>{if(!granted)reject(new Error('CPU broker closed before admission'));});
@@ -60,6 +61,9 @@ export async function holdBrokerCpu(address,slots,repo){
    try{const value=v.parse(grantSchema,JSON.parse(buffer.slice(0,buffer.indexOf('\n'))));if(value.slots<1)throw new Error('Invalid CPU grant');granted=true;resolve(value);}catch(error){socket.destroy();reject(error instanceof Error?error:new Error('Invalid broker message'));}
   }});
  });
+ const abort=()=>{socket.destroy(new Error('CPU broker request aborted'));};
+ socket.once('close',()=>{options.signal?.removeEventListener('abort',abort);});
+ if(options.signal?.aborted)abort();else options.signal?.addEventListener('abort',abort,{once:true});
  const proof=await admission;
  /** @type {Promise<void>} */
  const ended=new Promise(resolve=>{if(socket.closed)resolve();else socket.once('close',()=>resolve());});

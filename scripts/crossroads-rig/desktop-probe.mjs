@@ -19,7 +19,7 @@ import { GL_INIT } from '../parity/glbytes.mjs';
 import { deviceSavePicks, saveFixture } from '../debug-settings.mjs';
 import { launchMemoryBrowser } from '../chromium-memory-browser.mjs';
 
-const { devices } = await import('playwright');
+const { devices } = await import("../browser-playwright.mjs");
 const argv = process.argv.slice(2);
 const flag = (name, d) => { const a = argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : d; };
 const flags = (name) => argv.filter((x) => x.startsWith(`--${name}=`)).map((x) => x.slice(name.length + 3));

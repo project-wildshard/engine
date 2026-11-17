@@ -2,7 +2,7 @@
 // Settings' actual downloaded save, imported in an isolated browser profile with a different device identity.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import { saveFixture } from './debug-settings.mjs';
 import { paidSave } from './worker-client-pine.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';

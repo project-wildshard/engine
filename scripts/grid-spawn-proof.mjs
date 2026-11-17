@@ -13,7 +13,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, join, resolve as absolute } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium } from "./browser-playwright.mjs";
 import sharp from 'sharp';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';

@@ -5,7 +5,7 @@ import {cpSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSy
 import {createServer} from 'node:http';
 import {homedir} from 'node:os';
 import {join, resolve as resolvePath} from 'node:path';
-import {chromium, webkit, type Browser} from 'playwright';
+import {chromium, webkit, type Browser} from "./browser-playwright.mjs";
 import {bootCase} from './parity/boot-smoke.mjs';
 import {sweepExplorer} from './parity/explorer-smoke.mjs';
 import {serve} from './parity/serve.mjs';

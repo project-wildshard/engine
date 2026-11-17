@@ -1,5 +1,5 @@
 // Clean document measurement: no Developer, harness pins, product census or menu.
-import { devices } from 'playwright';
+import { devices } from "../browser-playwright.mjs";
 import * as v from 'valibot';
 import { launchMemoryBrowser } from '../chromium-memory-browser.mjs';
 import { saveFixture } from '../debug-settings.mjs';

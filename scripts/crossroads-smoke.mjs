@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { createReadStream, existsSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
-import { devices, chromium, webkit } from 'playwright';
+import { devices, chromium, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const option = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;

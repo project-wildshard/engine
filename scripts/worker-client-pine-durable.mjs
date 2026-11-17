@@ -1,6 +1,6 @@
 /** @typedef {import('./types/worker-page').WorkerWindow} WorkerWindow */
 // Two actual browser stores, a saved checkpoint, then a worker crash without a final save.
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import { saveFixture } from './debug-settings.mjs';
 import { paidSave } from './worker-client-pine.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';

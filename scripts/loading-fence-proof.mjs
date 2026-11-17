@@ -2,7 +2,7 @@
 // Manual native-WebGL lifecycle counterexamples, outside hooks. Run through browser-lane.sh.
 import assert from 'node:assert/strict';
 import {rolldown} from 'rolldown';
-import {chromium,webkit,devices} from 'playwright';
+import {chromium,webkit,devices} from "./browser-playwright.mjs";
 import {serve} from './parity/serve.mjs';
 import {saveFixture} from './debug-settings.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';

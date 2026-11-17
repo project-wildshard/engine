@@ -8,7 +8,7 @@
 //     <work dir> <key.json> [--engine=webkit]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from './browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { openRig, WORLD_PORT } from './online-rig.mjs';
@@ -31,7 +31,7 @@ const DRIFTWOOD = instanceOf('driftwood-isle'), DUNES = instanceOf('sunscar-dune
 const DEVICE_DOC = 'wildshard.save.v2@1.device';
 
 const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: 'driftwood-isle', more: ['sunscar-dunes'], cells: 'grid', workers: 2 });
-let code = 1, browser = /** @type {import('playwright').Browser | null} */ (null);
+let code = 1, browser = /** @type {import('./browser-playwright.mjs').Browser | null} */ (null);
 try {
   let open = null;
   for (let tries = 0; tries < 300 && open === null; tries++) { open = await fetch(`http://127.0.0.1:${String(WORLD_PORT)}/health`).then(found => found.ok ? found.json() : null).catch(() => null); if (open === null) await sleep(200); }

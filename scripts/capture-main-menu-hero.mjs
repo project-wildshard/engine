@@ -35,7 +35,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
-import { devices } from 'playwright';
+import { devices } from "./browser-playwright.mjs";
 import { launchMemoryBrowser } from './chromium-memory-browser.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { gridFloorDocumentIdentity } from './frame-floor-grid.mjs';

@@ -12,7 +12,7 @@
 // logged reports (`ws` counts what the socket received) before it is called the wire's (ZE16, opus-gcm18).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { watchFaults } from './proof-faults.mjs';

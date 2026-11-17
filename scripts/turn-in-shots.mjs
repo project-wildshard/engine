@@ -8,7 +8,7 @@
 // Writes <out>/<engine>[-phone]-<slug>-<side>.jpg and turn-ins.json. Preview or a loopback page only (the harness pose).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import sharp from 'sharp';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';

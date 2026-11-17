@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {parseArgs} from 'node:util';
-import {chromium, devices} from 'playwright';
+import {chromium, devices} from "./browser-playwright.mjs";
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 
 const {values} = parseArgs({options: {scratch: {type: 'string'}, out: {type: 'string'}}});

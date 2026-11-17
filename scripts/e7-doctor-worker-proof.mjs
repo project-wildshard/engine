@@ -5,7 +5,7 @@ import { resolve as resolvePath } from "node:path";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { rolldown } from "rolldown";
-import { chromium } from "playwright";
+import { chromium } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from "./chromium-keychain.mjs";
 
 const baseline = process.argv.find((value) => value.startsWith("--baseline="))?.slice(11);

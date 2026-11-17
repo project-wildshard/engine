@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { devices, webkit } from 'playwright';
+import { devices, webkit } from "../browser-playwright.mjs";
 import { browserPool } from './pool.mjs';
 import { serve } from './serve.mjs';
 import { NAME_ASKED, saveFixture } from '../debug-settings.mjs';

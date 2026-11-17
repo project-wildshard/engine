@@ -11,7 +11,7 @@
 // row: the source of loadingPaths.ts' measured tables.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve as resolvePath, join } from 'node:path';
-import { chromium, webkit, devices } from 'playwright';
+import { chromium, webkit, devices } from "./browser-playwright.mjs";
 import { serve } from './parity/serve.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';

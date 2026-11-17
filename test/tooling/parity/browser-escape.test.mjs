@@ -28,20 +28,25 @@ import {requestNativeRetention} from '../../fixtures/native-retention.mjs';
 // delivery block). Their children start here, before the warm-up, and run beside every other case; each case still
 // awaits its own child and asserts the same facts. Nothing in those children reads this process's clock.
 /** @typedef {{status: number | null, signal: string | null, stdout: string, stderr: string, error: string | null}} ChildRun */
-// The original spawnSync, unchanged, inside its own small supervisor process: its timeout and SIGTERM are enforced there,
-// so a case that blocks this worker (execFileSync, spawnSync) can't stretch the child's deadline.
+// The independent supervisor enforces each original active deadline. Its
+// private admission clock excludes only the broker's bounded queue interval.
 // The supervisor itself starts with no NODE_OPTIONS or other inherited settings; the child gets the case's env verbatim.
-const SUPERVISOR = `const {spawnSync} = require('node:child_process'), {readFileSync} = require('node:fs');
-const [args, timeout, env] = JSON.parse(readFileSync(0, 'utf8'));
-const run = spawnSync(process.execPath, args, {encoding: 'utf8', timeout, env});
+const SUPERVISOR = `import {readFileSync} from 'node:fs';
+const {runT1Child}=await import(process.argv[1]);
+const [command, timeout, env] = JSON.parse(readFileSync(0, 'utf8'));
+const run = await runT1Child(command,env,{timeoutMs:timeout,capture:true});
 process.stdout.write(JSON.stringify({status: run.status, signal: run.signal, stdout: run.stdout, stderr: run.stderr,
-  error: run.error === undefined ? null : String(Reflect.get(run.error, 'code') ?? run.error)}));`;
+  error: run.error}));`;
 /** spawnSync(process.execPath, args, {encoding: 'utf8', timeout, env}) without blocking this worker.
  * @param {string[]} args @param {number} timeout @param {NodeJS.ProcessEnv} [env] @returns {Promise<ChildRun>} */
 function runChild(args, timeout, env = process.env) {
+  return runProofCommand([process.execPath,...args],timeout,env);
+}
+/** @param {string[]} command @param {number} timeout @param {NodeJS.ProcessEnv} env @returns {Promise<ChildRun>} */
+function runProofCommand(command,timeout,env){
   return new Promise((resolveRun, reject) => {
-    const supervisor = spawn(process.execPath, ['-e', SUPERVISOR], {env: {}, stdio: ['pipe', 'pipe', 'inherit']});
-    supervisor.stdin.end(JSON.stringify([args, timeout, env]));
+    const supervisor = spawn(process.execPath, ['--input-type=module','-e', SUPERVISOR,new URL('../../../scripts/t1-runner.mjs',import.meta.url).href], {env: {}, stdio: ['pipe', 'pipe', 'inherit']});
+    supervisor.stdin.end(JSON.stringify([command, timeout, env]));
     let out = '';
     supervisor.stdout.setEncoding('utf8').on('data', chunk => {out += chunk;});
     supervisor.once('error', reject);
@@ -73,7 +78,7 @@ afterAll(async () => {
   await Promise.allSettled([endpointRun?.child, deliveryRun?.runs]);
   if (endpointRun !== undefined) rmSync(endpointRun.root, {recursive: true, force: true});
   if (deliveryRun !== undefined && !deliveryRun.checked) rmSync(deliveryRun.profile, {recursive: true, force: true});
-}, 30_000);
+}, 330_000); // Original 30 s cleanup plus the broker's maximum 300 s wait.
 
 /** @param {number | undefined} pid */
 function stopFixturePid(pid) {
@@ -82,13 +87,14 @@ function stopFixturePid(pid) {
   catch (error) {if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error;}
 }
 
-test('Escape sends only its own trusted down and up', () => {
+test('Escape sends only its own trusted down and up', async () => {
   const args = ['--experimental-transform-types', 'test/fixtures/native-browser-escape.ts'];
   // The shared Mac takes its existing lease. Each isolated Linux CI runner
   // owns one inert native-input browser; no game or external page is loaded.
   const command = process.platform === 'darwin' ? 'scripts/browser-lane.sh' : process.execPath;
-  const output = execFileSync(command, process.platform === 'darwin' ? ['--max', '2', process.execPath, ...args] : args,
-    {encoding: 'utf8', timeout: 25_000});
+  const child=await runProofCommand([command,...(process.platform==='darwin'?['--max','2',process.execPath,...args]:args)],25000,process.env);
+  expect(child.status).toBe(0);expect(child.error).toBe(null);
+  const output=child.stdout;
   expect(output).toContain('original trusted Escape pair preserved');
   const raw = output.split('\n').find(line => line.startsWith('{"cleanup":"complete"'));
   if (raw === undefined) throw new Error('Missing native cleanup completion');
@@ -100,16 +106,15 @@ test('Escape sends only its own trusted down and up', () => {
   expect(existsSync(cleanup.profile)).toBe(false);
   expect(existsSync(resolve(cleanup.socketTemp, '..'))).toBe(false);
   expect(output.indexOf(raw)).toBeLessThan(output.indexOf('original trusted Escape pair preserved'));
-});
+},325000); // The supervisor still enforces the original 25 s active budget.
 
-test('native startup refusal retains its signal and bounded stderr, never claims trusted input, and cleans its profile', () => {
+test('native startup refusal retains its signal and bounded stderr, never claims trusted input, and cleans its profile', async () => {
   const root = mkdtempSync(resolve('tmp/native-startup-refusal-'));
   try {
     const binary = resolve(root, 'native-refusal');
     const message = `${'x'.repeat(20_000)}\nOriginal native startup sentinel`;
     writeFileSync(binary, `#!/bin/sh\nprintf '%s\\n' '${message}' >&2\nkill -TERM $$\n`, {mode: 0o700});
-    const child = spawnSync(process.execPath, ['--experimental-transform-types', 'test/fixtures/native-browser-escape.ts'],
-      {encoding: 'utf8', timeout: 15_000, env: {...process.env, CHROME_PATH: binary}});
+    const child = await runChild(['--experimental-transform-types', 'test/fixtures/native-browser-escape.ts'],15000,{...process.env,CHROME_PATH:binary});
     expect(child.status).toBe(1);
     expect(child.stderr).toContain('code=null; signal=SIGTERM');
     expect(child.stderr).toContain('Original native startup sentinel');
@@ -128,7 +133,7 @@ test('native startup refusal retains its signal and bounded stderr, never claims
     if (typeof alias !== 'string' || !alias.startsWith('/tmp/wsesc-') || !alias.endsWith('/t')) throw new Error('Foreign socket alias');
     expect(existsSync(resolve(alias, '..'))).toBe(false);
   } finally {rmSync(root, {recursive: true, force: true});}
-});
+},315000);
 
 test('long native Unix socket paths refuse while the short alias binds to profile-owned data', async () => {
   const root = mkdtempSync(resolve('tmp/native-socket-control-'));
@@ -326,7 +331,7 @@ test('the original native startup deadline retains process and endpoint-file fac
     if (typeof profile !== 'string' || !profile.startsWith(resolve('tmp/escape-control-'))) throw new Error('Foreign profile');
     expect(existsSync(profile)).toBe(false);
   } finally {rmSync(root, {recursive: true, force: true});}
-});
+},325000);
 
 /** The delivery child, each delay in turn on one profile: a 650 ms block drains, a 5.1 s block outlives the 5 s drain. */
 function startDelivery() {

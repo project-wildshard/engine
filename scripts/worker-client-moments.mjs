@@ -2,7 +2,7 @@
 // N1, N2, N5, N6, N7: what a page says and shows of a fight the server runs. A tape wraps the audio layer and the HUD, so a step reads what the
 // game asked to play and show (`--mute-audio` and a headless page can't hear it), and `window.__audioLog` adds the score's scenes and phases.
 //   scripts/browser-lane.sh node scripts/worker-client-moments.mjs --base=http://127.0.0.1:4401/ [--only=practice,pine,race,captain,god,roc,sunscar,phases,longroom,day]
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';

@@ -20,7 +20,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 
@@ -67,8 +67,8 @@ let code = 1;
 try {
   // a fresh profile at each entry: the first, and again when the tour is stranded in a cell it can't leave (a grid page's title
   // won't take a second Shard Select in the same profile)
-  /** @type {import('playwright').BrowserContext | null} */ let context = null;
-  /** @type {import('playwright').Page} */ let page = /** @type {any} */ (undefined);
+  /** @type {import('./browser-playwright.mjs').BrowserContext | null} */ let context = null;
+  /** @type {import('./browser-playwright.mjs').Page} */ let page = /** @type {any} */ (undefined);
   let navigations = 0;
   const profile = async () => {
     await context?.close();
@@ -291,7 +291,7 @@ try {
   result.reloads = navigations - navigationsBefore;
   if (left.size > 0) result.untried = [...left].map(arc => `${arc.from}:${arc.to}`);
   code = crossings.length > 0 && crossings.every(row => row.ok) && result.reloads === 0 ? 0 : 1;
-  await /** @type {import('playwright').BrowserContext | null} */ (/** @type {unknown} */ (context))?.close();
+  await /** @type {import('./browser-playwright.mjs').BrowserContext | null} */ (/** @type {unknown} */ (context))?.close();
 } catch (error) { result.note = `the run: ${String(error).slice(0, 400)}`; }
 finally {
   save();

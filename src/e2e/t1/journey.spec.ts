@@ -3,8 +3,7 @@
 // World into play, and every sample on the way is a menu, the world's full-screen loading card or play. PZ27b2 failed this on
 // v0.1.28 to v0.1.30 (the launch shell on the world page, the main menu back, the HUD over it, a blank wait) while every other
 // T1 journey passed, because they only waited for play at the end. scripts/journey-proof.mjs is the same judge on staging.
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from '../../../scripts/browser-test.mjs'
 import {
   deckFrames,
   recordDeck,

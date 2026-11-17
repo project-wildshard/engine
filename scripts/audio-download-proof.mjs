@@ -61,7 +61,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect as netConnect } from 'node:net';
 import { join, resolve as resolvePath } from 'node:path';
-import { webkit } from 'playwright';
+import { webkit } from "./browser-playwright.mjs";
 import { saveFixture } from './debug-settings.mjs';
 import { CHANNELS, RELEASE_PUBLIC_KEY } from './page-release/flow.mjs';
 

@@ -17,7 +17,7 @@
 // scripts/preview-server.mjs on a built dist), never a dev server. One headless Chromium, muted, closed in a finally.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve as resolvePath, join } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "../browser-playwright.mjs";
 import sharp from 'sharp';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { NAME_ASKED, developerSettings, harnessPins, hideDeveloperOverlays, saveFixture } from '../debug-settings.mjs';

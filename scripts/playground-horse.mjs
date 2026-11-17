@@ -15,7 +15,7 @@ import { dirname, join, resolve as resolvePath } from 'node:path';
 import { bootToTitle, encodePhone, enterPlayground, flags, openHub, phonePage, sleep, startRecording, stopRecording, tap } from './playground-harness.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
-const { chromium } = await import('playwright');
+const { chromium } = await import("./browser-playwright.mjs");
 const flag = flags();
 const BASE = flag('url', 'http://127.0.0.1:5173');
 const OUT = resolvePath(flag('out', 'progress/e307-playgrounds'));

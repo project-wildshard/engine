@@ -12,7 +12,7 @@
 // J205: staging, preview or a loopback page only, never production. Chromium runs headless and muted; the page is closed at the end.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 

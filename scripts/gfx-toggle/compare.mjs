@@ -14,7 +14,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "../browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { developerSettings, saveFixture, hideDeveloperOverlays } from '../debug-settings.mjs';
 

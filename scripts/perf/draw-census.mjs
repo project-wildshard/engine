@@ -4,7 +4,7 @@
 // --slug=pine-hollow --pine-pose=P1 measures the PF14 spawn bar separately.
 // --nine-pose=P5 selects the maintained M3 frame-group cost pose.
 // Other public shards select golden camera 1. --environment=golden pins midday/clear.
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "../browser-playwright.mjs";
 import cameras from './cameras24.json' with { type: 'json' };
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';

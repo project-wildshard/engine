@@ -27,7 +27,7 @@ import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, createWriteStream } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 
-const { webkit, devices } = await import('playwright');
+const { webkit, devices } = await import("./browser-playwright.mjs");
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const argv = process.argv.slice(2);
 const flag = (name, d) => { const a = argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : d; };

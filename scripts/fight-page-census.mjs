@@ -11,7 +11,7 @@
 //   scripts/browser-lane.sh node scripts/fight-page-census.mjs --base=http://127.0.0.1:4401/ [--heads=nalati,pine,far,dunes] [--journeys=titan] [--out=tmp/census/census.json]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { fights, pageCensus } from './worker-client-fights.mjs';
 

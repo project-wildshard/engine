@@ -1,5 +1,5 @@
 // DS1.5 build preloader: importing browser APIs is allowed; starting or connecting to a browser is refused.
-import { chromium, firefox, webkit } from 'playwright';
+import { chromium, firefox, webkit } from "./browser-playwright.mjs";
 
 const refuse = () => { throw new Error('DS1.5: browsers are disabled during this build'); };
 for (const type of [chromium, firefox, webkit]) {

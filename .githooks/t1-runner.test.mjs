@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {fixtureScratch} from '../test/tooling/owned-scratch.mjs';
@@ -16,4 +17,18 @@ test('an owned child ignoring TERM is killed and returns a failed receipt result
 test('ordinary failed status is preserved for report-only or blocking policy to judge',async()=>{
  const result=await runT1Child([process.execPath,'-e','process.exit(7)'],process.env);
  assert.equal(result.status,7);assert.equal(result.signal,null);
+});
+
+test('an exited leader cannot hide a surviving TERM-resistant descendant',async()=>{
+ const root=fixtureScratch('t1-descendant'),script=join(root,'leader.mjs'),pidFile=join(root,'pid');
+ writeFileSync(script,`import {spawn} from 'node:child_process';import {writeFileSync} from 'node:fs';
+ const child=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});process.send('ready');setInterval(()=>{},1000);"],{stdio:['ignore','ignore','ignore','ipc']});
+ child.once('message',()=>{writeFileSync(${JSON.stringify(pidFile)},String(child.pid));child.disconnect();child.unref();process.exit(0);});`);
+ let pid;
+ try{
+  const result=await runT1Child([process.execPath,script],process.env);
+  pid=Number(readFileSync(pidFile,'utf8'));
+  const state=spawnSync('ps',['-p',String(pid),'-o','stat='],{encoding:'utf8'}).stdout.trim();
+  assert.equal(result.status,0);assert.ok(state===''||state.startsWith('Z'),`owned descendant remains alive: ${state}`);
+ }finally{if(pid!==undefined)try{process.kill(pid,'SIGKILL');}catch(error){if(error.code!=='ESRCH')throw error;}}
 });

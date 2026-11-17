@@ -6,7 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { resolve as resolvePath, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { rolldown } from "rolldown";
-import { chromium } from "playwright";
+import { chromium } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from "./chromium-keychain.mjs";
 
 const started = performance.now();

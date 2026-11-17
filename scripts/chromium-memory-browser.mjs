@@ -1,6 +1,6 @@
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {chromium} from 'playwright';
+import {chromium} from "./browser-playwright.mjs";
 import * as v from 'valibot';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 

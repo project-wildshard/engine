@@ -62,7 +62,7 @@ export async function served(url) {
  */
 export async function runSmoke({ url, release, out, only, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, store, vision = true, changelog = resolve('CHANGELOG.md'), bugbash, receipts, runBudgetS = RUN_BUDGET_S, log = console.log }) {
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The staging smoke joins worlds: staging or local only, never production');
-  const pw = await import('playwright');
+  const pw = await import('./browser-playwright.mjs');
   const started = Date.now();
   const version = await served(url);
   mkdirSync(out, { recursive: true });

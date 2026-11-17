@@ -1,6 +1,6 @@
 // Manual real-play milestones; never a hook or unit-test entry.
 import assert from 'node:assert/strict';
-import { chromium,webkit,devices } from 'playwright';
+import { chromium,webkit,devices } from "./browser-playwright.mjs";
 import { serve } from './parity/serve.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 /** @param {string} name @param {string} fallback */

@@ -149,7 +149,7 @@ if(nativeWalk!==undefined){
   if(nativeWalk.status!==0)process.exit(nativeWalk.status);
   if(MODE.length===1)process.exit(0);
 }
-const { chromium, devices } = await import('playwright');
+const { chromium, devices } = await import("./browser-playwright.mjs");
 async function seedVariantFixtures(target) {
   if (Object.keys(SETTINGS).length > 0) await debugSettings(target, SETTINGS);
   for (const [key, data] of Object.entries(DEVICE_SAVES)) await saveFixture(target, { scope: 'device', key, data });

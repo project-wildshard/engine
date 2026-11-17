@@ -10,7 +10,7 @@ import { existsSync, readFileSync, readdirSync, mkdirSync, rmSync, writeFileSync
 import { resolve as resolvePath, join, relative, sep } from "node:path";
 import { createRequire } from "node:module";
 import { build } from "vite";
-import { webkit, chromium, type Browser } from "playwright";
+import { webkit, chromium, type Browser } from "../browser-playwright.mjs";
 import { rapierAlias } from "../../vite/rapier.ts";
 import { KEYCHAIN_ARGS } from "../chromium-keychain.mjs";
 import { homedir } from "node:os";

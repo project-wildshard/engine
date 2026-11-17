@@ -16,7 +16,7 @@
 import http from 'node:http';
 import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { chromium } from 'playwright';
+import { chromium } from "../browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { NAME_ASKED, developerSettings, saveFixture, hideDeveloperOverlays } from '../debug-settings.mjs';
 

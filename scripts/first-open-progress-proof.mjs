@@ -15,7 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve as absolute } from 'node:path';
-import { webkit } from 'playwright';
+import { webkit } from "./browser-playwright.mjs";
 
 const arg = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const dist = absolute(arg('dist', 'dist')), out = absolute(arg('out', 'tmp/first-open')), kbps = Number(arg('kbps', '1600')), rtt = Number(arg('rtt', '150'));

@@ -193,7 +193,7 @@ const PAGE_FILE = resolve(ROOT, 'test/side-parity.page.json');
 
 async function recordPage(argv) {
   const flag = (name, fallback) => argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-  const { chromium, devices } = await import('playwright');
+  const { chromium, devices } = await import("./browser-playwright.mjs");
   const { KEYCHAIN_ARGS } = await import('./chromium-keychain.mjs');
   const { waitForPhysicsBoot } = await import('./physics-grid-entry.mjs');
   const only = flag('shard', ''), shards = only === '' ? SIDE_PARITY_SHARDS : only.split(','), port = Number(flag('port', '4177')), timeout = Number(flag('timeout', '240')) * 1000;

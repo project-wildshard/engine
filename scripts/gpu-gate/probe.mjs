@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Disposable F3.2 measurement: full Chromium, Metal, Driftwood phone tier.
-import { chromium } from 'playwright';
+import { chromium } from "../browser-playwright.mjs";
 import { writeFileSync } from 'node:fs';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 

@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve as resolvePath, sep } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import { rolldown } from 'rolldown';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { stampContentBase } from './app-build/contentBase.mjs';

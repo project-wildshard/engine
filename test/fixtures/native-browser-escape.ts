@@ -15,6 +15,7 @@ import {drainNativeBrowser} from './native-browser-drain.mjs';
 import {warmNativeInventory} from './native-process-inventory.mjs';
 import {requestNativeRetention} from './native-retention.mjs';
 import { KEYCHAIN_ARGS } from '../../scripts/chromium-keychain.mjs';
+import {reserveMachineBrowserAdmission} from '../../scripts/browser-machine-loader.mjs';
 
 warmNativeInventory();
 const executable = nativeChromeExecutable();
@@ -35,6 +36,7 @@ const boundedRead = (file: string, bytes: number): string => {
 };
 const cpuPressure = (): string | null => process.platform === 'linux' ? boundedRead('/proc/pressure/cpu', 140) : null;
 const cgroupCpu = (): string | null => process.platform === 'linux' ? boundedRead('/sys/fs/cgroup/cpu.stat', 200) : null;
+const admission = await reserveMachineBrowserAdmission();
 const startedAt = performance.now();
 const child = spawn(executable, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${directory}`,
   '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio', ...KEYCHAIN_ARGS,
@@ -69,6 +71,7 @@ const close = (): Promise<void> => (closing ??= (async () => {
   } finally {socket?.close();}
 })());
 const terminate = (): void => {void close().catch(error => {console.error(error);}).finally(() => {process.exitCode = 143;});};
+void admission?.lost.then(terminate);
 process.once('SIGTERM', terminate);
 try {
   const endpoint = await new Promise<string>((done, refuse) => {
@@ -127,7 +130,7 @@ try {
     {type: 'keydown', key: 'Escape', code: 'Escape', trusted: true, repeat: false},
     {type: 'keyup', key: 'Escape', code: 'Escape', trusted: true, repeat: false},
   ]);
-} finally {process.off('SIGTERM', terminate); await close();}
+} finally {process.off('SIGTERM', terminate); await close(); await admission?.release();}
 console.log(JSON.stringify({cleanup: 'complete', profile: directory, socketTemp: socketTemp.path,
   startup: {spawnedAt, firstStderrAt, lastStderrAt, endpointAtMs}}));
 console.log('original trusted Escape pair preserved');

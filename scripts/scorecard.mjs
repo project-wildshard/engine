@@ -38,7 +38,7 @@ import { imageScore } from './parity/record.mjs';
 // progress/scorecard/<tag>/ (the goldens when --goldens: progress/scorecard/baseline/).
 import { readShards } from './shards.mjs';
 import { spawn, execSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve as resolvePath, join, dirname } from 'node:path';
 import { linkNodeModules } from './link-node-modules.mjs';
@@ -46,7 +46,7 @@ import { createServer } from 'node:net';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
-const { chromium } = await import('playwright');
+const { chromium } = await import("./browser-playwright.mjs");
 
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const OUT_DIR = resolvePath(ROOT, 'progress/scorecard');
@@ -320,8 +320,7 @@ const MEMORY = `(() => {
 })()`;
 
 // ── browser: Chromium launched by hand so the service worker's fetches can be throttled too (bench-load.mjs) ──
-await waitForBrowserSlot();
-const { browser, chrome, swThrottle } = await launchBrowser();
+const { browser, chrome, swThrottle, close:closeBrowser } = await launchBrowser();
 children.push(chrome);
 await swThrottle(NETS[NET]);
 
@@ -343,7 +342,7 @@ try {
   if (RETOUCH) runs[0].retouch = await retouchRow();
 } finally {
   await within(browser.close(), 10_000);
-  chrome.kill();
+  await closeBrowser();
   cleanup();
 }
 
@@ -1083,20 +1082,12 @@ function freePort(start) {
   return (async () => { for (let p = start; p < start + 50; p++) if (await tryPort(p)) return p; throw new Error('no free port'); })();
 }
 
-/** AGENTS.md: at most 3 headless browsers machine-wide — wait for a slot (the browser processes, not their helpers) */
-async function waitForBrowserSlot() {
-  for (let i = 0; ; i++) {
-    let n;
-    try { n = execSync('ps -axo command', { encoding: 'utf8' }).split('\n').filter((l) => /(chrome-headless-shell|Chromium|Google Chrome for Testing)/.test(l) && l.includes('--headless') && !l.includes('--type=')).length; } catch { n = 0; }
-    if (n < 3) return;
-    if (i % 6 === 0) console.error(`> ${n} headless browsers running; waiting for a slot (AGENTS.md: at most 3)`);
-    await sleep(10_000);
-  }
-}
-
 async function launchBrowser() {
-  const udd = mkdtempSync(join(tmpdir(), 'wildshard-scorecard-'));
-  const chromeProc = spawn(chromium.executablePath(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${udd}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--disable-features=BackForwardCache', ...KEYCHAIN_ARGS, 'about:blank'], { stdio: 'ignore' });
+  const server = await chromium.launchServer({executablePath:chromium.executablePath(),headless:true,args:['--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--disable-features=BackForwardCache', ...KEYCHAIN_ARGS]});
+  const chromeProc=server.process();
+  const udd=chromeProc.spawnargs.find(arg=>arg.startsWith('--user-data-dir='))?.slice('--user-data-dir='.length);
+  try {
+  if(udd===undefined)throw new Error('Owned browser profile is unavailable');
   const portFile = join(udd, 'DevToolsActivePort');
   await waitFor(() => existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]) > 0, 15_000, 'chromium did not open its DevTools port');
   const port = readFileSync(portFile, 'utf8').split('\n')[0].trim();
@@ -1130,7 +1121,8 @@ async function launchBrowser() {
       if (ok !== true) swSessions.delete(s);
     }
   };
-  return { browser: cdpBrowser, chrome: chromeProc, swThrottle: throttle };
+  return { browser: cdpBrowser, chrome: chromeProc, swThrottle: throttle, close:()=>server.close() };
+  }catch(error){await server.close();throw error;}
 }
 
 // ── util ──

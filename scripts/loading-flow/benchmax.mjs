@@ -18,7 +18,7 @@
 //   --ratchet: NB6 holds the measured Nine street workload, load stalls, and hardware timing (nine-ratchet.mjs).
 import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "../browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays } from '../debug-settings.mjs';
 import { bootTimelineEntries, clockMarkExpression, profileAnchor, profileIdle, stageStalls, stageGaps, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';

@@ -1,4 +1,4 @@
-import {chromium,devices} from 'playwright';
+import {chromium,devices} from "../browser-playwright.mjs";
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {installInit} from '../parity/init.mjs';

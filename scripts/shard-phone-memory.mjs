@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
-import { devices } from 'playwright';
+import { devices } from "./browser-playwright.mjs";
 import * as v from 'valibot';
 import { launchMemoryBrowser } from './chromium-memory-browser.mjs';
 import { saveFixture } from './debug-settings.mjs';

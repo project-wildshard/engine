@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium } from "./browser-playwright.mjs";
 import { exportTree, serve } from './parity/serve.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 

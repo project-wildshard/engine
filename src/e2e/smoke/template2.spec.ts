@@ -3,8 +3,7 @@
 // build, no network and no cook. Each stretch's wall time goes to tmp/e2e/receipt.json (TB-4).
 import { mkdirSync, writeFileSync } from 'node:fs'
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from '../../../scripts/browser-test.mjs'
 import {
   ROOT,
   doorOpens,

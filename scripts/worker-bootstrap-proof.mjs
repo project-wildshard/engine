@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { resolve as resolvePath, join } from 'node:path';
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit } from "./browser-playwright.mjs";
 import { writeStandaloneOutput } from './app-build/standaloneOutput.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 

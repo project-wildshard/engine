@@ -1,0 +1,69 @@
+# One browser lease through a physical launch and drain
+
+J402 BR2a: a portable adapter covers all three Playwright launch forms.
+Each launch waits for its own admission before Playwright's launch clock,
+keeps the actual handle and options, and releases after close completes.
+Repeated installation shares the wrapper. Rejected admission starts no
+browser; rejected launch returns its unused lease. Disconnection or lease
+loss closes the handle. A failed close keeps the reservation charged.
+
+The optional machine-policy seam loads one private owned provider. An
+unconfigured author machine stays portable; a broken present policy
+refuses. Native private-file, symlink, size and mode controls accompany the
+injected policy tests. No machine configuration is installed yet.
+
+A real consumer-cwd control failed first: CPU admission resolved Python
+from the consumer's cwd. Both admission and ancestor inspection now resolve
+beside their provider module. A second red-first native control exposed an
+ancestor-backed browser row surviving release; it now removes its own row
+without waiting for another request to prune it. Generic CPU ancestry
+validation and budgets stay unchanged.
+
+The adapter and loader have 24 native controls behind two Vitest wrappers;
+the consumer-cwd and actual broker controls are separate. Actual headless
+Chromium launch, Chromium launchServer and phone WebKit persistent context
+each held exactly one four-core machine browser row and removed it after
+close. No machine configuration was installed. The injected controls open no browser. The broader engine/SDK/shard launcher integration, process
+loss qualification and real load comparison remain open. Synthetic scratch
+controls used SKIP_BROWSER_LANE=1 after the browser hook misclassified their
+fake handles. The actual native control also used that J381 hatch because
+the legacy hook does not recognize J402 admission; every actual launch
+first acquired the new machine broker slot. No launch bypassed admission.
+
+Review repairs preserve the native machine reaper and wrapper status,
+capacity, separators and ordinary exit codes. The two-owner policy
+replaces the old extra physical gate slot, while verified CPU ancestor
+budgets still lend. Configured CPU roots and existing outside headless
+roots are accounted before new admission; a full wait names its holders.
+
+The three raw Chromium launchers now use admitted BrowserServers and
+retain the full selected executable and network setup. Their CDP clients
+spend no second lease. T1 supervisors drain their owned groups even after
+the leader exits: a TERM-resistant orphan control failed first and now
+passes with the other four native supervisor cases. Every original native
+Escape control passes (8/8). The import census includes kit, core and
+runner launch authority; plain data/assertion imports remain portable.
+
+Nine focused adapter/import/clock controls pass. Queue intervals pause
+only fully waiting scopes, with no active sibling lease. Two additional
+native broker controls make eleven focused passes in total. Low-core
+hosts explicitly skip the twelve-core native control rather than claim
+it ran. The native Playwright Test runner waited seven seconds before a
+five-second case, held one four-core row and drained its worker row.
+
+The daemon close-refusal control escalates only recorded owned PID birth
+identities, drains a TERM-resistant daemon, and retains browser/charge and
+scratch on a real refusal. A failed browser close also retains its live
+owner; an actually lost grant stops work. The existing normal and
+interrupted daemon controls passed before that escalation change.
+
+No private policy is installed by these commits. All actual native
+qualification uses J381 SKIP_BROWSER_LANE=1 only because each actual
+launch first takes J402 admission. SKIP_BUDGET=1 for the local commit
+skips its eight-second clock; all installed hooks run normally.
+
+A concurrent SDK hook run exposed an unrelated shared fixture collision:
+the separate-Git-dir negative control placed and deleted a common
+system-temp .worktrees/foo. Keep that alternate Git parent inside the
+case's unique root and surface spawn errors directly. Refusal assertions
+and production checkout policy are unchanged.

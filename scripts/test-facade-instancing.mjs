@@ -2,7 +2,7 @@
 import { debugSettings, saveFixture } from './debug-settings.mjs';
 // E271/E272: exercise the real scene on desktop and mobile; no facade multi-draw anywhere.
 // See docs/audits/nine-dragon-mobile-multidraw.md. This guards routing, not native phone memory.
-import { chromium } from 'playwright';
+import { chromium } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const base = (process.argv.find((arg) => arg.startsWith('--url='))?.slice(6) ?? 'http://127.0.0.1:4184').replace(/\/$/, '');

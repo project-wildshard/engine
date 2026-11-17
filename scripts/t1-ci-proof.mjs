@@ -28,6 +28,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   /** @type {string|null} */ let signal = null;
   /** @type {string|null} */ let error = null;
   let reportOnly = true;
+  let queueMs = 0;
   try {
     scope = t1Scope();
     try {
@@ -44,14 +45,17 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
     if (sha !== undefined && (!/^[a-f0-9]{40}$/u.test(sha) || !/^[a-f0-9]{7,40}$/u.test(prefix) || !sha.startsWith(prefix))) {
       throw new Error('Shared T1 build does not belong to this source SHA');
     }
-    const result = await runT1Child([process.execPath, 'scripts/t1-e2e.mjs', `--project=${suite}`, '--global-timeout=120000'], env);
+    // The runner owns the overall active-time deadline. Playwright's global
+    // clock includes worker admission, so individual case clocks stay the bar.
+    const result = await runT1Child([process.execPath, 'scripts/t1-e2e.mjs', `--project=${suite}`], env);
     status = result.status; signal = result.signal; error = result.error;
+    queueMs = result.queueMs;
   } catch (caught) { error = caught instanceof Error ? caught.message : String(caught); }
-  const wallMs = Date.now() - started;
+  const totalWallMs = Date.now() - started, wallMs = Math.max(0,totalWallMs-queueMs);
   const verdict = error === null ? t1Verdict({ status, signal }, wallMs) : 'fail';
   const receipt = { version: 1, suite, scope, complete: t1ContentReady(), sha: process.env.GITHUB_SHA ?? null, run: process.env.GITHUB_RUN_ID ?? null,
     event: process.env.GITHUB_EVENT_NAME ?? null, ref: process.env.GITHUB_REF ?? null,
-    started, build, platform: process.platform, wallMs, budgetMs: T1_BUDGET_MS, status, signal, error, verdict, reportOnly };
+    started, build, platform: process.platform, wallMs, totalWallMs, queueMs, budgetMs: T1_BUDGET_MS, status, signal, error, verdict, reportOnly };
   writeFileSync(resolve(scratch, `t1/receipt-${suite}.json`), `${JSON.stringify(receipt)}\n`);
   const line = `T1 ${suite}: ${verdict.toUpperCase()}, ${(wallMs / 1000).toFixed(1)}s / 120s, exit ${String(status)}, shared build ${build ?? 'unavailable'} (${reportOnly ? 'report-only' : 'blocking'})`;
   console.log(line);

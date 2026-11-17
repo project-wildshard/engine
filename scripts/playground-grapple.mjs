@@ -17,7 +17,7 @@ import { aimAt, bootToTitle, encodePhone, enterPlayground, flags, openHub, phone
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { gitCommonPath } from './git-common.mjs';
 
-const { chromium } = await import('playwright');
+const { chromium } = await import("./browser-playwright.mjs");
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const flag = flags();
 const BASE = flag('url', 'http://127.0.0.1:5173');

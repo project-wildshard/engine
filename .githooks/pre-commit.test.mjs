@@ -1,13 +1,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { ENV, ok, roots, sandbox } from './test-helpers.mjs';
 
 describe('pre-commit hook', () => {
   const MSG = ok('feat: add files');
   const blocked = (result, pattern) => {
+    assert.ifError(result.error);
     assert.notEqual(result.status, 0, 'commit should have been blocked');
     assert.match(result.stderr, pattern);
   };
@@ -104,12 +105,13 @@ describe('pre-commit hook', () => {
     const { root, git, commit } = sandbox();
     commit({ 'a.txt': 'a\n' }, MSG);
     // Move the Git dir out of the checkout: <root>/.git becomes a gitfile.
-    const store = `${root}-store`;
-    roots.push(store);
+    // Keep the alternate Git parent unique to this case. Other hook suites
+    // must never share or remove a system-temp .worktrees/foo.
+    const store = join(root, 'outside', 'git-store');
+    mkdirSync(dirname(store), {recursive:true});
     git(['init', '-q', `--separate-git-dir=${store}`]);
     // A worktree placed under the store's parent folder is not the canonical checkout's .worktrees/.
     const fake = join(dirname(store), '.worktrees', 'foo');
-    roots.push(join(dirname(store), '.worktrees'));
     git(['worktree', 'add', '-q', '-b', 'plan/foo', fake]);
     cpSync(join(root, '.githooks'), join(fake, '.githooks'), { recursive: true });
     writeFileSync(join(fake, 'b.txt'), 'b\n');

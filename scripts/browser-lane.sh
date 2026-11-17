@@ -205,6 +205,18 @@ warn_listeners() {
   node "$(dirname "$SELF")/check-listeners.mjs" --warn >&2 || true
 }
 
+# J402 admits physical launches; keep the legacy machine reaper available.
+# The two-owner cap replaces W19's extra physical gate slot. CPU ancestor
+# grants still provide the gate's existing scheduling budget.
+if [ -e "$HOME/.config/wildshard/browser-admission.json" ] || [ -L "$HOME/.config/wildshard/browser-admission.json" ]; then
+  case "${1:-}" in
+    reap) reap "${2:-}"; exit 0;;
+    wait) reap >/dev/null; warn_listeners;;
+    ''|-h|--help) sed -n '2,30p' "$SELF"; exit 0;;
+  esac
+  exec node "$(dirname "$SELF")/browser-command.mjs" "$@"
+fi
+
 case "${1:-}" in
   status) status; exit 0;;
   capacity) n=$(used); free=$((LANES - n)); [ "$free" -lt 0 ] && free=0; printf '%s %s\n' "$LANES" "$free"; exit 0;;

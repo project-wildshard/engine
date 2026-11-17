@@ -4,7 +4,7 @@
 //   scripts/browser-lane.sh --max 15 node scripts/online-ride-proof.mjs <app dist> <work dir> <key.json> <pg bin dir> <pg data dir>
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices } from "./browser-playwright.mjs";
 import { enterPage, intoWorld, openRig } from './online-rig.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 

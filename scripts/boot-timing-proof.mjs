@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { chromium, webkit, devices } from 'playwright';
+import { chromium, webkit, devices } from "./browser-playwright.mjs";
 import { serve } from './parity/serve.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { bootTimingDelay } from './parity/boot-timing-delay.mjs';

@@ -9,7 +9,7 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { join, normalize, resolve as absolute } from 'node:path';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from "./browser-playwright.mjs";
 
 const ROOT = absolute(import.meta.dirname, '..');
 const RELEASE_PORT = 18899, WORLD_PORT = 18897, PAGE_PORT = 18898, BLOCK_PORT = 18896, SHARD = 'driftwood-isle';

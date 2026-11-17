@@ -28,7 +28,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { build } from 'vite';
 import { saveFixture } from './debug-settings.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';

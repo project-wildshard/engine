@@ -1,6 +1,6 @@
 import {writeFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {devices} from 'playwright';
+import {devices} from "../browser-playwright.mjs";
 import {developerSettings,saveFixture,NAME_ASKED} from '../debug-settings.mjs';
 import {startStallProfile,finishStallProfile,bootTimelineEntries} from './stalls.mjs';
 

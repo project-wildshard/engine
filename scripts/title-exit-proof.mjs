@@ -7,7 +7,7 @@
 //   scripts/browser-lane.sh node scripts/title-exit-proof.mjs <base url> <out dir> [--engine=chromium|webkit]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 

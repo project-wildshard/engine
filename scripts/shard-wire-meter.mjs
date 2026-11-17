@@ -12,6 +12,7 @@
 // byClass splits S1 shardfiles into `S1-packs` (blobs/pack/) and `S1-loose` (the other blobs) for PZ7. The browser
 // profile lives in the root's tmp/wire-meter, never the system temp folder.
 import { spawn } from 'node:child_process';
+import { admittedPlaywright } from './browser-machine-loader.mjs';
 import { createRequire } from 'node:module';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import http from 'node:http';
@@ -24,7 +25,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 const { values: o } = parseArgs({ options: { root: { type: 'string' }, shard: { type: 'string' }, card: { type: 'string' }, tier: { type: 'string', default: 'phone' }, flow: { type: 'string', default: 'select' },
   out: { type: 'string' }, upstream: { type: 'string' }, settle: { type: 'string', default: '20000' }, timeout: { type: 'string', default: '420000' }, shot: { type: 'string' }, last: { type: 'string' }, dwell: { type: 'string', default: '3000' } } });
 const require = createRequire(join(o.root, 'package.json'));
-const { chromium, devices } = require('playwright');
+const { chromium, devices } = await admittedPlaywright(require('playwright'));
 const { developerSettings, saveFixture } = await import(pathToFileURL(join(o.root, 'scripts/debug-settings.mjs')).href);
 
 const free = () => new Promise(resolve => { const s = http.createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
