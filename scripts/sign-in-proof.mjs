@@ -20,7 +20,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve as absolute } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
-import { chromium, devices, webkit } from 'playwright';
+import { chromium, devices, webkit } from './browser-playwright.mjs';
 import sharp from 'sharp';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';

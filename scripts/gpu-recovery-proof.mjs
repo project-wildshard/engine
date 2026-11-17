@@ -6,7 +6,7 @@
 //   scripts/browser-lane.sh --max 15 node scripts/gpu-recovery-proof.mjs --base=https://staging.wildshard.io --out=<dir>
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium } from './browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';

@@ -67,3 +67,9 @@ the separate-Git-dir negative control placed and deleted a common
 system-temp .worktrees/foo. Keep that alternate Git parent inside the
 case's unique root and surface spawn errors directly. Refusal assertions
 and production checkout policy are unchanged.
+
+Rebasing the finished cohort brought in two new raw launchers (GPU
+recovery and sign-in); the existing census failed first and both imports
+now use the bridge. The census also belongs to full static lint, so a
+disjoint-main delta gate always checks this global policy. Commit-only
+path lint retains its isolation from peers' loose working files.

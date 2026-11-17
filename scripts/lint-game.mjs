@@ -11,6 +11,13 @@ const LIFTED = new RegExp(`^(?:${TREE.join('|')})/`, 'u');
 const ENGINE_TESTS = new Set(ci21Tests);
 const COMPLETE = [...TREE, ...ENGINE_TESTS];
 const asked = process.argv.slice(2);
+// Full static gates include this global policy even on a disjoint delta retry.
+// Commit-only path checks keep their existing isolation from peer loose files.
+if(asked.length===0){
+ const {unadmittedBrowserImports}=await import('./browser-imports.mjs');
+ const missing=unadmittedBrowserImports();
+ if(missing.length>0)throw new Error(`Browser launch imports require admission: ${missing.join(', ')}`);
+}
 const threads = process.env.WS_PUSH_LINT_THREADS;
 if (threads !== undefined && !/^[1-9]\d*$/u.test(threads)) throw new Error('Invalid push lint worker limit');
 const files = asked.filter(path => LIFTED.test(path) || ENGINE_TESTS.has(path));
