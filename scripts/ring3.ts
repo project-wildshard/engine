@@ -9,12 +9,13 @@ export const shardRepos = ['shard-dunes', 'shard-sky-reach', 'shard-nalati', 'sh
 interface Row {repo: string; status: 'pending' | 'success' | 'failure' | 'error' | 'timeout'; runId?: number; runUrl?: string; shardSha?: string; conclusion?: string | null; issue?: string; error?: string}
 export interface Aggregate {version: 1; engine: string; originRun: string; ok: boolean; rows: Row[]}
 export type Api = (method: 'GET' | 'POST', path: string, body?: unknown) => Promise<unknown>;
-interface Options {api: Api; now?: () => number; sleep?: (ms: number) => Promise<void>; deadlineMs?: number; pollMs?: number; checkpoint?: (report: Aggregate) => void}
+interface Options {api: Api; now?: () => number; sleep?: (ms: number) => Promise<void>; deadlineMs?: number; pollMs?: number; checkpoint?: (report: Aggregate) => void; issues?: boolean}
 const errorText = (error: unknown): string => String(error).replaceAll(/[\r\n]/gu, ' ').slice(0, 1000);
 
-export function prepare(engine: string, originRun: string): Aggregate {
+export function prepare(engine: string, originRun: string, repos: readonly string[] = shardRepos): Aggregate {
   if (!/^[a-f0-9]{40}$/u.test(engine)) throw new Error('Ring 3 requires the full engine commit hash');
-  return {version: 1, engine, originRun, ok: false, rows: shardRepos.map(repo => ({repo, status: 'pending'}))};
+  if (repos.length === 0 || new Set(repos).size !== repos.length || repos.some(repo => !shardRepos.some(known => known === repo))) throw new Error('Ring 3 requires distinct known shard repos');
+  return {version: 1, engine, originRun, ok: false, rows: repos.map(repo => ({repo, status: 'pending'}))};
 }
 
 export async function runRing3(report: Aggregate, options: Options): Promise<Aggregate> {
@@ -25,7 +26,7 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
     try {
       const response = await api('POST', `repos/project-wildshard/${row.repo}/actions/workflows/ci.yml/dispatches`,
         {ref: 'main', inputs: {engine: report.engine}, return_run_details: true}) as {workflow_run_id?: number; html_url?: string};
-      if (!Number.isSafeInteger(response.workflow_run_id) || (response.workflow_run_id ?? 0) <= 0) throw new Error('Dispatch returned no exact run ID; refusing to guess a run');
+      if (typeof response.workflow_run_id !== 'number' || !Number.isSafeInteger(response.workflow_run_id) || response.workflow_run_id <= 0) throw new Error('Dispatch returned no exact run ID; refusing to guess a run');
       row.runId = response.workflow_run_id;
       row.runUrl = `https://github.com/project-wildshard/${row.repo}/actions/runs/${row.runId}`;
     } catch (error) {row.status = 'error'; row.error = errorText(error);}
@@ -45,7 +46,7 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
   }
   for (const row of report.rows) if (row.status === 'pending') {row.status = 'timeout'; row.error = 'Receiver did not complete within the Ring 3 deadline';}
   // Deduplicate per candidate in each shard; cancelled/skipped/incomplete is never green.
-  await Promise.all(report.rows.filter(row => row.status !== 'success' && row.runId !== undefined).map(async row => {
+  await Promise.all(report.rows.filter(row => options.issues !== false && row.status !== 'success' && row.runId !== undefined).map(async row => {
     try {
       const title = `[Ring 3] engine ${report.engine}`;
       const existing = await api('GET', `repos/project-wildshard/${row.repo}/issues?state=all&per_page=100&sort=created&direction=desc`) as {title: string; html_url: string; pull_request?: unknown}[];
@@ -59,7 +60,7 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
     } catch (error) {row.error = `${row.error ?? ''} Issue creation failed: ${errorText(error)}`.trim();}
     checkpoint(report);
   }));
-  report.ok = report.rows.length === shardRepos.length && report.rows.every(row => row.status === 'success');
+  report.ok = report.rows.length > 0 && report.rows.every(row => row.status === 'success');
   checkpoint(report);
   return report;
 }
@@ -73,14 +74,15 @@ export function markdown(report: Aggregate): string {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const {RING3_ENGINE, RING3_ORIGIN_RUN, GH_TOKEN} = process.env;
   const [command, directory = 'tmp/ring3'] = process.argv.slice(2);
   const save = (report: Aggregate): void => {mkdirSync(directory, {recursive: true}); writeFileSync(join(directory, 'verdict.json'), `${JSON.stringify(report, null, 2)}\n`); writeFileSync(join(directory, 'summary.md'), markdown(report));};
-  if (command === 'prepare') save(prepare(process.env.RING3_ENGINE ?? '', process.env.RING3_ORIGIN_RUN ?? 'local'));
+  if (command === 'prepare') save(prepare(RING3_ENGINE ?? '', RING3_ORIGIN_RUN ?? 'local'));
   else if (command === 'run') {
     const report = JSON.parse(readFileSync(join(directory, 'verdict.json'), 'utf8')) as Aggregate;
     // Revalidate the persisted candidate before any write request.
     if (JSON.stringify(report) !== JSON.stringify(prepare(report.engine, report.originRun))) throw new Error('Ring 3 must start from a fresh prepared aggregate');
-    const token = process.env.GH_TOKEN;
+    const token = GH_TOKEN;
     if (token === undefined || token === '') throw new Error('Ring 3 needs the dedicated nightly App token');
     const api: Api = async (method, path, body) => {
       const response = await fetch(`https://api.github.com/${path}`, {method, signal: AbortSignal.timeout(20_000),

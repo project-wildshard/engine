@@ -356,6 +356,8 @@
     "../scripts/pin-format.ts",
     "../scripts/pin-local.ts",
     "../scripts/local-candidates.ts",
+    "../scripts/ring3.ts",
+    "../scripts/shard-check.ts",
     "../scripts/engine-ci-plan.ts",
     "../scripts/engine-ci-budget.ts",
     "../pages/worker.ts",

@@ -21,3 +21,10 @@ before native pre-push creates a clean gate copy. Legacy land and
 release preflight use the same guard. Installed slugs and the exact
 normal pinned restoration command appear in each refusal. Hosted CI
 refuses a planted marker without reading its contents.
+
+LL6 adds an explicit post-push comparison using Ring3 exact dispatch IDs,
+selected receivers (all seven by default), the same shard commit for
+both engine inputs, and one twenty-minute deadline. A baseline-green /
+candidate-red execution is a regression; changed receiver heads, reused
+run IDs and incomplete runs remain inconclusive. This local command
+does not create issues or hold the main-push lock. Reads use the App.
