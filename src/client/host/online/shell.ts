@@ -6,7 +6,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
 import type { NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
-import { decodeArrive, decodeCountdown, decodeEnter, encodeEnter, type ArriveWord, type Countdown } from '@wildshard/engine/net/socketFrames';
+import { decodeArrive, decodeCountdown, decodeEnter, encodeEnter, type ArriveWord, type Countdown, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { encodeDeviceWord, worldReadsDevice } from '@wildshard/engine/net/deviceWord';
 import { subscribePersistence, type PersistenceWord } from '@wildshard/engine/net/persistenceWord';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
@@ -25,6 +25,7 @@ import { linkScreens } from './linkScreens';
 import { saveScreens } from './saveScreens';
 import { retentionWatch } from './retentionWatch';
 import { tooOldScreens } from './tooOldScreens';
+import { clearRestart, holdTitleEntry, noteRestart, type TitleWorld, type WorldHeard } from './titleHold';
 import { fetchCodeRetention } from './codeRetention';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { installBrowserScopeEnvironment } from '@wildshard/engine/app/view/scopeEnvironment';
@@ -379,6 +380,16 @@ async function askWorld(config: { readonly release: string; readonly key: string
   try { return await Promise.race([read, late]); } finally { scope.dispose(); asked.transport?.close(); }
 }
 
+/** FM4 9b/10b: what the title's own socket heard, for `titleHold.ts`. */
+async function heardWorld(world: TitleWorld): Promise<WorldHeard> {
+  const word = await askWorld(world, 3000);
+  if (typeof word !== 'object' || word === null) return { heard: false };
+  const moving = (word as WorldWord).moving?.inS;
+  return { heard: true, movingInS: typeof moving === 'number' && Number.isFinite(moving) ? moving : null };
+}
+/** FM4 9b/10b: Enter world from the title enters now, or holds on `restart-blocked` / `deploy-blocked` until the world is back. */
+export async function titleEnter(world: TitleWorld, go: () => void): Promise<void> { await holdTitleEntry(world, go, heardWorld); }
+
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 /** ZE10d2: a page's online session that the next session on the same page can take over after a gate's `enter` (`adopt`). */
 export interface StartedOnline extends OnlineShell {
@@ -439,6 +450,8 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     link: (state, reason) => {
       waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); tooOld.link(state === 'live');
       if (state === 'reconnecting' && wasLive) tooOld.refuse('reconnect');
+      // FM4 9b: a restart this tab heard explains a quiet world to the title's Enter world; a live link ends it
+      if (state === 'live') clearRestart(); else if (shellNow?.why() === 'restart') noteRestart();
       wasLive = state === 'live';
       if (state === 'ended' && reason === 'reload') void ended();
     },

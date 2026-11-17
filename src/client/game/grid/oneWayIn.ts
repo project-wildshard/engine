@@ -53,7 +53,9 @@ export function oneWayIn(page: OneWayIn, assembly?: GridAssembly): GridCell | nu
 }
 
 /** The online module's gate, as `clientWorker.ts` reads it; a page with no world never asks. */
-export interface OnlineGate { readonly worldWord: (world: { readonly release: string; readonly key: string }, waitMs?: number, keep?: WordKeep) => Promise<unknown> }
+export interface OnlineGate { readonly worldWord: (world: { readonly release: string; readonly key: string }, waitMs?: number, keep?: WordKeep) => Promise<unknown>;
+  /** FM4 9b/10b: Enter world from the title, now or once the world is back (an older online.js has none: enter at once) */
+  readonly titleEnter?: (world: { readonly release: string; readonly key: string }, go: () => void) => Promise<void> }
 /** opus-wordkeep: the word the door said, which release and when (`online.js`'s `KeptWord`). */
 interface KeptWord { readonly of: string; readonly at: number; readonly word: unknown }
 interface WordKeep { readonly read: () => KeptWord | null; readonly write: (kept: KeptWord) => void }
@@ -152,6 +154,21 @@ export async function worldHosted(world: unknown, waitMs: number = HOSTED_MS, me
 async function onlineGate(): Promise<OnlineGate> {
   const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
   return await import(/* @vite-ignore */ `/b/${build}/standalone/online.js`) as OnlineGate;
+}
+/** FM4 9b/10b: the title's Enter world on a world build asks the world first (online.js `titleEnter`): a restart this tab heard and a
+ *  quiet world, or a move due in the last 15 s, holds the tap on a card that joins by itself. No world (preview, solo): no gate. */
+export function titleEntryGate(world: unknown, gate: () => Promise<OnlineGate> = onlineGate): ((go: () => void) => void) | undefined {
+  if (typeof world !== 'object' || world === null || !('release' in world) || !('key' in world)) return undefined;
+  const { release, key } = world;
+  if (typeof release !== 'string' || typeof key !== 'string') return undefined;
+  return go => {
+    void (async (): Promise<void> => {
+      let online: OnlineGate;
+      try { online = await gate(); } catch { go(); return; }
+      if (online.titleEnter === undefined) { go(); return; }
+      await online.titleEnter({ release, key }, go);
+    })();
+  };
 }
 /** The door's word read as grid or not and the shards it opens, or null when no word came (unreachable, stalled, closed before its word). */
 export async function readHosted(world: unknown, waitMs: number, gate: () => Promise<OnlineGate> = onlineGate): Promise<WorldHeard | null> {

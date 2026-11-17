@@ -453,7 +453,9 @@ export class World {
     // page joins only a world that opens its shard. D7 keeps `/health` private on the rooms address, and a
     // grid page asks this on a socket of its own (`worldWord`). No build, serial or player data.
     // DEVICE-TELEMETRY DT3: `device: 1` says this door reads the client's device word; a client sends it only then.
-    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1} satisfies WorldWord)).buffer);
+    // FM4 deploy-blocked: while a deploy is due, the seconds left before the move (a title's Enter world holds in the last 15 s)
+    const moving = this.grace === null ? {} : { moving: { inS: Math.max(0, Math.ceil((this.grace.endsAt - diagnosticNow()) / 1000)) } };
+    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving} satisfies WorldWord)).buffer);
     end.onControl((control, bytes) => { if (control === 'device') this.deviceWord(end, bytes); });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });

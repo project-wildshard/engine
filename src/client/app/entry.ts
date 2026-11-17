@@ -294,6 +294,12 @@ async function showPageTitle(refusal = ''): Promise<void> {
   const mountedCatalogue = installedCatalogue(), mountedTitles = titleManifests();
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
   const grid = installGridTitle();
+  // FM4 9b/10b: on a world build, Enter world asks the world first and may hold on a card until it is back (no title weight: the
+  // gate's code loads on the tap)
+  const world = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__;
+  const gate = world === undefined ? undefined : (go: () => void): void => {
+    void import('@wildshard/engine/game/grid/oneWayIn').then(({ titleEntryGate }) => { const held = titleEntryGate(world); if (held === undefined) go(); else held(go); return undefined; }, () => { go(); });
+  };
   let menu: ReturnType<typeof buildTitleMenu> | undefined;
   // the composition root wires the game's main menu (over its shard deck) into the engine's title (E405)
   const title = showStartTitle(({ settings, notice }) => {
@@ -304,6 +310,7 @@ async function showPageTitle(refusal = ''): Promise<void> {
       onEnter: (card) => { travel({ to: card.slug, mode: 'enter' }); },
       onExplore: (card) => { travel({ to: card.slug, mode: 'explore' }); },
       onGrid: grid.onGrid,
+      ...(gate === undefined ? {} : { gate }),
       ...(screen === undefined ? {} : { screen }),
       // Settings needs common inventory and level predicates, without booting a renderer.
       onSettings: () => { void (async () => { const { openTitleSettings } = await import('./titleSettings'); await openTitleSettings(settings); })(); },

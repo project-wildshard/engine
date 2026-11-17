@@ -17,7 +17,10 @@ export interface WorldWord { readonly cells: number; readonly shards: readonly s
    *  `refused` on a prefix it does not know, so a client sends the word only after hearing this. */
   readonly device?: 1;
   /** Bounded optional per-client observations; each extension has its own decoder. Later words omit device. */
-  readonly status?: Readonly<Record<string, unknown>> }
+  readonly status?: Readonly<Record<string, unknown>>;
+  /** FM4 deploy-blocked (J174): in the first word, the seconds left before a deploy's move, while one is due. A page on the title hears
+   *  it on its own socket before any hello (an older door never says it; an older client ignores it). */
+  readonly moving?: { readonly inS: number } }
 /** J218: a voice word is JSON in a few hundred bytes; an SDP travels in pieces of this many characters, under the room's 1024-byte cap. */
 export const VOICE_PIECE_CHARS = 400;
 /** The server sends no frame while this much is waiting (E7.1). Delta-against-ack heals, and the next frame is just bigger. */

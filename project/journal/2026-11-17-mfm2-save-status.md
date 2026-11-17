@@ -23,3 +23,8 @@
   cards that stop play did not (the version-skew new-build page, download-failed, doctor-http).
   The trap is `ui/focusTrap.ts` now and all four use it; the new-build page is aria-modal and
   takes focus on its Reload.
+- FM4 leftover, restart-blocked and deploy-blocked from the title (9b, 10b): the title has no link,
+  so Enter world asks the world's first word on its own socket (`titleHold.ts` via online.js
+  `titleEnter`). Only observed causes hold the tap: a restart this tab heard (sessionStorage mark,
+  cleared on live) and a quiet world, or the world's own `moving.inS` (new in the first word while
+  a grace runs) inside 15 s. Re-asks every 8 s, under the door's 10 sockets a minute.

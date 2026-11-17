@@ -105,10 +105,13 @@ test('a deploy: the countdown says the seconds and the build, play goes on, a la
   bench.world.beginGrace('a-second-word');
   await vi.waitFor(() => { expect(words).toEqual([{ seconds: 2, build: 'next-build' }]); }, { timeout: 1000, interval: 10 });
   const room = bench.room(SHARD), tick = room?.host.state.tick ?? 0;
-  const second = bot(bench.url, 'bench', 'device:two');
-  second.transport.onControl((control, bytes) => { if (control === 'countdown') late.push(decodeCountdown(bytes)); });
+  const second = bot(bench.url, 'bench', 'device:two'), first: unknown[] = [];
+  second.transport.onControl((control, bytes) => { if (control === 'countdown') late.push(decodeCountdown(bytes)); if (control === 'world') first.push(JSON.parse(new TextDecoder().decode(bytes))); });
   expect(await second.arrived()).toBe(true);
   expect(late).toHaveLength(1);
+  // FM4 deploy-blocked: the first word, before any hello, says how long until the move (a title's socket hears no countdown)
+  const moving = (first[0] as { moving?: { inS: number } } | undefined)?.moving?.inS ?? 0;
+  expect(moving).toBeGreaterThan(0); expect(moving).toBeLessThanOrEqual(2);
   expect(room?.host.state.tick, 'play goes on').toBeGreaterThan(tick);
   expect(bench.restarts).toBe(0);
   await vi.waitFor(() => { expect(bench?.restarts).toBe(1); }, { timeout: 3000, interval: 10 });

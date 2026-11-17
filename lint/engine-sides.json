@@ -1138,6 +1138,7 @@
     "src/client/host/online/saveScreens.ts": "client",
     "src/client/host/online/retentionWatch.ts": "client",
     "src/client/host/online/tooOldScreens.ts": "client",
+    "src/client/host/online/titleHold.ts": "client",
     "src/client/host/online/releaseScreens.ts": "client",
     "src/client/host/online/reconnectStrip.ts": "client",
     "src/client/host/online/codeRetention.ts": "client",
