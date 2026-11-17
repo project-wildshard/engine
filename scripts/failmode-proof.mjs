@@ -510,9 +510,6 @@ try {
           const entries = await page.evaluate(async () => { let n = 0; for (const name of await caches.keys()) n += (await (await caches.open(name)).keys()).length; return n; }).catch(() => 0);
           still = entries > 0 && entries === held ? still + 1 : 0; held = entries;
         }
-        if (process.env['FM_TRACE'] === '1') console.log('  [warm]', held, JSON.stringify(await page.evaluate(async () => {
-          const out = {}; for (const name of await caches.keys()) { const keys = await (await caches.open(name)).keys(); out[name] = [keys.length, keys.map(k => new URL(k.url).pathname).filter(p => /boot-tables|packs-/.test(p))]; } return out;
-        }).catch(error => String(error))));
         await context.setOffline(true);
         const loopbackCut = await cutLoopback(false), injection = { warmed: true, setOffline: true, guard: 'observe-only (routing would disable the HTTP cache)', ...loopbackCut ? { loopbackCut } : {} };
         const started = Date.now(); await page.goto(URL_PLAY).catch(() => undefined);
@@ -726,11 +723,6 @@ try {
           const tools = page.locator('.ws-gmenu.show .ws-gmenu-card.fold', { has: page.locator('.ws-gmenu-cardtitle', { hasText: /^Developer/u }) }).first();
           if (await tools.evaluate(node => node.classList.contains('folded')).catch(() => false)) await tools.locator('.ws-gmenu-cardtitle').first().click({ timeout: 10_000 });
         }
-        if (process.env['FM_TRACE'] === '1') console.log('  [gallery]', JSON.stringify(await page.evaluate(() => ({
-          tabs: [...document.querySelectorAll('.ws-gmenu.show [data-sv-tab]')].map(n => n.getAttribute('data-sv-tab') + (n.hidden ? ':hidden' : '') + (n.getAttribute('aria-selected') === 'true' ? ':on' : '')),
-          filters: [...document.querySelectorAll('.ws-dbg-filter')].map(n => { const r = n.getBoundingClientRect(); return (n.closest('.ws-gmenu.show') ? 'in ' : 'out ') + String(r.width) + 'x' + String(r.height); }),
-          cards: [...document.querySelectorAll('.ws-gmenu.show .ws-gmenu-card.fold')].map(n => (n.querySelector('.ws-gmenu-cardtitle')?.textContent ?? '') + (n.classList.contains('folded') ? ':folded' : '') + (n.hidden ? ':hidden' : '')),
-        })).catch(error => String(error))));
         await filter.fill('Failure screens');
         await page.locator('.ws-gmenu.show .ws-dbg-row:visible', { hasText: 'Failure screens' }).locator('.ws-dbg-action:visible').first().click({ timeout: 10_000 });
         await list.waitFor({ state: 'visible', timeout: 15_000 });
