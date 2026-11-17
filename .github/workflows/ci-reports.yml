@@ -14,7 +14,7 @@ jobs:
   nine-street:
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: macos-15
-    timeout-minutes: 10
+    timeout-minutes: 12
     continue-on-error: true
     env:
       WS_LANE_NAME: nine-ring1
@@ -69,6 +69,14 @@ jobs:
           if [ "$STREET_OUTCOME" != success ]; then
             echo "::warning::NB6 street observation failed; inspect nine-ring1-street. Producer and props load remain blocking in ci."
           fi
+      - name: Read the phone boot memory peak (MEMORY-GATES MG1, J408)
+        id: memory
+        if: steps.source.outputs.artifact == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          node scripts/nine-ring1.mjs memory 2>&1 | tee tmp/nine-ring1/memory.log
+          grep '^BOOT MEMORY' tmp/nine-ring1/memory.log >> "$GITHUB_STEP_SUMMARY" || true
       - name: Keep Nine street measurements and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -77,6 +85,8 @@ jobs:
           path: |
             tmp/nine-ring1/street.json
             tmp/nine-ring1/street.log
+            tmp/nine-ring1/memory.json
+            tmp/nine-ring1/memory.log
           retention-days: 7
           if-no-files-found: ignore
 

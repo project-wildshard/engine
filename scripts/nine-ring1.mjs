@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // NB6: full pinned Nine (not its Ring 1 server slice), stock standalone
-// load-profile gate and NB1's phone street walk. No pin/baseline writes.
+// load-profile gate, NB1's phone street walk and the phone boot memory peak
+// (meta MEMORY-GATES MG1, J408). No pin/baseline writes.
 import {spawn} from 'node:child_process';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {resolve as resolvePath} from 'node:path';
@@ -18,7 +19,7 @@ async function run(command, env = process.env) {
   if (code !== 0) throw new Error(`Nine ring-1 command exited ${String(code)}: ${command.join(' ')}`);
 }
 const phase = process.argv[2] ?? 'all';
-if (!['build','boot','bench','all'].includes(phase)) throw new Error('Usage: nine-ring1.mjs build|boot|bench|all');
+if (!['build','boot','bench','memory','all'].includes(phase)) throw new Error('Usage: nine-ring1.mjs build|boot|bench|memory|all');
 if (phase === 'build' || phase === 'all') {
   await run([process.execPath, 'scripts/pins.ts', 'install', 'template', 'nine-dragon-stack']);
   const catalogue = JSON.parse(readFileSync('test/pins/catalogue.json','utf8'));
@@ -46,6 +47,10 @@ if (phase !== 'build') {
       const bench = [process.execPath,'scripts/loading-flow/benchmax.mjs','--base',preview.url,
         '--route','nine','--seconds','60','--throttle','4','--dpr','2','--ratchet','--json',resolvePath(out,'street.json')];
       await run(process.platform === 'darwin' ? ['bash','scripts/browser-lane.sh',...bench] : bench);
+    }
+    if (phase === 'memory' || phase === 'all') {
+      const probe = [process.execPath,'scripts/boot-memory-peak.mjs',`--url=${preview.url}`,'--chunk=nine-dragon-stack',`--out=${resolvePath(out,'memory.json')}`];
+      await run(process.platform === 'darwin' ? ['bash','scripts/browser-lane.sh',...probe] : probe);
     }
   } finally {preview.close();await preview.closed;}
 }
