@@ -5,19 +5,42 @@ import { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { minimapLabelText } from '@wildshard/engine/ui/Minimap';
 import { minimapOverlay } from './minimapBlend';
 
-// STAGING-BUGBASH SB33 (opus-pineload, v0.1.31 and main): at Pine Hollow's spawn, 5 m inside its south edge, the minimap read
-// "DRIFTWOOD ISLE" under the arrow like the minimap's own title. It is Driftwood's name across the road (E435), so a
-// neighbour's name now carries an arrow toward its cell, and only a neighbour's.
+// STAGING-BUGBASH SB32c (opus-pineload, v0.1.31 and main): at Pine Hollow's spawn, 5 m inside its south edge, the minimap read
+// "DRIFTWOOD ISLE" under the arrow like the minimap's own title: Driftwood's name across the road (E435). Jake picked option 3
+// on the SB32c board: no neighbour name inside a cell; the names show only while you stand on the road between cells, each
+// on its own cell's ground with an arrow toward it. Before, the road showed no name at all.
 
-test('at Pine Hollow\'s south entryway the only minimap name is Driftwood\'s, marked as across the road', () => {
+function pineAndDriftwood(): { readonly host: Parameters<typeof minimapOverlay>[0]; readonly cells: GridCellEvents; readonly feet: { x: number; z: number }; readonly pine: GridAssembly['cells'][number]; readonly home: GridAssembly['cells'][number] } {
   const assembly = new GridAssembly({ developer: true, devserver: true });
   const pine = assembly.cells.find(cell => cell.slug === 'pine-hollow'), home = assembly.cells.find(cell => cell.slug === 'driftwood-isle');
   if (pine === undefined || home === undefined) throw new Error('the live grid places Pine Hollow and Driftwood Isle');
-  const cells = new GridCellEvents();
+  const cells = new GridCellEvents(), feet = { x: pine.origin.x, z: pine.origin.z };
+  const host = { assembly, home, cells, worldFeet: () => feet, name: (cell: { slug: string }) => cell.slug, image: () => null };
+  return { host, cells, feet, pine, home };
+}
+
+test('inside Pine Hollow, 5 m from the road to Driftwood, the minimap names no shard', () => {
+  const { host, cells, feet, pine } = pineAndDriftwood();
   cells.enter(pine);
-  const host = { assembly, home, cells, worldFeet: () => ({ x: pine.origin.x, z: pine.origin.z - (CHUNK_HALF - 5) }), name: (cell: { slug: string }) => cell.slug, image: () => null };
-  const { labels } = minimapOverlay(host, []);
-  expect(labels.map(label => ({ text: label.text, toward: label.toward }))).toEqual([{ text: 'driftwood-isle', toward: true }]);
+  feet.z = pine.origin.z - (CHUNK_HALF - 5);
+  expect(minimapOverlay(host, []).labels.map(label => label.text)).toEqual([]);
+});
+
+test('on the road between Pine Hollow and Driftwood, each names itself on its own ground, pointed at', () => {
+  const { host, cells, feet, pine, home } = pineAndDriftwood();
+  cells.leave();
+  // the road's centre line, between Pine's south edge and Driftwood's north edge
+  feet.z = (pine.origin.z - CHUNK_HALF + home.origin.z + CHUNK_HALF) / 2;
+  const labels = minimapOverlay(host, []).labels, at = (slug: string) => labels.find(label => label.text === slug);
+  expect(labels.map(label => label.text).sort()).toEqual(['driftwood-isle', 'pine-hollow']);
+  expect(labels.every(label => label.toward === true)).toBe(true);
+  // each name sits on its own cell's ground (home-frame metres), across the road from the other
+  expect(at('pine-hollow')?.z ?? -Infinity).toBeGreaterThan(pine.origin.z - CHUNK_HALF - home.origin.z);
+  expect(at('driftwood-isle')?.z ?? Infinity).toBeLessThan(CHUNK_HALF);
+  // far down a road, past the disc, no name
+  feet.x = pine.origin.x + 4 * CHUNK_HALF;
+  feet.z = pine.origin.z;
+  expect(minimapOverlay(host, []).labels.map(label => label.text).filter(text => text === 'pine-hollow')).toEqual([]);
 });
 
 test('a neighbour\'s name points outward at its cell; any other label is its text alone', () => {

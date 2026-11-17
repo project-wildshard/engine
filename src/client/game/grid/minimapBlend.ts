@@ -14,22 +14,32 @@
 import type { MapExtras, MapExtraImage, MapExtraLabel, MapExtraRect } from '@wildshard/engine/ui/Minimap';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { GridAssembly, GridCell, GridSide } from '../../../shared/game/grid/assembly';
+import type { GridAssembly, GridCell } from '../../../shared/game/grid/assembly';
 import type { GridCellEvents } from '../../../shared/game/grid/cellEvents';
-import { GAP_HALF, RAIL_OFFSET, ROAD_HALF } from '../../../shared/game/grid/roadLayout';
+import { RAIL_OFFSET, ROAD_HALF } from '../../../shared/game/grid/roadLayout';
 
 /** On the road the neighbours' terrain shows at this opacity (G107: "faded ~50 %"). */
 export const ROAD_TERRAIN_ALPHA = 0.5;
-/** Where a neighbour's name sits: this far past the road's centre line, on the neighbour's own ground (its edge is GAP_HALF out). */
-const NAME_ACROSS = GAP_HALF + 12;
-/** template-prompts (E435): a neighbour's name shows only while its spot across the road is inside the minimap's disc (the
- *  engine minimap's 110 m view less its 9 m rim), so it reads as the shard across the road. Before, it showed from 140 m
- *  out, pinned to the rim: in Sky Reach and the template copies "DRIFTWOOD ISLE" sat under the N tab like the minimap's
- *  own title for the cell you were in. Metres from the feet to the road's centre line. */
-const NAME_RANGE = 101 - NAME_ACROSS;
+/** Where a cell's name sits on the road minimap: this far inside its edge, on its own ground, beside the feet. */
+const NAME_IN = 12;
+/** STAGING-BUGBASH SB32c (Jake's option 3): the cells' names show only on the road between cells, each while its spot is inside
+ *  the minimap's disc (the engine minimap's 110 m view less its 9 m rim). Inside a cell no name shows: at Pine Hollow's spawn,
+ *  5 m from the road, "DRIFTWOOD ISLE" across it read as the minimap's own title (as in Sky Reach before E435 narrowed it). */
+const NAME_RANGE = 101;
 /** A neighbour's baked map is kept at this many px a side (0.8 px per metre, 0.64 MB): the minimap shows it ~110 m across */
 export const CELL_PX = 400;
 const STRIP = '#3b4038', ROAD = '#2a2e35', LINE = '#c9a640', VOID = '#0b1016', NAME = '#eaf6ff';
+/** Each cell whose name spot is in the disc from the feet (home-frame metres), with an arrow toward it. */
+function roadNames(host: MinimapBlendHost, feet: { readonly x: number; readonly z: number }): MapExtraLabel[] {
+  const { home } = host, labels: MapExtraLabel[] = [], along = (v: number): number => Math.max(-CHUNK_HALF + 40, Math.min(CHUNK_HALF - 40, v));
+  for (const cell of host.assembly.cells) {
+    const lx = feet.x - cell.origin.x, lz = feet.z - cell.origin.z, beside = Math.abs(lx) - CHUNK_HALF >= Math.abs(lz) - CHUNK_HALF;
+    const x = beside ? Math.sign(lx) * (CHUNK_HALF - NAME_IN) : along(lx), z = beside ? along(lz) : Math.sign(lz) * (CHUNK_HALF - NAME_IN);
+    if (Math.hypot(x - lx, z - lz) > NAME_RANGE) continue;
+    labels.push({ x: cell.origin.x - home.origin.x + x, z: cell.origin.z - home.origin.z + z, text: host.name(cell), color: NAME, toward: true });
+  }
+  return labels;
+}
 /** A cell the atlas has no tile for, until its own map loads: the build's plain-plot green (scripts/app-build/worldMapAtlas.ts). */
 const PLOT = '#69704f';
 
@@ -115,7 +125,6 @@ export function roadRects(assembly: GridAssembly, home: GridCell): MapExtraRect[
   return out;
 }
 
-const SIDES: readonly { side: GridSide; dx: number; dz: number }[] = [{ side: 'north', dx: 0, dz: 1 }, { side: 'south', dx: 0, dz: -1 }, { side: 'east', dx: 1, dz: 0 }, { side: 'west', dx: -1, dz: 0 }];
 
 /** What the blend reads: the grid, the cell events, the feet (grid metres), each cell's map (null for the home: the minimap's
  *  own ground) and its shard name. */
@@ -130,7 +139,7 @@ export function minimapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
   const { assembly, home } = host, feet = host.worldFeet(), ox = home.origin.x, oz = home.origin.z;
   const inside = host.cells.cell === null ? undefined : assembly.at(feet.x, feet.z);
   const homeImage = host.image(home.instance);
-  const images: MapExtraImage[] = [], labels: MapExtraLabel[] = [];
+  const images: MapExtraImage[] = [];
   if (inside === undefined) {
     // G107 on the road: every cell in view faded, the home's own layer too. ZONE-ENTRY ZE14: another cell is its world map
     // atlas tile; its own map read admits its whole product (24 cells' worth on the first road step, failing offline)
@@ -142,23 +151,14 @@ export function minimapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
       const image = host.image(cell.instance);
       if (image !== null) images.push({ image, ...at });
     }
-    return { outside: VOID, baseAlpha: homeImage === null ? ROAD_TERRAIN_ALPHA : 0, rects, images, labels };
+    return { outside: VOID, baseAlpha: homeImage === null ? ROAD_TERRAIN_ALPHA : 0, rects, images, labels: roadNames(host, feet) };
   }
-  // inside a cell: that shard at full strength, the road, the neighbours' names across it
+  // inside a cell: that shard at full strength and the road; no shard's name (SB32c: names are the road's)
   if (inside.instance !== home.instance || homeImage !== null) {
     const image = host.image(inside.instance);
     if (image !== null) images.push({ image, x: inside.origin.x - ox, z: inside.origin.z - oz, size: 2 * CHUNK_HALF, alpha: 1 });
   }
-  const lx = feet.x - inside.origin.x, lz = feet.z - inside.origin.z, edgeToRoad = CHUNK_HALF + GAP_HALF;
-  for (const { side, dx, dz } of SIDES) {
-    const next = assembly.neighbour(inside, side);
-    if (!('instance' in next)) continue;
-    const toRoad = dx !== 0 ? edgeToRoad - dx * lx : edgeToRoad - dz * lz;
-    if (toRoad > NAME_RANGE) continue;
-    const along = Math.max(-CHUNK_HALF + 40, Math.min(CHUNK_HALF - 40, dx !== 0 ? lz : lx)), across = edgeToRoad + NAME_ACROSS;
-    labels.push({ x: inside.origin.x - ox + (dx !== 0 ? dx * across : along), z: inside.origin.z - oz + (dz !== 0 ? dz * across : along), text: host.name(next), color: NAME, toward: true });
-  }
-  return { outside: VOID, baseAlpha: inside.instance === home.instance && homeImage === null ? 1 : 0, rects, images, labels };
+  return { outside: VOID, baseAlpha: inside.instance === home.instance && homeImage === null ? 1 : 0, rects, images, labels: [] };
 }
 
 /** The grid's full map (SF66): every cell's baked map at its cell, the road network, each shard's name near its cell's north
