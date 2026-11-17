@@ -32,6 +32,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import {assertNoLocalCandidates} from './local-candidates.ts';
 
 export class StopError extends Error {
   /** @param {string} message @param {boolean} [retry] a later try may succeed */
@@ -62,6 +63,7 @@ function firstLines(text, n = 6) { return text.trim().split('\n').slice(0, n).jo
 
 /** Refuse anything but main with no rebase, merge, cherry-pick or revert in progress. @param {string} cwd */
 export function checkState(cwd) {
+  try { assertNoLocalCandidates(cwd); } catch (error) { throw new StopError(error instanceof Error ? error.message : String(error)); }
   if (run(cwd, ['symbolic-ref', '--quiet', 'HEAD']).stdout.trim() !== 'refs/heads/main') {
     throw new StopError('the checkout is not on main; lanes here work on main only (M1)');
   }

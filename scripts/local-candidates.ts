@@ -1,6 +1,7 @@
 /** LL4: local provenance is never an input to hosted CI or to the tracked pin book. */
-import {existsSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {existsSync, readFileSync, realpathSync, rmSync, writeFileSync} from 'node:fs';
+import {join, resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
 import * as v from 'valibot';
 import {insideTree} from './pins-reuse.mjs';
 
@@ -27,4 +28,18 @@ export function recordLocalCandidate(root: string, value: LocalCandidate): void 
 export function clearLocalCandidates(root: string): void {
   insideTree(root, LOCAL_CANDIDATES);
   rmSync(join(root, LOCAL_CANDIDATES), {force: true});
+}
+
+/** Publication checks the operator's tree before a clean gate copy can hide its local state. */
+export function assertNoLocalCandidates(root: string, env: NodeJS.ProcessEnv = process.env): void {
+  if (!existsSync(join(root, LOCAL_CANDIDATES))) return;
+  const {CI: continuousIntegration} = env;
+  // Hosted checks never read the local file's contents, even if one was planted there.
+  const names = continuousIntegration === 'true' || continuousIntegration === '1'
+    ? 'local provenance in CI' : localCandidates(root, env).map(row => row.slug).join(', ') || 'empty local provenance';
+  throw new Error(`Local shard installed: ${names}; clear with node scripts/pins.ts install`);
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href) {
+  assertNoLocalCandidates(process.cwd());
 }

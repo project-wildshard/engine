@@ -15,3 +15,9 @@ those unpublished bytes, cooks them with the production encoder, opens
 the real cell world with physics, spawns a player and advances a tick.
 Normal installation restores the public pin and removes the local mount.
 Malformed receipts, links, conflicts and CI use refuse before replacement.
+
+LL5 checks the operator checkout before main-push takes its lock and
+before native pre-push creates a clean gate copy. Legacy land and
+release preflight use the same guard. Installed slugs and the exact
+normal pinned restoration command appear in each refusal. Hosted CI
+refuses a planted marker without reading its contents.

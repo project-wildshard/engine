@@ -29,6 +29,7 @@ import {checkedTreeDirt} from './push-proof-cache.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {GitHubLimitError,backoffMs,ghFailure,readerEnv} from './gh-limit.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
+import {assertNoLocalCandidates} from './local-candidates.ts';
 
 /** The hosted workflows a landing needs green, by workflow name (J195, J240). */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
@@ -1017,6 +1018,7 @@ export function mainPushArgs(sha){
 export async function land(argv,cwd=process.cwd(),env=process.env){
  /** @type {(() => void)|null} */let unlock=null;
  try{
+  try{assertNoLocalCandidates(cwd,env);}catch(error){throw new StopError(error instanceof Error?error.message:String(error));}
   const landing=new Landing(cwd,parseArgs(argv),env);
   unlock=landing.lock();
   const code=await landing.run();
