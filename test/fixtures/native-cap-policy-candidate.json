@@ -1,0 +1,378 @@
+{
+  "version": 1,
+  "sdk": "3d16490",
+  "engine": "c24086499",
+  "format": "0.14.0",
+  "candidates": [
+    {
+      "name": "driftwood",
+      "source": "cf353492e7ce960e0655d1694b459aebd6c9fd71",
+      "beforeFight": {
+        "attackers": 2,
+        "capExempt": [
+          "captain"
+        ],
+        "input": {
+          "bufferMs": 120,
+          "coyoteMs": 100
+        },
+        "maxHitDamage": 20,
+        "telegraphed": true
+      },
+      "afterFight": {
+        "attackers": 2,
+        "capExempt": [
+          "captain"
+        ],
+        "capExemptTags": [
+          "creature.captain"
+        ],
+        "input": {
+          "bufferMs": 120,
+          "coyoteMs": 100
+        },
+        "maxHitDamage": 20,
+        "telegraphed": true
+      },
+      "beforeRows": [
+        {
+          "owner": "page",
+          "row": {
+            "id": "driftwood.creature.boar",
+            "kind": "boar"
+          },
+          "amount": 25
+        },
+        {
+          "owner": "page",
+          "row": {
+            "id": "driftwood.creature.bear",
+            "kind": "bear"
+          },
+          "amount": 35
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "driftwood.creature.boar",
+            "kind": "boar"
+          },
+          "amount": 25
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "driftwood.creature.bear",
+            "kind": "bear"
+          },
+          "amount": 35
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "creature.crab",
+            "kind": "crab"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "creature.monkey",
+            "kind": "monkey"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "creature.sailor",
+            "kind": "sailor"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "creature.captain",
+            "kind": "captain"
+          },
+          "amount": 24
+        }
+      ],
+      "afterRows": [
+        {
+          "owner": "page",
+          "row": {
+            "id": "driftwood.creature.boar",
+            "kind": "boar"
+          },
+          "amount": 25
+        },
+        {
+          "owner": "page",
+          "row": {
+            "id": "driftwood.creature.bear",
+            "kind": "bear"
+          },
+          "amount": 35
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "driftwood.creature.boar",
+            "kind": "boar"
+          },
+          "amount": 25
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "driftwood.creature.bear",
+            "kind": "bear"
+          },
+          "amount": 35
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "creature.crab",
+            "kind": "crab"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "creature.monkey",
+            "kind": "monkey"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "creature.sailor",
+            "kind": "sailor"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "creature.captain",
+            "kind": "captain"
+          },
+          "amount": 24
+        }
+      ],
+      "hashes": {
+        "before": {
+          "actors/species-programs.json": "4dd5380118b36057b363657fbf41ddd43e2b05dec9d3b0e5c58c54ff72f6c923",
+          "ui/level.json": "66b629dc2bd57acbd13f60c2a475088c59c51ca22a9435495eac513aac6dc444",
+          "combat/items.json": "e5bfdc4dca497b9639fbb9528b6f9785d4c9770154c4bd4290b87758c4aee065"
+        },
+        "after": {
+          "actors/species-programs.json": "65faddfe80d71ce80c0365518d1fb3f4a21eca34053ad0e5c59cac955b9cfe27",
+          "ui/level.json": "ebaf52afc70d677d6fd5b8d6fbcc49b30759218e959227e702310df6c5d22be4",
+          "combat/items.json": "1a04bc40306744ea93a0c80926433346a1dc60a072d7b15beb2c8915bc2dfa30"
+        }
+      }
+    },
+    {
+      "name": "pine",
+      "source": "3ad4a7ff9a9bd75a44c8869c012e9318b28cbc4d",
+      "beforeFight": {
+        "input": {
+          "bufferMs": 120,
+          "coyoteMs": 100
+        },
+        "telegraphed": false
+      },
+      "afterFight": {
+        "capExemptTags": [],
+        "input": {
+          "bufferMs": 120,
+          "coyoteMs": 100
+        },
+        "telegraphed": false
+      },
+      "beforeRows": [
+        {
+          "owner": "page",
+          "row": {
+            "id": "pine.creature.boar",
+            "kind": "boar"
+          },
+          "amount": 25
+        },
+        {
+          "owner": "page",
+          "row": {
+            "id": "pine.creature.bear",
+            "kind": "bear"
+          },
+          "amount": 35
+        },
+        {
+          "owner": "page",
+          "row": {
+            "id": "pine.creature.deer",
+            "kind": "deer"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "page",
+          "row": {
+            "id": "pine.creature.elk",
+            "kind": "elk"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.deer",
+            "kind": "deer"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.elk",
+            "kind": "elk"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.boar",
+            "kind": "boar"
+          },
+          "amount": 25
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.bear",
+            "kind": "bear"
+          },
+          "amount": 35
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.antler-king",
+            "kind": "antler-king"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "pine.creature.antler-king",
+            "kind": "antler-king"
+          },
+          "amount": 24
+        }
+      ],
+      "afterRows": [
+        {
+          "owner": "page",
+          "row": {
+            "id": "pine.creature.boar",
+            "kind": "boar"
+          },
+          "amount": 25
+        },
+        {
+          "owner": "page",
+          "row": {
+            "id": "pine.creature.bear",
+            "kind": "bear"
+          },
+          "amount": 35
+        },
+        {
+          "owner": "page",
+          "row": {
+            "id": "pine.creature.deer",
+            "kind": "deer"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "page",
+          "row": {
+            "id": "pine.creature.elk",
+            "kind": "elk"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.deer",
+            "kind": "deer"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.elk",
+            "kind": "elk"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.boar",
+            "kind": "boar"
+          },
+          "amount": 25
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.bear",
+            "kind": "bear"
+          },
+          "amount": 35
+        },
+        {
+          "owner": "native",
+          "row": {
+            "id": "pine.creature.antler-king",
+            "kind": "antler-king"
+          },
+          "amount": 24
+        },
+        {
+          "owner": "program",
+          "row": {
+            "id": "pine.creature.antler-king",
+            "kind": "antler-king"
+          },
+          "amount": 24
+        }
+      ],
+      "hashes": {
+        "before": {
+          "actors/species-programs.json": "46b50ba165576bae7f1e781648520edcd2d3100d46b39134c403eee5227816e8",
+          "ui/level.json": "370a199fc954a44770711de9a9914c03bf761e95b7cbd22744c1228279fd5022",
+          "combat/items.json": "4e3e04135d77ab3f6248d0e4db5f72fe78887182ebbdd8c241518e096a92712c"
+        },
+        "after": {
+          "actors/species-programs.json": "5ee422448738b6610c19c8d7693a79f93061ccd3430b4c10623ff71ac5f0d935",
+          "ui/level.json": "01de2c41ac4feff4855d11c23c1c9b7b918e3d5227f1a3ea1e715df0be48fc92",
+          "combat/items.json": "4e3e04135d77ab3f6248d0e4db5f72fe78887182ebbdd8c241518e096a92712c"
+        }
+      }
+    }
+  ]
+}

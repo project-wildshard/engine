@@ -1,3 +1,7 @@
+import { parse, pick } from 'valibot';
+import { ManifestMetadataSchema } from '@wildshard/format/minimap';
+import { SpeciesSchema } from '@wildshard/format/speciesPrograms';
+import nativeCaps from './fixtures/native-cap-policy-candidate.json';
 import { compileIncomingCapPolicy } from '@wildshard/format/incomingCapPolicy';
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
@@ -90,5 +94,33 @@ test('the native captain retains the level exemption even when hunt metadata omi
         target: f.player, amount: 24, point: new Vector3(), dir: new Vector3() });
       expect(result?.dealt).toBe(expected);
     } finally { f.scope.dispose(); }
+  }
+});
+
+const fightPolicy = pick(ManifestMetadataSchema, ['fight']);
+const speciesPolicy = pick(SpeciesSchema, ['id', 'kind', 'capExempt']);
+for (const candidate of nativeCaps.candidates) test(candidate.name + ': actual producer cap choices preserve the original native outcomes', () => {
+  const originalFight = parse(fightPolicy, { fight: candidate.beforeFight }).fight;
+  const currentFight = parse(fightPolicy, { fight: candidate.afterFight }).fight;
+  expect(currentFight?.capExemptTags).toEqual(compileIncomingCapPolicy(originalFight ?? {}));
+  expect(currentFight?.maxHitDamage).toBe(originalFight?.maxHitDamage);
+  expect(candidate.afterRows.map(row => [row.owner, row.row.id])).toEqual(candidate.beforeRows.map(row => [row.owner, row.row.id]));
+  for (const [index, current] of candidate.afterRows.entries()) {
+    const previous = candidate.beforeRows[index]; if (previous === undefined) throw new Error('Missing original producer row');
+    const original = parse(speciesPolicy, previous.row), admitted = parse(speciesPolicy, current.row);
+    expect(admitted.capExempt).toBe(original.capExempt);
+    for (const extra of [[], ['state.rage'], ['effect.hot'], ['state.*']] as const) {
+      const f = fixture(currentFight?.capExemptTags), source = body(admitted.id, admitted.kind);
+      source.capExempt = admitted.capExempt; f.player.attributes.incomingCap = currentFight?.maxHitDamage ?? Infinity;
+      try {
+        expect(source.species).toBe('');
+        const tags = [...source.combatActor().tags, ...extra];
+        const exempt = original.capExempt ?? (originalFight?.capExempt ?? []).some(alias => tags.some(tag => tag === alias || tag === `creature.${alias}`));
+        const expected = exempt ? previous.amount : Math.min(previous.amount, originalFight?.maxHitDamage ?? Infinity);
+        const result = f.combat.hit({ source: source.combatActor(), sourceTags: tags, target: f.player,
+          amount: current.amount, point: new Vector3(), dir: new Vector3() });
+        expect(result?.dealt).toBe(expected);
+      } finally { f.scope.dispose(); }
+    }
   }
 });
