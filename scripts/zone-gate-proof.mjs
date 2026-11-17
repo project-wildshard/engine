@@ -10,30 +10,40 @@
 // steps into Driftwood's own buffer and reads its gate (the old home is walled now), then steps out again before the count ends.
 // `--online` (ZE10d2): a loopback world build on the local rig (zone-gate-rig.mjs runs it): the seat can't be placed, so the walker
 // walks from the spawn to Driftwood's east entryway; the entry must keep the page's one game socket open and dial no other.
+// ZE15 (opus-gcm18): `--base=https://staging.wildshard.io` is the online form on staging (a guest seat, every socket guarded to the
+// staging door, J205), and `--target=` takes any of Driftwood's four neighbours (pine-hollow north, far-reach south), each walked from
+// the spawn by grid-crossing-walk-proof.mjs's route. Staging's fresh boot can't be placed, so its playingMB is reported, not held.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from 'playwright';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
+import { guardStagingSockets } from './staging-proof-lines.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire'), online = process.argv.includes('--online');
-if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: zone-gate-proof.mjs --base=<preview or loopback url> --out=<dir>');
+const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire');
+if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: zone-gate-proof.mjs --base=<staging, preview or loopback url> --out=<dir>');
+// ZE15/ZE22: staging is a world build like the rig's (J205: a guest seat, the socket guarded to the staging door; never production)
+const staging = base === 'https://staging.wildshard.io', online = staging || process.argv.includes('--online');
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ?? [0, '2992', '1434', '2']).slice(1).map(Number);
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 const HALF = 250;
-/** the gate's cell: Driftwood's east (Nalati) or west (Sunscar) neighbour; `dir` is its side, +1 east, -1 west */
-const TARGETS = /** @type {Record<string, { name: string, dir: number }>} */ ({ 'nalati-grasslands': { name: 'Nalati Grasslands', dir: 1 }, 'sunscar-dunes': { name: 'Signal Dunes', dir: -1 } });
+/** the gate's cell: one of Driftwood's four neighbours; `axis` and `dir` its side (+1 east or north, -1 west or south); `approach` the
+ *  walked route from an online seat's spawn (on Driftwood's pier) to the entryway facing it, in Driftwood's frame (as grid-crossing-walk-proof.mjs walks them) */
+const TARGETS = /** @type {Record<string, { name: string, axis: 'x' | 'z', dir: number, approach: [number, number][] }>} */ ({
+  'nalati-grasslands': { name: 'Nalati Grasslands', axis: 'x', dir: 1, approach: [[235, -194], [235, 0]] },
+  'sunscar-dunes': { name: 'Signal Dunes', axis: 'x', dir: -1, approach: [[-235, -194], [-235, 0]] },
+  'pine-hollow': { name: 'Pine Hollow', axis: 'z', dir: 1, approach: [[-235, -194], [-235, 0], [-200, 20], [-200, 235], [0, 235]] },
+  'far-reach': { name: 'Far Reach', axis: 'z', dir: -1, approach: [[0, -235]] } });
 const targetSlug = flag('target', 'nalati-grasslands'), target = TARGETS[targetSlug];
 if (target === undefined) throw new Error(`--target is one of ${Object.keys(TARGETS).join(', ')}`);
-const dir = target.dir;
-/** ZE10d2: the walked approach from the rig's fresh seat (on Driftwood's pier) to its east entryway, as grid-road-lag.mjs walks it */
-const APPROACH = /** @type {[number, number][]} */ ([[235, -194], [235, 0]]);
-if (online && dir !== 1) throw new Error('--online walks to Driftwood\'s east entryway only: --target=nalati-grasslands');
+const dir = target.dir, ax = target.axis, pp = ax === 'x' ? 'z' : 'x';
+/** the yaw that walks toward +1 or -1 along the gate's axis (the page's motor faces atan2(own - target)) */
+const yawTo = (/** @type {number} */ sign) => ax === 'x' ? -sign * Math.PI / 2 : sign > 0 ? Math.PI : 0;
 /** ZE10b: control in the new home on its Driftwood-side entryway's centre line 14 m in (within 1.5 m), facing in, then out onto the road. */
 const arrivedPastGate = (/** @type {any} */ fired) => fired?.ready === true && fired.walkedOut === true && fired.arrived !== null
-  && Math.abs(dir * fired.arrived.x + HALF - 14) < 1.5 && Math.abs(fired.arrived.z) < 1.5 && Math.abs(Math.abs(fired.arrived.yaw) - Math.PI / 2) < 0.2;
+  && Math.abs(dir * fired.arrived[ax] + HALF - 14) < 1.5 && Math.abs(fired.arrived[pp]) < 1.5 && Math.abs(Math.abs(fired.arrived.yaw) - Math.abs(yawTo(dir))) < 0.2;
 mkdirSync(out, { recursive: true });
 /** ZE10c: how long the arrival and the fresh boot each stand at the arrival pose before playingMB is read */
 const SETTLE_MS = 10_000;
@@ -43,11 +53,12 @@ const SETTLE_MS = 10_000;
  * @param {import('playwright').BrowserContext} context @param {string} card @param {{ x: number, z: number, yaw: number }} pose
  */
 async function bootCard(context, card, pose) {
+  if (staging) await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
   const page = await context.newPage();
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
-  await page.goto(`${base}/?mute=1&nolock=1`, { waitUntil: 'load' });
+  await page.goto(`${base}/?mute=1&nolock=1${staging ? '&fps=60' : ''}`, { waitUntil: 'load' });
   await page.locator('.ws-main-select').click({ timeout: 120_000 });
   if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill('fresh'); await page.locator('#ws-name-box button[type=submit]').click(); }
   await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
@@ -72,6 +83,7 @@ try {
   result.viewport = phone === undefined ? `${String(desk[0])}x${String(desk[1])}@${String(desk[2])}` : `${device} ${String(phone.viewport.width)}x${String(phone.viewport.height)}@${String(phone.deviceScaleFactor)}`;
   const context = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 }), page = await context.newPage();
   page.on('pageerror', error => { result.errors.push(error.message.slice(0, 240)); });
+  if (staging) await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
   // ZE10d2: every socket the page opens, and whether each is still open (the game's link is the one to the world's port)
   if (online) await context.addInitScript(() => {
     const W = /** @type {any} */ (window), Real = W.WebSocket;
@@ -82,9 +94,9 @@ try {
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
-  await page.goto(`${base}/?mute=1&nolock=1`, { waitUntil: 'load' });
+  await page.goto(`${base}/?mute=1&nolock=1${staging ? '&fps=60' : ''}`, { waitUntil: 'load' });
   await page.locator('.ws-main-select').click({ timeout: 120_000 });
-  if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill('gate'); await page.locator('#ws-name-box button[type=submit]').click(); }
+  if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill(staging ? `ZE ${Date.now().toString(36).slice(-5)}` : 'gate'); await page.locator('#ws-name-box button[type=submit]').click(); }
   await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
   const index = await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes('Driftwood Isle')));
   if (index < 0) throw new Error('No Driftwood Isle card');
@@ -95,13 +107,14 @@ try {
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
   const state = () => page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard.shard.grid.state(), wf = st.live?.live?.worldFeet ?? W.__wildshard.world.player.position; return { x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), gate: st.gate ?? null, walls: st.softWalls ?? null, inside: st.inside, cur: st.live?.live?.current ?? null }; });
   const origin = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
-  const pitch = 562.5, nalatiEdge = origin.x + dir * (pitch - HALF);
+  const pitch = 562.5, nalatiEdge = origin[ax] + dir * (pitch - HALF);
   const face = (/** @type {number} */ yaw) => page.evaluate(wanted => { /** @type {any} */ (window).__wildshard.world.player.yaw = wanted; }, yaw);
-  /** Walk with W held toward x (along z = origin.z) until within 0.4 m. */
-  const walkTo = async (/** @type {number} */ x) => {
+  /** Walk with W held toward `v` on the gate's axis (along the line through Driftwood's origin) until within 0.4 m. */
+  const walkTo = async (/** @type {number} */ v) => {
     for (const ends = Date.now() + 60_000; Date.now() < ends;) {
-      const at = await state(); if (Math.abs(at.x - x) < 0.4) break;
-      await face(Math.atan2(at.x - x, at.z - origin.z)); await page.keyboard.down('KeyW'); await sleep(Math.min(400, Math.abs(at.x - x) * 200)); await page.keyboard.up('KeyW');
+      const at = await state(); if (Math.abs(at[ax] - v) < 0.4) break;
+      const tx = ax === 'x' ? v : origin.x, tz = ax === 'z' ? v : origin.z;
+      await face(Math.atan2(at.x - tx, at.z - tz)); await page.keyboard.down('KeyW'); await sleep(Math.min(400, Math.abs(at[ax] - v) * 200)); await page.keyboard.up('KeyW');
     }
   };
   // the state is read first: a full-size shot can take longer than a count's second on a loaded laptop (the count then read one on)
@@ -109,7 +122,7 @@ try {
   if (online) {
     // the seat walks: W and sprint held toward each point, a hop when a post or rail holds it (no 0.5 m in a second)
     await page.keyboard.down('ShiftLeft');
-    for (const [x, z] of APPROACH) {
+    for (const [x, z] of target.approach) {
       await page.keyboard.down('KeyW');
       for (let ends = Date.now() + 90_000, near = Infinity, last = { x: Infinity, z: Infinity, t: Date.now() }; Date.now() < ends && near > 3; await sleep(250)) {
         const at = await state(), lx = at.x - origin.x, lz = at.z - origin.z;
@@ -120,16 +133,16 @@ try {
       await page.keyboard.up('KeyW');
     }
     await page.keyboard.up('ShiftLeft');
-  } else await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [dir * (HALF - 20), 0]);
+  } else await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, ax === 'x' ? [dir * (HALF - 20), 0] : [0, dir * (HALF - 20)]);
   await sleep(4000);
-  await walkTo(origin.x + dir * (HALF + 31.25)); await face(-dir * Math.PI / 2); await sleep(1500);
+  await walkTo(origin[ax] + dir * (HALF + 31.25)); await face(yawTo(-dir)); await sleep(1500);
   await shoot('road-wall');
   /** Poll the gate until `test` holds (or 8 s). */
   const until = async (/** @type {(gate: any) => boolean} */ test) => { for (const ends = Date.now() + 8000; Date.now() < ends; await sleep(50)) if (test((await state()).gate)) return true; return false; };
   // in, 2 m past the edge line: the card at 5; back out of the buffer at 3 (so the count can't reach 0 on the way out)
   await walkTo(nalatiEdge + dir * 2); await until(gate => gate?.count === 5); await shoot('gate-5');
   await until(gate => gate?.count === 3);
-  await walkTo(nalatiEdge - dir * 6); await face(-dir * Math.PI / 2); await sleep(600);
+  await walkTo(nalatiEdge - dir * 6); await face(yawTo(-dir)); await sleep(600);
   await shoot('backed-away');
   // in again: 5 (the reset), then 2
   await walkTo(nalatiEdge + dir * 2); await until(gate => gate?.count === 5); await shoot('gate-again');
@@ -202,12 +215,12 @@ try {
       // out onto the road: the feet in no cell (online the player's own position is the road's frame once it steps out)
       for (const ends = Date.now() + 20_000; Date.now() < ends;) {
         if ((await state()).inside === null) { walkedOut = true; break; }
-        await face(dir * Math.PI / 2); await page.keyboard.down('KeyW'); await sleep(400); await page.keyboard.up('KeyW');
+        await face(yawTo(-dir)); await page.keyboard.down('KeyW'); await sleep(400); await page.keyboard.up('KeyW');
       }
       await page.screenshot({ path: join(out, `${tag}-walked-out.png`) });
       // ZE10d: the old home is walled now: 2 m into Driftwood's buffer its gate counts 5 (then straight back out, so it never reaches 0)
       if (walkedOut) {
-        const driftwoodEdge = homeAt.x - dir * (pitch - HALF);
+        const driftwoodEdge = homeAt[ax] - dir * (pitch - HALF);
         await walkTo(driftwoodEdge - dir * 2);
         // the gate's state is read before the shot (a full-size shot can outlast a count's second), and the walker steps straight back
         // out: the count must never reach 0 here (a second entry would overlap the memory reads below)
@@ -227,10 +240,10 @@ try {
     // playingMB there is held within 50 MB of it (one world in memory)
     const freshContext = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 });
     let freshMB = /** @type {number | null} */ (null);
-    try { freshMB = await bootCard(freshContext, target.name, arrived ?? { x: dir * (14 - HALF), z: 0, yaw: -dir * Math.PI / 2 }); } catch (error) { result.errors.push(`fresh ${target.name} boot: ${String(error).slice(0, 200)}`); }
+    try { freshMB = await bootCard(freshContext, target.name, arrived ?? { x: ax === 'x' ? dir * (14 - HALF) : 0, z: ax === 'z' ? dir * (14 - HALF) : 0, yaw: yawTo(dir) }); } catch (error) { result.errors.push(`fresh ${target.name} boot: ${String(error).slice(0, 200)}`); }
     await freshContext.close();
     // ZE10d2: the same socket: the game link open before the 0 is still open, and no game link was dialled after it
-    const socketsAfter = online ? await sockets() : null, game = (/** @type {any} */ row) => /:\d+\/?$/u.test(row.url) && !row.url.includes(new URL(base).host);
+    const socketsAfter = online ? await sockets() : null, game = (/** @type {any} */ row) => staging ? row.url.startsWith('wss://rooms-staging.wildshard.io') : /:\d+\/?$/u.test(row.url) && !row.url.includes(new URL(base).host);
     const oneSocket = !online ? null : socketsBefore !== null && socketsAfter !== null && socketsBefore.some(game)
       && socketsAfter.filter(game).length === socketsBefore.filter(game).length && [...socketsAfter].reverse().find(game)?.open === true;
     result.fired = { navigations, departure: departure?.how ?? null, samePage, oneSocket, socketsBefore, socketsAfter, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, oldHomeLeft, enteredMB, controlMB, freshMB,
@@ -248,7 +261,7 @@ try {
   // ZE10c: nothing of the target read before the old document went, and memory at control within 50 MB of a fresh boot
   // both clocks: the page's resource timing (exact order, the window's reads only) and the script's request log (the in-page server
   // worker's reads too)
-  const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && (fired.residency.script?.readsBefore ?? 0) === 0 && typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50;
+  const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && (fired.residency.script?.readsBefore ?? 0) === 0 && (staging || (typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50));
   code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false && (!online || fired.oneSocket === true))) ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
 finally {

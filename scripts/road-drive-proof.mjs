@@ -11,19 +11,24 @@
 //     [--from=k] (start measuring at segment k: the board drives the shortest junction path there first, unmeasured; a repro of one
 //     segment's frame, not the proof)
 // The steering runs in the page (a 50 ms yaw toward the next waypoint); the keys are real. The walker is placed 20 m inside the
-// home's east entryway by the in-page harness pose, so it runs on preview or a loopback page only. Never production (J205).
+// home's east entryway by the in-page harness pose on preview or a loopback page; on staging (ZE15) a guest seat walks there from
+// its spawn on Driftwood's pier. Never production (J205). A chunk that ends at the path's end (--from=70) also walks back in.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from 'playwright';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
+import { guardStagingSockets } from './staging-proof-lines.mjs';
+/** ZE15 (ZE22): staging is a world build: a guest seat (J205, the socket guarded to the staging door), walked from its spawn on
+ *  Driftwood's pier to the east entryway (grid-road-lag.mjs's approach), since an online seat can't be placed */
+const STAGING_APPROACH = /** @type {[number, number][]} */ ([[235, -194], [235, 0]]);
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', '');
 const limit = Number(flag('segments', '0')) || Infinity, ride = flag('ride', 'board'), from = Number(flag('from', '0'));
 if (!['board', 'boost', 'run'].includes(ride)) throw new Error(`No ride ${ride}: board, boost or run`);
-if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: road-drive-proof.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood] [--segments=n]');
+if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: road-drive-proof.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood] [--segments=n]');
 const HOMES = /** @type {Record<string, { slug: string, card: string }>} */ ({ driftwood: { slug: 'driftwood-isle', card: 'Driftwood Isle' }, sunscar: { slug: 'sunscar-dunes', card: 'Signal Dunes' }, pine: { slug: 'pine-hollow', card: 'Pine Hollow' } });
 const homeName = flag('home', 'driftwood'), home = HOMES[homeName];
 if (home === undefined) throw new Error(`No home ${homeName}: ${Object.keys(HOMES).join(', ')}`);
@@ -68,12 +73,15 @@ try {
   if (phone !== undefined) result.viewport = `${device} ${String(phone.viewport.width)}x${String(phone.viewport.height)}@${String(phone.deviceScaleFactor)}`;
   const context = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 }), page = await context.newPage();
   page.on('pageerror', error => { result.errors.push(error.message.slice(0, 240)); });
+  const staging = base === 'https://staging.wildshard.io';
+  if (staging && homeName !== 'driftwood') throw new Error('staging walks from Driftwood\'s spawn only: --home=driftwood');
+  if (staging) await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
-  await page.goto(`${base}/?mute=1&nolock=1`, { waitUntil: 'load' });
+  await page.goto(`${base}/?mute=1&nolock=1${staging ? '&fps=60' : ''}`, { waitUntil: 'load' });
   await page.locator('.ws-main-select').click({ timeout: 120_000 });
-  if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill('roaddrive'); await page.locator('#ws-name-box button[type=submit]').click(); }
+  if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill(staging ? `ZE drive ${Date.now().toString(36).slice(-4)}` : 'roaddrive'); await page.locator('#ws-name-box button[type=submit]').click(); }
   await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
   const index = await page.evaluate(card => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes(card)), home.card);
   if (index < 0) throw new Error(`No ${home.card} card`);
@@ -122,7 +130,22 @@ try {
   }
   // out of the home's east entryway onto its east road, then down to the first segment's start
   const exitAt = { x: grid.origin.x + HALF + GAP_HALF - LANE, z: grid.origin.z };
-  await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [HALF - 20, 0]);
+  if (staging) {
+    const feet = () => page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet; return { x: Number(wf.x), z: Number(wf.z) }; });
+    const turn = (/** @type {number} */ yaw) => page.evaluate(wanted => { /** @type {any} */ (window).__wildshard.world.player.yaw = wanted; }, yaw);
+    await page.keyboard.down('ShiftLeft');
+    for (const [x, z] of STAGING_APPROACH) {
+      await page.keyboard.down('KeyW');
+      for (let ends = Date.now() + 90_000, near = Infinity, last = { x: Infinity, z: Infinity, t: Date.now() }; Date.now() < ends && near > 3; await sleep(250)) {
+        const now = await feet(), lx = now.x - grid.origin.x, lz = now.z - grid.origin.z;
+        near = Math.hypot(lx - x, lz - z); await turn(Math.atan2(lx - x, lz - z));
+        if (Math.hypot(now.x - last.x, now.z - last.z) >= 0.5) last = { x: now.x, z: now.z, t: Date.now() };
+        else if (Date.now() - last.t > 1000) { await page.keyboard.press('Space'); last.t = Date.now(); }
+      }
+      await page.keyboard.up('KeyW');
+    }
+    await page.keyboard.up('ShiftLeft');
+  } else await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [HALF - 20, 0]);
   // the page's first gesture builds its AudioContext (G325, SF67: `unlock.ts`, a ~70 to 130 ms native constructor kept out of the
   // boot). A player has touched and pressed many times before they reach the road; the harness pose skipped all of that, so one
   // gesture here (a key that does nothing in play) keeps that once-per-page cost out of the drive's frames.
@@ -253,7 +276,7 @@ try {
       programs: programs.filter((/** @type {any} */ r) => r.t >= rows[0].t && r.t <= rows.at(-1).t).length });
   }
   // back to the home's east entryway and in, by input: control with no card (a short --segments check ends away from home)
-  const whole = from === 0 && legs === path.length - 1;
+  const whole = legs === path.length - 1; // opus-gcm18: the last chunk (--from=70) also walks back in
   const backFrom = await page.evaluate(() => Math.round(performance.now()));
   await page.evaluate(([wps]) => { const q = /** @type {any} */ (window).__drive; q.wps = wps; q.at = 0; q.done = false; }, [[{ x: grid.origin.x + HALF + GAP_HALF - LANE, z: grid.origin.z, seg: -4 }, { x: grid.origin.x + HALF - 12, z: grid.origin.z, seg: -4 }]]);
   if (whole) {
