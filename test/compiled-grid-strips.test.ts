@@ -7,7 +7,7 @@ import { generatePlatform, type GeneratedStrip, type PlatformCell, type StripPro
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { decodeCompiledGridBlock, mergeGridBlocks, parseCompiledGridHeader, platformGeometrySource, readCompiledGridStrips, type CompiledGridAddress } from '../src/shared/game/grid/compiledStrips';
 import { seamLookGeometrySteps } from '../src/client/game/grid/seamLook';
-import { encodeGridStripBlock, gridStripBlockKey, writeGridStripBlocks, type CompiledGridBlockFile } from '../src/cook/game/gridStripPages';
+import { encodeGridStripBlock, gridStripBlockKey, gridStripSetBudget, writeGridStripBlocks, type CompiledGridBlockFile } from '../src/cook/game/gridStripPages';
 import { gridSeamAsset, readGridSeams, writeGridSeams } from '../scripts/app-build/gridSeams.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- This artifact fixture owns and removes only its bounded tmp directory.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -309,4 +309,17 @@ test('the plain app step ships the exact block set, and the set ratchet refuses 
     for (const file of built.files ?? []) expect(readFileSync(join(b.root, 'dist', file.url.slice(1))).length).toBe(file.bytes);
     const total = b.result.rows[0]?.set ?? 0; expect(total).toBe(64 * 1024 * 1024);
   } finally { rmSync(b.root, { recursive: true, force: true }); }
+});
+
+// Preview red since 2026-11-17 00:43 UTC: preview bakes staging's grid (SA35), so each cell staging places adds its road to
+// the block set. The fixed 3.7 MB set (sized for the pinned 25 homes) refused 30 homes at 3,988,526 wire bytes; the room is
+// per home, so a placed cell brings its own room and the ratchet still catches a block encoding that grows.
+test('the strip set budget is the committed room per distinct home, so staging\'s placed cells fit', () => {
+  const room: unknown = JSON.parse(readFileSync('budgets/grid-strip-room.json', 'utf8'));
+  const homes = (count: number, prefix: string) => [{ source: prefix, pitch: 1, strips: [], homes: Array.from({ length: count }, (_, index) => ({ instance: `${prefix}-${String(index)}`, slug: 's', origin: { x: 0, z: 0 } })) }];
+  expect(gridStripSetBudget(room, homes(25, 'pinned'))).toBeGreaterThanOrEqual(3_700_000);
+  expect(gridStripSetBudget(room, homes(30, 'staging'))).toBeGreaterThan(3_988_526);
+  // a home every grid mode shares counts once
+  expect(gridStripSetBudget(room, [...homes(25, 'pinned'), ...homes(25, 'pinned')])).toBe(gridStripSetBudget(room, homes(25, 'pinned')));
+  expect(() => gridStripSetBudget({ set: 3_700_000 }, homes(1, 'a'))).toThrow('budgets/grid-strip-room.json');
 });

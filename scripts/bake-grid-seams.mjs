@@ -17,7 +17,7 @@ import { platformInputs } from '../src/shared/game/grid/platformInputs.ts';
 import { generatePlatform } from '../src/shared/engine/sim/strips.ts';
 import { platformGeometrySource } from '../src/shared/game/grid/compiledStrips.ts';
 import { writeGridCollision } from '../src/cook/game/gridCollision.ts';
-import { writeGridStripBlocks } from '../src/cook/game/gridStripPages.ts';
+import { gridStripSetBudget, writeGridStripBlocks } from '../src/cook/game/gridStripPages.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const root = process.cwd(), outputRoot = resolve(process.argv[2] ?? root), base = 'https://build.invalid/';
@@ -91,7 +91,7 @@ for (const developer of modes) for (const devserver of modes) for (const nineDra
 const ordered = rows => [...rows].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
 const output = JSON.stringify({ plans: ordered(plans), edges: ordered(sources) });
 if (!collisionOnly) {
-  const { set } = JSON.parse(readFileSync(resolve(root, 'budgets/grid-strip-room.json'), 'utf8'));
+  const set = gridStripSetBudget(JSON.parse(readFileSync(resolve(root, 'budgets/grid-strip-room.json'), 'utf8')), compiled);
   const pages = writeGridStripBlocks(outputRoot, createHash('sha256').update(output).digest('hex'), compiled, reach, set);
   // Addressing only: all original strip bytes and hashes stay in writeGridStripBlocks.
   // The title can request a home's exact initial blocks.

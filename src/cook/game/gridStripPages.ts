@@ -169,6 +169,16 @@ function certifyStrips(decoded: readonly GeneratedStrip[], strips: readonly Gene
 }
 
 /**
+ * The whole block set's wire ratchet: budgets/grid-strip-room.json's `perHome` room times the distinct homes baked. Preview
+ * bakes staging's placed cells (SA35), and each brings its own road, so the room scales with the grid, not a fixed 25.
+ */
+export function gridStripSetBudget(room: unknown, sources: readonly GridStripSource[]): number {
+  const perHome = typeof room === 'object' && room !== null && 'perHome' in room ? room.perHome : undefined;
+  if (typeof perHome !== 'number' || !Number.isInteger(perHome) || perHome <= 0) throw new Error('budgets/grid-strip-room.json needs a positive integer perHome');
+  return perHome * new Set(sources.flatMap(source => source.homes.map(home => home.instance))).size;
+}
+
+/**
  * Bake every source's road as shared blocks and one directory, certify each home's two phases against native, and write
  * them under out/.app/grid-strip-pages. `reach` is the session's ring (a strip whose origin is within it of the home is
  * initial, the rest outer); `set` is the whole block set's wire ratchet (budgets/grid-strip-room.json).

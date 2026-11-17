@@ -1,4 +1,4 @@
 {
- "about": "ZONE-ENTRY ZE4: the wire bytes (the page host's Brotli) the whole shared grid strip block set may take: every seam source's road, baked once as blocks every home shares (scripts/bake-grid-seams.mjs, src/cook/game/gridStripPages.ts). The bake refuses a set over it. It replaced the per-shard rooms that let only four homes ship their road.",
- "set": 3700000
+ "about": "ZONE-ENTRY ZE4: the wire bytes (the page host's Brotli) the whole shared grid strip block set may take: every seam source's road, baked once as blocks every home shares (scripts/bake-grid-seams.mjs, src/cook/game/gridStripPages.ts). The bake refuses a set over perHome times the distinct homes it bakes (gridStripSetBudget): 148000 is the old 3.7 MB set over the pinned 25 homes, and preview's borrowed staging cells (SA35) each bring their own road. Every home reads the whole set (its ring, then its outer road), so it is phone bytes: 4.0 MB at staging's 30 homes, inside PAGE-SIZE/SHARD-SIZE's 60 MB phone first-download ceiling. It replaced the per-shard rooms that let only four homes ship their road.",
+ "perHome": 148000
 }
