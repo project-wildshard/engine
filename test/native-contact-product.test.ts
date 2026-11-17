@@ -9,12 +9,12 @@ import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { validationSourceBytes } from '@wildshard/format/validationReceipt';
 import { emptyShardfile } from '../src/shared/host/author';
 import { createNativeProofWorker } from '../src/test/game/headlessWorker';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { HeadlessSimulation } from '../src/server/host/headless';
-import { headlessSections, productHeadlessSections } from '../src/shared/host/headlessSections';
+import { headlessSections, folderHeadlessSections } from '../src/shared/host/headlessSections';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { readProductInput } from '../src/client/game/shardfile/product';
-import { validateCheckedProductAssets } from '../src/client/game/shardfile/productChecks';
+import { readFolderInput } from '../src/client/game/shardfile/folder';
+import { validateCheckedFolderAssets } from '../src/client/game/shardfile/folderChecks';
 
 const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const native = { id: 'fixture.shell', kind: 'different.kind', label: 'Shell', variants: [
@@ -46,12 +46,12 @@ async function onDisk<T>(files: ReadonlyMap<string, Uint8Array>, run: (directory
 }
 test('native contact targets pass real Node and client product admission with their complete context', async () => {
   const fixture = product();
-  const admitted = await onDisk(fixture.files, loadHeadlessProduct);
+  const admitted = await onDisk(fixture.files, loadHeadlessFolder);
   expect(admitted.shardfile.items).toEqual(fixture.shard.items);
-  expect(productHeadlessSections(admitted).get('actors/species-programs')).toEqual(fixture.payloads.get('actors/species-programs'));
-  const source = await readProductInput(fixture.index, {base: 'https://fixture.test/', firstParty: false, offline: false, hash: bytes => Promise.resolve(hash(bytes)),
+  expect(folderHeadlessSections(admitted).get('actors/species-programs')).toEqual(fixture.payloads.get('actors/species-programs'));
+  const source = await readFolderInput(fixture.index, {base: 'https://fixture.test/', firstParty: false, offline: false, hash: bytes => Promise.resolve(hash(bytes)),
     fetch: url => { const bytes = fixture.files.get(new URL(url).pathname.slice(1)); return Promise.resolve(bytes === undefined ? new Response(null, {status: 404}) : new Response(Uint8Array.from(bytes))); }});
-  await validateCheckedProductAssets(source, new Map(), hash, undefined, undefined, fixture.payloads, false);
+  await validateCheckedFolderAssets(source, new Map(), hash, undefined, undefined, fixture.payloads, false);
   expect(source.items).toEqual(fixture.shard.items);
 });
 test('worker context retains defining species values and refuses malformed metadata', () => {
@@ -61,17 +61,17 @@ test('worker context retains defining species values and refuses malformed metad
 });
 test('unknown rehashed targets and changed native bytes refuse actual Node product admission', async () => {
   const unknown = product({page: [], native: [{...native, id: native.kind}]});
-  await expect(onDisk(unknown.files, loadHeadlessProduct)).rejects.toThrow();
+  await expect(onDisk(unknown.files, loadHeadlessFolder)).rejects.toThrow();
   const forged = product(); forged.files.set('sections/actors/species-programs.json', validationSourceBytes({page: [], native: []}));
-  await expect(onDisk(forged.files, loadHeadlessProduct)).rejects.toThrow('hash or size mismatch');
+  await expect(onDisk(forged.files, loadHeadlessFolder)).rejects.toThrow('hash or size mismatch');
 });
 
 test('the real parent and worker admit a native item context before ticking', {timeout: 30000}, async () => {
   const fixture = product();
   await onDisk(fixture.files, async directory => {
-    const admitted = await loadHeadlessProduct(directory);
+    const admitted = await loadHeadlessFolder(directory);
     const prepare = new URL('./fixtures/headless/trustedRuntime.ts', import.meta.url);
-    const worker = await createNativeProofWorker(admitted.shardfile, new Map(), prepare, {directory, sections: productHeadlessSections(admitted)});
+    const worker = await createNativeProofWorker(admitted.shardfile, new Map(), prepare, {directory, sections: folderHeadlessSections(admitted)});
     try { expect(worker).toBeDefined(); } finally { await worker.dispose(); }
   });
 });
@@ -87,8 +87,8 @@ test('descriptor context lookup never reads an authored files getter', () => {
 test('the public headless session carries native contact context through parent admission', {timeout: 30000}, async () => {
   const fixture = product();
   await onDisk(fixture.files, async directory => {
-    const admitted = await loadHeadlessProduct(directory);
-    const session = await HeadlessSimulation.create(admitted.shardfile, new Map(), undefined, {deadline: 'advisory', sections: productHeadlessSections(admitted)});
+    const admitted = await loadHeadlessFolder(directory);
+    const session = await HeadlessSimulation.create(admitted.shardfile, new Map(), undefined, {deadline: 'advisory', sections: folderHeadlessSections(admitted)});
     try { expect(session.checkpoint).toBeDefined(); } finally { await session.dispose(); }
   });
 });
