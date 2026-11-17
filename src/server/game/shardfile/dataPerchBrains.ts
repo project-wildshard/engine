@@ -67,6 +67,19 @@ export function preflightPlainPerches(shard: Shardfile, assets: ReadonlyMap<stri
       if (!signals.has(body.policy.score) || !signals.has(body.policy.height) || !channels.has(body.policy.heightChannel))
         throw new Error('Missing declared perch return signal or channel');
     }
+    // Return inventory names a real consumer too. Check overlapping legacy
+    // declarations in the same native identity owner before constructing a host.
+    // A generated perch inventory row aliases its programme, rather than adding
+    // a second consumer. Keep its remaining bindings exact during normalization.
+    for (const row of serverReturnRows(sections?.get('actors/return-scripts') ?? [])) {
+      if (row.abi === 2) continue; // Its complete resource contract was checked above.
+      const body = catalogue.find(candidate => candidate.program.v2 === undefined && candidate.program.script.module === row.module);
+      if (body === undefined) continue; // Unrelated lazy consumers retain their own admission owner.
+      const [inventory] = creaturePerchAdmissionRows([body]);
+      const script = row.id === inventory?.id ? { ...row, id: body.program.script.id } : row;
+      try { ReturnProgram.preflight({ ...body.program, script }, owner); }
+      catch (error) { throw new Error(`Invalid mixed perch return ${row.id}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+    }
     return result;
   } finally { owner.dispose(); }
 }
