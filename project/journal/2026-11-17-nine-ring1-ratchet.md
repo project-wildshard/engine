@@ -34,3 +34,9 @@ browser has already proved the world exists there. No gate bypass.
 M11 held the original change when J400 rewrote ci.yml concurrently.
 Reapply the isolated Nine job beside the current nine-share products
 layout; preserve the current workflow and the typed accessor fix.
+
+Hosted 44027299222 took 247 seconds to finish the cold client build,
+leaving too little of the five-minute job for both real boots and the
+60-second street route. Split producer and observation jobs, carrying
+the exact client as an artifact. Both keep the five-minute cap; the
+ratchet and workload are unchanged.
