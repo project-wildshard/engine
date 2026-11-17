@@ -32,7 +32,7 @@ test('a taken sword\'s rack prompt is spent, standalone and in a grid copy', { t
 // The server restocks a taken lever on its take (TC-E1d, `declaredKitItems.ts`), so a lever's take is never spent.
 const LEVER = 'weapon.brasscap-lever';
 test('a taken lever\'s takes stay: Brasscap\'s rack, ammo boxes and strongbox restock it', { timeout: 60_000 }, async () => {
-  const shard = (await loadHeadlessProduct(builtProduct('brasscap-mesa'))).shardfile;
+  const shard = (await loadHeadlessFolder(builtFolder('brasscap-mesa'))).shardfile;
   const takes = new Set((shard.targets.itemActions ?? []).filter(action => action.item === LEVER && action.action === 3).map(action => action.scene));
   const rows = shard.targets.interactions.filter(row => takes.has(row.scene));
   expect(rows.map(row => row.id).sort()).toEqual(['brasscap.ammo.camp-1', 'brasscap.ammo.camp-2', 'brasscap.ammo.camp-3', 'brasscap.rack.use', 'brasscap.strongbox.use']);
