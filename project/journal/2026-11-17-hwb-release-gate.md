@@ -17,3 +17,5 @@ tag gate can reuse either proof.
 
 The hook fixture exercises the canonical tag push and its clean copy.
 The boundaries job must have run its cook-and-play step.
+After the lift ratchet retired, the release proof binds the active
+quarantine at the release worktree's root.
