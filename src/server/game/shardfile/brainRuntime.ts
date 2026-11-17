@@ -26,7 +26,7 @@ export interface DeclaredBrainRecipe<P> { observe: (dt: number) => P; body: (dt:
 export interface DeclaredBrainPorts {
   navigation?: BrainNavigation;
   skirmisher?: (actor: AnimalSim, host: SimHost, declaration?: ShardSkirmisher) => DeclaredBrainRecipe<SkirmisherPorts<AnimalSim>>;
-  guardian?: (actor: AnimalSim, host: SimHost) => DeclaredBrainRecipe<GuardianPorts<AnimalSim>>;
+  guardian?: (actor: AnimalSim, host: SimHost, declaration?: ShardGuardian) => DeclaredBrainRecipe<GuardianPorts<AnimalSim>>;
   perchHunter?: (actor: AnimalSim, host: SimHost) => DeclaredBrainRecipe<PerchHunterPorts<AnimalSim>>;
   /** Pure preparation binds the declared strike and native floor/body without executing gameplay. */
   ramGrazer?: (actor: AnimalSim, declaration: ShardRamGrazer, host: SimHost) => DeclaredBrainRecipe<RamGrazerPorts<AnimalSim>> & { strike: StrikeSpec };
@@ -135,7 +135,7 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
         registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new SkirmisherBrain(actor, spec), ports.skirmisher(actor, host, spec), host)); break;
       case 'guardian':
         if (ports.guardian === undefined) throw new Error('Missing native brain port');
-        registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new GuardianBrain(actor, spec), ports.guardian(actor, host), host)); break;
+        registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new GuardianBrain(actor, spec), ports.guardian(actor, host, spec), host)); break;
       case 'perch-hunter':
         if (ports.perchHunter === undefined) throw new Error('Missing native brain port');
         registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new PerchHunterBrain(actor, spec), ports.perchHunter(actor, host), host)); break;

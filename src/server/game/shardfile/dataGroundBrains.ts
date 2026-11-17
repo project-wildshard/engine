@@ -5,6 +5,7 @@ import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { ShardCreatures } from '@wildshard/format/creatures';
+import { stepCreatureLift } from '../../../shared/game/plugin/animation';
 import { createMemoryActionBrain } from '../plugin/brain';
 import type { DeclaredBrainPorts } from './brainRuntime';
 
@@ -30,11 +31,11 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
   const strikes = new Map<string, StrikeSpec>(rows.strikes.map(({ weight, speed, ...row }) =>
     [row.id, { ...row, motion: { speed }, weight: () => weight }]));
   const contact = new StrikeRunner();
-  return { skirmisher: (actor, _host, declaration) => {
-    if (declaration === undefined) throw new Error('Missing parsed data-host skirmisher policy');
-    const spawn = byId.get(actor.entityId), strike = spawn?.strike === null ? undefined : strikes.get(spawn?.strike ?? '');
-    if (strike === undefined) throw new Error('Missing declared data-host skirmisher strike');
-    if (strike.windup >= declaration.attackDuration) throw new Error('Skirmisher contact must fit its body attack clock');
+  const bindContact = (actor: AnimalSim, id: string | null | undefined, duration: number, label: 'Skirmisher' | 'Guardian') => {
+    const strike = id === null ? undefined : strikes.get(id ?? '');
+    if (strike === undefined) throw new Error(`Missing declared data-host ${label.toLowerCase()} strike`);
+    if (!Number.isFinite(duration) || duration <= 0 || strike.windup >= duration)
+      throw new Error(`${label} contact must fit its body attack clock`);
     const from = new Vector3(), point = new Vector3(), direction = new Vector3();
     const target = () => host.nearestPlayer(actor.position);
     const packet = { actor, target: target().position,
@@ -48,6 +49,14 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
         host.combat.hit({ source: actor.combatActor(), sourceTags: selected.tags, target: player.health,
           amount: selected.damage, point, dir: direction, from, moveId: selected.id });
       } };
+    return { phase: strike.windup / duration, target, hit: () => {
+      packet.target = target().position; contact.contact(strike, packet);
+    } };
+  };
+  return { skirmisher: (actor, _host, declaration) => {
+    if (declaration === undefined) throw new Error('Missing parsed data-host skirmisher policy');
+    const spawn = byId.get(actor.entityId);
+    const binding = bindContact(actor, spawn?.strike, declaration.attackDuration, 'Skirmisher'), target = binding.target;
     const herd = herdOf(spawn?.group);
     const observation = { dt: 0, player: target().position, calm: false, rng: host.rng.stream('ai'), herd,
       sound: (_cue: string) => undefined,
@@ -64,11 +73,35 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
       return observation;
     };
     const action = createMemoryActionBrain(actor, { stateKey: 'st', states: ['idle', 'sidestep', 'attack', 'flee'],
-      actions: [{ state: 2, phase: strike.windup / declaration.attackDuration,
+      actions: [{ state: 2, phase: binding.phase,
         effect: 'contact', once: { key: 'hit', value: 1, test: 'falsy' } }] },
-    { decide: () => undefined, effects: new Map([['contact', () => {
-      packet.target = target().position; contact.contact(strike, packet);
-    }]]) });
+    { decide: () => undefined, effects: new Map([['contact', binding.hit]]) });
     return { observe, body: dt => { action.act(observe(dt)); } };
+  }, guardian: (actor, _host, declaration) => {
+    if (declaration === undefined) throw new Error('Missing parsed data-host guardian policy');
+    const spawn = byId.get(actor.entityId);
+    if (spawn === undefined) throw new Error('Missing declared data-host guardian home');
+    const binding = bindContact(actor, spawn.strike, declaration.swingDuration, 'Guardian');
+    const target = binding.target;
+    const context = { dt: 0, player: target().position, calm: false,
+      rng: host.rng.stream('ai'),
+      world: { hold: { x: spawn.at[0], z: spawn.at[2], r: declaration.wakeRadius,
+        guardR: declaration.guardRadius, floorAt: (x: number, z: number) => host.groundHeightAt(x, z) } },
+      heightAt: (x: number, z: number) => host.groundHeightAt(x, z),
+      sound: (_cue: string) => undefined,
+      reach: (body: AnimalSim) => canReach(body, target().position, host.physics),
+      claim: (body: AnimalSim) => host.events.ask('ai.claim', body),
+      mayAttack: (body: AnimalSim) => host.events.ask('ai.mayAttack', body) };
+    const observe = (dt: number) => {
+      const player = target(); context.dt = dt; context.player = player.position; context.calm = !player.health.alive;
+      return context;
+    };
+    const action = createMemoryActionBrain(actor, { stateKey: 'st', states: ['hide', 'rise', 'attack', 'guard', 'sink'],
+      actions: [{ state: 2, phase: binding.phase, effect: 'contact', once: { key: 'hit', value: 1, test: 'falsy' } }] },
+    { decide: () => undefined, effects: new Map([['contact', binding.hit]]) });
+    return { observe, body: dt => {
+      stepCreatureLift(actor, dt, 1.5, 1.5, declaration.hideOffset, 6);
+      action.act(observe(dt));
+    } };
   } };
 }
