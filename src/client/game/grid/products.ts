@@ -4,6 +4,7 @@
  * share one product's immutable bytes; a failed admission is forgotten so a later request retries.
  */
 import { findShard } from '../shard/registry';
+import { findTitleManifest } from '../shard/titleList';
 import { admitProduct, boundedResponse, checkBuiltIndex, readIndexBytes, readProductDescriptor, type AdmittedProduct, type ProductOptions } from '../shardfile/product';
 import { browserShardfileOptions } from '../shardfile/runtimeProduct';
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
@@ -161,13 +162,20 @@ export async function readGridProductEdges(url: string, identity: string, option
   if (rows === null) throw new Error('Grid edge index lacks world/edge');
   return v.parse(edgeRows, rows);
 }
+/** A head added after this build has title metadata but no prepared native
+ * manifest. Its verified product owns the far view just like a built world. */
+function farDescriptor(slug: string): string | undefined {
+  const row = findShard(slug) ?? findTitleManifest(slug);
+  return row?.shardfile ?? row?.gridShardfile;
+}
+
 /**
  * The far proxy's declared resident bytes (decoded + GPU, what `loadShardfileFar` charges once it loads) from the index and
  * its world/tiles section: the far ring charges these before the proxy arrives instead of the 1.6 MB cap, so a visible
  * cell is never left out of the ring for placeholder charges (null: no far row). No admission, no claim.
  */
 export function gridShardfileFarBytes(slug: string): Promise<number | null> | null {
-  const descriptor = findShard(slug)?.shardfile;
+  const descriptor = farDescriptor(slug);
   if (descriptor === undefined) return null;
   const url = new URL(descriptor, location.href);
   return readGridProductSection(url.href, slug, 'world/tiles', browserShardfileOptions(new URL('.', url).href, true))
@@ -183,7 +191,7 @@ export function gridShardfileFarBytes(slug: string): Promise<number | null> | nu
  * null only when the product's tiles carry no far row.
  */
 export function readGridShardfileFar(slug: string, anyWorld = false): Promise<GridShardfileFar | null> {
-  const descriptor = findShard(slug)?.shardfile;
+  const descriptor = farDescriptor(slug);
   if (descriptor === undefined) return Promise.resolve(null);
   const url = new URL(descriptor, location.href);
   return readGridProductFar(url.href, slug, browserShardfileOptions(new URL('.', url).href, true), anyWorld);

@@ -1,9 +1,15 @@
+import { readGridShardfileFar, gridShardfileFarBytes, readGridProductEdges, readGridProductFar, readGridProductNear } from '../src/client/game/grid/products';
+
+import * as runtimeFolder from '../src/client/game/shardfile/runtimeProduct';
+import {installShards} from '../src/client/game/shard/list';
+import type {ShardManifest} from '../src/client/game/shard/manifest';
+import {installTitleManifests,catalogueTitleRow,type TitleManifest} from '../src/client/game/shard/titleList';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { expect, test, vi } from 'vitest';
 import { emptyShardfile } from '@wildshard/engine/host/author';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immutable';
-import { readGridProductEdges, readGridProductFar, readGridProductNear } from '../src/client/game/grid/products';
+
 import { loadShardfileFar } from '../src/client/game/grid/shardfileFar';
 import type { ProductCache } from '../src/client/game/shardfile/product';
 
@@ -310,4 +316,34 @@ test('OF8: a first-party section URL carries ?v= from the hash its index declare
   // a later reader in the same load (the far and near proxies after the far charge) reads none: the bytes were kept
   expect(await readGridProductEdges(f.url, f.source.identity.slug, options)).toEqual({ edge: f.source.edge, entryways: f.source.entryways });
   expect(reads.filter(url => new URL(url).pathname === new URL(f.edgeUrl).pathname)).toHaveLength(1);
+});
+
+
+// A placed upload can appear in the title catalogue after the build, without
+// executable discovery in the prepared manifest list. Its far bytes still
+// belong to its verified product, never an invented baked-folder URL.
+test.each(['empty', 'geometry'] as const)('catalogue-only %s far view uses its declared product', async kind => {
+  const f = kind === 'empty' ? fixture('catalogue-empty-far') : sceneFar(false, { kind: 'glb' });
+  for (const name of ['world/collision', 'world/tiles', 'world/props', 'look/look']) {
+    const url = new URL(`sections/${name}.json`, f.url).href;
+    if (!f.wires.has(url)) {
+      const bytes = f.sectionBytes.get(name); if (bytes === undefined) throw new Error('Missing far section'); f.wires.set(url, bytes);
+    }
+  }
+  const oldShards = Reflect.get(globalThis, Symbol.for('game.shards')) as readonly ShardManifest[] | undefined;
+  const oldTitle = Reflect.get(globalThis, Symbol.for('game.titleManifests')) as readonly TitleManifest[] | undefined;
+  const options = vi.spyOn(runtimeFolder, 'browserShardfileOptions').mockReturnValue(f.options);
+  const oldLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis,'location',{value:{href:'https://game.test/'},configurable:true});
+  installShards([]); installTitleManifests([catalogueTitleRow(f.source.identity.slug, 'Uploaded world', 99)]);
+  try {
+    const far = await readGridShardfileFar(f.source.identity.slug, true);
+    expect(far).not.toBeNull();
+    expect(far?.rows).toMatchObject(kind === 'empty' ? {far:null,farRef:null} : {far:SCENE_FAR,farRef:GLB});
+    expect(await gridShardfileFarBytes(f.source.identity.slug)).toBe(kind === 'empty' ? null : SCENE_FAR.decoded + SCENE_FAR.gpu);
+    expect(f.fetch).toHaveBeenCalledWith(f.url);
+    expect(f.fetch.mock.calls.some(([url]) => url.includes('/assets/baked/'))).toBe(false);
+  } finally {
+    options.mockRestore(); if(oldLocation===undefined)Reflect.deleteProperty(globalThis,'location');else Object.defineProperty(globalThis,'location',oldLocation); installShards(oldShards ?? []); installTitleManifests(oldTitle ?? []);
+  }
 });
