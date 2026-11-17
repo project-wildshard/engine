@@ -134,7 +134,7 @@ export async function authorBundleCached(root, recipe, compile, cacheRoot = shar
       return [...sources.keys()].some(source => CHECKOUT_OUTPUT.test(relative(source, path).split(sep).join('/')));
     });
     if (usesCheckoutOutput) {
-      replayProductInputs(root, receipt);
+      replayFolderInputs(root, receipt);
       return { ...bundle, reused: false };
     }
     writeFileSync(temporary, JSON.stringify({ key: captured, bundle, seal: digest(JSON.stringify(bundle)) }));
