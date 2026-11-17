@@ -6,7 +6,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { join } from 'node:path';
 import { after, beforeEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { parseArgs } from '../scripts/main-push.mjs';
+import { heldCommits, parseArgs } from '../scripts/main-push.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../scripts/main-push.mjs', import.meta.url));
 const repoDir = fileURLToPath(new URL('..', import.meta.url));
@@ -20,7 +20,7 @@ after(() => rmSync(work, { recursive: true, force: true }));
 // "Author identity unknown" on a runner with no global identity). Its own HOME, with useConfigOnly, makes every machine that runner:
 // no global config, and no identity guessed from the host name, as macOS's git does.
 const home = join(work, 'home');
-const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), HOME: home, XDG_CONFIG_HOME: home, WS_MAIN_PUSH_RECEIPT: '0' };
+const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), HOME: home, XDG_CONFIG_HOME: home, WS_MAIN_PUSH_RECEIPT: '0', WS_MAIN_PUSH_NOTIFY: '0', WS_LANE_NAME: 'lane-a' };
 const ID = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
 const git = (cwd, ...args) => {
   const out = spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...env, ...ID } });
@@ -93,34 +93,81 @@ test('commits only the named files, syncs past another lane, pushes, and leaves 
   notMidRebase(a);
 });
 
-test('a real conflict undoes its own commit, never rebases, and prints the --onto command that finishes it', () => {
-  const before = git(a, 'rev-parse', 'HEAD');
+test('a real conflict holds only its lane with exact committed bytes and prints its recovery command', () => {
   otherLanePushes('plan.md', 'B wrote line 1\n');
   write(a, 'plan.md', 'A wrote line 1\n');
   write(a, 'other.md', 'other lane edit\n');
   const out = push(a, '-m', "docs: A's tick", 'plan.md');
   assert.equal(out.status, 1);
-  assert.match(out.stderr, /^main-push STOP your commit\(s\) conflict with origin\/main in plan\.md; nothing moved\. Your commit is undone and your edits are back, uncommitted, in plan\.md\./mu);
-  assert.match(out.stderr, /git rebase --abort wipes them/u);
-  const command = /run: (node scripts\/main-push\.mjs --onto ([0-9a-f]{12}) -m 'docs: A'\\''s tick' plan\.md)$/mu.exec(out.stderr);
-  assert.ok(command, out.stderr);
+  assert.match(out.stderr, /^main-push STOP lane lane-a is held at refs\/wildshard-held\/lane-a\/[0-9a-f]{40}; only that lane stops\./mu);
+  const [held] = heldCommits(a);
+  assert.ok(held);
+  assert.match(out.stderr, new RegExp(`--onto ${held.upstream.slice(0, 12)}`, 'u'));
+  assert.equal(git(a, 'show', `${held.ref}:plan.md`), 'A wrote line 1');
   notMidRebase(a);
-  assert.equal(git(a, 'rev-parse', 'HEAD'), before, 'main is back where it was');
-  assert.equal(git(a, 'status', '--short', '--', 'plan.md', 'other.md'), 'M other.md\n M plan.md', 'both edits are uncommitted');
-  assert.equal(read(a, 'plan.md'), 'A wrote line 1\n');
+  assert.equal(git(a, 'rev-parse', 'HEAD'), git(remote, 'rev-parse', 'main'), 'main can advance without the held lane');
+  assert.equal(git(a, 'status', '--short', '--', 'plan.md', 'other.md'), 'M other.md', 'the other lane edit survives');
+  assert.equal(read(a, 'plan.md'), 'B wrote line 1\n');
   assert.equal(read(a, 'other.md'), 'other lane edit\n');
   assert.equal(remoteFile('plan.md'), 'B wrote line 1');
 
   // The lane merges against the printed SHA; meanwhile another lane pushes a file A does not touch.
   write(a, 'plan.md', 'B wrote line 1\nA wrote line 2\n');
   otherLanePushes('shared.md', 'B again\n');
-  const onto = push(a, '--onto', command[2], '-m', "docs: A's tick", 'plan.md');
+  const onto = push(a, '--onto', held.upstream, '-m', "docs: A's tick", 'plan.md');
   assert.equal(onto.status, 0, onto.stderr);
   assert.equal(remoteFile('plan.md'), 'B wrote line 1\nA wrote line 2');
   assert.equal(remoteFile('shared.md'), 'B again');
   assert.equal(git(remote, 'log', '-1', '--format=%s', 'main'), "docs: A's tick");
   assert.equal(read(a, 'other.md'), 'other lane edit\n');
   assert.equal(git(a, 'status', '--short', '--', 'plan.md', 'shared.md'), '', 'A is in step with origin');
+  assert.deepEqual(heldCommits(a), []);
+  notMidRebase(a);
+});
+
+test('M11 drops a patch already on origin while preserving peer staging and edits', () => {
+  otherLanePushes('plan.md', 'same patch\n');
+  write(a, 'plan.md', 'same patch\n');
+  write(a, 'other.md', 'dirty peer\n');
+  write(a, 'staged.md', 'staged peer\n'); git(a, 'add', '--', 'staged.md');
+  write(a, 'loose.md', 'untracked peer\n');
+  const out = push(a, '-m', 'docs: duplicate', 'plan.md');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /dropped 1 duplicate\(s\)/u);
+  assert.equal(git(a, 'rev-parse', 'HEAD'), git(remote, 'rev-parse', 'main'));
+  assert.equal(read(a, 'other.md'), 'dirty peer\n');
+  assert.equal(read(a, 'loose.md'), 'untracked peer\n');
+  assert.equal(git(a, 'diff', '--cached', '--name-only'), 'staged.md');
+  assert.deepEqual(heldCommits(a), []);
+});
+
+test('M11 a conflicting peer and its later commits cannot block an independent lane', () => {
+  write(a, 'plan.md', 'peer conflict\n');
+  git(a, 'commit', '-qm', 'peer conflict', '-m', 'Lane: lane-b', '--', 'plan.md');
+  const original = git(a, 'rev-parse', 'HEAD');
+  write(a, 'peer-later.md', 'dependent peer work\n'); git(a, 'add', '--', 'peer-later.md');
+  git(a, 'commit', '-qm', 'peer later', '-m', 'Lane: lane-b', '--', 'peer-later.md');
+  otherLanePushes('plan.md', 'remote conflict\n');
+  write(a, 'other.md', 'dirty third lane\n');
+  write(a, 'staged.md', 'staged third lane\n'); git(a, 'add', '--', 'staged.md');
+  write(a, 'loose.md', 'untracked third lane\n');
+  write(a, 'mine.md', 'independent lane-a\n');
+  const out = push(a, '-m', 'docs: mine', 'mine.md');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /held lane\(s\) lane-b/u);
+  assert.equal(remoteFile('mine.md'), 'independent lane-a');
+  assert.equal(remoteFile('plan.md'), 'remote conflict');
+  const held = heldCommits(a);
+  assert.equal(held.length, 2);
+  assert.ok(held.every(row => row.lane === 'lane-b'));
+  assert.equal(git(a, 'show', `${held.find(row => row.sha === original).ref}:plan.md`), 'peer conflict');
+  assert.equal(read(a, 'other.md'), 'dirty third lane\n');
+  assert.equal(read(a, 'loose.md'), 'untracked third lane\n');
+  assert.equal(git(a, 'diff', '--cached', '--name-only'), 'staged.md');
+  const stopped = spawnSync(process.execPath, [SCRIPT, '--wait', '0'], { cwd: a, encoding: 'utf8', env: { ...env, WS_LANE_NAME: 'lane-b' } });
+  assert.equal(stopped.status, 1);
+  assert.match(stopped.stderr, /lane lane-b is held/u);
+  assert.equal(push(a).status, 0, 'lane-a keeps working while lane-b repairs');
   notMidRebase(a);
 });
 

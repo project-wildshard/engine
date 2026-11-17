@@ -22,12 +22,13 @@
 // One run at a time: a lock directory in the git dir (main-push.lock), held through the push; a dead or 30-minute-old
 // lock is taken over. Another lane's edit in the way, a held index.lock, the lock or a push race waits and tries again
 // (5, 10, 20 ... 640 s). A merge commit or a refused pre-push stops at once, your commit on local main. A real conflict
-// stops too, and undoes this run's own commit so the lane's edits are uncommitted again; the STOP line says what to
-// merge and prints the `--onto` command that finishes it. Never a rebase, never a stash (never --autostash): in a
+// holds that lane's original commits under refs/wildshard-held/<lane>/, names and prompts it, and lets independent
+// lanes continue. Duplicate patches already on origin are dropped (M11). Recovery uses the printed --onto command.
+// Never a rebase, never a stash (never --autostash): in a
 // shared checkout `git rebase --continue` refuses beside another lane's unstaged edit and `git rebase --abort` wipes it.
 // Exit 0 when pushed; 1 with a `main-push STOP` line; 2 on bad arguments.
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -74,6 +75,61 @@ export function checkState(cwd) {
 /** Subjects of the commits this run made (commitFiles), so a push can tell its own from another lane's. A sync replays
  * them to new SHAs, so the subject is what survives. */
 const OWN = new Set();
+const currentLane = () => /^[a-z][a-z0-9_-]*$/u.test(process.env.WS_LANE_NAME ?? '') ? process.env.WS_LANE_NAME : 'main-push';
+
+/** @typedef {{sha:string,lane:string,ref:string,files:string[],upstream:string}} HeldCommit */
+/** @param {string} cwd */
+const heldDirectory = (cwd) => resolve(cwd, git(cwd, ['rev-parse', '--git-path', 'main-push-held']));
+
+/** Recovery records belong only to the named lane. The refs retain its original committed bytes.
+ * @param {string} cwd @returns {HeldCommit[]} */
+export function heldCommits(cwd) {
+  const dir = heldDirectory(cwd);
+  return existsSync(dir) ? readdirSync(dir).filter(name => /^[a-f0-9]{40}\.json$/u.test(name))
+    .map(name => /** @type {HeldCommit} */ (JSON.parse(readFileSync(join(dir, name), 'utf8')))) : [];
+}
+
+/** @param {string} cwd @param {HeldCommit} held */
+function heldAdvice(cwd, held) {
+  const message = git(cwd, ['show', '-s', '--format=%B', held.sha]);
+  return `lane ${held.lane} is held at ${held.ref}; only that lane stops. Original commit: git show ${held.ref}. ` +
+    `Merge its change into today's files, then run: ${ontoCommand(held.upstream, [message], held.files)}`;
+}
+
+/** Replay separately so a conflict holds its lane, while other lanes continue. No worktree or index is touched.
+ * @param {string} cwd @param {string} upstream @param {string} head */
+function replayLanes(cwd, upstream, head) {
+  const commits = git(cwd, ['rev-list', '--reverse', '--topo-order', `${upstream}..${head}`]).split('\n').filter(Boolean);
+  const duplicates = new Set(git(cwd, ['cherry', upstream, head]).split('\n').filter(row => row.startsWith('- ')).map(row => row.slice(2)));
+  /** @type {HeldCommit[]} */ const held = [];
+  /** @type {string[]} */ const dropped = [];
+  const stopped = new Set();
+  let target = upstream;
+  for (const sha of commits) {
+    const parents = git(cwd, ['rev-list', '--parents', '-n', '1', sha]).split(' ').slice(1);
+    if (parents.length !== 1) throw new StopError(`local commit ${sha.slice(0, 10)} is a merge, which git replay cannot move; ask the coordinator`);
+    if (duplicates.has(sha)) { dropped.push(sha); continue; }
+    const message = git(cwd, ['show', '-s', '--format=%B', sha]);
+    const lane = /^Lane: ([a-z][a-z0-9_-]*)$/mu.exec(message)?.[1] ?? `unnamed-${sha.slice(0, 10)}`;
+    const replayed = stopped.has(lane) ? null : run(cwd, ['replay', '--ref=refs/heads/main', '--ref-action=print', '--onto', target, `${parents[0]}..${sha}`]);
+    if (replayed?.status === 0) {
+      const next = replayed.stdout.trim().split('\n').find(row => /^update(-ref)? refs\/heads\/main /u.test(row))?.split(/\s+/u)[2] ?? '';
+      if (!/^[a-f0-9]{40}$/u.test(next)) throw new StopError(`git replay gave no new main for ${sha.slice(0, 10)}`);
+      if (git(cwd, ['rev-parse', `${next}^{tree}`]) === git(cwd, ['rev-parse', `${target}^{tree}`])) dropped.push(sha);
+      else target = next;
+      continue;
+    }
+    if (replayed !== null) {
+      // Only a demonstrated merge conflict is held. A git/tool failure must leave main alone.
+      const merged = run(cwd, ['merge-tree', '--write-tree', '--name-only', '--no-messages', '--merge-base', parents[0], target, sha]);
+      if (merged.status !== 1) throw new StopError(`git replay failed for ${sha.slice(0, 10)}: ${firstLines(replayed.stderr || replayed.stdout)}`);
+    }
+    stopped.add(lane);
+    const files = git(cwd, ['diff-tree', '--no-commit-id', '--name-only', '-r', sha]).split('\n').filter(Boolean);
+    held.push({ sha, lane, ref: `refs/wildshard-held/${lane}/${sha}`, files, upstream });
+  }
+  return { target, dropped, held, count: commits.length };
+}
 
 /** One `lane-receipts.log` line, `<HH:MM Cancún> <lane> <text>` (the Mac's clock is Cancún time). WS_MAIN_PUSH_RECEIPT=0
  * (the tests) writes none. @param {string} text */
@@ -100,7 +156,11 @@ export function commitFiles(cwd, files, messages) {
   }
   const untracked = files.filter((file) => existsSync(resolve(cwd, file)) && run(cwd, ['ls-files', '--error-unmatch', '--', file]).status !== 0);
   if (untracked.length > 0) git(cwd, ['add', '--', ...untracked]);
-  const commit = run(cwd, ['commit', ...messages.flatMap((message) => ['-m', message]), '--', ...files]);
+  // Keep Assisted-by last while making the lane discoverable after another process replays this commit (M11).
+  const labelled = messages.some(message => /^Lane: /mu.test(message)) ? [...messages]
+    : messages.map(message => message.replace(/^(Assisted-by: .+)$/mu, `Lane: ${currentLane()}\n\n$1`));
+  if (!labelled.some(message => /^Lane: /mu.test(message))) labelled.push(`Lane: ${currentLane()}`);
+  const commit = run(cwd, ['commit', ...labelled.flatMap((message) => ['-m', message]), '--', ...files]);
   if (commit.status !== 0) {
     if (untracked.length > 0) run(cwd, ['reset', '--quiet', '--', ...untracked]);
     throw new StopError(`git commit refused: ${firstLines(`${commit.stdout}\n${commit.stderr}`, 12)}`);
@@ -123,26 +183,14 @@ export function syncMain(cwd, remote = 'origin') {
   if (run(cwd, ['merge-base', '--is-ancestor', upstream, head]).status === 0) return `main current at ${head.slice(0, 8)}`;
   let target = upstream;
   let how = 'fast-forward';
+  /** @type {HeldCommit[]} */ let held = [];
+  /** @type {string[]} */ let dropped = [];
   if (run(cwd, ['merge-base', '--is-ancestor', head, upstream]).status !== 0) {
-    const own = git(cwd, ['rev-list', '--count', `${upstream}..refs/heads/main`]);
-    const replayed = run(cwd, ['replay', '--ref-action=print', '--onto', upstream, `${upstream}..refs/heads/main`]);
-    if (replayed.status !== 0 && /merge commit/iu.test(replayed.stderr)) {
-      throw new StopError(`the ${own} local commit(s) include a merge, which git replay cannot move; ask the coordinator`);
-    }
-    if (replayed.status !== 0) {
-      // git replay prints nothing on a conflict; merge-tree names the files without touching anything.
-      const named = run(cwd, ['merge-tree', '--write-tree', '--name-only', '--no-messages', upstream, head]).stdout.trim().split('\n').slice(1).filter(Boolean);
-      const files = [...new Set(named)];
-      const detail = firstLines(replayed.stderr || replayed.stdout, 3);
-      const error = new StopError(`your commit(s) conflict with origin/main${files.length > 0 ? ` in ${files.join(', ')}` : ` (${detail === '' ? 'git replay failed' : detail})`}; nothing moved`);
-      error.conflict = { upstream, files };
-      throw error;
-    }
-    const line = replayed.stdout.trim().split('\n').find((row) => /^update(-ref)? refs\/heads\/main /u.test(row));
-    const sha = line?.split(/\s+/u)[2] ?? '';
-    if (!/^[a-f0-9]{40}$/u.test(sha)) throw new StopError(`git replay gave no new main (${replayed.stdout.trim().slice(0, 200)})`);
-    target = sha;
-    how = `replayed ${own} local commit(s)`;
+    const replay = replayLanes(cwd, upstream, head);
+    target = replay.target; held = replay.held; dropped = replay.dropped;
+    how = `replayed ${replay.count} local commit(s)`;
+    // Protect every held commit before removing it from main, even if a later index/ref race refuses the move.
+    for (const row of held) git(cwd, ['update-ref', row.ref, row.sha]);
   }
   if (git(cwd, ['rev-parse', 'HEAD']) !== head) throw new StopError('another lane committed while syncing; nothing moved', true);
   run(cwd, ['update-index', '-q', '--refresh']);
@@ -161,6 +209,21 @@ export function syncMain(cwd, remote = 'origin') {
     if (back.status !== 0) throw new StopError(`another lane committed while syncing and the tree could not be put back (${firstLines(back.stderr, 1)}): git status, then git read-tree -m -u ${target.slice(0, 10)} HEAD`);
     throw new StopError('another lane committed while syncing; nothing moved', true);
   }
+  for (const sha of dropped) receipt(`main-push dropped duplicate ${sha.slice(0, 10)}: patch already on origin/main`);
+  const notified = new Set();
+  for (const row of held) {
+    mkdirSync(heldDirectory(cwd), { recursive: true });
+    writeFileSync(join(heldDirectory(cwd), `${row.sha}.json`), `${JSON.stringify(row)}\n`);
+    const message = heldAdvice(cwd, row);
+    receipt(`main-push HELD ${message}`);
+    if (process.env.WS_MAIN_PUSH_NOTIFY !== '0' && !row.lane.startsWith('unnamed-') && !notified.has(row.lane)) {
+      const sent = spawnSync('herdr', ['agent', 'prompt', row.lane, `main-push M11: ${message}`], { encoding: 'utf8', timeout: 10_000 });
+      receipt(`main-push HELD message to ${row.lane} ${sent.status === 0 ? 'delivered' : 'not delivered; recovery is in the held receipt'}`);
+      notified.add(row.lane);
+    }
+  }
+  if (dropped.length > 0) how += `; dropped ${dropped.length} duplicate(s)`;
+  if (held.length > 0) how += `; held lane(s) ${[...new Set(held.map(row => row.lane))].join(', ')}`;
   return `main ${head.slice(0, 8)} -> ${target.slice(0, 8)} (${how}); other lanes' files untouched`;
 }
 
@@ -418,6 +481,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   try {
     checkState(cwd);
     lock();
+    const pending = heldCommits(cwd).filter(row => row.lane === currentLane());
+    if (!options.onto && pending.length > 0) throw new StopError(heldAdvice(cwd, pending[0]));
     const commit = () => {
       made = commitFiles(cwd, options.files, options.messages);
       log(`committed ${made}`);
@@ -447,6 +512,14 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
       }
       log(syncAndPush(cwd, { tries: options.tries, wait: options.wait, log, sleep: sleepUnlocked }));
     }
+    if (options.onto) {
+      for (const row of pending.filter(heldRow => heldRow.files.every(file => options.files.includes(file)))) {
+        rmSync(join(heldDirectory(cwd), `${row.sha}.json`));
+        git(cwd, ['update-ref', '-d', row.ref, row.sha]);
+      }
+    }
+    const ownHeld = heldCommits(cwd).find(row => row.lane === currentLane());
+    if (ownHeld !== undefined) throw new StopError(heldAdvice(cwd, ownHeld));
   } catch (error) {
     if (!(error instanceof StopError)) throw error;
     let message = error.message;
