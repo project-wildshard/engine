@@ -6,6 +6,8 @@
 //   node scripts/mmo-bots.mjs replica --remote wildshard [--cpus 9-13] ...   (MP1.2: the replica on the box's cores, bots on this Mac)
 //   node scripts/mmo-bots.mjs replica [--remote wildshard] --server-from <main commit> ...   (MP1.2: that commit's server code)
 //   node scripts/mmo-bots.mjs replica --remote wildshard-agent --bots-on-host [--bot-cpus 14-15] ...   (MP1.2: bots on the box too)
+//   node scripts/mmo-bots.mjs replica --box [--seconds 1800] ...   (MP1.2.d: the replica on the box's staging CPUs through the
+//     allowlisted `wildshard-config replica`, bots on this Mac over the tailnet; no other command reaches the box)
 //   node scripts/mmo-bots.mjs staging [--bots 2] [--seconds 60]   (at most 4: one address)
 //   node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60   (TC45: public Tunnel, no private health)
 //   node scripts/mmo-bots.mjs staging --tailnet ...   (NET-LAG NL3: the same, over staging's tailnet Serve address, no Cloudflare)
@@ -50,7 +52,8 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
   cells: { type: 'string', default: 'driftwood-isle' }, database: { type: 'string', default: 'memory:' }, keep: { type: 'boolean', default: false },
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
   'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false },
-  'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false }, 'outside-proof': { type: 'boolean', default: false } } });
+  'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false }, 'outside-proof': { type: 'boolean', default: false },
+  box: { type: 'boolean', default: false } } });
 const outsideProof = values['outside-proof'];
 if (outsideProof && (mode !== 'staging' || values.tailnet || values.remote !== undefined || values['bots-on-host']))
   throw new Error('--outside-proof is one public staging client, without tailnet, SSH or a replica');
@@ -64,6 +67,12 @@ if (remote !== undefined && (mode !== 'replica' || !/^[\w.@-]+$/u.test(remote) |
 if (!/^[\d,-]+$/u.test(values.cpus) || !/^[\d,-]+$/u.test(values['bot-cpus'])) throw new Error('--cpus and --bot-cpus are taskset lists');
 const botsOnHost = values['bots-on-host'];
 if (botsOnHost && remote === undefined) throw new Error('--bots-on-host needs --remote');
+// MP1.2.d: `--box` asks the box's own helper for the replica (staging's signed bundle, staging's CPUs, its tailnet address),
+// so the lane never runs an ssh command of its own there. The helper bounds it to 3,900 s: the run plus 7 minutes to boot.
+const box = values.box, BOX = 'wildshard-agent', BOX_SLACK = 420;
+if (box && (mode !== 'replica' || remote !== undefined || values.database !== 'memory:' || values['server-from'] !== undefined || values.spread
+  || Number(values.workers) > 4 || Number(values.seats) > 64 || Number(values.seconds ?? 120) + BOX_SLACK > 3900))
+  throw new Error('--box is a replica on memory saves from the signed staging bundle: no --remote, --server-from or --spread, 4 workers, 64 seats, 3,480 s at most');
 if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
 const bots = Number(values.bots ?? (outsideProof ? 1 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
@@ -182,9 +191,10 @@ const tailnetDoor = STAGING_HEALTH.replace(/^https:/u, 'wss:').replace(/\/health
 let url = values.tailnet ? tailnetDoor : release.socket.replace(/\/$/u, '');
 if (mode === 'replica') {
   const tarball = join(work, 'server.tar.gz'), served = join(work, 'server');
-  const bytes = serverBundle !== null ? readFileSync(serverBundle) : Buffer.from(await (await fetch(`${BUNDLES}/${release.bundle.name}`, { signal: AbortSignal.timeout(300_000) })).arrayBuffer());
-  if (serverBundle === null && createHash('sha256').update(bytes).digest('hex') !== release.bundle.sha256) throw new Error('The release bundle differs from its SHA-256');
-  writeFileSync(tarball, bytes); mkdirSync(served, { recursive: true }); execFileSync('tar', ['-xzf', tarball, '-C', served]);
+  // `--box`: the box's helper fetches and checks the bundle itself, so nothing is downloaded here.
+  const bytes = box ? Buffer.alloc(0) : serverBundle !== null ? readFileSync(serverBundle) : Buffer.from(await (await fetch(`${BUNDLES}/${release.bundle.name}`, { signal: AbortSignal.timeout(300_000) })).arrayBuffer());
+  if (!box && serverBundle === null && createHash('sha256').update(bytes).digest('hex') !== release.bundle.sha256) throw new Error('The release bundle differs from its SHA-256');
+  if (!box) { writeFileSync(tarball, bytes); mkdirSync(served, { recursive: true }); execFileSync('tar', ['-xzf', tarball, '-C', served]); }
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const body = JSON.stringify({ channel: 'production', serial: 1, engineBuild: release.engineBuild, saveEpoch: release.saveEpoch, shards: release.shards });
   writeFileSync(join(work, 'release.json'), JSON.stringify({ body, signature: sign(null, Buffer.from(body), privateKey).toString('hex') }));
@@ -193,7 +203,15 @@ if (mode === 'replica') {
     RELEASE_PUBLIC_KEY: publicKey.export({ type: 'spki', format: 'der' }).toString('hex'), WORLD_CELLS: values.cells, WORLD_WORKERS: values.workers, WORLD_SEATS: values.seats,
     TELEMETRY_URL: '', ERRORS_URL: '', SENTRY_DSN: '', RECORD_TAG: '' };
   const log = join(work, 'server.jsonl');
-  if (remote === undefined) room = spawn(process.execPath, [join(served, 'main.mjs')], { cwd: served, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  /** `--box`: the replica's own first line names the build it runs, which must be the bots'. */
+  let boxBuild = '';
+  if (box) {
+    room = spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, BOX, `sudo -n /usr/local/sbin/wildshard-config replica start --seconds ${String(seconds + BOX_SLACK)}`
+      + ` --workers ${values.workers} --seats ${values.seats} --cells ${values.cells}`], { stdio: ['ignore', 'pipe', 'pipe'] });
+    remoteStop = () => { try { execFileSync('ssh', ['-o', 'BatchMode=yes', BOX, 'sudo -n /usr/local/sbin/wildshard-config replica stop'], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 60_000 }); } catch { /* already gone */ } };
+    note({ step: 'box', host: BOX, via: 'wildshard-config replica' });
+  }
+  else if (remote === undefined) room = spawn(process.execPath, [join(served, 'main.mjs')], { cwd: served, env, stdio: ['ignore', 'pipe', 'pipe'] });
   else {
     // The same bundle on the host: it fetches it itself and checks the same SHA-256, and the release file goes over ssh.
     away = `mmo-bench/${stamp}`;
@@ -221,7 +239,7 @@ if (mode === 'replica') {
     writeFileSync(log, chunk, { flag: 'a' }); buffer += chunk.toString();
     for (let end = buffer.indexOf('\n'); end >= 0; end = buffer.indexOf('\n')) {
       const line = buffer.slice(0, end); buffer = buffer.slice(end + 1);
-      try { const row = JSON.parse(line); if (row.at === 'worker') { ready = true; readings.push(row); } } catch { /* kept in the log */ }
+      try { const row = JSON.parse(line); if (row.at === 'replica') boxBuild = String(row.build); if (row.at === 'worker') { ready = true; readings.push(row); } } catch { /* kept in the log */ }
     }
   });
   room.stderr?.on('data', (/** @type {Buffer} */ chunk) => { writeFileSync(log, chunk, { flag: 'a' }); });
@@ -230,6 +248,10 @@ if (mode === 'replica') {
   while (!booted() && room.exitCode === null && performance.now() - begun < 180_000) await new Promise(resolve => { setTimeout(resolve, 250); });
   if (!ready) throw new Error(`The replica did not boot; see ${log}`);
   url = `ws://127.0.0.1:${String(REPLICA_PORT)}/`;
+  if (box) {
+    if (boxBuild !== release.engineBuild) throw new Error(`The box's replica runs ${boxBuild || 'no named build'}, and the bots are ${release.engineBuild}: staging moved, run again`);
+    url = `ws://${new URL(STAGING_HEALTH).hostname}:${String(REPLICA_PORT)}/`;
+  }
   note({ step: 'replica', boot: Math.round((performance.now() - begun) / 1000), cells: values.cells, workers: Number(values.workers), seats: Number(values.seats) });
 }
 

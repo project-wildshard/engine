@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the driver's argument check only.
 import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
-import { botCells, botTarget, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS, TAILNET_SOCKET } from './fixtures/dedicated/mmoBotsGuard';
+import { botCells, botTarget, BOX_REPLICA_SOCKET, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS, TAILNET_SOCKET } from './fixtures/dedicated/mmoBotsGuard';
 import { interArrival } from './fixtures/dedicated/mmoBotsStats';
 
 const entry = readFileSync('test/fixtures/dedicated/mmoBotsEntry.ts', 'utf8'), driver = readFileSync('scripts/mmo-bots.mjs', 'utf8');
@@ -152,4 +152,24 @@ test('the report carries frame inter-arrival per bot and over all bots', () => {
   expect(interArrival([33.333, 33.333])).toEqual({ gaps: 2, p50: 33.3, p95: 33.3, max: 33.3 });
   expect(entry).toContain('interArrival: interArrival(walker.gaps)');
   expect(entry).toContain('interArrivalMs: interArrival(walkers.flatMap(walker => walker.gaps))');
+});
+
+test("MP1.2.d: the box replica's tailnet door takes forwarded bots, and nothing else on the box does", () => {
+  expect(BOX_REPLICA_SOCKET).toBe('ws://wildshard.tailb41b20.ts.net:18796');
+  expect(() => botTarget(`${BOX_REPLICA_SOCKET}/`, 'forwarded', 32)).not.toThrow();
+  for (const url of ['ws://wildshard.tailb41b20.ts.net:8790/', 'ws://wildshard.tailb41b20.ts.net:8791/', 'wss://wildshard.tailb41b20.ts.net:18796/',
+    `${BOX_REPLICA_SOCKET}/other`, `${BOX_REPLICA_SOCKET}/?x=1`, 'ws://rooms.wildshard.io:18796/'])
+    expect(() => botTarget(url, 'forwarded', 2), url).toThrow(/J205/u);
+  // The driver asks the box's allowlisted helper and nothing else, and dials the same door the guard allows.
+  expect(driver).toContain('sudo -n /usr/local/sbin/wildshard-config replica start --seconds');
+  expect(driver).toContain("'sudo -n /usr/local/sbin/wildshard-config replica stop'");
+  expect(driver).toContain('url = `ws://${new URL(STAGING_HEALTH).hostname}:${String(REPLICA_PORT)}/`;');
+  expect(driver).toMatch(/REPLICA_PORT = 18796;/u);
+  for (const args of [['--box', '--remote', 'wildshard'], ['--box', '--workers', '8'], ['--box', '--seats', '65'], ['--box', '--seconds', '3600'], ['--box', '--spread']]) {
+    const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', ...args], { encoding: 'utf8', timeout: 10_000 });
+    expect(run.status, args.join(' ')).not.toBe(0);
+    expect(run.stderr, args.join(' ')).toMatch(/--box is a replica on memory saves|--spread is for a local replica/u);
+  }
+  const staging = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'staging', '--box'], { encoding: 'utf8', timeout: 10_000 });
+  expect(staging.status).not.toBe(0);
 });

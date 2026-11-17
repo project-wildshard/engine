@@ -8,6 +8,8 @@
 #   wildshard-config cook <tag>                                     AUTO-RELEASE AR4 (J355): move the cook worker to vX.Y.Z and
 #                                                                   the build a signed release names for it; roll back on failure
 #   wildshard-config show cook                                      print the cook worker's tag and build
+#   wildshard-config replica start [--seconds S] [--workers N] [--seats N] [--cells a,b] | replica stop
+#                                                                   MP1.2.d: the cap bench's replica on staging's CPUs, tailnet only
 #   wildshard-config saves list [--production]                      QA 11-15 row 24: every player's id, name and created_at
 #   wildshard-config saves delete-test <id>... [--production] [--yes]
 #                                                                   a test or bot player's rows, a dry run unless --yes
@@ -188,7 +190,8 @@ def helper(name):
     """A root-owned helper, or the test's stand-in (never as root)."""
     if TEST:
         return os.environ.get(f'WILDSHARD_CONFIG_TEST_{name.upper()}', '/nonexistent')
-    return {'apply': '/usr/local/sbin/wildshard-apply', 'rebuild': '/opt/wildshard-vps/rebuild.sh'}[name]
+    return {'apply': '/usr/local/sbin/wildshard-apply', 'rebuild': '/opt/wildshard-vps/rebuild.sh',
+            'replica': '/opt/wildshard-vps/replica.mjs'}[name]
 
 
 def helper_env():
@@ -395,6 +398,35 @@ def write_secret_rows(path, rows):
             os.unlink(temporary)
 
 
+# MMO-SERVER MP1.2.d: the cap bench's throwaway replica, on staging's CPUs and the tailnet only; replica.mjs (root-owned in
+# /opt/wildshard-vps, from a signed tag) says how. Bounded here and there: 60 to 3,900 seconds, 1 to 4 workers, 1 to 64 seats,
+# at most 8 cells. It runs in the foreground and its server lines come back on stdout; `replica stop` ends it.
+REPLICA_USAGE = ('usage: wildshard-config replica start [--seconds 60-3900] [--workers 1-4] [--seats 1-64] [--cells a,b] '
+                 '| replica stop')
+
+
+def replica(args):
+    if args[1:] == ['stop']:
+        words = ['stop']
+    elif args[1:2] == ['start']:
+        options = {'--seconds': '1800', '--workers': '4', '--seats': '32', '--cells': 'driftwood-isle'}
+        rest = args[2:]
+        if len(rest) % 2 or any(flag not in options for flag in rest[::2]):
+            stop(REPLICA_USAGE)
+        options.update(zip(rest[::2], rest[1::2]))
+        seconds, workers, seats, cells = (options[flag] for flag in ('--seconds', '--workers', '--seats', '--cells'))
+        if (re.fullmatch(r'[0-9]{2,4}', seconds) is None or not 60 <= int(seconds) <= 3900
+                or re.fullmatch(r'[1-4]', workers) is None or re.fullmatch(r'[0-9]{1,2}', seats) is None or not 1 <= int(seats) <= 64
+                or re.fullmatch(f'{CELL}(,{CELL}){{0,7}}', cells) is None):
+            stop(REPLICA_USAGE)
+        words = ['start', seconds, workers, seats, cells]
+    else:
+        stop(REPLICA_USAGE)
+    node = 'node' if TEST else '/usr/bin/node'
+    sys.stdout.flush()
+    os.execvpe(node, [node, helper('replica'), *words], helper_env())
+
+
 def async_upload(args):
     """SP22's staging-only credential seam; two fixed secrets arrive on stdin, never argv."""
     if args != ['async-upload', 'staging']:
@@ -450,6 +482,8 @@ def main(argv):
         return async_upload(args)
     if args and args[0] == 'saves':
         return saves(args, production)
+    if args and args[0] == 'replica':
+        return replica(args)
     if args and args[0] == 'cook':
         return cook(args)
     if args[:2] == ['show', 'cook'] and len(args) == 2:
@@ -458,7 +492,7 @@ def main(argv):
         stop('the cook worker moves with: wildshard-config cook vX.Y.Z')
     if not args or args[0] not in ('show', 'set', 'split'):
         stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [<KEY> <value>]... [--production] | split <channel> '
-             '| cook vX.Y.Z | show cook | saves list|delete-test ...')
+             '| cook vX.Y.Z | show cook | replica start|stop | saves list|delete-test ...')
     verb = args[0]
     if len(args) < 2 or args[1] not in CHANNELS:
         stop('the channel is production or staging')
