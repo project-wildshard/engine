@@ -8,6 +8,14 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { serverReturnRows } from './nativeRuntimeLoans';
+import type { SimHost } from '@wildshard/engine/sim';
+import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
+import type { DeclaredBrainPorts } from './brainRuntime';
+import { canReach } from '@wildshard/engine/ai/reach';
+import { Vector3 } from 'three';
+import { preparePerchBody } from '../population/perchBody';
+import { stepPerchBodyRoot } from '../../../shared/game/population/perchRoot';
+import { installPerchBodyPools } from './perchBodyPools';
 
 interface PerchPreparationPorts {
   readonly scope?: Scope;
@@ -61,4 +69,69 @@ export function preflightPlainPerches(shard: Shardfile, assets: ReadonlyMap<stri
     }
     return result;
   } finally { owner.dispose(); }
+}
+
+/** Default data bodies lend native observations/actions to the installer's one
+ * PerchHunterBrain. Actor identity, rather than species, selects its authority. */
+export function dataPerchBrains(host: SimHost, shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>): Pick<DeclaredBrainPorts, 'perchHunter'> {
+  const catalogue = parse(CreaturePerchBodiesSchema, shard.creatures.perchBodies ?? []);
+  if (catalogue.length === 0) return {};
+  lendPerchClosure(host.scope, assets, catalogue);
+  const byId = new Map(catalogue.map(row => [row.id, row]));
+  const spawns = new Map(shard.creatures.spawns.map(row => [row.id, row]));
+  const pools = installPerchBodyPools(host, catalogue, shard.rows);
+  const strikes = new Map(shard.rows.strikes.map(({ weight, speed, ...row }) =>
+    [row.id, { ...row, motion: { speed }, weight: () => weight }]));
+  const sites = new Map(catalogue.map(row => [row.id, {
+    perches: row.sites.map(site => new Vector3(...site.at)),
+    perchBases: row.sites.map(site => new Vector3(...site.base)),
+  }]));
+  return { perchHunter: actor => {
+    const spawn = spawns.get(actor.entityId), row = spawn?.perchBody === undefined ? undefined : byId.get(spawn.perchBody);
+    const strike = row === undefined ? undefined : strikes.get(row.policy.strike);
+    const habitat = row === undefined ? undefined : sites.get(row.id);
+    if (spawn === undefined || row === undefined || strike === undefined || habitat === undefined || spawn.home === undefined)
+      throw new Error('Missing declared per-spawn perch body');
+    const home = spawn.home, rng = host.rng.stream('spawn');
+    const herd: AnimalSim[] | null = spawn.group === undefined ? null : shard.creatures.spawns
+      .filter(candidate => candidate.group === spawn.group && candidate.perchBody === row.id)
+      .map(candidate => { const body = host.entities.get(candidate.id); if (body === undefined) throw new Error('Missing perch herd body'); return body; });
+    let selected: ReturnType<SimHost['nearestPlayer']> | undefined;
+    const from = new Vector3(), point = new Vector3(), direction = new Vector3();
+    const context = {
+      dt: 0, player: actor.position, calm: true, rng, herd,
+      world: { ...habitat, throwCoconut: (start: Vector3, target: Vector3, source: AnimalSim) => { pools.throw(row.id, start, target, source, rng); } },
+      heightAt: (x: number, z: number) => host.groundHeightAt(x, z),
+      sound: (_cue: string) => undefined,
+      steer: (body: AnimalSim, yaw: number, speed: number, turn: number) => { body.setMotion(yaw, speed, turn); },
+      confine: (body: AnimalSim) => {
+        const x = body.position.x + Math.sin(body.desiredYaw) * 2, z = body.position.z + Math.cos(body.desiredYaw) * 2;
+        if (Math.hypot(x - home.x, z - home.z) > home.r)
+          body.setMotion(Math.atan2(home.x - body.position.x, home.z - body.position.z), 0, 3);
+      },
+      claim: (body: AnimalSim) => host.events.ask('ai.claim', body),
+      mayAttack: (body: AnimalSim) => host.events.ask('ai.mayAttack', body),
+      reach: (body: AnimalSim) => selected !== undefined && canReach(body, selected.position, host.physics),
+      hurt: (damage: number) => {
+        if (selected === undefined || !selected.health.alive || host.parked.has(selected.id)) return;
+        point.copy(selected.position); point.y += 1.2;
+        from.copy(actor.position); from.y += actor.dims.bodyY * actor.scale;
+        direction.subVectors(point, from).normalize();
+        host.combat.hit({ source: actor.combatActor(), sourceTags: strike.tags, target: selected.health,
+          amount: damage, point, dir: direction, from, moveId: strike.id,
+          cause: { kind: actor.kind, label: actor.label } });
+      },
+    };
+    const cooldown = { range: (min: number, max: number) => host.rng.stream(row.policy.attackStream ?? 'ai').range(min, max) };
+    const prepared = preparePerchBody(actor, context, strike, ReturnProgram.native(host, row.program), row.policy, cooldown);
+    const observe = (dt: number) => {
+      const player = host.nearestPlayer(actor.position);
+      selected = player.health.alive && !host.parked.has(player.id) ? player : undefined;
+      context.dt = dt; context.player = selected?.position ?? actor.position; context.calm = selected === undefined;
+      return prepared.observe(context);
+    };
+    return { observe, body: dt => {
+      observe(dt); stepPerchBodyRoot(actor, dt, row.policy.root); prepared.brain.act(context);
+    } };
+  } };
 }

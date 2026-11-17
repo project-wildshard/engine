@@ -1,5 +1,5 @@
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
-import { preflightPlainPerches } from '../shardfile/dataPerchBrains';
+import { dataPerchBrains, preflightPlainPerches } from '../shardfile/dataPerchBrains';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { parseNativeLoadoutRow, type NativeLoadoutRowSchema } from '@wildshard/format/nativeItems';
@@ -541,7 +541,8 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     });
     if (brainBindings.length > 0 && ports.scriptBrains === undefined) throw new Error('Missing custom brain port');
     const dataPorts = shard.runtime === null ? dataCreaturePorts(host, shard.rows, creatures.spawns, ports.creatureImpulse) : undefined;
-    const dataBrains = dataPorts === undefined ? undefined : { ...dataPorts.brains, ...dataGroundBrains(host, shard.rows, creatures.spawns) };
+    const dataBrains = dataPorts === undefined ? undefined : { ...dataPorts.brains, ...dataGroundBrains(host, shard.rows, creatures.spawns),
+      ...(ports.brains === undefined ? dataPerchBrains(host, shard, assets) : {}) };
     const groupIds = new Set(creatures.groups.map((group) => group.id));
     const preparedGroups = prepareDeclaredGroupBrains(host, creatures.groups, creatures.spawns, ports.groups ?? dataPorts?.groups ?? {},
       creatures.brains.map((brain) => brain.id), shard.encounters.map((row) => row.entity));
