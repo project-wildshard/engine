@@ -34,6 +34,22 @@ Git hygiene
    arguments to push commits already made). It commits by pathspec, syncs main the `main-pull.mjs` way (never a
    rebase or stash), pushes through the normal pre-push and retries a race, under one lock per checkout. On a
    conflict it uncommits your files and prints the `--onto` command that finishes the merge.
+ - **Local cross-repo proof on the mini (LOCAL-LINK, M1):** from repo-kit,
+   `WS_LANE_NAME=<lane> node kit/cli/main.ts local init`, then `local link
+   --consumer sharddev --production-live v0.1.2 --reason "<purpose>"` with
+   the same lane environment reserves that consumer by receipt. Link the
+   canonical main checkouts; repo-kit `docs/local-development.md` owns
+   peer compatibility and restoration. Run the consumer's normal check.
+   To test an unpublished built shard, run `node scripts/pins.ts install
+   --from-dir <canonical-shard/built-product-directory>` here, then its
+   cook/journey proof. Before main-push, restore the consumer with `local
+   pinned --consumer sharddev --production-live v0.1.2` and restore engine
+   products with `node scripts/pins.ts install`. Push/land/release refuse
+   local shard provenance. After pushing, run `node scripts/shard-check.ts
+   --baseline <full-pushed-sha> [--shards shard-dunes,...]`; HEAD is the
+   candidate, all seven shards are the default, and both legs are bounded
+   to twenty minutes. Keep its receipt and run URLs; a regression means
+   fix forward on main. This check runs outside main-push's shared lock.
  - Mode 1's pull is `node scripts/main-pull.mjs`, not `git pull --rebase` (which refuses while any lane has an
    unstaged edit here). It replays your commits onto origin/main and moves only the paths main changes; if one of
    those is another lane's uncommitted edit it stops and names it: wait and run it again, never stash, restore or

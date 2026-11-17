@@ -28,3 +28,8 @@ both engine inputs, and one twenty-minute deadline. A baseline-green /
 candidate-red execution is a regression; changed receiver heads, reused
 run IDs and incomplete runs remain inconclusive. This local command
 does not create issues or hold the main-push lock. Reads use the App.
+
+LL7 records the scoped mini habit in engine AGENTS: canonical links with
+receipts, actual local product proof, restoration before main-push, then
+explicit pushed candidate/baseline checks. M1 cuts LL2/LL3 worktree
+machinery; other machines keep their own execution rules.
