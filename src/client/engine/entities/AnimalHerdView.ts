@@ -388,7 +388,7 @@ export class AnimalHerdView implements RowBodiesDraw {
     // … except a pinned body (a boss row's): a 19 m boss must not vanish mid-fight past the phone's 150 m; with cards
     // past it (CC55b) the rig stays whole to the hide distance and the card takes over there
     const fade = a.drawPinned || cards || d2 < (hide * 0.85) ** 2 ? 1 : Math.max(0, Math.min(1, (hide - Math.sqrt(d2)) / (hide * 0.15)));
-    a.mesh.visible = fade > 0 && d2 < hide * hide;
+    a.mesh.visible = fade > 0 && (a.drawPinned || d2 < hide * hide);
     const sc = a.scale * fade * fade * (3 - 2 * fade);
     if (a.mesh.scale.x !== sc) a.mesh.scale.setScalar(sc);
     const made = this.rigs.get(a);

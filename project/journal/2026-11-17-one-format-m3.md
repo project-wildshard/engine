@@ -34,3 +34,4 @@
   the LOD keeps them, or a rig returning inside 40 m stayed at mask 0. After standing
   20 m from a herd for 16 s, 3 models had recorded bakes; at 80 m: 13 deer in baked
   herds, 22 on cards past 112.5 m, 74-77 draws (86 at spawn with fewer deer in view).
+- Review (claude -p, one MUST): pinned bodies stayed hidden past hide; fixed. Also: record only posed frames, ask a refused look once, full herd's leftovers pose.

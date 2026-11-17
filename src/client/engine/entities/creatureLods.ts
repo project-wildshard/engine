@@ -30,6 +30,8 @@ export interface LodRig {
   readonly drawPinned: boolean;
   readonly speed: number;
   readonly gaitPhase: number;
+  /** this frame's update left the bones as they were (the pose cadence skipped it): nothing new to record */
+  readonly poseFrozen: boolean;
 }
 
 /** what the bands need from a model: its rig geometry, a fresh body material, its views (null: that band stays off) */
@@ -53,6 +55,10 @@ interface ModelBands {
   cards: HerdSprites | null | undefined;
   herdCount: number;
   cardCount: number;
+  /** the herd held every copy last frame: the rest stay rigs, and pose */
+  full: boolean;
+  /** the model's look has no herd material: never record it again */
+  refused: boolean;
 }
 
 export type LodDraw = 'rig' | 'baked' | 'card' | 'none';
@@ -71,14 +77,14 @@ export class CreatureLods<M extends object> {
 
   private bands(model: M): ModelBands {
     let b = this.models.get(model);
-    if (b === undefined) { b = { recorder: null, herd: null, cards: undefined, herdCount: 0, cardCount: 0 }; this.models.set(model, b); }
+    if (b === undefined) { b = { recorder: null, herd: null, cards: undefined, herdCount: 0, cardCount: 0, full: false, refused: false }; this.models.set(model, b); }
     return b;
   }
 
   begin(): void { for (const b of this.models.values()) { b.herdCount = 0; b.cardCount = 0; } }
 
   /** whether the model's herd is baked (the rig may stop posing in its band) */
-  baked(model: M): boolean { const herd = this.models.get(model)?.herd; return herd !== undefined && herd !== null; }
+  baked(model: M): boolean { const b = this.models.get(model); return b !== undefined && b.herd !== null && !b.full; }
 
   /** Whether `a`'s rig must pose its bones this frame: not while its model's herd or cards draw it. */
   posesLive(a: LodRig, model: M, d2: number, tier: LodTier): boolean {
@@ -112,14 +118,14 @@ export class CreatureLods<M extends object> {
 
   /** a walking rig inside the live band fills its model's gait slot for its phase, once */
   private record(a: LodRig, model: M, b: ModelBands): void {
-    if (b.herd !== null || Math.abs(a.speed) < WALKING) return;
+    if (b.herd !== null || b.refused || a.poseFrozen || Math.abs(a.speed) < WALKING) return;
     const recorder = b.recorder ??= new GaitRecorder(a.mesh.skeleton.bones.length, LOD_FRAMES);
     if (a.mesh.skeleton.bones.length !== recorder.bones || !recorder.wants(a.gaitPhase)) return;
     a.mesh.updateMatrixWorld(true);
     if (!recorder.record(a.mesh, a.mesh, a.gaitPhase)) return;
     const material = this.source.material(model);
     b.recorder = null;
-    if (material === null) return;
+    if (material === null) { b.refused = true; return; }
     b.herd = new BakedHerd(this.source.geometry(model), recorder.bake(), LOD_CAPACITY, material);
     this.group.add(b.herd.mesh);
   }
@@ -127,7 +133,7 @@ export class CreatureLods<M extends object> {
   /** the copies taken this frame are drawn; the rest are not */
   end(): void {
     for (const b of this.models.values()) {
-      if (b.herd !== null) { b.herd.setCount(b.herdCount); b.herd.mesh.visible = b.herdCount > 0; b.herd.update(0); }
+      if (b.herd !== null) { b.full = b.herdCount >= b.herd.capacity; b.herd.setCount(b.herdCount); b.herd.mesh.visible = b.herdCount > 0; b.herd.update(0); }
       if (b.cards !== undefined && b.cards !== null) { b.cards.setCount(b.cardCount); b.cards.mesh.visible = b.cardCount > 0; b.cards.update(); }
     }
   }

@@ -19,18 +19,19 @@ function rigMesh(): SkinnedMesh {
 
 interface Deer extends LodRig { gaitPhase: number; speed: number; alive: boolean; drawPinned: boolean }
 const deer = (mesh: SkinnedMesh, z: number, speed = 1.2): Deer => ({
-  mesh, position: new Vector3(0, 0, -z), yaw: 0.4, scale: 1, alive: true, fading: false, drawPinned: false, speed, gaitPhase: 0,
+  mesh, position: new Vector3(0, 0, -z), yaw: 0.4, scale: 1, alive: true, fading: false, drawPinned: false, speed, gaitPhase: 0, poseFrozen: false,
 });
 
-function lods(opts: { material?: boolean; views?: boolean } = {}): { lods: CreatureLods<object>; model: object; made: Material[] } {
+function lods(opts: { material?: boolean; views?: boolean } = {}): { lods: CreatureLods<object>; model: object; made: Material[]; asked: () => number } {
   const made: Material[] = [], model = {}, mesh = rigMesh();
+  let asks = 0;
   const views: SpriteViews = { texture: new DataTexture(new Uint8Array(4), 1, 1), views: 8, width: 2, height: 2, offsetY: 0 };
   const source: LodSource<object> = {
     geometry: () => mesh.geometry,
-    material: () => { if (opts.material === false) return null; const m = new MeshStandardMaterial(); made.push(m); return m; },
+    material: () => { asks++; if (opts.material === false) return null; const m = new MeshStandardMaterial(); made.push(m); return m; },
     views: () => (opts.views === false ? null : views),
   };
-  return { lods: new CreatureLods(source), model, made };
+  return { lods: new CreatureLods(source), model, made, asked: () => asks };
 }
 
 /** walk `rig` through every gait slot inside the live band */
@@ -68,9 +69,17 @@ test('a standing rig records nothing; corpses, fading and pinned bodies are alwa
   for (const a of [dead, pinned]) { expect(l.draw(a, model, 90 * 90, PHONE)).toBe('rig'); expect(l.posesLive(a, model, 90 * 90, PHONE)).toBe(true); }
 });
 
-test('a look the herd cannot draw keeps its rigs', () => {
-  const { lods: l, model } = lods({ material: false });
+test('a rig whose bones the cadence froze this frame records nothing', () => {
+  const { lods: l, model, made } = lods();
+  walkThrough(l, model, { ...deer(rigMesh(), 20), poseFrozen: true });
+  expect(made).toHaveLength(0);
+});
+
+test('a look the herd cannot draw keeps its rigs, and is asked once', () => {
+  const { lods: l, model, asked } = lods({ material: false });
   walkThrough(l, model, deer(rigMesh(), 20));
+  walkThrough(l, model, deer(rigMesh(), 20));
+  expect(asked()).toBe(1);
   expect(l.draw(deer(rigMesh(), 90), model, 90 * 90, PHONE)).toBe('rig');
   expect(l.baked(model)).toBe(false);
 });
