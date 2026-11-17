@@ -2,6 +2,7 @@ import { prepareClientModuleGroups } from './clientModules';
 import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/shardfile/outputDescriptor';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
+import { dangerousRuntimeOwnership, dangerousUnbudgetedRuntime } from '../../../shared/game/shardfile/dangerousGates';
 import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { contentCost } from '@wildshard/format/contentCost';
@@ -99,9 +100,12 @@ function withPageMemory(options: FolderOptions, bindings: ShardfileClientBinding
 
 function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings: ShardfileClientBindings): ShardManifest {
   const source = admitted.source;
-  if (bindings.trustedRuntime === true && (!options.firstParty || source.runtime === null)) throw new Error('Empty hybrid policy requires a trusted first-party runtime declaration');
-  if (bindings.audioOwner === 'runtime' && (!options.firstParty || source.runtime === null)) throw new Error('Runtime audio ownership requires a trusted first-party runtime declaration');
-  if (bindings.worldOwner === 'runtime' && (!options.firstParty || source.runtime === null)) throw new Error('Runtime world ownership requires a trusted first-party runtime declaration');
+  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+  if (bindings.trustedRuntime === true && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Empty hybrid policy requires a trusted first-party runtime declaration');
+  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+  if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime audio ownership requires a trusted first-party runtime declaration');
+  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+  if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime world ownership requires a trusted first-party runtime declaration');
   if (!options.firstParty && admitted.instance === undefined) throw new Error('Outside shardfile is missing its admitted save identity');
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
@@ -153,7 +157,8 @@ export async function installShardfileFolder(input: unknown, providedOptions: Fo
 export async function inlineHybridArrival(source: Shardfile, options: Pick<FolderOptions, 'base' | 'firstParty'>,
   read: (url: string) => Promise<unknown>, discover: (document: unknown) => ShardManifest = shardFromDiscovery): Promise<ShardManifest | null> {
   if (source.runtime === null) return null;
-  if (!options.firstParty) throw new Error('Custom runtime requires trusted hybrid composition');
+  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+  if (!dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires trusted hybrid composition');
   const { slug: folder } = source.identity;
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(folder)) throw new Error('Inline hybrid identity is not a shard folder');
   const url = new URL(`/shardfiles/${folder}/discovery.json`, options.base);

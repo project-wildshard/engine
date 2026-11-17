@@ -39,6 +39,8 @@ const CLIENT_SOURCE = 'src/client/game/shardfile/clientSource.ts';
 const PLAN_PAGE = 'src/client/game/shardfile/hybrid.ts';
 const DESCRIPTOR = 'src/shared/game/shardfile/outputDescriptor.ts';
 const GRID_FOLDERS = 'src/client/game/grid/folders.ts';
+/** OF10b: each dangerous gate is one deprecated function here; its sites call it by name. */
+export const DANGEROUS_GATES = 'src/shared/game/shardfile/dangerousGates.ts';
 
 export const GATES: readonly Gate[] = [
   {
@@ -46,7 +48,7 @@ export const GATES: readonly Gate[] = [
     what: 'The provenance option itself: its field on `FolderOptions` and on a client-plan resident, '
       + '`browserShardfileOptions`\'s argument, and the literal `true` our client-plan shards, the grid prefetch and the server pass.',
     replacedBy: 'Nothing: with every other gate gone the option carries no meaning, so it goes (OF10a).',
-    refs: { [FOLDER]: 4, [RUNTIME_FOLDER]: 2, [PLAN_PAGE]: 5, [DESCRIPTOR]: 1, [CLIENT_SOURCE]: 1,
+    refs: { [FOLDER]: 4, [RUNTIME_FOLDER]: 2, [PLAN_PAGE]: 3, [DESCRIPTOR]: 1, [CLIENT_SOURCE]: 1, [DANGEROUS_GATES]: 1,
       'src/server/host/standalone/serverFolder.ts': 1, 'src/client/game/grid/prefetchIndexCore.ts': 1,
       'src/client/game/grid/regionalRuntime.ts': 1, 'src/client/game/shard/declaredEntry.ts': 1 },
   },
@@ -99,8 +101,10 @@ export const GATES: readonly Gate[] = [
     harm: 'A runtime binds a native module compiled into the engine bundle (one shard\'s TypeScript), which runs with no CPU, '
       + 'memory or bandwidth limit of its own.',
     budget: 'OF10c: the shard\'s tier CPU and memory limits, metered on the runtime\'s module.',
-    refs: { [FOLDER]: 1, [CLIENT_SOURCE]: 1 },
+    refs: { [DANGEROUS_GATES]: 1 },
     snippets: [
+      { file: FOLDER, text: 'if (source.runtime !== null && !dangerousUnbudgetedRuntime(options)) throw' },
+      { file: CLIENT_SOURCE, text: 'if (!dangerousUnbudgetedRuntime(options)) throw' },
       { file: CLIENT_SOURCE, text: "if (admitted.source.runtime !== null) throw new Error('Custom runtime requires" },
       { file: CLIENT_SOURCE, text: "  if (source.runtime !== null) throw new Error('Custom runtime requires" },
     ],
@@ -111,7 +115,8 @@ export const GATES: readonly Gate[] = [
     harm: 'Native page features run engine page code paths the shard selects (stages, owners, plan features), outside the '
       + 'cost its admission charged.',
     budget: 'OF10c: the shard\'s tier CPU and memory limits, charged per page feature.',
-    refs: { [FOLDER]: 1 },
+    refs: { [DANGEROUS_GATES]: 1 },
+    snippets: [{ file: FOLDER, text: 'if (hasDeclaredClientPage(source) && !dangerousUnbudgetedPageFeatures(options)) throw' }],
   },
   {
     id: 'runtime-ownership', verdict: 'dangerous', name: 'dangerousRuntimeOwnership',
@@ -120,7 +125,15 @@ export const GATES: readonly Gate[] = [
     harm: 'An owning runtime replaces the engine\'s admitted world, audio or stage owners, so its frame and memory cost '
       + 'escape admission entirely.',
     budget: 'OF10c: the shard\'s tier CPU and memory limits, with the owned stages metered as the runtime\'s.',
-    refs: { [CLIENT_SOURCE]: 3, [PLAN_PAGE]: 3 },
+    refs: { [DANGEROUS_GATES]: 1 },
+    snippets: [
+      { file: CLIENT_SOURCE, text: "=== true && (!dangerousRuntimeOwnership(options)" },
+      { file: CLIENT_SOURCE, text: "if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options)" },
+      { file: CLIENT_SOURCE, text: "if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options)" },
+      { file: PLAN_PAGE, text: "if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(options)) throw" },
+      { file: PLAN_PAGE, text: 'preparePageRuntime(product, dangerousRuntimeOwnership(folderOptions))' },
+      { file: PLAN_PAGE, text: 'if (!dangerousRuntimeOwnership(resident) ||' },
+    ],
   },
   {
     id: 'graph-authority', verdict: 'dangerous', name: 'dangerousUnbudgetedMaterialGraph',
@@ -128,7 +141,8 @@ export const GATES: readonly Gate[] = [
       + 'shard\'s graphs are clamped.',
     harm: 'Opened, any shard could compile unbounded GPU shader graphs (nodes, samplers, passes) on every player\'s device.',
     budget: 'OF10c: the shard\'s tier GPU limits (graph nodes, textures, passes).',
-    snippets: [{ file: 'src/client/game/shardfile/clientMaterials.ts', text: 'export function admittedGraphAuthority(' }],
+    snippets: [{ file: DANGEROUS_GATES, text: 'export function dangerousUnbudgetedMaterialGraph(' },
+      { file: 'src/client/game/grid/session.ts', text: 'trustedGraphs: dangerousUnbudgetedMaterialGraph(source)' }],
   },
 ];
 

@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { GATES, renderGates } from '../src/shared/game/shardfile/gates';
+import { DANGEROUS_GATES, GATES, renderGates } from '../src/shared/game/shardfile/gates';
 
 const ROOT = resolve(import.meta.dirname, '..');
 /** OF1's `engine.access-gate-references` pattern (shard-format src/tools/one-way-counts.ts), over runtime src. */
@@ -50,4 +50,12 @@ test('every gate has a verdict; delete names its replacement; dangerous names it
 
 test('docs/GATES.md is generated from the ledger', () => {
   expect(readFileSync(resolve(ROOT, 'docs/GATES.md'), 'utf8')).toBe(renderGates());
+});
+
+test('OF10b: every dangerous gate is one deprecated function of its name, naming its OF10c row; nothing else is there', () => {
+  const text = readFileSync(resolve(ROOT, DANGEROUS_GATES), 'utf8');
+  const exported = [...text.matchAll(/^export function (\w+)\(/gmu)].map(match => match[1]);
+  const named = GATES.filter(gate => gate.verdict === 'dangerous').map(gate => gate.name);
+  expect(exported.sort()).toEqual([...named].sort());
+  for (const name of named) expect(text, name).toMatch(new RegExp(`/\\*\\* @deprecated ONE-FORMAT OF10c\\d[^]*?\\*/\\nexport function ${name ?? ''}\\(`, 'u'));
 });

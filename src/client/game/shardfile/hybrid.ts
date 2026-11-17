@@ -25,6 +25,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 
 import type { RuntimeDeclaration } from '@wildshard/format/runtime';
 import type { AudioData } from '@wildshard/format/audio';
+import { dangerousRuntimeOwnership } from '../../../shared/game/shardfile/dangerousGates';
 
 async function runtimeClientPhase(ctx: ShardContext, phase: ClientPhase, resident: Scope, lifetime?: 'entered'): Promise<void> {
   if (!ctx.product.has('client/plan')) return;
@@ -34,8 +35,8 @@ async function runtimeClientPhase(ctx: ShardContext, phase: ClientPhase, residen
 
 /** A finite data runtime has no source entry or hooks of its own. */
 class ClientPlanRuntime extends ShardPlugin {}
-function preparePageRuntime(product: ShardFolder, firstParty: boolean): new () => ShardPlugin {
-  if (!firstParty || !product.has('client/plan')) throw new Error('Data resident requires its admitted client plan');
+function preparePageRuntime(product: ShardFolder, owned: boolean): new () => ShardPlugin {
+  if (!owned || !product.has('client/plan')) throw new Error('Data resident requires its admitted client plan');
   admittedFolderClientPlan(product);
   return ClientPlanRuntime;
 }
@@ -307,7 +308,8 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
   const source = product.shardfile;
   if (source.runtime === null) throw new Error('Hybrid requires a compiled client-plan runtime declaration');
   provideHybridDeclaration(source);
-  if (bindings.stagesOwner === 'runtime' && !options.firstParty) throw new Error('Runtime stage ownership requires a trusted first-party shard');
+  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+  if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(options)) throw new Error('Runtime stage ownership requires a trusted first-party shard');
   const { residencyContext, retainHomeRuntime, stagesOwner, ...providedBindings } = bindings;
   const residency = residencyContext?.game.residency;
   if (residency !== undefined && providedBindings.residency !== undefined && residency !== providedBindings.residency) {
@@ -330,7 +332,8 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
   const { load, mapImage } = await shardfileSource(source, folderOptions, { ...clientBindings, instance, trustedRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime', onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
     .then(data => ({ load: data.load, mapImage: data.minimap?.image }));
   if (load === undefined) throw new Error('Missing admitted hybrid data plugin');
-  const Runtime = preparePageRuntime(product, folderOptions.firstParty);
+  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+  const Runtime = preparePageRuntime(product, dangerousRuntimeOwnership(folderOptions));
   const installed = await load().then(({ default: Data }) => new Data());
   const mapped: ShardPlugin = source.map === undefined ? installed : {
     async world(ctx) {
@@ -373,7 +376,8 @@ export class HybridRuntimeSession {
     if (resident === undefined) return Promise.reject(new Error('Missing hybrid resident'));
     const prior = this.prepared.get(instance); if (prior !== undefined) return prior;
     const product = resident.product;
-    if (!resident.firstParty || product === undefined || !product.has('client/plan')) return Promise.reject(new Error('Data resident requires its admitted client plan'));
+    // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+    if (!dangerousRuntimeOwnership(resident) || product === undefined || !product.has('client/plan')) return Promise.reject(new Error('Data resident requires its admitted client plan'));
     admittedFolderClientPlan(product);
     const prepared = Promise.resolve(ClientPlanRuntime);
     this.prepared.set(instance, prepared);

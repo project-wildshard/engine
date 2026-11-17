@@ -96,7 +96,8 @@ import { findShard } from '../shard/registry';
 import { TileDecoder } from './tileDecoder';
 import { clientTileRegistration, type ClientTileRegistration, clientRingCatalogue, clientRingPorts, type ClientRingInstance, type PreparedRingTile } from '../shardfile/tileContent';
 import type { ClientAssets } from '../shardfile/clientAssets';
-import { admittedGraphAuthority, clientMaterials } from '../shardfile/clientMaterials';
+import { clientMaterials } from '../shardfile/clientMaterials';
+import { dangerousUnbudgetedMaterialGraph } from '../../../shared/game/shardfile/dangerousGates';
 import { clientTileViews, type ClientTileViews } from '../shardfile/clientViews';
 import type { ClientSkin } from '../shardfile/clientSkins';
 import { exteriorLightingState, setParkedMatricesFrozen, setWarmUpHeld } from '@wildshard/engine/render/precompile';
@@ -965,7 +966,8 @@ export class GridSession {
               try {
                 if (scope.disposed) throw new Error('Grid product view disposed during admission');
                 // A neighbour's tiles hold the authority its entered page holds, or Nine's look graphs are refused by whichever walk reaches it first.
-                const presentation = await clientMaterials(source, admitted.assets, renderer, scope, { trustedGraphs: admittedGraphAuthority(source) });
+                // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+                const presentation = await clientMaterials(source, admitted.assets, renderer, scope, { trustedGraphs: dangerousUnbudgetedMaterialGraph(source) });
                 return { source, assets: retained.reader, views: clientTileViews({ terrain: source.terrain, terrainShadow: source.terrain?.shadow, terrainOrder: source.terrain?.order, ...presentation }), compile: presentation.compile,
                   scene: { materials: presentation.materials, swings: presentation.swings } };
               } catch (error) { retained.release(); throw error; }

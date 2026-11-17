@@ -1,4 +1,5 @@
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
+import { dangerousUnbudgetedPageFeatures, dangerousUnbudgetedRuntime } from '../../../shared/game/shardfile/dangerousGates';
 
 import { waitFor } from '@wildshard/engine/boot/waits';
 import type { TextureTranscodeSupport } from '@wildshard/format/contentBounds';
@@ -499,8 +500,10 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
     ? readValidationReceipt(visited?.validation, sourceHash) ?? (options.firstParty ? builtValidationReceipt(sourceHash) : null) : null;
   const worst = receipt?.worst ?? await checkedFolderCosts(source, options.memory);
   if (receipt !== null) acceptValidatedCost(source, worst, options.memory);
-  if (source.runtime !== null && !options.firstParty) throw new Error('Custom runtime requires a trusted first-party shard');
-  if (hasDeclaredClientPage(source) && !options.firstParty) throw new Error('Native page features require a trusted first-party shard');
+  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+  if (source.runtime !== null && !dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires a trusted first-party shard');
+  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
+  if (hasDeclaredClientPage(source) && !dangerousUnbudgetedPageFeatures(options)) throw new Error('Native page features require a trusted first-party shard');
   if (!options.offline && visited !== null && visited !== undefined && isOutputIndex(visited.source) && compatibleShardfileVersion(version(visited.source))) {
     let previous: unknown;
     // Only its identity and state are compared: an older build's sections can fail this build's schemas (G531 retired
