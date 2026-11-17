@@ -17,7 +17,7 @@
 // through `wildshard memory`; engine CI runs it on the Nine preview (`scripts/nine-ring1.mjs memory`).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { setTimeout as sleep } from 'node:timers/promises';
 import * as v from 'valibot';
 
 /** Engine's MEMORY_AMBER (src/client/game/grid/budgetOverlay.ts): red over it in CI (J408). Decimal bytes. */
@@ -146,9 +146,9 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
     tracing.on('Tracing.dataCollected', event => { events.push(...event.value); });
     await tracing.send('Tracing.start', { transferMode: 'ReportEvents', traceConfig: { includedCategories: ['disabled-by-default-memory-infra'], memoryDumpConfig: { triggers: [] } } });
     const started = Date.now();
-    let sampling = true;
+    const run = { sampling: true };
     const sampler = (async () => {
-      while (sampling) {
+      while (run.sampling) {
         const tick = Date.now();
         const [dumped, heap, step] = await Promise.all([
           tracing.send('Tracing.requestMemoryDump', { levelOfDetail: 'light', deterministic: false }).catch(() => null),
@@ -157,7 +157,7 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
         ]);
         const heapBytes = heap === null ? 0 : heap.usedSize + (heap.embedderHeapUsedSize ?? 0) + (heap.backingStorageSize ?? 0);
         samples.push({ atMs: tick - started, step: String(step), dump: dumped?.success === true ? dumped.dumpGuid : null, heapBytes });
-        await new Promise(done => setTimeout(done, Math.max(0, everyMs - (Date.now() - tick))));
+        await sleep(Math.max(0, everyMs - (Date.now() - tick)));
       }
     })();
     try {
@@ -167,8 +167,8 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
       ready = failure === null;
       if (ready) await page.waitForTimeout(settleMs);
     } finally {
-      sampling = false; await sampler;
-      const ended = new Promise(done => { tracing.once('Tracing.tracingComplete', done); });
+      run.sampling = false; await sampler;
+      const ended = new Promise(resolve => { tracing.once('Tracing.tracingComplete', resolve); });
       await tracing.send('Tracing.end'); await ended;
     }
     return { chunk, url, protocol: 'chromium-phone-boot/1', ready, failure, errors, everyMs, settleMs, elapsedMs: Date.now() - started, samples, dumps: processDumps(events) };
@@ -194,6 +194,6 @@ async function main(argv) {
   return verdict.pass ? 0 : 1;
 }
 
-if (process.argv[1] !== undefined && resolvePath(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] !== undefined && resolvePath(process.argv[1]) === import.meta.filename) {
   process.exitCode = await main(process.argv.slice(2));
 }
