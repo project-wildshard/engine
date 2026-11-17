@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "a66a6910b057fc01fb62703097a6d33f4e539b450d040d89e940ef2c71e4ac4c",
+  "catalogueHash": "7f595663fccaa6f9a0d08d8edbb411a0f6f3135bd25b55acb4891302bd322c9a",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -741,6 +741,14 @@
             1,
             3
           ]
+        },
+        {
+          "instance": "mossgate",
+          "slug": "mossgate",
+          "cell": [
+            2,
+            3
+          ]
         }
       ],
       "emptyNeighbour": {
@@ -788,6 +796,12 @@
         "hash": "5764c86a258ac664ced0ba46860089738cca44d2f27a3f84abdd9ad80f79b0c3"
       },
       {
+        "slug": "mossgate",
+        "name": "Mossgate Hollow",
+        "revision": 2,
+        "hash": "c97266026e66bcd39ba1645a7e15b3543e0fe2a4903aaf5259eede9308a169a6"
+      },
+      {
         "slug": "mu9-auto-20261116",
         "name": "mu9-auto-20261116",
         "revision": 1,
@@ -802,8 +816,8 @@
       {
         "slug": "nine-dragon-stack",
         "name": "Nine Dragon Stack",
-        "revision": 1,
-        "hash": "ea45516a999bd33b7bea1cfca79c018503d6b51163fbeaeee6760709fc2c551b"
+        "revision": 2,
+        "hash": "0dd1fb1079166db5ef18420f3a3d18f18c0d4b38dcf540b1438b50f10adda6f5"
       },
       {
         "slug": "open-plot-alien-plain",
@@ -960,6 +974,12 @@
       "bytes": 7011840
     },
     {
+      "slug": "mossgate",
+      "revision": 2,
+      "hash": "c97266026e66bcd39ba1645a7e15b3543e0fe2a4903aaf5259eede9308a169a6",
+      "bytes": 19338752
+    },
+    {
       "slug": "mu9-auto-20261116",
       "revision": 1,
       "hash": "25fa04cd98ced6a8fd14b7d267a434aab15dec3920f4d0cb30b22ba7471a9ba0",
@@ -973,9 +993,9 @@
     },
     {
       "slug": "nine-dragon-stack",
-      "revision": 1,
-      "hash": "ea45516a999bd33b7bea1cfca79c018503d6b51163fbeaeee6760709fc2c551b",
-      "bytes": 115897344
+      "revision": 2,
+      "hash": "0dd1fb1079166db5ef18420f3a3d18f18c0d4b38dcf540b1438b50f10adda6f5",
+      "bytes": 116812288
     },
     {
       "slug": "open-plot-alien-plain",
