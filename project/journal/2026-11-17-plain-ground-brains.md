@@ -155,3 +155,24 @@ controls. Both dedicated main and cellWorker production targets build
 against moved format exports through the normal heavy-lane admission:
 29.47s, output tmp/codex-te2e/m2-format16-server. This is a server build
 proof; no client visual or full local land is claimed.
+
+## Cleared queue local gate, 05:58 Cancun
+
+Coordinator cleared the queue after SA25a and main-screen801c1965.
+Rebased source91294e724 passed fresh full lint/types and124focused cases.
+The normal J400 gate passed9592cases and stopped at592s on five files:
+headless-journey-worker (20s subprocess timeout, null exit), net-boss-tells
+(10s timeout), physics-headless (suite failed before its eight cases),
+pinned-restore-play (15s brasscap-mesa timeout), standalone-progress-save
+(1006.4ms elapsed versus1000ms wall-clock assertion). Load1/5/15 ended
+8.0/20.1/19.5. The retained report is
+ tmp/codex-te2e/vitest-1794912525637-47866.json.
+
+All25cases in those exact five files then passed with unchanged timeouts,
+normal assertions and two workers. The rerun report is
+ tmp/codex-te2e/m2-named-refusals-rerun.json.
+None of the five test files changed in this source range. The physics
+report has no suite failure message, so no specific hook cause is claimed.
+This supports a load-sensitive classification, not an assertion change.
+No hatch was used; retry the normal J400 local land once. Keep the saved
+red and green evidence. Do not claim this refused attempt landed.
