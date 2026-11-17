@@ -98,7 +98,7 @@ try {
 
   const { defaultBrowserType: _phoneEngine, ...iphone } = devices['iPhone 15 Pro'];
   const phoneDevice = { ...iphone, viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 } };
-  /** @param {import('playwright').Browser} browser @param {Record<string, unknown>} device */
+  /** @param {import('./browser-playwright.mjs').Browser} browser @param {Record<string, unknown>} device */
   const open = async (browser, device) => {
     const context = await browser.newContext(device), page = await context.newPage();
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
@@ -115,7 +115,7 @@ try {
     }
     throw new Error('no sign-in mail');
   };
-  /** SIGN IN on the title, mail a link, open it. @param {import('playwright').Page} page @param {string} email @param {string} shot */
+  /** SIGN IN on the title, mail a link, open it. @param {import('./browser-playwright.mjs').Page} page @param {string} email @param {string} shot */
   const signIn = async (page, email, shot) => {
     const before = readdirSync(mailDir).length;
     await page.goto(`${rig.base}/?mute=1&nolock=1`, { waitUntil: 'load' });
@@ -131,7 +131,7 @@ try {
     await page.screenshot({ path: join(shots, `${shot}.png`) });
     return who.textContent();
   };
-  /** Into Driftwood, then who the door seated and what the bag holds. @param {import('playwright').Page} page @param {string} shot */
+  /** Into Driftwood, then who the door seated and what the bag holds. @param {import('./browser-playwright.mjs').Page} page @param {string} shot */
   const join_ = async (page, shot) => {
     await page.goto(`${rig.base}/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1`, { waitUntil: 'load' });
     await intoWorld(page);
