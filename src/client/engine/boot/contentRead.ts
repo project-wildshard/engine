@@ -149,6 +149,9 @@ function reportStall(target: Document, error: ContentReadError, step: string | n
 /** FM6 mode 36: how long a read may wait on RETRY, with nothing left that reads again by itself, before its line becomes the
  *  download-failed page. The line (modes 33 to 35) is the pause; the page says the download stopped, with what to do. */
 export const DOWNLOAD_GIVE_UP_MS = 30_000;
+/** FM6 modes 36 and 44: a wait on the card's RETRY (and the download-failed page) for something that is not one read: the spawn
+ *  download refused, and runs again on the player's Try again or the network coming back. */
+export function awaitContentRetry(error: ContentReadError, signal?: AbortSignal): Promise<void> { return retryFromCard(error, signal, 3); }
 async function retryFromCard(error: ContentReadError, signal?: AbortSignal, reads = 2): Promise<void> {
   if (typeof document === 'undefined') throw error;
   const target = document, timeline = currentLoadingTimeline(), scope = new Scope('content-read-button');

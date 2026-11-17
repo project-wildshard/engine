@@ -39,7 +39,8 @@ import { settleTileDrivers, settlingTiles } from '../shardfile/tileDriver';
 import { observeTitlePreparation, prepareTitleFrame } from './titlePreparation';
 import { installCrashCheckpoint } from './crashResume';
 import { GAME_STRINGS } from '../../../shared/game/strings';
-import { currentSpawnDownload } from '../boot/spawnDownload';
+import { currentSpawnDownload, retrySpawnDownload } from '../boot/spawnDownload';
+import { downloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { waitEntryWork } from './entryReadiness';
 import { spawnViewThenNamed } from './readyFrame';
 import { slowShaderGpu } from './slowGpu';
@@ -290,8 +291,18 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     if (queuedLinks()) await loadingStage('worldPrograms', () => linkWorldUnderLoader(game));
   }
   // DL11: setup overlapped the spawn download; control still waits for the whole set
-  const spawn = currentSpawnDownload();
-  if (spawn !== undefined && !spawn.snapshot().complete) await waitFor('Spawn download', spawn.ready, 'file');
+  // FM6 modes 36 and 44: a part out of its reads refuses the job (a broken or unreachable pack); the load then waits on the card's
+  // RETRY and the download-failed page, and the same download runs again, instead of ending the load on the startup refusal
+  for (let spawn = currentSpawnDownload(); spawn !== undefined && !spawn.snapshot().complete;) {
+    try { await waitFor('Spawn download', spawn.ready, 'file'); break; } catch (failure) {
+      const given = downloadGiveUp();
+      if (given === null || spawn.snapshot().error === null) throw failure;
+      const { awaitContentRetry, ContentReadError } = await import('@wildshard/engine/boot/contentRead');
+      await awaitContentRetry(new ContentReadError(given.detail, 'the download stopped', failure, false,
+        { ...given.status === null ? {} : { status: given.status }, broken: given.status !== null && given.status < 400 }));
+      spawn = retrySpawnDownload();
+    }
+  }
   // DL17, DL21: the server boots under the card, a counted line on it, so its reads land before control and the player's first
   // press reaches a server that is up. Before the flip this moves only J130's row.
   try {

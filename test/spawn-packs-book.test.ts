@@ -1,5 +1,5 @@
 import {afterEach, expect, test, vi} from 'vitest';
-import {setSpawnPacks, startSpawnDownload} from '../src/client/game/boot/spawnDownload';
+import {currentSpawnDownload, retrySpawnDownload, setSpawnPacks, startSpawnDownload} from '../src/client/game/boot/spawnDownload';
 
 const initialStorage = globalThis.localStorage;
 afterEach(() => { setSpawnPacks(false); vi.unstubAllGlobals(); vi.stubGlobal('localStorage', initialStorage); });
@@ -101,4 +101,16 @@ test('a packs book that answers 503 is read again, says book-5xx while it waits,
     expect(download.snapshot()).toMatchObject({complete: true, error: null});
     expect([...loadingWaitState().pending.values()].some(row => row.failmode === 'book-5xx')).toBe(false);
   } finally { vi.useRealTimers(); }
+});
+
+// FM6 modes 36 and 44: a refused download runs again (Try again at finish.ts), as a new job of the same entry; a live one never does
+test('a refused download runs again as a new job of the same entry, and only once it has failed', async () => {
+  const slug = '_book-again'; let answers = 0;
+  const {download} = run(slug, whole => (++answers === 1 ? new Response(null, {status: 404}) : Response.json({book: 'packs', build: `build-${slug}`, client: {[slug]: {phone: whole}}})));
+  await expect(download.ready).rejects.toThrow('Packs book unavailable (404)');
+  const again = retrySpawnDownload();
+  expect(again).toBeDefined(); expect(again).not.toBe(download); expect(currentSpawnDownload()).toBe(again);
+  expect(retrySpawnDownload(), 'a job that has not failed is never replaced').toBeUndefined();
+  await again?.ready;
+  expect(again?.snapshot()).toMatchObject({complete: true, error: null, filesDone: 1});
 });

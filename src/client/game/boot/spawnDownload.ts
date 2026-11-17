@@ -737,7 +737,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
     cancel: () => {controller.abort(); endStorageFull(); releaseWaits(); nudge(); markStopped(controller.signal.reason); listeners.clear();}};
 }
 
-let current: {key: string; download: SpawnDownload; foreground: boolean} | undefined;
+let current: {key: string; download: SpawnDownload; foreground: boolean; again: () => SpawnDownload | null} | undefined;
 const nativeCacheWork = new Set<Promise<unknown>>();
 /** DL20: each download's settled outcome and whether it was ever a boot's own (foreground): a boot's download is reported
  *  once, when both hold (a completed title prefetch is adopted after it settled). Queued until a sink is installed. */
@@ -1068,7 +1068,7 @@ function spawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'd
       if (address.url === selected.address.url) throw new Error('Packs book names the default manifest');
       return downloadSpawnManifest(address, downloadPorts(selected.cacheName, true), document.baseURI, selected.base);
     });
-  current?.download.cancel(); current = {key, download, foreground};
+  current?.download.cancel(); current = {key, download, foreground, again: () => spawnDownload(slug, flow, tier, mode, foreground)};
   trackOutcome(download, slug, packsOn);
   if (foreground) { markForeground(download); holdUnlisted(download.ready); }
   return download;
@@ -1081,6 +1081,14 @@ function holdUnlisted(ready: Promise<void>): void {
   void wait.then(() => { if (unlistedWait === wait) unlistedWait = null; return undefined; });
 }
 export function currentSpawnDownload(): SpawnDownload | undefined { return current?.download; }
+/** FM6 modes 36 and 44: the page's download refused (a part out of its reads), so it runs again from its manifest: the same entry,
+ *  a new job (parts it stored are cache hits). Undefined when there is none, or the current one has not failed. */
+export function retrySpawnDownload(): SpawnDownload | undefined {
+  const was = current;
+  if (was === undefined || was.download.snapshot().error === null) return undefined;
+  current = undefined; was.download.cancel();
+  return was.again() ?? undefined;
+}
 
 const mb = (bytes: number): string => (bytes / 1_000_000).toFixed(1);
 /** Paint only the existing card's numbers/text, before engine imports. The
