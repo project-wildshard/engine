@@ -16,3 +16,7 @@
   systemd-socket-proxyd door on the tailnet address :18796 so the door still trusts each bot's
   forwarded address (only loopback peers are proxies). `mmo-bots.mjs replica --box` drives it;
   the bots stay on the Mac. No arbitrary ssh command reaches the box.
+- vps-rebuild-proof.sh: the cook now follows staging's signed build (MS2.4a), so the proof reads
+  the build from cook-release.env and points cook.env at its stub API (the unit's own
+  api.wildshard.io row would win otherwise). PASS: blank box to two serving channels and a
+  cooking worker on the global store.

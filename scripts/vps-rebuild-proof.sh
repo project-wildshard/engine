@@ -129,7 +129,8 @@ UNIT
 systemctl daemon-reload && systemctl start proof-api.service"
 box sh -c "sed -i -e 's|^COOK_ENGINE_REF=\$|COOK_ENGINE_REF=$COOK_REF|' -e 's|^WILDSHARD_BUILD=\$|WILDSHARD_BUILD=proof-$COOK_REF|' \
   -e 's|^WILDSHARD_API_URL=.*|WILDSHARD_API_URL=http://127.0.0.1:8793|' -e \"s|^COOK_NOTIFY_TOKEN=\$|COOK_NOTIFY_TOKEN=\$(openssl rand -hex 24)|\" \
-  -e 's|^# COOK_STORE_DIR=.*|COOK_STORE_DIR=/var/lib/wildshard-cook/store|' /etc/wildshard/cook.env"
+  -e 's|^# COOK_STORE_DIR=.*|COOK_STORE_DIR=/var/lib/wildshard-cook/store|' /etc/wildshard/cook.env
+grep -q '^WILDSHARD_API_URL=' /etc/wildshard/cook.env || echo WILDSHARD_API_URL=http://127.0.0.1:8793 >> /etc/wildshard/cook.env"
 run 3-cook
 expect_exit 3-cook 0
 run 4-again
@@ -151,8 +152,12 @@ for channel in production staging; do
   fi
   log "$channel /health: $(printf '%s' "$health" | cut -c1-220)"
 done
+# MS2.4a: the signed staging release picks the cook's build (cook-release.env), and packs are keyed by it.
+COOK_BUILD=$(box sh -c "sed -n 's/^WILDSHARD_BUILD=//p' /etc/wildshard/cook-release.env")
+[ -n "$COOK_BUILD" ] || fail 'the cook follows no signed staging build'
+log "cook build (staging's signed release): $COOK_BUILD"
 for _ in $(seq 1 120); do
-  index=$(box sh -c "ls /var/lib/wildshard-cook/store/index/proof-$COOK_REF/$SHARD_HASH.json 2>/dev/null" || true)
+  index=$(box sh -c "ls /var/lib/wildshard-cook/store/index/$COOK_BUILD/$SHARD_HASH.json 2>/dev/null" || true)
   if [ -n "$index" ]; then break; fi
   sleep 5
 done
