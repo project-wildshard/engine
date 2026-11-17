@@ -486,7 +486,9 @@ try {
           const warned = await page.locator('[data-failmode~="save-failed"][role="status"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
           const warnShot = await shoot(page, item.id, 'warning');
           if (!warned) return { outcome: 'ui-fail', reason: 'Keep playing left no lasting warning', seen, shot: warnShot };
-          const playing = await recovered(page, 10_000).catch(() => false);
+          // play goes on under the lasting warning: frames keep coming (a notice, not a card)
+          const before = await frames(page); await sleep(3000);
+          const playing = await frames(page) > before + 10 && await page.locator('[role="alertdialog"]').count() === 0;
           db.fault('pass');
           const cleared = await gone('save-failed', 30_000), back = cleared && await recovered(page, 20_000);
           return back && playing ? { ...result, injection: { ...injection, refusedConnections: db.stats.refused }, shot, warning: warnShot, recovery: 'Keep playing: a lasting warning, play on; pass: the retried save lands and it clears' }
