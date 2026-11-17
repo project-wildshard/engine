@@ -13,7 +13,7 @@
  */
 import { Bone, Skeleton, SkinnedMesh, Vector3, type Group, type Object3D } from 'three';
 import { RestCreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
-import type { CreatureLockPoints } from '@wildshard/engine/physics/creatureVolumes';
+import type { CreatureLockPoints, CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
 import { addCombatTargets, reportCombatHit, type CombatTarget } from '@wildshard/engine/ui/Combat';
 import { addAimTargets, type AimTarget } from '@wildshard/engine/player/AimTargets';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -27,6 +27,7 @@ import type { GridCell } from '../../../shared/game/grid/assembly';
 
 /** One creature as a view draws it (E6): a page reads the region's sim entity, a client reads its row. */
 export interface NeighbourCreature {
+  readonly hitVolumes?: CreatureVolumePose | undefined;
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly yaw: number; readonly scale: number; readonly speed: number; readonly strafe: number;
   readonly alive: boolean; readonly attackPhase: number; readonly state: SkinDriveState['state'];
@@ -57,7 +58,7 @@ class CreatureTarget implements CombatTarget, AimTarget {
     readonly dims: { readonly bodyY: number; readonly bodyRadius: number }, readonly lockable: boolean) { this.hp = maxHp; this.maxHp = maxHp; this.scale = scale; }
   headWorld(out: Vector3): Vector3 { return out.copy(this.position).setY(this.position.y + this.head * this.scale); }
 }
-interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; readonly target: CreatureTarget; t: number; phase: number }
+interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly bones: Record<string, Bone>; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; readonly target: CreatureTarget; t: number; phase: number }
 interface CellLife {
   readonly cell: GridCell; readonly root: Group; readonly creatures: ReadonlyMap<string, CreatureView>;
   /** null: the cell binds no script (or its lane failed to build, `failed` says why); its creatures still draw */
@@ -136,7 +137,7 @@ export class NeighbourLife {
           get yaw() { return mesh.rotation.y; }, get scale() { return mesh.scale.x * body.scale; } });
         target.lockPoints = { names: points.names, point: (index, out) => { root.updateWorldMatrix(true, false); return points.point(index, out).applyMatrix4(root.matrixWorld); } };
       }
-      const view: CreatureView = { id, mesh, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale: spawn.scale }, bodyY: species.dims.bodyY * spawn.scale, target, t: (spawn.seed % 97) / 13, phase: 0 };
+      const view: CreatureView = { id, mesh, bones, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale: spawn.scale }, bodyY: species.dims.bodyY * spawn.scale, target, t: (spawn.seed % 97) / 13, phase: 0 };
       mesh.position.set(spawn.at[0], spawn.at[1], spawn.at[2]); mesh.rotation.set(0, spawn.yaw, 0, 'YXZ'); mesh.scale.setScalar(spawn.scale);
       // ZE3a: hidden from birth unless its cell is the active one: an admission that resolves between the late phase (which
       // hides a frozen cell's creatures) and the draw drew them once, and that draw linked their programs on the frame (a
@@ -221,7 +222,10 @@ export class NeighbourLife {
         view.t += dt; const speed = sim?.speed ?? 0, strafe = sim?.strafe ?? 0;
         view.phase = (view.phase + dt * Math.hypot(speed, strafe) * 0.6) % 1;
         this.follow(view, sim);
-        view.driver.step({ dt, t: view.t, alive: sim?.alive ?? true, flinch: sim?.flinch ?? 0, attack: sim?.attackPhase ?? -1, speed, strafe, scale: sim?.scale ?? view.spawn.scale, phase: view.phase, state: sim?.state ?? 'idle' });
+        const pose = sim?.hitVolumes;
+        if (pose?.joint !== undefined) {
+          for (const [name, bone] of Object.entries(view.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative neighbour joint ${name}`);
+        } else view.driver.step({ dt, t: view.t, alive: sim?.alive ?? true, flinch: sim?.flinch ?? 0, attack: sim?.attackPhase ?? -1, speed, strafe, scale: sim?.scale ?? view.spawn.scale, phase: view.phase, state: sim?.state ?? 'idle' });
       }
       if (life.failed === null) life.lane?.views.apply(dt);
     }

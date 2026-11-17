@@ -5,7 +5,7 @@ import type { AnimalSim } from '../../../shared/engine/entities/AnimalSim';
 import { hitHistoryOf, publishHitHistory } from '../combat/rewind';
 import type { SimHost } from '../sim';
 import type {HitRewind} from '../../../shared/engine/net/measurements';
-import type { CreatureVolumePose } from '../../../shared/engine/physics/creatureVolumes';
+import type { CreatureVolumeFrame, CreatureVolumePose } from '../../../shared/engine/physics/creatureVolumes';
 
 /** The furthest back a hit reads, in ticks: 200 ms at 60 Hz (J50). Past it the shooter leads. */
 export const REWIND_TICKS = 12;
@@ -18,7 +18,7 @@ export const HIT_HISTORY_BYTES: number = ROWS * FIELDS * Float32Array.BYTES_PER_
 
 /**
  * A body as it stood on a past tick: its feet and facing from the history, its volumes from the live body carried there. The
- * shape is the present one, so a posed joint reads today's pose at the old place, which holds for 200 ms of animation.
+ * Native/rest shapes retain today's pose at the old root. Opted-in clip shapes retain their bounded recorded endpoints.
  */
 export class RewoundBody {
   rewind:HitRewind|undefined;
@@ -26,11 +26,17 @@ export class RewoundBody {
   readonly body: AnimalSim;
   private cos = 1; private sin = 0;
   readonly hitVolumes: CreatureVolumePose | undefined;
+  private frame: CreatureVolumeFrame | undefined;
   constructor(body: AnimalSim) {
     this.body = body;
     const authored = body.hitVolumes;
-    this.hitVolumes = authored === undefined ? undefined : { volumes: authored.volumes,
-      segment: (index, rear, front) => { authored.segment(index, rear, front); this.past(rear); this.past(front); } };
+    const readFrame = (): CreatureVolumeFrame | undefined => this.frame;
+    this.hitVolumes = authored === undefined ? undefined : { get volumes() { return readFrame()?.volumes ?? authored.volumes; },
+      segment: (index, rear, front) => {
+        const frame = this.frame;
+        if (frame !== undefined) { rear.fromArray(frame.points, index * 6); front.fromArray(frame.points, index * 6 + 3); }
+        else { authored.segment(index, rear, front); this.past(rear); this.past(front); }
+      } };
   }
   get entityId(): string { return this.body.entityId; }
   get alive(): boolean { return this.body.alive; }
@@ -38,7 +44,8 @@ export class RewoundBody {
   get scale(): number { return this.body.scale; }
   get dims(): AnimalSim['dims'] { return this.body.dims; }
   /** Stand at a row of feet and yaw. */
-  place(x: number, y: number, z: number, yaw: number): void {
+  place(x: number, y: number, z: number, yaw: number, frame?: CreatureVolumeFrame): void {
+    this.frame = frame;
     const turn = yaw - this.body.yaw;
     this.position.set(x, y, z); this.cos = Math.cos(turn); this.sin = Math.sin(turn);
   }
@@ -60,7 +67,7 @@ export class RewoundBody {
   }
 }
 
-interface Track { readonly body: AnimalSim; readonly rows: Float32Array; readonly seen: RewoundBody; readonly first: number; last: number }
+interface Track { readonly body: AnimalSim; readonly rows: Float32Array; readonly frames?: (CreatureVolumeFrame | undefined)[]; readonly seen: RewoundBody; readonly first: number; last: number }
 
 /** Each hittable's last `ROWS` ticks. It reads the sim and writes nothing back, so nothing it holds is saved: a restored room starts empty and reads the present. */
 export class HitHistory {
@@ -74,15 +81,22 @@ export class HitHistory {
     host.onStep('net.hit-history', () => { this.record(); }, undefined, 'afterBodies');
   }
   /** Bytes the rows hold now, against §6.2's 18 KB estimate for 64 bodies. */
-  get bytes(): number { return this.tracks.size * HIT_HISTORY_BYTES; }
+  get bytes(): number {
+    let bytes = this.tracks.size * HIT_HISTORY_BYTES;
+    for (const track of this.tracks.values()) for (const frame of track.frames ?? []) if (frame !== undefined) bytes += frame.points.byteLength + frame.volumes.length * 24;
+    return bytes;
+  }
   /** Note every body as this tick leaves it: what a frame of this tick shows. */
   private record(): void {
     const { tracks, host } = this, tick = host.state.tick, at = (tick % ROWS) * FIELDS;
     for (const [id, body] of host.entities) {
       let track = tracks.get(id);
-      if (track?.body !== body) { track = { body, rows: new Float32Array(ROWS * FIELDS), seen: new RewoundBody(body), first: tick, last: tick }; tracks.set(id, track); }
+      if (track?.body !== body) { track = { body, rows: new Float32Array(ROWS * FIELDS),
+        ...(body.hitVolumes?.capture === undefined ? {} : { frames: Array.from({ length: ROWS }, (): CreatureVolumeFrame | undefined => undefined) }),
+        seen: new RewoundBody(body), first: tick, last: tick }; tracks.set(id, track); }
       const { rows } = track, p = body.position;
       rows[at] = p.x; rows[at + 1] = p.y; rows[at + 2] = p.z; rows[at + 3] = body.yaw;
+      if (track.frames !== undefined) track.frames[tick % ROWS] = body.hitVolumes?.capture?.();
       track.last = tick;
     }
     for (const [id, track] of tracks) if (track.last !== tick) tracks.delete(id);
@@ -99,7 +113,7 @@ export class HitHistory {
   /** Stand a track at `tick`, or at its first row if the body is newer. */
   private stand(track: Track, tick: number): RewoundBody {
     const at = (Math.max(tick, track.first) % ROWS) * FIELDS, { rows, seen } = track;
-    seen.place(rows[at] ?? 0, rows[at + 1] ?? 0, rows[at + 2] ?? 0, rows[at + 3] ?? 0);
+    seen.place(rows[at] ?? 0, rows[at + 1] ?? 0, rows[at + 2] ?? 0, rows[at + 3] ?? 0, track.frames?.[Math.max(tick, track.first) % ROWS]);
     return seen;
   }
   /**

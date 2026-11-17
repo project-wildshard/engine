@@ -55,7 +55,7 @@ interface Boxes { head: Collider; body: Collider; fore: Collider | null; bodyHal
   /** Exact pre-normalization body / fore segment directions at the last projection. */
   readonly directions: Float64Array }
 interface VolumeBoxes {
-  readonly volumes: readonly { readonly collider: Collider; readonly pose: Float64Array; readonly directions: Float64Array }[];
+  readonly volumes: readonly { readonly collider: Collider; readonly pose: Float64Array; readonly directions: Float64Array; radius: number; halfLength: number }[];
   on: boolean; slept: boolean;
 }
 /**
@@ -123,7 +123,7 @@ export class CreatureBodies<C extends Creature = Creature> {
           const collider = world.createCollider(shape.setCollisionGroups(groups('HITBOX')));
           const owner: HitboxOwner<C> = { creature: c, part: row.part, multiplier: row.multiplier };
           tagCollider(collider, 'flesh', owner); this.owners.set(collider.handle, owner);
-          return { collider, pose: new Float64Array(7).fill(Number.NaN), directions: new Float64Array(3).fill(Number.NaN) };
+          return { collider, radius, halfLength: row.halfLength, pose: new Float64Array(7).fill(Number.NaN), directions: new Float64Array(3).fill(Number.NaN) };
         });
         b = { volumes, on: true, slept: false }; this.boxes.set(c, b);
       }
@@ -156,8 +156,14 @@ export class CreatureBodies<C extends Creature = Creature> {
         if ('volumes' in b) {
           const pose = c.hitVolumes;
           if (pose === undefined) throw new Error('Creature volume authority disappeared');
+          const shapes = pose.volumes;
           for (let index = 0; index < b.volumes.length; index++) {
             const box = b.volumes[index]; if (box === undefined) break;
+            const shape = shapes[index]; if (shape === undefined) throw new Error('Creature clip shape disappeared');
+            if (box.radius !== shape.radius || box.halfLength !== shape.halfLength) {
+              box.collider.setShape(shape.halfLength === 0 ? new R.Ball(shape.radius) : new R.Capsule(shape.halfLength, shape.radius));
+              box.radius = shape.radius; box.halfLength = shape.halfLength;
+            }
             pose.segment(index, _a, _b);
             _d.subVectors(_b, _a); turnAlong(box.collider, box.pose, 3, box.directions, 0);
             moveTo(box.collider, box.pose, 0, (_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2);

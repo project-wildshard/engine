@@ -1,11 +1,12 @@
 import { parse } from 'valibot';
 import { CreatureBodySchema } from '@wildshard/format/creatureLayers';
-import { resolveSkinLookFiles } from '@wildshard/format/skinAssets';
+import { resolveSkinLookFiles, skinLookParameters } from '@wildshard/format/skinAssets';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { SimHost } from '@wildshard/engine/sim';
 import { RestCreatureVolumes } from '../../../shared/game/shardfile/creatureVolumes';
 import { RestCreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
+import { ClipCreatureVolumes } from '../../../shared/game/shardfile/creatureClipVolumes';
 import { creatureRestRig } from '../../../shared/game/shardfile/creatureRestRig';
 
 /** The actual admitted skin supplies rest joints. Native rows with no body layer
@@ -26,11 +27,13 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     }
     if (body.skeleton === undefined && body.volumes === undefined && body.lock === undefined && body.hits !== 'clip') return [];
     const resolved = resolveSkinLookFiles(shard, look, assets), skin = resolved.variants?.get(spawn.variant) ?? resolved.skin;
+    if (body.hits === 'clip' && Object.keys(skin.binding.poseLayers ?? {}).length > 0) throw new Error(`species ${spawn.species}: clip hits do not admit presentation-only pose layers`);
     const bytes = assets.get(skin.row.file);
     if (bytes === undefined) throw new Error(`species ${spawn.species}: missing admitted skin GLB`);
     const joints = creatureRestRig(bytes, skin.row.rig.joints[0] ?? []);
     const root = { position: actor.position, get yaw() { return actor.yaw; }, get scale() { return actor.scale * body.scale; } };
-    return [{ actor, pose: body.skeleton === undefined && body.volumes === undefined ? undefined : new RestCreatureVolumes(body, joints, root),
+    return [{ actor, pose: body.hits === 'clip' ? new ClipCreatureVolumes(body, bytes, joints, actor, () => host.clock.now, skinLookParameters(look).attackSpan)
+      : body.skeleton === undefined && body.volumes === undefined ? undefined : new RestCreatureVolumes(body, joints, root),
       locks: body.skeleton === undefined && body.lock === undefined ? undefined : new RestCreatureSockets(body, joints, root), contract: { id: spawn.id, body, skin: skin.hash, joints } }];
   });
   if (pending.length === 0) return;

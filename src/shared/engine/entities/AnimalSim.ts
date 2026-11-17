@@ -224,6 +224,8 @@ export class AnimalSim {
   setStrafe(mps: number): void { this.desiredStrafe = mps; }
   startAttack(dur: number): void { this.attackT = 0; this.attackDur = Math.max(0.05, dur); this.simPorts.attackStarted?.(); this.attackStarted(this.attackDur); }
   get attackPhase(): number { return this.attackT < 0 ? -1 : Math.min(1, this.attackT / this.attackDur); }
+  /** Existing saved death timer; clip reads never advance it. */
+  get deathTime(): number { return this.deathT; }
   /** Wrapped body-clock milliseconds at this attack's start. Existing motion checkpoints preserve both clocks. */
   get attackStamp(): number { return this.attackT < 0 ? 0 : Math.round((this.elapsed - this.attackT) * 1000) >>> 0; }
   cancelAttack(): void { this.attackT = -1; }

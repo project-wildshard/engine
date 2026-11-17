@@ -201,6 +201,13 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
     material: () => skin.material(),
     ...(skin.parts.length === 0 ? {} : { partMaterials: () => skin.parts.map((part) => part()) }),
     skin: (variant) => { const selected = select(variant.id); return { geometry: selected.geometry, map: null, normalMap: null, bones: bones(selected), overgrown: false }; },
-    animate: (c) => { let driver = drivers.get(c.bones); if (driver === undefined) { driver = new SkinDriver(select(c.animal.variant), c.bones); drivers.set(c.bones, driver); } driver.step(c); },
+    animate: (c) => {
+      const pose = c.animal.hitVolumes;
+      if (pose?.joint !== undefined) {
+        for (const [name, bone] of Object.entries(c.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative skin joint ${name}`);
+        return;
+      }
+      let driver = drivers.get(c.bones); if (driver === undefined) { driver = new SkinDriver(select(c.animal.variant), c.bones); drivers.set(c.bones, driver); } driver.step(c);
+    },
   };
 }

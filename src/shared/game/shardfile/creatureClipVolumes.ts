@@ -1,0 +1,84 @@
+import { Vector3, type Quaternion } from 'three';
+import type { CreatureBody } from '@wildshard/format/creatureLayers';
+import { CREATURE_SKELETONS, MIN_VOLUME_RADIUS } from '@wildshard/format/creatureSkeletons';
+import type { CreatureVolume } from '@wildshard/format/creatureVolumes';
+import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
+import type { CreatureVolumeFrame, CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
+import { CreatureClipSampler } from './creatureClipSampler';
+import type { CreatureRestJoint } from './creatureVolumes';
+
+/** Giant-only numeric clip authority. Time and damage/attack state remain owned
+ * by the existing host and actor; reads never step or create playback clocks. */
+export class ClipCreatureVolumes implements CreatureVolumePose {
+  private readonly sampler: CreatureClipSampler;
+  private readonly definitions: readonly { row: CreatureVolume; index: number }[];
+  private readonly shapes: { part: string; multiplier: number; radius: number; halfLength: number }[];
+  private readonly endpoints: { rear: Vector3; front: Vector3 }[];
+  private frame = '';
+  private readonly centre = new Vector3(); private readonly axis = new Vector3();
+  private readonly roots: ReadonlySet<string>;
+  constructor(body: CreatureBody, bytes: Uint8Array, joints: readonly CreatureRestJoint[], private readonly actor: AnimalSim,
+    private readonly now: () => number, private readonly attackSpan: number) {
+    if (body.size !== 'giant' || body.hits !== 'clip') throw new Error('Clip hit authority needs an opted-in giant');
+    this.sampler = new CreatureClipSampler(bytes, joints);
+    this.roots = new Set(joints.filter(joint => joint.parent === -1).map(joint => joint.name));
+    if (!this.sampler.has('idle')) throw new Error('Clip hit authority needs an idle clip');
+    const defaults = body.skeleton === undefined ? [] : CREATURE_SKELETONS[body.skeleton].volumes;
+    const rows = new Map<string, CreatureVolume>(defaults.map(row => [row.part, row]));
+    for (const row of body.volumes ?? []) rows.set(row.part, row);
+    if (rows.size === 0 || rows.size > 16) throw new Error('Invalid clip creature volumes');
+    this.definitions = [...rows.values()].map(row => {
+      const index = joints.findIndex(joint => joint.name === row.bone); if (index === -1) throw new Error(`Missing creature volume bone ${row.bone}`);
+      return { row, index };
+    });
+    this.shapes = this.definitions.map(({ row }) => ({ part: row.part, multiplier: row.multiplier, radius: MIN_VOLUME_RADIUS, halfLength: 0 }));
+    this.endpoints = this.definitions.map(() => ({ rear: new Vector3(), front: new Vector3() }));
+    this.scale = body.scale;
+  }
+  private readonly scale: number;
+  get volumes(): CreatureVolumePose['volumes'] { this.refresh(); return this.shapes; }
+  private refresh(): void {
+    const a = this.actor, sampler = this.sampler, now = this.now();
+    let name = 'idle', time = now, loop = true;
+    const hit = now - a.lastHitT / 1000;
+    if (!a.alive && sampler.has('die')) { name = 'die'; time = Math.max(0, a.deathTime); loop = false; }
+    else if (a.attackPhase >= 0 && sampler.has('attack')) { name = 'attack'; time = a.attackPhase * this.attackSpan; loop = false; }
+    else if (hit >= 0 && sampler.has('hit') && hit < sampler.duration('hit')) { name = 'hit'; time = hit; loop = false; }
+    else if (Math.hypot(a.speed, a.strafe) / a.scale > .15 && sampler.has('walk')) name = 'walk';
+    else if (a.state === 'graze' && sampler.has('idle.graze')) name = 'idle.graze';
+    const scale = a.scale * this.scale, key = `${name}:${time}:${scale}`;
+    if (key === this.frame) return;
+    if (!Number.isFinite(scale) || scale <= 0) throw new Error('Invalid creature clip scale');
+    const pose = sampler.sample(name, time, loop);
+    this.definitions.forEach(({ row, index }, part) => {
+      const shape = this.shapes[part], endpoints = this.endpoints[part];
+      if (shape === undefined || endpoints === undefined) throw new Error('Missing creature clip part');
+      const at = row.at ?? [0, 0, 0]; pose.point(index, at, this.centre);
+      let stretch = 0;
+      for (let axis = 0; axis < 3; axis++) {
+        const offset: [number, number, number] = [at[0], at[1], at[2]]; offset[axis] = (offset[axis] ?? 0) + 1;
+        pose.point(index, offset, this.axis); stretch = Math.max(stretch, this.axis.distanceTo(this.centre));
+      }
+      pose.capsule(index, at, row.axis, 0, row.halfLength, endpoints.rear, endpoints.front);
+      shape.radius = Math.max(MIN_VOLUME_RADIUS, row.radius * stretch * scale); shape.halfLength = endpoints.rear.distanceTo(endpoints.front) * scale / 2;
+      endpoints.rear.multiplyScalar(scale); endpoints.front.multiplyScalar(scale);
+    });
+    this.frame = key;
+  }
+  segment(index: number, rear: Vector3, front: Vector3): void {
+    this.refresh(); const row = this.endpoints[index]; if (row === undefined) throw new Error('Missing creature clip segment');
+    const { position: p, yaw } = this.actor, cos = Math.cos(yaw), sin = Math.sin(yaw);
+    const world = (at: Vector3, out: Vector3): void => { out.set(p.x + at.x * cos + at.z * sin, p.y + at.y, p.z - at.x * sin + at.z * cos); };
+    world(row.rear, rear); world(row.front, front);
+  }
+  joint(name: string, position: Vector3, quaternion: Quaternion, scale: Vector3): boolean {
+    this.refresh(); const found = this.sampler.joint(name, position, quaternion, scale);
+    if (found && this.roots.has(name)) { position.multiplyScalar(this.scale); scale.multiplyScalar(this.scale); }
+    return found;
+  }
+  capture(): CreatureVolumeFrame {
+    const volumes = this.volumes.map(row => ({ ...row })), points = new Float32Array(volumes.length * 6), rear = new Vector3(), front = new Vector3();
+    volumes.forEach((_row, index) => { this.segment(index, rear, front); points.set(rear.toArray(), index * 6); points.set(front.toArray(), index * 6 + 3); });
+    return { volumes, points };
+  }
+}

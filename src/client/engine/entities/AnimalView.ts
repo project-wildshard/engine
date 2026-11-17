@@ -560,7 +560,8 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     this.jointPose?.apply(this.pose,dt,c);
   }
   private applyRoot(): void {
-    applyAnimalRoot(this.mesh,this.position,this.yaw,this.tiltPitch,this.tiltRoll,this.custom,this.alive,this.flinch,this.flinchPitch,this.flinchRoll);
+    if (this.hitVolumes?.joint !== undefined) { this.mesh.position.copy(this.position); this.mesh.rotation.set(0, this.yaw, 0, 'YXZ'); }
+    else applyAnimalRoot(this.mesh,this.position,this.yaw,this.tiltPitch,this.tiltRoll,this.custom,this.alive,this.flinch,this.flinchPitch,this.flinchRoll);
   }
 
 }

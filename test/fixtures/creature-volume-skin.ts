@@ -33,7 +33,7 @@ export function creatureVolumeGlb(path: 'translation' | 'rotation' | 'scale' = '
   const binary = Buffer.alloc(8); binary.writeUInt32LE(bin.length); binary.writeUInt32LE(0x004e4942, 4);
   return Uint8Array.from(Buffer.concat([header, text, binary, bin]));
 }
-export async function creatureVolumeFixture() {
+export async function creatureVolumeFixture(path: 'translation' | 'rotation' | 'scale' = 'translation') {
   await prepareGlbCost();
   const source = groundFixture(true), species = source.rows.species[0], spawn = source.creatures.spawns[0];
   if (species === undefined || spawn === undefined) throw new Error('Missing actual volume fixture');
@@ -41,7 +41,7 @@ export async function creatureVolumeFixture() {
   species.body = { skeleton: 'biped', size: 'medium', scale: 1, look: 'fixture.look', volumes: [
     { part: 'shield', bone: 'hand.L', shape: 'sphere', radius: .4, halfLength: 0, axis: 'y', multiplier: 0 }] };
   spawn.yaw = 0;
-  const glb = creatureVolumeGlb(), cost = parseGlbData(glb), sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex'), file = sha(glb);
+  const glb = creatureVolumeGlb(path), cost = parseGlbData(glb), sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex'), file = sha(glb);
   const metadata = new TextEncoder().encode(JSON.stringify({ row: { id: 'fixture.skin', file, family: 'toon',
     rig: { skeleton: 'fixture.biped', joints: [volumeJoints], clips: ['idle'], sockets: volumeJoints }, cost },
     binding: { skin: 'fixture.skin', material: { family: 'pbr', vertexColours: false }, loops: ['idle'] } }));
