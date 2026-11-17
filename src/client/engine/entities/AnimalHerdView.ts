@@ -393,6 +393,11 @@ export class AnimalHerdView implements RowBodiesDraw {
     if (a.mesh.scale.x !== sc) a.mesh.scale.setScalar(sc);
     const made = this.rigs.get(a);
     const lod = made === undefined ? 'rig' : this.lods.draw(a, made.model, d2, this.lodTier, made.fur?.color);
+    if (lod !== 'rig') {
+      // the far herd lets go first (its slot is not taken this frame), so the layers kept are the rig's own
+      const held = this.farRigs.get(a);
+      if (held !== undefined && held.mask !== null) { a.mesh.layers.mask = held.mask; held.mask = null; }
+    }
     this.lodShows(a, lod === 'baked' || lod === 'card');
     if (lod !== 'rig') { if (lod === 'none') (this.casters.get(a) ?? a.mesh).castShadow = false; return; }
     const fr = this.farRigs.get(a);

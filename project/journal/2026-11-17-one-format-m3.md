@@ -28,3 +28,9 @@
   white, tint by instance colour). Cards are shot from a rest rig in a plain standard
   copy of its coat: the rig's shaders read the sky's cascades. Desktop baked band off.
   AnimalView already had `gaitPhase`, so M2's AnimalView is untouched.
+- Pine proof (local preview, phone tier, iPhone 17 Pro viewport, 0 console errors):
+  Pine's phone tier batches its hulls in the far herd at every distance (level
+  override), so a herd-drawn rig must take its layers back from the far herd before
+  the LOD keeps them, or a rig returning inside 40 m stayed at mask 0. After standing
+  20 m from a herd for 16 s, 3 models had recorded bakes; at 80 m: 13 deer in baked
+  herds, 22 on cards past 112.5 m, 74-77 draws (86 at spawn with fewer deer in view).
