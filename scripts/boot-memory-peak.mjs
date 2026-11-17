@@ -144,7 +144,9 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
     page.on('pageerror', error => { errors.push(error.message); });
     const tracing = await browser.newBrowserCDPSession(), cdp = await context.newCDPSession(page);
     tracing.on('Tracing.dataCollected', event => { events.push(...event.value); });
-    await tracing.send('Tracing.start', { transferMode: 'ReportEvents', traceConfig: { includedCategories: ['disabled-by-default-memory-infra'], memoryDumpConfig: { triggers: [] } } });
+    // No periodic dumps (CDP types memoryDumpConfig as strings): only the light dumps the sampler asks for.
+    const traceConfig = /** @type {{includedCategories:string[]}} */ ({ includedCategories: ['disabled-by-default-memory-infra'], memoryDumpConfig: { triggers: [] } });
+    await tracing.send('Tracing.start', { transferMode: 'ReportEvents', traceConfig });
     const started = Date.now();
     const run = { sampling: true };
     const sampler = (async () => {
