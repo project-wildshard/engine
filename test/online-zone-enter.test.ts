@@ -5,7 +5,7 @@ import { ARRIVAL_DEPTH } from '../src/shared/game/grid/zoneWalls';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { cellFrame, roadName } from '../src/server/host/dedicated/gridCells';
 import { connectOnline, type OnlineShell } from '../src/client/host/online/shell';
-import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
+import { roomBench, serverInput, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot, stillThumb } from './fixtures/dedicated/roomBot';
 import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 
@@ -18,6 +18,17 @@ const IDENTITY = { player: 'device:zone', name: 'Zone' }, EDGE = 562.5 - CHUNK_H
 let bench: RoomBench | undefined, shell: OnlineShell | undefined, pump: ReturnType<typeof setInterval> | undefined;
 const observers: RoomBot[] = [];
 afterEach(async () => { for (const bot of observers.splice(0)) bot.drop(); clearInterval(pump); shell?.dispose(); await bench?.close(); bench = undefined; shell = undefined; });
+
+// Each case still boots fresh rooms, native worlds and real sockets. Only the
+// verified immutable product inputs are shared; runtime preparation stays fresh.
+const inputs = new Map<string, ReturnType<typeof serverInput>>();
+function entryBench(options: Parameters<typeof roomBench>[0]): Promise<RoomBench> {
+  return roomBench({ ...options, load: slug => {
+    let input = inputs.get(slug);
+    if (input === undefined) { input = serverInput(slug); inputs.set(slug, input); }
+    return input;
+  } });
+}
 
 /** A seated page at Driftwood, its commands running `yaw` (null stands still), and what the link told it. */
 async function seated(): Promise<{ shell: OnlineShell; steer: (yaw: number | null) => void; regrids: string[]; closes: () => number }> {
@@ -56,7 +67,7 @@ async function toGate(side: -1 | 1, steer: (yaw: number | null) => void): Promis
 
 for (const [to, side, worker] of [[WEST, -1, 'its own worker'], [EAST, 1, 'the other worker']] as const) {
   test(`the page enters ${to} by its gate on ${worker} and the next session is seated past it on the same socket`, { timeout: 180_000 }, async () => {
-    bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
+    bench = await entryBench({ cells: CELLS, workers: 2, crossing: true });
     const page = await seated(), road = bench.road(roadName(HOME));
     await toGate(side, page.steer);
     const enter = page.shell.enter;
@@ -85,7 +96,7 @@ for (const [to, side, worker] of [[WEST, -1, 'its own worker'], [EAST, 1, 'the o
 }
 
 test('an enter the road refuses answers null, and the page plays on', { timeout: 120_000 }, async () => {
-  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
+  bench = await entryBench({ cells: CELLS, workers: 2, crossing: true });
   const page = await seated();
   const enter = page.shell.enter;
   if (enter === undefined) throw new Error('a world page\'s shell says enter');
@@ -100,7 +111,7 @@ test('an enter the road refuses answers null, and the page plays on', { timeout:
 // ZE16's walk on the bench (staging's is ZE22's): B stands on Driftwood's road beside Nalati's gate and C stands in Nalati while A enters
 // it by the gate. B sees A frozen (its row never changes) and then gone; C sees A arrive; A keeps its one socket.
 test('two others see the entry: B on the road sees A frozen then go, C in Nalati sees A arrive', { timeout: 180_000 }, async () => {
-  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
+  bench = await entryBench({ cells: CELLS, workers: 2, crossing: true });
   const page = await seated(), road = bench.road(roadName(HOME));
   const b = new RoomBot(bench.url, 'bench', 'device:b', 'B'), c = new RoomBot(`${bench.url}${bench.url.includes('?') ? '&' : '?'}chunk=${EAST}`, 'bench', 'device:c', 'C');
   observers.push(b, c);
@@ -138,7 +149,7 @@ test('two others see the entry: B on the road sees A frozen then go, C in Nalati
 });
 
 test('an entry the door calls off after arrive (no ready in time) lets the hold go and sends the page back to the cell it left', { timeout: 120_000 }, async () => {
-  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true, readyMs: 2500 });
+  bench = await entryBench({ cells: CELLS, workers: 2, crossing: true, readyMs: 2500 });
   const page = await seated(), road = bench.road(roadName(HOME));
   await toGate(-1, page.steer);
   expect(await page.shell.enter?.(WEST)).not.toBeNull();
@@ -151,7 +162,7 @@ test('an entry the door calls off after arrive (no ready in time) lets the hold 
 });
 
 test('a redial between arrive and the next session\'s ready still arrives past the gate, with no re-entry', { timeout: 180_000 }, async () => {
-  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
+  bench = await entryBench({ cells: CELLS, workers: 2, crossing: true });
   const page = await seated();
   await toGate(1, page.steer);
   expect(await page.shell.enter?.(EAST)).not.toBeNull();
