@@ -84,10 +84,15 @@ resolve() {  # named device → UDID/runtime pair (only the default is created, 
   fi
   if [ -z "$u" ]; then
     local dt
-    rt="$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable)] | last | .identifier')"
-    dt="$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.name | test("^iPhone 17 Pro$"))] | first | .identifier')"
-    [ "$dt" = "null" ] && dt="$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.name | test("^iPhone"))] | last | .identifier')"
-    u="$(xcrun simctl create "$want" "$dt" "$rt")" || { echo "sim-lane: could not create $want" >&2; exit 1; }
+    # the newest general iOS runtime: Xcode 27 also lists device-only ones (iOS-27-2-iPhone19-4) that refuse every other
+    # device type ("Incompatible device", mini-boot99 2026-11-17)
+    rt="$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable and (.identifier | test("-iPhone[0-9]") | not))] | last | .identifier')"
+    # an iPhone 17 Pro where the runtime takes one, else the newest Pro it supports (iOS 27.2 dropped the 17 Pro)
+    u=""
+    for dt in $(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.name | test("^iPhone [0-9]+ Pro$"))] | sort_by(.name != "iPhone 17 Pro") | .[].identifier'); do
+      u="$(xcrun simctl create "$want" "$dt" "$rt" 2>/dev/null)" && break
+    done
+    [ -n "$u" ] || { echo "sim-lane: could not create $want" >&2; exit 1; }
     echo "sim-lane: created $want ($u)" >&2
   fi
   # Carry the pair from this locked inventory read; no sidecar can go stale.

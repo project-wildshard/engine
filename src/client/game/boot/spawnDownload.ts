@@ -64,6 +64,26 @@ const members = new Map<string, Promise<Uint8Array<ArrayBuffer> | null>>();
  * of a stored URL is answered from that same store. */
 const storedUrls = new Map<string, {readonly bytes: number; readonly hash: string}>();
 let storeRead: ((url: string) => Promise<Response | undefined>) | null = null;
+/** mini QA 2026-11-17 row 19 (Jake's iPhone 17 Pro killed Nine's page right after the shaders step, staging v0.1.36): a member
+ *  the store also holds, by URL. Its bytes leave `members` on its first read, and every one before the shaders step
+ *  (dropStoredSpawnMembers), so its part can go: kept until control, Nine's 48 parts held 106.5 MB through compile and the
+ *  first frames. A later read is the store's copy, checked against the manifest (storedUrls). */
+const keptSpawnMembers = new Map<string, {readonly bytes: number; readonly hash: string}>();
+/** The member's bytes leave the page; its reads go to the store. False when the store does not hold it. */
+function dropKeptMember(url: string): boolean {
+  const kept = keptSpawnMembers.get(url);
+  if (kept === undefined || storeRead === null) return false;
+  keptSpawnMembers.delete(url); members.delete(url); storedUrls.set(url, kept);
+  return true;
+}
+/** QA 19: before the shaders step, every member the store holds leaves memory (its part with it). The count dropped. */
+export function dropStoredSpawnMembers(): number {
+  let dropped = 0;
+  for (const url of keptSpawnMembers.keys()) if (members.has(url) && dropKeptMember(url)) dropped++;
+  return dropped;
+}
+/** Members whose bytes this page still holds (tests, diagnostics). */
+export function heldSpawnMembers(): number { return members.size; }
 let layer: typeof fetch | null = null;
 /** The network beneath the first layer. The download reads only through it, never through `window.fetch`: a layer
  *  installed later (the byte counter's texture-pack reads) can wrap this one, and a request of the download's that
@@ -160,7 +180,12 @@ function installMemberLayer(): boolean {
         performance.clearMarks(held.name);
       }
       const bytes = await members.get(url);
-      if (bytes !== null && bytes !== undefined) return new Response(bytes, {status: 200, headers: {'content-type': typeOf(url), 'content-length': String(bytes.length)}});
+      if (bytes !== null && bytes !== undefined) {
+        // the Response holds its own copy: a stored member's view into its part goes now (QA 19)
+        const answer = new Response(bytes, {status: 200, headers: {'content-type': typeOf(url), 'content-length': String(bytes.length)}});
+        dropKeptMember(url);
+        return answer;
+      }
       const expected = storedUrls.get(url);
       if (expected !== undefined && storeRead !== null) {
         const body = await exactCopy({...expected, url, read: storeRead});
@@ -279,7 +304,7 @@ export async function spawnHeldBytes(url: string, demand = true): Promise<ArrayB
   const pending = jobWaits?.get(file.url);
   if (pending !== undefined) { if (demand) jobDemand?.(file.url); await pending; }
   const member = await members.get(file.url);
-  if (member !== null && member !== undefined) return member.slice().buffer; // a view into its part: only its own bytes cross
+  if (member !== null && member !== undefined) { const own = member.slice().buffer; dropKeptMember(file.url); return own; } // a view into its part: only its own bytes cross
   const memory = memoryPartMembers.get(address.pathname);
   if (memory !== undefined) return memory.slice().buffer;
   return (await exactCopy(file))?.buffer ?? null;
@@ -291,7 +316,7 @@ export function spawnListed(url: string): boolean {
   return pageFiles.has(address.origin + address.pathname);
 }
 /** Control: the level is complete and its reads are done, so the member bytes go. */
-export function releaseSpawnMembers(): void { members.clear(); storedUrls.clear(); jobPaths = null; jobWaits = null; jobDemand = null; storeRead = null; }
+export function releaseSpawnMembers(): void { members.clear(); keptSpawnMembers.clear(); storedUrls.clear(); jobPaths = null; jobWaits = null; jobDemand = null; storeRead = null; }
 /** Debug 'Loading: runtime packs / shardfile' (DL16, default shardfile): set by the composition root before a spawn
  * download starts; this leaf reads no engine setting itself. */
 let packsOn = false;
@@ -662,6 +687,8 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 controller.signal.throwIfAborted();
                 const memberStored = await keepCopy(ports.keep, file.url, new Response(member, {headers: {'content-type': typeOf(file.url), 'content-length': String(member.length)}}));
                 controller.signal.throwIfAborted();
+                // QA 19: the store holds it, so its bytes may leave memory (keep and cached are the same store)
+                if (memberStored) { storeRead ??= ports.cached; keptSpawnMembers.set(file.url, {bytes: file.bytes, hash: file.hash}); }
                 settle.get(index)?.(member); done.add(index); settleFile(file.url, memberStored);
                 landed(file.url); completedBytes += file.bytes; wireCompleted += file.wireBytes; filesDone++; publish();
               }

@@ -39,7 +39,7 @@ import { settleTileDrivers, settlingTiles } from '../shardfile/tileDriver';
 import { observeTitlePreparation, prepareTitleFrame } from './titlePreparation';
 import { installCrashCheckpoint } from './crashResume';
 import { GAME_STRINGS } from '../../../shared/game/strings';
-import { currentSpawnDownload, retrySpawnDownload } from '../boot/spawnDownload';
+import { currentSpawnDownload, dropStoredSpawnMembers, retrySpawnDownload } from '../boot/spawnDownload';
 import { downloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { waitEntryWork } from './entryReadiness';
 import { spawnViewThenNamed } from './readyFrame';
@@ -152,6 +152,10 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // PINE-FLASH (grid/spawnGround.ts): first the entered cell's own ground where its ring tiles are that ground (Pine), so
   // control never arrives over its far proxy; bounded, and nothing for a cell that draws its own ground (Nalati)
   await loadingStage('spawnDetail', async () => { await holdSpawnGround(ctx.grid); await prepareSpawnView(undefined, undefined, 'player'); });
+  // mini QA 2026-11-17 row 19: the shaders step and the first frames are the boot's memory peak (every texture, buffer and
+  // pipeline reaches the GPU, which iOS charges to the page). The parts the store already holds leave memory first (Nine:
+  // 48 parts, 106.5 MB); a later read of their files is the store's checked copy.
+  bootMark('download:members-dropped', { count: dropStoredSpawnMembers() });
   try {
     // LS8 (J204): the shaders step's measured cost per program decides how the first frame slices its draws
     const shadersAt = diagnosticNow(), programsBefore = game.renderer.info.programs?.length ?? 0;
