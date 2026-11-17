@@ -20,3 +20,7 @@
   engine's rows), headless sections, `ROAD_SKY`, `FAR_CLIFF_FLOOR` and
   the mover pose. Dead `placeUndergrowth`, `DecisionLog` and
   `decodeTreeRecords` went (Pine Hollow keeps its own undergrowth).
+- SP5d: `src/shared/engine/format-laws.test.ts` replays format's RNG
+  golden through the engine's `Rng` and sim streams, and checks forest
+  and collider placement through the engine wrappers (and into Rapier)
+  give format's numbers bit for bit.
