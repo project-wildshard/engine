@@ -112,7 +112,7 @@ export class SimNetWorld implements NetWorld {
   owned(player: string, out: Map<string, number>): void { for (const read of shardRows(this.host).owned.values()) read(player, out); }
   visit(visitor: NetVisitor): void {
     const { host, pose } = this, targets = new Map(host.attackTargets());
-    for (const player of host.players.values()) if (!host.parked.has(player.id)) visitor.entity(player.id, PLAYER_CLASS, player);
+    for (const player of host.players.values()) if (!host.parked.has(player.id) || host.shown.has(player.id)) visitor.entity(player.id, PLAYER_CLASS, player);
     for (const [id, sim] of host.entities) {
       sim.samplePose(pose);
       const view: AnimalNetView = { sim, pose, target: targets.get(id) ?? null, rideable: actRoutes(this.host).mountable?.(id) === true };

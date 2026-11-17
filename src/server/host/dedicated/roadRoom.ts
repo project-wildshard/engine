@@ -211,14 +211,14 @@ export class RoadRoom implements CrossTarget {
     player.resetPose({ x, y, z }, player.yaw);
     // NetRoom has already queued catch-up commands for this tick. Park the entire
     // player so neither the ordinary motion phase nor an extra command can move it.
-    this.host.parked.add(player.id);
+    this.host.parked.add(player.id); this.host.shown.add(player.id);
     seat.frozen = { cell: word.cell, until: this.options.now() + (this.options.freezeMs ?? FREEZE_MS) };
     // ZE9b: the door answers `arrive` with the pose past the gate and moves the seat there once the page is ready
     const pose = arrivalPose(at, player.position);
     this.options.post({ kind: 'entering', device: seat.device, to: word.cell, at: { x: pose.x, y: y + ARRIVAL_LIFT, z: pose.z, yaw: pose.yaw } });
   }
   /** ZE9b: the door called the entry off; the body plays on where it stands. */
-  thaw(device: string): void { const seat = this.seats.get(device); if (seat !== undefined) { this.host.parked.delete(seat.body); seat.frozen = null; } }
+  thaw(device: string): void { const seat = this.seats.get(device); if (seat !== undefined) { this.host.parked.delete(seat.body); this.host.shown.delete(seat.body); seat.frozen = null; } }
   private closed(seat: RoadSeat, transport: Transport, reason: string): void {
     if (seat.transport !== transport) return;
     seat.transport = null; seat.client = null; seat.closeOff?.(); seat.closeOff = null;
@@ -229,7 +229,7 @@ export class RoadRoom implements CrossTarget {
   private release(seat: RoadSeat): void {
     if (this.seats.get(seat.device) !== seat) return;
     seat.controlOff?.(); seat.controlOff = null; seat.frozen = null;
-    this.host.parked.delete(seat.body);
+    this.host.parked.delete(seat.body); this.host.shown.delete(seat.body);
     this.seats.delete(seat.device);
     this.host.removePlayer(seat.body);
     this.options.post({ kind: 'left', device: seat.device, seats: this.seats.size });

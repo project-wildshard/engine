@@ -226,6 +226,8 @@ export class SimHost {
   private focused: PlayerSim;
   /** Seats held out of the world: their capsule is disabled, and they take no input, move and heal nothing, and draw no one. */
   readonly parked: Set<string> = new Set<string>();
+  /** ZONE-ENTRY ZE9a: parked seats that are still drawn to everyone (a body frozen at a gate stands where it stood until it goes). */
+  readonly shown: Set<string> = new Set<string>();
   /** What a net room's queues say of the next `step` (J125). That step clears it; a host with no room never has one. */
   commanded: { readonly still: ReadonlySet<string>; readonly extra: ReadonlyMap<string, SimTickCommand> } | null = null;
   /** Each says whether its system alone moves a player now, for the owner block's `led`: a grapple's pull, a cable. */

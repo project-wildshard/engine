@@ -6,6 +6,8 @@ import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { cellFrame, roadName } from '../src/server/host/dedicated/gridCells';
 import { connectOnline, type OnlineShell } from '../src/client/host/online/shell';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
+import { RoomBot, stillThumb } from './fixtures/dedicated/roomBot';
+import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 
 // ZONE-ENTRY ZE10d2 (J352: "same page, same socket"): a world page's gate. At the gate's 0 the page's online shell says `enter`, hears
 // `arrive` with the pose past the gate and holds its client (the road's frames name the cell it is leaving); the next session on the
@@ -14,7 +16,8 @@ import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 const HOME = 'driftwood-isle', WEST = 'sunscar-dunes', EAST = 'nalati-grasslands', CELLS = [HOME, 'far-reach', WEST, EAST];
 const IDENTITY = { player: 'device:zone', name: 'Zone' }, EDGE = 562.5 - CHUNK_HALF;
 let bench: RoomBench | undefined, shell: OnlineShell | undefined, pump: ReturnType<typeof setInterval> | undefined;
-afterEach(async () => { clearInterval(pump); shell?.dispose(); await bench?.close(); bench = undefined; shell = undefined; });
+const observers: RoomBot[] = [];
+afterEach(async () => { for (const bot of observers.splice(0)) bot.drop(); clearInterval(pump); shell?.dispose(); await bench?.close(); bench = undefined; shell = undefined; });
 
 /** A seated page at Driftwood, its commands running `yaw` (null stands still), and what the link told it. */
 async function seated(): Promise<{ shell: OnlineShell; steer: (yaw: number | null) => void; regrids: string[]; closes: () => number }> {
@@ -92,4 +95,44 @@ test('an enter the road refuses answers null, and the page plays on', { timeout:
   expect(page.shell.client.latest, 'frames still flow').not.toBeNull();
   expect(bench.room(HOME)?.holds(IDENTITY.player)).toBe(true);
   expect(page.closes(), 'one socket').toBe(0);
+});
+
+// ZE16's walk on the bench (staging's is ZE22's): B stands on Driftwood's road beside Nalati's gate and C stands in Nalati while A enters
+// it by the gate. B sees A frozen (its row never changes) and then gone; C sees A arrive; A keeps its one socket.
+test('two others see the entry: B on the road sees A frozen then go, C in Nalati sees A arrive', { timeout: 180_000 }, async () => {
+  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
+  const page = await seated(), road = bench.road(roadName(HOME));
+  const b = new RoomBot(bench.url, 'bench', 'device:b', 'B'), c = new RoomBot(`${bench.url}${bench.url.includes('?') ? '&' : '?'}chunk=${EAST}`, 'bench', 'device:c', 'C');
+  observers.push(b, c);
+  expect(await b.arrived()).toBe(true); expect(await c.arrived()).toBe(true);
+  await vi.waitFor(() => { expect(bench?.room(EAST)?.holds('device:c'), 'C stands in Nalati').toBe(true); }, { timeout: 20_000, interval: 50 });
+  // B steps off Driftwood's east entryway and is placed on the road 6 m short of Nalati's edge, standing still
+  const bBody = bench.room(HOME)?.bodyOf('device:b');
+  if (bBody === undefined || road === undefined) throw new Error('B stands in Driftwood');
+  bBody.resetPose({ x: CHUNK_HALF - 5, y: 1, z: 0 }, -Math.PI / 2);
+  b.thumb = () => ({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: -Math.PI / 2, pitch: 0, buttons: NET_BUTTONS.sprint });
+  await vi.waitFor(() => { expect(road.holds('device:b'), 'B onto the road').toBe(true); }, { timeout: 20_000, interval: 50 });
+  b.thumb = stillThumb;
+  const bOnRoad = road.bodyOf('device:b');
+  bOnRoad?.resetPose({ x: EDGE - 6, y: bOnRoad.position.y + 1, z: 6 }, -Math.PI / 2);
+  await toGate(1, page.steer);
+  // A as B and C hear it: a player row that is neither of theirs
+  const others = (bot: RoomBot): number[] => [...bot.client.entities.values()].filter(row => row.cls === PLAYER_CLASS && row.handle !== bot.client.welcome?.handle).map(row => row.handle);
+  await vi.waitFor(() => { expect(others(b), 'B sees A at the gate').toHaveLength(1); }, { timeout: 10_000, interval: 50 });
+  expect(others(c), 'C sees no one in Nalati yet').toHaveLength(0);
+  const enter = page.shell.enter;
+  if (enter === undefined) throw new Error('a world page\'s shell says enter');
+  expect(await enter(EAST)).not.toBeNull();
+  // Frozen: A stays in B's view (a frozen body is still drawn to others) and its body does not move for a second
+  const [a] = others(b), frozenAt = road.bodyOf(IDENTITY.player)?.position.clone();
+  await new Promise(resolve => { setTimeout(resolve, 1300); });
+  expect(others(b), 'B still sees A at the gate').toEqual([a]);
+  const now = road.bodyOf(IDENTITY.player)?.position;
+  expect(Math.hypot((now?.x ?? Infinity) - (frozenAt?.x ?? 0), (now?.z ?? Infinity) - (frozenAt?.z ?? 0)), 'A stands frozen').toBeLessThan(0.05);
+  page.shell.rehome?.(EAST);
+  page.shell.ready();
+  await vi.waitFor(() => { expect(others(b), 'A is gone from B\'s road').toHaveLength(0); }, { timeout: 20_000, interval: 50 });
+  await vi.waitFor(() => { expect(others(c), 'C sees A arrive in Nalati').toHaveLength(1); }, { timeout: 20_000, interval: 50 });
+  expect(bench.room(EAST)?.holds(IDENTITY.player)).toBe(true);
+  expect(page.closes(), 'A kept one socket').toBe(0);
 });
