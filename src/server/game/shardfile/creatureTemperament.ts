@@ -9,8 +9,19 @@ export interface TemperamentBrain { readonly run: (dt: number) => void; readonly
 /** Layer-owned home/engagement policy; the existing brain, body, strike and host remain their sole owners. */
 export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: readonly [number, number, number],
   temperament: CreatureTemperament, source: TemperamentBrain, target: () => Position | undefined): TemperamentBrain {
-  const [x, y, z] = at, leash = temperament.leash, speed = temperament.home.speed, stop = temperament.home.stop;
+  const [x, y, z] = at, territory = temperament.territorial, leash = Math.min(temperament.leash, territory ?? temperament.leash);
+  const speed = temperament.home.speed, stop = temperament.home.stop;
   const contract = JSON.stringify({ at, temperament }), initial = source.adapter.snapshot();
+  if (territory !== undefined) {
+    const previous = actor.motionConstraint;
+    const constrain: NonNullable<AnimalSim['motionConstraint']> = (from, to) => {
+      previous?.(from, to);
+      const dx = to.x - x, dz = to.z - z, distance = Math.hypot(dx, dz);
+      if (distance > territory) { to.x = x + dx * territory / distance; to.z = z + dz * territory / distance; }
+    };
+    actor.motionConstraint = constrain;
+    host.scope.onDispose(() => { if (actor.motionConstraint === constrain) actor.motionConstraint = previous; });
+  }
   let returning = false;
   return { run: dt => {
     if (!actor.alive) { source.run(dt); return; }

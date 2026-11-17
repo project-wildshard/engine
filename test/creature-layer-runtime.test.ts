@@ -10,6 +10,7 @@ import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { requireHuntTuning } from '../src/shared/engine/ai/huntPattern';
 import { speciesHealth } from '../src/shared/engine/entities/species/registry';
 import { Vector3 } from 'three';
+import { bindCreatureTemperament } from '../src/server/game/shardfile/creatureTemperament';
 
 function fixture() {
   const base = emptyShardfile({ slug: 'layer-policy', name: 'Layer policy', author: 'Test', revision: 1, seed: 7 });
@@ -96,6 +97,66 @@ test('an aggressive return restores the exact controller and body continuation',
     expect(resumed.host.adapters.get('brain.fixture.actor')?.snapshot()).toEqual(first.host.adapters.get('brain.fixture.actor')?.snapshot());
     expect(resumed.host.rng.snapshot()).toEqual(first.host.rng.snapshot());
   } finally { resumed.host.dispose(); first.host.dispose(); }
+});
+
+test('a territorial layer never crosses its radius while a player moves across its edge', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = pursuing(8);
+  const row = shard.rows.species[0];
+  if (row?.temperament === undefined) throw new Error('Missing fixture temperament');
+  row.temperament.territorial = 5;
+  const sim = createShardfileSim(shard, new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = sim.host.nearestPlayer(body.position);
+    for (let i = 0; i < 240; i++) {
+      sim.host.step(); expect(Math.hypot(body.position.x, body.position.z)).toBeLessThanOrEqual(5.001);
+    }
+    player.position.set(0, 0, 4); player.motor?.resetAt(player.position);
+    for (let i = 0; i < 60; i++) sim.host.step();
+    expect(body.position.z).toBeGreaterThan(1);
+    player.position.set(0, 0, 5.1); player.motor?.resetAt(player.position);
+    for (let i = 0; i < 240; i++) {
+      sim.host.step(); expect(Math.hypot(body.position.x, body.position.z)).toBeLessThanOrEqual(5.001);
+    }
+  } finally { sim.host.dispose(); }
+});
+
+test('the territorial body constraint includes native impulses', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = pursuing(8);
+  const row = shard.rows.species[0];
+  if (row?.temperament === undefined) throw new Error('Missing fixture temperament');
+  row.temperament.territorial = 5;
+  const sim = createShardfileSim(shard, new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    body.impulse(new Vector3(0, 0, 30));
+    for (let i = 0; i < 120; i++) {
+      sim.host.step(); expect(Math.hypot(body.position.x, body.position.z)).toBeLessThanOrEqual(5.001);
+    }
+  } finally { sim.host.dispose(); }
+});
+
+test('a territorial constraint retains and restores the previous world constraint', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = pursuing(8);
+  const sim = createShardfileSim(shard, new Map(), { rapier }), body = sim.host.entities.get('fixture.actor');
+  const temperament = shard.rows.species[0]?.temperament;
+  if (body === undefined || temperament === undefined) { sim.host.dispose(); throw new Error('Missing fixture body'); }
+  let sampled = 0;
+  const previous: NonNullable<typeof body.motionConstraint> = (_from, to) => { sampled++; to.x = Math.min(to.x, 0); };
+  body.motionConstraint = previous;
+  try {
+    bindCreatureTemperament(sim.host, body, [0, 0, 0], { ...temperament, territorial: 5 },
+      { run: () => undefined, adapter: { snapshot: () => null, restore: () => undefined } }, () => undefined);
+    body.impulse(new Vector3(30, 0, 30));
+    for (let i = 0; i < 120; i++) {
+      sim.host.step(); expect(body.position.x).toBeLessThanOrEqual(0.001);
+      expect(Math.hypot(body.position.x, body.position.z)).toBeLessThanOrEqual(5.001);
+    }
+    expect(sampled).toBeGreaterThan(0);
+  } finally { sim.host.dispose(); }
+  expect(body.motionConstraint).toBe(previous);
 });
 
 test.each(['passive', 'skittish', 'neutral'] as const)('an admitted %s hunt reacts to actual server damage', async reaction => {

@@ -59,6 +59,10 @@ function resolveBrain(temperament: CreatureTemperament, senses: CreatureSenses |
   const input = { ...parameters, id: id(), kind: name,
     ...(name === 'pursue' ? { leashRadius: temperament.leash, returnSpeed: temperament.home.speed, stopDistance: temperament.home.stop,
       ...(senses === undefined ? {} : { awareRadius: senses.notice }) } : {}) };
+  if (name === 'pursue' && temperament.territorial !== undefined) {
+    input.leashRadius = Math.min(temperament.leash, temperament.territorial);
+    if (typeof input.awareRadius === 'number') input.awareRadius = Math.min(input.awareRadius, input.leashRadius);
+  }
   return { kind: 'declared', declaration: brainRow(input, name), referenced: false };
 }
 

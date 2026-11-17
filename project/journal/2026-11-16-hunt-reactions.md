@@ -57,3 +57,11 @@ Both real-server return tests fail with this binding removed, then
 pass: a player beyond45m provokes return, arrival heals, re-entry starts
 a fresh pursuit, and a mid-return snapshot resumes body/controller/RNG
 exactly. All35cases/fivefiles and defining types/lint pass.
+
+CC5b2: authored territory now bounds both pursuit acquisition and the
+native body's wanted displacement. The constraint includes native
+impulses, composes the previous world constraint, and restores that
+previous owner when its scope ends. Returning still uses the same
+controller and home policy. Two real5m boundary controls fail before
+the fix; the normal pursuit entry and constraint-lifetime controls pass
+with the existing layer and45m return controls (20cases/twofiles).
