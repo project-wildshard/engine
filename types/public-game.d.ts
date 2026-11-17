@@ -14,3 +14,4 @@ import '../src/client/engine/types/meshopt-simplifier';
 import '../src/shared/engine/physics/rapier-bg';
 import '../src/client/engine/boot/swGlobal';
 import '../src/client/engine/build';
+import '../src/client/game/debug/browser';
