@@ -193,6 +193,8 @@ function selectSource(source: ShardManifest, firstParty: boolean): ShardManifest
  * A trusted preparation barrier may overlap admission, but precedes every live binding and publication. */
 export async function installManifestShardfile(manifest: ShardManifest, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
+  // Fails closed for any manifest naming `shardfile`, a client-plan one included (OF8).
+  if (manifest.shardfile !== undefined && !options.firstParty) throw new Error('Manifest shardfile descriptors require first-party provenance');
   const hybrid = hybridPointer(manifest);
   if (manifest.shardfile === undefined || hybrid !== undefined) {
     // Transitional entries bootstrap their native terrain before admitting the world plugin.
@@ -207,7 +209,6 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     const ground = tiledBootstrapGround(manifest.ground, source.props, source.runtime.binds ?? []);
     return ground === manifest.ground ? manifest : selectSource({ ...manifest, ground }, true);
   }
-  if (!options.firstParty) throw new Error('Manifest shardfile descriptors require first-party provenance');
   const url = new URL(manifest.shardfile, options.base);
   if (url.origin !== new URL(options.base).origin || url.search !== '' || url.hash !== '') throw new Error('Manifest shardfile must be an unqualified same-origin source');
   const folderOptions = { ...options, base: new URL('.', url).href, descriptorPath: url.pathname };

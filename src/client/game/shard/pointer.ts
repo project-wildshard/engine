@@ -6,6 +6,8 @@ import type { ShardManifest } from './manifest';
  * A shard with no client-plan runtime has no hybrid pointer: its `shardfile` is plain data admission.
  */
 export function hybridPointer(manifest: Pick<ShardManifest, 'shardfile' | 'gridShardfile' | 'clientPlanRuntime'>): string | undefined {
+  // the grid's readers take `shardfile` first and the page this; one pointer keeps them on one descriptor
+  if (manifest.shardfile !== undefined && manifest.gridShardfile !== undefined) throw new Error('A manifest names its shardfile once (shardfile or gridShardfile)');
   return manifest.gridShardfile ?? (manifest.clientPlanRuntime === true ? manifest.shardfile : undefined);
 }
 

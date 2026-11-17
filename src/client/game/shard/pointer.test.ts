@@ -18,6 +18,9 @@ test('a client-plan shard names its hybrid descriptor as shardfile, and the old 
   expect(hybridPointer({ shardfile: PATH })).toBeUndefined();
   expect(dataPointer({ shardfile: PATH })).toBe(PATH);
   expect(hybridPointer({})).toBeUndefined();
+  // naming both would let the page and the grid admit different descriptors
+  expect(() => hybridPointer({ shardfile: PATH, gridShardfile: PATH })).toThrow('names its shardfile once');
+  expect(() => dataPointer({ shardfile: PATH, gridShardfile: PATH, clientPlanRuntime: true })).toThrow('names its shardfile once');
 });
 
 test('a manifest with only shardfile and a runtime declaration owns its grid home, as gridShardfile did', () => {
