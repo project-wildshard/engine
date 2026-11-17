@@ -2,6 +2,7 @@ import { NativeActors } from '../population/actors';
 import { NativeReturns } from '../population/nativeReturns';
 import { registerPopulationHomes } from '../../../shared/game/population/census';
 import { clearBody } from '@wildshard/engine/entities/bodyClear';
+import { CREDIT_PREFIX } from '@wildshard/engine/quest/players';
 import * as v from 'valibot';
 import { Rng, type RngState } from '@wildshard/engine/core/rng';
 import type { AnimalSim, AnimalSimSpec } from '@wildshard/engine/entities/AnimalSim';
@@ -186,8 +187,11 @@ export function installHomeKeeper(host: SimHost, spec: HomeKeeperSpec, saved?: R
       if (home === undefined || home.wait <= 0) continue;
       home.wait -= dt * roomRefillRate(host.players, home.x, home.z, host.parked); // J109: faster with players near; one player's clock is plain dt
       if (home.wait > 0) continue;
+      const fell = home.actor?.combatActor().id;
       freeBody(home);
       respawn(home);
+      // SB34c: the world sees the body alive again; each player's credit for the kill stays in their own book
+      if (fell !== undefined) host.flags.clear(`${CREDIT_PREFIX}${fell}`);
     }
   }, {
     snapshot: () => ({ version: 1, rng: { ...rng.snapshot() }, tokens: bodies.flatMap(b => b.actor !== null && holders.has(b.actor) ? [b.id] : []),

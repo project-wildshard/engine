@@ -4,6 +4,7 @@
 // waits are the host's state (one adapter), so a save keeps the clock; a cell asleep spends it (SC10, as declared homes do).
 import * as v from 'valibot';
 import type { SimHost } from '@wildshard/engine/sim';
+import { CREDIT_PREFIX } from '@wildshard/engine/quest/players';
 
 /** One spawn row's revive inputs (the format's `creatures.spawns` row). */
 export interface RespawnRow { readonly id: string; readonly at: readonly [number, number, number]; readonly yaw: number; readonly respawn?: number | undefined }
@@ -28,6 +29,8 @@ export function installDataRespawns(host: SimHost, rows: readonly RespawnRow[]):
     // A data cell keeps a dead body's motor (no body bands drop it): stand its capsule at the spawn, no sweep. Under body
     // bands a dead body has none, and the next sync makes one where it now stands.
     body.motor?.resetAt?.(body.position);
+    // SB34c: the world sees the body alive again; each player's credit for the kill stays in their own book
+    host.flags.clear(`${CREDIT_PREFIX}${row.id}`);
   };
   host.onStep(DATA_RESPAWN_STEP, (dt) => {
     // Logical revision migration carries body health and flags, without adapter clocks or death events.

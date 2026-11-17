@@ -71,3 +71,19 @@ test('a fresh device on the lead seat inherits none of the last lead\'s camp kil
   expect(bounty(bookOf(room, 'a'))).toBe(true);
   quit(again);
 });
+
+// SB34c (QA 11-16-mini row 74): a camp that respawns is alive again to the world; the killer's credit and quests stay.
+test('a respawned bandit clears the world\'s death, and the killer keeps its credit and bounty', { timeout: 120_000 }, async () => {
+  const room = await DedicatedRoom.boot({ slug: SLUG, build: '', bootId: 'kill-credit-respawn', input: await shippedInput(SLUG), now: () => clock, post });
+  rooms.push(room);
+  const first = enter(room, 'a'); enter(room, 'b'); tick(room, 5);
+  clearCamp(room, 'a');
+  expect(room.host.flags.has('dead:bandit.camp-1.1')).toBe(true);
+  room.host.events.emit('world.slept', { seconds: 600 }); tick(room, 3);
+  expect(room.host.entities.get('bandit.camp-1.1')?.alive, 'the home refilled').toBe(true);
+  expect(CAMP.map(id => room.host.flags.has(`dead:${id}`)), 'the world sees the camp alive').toEqual([false, false, false]);
+  expect(holds(bookOf(room, 'a').flags, CLEAR), 'the killer keeps its credit').toBe(true);
+  expect(bounty(bookOf(room, 'a')), 'and its bounty: no quest walks back').toBe(true);
+  expect(holds(bookOf(room, 'b').flags, CLEAR)).toBe(false);
+  quit(first);
+});
