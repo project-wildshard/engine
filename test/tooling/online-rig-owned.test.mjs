@@ -3,7 +3,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createServer } from 'node:net';
-import { claimFixture, confirmPostgres, fixtureKey, fixtureRequestOrigins, freeFixturePorts, ownedPostgres, plainPath } from '../../scripts/online-rig-owned.mjs';
+import { claimFixture, confirmPostgres, fixtureKey, fixtureRequestOrigins, freeFixturePorts, ownedEphemeralPostgres, ownedPostgres, plainPath } from '../../scripts/online-rig-owned.mjs';
 import { openRig, PG_PORT } from '../../scripts/online-rig.mjs';
 
 const base = resolve('tmp/codex-pagesize');
@@ -66,4 +66,11 @@ test('the connected database must report the claimed real data directory', async
   mkdirSync(own); mkdirSync(other);
   await expect(confirmPostgres({ query: async () => ({ rows: [{ data: other }] }) }, own)).rejects.toThrow('unowned Postgres');
   await expect(confirmPostgres({ query: async () => ({ rows: [{ data: own }] }) }, own)).resolves.toBeUndefined();
+});
+
+test('ephemeral database admission preserves foreign data and its listener on refusal', async () => {
+  const data = at('foreign-ephemeral'); mkdirSync(data); writeFileSync(resolve(data, 'sentinel'), 'keep');
+  await expect(ownedEphemeralPostgres({ bin: 'not-a-bin', data })).rejects.toThrow();
+  expect(readFileSync(resolve(data, 'sentinel'), 'utf8')).toBe('keep');
+  expect(() => claimFixture(data)).toThrow();
 });

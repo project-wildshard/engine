@@ -10,7 +10,7 @@ import { childListener, listenLoopback, rigFront } from './rig-listeners.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { rigOptions } from './online-rig-options.mjs';
-import { claimFixture, fixtureKey, freeFixturePorts, ownedPostgres, confirmPostgres } from './online-rig-owned.mjs';
+import { claimFixture, fixtureKey, freeFixturePorts, ownedPostgres, ownedEphemeralPostgres, confirmPostgres } from './online-rig-owned.mjs';
 
 const ROOT = absolute(import.meta.dirname, '..');
 /** The rig's four loopback ports, from 18796 (a lane beside another rig names its own: WS_RIG_PORTS=18856; its dist is stamped
@@ -19,7 +19,7 @@ const PORTS = Number(process.env.WS_RIG_PORTS ?? 18796);
 if (!Number.isInteger(PORTS) || PORTS < 1024 || PORTS > 65532) throw new Error(`WS_RIG_PORTS must be a port from 1024 to 65532, not ${String(process.env.WS_RIG_PORTS)}`);
 export const RELEASE_PORT = PORTS + 3, WORLD_PORT = PORTS + 1, PAGE_PORT = PORTS + 2, PG_PORT = PORTS;
 /** @param {string} name */
-const database = name => { const url = new URL(`postgresql://127.0.0.1:${String(PG_PORT)}/${name}`); url.username = 'postgres'; url.searchParams.set('sslmode', 'disable'); return url.href; };
+const database = (name, port = PG_PORT) => { const url = new URL(`postgresql://127.0.0.1:${String(port)}/${name}`); url.username = 'postgres'; url.searchParams.set('sslmode', 'disable'); return url.href; };
 /** @param {string} folder */
 export const buildOf = folder => JSON.parse(readFileSync(join(folder, 'version.json'), 'utf8')).build;
 /** @param {number} ms */
@@ -58,7 +58,6 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
   const { memory } = rigOptions({ saves, pgBin, pgData, socket });
   if (port !== undefined && port !== 0) throw new Error('A rig port option must be zero; use WS_RIG_PORTS for legacy named ports');
-  if (port === 0 && !memory) throw new Error('Ephemeral native database rigs are not implemented');
   const ephemeral = port === 0;
   const key = isolated || ephemeral ? fixtureKey(keyFile) : JSON.parse(readFileSync(keyFile, 'utf8'));
   if (isolated || ephemeral) { if (!ephemeral) await freeFixturePorts([PG_PORT, WORLD_PORT, PAGE_PORT, RELEASE_PORT]); claimFixture(work); }
@@ -76,7 +75,8 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   if (pageFront !== undefined) resources.push(pageFront.close);
   const worldPort = worldFront?.port ?? WORLD_PORT, pagePort = pageFront?.port ?? PAGE_PORT;
   let signedSocket = ephemeral && socket === `ws://127.0.0.1:${String(WORLD_PORT)}/` ? `ws://127.0.0.1:${String(worldPort)}/` : socket;
-  const build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
+  const build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist);
+  let pgPort = PG_PORT;
   mkdirSync(work, { recursive: true });
   const slugs = [shard, ...more];
   if (slugs.some(slug => !/^[a-z0-9_-]+$/u.test(slug))) throw new Error('A rig shard must be a slug');
@@ -102,20 +102,22 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   const pgCtl = join(pgBin, 'pg_ctl'), log = createWriteStream(join(work, 'server.log'));
   resources.push(() => { log.end(); });
   if (!memory) {
-    if (isolated) { const pg = ownedPostgres({ bin: pgBin, data: pgData, port: PG_PORT }); resources.push(pg.close); }
+    if (ephemeral) { const pg = await ownedEphemeralPostgres({ bin: pgBin, data: pgData }); pgPort = pg.port; resources.push(pg.close); }
+    else if (isolated) { const pg = ownedPostgres({ bin: pgBin, data: pgData, port: PG_PORT }); resources.push(pg.close); }
     else {
       const result = spawnSync(pgCtl, ['-D', pgData, '-o', `-p ${String(PG_PORT)} -k /tmp -c listen_addresses=127.0.0.1`, '-w', '-l', join(work, 'pg.log'), 'start'], { stdio: 'inherit' });
       if (result.status !== 0) throw new Error('The rig could not start Postgres; no database was changed');
       resources.push(() => { if (spawnSync(pgCtl, ['-D', pgData, '-m', 'fast', '-w', 'stop'], { stdio: 'ignore' }).status !== 0) throw new Error('The rig could not stop its Postgres'); });
     }
-    const admin = new Client({ connectionString: database('postgres') });
+    const admin = new Client({ connectionString: database('postgres', pgPort) });
     try {
       await admin.connect();
-      if (isolated) await confirmPostgres(admin, pgData);
+      if (isolated || ephemeral) await confirmPostgres(admin, pgData);
       await admin.query('drop database if exists saves_online'); await admin.query('create database saves_online');
     } finally { await admin.end(); }
   }
 
+  const DATABASE = memory ? 'memory:' : database('saves_online', pgPort);
   const world = (running = build) => {
     const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', ephemeral ? 'ipc' : 'ignore'],
       env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(releasePort)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(ephemeral ? 0 : worldPort), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(pagePort)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
@@ -168,7 +170,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     try { if (worldFront !== undefined) worldFront.point(await childListener(main, 'world-ready')); }
     catch (error) { await stopped(main); throw error; }
   };
-  return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(pagePort)}`, worldOrigin: `http://127.0.0.1:${String(worldPort)}`, releaseOrigin: `http://127.0.0.1:${String(releasePort)}`, socket: signedSocket, ports: { page: pagePort, world: worldPort, release: releasePort }, Client,
+  return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(pagePort)}`, worldOrigin: `http://127.0.0.1:${String(worldPort)}`, releaseOrigin: `http://127.0.0.1:${String(releasePort)}`, socket: signedSocket, ports: { page: pagePort, world: worldPort, release: releasePort, ...(memory ? {} : { database: pgPort }) }, Client,
     /** The server goes down, for a test of its coming back. */
     stop: () => { worldFront?.clear(); return stopped(main); },
     /** The server up on this build. @param {string} [running] */
