@@ -384,7 +384,7 @@ jobs:
           mkdir -p tmp/nine-ring1/preview
           tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
           rm tmp/nine-ring1/client.tar
-          bash scripts/ci-playwright-install.sh --no-shell chromium
+          bash scripts/ci-playwright-install.sh chromium
       - name: Refuse load stalls and street workload regressions
         run: node scripts/nine-ring1.mjs boot && node scripts/nine-ring1.mjs bench
       - name: Keep Nine measurements and stock boot evidence
