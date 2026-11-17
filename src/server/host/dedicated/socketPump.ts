@@ -89,10 +89,10 @@ export class SeatTransport implements Transport {
    * GC15 (3): this seat walks on to a cell on another worker. After everything already sent (the `travel`), the door hears `out` and
    * moves the socket; this end is done, and its close listeners never hear of it: nothing closed.
    */
-  handOut(motion: unknown, seq: number): void {
+  handOut(motion: unknown, seq: number | undefined): void {
     if (!this.open) return;
     // oxlint-disable-next-line unicorn/require-post-message-target-origin -- A MessagePort has no origin.
-    this.port.postMessage({ out: true, motion, seq });
+    this.port.postMessage(seq === undefined ? { out: true, motion } : { out: true, motion, seq });
     this.open = false; this.closes.clear(); this.messages.clear(); this.controls.clear();
   }
   onClose(listener: (reason: string) => void): () => void { this.closes.add(listener); return () => { this.closes.delete(listener); }; }

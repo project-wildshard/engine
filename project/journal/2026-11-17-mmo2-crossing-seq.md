@@ -8,3 +8,5 @@
   no seq seats a fresh queue, as before: seeding 0 would drop every command of a client past 0x8000 as spent.
 - Red first: `net-player-crossing.test.ts` (a predicted client past 0x8000 crosses; its owner block never says 0 and a server slip is
   corrected) and the crossing churn's `zeroAcks` (no owner block says 0 after the walker's commands were stepped).
+- Review SHOULD: a queue that never stepped says 0 for "nothing yet"; `CommandQueue.stepped` says whether it did, and `handOut` hands on
+  no seq when it didn't, so the target starts fresh instead of reading every command past 0x8000 as spent.

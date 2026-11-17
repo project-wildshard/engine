@@ -158,11 +158,11 @@ export class RoadRoom implements CrossTarget {
     const seat = this.seats.get(device), transport = seat?.transport ?? null, player = seat === undefined ? undefined : this.host.players.get(seat.body);
     if (seat === undefined || !(transport instanceof SeatTransport) || seat.client === null || player === undefined || !this.opened.has(to)) return false;
     const motion = mountedPlayerOf(this.host, seat.body)?.mounted === true ? null : motionOf(player);
-    const seq = this.net.handOut(seat.client, cellFrame(to));
-    if (seq === null) return false;
+    const out = this.net.handOut(seat.client, cellFrame(to));
+    if (out === null) return false;
     mountedPlayerOf(this.host, seat.body)?.dismount();
     seat.closeOff?.(); seat.closeOff = null; seat.transport = null; seat.client = null;
-    transport.handOut(motion, seq);
+    transport.handOut(motion, out.seq);
     this.release(seat);
     return true;
   }

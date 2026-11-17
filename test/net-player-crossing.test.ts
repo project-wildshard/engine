@@ -91,8 +91,8 @@ test('a predicted client past half its seq range reconciles at once after a cros
 
   // The other worker: the road lets the client go on its open link, and the cell seats it with the road's last stepped seq
   const handed = roadRoom.handOut(seat, 7);
-  expect(handed).not.toBeNull();
-  const arrived = cellRoom.arrive(link.server, second.playerOf(second.player.id), handed ?? undefined);
+  expect(handed?.seq).toBeGreaterThan(40_000);
+  const arrived = cellRoom.arrive(link.server, second.playerOf(second.player.id), handed?.seq);
   client.hello(); link.pump();
   pageCell = 7;
   const owners: number[] = [];
@@ -110,4 +110,13 @@ test('a predicted client past half its seq range reconciles at once after a cros
   expect(acked(), 'the predictor reconciles every frame').toBe(client.latest?.lastSeq);
   expect(net.predictor.corrections, 'the correction lands').toBeGreaterThan(corrections);
   expect(client.dropped).toBe(0);
+});
+
+// MP1.6b review: a queue that never stepped a command says 0 for "nothing yet"; handing that 0 on would make every command past 0x8000
+// read as spent. It hands on nothing, and the target's queue starts fresh.
+test('a hand-out before any command names no seq', () => {
+  const road = new HostSide(R, FROM), link = directLoopback(), client = new NetClient(link.client);
+  const roadRoom = new NetRoom({ world: new SimNetWorld(road.host, 0), step: () => undefined });
+  const seat = roadRoom.join(link.server); client.hello(); link.pump(); roadRoom.open(); link.pump();
+  expect(roadRoom.handOut(seat, 7)).toEqual({ seq: undefined });
 });

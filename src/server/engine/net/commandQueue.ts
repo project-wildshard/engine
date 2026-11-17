@@ -51,6 +51,8 @@ export class CommandQueue {
   private empty = 0;
   /** The `seq` this player's state reflects, sent back in the owner block. */
   lastSeq = 0;
+  /** MP1.6b: whether `lastSeq` names a command this queue (or the one it continues) stepped; a fresh queue's 0 names none. */
+  stepped = false;
   /** Commands refused by admission, and copies dropped as duplicates. */
   refused = 0; duplicates = 0;
   /**
@@ -59,7 +61,7 @@ export class CommandQueue {
    */
   static after(seq: number): CommandQueue {
     const queue = new CommandQueue();
-    queue.lastSeq = seq & 0xffff; queue.newest = queue.lastSeq;
+    queue.lastSeq = seq & 0xffff; queue.newest = queue.lastSeq; queue.stepped = true;
     return queue;
   }
   /**
@@ -91,7 +93,7 @@ export class CommandQueue {
   private take(): NetCommand | undefined {
     const command = this.queue.shift();
     if (command === undefined) return undefined;
-    this.budget--; this.lastSeq = command.seq; this.held = holdsOf(command);
+    this.budget--; this.lastSeq = command.seq; this.stepped = true; this.held = holdsOf(command);
     return command;
   }
   private starved(): CommandTurn {

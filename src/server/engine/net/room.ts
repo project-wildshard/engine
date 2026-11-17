@@ -229,16 +229,16 @@ export class NetRoom {
   /**
    * GC15 (3): a player crossed into cell `toFrame` on another worker. Their client hears `travel` here, then this room lets it go with its
    * link left open: the target room on the other worker hears the client's hello again and welcomes it (`travel`, `welcome`, full frame,
-   * as `handOff` does on one worker). Null when there is nobody live to send; else the last command `seq` stepped here, which the target's
-   * queue starts from (`CommandQueue.after`, MP1.6b), as `handOff` carries the queue itself.
+   * as `handOff` does on one worker). Null when there is nobody live to send. Else what the target's queue starts from (MP1.6b), as
+   * `handOff` carries the queue itself: `seq`, the last command stepped here, or undefined when none was (a fresh queue's 0 names none).
    */
-  handOut(id: number, toFrame: number): number | null {
+  handOut(id: number, toFrame: number): { readonly seq: number | undefined } | null {
     const client = this.clients.find(entry => entry.id === id);
     if (client?.state !== 'live') return null;
     const tick = this.world.tick(), travel: NetEvent = { kind: 'travel', tick, from: this.world.cell(), to: toFrame };
     client.transport.send('reliable', eventsMessage(tick, [travel]).buffer);
     this.remove(client);
-    return client.queue.lastSeq;
+    return { seq: client.queue.stepped ? client.queue.lastSeq : undefined };
   }
   /** GC15 (3), MP1.6b: `join` for a client `handOut` let go on another worker, whose commands there were stepped up to `seq` (unknown: fresh). */
   arrive(transport: Transport, player: NetPlayer, seq?: number): number { return this.join(transport, player, seq === undefined ? new CommandQueue() : CommandQueue.after(seq)); }
