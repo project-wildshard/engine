@@ -234,6 +234,17 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     } finally { if (child.exitCode === null) child.kill('SIGTERM'); }
   }, 20_000);
 
+  test('J400: an additional workflow gate is authoritative without a job-name allowlist', () => {
+    const f = fixture(), wt = f.worktree('future-gate');
+    const before = f.remoteMain();
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: extra gate');
+    f.state({ red: { 'plan/future-gate': { ci: 'future-independent-gate' } } });
+    const result = f.land(wt);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('future-independent-gate');
+    expect(f.remoteMain()).toBe(before);
+  }, 60_000);
+
   test('J400: a red gate stays red when a peer also moves main', () => {
     const f = fixture();
     f.env['WS_LAND_MODE'] = 'local';
@@ -1231,19 +1242,19 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
   test('J400: nine shares keep T1 with products and reporting off the gate', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
-    // NB6 adds a blocking Nine observation beside the packed shares. Its
-    // build may run separately; neither job changes J400's reporting split.
-    const nineJobs = new Set(['nine-ring1', 'nine-ring1-build']);
-    expect([...jobs.keys()].filter(name => !nineJobs.has(name ?? ''))).toEqual(['tests', 'products', 'boundaries']);
-    expect(jobs.has('nine-ring1')).toBe(true);
-    expect(text).toContain('job: [1, 2, 3, 4, 5, 6, 7, 8]');
-    expect(jobs.get('products')).toContain('job: [9]');
-    expect(text).toContain('--jobs=9 --job=${{ matrix.job }}');
-    expect(text).toContain('node scripts/t1-batch.mjs');
-    for (const name of ['tests', 'products']) expect(jobs.get(name)).not.toMatch(/^ {4}needs:/mu);
-    for (const suite of ['A', 'B', 'C', 'D']) expect(text).toContain('name: template-e2e-' + suite);
-    expect(text).not.toContain('continue-on-error: true');
-    expect(text).not.toMatch(/Soak |Observe /u);
+    // These are required execution roles, not an exhaustive gate list.
+    // Nine's jobs and every future job retain the workflow's own gating
+    // policy: land uses its whole resolved conclusion, never this inventory.
+    expect([...jobs.keys()]).toEqual(expect.arrayContaining(['tests', 'products', 'boundaries']));
+    const packed = jobs.get('tests') ?? '', producer = jobs.get('products') ?? '';
+    expect(packed).toContain('job: [1, 2, 3, 4, 5, 6, 7, 8]');
+    expect(producer).toContain('job: [9]');
+    expect(packed).toContain('--jobs=9 --job=${{ matrix.job }}');
+    expect(packed).toContain('node scripts/t1-batch.mjs');
+    expect(packed + producer).not.toMatch(/^ {4}needs:/mu);
+    for (const suite of ['A', 'B', 'C', 'D']) expect(packed).toContain('name: template-e2e-' + suite);
+    expect(packed).not.toContain('continue-on-error: true');
+    expect(packed).not.toMatch(/Soak |Observe /u);
     const reports = readFileSync('.github/workflows/ci-reports.yml', 'utf8');
     expect(reports).toContain('workflow_run:');
     expect(reports).toContain('types: [completed]');
