@@ -158,9 +158,29 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
     const skip = page.locator('#ws-name-box [data-name=skip]');
     if (await skip.isVisible()) await skip.tap();
   };
+  // SB44: a shell that ended mid-play (the browser killed, not a leave) resumes into its world on the next visit (SR4,
+  // `consumeGridRecovery`: `?chunk=<world>&glreload=1`, then the loading card): there is no menu to tap. Follow it as a player
+  // would (SKIP the Name, which asks over the loading card) and judge the loading card to play; the samples say `resumed`.
+  /** @param {import('playwright').Locator} target @returns {Promise<boolean>} true: the page resumed into its world */
+  const resumedBefore = async (target) => {
+    const until = Date.now() + 60_000;
+    while (Date.now() < until) {
+      if (/[?&](glreload=1|chunk=)/u.test(page.url())) return true;
+      if (await target.isVisible().catch(() => false)) return false;
+      await page.waitForTimeout(100);
+    }
+    await target.waitFor({ state: 'visible', timeout: 1 });
+    return false;
+  };
+  const followResume = async () => {
+    /** @type {Sample[] & { resumed?: boolean }} */
+    const resumed = await sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample, start, skipName });
+    resumed.resumed = true;
+    return resumed;
+  };
   if (path !== 'select') {
     const go = page.locator(path === 'mmo' ? '.ws-main-mmo' : '.ws-slug .ws-menu-play');
-    await go.waitFor({ state: 'visible', timeout: 60_000 });
+    if (await resumedBefore(go)) return followResume();
     await clear();
     await sample();
     await go.tap();
@@ -169,7 +189,7 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
     return sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample, start });
   }
   const selectCard = page.locator('.ws-main-select');
-  await selectCard.waitFor({ state: 'visible', timeout: 60_000 });
+  if (await resumedBefore(selectCard)) return followResume();
   await clear();
   await selectCard.tap();
   await page.locator('#ws-name-box, .ws-title-stack[data-screen="select"]').first().waitFor({ timeout: 15_000 });
@@ -212,13 +232,14 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
 }
 
 /** Sample from the tap until play holds for 2 s, or the budget runs out.
- * @param {Page} page @param {{ budgetMs: number, sampleMs: number, frames?: (row: Sample) => Promise<void>, samples: Sample[], sample: () => Promise<Screen | null>, start: number }} run
+ * @param {Page} page @param {{ budgetMs: number, sampleMs: number, frames?: (row: Sample) => Promise<void>, samples: Sample[], sample: () => Promise<Screen | null>, start: number, skipName?: () => Promise<void> }} run
  * @returns {Promise<Sample[]>} */
-async function sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample, start }) {
+async function sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample, start, skipName }) {
   /** @type {number | null} */
   let playSince = null;
   let shotAt = -1e9;
   while (Date.now() - start < budgetMs) {
+    if (skipName !== undefined) await skipName().catch(() => undefined);
     const s = await sample();
     const last = samples.at(-1);
     if (frames !== undefined && last !== undefined && Date.now() - shotAt > 450) { shotAt = Date.now(); await frames(last).catch(() => undefined); }
@@ -331,9 +352,10 @@ async function cli() {
         for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t)}:${l}`); }
         const ok = problems.length === 0;
         const zones = [...new Set(samples.map((row) => row.s?.zone ?? '').filter((zone) => zone !== ''))];
-        report.push({ browser: name, way, run, ok, problems, path: path.join(' '), zones, errors, samples });
+        const resumed = /** @type {{ resumed?: boolean }} */ (samples).resumed === true;
+        report.push({ browser: name, way, run, ok, problems, path: path.join(' '), zones, errors, samples, ...(resumed ? { resumed } : {}) });
         if (!ok) failed = true;
-        console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${way} ${run}: ${path.join(' ')}${zones.length > 0 ? ` (card: ${zones.join(', ')})` : ''}`);
+        console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${way} ${run}${resumed ? ' (resumed into its world)' : ''}: ${path.join(' ')}${zones.length > 0 ? ` (card: ${zones.join(', ')})` : ''}`);
         for (const p of problems) console.log(`  - ${String(p.at)} ms: ${p.text}`);
         await page.goto('about:blank');
       }
