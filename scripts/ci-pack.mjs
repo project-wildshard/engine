@@ -38,7 +38,9 @@ import {amberLine,judgeWall} from './test-amber.mjs';
 /** Seconds a unit takes alone on the hosted runner; only the packing reads them. TEST-SPEED TS2 (2026-11-11): re-measured
  * over 12 packed runs (42960973990 .. 42974435994): products grew from 205 to 347-384 s and set the long job. EV3b
  * (HOW-WE-BUILD, 2026-11-12): boundaries is 258-392 s, p50 320, in its own job (8 main runs, 43310335051 .. 43315974456). */
-export const UNIT_SECONDS=Object.freeze({static:170,e2e:45,'plan-proofs':45,quarantine:135,products:360,boundaries:320});
+// J400 reserves the producer's remaining ~180 s for its in-process T1 batch.
+// It cannot receive test shards as if those same runner seconds were free.
+export const UNIT_SECONDS=Object.freeze({static:170,e2e:45,'plan-proofs':45,quarantine:135,products:540,boundaries:320});
 const PHASE=Object.freeze({static:0,e2e:0,'plan-proofs':0,quarantine:2,products:3,boundaries:4});
 /** Units that go wherever another unit went, after it (they need its state), instead of being balanced on their own. */
 const FOLLOWS=Object.freeze(/** @type {Record<string,string>} */({boundaries:'products'}));

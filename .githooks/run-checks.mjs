@@ -71,6 +71,17 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   // The marker is read from the hook's own environment: the gate's environment keeps only its allowlist.
   const landMain=landMainMode({...env,WS_LAND_MAIN_PUSH:process.env.WS_LAND_MAIN_PUSH},env.WS_PUSH_REFS);
   if(landMain!==null){
+    if(landMain==='local'){
+      // Land owns main-watch after this main-only push. Release/tag
+      // observations cannot use this exact single-main-ref marker.
+      // No push refs means conservative FULL selection in push-checks, never
+      // DS9's related/split path or the known-red allowance. Retain the normal
+      // lease and environment policy used by WL22; no patch-id carry on rebase.
+      const full={...env,WS_LOCAL_LAND_HEAD:process.env.WS_LAND_MAIN_PUSH?.slice(6)??''};Reflect.deleteProperty(full,'WS_PUSH_REFS');
+      const ran=spawn('python3',['scripts/heavy-lane.py','full-test','--checkout-scope','--',process.execPath,'scripts/land-local-gate.mjs'],{cwd:root,env:full,stdio:'inherit'});
+      process.on('SIGINT',()=>ran.kill('SIGINT'));process.on('SIGTERM',()=>ran.kill('SIGTERM'));
+      process.exit(await new Promise(done=>{ran.once('error',()=>done(1));ran.once('close',code=>done(code??1));}));
+    }
     if(landMain==='exact'){
       console.error('  - land main push (exact, LS3): the SHA branch CI proved; no local gate');
       process.exit(0);

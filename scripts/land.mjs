@@ -1,23 +1,11 @@
-// LAND-SIMPLIFY (J240, J249, J250, J258): land a plan worktree on main by fast-forward, then get out of the way.
-//   1. From .worktrees/<slug> on plan/<slug> (scripts/worktree.mjs new): one land per worktree (its lock). The tree
-//      must be clean but for the boot stamps; anything else stops land at once, naming each path and its fix (DS22).
-//   2. Rebase first if main is already ahead, run gen:inputs and commit a stamps-only diff on plan/<slug> (DS22), then
-//      push plan/<slug> under a lease its own reflog vouches for; the split pre-push runs (DS9).
-//   3. Wait for that exact SHA's `ci` to go green.
-//   4. Rebase onto origin/main if it moved during CI. Any conflict stops (no stamps are tracked since LS1, J250). A rebase
-//      that changes the lockfile or a package.json runs `pnpm install --frozen-lockfile` before any push.
-//      A clean rebase carries the branch's green run (J249: "they don't have to re-CI on rebase").
-//   5. Push the SHA to main, never forced. The pre-push knows it is land's (WS_LAND_MAIN_PUSH): exact runs nothing
-//      more, carried runs lint, TypeScript and the static checks, no Vitest (LS3). A lost race rebases and retries,
-//      at most 5 tries (J258).
-//   6. Fast-forward the canonical checkout when it is on main and clean (J247, WL7).
-//   7. A `landed` receipt; main-watch follows main's own `ci` and reports it (LS5).
-//   8. Delete origin's plan branch and remove this worktree (--keep skips it).
-// Before gen:inputs, a worktree that never ran `pnpm pins` runs it. Before step 2's push, a preflight runs lint:game,
-// check-css, typecheck and the Vitest files related to the branch's changed code,
-// here, and stops on the first red with its log (BUILD-MAX 2026-11-15: 14 of 22 stopped lands failed a check that runs
-// locally, each after a push and a wait). --no-preflight skips it.
-// Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
+// J400: worktree -> rebase -> complete local gate -> fast-forward main.
+// Default MacBook mode never pushes plan/* and never waits on Actions.
+// The ordinary pre-push owns the full gate plus CSS inside a test slot;
+// a lost main race rebases and gates the resulting tree again.
+// --hosted retains J249/J258's branch-CI fallback: preflight, plan push,
+// exact CI, then exact/carried main push. --no-preflight affects only it.
+// Both modes preserve pin provenance, canonical sync, main-watch and
+// owned-worktree cleanup. A red main is fixed forward at once (J249).
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {keepCopy,worktreeState} from './pin-keep-copy.mjs';
 import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
@@ -79,15 +67,26 @@ export function prePushCause(output){
 
 /** Run git with its stderr shown live (the pre-push's progress) and kept, for the receipt's cause.
  * @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} env
- * @returns {Promise<{status:number,stdout:string,stderr:string}>} */
+ * @returns {Promise<{status:number,stdout:string,stderr:string,interrupted:boolean}>} */
 function gitTee(cwd,args,env){
  return new Promise(_resolve=>{
-  const child=spawn('git',args,{cwd,env,stdio:['ignore','pipe','pipe']});
-  let stdout='',stderr='';
+  const groups=process.platform!=='win32',child=spawn('git',args,{cwd,env,stdio:['ignore','pipe','pipe'],detached:groups});
+  let stdout='',stderr='',interrupted=false;
+  /** @type {ReturnType<typeof setTimeout>|undefined} */let forced;
+  const signal=(/** @type {NodeJS.Signals} */kind)=>{
+   try{if(groups&&child.pid!==undefined)process.kill(-child.pid,kind);else child.kill(kind);}
+   catch(error){if(/** @type {NodeJS.ErrnoException} */(error).code!=='ESRCH')throw error;}
+  };
+  const stop=()=>{interrupted=true;signal('SIGTERM');forced??=setTimeout(()=>{signal('SIGKILL');},10000);};
+  process.once('SIGTERM',stop);process.once('SIGINT',stop);
+  const finish=(/** @type {number} */status,/** @type {string} */error='')=>{
+   clearTimeout(forced);process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);
+   _resolve({status,stdout,stderr:`${stderr}${error}`,interrupted});
+  };
   child.stdout.on('data',chunk=>{stdout+=String(chunk);});
   child.stderr.on('data',chunk=>{process.stderr.write(chunk);stderr=`${stderr}${String(chunk)}`.slice(-(1<<16));});
-  child.once('error',error=>{_resolve({status:1,stdout,stderr:`${stderr}\n${error.message}`});});
-  child.once('close',code=>{_resolve({status:code??1,stdout,stderr});});
+  child.once('error',error=>{finish(1,`\n${error.message}`);});
+  child.once('close',code=>{finish(code??1);});
  });
 }
 
@@ -168,22 +167,23 @@ export function githubSlug(remote){
 }
 
 /** Refuse anything but the known options. Any spelling of force is refused by name.
- * @param {string[]} argv */
-export function parseArgs(argv){
- const options={pollSeconds:60,timeoutMinutes:60,appearMinutes:5,rounds:5,keep:false,preflight:true};
+ * @param {string[]} argv @param {NodeJS.ProcessEnv} [env] */
+export function parseArgs(argv,env=process.env){
+ const options={mode:env.WS_LAND_MODE==='hosted'?'hosted':'local',pollSeconds:60,timeoutMinutes:60,appearMinutes:5,rounds:5,keep:false,preflight:true};
  for(const arg of argv){
   if(/^-f$|force/iu.test(arg))throw new StopError(`refused ${arg}: land never force-pushes main (J240: fast-forward only). If main moved, land rebases and retries by itself`);
   const [name,value]=arg.split('=',2);
   const number=Number(value);
   // --no-watch-main is accepted for old callers: land never watches main now (LS8).
   if(name==='--no-watch-main'&&value===undefined)continue;
-  if(name==='--keep'&&value===undefined)options.keep=true;
+  if((name==='--hosted'||name==='--local')&&value===undefined)options.mode=name.slice(2);
+  else if(name==='--keep'&&value===undefined)options.keep=true;
   else if(name==='--no-preflight'&&value===undefined)options.preflight=false;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--poll')options.pollSeconds=number;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--timeout')options.timeoutMinutes=number;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--appear')options.appearMinutes=number;
   else if(value!==undefined&&Number.isSafeInteger(number)&&number>0&&name==='--rounds')options.rounds=number;
-  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--keep] [--no-preflight]`);
+  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--local|--hosted] [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--keep] [--no-preflight]`);
  }
  return options;
 }
@@ -765,22 +765,26 @@ class Landing{
 
  /** Fast-forward main to HEAD. Refuses before pushing unless origin/main is
   * an ancestor; the refspec has no `+` and no force flag ever.
-  * @param {boolean} carried @returns {'landed'|'moved'} */
- pushMain(carried){
+  * @param {boolean} carried @param {boolean} [local] @returns {Promise<'landed'|'moved'>} */
+ async pushMain(carried,local=false){
   const head=this.holds('before the merge'),main=this.fetchMain();
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
   const args=mainPushArgs(head);
-  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${carried?'; static pre-push on the rebased tree, no Vitest (LS3)':'; the hosted-green SHA, no local gate'}`);
+  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${local?'; full local gate (J400)':carried?'; static pre-push on the rebased tree, no Vitest (LS3)':'; the hosted-green SHA, no local gate'}`);
   // LS3 (J258): the pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
-  const env={...this.env,WS_LAND_MAIN_PUSH:`${carried?'carried':'exact'}:${head}`};
-  const result=spawnSync('git',args,{cwd:this.root,env,encoding:'utf8',stdio:['ignore','pipe','inherit']});
+  const env={...this.env,WS_LAND_MAIN_PUSH:`${local?'local':carried?'carried':'exact'}:${head}`};
+  if(local)Reflect.deleteProperty(env,'SKIP_CHECK');
+  const result=await gitTee(this.root,args,env);
   if(result.status===0)return 'landed';
   // A lost race is main having moved; anything else (a red pre-push) stops.
   const now=this.fetchMain();
-  if(now!==main&&!isAncestor(this.root,now,head))return 'moved';
-  this.receipt(`STOP main push of ${short(head)} refused: ${result.stdout.trim().split('\n').slice(-2).join(' ')}`);
-  throw new StopError(`main push of ${short(head)} failed and main did not move: ${result.stdout.trim()}\nA red pre-push names its failing check above; fix forward and run land again.`);
+  if(isAncestor(this.root,head,now))return 'landed';
+  const rejected=/^!\s.*\[(?:remote )?rejected\].*(?:fetch first|non-fast-forward|incorrect old value provided)/mu.test(result.stdout);
+  if(!result.interrupted&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
+  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(`${result.stdout}\n${result.stderr}`);
+  this.receipt(`STOP main push of ${short(head)} refused: ${cause}`);
+  throw new StopError(`main push of ${short(head)} refused: ${cause}\nFix forward and run land again.`);
  }
 
  /** lint:game, typecheck and the related Vitest files, here, before anything is pushed; the first red stops land with
@@ -848,6 +852,7 @@ class Landing{
   }
   this.pinsOnce();
   this.regenerate();
+  if(this.options.mode==='local')return this.runLocal(main);
   this.localChecks(main);
   /** @type {{sha:string,base:string}|null} */let tested=null;
   let needHosted=true,rule='exact',why='main had not moved since the hosted run';
@@ -880,12 +885,29 @@ class Landing{
     rule='carried';why=`clean rebase onto ${short(main)}: the branch's green run ${short(tested.sha)} carries (J249)`;
     this.say('carried',why);
    }
-   const outcome=this.pushMain(rule==='carried');
+   const outcome=await this.pushMain(rule==='carried');
    if(outcome==='moved'){this.say('moved','main moved during the merge; rebasing and retrying');continue;}
    return this.landed(rule,why,round,main);
   }
   this.receipt(`STOP gave up after ${this.options.rounds} tries; main kept moving`);
   throw new StopError(`main kept moving: ${this.options.rounds} tries each lost the race to another push (J258 stops at 5). Nothing landed; run land again when main is quieter`);
+ }
+
+ /** J400: the real pre-push owns the complete local gate. No plan ref is published.
+  * A lost FF race rebases and gates the new tree, never carrying a patch-id proof.
+  * WL22's gate-before-lock principle applies: there is no shared main lock while testing.
+  * @param {string} base */
+ async runLocal(base){
+  let main=base;
+  for(let round=1;round<=this.options.rounds;round++){
+   if(await this.pushMain(false,true)==='landed')return this.landed('local','full local gate; no hosted branch run',round,main);
+   main=this.fetchMain();
+   this.say('moved',`main moved to ${short(main)}; rebase and repeat the full local gate`);
+   this.rebase(main);
+   this.pinsOnce();
+   this.regenerate();
+  }
+  throw new StopError(`main kept moving after ${this.options.rounds} local-gate attempts; nothing landed`);
  }
 
  /** After GitHub's main moved, bring the canonical checkout's main along (Jake, 2026-11-10 ~23:50 Cancún: "go to
@@ -999,7 +1021,7 @@ class Landing{
   this.startWatcher(head);
   this.say('rule',`main's own CI runs on ${short(head)} now. If it goes red, the lane that landed last fixes it forward or reverts it, at once (J249)`);
   const seconds=Math.round((Date.now()-this.started)/1000);
-  this.receipt(`landed ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; branch ci ${this.runs.join(', ')||'none'}; main ci ${rule==='carried'?'followed by main-watch':'reuses the branch run'}${this.sizeWarning===null?'':'; one-row'}; ${seconds} s`);
+  this.receipt(`landed ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; branch ci ${this.runs.join(', ')||'none'}; main ci ${rule==='exact'?'reuses the branch run':'followed by main-watch'}${this.sizeWarning===null?'':'; one-row'}${rule==='local'?`; finished=${new Date().toISOString()}`:''}; ${seconds} s`);
   return 0;
  }
 }
@@ -1019,7 +1041,7 @@ export async function land(argv,cwd=process.cwd(),env=process.env){
  /** @type {(() => void)|null} */let unlock=null;
  try{
   try{assertNoLocalCandidates(cwd,env);}catch(error){throw new StopError(error instanceof Error?error.message:String(error));}
-  const landing=new Landing(cwd,parseArgs(argv),env);
+  const landing=new Landing(cwd,parseArgs(argv,env),env);
   unlock=landing.lock();
   const code=await landing.run();
   // Cleanup runs under the land lock (J206 review): no second land can start here meanwhile. The lock file lives in

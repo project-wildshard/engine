@@ -16,6 +16,7 @@ export default defineConfig({
     'tmp',
     process.env['WS_LANE_NAME'] ?? 't1-e2e',
     't1/results',
+    process.env['WS_T1_SHARD'] ?? 'all',
   ),
   projects: [
     { name: 'A', testMatch: T1_SHARDS.A },

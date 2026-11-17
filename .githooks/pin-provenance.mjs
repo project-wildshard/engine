@@ -53,12 +53,26 @@ export function matchingPlanTips(cwd, old, pushed) {
  * @returns {{ ok: true, note?: string } | { ok: false, problems: string[] }}
  */
 export function checkPinPush({ cwd, refs, ciState, env = process.env }) {
+  // Match landMainMode's single-main-ref rule without importing engine
+  // tooling into the standalone installed hook. Seed repos have no scripts/.
+  const localOnly = !env.CI && !env.GITHUB_ACTIONS && refs.trim().split('\n').filter(Boolean).length === 1;
   for (const row of refs.split('\n').map((line) => line.trim().split(/\s+/u))) {
     const [, pushed = '', remote = '', old = ''] = row;
     if (remote !== 'refs/heads/main' || !SHA.test(pushed) || ZERO.test(pushed) || !SHA.test(old) || ZERO.test(old)) continue;
     if (!git(cwd, ['cat-file', '-e', `${old}^{commit}`]).ok) continue; // main moved past us: git refuses the push itself
     const changed = git(cwd, ['diff', '--name-only', old, pushed, '--', PINS]).out.split('\n').filter(Boolean);
     if (!changed.length) continue;
+    // J400 keeps pin changes in a plan worktree, but the ordinary pre-push
+    // now runs the full local gate next, before Git can send main. A marker
+    // alone cannot turn a canonical/direct push into a local plan land.
+    const head = git(cwd, ['rev-parse', 'HEAD']).out;
+    const branch = git(cwd, ['symbolic-ref', '--quiet', 'HEAD']).out;
+    const gitDir = git(cwd, ['rev-parse', '--absolute-git-dir']).out;
+    const common = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']).out;
+    if (localOnly && env.WS_LAND_MAIN_PUSH === `local:${pushed}` && head === pushed && /^refs\/heads\/plan\//u.test(branch)
+      && gitDir !== common && git(cwd, ['merge-base', '--is-ancestor', old, pushed]).ok) {
+      return { ok: true, note: `local plan HEAD ${pushed.slice(0, 10)}; full local pre-push gate follows (J400)` };
+    }
     if (env.ALLOW_PIN_PUSH === '1') return { ok: true, note: `ALLOW_PIN_PUSH=1: ${changed.length} test/pins file(s) pushed to main without a green plan branch (J375); say so in your receipt` };
     const tips = matchingPlanTips(cwd, old, pushed);
     const states = [];

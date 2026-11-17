@@ -11,11 +11,12 @@ import { scratchDir } from './scratch-dir.mjs';
 const WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const SUITES = ['A', 'B', 'C', 'D'];
 /** @typedef {{id:number,name:string,created_at:string,expired:boolean,workflow_run?:{id:number,head_branch:string}}} GithubArtifact */
-/** Changing the suite resets qualification; ordinary game changes do not. */
-export function t1Scope() {
-  const files = readdirSync('src/e2e/t1').filter(name => name.endsWith('.ts')).sort().map(name => `src/e2e/t1/${name}`);
+/** Changing the suite or runner resets qualification; ordinary game changes do not.
+ * @param {string} [root] */
+export function t1Scope(root = process.cwd()) {
+  const files = readdirSync(resolve(root, 'src/e2e/t1')).filter(name => name.endsWith('.ts')).sort().map(name => `src/e2e/t1/${name}`);
   const digest = createHash('sha256');
-  for (const file of [...files, 'scripts/t1-shards.mjs']) digest.update(file).update('\0').update(readFileSync(file)).update('\0');
+  for (const file of [...files, 'scripts/t1-shards.mjs', 'scripts/t1-batch.mjs', 'scripts/t1-ci-proof.mjs', 'scripts/t1-e2e.mjs', 'scripts/t1-runner.mjs']) digest.update(file).update('\0').update(readFileSync(resolve(root, file))).update('\0');
   return digest.digest('hex');
 }
 export const t1ContentReady = () => existsSync('src/e2e/t1/content.spec.ts');

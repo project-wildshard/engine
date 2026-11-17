@@ -56,8 +56,9 @@ Git hygiene
    commit its files (BUILD-MAX EV1, meta WL11).
  - **Nothing under `test/pins/` goes to main by mode 1 (J375, meta MINI-FLOW MF4).** Shard pins, ring digests, slices
    and saves alike: the pre-push (`.githooks/pin-provenance.mjs`) passes a main push that changes them only when it
-   is what land pushes for a green `origin/plan/*` tip (exact or carried). Put the change on a plan branch and land
-   it. Escape hatch when truly stuck (main red, the fix can't wait for CI): `ALLOW_PIN_PUSH=1`, said in your receipt.
+   is a linked plan HEAD passing J400's full local gate, or what hosted fallback land pushes for a green
+   `origin/plan/*` tip. Put the change on a plan branch and land it. Escape hatch when truly stuck:
+   `ALLOW_PIN_PUSH=1`, said in your receipt.
  - Mode 1's pre-push gates the pushed commit in a clean copy (`tmp/push-gate/<sha>-<pid>`, about 5 s,
    `scripts/push-gate-copy.mjs`), so other lanes' dirty and untracked files neither refuse your push nor reach the
    checks (EV1). It runs the split gate (EV2, J288): static checks plus the related Vitest files, browser, timing
@@ -81,10 +82,15 @@ Landing from a worktree (mode 2; J290, LAND-SIMPLIFY J249/J258; meta `docs/plans
    once per row. Never land from `tmp/`, a scratchpad or a private clone.
  - Start: from the canonical checkout, `node scripts/worktree.mjs new <slug>`, then `cd .worktrees/<slug>`.
    Commit there by pathspec as usual. One plan, one worktree, one `plan/<slug>` branch.
- - Land: `WS_LANE_NAME=<lane> node scripts/land.mjs` from the worktree. Options: `--timeout=MIN` (CI wait, 60),
+ - Land: `WS_LANE_NAME=<lane> node scripts/land.mjs` from the worktree. **J400: local gate is the default.**
+   Rebase onto origin/main, regenerate stamps, then push main through the complete local gate plus CSS inside
+   a test slot. No plan-branch push and no hosted wait. A lost FF race rebases and gates the new tree again.
+   WL22's environment/lease policy is reused; patch-id carry never substitutes for testing the rebased tree.
+   `--hosted` (or `WS_LAND_MODE=hosted`) retains the old hosted fallback below; `--local` selects local explicitly.
+   `--no-preflight` affects only the hosted preflight, never the full local gate. Options: `--timeout=MIN` (CI wait, 60),
    `--rounds=N` (tries at the main push, 5), `--poll=S` (30), `--keep` (keep the worktree and branch). Don't commit
    while it runs.
- - The flow, in 8 steps:
+ - The hosted fallback flow, in 8 steps:
    1. One land per worktree (its lock); worktrees never wait on each other. The tree must be clean but for the
       boot stamps (`src/client/game/boot/{audio,bytes,versions}.generated.ts`) and this tree's own pin outputs;
       anything else stops land in seconds, naming each path and its fix (DS22).

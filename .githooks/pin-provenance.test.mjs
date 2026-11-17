@@ -64,6 +64,21 @@ const line = (pushed, old) => `refs/heads/main ${pushed} refs/heads/main ${old}`
 const green = () => 'green';
 
 describe('pin provenance (J375)', () => {
+  test('J400 local land: exact linked plan HEAD passes without hosted lookup; mode 1 cannot claim it', () => {
+    const w = world();
+    const old = w.git(w.lane, 'rev-parse', 'origin/main');
+    const linked = join(w.lane, '.worktrees/local-pins');
+    w.git(w.lane, 'worktree', 'add', '-b', 'plan/local-pins', linked, old);
+    const tip = w.commit(linked, { 'test/pins/rings.json': '{"r":2}\n' }, 'pin change');
+    const env = { WS_LAND_MAIN_PUSH: `local:${tip}` };
+    const never = () => { throw new Error('local must not ask Actions'); };
+    assert.equal(checkPinPush({ cwd: linked, refs: line(tip, old), ciState: never, env }).ok, true);
+    assert.equal(checkPinPush({ cwd: w.lane, refs: line(tip, old), ciState: never, env }).ok, false);
+    assert.equal(checkPinPush({ cwd: linked, refs: `${line(tip, old)}\nHEAD ${tip} refs/heads/plan/extra ${'0'.repeat(40)}`,
+      ciState: never, env }).ok, false);
+    assert.equal(checkPinPush({ cwd: linked, refs: line(tip, old), ciState: never,
+      env: { WS_LAND_MAIN_PUSH: `local:${old}` } }).ok, false);
+  });
   test('exact land: the green plan SHA itself passes', () => {
     const w = world();
     const old = w.git(w.lane, 'rev-parse', 'origin/main');

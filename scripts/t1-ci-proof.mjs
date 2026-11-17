@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Preserve failures during Q4's report window, including setup failures.
-import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { scratchDir } from './scratch-dir.mjs';
 import { activeT1Gate, t1ContentReady, t1Scope } from './t1-qualification.mjs';
 import { T1_SHARDS } from './t1-shards.mjs';
+import { runT1Child } from './t1-runner.mjs';
 
 export const T1_BUDGET_MS = 120_000;
 /** @param {{status:number|null,signal:string|null}} result @param {number} wallMs */
@@ -44,8 +44,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
     if (sha !== undefined && (!/^[a-f0-9]{40}$/u.test(sha) || !/^[a-f0-9]{7,40}$/u.test(prefix) || !sha.startsWith(prefix))) {
       throw new Error('Shared T1 build does not belong to this source SHA');
     }
-    const result = spawnSync(process.execPath, ['scripts/t1-e2e.mjs', `--project=${suite}`, '--global-timeout=120000'], { stdio: 'inherit', env });
-    status = result.status; signal = result.signal; error = result.error?.message ?? null;
+    const result = await runT1Child([process.execPath, 'scripts/t1-e2e.mjs', `--project=${suite}`, '--global-timeout=120000'], env);
+    status = result.status; signal = result.signal; error = result.error;
   } catch (caught) { error = caught instanceof Error ? caught.message : String(caught); }
   const wallMs = Date.now() - started;
   const verdict = error === null ? t1Verdict({ status, signal }, wallMs) : 'fail';

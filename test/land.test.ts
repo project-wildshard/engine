@@ -130,7 +130,7 @@ function fixture() {
     WS_LAND_REPO: 'project-wildshard/fixture', WS_FLAKE_STRIKES: join(root, 'strikes.jsonl'), WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
     WS_SESSION_KEEP_ROOT: join(root, 'session-keep'),
     // MF12: never mint a real reader App token from a fixture, even on a machine that has the App's key.
-    WS_GH_READER: '0',
+    WS_GH_READER: '0', WS_LAND_MODE: 'hosted',
     WS_STORE_USERS: join(root, 'store-users'), WS_STORE_RESERVATION: join(root, 'store-maintenance.lock'),
   };
   for (const key of Object.keys(env)) if (key.startsWith('GIT_') && !['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL'].includes(key)) Reflect.deleteProperty(env, key);
@@ -197,6 +197,78 @@ const GEN_STAMPS = "import {mkdirSync,readdirSync,statSync,writeFileSync} from '
 const prepushLines = (f: Fixture) => f.read(f.files.prepush).trim().split('\n').filter(Boolean);
 
 describe('land (J240): fast-forward main from a plan worktree after its branch CI is green', () => {
+  test('J400: local default lands without a plan push or Actions lookup', () => {
+    const f = fixture();
+    delete f.env['WS_LAND_MODE'];
+    const wt = f.worktree('local');
+    const tip = f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
+    const result = f.land(wt);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(f.remoteMain()).toBe(tip);
+    expect(f.git(f.remote, ['for-each-ref', '--format=%(refname)', 'refs/heads/plan/'])).toBe('');
+    expect(f.read(f.files.gh)).toBe('');
+    expect(prepushLines(f)).toHaveLength(1);
+    expect(prepushLines(f)[0]).toContain(`land=local:${tip}`);
+    expect(f.read(f.files.receipts)).toMatch(/; local;.*finished=\S+; \d+ s$/mu);
+  }, 60_000);
+
+  test('J400: interrupting the full gate drains its push and leaves main unchanged', async () => {
+    const f = fixture();
+    f.env['WS_LAND_MODE'] = 'local';
+    const ready = join(f.root, 'gate-ready');
+    f.env['PREPUSH_READY'] = ready;
+    const wt = f.worktree('interrupted');
+    f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
+    const before = f.remoteMain();
+    writeFileSync(join(f.root, 'hooks/pre-push'), '#!/bin/sh\ntrap "exit 1" TERM INT\ncat >/dev/null\ntouch "$PREPUSH_READY"\nsleep 4\nexit 0\n');
+    chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
+    const child = spawn(process.execPath, [LAND, '--keep'], { cwd: wt, env: f.env, stdio: 'ignore' });
+    const done = new Promise<number | null>(_resolve => { child.once('close', code => { _resolve(code); }); });
+    try {
+      for (let tries = 0; tries < 300 && !existsSync(ready); tries++) await new Promise(doneWaiting => setTimeout(doneWaiting, 10));
+      expect(existsSync(ready)).toBe(true);
+      child.kill('SIGTERM');
+      expect(await done).toBe(1);
+      expect(f.remoteMain()).toBe(before);
+      expect(f.read(f.files.receipts)).toContain('owned push stopped');
+    } finally { if (child.exitCode === null) child.kill('SIGTERM'); }
+  }, 20_000);
+
+  test('J400: a red gate stays red when a peer also moves main', () => {
+    const f = fixture();
+    f.env['WS_LAND_MODE'] = 'local';
+    const wt = f.worktree('red-race');
+    f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
+    writeFileSync(f.files.raceScript, readFileSync(f.peerScript('src/racer.ts', null, 'export const racer = 3;'), 'utf8'));
+    writeFileSync(join(f.root, 'hooks/pre-push'), '#!/bin/sh\nrefs=$(cat)\necho "$refs" >> "$PREPUSH_LOG"\nsh "$RACE_SCRIPT"\necho "pre-push RED planted failure" >&2\nexit 1\n');
+    chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
+    const result = f.land(wt);
+    expect(result.status).toBe(1);
+    expect(prepushLines(f)).toHaveLength(1);
+    expect(f.git(f.remote, ['ls-tree', 'main', '--', 'src/local.ts'])).toBe('');
+  }, 60_000);
+
+  test('J400: a local red cannot move main and a race gates the rebased tree again', () => {
+    const f = fixture();
+    f.env['WS_LAND_MODE'] = 'local';
+    const wt = f.worktree('local-red');
+    f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
+    const before = f.remoteMain();
+    writeFileSync(f.files.fail, '');
+    expect(f.land(wt).status).toBe(1);
+    expect(f.remoteMain()).toBe(before);
+    rmSync(f.files.fail);
+    writeFileSync(f.files.raceScript, readFileSync(f.peerScript('src/racer.ts', null, 'export const racer = 3;'), 'utf8'));
+    writeFileSync(f.files.race, '');
+    const result = f.land(wt);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    const lines = prepushLines(f);
+    expect(lines).toHaveLength(3);
+    expect(lines.every(line => line.includes('land=local:'))).toBe(true);
+    expect(lines[1]).not.toBe(lines[2]);
+    expect(f.git(wt, ['show', 'HEAD:src/racer.ts'])).toContain('racer = 3');
+    expect(f.read(f.files.gh)).toBe('');
+  }, 60_000);
   test('MF12: a spent GitHub quota is waited out, not read as "no hosted ci run", and the plan lands', () => {
     const f = fixture(), wt = f.worktree('quota');
     const head = f.commit(wt, 'src/quota.ts', 'export const quota = 1;\n', 'quota');
@@ -277,7 +349,9 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     g.commit(kept, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     expect(g.land(kept, ['--keep']).stdout).not.toContain('cleaned');
     expect(existsSync(kept)).toBe(true);
-    expect(parseArgs([])).toEqual({ pollSeconds: 60, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false, preflight: true });
+    expect(parseArgs([], {})).toEqual({ mode: 'local', pollSeconds: 60, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false, preflight: true });
+    expect(parseArgs(['--hosted'], {}).mode).toBe('hosted');
+    expect(parseArgs(['--local'], { WS_LAND_MODE: 'hosted' }).mode).toBe('local');
     expect(parseArgs(['--no-preflight']).preflight).toBe(false);
   }, 60_000);
 
@@ -1055,7 +1129,7 @@ describe('shaVerdict', () => {
   });
 });
 
-test('CIQ1: boundaries and quarantine skip plan/** runs, and main runs them without reusing a plan run', () => {
+test('boundaries stays blocking and independent; J400 moves quarantine to reports', () => {
   const text = readFileSync('.github/workflows/ci.yml', 'utf8');
   const job = (name: string): string => {
     const start = text.indexOf(`\n  ${name}:\n`);
@@ -1063,16 +1137,16 @@ test('CIQ1: boundaries and quarantine skip plan/** runs, and main runs them with
     const next = text.slice(start + 1).search(/\n {2}[a-z][a-z0-9_-]*:\n/u);
     return next === -1 ? text.slice(start) : text.slice(start, start + 1 + next);
   };
-  for (const name of ['boundaries', 'quarantine']) {
+  for (const name of ['boundaries']) {
     const block = job(name);
     expect(block, name).toContain("    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}");
-    if (name === 'quarantine') expect(block).toMatch(/^ {4}continue-on-error: true$/mu);
-    else expect(block).not.toMatch(/^ {4}continue-on-error:/mu);
+    expect(block).not.toMatch(/^ {4}continue-on-error:/mu);
     // a main push that reused the plan run would skip it for every landed SHA: no reuse step here
     expect(block, name).not.toContain('ci-exact-reuse.mjs');
     expect(block, name).not.toContain('steps.reuse');
   }
-  // the blocking tests keep their exact reuse and run on plan branches, as land waits on them
+  expect(readFileSync('.github/workflows/ci-reports.yml', 'utf8')).toContain('node scripts/test-quarantine.mjs --shard=1/1');
+  // The hosted fallback still accepts an exact plan proof.
   expect(job('tests')).toContain('node scripts/ci-exact-reuse.mjs ci.yml');
   expect(job('tests')).not.toMatch(/^ {4}if: /mu);
 });
@@ -1154,73 +1228,30 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(evaluate(cancel, plan)).toBe('true');
   });
 
-  test('ci runs on plan/** pushes; every job gates itself on the reuse check, and ring-1 is gone (CI-JOB-PACKING)', () => {
+  test('J400: nine shares keep T1 with products and reporting off the gate', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
-    expect(text).toMatch(/push:\n {4}branches: \[main, 'plan\/\*\*', 'release\/\*\*'\]/u);
-    expect(text).toContain("startsWith(github.ref, 'refs/heads/plan/')");
-    expect(existsSync('.github/workflows/ring-1.yml')).toBe(false);
-    expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {2}push:/mu);
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
-    expect([...jobs.keys()]).toEqual(['tests', 'products', 't1-e2e', 'timings', 'boundaries', 'quarantine']);
-    // TS9b uses native YAML aliases: both jobs execute exactly the same
-    // blocking packed-step sequence, retaining the original visible names.
-    const packed = jobs.get('tests') ?? '';
-    const start = packed.indexOf('    steps: &packed-steps\n');
-    expect(start).toBeGreaterThan(0);
-    const steps = packed.slice(start).replace('steps: &packed-steps', 'steps:');
-    const producer = jobs.get('products') ?? '';
-    expect(producer).toContain('steps: *packed-steps');
-    expect(producer).toContain('outputs: *packed-outputs');
-    expect(producer).toContain('env: *packed-env');
-    expect(producer).toContain('name: tests (${{ matrix.job }})');
-    jobs.set('tests', packed.replace('steps: &packed-steps', 'steps:'));
-    jobs.set('products', producer.replace('    steps: *packed-steps\n', steps));
-    // T1 consumes the products build and the producer's code/reuse verdict.
-    // Packed shares keep their independent start and reuse checks below.
-    const template = jobs.get('t1-e2e') ?? '';
-    jobs.delete('t1-e2e');
-    expect(template).toMatch(/^ {4}needs: products$/mu);
-    expect(template).toContain("if: needs.products.outputs.code-run == 'true'");
-    expect(template).toContain('suite: [A, B, C, D]');
-    expect(template).toContain('WS_T1_BUILD_DIR: dist');
-    // LS2: the one bookkeeping job saves main's measured timings after the tests; it never decides the run's verdict.
-    const timings = jobs.get('timings') ?? '';
-    jobs.delete('timings');
-    expect(timings).toMatch(/^ {4}needs: \[tests, products\]$/mu);
-    expect(timings).toMatch(/^ {4}continue-on-error: true$/mu);
-    expect(timings).toContain("github.ref == 'refs/heads/main'");
-    expect(timings).not.toMatch(/ci-pack|vitest|test-quarantine/u);
-    for (const [name, body] of jobs) {
-      const steps = body.slice(body.indexOf('    steps:\n')).split(/^ {6}- /mu).slice(1);
-      const work = steps.filter(step => /scripts\/(?:ci-pack|test-quarantine)\.mjs --(?:jobs|shard)/u.test(step));
-      expect(work.length, name).toBe(1);
-      expect(work[0], name).toMatch(/if: steps\.code\.outputs\.run == 'true'/u);
-      const code = steps.find(step => step.startsWith('id: code')) ?? '';
-      expect(body, name).not.toMatch(/^ {4}needs:/mu);
-      if (name !== 'tests' && name !== 'products') {
-        // CIQ1: main-only jobs skip plan/** runs by ref and never reuse one (the CIQ1 test above).
-        // Quarantine also requires a nonempty inventory. A conjoined guard
-        // must still exclude docs, without requiring docs to be first.
-        expect(code, name).toMatch(/if: [^\n]*steps\.paths\.outputs\.docs != 'true'/u);
-        continue;
-      }
-      // The blocking job is never skipped wholesale: a failed reuse check is a red job, never a false green.
-      expect(body, name).not.toMatch(/^ {4}if:/mu);
-      const reuse = steps.findIndex(step => step.includes('node scripts/ci-exact-reuse.mjs ci.yml'));
-      expect(reuse, name).toBeGreaterThan(0);
-      expect(code, name).toContain("steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'");
-    }
-    expect(jobs.get('tests')).toContain("name: Run this job's packed share");
-    expect(jobs.get('tests')).toContain('--units=static,e2e,plan-proofs,tests,products');
-    // TS15/EV3b: boundaries is blocking on its own runner from t=0, never behind products.
-    expect(jobs.get('tests')).not.toContain('boundaries');
-    expect(jobs.get('boundaries')).not.toMatch(/^ {4}continue-on-error:/mu);
-    expect(jobs.get('boundaries')).toContain('scripts/ci-pack.mjs --jobs=1 --job=1 --units=boundaries');
-    // EV3: six shares, the last of them Ring 1's products alone.
-    expect(jobs.get('tests')).toContain('job: [1, 2, 3, 4, 5]');
-    expect(jobs.get('products')).toContain('job: [6]');
-    for (const name of ['tests', 'products']) expect(jobs.get(name)).toContain('--jobs=6 --job=${{ matrix.job }}');
-    expect(template).toContain("continue-on-error: ${{ needs.products.outputs.t1-blocking != 'true' }}");
+    expect([...jobs.keys()]).toEqual(['tests', 'products', 'boundaries']);
+    expect(text).toContain('job: [1, 2, 3, 4, 5, 6, 7, 8]');
+    expect(jobs.get('products')).toContain('job: [9]');
+    expect(text).toContain('--jobs=9 --job=${{ matrix.job }}');
+    expect(text).toContain('node scripts/t1-batch.mjs');
+    expect(text).not.toContain('needs: products');
+    for (const suite of ['A', 'B', 'C', 'D']) expect(text).toContain('name: template-e2e-' + suite);
+    expect(text).not.toContain('continue-on-error: true');
+    expect(text).not.toMatch(/Soak |Observe /u);
+    const reports = readFileSync('.github/workflows/ci-reports.yml', 'utf8');
+    expect(reports).toContain('workflow_run:');
+    expect(reports).toContain('types: [completed]');
+    expect(reports).toContain('github.event.workflow_run.head_sha');
+    expect(reports).toContain('github.event.workflow_run.id');
+    expect(reports).toContain('node scripts/test-timings.mjs collect');
+    expect(reports).toContain('Soak socket loss');
+    // Reports are read-only source-run follow-ups, never a workflow_run token
+    // exposed to fork PR code or granted write permission.
+    expect(reports).toContain("github.event.workflow_run.event == 'push'");
+    expect(reports).toContain('contents: read');
+    expect(reports).toContain('actions: read');
   });
 
   test('products and boundaries start the last packed job; a heavy last job takes nothing else (EV3)', () => {
@@ -1238,19 +1269,17 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(runUnits(0, ['boundaries'])[0]).toMatchObject({ seconds: 320, blocking: true });
   });
 
-  test('products starts the last job and shards fill it once it is the least loaded (EV3b)', () => {
+  test('J400 reserves T1 time on share nine and covers each existing unit once', () => {
     // ci.yml's kinds (boundaries has its own job), at run 43315969089's measured shard seconds: alone, products left its
     // job 2-4 min short while one of jobs 1-5 ran four shards deep.
     const measured = [137, 155, 88, 157, 137, 135, 95, 146, 121, 161, 108, 74, 116, 126, 164];
     const units = runUnits(15, ['static', 'e2e', 'plan-proofs', 'tests', 'products'], index => measured[index - 1] ?? 0);
-    const bins = packUnits(units, 6);
-    const last = bins[5]?.map(unit => unit.name) ?? [];
-    expect(last.at(-1)).toBe('products');
-    expect(last.length).toBeGreaterThan(1);
-    expect(last.slice(0, -1).every(name => name.startsWith('shard:'))).toBe(true);
+    const bins = packUnits(units, 9);
+    expect(bins).toHaveLength(9);
+    expect(bins[8]?.map(unit => unit.name)).toEqual(['products']);
     expect(bins.flat().map(unit => unit.name).sort()).toEqual(units.map(unit => unit.name).sort());
     const loads = bins.map(bin => bin.reduce((sum, unit) => sum + unit.seconds, 0));
-    expect(Math.max(...loads)).toBeLessThan(450);
+    expect(Math.max(...loads)).toBeLessThanOrEqual(540);
   });
 });
 

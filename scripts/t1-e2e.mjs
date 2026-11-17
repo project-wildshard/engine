@@ -11,7 +11,8 @@ const taskRoot=process.env.WS_T1_SCRATCH_ROOT??resolvePath(import.meta.dirname,'
 const scratch=scratchDir(lane,'Template 1 browser harness',{root:taskRoot,env:{...process.env,WS_LANE_NAME:lane}});
 
 const out = resolvePath(process.env.WS_T1_BUILD_DIR ?? `${scratch}/t1/client`);
-const browserTemp = resolvePath(scratch,'t1/browser-tmp');
+const suite=process.env.WS_T1_SHARD??'all';
+const browserTemp = resolvePath(scratch,'t1/browser-tmp',suite);
 mkdirSync(browserTemp, { recursive: true });
 const env = { ...process.env, TMPDIR: browserTemp, WS_T1_BUILD_DIR: out, WILDSHARD_CATALOGUE: resolvePath('out/.ring-catalogue.json') };
 const commands = process.env.WS_T1_BUILD_DIR === undefined ? [
@@ -23,7 +24,7 @@ for (const [command, ...args] of commands) {
 }
 
 // Keep the actual listener alive throughout Playwright's run: never probe then rebind.
-const preview = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', out, '--port', '0', '--telemetry-dir', resolvePath(scratch, 't1/telemetry')], { stdio: ['ignore', 'inherit', 'inherit', 'ipc'], env });
+const preview = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', out, '--port', '0', '--telemetry-dir', resolvePath(scratch, 't1/telemetry',suite)], { stdio: ['ignore', 'inherit', 'inherit', 'ipc'], env });
 try {
   const port = await childListener(preview, 'preview-ready');
   const result = spawnSync('pnpm', ['exec', 'playwright', 'test', '--config', 'src/e2e/t1/playwright.config.ts', ...process.argv.slice(2)], {

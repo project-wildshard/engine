@@ -3,7 +3,7 @@ import type { SpawnSyncReturns } from 'node:child_process';
 export const LAND_WORKFLOWS: readonly string[];
 export function smallPlanWarning(root: string, branch: string, now?: number, env?: NodeJS.ProcessEnv): string | null;
 export function githubSlug(remote: string): string | null;
-export function parseArgs(argv: string[]): { pollSeconds: number; timeoutMinutes: number; appearMinutes: number; rounds: number; keep: boolean; preflight: boolean };
+export function parseArgs(argv: string[], env?: NodeJS.ProcessEnv): { mode: 'local' | 'hosted'; pollSeconds: number; timeoutMinutes: number; appearMinutes: number; rounds: number; keep: boolean; preflight: boolean };
 export function preflightSteps(files: string[]): [string, string[]][];
 export const CHECK_CSS: string;
 export function failureLine(output: string, error?: Error): string;

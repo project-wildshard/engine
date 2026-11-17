@@ -1,22 +1,11 @@
 name: ci
 
-# CI-JOB-PACKING (J244, Jake 2026-11-10): one workflow for a push. It was ci (21 jobs), ring-1 (16) and
-# engine-boundaries (1): 38 jobs, a third of their runner time the same work twice, on an org that runs 20 at
-# once. Now every unit of work runs once, packed longest-first into the `tests` matrix by scripts/ci-pack.mjs:
-# ci's static checks, the planner's proofs, e2e, every planned test shard, Ring 1's products (cook, build, boot)
-# and the engine-boundaries cook-to-play report. Quarantine keeps its own non-blocking job (J193).
-# EV3 (HOW-WE-BUILD, 2026-11-12): products and boundaries took the last share, `tests (6)`, to themselves, beside the
-# shards (after that job's own set-up and pins); jobs 1-5 pack everything else. Run after job 1's shards, products
-# made job 1 the long pole.
-# EV3b (2026-11-12): boundaries cook-to-play is 223-338 s, and after products it made `tests (6)` the
-# long pole at 13.7 min. It needs nothing products makes (full pins, then its own Ring 1, Chromium and build): its own
-# independent `boundaries` job from t=0. TS15 makes it blocking after its green main soak on 2026-11-15.
-# EV3b measured (2026-11-12): alone, `tests (6)` ran 5.2-8.1 min while jobs 1-5 ran 9.6-11.3, one of them four shards
-# deep. Products still starts the last job, but the shards now pack over all six, that one included (before products).
+# J400: eight packed test runners plus share nine's products and T1 batch.
+# Boundaries starts independently. Report-only soaks, quarantine and timings
+# are source-run follow-ups in ci-reports.yml and cannot hold this verdict.
 on:
-  # J240: a plan worktree pushes plan/<slug>; scripts/land.mjs waits for this
-  # exact SHA to go green here, then fast-forwards main to it. Main's run of
-  # that same SHA reuses the branch run (scripts/ci-exact-reuse.mjs).
+  # Local-gate land pushes only main. plan/** remains for --hosted fallback;
+  # its exact main SHA may reuse that green branch run (J240).
   push:
     branches: [main, 'plan/**', 'release/**']
   pull_request:
@@ -46,7 +35,7 @@ concurrency:
   # CIQ1 (meta HOW-WE-BUILD, J222's burst coalescing): main pushes share one group. GitHub keeps the running run and
   # only the newest pending one, so a burst of N main pushes costs at most two full runs, not N; the newest covers
   # every commit before it (the descendant-green rule: scripts/main-watch.mjs reads a cancel as superseded, never red,
-  # and each run's summary names the commits it covers). One group per SHA ran 131 of 2026-11-13's 135 main pushes
+  # and main-watch reads actual commit ancestry, independently of reports). One group per SHA ran 131 of 2026-11-13's 135 main pushes
   # in full (a land rebases, so exact reuse rarely fires): 39 % of the org's runner time in the 15:00-18:00 Cancun
   # burst, when lands queued 15-25 min behind the 20-job cap. Releases run on their own release/vX.Y.Z ref
   # (RELEASE-BRANCHES RB1); their CI is independent of main and is never cancelled.
@@ -58,7 +47,7 @@ jobs:
   # Every packed job gates itself, so its shares start independently: a main push of a SHA its plan
   # branch already proved green reuses that run (J240), and a docs-only push runs only job 1's docs checks.
   # A job that runs its packed share says so in its step "Run this job's packed share"; scripts/ci-proof-jobs.mjs
-  # counts a run as a code proof only when every share ran that step green. T1's consumers wait for the shared build.
+  # counts a run as a code proof only when every share ran that step green. T1 consumes its producer's build in that same job.
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -70,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        job: [1, 2, 3, 4, 5]
+        job: [1, 2, 3, 4, 5, 6, 7, 8]
     env: &packed-env
       WS_TEST_QUARANTINE: blocking
       WS_CI_PLAN: tmp/engine-ci/plan.json
@@ -219,7 +208,7 @@ jobs:
         if: steps.code.outputs.run == 'true'
         env:
           RING_RECORD: ${{ inputs.record && 'true' || 'false' }}
-        run: node scripts/ci-pack.mjs --jobs=6 --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products
+        run: node scripts/ci-pack.mjs --jobs=9 --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products
       - name: Retain actual membership, budget and timing evidence
         if: always() && steps.code.outputs.run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -268,22 +257,6 @@ jobs:
       - name: Record every shard's wall-budget verdict, artifact upload included (J193)
         if: always() && steps.code.outputs.run == 'true'
         run: node scripts/ci-pack.mjs --check-walls --job=${{ matrix.job }}
-      # TC39/J186: report-only, outside blocking wall accounting.
-      # Review no earlier than 2026-11-23 after an actual green proof week.
-      - name: Observe API health version reader over real HTTP
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        timeout-minutes: 2
-        env:
-          TC39_INSTALLED_FORMAT: '1'
-        run: node --test --test-timeout=10000 scripts/api-health.proof.ts
-      # TC22/J186: report-only, outside the blocking share's wall budget.
-      # Admission review no earlier than 2026-11-23 after a green week.
-      - name: Observe nightly release refusal and planted failure
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        timeout-minutes: 2
-        run: node --test --test-timeout=10000 scripts/release-nightly.proof.ts
       # TEMPLATE-E2E T1E-2a: products already built Ring 1. Export those
       # exact bytes plus the Template pin read by POI and memory-server probes.
       - name: Bundle the shared Template suite build
@@ -296,100 +269,56 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/t1-qualification.mjs
-      - name: Archive the shared Template build and qualification
+      - name: Run all Template suites on the producer runner
         if: steps.pack.outputs.products == 'true'
-        run: tar -cf tmp/template-e2e-ci/products.tar dist out/_template test/pins/saves tmp/template-e2e-ci/qualification.json
-      - name: Publish the shared Template suite build
-        if: steps.pack.outputs.products == 'true'
+        continue-on-error: ${{ steps.t1-policy.outputs.blocking != 'true' }}
+        env:
+          WS_LANE_NAME: template-e2e-ci
+          WS_T1_BUILD_DIR: dist
+        run: node scripts/t1-batch.mjs
+      - name: Keep Template A receipt
+        if: always() && steps.pack.outputs.products == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: template-e2e-products
-          path: tmp/template-e2e-ci/products.tar
-          retention-days: 3
-          if-no-files-found: error
-      # TC26/J186: new outer-edge contracts soak for one week before blocking.
-      # Run after wall accounting: a non-blocking report must never spend a
-      # shard's blocking wall budget. Hooks and Vitest discovery stay unchanged.
-      - name: Soak actual host, door, format and outside-author contracts
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs
-      # TC7: new complete journeys report for a week before becoming gates.
-      - name: Soak full Dunes and real pin-grid journeys
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        run: |
-          node scripts/pins.ts install --ring 1
-          node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test --test-reporter=tap test/ci/dunes-journey.proof.mjs test/ci/pin-grid-journey.proof.mjs
-      # New coverage reports for a week before explicit blocking admission.
-      # After wall accounting: report time cannot spend a blocking shard budget.
-      - name: Soak named elite ownership on pinned products
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        run: |
-          node scripts/pins.ts install --ring 1
-          WILDSHARD_RING=1 node scripts/vitest-tmp.ts run test/roster-owners.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-coverage-edges/roster.json
-      - name: Soak malformed nightly receipt refusal
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        run: |
-          mkdir -p tmp/ci-coverage-edges
-          NIGHTLY_IDENTITY_SOAK=1 node --test --test-name-pattern='extra receipt' scripts/nightly.proof.ts > tmp/ci-coverage-edges/identity.tap
-      # TC8: exercise rejected live-clock admission without consuming a tap.
-      - name: Soak hover presses across rejected network ticks
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        run: node scripts/vitest-tmp.ts run test/net-hover-admission.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-coverage-edges/hover-admission.json
-      - name: Keep non-blocking coverage edge observations
-        if: ${{ !cancelled() && steps.code.outputs.run == 'true' && matrix.job == 1 }}
-        continue-on-error: true
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+          name: template-e2e-A
+          path: tmp/template-e2e-ci/t1/receipt-A.json
+          retention-days: 7
+          if-no-files-found: ${{ steps.t1-policy.outputs.blocking == 'true' && 'error' || 'warn' }}
+      - name: Keep Template B receipt
+        if: always() && steps.pack.outputs.products == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: coverage-edges-soak
-          path: tmp/ci-coverage-edges
-          retention-days: 14
-      # EG-24: a new regression reports for one week before explicit admission.
-      - name: Soak socket loss during combat and crossing
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        run: node scripts/vitest-tmp.ts run test/dedicated-critical-reconnect.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-socket-soak/recovery.json
-      - name: Keep socket recovery soak observations
-        if: ${{ !cancelled() && steps.code.outputs.run == 'true' && matrix.job == 1 }}
-        continue-on-error: true
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+          name: template-e2e-B
+          path: tmp/template-e2e-ci/t1/receipt-B.json
+          retention-days: 7
+          if-no-files-found: ${{ steps.t1-policy.outputs.blocking == 'true' && 'error' || 'warn' }}
+      - name: Keep Template C receipt
+        if: always() && steps.pack.outputs.products == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: socket-recovery-soak
-          path: tmp/ci-socket-soak
-          retention-days: 14
-      # One run stands for every commit since the last finished run (was the verdict-coverage job; each share now
-      # names the range and flags its own red, so a main push needs no extra job).
-      - name: Name the commits this verdict covers
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RESULT: ${{ job.status }}
-          REUSED: ${{ steps.reuse.outputs.reused }}
-          DOCS_ONLY: ${{ steps.paths.outputs.docs }}
-          CODE_BASE: ${{ steps.paths.outputs.code_base }}
-        run: |
-          if test "$REUSED" = true; then echo "### Reused this SHA's green plan-branch run (J240)." >> "$GITHUB_STEP_SUMMARY"; fi
-          if test "$DOCS_ONLY" = true; then
-            echo "### Tests skipped (docs-only); code unchanged since proved $CODE_BASE." >> "$GITHUB_STEP_SUMMARY"
-          fi
-          previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=50" \
-            --jq "[.workflow_runs[]|select(.status == \"completed\" and .conclusion != \"cancelled\" and .id != $GITHUB_RUN_ID)][0].head_sha // empty")
-          test -n "$previous" || { echo 'No finished run to compare against'; exit 0; }
-          commits=$(gh api "repos/$GITHUB_REPOSITORY/compare/$previous...$GITHUB_SHA" --jq '.commits[]|"\(.sha[0:10]) \(.commit.message|split("\n")[0])"')
-          range="${previous:0:10}..${GITHUB_SHA:0:10}"
-          { echo "### Commits since the last finished run: $range"; echo '```'; echo "$commits"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          if test "$RESULT" = failure; then
-            echo "::error title=Red run covers $range::$(printf '%s\n' "$commits" | sed '/^$/d' | wc -l | tr -d ' ') commits after the last finished run; see this job's summary"
-          fi
+          name: template-e2e-C
+          path: tmp/template-e2e-ci/t1/receipt-C.json
+          retention-days: 7
+          if-no-files-found: ${{ steps.t1-policy.outputs.blocking == 'true' && 'error' || 'warn' }}
+      - name: Keep Template D receipt
+        if: always() && steps.pack.outputs.products == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: template-e2e-D
+          path: tmp/template-e2e-ci/t1/receipt-D.json
+          retention-days: 7
+          if-no-files-found: ${{ steps.t1-policy.outputs.blocking == 'true' && 'error' || 'warn' }}
+      - name: Keep failing Template traces
+        if: failure() && steps.pack.outputs.products == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: template-e2e-traces
+          path: tmp/template-e2e-ci/t1/results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
 
-  # TS9b: the exact same packed share 6 is a named producer dependency.
-  # Anchors preserve every step, reuse/docs gate, report and failure policy.
-  # T1 can start when its build is published, while shares 1..5 still run.
+  # Share nine reserves products plus T1 time; no consumer needs another runner.
+  # Anchors preserve the same static checks, packed inventory and artifact policy.
   products:
     name: tests (${{ matrix.job }})
     runs-on: ubuntu-latest
@@ -398,111 +327,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        job: [6]
+        job: [9]
     env: *packed-env
     steps: *packed-steps
-
-  t1-e2e:
-    # J244 folded Ring 1 into this workflow. Every shard consumes the one
-    # products build; exact-reuse and docs-only runs create no second suite.
-    needs: products
-    if: needs.products.outputs.code-run == 'true'
-    continue-on-error: ${{ needs.products.outputs.t1-blocking != 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [A, B, C, D]
-    env:
-      WS_LANE_NAME: template-e2e-ci
-      WS_T1_BUILD_DIR: dist
-      WS_T1_SHARD: ${{ matrix.suite }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/ring-setup
-      - name: Select the installed Playwright version
-        id: playwright
-        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: ~/.cache/ms-playwright
-          key: ms-playwright-pack-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-          restore-keys: ms-playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - name: Own the suite scratch folder
-        run: node scripts/scratch-dir.mjs template-e2e-ci "Template suite shard"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: template-e2e-products
-          path: tmp/template-e2e-ci
-      - name: Restore the shared client and Template pin
-        run: |
-          tar -xf tmp/template-e2e-ci/products.tar
-          rm tmp/template-e2e-ci/products.tar
-          bash scripts/ci-playwright-install.sh --only-shell chromium
-      - name: Run this Template suite shard (report-only until qualified)
-        run: node scripts/t1-ci-proof.mjs
-      - name: Keep the actual exit, wall and traces
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: template-e2e-${{ matrix.suite }}
-          path: |
-            tmp/template-e2e-ci/t1/receipt-*.json
-          retention-days: 7
-          if-no-files-found: error
-      - name: Keep failing Template traces separately from receipt history
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: template-e2e-traces-${{ matrix.suite }}
-          path: tmp/template-e2e-ci/t1/results/**/trace.zip
-          retention-days: 7
-          if-no-files-found: ignore
-
-  timings:
-    # LAND-SIMPLIFY LS2 (J250, J258): main's run measures every planned file; merge its shard reports into the
-    # table and save it as the newest `timings-<run id>`, which every later run's planner restores. It never fails
-    # the run: a missed save only leaves the previous table in place. Node built-ins only, no install.
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [tests, products]
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version-file: package.json
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: tmp/timings
-          key: timings-${{ github.run_id }}
-          restore-keys: timings-
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        continue-on-error: true
-        with:
-          pattern: engine-ci-*
-          path: tmp/timings-run
-      - name: A main push that reused its plan-branch run takes that run's reports
-        if: needs.tests.outputs.reused-run != ''
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN: ${{ needs.tests.outputs.reused-run }}
-        run: gh run download "$RUN" -R "$GITHUB_REPOSITORY" -p 'engine-ci-*' -D tmp/timings-run
-      - name: Merge this run's measured files into the table
-        id: collect
-        run: node scripts/test-timings.mjs collect tmp/timings-run
-      - if: steps.collect.outputs.measured == 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: tmp/timings
-          key: timings-${{ github.run_id }}
 
   boundaries:
     # TS15: blocking after main run 43768938893's green soak, 2026-11-15. Cook Ring 1, attach, and play the same bytes.
@@ -565,58 +392,3 @@ jobs:
             tmp/ci-pack/*.json
           retention-days: 7
           if-no-files-found: ignore
-
-  quarantine:
-    # J193: run every active quarantined proof with its ordinary exit code,
-    # separately from the blocking verdict and its covered-commit summary.
-    # One job, one file at a time (it was three in ci, and ring-1 ran the same three again).
-    # CIQ1 (HOW-WE-BUILD): non-blocking, so a plan/** run skips it (land never waits on it), and main runs it on every push
-    # without reusing the plan run, which no longer has it: each landed SHA still gets one run, on main.
-    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Check for active quarantine files before installing anything
-        id: active
-        run: |
-          node --input-type=module <<'NODE'
-          import { appendFileSync } from 'node:fs';
-          import { activeQuarantineFiles } from './scripts/test-quarantine.mjs';
-          const count = activeQuarantineFiles().length;
-          appendFileSync(process.env.GITHUB_OUTPUT, `run=${count > 0}\n`);
-          console.log(`${count} active quarantine files; ${count === 0 ? 'skip setup and pins' : 'run the original cohort'}`);
-          NODE
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        if: steps.active.outputs.run == 'true'
-        with:
-          node-version-file: package.json
-      - name: Classify from an actually green code-proving ancestor
-        id: paths
-        if: steps.active.outputs.run == 'true'
-        env:
-          BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-selection.mjs
-      - id: code
-        if: steps.paths.outputs.docs != 'true'
-        run: echo "run=${{ steps.active.outputs.run }}" >> "$GITHUB_OUTPUT"
-      - if: steps.code.outputs.run == 'true'
-        uses: ./.github/actions/ring-setup
-        with:
-          pins-cache-scope: full
-      - if: steps.code.outputs.run == 'true'
-        run: pnpm pins && pnpm gen:inputs
-      - if: steps.code.outputs.run == 'true'
-        run: node scripts/test-quarantine.mjs --shard=1/1
-      - name: Keep the original quarantine results
-        if: always() && steps.code.outputs.run == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ci-quarantine-results
-          path: tmp/quarantine
-          retention-days: 7
