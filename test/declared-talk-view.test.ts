@@ -70,7 +70,7 @@ test('the talk: the server\'s node, its choices, an answer by position, the next
   box.close(true); // a node with no choices: read, the talk is over
   expect(sent).toEqual([talkChoice(0, 0, 0), talkChoice(0, 1, 0), talkFinish(0)]);
   lines.set(LINE, dialogue.nodes.length + 1);
-  expect(prompt.radius).toBe(0);
+  expect(prompt.radius).toBe(talk.radius);
   expect(talks[0]?.node()).toBeNull();
 
   scope.dispose();
@@ -94,4 +94,20 @@ test('a refused answer moves nothing, and a node whose choices all wait closes w
 test('a talk that names its props figure draws no stand-in', () => {
   const { root } = page([{ ...talk, figure: 'keeper.figure' }]);
   expect(root.children).toHaveLength(0);
+});
+
+test('a closed conversation still offers its prompt and waits for the server before reopening', () => {
+  const { box, sent, lines, interactables, scope, frame } = page([talk]);
+  try {
+    const prompt = interactables[0]; if (prompt === undefined) throw new Error('Missing prompt');
+    lines.set(LINE, dialogue.nodes.length + 1);
+    expect(prompt.radius).toBe(talk.radius);
+    prompt.onInteract();
+    expect(sent).toEqual(['talk:0.start']);
+    expect(box.isOpen).toBe(false);
+    expect(prompt.radius).toBe(0);
+    lines.set(LINE, node('offer')); frame();
+    expect(box.isOpen).toBe(true);
+    expect(box.shown?.lines).toEqual(dialogue.nodes[0]?.lines);
+  } finally { scope.dispose(); }
 });

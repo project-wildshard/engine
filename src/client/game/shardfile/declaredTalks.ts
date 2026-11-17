@@ -8,7 +8,7 @@ import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import { test } from '@wildshard/engine/world/interact/flags';
 import type { DialogueChoice } from '@wildshard/engine/quest/view/ui';
-import { TALK_HEIGHT, talkChoice, talkFinish, talkLine, talkNode, type TalkRow } from '../../../shared/game/shardfile/talks';
+import { TALK_HEIGHT, talkChoice, talkFinish, talkLine, talkNode, talkStart, type TalkRow } from '../../../shared/game/shardfile/talks';
 
 /** The dialogue box a talk opens: the HUD's, or a test's. */
 export interface TalkBox {
@@ -90,9 +90,16 @@ export function installDeclaredTalks(source: Pick<Shardfile, 'targets' | 'quests
     const node = (): ReturnType<typeof talkNode> => talkNode(tree, lineOf(tree));
     const prompt: Interactable = {
       position: new Vector3(talk.at[0], talk.at[1] + TALK_HEIGHT, talk.at[2]), label: talk.label,
-      // hidden while a talk is open or an answer waits, before the server has said a node, and once the talk is over
-      get radius() { const current = node(); return open !== null || pending !== null || ports.box().isOpen || current === null || current === undefined ? 0 : talk.radius; },
-      onInteract: () => { const current = node(); if (current !== null && current !== undefined && !ports.box().isOpen && pending === null) show(talk, index, tree, current); },
+      // Hidden while a conversation is open or waiting, and before the server has said any state.
+      get radius() { const current = node(); return open !== null || pending !== null || ports.box().isOpen || current === undefined ? 0 : talk.radius; },
+      onInteract: () => {
+        const current = node();
+        if (current === undefined || ports.box().isOpen || open !== null || pending !== null) return;
+        if (current === null) {
+          ports.send(talkStart(index));
+          pending = { talk, index, tree, from: lineOf(tree), waited: 0 };
+        } else show(talk, index, tree, current);
+      },
     };
     ports.interactables.push(prompt);
     ports.scope.onDispose(() => { const at = ports.interactables.indexOf(prompt); if (at !== -1) ports.interactables.splice(at, 1); });

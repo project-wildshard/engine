@@ -124,6 +124,12 @@ export class DeclaredQuests {
     for (const flag of [...(node.sets ?? []), ...(choice.sets ?? [])]) flags.set(flag);
     nodes.set(id, choice.next);
   }
+  /** A new conversation starts at the tree's entry; a saved null closes only the previous conversation. */
+  reopen(id: string, player: string = this.books.lead.player): void {
+    const tree = this.data.dialogue.find(row => row.id === id); if (tree === undefined) throw new Error('Unknown dialogue');
+    const nodes = this.nodes(player);
+    if (nodes.get(id) === null) nodes.set(id, tree.start);
+  }
   /** Close a terminal node after its lines; choice-bearing nodes require an explicit available choice. */
   finish(id: string, player: string = this.books.lead.player): void {
     const nodes = this.nodes(player), { flags } = this.books.of(player);

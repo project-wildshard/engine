@@ -70,9 +70,11 @@ test('a tape talks to the quest-giver and answers it by name, through the same c
   expect(sim.interact(`${talk}:report`)).toBe(true); sim.host.step();
   expect(keeper(sim)?.isComplete).toBe(true);
   expect(facts).toEqual([{ name: 'fixture.keeper', entity: fixture.quest.id }]);
-  // The last node has no choices: E closes it, and once over the talk takes nothing more
+  // The last node has no choices: E closes this conversation; a new E starts another.
   expect(sim.interact(talk)).toBe(true); sim.host.step();
   expect(line(sim)).toBe(fixture.dialogue.nodes.length + 1);
-  expect(sim.interact(talk)).toBe(false);
+  expect(sim.interact(talk)).toBe(true); sim.host.step();
+  expect(line(sim)).toBe(node('offer'));
+  expect(facts).toHaveLength(1);
   sim.dispose();
 });

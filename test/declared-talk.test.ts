@@ -7,7 +7,7 @@ import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes } from '.
 import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { questBooks } from '../src/shared/engine/quest/players';
-import { talkChoice, talkFinish, talkLine } from '../src/shared/game/shardfile/talks';
+import { talkChoice, talkFinish, talkLine, talkStart } from '../src/shared/game/shardfile/talks';
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
@@ -118,8 +118,8 @@ test('a rows-only quest-giver: its talk offers the quest, the steps finish it, i
 });
 
 test('every press a talk takes is a wire-safe act id', () => {
-  const ids = [...fixture.dialogue.nodes.flatMap((row, at) => row.choices.map((_choice, choice) => talkChoice(31, at, choice))), talkFinish(31)];
-  for (const id of ids) expect(id).toMatch(/^talk:[0-9.]+(?:end)?$/u);
+  const ids = [...fixture.dialogue.nodes.flatMap((row, at) => row.choices.map((_choice, choice) => talkChoice(31, at, choice))), talkFinish(31), talkStart(31)];
+  for (const id of ids) expect(id).toMatch(/^talk:[0-9.]+(?:end|start)?$/u);
   expect(ids.every(id => id.length <= 128)).toBe(true);
 });
 
@@ -136,4 +136,46 @@ test('a second player keeps its own node', async () => {
   expect(line(sim, BOT)).toBe(node('waiting'));
   expect(questBooks(sim.host).of(BOT).flags.has('fixture.keeper.accepted')).toBe(true);
   sim.dispose();
+});
+
+test('null choices close one conversation; reopening allows a later turn-in and Leave never locks the keeper', async () => {
+  const input = await withTalk(), payouts: number[] = [];
+  input.shard.quests.dialogue = [{ ...fixture.dialogue, nodes: [{ id: 'offer', lines: ['How can I help?'], choices: [
+    { id: 'accept', label: 'I will help.', next: null, when: { none: ['fixture.keeper.accepted'] }, sets: ['fixture.keeper.accepted'] },
+    { id: 'report', label: 'The lamp is lit.', next: null, when: { all: ['fixture.keeper.accepted', 'fixture.keeper.lamp'], none: ['fixture.keeper.reported'] }, sets: ['fixture.keeper.reported'] },
+    { id: 'leave', label: 'Leave.', next: null },
+  ] }] }];
+  const ports = { rapier: input.rapier, quest: { fact: () => undefined, coins: (amount: number) => { payouts.push(amount); } } };
+  const sim = createShardfileSim(input.shard, input.assets, ports), [x, , z] = fixture.talk.at;
+  let back: ShardfileSimulation | undefined;
+  try {
+    put(sim, PLAYER, x, z);
+    press(sim, talkChoice(0, 0, 0));
+    expect(sim.quest.view(fixture.dialogue.id)).toBeNull(); // closed, no automatic loop
+    expect(keeper(sim)?.isStarted).toBe(true);
+    // Old saved null states must be reopenable too, without replaying accept effects.
+    restoreSimHost(sim.host.level, { rapier: input.rapier }, snapshotSimHostBytes(sim.host), host => {
+      back = bindShardfileSim(host, input.shard, input.assets, { ...ports, restoring: true });
+    });
+    if (back === undefined) throw new Error('Missing resumed talk');
+    const reopened = back;
+    put(reopened, PLAYER, x + 50, z);
+    const refused = actRoutes(reopened.host).refused;
+    press(reopened, talkStart(0));
+    expect(reopened.quest.view(fixture.dialogue.id)).toBeNull();
+    expect(actRoutes(reopened.host).refused).toBe(refused + 1);
+    put(reopened, PLAYER, x, z); press(reopened, talkStart(0));
+    expect(reopened.quest.view(fixture.dialogue.id)?.choices.map(choice => choice.id)).toEqual(['leave']);
+    press(reopened, talkChoice(0, 0, 2)); // Leave, then return after lighting the lamp
+    expect(reopened.quest.view(fixture.dialogue.id)).toBeNull();
+    put(reopened, PLAYER, -30, 30); reopened.host.step();
+    put(reopened, PLAYER, x, z); press(reopened, talkStart(0));
+    expect(reopened.quest.view(fixture.dialogue.id)?.choices.map(choice => choice.id)).toEqual(['report', 'leave']);
+    press(reopened, talkChoice(0, 0, 1));
+    expect(keeper(reopened)?.isComplete).toBe(true);
+    expect(payouts).toEqual([7]);
+    press(reopened, talkStart(0)); press(reopened, talkChoice(0, 0, 1));
+    expect(payouts).toEqual([7]);
+    expect(reopened.quest.view(fixture.dialogue.id)?.choices.map(choice => choice.id)).toEqual(['leave']);
+  } finally { sim.dispose(); back?.dispose(); }
 });

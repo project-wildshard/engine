@@ -6,7 +6,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { SimHost } from '@wildshard/engine/sim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import type { DeclaredQuests } from '../../../shared/game/quest/declared';
-import { talkChoice, talkFinish } from '../../../shared/game/shardfile/talks';
+import { talkChoice, talkFinish, talkStart } from '../../../shared/game/shardfile/talks';
 
 /** What a tape's `interact` id names among a shard's talks. */
 export type TalkPress = { readonly kind: 'press'; readonly claim: string } | { readonly kind: 'open' } | { readonly kind: 'over' };
@@ -31,7 +31,7 @@ export function talkPress(shard: Pick<Shardfile, 'targets' | 'quests'>, quest: D
   const tree = shard.quests.dialogue.find(row => row.id === talk.dialogue);
   if (tree === undefined) throw new Error(`Talk ${talk.id} requires its declared dialogue: ${talk.dialogue}`);
   const view = quest.view(tree.id, player);
-  if (view === null) return { kind: 'over' };
+  if (view === null) return choiceId === null ? { kind: 'press', claim: talkStart(index) } : { kind: 'over' };
   const at = tree.nodes.findIndex(node => node.id === view.id), node = tree.nodes[at];
   if (node === undefined) throw new Error(`Talk ${talk.id} stands at an undeclared node: ${view.id}`);
   if (choiceId === null) return node.choices.length === 0 ? { kind: 'press', claim: talkFinish(index) } : { kind: 'open' };

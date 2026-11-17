@@ -6,7 +6,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
 import type { DeclaredQuests } from '../../../shared/game/quest/declared';
-import { talkChoice, talkFinish, talkLine } from '../../../shared/game/shardfile/talks';
+import { talkChoice, talkFinish, talkLine, talkStart } from '../../../shared/game/shardfile/talks';
 
 /** A press is judged where the server has the body, a command behind: this much past the talk's reach still counts. */
 const TALK_SLACK = 1.5;
@@ -26,7 +26,7 @@ export function installDeclaredTalks(host: SimHost, shard: Pick<Shardfile, 'targ
       const body = host.players.get(player)?.position;
       return body !== undefined && Math.hypot(body.x - talk.at[0], body.z - talk.at[2]) <= talk.radius + TALK_SLACK;
     };
-    // The node the player stands at, as the tree declares it; null once the talk is over.
+    // The node this player stands at; null closes this conversation until they interact again.
     const current = (player: string): Shardfile['quests']['dialogue'][number]['nodes'][number] | null => {
       const view = quest.view(tree.id, player);
       return view === null ? null : tree.nodes.find(node => node.id === view.id) ?? null;
@@ -35,6 +35,10 @@ export function installDeclaredTalks(host: SimHost, shard: Pick<Shardfile, 'targ
       // only a choice of the node this player stands at, its condition met now (a page a frame behind may ask for one it no longer has)
       if (!near(player) || current(player) !== node || quest.view(tree.id, player)?.choices.some(entry => entry.id === choice.id) !== true) { routes.refused++; return; }
       quest.choose(tree.id, choice.id, player);
+    });
+    routes.claims.set(talkStart(index), player => {
+      if (!near(player) || current(player) !== null) { routes.refused++; return; }
+      quest.reopen(tree.id, player);
     });
     routes.claims.set(talkFinish(index), player => {
       const node = current(player);
