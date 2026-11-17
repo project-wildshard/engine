@@ -81,8 +81,8 @@ export class DeclaredQuests {
     });
     books.lead.part(`dialogue:${data.quests[0]?.id ?? ''}`, { read: () => JSON.stringify(Object.fromEntries(this.dialogue)), write: saved => { this.restoreNodes(this.dialogue, JSON.parse(saved) as SimValue); } });
     host.events.on('actor.died', ({ actor }) => {
-      // the kill counts for everyone in the room whose trigger is waiting on it
-      for (const book of books.each()) for (const t of data.triggers) if (t.kind === 'death' && actor.tags.some((tag) => tag === t.tag) && test(book.flags, t.when)) book.flags.set(t.flag);
+      // A selector names an exact spawn or one of its actor tags; credit stays per player and condition.
+      for (const book of books.each()) for (const t of data.triggers) if (t.kind === 'death' && (actor.id === t.tag || actor.tags.some((tag) => tag === t.tag)) && test(book.flags, t.when)) book.flags.set(t.flag);
     }, host.scope);
     host.onStep('quest.declared', () => {
       for (const book of books.each()) this.watch(book);
