@@ -527,7 +527,7 @@ async function startSelected(): Promise<void> {
   // MF4: one spawn manifest per shard / tier / flow (grid: per menu mode) is the whole download; the bar reads only it and
   // admission waits for it (a tap on the title started the same job, so its files may already be in the worker cache)
   // a world entry's own import: the spawn manifest's reader stays out of the title's chunk (check-chunks)
-  const { startSpawnDownload, setSpawnPacks, observeSpawnHolds } = await import('@wildshard/engine/game/boot/spawnDownload');
+  const { startSpawnDownload, setSpawnPacks, observeSpawnHolds, adoptSpawnReruns } = await import('@wildshard/engine/game/boot/spawnDownload');
   setSpawnPacks(runtimePacksOn()); // DL16: Debug ▸ Loading & memory ▸ Level download
   // DL21: a read the whole-set hold stalls is named on the card as the spawn download, in its step
   observeSpawnHolds((held, path) => waitFor('Spawn download', held, 'file', `spawn-download:${path}`));
@@ -537,6 +537,8 @@ async function startSelected(): Promise<void> {
   const spawnMode = gridMode(DEVSERVER), spawnJob = authored ? null : startSpawnDownload(arrival.slug, earlyPath === 'grid' ? 'grid' : 'client', TIER,
     `${Number(spawnMode.developer)}${Number(spawnMode.devserver)}${Number(spawnMode.nineDragon)}`);
   if (spawnJob !== null) void loading.setDownloadSource(spawnJob);
+  // FM6: a refused download that runs again (finish.ts) paints on the same card
+  if (spawnJob !== null) { adoptSpawnReruns(next => { void loading.setDownloadSource(next); }); entryScope.onDispose(() => { adoptSpawnReruns(null); }); }
   // Read mandatory primary declarations while services and the yielding memory
   // bank prepare. Capture any failure now; publish only at the original barrier.
   const catalogue = earlyPath === 'grid' ? prepareBootImports(preparePageCatalogue()) : null;

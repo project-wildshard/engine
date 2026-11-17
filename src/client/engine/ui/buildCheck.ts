@@ -46,7 +46,7 @@ export interface LiveBuildFailure { readonly status: number | null }
 let lastFailure: LiveBuildFailure | null = null;
 /** The live build's id, or null: offline (the PWA plays from its cache), a failed request, or an answer with no build. */
 export async function liveBuild(): Promise<string | null> {
-  if (!navigator.onLine) return null; // no request that can only fail
+  if (!navigator.onLine) { lastFailure = null; return null; } // no request that can only fail, and no failure to report
   try {
     const r = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
     if (!r.ok) { lastFailure = { status: r.status }; return null; }

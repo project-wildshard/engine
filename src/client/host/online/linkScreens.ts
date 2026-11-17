@@ -403,7 +403,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
         [{ label: 'Play here', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }], 'close "replaced" (4003)');
     } else if (state === 'ended' && reason === 'refused' && hooks.progress().ended?.code === 'banned') {
       // FM8m mode 41: the server's coded fact, not a moderator's words (J229): an end time only when it sent one; no redial, no Play again
-      const ended = hooks.progress().ended, untilMs = ended?.code === 'banned' ? ended.untilMs : undefined;
+      // an end time already past is no end time to wait for: the card claims none rather than a time gone by
+      const ended = hooks.progress().ended, sent = ended?.code === 'banned' ? ended.untilMs : undefined, untilMs = sent !== undefined && sent > Date.now() ? sent : undefined;
       const when = untilMs === undefined ? null : new Date(untilMs).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
       stop('banned', 'bad', 'Removed', 'You were removed from the world',
         `${when === null ? 'You can\'t rejoin for now: no end time was given.' : `You can't rejoin until ${when}.`} You can still look around the title and your settings.`,

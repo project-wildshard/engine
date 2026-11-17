@@ -11,7 +11,8 @@ export const SOCKET_CLOSE_REASON_BYTES = 123;
 const Whole = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 const Schema: v.GenericSchema<SocketCloseInfo & { readonly v: 1 }> = v.variant('code', [
   v.strictObject({ v: v.literal(1), code: v.literal('queue'), position: v.exactOptional(v.pipe(Whole, v.minValue(1), v.maxValue(1_000_000))), etaMs: v.exactOptional(v.pipe(Whole, v.maxValue(604_800_000))) }),
-  v.strictObject({ v: v.literal(1), code: v.literal('banned'), untilMs: v.exactOptional(Whole) }),
+  // a Date can hold at most 8.64e15 ms: a later end time is malformed, never a card that throws while it renders
+  v.strictObject({ v: v.literal(1), code: v.literal('banned'), untilMs: v.exactOptional(v.pipe(Whole, v.maxValue(8.64e15))) }),
   v.strictObject({ v: v.literal(1), code: v.picklist(['auth-expired', 'refused']) }),
 ]);
 const matches = (reason: string, info: SocketCloseInfo): boolean => reason === 'full' ? info.code === 'queue' : reason === 'refused' && info.code !== 'queue';

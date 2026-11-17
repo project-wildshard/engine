@@ -1081,14 +1081,19 @@ function holdUnlisted(ready: Promise<void>): void {
   void wait.then(() => { if (unlistedWait === wait) unlistedWait = null; return undefined; });
 }
 export function currentSpawnDownload(): SpawnDownload | undefined { return current?.download; }
+let rerunAdopter: ((download: SpawnDownload) => void) | null = null;
 /** FM6 modes 36 and 44: the page's download refused (a part out of its reads), so it runs again from its manifest: the same entry,
  *  a new job (parts it stored are cache hits). Undefined when there is none, or the current one has not failed. */
 export function retrySpawnDownload(): SpawnDownload | undefined {
   const was = current;
   if (was === undefined || was.download.snapshot().error === null) return undefined;
   current = undefined; was.download.cancel();
-  return was.again() ?? undefined;
+  const next = was.again() ?? undefined;
+  if (next !== undefined) rerunAdopter?.(next);
+  return next;
 }
+/** The loading card paints the job that runs again (FM6), as it painted the first (entry.ts). One adopter: the page's card. */
+export function adoptSpawnReruns(adopt: ((download: SpawnDownload) => void) | null): void { rerunAdopter = adopt; }
 
 const mb = (bytes: number): string => (bytes / 1_000_000).toFixed(1);
 /** Paint only the existing card's numbers/text, before engine imports. The

@@ -301,10 +301,12 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       if (rerun) {
         const given = downloadGiveUp(), { awaitContentRetry, ContentReadError } = await import('@wildshard/engine/boot/contentRead');
         await awaitContentRetry(new ContentReadError(given?.detail ?? spawn.snapshot().error ?? 'spawn download', 'the download stopped', failure, false,
-          { ...given?.status === undefined || given.status === null ? {} : { status: given.status }, broken: given === null || (given.status !== null && given.status < 400) }));
+          { ...given?.status === undefined || given.status === null ? {} : { status: given.status }, broken: given !== null && given.status !== null && given.status < 400 }));
       }
       rerun = true;
-      spawn = retrySpawnDownload();
+      const next = retrySpawnDownload();
+      if (next === undefined) throw failure; // nothing to run again: never control without the whole set
+      spawn = next;
     }
   }
   // DL17, DL21: the server boots under the card, a counted line on it, so its reads land before control and the player's first
