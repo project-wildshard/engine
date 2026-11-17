@@ -13492,5 +13492,2459 @@
     "destinationCi": "https://github.com/project-wildshard/shard-nine-dragon/actions/runs/44013668599",
     "originalCases": 3,
     "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-nine-c7/port-audit.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/approved-enemy-placement.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/approved-enemy-placement.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('approved enemy placement retains the entire original page/native file and exact wire bytes',()=>{",
+      "test('complete enemy placement retains native RNG, population, kind and root refusals',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "3bf6db5ac70f5cee882f4e2486223d1bc8525520",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/approved-enemy-placement.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "42f0669f1746f9dec78cc3bebd1e3b4035ac8077",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "approved enemy placement retains the entire original page/native file and exact wire bytes",
+          "complete enemy placement retains native RNG, population, kind and root refusals"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/balbal-v2.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/balbal-v2.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Balbal ABI2 preserves the frozen callback trace, twenty defaults and original memory continuation', () => {",
+      "test('ABI2 retains same-call native Wedge contact, reach refusal and both ordered sounds', () => {",
+      "test('the selected creature artifact is admitted in the complete emitted inventory and leaves held ABI1 intact', async () => {",
+      "test('selected Balbal capture refuses missing fields and retired owners without native memory or effects', () => {",
+      "test('every shared held, power, stealth and creature signal matches its unchanged ABI1 witness', () => {",
+      "test('retirement from native contact reach cannot publish hurt or either sound',()=>{",
+      "test('AS request-tag policy retains legacy equipment fallback, visibility and stow precedence',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "fb4e968f7b038400297f027d3bbc6f7fc655ea23",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/balbal-v2.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "b637c0b7cdb4e8abb710519a08982ae742baf475",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "Balbal ABI2 preserves the frozen callback trace, twenty defaults and original memory continuation",
+          "ABI2 retains same-call native Wedge contact, reach refusal and both ordered sounds",
+          "the selected creature artifact is admitted in the complete emitted inventory and leaves held ABI1 intact",
+          "selected Balbal capture refuses missing fields and retired owners without native memory or effects",
+          "every shared held, power, stealth and creature signal matches its unchanged ABI1 witness",
+          "retirement from native contact reach cannot publish hurt or either sound",
+          "AS request-tag policy retains legacy equipment fallback, visibility and stow precedence"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/basis-glb-variant.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-source/basis-glb-variant.source.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the injected shipped image reproduces the entire shipped phone container', async () => {",
+      "test('the caller cannot mutate geometry while the asynchronous encoder owns its detached image', async () => {",
+      "test.each([",
+      "test('unsupported or malformed sources refuse before requesting an encoder', async () => {",
+      "test('an individually bounded image cannot overflow the combined GLB allocation', async () => {",
+      "test('the unused writer bundles as one config-safe chunk with no file, process or generated imports', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "6822655cdc9554cc70486568b3e99df1baa01366",
+    "destinations": [
+      {
+        "repo": "sharddev",
+        "target": "test/ci21-source/basis-glb-variant.source.ts",
+        "destinationCommit": "ad16070ad6320cfbd9f8dd9b6ecf8665d0e03c4b",
+        "destinationBlob": "529156011841f4452fb128dcde15899a102442e6",
+        "destinationCi": "https://github.com/project-wildshard/sharddev/actions/runs/44017781230",
+        "originalTests": [
+          "the injected shipped image reproduces the entire shipped phone container",
+          "the caller cannot mutate geometry while the asynchronous encoder owns its detached image",
+          "a malformed encoder result refuses: %s",
+          "unsupported or malformed sources refuse before requesting an encoder",
+          "an individually bounded image cannot overflow the combined GLB allocation",
+          "the unused writer bundles as one config-safe chunk with no file, process or generated imports"
+        ],
+        "defaultAdmission": null
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/contract-page-admission.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/contract-page-admission.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('build admission retains the original page data and emits a structural product contract',()=>{",
+      "test('page admission refuses missing feedback, unknown notice tokens, invalid prompt and callback data',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "9cbeee5cfc8161c3d68831cd480d20646bd34ab3",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/contract-page-admission.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "430fa5811886a06ea399e067c099015386403944",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "build admission retains the original page data and emits a structural product contract",
+          "page admission refuses missing feedback, unknown notice tokens, invalid prompt and callback data"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/director-shipping-product.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/driftwood-director-product.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test(`${slug} ships one raw director and admits its original native factory`,async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "a8717e0faf4cd12ddd6889ae77bb9466caed5ae2",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/driftwood-director-product.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "9a83ec872d2aae5a16edd38b7cd3aa379d2c27d5",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "driftwood-isle ships one raw director and admits its original native factory"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      },
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-director-product.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "2cfea84d061ea195332701ab615d6b3c0962e1cd",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "pine-hollow ships one raw director and admits its original native factory"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/discovery-output-placement.test.mjs",
+    "outcome": "migrated",
+    "target": "test/ci21-source/discovery-output-placement.source.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('ungrandfathered discoveries leave src while reviewed paths and authored factories remain unchanged',()=>fixture((directory,put)=>{",
+      "test('relative static and lazy imports move, authored data that resembles an import remains exact',()=>{",
+      "test('all four actual NU3 wrappers keep complete code, manifest rows and physical dependency graphs',()=>{",
+      "test('the unchanged original all-files guard refuses actual src wrappers and accepts their relocated bytes',()=>fixture((directory,put)=>{",
+      "test('the normal push metadata writer emits complete relocated wrappers without a product build',()=>fixture((directory,put)=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "49c4645f67ad117bfd06db4f43cd2f0eac928bc3",
+    "destinations": [
+      {
+        "repo": "sharddev",
+        "target": "test/ci21-source/discovery-output-placement.source.ts",
+        "destinationCommit": "ad16070ad6320cfbd9f8dd9b6ecf8665d0e03c4b",
+        "destinationBlob": "2ad1e432c15e4eb9ef51ce55b26ab057d9eb1e88",
+        "destinationCi": "https://github.com/project-wildshard/sharddev/actions/runs/44017781230",
+        "originalTests": [
+          "ungrandfathered discoveries leave src while reviewed paths and authored factories remain unchanged",
+          "relative static and lazy imports move, authored data that resembles an import remains exact",
+          "all four actual NU3 wrappers keep complete code, manifest rows and physical dependency graphs",
+          "the unchanged original all-files guard refuses actual src wrappers and accepts their relocated bytes",
+          "the normal push metadata writer emits complete relocated wrappers without a product build"
+        ],
+        "defaultAdmission": null
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/driftwood-optional-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/driftwood-optional-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "for(const stage of ['bench','reef'] as const)test(stage==='bench'"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "d6d14e5fb1861be04c23aa3ceeb7541cd980747e",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/driftwood-optional-verbs.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "0ccbf0eeba34add53cca6f2945133f7e228ccfa6",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "Driftwood walk-in glass and bench USE earn their real counters exactly once",
+          "Driftwood reaches the reef through real HOVER, swim and DIVE before opening its treasure"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/driftwood-output.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/driftwood-output.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Driftwood fixed draws and island cover files name admitted product blobs (no legacy URL table)', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "caf4488dbaa194dc6a7eacb19581ed5e6fcda310",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/driftwood-output.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "c9f7766b47f509585ef417169a68825ba9a27f39",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "Driftwood fixed draws and island cover files name admitted product blobs (no legacy URL table)"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/driftwood-program-files.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/driftwood-program-files.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('both raw files preserve the complete original contracts and admitted executable bytes',()=>{",
+      "test('the original scoped return owner reuses its raw executable and refuses missing or retired loans',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "ebad179a551e63f94925dd8fdde7c3f5fe63698a",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/driftwood-program-files.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "151f59da98e155a6b3fd73e71c5f4f02111c346b",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "both raw files preserve the complete original contracts and admitted executable bytes",
+          "the original scoped return owner reuses its raw executable and refuses missing or retired loans"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/driftwood-scene.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/driftwood-scene.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "a5fc017fc06f852b247bbe34276ee700c8b7994d",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/driftwood-scene.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "8921242064605bfa91f452a295fb3a01cd88cd8b",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "admits the real generated ground, tile and library assets for the trusted world",
+          "refuses the CLI far bake when its actual image envelope exceeds the cap",
+          "publishes real pier parents in place of vacant L1 metadata without duplicate addresses"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/driftwood-story-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/driftwood-story-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Driftwood earns the Sealed Ring through real movement, combat, barrel contacts and replay',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "f6ea2041a4dbd43e9e573d0f055c70c845969020",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/driftwood-story-verbs.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "2cbb03466d31e4f34d88cab7681541d5928957f2",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "Driftwood earns the Sealed Ring through real movement, combat, barrel contacts and replay"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/driftwood-trade-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/driftwood-trade-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('walk to the real counter and refuse out-of-reach and empty-purse BUY',()=>{",
+      "test('the earned counter continuation funds its real purse through the original kills',()=>{",
+      "test('real kills fund Maren BUY and fresh restoration; omitted BUY cannot grant or spend', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "36c10ea5a6721322d3900d0a47218a8ec401317d",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/driftwood-trade-verbs.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "54e8cad1307e5cffd457e2e608a5968d6e1c9a4a",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "walk to the real counter and refuse out-of-reach and empty-purse BUY",
+          "the earned counter continuation funds its real purse through the original kills",
+          "real kills fund Maren BUY and fresh restoration; omitted BUY cannot grant or spend"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/driftwood-zipline-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/driftwood-zipline-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the continuous lookout walk and actual cable landing earn the zipline feat',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "486bd4373f353d7c9343c0eb6caf114b2cc26bcb",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/driftwood-zipline-verbs.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "b716b02b4201ba8c30308881f210b893036ddd82",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "the continuous lookout walk and actual cable landing earn the zipline feat"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/encounter-slots.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/encounter-slots.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('authored slot cycles wake once, rotate nights and release corpses during daylight',()=>{",
+      "test('authored slot members publish one break, retirement and a living home return',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "53c034f70b40ca545f76824695f2d50fe613eaa6",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/encounter-slots.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "b6b9cb5aaa11a6d38b8c7459e1bee1d729f2f2b7",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "authored slot cycles wake once, rotate nights and release corpses during daylight",
+          "authored slot members publish one break, retirement and a living home return"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/glb-embedded-basis.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-source/glb-embedded-basis.source.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the complete shipped phone Basis rig admits without reencoding or changing its identity', async () => {",
+      "test.each(["
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "9eebdf2e51d9dcdbe574be739454e2627eee56af",
+    "destinations": [
+      {
+        "repo": "sharddev",
+        "target": "test/ci21-source/glb-embedded-basis.source.ts",
+        "destinationCommit": "ad16070ad6320cfbd9f8dd9b6ecf8665d0e03c4b",
+        "destinationBlob": "68fb4fe4f468c372c77ac7a900a3df2d71aedca7",
+        "destinationCi": "https://github.com/project-wildshard/sharddev/actions/runs/44017781230",
+        "originalTests": [
+          "the complete shipped phone Basis rig admits without reencoding or changing its identity",
+          "normal admission refuses %s before allocation"
+        ],
+        "defaultAdmission": null
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/held-bow-product.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/held-bow-product.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the named bow retains the original bytes, pool channels and borrowed arrays',async()=>{",
+      "test('actual named admission rejects malformed bow and pool bytes',async()=>{",
+      "test('the product input recorder sees the raw bow and its existing producer',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "8644d00a7045d8cae9abbd8d483980bb7337ec7b",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/held-bow-product.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "a9fbdd81f33ccce91b8ebe05845de50fe12b511c",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "the named bow retains the original bytes, pool channels and borrowed arrays",
+          "actual named admission rejects malformed bow and pool bytes",
+          "the product input recorder sees the raw bow and its existing producer"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/model-sources.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-source/model-sources.source.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('every Blender-built model keeps its source, and no script is an orphan', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "480160bd3e6f783f74048ce8690ddbcc5df5e040",
+    "destinations": [
+      {
+        "repo": "sharddev",
+        "target": "test/ci21-source/model-sources.source.ts",
+        "destinationCommit": "ad16070ad6320cfbd9f8dd9b6ecf8665d0e03c4b",
+        "destinationBlob": "7529dd98292b25abe042511690dc312d1af6a701",
+        "destinationCi": "https://github.com/project-wildshard/sharddev/actions/runs/44017781230",
+        "originalTests": [
+          "every Blender-built model keeps its source, and no script is an orphan"
+        ],
+        "defaultAdmission": null
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/mounted-firearm-admission.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-firearm-admission.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('baked firearm admission preserves every feel and playback row and refuses invalid products', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "507e32171cbff5c5b2509f0aab2a688ea55d03d2",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-firearm-admission.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "5533e3d3a133eefd97168c9f4fe713c2c129a6e2",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "baked firearm admission preserves every feel and playback row and refuses invalid products"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-chapter-binding.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-chapter-binding.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('native chapter polling owns its encounters and refuses a forged closed-room continuation',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "4a04da26640bb123b1918e4f71ec9b6b8c6dadcf",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-chapter-binding.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "4a04da26640bb123b1918e4f71ec9b6b8c6dadcf",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "native chapter polling owns its encounters and refuses a forged closed-room continuation"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-chapter-one.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-chapter-one.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('chapter one earns its horse-plains arrival through the real elder talk and bank walk',()=>{",
+      "test('the earned plains continuation approaches its real stallion and earns the first bucking round',()=>{",
+      "test('the earned first bucking round tames its stallion through all five real rounds',()=>{",
+      "test('the earned horse wins and exactly replays the actual Kokpar pickup and delivery',()=>{",
+      "test('the earned Kokpar winner rides back to the real graded-road bend',()=>{",
+      "test('the earned road return crosses the bridge and finishes the real elder reading once',()=>{",
+      "test('the completed first chapter accepts the next story and rides to the real graded-road rim',()=>{",
+      "test('the earned rim continuation rides to the real balbal field and dismounts',()=>{",
+      "test('three real balbal deaths earn and exactly replay all three chapter carvings',()=>{",
+      "test('the earned three carvings enter and replay the actual King portal and intro',()=>{",
+      "test('the entered King earns and exactly replays its first real health checkpoint',()=>{",
+      "test('the earned first King checkpoint fights through the real shield adds and second health threshold',()=>{",
+      "test('the earned second King checkpoint wins through real inputs and the original chapter poll',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "9de24c0ef3ca98d8859b89d12272d0434555c864",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-chapter-one.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "661c756af4f9e9e0f4bef7accac031b0a3b1c2d0",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "chapter one earns its horse-plains arrival through the real elder talk and bank walk",
+          "the earned plains continuation approaches its real stallion and earns the first bucking round",
+          "the earned first bucking round tames its stallion through all five real rounds",
+          "the earned horse wins and exactly replays the actual Kokpar pickup and delivery",
+          "the earned Kokpar winner rides back to the real graded-road bend",
+          "the earned road return crosses the bridge and finishes the real elder reading once",
+          "the completed first chapter accepts the next story and rides to the real graded-road rim",
+          "the earned rim continuation rides to the real balbal field and dismounts",
+          "three real balbal deaths earn and exactly replay all three chapter carvings",
+          "the earned three carvings enter and replay the actual King portal and intro",
+          "the entered King earns and exactly replays its first real health checkpoint",
+          "the earned first King checkpoint fights through the real shield adds and second health threshold",
+          "the earned second King checkpoint wins through real inputs and the original chapter poll"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-cloth-publication.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-cloth-publication.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('both cloth tiers borrow one compressed file with every original geometry byte and declaration',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "143d8b3e20a10c45a12b6272d84a556e2a94578d",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-cloth-publication.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "caad450454a3dbe20323d7225d3916a70ca55cce",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "both cloth tiers borrow one compressed file with every original geometry byte and declaration"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-contact-publication.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-contact-publication.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('both shipping dressing tiers lend every packed hull through exact named compressed bytes',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "e9f2f9b1977d2d11ba2c01c483fe92515b803af5",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-contact-publication.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "2ef51e2b900c32aa13d0fb29a0fe952a252e5033",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "both shipping dressing tiers lend every packed hull through exact named compressed bytes"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-decorative-scene.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-decorative-scene.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the two observed Linux outcrop input values reconstruct both complete scene wires exactly', () => {",
+      "test('supplied incomplete decorative profiles refuse without falling back to the retained copy', () => {",
+      "test('missing or malformed supplied runtime metadata refuses without a retained fallback', () => {",
+      "test('supplied place addresses drive both tier wires without mutating their source', () => {",
+      "test('scene construction requires the supplied balbal catalogue and encounter owner', () => {",
+      "test('scene compilation requires supplied specimen ownership and retains its packed byte count', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "303ee6574f2ef969879829ccfde776a9dfa8a2e3",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-decorative-scene.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "4f98426274dac56d505ae2c2d0c08266df8f6b93",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "the two observed Linux outcrop input values reconstruct both complete scene wires exactly",
+          "supplied incomplete decorative profiles refuse without falling back to the retained copy",
+          "missing or malformed supplied runtime metadata refuses without a retained fallback",
+          "supplied place addresses drive both tier wires without mutating their source",
+          "scene construction requires the supplied balbal catalogue and encounter owner",
+          "scene compilation requires supplied specimen ownership and retains its packed byte count"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-elite-admission.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-elite-admission.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('AS owns named-elite gates, captain support and herd display/adoption decisions', () => {",
+      "test('motion observations hold their scalar between ten-Hz AS projections', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "1b987286addf687faa7388a548b3567a87f7eb04",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-elite-admission.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "36cd547dc75161c5f377c089ee6a95c5aabda467",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "AS owns named-elite gates, captain support and herd display/adoption decisions",
+          "motion observations hold their scalar between ten-Hz AS projections"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-flock-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-flock-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the earned pasture visit survives its ordinary raid and fresh-worker defense replay',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "7ccdd3e59f50fab747e3391f847c4564a06307e5",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-flock-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "4224e678b1a7d3dfdb37beacaa402e211c12de0c",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "the earned pasture visit survives its ordinary raid and fresh-worker defense replay"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-headless-assembly.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-headless-assembly.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Nalati declared assembly retains its native 100 + 30 tick continuation', async () => {",
+      "test('Nalati chapter landing retains native actor order, codec and strict suffix', async () => {",
+      "test('Nalati chapter landing retains the native taming adoption suffix', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "1dd945f9d6cbbf359bbfd10687f364c709af9833",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-headless-assembly.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "3e15114252a05aa7837aa91a3562e6dc5be2d82a",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "Nalati declared assembly retains its native 100 + 30 tick continuation",
+          "Nalati chapter landing retains native actor order, codec and strict suffix",
+          "Nalati chapter landing retains the native taming adoption suffix"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-herd-binary.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-herd-binary.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the generated programme stays binary through the existing project reader and original scope',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "a00a36db161c33f23bfdd82e4558af35cfe84c08",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-herd-binary.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "382f9e110dda0855fe8b3bc4b1abae40b372ee6e",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "the generated programme stays binary through the existing project reader and original scope"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-javelin-contact-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-javelin-contact-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test(`real ${mode} inputs strike a natural raider and replay its native state`,()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "19b04efc1f340ec52b8513169aec14b51e2459d2",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-javelin-contact-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "14f206d4e9ff8917107cc762b8373a81b62e85dd",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "real javelin inputs strike a natural raider and replay its native state"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-king-pose.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-king-pose.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('King pose rows retain every joint through the full fight and its reset', () => {",
+      "test('species channels drive the original joints without writing actor memory', () => {",
+      "test('balbal decisions rise, strike once, return and sink on the bounded guest tick', () => {",
+      "test('packed species bodies lend owned indexed geometry for every family', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "c01a321d861edeb5529c19684016343ba9a9cd96",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-king-pose.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "a7a05d960ede8ad9dda7fdb7126a8c1806bd94bc",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "King pose rows retain every joint through the full fight and its reset",
+          "species channels drive the original joints without writing actor memory",
+          "balbal decisions rise, strike once, return and sink on the bounded guest tick",
+          "packed species bodies lend owned indexed geometry for every family"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-kokpar-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-kokpar-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Nalati borrowed-horse Kokpar earns and replays its real delivery checkpoint',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "350cd21509baa491a7275cb95718e207216bf31f",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-kokpar-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "07226f99d323e6ec2fea99675c92c0a4de7cee83",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "Nalati borrowed-horse Kokpar earns and replays its real delivery checkpoint"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-kurgan-fabric.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-kurgan-fabric.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('baked Kurgan fabric preserves shipping geometry, lighting, colliders and sand', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "7822fdd73d90e71c5c02f64b1f36e470423666a2",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-kurgan-fabric.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "07c2792846950958caab945dfdca98f9db82d0f5",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "baked Kurgan fabric preserves shipping geometry, lighting, colliders and sand"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-mounted-chain-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-mounted-chain-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('real mounted contacts earn a two-hit chain and restore its exact native suffix',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "147a087ca76afbdc3875c3dbeb4c3f02e5402524",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-mounted-chain-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "7653d8341976f2c0265a86e5ed704af99ac29835",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "real mounted contacts earn a two-hit chain and restore its exact native suffix"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-mounted-lance-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-mounted-lance-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('real mounted steering lands a lance contact and restores its exact native continuation',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "7124315323bb33f8da6abbb556f590239083299d",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-mounted-lance-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "82e7609af25d7f7c32135e9af9c7206afee32de4",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "real mounted steering lands a lance contact and restores its exact native continuation"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-night-decisions.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-night-decisions.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('ridge slots wrap and the night line engages and retreats with hysteresis', () => {",
+      "test('roster holds, rider death and warrior retirement publish once', () => {",
+      "test('dusk selection handles empty rings and rotates the crown', () => {",
+      "test('firing policy rejects quiet and distant riders and admits a finite ballistic aim', () => {",
+      "test('weather policy holds the titan storm and restores calm after its wind ends', () => {",
+      "test('the actual return-script catalogue admits the shared weather/night module once', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "c6e50f3d2d26dcafcb4be292949854e4a3ddb1ef",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-night-decisions.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "6a6e947a7e680bebe6038fbfca6df04fee2e8d3f",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "ridge slots wrap and the night line engages and retreats with hysteresis",
+          "roster holds, rider death and warrior retirement publish once",
+          "dusk selection handles empty rings and rotates the crown",
+          "firing policy rejects quiet and distant riders and admits a finite ballistic aim",
+          "weather policy holds the titan storm and restores calm after its wind ends",
+          "the actual return-script catalogue admits the shared weather/night module once"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-patrol-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-patrol-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Nalati night riders appear naturally and retain an unearned captain gate after native restore',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "1c9252eafaa58b7671ddeaa3a0e07e99d0b3b077",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-patrol-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "7200e4cce8471e589af4f77a1a1f7c3f812f3443",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "Nalati night riders appear naturally and retain an unearned captain gate after native restore"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-place-binary.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-place-binary.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the two named floor rasters read their exact blocks, NaN words included',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "1e525accef9551ad4b7f5fbd5e4e1d1c7ce019fa",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-place-binary.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "7b9776d30822c9ccf7f7ea5363f11ff3f9826ace",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "the two named floor rasters read their exact blocks, NaN words included"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-qara-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-qara-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('camp travel and natural night earn the original checkpoint',()=>{",
+      "test('five real night kills earn the checked captain unlock',()=>{",
+      "test('the checked captain unlock continues the original bow inputs until the quiver is empty',()=>{",
+      "test('the exact earned continuation swaps to sabre and replays the complete victory',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "3163ce865f209ba184842bd8285f71bb924f80cb",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-qara-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "7297af1b0bcaf99f7af50552c6e67271b874ca6b",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "camp travel and natural night earn the original checkpoint",
+          "five real night kills earn the checked captain unlock",
+          "the checked captain unlock continues the original bow inputs until the quiver is empty",
+          "the exact earned continuation swaps to sabre and replays the complete victory"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-quest-prop-binary.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-quest-prop-binary.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the carried specimen prepares the exact original geometry through its named product file',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "cd95c70fa3d4a9c97e4165cddb774af6995f8a4b",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-quest-prop-binary.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "a543226373895f38d56193a9a456fd53bd0c6386",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "the carried specimen prepares the exact original geometry through its named product file"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-roster-decisions.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-roster-decisions.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('native alarm decisions retain strict radii and capped awareness', () => {",
+      "test('wild speed projection caps teleports and handles a stationary clock', () => {",
+      "test('raid setup borrows precisely two native stream draws', () => {",
+      "test('owned and stallion damage floors remain bounded at native contact', () => {",
+      "test('dispatch chooses the elite before a group and holds owned horses', () => {",
+      "test('existing sheepdog decision still fits the unchanged return fuel budget', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "5e301c9ca8c56a27bd85d7cffbb8ef786baa0890",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-roster-decisions.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "f74bdd44de777b29654ff94531b73de784264ffb",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "native alarm decisions retain strict radii and capped awareness",
+          "wild speed projection caps teleports and handles a stationary clock",
+          "raid setup borrows precisely two native stream draws",
+          "owned and stallion damage floors remain bounded at native contact",
+          "dispatch chooses the elite before a group and holds owned horses",
+          "existing sheepdog decision still fits the unchanged return fuel budget"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-sabre-contact-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-sabre-contact-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('real sabre inputs strike a natural raider and restore the live swing without duplicate damage',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "d8409384ec38d1169918a77c174fdbde8c5e3e7d",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-sabre-contact-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "9fd0251ee8ab99fcb5e149fa9f2fb0d68c2a6075",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "real sabre inputs strike a natural raider and restore the live swing without duplicate damage"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-script-sections-source.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-script-sections-source.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('only the selected held executable consumes supplied artifact fields', () => {",
+      "test('owned result mutations cannot change another construction or retained default', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "385022695cb3a035bcea5107d3ca65ddb7d883c8",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-script-sections-source.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "f009459438cf2cee21332cf46d53ec8da4f663a8",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "only the selected held executable consumes supplied artifact fields",
+          "owned result mutations cannot change another construction or retained default"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-shape-files.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-shape-files.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('all named shape blocks preserve the original raw bytes and geometry metadata',()=>{",
+      "test('the product owner restores every original painted shape through file intake',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "8ff2c48ec8204f22444027b655c35d7639cc6a4b",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-shape-files.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "9c7bc5221ab1b5876c76e1f3035fdfffbac86171",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "all named shape blocks preserve the original raw bytes and geometry metadata",
+          "the product owner restores every original painted shape through file intake"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-shape-product-lanes.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-shape-product-lanes.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('all 36 original actor shapes use the admitted bank with complete geometry parity',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "8994b1959adbab362387979312373c912f6b924b",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-shape-product-lanes.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "2df63ce1d9a3aebad6eccfb8bad62a77c261fd6f",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "all 36 original actor shapes use the admitted bank with complete geometry parity"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-spear-contact-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-spear-contact-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test(`real ${mode} inputs strike a natural raider and replay its native state`,()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "dd454b3bf22c74aeb68854de535b7e518b414620",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-spear-contact-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "ace0441e3bcb779d6338f6489197e8d44635a0cc",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "real thrust inputs strike a natural raider and replay its native state"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-species-product-inputs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-species-product-inputs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('witness bytes and species pages retain their separate original budget charges', () => {",
+      "test('original module deduplication prevents charging an existing module payload twice', () => {",
+      "test('separate headers own their admitted file rows and budget storage', () => {",
+      "test('invalid explicit species page and witness costs refuse before composition', () => {",
+      "test('explicit held inputs retain the complete original header and separate compiled/page charges', () => {",
+      "test('held and stealth legacy pages remain separately charged while duplicate payloads stay deduplicated', () => {",
+      "test('invalid explicit held compiled and executable costs refuse before composition', () => {",
+      "test('render rows must be explicit and schema-admitted before header composition', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "1e5390eb46623c5627b049abd8e9310394f47b64",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-species-product-inputs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "105f9038576297a1d2138ed0db1056c58db04ee6",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "witness bytes and species pages retain their separate original budget charges",
+          "original module deduplication prevents charging an existing module payload twice",
+          "separate headers own their admitted file rows and budget storage",
+          "invalid explicit species page and witness costs refuse before composition",
+          "explicit held inputs retain the complete original header and separate compiled/page charges",
+          "held and stealth legacy pages remain separately charged while duplicate payloads stay deduplicated",
+          "invalid explicit held compiled and executable costs refuse before composition",
+          "render rows must be explicit and schema-admitted before header composition"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-titan-decisions.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-titan-decisions.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('selected Titan spear retains the frozen 10 Hz trace, lock point, strike window and borrowed RNG', () => {",
+      "test('storm riders complete circle, committed charge and open flank without a second state owner', () => {",
+      "test('chain storms schedule seven tells and land only inside their contact radius', () => {",
+      "test('fire decisions expire cells, preserve burnt neighbours and stay within the v1 fuel budget', () => {",
+      "test('rider coupling removes dead slots once and commits a single live charge', () => {",
+      "test('the native world receives bounded wind positions and doorway decisions', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "5aceb3b6dec8788acd618c6afd6188d9f620af8c",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-titan-decisions.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "5c613e7c5d910fd0e5dfd5a8d1cefd24a11109da",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "selected Titan spear retains the frozen 10 Hz trace, lock point, strike window and borrowed RNG",
+          "storm riders complete circle, committed charge and open flank without a second state owner",
+          "chain storms schedule seven tells and land only inside their contact radius",
+          "fire decisions expire cells, preserve burnt neighbours and stay within the v1 fuel budget",
+          "rider coupling removes dead slots once and commits a single live charge",
+          "the native world receives bounded wind positions and doorway decisions"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-titan-handoff.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-titan-handoff.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the earned prefix remains charged when a second case continues it',()=>{",
+      "test('a handoff cannot omit, reorder or relabel the checked input intervals',()=>{",
+      "test('only the checked pre-combat storm handoff may have an empty combat ledger',()=>{",
+      "test('the retry carries an earned death and the unreset bounded controller cursor',()=>{",
+      "test('a checked extra handoff preserves the original input and observation fences',()=>{",
+      "test('input integrity uses the worker command codec, preserving values and array order',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "75907db1d7cee7b89f11046db6f1274d15f8691f",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-titan-handoff.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "a5924cc4c2f64ab4c529a2f47a6208c605132127",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "the earned prefix remains charged when a second case continues it",
+          "a handoff cannot omit, reorder or relabel the checked input intervals",
+          "only the checked pre-combat storm handoff may have an empty combat ledger",
+          "the retry carries an earned death and the unreset bounded controller cursor",
+          "a checked extra handoff preserves the original input and observation fences",
+          "input integrity uses the worker command codec, preserving values and array order"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-titan-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-titan-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('natural storm, real entry and borrowed mount earn the checked cairn checkpoint',()=>{",
+      "test('the exact storm checkpoint earns the checked fire phase through real combat',()=>{",
+      "test('the exact earned fire continuation earns the real death and retry checkpoint',()=>{",
+      "test('the exact retry and input cursor win and replay the remaining fight',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "992bf58a4f46b05c090a359e17ab20d2b01ab9aa",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-titan-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "10f3ea0e553689bf32851463299f52ca91a533ce",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "natural storm, real entry and borrowed mount earn the checked cairn checkpoint",
+          "the exact storm checkpoint earns the checked fire phase through real combat",
+          "the exact earned fire continuation earns the real death and retry checkpoint",
+          "the exact retry and input cursor win and replay the remaining fight"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-view-binary.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-view-binary.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test.each(originals)('raw $stem names its shipped bytes and passes view admission',original=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "d35e46e4612c85f039da3d0cbff78acc65082090",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-view-binary.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "0c27ff2362b2373fb7b64bdbd0af86d60c34f250",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "raw creatureViews names its shipped bytes and passes view admission",
+          "raw eliteViews names its shipped bytes and passes view admission",
+          "raw titanView names its shipped bytes and passes view admission",
+          "raw titanFireView names its shipped bytes and passes view admission",
+          "raw titanWhirlsView names its shipped bytes and passes view admission"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-weapon-observation.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-weapon-observation.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('native weapon observations read fresh detached values from the real string envelope',()=>{",
+      "test('native weapon observation keeps the original enabled default and refuses foreign envelopes',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "2c4de808399f1b3a7991e1c9416968e57cbbcfb3",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-weapon-observation.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "3e9e7606c62a2cc8983ac5591ef9f0eb44db1117",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "native weapon observations read fresh detached values from the real string envelope",
+          "native weapon observation keeps the original enabled default and refuses foreign envelopes"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-weapon-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-weapon-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('real held inputs drive the bow, three-hit sabre/heavy/pass and spear/javelin laws',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "cdd9f9fbea4d97d2b65c31190ea67d427c0a058b",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-weapon-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "3ecc052a00361c7088092cfb72b1edf3b6d3b862",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "real held inputs drive the bow, three-hit sabre/heavy/pass and spear/javelin laws"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-wind-projection.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-wind-projection.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('packed wind preserves the existing native trajectory and hit clock',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "0c960006a0ed0288f51b8d216b93594e25b96096",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-wind-projection.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "c41887d70d44fc95f3b3e3ba4354c05bcc7bbb2c",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "packed wind preserves the existing native trajectory and hit clock"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-wolf-fight-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-wolf-fight-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('real bow inputs kill a natural raider and replay the complete flock defense',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "83ee50b95e86155c0df27a0e99745b171029feb2",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-wolf-fight-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "3769f415b4c9bae6bd71c38b9e838b145e494a57",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "real bow inputs kill a natural raider and replay the complete flock defense"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-wolf-howl-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/nalati-wolf-howl-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('an intercepted natural raid earns a living leader regroup and both native wolf messages',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "8a7be5bf13179253247868f86945c6c49da91872",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/nalati-wolf-howl-verbs.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "7f1d1af7496884fd465e8b6acc42e8982ce3f780",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "an intercepted natural raid earns a living leader regroup and both native wolf messages"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/net-titan-saddle.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/net-titan-saddle.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('a rider at a gallop takes the Titan\\'s heart to his next phase with real arrows', { timeout: 300_000 }, async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "edf9870cf385ce75ef608936f7d7c5087d07979c",
+    "destinations": [
+      {
+        "repo": "shard-nalati",
+        "target": "test/ci21-candidate/net-titan-saddle.test.ts",
+        "destinationCommit": "0c6c2ad05115243f368655507eb9944c59edc06a",
+        "destinationBlob": "99356ebf2b6448232e877a9b83e6f36358ccecfc",
+        "destinationCi": "https://github.com/project-wildshard/shard-nalati/actions/runs/44015903559",
+        "originalTests": [
+          "a rider at a gallop takes the Titan's heart to his next phase with real arrows"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "8b2ee5a570d5adf3c2691f5467bdc157382518d8",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 43999483554,
+          "promoteBoundaryAfter": "2026-11-23"
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/pine-ammunition-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/pine-ammunition-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Pine fires once, auto-reloads and exhausts the real crossbow over the listed five-minute session',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "8129a2c6aa52cab7238c8f91f27aec7b1b8228f3",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-ammunition-verbs.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "7e6a74d88964d6365b9893f94c30d2d2180a1f0b",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "Pine fires once, auto-reloads and exhausts the real crossbow over the listed five-minute session"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/pine-contract-admission.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/pine-contract-admission.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the actual contract file validates before page or native board construction', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "189843bff9030381db6ccb89a78e02cac4dde2b7",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-contract-admission.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "32d23c8e8318f720a28ae43daac9966345fd5010",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "the actual contract file validates before page or native board construction"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/pine-door-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/pine-door-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Pine walks from spawn and opens and closes the actual cabin leaf; remote use does nothing',async()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "acbecf054ac60258842e0f3d5754c6352d00ec36",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-door-verbs.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "4ebe9bb4a25d2fe6d3a2710219c99b04ab04c28d",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "Pine walks from spawn and opens and closes the actual cabin leaf; remote use does nothing"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/pine-headless-population.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/pine-headless-population.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('the product ships the facts the fixture lent, as server files only', async () => {",
+      "test('Pine lands, moves, loses and fills out its population headless, and its census round-trips a snapshot', async () => {",
+      "test('the tick worker runs Pine from its built product: the same world, and it resumes from its own checkpoint', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "56c0fbe010aee7fd86dd186c3ef00e240f9b2e30",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-headless-population.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "ef7d41b0617ed0bf86ccebe5e4a576175de20b81",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "the product ships the facts the fixture lent, as server files only",
+          "Pine lands, moves, loses and fills out its population headless, and its census round-trips a snapshot",
+          "the tick worker runs Pine from its built product: the same world, and it resumes from its own checkpoint"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/pine-journal.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/pine-journal.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('authored journal pages retain elite matching and place discovery on the shared host', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "9ae7dd783361b489a3101312c72126db34b34569",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-journal.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "decfca4909cbb599ea8c1333850d06874f3fa804",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "authored journal pages retain elite matching and place discovery on the shared host"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/pine-native-story-admission.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/pine-native-story-admission.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test(`${name}: native rows retain their original admission before owner installation`, () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "2fd3ee9bbebeba85f1332b588441afe859d7cbc8",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-native-story-admission.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "a384503aeaf5675c8fabf529d5eacccba6f5a35d",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "quests/native-story.json: native rows retain their original admission before owner installation",
+          "quests/native-spots.json: native rows retain their original admission before owner installation"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/pine-product-reads.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/pine-product-reads.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Pine client reads resolve against the emitted output', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "2c18d9d3657c9a993ca25063ba2dace525c8cd23",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-product-reads.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "f9e0e061c1f938d2d34da8b943b20a4f0c1e2cd8",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "Pine client reads resolve against the emitted output"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/pine-quest-verbs.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/pine-quest-verbs.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Pine earns every story step through native commands and replays the fresh input frames',()=>{"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "9ecbe68eb5527cf153deb63043e88cca1f724820",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/pine-quest-verbs.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "5d660dec42bb45a426fd23b43d751fb36249b37f",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "Pine earns every story step through native commands and replays the fresh input frames"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/program-discovery-bootstrap.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-source/program-discovery-bootstrap.source.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('cold inputs-only generation builds the required product before emitting discovery', async () => {",
+      "test(`changed ${file} cannot grant discovery through an old receipt`, async () => {",
+      "test('a failed prerequisite never enters the discovery or boot table pass', async () => {",
+      "test('normal and scoped generation build every required product once', async () => {",
+      "test('ordinary manifests keep their original inputs-only and normal ordering', async () => {",
+      "test('composed output markers are discovered without executing source or accepting executable slots', () => {",
+      "test('a scoped request prepares the remaining producer inputs of global discovery prerequisites', () => {",
+      "test('a corrupt newly built receipt refuses before any table is published', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "9c06d0b22ea6a48cd6f32921655400f2120e3d81",
+    "destinations": [
+      {
+        "repo": "sharddev",
+        "target": "test/ci21-source/program-discovery-bootstrap.source.ts",
+        "destinationCommit": "ad16070ad6320cfbd9f8dd9b6ecf8665d0e03c4b",
+        "destinationBlob": "758210e00a80e4b61313d38e19b05497281f5f92",
+        "destinationCi": "https://github.com/project-wildshard/sharddev/actions/runs/44017781230",
+        "originalTests": [
+          "cold inputs-only generation builds the required product before emitting discovery",
+          "`changed ${file} cannot grant discovery through an old receipt`",
+          "a failed prerequisite never enters the discovery or boot table pass",
+          "normal and scoped generation build every required product once",
+          "ordinary manifests keep their original inputs-only and normal ordering",
+          "composed output markers are discovered without executing source or accepting executable slots",
+          "a scoped request prepares the remaining producer inputs of global discovery prerequisites",
+          "a corrupt newly built receipt refuses before any table is published"
+        ],
+        "defaultAdmission": null
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/quest-step-native-parity.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/quest-step-native-parity.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "c4c61ca31516f0a5262657cf378ad05f74dc27fd",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/quest-step-native-parity.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "c5338a670dcddd974825882635394f28261d98a9",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "driftwood-isle: recorded native checkpoints regenerate and verify before replay",
+          "driftwood-isle: recorded native quest saves restore and replay byte-identically",
+          "driftwood-isle: an existing native quest envelope retains its exact bytes"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-pine-hollow",
+    "file": "test/quest-step-pine-native-parity.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/quest-step-pine-native-parity.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "7529406c63678471a93c88ac4d132363d7f3c22b",
+    "destinations": [
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/quest-step-pine-native-parity.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "04e5de219bfcda500494550fbe738f260a4cf548",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "pine-hollow: recorded native checkpoints regenerate and verify before replay",
+          "pine-hollow: recorded native quest saves restore and replay byte-identically",
+          "pine-hollow: an existing native quest envelope retains its exact bytes"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/scripts/ground-encounters.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-candidate/captain-encounter-script.test.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Captain published guest rises, sinks, relocates inside the pool and resumes its second cut', async () => {",
+      "test('King published guest chooses sweep, ring recovery, summons and last-phase lanes without replay on restore', async () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "1f8a65954fabe39190f3d5f68f64f362bced4bf6",
+    "destinations": [
+      {
+        "repo": "shard-driftwood",
+        "target": "test/ci21-candidate/captain-encounter-script.test.ts",
+        "destinationCommit": "c1bb6543489e2e61de4d863bc991079b9358c712",
+        "destinationBlob": "233453d16845be996694bd944e7b822b43e48fdc",
+        "destinationCi": "https://github.com/project-wildshard/shard-driftwood/actions/runs/44018055746",
+        "originalTests": [
+          "Captain published guest rises, sinks, relocates inside the pool and resumes its second cut"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "5a3511aa1490f36b2290e33b7ed574d072e33407",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph is unchanged. C11 retains released-package rollout.",
+          "priorProof": 44007153475,
+          "promoteBoundaryAfter": null
+        }
+      },
+      {
+        "repo": "shard-pine-hollow",
+        "target": "test/ci21-candidate/king-encounter-script.test.ts",
+        "destinationCommit": "49b1208ce67121fb9679f7a46ff7ba4f9d0bdcbd",
+        "destinationBlob": "905c93d19b877c886f4358e2cb929bad86002d47",
+        "destinationCi": "https://github.com/project-wildshard/shard-pine-hollow/actions/runs/44014409588",
+        "originalTests": [
+          "King published guest chooses sweep, ring recovery, summons and last-phase lanes without replay on restore"
+        ],
+        "defaultAdmission": {
+          "schema": "ci21-default-admission/1",
+          "engine": "a462bbfaa95b7410a087700c5578b17b234aa1b5",
+          "scope": "Mandatory source CI on every push/PR; ordinary pinned producer graph unchanged. C11 retains released-package rollout.",
+          "priorProof": 44014409588
+        }
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/template-generation.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-source/template-generation.source.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('template direct generation and a cache hit retain every original world row and asset byte', async () => {",
+      "test('the actual template build closure bundles and executes through the unchanged config boundary', async () => {",
+      "test('Template boss and output sources use the unchanged SDK-only author import surface', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "37a45eb198c9f59ffad7e77058e69c17f955dccd",
+    "destinations": [
+      {
+        "repo": "sharddev",
+        "target": "test/ci21-source/template-generation.source.ts",
+        "destinationCommit": "ad16070ad6320cfbd9f8dd9b6ecf8665d0e03c4b",
+        "destinationBlob": "1b4483041952514e19a447e3c841a04998d62191",
+        "destinationCi": "https://github.com/project-wildshard/sharddev/actions/runs/44017781230",
+        "originalTests": [
+          "template direct generation and a cache hit retain every original world row and asset byte",
+          "the actual template build closure bundles and executes through the unchanged config boundary",
+          "Template boss and output sources use the unchanged SDK-only author import surface"
+        ],
+        "defaultAdmission": null
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/template-source-layout.test.ts",
+    "outcome": "migrated",
+    "target": "test/ci21-source/template-source-layout.source.ts",
+    "ring": 1,
+    "decision": "CI21 C10/J232: full original cases verified in blocking owner source CI. Mandatory push/PR source admission uses the exact proved engine graph; C11 retains released-package rollout. No whole-original case retired. Shared partitions are recorded together.",
+    "originalTests": [
+      "test('Template author modules and temporary discovery have zero P0 and sim violations', () => {",
+      "test('legacy map layout remains the fallback until a source map exists', () => {"
+    ],
+    "sourceRevision": "19454d8650fb9c5c016e0bd754b8dbe2622bb076",
+    "sourceBlob": "d23633e148d4e1c426c89a4b45d2326afe16999a",
+    "destinations": [
+      {
+        "repo": "sharddev",
+        "target": "test/ci21-source/template-source-layout.source.ts",
+        "destinationCommit": "ad16070ad6320cfbd9f8dd9b6ecf8665d0e03c4b",
+        "destinationBlob": "28dfccf2be90e341c71af1e69ca41f0c106b9c5f",
+        "destinationCi": "https://github.com/project-wildshard/sharddev/actions/runs/44017781230",
+        "originalTests": [
+          "Template author modules and temporary discovery have zero P0 and sim violations",
+          "legacy map layout remains the fallback until a source map exists"
+        ],
+        "defaultAdmission": null
+      }
+    ],
+    "metaEvidence": "Raynos/project-wildshard-meta:docs/plans/test-coverage/evidence/ci21-c10/removal69.json"
   }
 ]
