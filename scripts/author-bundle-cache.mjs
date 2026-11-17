@@ -15,6 +15,9 @@ const Bundle = v.strictObject({ code: v.string(), modules: v.array(v.string()) }
 const Saved = v.strictObject({ key: v.string(), bundle: Bundle, seal: v.string() });
 const SKIPPED = new Set(['node_modules', '.git', '.worktrees', 'tmp', '.cache']);
 const SOURCE = /\.(?:[cm]?[jt]sx?|json|glsl|wgsl)$/u;
+// These checkout-root products are not compiler sources. If a compiler really
+// imports one, its completed bundle is deliberately ineligible for reuse.
+const CHECKOUT_OUTPUT = /^(?:out|dist[^/]*|\.tsc-layers)\//u;
 /** @param {string} directory @returns {string[]} */
 const entries = directory => { try { return readdirSync(directory); } catch { return []; } };
 /** @param {string} directory @param {string} file */
@@ -34,7 +37,7 @@ function gitDigest(directory) {
     if (realpathSync(gitText(directory, ['rev-parse', '--show-toplevel']).trim()) !== directory) return undefined;
     head = gitText(directory, ['rev-parse', 'HEAD']).trim();
     status = gitText(directory, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--no-renames']);
-    ignored = gitText(directory, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--', ...[...SKIPPED].map(name => `:(exclude,glob)**/${name}/**`)]);
+    ignored = gitText(directory, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--', ...[...SKIPPED].map(name => `:(exclude,glob)**/${name}/**`), ':(exclude,glob)out/**', ':(exclude,glob)dist*/**', ':(exclude,glob).tsc-layers/**']);
   } catch { return undefined; }
   const kept = (/** @type {string} */ file) => !file.endsWith('/') && !file.split('/').some(part => SKIPPED.has(part));
   const changed = status.split('\0').filter(line => line.length > 3 && kept(line.slice(3)))
@@ -62,8 +65,8 @@ function treeDigest(directory) {
  * symlinks that resolve outside root. Receipts skip node_modules and everything
  * outside root, so those linked bytes key the namespace instead; pnpm-installed
  * packages resolve inside a node_modules store and stay keyed by their pins.
- * @param {string} root @returns {string[]} */
-export function linkedSources(root) {
+ * @param {string} root @returns {Map<string,string>} */
+function linkedInputs(root) {
   const own = realpathSync(root), found = new Map();
   /** @param {string} base */
   const visit = base => {
@@ -80,8 +83,10 @@ export function linkedSources(root) {
     }
   };
   visit(own);
-  return [...found].map(([path, value]) => `${path}=${value}`).sort();
+  return found;
 }
+/** @param {string} root @returns {string[]} */
+export function linkedSources(root) { return [...linkedInputs(root)].map(([path, value]) => `${path}=${value}`).sort(); }
 /** Cache only a completed compiler with its full native bundler/read receipt.
  * Every hit verifies current inputs and body integrity, then replays the exact
  * dependency evidence into the enclosing product. Missing evidence compiles.
@@ -94,8 +99,9 @@ export async function authorBundleCached(root, recipe, compile, cacheRoot = shar
     .sort(([left], [right]) => left.localeCompare(right)));
   // Receipts skip node_modules, so the installed format's real path (it names the commit) stands for its bytes.
   const format = resolve(root, 'node_modules/@wildshard/format');
-  const linked = JSON.stringify(linkedSources(root));
-  const args = ['author-bundle/6', root, JSON.stringify(environment), existsSync(format) ? realpathSync(format) : '', linked, ...recipe];
+  const sources = linkedInputs(root);
+  const linked = JSON.stringify([...sources].map(([path, value]) => `${path}=${value}`).sort());
+  const args = ['author-bundle/7', root, JSON.stringify(environment), existsSync(format) ? realpathSync(format) : '', linked, ...recipe];
   const namespace = digest(JSON.stringify(args)), directory = resolve(cacheRoot, '.author-bundles', namespace);
   /** @param {string} key */
   const used = key => {
@@ -122,6 +128,15 @@ export async function authorBundleCached(root, recipe, compile, cacheRoot = shar
     if (bundle === undefined) throw new Error('Author compiler produced no bundle');
     const captured = productInputKey(root, receipt, args, new InputHashMemo(root));
     if (captured === undefined || JSON.stringify(linkedSources(root)) !== linked) throw new Error('Author compiler inputs changed');
+    const usesCheckoutOutput = bundle.modules.some(module => {
+      let path;
+      try { path = realpathSync(module); } catch { return false; }
+      return [...sources.keys()].some(source => CHECKOUT_OUTPUT.test(relative(source, path).split(sep).join('/')));
+    });
+    if (usesCheckoutOutput) {
+      replayProductInputs(root, receipt);
+      return { ...bundle, reused: false };
+    }
     writeFileSync(temporary, JSON.stringify({ key: captured, bundle, seal: digest(JSON.stringify(bundle)) }));
     renameSync(temporary, resolve(directory, `${captured}.json`));
     publishProductInputs(receipts, receipt, captured);

@@ -10,6 +10,16 @@ WebSocket upgrades; the signed release and allowed browser origins use the
 instance's actual doors. Legacy explicitly named rigs retain their defaults.
 Native database zero mode remains refused until DS20b2 qualifies it.
 
+The batch review found T1 publishing serial 2 merely to advertise its bound
+chaos endpoint. The world correctly drained six seconds later. T1 now owns
+a public world front before signing serial 1 and points that held listener
+at the bound proxy. No synthetic deploy occurs. The native test first
+failed with a 502 after eight seconds; it now discovers the real world
+again beyond that grace period. Explicit stop also retains forwarding
+until child exit so the world can send its drain message. The combined
+cache/memory/native-PostgreSQL controls pass all 17 cases locally. Hosted
+qualification of this repair remains open; no landing has started.
+
 The dedicated host reports its bound port rather than the requested zero.
 An IPC parent's departure drains its world and saves; standalone production
 processes keep their existing signal lifecycle. Duplicate shutdown is guarded.

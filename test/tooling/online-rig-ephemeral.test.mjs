@@ -35,6 +35,9 @@ test('memory/T1 rigs own actual HTTP/WS endpoints across replacement and cleanup
       expect(new URL(t1.base).port).not.toBe('0');
       await discovery(body.socket, t1.base);
       await t1.arm('native-forward', []);
+      // A release change must not drain the shared worker after its six-second grace.
+      await new Promise(resolve => { setTimeout(resolve, 8000); });
+      await discovery(body.socket, t1.base);
     } finally { await t1.close(); }
     const rig = rigs[0], before = { ...rig.ports };
     await rig.stop(); await rig.start(); await rig.pagesServe(dist);

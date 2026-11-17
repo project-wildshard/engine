@@ -172,7 +172,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   };
   return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(pagePort)}`, worldOrigin: `http://127.0.0.1:${String(worldPort)}`, releaseOrigin: `http://127.0.0.1:${String(releasePort)}`, socket: signedSocket, ports: { page: pagePort, world: worldPort, release: releasePort, ...(memory ? {} : { database: pgPort }) }, Client,
     /** The server goes down, for a test of its coming back. */
-    stop: () => { worldFront?.clear(); return stopped(main); },
+    stop: () => stopped(main),
     /** The server up on this build. @param {string} [running] */
     start,
     /** A draining server's own exit. */

@@ -145,3 +145,37 @@ test.each(['untracked', 'ignored file', 'ignored folder', 'plain directory'])('u
   expect(changed.reused).toBe(false); expect(changed.code).toContain('sdk=2');
   expect((await run()).reused).toBe(true);
 });
+
+
+test('unrelated ignored checkout build outputs do not race or invalidate a linked compiler', async () => {
+  const f = linkedFixture(true), linked = resolve(f.file, '../..'), output = resolve(linked, 'out/generated.json');
+  writeFileSync(resolve(linked, '.gitignore'), 'out/\n.tsc-layers/\ndist*/\n');
+  mkdirSync(resolve(output, '..'), { recursive: true });
+  writeFileSync(output, '{"build":1}');
+  const compile = async (): Promise<{ code: string; modules: string[] }> => {
+    const bundle = await f.compile();
+    writeFileSync(output, '{"build":2}');
+    return bundle;
+  };
+  const run = (): ReturnType<typeof authorBundleCached> => authorBundleCached(f.root, ['artifact-race'], compile, f.cache);
+  expect((await run()).reused).toBe(false);
+  writeFileSync(output, '{"build":3}');
+  expect((await run()).reused).toBe(true);
+});
+
+test('a compiler importing ignored checkout output always rebuilds', async () => {
+  const f = linkedFixture(true), linked = resolve(f.file, '../..'), output = resolve(linked, 'dist/generated.ts');
+  writeFileSync(resolve(linked, '.gitignore'), 'dist/\n');
+  mkdirSync(resolve(output, '..'), { recursive: true });
+  writeFileSync(output, 'export const built=1;');
+  const compile = async (): Promise<{ code: string; modules: string[] }> => {
+    const bundle = await f.compile();
+    return { code: bundle.code + readFileSync(output, 'utf8'), modules: [...bundle.modules, output] };
+  };
+  const run = (): ReturnType<typeof authorBundleCached> => authorBundleCached(f.root, ['imported-artifact'], compile, f.cache);
+  expect((await run()).reused).toBe(false);
+  expect((await run()).reused).toBe(false);
+  writeFileSync(output, 'export const built=2;');
+  const changed = await run();
+  expect(changed.reused).toBe(false); expect(changed.code).toContain('built=2');
+});

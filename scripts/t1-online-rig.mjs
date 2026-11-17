@@ -16,17 +16,20 @@ export async function openT1OnlineRig(dist, scratch, { gridRoot } = {}) {
   const keyFile = join(work, 'key.json');
   writeFileSync(keyFile, JSON.stringify({ public: key, private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }) }), { mode: 0o600 });
   const page = await rigFront(), pageOrigin = `http://127.0.0.1:${String(page.port)}`;
-  let proxy, rig;
+  let proxy, rig, world;
   const close = async () => {
-    const results = await Promise.allSettled([page.close(), proxy?.close(), rig?.close()]);
+    const results = await Promise.allSettled([page.close(), world?.close(), proxy?.close(), rig?.close()]);
     const errors = results.filter(result => result.status === 'rejected').map(result => result.reason);
     if (errors.length > 0) throw new AggregateError(errors, 'T1 rig cleanup failed');
   };
   try {
-    rig = await openRig({ port: 0, dist, work: join(work, 'rig'), keyFile, saves: 'memory', shard: '_template', workers: 1, gridRoot, origins: [pageOrigin] });
+    // Sign the final public socket on the initial release. Publishing a new
+    // serial merely to discover a proxy port would drain this same world.
+    world = await rigFront();
+    rig = await openRig({ port: 0, socket: `ws://127.0.0.1:${String(world.port)}/`, dist, work: join(work, 'rig'), keyFile, saves: 'memory', shard: '_template', workers: 1, gridRoot, origins: [pageOrigin] });
     proxy = await openChaosProxy({ work: join(work, 'proxy'), pageUpstream: rig.base, releaseUpstream: rig.releaseOrigin, worldUpstream: rig.worldOrigin, pagePort: 0, worldPort: 0 });
     page.point(Number(new URL(proxy.ready.pageOrigin).port));
-    rig.publish(2, rig.build, 'production', `${proxy.ready.worldOrigin.replace('http:', 'ws:')}/`);
+    world.point(Number(new URL(proxy.ready.worldOrigin).port));
     const token = readFileSync(proxy.ready.tokenFile, 'utf8');
     const controlUrl = proxy.ready.controlUrl;
     /** @param {{scenario: string, rules: readonly import('./t1-online-rig.mjs').T1FaultRule[]}} [body] */

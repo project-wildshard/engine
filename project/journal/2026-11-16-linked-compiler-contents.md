@@ -19,3 +19,11 @@ fixed. Afterward all 13 cache cases pass, including unchanged reuse,
 concurrent linked edits, corrupt payloads and dependency receipt replay.
 Shared-peer identity and the four actual linked shard builds remain separate
 EV8b/c qualification rows; this unit result does not claim those builds.
+
+The batch review found that enumerating every ignored source also included
+unrelated checkout-root out, dist* and .tsc-layers products. A compiler that
+wrote such a product during compilation falsely failed the race check.
+Namespace 7 excludes these ignored root products while retaining generated
+source below src. A bundle importing a root product always recompiles;
+omitting that product from the namespace therefore cannot grant stale reuse.
+Both artifact controls and the original content controls pass (15 cases).
