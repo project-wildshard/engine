@@ -2,7 +2,8 @@
 # Meta MINI-AUTONOMY MA4: the staging proofs for one browser, as .github/workflows/verify-staging.yml runs them, with one
 # pass/fail line per proof in the run summary. Read-only against the live staging page (J205): no secret, no write.
 #   bash scripts/verify-staging.sh chromium|webkit [<build>] [<cards, comma separated>]
-# <build> defaults to what staging.wildshard.io serves now. The proofs: J386's tapped journey (journey-proof.mjs) per
+# <build> defaults to what staging.wildshard.io serves now; <cards> to Driftwood and Pine Hollow, the two production go-live
+# reads (SB3: page-release.mjs refuses go-live until both pass cold and warm in both browsers on the build). The proofs: J386's tapped journey (journey-proof.mjs) per
 # card, cold then warm; Doctor (e7-doctor-proof.mjs); the live two-player proof (e7-live-staging-proof.mjs). Off the
 # tailnet (a hosted runner) set WS_PRIVATE_HEALTH=skip; the box's own build and serial are then left to live-status.
 # Exit 0 when every proof passed. Output in tmp/verify-staging/<browser>.
@@ -11,7 +12,7 @@ cd "$(dirname "$0")/.." || exit 2
 browser=${1:-}
 [ "$browser" = chromium ] || [ "$browser" = webkit ] || { echo "usage: verify-staging.sh chromium|webkit [<build>] [<cards>]" >&2; exit 2; }
 build=${2:-}
-cards=${3:-driftwood-isle}
+cards=${3:-driftwood-isle,pine-hollow}
 base=https://staging.wildshard.io
 out=tmp/verify-staging/$browser
 mkdir -p "$out"

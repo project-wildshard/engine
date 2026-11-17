@@ -48,9 +48,14 @@ export interface Deps {
   waitMs?: number;
   pollMs?: number;
   afterStagingProofs?: boolean;
+  journeys?: readonly JourneyRow[];
   releaseKey?: string;
   catalogue?: string;
 }
+export interface JourneyRow { card: string; browser: string; run: string; build?: string; ok: boolean; at: string }
+export const JOURNEY_GATE: Readonly<{ cards: string[]; browsers: string[]; runs: string[] }>;
+export function journeyRows(report: unknown): JourneyRow[];
+export function journeyGaps(journeys: readonly JourneyRow[] | undefined, build: string): string[];
 export const PACKS_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;
 export function pinnedReleaseKey(configured?: string): string;

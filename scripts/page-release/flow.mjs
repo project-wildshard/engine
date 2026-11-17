@@ -114,12 +114,57 @@ export function pinnedReleaseKey(configured) {
  * @property {number} [waitMs]  How long `check` waits for the signed serial and /health (default 45 minutes).
  * @property {number} [pollMs]
  * @property {boolean} [afterStagingProofs]  Production go-live: the strict staging proofs passed on this build.
+ * @property {readonly JourneyRow[]} [journeys]  Production go-live (SB3): the staging journey runs found for the release
+ *   (page-release.mjs reads them from `tmp/verify-staging/<browser>/journey-<card>/report.json`).
  * @property {string} [releaseKey]  Defaults to RELEASE_PUBLIC_KEY; tests sign with their own.
  * @property {string} [catalogue]  Preview only (SA35): the catalogue the page bakes, staging's borrowed grid (scripts/preview-grid.ts);
  *   default the pinned `test/pins/catalogue.json`.
  */
 
 const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(bytes).digest('hex');
+
+/**
+ * One tapped journey run on staging (scripts/journey-proof.mjs): the card, the browser, cold or warm, the build staging
+ * served through the whole run (absent when it changed mid-run or could not be read), whether it passed, and when.
+ * @typedef {{card: string, browser: string, run: string, build?: string, ok: boolean, at: string}} JourneyRow
+ */
+
+/** SB3 (meta STAGING-BUGBASH, J386): production go-live needs the tapped journey passing on staging, on this exact build,
+ * for each of these cards in each browser, cold and warm: the journey Jake's phone takes. */
+export const JOURNEY_GATE = Object.freeze({cards: ['driftwood-isle', 'pine-hollow'], browsers: ['chromium', 'webkit'], runs: ['cold', 'warm']});
+
+/**
+ * The rows of one journey-proof `report.json`. A report that is not one gives none.
+ * @param {unknown} report @returns {JourneyRow[]}
+ */
+export function journeyRows(report) {
+  if (report === null || typeof report !== 'object') return [];
+  const {card, build, at, prime, report: runs} = /** @type {{card?: unknown, build?: unknown, at?: unknown, prime?: unknown, report?: unknown}} */ (report);
+  if (typeof card !== 'string' || typeof at !== 'string' || !Array.isArray(runs)) return [];
+  return runs.flatMap(row => {
+    const {browser, run, ok} = /** @type {{browser?: unknown, run?: unknown, ok?: unknown}} */ (row ?? {});
+    if (typeof browser !== 'string' || typeof run !== 'string') return [];
+    // a run from a primed profile (--prime, an old shell) is its own row: it is neither cold nor warm
+    return [{card, browser, run: prime === undefined ? run : `primed-${run}`, ok: ok === true, at, ...(typeof build === 'string' ? {build} : {})}];
+  });
+}
+
+/**
+ * What the journey gate still lacks for `build`: each card, browser and run whose newest row on this build is missing or
+ * failed. Empty when go-live may go.
+ * @param {readonly JourneyRow[] | undefined} journeys @param {string} build @returns {string[]}
+ */
+export function journeyGaps(journeys, build) {
+  /** @type {string[]} */
+  const gaps = [];
+  for (const card of JOURNEY_GATE.cards) for (const browser of JOURNEY_GATE.browsers) for (const run of JOURNEY_GATE.runs) {
+    const newest = (journeys ?? []).filter(row => row.card === card && row.browser === browser && row.run === run && row.build === build)
+      .sort((a, b) => b.at.localeCompare(a.at))[0];
+    if (newest === undefined) gaps.push(`${card} ${browser} ${run} not run on this build`);
+    else if (!newest.ok) gaps.push(`${card} ${browser} ${run} FAIL`);
+  }
+  return gaps;
+}
 
 /**
  * Run one phase. A refusal throws `RefusedError`; under --dry-run it is logged as `would refuse` and the phase goes on
@@ -363,6 +408,8 @@ async function productionGates(phase, deps, refuse) {
   const staging = /** @type {{build?: string}} */ (await deps.fetchJSON(`${CHANNELS.staging.origin}/version.json`).catch(() => ({})));
   if (staging.build !== deps.build) refuse(`staging serves ${staging.build ?? 'nothing'}, not ${deps.build}: staging goes live first`);
   if (phase === 'go-live' && deps.afterStagingProofs !== true) refuse('production go-live needs --after-staging-proofs: Doctor 7/7 and the live proof on Chromium and WebKit over staging');
+  const gaps = phase === 'go-live' ? journeyGaps(deps.journeys, deps.build) : [];
+  if (gaps.length > 0) refuse(`production go-live needs the staging journey on this build (bash scripts/verify-staging.sh chromium|webkit): ${gaps.join(', ')}`);
 }
 
 /**

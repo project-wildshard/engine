@@ -10,6 +10,8 @@
 //   --dry-run                print every step and read the live gate; build, upload and alias nothing
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
 //   --after-staging-proofs   production go-live: the strict staging proofs passed on this exact build
+//   --journeys=<dir>         production go-live (SB3): where verify-staging.sh wrote its journey reports, read as
+//                            <dir>/<browser>/journey-<card>/report.json (default <root>/tmp/verify-staging)
 //   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
 //                            dist-content/ to packs.wildshard.io first (PAGE-SIZE PZ2,
 //                            page-release/content.mjs); preview.yml passes it (PZ6), staging and production with PZ8
@@ -25,12 +27,26 @@
 // Phase results go to <root>/tmp/page-release/<channel>-<sha>.json, which the next phase reads.
 import {execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
+import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, journeyRows, runPhase} from './page-release/flow.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
+
+/** SB3: every journey row verify-staging.sh left under `dir` (<browser>/journey-<card>/report.json); none when absent.
+ * @param {string} dir */
+function readJourneys(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).flatMap(browser => {
+    /** @type {string[]} */
+    let names = [];
+    try { names = readdirSync(join(dir, browser)); } catch { return []; }
+    return names.filter(name => name.startsWith('journey-')).flatMap(name => {
+      try { return journeyRows(JSON.parse(readFileSync(join(dir, browser, name, 'report.json'), 'utf8'))); } catch { return []; }
+    });
+  });
+}
 
 // The world-signing key reaches only the deployment publisher, never build tools or the host.
 const signingKey = process.env.E7_RELEASE_SIGNING_KEY;
@@ -56,7 +72,7 @@ if (flag('print-env') !== undefined) {
   process.exit(0);
 }
 if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
-  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--content] [--catalogue=<file>]');
+  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--journeys=<dir>] [--content] [--catalogue=<file>]');
   process.exit(2);
 }
 const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFileSync('git', argv, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
@@ -122,6 +138,7 @@ try {
       dryRun: flag('dry-run') !== undefined,
       waitMs: Number(value('wait') ?? 45) * 60_000,
       afterStagingProofs: flag('after-staging-proofs') !== undefined,
+      journeys: readJourneys(resolve(value('journeys') ?? join(root, 'tmp/verify-staging'))),
       // the build runs in `root`, so a relative path is the caller's
       ...(value('catalogue') === undefined ? {} : {catalogue: resolve(value('catalogue') ?? '')}),
     });

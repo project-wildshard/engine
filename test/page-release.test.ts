@@ -8,12 +8,15 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {CHANNELS, CHECKED_DOCUMENTS, PHASES, RELEASE_PUBLIC_KEY, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
+import {CHANNELS, CHECKED_DOCUMENTS, JOURNEY_GATE, PHASES, RELEASE_PUBLIC_KEY, journeyGaps, journeyRows, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
 
 const build = 'a'.repeat(40);
+/** SB3: the eight staging journeys production go-live reads (two cards, two browsers, cold and warm), all passing on `on`. */
+const journeysOn = (on: string = build) => JOURNEY_GATE.cards.flatMap(card => JOURNEY_GATE.browsers.flatMap(browser =>
+  JOURNEY_GATE.runs.map(run => ({card, browser, run, build: on, ok: true, at: '2026-11-17T05:00:00.000Z'}))));
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
 const key = publicKey.export({format: 'der', type: 'spki'}).toString('hex');
 const token = ['host', 'credential', 'marker'].join('-');
@@ -195,6 +198,7 @@ test('production go-live holds a candidate the world does not run, with the reas
   const {deps, calls, live} = rig('production');
   await through(deps, 'check');
   deps.afterStagingProofs = true;
+  deps.journeys = journeysOn();
   live.release = signed('production', 8, 'd'.repeat(40));
   await expect(runPhase('go-live', deps)).rejects.toThrow(/production\.json serial 8 signs d+, not /u);
   live.release = signed('production', 7);
@@ -246,8 +250,42 @@ test('production needs its tag, staging live on the build and the strict staging
   await expect(runPhase('go-live', deps)).rejects.toThrow(/--after-staging-proofs/);
   expect(calls).not.toContain('goLive');
   deps.afterStagingProofs = true;
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging journey on this build/u);
+  deps.journeys = journeysOn();
   await runPhase('go-live', deps);
   expect(fetched(calls).at(-2)).toBe('goLive');
+});
+
+// SB3 (meta STAGING-BUGBASH, J386): go-live waits for the tapped journey on staging, Driftwood and Pine Hollow, Chromium and
+// WebKit, cold and warm, on this exact build; a missing, failed or other-build run holds it and names what is missing.
+test('production go-live needs the staging journey passing on this build', async () => {
+  const {deps, calls} = rig('production');
+  await through(deps, 'check');
+  deps.afterStagingProofs = true;
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging journey on this build.*driftwood-isle chromium cold not run on this build/u);
+  deps.journeys = journeysOn('b'.repeat(40));
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/pine-hollow webkit warm not run on this build/u);
+  const failed = journeysOn().map(row => row.card === 'pine-hollow' && row.browser === 'webkit' && row.run === 'cold' ? {...row, ok: false} : row);
+  deps.journeys = failed;
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/pine-hollow webkit cold FAIL/u);
+  expect(calls).not.toContain('goLive');
+  // a newer passing rerun of the same journey clears it
+  deps.journeys = [...failed, {card: 'pine-hollow', browser: 'webkit', run: 'cold', build, ok: true, at: '2026-11-17T06:00:00.000Z'}];
+  await runPhase('go-live', deps);
+  expect(fetched(calls).at(-2)).toBe('goLive');
+});
+
+test('a journey report gives one row per run; a primed run is neither cold nor warm, and a moved build names none', () => {
+  const report = {url: 'https://staging.wildshard.io', card: 'pine-hollow', build, at: '2026-11-17T05:00:00.000Z',
+    report: [{browser: 'chromium', run: 'cold', ok: true, problems: []}, {browser: 'webkit', run: 'warm', ok: false, problems: []}]};
+  expect(journeyRows(report)).toEqual([
+    {card: 'pine-hollow', browser: 'chromium', run: 'cold', build, ok: true, at: '2026-11-17T05:00:00.000Z'},
+    {card: 'pine-hollow', browser: 'webkit', run: 'warm', build, ok: false, at: '2026-11-17T05:00:00.000Z'},
+  ]);
+  expect(journeyRows({...report, prime: 'tmp/profiles'}).map(row => row.run)).toEqual(['primed-cold', 'primed-warm']);
+  const {build: _moved, ...moved} = report;
+  expect(journeyGaps(journeyRows(moved), build)).toContain('pine-hollow chromium cold not run on this build');
+  expect(journeyRows('not a report')).toEqual([]);
 });
 
 test('a dirty tree or another HEAD refuses before the host is touched', async () => {
@@ -468,6 +506,7 @@ test('the Workers host uploads a version, checks it, gates and deploys it last, 
 test('the Workers host names production --env \'\' and preview --env preview', async () => {
   const production = workersRig('production');
   production.deps.afterStagingProofs = true;
+  production.deps.journeys = journeysOn();
   await through(production.deps, 'go-live');
   expect(production.wrangler.every(call => call.args.slice(-2).join('|') === '--env|')).toBe(true);
   expect(verbs(production.wrangler).at(-1)).toBe('versions deploy');

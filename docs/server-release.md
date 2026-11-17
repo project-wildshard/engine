@@ -120,7 +120,17 @@ Each phase refuses until the one before it has run for the same SHA
 SHA and `staging.wildshard.io` already serving it; `go-live` needs
 `--after-staging-proofs`, which says the strict staging proofs passed:
 `e7-doctor-proof.mjs` 7/7 and `e7-live-staging-proof.mjs` on Chromium
-and WebKit. J205: the script opens no socket; production's own proof is
+and WebKit. It also reads the tapped journey (J386, STAGING-BUGBASH
+SB3): `bash scripts/verify-staging.sh chromium` and `... webkit` on the
+release clone run `journey-proof.mjs` on Driftwood and Pine Hollow,
+cold and warm, and each `report.json` names the build staging served.
+Go-live refuses until all eight passed on this exact build, and names
+any that are missing or failed (`--journeys=<dir>` reads them from
+elsewhere; default `<root>/tmp/verify-staging`). `journey-proof.mjs
+--prime <dir>` starts from saved profiles (`<dir>/chromium`,
+`<dir>/webkit`), an old shell as a returning phone holds one, and
+`--throttle 4` slows Chromium's CPU like a Low Power phone; primed runs
+are reported but are not the gate's cold or warm. J205: the script opens no socket; production's own proof is
 `e7-doctor-proof.mjs <origin> <sha> <key> --human-static`. After each
 staging tag, beside GC17's crossing walk, `node scripts/net-lag-proof.mjs`
 reads NET-LAG's "buttery" bar (B1 to B4) on staging, both engines and
@@ -148,7 +158,7 @@ branch CI and the signed staging serial, then `staging check`,
 starts trusted npm publishing. `--published` waits for npm's listing;
 never rerun the publish job while npm processes it. Production build
 and upload may run once the build is green. Run `production check`,
-`production go-live --after-staging-proofs`, then the static Doctor
+`verify-staging.sh` in both browsers, `production go-live --after-staging-proofs`, then the static Doctor
 with `--human-static` (J205).
 
 The cook follows production: `node scripts/release-cook.mjs vX.Y.Z`

@@ -32,3 +32,15 @@ Review MUST: a boss's `deadFlag` and a shard's death-effect flags are
 credit-shaped world writes no body id names. One raised while a death
 is told goes to its killers; one no death claims goes to everyone
 present at the next tick.
+
+## SB3: the journey gates production go-live (2026-11-17)
+
+- J386 asked that every release run the tapped journey before prod.
+  `page-release.mjs production go-live` now reads the journey reports
+  `verify-staging.sh` leaves (`tmp/verify-staging/<browser>/journey-<card>/report.json`)
+  and refuses until Driftwood and Pine Hollow passed cold and warm in
+  Chromium and WebKit on this exact build (`journeyGaps`, flow.mjs).
+- `journey-proof.mjs` records the build staging served before and
+  after the run (none if it moved) and gains `--prime <dir>`;
+  `verify-staging.sh` defaults to both cards. Tests red first: the old
+  gate let go-live through with no journey at all.

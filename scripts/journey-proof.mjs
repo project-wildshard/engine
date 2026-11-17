@@ -4,11 +4,11 @@
 // menu, the bare launch shell on a world page, the HUD over a menu, a loading card shrunk to a bar or a blank wait fails.
 //
 //   node scripts/journey-proof.mjs --url https://staging.wildshard.io --card driftwood-isle [--browsers chromium,webkit]
-//        [--runs cold,warm] [--throttle 4] [--out tmp/<lane>/journey] [--video]
+//        [--runs cold,warm] [--throttle 4] [--prime <profiles dir>] [--out tmp/<lane>/journey] [--video]
 //
 // The T1 spec (src/e2e/t1/journey.spec.ts) drives the same `tapJourney` against the local build; this CLI is the release
 // staging gate (J386), run before any prod promote. It only reads: every request but a GET is aborted.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 
 /** @typedef {import('playwright').Page} Page */
@@ -204,15 +204,25 @@ async function cli() {
   const out = resolvePath(args.get('out') ?? `tmp/${process.env.WS_LANE_NAME ?? 'journey'}/journey`);
   const browsers = (args.get('browsers') ?? 'chromium,webkit').split(','), runs = (args.get('runs') ?? 'cold,warm').split(',');
   const throttle = Number(args.get('throttle') ?? '0');
+  // SB3: --prime <dir> starts each browser from a saved profile (<dir>/<browser>), an old shell as Jake's phone holds one
+  const prime = args.get('prime');
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The journey proof joins a world: staging or local only');
   const pw = await import('playwright');
+  // SB3: the build staging serves, read before and after; a run whose build moved under it names none (the gate skips it)
+  const served = async () => { try { return String((await (await fetch(`${url}/version.json`, { cache: 'no-store' })).json()).build); } catch { return undefined; } };
+  const before = await served();
   mkdirSync(out, { recursive: true });
   let failed = false;
   /** @type {unknown[]} */
   const report = [];
   for (const name of browsers) {
     const engine = name === 'webkit' ? pw.webkit : pw.chromium;
-    const context = await engine.launchPersistentContext(join(out, `profile-${name}`), {
+    const profile = join(out, `profile-${name}`);
+    if (prime !== undefined) {
+      if (!existsSync(join(prime, name))) throw new Error(`--prime ${prime} has no ${name} profile`);
+      cpSync(join(prime, name), profile, { recursive: true });
+    }
+    const context = await engine.launchPersistentContext(profile, {
       ...PHONE, isMobile: name !== 'webkit', headless: true,
       ...(args.has('video') ? { recordVideo: { dir: join(out, `video-${name}`), size: PHONE.viewport } } : {}),
       ...(name === 'webkit' ? {} : { args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }),
@@ -246,7 +256,8 @@ async function cli() {
       }
     } finally { await context.close(); }
   }
-  writeFileSync(join(out, 'report.json'), `${JSON.stringify({ url, card, at: new Date().toISOString(), report }, null, 1)}\n`);
+  const after = await served(), build = before !== undefined && before === after ? before : undefined;
+  writeFileSync(join(out, 'report.json'), `${JSON.stringify({ url, card, ...(build === undefined ? {} : { build }), ...(prime === undefined ? {} : { prime }), at: new Date().toISOString(), report }, null, 1)}\n`);
   process.exitCode = failed ? 1 : 0;
 }
 
