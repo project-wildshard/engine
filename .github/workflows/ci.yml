@@ -363,12 +363,16 @@ jobs:
     # Each real boot consumes the exact producer bytes under its own cap.
     needs: [products, nine-ring1-build]
     if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        kind: [load, street]
+        include:
+          - kind: load
+            runner: ubuntu-latest
+          - kind: street
+            runner: macos-15
     env:
       WS_LANE_NAME: nine-ring1
     steps:

@@ -63,3 +63,12 @@ Focused load proof: baseline 6.138 s, 2 s props sleep RED with
 All 17 focused cases and typed lint pass. Correct declaration import
 spacing from the normal gate. M11 recovery preserves the newer
 Chromium installer fix (03d9ee6f), including its headless shell.
+
+Hosted f840 qualification 44035389220 proves producer and load GREEN.
+Linux SwiftShader street reaches control in 147 s, renders 0.1 fps at
+scale 0.5, and reaches two waypoints. It cannot produce the required
+402x874 @2 route; the scale/route checks correctly reject that reading.
+Use macos-15 for the street leg's existing Metal backend, keeping CPU
+x4, route, DPR, ceilings and five-minute cap. The CPU load profiler
+remains on Linux. This matches NB1's measured backend rather than
+pretending a software GPU timed or walked the measured phone route.
