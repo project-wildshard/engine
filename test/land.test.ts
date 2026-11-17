@@ -1231,12 +1231,16 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
   test('J400: nine shares keep T1 with products and reporting off the gate', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
-    expect([...jobs.keys()]).toEqual(['tests', 'products', 'boundaries']);
+    // NB6 adds a blocking Nine observation beside the packed shares. Its
+    // build may run separately; neither job changes J400's reporting split.
+    const nineJobs = new Set(['nine-ring1', 'nine-ring1-build']);
+    expect([...jobs.keys()].filter(name => !nineJobs.has(name))).toEqual(['tests', 'products', 'boundaries']);
+    expect(jobs.has('nine-ring1')).toBe(true);
     expect(text).toContain('job: [1, 2, 3, 4, 5, 6, 7, 8]');
     expect(jobs.get('products')).toContain('job: [9]');
     expect(text).toContain('--jobs=9 --job=${{ matrix.job }}');
     expect(text).toContain('node scripts/t1-batch.mjs');
-    expect(text).not.toContain('needs: products');
+    for (const name of ['tests', 'products']) expect(jobs.get(name)).not.toMatch(/^ {4}needs:/mu);
     for (const suite of ['A', 'B', 'C', 'D']) expect(text).toContain('name: template-e2e-' + suite);
     expect(text).not.toContain('continue-on-error: true');
     expect(text).not.toMatch(/Soak |Observe /u);
