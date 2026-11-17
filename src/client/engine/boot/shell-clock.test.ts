@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { beginNavigationShell, loadShellTemplate, startShellClock, stopShellClock } from './shell';
 import { saveStorage } from '../saves/slots';
@@ -13,7 +13,7 @@ beforeEach(() => {
   document.body.innerHTML = `<div class="ws-load" data-shell>${loadShellTemplate()}</div>`;
 });
 afterEach(() => {
-  stopShellClock(); owner.dispose();
+  stopShellClock(); owner.dispose(); vi.restoreAllMocks();
   saveStorage('session').removeItem('titleArrival'); saveStorage('device').removeItem('titleArrival.once');
 });
 
@@ -28,6 +28,8 @@ test.each([false, true])('navigation owns HUD input and restores prior inert=%s 
 });
 
 test('the static card counts from the title tap and names the shard, its tier and the code wait', () => {
+  // A busy test worker can begin after ten seconds; the tap's clock must still count correctly.
+  vi.spyOn(performance, 'now').mockReturnValue(12_500);
   // The title tapped 1.5 s before this document started.
   saveStorage('session').setItem('titleArrival', JSON.stringify({ slug: 'driftwood-isle', mode: 'enter', name: 'Driftwood Isle', tier: 'phone',
     at: performance.timeOrigin - 1500 }));
@@ -36,7 +38,7 @@ test('the static card counts from the title tap and names the shard, its tier an
   expect(field('stFact')).toBe('Downloading game code');
   // Loading adopts this start, so its clock continues from the tap.
   expect(document.querySelector<HTMLElement>('.ws-load')?.dataset['clockStartedAt']).toBe('-1500');
-  expect(field('clock')).toMatch(/^00:0[1-9]\.\d$/u);
+  expect(field('clock')).toBe('00:14.0');
 });
 
 test('without a fresh arrival the card counts from its document and names the shard from the URL', () => {
