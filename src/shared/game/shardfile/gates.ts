@@ -52,14 +52,6 @@ export const GATES: readonly Gate[] = [
       'src/client/game/grid/regionalRuntime.ts': 1, 'src/client/game/shard/declaredEntry.ts': 1 },
   },
   {
-    id: 'identity', verdict: 'delete',
-    what: 'An outside shard may not take one of our reserved slugs, and must carry its admitted save instance; ours '
-      + 'derive theirs from the slug.',
-    replacedBy: 'Identity and the save instance come from admission for every shard; the api-server owns slugs per account '
-      + '(check it refuses another account\'s slug before OF10a deletes the reserved list).',
-    refs: { [FOLDER]: 2, [CLIENT_SOURCE]: 2 },
-  },
-  {
     id: 'catalogue-manifest', verdict: 'delete',
     what: 'The built-in catalogue path: a manifest\'s `shardfile` descriptor needs our own provenance, and selection '
       + 'keeps the other catalogue shards only for our own source.',

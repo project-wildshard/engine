@@ -22,7 +22,7 @@ import { folderResourceRole } from '../../../shared/game/shardfile/resourceRole'
 import { preflightFolder } from './folderPreflight';
 
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
-import { assertExternalShardSlug, externalShardInstance } from '../../../shared/game/shardfile/identity';
+import { admittedShardInstance, assertShardSlug } from '../../../shared/game/shardfile/identity';
 import { runtimeBoundWorldFiles } from '../../../shared/game/plugin/runtimeRows';
 import { neighbourFolderFilesPaced, runtimeOnlyFolderFilesPaced, tierLibrarySourcePaced, tierFolderFilesPaced, urlImageLibrarySourcePaced, scopedSpecimenLibrarySourcePaced, playLibrarySourcePaced, deviceLibraryCostPaced } from './folderCost';
 import { carryOutputDescriptor, IncompleteOutputCacheError, isBuildValidatedOutput, outputBlobUrl, outputDescriptor, resolveOutputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
@@ -483,7 +483,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   if (!compatibleShardfileVersion(version(raw))) throw new Error('Shardfile needs the current or previous additive format');
   const source = isBuildValidatedOutput(raw) ? raw : await parseCheckedFolder(raw, outputDescriptor(raw)?.sections), assets = new Map<string, Uint8Array>(), hashes = new Map<Uint8Array, string>();
   carryOutputDescriptor(raw, source);
-  if (!options.firstParty) assertExternalShardSlug(source.identity.slug);
+  assertShardSlug(source.identity.slug);
   // A newly reconstructed private root already proved its exact declaration.
   // Node checks exposed roots; the browser rehashes their complete source below.
   let decodersReady = false;
@@ -716,5 +716,5 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   const completeCache = deferredDescriptor === undefined ? undefined : folderCacheCompletion(source, options, selected, remaining, { source: deferredDescriptor.index,
     ...(revisionKey === null ? {} : { validation: { revision: revisionKey, sourceHash, indexHash: deferredDescriptor.indexHash, worst } }) });
   trace?.mark('finish');
-  return { source, assets, cached: cached !== null && cached !== undefined, releaseTransport: transportRelease(source, assets, options), releasePreparedTransport: transportRelease(source, assets, options, true), ...completeCache === undefined ? {} : { completeCache }, ...(options.firstParty ? {} : { instance: await externalShardInstance(base, source.identity.slug, options.hash) }) };
+  return { source, assets, cached: cached !== null && cached !== undefined, releaseTransport: transportRelease(source, assets, options), releasePreparedTransport: transportRelease(source, assets, options, true), ...completeCache === undefined ? {} : { completeCache }, ...await admittedShardInstance(base, source.identity.slug, options.hash).then(instance => instance === undefined ? {} : { instance }) };
 }

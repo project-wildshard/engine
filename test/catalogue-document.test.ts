@@ -18,7 +18,7 @@ import {installCatalogue, installInlineCatalogue, installedCatalogue} from '../s
 import {firstPartyInstance} from '../src/shared/game/grid/instances';
 import shipped from '../src/shared/game/grid/singleplayer.json' with {type: 'json'};
 import {instanceSaveIdentity} from '../src/shared/game/instanceSaves';
-import {assertExternalShardSlug} from '../src/shared/game/shardfile/identity';
+import {admittedShardInstance, assertShardSlug} from '../src/shared/game/shardfile/identity';
 
 /** C3 (J61, D7): what a page reads at boot, and a shard added to it after the build. */
 const fresh = {slug: 'test-shard', name: 'Test Shard', revision: 1, hash: 'a'.repeat(64)};
@@ -49,13 +49,16 @@ describe('the catalogue a page reads', () => {
     expect(catalogueDocument().shards).toEqual([fresh]);
   });
 
-  it('runs a new placement through every reader', () => {
+  it('runs a new placement through every reader', async () => {
     installCatalogue(added);
     expect(new GridAssembly({developer: false, devserver: false}).cell('test-shard').slug).toBe('test-shard');
     expect(firstPartyInstance('test-shard')).toBe('test-shard-solo');
     expect(instanceSaveIdentity({id: 'test-shard-solo', shard: 'test-shard'})).toEqual({id: 'test-shard-solo', legacy: 'test-shard'});
-    // Placed by the catalogue, so an outside product can't take its slug or saves.
-    expect(() => { assertExternalShardSlug('test-shard'); }).toThrow('reserved');
+    // OF10a5: placed by the catalogue, so it saves under its placement's instance, whoever made it (the api-server
+    // owns the slug); a private save namespace is refused for every shard
+    await expect(admittedShardInstance('https://elsewhere.test/', 'test-shard', () => Promise.resolve('a'.repeat(64)))).resolves.toBeUndefined();
+    await expect(admittedShardInstance('https://elsewhere.test/', 'not-placed', () => Promise.resolve('a'.repeat(64)))).resolves.toBe(`external-${'a'.repeat(64)}`);
+    expect(() => { assertShardSlug('profile'); }).toThrow('private save namespace');
   });
 
   it('lists a placed head the build has no card for, and only that', () => {

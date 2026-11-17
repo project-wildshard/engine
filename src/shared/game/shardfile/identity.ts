@@ -1,17 +1,22 @@
 import { catalogueDocument } from '../grid/catalogueDocument';
 import { bareSlug } from '../grid/catalogueSlot';
 
-const PRIVATE_NAMESPACES = ['global', 'profile', 'device', 'session'];
-/** Outside products cannot impersonate a platform shard or a private save namespace. */
-export function assertExternalShardSlug(slug: string): void {
-  const reserved = new Set([...catalogueDocument().placements.map((row) => bareSlug(row.slug)), ...PRIVATE_NAMESPACES]);
-  if (reserved.has(bareSlug(slug))) throw new Error('Outside shardfile uses a reserved first-party slug');
+const PRIVATE_NAMESPACES = new Set(['global', 'profile', 'device', 'session']);
+/** No shard, whoever made it, may name a private save namespace. */
+export function assertShardSlug(slug: string): void {
+  if (PRIVATE_NAMESPACES.has(bareSlug(slug))) throw new Error('Shardfile slug names a private save namespace');
 }
-/** Stable, bounded save key for the exact (origin, slug) pair; paths and revisions do not change progress identity. */
-export async function externalShardInstance(base: string, slug: string, hash: (bytes: Uint8Array) => Promise<string>): Promise<string> {
+/**
+ * ONE-FORMAT OF10a5: identity and the save instance come from admission, for every shard. A slug the catalogue places
+ * (the api-server owns each slug per account: another account's upload of it is a 403) saves under its placement's
+ * instance, so this answers undefined; any other product's saves are keyed by its exact (origin, slug) pair, which
+ * paths and revisions do not change.
+ */
+export async function admittedShardInstance(base: string, slug: string, hash: (bytes: Uint8Array) => Promise<string>): Promise<string | undefined> {
+  assertShardSlug(slug);
+  if (catalogueDocument().placements.some(row => bareSlug(row.slug) === bareSlug(slug))) return undefined;
   const url = new URL(base);
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Outside shardfiles require an HTTP origin');
-  assertExternalShardSlug(slug);
   const identity = await hash(new TextEncoder().encode(JSON.stringify([url.origin, slug])));
   if (!/^[a-f0-9]{64}$/u.test(identity)) throw new Error('Outside shard identity requires a SHA-256 address');
   return `external-${identity}`;

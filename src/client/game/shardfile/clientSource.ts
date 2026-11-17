@@ -106,12 +106,11 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
   if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime audio ownership requires a trusted first-party runtime declaration');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
   if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime world ownership requires a trusted first-party runtime declaration');
-  if (!options.firstParty && admitted.instance === undefined) throw new Error('Outside shardfile is missing its admitted save identity');
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
   const ownedBindings = { ...bindings,
     ...(bindings.allocator === undefined && bindings.residency === undefined && options.memory !== undefined ? { allocator: new ResidencyAllocator({ memory: options.memory, playing: pagePlayingBytes() }) } : {}),
-    ...(options.firstParty ? {} : { instance: admitted.instance ?? '' }) };
+    ...(admitted.instance === undefined ? {} : { instance: admitted.instance }) };
   const residency = clientResidency(source, ownedBindings);
   const assets = new ClientAssets(source, admitted.assets, options);
   const manifest = sourceManifest(source, admitted.assets, bindings.imageOwner);

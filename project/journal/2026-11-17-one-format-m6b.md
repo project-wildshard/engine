@@ -11,3 +11,7 @@
 - OF10a4 native-read: every browser product gets the build reader, pack range reads and the paced
   section parse; the reader is the host's capability, not a provenance grant. (Corrected the ledger:
   identity had 2 folder.ts references, the `instance` at admission's end.)
+- OF10a5 identity: the api-server owns slugs per account (DEL5; adopt gave the operator all 29;
+  `account-upload.test.ts` proves a stranger's `dunes` upload is 403), so the engine's reserved-slug
+  list goes. `admittedShardInstance`: a catalogue-placed slug saves under its placement's instance
+  (our saves unchanged), anything else by (origin, slug). Private save namespaces refuse for all.
