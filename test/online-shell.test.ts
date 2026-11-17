@@ -110,6 +110,28 @@ test('GO4: a grid page in its seat\'s cell takes its body there; a seat in anoth
   expect({ regrids, reloads }).toEqual({ regrids: ['template-2'], reloads: [] });
 });
 
+test('GO5: a seat in another cell enters it on this page and this link: no re-entry, and the next session\'s ready seats it there', { timeout: 60_000 }, async () => {
+  const saves = memoryPlayerSaves();
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: '_template', cell: 'template-2', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'template-2'], workers: 2, saves });
+  const regrids: string[] = [], inPage: string[] = [];
+  const view = { link: (): void => undefined, countdown: (): void => undefined, elsewhere: (): void => undefined, regrid: (cell: string): void => { regrids.push(cell); },
+    regridInPage: (cell: string): boolean => { inPage.push(cell); return true; } };
+  // The hint said Driftwood; the door's place is Template's cell
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, gridCell: SHARD }, view);
+  const { client, ready, rehome } = shell;
+  pump = setInterval(() => { client.present(); client.flush(); }, 16);
+  await vi.waitFor(() => { expect(inPage).toEqual(['template-2']); }, { timeout: 5000 });
+  expect(regrids, 'no fresh page').toEqual([]);
+  // The page's next session takes the link over in Template's cell (`adopt`), loads it, and says ready
+  rehome?.('template-2');
+  ready();
+  await vi.waitFor(() => { expect(bench?.room('template-2')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('template-2')); }, { timeout: 5000 });
+  expect(bench.room(SHARD)?.holds(IDENTITY.player), 'never a body in the hint\'s cell').toBe(false);
+  expect(regrids).toEqual([]);
+});
+
 test('GO4: a held seat in another cell (no `resume`, only frames) re-enters the grid there too', { timeout: 60_000 }, async () => {
   const saves = memoryPlayerSaves(), cells = new GridAssembly({ developer: false, devserver: false }).cells.map(cell => cell.instance);
   saves.write({ player: IDENTITY.player, name: 'Jake', shard: '_template', cell: 'template-2', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });

@@ -48,7 +48,8 @@ import { netClaw } from '../grapple/netClaw';
 import type { Mount } from '../riding/mount';
 import { NetMovers } from '../plugin/moverViews';
 import { spawnHeldBytes } from '../boot/spawnDownload';
-import { travel } from '../travel/travel';
+import { travel, whenEntersInPage } from '../travel/travel';
+import { RegridLater, type RegridHere } from '../grid/regridLater';
 import { lendOnlineGate } from '../grid/onlineGate';
 import type { ShardSlug } from '../../../shared/game/shard/slug';
 import { DAY_ROW, NET_POSE } from '@wildshard/engine/sim/shardRows';
@@ -77,6 +78,9 @@ export interface WorkerClientGrid {
   readonly serverPlace?: (instance: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void;
   /** GO4: the seat is in another cell than this page booted: enter the grid again there (a grid entry, never a `?chunk=` page). */
   readonly reenter?: (instance: string) => void;
+  /** GO5: the same entry on this page (the app's same-page entry): `handOver` runs once it will go, before the page leaves, and the
+   *  answer is true; false when this page can't enter in place (nothing ran). */
+  readonly reenterInPage?: (instance: string, handOver: () => void) => boolean;
   /** OF2: the world hosts one cell: enter this cell again as its one-shard online page, never the solo grid. */
   readonly reshard?: (instance: string) => void;
   /** The cell (instance) this page booted in. */
@@ -146,11 +150,22 @@ interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: 
   /** ZE10d2: an online shell's gate word and its adoption by the next session on this page (`shell.ts` `StartedOnline`) */
   enter?: (cell: string) => Promise<{ readonly x: number; readonly z: number; readonly yaw: number } | null>;
   adopt?: (next: { readonly loaded: string; readonly grid: OnlineGrid }) => void }
-interface OnlineGrid { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean }
+interface OnlineGrid { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly reenterInPage: (cell: string, reload: () => void) => boolean; readonly goto?: boolean }
 /** ZE10d2: the online shell a gate's `enter` handed over (its seat frozen at the gate of `cell`), for the next session on this page. */
 let handedOver: { readonly shell: Shell; readonly cell: string } | null = null;
 /** ZE10d2: past the door's `READY_MS` (120 s) a handed-over link no session took is let go. */
 const HANDOVER_MS = 130_000;
+/** GO5b: how long a disagreeing `resume` waits for this page's session and its same-page entry (control) before GO4's reload. */
+const REGRID_WAIT_MS = 45_000;
+/** GO5/GO5b: a seat in another cell than this page booted is entered on this page once the running session can hand its link over and
+ *  the app's same-page entry is in place, both of which may come after the door's `resume` (it can arrive mid-boot). */
+const regrids = new RegridLater({ waitMs: REGRID_WAIT_MS, timeout: (ms, then) => {
+  const wait = new Scope('grid.regrid-wait');
+  wait.timeout(ms, () => { wait.dispose(); then(); });
+  return () => { wait.dispose(); };
+} });
+whenEntersInPage(() => { regrids.entry(); });
+let regridSession: RegridHere | null = null;
 
 const SAVE_EVERY_MS = 30_000;
 /** How long the card waits for the server's first rows, and how often it looks. A server that has booted says them in a tick. */
@@ -378,7 +393,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const onlineModule = (): Promise<OnlineModule> => bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as Promise<OnlineModule>;
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { grid } = ports, booted = grid?.booted;
-    const gridOf = (cell: string, goto: boolean): OnlineGrid | undefined => grid === null ? undefined : { cell, cells: grid.cells.map(row => row.instance), placed: (at, pose) => { grid.serverPlace?.(at, pose); }, reenter: next => { grid.reenter?.(next); }, ...(goto ? { goto: true } : {}) };
+    const gridOf = (cell: string, goto: boolean): OnlineGrid | undefined => grid === null ? undefined : { cell, cells: grid.cells.map(row => row.instance), placed: (at, pose) => { grid.serverPlace?.(at, pose); }, reenter: next => { grid.reenter?.(next); },
+      // a page with no in-place entry at all takes GO4's reload at once
+      reenterInPage: (next, reload) => { if (grid.reenterInPage === undefined) return false; regrids.ask(next, reload); return true; }, ...(goto ? { goto: true } : {}) };
     // ZE10d2: a gate's 0 handed this page's link over: the seat is frozen at that cell's gate, and this session's `ready` seats it past
     const kept = handedOver;
     handedOver = null;
@@ -433,6 +450,21 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     expiry.timeout(HANDOVER_MS, () => { expiry.dispose(); if (handedOver === kept) { handedOver = null; kept.shell.dispose(); } });
     return at;
   }));
+  // GO5: the door seated this page's player in another cell than it booted (a disagreeing hint): the page enters that cell in place
+  // and the next session takes this link over, as at a gate's 0, so there is no reload; the door waits for that session's `ready`
+  const reenterInPage = ports.grid?.reenterInPage;
+  if (shell.adopt !== undefined && reenterInPage !== undefined) {
+    // the hand-over runs before the page leaves: the leave's hold (a quit) must be gone first, as at the gate
+    const mine = (cell: string): boolean => (!ended && !scope.disposed && handedOver === null) && reenterInPage(cell, () => {
+      console.info(`[grid] the seat is in ${cell}: entering it on this page, the link handed over`);
+      ended = true; leaves(); const kept = { shell, cell }; handedOver = kept;
+      const expiry = new Scope('regrid.handover');
+      expiry.timeout(HANDOVER_MS, () => { expiry.dispose(); if (handedOver === kept) { handedOver = null; kept.shell.dispose(); } });
+    });
+    regrids.session(mine); regridSession = mine;
+    // a later session may already have said its own
+    scope.onDispose(() => { if (regridSession === mine) { regridSession = null; regrids.session(null); } });
+  }
   scope.onDispose(serverStopsForImport(stop));
   // A session that ends with its page still here saves first. What navigates asks through `holdLeaving`, below.
   scope.onDispose(() => { if (ended) return; ended = true; leaves(); shell.pause(); closing = atMostLeaveWait(shell.save()).finally(() => { shell.dispose(); }); });

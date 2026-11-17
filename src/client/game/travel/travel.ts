@@ -61,9 +61,13 @@ export function bindTravelInventory(source: TravelSource): () => void {
   return () => { if (running === source) running = null; };
 }
 let inPageEntry: ((request: TravelRequest, url: URL) => Promise<void>) | null = null;
+/** GO5b: who waits for the same-page entry (`whenEntersInPage`). */
+const entryHeard: (() => void)[] = [];
 /** ZE10a3: the app's same-page entry (`app/entry.ts`): the level and its Game go, then the page's start runs again and reads the
  *  handoff, the title arrival and the address (`url`, the fresh page's) this travel wrote. */
-export function setInPageEntry(enter: (request: TravelRequest, url: URL) => Promise<void>): void { inPageEntry = enter; }
+export function setInPageEntry(enter: (request: TravelRequest, url: URL) => Promise<void>): void { inPageEntry = enter; for (const heard of entryHeard.splice(0)) heard(); }
+/** GO5b: run `heard` once this page has its same-page entry (now, if it has). */
+export function whenEntersInPage(heard: () => void): void { if (inPageEntry !== null) heard(); else entryHeard.push(heard); }
 /** True when an `inPage` request enters without a navigation (a read-ahead then waits for the old world to go). */
 export function entersInPage(): boolean { return inPageEntry !== null; }
 /** An `inPage` request on a page with a same-page entry: the arrival and the address the fresh page would get, then that entry. */

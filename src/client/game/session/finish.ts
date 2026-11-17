@@ -6,7 +6,7 @@ import { sustainedFrames } from '@wildshard/engine/core/sustainedFrames';
 import { Rng } from '@wildshard/engine/core/rng';
 import { gridCells } from '../plugin/context';
 import { initialHomeMetadataRequired } from '../grid/homeMetadata';
-import { reenterGrid, reenterShard, showGridDestination } from '../grid/pageEntry';
+import { reenterGrid, reenterGridInPage, reenterShard, showGridDestination } from '../grid/pageEntry';
 import type { playStage } from './play';
 import type { WorkerClientGrid } from '../shardfile/clientWorker';
 import { asShell } from '@wildshard/engine/app/ownership';
@@ -49,7 +49,7 @@ function workerGrid({ grid, gridLive }: Pick<Awaited<ReturnType<typeof playStage
   return grid === null || gridLive === null ? null : { cells: grid.assembly.cells, bindWire: wire => { gridLive.bindWire(wire); }, frame: () => gridLive.frame(), animals: () => gridLive.enteredAnimals(), items: () => gridLive.enteredItems(), saveLocation: () => { gridLive.saveLocation(); },
     // GO5: the server's place is the save; the hint and the loading card follow it.
     serverPlace: (instance, at) => { gridLive.serverPlace(instance, at); const cell = grid.assembly.cells.find(row => row.instance === instance); if (cell !== undefined) showGridDestination(cell.slug); },
-    reenter: instance => { reenterGrid(instance); }, reshard: instance => { reenterShard(instance); }, booted: gridLive.booted };
+    reenter: instance => { reenterGrid(instance); }, reenterInPage: (instance, handOver) => reenterGridInPage(instance, handOver), reshard: instance => { reenterShard(instance); }, booted: gridLive.booted };
 }
 
 /** how often the in-play warm-up asks whether an arrival's Explorer has closed, and how long it waits for one to open */

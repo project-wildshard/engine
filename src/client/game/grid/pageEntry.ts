@@ -95,6 +95,20 @@ export function reenterGrid(instance: string): void {
   travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
 }
 
+/** GO5: `reenterGrid` on this page: the app's same-page entry boots the seat's cell from its grid intent, so a disagreeing hint costs
+ *  no reload. `handOver` runs before the page leaves (the session lets its link go to the next one). False, with nothing run, when this
+ *  page has no same-page entry, the cell isn't one it can open, or the re-entries ran out (the caller's `reenterGrid` then takes the
+ *  title path). */
+export function reenterGridInPage(instance: string, handOver: () => void): boolean {
+  if (!entersInPage() || (navigating !== null && !navigating.disposed)) return false;
+  const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
+  if (cell === undefined || target === undefined || !reentryAllowed(Date.now())) return false;
+  handOver();
+  pageGridIntents().set({ instance: cell.instance, slug: target.slug });
+  travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target), inPage: () => undefined });
+  return true;
+}
+
 /** OFFLINE OF2 (J298): a grid page on a build whose world is known to host one cell (production before GC16) re-enters as that cell's
  *  one-shard page, online, never the solo grid. The page that boots is a `?chunk=` page with no grid intent; Shard select's one way in
  *  keeps it a one-shard page, since the same word (kept a minute, and in the device's route memory) says the world opens one cell. */
