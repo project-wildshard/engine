@@ -10,7 +10,7 @@ import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
 import {gateEnvironment} from '../scripts/push-environment.mjs';
 import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
-import {localDeltaPlan} from '../scripts/local-land-delta.mjs';
+import {discoverLocalDeltaPlan,localDeltaPlan} from '../scripts/local-land-delta.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
@@ -145,7 +145,12 @@ async function main(){
   if(!split&&context!==null&&process.env.WS_LOCAL_LAND_HEAD===context.commit&&process.env.WS_LOCAL_LAND_DELTA){
     try{basis=JSON.parse(process.env.WS_LOCAL_LAND_DELTA);}catch{ /* Malformed evidence keeps the full gate. */ }
   }
-  const delta=localDeltaPlan(context,basis);
+  const planDelta=current=>{
+    const planned=localDeltaPlan(current,basis);
+    return !planned.eligible&&process.env.WS_LOCAL_LAND_HEAD===current?.commit
+      ?discoverLocalDeltaPlan(current,process.env.WS_LOCAL_LAND_BASE_MAIN):planned;
+  };
+  const delta=planDelta(context);
   if(delta.eligible&&delta.selection!==null){
     selection=delta.selection;
     console.error(`  - local disjoint delta: ${delta.reason}; ${selection.files.join(', ')}`);
@@ -160,7 +165,7 @@ async function main(){
     // A split full-mode gate ran no complete suite, so it proves nothing reusable.
     if(context!==null&&!(split&&selection.mode==='full')){
       if(after===null||after.tree!==context.tree||after.runtime!==context.runtime)throw new Error('Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree');
-      const current=delta.eligible?localDeltaPlan(after,basis):null;
+      const current=delta.eligible?planDelta(after):null;
       if(delta.eligible&&(!current?.eligible||current.proof?.run!==delta.proof?.run))throw new Error('Prior full proof changed or expired during the delta gate; rerun the full gate');
       // Only authenticated disjoint composition covers the complete new tree.
       const covered=delta.eligible?{mode:/** @type {const} */('full'),files:[]}:selection;

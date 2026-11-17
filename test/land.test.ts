@@ -201,7 +201,7 @@ const GEN_STAMPS = "import {mkdirSync,readdirSync,statSync,writeFileSync} from '
 const prepushLines = (f: Fixture) => f.read(f.files.prepush).trim().split('\n').filter(Boolean);
 
 describe('land (J240): fast-forward main from a plan worktree after its branch CI is green', () => {
-  test.each(['release', 'cancel-waiter', 'cancel-holder', 'shared-origin', 'changed-waiter'])('FL8: independent clones queue full gates and cancel safely (%s)', async mode => {
+  test.each(['release', 'cancel-waiter', 'cancel-holder', 'slow-holder', 'shared-origin', 'changed-waiter'])('FL8: independent clones queue full gates and cancel safely (%s)', async mode => {
     const cancelWaiter = mode === 'cancel-waiter';
     const a = fixture(), b = fixture();
     if (mode === 'shared-origin') {
@@ -221,6 +221,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const tb = b.commit(wb, 'src/b.ts', 'export const b = 1;', 'feat: b');
     const tc = c === undefined || wc === undefined ? undefined : c.commit(wc, 'src/c.ts', 'export const c = 1;', 'feat: c');
     const sockets = new Map<string, import('node:net').Socket>();
+    let firstDrained = false, overlapped = false;
     let first: () => void = () => {}, second: () => void = () => {}, third: () => void = () => {}, verdict: (value: string) => void = () => {}, queuedThird: () => void = () => {}, advancedThird: () => void = () => {};
     const readyA = new Promise<void>(done => { first = done; });
     const readyB = new Promise<void>(done => { second = done; });
@@ -231,7 +232,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const { createServer: gateServer } = await import('node:net');
     const server = gateServer(socket => { socket.once('data', chunk => {
       const name = chunk.toString(); sockets.set(name, socket);
-      if (name === 'a') first(); else if (name === 'b') { second(); verdict('started'); } else third();
+      if (name === 'a') { socket.once('close', () => { firstDrained = true; }); first(); }
+      else if (name === 'b') { if (!firstDrained) overlapped = true; second(); verdict('started'); } else third();
     }); });
     await new Promise<void>(done => { server.listen(0, '127.0.0.1', done); });
     const address = server.address(); if (address === null || typeof address === 'string') throw new Error('Missing gate endpoint');
@@ -240,7 +242,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const start = (f: Fixture, wt: string, name: string) => {
       const worker = join(f.root, 'gate.mjs');
       const refresh = mode === 'shared-origin' && name === 'b' ? "if(!existsSync('src/a.ts'))throw new Error('Queued gate started without incoming main');" : '';
-      writeFileSync(worker, `import {connect} from 'node:net';import {existsSync} from 'node:fs';${refresh}const socket=connect({host:'127.0.0.1',port:${address.port}},()=>socket.write(${JSON.stringify(name)}));socket.on('data',()=>socket.end());`);
+      const delayed = mode === 'slow-holder' && name === 'a' ? "process.once('SIGTERM',()=>setTimeout(()=>socket.end(),6000));" : '';
+      writeFileSync(worker, `import {connect} from 'node:net';import {existsSync} from 'node:fs';${refresh}const socket=connect({host:'127.0.0.1',port:${address.port}},()=>socket.write(${JSON.stringify(name)}));socket.on('data',()=>socket.end());${delayed}`);
       writeFileSync(join(f.root, 'hooks/pre-push'), `#!/bin/sh\ncat >/dev/null\nnode '${worker}'\n[ -n "\${WS_LAND_HOOK_ACK:-}" ] && node "$ACK_SCRIPT"\n`); chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
       const child = spawn(process.execPath, [LAND, '--keep'], { cwd: wt, env: f.env, stdio: ['ignore', 'pipe', 'pipe'] }); children.push(child);
       let output = '';
@@ -273,17 +276,18 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
         await readyC; sockets.get('c')?.end('release'); expect((await pc).code).toBe(0);
         expect(c.remoteMain()).toBe(tc); expect(b.remoteMain()).not.toBe(tb);
       } else {
-        if (mode === 'cancel-holder') {
+        if (mode === 'cancel-holder' || mode === 'slow-holder') {
           children[0]?.kill('SIGTERM'); expect((await pa).code).toBe(1);
         } else { sockets.get('a')?.end('release'); expect((await pa).code).toBe(0); }
         await Promise.race([readyB, pb.then(result => { throw new Error(result.output); })]);
+        if (mode === 'slow-holder') expect(overlapped).toBe(false);
         sockets.get('b')?.end('release'); expect((await pb).code).toBe(0);
         if (mode === 'shared-origin') {
           expect(a.git(a.remote, ['show', 'main:src/a.ts'])).toContain('a = 1');
           expect(a.git(a.remote, ['show', 'main:src/b.ts'])).toContain('b = 1');
         } else expect(b.remoteMain()).toBe(tb);
       }
-      if (mode !== 'cancel-holder' && mode !== 'shared-origin') expect(a.remoteMain()).toBe(ta);
+      if (mode !== 'cancel-holder' && mode !== 'slow-holder' && mode !== 'shared-origin') expect(a.remoteMain()).toBe(ta);
     } finally {
       for (const socket of sockets.values()) socket.destroy();
       for (const child of children) if (child.exitCode === null) child.kill('SIGTERM');
@@ -426,6 +430,25 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(prepushLines(f)).toHaveLength(2);
     expect(f.git(wt, ['show', 'HEAD:src/racer.ts'])).toContain('racer = 3');
+  }, 60_000);
+
+  test('FL9: a restarted real land discovers its completed pre-rebase gate', () => {
+    const f = fixture(); f.env['WS_LAND_MODE'] = 'local';
+    const wt = f.worktree('proof-restart');
+    const tip = f.commit(wt, 'src/feature.ts', 'export const feature = 42;', 'feat: feature');
+    const cache = JSON.stringify(resolve('scripts/push-proof-cache.mjs'));
+    const delta = JSON.stringify(resolve('scripts/local-land-delta.mjs'));
+    const marker = join(f.root, 'completed'), runner = join(f.root, 'gate.mjs');
+    writeFileSync(runner, `import assert from 'node:assert/strict';import{existsSync,readFileSync,writeFileSync}from'node:fs';import{capturePushTree,writePushProof}from${cache};import{discoverLocalDeltaPlan}from${delta};const context=capturePushTree('restart-fixture',{PATH:process.env.PATH,CI:'',GITHUB_ACTIONS:''});assert.ok(context);if(!existsSync(${JSON.stringify(marker)})){assert.match(readFileSync('src/feature.ts','utf8'),/42/);writePushProof(context,{mode:'full',files:['src/feature.ts']},.01);writeFileSync(${JSON.stringify(marker)},'full completed');}else{const plan=discoverLocalDeltaPlan(context,process.env.WS_LOCAL_LAND_BASE_MAIN);assert.equal(plan.eligible,true);assert.deepEqual(plan.selection.files,['src/incoming.ts']);console.error('authenticated prior full plus affected incoming test');}`);
+    writeFileSync(join(f.root, 'hooks/pre-push'), `#!/bin/sh\ncat >/dev/null\nnode '${runner}' || exit 1\nnode "$ACK_SCRIPT"\n`);
+    chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
+    writeFileSync(join(f.remote, 'hooks/update'), `#!/bin/sh\n[ "$3" = '${tip}' ] && exit 1\nexit 0\n`);
+    expect(f.land(wt).status).toBe(1); expect(existsSync(marker)).toBe(true);
+    execFileSync('sh', [f.peerScript('src/incoming.ts', null, 'export const incoming = 1;')], {env: f.env, stdio: 'pipe'});
+    f.git(wt, ['fetch', '--quiet', 'origin', 'main']); f.git(wt, ['rebase', '--quiet', 'origin/main']);
+    const result = f.land(wt); expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stderr).toContain('authenticated prior full plus affected incoming test');
+    expect(f.git(f.remote, ['show', 'main:src/feature.ts'])).toContain('42');
   }, 60_000);
 
   test('J400: a local red cannot move main and a race gates the rebased tree again', () => {

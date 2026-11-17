@@ -480,7 +480,7 @@ def record_build(root, queued, started, load, code, inherited_lease=False):
         print('heavy-lane: build observation unavailable: ' + str(error), file=sys.stderr)
 
 
-def terminate(child):
+def terminate(child, grace=3):
     if child is None:
         return
     # start_new_session gives this command its own process group; never match unrelated commands by name.
@@ -489,7 +489,7 @@ def terminate(child):
     except ProcessLookupError:
         return
     try:
-        child.wait(timeout=3)
+        child.wait(timeout=grace)
     except subprocess.TimeoutExpired:
         pass
     try:
@@ -861,7 +861,7 @@ def main():
                     if args.kind == 'build' and not service else child.wait(timeout=args.max * 60))
         except subprocess.TimeoutExpired:
             print('heavy-lane: owned command timed out', file=sys.stderr)
-            (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' and not service else terminate(child))
+            (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' and not service else terminate(child, 15 if args.kind == 'full-gate' else 3))
             code = 124
         if command_began is not None:
             command_result = command_usage(child, command_began, command_owner, command_before)
@@ -869,7 +869,7 @@ def main():
         return code if code >= 0 else 128 - code
     except KeyboardInterrupt:
         code = 130
-        (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' and not service else terminate(child))
+        (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' and not service else terminate(child, 15 if args.kind == 'full-gate' else 3))
         if child is not None and command_began is not None:
             command_result = command_usage(child, command_began, command_owner, command_before)
         return 130

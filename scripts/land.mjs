@@ -112,7 +112,7 @@ function gitTee(cwd,args,env,command='git'){
    try{if(groups&&child.pid!==undefined)process.kill(-child.pid,kind);else child.kill(kind);}
    catch(error){if(/** @type {NodeJS.ErrnoException} */(error).code!=='ESRCH')throw error;}
   };
-  const stop=()=>{interrupted=true;signal('SIGTERM');forced??=setTimeout(()=>{signal('SIGKILL');},10000);};
+  const stop=()=>{interrupted=true;signal('SIGTERM');forced??=setTimeout(()=>{signal('SIGKILL');},command==='python3'?20000:10000);};
   process.once('SIGTERM',stop);process.once('SIGINT',stop);
   const finish=(/** @type {number} */status,/** @type {string} */error='')=>{
    if(settled)return;settled=true;
@@ -831,6 +831,8 @@ class Landing{
   // The outer queue authenticates this controller, never a hook or proof.
   for(const key of Object.keys(env))if(key.startsWith('WS_FULL_GATE_'))Reflect.deleteProperty(env,key);
   Reflect.deleteProperty(env,'WS_LOCAL_LAND_DELTA');
+  Reflect.deleteProperty(env,'WS_LOCAL_LAND_BASE_MAIN');
+  if(local&&hatch===undefined)env.WS_LOCAL_LAND_BASE_MAIN=main;
   if(local&&delta!==null&&hatch===undefined)env.WS_LOCAL_LAND_DELTA=JSON.stringify(delta);
   if(local&&hatch===undefined)Reflect.deleteProperty(env,'SKIP_CHECK');
   if(hatch!==undefined)this.receipt(`J381 SKIP_CHECK=1 ${short(head)}: ${hatch}; no full proof`);

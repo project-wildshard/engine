@@ -82,6 +82,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
       const full={...env,WS_LOCAL_LAND_HEAD:process.env.WS_LAND_MAIN_PUSH?.slice(6)??'',WS_LANE_NAME:(process.env.WS_LANE_NAME===''?undefined:process.env.WS_LANE_NAME)??'local-land'};Reflect.deleteProperty(full,'WS_PUSH_REFS');
       Reflect.deleteProperty(full,'WS_LAND_HOOK_ACK');
       if(process.env.WS_LOCAL_LAND_DELTA!==undefined)full.WS_LOCAL_LAND_DELTA=process.env.WS_LOCAL_LAND_DELTA;
+      if(process.env.WS_LOCAL_LAND_BASE_MAIN!==undefined)full.WS_LOCAL_LAND_BASE_MAIN=process.env.WS_LOCAL_LAND_BASE_MAIN;
       const ran=spawn('python3',['scripts/heavy-lane.py','full-test','--checkout-scope','--',process.execPath,'scripts/land-local-gate.mjs'],{cwd:root,env:full,stdio:'inherit'});
       process.on('SIGINT',()=>ran.kill('SIGINT'));process.on('SIGTERM',()=>ran.kill('SIGTERM'));
       const code=await new Promise(done=>{ran.once('error',()=>done(1));ran.once('close',value=>done(value??1));});

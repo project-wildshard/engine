@@ -6,7 +6,8 @@ import {chmodSync,mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay in this lane's scratch.
 import {join,resolve} from 'node:path';
 import {capturePushTree,readPushProof,writePushProof} from '../../scripts/push-proof-cache.mjs';
-import {localDeltaPlan} from '../../scripts/local-land-delta.mjs';
+import * as deltaPlanner from '../../scripts/local-land-delta.mjs';
+const {localDeltaPlan}=deltaPlanner;
 
 const roots=[];
 afterEach(()=>{for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});});
@@ -36,6 +37,23 @@ test('FL5b authenticates a prior full proof and selects only incoming-main paths
  const f=fixture();const plan=localDeltaPlan(f.current(),f.basis);
  expect(plan.eligible).toBe(true);expect(plan.selection.files).toEqual(['src/b.ts']);
  expect(plan.proof.mode).toBe('full');
+});
+test('FL9 discovers a real full proof after a separate branch rebase',()=>{
+ const f=fixture();
+ f.git('switch','--quiet','-c','plan/reuse',f.basis.testedHead);
+ f.git('-c','user.name=Fixture','-c','user.email=fixture@example.test','rebase','--quiet',f.basis.incomingMain);
+ const plan=deltaPlanner.discoverLocalDeltaPlan(f.current(),f.basis.incomingMain);
+ expect(plan.eligible).toBe(true);expect(plan.selection.files).toEqual(['src/b.ts']);
+ expect(plan.proof.commit).toBe(f.basis.testedHead);
+});
+test.each(['missing','related','altered','runtime','composed'])('FL9 discovery refuses %s evidence',mode=>{
+ const f=fixture(mode==='missing'||mode==='related'?mode:'full');
+ if(mode==='composed')writePushProof(f.original,{mode:'full',files:[]},1,{run:'earlier',commit:f.basis.baseMain});
+ f.git('switch','--quiet','-c','plan/reuse',f.basis.testedHead);
+ f.git('-c','user.name=Fixture','-c','user.email=fixture@example.test','rebase','--quiet',f.basis.incomingMain);
+ if(mode==='altered')f.commit('src/a.ts','export const a=3;');
+ const context=f.current();
+ expect(deltaPlanner.discoverLocalDeltaPlan(mode==='runtime'?{...context,runtime:'f'.repeat(64)}:context,f.basis.incomingMain).eligible).toBe(false);
 });
 test.each(['missing','related'])('FL5b %s proof cannot carry a full gate',mode=>{
  const f=fixture(mode);expect(localDeltaPlan(f.current(),f.basis).eligible).toBe(false);

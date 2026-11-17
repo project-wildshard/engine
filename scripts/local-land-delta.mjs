@@ -7,6 +7,32 @@ import {pushSelection} from './push-selection.mjs';
 const sha=v.pipe(v.string(),v.regex(/^[a-f0-9]{40}$/u));
 const basisSchema=v.object({baseMain:sha,testedHead:sha,incomingMain:sha,head:sha});
 
+/** Recover a directly completed basis after a separate land/rebase invocation.
+ * Reflog entries are candidates only; the receipt and complete replay still
+ * authenticate every selected candidate with the current runtime.
+ * @param {NonNullable<ReturnType<typeof import('./push-proof-cache.mjs').capturePushTree>>|null} context
+ * @param {string|undefined} incomingMain */
+export function discoverLocalDeltaPlan(context,incomingMain){
+ const fallback=localDeltaPlan(context,null);
+ if(context===null||!v.safeParse(sha,incomingMain).success)return fallback;
+ /** @param {string[]} args */
+ const git=args=>execFileSync('git',args,{cwd:context.root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+ try{
+  const branch=git(['symbolic-ref','--quiet','HEAD']);
+  if(!branch.startsWith('refs/heads/plan/'))return fallback;
+  const candidates=new Set(git(['reflog','show','--format=%H','-n','64',branch]).split('\n'));
+  for(const testedHead of candidates){
+   if(testedHead===context.commit||!v.safeParse(sha,testedHead).success)continue;
+   const proof=readPriorFullProof(context,testedHead);
+   if(proof===null||proof.inherited!==undefined)continue;
+   const baseMain=git(['merge-base',testedHead,String(incomingMain)]);
+   const plan=localDeltaPlan(context,{baseMain,testedHead,incomingMain,head:context.commit});
+   if(plan.eligible)return plan;
+  }
+ }catch{ /* Unavailable branch history never substitutes for a full gate. */ }
+ return fallback;
+}
+
 /** @param {NonNullable<ReturnType<typeof import('./push-proof-cache.mjs').capturePushTree>>|null} context
  * @param {unknown} raw */
 export function localDeltaPlan(context,raw){
