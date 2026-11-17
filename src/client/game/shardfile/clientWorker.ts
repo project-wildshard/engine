@@ -418,6 +418,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     // joins as its device. The ticket is read at each hello, so a redial after a refresh sends the new one.
     const login = pageLogin(storage), device = deviceIdentity(storage, savePrefix).player;
     await ticketBeforeJoin(login, device);
+    if (scope.disposed) throw new Error('The page left before it joined the world');
     scope.interval(TICKET_REFRESH_MS, () => { void refreshTicket(login, device); });
     return startOnline({ ...world, keep: releaseKeep(), leaving: onlineLeaving, loaded: slug, build, identity: name => ticketed(login, deviceIdentity(storage, savePrefix, name)),
       ...(first === undefined ? {} : { grid: first }) });

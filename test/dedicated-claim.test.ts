@@ -3,6 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { claimSaves } from '../src/server/host/dedicated/saves/claim';
 import type { Database } from '../src/server/host/dedicated/saves/database';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
+import { grantProfile } from '../src/server/host/dedicated/saves/profile';
 import { readSave, writeSave, type SaveParse, type SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import { openPglite } from './fixtures/pgliteDatabase';
 
@@ -46,4 +47,16 @@ test('a device with nothing saved claims nothing, and the account is still made'
   const db = await fresh();
   expect(await claimSaves(db, 'device:new', ACCOUNT)).toBe(false);
   expect(await coins(db, ACCOUNT)).toBeNull();
+});
+
+test('platform grants neither move nor count as progress (review M2)', async () => {
+  const db = await fresh(), grant = async (player: string): Promise<void> => { await grantProfile(db, 0, player, { factId: 'title.founder', kind: 'title', name: 'founder' }); };
+  await writeSave(db, 0, save('device:phone', 12));
+  await grant('device:phone');
+  await db.query("insert into player (id, name) values ($1, 'Ann')", [ACCOUNT]);
+  await grant(ACCOUNT);
+  expect(await claimSaves(db, 'device:phone', ACCOUNT), 'an account with only a platform grant still claims').toBe(true);
+  expect(await coins(db, ACCOUNT)).toBe(12);
+  const platform = await db.query("select player_id from ledger_receipt where shard = '@platform' order by player_id");
+  expect(platform.rows, 'each keeps its own platform grant').toEqual([{ player_id: ACCOUNT }, { player_id: 'device:phone' }]);
 });

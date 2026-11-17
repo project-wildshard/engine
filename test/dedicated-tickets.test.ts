@@ -75,6 +75,12 @@ test('two devices\' tickets reach one player, with the api-server down; a bad ti
   expect(room?.bodyOf('device:stranger'), 'a ticket from another key plays as its device').toBeDefined();
   await join(ticket(key.privateKey, { player: PLAYER, device: 'device:late', expires: Math.floor(Date.now() / 1000) - 1 }));
   expect(room?.bodyOf('device:late'), 'an expired ticket plays as its device').toBeDefined();
+  // review M1: a guest still playing in another tab is never claimed from under its body (another account, so only the guest is live)
+  for (const bot of bots.splice(0)) bot.drop(); // the door lets one address hold only a few sockets
+  const tab = await join('device:tab');
+  await join(ticket(key.privateKey, { player: PLAYER.replace('0123', '4567'), device: 'device:tab', expires }));
+  expect(room?.bodyOf('device:tab'), 'the guest tab plays on').toBeDefined();
+  tab.drop();
   expect(asked, 'no join asked the api-server').toEqual([]);
-  expect(claims, 'MP2.2d: each live ticket claims its device\'s guest progress; a dead one claims nothing').toEqual([`device:phone>${account}`, `device:desk>${account}`]);
+  expect(claims, 'MP2.2d: a live ticket claims its device\'s guest progress, never while the account (the desktop, its body still held) or the guest (the tab) is live; a dead ticket claims nothing').toEqual([`device:phone>${account}`]);
 });

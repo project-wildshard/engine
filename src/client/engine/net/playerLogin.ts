@@ -90,6 +90,8 @@ export async function refreshTicket(ports: LoginPorts, device: string, signal?: 
   const session = signedIn(ports)?.session;
   if (session === undefined) return undefined;
   const response = await post(ports, '/api/players/ticket', { device }, { session, ...(signal === undefined ? {} : { signal }) });
+  // an answer for a session the page no longer holds (signed out, or in as someone else meanwhile) changes nothing
+  if (signedIn(ports)?.session !== session) return undefined;
   if (response?.status === 401) { signOut(ports); return undefined; }
   const ticket = (await json(response))?.['ticket'];
   if (typeof ticket !== 'string' || TICKET.exec(ticket)?.groups?.['device'] !== device) return undefined;

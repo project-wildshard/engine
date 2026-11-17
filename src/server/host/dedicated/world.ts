@@ -497,6 +497,9 @@ export class World {
   }
   /** MP2.2d: a device's guest progress to the account a ticket seats; a failed claim leaves both as they were and the join goes on. */
   private async claim(device: string, account: string): Promise<void> {
+    // Review M1: a body the door holds, loads, moves or redials (the guest's or the account's) would save over the move, so the
+    // claim waits for a join with neither live; it is tried at every ticketed join, so it happens at a later one.
+    if ([device, account].some(id => this.seated.has(id) || this.pending.has(id) || this.crossings.has(id) || this.redials.has(id) || this.entries.has(id))) return;
     try { if (await this.options.saves.claim?.(device, account) === true) this.options.log({ at: 'saves.claimed' }); }
     catch (error) { this.options.log({ at: 'saves.claim-failed', error: error instanceof Error ? error.message : String(error) }); }
   }
