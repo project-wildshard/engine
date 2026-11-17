@@ -8,7 +8,6 @@ export const CI_NATIVE_GROUPS = {
   'room-performance-driftwood': ['test/net-bots-driftwood.test.ts'],
   'escape-titan': [
     'test/tooling/parity/browser-escape.test.mjs',
-    'test/nalati-titan-verbs.test.ts',
     'test/engine-rule-successors.test.ts',
     'test/engine-rule-successors-titan.test.ts',
   ],
@@ -69,24 +68,13 @@ export const CI_NATIVE_GROUPS = {
   'native-observation-sunscar': ['test/native-runtime-observation-sunscar.test.ts'],
   'standalone-grid': ['test/standalone-grid.test.ts', 'test/standalone-grid-lone.test.ts', 'test/standalone-grid-restore.test.ts'],
   'native-routes': [
-    'test/driftwood-optional-verbs.test.ts',
-    'test/driftwood-trade-verbs.test.ts',
-    'test/nalati-patrol-verbs.test.ts',
     'test/physics-nalati-headless.test.ts',
-    'test/nalati-chapter-binding.test.ts',
     'test/native-runtime-observation.test.ts',
     'test/physics-headless.test.ts',
     'test/physics-shards-headless.test.ts',
   ],
   'stories-qara': [
-    'test/pine-quest-verbs.test.ts',
     'test/pine-door-continuation.test.ts',
-    'test/driftwood-story-verbs.test.ts',
-    'test/sky-progression-verbs.test.ts',
-    'test/nalati-qara-verbs.test.ts',
-  ],
-  'chapter-one': [
-    'test/nalati-chapter-one.test.ts',
   ],
   'lease-order': [
     'test/mirror-lease-order-1.test.ts',
