@@ -73,31 +73,41 @@ export function browserErrorDist(build: string): string | undefined {
   return build !== '' && build.length <= 64 ? build : undefined;
 }
 let sdk: Promise<BrowserSdk | null> | null = null;
+const AUTOMATION_AGENT = /HeadlessChrome|Playwright|PhantomJS/u;
 /** S13: deliveries waiting on an event that beforeSend refused (noise, a page that stopped reporting): that event is done, not owed */
 const refusedListeners = new Set<(id: string) => void>();
 const refused = (id: string | undefined): null => { for (const listener of refusedListeners) listener(id ?? ''); return null; };
 
-/** External error delivery is opt-in by exact app origin and never by a test runner. */
-export function browserErrorDeliveryAllowed(environment: { readonly origin: string; readonly automated: boolean; readonly harness: boolean },
-  origins: readonly string[]): boolean {
-  return !environment.automated && !environment.harness && origins.includes(environment.origin);
+/**
+ * Who a page that may report is: a `player`, or `automation` (navigator.webdriver, harness pins, or a headless or Playwright user
+ * agent, since a CDP-attached agent may not set webdriver). Null: this origin never reports. External delivery is opt-in by exact
+ * app origin. SENTRY-TRIAGE S21: automation reports too, under its own environment (`browserErrorEnvironment`), because Nalati's
+ * error card on staging v0.1.33 and v0.1.34 was met only by agent proofs and so never reached Sentry.
+ */
+export type BrowserErrorAudience = 'player' | 'automation';
+export function browserErrorAudience(environment: { readonly origin: string; readonly automated: boolean; readonly harness: boolean; readonly userAgent?: string },
+  origins: readonly string[]): BrowserErrorAudience | null {
+  if (!origins.includes(environment.origin)) return null;
+  return environment.automated || environment.harness || AUTOMATION_AGENT.test(environment.userAgent ?? '') ? 'automation' : 'player';
 }
-/** The Sentry environment an allowed origin reports as: its entry in the identity's map, else `production`. */
-export function browserErrorEnvironment(origin: string, environments: Readonly<Record<string, string>>): string {
-  return Object.hasOwn(environments, origin) ? environments[origin] ?? 'production' : 'production';
+/** S21: the most events an automated page sends (beforeSend refuses the rest), so an agent soak cannot spend the project's quota */
+export const AUTOMATION_EVENTS_MAX = 20;
+/** The Sentry environment an allowed origin reports as: its entry in the identity's map, else `production`; an automated page
+ *  reports as `<environment>-automation` (S21), so `environment:staging` stays the players'. */
+export function browserErrorEnvironment(origin: string, environments: Readonly<Record<string, string>>, audience: BrowserErrorAudience = 'player'): string {
+  const environment = Object.hasOwn(environments, origin) ? environments[origin] ?? 'production' : 'production';
+  return audience === 'automation' ? `${environment}-automation` : environment;
 }
 
 const EXTENSION_FRAME = /^(?:chrome-extension|moz-extension|safari-extension|safari-web-extension|webkit-masked-url):/u;
-const AUTOMATION_AGENT = /HeadlessChrome|Playwright|PhantomJS/u;
 
 /**
  * Why an event is noise and must not reach Sentry, or null to keep it (SENTRY-TRIAGE S6). Pure, so each case is tested:
  * extension-only stacks, the debug probe's harness error (a tool on a real page), QB8's deliberate error outside staging,
- * automation user agents (a CDP-attached agent may not set navigator.webdriver), ResizeObserver loop warnings and an
- * opaque "Script error." with no frames.
+ * ResizeObserver loop warnings and an opaque "Script error." with no frames. An automation user agent is not noise since S21:
+ * `browserErrorAudience` sends it under its own environment.
  */
-export function browserErrorNoise(event: ErrorEvent, page: { readonly environment: string; readonly userAgent: string }): string | null {
-  if (AUTOMATION_AGENT.test(page.userAgent)) return 'automation';
+export function browserErrorNoise(event: ErrorEvent, page: { readonly environment: string }): string | null {
   const exceptions = event.exception?.values ?? [];
   const messages = [event.message ?? '', ...exceptions.map((value) => value.value ?? '')].map((message) => message.trim());
   // Every frame counts, a nameless or <anonymous> one too: only a stack that is all extension is the extension's.
@@ -126,16 +136,20 @@ export function browserErrorLevel(error: unknown, fatal: boolean, screen?: Error
   return fatal ? 'fatal' : 'error';
 }
 
-function productionPage(): boolean {
-  if (typeof location === 'undefined' || typeof navigator === 'undefined') return false;
-  return browserErrorDeliveryAllowed({origin: location.origin, automated: navigator.webdriver, harness: harnessPins() !== undefined},
+function pageAudience(): BrowserErrorAudience | null {
+  if (typeof location === 'undefined' || typeof navigator === 'undefined') return null;
+  return browserErrorAudience({origin: location.origin, automated: navigator.webdriver, harness: harnessPins() !== undefined, userAgent: navigator.userAgent},
     installedIdentity()?.errorReportOrigins ?? []);
 }
+function productionPage(): boolean { return pageAudience() !== null; }
+/** S21: the distinct events this automated page sent; an outbox resend keeps its event id, so it is not a second one */
+const automationEvents = new Set<string>();
 
 function loadSdk(): Promise<BrowserSdk | null> {
   if (!productionPage()) return Promise.resolve(null);
   sdk ??= import('@sentry/browser').then(async (sentry) => {
-    const environment = browserErrorEnvironment(location.origin, installedIdentity()?.errorReportEnvironments ?? {});
+    const audience = pageAudience() ?? 'player';
+    const environment = browserErrorEnvironment(location.origin, installedIdentity()?.errorReportEnvironments ?? {}, audience);
     const version = typeof __ENGINE_RELEASE__ === 'object' ? __ENGINE_RELEASE__.version : undefined;
     sentry.init({
       dsn,
@@ -154,8 +168,14 @@ function loadSdk(): Promise<BrowserSdk | null> {
       maxBreadcrumbs: 0,
       normalizeDepth: 6, // context -> checkpoint array -> checkpoint -> facts
       beforeSend(event) {
-        if (!productionPage()) return refused(event.event_id);
-        if (browserErrorNoise(event, { environment, userAgent: navigator.userAgent }) !== null) return refused(event.event_id);
+        if (pageAudience() !== audience) return refused(event.event_id); // stopped reporting, or became automated after the SDK loaded
+        if (browserErrorNoise(event, { environment }) !== null) return refused(event.event_id);
+        // a screen's report (the card the agent saw) always goes; other automated events stop at the cap
+        if (audience === 'automation' && event.tags?.['screen'] === undefined) {
+          const id = event.event_id ?? '';
+          if (!automationEvents.has(id) && automationEvents.size >= AUTOMATION_EVENTS_MAX) return refused(event.event_id);
+          automationEvents.add(id);
+        }
         if (event.request) {
           event.request.url = `${location.origin}${location.pathname}`;
           // The user agent names the browser, OS and device; no referrer or other header leaves the page.

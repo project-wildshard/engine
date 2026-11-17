@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { WILDSHARD_IDENTITY } from './identity';
 
 // SENTRY-TRIAGE S1: the live hosts report to Sentry, each under its own environment; nothing else does. The engine's
-// browserErrorDeliveryAllowed (exact origin match) and browserErrorEnvironment (map, else production) read these lists;
+// browserErrorAudience (exact origin match) and browserErrorEnvironment (map, else production) read these lists;
 // browser-errors-policy.test.ts proves those two functions.
 const origins = WILDSHARD_IDENTITY.errorReportOrigins ?? [];
 const environments = WILDSHARD_IDENTITY.errorReportEnvironments ?? {};

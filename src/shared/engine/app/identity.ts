@@ -33,7 +33,7 @@ export interface AppIdentity {
   /** the harness pins a test or capture script set before the boot, when there are any */
   readonly harness: () => HarnessPins | undefined;
   /** Exact production origins allowed to send optional browser error telemetry.
-   * Unset identities and automation never send to that external channel. */
+   * Unset identities never send to that external channel; automation sends as `<environment>-automation` (SENTRY-TRIAGE S21). */
   readonly errorReportOrigins?: readonly string[];
   /** The Sentry environment each report origin sends as (`staging`, `preview`); an origin not listed is `production`. */
   readonly errorReportEnvironments?: Readonly<Record<string, string>>;

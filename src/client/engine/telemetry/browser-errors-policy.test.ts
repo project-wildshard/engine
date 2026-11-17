@@ -1,22 +1,29 @@
 import {expect,test} from 'vitest';
 import type {ErrorEvent} from '@sentry/browser';
-import {browserErrorDeliveryAllowed,browserErrorEnvironment,browserErrorLevel,browserErrorNoise,browserErrorRelease,browserErrorDist} from './browserErrors';
+import {browserErrorAudience,browserErrorEnvironment,browserErrorLevel,browserErrorNoise,browserErrorRelease,browserErrorDist} from './browserErrors';
 
 const origins=['https://play.example.invalid'] as const;
+const desktopAgent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
 test.each([
-  ['https://play.example.invalid',false,false,true],
-  ['https://play.example.invalid',true,false,false],
-  ['https://play.example.invalid',false,true,false],
-  ['http://localhost:4401',false,false,false],
-  ['http://127.0.0.1:4401',false,false,false],
-  ['https://preview.example.invalid',false,false,false],
-  ['https://play.example.invalid.evil.invalid',false,false,false],
-  ['http://play.example.invalid',false,false,false],
-] as const)('browser error eligibility %s automated=%s harness=%s', (origin,automated,harness,allowed)=>{
-  expect(browserErrorDeliveryAllowed({origin,automated,harness},origins)).toBe(allowed);
+  ['https://play.example.invalid',false,false,desktopAgent,'player'],
+  // S21: an automated page on an allowed origin reports, as automation (webdriver, harness pins, or an agent's user agent)
+  ['https://play.example.invalid',true,false,desktopAgent,'automation'],
+  ['https://play.example.invalid',false,true,desktopAgent,'automation'],
+  ['https://play.example.invalid',false,false,desktopAgent.replace('Chrome/','HeadlessChrome/'),'automation'],
+  ['https://play.example.invalid',false,false,`${desktopAgent} Playwright/1.60`,'automation'],
+  ['https://play.example.invalid',false,false,'Mozilla/5.0 PhantomJS/2.1.1','automation'],
+  ['http://localhost:4401',false,false,desktopAgent,null],
+  ['http://localhost:4401',true,false,desktopAgent,null],
+  ['http://127.0.0.1:4401',false,false,desktopAgent,null],
+  ['https://preview.example.invalid',false,false,desktopAgent,null],
+  ['https://play.example.invalid.evil.invalid',false,false,desktopAgent,null],
+  ['http://play.example.invalid',false,false,desktopAgent,null],
+] as const)('browser error audience %s automated=%s harness=%s agent=%s', (origin,automated,harness,userAgent,audience)=>{
+  expect(browserErrorAudience({origin,automated,harness,userAgent},origins)).toBe(audience);
 });
 test('an uninstalled or unconfigured app identity cannot opt in by build mode or DSN',()=>{
-  expect(browserErrorDeliveryAllowed({origin:origins[0],automated:false,harness:false},[])).toBe(false);
+  expect(browserErrorAudience({origin:origins[0],automated:false,harness:false},[])).toBeNull();
+  expect(browserErrorAudience({origin:origins[0],automated:true,harness:false},[])).toBeNull();
 });
 
 test('an origin reports under its mapped environment, and an unmapped allowed origin is production',()=>{
@@ -25,6 +32,12 @@ test('an origin reports under its mapped environment, and an unmapped allowed or
   expect(browserErrorEnvironment('https://preview.example.invalid',environments)).toBe('preview');
   expect(browserErrorEnvironment('https://play.example.invalid',environments)).toBe('production');
   expect(browserErrorEnvironment('toString',environments)).toBe('production');
+});
+test('S21: an automated page reports under <environment>-automation, so a player environment stays the players\'',()=>{
+  const environments={'https://staging.example.invalid':'staging'};
+  expect(browserErrorEnvironment('https://staging.example.invalid',environments,'automation')).toBe('staging-automation');
+  expect(browserErrorEnvironment('https://play.example.invalid',environments,'automation')).toBe('production-automation');
+  expect(browserErrorEnvironment('https://staging.example.invalid',environments,'player')).toBe('staging');
 });
 
 const desktop='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
@@ -39,9 +52,6 @@ test.each([
   ['the harness-pins probe error',thrown('Probe control requires the harness pins'),page,'probe'],
   ['a QB8 capture on production',thrown('QB8 capture: a forced uncaught error in play'),page,'qb8'],
   ['a QB8 capture on preview',thrown('QB8 capture: a forced uncaught error in play'),{...page,environment:'preview'},'qb8'],
-  ['a headless Chrome agent',thrown('boom'),{...page,userAgent:desktop.replace('Chrome/','HeadlessChrome/')},'automation'],
-  ['a Playwright agent',thrown('boom'),{...page,userAgent:`${desktop} Playwright/1.60`},'automation'],
-  ['a PhantomJS agent',thrown('boom'),{...page,userAgent:'Mozilla/5.0 PhantomJS/2.1.1'},'automation'],
   ['a ResizeObserver loop limit',thrown('ResizeObserver loop limit exceeded'),page,'resize-observer'],
   ['a ResizeObserver undelivered loop',thrown('ResizeObserver loop completed with undelivered notifications.'),page,'resize-observer'],
   ['a frameless Script error.',thrown('Script error.',[]),page,'script-error'],
