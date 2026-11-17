@@ -35,13 +35,14 @@ function fits(field: Field, start: number, end: number, firstColumn: number, las
     }
     // XYZ is linear in linear RGB. Both surfaces and the line between them stay
     // in the convex hull of these vertices, so the minimum bounds Lab's derivative.
-    for (let row = start; row <= end; row++) for (const side of [column - 1, column]) for (let axis = 0; axis < 3; axis++) {
+    for (let row = start; row <= end; row++) for (let side = column - 1; side <= column; side++) for (let axis = 0; axis < 3; axis++) {
       const matrix = xyz[axis]; if (matrix === undefined) throw new Error('Missing colour transform');
-      const value = matrix.reduce((sum, coefficient, channel) => sum + coefficient * colour(row, side, channel), 0);
+      const value = 0 + matrix[0] * colour(row, side, 0) + matrix[1] * colour(row, side, 1) + matrix[2] * colour(row, side, 2);
       minima[axis] = Math.min(minima[axis] ?? Infinity, value);
     }
-    const transformed = xyz.map((matrix, axis) => matrix.reduce((sum, coefficient, channel) => sum + coefficient * (bounds[channel] ?? 0), 0) * labSlope(minima[axis] ?? 0));
-    const [x = 0, y = 0, z = 0] = transformed;
+    const transform = (axis: 0 | 1 | 2): number => { const matrix = xyz[axis];
+      return (0 + matrix[0] * (bounds[0] ?? 0) + matrix[1] * (bounds[1] ?? 0) + matrix[2] * (bounds[2] ?? 0)) * labSlope(minima[axis] ?? 0); };
+    const x = transform(0), y = transform(1), z = transform(2);
     if (Math.hypot(116 * y, 500 * (x + y), 200 * (y + z)) > COLOUR_ERROR) return false;
   }
   return true;
@@ -81,7 +82,9 @@ export function* seamLatticeSteps(field: Field, plans?: SeamLatticePlans): Gener
   }
   const native = Array.from({ length: rows }, (_unused, row) => row);
   const output = retained.map((kept, column) => column === 0 || column === field.columns - 1 ? native : [...kept].sort((a, b) => a - b));
-  const bandTriangles = (column: number, visit: (triangle: readonly [number, number, number]) => void): void => {
+  // SB38: a band's triangles go to `visit` as three indices (no array a triangle), and a trial removal reuses one spare
+  // list a column (no filtered copy a candidate row); both were most of the seam's garbage on the page.
+  const bandTriangles = (column: number, visit: (a: number, b: number, c: number) => void): void => {
     const left = output[column - 1], right = output[column];
     if (left === undefined || right === undefined) throw new Error('Missing adaptive band');
     let l = 0, r = 0;
@@ -90,10 +93,10 @@ export function* seamLatticeSteps(field: Field, plans?: SeamLatticePlans): Gener
       const nextLeft = left[l + 1] ?? Infinity, nextRight = right[r + 1] ?? Infinity;
       if (nextLeft === nextRight) {
         const c = nextLeft * field.columns + column - 1, d = nextRight * field.columns + column;
-        if (field.corner === true) { visit([a, c, b]); visit([b, c, d]); } else { visit([a, c, d]); visit([a, d, b]); }
+        if (field.corner === true) { visit(a, c, b); visit(b, c, d); } else { visit(a, c, d); visit(a, d, b); }
         l++; r++;
-      } else if (nextLeft < nextRight) { visit([a, nextLeft * field.columns + column - 1, b]); l++; }
-      else { visit([a, nextRight * field.columns + column, b]); r++; }
+      } else if (nextLeft < nextRight) { visit(a, nextLeft * field.columns + column - 1, b); l++; }
+      else { visit(a, nextRight * field.columns + column, b); r++; }
     }
   };
   // The conservative bilinear pass is cheap. A local exact overlay check can
@@ -101,25 +104,32 @@ export function* seamLatticeSteps(field: Field, plans?: SeamLatticePlans): Gener
   for (const direction of [1, -1]) for (let at = 1; at < field.columns - 1; at++) {
     const column = direction === 1 ? at : field.columns - 1 - at;
     const initial = output[column]; if (initial === undefined) throw new Error('Missing adaptive column');
-    let kept: number[] = initial;
+    let kept: number[] = initial, spare: number[] = [];
     // Only the two affected bands are read here (at most four native vertices per row).
     // Reuse their rounded values until this column completes; no field survives the generation.
     const triangleError = seamTriangleErrorEvaluator(field);
+    const triangle: [number, number, number] = [0, 0, 0];
     for (let i = 1; i < kept.length - 1;) {
       yield;
       const row: number = kept[i] ?? 0, previous = kept[i - 1] ?? 0, next = kept[i + 1] ?? 0;
       if (Math.abs(field.along[row] ?? 0) <= 2) { i++; continue; }
-      output[column] = kept.filter(value => value !== row);
-      const status = { good: true };
-      for (const band of [column, column + 1]) bandTriangles(band, triangle => {
-        if (!status.good) return;
-        const triangleRows = triangle.map(index => Math.floor(index / field.columns)), low = Math.min(...triangleRows), high = Math.max(...triangleRows);
+      let n = 0;
+      for (const value of kept) if (value !== row) spare[n++] = value;
+      spare.length = n;
+      output[column] = spare;
+      let good = true;
+      const check = (a: number, b: number, c: number): void => {
+        if (!good) return;
+        const low = Math.min(Math.floor(a / field.columns), Math.floor(b / field.columns), Math.floor(c / field.columns));
+        const high = Math.max(Math.floor(a / field.columns), Math.floor(b / field.columns), Math.floor(c / field.columns));
         if (high < previous || low > next) return;
-        if ((field.along[high] ?? 0) - (field.along[low] ?? 0) > CONTACT_SPAN) { status.good = false; return; }
+        if ((field.along[high] ?? 0) - (field.along[low] ?? 0) > CONTACT_SPAN) { good = false; return; }
+        triangle[0] = a; triangle[1] = b; triangle[2] = c;
         const error = triangleError(triangle);
-        status.good = error.height <= HEIGHT_ERROR && error.colour <= COLOUR_ERROR;
-      });
-      if (status.good) { kept = output[column] ?? kept; } else { output[column] = kept; i++; }
+        good = error.height <= HEIGHT_ERROR && error.colour <= COLOUR_ERROR;
+      };
+      bandTriangles(column, check); bandTriangles(column + 1, check);
+      if (good) { const removed = kept; kept = spare; spare = removed; } else { output[column] = kept; i++; }
     }
   }
   plans?.rows.set(plans.key, output);

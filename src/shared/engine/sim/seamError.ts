@@ -12,41 +12,27 @@ function readVertex(field: SeamFloorField, index: number, column: number): Verte
       Math.fround(field.colours[at + 1] ?? 0), Math.fround(field.colours[at + 2] ?? 0)] };
 }
 
-/** Reuse native vertex reads only during one immutable field certification; no cache survives a generation. */
+/** Reuse native vertex reads only during one immutable field certification; no cache survives a generation.
+ *  SB38: one evaluator holds its scratch (the overlay's channels, its Lab extrema, the result it returns), so a triangle
+ *  allocates nothing: a seam's certification calls this millions of times on the page, and JavaScriptCore grows its heap
+ *  with the garbage. The arithmetic keeps the exact order the reductions had. The result is read before the next call. */
 export function seamTriangleErrorEvaluator(field: SeamFloorField): (indices: readonly [number, number, number]) => { height: number; colour: number } {
-  const bands = new Map<number, Map<number, Vertex>>();
-  return (indices) => triangleError(field, indices, (index, column) => {
+  const bands = new Map<number, Map<number, Vertex>>(), columns = field.columns;
+  const minimum = [Infinity, Infinity, Infinity], difference = [0, 0, 0], interpolated = [0, 0, 0, 0], actual = [0, 0, 0, 0];
+  const result = { height: 0, colour: 0 };
+  let column = 0, height = 0, denominator = 1;
+  let a: Vertex = { u: 0, v: 0, row: 0, values: [] }, b = a, c = a;
+  const vertex = (index: number): Vertex => {
     let vertices = bands.get(column);
     if (vertices === undefined) { vertices = new Map(); bands.set(column, vertices); }
-    let vertex = vertices.get(index);
-    if (vertex === undefined) { vertex = readVertex(field, index, column); vertices.set(index, vertex); }
-    return vertex;
-  });
-}
-
-function triangleError(field: SeamFloorField, indices: readonly [number, number, number], read: (index: number, column: number) => Vertex): { height: number; colour: number } {
-  const column = Math.min(...indices.map(index => index % field.columns));
-  if (indices.some(index => index % field.columns < column || index % field.columns > column + 1)) throw new RangeError('Non-adjacent seam columns');
-  const vertex = (index: number): Vertex => read(index, column);
-  const [a, b, c] = indices.map(vertex);
-  if (a === undefined || b === undefined || c === undefined) throw new Error('Missing seam triangle');
-  const denominator = (b.v - c.v) * (a.u - c.u) + (c.u - b.u) * (a.v - c.v);
-  if (denominator === 0) throw new RangeError('Degenerate seam triangle');
-  const first = Math.min(a.row, b.row, c.row), last = Math.max(a.row, b.row, c.row);
-  const diagonal = field.corner === true ? [first * field.columns + column + 1, last * field.columns + column]
-    : [first * field.columns + column, last * field.columns + column + 1];
-  if (last === first + 1 && diagonal.every(index => indices.includes(index))) return { height: 0, colour: 0 };
-  const leftValues = vertex(first * field.columns + column).values, rightValues = vertex(first * field.columns + column + 1).values;
-  let constant = true;
-  for (let row = first + 1; row <= last && constant; row++) {
-    constant = vertex(row * field.columns + column).values.every((value, channel) => value === leftValues[channel])
-      && vertex(row * field.columns + column + 1).values.every((value, channel) => value === rightValues[channel]);
-  }
-  if (constant) return { height: 0, colour: 0 }; // A plane with an affine colour ramp.
-  let height = 0;
-  const minimum = [Infinity, Infinity, Infinity], difference = [0, 0, 0];
-  // Overlay samples are consumed synchronously; scratch never leaves this triangle.
-  const interpolated = [0, 0, 0, 0], actual = [0, 0, 0, 0];
+    let found = vertices.get(index);
+    if (found === undefined) { found = readVertex(field, index, column); vertices.set(index, found); }
+    return found;
+  };
+  const same = (values: readonly number[], reference: readonly number[]): boolean => {
+    for (let channel = 0; channel < values.length; channel++) if (values[channel] !== reference[channel]) return false;
+    return true;
+  };
   const mix = (p: Vertex, q: Vertex, t: number): readonly number[] => {
     for (let channel = 0; channel < 4; channel++) {
       const value = p.values[channel] ?? 0;
@@ -62,39 +48,63 @@ function triangleError(field: SeamFloorField, indices: readonly [number, number,
     height = Math.max(height, Math.abs((actual[0] ?? 0) - (reference[0] ?? 0)));
     for (let axis = 0; axis < 3; axis++) {
       const matrix = xyz[axis]; if (matrix === undefined) throw new Error('Missing colour transform');
-      const x = matrix.reduce((sum, coefficient, channel) => sum + coefficient * (actual[channel + 1] ?? 0), 0);
-      const y = matrix.reduce((sum, coefficient, channel) => sum + coefficient * (reference[channel + 1] ?? 0), 0);
+      const x = 0 + matrix[0] * (actual[1] ?? 0) + matrix[1] * (actual[2] ?? 0) + matrix[2] * (actual[3] ?? 0);
+      const y = 0 + matrix[0] * (reference[1] ?? 0) + matrix[1] * (reference[2] ?? 0) + matrix[2] * (reference[3] ?? 0);
       minimum[axis] = Math.min(minimum[axis] ?? Infinity, x, y); difference[axis] = Math.max(difference[axis] ?? 0, Math.abs(x - y));
     }
   };
-  const edges = [[a, b], [b, c], [c, a]] as const;
-  // Overlay vertices comprise original vertices inside the new triangle and
-  // intersections of its edges with original row edges and cell diagonals.
-  // Every scalar difference is affine on each overlay polygon, so these are
-  // its exact extrema; no interior sampling grid can miss a thin error spike.
-  for (let row = first; row <= last; row++) {
-    const left = vertex(row * field.columns + column), right = vertex(row * field.columns + column + 1);
-    record(left.u, left.v, left.values); record(right.u, right.v, right.values);
-    for (const [p, q] of edges) {
-      if (p.v !== q.v) {
-        const t = (left.v - p.v) / (q.v - p.v);
-        if (t >= 0 && t <= 1) { const u = p.u + (q.u - p.u) * t; record(u, left.v, mix(left, right, u)); }
-      }
+  /** The edge p→q of the triangle against one original row edge or cell diagonal (an overlay vertex where they cross). */
+  const crossRow = (p: Vertex, q: Vertex, left: Vertex, right: Vertex): void => {
+    if (p.v !== q.v) {
+      const t = (left.v - p.v) / (q.v - p.v);
+      if (t >= 0 && t <= 1) { const u = p.u + (q.u - p.u) * t; record(u, left.v, mix(left, right, u)); }
     }
-    if (row === last) continue;
-    const topLeft = vertex((row + 1) * field.columns + column), topRight = vertex((row + 1) * field.columns + column + 1);
-    const start = field.corner === true ? right : left, end = field.corner === true ? topLeft : topRight;
-    for (const [p, q] of edges) {
-      const du = q.u - p.u, dv = q.v - p.v, eu = end.u - start.u, ev = end.v - start.v;
-      const determinant = du * ev - dv * eu;
-      if (determinant === 0) continue;
-      const ru = start.u - p.u, rv = start.v - p.v;
-      const t = (ru * ev - rv * eu) / determinant, s = (ru * dv - rv * du) / determinant;
-      if (t >= 0 && t <= 1 && s >= 0 && s <= 1) record(p.u + t * du, p.v + t * dv, mix(start, end, s));
+  };
+  const crossDiagonal = (p: Vertex, q: Vertex, start: Vertex, end: Vertex): void => {
+    const du = q.u - p.u, dv = q.v - p.v, eu = end.u - start.u, ev = end.v - start.v;
+    const determinant = du * ev - dv * eu;
+    if (determinant === 0) return;
+    const ru = start.u - p.u, rv = start.v - p.v;
+    const t = (ru * ev - rv * eu) / determinant, s = (ru * dv - rv * du) / determinant;
+    if (t >= 0 && t <= 1 && s >= 0 && s <= 1) record(p.u + t * du, p.v + t * dv, mix(start, end, s));
+  };
+  const done = (h: number, colour: number): { height: number; colour: number } => { result.height = h; result.colour = colour; return result; };
+  return (indices) => {
+    const i0 = indices[0], i1 = indices[1], i2 = indices[2];
+    column = Math.min(i0 % columns, i1 % columns, i2 % columns);
+    for (let k = 0; k < 3; k++) { const at = (indices[k] ?? 0) % columns; if (at < column || at > column + 1) throw new RangeError('Non-adjacent seam columns'); }
+    a = vertex(i0); b = vertex(i1); c = vertex(i2);
+    denominator = (b.v - c.v) * (a.u - c.u) + (c.u - b.u) * (a.v - c.v);
+    if (denominator === 0) throw new RangeError('Degenerate seam triangle');
+    const first = Math.min(a.row, b.row, c.row), last = Math.max(a.row, b.row, c.row);
+    const d0 = field.corner === true ? first * columns + column + 1 : first * columns + column;
+    const d1 = field.corner === true ? last * columns + column : last * columns + column + 1;
+    if (last === first + 1 && (d0 === i0 || d0 === i1 || d0 === i2) && (d1 === i0 || d1 === i1 || d1 === i2)) return done(0, 0);
+    const leftValues = vertex(first * columns + column).values, rightValues = vertex(first * columns + column + 1).values;
+    let constant = true;
+    for (let row = first + 1; row <= last && constant; row++) {
+      constant = same(vertex(row * columns + column).values, leftValues) && same(vertex(row * columns + column + 1).values, rightValues);
     }
-  }
-  const [dx = 0, dy = 0, dz = 0] = difference.map((value, axis) => value * slope(Math.max(0, minimum[axis] ?? 0)));
-  // XYZ extrema are also affine; the Lab derivative is bounded by the minimum
-  // over the same convex polygons, including the path between both RGB values.
-  return { height, colour: Math.hypot(116 * dy, 500 * (dx + dy), 200 * (dy + dz)) };
+    if (constant) return done(0, 0); // A plane with an affine colour ramp.
+    height = 0;
+    minimum[0] = minimum[1] = minimum[2] = Infinity; difference[0] = difference[1] = difference[2] = 0;
+    // Overlay vertices comprise original vertices inside the new triangle and
+    // intersections of its edges with original row edges and cell diagonals.
+    // Every scalar difference is affine on each overlay polygon, so these are
+    // its exact extrema; no interior sampling grid can miss a thin error spike.
+    for (let row = first; row <= last; row++) {
+      const left = vertex(row * columns + column), right = vertex(row * columns + column + 1);
+      record(left.u, left.v, left.values); record(right.u, right.v, right.values);
+      crossRow(a, b, left, right); crossRow(b, c, left, right); crossRow(c, a, left, right);
+      if (row === last) continue;
+      const topLeft = vertex((row + 1) * columns + column), topRight = vertex((row + 1) * columns + column + 1);
+      const start = field.corner === true ? right : left, end = field.corner === true ? topLeft : topRight;
+      crossDiagonal(a, b, start, end); crossDiagonal(b, c, start, end); crossDiagonal(c, a, start, end);
+    }
+    const dx = (difference[0] ?? 0) * slope(Math.max(0, minimum[0] ?? 0)), dy = (difference[1] ?? 0) * slope(Math.max(0, minimum[1] ?? 0)),
+      dz = (difference[2] ?? 0) * slope(Math.max(0, minimum[2] ?? 0));
+    // XYZ extrema are also affine; the Lab derivative is bounded by the minimum
+    // over the same convex polygons, including the path between both RGB values.
+    return done(height, Math.hypot(116 * dy, 500 * (dx + dy), 200 * (dy + dz)));
+  };
 }
