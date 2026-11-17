@@ -56,7 +56,9 @@ export function readerPaths(env=process.env){
  const config=env.WS_GH_READER_DIR??join(homedir(),'.config/wildshard');
  const common=spawnSync('git',['rev-parse','--path-format=absolute','--git-common-dir'],{cwd:import.meta.dirname,encoding:'utf8'}).stdout?.trim()??'';
  const meta=env.WS_META_DIR??resolve(dirname(common||join(import.meta.dirname,'..','.git')),'..','..','project-wildshard-meta');
- return {key:join(config,'github-reader.pem'),client:join(config,'github-reader-client-id'),
+ // The mini's key went in as github-reader.client-id (meta MINI-AUTONOMY MA6); MF12's first name still works.
+ const client=['github-reader.client-id','github-reader-client-id'].map(name=>join(config,name)).find(existsSync)??join(config,'github-reader.client-id');
+ return {key:join(config,'github-reader.pem'),client,
   cache:env.WS_GH_READER_CACHE??join(homedir(),'.cache/wildshard/github-reader-token.json'),minter:join(meta,'scripts/gh-reader-token.mjs')};
 }
 

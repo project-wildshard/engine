@@ -27,12 +27,12 @@ test('quotaReset reads the latest reset among spent resources, else waits a minu
 });
 
 /** A reader App on disk and a stand-in meta checkout; the key's contents do not matter here, meta's minter reads them. */
-function app() {
+function app(clientName = 'github-reader-client-id') {
   mkdirSync('tmp/mini-flow', {recursive: true});
   const dir = mkdtempSync(resolve('tmp/mini-flow/gh-reader-'));
   roots.push(dir);
   writeFileSync(join(dir, 'github-reader.pem'), 'key\n');
-  writeFileSync(join(dir, 'github-reader-client-id'), 'Iv23reader\n');
+  writeFileSync(join(dir, clientName), 'Iv23reader\n');
   mkdirSync(join(dir, 'scripts'));
   writeFileSync(join(dir, 'scripts/gh-reader-token.mjs'), '');
   return {dir, env: {WS_GH_READER_DIR: dir, WS_GH_READER_CACHE: join(dir, 'cache.json'), WS_META_DIR: dir}};
@@ -59,4 +59,11 @@ test('no App files, WS_GH_READER=0, or a failed mint: reads stay on the gh user'
   expect(readerToken({env, now: 10, mint: () => ({status: 1, stdout: '', stderr: 'GET answered 401'})})).toBeUndefined();
   // The failure holds for ten minutes in this process: no mint per call.
   expect(readerToken({env, now: 20, mint: never})).toBeUndefined();
+});
+
+test('the client ID may be github-reader.client-id, the name the mini key went in under (meta MA6)', () => {
+  const {env} = app('github-reader.client-id');
+  const mint = () => ({status: 0, stdout: 'ghs_dotted\n', stderr: ''});
+  // Past the ten-minute hold a failed mint above may have set in this process.
+  expect(readerToken({env, now: 3_400_000, mint})).toBe('ghs_dotted');
 });
