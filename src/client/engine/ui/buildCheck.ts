@@ -40,15 +40,21 @@ export function compactBuildLabel(label: string): string {
   return label.replace(/^(v\d+\.\d+\.\d+)-(\d+)-g[0-9a-f]+(?:-dirty)?$/u, '$1+$2');
 }
 
+/** FM5 mode 13: why the last online read of `/version.json` failed: its HTTP status, or null for no answer (a network error, an
+ *  answer with no build). Offline is not a failure: no request is made. */
+export interface LiveBuildFailure { readonly status: number | null }
+let lastFailure: LiveBuildFailure | null = null;
 /** The live build's id, or null: offline (the PWA plays from its cache), a failed request, or an answer with no build. */
 export async function liveBuild(): Promise<string | null> {
   if (!navigator.onLine) return null; // no request that can only fail
   try {
     const r = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
-    if (!r.ok) return null;
+    if (!r.ok) { lastFailure = { status: r.status }; return null; }
     const j: unknown = await r.json();
-    return typeof j === 'object' && j !== null && 'build' in j && typeof j.build === 'string' && j.build !== '' ? j.build : null;
-  } catch { return null; }
+    const build = typeof j === 'object' && j !== null && 'build' in j && typeof j.build === 'string' && j.build !== '' ? j.build : null;
+    lastFailure = build === null ? { status: null } : null;
+    return build;
+  } catch { lastFailure = { status: null }; return null; }
 }
 
 /** Whether a service worker controls this page: then a new build reaches it only once that worker has installed it. */
@@ -66,8 +72,10 @@ let asked = 0, announced = 0;
  * build read (announced or not), or null. */
 export async function checkLiveBuild(): Promise<string | null> {
   const ticket = ++asked;
-  const build = await liveBuild();
+  const build = await liveBuild(), failure = lastFailure;
   if (build !== null && ticket > announced) { announced = ticket; applyLiveBuild(build); }
+  // FM5 mode 13: a failed online read says so (the pill tells a developer; a player sees nothing). Same order as the build.
+  if (build === null && failure !== null && ticket > announced) { announced = ticket; window.dispatchEvent(new CustomEvent('ws-live-build-failed', { detail: failure })); }
   return build;
 }
 

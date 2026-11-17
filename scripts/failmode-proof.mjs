@@ -20,6 +20,9 @@
 //                                                       proxy's release address (<work>/dist); prints both paths
 //   scripts/browser-lane.sh node scripts/failmode-proof.mjs <dist> <work> <key.json> <pg bin|memory:> <pg data>
 //       [--engine=chromium|webkit] [--scenario=<id,...>|all] [--baseline] [--cooldown=<s>]
+//   ... --gallery     FM1b: no faults; in Driftwood, real taps open Settings ▸ Debug ▸ Failure screens, then every entry of the
+//                     gallery (its 46 modes and nine hold cards) one by one, shot at 402x874 and 1440x900, each closed by its ✕.
+//                     Writes <work>/failmodes/gallery.json; exit 0 only when every entry opened and closed.
 // Ports: the rig from WS_RIG_PORTS (18856 here: Postgres 18856, world 18857, pages 18858, release 18859), the proxy's pages on 18851 and
 // its world door on 18852. The fixture release is signed by the owned key only, channel production on loopback (staging for mode 46).
 import { spawnSync } from 'node:child_process';
@@ -76,6 +79,7 @@ if (args[0] === '--prepare') {
 
 const [dist = '', work = '', keyFile = '', pgBin = '', pgData = ''] = positional;
 if (pgData === '' && pgBin !== 'memory:') throw new Error('failmode-proof <dist> <work> <key.json> <pg bin|memory:> <pg data>');
+const galleryWalk = args.includes('--gallery');
 const engine = flag('engine', 'chromium'), baseline = args.includes('--baseline'), cooldownMs = Number(flag('cooldown', '60')) * 1000;
 if (engine !== 'chromium' && engine !== 'webkit') throw new Error('--engine=chromium|webkit');
 // `--refusal=screen|injection` proves strict mode refuses: a drop that must show a screen no build has (exit 1), and a fault armed on
@@ -83,7 +87,7 @@ if (engine !== 'chromium' && engine !== 'webkit') throw new Error('--engine=chro
 const refusal = flag('refusal', '');
 if (!['', 'screen', 'injection'].includes(refusal)) throw new Error('--refusal=screen|injection');
 const drop = selectCases('drop')[0];
-const cases = refusal === '' ? selectCases(flag('scenario', 'all')) : drop === undefined ? [] : [refusal === 'screen' ? { ...drop, id: 'drop', screen: 'no-such-screen', mode: 'R1' } : { ...drop, id: 'unmatched', run: 'unmatched', mode: 'R2' }], out = join(absolute(work), 'failmodes'), shots = join(out, 'shots');
+const cases = galleryWalk ? [] : refusal === '' ? selectCases(flag('scenario', 'all')) : drop === undefined ? [] : [refusal === 'screen' ? { ...drop, id: 'drop', screen: 'no-such-screen', mode: 'R1' } : { ...drop, id: 'unmatched', run: 'unmatched', mode: 'R2' }], out = join(absolute(work), 'failmodes'), shots = join(out, 'shots');
 if (!readFileSync(join(dist, 'index.html'), 'utf8').includes(RELEASE_URL)) throw new Error(`${dist} is not stamped with ${RELEASE_URL}: build it with --prepare`);
 fixtureKey(keyFile);
 const fixture = JSON.parse(readFileSync(join(absolute(dist, '..'), 'fixture.json'), 'utf8'));
@@ -150,6 +154,7 @@ try {
     page.on('pageerror', error => { const message = error.message.slice(0, 240); errors.push(message); pageFaults.push(message); });
     page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 240)); if (process.env.FM_TRACE === '1') console.log(`  [page ${line.type()}] ${line.text().slice(0, 300)}`); });
     page.on('response', response => { if (process.env.FM_TRACE === '1' && response.status() >= 400) console.log(`  [http ${String(response.status())}] ${response.url().slice(0, 200)}`); });
+    page.on('requestfailed', request => { if (process.env.FM_TRACE === '1') console.log(`  [failed ${request.failure()?.errorText ?? '?'}] ${request.url().slice(0, 200)}`); });
     page.on('framenavigated', frame => { if (frame === page.mainFrame() && process.env.FM_TRACE === '1') console.log(`  [nav] ${frame.url()}`); });
     return { page, context, errors };
   };
@@ -206,7 +211,8 @@ try {
       if (style.display !== 'none' && style.visibility !== 'hidden') text.push(node.textContent ?? '');
     }
     return text.join(' ');
-  }).catch(() => '') ?? '').replaceAll(/\s+/gu, ' ').slice(0, 300) });
+  }).catch(() => '') ?? '').replaceAll(/\s+/gu, ' ').slice(0, process.env.FM_TRACE === '1' ? 3000 : 300),
+    ...process.env.FM_TRACE === '1' ? { marks: await page.evaluate(() => Object.fromEntries(Object.entries(document.documentElement.dataset))).catch(() => null) } : {} });
   /** A shot named for the case. @param {import('playwright').Page} page @param {string} id @param {string} what */
   const shoot = async (page, id, what) => { const file = `${id.replace('/', '-')}-${what}.png`; await page.screenshot({ path: join(shots, file) }); return file; };
   /** Back in play: frames move on and no card or page is up (a notice may be). @param {import('playwright').Page} page @param {number} timeout */
@@ -227,6 +233,15 @@ try {
   };
   /** Clicks a button on the case's screen. @param {import('playwright').Page} page @param {string} id @param {string} label */
   const press = (page, id, label) => page.locator(`[data-failmode~="${id}"] button`, { hasText: label }).first().click({ timeout: 5000 });
+  /** The pause menu's Settings at one of its tabs, as a player gets there: Escape (the pause key), else the HUD's Settings button.
+   *  @param {import('playwright').Page} page @param {'system' | 'dev'} tab */
+  const settingsTab = async (page, tab) => {
+    const menu = page.locator('.ws-gmenu.show');
+    if (!await menu.isVisible().catch(() => false)) await page.keyboard.press('Escape');
+    if (!await menu.isVisible().catch(() => false)) await page.locator('button', { hasText: /^Settings$/u }).first().click({ timeout: 5000 }).catch(() => undefined);
+    await menu.waitFor({ state: 'visible', timeout: 10_000 });
+    await page.locator(`.ws-gmenu.show [data-sv-tab="${tab}"]`).first().click({ timeout: 10_000 });
+  };
   /** WebKit's setOffline (Playwright) leaves loopback sockets up, so a WebKit page "offline" kept playing on the rig (opus-fm1's mode 1).
    *  There the proxy cuts the world door too while the browser is offline: a live link drops and new upgrades are refused. Labelled in
    *  the receipt as `loopbackCut`; Chromium needs none (its offline mode closes the socket itself). @param {boolean} live */
@@ -330,6 +345,33 @@ try {
         const back = await recovered(page, 30_000);
         return back ? { ...result, ...shot === undefined ? {} : { shot }, injection: { secondTab: true }, recovery: 'Play here: seated' } : { outcome: 'ui-fail', reason: 'Play here never seated', seen, notes: await onScreen(page) };
       } finally { await entered.context.close(); }
+    },
+    // FM5 mode 13: /version.json fails (Developer on, as every fixture page is). The poll is the pause menu's Settings ▸ Build ▸
+    // Check, a player's tap that runs the same read as the 5-minute/foreground poll; the pill (title and pause menu) says so to a
+    // developer only, and the next read that answers clears it.
+    versionHttp: async item => {
+      const entered = await fresh(); const { page } = entered;
+      const check = async () => {
+        const button = page.locator('.ws-gmenu.show .ws-gmenu-buildcheck').first();
+        if (!await button.isVisible().catch(() => false)) await settingsTab(page, 'system');
+        await button.click({ timeout: 10_000 });
+      };
+      try {
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        const before = await control(), started = Date.now();
+        await arm(item.id, [{ route: 'version', kind: 'status', code: 503 }]);
+        await check();
+        const seen = await screen(page, item.screen, 15_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'pill');
+        const injection = { versionMatches: await matchedSince(before, 'version'), trigger: 'Settings ▸ Build ▸ Check (same read as the poll)' };
+        await heal();
+        if (injection.versionMatches === 0) return { outcome: 'harness-fail', reason: 'the version fault matched nothing', injection, notes: await onScreen(page) };
+        const result = await judged(seen, item, page);
+        if (result.outcome !== 'pass') return { ...result, injection, shot };
+        await check();
+        const cleared = await page.locator('[data-failmode~="version-http"]').waitFor({ state: 'detached', timeout: 15_000 }).then(() => true,
+          async () => !(await visibleIds(page)).some(ids => /\bversion-http\b/u.test(ids)));
+        return cleared ? { ...result, injection, shot, recovery: 'healed, the next read clears it' } : { outcome: 'ui-fail', reason: 'the failed line stayed after a read answered', seen, injection, shot };
+      } finally { await heal(); await entered.context.close(); }
     },
     // FM8m mode 41: the proxy sends the server's coded close (FM7b1: 4001 `refused` with {v:1,code:'banned'}); the page shows the
     // removed card, says the end time only when one was sent, and never dials again. Two joins: with an end time, then without one.
@@ -615,6 +657,45 @@ try {
     },
   };
 
+  // FM1b: the Developer gallery, by real taps only (the menu, the filter, the row's Open, each entry, its ✕)
+  if (galleryWalk) {
+    const entered = await fresh(); const { page } = entered;
+    /** @type {{ id: string, size: string, opened: boolean, closed: boolean, shot?: string, ms: number }[]} */
+    const walked = [];
+    try {
+      await page.goto(URL_PLAY); await intoWorld(entered);
+      const list = page.locator('[data-kind="gallery"]');
+      const openGallery = async () => {
+        if (await list.isVisible().catch(() => false)) return;
+        const filter = page.locator('.ws-gmenu.show .ws-dbg-filter').first();
+        if (!await filter.isVisible().catch(() => false)) await settingsTab(page, 'dev');
+        await filter.fill('Failure screens');
+        await page.locator('.ws-dbg-row', { hasText: 'Failure screens' }).locator('.ws-dbg-action').first().click({ timeout: 10_000 });
+        await list.waitFor({ state: 'visible', timeout: 15_000 });
+      };
+      for (const size of [{ width: 402, height: 874 }, { width: 1440, height: 900 }]) {
+        await page.setViewportSize(size);
+        await openGallery();
+        const ids = await list.locator('button[data-failmode]').evaluateAll(nodes => nodes.map(node => node instanceof HTMLElement ? node.dataset.failmode ?? '' : ''));
+        for (const id of ids) {
+          const at = Date.now();
+          await openGallery();
+          await list.locator(`button[data-failmode="${id}"]`).click({ timeout: 10_000 });
+          const screenNode = page.locator(`.ws-fail[data-failmode="${id}"]:not(.ws-fail-proto)`).first();
+          const opened = await screenNode.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true, () => false);
+          const shot = opened ? await shoot(page, `gallery-${id}`, `${String(size.width)}x${String(size.height)}`) : undefined;
+          await page.locator('.ws-fail-proto button[aria-label="Close"]').click({ timeout: 10_000 }).catch(() => undefined);
+          const closed = await page.locator('.ws-fail').first().waitFor({ state: 'detached', timeout: 10_000 }).then(() => true, () => false);
+          walked.push({ id, size: `${String(size.width)}x${String(size.height)}`, opened, closed, ...shot === undefined ? {} : { shot }, ms: Date.now() - at });
+          console.log(`${opened && closed ? 'pass' : 'ui-fail'} gallery ${id} ${String(size.width)}x${String(size.height)}`);
+        }
+      }
+    } finally { await entered.context.close(); }
+    const ok = walked.length > 0 && walked.every(row => row.opened && row.closed);
+    writeFileSync(join(out, 'gallery.json'), JSON.stringify({ schema: 'failmode-gallery/1', sha, engine, browser: browserVersion, build: fixture.build, at: new Date().toISOString(),
+      entries: new Set(walked.map(row => row.id)).size, taps: 'menu Escape/Debug, filter, row Open, entry, ✕ Close', ok, walked }, null, 1));
+    rows.push({ mode: 'FM1b', id: 'gallery', owner: 'FM1b', screen: 'gallery', inject: 'none', ms: 0, ...ok ? { outcome: 'pass' } : { outcome: 'ui-fail', reason: 'an entry did not open or close' } });
+  }
   let lastPlay = 0;
   for (const item of cases) {
     let started = Date.now();

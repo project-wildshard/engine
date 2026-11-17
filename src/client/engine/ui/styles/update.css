@@ -15,6 +15,7 @@
 .ws-update .ws-update-dot { width: 4px; height: 4px; background: rgba(196, 220, 232, 0.35); }
 .ws-update.newer { color: var(--ws-cyan); border-color: var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.3); }
 .ws-update.newer .ws-update-dot { background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); animation: ws-update-pulse 1.2s ease-in-out infinite; }
+.ws-update.failed { color: var(--ws-amber); border-color: var(--ws-amber); }
 .ws-update.confirm { color: var(--ws-amber); border-color: var(--ws-amber); box-shadow: 0 0 18px rgba(255, 181, 71, 0.35); }
 .ws-update.confirm .ws-update-dot { background: var(--ws-amber); }
 @media (max-width: 700px) {

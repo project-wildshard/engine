@@ -54,13 +54,33 @@ scope.listen(el, 'click', reload);
 scope.listen(window, 'pageshow', event => { if (event.persisted) busy = false; });
 
 let newLabel = '';
+/** FM5 mode 13: the last check failed (its status), until a check answers. Only a developer is told (decision 5: play is not
+ *  affected); the status rides the pill's title, not its words, and the words count down to the next 5-minute poll. */
+let checkFailed: { status: number | null } | null = null;
+const POLL_MS = 5 * 60 * 1000, pollFrom = Date.now();
 /** the pill's words: a player reads "New version", a developer the build ids */
 function paint(): void {
   const text = el.querySelector('[data-el="text"]');
   if (!text || busy) return;
+  const failing = !newer && checkFailed !== null && isDev();
+  el.classList.toggle('failed', failing);
+  if (failing) {
+    const nextMin = Math.max(1, Math.ceil((POLL_MS - (Date.now() - pollFrom) % POLL_MS) / 60_000));
+    el.dataset['failmode'] = 'version-http'; el.title = `version.json ${checkFailed?.status === null || checkFailed === null ? 'no answer' : `HTTP ${String(checkFailed.status)}`}`;
+    text.textContent = engineString('s_update_check_failed_dev', [String(nextMin)]);
+    return;
+  }
+  if (el.dataset['failmode'] !== undefined) { delete el.dataset['failmode']; el.title = ''; }
   text.textContent = !newer ? (narrow?.matches === true ? compactBuildLabel(runningLabel) : engineString('s_9e4fe13a912d', [runningLabel])) : isDev()
     ? engineString('s_update_next_boundary_dev', [newLabel]) : engineString('s_update_next_boundary');
 }
+scope.listen(window, 'ws-live-build-failed', event => {
+  const value: unknown = event instanceof CustomEvent ? event.detail : null;
+  checkFailed = { status: typeof value === 'object' && value !== null && 'status' in value && typeof value.status === 'number' ? value.status : null };
+  paint();
+});
+// the failed line's countdown moves with the clock while it shows
+scope.interval(60_000, () => { if (checkFailed !== null) paint(); });
 const lightUp = (label: string): void => {
   newer = true;
   newLabel = label;
@@ -85,6 +105,7 @@ const check = (): Promise<unknown> => checkLiveBuild();
 // that worker has installed the build (`ws-sw-waiting` above); any other page reloads straight into it
 scope.listen(window, 'ws-live-build', event => {
   const build = liveBuildOf(event);
+  if (build !== null && checkFailed !== null) { checkFailed = null; paint(); }
   if (build === null || workerControlled()) return;
   if (build !== __BUILD_ID__) lightUp(shortBuild(build));
   else dim();
