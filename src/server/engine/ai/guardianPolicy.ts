@@ -94,10 +94,12 @@ export class GuardianPolicy<A extends AnimalSim> {
     if (saved !== this.contract) throw new Error(`Incompatible ${this.profile.pattern === 'perch' ? 'perch hunter' : 'guardian'} continuation`);
   }
   /** Wake the native rise recipe without touching the real hit timestamp or RNG. */
-  provokeInterior(): boolean {
+  provokeInterior(retarget = false): boolean {
     if (this.profile.pattern !== 'interior') throw new Error('Incompatible guardian provocation');
     const a = this.actor, m = a.mem as GuardianMemory;
     if (!m.init) return false;
+    if (!retarget && m.st !== INTERIOR_HIDE && m.st !== INTERIOR_SINK) return true;
+    if (retarget && m.st === INTERIOR_ATTACK) m.cd = Math.max(m.cd, this.profile.spec.cooldownSeconds);
     a.cancelAttack();
     if (m.st === INTERIOR_HIDE || m.st === INTERIOR_SINK) { m.st = INTERIOR_RISE; m.rising = 1; m.sinking = 0; }
     else if (m.st !== INTERIOR_RISE) m.st = INTERIOR_GUARD;

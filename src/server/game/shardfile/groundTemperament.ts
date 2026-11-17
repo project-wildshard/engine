@@ -3,14 +3,15 @@ import type { SimHost, SimStateAdapter } from '@wildshard/engine/sim';
 import type { DeclaredBrainRecipe } from './brainRuntime';
 import type { TemperamentBrain } from './creatureTemperament';
 
-interface GroundOwner extends SimStateAdapter { provoke: () => boolean; reset: () => void }
+interface GroundOwner extends SimStateAdapter { provoke: (retarget?: boolean) => boolean; reset: () => void }
 /** Keep actual-player selection and deferred wakes separate from native immutable policy bytes.
  * Decisions run here; the outer registration always runs the stock body exactly once afterward. */
 export function bindGroundTemperament<P>(host: SimHost, actor: AnimalSim, divisor: number,
-  brain: GroundOwner & { think: (ports: P) => void }, recipe: DeclaredBrainRecipe<P>): TemperamentBrain & { target: () => ReturnType<SimHost['nearestPlayer']> | undefined } {
+  brain: GroundOwner & { think: (ports: P) => void }, recipe: DeclaredBrainRecipe<P>,
+  origin: { readonly x: number; readonly y: number; readonly z: number } = actor.position): TemperamentBrain & { target: () => ReturnType<SimHost['nearestPlayer']> | undefined } {
   if (recipe.bindTarget === undefined) throw new Error('Missing layered native target authority');
-  let selected: string | null = null, pending = false, enabled = true;
-  const contract = JSON.stringify({ version: 1, divisor, policy: brain.snapshot() });
+  let selected: string | null = null, pending: 0 | 1 | 2 = 0, enabled = true;
+  const contract = JSON.stringify({ version: 2, divisor, policy: brain.snapshot() });
   const living = (id: string) => {
     const player = host.players.get(id);
     return player?.health.alive === true && !host.parked.has(id) ? player : undefined;
@@ -19,25 +20,26 @@ export function bindGroundTemperament<P>(host: SimHost, actor: AnimalSim, diviso
   recipe.bindTarget(() => enabled ? target() : undefined);
   return { target, provoke: id => {
     if (living(id) === undefined) return;
-    selected = id; pending = true;
-  }, reset: () => { selected = null; pending = false; enabled = true; brain.reset(); }, run: (_dt, acquire = true) => {
+    if (selected !== id) { selected = id; pending = 2; }
+    else if (pending === 0) pending = 1;
+  }, reset: () => { selected = null; pending = 0; enabled = true; brain.reset(); }, run: (_dt, acquire = true) => {
     enabled = acquire;
-    if (!actor.alive) return;
+    if (!actor.alive) { selected = null; pending = 0; enabled = false; return; }
     if (acquire && target() === undefined) {
-      const player = host.nearestPlayer(actor.position);
+      const player = host.nearestPlayer(origin);
       selected = living(player.id)?.id ?? null;
     }
-    if (!acquire) actor.cancelAttack();
+    if (!acquire) { actor.cancelAttack(); if (target() === undefined) { selected = null; pending = 0; } }
     if (acquire && pending) {
       if (!actor.mem['init']) brain.think(recipe.observe(0));
-      brain.provoke(); pending = false;
+      brain.provoke(pending === 2); pending = 0;
     }
     if (host.state.tick % divisor === 0) brain.think(recipe.observe(divisor / 60));
     if (!acquire) actor.cancelAttack();
   }, adapter: { snapshot: () => [contract, selected, pending, enabled, brain.snapshot()], restore: saved => {
     if (!Array.isArray(saved) || saved.length !== 5 || saved[0] !== contract
       || (saved[1] !== null && (typeof saved[1] !== 'string' || saved[1].length === 0 || saved[1].length > 128))
-      || typeof saved[2] !== 'boolean' || typeof saved[3] !== 'boolean' || saved[4] === undefined)
+      || (saved[2] !== 0 && saved[2] !== 1 && saved[2] !== 2) || typeof saved[3] !== 'boolean' || saved[4] === undefined)
       throw new Error('Incompatible grounded temperament continuation');
     brain.restore(saved[4]); selected = saved[1]; pending = saved[2]; enabled = saved[3];
   } } };

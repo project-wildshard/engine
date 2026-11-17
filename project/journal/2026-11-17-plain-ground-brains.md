@@ -115,3 +115,26 @@ and all native/default/restore controls. Full types and lint pass. M1 SDK
 remains first when its external release/Opus gates clear. Engine lands in
 the coordinator's MMO,SP5,main-screen,SA25a,ONE-FORMAT order; mode1 stays
 held. No main push or new land was started for these source rows.
+
+## Ground delta review corrections
+
+The narrow read-only review found two MUSTs. Seven actual server controls
+fail first after observing the real deferred damage-event phase: repeated
+same-target notifications cancel a swing, and pending/selected aggression
+survives a timed neutral respawn. Both are corrected before any land.
+
+A pending wake distinguishes continuing the same target from a true
+retarget. Same-target notifications preserve active guardian/skirmisher
+swings. Their native own-hit rules still run normally. A true retarget
+cancels the old contact and uses the native recovery cooldown. This small
+unshipped layer adapter is version2; flat native contracts are unchanged.
+The dead branch clears pending and selected targets. Loss of a dead or
+parked target during suppressed acquisition also clears the old grudge,
+as pursuit does. Guardian nearest-player choice now uses the same live
+floor origin as the outer layer.
+
+All9review controls pass, including both true-retarget recovery controls.
+The broader117case/12file matrix, full types/lint pass (119distinct cases
+with the two added recovery controls). No repeated full local gate ran.
+The review's injected-port note is deliberate: layered ports must lend
+actual target binding; old flat/injected contracts remain supported.

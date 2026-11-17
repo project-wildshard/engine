@@ -392,9 +392,11 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
   /** Allocation-free native skirmish perception on the existing manager cadence. */
   decideSkirmisher(a: A, c: SkirmisherPorts<A>): void { if (this.profile.pattern !== 'skirmish') throw new Error('Incompatible stalker observation'); this.skirmishThink(a, c); }
   /** A layer may wake the native owner, but cannot override its herd flight. */
-  provokeSkirmisher(a: A): boolean {
+  provokeSkirmisher(a: A, retarget = false): boolean {
     const spec = this.skirmishSpec, m = a.mem as SkirmisherMemory;
     if (!m.init || m.st === ST_FLEE) return false;
+    if (!retarget && (m.st === ST_ENGAGE || m.st === ST_ATTACK)) return true;
+    if (retarget && m.st === ST_ATTACK) m.cd = Math.max(m.cd, spec.attackCooldown);
     a.cancelAttack(); m.st = ST_ENGAGE; m.cd = Math.max(m.cd, spec.alertCooldown); a.state = 'sidestep';
     return true;
   }

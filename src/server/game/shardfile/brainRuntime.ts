@@ -153,9 +153,9 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
         const brain = new GuardianBrain(actor, spec), recipe = ports.guardian(actor, host, spec), layer = layers?.get(row.species);
         if (layer === undefined) registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, brain, recipe, host));
         else {
-          const native = bindGroundTemperament(host, actor, spec.thinkDivisor, brain, recipe);
           // Native root lift moves the body below its floor; perception/home use the floor origin.
           const origin = { get x() { return actor.position.x; }, get y() { return actor.position.y - actor.yOffset; }, get z() { return actor.position.z; } };
+          const native = bindGroundTemperament(host, actor, spec.thinkDivisor, brain, recipe, origin);
           const policy = bindCreatureTemperament(host, actor, row.at, layer.temperament,
             { ...native, origin, notice: layer.senses?.notice ?? spec.wakeRadius, escapeSpeed: spec.speed },
             () => native.target()?.position, row.group === undefined ? undefined : social.get(row.group));
