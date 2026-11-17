@@ -16,3 +16,8 @@ recover this explanation rather than apply a duplicate fix.
 
 The remote-status recognizer remains separate. The hook reason
 can fall back to stdout. No gate decision or CPU guard is relaxed.
+
+Complete the native recovery with all three original held paths
+named, including the unchanged source and test. A journal-only
+recovery landed the explanation in 70a6a04c but correctly did not
+clear a held record whose source paths were not acknowledged.
