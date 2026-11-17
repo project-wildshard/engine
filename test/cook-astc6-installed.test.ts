@@ -11,7 +11,7 @@ function installedCommands(root: string, signal: AbortSignal) {
   const active = new Set<Promise<unknown>>();
   let closing: Promise<void> | undefined;
   const record = (row: Record<string, unknown>) => {
-    const report = process.env.WS_CI_TIMINGS;
+    const report = process.env['WS_CI_TIMINGS'];
     if (report === undefined) return;
     mkdirSync(resolve(report, '..'), {recursive: true});
     appendFileSync(`${report}.installed-cook.jsonl`, `${JSON.stringify(row)}\n`);
