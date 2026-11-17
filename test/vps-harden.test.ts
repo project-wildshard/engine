@@ -111,6 +111,18 @@ const HARDENED: Readonly<Record<string, string>> = { ...TODAY,
   'firewall list') if [ -n "\${HARDEN_TEST_FIREWALLS:-}" ]; then echo "$HARDEN_TEST_FIREWALLS"; else echo '[{"name":"edge","applied_to":[{"server":{"id":1}}],"rules":[{"direction":"in","protocol":"tcp","port":"443"},{"direction":"in","protocol":"udp","port":"41641"},{"direction":"out","protocol":"tcp","port":"any"}]}]'; fi ;; *) exit 1 ;; esac`,
 };
 
+test.each([
+  ['600 root:root', true],
+  ['640 root:root', false],
+  ['600 root:wildshard-cook', false],
+])('VH12: cook release state requires root-only metadata (%s)', (metadata, valid) => {
+  const stat = `case "$3" in */cook-release.env) echo '${metadata}' ;; */production.env) echo '640 root:wildshard-production' ;; *) echo '600 root:root' ;; esac`;
+  const run = check({ ...HARDENED, stat }, {}, ['--check'], { 'etc/wildshard/cook-release.env': 'COOK_ENGINE_REF=v0.1.32\n' });
+  const wanted = 'cook-release.env 600 root:root';
+  if (valid) expect(run.out).toContain(`ok      VH12  ${wanted}`);
+  else expect(run.out).toContain(`fail    VH12  cook-release.env is ${metadata}; want 600 root:root`);
+});
+
 test('a hardened box reads clean for the rows it can see', () => {
   const run = check(HARDENED);
   // The made-up box keeps its planted OpenClaw token, so VH2's search still finds it.

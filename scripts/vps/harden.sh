@@ -309,7 +309,7 @@ if [ "$ROOT" = 1 ] && [ -d "$R/etc/wildshard" ]; then
   for file in "$R"/etc/wildshard/*.env; do
     [ -f "$file" ] || continue
     name=$(basename "$file" .env); have=$(stat -c '%a %U:%G' "$file" 2>/dev/null)
-    case $name in ops) want='600 root:root' ;; cook) want='600 root:root' ;; *) want="640 root:wildshard-$name" ;; esac
+    case $name in ops|cook|cook-release) want='600 root:root' ;; *) want="640 root:wildshard-$name" ;; esac
     if [ "$have" = "$want" ]; then ok VH12 "$name.env $have"; else bad VH12 "$name.env is $have; want $want"; fi
   done
   if find "$R/etc/wildshard" "$R/home" "$R/root" -name '*release*sign*key*' 2>/dev/null | grep -q .; then bad VH12 'a release signing key sits on the box'
