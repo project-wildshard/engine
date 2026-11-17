@@ -14,3 +14,7 @@ closed-over values. Three failing-first regressions cover an empty MMO
 shell, the dev fallback, local quests, title, road and unknown seats in a
 fresh VM realm. Spawn and MMO grid proofs use it; the SDK guide documents
 its installed-package import and requested creature kinds.
+
+Follow-up: a scoped probe remains on window after its level retires. Check
+its world before invoking state; the added case failed with "Debug level
+has retired", then passed with the guard. Title/exit reads return null.

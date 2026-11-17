@@ -1,7 +1,7 @@
 /** @typedef {import('../src/client/engine/debug/probe.ts').GameplayState} GameplayState */
 /** @typedef {{instance: string, slug: string}} ProofCell */
 /** @typedef {{
- * __wildshard?: {state: () => GameplayState, area?: () => {flags: readonly string[]} | null,
+ * __wildshard?: {world?: object, state: () => GameplayState, area?: () => {flags: readonly string[]} | null,
  *   shard?: {grid?: {state: () => {cells: readonly ProofCell[], inside: string | null}}}},
  * __workerClient?: () => {cell: number, flags: readonly string[], quests: Readonly<Record<string, string | null>>},
  * __workerClientNet?: () => {client: Pick<import('../src/client/engine/net/client.ts').NetClient, 'flags' | 'phased' | 'quests'>},
@@ -16,7 +16,7 @@
 export function readProofState({creatureKinds = []} = {}) {
   const W = /** @type {ProofWindow} */ (/** @type {unknown} */ (window));
   const probe = W.__wildshard;
-  if (typeof probe?.state !== 'function') return null;
+  if (typeof probe?.state !== 'function' || probe.world === undefined) return null;
   const state = probe.state(), worker = W.__workerClient?.(), client = W.__workerClientNet?.().client;
   const grid = probe.shard?.grid?.state();
   // Wire seats are 1-based; zero is the road. Never infer the server seat from the page's visual inside cell.

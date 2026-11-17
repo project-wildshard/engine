@@ -10,7 +10,7 @@ const local = () => ({ appState: 'playing', quest: { adventure: [], level: [] },
 const cells = [{ instance: 'wrong-first', slug: 'wrong' }, { instance: 'honey', slug: 'honeyknoll' }];
 function page(cell = 2) {
   return {
-    __wildshard: { state: local, shard: { grid: { state: () => ({ cells, inside: 'honey' }) } } },
+    __wildshard: { world: {}, state: local, shard: { grid: { state: () => ({ cells, inside: 'honey' }) } } },
     __workerClient: () => ({ cell, flags: [], quests: {} }),
     __workerClientNet: () => ({ client: { flags: () => new Set(['shared', 'both']), phased: new Set(['private', 'both']), quests: new Map([
       ['honey.quest', { quest: 'honey.quest', started: true, step: 'boar', n: 1 }],
@@ -41,6 +41,10 @@ test('local dev uses the worker report when the dev-only net reader is absent', 
 
 test('local probes preserve authored quests, and the title is explicitly unavailable', () => {
   const state = { ...local(), quest: { adventure: ['local-quest'], level: ['found'] }, creatures: [{ kind: 'boar', pos: { x: 1, y: 2, z: 3 }, hp: 8 }] };
-  expect(snapshot({ __wildshard: { state: () => state, area: () => ({ flags: ['found'] }) } })).toMatchObject({ quest: { adventure: ['local-quest'], flags: ['found'] }, creatures: state.creatures, seat: null });
+  expect(snapshot({ __wildshard: { world: {}, state: () => state, area: () => ({ flags: ['found'] }) } })).toMatchObject({ quest: { adventure: ['local-quest'], flags: ['found'] }, creatures: state.creatures, seat: null });
   expect(snapshot({})).toBeNull();
+});
+
+test('a retired browser probe is unavailable without invoking its retired state reader', () => {
+  expect(snapshot({ __wildshard: { world: undefined, state: () => { throw new Error('Debug level has retired'); } } })).toBeNull();
 });
