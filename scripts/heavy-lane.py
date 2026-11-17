@@ -10,6 +10,7 @@ import importlib.util
 import math
 import os
 import re
+import select
 import socket
 import stat
 from pathlib import Path
@@ -319,6 +320,9 @@ def owns(root, resource, token, family):
 def scheduler(root, deadline=None, wait_seconds=WAIT_SECONDS):
     if deadline is None:
         deadline = time.monotonic() + WAIT_SECONDS
+    elif math.isinf(deadline):
+        deadline = time.monotonic() + WAIT_SECONDS
+        wait_seconds = WAIT_SECONDS
     with (root / 'scheduler.lock').open('a+') as lock:
         while True:
             try:
@@ -497,6 +501,30 @@ def terminate(child, grace=3):
     except ProcessLookupError:
         pass
     child.wait()
+
+
+def wait_gate_child(child, owner):
+    """Keep the controller's output pipes alive while draining on caller loss.
+
+    Each inner gate owns its deadline. Coordination must not kill a valid
+    multi-round land, or let an orphaned push escape its controller.
+    """
+    streams = {child.stdout: sys.stdout.buffer, child.stderr: sys.stderr.buffer}
+    while streams or child.poll() is None:
+        if os.getppid() != owner:
+            raise KeyboardInterrupt
+        readable, _, _ = select.select(list(streams), [], [], .2)
+        for stream in readable:
+            data = os.read(stream.fileno(), 65536)
+            if not data:
+                del streams[stream]
+                continue
+            try:
+                streams[stream].write(data)
+                streams[stream].flush()
+            except BrokenPipeError:
+                raise KeyboardInterrupt from None
+    return child.wait()
 
 
 def child_cpu():
@@ -693,8 +721,8 @@ def main():
     parser.add_argument('--checkout-scope', action='store_true', help='one coordinated push per checkout, with shared CPU admission')
     parser.add_argument('--observation-kind', choices=['release'], help='report-only caller provenance; never affects admission or checks')
     parser.add_argument('--admission-wait-seconds', type=float, default=None,
-                        help='FIFO resource wait (default 300), separate from command time; at most 100 minutes')
-    parser.add_argument('--max', type=float, default=30, help='owned command timeout in minutes; queue time is separate')
+                        help='FIFO resource wait (default 300; full-gate unbounded), at most 100 minutes when explicit')
+    parser.add_argument('--max', type=float, default=30, help='owned command timeout in minutes; full-gate uses its inner command deadlines')
     argv = sys.argv[1:]
     separator = argv.index('--') if '--' in argv else len(argv)
     command = argv[separator + 1:]
@@ -705,8 +733,8 @@ def main():
                     or command[1:] != ['--import', './scripts/format-hook.mjs', 'scripts/e2e-watcher.mjs']
                     or Path.cwd().resolve() != Path(__file__).resolve().parent.parent):
         parser.error('watch-service is reserved for the official e2e watcher with per-rebuild CPU admission')
-    admission_wait_seconds = WAIT_SECONDS if args.admission_wait_seconds is None else args.admission_wait_seconds
-    if not math.isfinite(admission_wait_seconds) or not 0 < admission_wait_seconds <= 6000:
+    admission_wait_seconds = (None if args.kind == 'full-gate' else WAIT_SECONDS) if args.admission_wait_seconds is None else args.admission_wait_seconds
+    if admission_wait_seconds is not None and (not math.isfinite(admission_wait_seconds) or not 0 < admission_wait_seconds <= 6000):
         parser.error('admission wait must be positive and at most 6000 seconds')
     if args.admission_wait_seconds is not None and args.kind not in ('full-test', 'full-gate'):
         parser.error('explicit admission waiting is only supported for full-test/full-gate gates')
@@ -778,6 +806,7 @@ def main():
     if os.environ.get('WS_HEAVY_TOKEN') and args.kind != 'full-gate':
         parser.error('cannot upgrade an inherited lane; release it before requesting different resources')
     token = uuid.uuid4().hex
+    gate_owner = int(os.environ.get('WS_FULL_GATE_OWNER_PID', os.getppid())) if args.kind == 'full-gate' else None
     entry = {'token': token, 'pid': os.getpid(), 'runnerPid': os.getpid(), 'childPid': None,
              'admissionWaitSeconds': admission_wait_seconds,
              'resources': resources, 'priority': 1,
@@ -794,11 +823,13 @@ def main():
     queued_mono, acquired_mono = time.monotonic(), None
     cpu_before = process_resource.getrusage(process_resource.RUSAGE_CHILDREN)
     record_full_test(root, entry, 'request')
-    deadline = time.monotonic() + admission_wait_seconds
+    deadline = math.inf if admission_wait_seconds is None else time.monotonic() + admission_wait_seconds
     def interrupted(_signal, _frame):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
+    if args.kind == 'full-gate':
+        signal.signal(signal.SIGHUP, interrupted)
     try:
         with scheduler(root, deadline, admission_wait_seconds) as state:
             if args.kind == 'full-gate':
@@ -814,6 +845,8 @@ def main():
         print('heavy-lane: queued ' + args.kind + ' ticket ' + str(entry['ticket']), file=sys.stderr, flush=True)
         gate_position = None
         while held is None:
+            if args.kind == 'full-gate' and (gate_owner <= 1 or os.getppid() != gate_owner):
+                raise KeyboardInterrupt
             if time.monotonic() >= deadline:
                 raise queue_timeout(root, entry)
             if args.kind == 'full-gate':
@@ -844,7 +877,8 @@ def main():
             command_began = (time.time(), time.monotonic())
         child = (start_build_child(launch, env, tuple(fd.fileno() for fd in held), cpu_owned)
                  if args.kind == 'build' and not service else subprocess.Popen(launch, env=env, start_new_session=True,
-                                 pass_fds=tuple(fd.fileno() for fd in held)))
+                                 pass_fds=tuple(fd.fileno() for fd in held),
+                                 **({'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE} if args.kind == 'full-gate' else {})))
         entry['childPid'] = child.pid
         with scheduler(root):
             write_compat(root, entry)
@@ -857,7 +891,8 @@ def main():
             # helpers, immediately before the sole command wait.
             command_before = child_cpu()
         try:
-            code = (wait_build_child(child, args.max * 60, cpu_parent, cpu_owned)
+            code = (wait_gate_child(child, gate_owner) if args.kind == 'full-gate' else
+                    wait_build_child(child, args.max * 60, cpu_parent, cpu_owned)
                     if args.kind == 'build' and not service else child.wait(timeout=args.max * 60))
         except subprocess.TimeoutExpired:
             print('heavy-lane: owned command timed out', file=sys.stderr)
@@ -885,6 +920,8 @@ def main():
         raise
     finally:
         try:
+            if args.kind == 'full-gate' and child is not None and child.returncode is None:
+                terminate(child, 15)
             if args.kind == 'build' and not service:
                 try:
                     build_cpu_module().owned_command.terminate_command(child)

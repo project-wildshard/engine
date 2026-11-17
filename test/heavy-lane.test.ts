@@ -2,6 +2,20 @@ import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise real flock leases in an isolated owned fixture.
 import { execFileSync } from 'node:child_process';
 
+test('full-gate coordination cannot time out its already bounded inner command', () => {
+  execFileSync('python3', ['-c', `
+import os,pathlib,subprocess,sys,tempfile
+scratch=pathlib.Path('tmp/codex-pagesize');scratch.mkdir(parents=True,exist_ok=True)
+with tempfile.TemporaryDirectory(dir=scratch) as work:
+ root=pathlib.Path(work).resolve()
+ env={k:v for k,v in os.environ.items() if not k.startswith(('WS_HEAVY_','WS_FULL_GATE_','WS_CPU_'))}
+ env.update(WS_FULL_GATE_ROOT=str(root),WS_LANE_RECEIPTS=str(root/'receipts'))
+ command="const fs=require('node:fs'),p=require('node:path');if(JSON.parse(fs.readFileSync(p.join(process.env.WS_FULL_GATE_ROOT,'full-gate.active.json'))).admissionWaitSeconds!==null)throw Error('Queue inherited a shorter admission timeout');setTimeout(()=>{},100)"
+ result=subprocess.run([sys.executable,'scripts/heavy-lane.py','full-gate','--max=.0001','--','node','-e',command],env=env,capture_output=True,text=True,timeout=10)
+ assert result.returncode==0,result.stderr
+`], {encoding: 'utf8', timeout: 15000});
+});
+
 test('queue and scheduler deadlines name holders without launching or taking their locks', () => {
   const result = execFileSync('python3', ['-c', `
 import contextlib, fcntl, importlib.util, json, os, pathlib, subprocess, sys, tempfile, time, types

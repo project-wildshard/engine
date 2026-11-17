@@ -201,8 +201,8 @@ const GEN_STAMPS = "import {mkdirSync,readdirSync,statSync,writeFileSync} from '
 const prepushLines = (f: Fixture) => f.read(f.files.prepush).trim().split('\n').filter(Boolean);
 
 describe('land (J240): fast-forward main from a plan worktree after its branch CI is green', () => {
-  test.each(['release', 'cancel-waiter', 'cancel-holder', 'slow-holder', 'shared-origin', 'changed-waiter'])('FL8: independent clones queue full gates and cancel safely (%s)', async mode => {
-    const cancelWaiter = mode === 'cancel-waiter';
+  test.each(['release', 'cancel-waiter', 'lost-waiter', 'cancel-holder', 'slow-holder', 'lost-holder', 'shared-origin', 'changed-waiter'])('FL8: independent clones queue full gates and cancel safely (%s)', async mode => {
+    const cancelWaiter = mode === 'cancel-waiter' || mode === 'lost-waiter';
     const a = fixture(), b = fixture();
     if (mode === 'shared-origin') {
       b.git(b.repo, ['remote', 'set-url', 'origin', a.remote]);
@@ -270,24 +270,30 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
       }
       if (c !== undefined && wc !== undefined) {
         const pc = start(c, wc, 'c'); await queuedC;
-        children[1]?.kill('SIGTERM'); expect((await pb).code).toBe(1); await advancedC;
+        children[1]?.kill(mode === 'lost-waiter' ? 'SIGKILL' : 'SIGTERM'); expect((await pb).code).toBe(mode === 'lost-waiter' ? null : 1); await advancedC;
         expect(sockets.has('b')).toBe(false); expect(sockets.has('c')).toBe(false);
         sockets.get('a')?.end('release'); expect((await pa).code).toBe(0);
         await readyC; sockets.get('c')?.end('release'); expect((await pc).code).toBe(0);
         expect(c.remoteMain()).toBe(tc); expect(b.remoteMain()).not.toBe(tb);
       } else {
-        if (mode === 'cancel-holder' || mode === 'slow-holder') {
+        if (mode === 'lost-holder') {
+          children[0]?.kill('SIGKILL');
+          let timeout: ReturnType<typeof setTimeout> | undefined;
+          try { await Promise.race([readyB, new Promise<never>((_done, reject) => { timeout = setTimeout(() => { reject(new Error('Lost owner kept its gate alive')); }, 10000); })]); }
+          finally { clearTimeout(timeout); }
+          expect((await pa).code).toBeNull(); expect(a.remoteMain()).not.toBe(ta);
+        } else if (mode === 'cancel-holder' || mode === 'slow-holder') {
           children[0]?.kill('SIGTERM'); expect((await pa).code).toBe(1);
         } else { sockets.get('a')?.end('release'); expect((await pa).code).toBe(0); }
         await Promise.race([readyB, pb.then(result => { throw new Error(result.output); })]);
-        if (mode === 'slow-holder') expect(overlapped).toBe(false);
+        if (mode === 'slow-holder' || mode === 'lost-holder') expect(overlapped).toBe(false);
         sockets.get('b')?.end('release'); expect((await pb).code).toBe(0);
         if (mode === 'shared-origin') {
           expect(a.git(a.remote, ['show', 'main:src/a.ts'])).toContain('a = 1');
           expect(a.git(a.remote, ['show', 'main:src/b.ts'])).toContain('b = 1');
         } else expect(b.remoteMain()).toBe(tb);
       }
-      if (mode !== 'cancel-holder' && mode !== 'slow-holder' && mode !== 'shared-origin') expect(a.remoteMain()).toBe(ta);
+      if (!['cancel-holder', 'slow-holder', 'lost-holder', 'shared-origin'].includes(mode)) expect(a.remoteMain()).toBe(ta);
     } finally {
       for (const socket of sockets.values()) socket.destroy();
       for (const child of children) if (child.exitCode === null) child.kill('SIGTERM');
@@ -440,6 +446,14 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(result.status).toBe(1); expect(f.remoteMain()).toBe(before);
     expect(f.read(f.files.receipts)).toContain('refused: Checked tree or runtime changed during the gate');
     expect(f.read(f.files.receipts)).not.toContain('refused: Inherited CPU grant');
+  }, 60_000);
+
+  test('FL10: actual task RED on stderr wins over sample stdout RED', () => {
+    const f = fixture(); f.env['WS_LAND_MODE'] = 'local';
+    const wt = f.worktree('red-cause'); f.commit(wt, 'src/feature.ts', 'export {};', 'feat: feature');
+    writeFileSync(join(f.root, 'hooks/pre-push'), '#!/bin/sh\ncat >/dev/null\necho "lint RED in 1 s"\necho "  - vitest (full) RED in 1200 s" >&2\nexit 1\n');
+    expect(f.land(wt).status).toBe(1);
+    expect(f.read(f.files.receipts)).toContain('refused: vitest (full) RED in 1200 s');
   }, 60_000);
 
   test('FL9: a restarted real land discovers its completed pre-rebase gate', () => {

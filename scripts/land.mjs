@@ -68,17 +68,22 @@ const GIT_OWN=/^error: failed to push some refs|^To \S+$|^hint: |^Done$|^!\s/u;
 /** Prefer an actual remote rejection, otherwise the hook's first RED or last
  * thrown error. Git may forward hook output on either stream under --porcelain.
  * Keep Git's stdout separate from hook stderr, which can print sample trailers.
- * @param {string} output @param {string} [porcelain] @returns {string} */
-export function prePushCause(output,porcelain=''){
+ * @param {string} output @param {string} [porcelain] @param {string} [fallback] @returns {string} */
+export function prePushCause(output,porcelain='',fallback=''){
  // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
  const plain=(/** @type {string} */text)=>text.split('\n').map(line=>line.replaceAll(/\u001B\[[0-9;]*m/gu,'').trim()).filter(line=>line!=='');
  const lines=plain(output);
  const hook=lines.filter(line=>!GIT_OWN.test(line));
+ const other=plain(fallback),otherHook=other.filter(line=>!GIT_OWN.test(line));
  const pick=remoteRejection(porcelain)
   ??hook.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
   ??hook.findLast(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
   ??lines.find(line=>/^!\s.*\[(?:remote )?rejected\]/u.test(line))
+  ??otherHook.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
+  ??otherHook.findLast(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
+  ??other.find(line=>/^!\s.*\[(?:remote )?rejected\]/u.test(line))
   ??hook.at(-1)
+  ??otherHook.at(-1)
   ??plain(porcelain).findLast(line=>!GIT_OWN.test(line));
  return pick===undefined?'no output':pick.slice(0,300);
 }
@@ -113,13 +118,17 @@ function gitTee(cwd,args,env,command='git'){
    catch(error){if(/** @type {NodeJS.ErrnoException} */(error).code!=='ESRCH')throw error;}
   };
   const stop=()=>{interrupted=true;signal('SIGTERM');forced??=setTimeout(()=>{signal('SIGKILL');},command==='python3'?20000:10000);};
-  process.once('SIGTERM',stop);process.once('SIGINT',stop);
+  const exit=()=>{signal('SIGKILL');};
+  const pipeLost=(/** @type {NodeJS.ErrnoException} */error)=>{if(error.code==='EPIPE')stop();else throw error;};
+  process.once('SIGTERM',stop);process.once('SIGINT',stop);process.once('SIGHUP',stop);process.once('exit',exit);
+  process.stdout.on('error',pipeLost);process.stderr.on('error',pipeLost);
   const finish=(/** @type {number} */status,/** @type {string} */error='')=>{
    if(settled)return;settled=true;
-   clearTimeout(forced);process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);
+   clearTimeout(forced);process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);process.removeListener('SIGHUP',stop);process.removeListener('exit',exit);
+   process.stdout.removeListener('error',pipeLost);process.stderr.removeListener('error',pipeLost);
    _resolve({status,stdout,stderr:`${stderr}${error}`,interrupted,hookGreen:ack?.finish()??false});
   };
-  child.stdout.on('data',chunk=>{stdout+=String(chunk);if(command!=='git')process.stdout.write(chunk);});
+  child.stdout.on('data',chunk=>{stdout=`${stdout}${String(chunk)}`.slice(-(1<<16));if(command!=='git')process.stdout.write(chunk);});
   child.stderr.on('data',chunk=>{process.stderr.write(chunk);stderr=`${stderr}${String(chunk)}`.slice(-(1<<16));});
   child.once('error',error=>{finish(1,`\n${error.message}`);});
   child.once('close',code=>{finish(code??1);});
@@ -843,11 +852,9 @@ class Landing{
   if(isAncestor(this.root,head,now))return 'landed';
   const rejected=remoteRejection(result.stdout)!==undefined;
   if(!result.interrupted&&(!local||result.hookGreen)&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
-  // Passing controls print expected errors on stdout. A terminal hook error
-  // on stderr must follow those controls when selecting the final exception.
-  const hook=local&&!result.hookGreen?`${result.stdout}\n${result.stderr}`:result.stderr;
+  // Structured stderr failures take priority over expected stdout controls.
   const porcelain=local&&!result.hookGreen?'':result.stdout;
-  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(hook,porcelain);
+  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(result.stderr,porcelain,local&&!result.hookGreen?result.stdout:'');
   this.receipt(`STOP main push of ${short(head)} refused: ${cause}`);
   throw new StopError(`main push of ${short(head)} refused: ${cause}\nFix forward and run land again.`);
  }
@@ -1121,8 +1128,8 @@ export async function land(argv,cwd=process.cwd(),env=process.env){
    if(env.WS_FULL_GATE_TOKEN===undefined){
     // Refuse an active same-tree controller before joining the machine FIFO.
     const release=landing.lock();release();landing.clean();
-    const result=await gitTee(landing.root,[resolve(import.meta.dirname,'heavy-lane.py'),'full-gate','--max=45','--admission-wait-seconds=6000','--',process.execPath,resolve(import.meta.dirname,'land.mjs'),...argv],
-     {...env,WS_FULL_GATE_EXPECTED_HEAD:landing.head(),WS_FULL_GATE_EXPECTED_BRANCH:landing.branch},'python3');
+    const result=await gitTee(landing.root,[resolve(import.meta.dirname,'heavy-lane.py'),'full-gate','--',process.execPath,resolve(import.meta.dirname,'land.mjs'),...argv],
+     {...env,WS_FULL_GATE_OWNER_PID:String(process.pid),WS_FULL_GATE_EXPECTED_HEAD:landing.head(),WS_FULL_GATE_EXPECTED_BRANCH:landing.branch},'python3');
     return result.interrupted?1:result.status;
    }
    try{assertHeavyLease('full-gate',{...env,WS_HEAVY_ROOT:env.WS_FULL_GATE_ROOT,WS_HEAVY_TOKEN:env.WS_FULL_GATE_TOKEN});}
