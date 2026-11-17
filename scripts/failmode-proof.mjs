@@ -450,6 +450,33 @@ try {
         return { ...result, shot, injection: { closes: settled, untilMs, redials: 0 }, noEnd: { seen: open, shot: openShot }, recovery: 'none: no redial; Title screen leaves for the title' };
       } finally { await heal(); await entered.context.close(); }
     },
+    // FM4 mode 9b: the world restarts under play (close 4005 `restart`, then upgrades refused: the world is quiet), the player goes to
+    // the title and taps ENTER THE MMO. The tap holds on `restart-blocked`; when the world answers again it joins by itself.
+    titleHold: async item => {
+      const entered = await fresh(); const { page } = entered;
+      try {
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        const before = await control();
+        await arm(item.id, [{ route: 'socket', kind: 'close', code: 4005, reason: 'restart' }]);
+        for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
+        if (await matchedSince(before, 'socket') === 0) return { outcome: 'harness-fail', reason: 'the restart close matched nothing' };
+        await arm(`${item.id}-held`, [{ route: 'socket', kind: 'refuse-upgrade', code: 503 }]);
+        const heard = await screen(page, 'restart', 10_000);
+        if (heard === null) return { outcome: 'harness-fail', reason: 'the page never showed the in-world restart banner', notes: await onScreen(page) };
+        await page.goto(`${PAGE_ORIGIN}/?mute=1&nolock=1`);
+        await page.locator('.ws-main-mmo').first().click({ timeout: 60_000 });
+        const started = Date.now(), seen = await screen(page, item.screen, 15_000, started), shot = await shoot(page, item.id.replace('/', '-'), seen === null ? 'missing' : 'card');
+        const result = await judged(seen, item, page);
+        if (result.outcome !== 'pass') return { ...result, shot };
+        await sleep(2000);
+        const injection = { socketMatches: await matchedSince(before, 'socket'), quietMs: Date.now() - started };
+        await heal();
+        const gone = await page.locator(`[data-failmode~="${item.screen}"]`).first().waitFor({ state: 'detached', timeout: 20_000 }).then(() => true, () => false);
+        const joined = gone && await intoWorld(entered, 120_000).then(() => true, () => false);
+        return joined ? { ...result, injection, shot, recovery: 'heal: the held tap joined by itself' }
+          : { outcome: 'ui-fail', reason: gone ? 'the card went but the world never loaded' : 'the card stayed after the world answered', seen, injection, shot };
+      } finally { await heal(); await entered.context.close(); }
+    },
     // FM8s modes 30, 30b and 31: the rig's own database (pglite:) breaks on purpose through its front (online-rig.mjs `database`):
     // `hold` keeps every query waiting (a save is late, never failed), `refuse` drops every connection (each save fails, the server
     // retries). Each case first waits for a save to land after the page is seated, so the page has heard a confirmed save.
