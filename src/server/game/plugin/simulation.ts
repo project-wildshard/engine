@@ -538,7 +538,9 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     const preparedCrowds = prepareDeclaredCrowds(shard.crowds, ports.crowds?.(host) ?? { flock: () => { throw new Error('Missing declared crowd recipe'); } });
     let lane: ScriptLanePort | undefined;
     let movers: MoverRuntime | undefined;
-    if (shard.sim.scripts.length > 0) {
+    // SHARD-SOURCE SS-GF2a: declared movers step on the script lane, so a script-free shard with a mover (a scene shard's
+    // raft) gets a lane of its movers alone; without one its mover was drawn and never moved
+    if (shard.sim.scripts.length > 0 || shard.movers.length > 0) {
       const entities = new Map<number, ScriptEntity>();
       for (const [id, handle] of actors) {
         const position = id === first.id ? first.position : host.entities.get(id)?.position;
