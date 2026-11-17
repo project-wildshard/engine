@@ -35,3 +35,9 @@ an HTTP client as their browser command: both old launchers failed to serve
 the allocated address; both repaired launchers serve distinct actual ports
 and those listeners refuse connections after exit. Actual game/browser
 acceptance remains the hosted T1 groups, not this native lifecycle control.
+
+Hosted CI 43996503502 caught the T1 launcher fixture borrowing a locally
+pre-owned lane directory: fresh CI had no owner and correctly refused it.
+Each native launcher now receives its own fresh scratch root and asserts its
+owner file there. Normal launchers retain their repo-root default. The
+ownership refusal stays enforced; the test no longer depends on local state.

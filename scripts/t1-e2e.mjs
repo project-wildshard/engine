@@ -7,7 +7,8 @@ import { resolve as resolvePath } from 'node:path';
 import { scratchDir } from './scratch-dir.mjs';
 
 const lane=process.env.WS_LANE_NAME??'t1-e2e';
-const scratch=scratchDir(lane,'Template 1 browser harness',{env:{...process.env,WS_LANE_NAME:lane}});
+const taskRoot=process.env.WS_T1_SCRATCH_ROOT??resolvePath(import.meta.dirname,'..');
+const scratch=scratchDir(lane,'Template 1 browser harness',{root:taskRoot,env:{...process.env,WS_LANE_NAME:lane}});
 
 const out = resolvePath(process.env.WS_T1_BUILD_DIR ?? `${scratch}/t1/client`);
 const browserTemp = resolvePath(scratch,'t1/browser-tmp');
