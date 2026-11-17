@@ -1,0 +1,67 @@
+// oxlint-disable-next-line import/no-nodejs-modules -- the door's HTTP server hands these routes its request and response.
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { AccountExport } from './saves/account';
+import { admit } from './ticket';
+
+// MMO-PLAN MP2.5a (delete and export): a signed-in page's own data, from the door. `POST /account/export` answers everything the
+// saves database holds for the account; `POST /account/delete` deletes it, leaving anonymous ledger rows only (`saves/account.ts`).
+// The proof is a live join ticket in `Authorization: Ticket <ticket>`, checked offline as a hello's is (`ticket.ts`); a guest id, a
+// dead ticket or one another key signed gets 401. Only the game's pages may ask from a browser (the WebSocket's `ALLOWED_ORIGINS`).
+// An account still in the world (a body linked, held, loading or crossing) can't be deleted: 409, play leaves first. Neither the
+// ticket nor the account is ever logged.
+
+/** What the routes read. */
+export interface AccountRoutes {
+  readonly ticketKey: string;
+  /** The game's pages; null lets any Origin in (`ALLOWED_ORIGINS=*`). */
+  readonly allowedOrigins: readonly string[] | null;
+  /** Whether this seat has a body in the world now. */
+  readonly playing: (seat: string) => boolean;
+  readonly exportAccount: (account: string) => Promise<AccountExport | undefined>;
+  readonly deleteAccount: (account: string) => Promise<boolean>;
+  readonly log: (line: Record<string, unknown>) => void;
+  /** After a delete: the door forgets what it knew of the account (a settled claim). */
+  readonly deleted?: (account: string) => void;
+}
+
+const PATHS = new Set(['/account/export', '/account/delete']);
+const TICKET = /^Ticket (?<ticket>\S{1,255})$/u;
+
+/** The routes as one handler; false for any other request. */
+export function accountRoutes(options: AccountRoutes): (request: IncomingMessage, response: ServerResponse) => boolean {
+  return (request, response) => {
+    const path = (request.url ?? '').split('?')[0] ?? '';
+    if (!PATHS.has(path)) return false;
+    const origin = request.headers.origin, allowed = origin === undefined || options.allowedOrigins === null || options.allowedOrigins.includes(origin);
+    const cors: Record<string, string> = origin !== undefined && allowed ? { 'access-control-allow-origin': origin, vary: 'origin' } : {};
+    const send = (status: number, body?: unknown): void => {
+      response.writeHead(status, { ...cors, 'cache-control': 'no-store', ...(body === undefined ? {} : { 'content-type': 'application/json' }) }).end(body === undefined ? undefined : JSON.stringify(body));
+    };
+    if (!allowed) { send(403, { error: 'not a game page' }); return true; }
+    if (request.method === 'OPTIONS') {
+      response.writeHead(204, { ...cors, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization', 'access-control-max-age': '600' }).end();
+      return true;
+    }
+    if (request.method !== 'POST') { send(405, { error: 'POST only' }); return true; }
+    request.resume(); // no body is read
+    void (async (): Promise<void> => {
+      const ticket = TICKET.exec(request.headers.authorization ?? '')?.groups?.['ticket'] ?? '';
+      const admitted = ticket.startsWith('ticket:') ? await admit(ticket, options.ticketKey, Date.now()) : undefined;
+      const account = admitted?.from === undefined ? undefined : admitted.seat;
+      if (account === undefined) { send(401, { error: 'sign in again' }); return; }
+      const action = path === '/account/export' ? 'export' : 'delete';
+      try {
+        if (action === 'export') { const data = await options.exportAccount(account); send(data === undefined ? 404 : 200, data ?? { error: 'nothing saved' }); return; }
+        if (options.playing(account)) { send(409, { error: 'leave the world first' }); return; }
+        const deleted = await options.deleteAccount(account);
+        options.deleted?.(account);
+        options.log({ at: 'account.deleted', found: deleted });
+        send(200, { deleted });
+      } catch (error) {
+        options.log({ at: 'account.failed', action, error: error instanceof Error ? error.message : String(error) });
+        send(503, { error: 'try again later' });
+      }
+    })();
+    return true;
+  };
+}

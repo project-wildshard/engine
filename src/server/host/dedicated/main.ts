@@ -17,6 +17,8 @@ import type { CellWorkerData } from './cellWorker';
 import { readPackFolder, readReleaseItems, type PackReads } from './packReader';
 import { openPlayerSaves, memoryPlayerSaves } from './playerSaves';
 import { guestExpiryDays, startGuestExpiry } from './saves/expiry';
+import { accountRoutes } from './accountRoutes';
+import { PLAYER_TICKET_PUBLIC_KEY } from './ticket';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
@@ -120,8 +122,12 @@ const world: World = await World.open({ build, cells, roads: crossing, ...worldS
 /** SA33's watch, once the door listens; `/health` names its serial. */
 let placements: PlacementWatch | null = null;
 let activationReceiver: ReturnType<typeof uploadActivationReceiver> | undefined;
+// MMO-PLAN MP2.5a: a signed-in page's export and delete, with its join ticket as the proof. Memory saves have none.
+const { exportAccount: exporting, deleteAccount: deleting } = saves;
+const accounts = exporting === undefined || deleting === undefined ? undefined : accountRoutes({ ticketKey: ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, allowedOrigins: trust.allowedOrigins, playing: seat => world.isPlaying(seat), exportAccount: exporting, deleteAccount: deleting, deleted: account => { world.forgetAccount(account); }, log });
 const server = createServer((request, response) => {
   if (activationReceiver?.(request, response)) return;
+  if (accounts?.(request, response) === true) return;
   if (request.url !== '/health') { response.writeHead(404).end(); return; }
   // E7.5 prep: any page may read it (no player data), so the Connection doctor sees the build; `now` lets it read a phone's clock.
   response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ ...world.health(), serial: release.serial, ...(placements === null ? {} : { placements: placements.serial }), uptime: Math.round((Date.now() - started) / 1000), now: Date.now() }));

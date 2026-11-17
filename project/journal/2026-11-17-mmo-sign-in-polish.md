@@ -16,3 +16,12 @@
   with their receipts, saves and place, 500 a transaction (`for update skip locked`). Accounts never expire here (MP2.5's).
 - The server sweeps an hour after boot, then every 24 h, only when `GUEST_EXPIRY_DAYS` is set (Jake's switch: it deletes every
   Friends-grid guest idle that long). Boot logs `guests.expiry` with the days or `off`.
+
+## MP2.5a account export and delete on the door
+
+- `saves/account.ts`: `exportAccount` hands over the account's player row, saves, receipts and places; `deleteAccount` moves its
+  receipts to a fresh `deleted:<uuid>` player named "Deleted" (no tag, empty profile) and deletes the rest, so the ledger keeps
+  anonymous rows only. Guests are refused here (they expire, MP2.3).
+- `accountRoutes.ts`: `POST /account/export` and `/account/delete` on the door's HTTP server, `Authorization: Ticket <ticket>`
+  checked offline like a hello; game origins only (`ALLOWED_ORIGINS`); delete answers 409 while the account is in the world
+  (`World.isPlaying`), and a deleted account is forgotten by the claim skip so it can be claimed into again.

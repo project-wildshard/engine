@@ -29,6 +29,7 @@ import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
 import type { ClaimResult } from './saves/claim';
+import type { AccountExport } from './saves/account';
 import { workerTable } from './workerTable';
 import { cellName, cellShard, gridAssembly, placedCells, roadHome } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
@@ -99,6 +100,10 @@ export interface PlayerSaves {
   claim?: (device: string, account: string) => Promise<ClaimResult>;
   /** MP2.3: delete guests unseen for this many days (`saves/expiry.ts`); how many went. Left out (memory saves), none expire. */
   expire?: (days: number) => Promise<number>;
+  /** MP2.5a: an account's data, or undefined (`saves/account.ts`). Left out (memory saves), the door has no account routes. */
+  exportAccount?: (account: string) => Promise<AccountExport | undefined>;
+  /** MP2.5a: delete an account, leaving anonymous ledger rows; whether there was one. */
+  deleteAccount?: (account: string) => Promise<boolean>;
   /** MP2.4: claim a cleaned Name for this device and answer what everyone reads (`Name#1234`). Left out, the Name goes as typed. */
   name?: (device: string, name: string) => Promise<string>;
   /** Wait for what is on its way, at most `ms`. */
@@ -520,6 +525,12 @@ export class World {
     this.settled.add(account);
     for (const oldest of this.settled) { if (this.settled.size <= SETTLED_ACCOUNTS) break; this.settled.delete(oldest); }
   }
+  /** MP2.5a: whether this seat has a body in the world now (linked, held, loading, crossing or redialling). */
+  isPlaying(seat: string): boolean {
+    return this.seated.has(seat) || this.pending.has(seat) || this.crossings.has(seat) || this.redials.has(seat) || this.entries.has(seat);
+  }
+  /** MP2.5a: a deleted account starts empty again, so a later device's guest progress may be claimed into it. */
+  forgetAccount(account: string): void { this.settled.delete(account); }
   /** The join: check, find where they stand, let them load, seat them. */
   private async hello(end: SocketTransport, sent: ArrayBuffer, goto: string | null): Promise<void> {
     let bytes = sent;

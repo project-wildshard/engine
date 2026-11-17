@@ -93,6 +93,7 @@ test('MP2.2g: the door stops asking to claim once the account has progress; an e
   const visit = async (player: string, seat: string): Promise<void> => {
     const bot = new RoomBot(bench?.url ?? '', 'bench', player, 'Ann'); bots.push(bot);
     expect(await bot.arrived()).toBe(true);
+    expect(bench?.world.isPlaying(seat), 'MP2.5a: the door knows the account is in the world').toBe(true);
     bot.drop();
     await vi.waitFor(() => { expect(room()?.bodyOf(seat), 'the body goes once its hold ends').toBeUndefined(); }, { timeout: 10_000, interval: 50 });
     await new Promise(resolve => { setTimeout(resolve, 200); }); // the door hears the leave after the room does
@@ -104,5 +105,6 @@ test('MP2.2g: the door stops asking to claim once the account has progress; an e
   const other = PLAYER.replace('0123', '4567');
   await visit(at(other, 'device:pad'), empty);
   await visit(at(other, 'device:pad'), empty);
+  expect(bench.world.isPlaying(kept), 'and that it left').toBe(false);
   expect(claims, 'an account with progress is claimed into once, never again; one with none is asked at each join').toEqual([`device:phone>${kept}`, `device:pad>${empty}`, `device:pad>${empty}`]);
 });

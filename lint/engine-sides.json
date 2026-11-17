@@ -1379,6 +1379,8 @@
     "src/server/host/dedicated/saves/writeQueue.ts": "server",
     "src/server/host/dedicated/seats.ts": "server",
     "src/server/host/dedicated/ticket.ts": "server",
+    "src/server/host/dedicated/saves/account.ts": "server",
+    "src/server/host/dedicated/accountRoutes.ts": "server",
     "src/server/host/dedicated/saves/claim.ts": "server",
     "src/server/host/dedicated/saves/expiry.ts": "server",
     "src/server/host/dedicated/serverMetrics.ts": "server",
