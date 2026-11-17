@@ -70,7 +70,10 @@ export function prePushCause(output){
  * @returns {Promise<{status:number,stdout:string,stderr:string,interrupted:boolean}>} */
 function gitTee(cwd,args,env){
  return new Promise(_resolve=>{
-  const groups=process.platform!=='win32',child=spawn('git',args,{cwd,env,stdio:['ignore','pipe','pipe'],detached:groups});
+  // WL22's keepalive policy also belongs to the parent SSH session: the
+  // pre-push may spend minutes in a full gate before Git sends main.
+  const network={...env,GIT_SSH_COMMAND:env.GIT_SSH_COMMAND??'ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes'};
+  const groups=process.platform!=='win32',child=spawn('git',args,{cwd,env:network,stdio:['ignore','pipe','pipe'],detached:groups});
   let stdout='',stderr='',interrupted=false;
   /** @type {ReturnType<typeof setTimeout>|undefined} */let forced;
   const signal=(/** @type {NodeJS.Signals} */kind)=>{

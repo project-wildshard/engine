@@ -101,8 +101,8 @@ describe('release merge-back gate', () => {
     box.git(['tag', 'v1.2.3', release]);
     mkdirSync(join(box.root, 'node_modules'));
     const merge = () => box.git(['commit-tree', 'HEAD^{tree}', '-p', base, '-p', release, '-m', 'Merge release']).stdout.trim();
-    const check = (sha) => spawnSync(process.execPath, [fileURLToPath(new URL('./run-checks.mjs', import.meta.url)), 'push'], {
-      cwd: box.root, encoding: 'utf8', env: { ...ENV, WS_PUSH_REFS: `refs/heads/main ${sha} refs/heads/main ${base}\n` },
+    const check = (sha, extraEnv = {}) => spawnSync(process.execPath, [fileURLToPath(new URL('./run-checks.mjs', import.meta.url)), 'push'], {
+      cwd: box.root, encoding: 'utf8', env: { ...ENV, WS_PUSH_REFS: `refs/heads/main ${sha} refs/heads/main ${base}\n`, ...extraEnv },
     });
     return { ...box, manifest, base, release, merge, check };
   };
@@ -111,6 +111,13 @@ describe('release merge-back gate', () => {
     const result = box.check(box.merge());
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stderr, /release merge-back v1\.2\.3/);
+  });
+  test('J400 local land cannot reuse the release merge-back shortcut', () => {
+    const box = prepared(), sha = box.merge();
+    const result = box.check(sha, { WS_LAND_MAIN_PUSH: `local:${sha}` });
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /release merge-back/);
+    assert.match(result.stderr, /pnpm check failed/);
   });
   test('code and manifest edits keep the failing full check', () => {
     for (const files of [{ 'code.txt': 'untested code\n' }, { 'package.json': JSON.stringify({ version: '1.2.3', scripts: { check: 'exit 1' }, extra: true }) }]) {

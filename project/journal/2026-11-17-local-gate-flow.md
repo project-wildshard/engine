@@ -35,3 +35,8 @@ and 94 focused cases pass. A planted red during a concurrent main move
 stops immediately; only an actual FF rejection retries. Interrupting a
 full gate stops its owned push before publication. Lint, types, CSS and
 actionlint pass. Full local integration checks still run before main.
+
+A native release-merge counterexample fails first: the local marker must
+not take the historical release-CI shortcut. It now runs the complete
+gate. Keepalives use WL22's SSH policy on the actual parent push session,
+so a long local pre-push cannot leave that connection idle for minutes.

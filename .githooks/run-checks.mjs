@@ -35,7 +35,8 @@ if (lane === 'push') {
 }
 // A merge-back only carries the version and notes already tested on the tagged release branch.
 // The outgoing main tip must be its first parent; unrelated outgoing commits keep the normal gate.
-if (lane === 'push') {
+// J400 local lands always take the complete local gate, including merge-backs.
+if (lane === 'push' && !process.env.WS_LAND_MAIN_PUSH?.startsWith('local:')) {
   const { releaseMerge } = await import('./release-merge.mjs');
   const tag = releaseMerge(process.env.WS_PUSH_REFS ?? '', root);
   if (tag !== null) {
