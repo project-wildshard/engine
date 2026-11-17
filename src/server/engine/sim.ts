@@ -356,7 +356,7 @@ export class SimHost {
    * NPC), everyone present, as the world's flag reached them before.
    */
   private credit(id: string, req: DamageRequest | undefined): void { // a scripted death may carry no blow
-    if (this.players.size === 0) return;
+    if (this.players.size === 0 || this.players.has(id)) return; // a player's fall is nobody's kill
     let credited = this.damage.meaningful(id).filter(player => this.players.has(player));
     if (credited.length === 0) { const by = req === undefined ? null : landedBy(req, this.players); credited = by === null ? [...this.players.keys()] : [by]; }
     const books = questBooks(this), flag = `${CREDIT_PREFIX}${id}`;

@@ -19,3 +19,11 @@ so it leaves with the lead's doc and a fresh device on the lead seat
 starts with none; the world's death record stays for world rules. A
 save writes `credit` only where it parts from the world's deaths, so
 a one-player save keeps its bytes.
+
+The sim snapshot is version 4 (`credit`, books' `credited`), read up
+from 3 by `migrateV3`; a save's books come back even before a quest
+owner made the store, and a player's own fall is nobody's kill.
+
+SB34c: a respawn (`dataRespawn` revive, a home keeper's refill) clears
+the world's `dead:<id>`, so world rules see the body alive; players'
+credit stays in their books, so no quest walks back.

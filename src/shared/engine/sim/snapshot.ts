@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import { createSnapshotDataSerializer, serializeSnapshotData, serializeSnapshotDataSteps, decodeSnapshotData, decodeSnapshotDataBytes, admitSnapshotDataBytes, finishSteps, checkSnapshotDataWire } from './snapshotData';
 import { byteArray } from './snapshotPhysics';
-import { isCredit, type QuestBookSaved } from '../quest/players';
+import { isCredit, questBooks, type QuestBookSaved } from '../quest/players';
 import type { SimHost, SimLevel, SimSlots, SimValue } from '../../../server/engine/sim';
 import { SIM_API_VERSION } from './apiVersion';
 import type { PlayerSim } from '../../../server/engine/sim/playerSim';
@@ -25,7 +25,7 @@ import type { RespawnRow } from '../../../server/engine/sim/respawn';
 import type { DayClockState } from './dayClock';
 
 /** Same-engine snapshot format; live callbacks and authored content are installed by the fresh host. */
-export const SIM_SNAPSHOT_VERSION = 3;
+export const SIM_SNAPSHOT_VERSION = 4;
 /** Durable per-region ceiling in stored characters; the grid caller uses a logical checkpoint if exact encoding exceeds it. */
 export const SIM_REGION_SNAPSHOT_CHAR_BUDGET: number = 512 * 1024;
 /**
@@ -433,7 +433,8 @@ export function restoreInstalledHost(host: SimHost, ports: { rapier: Rapier }, s
     host.flags.restore(saved.flags);
     host.questFlags.restoreCredit(saved.credit ?? saved.flags.filter(isCredit));
     for (const quest of host.quests) { const state = saved.quests.find((entry) => entry.id === quest.def.id); if (state !== undefined) quest.restore(state); }
-    host.questStore?.restore(saved.books);
+    // a save's books come back though no quest owner made the store yet: kill credit makes them (SB34a)
+    if (saved.books !== undefined) (host.questStore ?? questBooks(host)).restore(saved.books);
     host.rng.restore(saved.rng); host.clock.restore(saved.clock);
     host.state.tick = saved.state.tick; host.state.accumulator = saved.state.accumulator;
     for (const key of Object.keys(host.state.timers)) delete host.state.timers[key];

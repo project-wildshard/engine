@@ -7,7 +7,7 @@ import { questBooks } from '../src/shared/engine/quest/players';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { createSimHost, type SimHost } from '../src/server/engine/sim';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
-import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
+import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { DeclaredQuests } from '../src/shared/game/quest/declared';
 import { InteractionRules, parseInteractionRows, playerInteractionRules } from '../src/shared/game/quest/interactionRows';
@@ -170,4 +170,19 @@ test('a lead who stood by has no credit, through a save', () => {
   expect(restored.flags.has('dead:boar:1')).toBe(true);
   expect(questBooks(restored).lead.flags.has('dead:boar:1')).toBe(false);
   expect(camp(restored.quests)?.current?.id).toBe('boar');
+});
+
+test('a version 3 save on the wire reads up: the lead\'s credit is the world\'s deaths, and an unmarked book reads them once', () => {
+  const host = createSimHost(SIM_LEVEL, { rapier });
+  new DeclaredQuests(host, CAMP, { coins: () => undefined });
+  const bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 });
+  strike(host, bot.id, 1000);
+  const wire = JSON.parse(serializeSimSnapshot(snapshotSimHost(host))) as { version: number; snapshot: Record<string, unknown> & { books?: Record<string, unknown>[] } };
+  expect(wire.version).toBe(4);
+  // what a version 3 writer left: no credit field, unmarked books holding no deaths, the world's flag for every one
+  const { credit: _credit, ...rest } = wire.snapshot;
+  const old = { ...wire, version: 3, snapshot: { ...rest, version: 3, books: wire.snapshot.books?.map(({ credited: _, ...book }) => ({ ...book, flags: [] })) } };
+  const restored = restoreSimHost(SIM_LEVEL, { rapier }, decodeSimSnapshot(JSON.stringify(old)), fresh => { new DeclaredQuests(fresh, CAMP, { coins: () => undefined }); });
+  expect(questBooks(restored).of(bot.id).flags.has('dead:boar:1')).toBe(true);
+  expect(questBooks(restored).lead.flags.has('dead:boar:1'), 'as a version 3 lead read it').toBe(true);
 });

@@ -94,7 +94,7 @@ const playerState = v.strictObject({ id, position: vector, yaw: finite, health: 
   lock: v.optional(v.strictObject({ target: id, r0: nonnegative })),
   jump: v.optional(v.strictObject({ ago: v.nullable(nonnegative), left: v.picklist([0, 1]) })),
   dash: v.optional(v.strictObject({ t: finite, vx: finite, vz: finite })), dodge: v.optional(v.strictObject({ cd: nonnegative, t: nonnegative })) });
-const entries = {
+const entriesV3 = {
   version: v.literal(3), apiVersion: integer, levelId: id, levelFingerprint: uint32,
   state: v.strictObject({ tick: integer, accumulator: v.pipe(finite, v.minValue(-Number.EPSILON)), timers: v.record(v.string(), nonnegative) }),
   clock: v.strictObject({ version, elapsed: nonnegative, wall: nonnegative, frames: integer,
@@ -109,8 +109,8 @@ const entries = {
     frameCount: v.pipe(integer, v.maxValue(1000)), frameBound: v.boolean() }),
   colliderTags: v.array(v.strictObject({ handle: nonnegative,
     material: v.picklist(['sand', 'wetSand', 'grass', 'rock', 'planks', 'stone', 'water', 'wood', 'metal', 'flesh', 'shell', 'ground', 'edge', 'felt', 'earth']), owner: eventValue })),
-  flags: v.array(id), quests: v.array(quest), credit: v.optional(v.array(id)),
-  books: v.exactOptional(v.array(v.strictObject({ player: id, flags: v.array(id), quests: v.array(quest), parts: v.record(v.string(), v.string()), credited: v.exactOptional(v.literal(true)) }))),
+  flags: v.array(id), quests: v.array(quest),
+  books: v.exactOptional(v.array(v.strictObject({ player: id, flags: v.array(id), quests: v.array(quest), parts: v.record(v.string(), v.string()) }))),
   slots: v.strictObject({ scriptMemory: v.record(v.string(), simValue), scriptGlobals: v.record(v.string(), simValue),
     questState: v.record(v.string(), simValue), ledgerDedupe: v.array(v.string()) }),
   adapters: v.array(v.strictObject({ id, state: simValue })),
@@ -124,6 +124,9 @@ const entries = {
     held: v.nullable(v.strictObject({ value: finite, paused: v.boolean() })), last: v.picklist(DAY_CLOCK_PHASES) })),
   boardColliders: v.optional(v.pipe(v.array(nonnegative), v.minLength(1))), // Rapier handles, as colliderTags'
 };
+// STAGING-BUGBASH SB34: version 4 adds kill credit: the lead's own (`credit`) and each other book's mark that its flags hold its own.
+const entries = { ...entriesV3, version: v.literal(4), credit: v.optional(v.array(id)),
+  books: v.exactOptional(v.array(v.strictObject({ player: id, flags: v.array(id), quests: v.array(quest), parts: v.record(v.string(), v.string()), credited: v.exactOptional(v.literal(true)) }))) };
 const snapshot: v.GenericSchema<unknown, SimSnapshot> = v.strictObject({ ...entries,
   physics: v.pipe(v.array(v.pipe(integer, v.maxValue(255))), v.minLength(1), v.maxLength(maxPhysicsBytes)) });
 const packedPhysicsSchema = v.variant('encoding', [
@@ -134,16 +137,19 @@ const packedPhysicsSchema = v.variant('encoding', [
       chunks: v.pipe(v.array(v.pipe(v.string(), v.minLength(4), v.maxLength(Math.ceil((physicsBlockBytes + 64) / 3) * 4))), v.minLength(1), v.maxLength(Math.ceil(MAX_REFERENCE_BYTES / physicsBlockBytes))), checksum: uint32 }),
 ]);
 const packedSnapshot = v.strictObject({ ...entries, physics: packedPhysicsSchema });
+// SB34: a version 3 save, as the old writer left it: every death was the world's, and every book read it.
+const packedSnapshotV3 = v.strictObject({ ...entriesV3, physics: packedPhysicsSchema });
 // P1-E5.3-A1: a version 2 save, as the old writer left it: a velocity for each mode.
-const { players: _players, ...sharedEntries } = entries;
+const { players: _players, ...sharedEntries } = entriesV3;
 const packedSnapshotV2 = v.strictObject({ ...sharedEntries, version: v.literal(2), players: v.pipe(v.array(playerStateV2), v.minLength(1)), physics: packedPhysicsSchema });
 // P1-E5.2a: a version 1 save, as the old writer left it: one `player`, from an engine with a level API of 1.
 const packedSnapshotV1 = v.strictObject({ ...sharedEntries, version, apiVersion: version, player: playerStateV2, physics: packedPhysicsSchema });
-const wire = v.variant('version', [v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(3), snapshot: packedSnapshot }),
+const wire = v.variant('version', [v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(4), snapshot: packedSnapshot }),
+  v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(3), snapshot: packedSnapshotV3 }),
   v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(2), snapshot: packedSnapshotV2 }),
   v.strictObject({ format: v.literal('sim.snapshot'), version, snapshot: packedSnapshotV1 })]);
-/** WIRE-STABILITY WR7: the persisted `sim.snapshot` contract, for saves.lock.json: version 3, read up from 1 and 2. */
-export const SIM_SNAPSHOT_CONTRACT: { readonly version: number; readonly schema: v.GenericSchema<unknown, unknown>; readonly migrations: readonly number[] } = { version: 3, schema: wire, migrations: [1, 2] };
+/** WIRE-STABILITY WR7: the persisted `sim.snapshot` contract, for saves.lock.json: version 4, read up from 1, 2 and 3. */
+export const SIM_SNAPSHOT_CONTRACT: { readonly version: number; readonly schema: v.GenericSchema<unknown, unknown>; readonly migrations: readonly number[] } = { version: 4, schema: wire, migrations: [1, 2, 3] };
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 // A JSON-tree fence also rejects cycles/accessors/classes before lazy recursive schemas run.
@@ -438,9 +444,14 @@ function migratePlayerV2({ walk, fall, board, swim, ...rest }: v.InferOutput<typ
     ...(board === undefined ? fall?.grounded === false : !board.ground) ? { airborne: true as const } : {}, ...(board === undefined ? {} : { board: { air: board.air, bob: board.bob } }),
     ...(swim === undefined ? {} : { swim: { on: swim.on, diving: swim.diving, climbTo: swim.climbTo, climbCooldown: swim.climbCooldown, stroke: swim.stroke, stood: swim.stood } }) };
 }
+/** A version 3 save is a version 4 save with no credit of its own: the lead's is the world's deaths, and every other book,
+ *  unmarked, reads them once on restore (SB34), as it read them before. */
+function migrateV3(saved: v.InferOutput<typeof packedSnapshotV3>): v.InferOutput<typeof packedSnapshot> {
+  return { ...saved, version: 4 };
+}
 /** A version 2 save is a version 3 save with one velocity on each player. Nothing else about the continuation moved. */
 function migrateV2({ players, ...rest }: v.InferOutput<typeof packedSnapshotV2>, apiVersion: number): v.InferOutput<typeof packedSnapshot> {
-  return { ...rest, version: 3, apiVersion, players: players.map(migratePlayerV2) };
+  return migrateV3({ ...rest, version: 3, apiVersion, players: players.map(migratePlayerV2) });
 }
 /** A version 1 save is a version 2 save with its one player as the list. Nothing else about the continuation moved. */
 function migrateV1({ player, ...rest }: v.InferOutput<typeof packedSnapshotV1>, apiVersion: number): v.InferOutput<typeof packedSnapshot> {
@@ -450,7 +461,8 @@ function readSnapshotData(input: unknown, apiVersion: number, physicsBasis: Uint
   const parsed: unknown = typeof input === 'string' ? JSON.parse(input) : input;
   jsonTree(parsed);
   const envelope = v.parse(wire, parsed);
-  const saved = envelope.version === 1 ? migrateV1(envelope.snapshot, apiVersion) : envelope.version === 2 ? migrateV2(envelope.snapshot, apiVersion) : envelope.snapshot;
+  const saved = envelope.version === 1 ? migrateV1(envelope.snapshot, apiVersion) : envelope.version === 2 ? migrateV2(envelope.snapshot, apiVersion)
+    : envelope.version === 3 ? migrateV3(envelope.snapshot) : envelope.snapshot;
   // Validate metadata/engine/identities before reporting a recoverable basis change. The placeholder is never returned:
   // the checksummed bytes replace it, as the writer does (a schema walk of Pine's 8.4M bytes was ~2 of a 2.3 s decode).
   const metadata = identities(v.parse(snapshot, { ...saved, physics: [0] }), apiVersion);
