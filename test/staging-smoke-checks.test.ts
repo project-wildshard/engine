@@ -1,6 +1,8 @@
 // Meta STAGING-SMOKE SM2: each hard check, fed a recorded sample or log, gives its listed severity; `hold` is true exactly when
 // a P0 or P1 is present.
 import { expect, test } from 'vitest';
+import {createTempRepo} from '../src/test/helpers/git';
+import {engineRelease} from '../scripts/changelog.mjs';
 import { checkScenario, holds, olderVersion, verdictOf } from '../scripts/staging-smoke/checks.mjs';
 import type { ScenarioResult } from '../scripts/staging-smoke/scenarios.mjs';
 
@@ -76,4 +78,30 @@ test('a skipped scenario has no checks; hold is true exactly with a P0 or P1', (
   expect(holds([])).toBe(false);
   expect(olderVersion('0.1.9', '0.1.31')).toBe(true);
   expect(olderVersion('0.1.31', '0.1.31')).toBe(false);
+});
+
+// A repair on an untagged release branch deliberately keeps its commit count
+// (engineRelease/SB7). The smoke must accept that label for this exact build.
+test('an actual untagged release repair keeps its verified describe label', () => {
+  const repo=createTempRepo();
+  try {
+    repo.commit({'package.json':JSON.stringify({version:'0.1.33'})},'chore(release): v0.1.33');
+    repo.git(['tag','v0.1.33']);
+    repo.commit({'package.json':JSON.stringify({version:'0.1.34'})},'chore(release): v0.1.34');
+    repo.commit({'repair.txt':'fixed'},'fix(grid): placed metadata');
+    const build=repo.git(['rev-parse','HEAD']).trim(), release=engineRelease(repo.dir);
+    expect(release.describe).toMatch(/^v0\.1\.34-1-g[0-9a-f]+$/u);
+    expect(failed(clean(),{...ctx,build,version:{...ctx.version,build,describe:release.describe}})).toEqual([]);
+  } finally {repo.cleanup();}
+});
+
+test.each([
+  {describe:'v0.1.34-2-gcccccccc'},
+  {describe:'v0.1.33-2-gbbbbbbbb'},
+  {describe:'v0.1.34-0-gbbbbbbbb'},
+  {describe:'v0.1.34-2-gbbbbbb'},
+  {describe:'v0.1.34-2-gbbbbbbbb-extra'},
+  {clientVersion:'0.1.33'},
+])('a repaired label never excuses a mismatched version or SHA: %j', patch => {
+  expect(failed(clean(),{...ctx,version:{...ctx.version,...patch}})).toEqual(['P1 version']);
 });

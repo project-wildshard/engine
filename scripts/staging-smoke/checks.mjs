@@ -53,7 +53,12 @@ export function checkScenario(s, ctx) {
   const dropped = s.legs.filter((leg) => (leg.modals ?? []).includes('drop')).map((leg) => leg.name);
   if (s.oldCache === undefined) add('drop', 'P1', dropped.length === 0, `a drop modal opened on the way into play (${dropped.join(', ')})`);
   const v = ctx.version;
-  const named = (ctx.build === undefined || v.build === ctx.build) && v.describe === ctx.release;
+  // SB7 keeps a commit count on an untagged release repair (engineRelease).
+  // Admit it only for the requested version and the same full build's SHA.
+  const repair = /^(v\d+\.\d+\.\d+)-[1-9]\d*-g([a-f0-9]{7,40})$/u.exec(v.describe ?? '');
+  const suffix = repair?.[2];
+  const label = v.describe === ctx.release || (repair?.[1] === ctx.release && suffix !== undefined && typeof v.build === 'string' && /^[a-f0-9]{40}$/u.test(v.build) && v.build.startsWith(suffix));
+  const named = (ctx.build === undefined || v.build === ctx.build) && v.clientVersion === ctx.release.slice(1) && label;
   if (ctx.checkVersion !== false) add('version', 'P1', named, `/version.json names ${v.build?.slice(0, 8) ?? 'no build'} ${v.describe ?? 'no describe'}, not ${ctx.build?.slice(0, 8) ?? ''} ${ctx.release} (SB7)`.replaceAll(/ {2,}/gu, ' '));
   // the old cache (K1, K2): the candidate on the first page, a forced update's wipe, the save kept
   if (s.oldCache !== undefined) {
