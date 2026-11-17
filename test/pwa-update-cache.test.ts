@@ -134,14 +134,16 @@ test('NB11: bare art keys name its bytes rather than its release set', async () 
   } finally { rmSync(root, {recursive: true, force: true}); }
 });
 
-test('PZ10: a page with no content base bakes no content origin and precaches as before', async () => {
+test('PZ10: a page with no content base bakes no content origin; its packs book precaches with the page (FM5 mode 1)', async () => {
   const url = '/assets/spawn/server-fixture.json', bytes = new TextEncoder().encode('{"book":"server"}');
   const packs = { url: '/assets/spawn/packs-fixture.json', bytes: new TextEncoder().encode('{"book":"packs"}') };
   for (const bank of [{}, { contentBase: '' }]) {
     const { core } = await serviceWorkerCore({ 'index.html': page(bank) }, process.cwd(), 'fixture', { url, bytes }, packs);
     expect(core).not.toContain('__CONTENT__');
     expect(bakedContent(core)).toEqual({ base: '', files: [] });
-    expect(core).toContain(url); expect(core).not.toContain(packs.url);
+    expect(core).toContain(url);
+    // OFFLINE J298: a warmed world starts offline only if the worker holds the book its download reads first
+    expect(core).toContain(packs.url);
   }
 });
 

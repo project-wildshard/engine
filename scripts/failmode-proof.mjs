@@ -344,10 +344,11 @@ try {
       try {
         await page.goto(URL_PLAY); await intoWorld(entered);
         const before = await control();
-        await arm(item.id, [plan.first]);
+        const name = item.id.replace('/', '-');
+        await arm(name, [plan.first]);
         for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
         if (await matchedSince(before, 'socket') === 0) return { outcome: 'harness-fail', reason: 'the socket fault matched nothing' };
-        if (plan.hold !== null) await arm(`${item.id}-held`, [plan.hold]);
+        if (plan.hold !== null) await arm(`${name}-held`, [plan.hold]);
         const banner = await screen(page, plan.banner, plan.waitMs);
         if (banner === null) return { outcome: 'ui-fail', reason: `no ${plan.banner} banner to tap under`, notes: await onScreen(page) };
         const started = Date.now();
@@ -497,7 +498,13 @@ try {
         if (!await controlling()) { await page.waitForFunction(async () => (await navigator.serviceWorker?.getRegistration())?.active !== undefined, undefined, { timeout: 60_000 }).catch(() => undefined); await page.goto(URL_PLAY); await intoWorld(entered); }
         const controlled = await controlling();
         if (!controlled) return { outcome: 'unsupported', reason: `${engine}: no controlling service worker after the warm visit, so nothing can launch offline` };
-        await sleep(3000);
+        // the worker precaches its build's code after control (DL1): wait until what it holds stops growing, not a fixed 3 s
+        let held = -1;
+        for (let still = 0, tries = 0; still < 3 && tries < 90; tries++) {
+          await sleep(1000);
+          const entries = await page.evaluate(async () => (await window.__ws_sw?.version())?.entries ?? 0).catch(() => 0);
+          still = entries > 0 && entries === held ? still + 1 : 0; held = entries;
+        }
         await context.setOffline(true);
         const loopbackCut = await cutLoopback(false), injection = { warmed: true, setOffline: true, ...loopbackCut ? { loopbackCut } : {} };
         const started = Date.now(); await page.goto(URL_PLAY).catch(() => undefined);
