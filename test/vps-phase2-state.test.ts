@@ -84,6 +84,36 @@ test('prefill changes only exact blank rows, is atomic, preserves filled values 
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+// PC4-REMOVE: goes with setup-state.mjs's RETIRED_PACKS once the Worker is deleted.
+test('prefill moves exact rows off the retired packs Worker and keeps every other filled value (PACKS-CDN PC3)', () => {
+  const directory = root(), path = join(directory, 'staging.env');
+  const worker = `https://${['wildshard-packs', 'wildshard', 'workers', 'dev'].join('.')}`;
+  const original = `PACK_ORIGIN=${worker}\nRELEASE_URL=${worker}/releases/staging.json\nRELEASE_PUBLIC_KEY=${key}\nSEAT_SECRET=owned-test-value\n`;
+  writeFileSync(path, original); chmodSync(path, 0o600);
+  const args = ['prefill', path, 'staging', key, '--check', String(process.getuid?.()), String(process.getgid?.())];
+  try {
+    const checked = run(args); expect(checked.status, String(checked.stderr)).toBe(0);
+    expect(String(checked.stdout)).toContain('would move PACK_ORIGIN in staging env off the retired packs Worker');
+    expect(String(checked.stdout)).toContain('would move RELEASE_URL in staging env off the retired packs Worker');
+    expect(readFileSync(path, 'utf8')).toBe(original);
+    args[4] = '--apply'; const applied = run(args); expect(applied.status, String(applied.stderr)).toBe(0);
+    expect(String(applied.stdout)).not.toContain('owned-test-value');
+    expect(readFileSync(path, 'utf8')).toBe(`PACK_ORIGIN=https://packs.wildshard.io\nRELEASE_URL=https://packs.wildshard.io/releases/staging.json\nRELEASE_PUBLIC_KEY=${key}\nSEAT_SECRET=owned-test-value\n`);
+    expect(String(run(args).stdout)).toContain('ok keep filled PACK_ORIGIN');
+    // The origin with a trailing slash moves too.
+    const slashed = readFileSync(path, 'utf8').replace('PACK_ORIGIN=https://packs.wildshard.io', `PACK_ORIGIN=${worker}/`);
+    writeFileSync(path, slashed); expect(run(args).status).toBe(0);
+    expect(readFileSync(path, 'utf8')).toContain('PACK_ORIGIN=https://packs.wildshard.io\n');
+    // Another channel's file, a path below the origin and a foreign host all stay as they are.
+    for (const kept of [`RELEASE_URL=${worker}/releases/production.json`, `PACK_ORIGIN=${worker}/other`, 'PACK_ORIGIN=https://keep.invalid']) {
+      const row = kept.split('=')[0] ?? '';
+      const text = readFileSync(path, 'utf8').replace(new RegExp(`^${row}=[^\\n]*`, 'm'), kept);
+      writeFileSync(path, text); const outcome = run(args); expect(outcome.status).toBe(0); expect(readFileSync(path, 'utf8')).toBe(text);
+      if (kept.includes(worker)) expect(String(outcome.stdout)).toContain('still names the retired packs Worker');
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('the staged pin must match embedded trust and reject symlinks, wrong owners and writable files', () => {
   const directory = root(), path = join(directory, 'release-public-key.hex');
   writeFileSync(path, `${key}\n`); chmodSync(path, 0o644);

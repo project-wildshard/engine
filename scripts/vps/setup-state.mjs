@@ -61,11 +61,19 @@ function pin(path, expected, uid) {
   console.info('ok trusted release public key');
 }
 
-/** Fill only exact blank rows. All other bytes, including the seat secret, survive.
+// PACKS-CDN PC3 (meta docs/plans/PACKS-CDN-PLAN.md): the retired `wildshard-packs` Worker served the same bucket as
+// packs.wildshard.io. A row naming exactly its address moves to the CDN's; any other filled value (quoted, CRLF, another
+// path) is kept, with a warning that names the Worker. PC4-REMOVE: drop this once the Worker is deleted.
+const RETIRED_PACKS = `https://${['wildshard-packs', 'wildshard', 'workers', 'dev'].join('.')}`;
+
+/** Fill only exact blank rows, and move exact rows off the retired packs Worker. All other bytes, including the seat
+ * secret, survive.
  * @param {string} path @param {string} channel @param {string} key @param {boolean} check @param {number} uid @param {number} gid */
 function prefill(path, channel, key, check, uid, gid) {
   if (!['production', 'staging'].includes(channel)) throw new Error('Unknown release channel');
   const values = { PACK_ORIGIN: 'https://packs.wildshard.io', RELEASE_URL: `https://packs.wildshard.io/releases/${channel}.json`, RELEASE_PUBLIC_KEY: key };
+  /** @type {Record<string, readonly string[]>} */
+  const retired = { PACK_ORIGIN: [RETIRED_PACKS, `${RETIRED_PACKS}/`], RELEASE_URL: [`${RETIRED_PACKS}/releases/${channel}.json`] };
   let before, stat;
   try {
     const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -82,8 +90,13 @@ function prefill(path, channel, key, check, uid, gid) {
     const rows = text.match(new RegExp(`^${name}=[^\\n]*`, 'gm')) ?? [];
     if (rows.length !== 1) throw new Error(`Expected exactly one ${name} row in ${channel} env`);
     if (rows[0] === `${name}=`) { console.info(`${check ? 'would' : 'doing'} fill ${name} in ${channel} env`); text = text.replaceAll(new RegExp(`^${name}=(?=\\n|$)`, 'gm'), `${name}=${value}`); }
+    else if ((retired[name] ?? []).some(old => rows[0] === `${name}=${old}`)) {
+      console.info(`${check ? 'would' : 'doing'} move ${name} in ${channel} env off the retired packs Worker`);
+      text = text.replace(new RegExp(`^${name}=[^\\n]*`, 'm'), `${name}=${value}`);
+    }
     else {
       console.info(`${rows[0] === `${name}=${value}` ? 'ok' : 'warn'} keep filled ${name} in ${channel} env`);
+      if (rows[0].includes(RETIRED_PACKS)) console.info(`warn ${name} in ${channel} env still names the retired packs Worker; move it by hand`);
       if (name === 'RELEASE_PUBLIC_KEY' && rows[0] !== `${name}=${value}`) throw new Error(`Existing ${channel} release trust differs; preserve it and refuse activation`);
     }
   }

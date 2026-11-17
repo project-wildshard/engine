@@ -230,8 +230,12 @@ EOF
 }
 env_file production "$PROD_PORT" 4 32
 env_file staging "$STAGING_PORT" 2 16
+MOVED_PACKS=' '
 for channel in production staging; do
-  "$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --apply 0 "${CHANNEL_GID[$channel]}"
+  filled=$("$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --apply 0 "${CHANNEL_GID[$channel]}")
+  [ -z "$filled" ] || printf '%s\n' "$filled"
+  # PACKS-CDN PC3 (PC4-REMOVE): a server reads PACK_ORIGIN and RELEASE_URL once, so a moved row needs a restart below.
+  case $filled in *'off the retired packs Worker'*) MOVED_PACKS="$MOVED_PACKS$channel " ;; esac
 done
 # J266 (MS3.5): the settings an agent may change move out of the secrets file into <channel>.settings, once.
 for channel in production staging; do python3 -I "$HERE/wildshard-config" split "$channel"; done
@@ -413,6 +417,8 @@ for channel in production staging; do
   pid=$(systemctl show -p MainPID --value "wildshard-server@$channel.service" 2>/dev/null || printf 0)
   if [ "${pid:-0}" != 0 ] && [ "$(ps -o user:32= -p "$pid" 2>/dev/null | tr -d ' ')" != "wildshard-$channel" ]; then
     say doing "restart $channel as wildshard-$channel"; systemctl restart "wildshard-server@$channel.service"
+  elif [ "${pid:-0}" != 0 ] && [[ $MOVED_PACKS == *" $channel "* ]]; then
+    say doing "restart $channel to read packs.wildshard.io"; systemctl restart "wildshard-server@$channel.service"
   fi
 done
 for channel in production staging; do
