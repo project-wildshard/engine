@@ -28,8 +28,8 @@
 //
 // J85 keeps only live, previous and preview, so an old commit's head eventually 404s on the API. Every tarball therefore has a
 // second home: WILDSHARD_PIN_MIRROR, by default this repo's `pins` release, whose assets are named by hash and never replaced.
-// The cache is tried first, then the mirror, then the API. A slice isn't a shardfile and the API never held one, so only the
-// mirror serves it. Coverage rows 4 and 5.
+// The cache is tried first, then the mirror, then the API. A missing slice is rebuilt from its pinned parent, and must
+// match its committed hash, byte count and file count exactly. Coverage rows 4 and 5.
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
 import './bake-loader.mjs';
 import { createHash } from 'node:crypto';
@@ -145,13 +145,31 @@ async function tarball({ slug, hash }: Pick<Pin, 'slug' | 'hash'>, apiHolds = tr
     if (sha256(bytes) === hash) return bytes;
     rmSync(file);
   }
-  const bytes = await fetched(`${MIRROR}/${hash}.tar`, slug, hash) ?? (apiHolds ? await fetched(`${API}/api/shardfiles/${hash}`, slug, hash) : undefined);
+  let bytes = await fetched(`${MIRROR}/${hash}.tar`, slug, hash) ?? (apiHolds ? await fetched(`${API}/api/shardfiles/${hash}`, slug, hash) : undefined);
+  if (bytes === undefined && !apiHolds) {
+    const row = (readJson(SLICES) as {slices: readonly Slice[]}).slices.find(candidate => candidate.slug === slug && candidate.hash === hash);
+    const parent = (readJson(PINS) as PinFile).shards.find(pin => pin.slug === slug);
+    if (row === undefined || parent === undefined || row.from !== parent.hash) throw new Error(`${slug}: slice belongs to another head; re-cut with node scripts/pins.ts slice`);
+    const rebuilt = await cutSlice(parent);
+    if (sha256(rebuilt.bytes) !== hash || rebuilt.bytes.length !== row.bytes || rebuilt.files !== row.files) throw new Error(`${slug}: reconstructed slice differs from the pin; re-cut with node scripts/pins.ts slice`);
+    bytes = rebuilt.bytes;
+    console.log(`${slug}: reconstructed pinned server slice from its verified head`);
+  }
   if (bytes === undefined) throw new Error(`${slug}: neither the mirror nor the API holds ${hash}`);
   mkdirSync(CACHE, { recursive: true });
   const part = `${file}.${process.pid}`;
   writeFileSync(part, bytes);
   renameSync(part, file);
   return bytes;
+}
+
+/** The same deterministic server inventory backs a fresh cut and a missing mirror artifact. */
+async function cutSlice(pin: Pin): Promise<{bytes: Uint8Array; files: number}> {
+  const {serverRows, openShardfile} = await import('../src/cook/game/shardCook.ts');
+  const {writeTar} = await import('@wildshard/format/tar');
+  const shard = openShardfile(await tarball(pin)), files = new Map<string, Uint8Array>();
+  for (const row of serverRows(shard)) files.set(row.path, shard.read(row.path));
+  return {bytes: writeTar(files), files: files.size};
 }
 
 /** Each pin with its tarball, in pin order, with at most `limit` fetches ahead of the reader. */
@@ -380,16 +398,12 @@ const ringOf = (name: string): Ring => {
 /** What a server reads of a head, as a tarball of its own: a slice proves a host on real data with none of the art. It holds no
  *  receipt and isn't a product a page can open, so no build reads it. */
 async function slice(check = false): Promise<void> {
-  const { serverRows, openShardfile } = await import('../src/cook/game/shardCook.ts');
-  const { writeTar } = await import('@wildshard/format/tar');
   const { shards } = readJson(PINS) as PinFile, rows: Slice[] = [];
   const existing = existsSync(SLICES) ? (readJson(SLICES) as {slices: readonly Slice[]}).slices : [];
   for (const slug of ringOf('1').slices) {
     const pin = shards.find(row => row.slug === slug);
     if (pin === undefined) throw new Error(`Not pinned: ${slug}`);
-    const shard = openShardfile(await tarball(pin)), files = new Map<string, Uint8Array>();
-    for (const row of serverRows(shard)) files.set(row.path, shard.read(row.path));
-    const bytes = writeTar(files), hash = sha256(bytes);
+    const {bytes, files} = await cutSlice(pin), hash = sha256(bytes);
     if (check) {
       const prior = existing.find(row => row.slug === slug);
       if (prior?.from !== pin.hash || prior.hash !== hash) throw new Error(`${slug}: slice differs from a fresh cook; re-cut with node scripts/pins.ts slice`);
@@ -397,8 +411,8 @@ async function slice(check = false): Promise<void> {
       mkdirSync(CACHE, { recursive: true });
       writeFileSync(join(CACHE, `${hash}.tar`), bytes);
     }
-    rows.push({ slug, from: pin.hash, hash, bytes: bytes.length, files: files.size });
-    console.log(`${slug}: ${(pin.bytes / 1e6).toFixed(1)} MB head, ${(bytes.length / 1e6).toFixed(1)} MB slice, ${files.size} files`);
+    rows.push({ slug, from: pin.hash, hash, bytes: bytes.length, files });
+    console.log(`${slug}: ${(pin.bytes / 1e6).toFixed(1)} MB head, ${(bytes.length / 1e6).toFixed(1)} MB slice, ${files} files`);
   }
   if (!check) writeFileSync(SLICES, json({ slices: rows }));
   console.log(`${rows.length} slices, ${(rows.reduce((sum, row) => sum + row.bytes, 0) / 1e6).toFixed(1)} MB`);

@@ -9,6 +9,9 @@ import { join, resolve as resolvePath } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { restorePacks, type PackedIndex } from '../scripts/pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../scripts/pin-assets.ts';
+import {formatTemplate} from '../scripts/pin-format.ts';
+import {writeTar} from '@wildshard/format/tar';
+import {openShardfile, serverRows} from '../src/cook/game/shardCook';
 
 /** The tool's stderr, once it exits. */
 const pinsTool = (cwd: string, env: NodeJS.ProcessEnv, ...args: readonly string[]): Promise<string> => new Promise(resolve => {
@@ -62,7 +65,7 @@ test('remote fallback publication refuses wrong and oversized HTTP bodies and ve
   await new Promise<void>(resolve=>{server.listen(0,'127.0.0.1',()=>{resolve();});});
   const address=server.address();if(address===null||typeof address==='string')throw new Error('No fixture port');
   let expectedUrl=`https://raw.githubusercontent.com/project-wildshard/shard-dawn/${'a'.repeat(40)}/public/assets/dawn-isle/model.glb`;
-  const request:typeof fetch=async(input,init)=>{expect(String(input)).toBe(expectedUrl);return fetch(`http://127.0.0.1:${address.port}`,init);};
+  const request:typeof fetch=(input,init)=>{expect(input).toBe(expectedUrl);return fetch(`http://127.0.0.1:${address.port}`,init);};
   const cache=join(root,'cache');
   await expect(fetchPinnedPublicAssets(root,undefined,cache,request)).rejects.toThrow('Pinned public asset bytes differ');
   expect(existsSync(cache)).toBe(false);
@@ -170,6 +173,42 @@ test('a slice comes from the head it was cut from, and Ring 1 names only pinned 
   for (const slug of rings['1']?.products ?? []) expect(heads.has(slug) || slug === 'blender-template').toBe(true);
   expect(slices.map(row => row.slug)).toEqual(rings['1']?.slices);
   for (const row of slices) expect(heads.get(row.slug)).toBe(row.from);
+});
+
+test('a missing mirrored slice rebuilds exact pinned bytes and refuses changed descriptors', async () => {
+  const root = mkdtempSync(resolvePath('tmp/pin-slice-rebuild-')); folders.push(root);
+  const product = formatTemplate('brasscap-mesa'), shard = openShardfile(product.bytes);
+  const files = new Map(serverRows(shard).map(row => [row.path, shard.read(row.path)]));
+  const body = writeTar(files), hash = createHash('sha256').update(body).digest('hex');
+  const row = {slug: product.pin.slug, from: product.pin.hash, hash, bytes: body.length, files: files.size};
+  mkdirSync(join(root, 'test/pins'), {recursive: true});
+  const save = (name: string, value: unknown): void => { writeFileSync(join(root, 'test/pins', name), JSON.stringify(value)); };
+  save('shardfiles.json', {api: 'local', shards: [product.pin]});
+  save('assets.json', {version: 1, assets: []});
+  save('slices.json', {slices: [row]});
+  save('rings.json', {'1': {products: [row.slug], slices: [row.slug]}});
+  save('catalogue.json', {shards: [{slug: row.slug}], placements: [], grid: {cells: []}});
+  mkdirSync(join(root, 'src/shared/game'), {recursive: true});
+  writeFileSync(join(root, 'src/shared/game/slugNames.json'), readFileSync('src/shared/game/slugNames.json'));
+  const server = createServer((request, response) => {
+    if (request.url === `/api/shardfiles/${product.pin.hash}`) response.end(product.bytes);
+    else {response.statusCode = 404; response.end();}
+  }); servers.push(server);
+  await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });
+  const address = server.address(); if (address === null || typeof address === 'string') throw new Error('No fixture port');
+  const origin = `http://127.0.0.1:${address.port}`, cache = join(root, 'cache');
+  const env = {...process.env, WILDSHARD_API: origin, WILDSHARD_PIN_MIRROR: `${origin}/mirror`, WILDSHARD_PIN_CACHE: cache, GIT_CEILING_DIRECTORIES: root};
+  expect(await pinsTool(root, env, 'install', '--ring', '1')).toBe('');
+  expect(readFileSync(join(cache, `${hash}.tar`))).toEqual(Buffer.from(body));
+  expect(readFileSync(join(root, 'out/.slices', row.slug, 'shard.json'))).toEqual(Buffer.from(shard.header));
+  for (const changed of [{hash: '0'.repeat(64)}, {bytes: row.bytes + 1}, {files: row.files + 1}]) {
+    rmSync(join(cache, `${hash}.tar`), {force: true});
+    save('slices.json', {slices: [{...row, ...changed}]});
+    expect(await pinsTool(root, env, 'install', '--ring', '1')).toContain('reconstructed slice differs from the pin');
+    expect(existsSync(join(root, 'out/.slices', row.slug))).toBe(false);
+  }
+  save('slices.json', {slices: [{...row, from: '0'.repeat(64)}]});
+  expect(await pinsTool(root, env, 'install', '--ring', '1')).toContain('slice belongs to another head');
 });
 
 test('a pack a thin head left out comes back from its members, and a carried one stays as it came', () => {
