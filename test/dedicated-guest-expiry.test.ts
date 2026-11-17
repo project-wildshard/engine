@@ -28,9 +28,17 @@ test('a guest idle past the days goes whole; a fresher guest and every account s
   await seen(db, 'device:recent', 6);
   await seen(db, 'account:plr_0123456789abcdef0123456789abcdef', 30);
   expect(await expireGuests(db, 7, NOW), 'one guest gone').toBe(1);
-  for (const table of ['player', 'player_save', 'ledger_receipt', 'player_place']) {
+  for (const table of ['player_save', 'player_place']) {
     expect(await ids(db, table), table).toEqual(['account:plr_0123456789abcdef0123456789abcdef', 'device:recent']);
   }
+  // MP2.5g (review S5): one rule with an account delete: the ledger keeps the guest's receipts under an id that names nobody
+  const players = await ids(db, 'player'), receipts = await ids(db, 'ledger_receipt');
+  expect(players.filter(id => !id.startsWith('deleted:'))).toEqual(['account:plr_0123456789abcdef0123456789abcdef', 'device:recent']);
+  expect(receipts).toEqual(players);
+  const gone = players.find(id => id.startsWith('deleted:')) ?? '';
+  expect(gone).toMatch(/^deleted:[0-9a-f-]{36}$/u);
+  expect((await db.query('select name, grant_kind from ledger_receipt where player_id = $1 order by name', [gone])).rows, 'its coins and its title').toEqual([{ name: 'coins', grant_kind: 'coins' }, { name: 'founder', grant_kind: 'title' }]);
+  expect((await db.query('select name, tag from player where id = $1', [gone])).rows).toEqual([{ name: 'Deleted', tag: null }]);
   expect(await expireGuests(db, 7, NOW), 'nothing left to expire').toBe(0);
 });
 
@@ -38,7 +46,9 @@ test('a sweep goes in batches until none is left', async () => {
   const db = await fresh();
   for (let i = 0; i < 5; i++) await seen(db, `device:g${String(i)}`, 9);
   expect(await expireGuests(db, 7, NOW, 2)).toBe(5);
-  expect(await ids(db, 'player')).toEqual([]);
+  expect((await ids(db, 'player')).filter(id => !id.startsWith('deleted:')), 'every guest gone').toEqual([]);
+  expect(await ids(db, 'player'), 'five anonymous ledgers, one per guest').toHaveLength(5);
+  expect(await expireGuests(db, 7, NOW + 30 * DAY_MS), 'an anonymous ledger never expires').toBe(0);
 });
 
 test('the switch: off unless GUEST_EXPIRY_DAYS names a whole number of days, at least 1', () => {
@@ -64,4 +74,15 @@ test('switched on, the server sweeps an hour after boot and then nightly, and lo
   scope.dispose();
   await vi.advanceTimersByTimeAsync(2 * DAY_MS);
   expect(swept, 'a stopped server sweeps no more').toHaveLength(2);
+});
+
+test('MP2.5f/g: an expired guest\'s chat reports name nobody, as a deleted account\'s do', async () => {
+  const db = await fresh();
+  await seen(db, 'device:old', 8);
+  await db.query("insert into chat_report (reporter, speaker, name, channel, typed, shown, shard, tick) values ('device:recent', 'device:old', 'Ann#1', 'say', 'x', 'x', $1, 1)", [SHARD]);
+  expect(await expireGuests(db, 7, NOW)).toBe(1);
+  const [row] = (await db.query('select reporter, speaker, name from chat_report')).rows as { reporter: string; speaker: string; name: string }[];
+  expect(row?.reporter).toBe('device:recent');
+  expect(row?.speaker).toMatch(/^deleted:/u);
+  expect(row?.name).toBe('Deleted');
 });

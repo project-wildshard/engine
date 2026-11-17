@@ -1,17 +1,19 @@
 import type { Scope } from '@wildshard/engine/app/scope';
+import { anonymise } from './account';
 import type { Database } from './database';
 
 // MMO-PLAN MP2.3 (Q33: "Guest ids expire after 7 idle days"; Q30: "unclaimed ids can expire way faster" than 180 days). A guest is
-// a `device:` id; nobody has seen it (`player.seen_at`, touched by every save and Name claim) for the idle days, so it goes whole:
-// saves, receipts, place, its platform grants and the Name tag it held. Accounts (`account:plr_…`) never expire here; deleting one
+// a `device:` id; nobody has seen it (`player.seen_at`, touched by every save and Name claim) for the idle days, so it goes: saves,
+// place and the Name tag it held. MP2.5g (review S5): its receipts (platform grants too) and chat reports stay under an id that names
+// nobody, the same rule as an account delete (`account.ts` `anonymise`), so the ledger still adds up. Accounts (`account:plr_…`) never expire here; deleting one
 // is MP2.5's. A device a sign-in claimed (MP2.2d) has only its `player` row left, which goes the same way.
 // Off unless `GUEST_EXPIRY_DAYS` is set: switching it on deletes every Friends-grid guest idle that long, which is Jake's call.
 
 /** How many guests one statement takes, so a first sweep over a big table holds no long lock. */
 const BATCH = 500;
 const DAY_MS = 86_400_000, HOUR_MS = 3_600_000;
-/** `player_id` tables first: each references `player`. */
-const OWNED = ['ledger_receipt', 'player_save', 'player_place'] as const;
+/** `player_id` tables first: each references `player`. Receipts move to an anonymous id first (`anonymise`). */
+const OWNED = ['player_save', 'player_place'] as const;
 
 /** Delete guests unseen for `days` before `nowMs`, `batch` at a time; how many went. */
 export async function expireGuests(db: Database, days: number, nowMs: number = Date.now(), batch: number = BATCH): Promise<number> {
@@ -22,6 +24,7 @@ export async function expireGuests(db: Database, days: number, nowMs: number = D
       const { rows } = await sql.query(`select id from player where id like 'device:%' and seen_at < $1 order by seen_at limit $2 for update skip locked`, [before, batch]);
       const ids = rows.map(row => String((row as { id: unknown }).id));
       if (ids.length === 0) return 0;
+      await anonymise(sql, ids);
       for (const table of OWNED) await sql.query(`delete from ${table} where player_id = any($1::text[])`, [ids]);
       await sql.query('delete from player where id = any($1::text[])', [ids]);
       return ids.length;

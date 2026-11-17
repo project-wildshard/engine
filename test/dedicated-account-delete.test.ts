@@ -53,3 +53,25 @@ test('a guest id is never deleted through the account path', async () => {
   await expect(deleteAccount(db, 'device:phone')).rejects.toThrow(/account/u);
   await expect(exportAccount(db, 'device:phone')).rejects.toThrow(/account/u);
 });
+
+// MP2.5f (review S2): chat reports outlive the account for moderation, and name nobody. The rule: a report keeps what was typed
+// and shown (the evidence), while the deleted player's id, as reporter or speaker, becomes the same `deleted:` id its receipts
+// moved to (so a moderator still sees one speaker's reports together), and a reported Name reads "Deleted".
+const report = (db: Database, reporter: string, speaker: string, name: string): Promise<unknown> => db.query(
+  "insert into chat_report (reporter, speaker, name, channel, typed, shown, shard, tick) values ($1, $2, $3, 'say', 'rude words', 'r*** words', $4, 1)", [reporter, speaker, name, SHARD]);
+
+test('MP2.5f: a deleted account\'s chat reports keep the evidence under its deleted id, and its Name goes', async () => {
+  const db = await fresh();
+  await writeSave(db, 0, save(ACCOUNT, 12));
+  await report(db, OTHER, ACCOUNT, 'Ann#1234');
+  await report(db, ACCOUNT, OTHER, 'Bob#5678');
+  await report(db, OTHER, 'device:phone', 'Cy#0001');
+  expect(await deleteAccount(db, ACCOUNT)).toBe(true);
+  const anonymous = String((await rows(db, "select id from player where id like 'deleted:%'") as { id: string }[])[0]?.id);
+  expect(await rows(db, 'select reporter, speaker, name, typed, shown from chat_report order by id')).toEqual([
+    { reporter: OTHER, speaker: anonymous, name: 'Deleted', typed: 'rude words', shown: 'r*** words' },
+    { reporter: anonymous, speaker: OTHER, name: 'Bob#5678', typed: 'rude words', shown: 'r*** words' },
+    { reporter: OTHER, speaker: 'device:phone', name: 'Cy#0001', typed: 'rude words', shown: 'r*** words' },
+  ]);
+  expect(JSON.stringify(await rows(db, 'select * from chat_report')), 'the account is named nowhere').not.toContain(ACCOUNT);
+});
