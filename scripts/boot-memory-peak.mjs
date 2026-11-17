@@ -113,7 +113,8 @@ export function bootMemoryLine(slug, verdict) {
 /** The boot page for a served client: the shard straight in, muted, no intro, no service worker. @param {string} url @param {string} chunk */
 export function bootPageURL(url, chunk) {
   const page = new URL(url);
-  for (const [key, value] of Object.entries({ chunk, mute: '1', skipintro: '1', nolock: '1', sw: '0' })) page.searchParams.set(key, value);
+  // An empty chunk: the page carries its one shard inline (`wildshard prepare`'s preview), so no `?chunk=`.
+  for (const [key, value] of Object.entries({ ...(chunk === '' ? {} : { chunk }), mute: '1', skipintro: '1', nolock: '1', sw: '0' })) page.searchParams.set(key, value);
   return page.href;
 }
 

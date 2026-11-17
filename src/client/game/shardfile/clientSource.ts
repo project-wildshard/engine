@@ -3,13 +3,11 @@ import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/s
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
-import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
+import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { contentCost } from '@wildshard/format/contentCost';
-import { MEMORY_GATES } from '@wildshard/format/contentBounds';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { isDev } from '@wildshard/engine/core/devMode';
 import { CONTENT_CAPS, PHONE_PLAYING_BYTES, _applyChunkConstants } from '@wildshard/engine/core/config';
 import { configureLevel } from '@wildshard/engine/level/selection';
 import { pageGridInstance, sourceManifest, compiledPageBoot, type PageMode } from '../plugin/context';
@@ -36,6 +34,7 @@ import type { ShardfileClientBindings } from './client';
 import { clientGround, clientPageGround, tiledBootstrapGround } from '../../../shared/game/shardfile/clientGround';
 import { shardfileWater } from './water';
 import { clientResidency } from './clientResidency';
+import { PageMemoryAdmission } from './phoneMemoryLine';
 
 /** The composition root passes this selection to hydration and startSession; its grid intent has already been consumed. */
 export interface PageResidencyBoot {
@@ -57,7 +56,7 @@ export interface PageResidencyBoot {
 /** GC13: the page's playing envelope: the phone tier's 1.0 GB (G65), else the shared caps' */
 export function pagePlayingBytes(tier: Tier = TIER): number { return tier === 'phone' ? PHONE_PLAYING_BYTES : CONTENT_CAPS.playing; }
 
-export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'shardfile' | 'runtimeCost'>, configuredSlug?: string, memory: MemoryAdmission = new MemoryAdmission(() => MEMORY_GATES.reportOnly || isDev())): PageResidencyBoot {
+export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'shardfile' | 'runtimeCost'>, configuredSlug?: string, memory: MemoryAdmission = new PageMemoryAdmission()): PageResidencyBoot {
   const mode = bootPageMode(configuredSlug ?? manifest.slug);
   const measuredHome = configuredSlug === undefined && manifest.shardfile === undefined;
   if (mode !== 'grid' && (!measuredHome || manifest.runtimeCost === undefined)) return { mode, instance: null, memory };

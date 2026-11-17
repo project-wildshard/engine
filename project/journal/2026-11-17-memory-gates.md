@@ -24,3 +24,11 @@ v0.1.36 is 1.318 GB, x1.4 for the phone = 1.845 GB, so Metal's factor
 is 0.87. Linux (SwiftShader) stays 1 until a hosted reading. `--entry=
 select` walks in through SHARD SELECT for released pages; staging's
 direct `?chunk=` load stopped with "build stopped: its scope has closed".
+
+MG3: the page's memory admission is now `PageMemoryAdmission`. On the
+phone tier a shard whose playing estimate passes 1.5 GB stops the boot
+with a `ShardMemoryRefusalError`, whose message is the card ("This world needs
+about 1.70 GB ... a phone has 1.50 GB ..."), even while memoryGates.json
+is report-only. A live grid's residency claim over the line is declined
+the ordinary way rather than thrown mid-play. Developer pages keep their
+override, so the boot memory probe can still load and measure Nine.
