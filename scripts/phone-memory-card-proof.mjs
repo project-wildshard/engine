@@ -53,7 +53,8 @@ try {
         await explanation.waitFor({ state: 'visible' });
         assert.ok(reads > 0);
         assert.equal(await card.locator('h1').textContent(), 'This world needs more memory');
-        const message = await explanation.innerText();
+        const message = await explanation.textContent();
+        assert.ok(message);
         assert.match(message, /^This world needs about \d+\.\d{2} GB of memory and a phone has 1\.50 GB to give it\. Pick another world, or play it on a computer\.$/u);
         assert.ok(Number(/about (\d+\.\d{2}) GB/u.exec(message)?.[1]) > 1.5);
         assert.equal(await control.count(), 0);
