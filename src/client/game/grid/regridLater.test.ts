@@ -4,11 +4,11 @@ import { RegridLater } from './regridLater';
 // MMO-PLAN GO5b: the door's `resume` names another cell while the grid page still boots, before its session can hand the link over and
 // before the app's same-page entry is in place (control). The page waits for both, then enters the seat's cell in place; with no way in
 // place in time, or a session that refuses, it takes GO4's reload.
-const rig = (): { readonly later: Pick<RegridLater, 'session' | 'entry'> & { readonly ask: (cell: string) => void }; readonly reloads: string[]; readonly fire: () => void; readonly armed: () => number } => {
+const rig = (): { readonly later: Pick<RegridLater, 'session' | 'entry'> & { readonly ask: (cell: string) => () => void }; readonly reloads: string[]; readonly fire: () => void; readonly armed: () => number } => {
   const reloads: string[] = [];
   let run: (() => void) | null = null, armed = 0;
   const inner = new RegridLater({ waitMs: 45_000, timeout: (_ms, then) => { armed++; run = then; return () => { run = null; }; } });
-  const later = { ask: (cell: string): void => { inner.ask(cell, () => { reloads.push(cell); }); }, session: (here: Parameters<RegridLater['session']>[0]): void => { inner.session(here); }, entry: (): void => { inner.entry(); } };
+  const later = { ask: (cell: string): (() => void) => inner.ask(cell, () => { reloads.push(cell); }), session: (here: Parameters<RegridLater['session']>[0]): void => { inner.session(here); }, entry: (): void => { inner.entry(); } };
   return { later, reloads, fire: () => { const then = run; run = null; then?.(); }, armed: () => armed };
 };
 
@@ -71,4 +71,23 @@ test('a second resume while one waits keeps the newest cell and one timer', () =
   expect(armed()).toBe(1);
   later.session(cell => { entered.push(cell); return true; }); later.entry();
   expect(entered).toEqual(['nalati-grasslands']);
+});
+
+// Review MUST: the boot that asked can go (back to the title mid-load): its ask goes with it, and no later session or timer runs it.
+test('a cancelled ask runs nothing: no entry, no reload', () => {
+  const { later, reloads, fire } = rig(), entered: string[] = [];
+  const cancel = later.ask('sunscar-dunes');
+  cancel();
+  fire();
+  later.session(cell => { entered.push(cell); return true; }); later.entry();
+  expect({ entered, reloads }).toEqual({ entered: [], reloads: [] });
+});
+
+// Review SHOULD: once GO4's reload has started the page is leaving: a redial's later `resume` starts nothing more.
+test('after a reload, a later ask is ignored', () => {
+  const { later, reloads, fire } = rig(), entered: string[] = [];
+  later.ask('sunscar-dunes'); fire();
+  later.session(cell => { entered.push(cell); return true; }); later.entry();
+  later.ask('nalati-grasslands');
+  expect({ entered, reloads }).toEqual({ entered: [], reloads: ['sunscar-dunes'] });
 });

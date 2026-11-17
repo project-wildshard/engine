@@ -23,3 +23,7 @@
   link still open (the grid gate's world-word probe pings once and closes in a few ms), the player walks in Signal Dunes, no page
   errors. Was two documents. The proof now runs on one page: WebKit's pages in one context shared no localStorage here, so its third
   page had lost the name and the hint.
+- Review MUSTs: an ask goes with the boot that made it (`ask` answers a cancel the session's scope runs, so a page sent back to the
+  title mid-load never re-enters 45 s later), and a redial's `resume` between the hand-over and the next session's `adopt` names the
+  cell the page is already entering, which the session now counts as done instead of spending a re-entry. Once GO4's reload has
+  started, a later `resume` starts nothing more. Both proofs pass again on the rebuilt dist.

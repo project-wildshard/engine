@@ -395,7 +395,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const { grid } = ports, booted = grid?.booted;
     const gridOf = (cell: string, goto: boolean): OnlineGrid | undefined => grid === null ? undefined : { cell, cells: grid.cells.map(row => row.instance), placed: (at, pose) => { grid.serverPlace?.(at, pose); }, reenter: next => { grid.reenter?.(next); },
       // a page with no in-place entry at all takes GO4's reload at once
-      reenterInPage: (next, reload) => { if (grid.reenterInPage === undefined) return false; regrids.ask(next, reload); return true; }, ...(goto ? { goto: true } : {}) };
+      // the ask goes with the boot that made it (review MUST: a page sent back to the title mid-load never re-enters later)
+      reenterInPage: (next, reload) => { if (grid.reenterInPage === undefined) return false; scope.onDispose(regrids.ask(next, reload)); return true; }, ...(goto ? { goto: true } : {}) };
     // ZE10d2: a gate's 0 handed this page's link over: the seat is frozen at that cell's gate, and this session's `ready` seats it past
     const kept = handedOver;
     handedOver = null;
@@ -455,12 +456,13 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const reenterInPage = ports.grid?.reenterInPage;
   if (shell.adopt !== undefined && reenterInPage !== undefined) {
     // the hand-over runs before the page leaves: the leave's hold (a quit) must be gone first, as at the gate
-    const mine = (cell: string): boolean => (!ended && !scope.disposed && handedOver === null) && reenterInPage(cell, () => {
+    // review MUST: a redial's `resume` between the hand-over and the next session's `adopt` names the cell the page is already entering
+    const mine = (cell: string): boolean => cell === ports.grid?.booted || handedOver?.cell === cell || ((!ended && !scope.disposed && handedOver === null) && reenterInPage(cell, () => {
       console.info(`[grid] the seat is in ${cell}: entering it on this page, the link handed over`);
       ended = true; leaves(); const kept = { shell, cell }; handedOver = kept;
       const expiry = new Scope('regrid.handover');
       expiry.timeout(HANDOVER_MS, () => { expiry.dispose(); if (handedOver === kept) { handedOver = null; kept.shell.dispose(); } });
-    });
+    }));
     regrids.session(mine); regridSession = mine;
     // a later session may already have said its own
     scope.onDispose(() => { if (regridSession === mine) { regridSession = null; regrids.session(null); } });

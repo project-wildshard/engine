@@ -21,13 +21,18 @@ export class RegridLater {
   private here: RegridHere | null = null;
   private inPage = false;
   private cancel: (() => void) | null = null;
+  /** GO4's reload has started: the page is leaving, and a later `resume` starts nothing more. */
+  private leaving = false;
   private readonly ports: RegridLaterPorts;
   constructor(ports: RegridLaterPorts) { this.ports = ports; }
-  /** The door seated this player in `cell`, which the page didn't boot; `reload` is GO4's fresh-page entry there. */
-  ask(cell: string, reload: () => void): void {
+  /** The door seated this player in `cell`, which the page didn't boot; `reload` is GO4's fresh-page entry there. The answer drops
+   *  this ask while it still waits: the boot that asked has gone (back to the title mid-load), and no other session may run it. */
+  ask(cell: string, reload: () => void): () => void {
+    if (this.leaving) return () => undefined;
     this.cell = cell; this.reload = reload;
     this.cancel ??= this.ports.timeout(this.ports.waitMs, () => { this.cancel = null; this.give(); });
     this.go();
+    return () => { if (this.reload !== reload) return; this.cell = null; this.reload = null; this.cancel?.(); this.cancel = null; };
   }
   /** The running session's in-place entry, or null once it has gone. */
   session(here: RegridHere | null): void { this.here = here; this.go(); }
@@ -39,13 +44,13 @@ export class RegridLater {
     this.cell = null; this.reload = null; this.cancel?.(); this.cancel = null;
     let entered = false;
     try { entered = here(cell); } catch { /* a session that can't say: the reload */ }
-    if (!entered) reload?.();
+    if (!entered) { this.leaving = true; reload?.(); }
   }
   /** The wait is over with no way in place: the reload. */
   private give(): void {
     const { reload } = this;
     if (this.cell === null) return;
-    this.cell = null; this.reload = null;
+    this.cell = null; this.reload = null; this.leaving = true;
     reload?.();
   }
 }
