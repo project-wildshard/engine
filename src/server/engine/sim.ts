@@ -131,6 +131,8 @@ export type SimStateAdapter = StateAdapter;
  * collided every tick, and its exact snapshot bytes.
  */
 export interface SimBodyBands {
+  /** Data recipes formerly stepped on exact fixed multiples; keep their native floating-point continuation. */
+  fixedSteps?: boolean;
   /** Tick rates by id over the page scheduler's defaults ('always', 'ai', 'npc', 'fx', 'weather') and the manager's
    *  'legacy' (decisions 10 Hz, the body every tick at any distance): the level's tier `ticks`. */
   rates?: Readonly<Record<string, TickRate>>;
@@ -250,7 +252,7 @@ export class SimHost {
   readonly floors: MotionPlatform[] = [];
   /** SF34: the level's water (useWater), if any. */
   water: SimWater | undefined;
-  private bands: { clocks: BodyBandClocks; rate: (body: AnimalSim) => string; present: ((body: AnimalSim) => boolean) | undefined; physics: boolean } | undefined;
+  private bands: { clocks: BodyBandClocks; rate: (body: AnimalSim) => string; present: ((body: AnimalSim) => boolean) | undefined; physics: boolean; fixedSteps: boolean } | undefined;
   private bodyStep: SimBodyStep | undefined;
   // Reused visitor state keeps this turn's captured hooks/band decision even
   // when a callback enters another fixed step. No iterator tuples per body.
@@ -469,7 +471,7 @@ export class SimHost {
   useBodyBands(options: SimBodyBands = {}): void {
     if (this.disposed || this.embedded || this.bands !== undefined) throw new Error('Body bands belong to an owned host, once');
     const clocks = new BodyBandClocks(options.rates);
-    this.bands = { clocks, rate: options.rate ?? ((body) => body.driven || body.state === 'sidestep' ? 'always' : 'ai'),
+    this.bands = { clocks, fixedSteps: options.fixedSteps === true, rate: options.rate ?? ((body) => body.driven || body.state === 'sidestep' ? 'always' : 'ai'),
       present: options.present, physics: options.physics ?? true };
     if (this.bands.physics) for (const entity of this.entities.values()) { entity.motor?.dispose(); entity.motor = null; }
   }
@@ -489,19 +491,23 @@ export class SimHost {
     const bands = this.bands;
     if (bands === undefined) return FIXED_STEP;
     if (entity.harnessHold || bands.present?.(entity) === false) { bands.clocks.forget(id); return 0; }
-    return bands.clocks.bodyDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position));
+    const dt = bands.clocks.bodyDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position));
+    return bands.fixedSteps ? Math.round(dt * 60) / 60 : dt;
   }
   /** Take this tick's decision step for body `id` on its band (the page scheduler's takeBrainDt): 0 until its rate's
    * period has passed, the time since its last decision when due; `urgent` (a hit, a lost sight line) wakes it now.
-   * Without bands every tick decides (the fixed step). */
-  brainDt(id: string, urgent = false): number {
+   * The authored divisor caps this same clock; without bands it retains its modulo and fixed-step multiple. */
+  brainDt(id: string, urgent = false, divisor = 1): number {
+    if (!Number.isInteger(divisor) || divisor < 1 || 60 % divisor !== 0) throw new RangeError('Invalid authored brain divisor');
     const entity = this.entities.get(id);
     if (entity === undefined) throw new RangeError(`Unknown simulation body ${id}`);
     this.focusOn(entity.position);
     const bands = this.bands;
-    if (bands === undefined) return FIXED_STEP;
+    if (bands === undefined) return this.state.tick % divisor === 0 ? divisor / 60 : urgent ? FIXED_STEP : 0;
     if (bands.present?.(entity) === false) { bands.clocks.forget(id); return 0; }
-    return bands.clocks.takeBrainDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position), urgent);
+    const dt = bands.clocks.takeBrainDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position), urgent, 60 / divisor);
+    // Authored native recipes historically receive exact fixed-step multiples, not accumulated float drift.
+    return divisor === 1 && !bands.fixedSteps ? dt : Math.round(dt * 60) / 60;
   }
   /** The page's creature capsule for a body under the physics body LOD (physics/creatures.ts's recipe), owned by its id. */
   creatureMotorOptions(entity: AnimalSim): MotorOptions {

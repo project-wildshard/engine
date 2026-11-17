@@ -70,12 +70,14 @@ export function bandAt(rate: TickRate, distance: number): TickBand | undefined {
  * paused clock discards the time and starts again one frame's step after the pause.
  * A supplied stable body identity splits unstarted half-body wakes by parity;
  * existing positive tickFrame phases, decision clocks and the save shape stay intact.
+ * maximumBrainHz caps the same decision credit by authored cadence; body clocks are unchanged.
  */
-export function tickClock(state: TickClock, band: TickBand, body: boolean, time: number, frame: number, urgent: boolean, bodyIdentity?: string): number {
+export function tickClock(state: TickClock, band: TickBand, body: boolean, time: number, frame: number, urgent: boolean, bodyIdentity?: string, maximumBrainHz?: number): number {
   if (state.frame === frame && !urgent) return state.dt;
   const step = time - state.last;
   state.last = time;
-  const paused = body ? band.body === 'paused' : band.brainHz === 'paused';
+  const brainHz = band.brainHz === 'paused' ? 0 : Math.min(band.brainHz, maximumBrainHz ?? Infinity);
+  const paused = body ? band.body === 'paused' : brainHz === 0;
   if (paused) { state.elapsed = 0; state.credit = 0; state.tickFrame = -1; }
   else { state.elapsed += step; state.credit += step; }
   state.frame = frame; state.dt = 0; state.due = false;
@@ -83,11 +85,11 @@ export function tickClock(state: TickClock, band: TickBand, body: boolean, time:
   // does not choose it; restored positive tickFrame values retain their phase.
   if (body && band.body === 'half' && state.tickFrame < 0 && state.elapsed > 0
     && bodyIdentity !== undefined && (fnv1a32(bodyIdentity) & 1) !== 0) state.tickFrame = frame - 1;
-  if (urgent || (!paused && (body ? band.body === 'frame' || state.tickFrame < 0 || frame - state.tickFrame >= 2 : band.brainHz !== 'paused' && state.credit + 1e-9 >= 1 / band.brainHz))) {
+  if (urgent || (!paused && (body ? band.body === 'frame' || state.tickFrame < 0 || frame - state.tickFrame >= 2 : state.credit + 1e-9 >= 1 / brainHz))) {
     state.due = urgent || state.elapsed > 0; state.dt = state.elapsed; state.elapsed = 0;
     if (state.due) state.tickFrame = frame;
-    state.credit = urgent || body || band.brainHz === 'paused' || band.brainHz === Infinity ? 0
-      : Math.max(0, state.credit - Math.floor((state.credit + 1e-9) * band.brainHz) / band.brainHz);
+    state.credit = urgent || body || brainHz === 0 || brainHz === Infinity ? 0
+      : Math.max(0, state.credit - Math.floor((state.credit + 1e-9) * brainHz) / brainHz);
   }
   return state.dt;
 }
@@ -151,9 +153,10 @@ export class BodyBandClocks {
     return tickClock(row.body, band(distance), true, this.time, this.frame, false, id);
   }
   /** This frame's decision step for `id`; `urgent` (a hit, a lost sight line) wakes it now. The step is taken (consumed). */
-  takeBrainDt(id: string, rate: string, distance: number, urgent: boolean): number {
+  takeBrainDt(id: string, rate: string, distance: number, urgent: boolean, maximumHz?: number): number {
+    if (maximumHz !== undefined && !(maximumHz > 0)) throw new RangeError('Invalid authored decision frequency');
     const { row, band } = this.row(id, rate);
-    const dt = tickClock(row.brain, band(distance), false, this.time, this.frame, urgent);
+    const dt = tickClock(row.brain, band(distance), false, this.time, this.frame, urgent, undefined, maximumHz);
     row.brain.dt = 0; row.brain.due = false;
     return dt;
   }

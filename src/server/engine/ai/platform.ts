@@ -59,11 +59,11 @@ export class PlatformBrain {
     this.state = checked.state;
   }
   /** Think at the authored divisor; motion remains fixed-step through AnimalSim and its collision motor. */
-  step(tick: number, acquire = true): void {
+  step(tick: number, acquire = true, decisionDue?: boolean): void {
     if (!Number.isSafeInteger(tick) || tick <= this.state.tick) throw new Error('Non-monotonic brain tick');
     this.state.tick = tick; this.state.cooldown = Math.max(0, this.state.cooldown - 1);
     if (!acquire && this.state.target !== null) { this.state.target = null; this.state.mode = 'idle'; this.actor.cancelAttack(); this.actor.setMotion(this.actor.yaw, 0, this.spec.turnRate); }
-    this.decide(tick, acquire); this.publishState();
+    this.decide(tick, acquire, decisionDue); this.publishState();
   }
   /** TEMPLATE-E2E TC-NE24c: the body's state names the brain's mode (never `charge`, which the hunt's contact reads). */
   private publishState(): void {
@@ -71,9 +71,9 @@ export class PlatformBrain {
     const now = this.state.mode;
     this.actor.state = now === 'pursue' ? 'stalk' : now === 'attack' ? 'attack' : now === 'wander' || now === 'return' ? 'wander' : 'idle';
   }
-  private decide(tick: number, acquire: boolean): void {
+  private decide(tick: number, acquire: boolean, decisionDue?: boolean): void {
     if (!this.actor.alive) { this.state.mode = 'dead'; this.state.target = null; this.actor.setMotion(this.actor.yaw, 0, this.spec.turnRate); return; }
-    if (tick % this.spec.thinkDivisor !== 0) return;
+    if (!(decisionDue ?? tick % this.spec.thinkDivisor === 0)) return;
     const at = this.actor.position, homeDistance = distance(at, this.home), targets = this.ports.targets();
     let target = targets.find((candidate) => candidate.id === this.state.target && candidate.alive);
     if (homeDistance > this.spec.leashRadius || (target && distance(target.position, this.home) > this.spec.leashRadius)) { target = undefined; this.state.mode = 'return'; }

@@ -52,7 +52,8 @@ function nativeRegistration<P>(id: string, actor: AnimalSim, divisor: number, br
   const contract = JSON.stringify({ divisor, policy: brain.snapshot() });
   return { id, run: dt => {
     if (!actor.alive) return;
-    if (host.state.tick % divisor === 0) brain.think(recipe.observe(divisor / 60));
+    const decisionDt = host.brainDt(actor.entityId, false, divisor);
+    if (decisionDt > 0) brain.think(recipe.observe(decisionDt));
     recipe.body(dt);
   }, adapter: { snapshot: () => contract, restore: saved => {
     if (saved !== contract) throw new Error('Incompatible native brain continuation');
@@ -63,7 +64,8 @@ function mutableRegistration<P>(id: string, actor: AnimalSim, divisor: number,
   const contract = JSON.stringify({ version: 1, divisor, ...(home === undefined ? {} : { home }), ...(phaseOffset === undefined ? {} : { phaseOffset }) });
   return { id, run: dt => {
     if (!actor.alive) return;
-    if (host.state.tick % divisor === 0) brain.think(recipe.observe(divisor / 60));
+    const decisionDt = host.brainDt(actor.entityId, false, divisor);
+    if (decisionDt > 0) brain.think(recipe.observe(decisionDt));
     brain.act(recipe.observe(dt)); recipe.body(dt);
   }, adapter: { snapshot: () => [contract, brain.snapshot()], restore: saved => {
     if (!Array.isArray(saved) || saved.length !== 2 || saved[0] !== contract || saved[1] === undefined) throw new Error('Incompatible native policy cadence continuation');
@@ -126,7 +128,7 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
       case 'pursue': {
         if (pursuit === undefined) throw new Error('Unresolved pursuit policy');
         const layer = layers?.get(row.species);
-        const source = { run: (_dt: number, acquire = true) => { pursuit.step(host.state.tick, acquire); }, adapter: pursuit,
+        const source = { run: (_dt: number, acquire = true) => { pursuit.step(host.state.tick, acquire, host.brainDt(actor.entityId, false, spec.thinkDivisor) > 0); }, adapter: pursuit,
           notice: layer?.senses?.notice ?? spec.awareRadius, escapeSpeed: spec.speed, crowd: spec.stopDistance,
           provoke: (targetId: string) => { pursuit.provoke(targetId); } };
         const policy = layer !== undefined

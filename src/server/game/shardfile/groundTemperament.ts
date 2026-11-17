@@ -34,7 +34,8 @@ export function bindGroundTemperament<P>(host: SimHost, actor: AnimalSim, diviso
       if (!actor.mem['init']) brain.think(recipe.observe(0));
       brain.provoke(pending === 2); pending = 0;
     }
-    if (host.state.tick % divisor === 0) brain.think(recipe.observe(divisor / 60));
+    const decisionDt = host.brainDt(actor.entityId, false, divisor);
+    if (decisionDt > 0) brain.think(recipe.observe(decisionDt));
     if (!acquire) actor.cancelAttack();
   }, adapter: { snapshot: () => [contract, selected, pending, enabled, brain.snapshot()], restore: saved => {
     if (!Array.isArray(saved) || saved.length !== 5 || saved[0] !== contract
