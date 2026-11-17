@@ -103,7 +103,11 @@ const failed = (error: unknown): void => { if (ending) return; ending = true; lo
 process.on('uncaughtException', failed);
 // VH10: which forwarded header the door believes, and which pages may open a socket. A word it doesn't know stops here.
 const trust = doorTrust(process.env);
-const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
+// MMO-PLAN MP2.2c: a proof's or a dev box's own ticket key, SPKI DER hex; unset, the pinned one (`ticket.ts`). The box's settings
+// are root's (`wildshard-config`), and the boot log says when the pin is overridden.
+const ticketKey = setting('PLAYER_TICKET_PUBLIC_KEY');
+if (ticketKey !== undefined) log({ at: 'tickets.key', pinned: false, key: ticketKey.slice(-16) });
+const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, ...(ticketKey === undefined ? {} : { ticketKey }), secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
   crashed: failed, reading: (index, row) => { reports.heard(index, row); metrics?.reading(index, row); },
   ...(metrics === undefined ? {} : { booted: (_index: number, _slug: string, ms: number) => { metrics.booted(ms); }, crossed: (ms: number, moved: boolean) => { metrics.crossed(ms, moved); } }),
