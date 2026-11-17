@@ -19,12 +19,19 @@ import { smokeProbes } from './staging-smoke/scenarios.mjs';
 
 /** @typedef {{ i: number, name: string, sub: string, enters: boolean, thumb: string }} SweepCard */
 /** @typedef {{ slug: string, name: string, pass: boolean, enterMs: number | null, errors: readonly string[], modal: boolean, thrown: string,
- *   problems: readonly string[], path: string, bad: readonly string[], failed: readonly string[], console: readonly string[], shot: string }} SweepResult */
+ *   zones: readonly string[], problems: readonly string[], path: string, bad: readonly string[], failed: readonly string[], console: readonly string[], shot: string }} SweepResult */
 
-/** The pass rule: in the world within the budget, no error card or fault, nothing thrown by the driver.
- * @param {{ enterMs: number | null, errors: readonly string[], modal: boolean, thrown: string }} row @param {number} budgetMs @returns {boolean} */
+/** The pass rule: in the world within the budget, in the zone the card names, no error card or fault, nothing thrown by the driver.
+ * @param {{ enterMs: number | null, errors: readonly string[], modal: boolean, thrown: string, name?: string, zones?: readonly string[] }} row @param {number} budgetMs @returns {boolean} */
 export function zoneVerdict(row, budgetMs) {
-  return row.thrown === '' && row.enterMs !== null && row.enterMs <= budgetMs && row.errors.length === 0 && !row.modal;
+  return row.thrown === '' && row.enterMs !== null && row.enterMs <= budgetMs && row.errors.length === 0 && !row.modal && wrongZone(row) === undefined;
+}
+
+/** The zone the loading card named when it is not the card tapped (Sky Reach's card loading Signal Dunes), else undefined.
+ * @param {{ name?: string, zones?: readonly string[] }} row @returns {string | undefined} */
+export function wrongZone(row) {
+  const want = (row.name ?? '').trim().toLowerCase();
+  return want === '' ? undefined : (row.zones ?? []).find((zone) => zone.trim() !== '' && zone.trim().toLowerCase() !== want);
 }
 
 /** Runs in the page with Zone select open: the cards as the player sees them. @returns {SweepCard[]} */
@@ -129,11 +136,14 @@ async function cli() {
       /** @type {string[]} */
       const path = [];
       for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t - tap)}:${l}`); }
-      const row = { enterMs: played === undefined ? null : played.t - tap, errors, modal: samples.some((s) => s.s?.modal === true), thrown };
+      // the zones the loading card named (journey-proof's `zone`): a card that loads another zone fails
+      const zones = [...new Set(samples.map((r) => r.s?.zone ?? '').filter((z) => z !== ''))];
+      const row = { enterMs: played === undefined ? null : played.t - tap, errors, modal: samples.some((s) => s.s?.modal === true), thrown, name: card.name, zones };
       const result = { slug, name: card.name, pass: zoneVerdict(row, budgetMs), ...row,
         problems: samples.length === 0 ? [] : judge(samples, { budgetMs }).map((p) => `${String(p.at - tap)} ms: ${p.text}`), path: path.join(' '), ...net, shot };
       results.push(result);
-      console.log(`${result.pass ? 'PASS' : 'FAIL'} ${slug}: ${result.enterMs === null ? 'never in the world' : `in the world in ${String(result.enterMs)} ms`}${thrown === '' ? '' : `, ${thrown}`}`);
+      const wrong = wrongZone(row);
+      console.log(`${result.pass ? 'PASS' : 'FAIL'} ${slug}: ${result.enterMs === null ? 'never in the world' : `in the world in ${String(result.enterMs)} ms`}${wrong === undefined ? '' : `, but the loading card named ${wrong}`}${thrown === '' ? '' : `, ${thrown}`}`);
       for (const line of [...errors, ...net.bad.map((b) => `HTTP ${b}`)]) console.log(`  - ${line}`);
     }
   } finally { await browser.close(); }

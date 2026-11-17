@@ -189,10 +189,22 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
     await page.waitForTimeout(250);
   }
   if (index === -1) throw new Error(`No Shard Select card for ${card} after ${String(CARD_WAIT_MS / 1000)} s (cards: ${names.join(', ')})`);
-  await clear();
-  await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).tap();
-  await page.locator(`.ws-menu-card.selected[data-i="${String(index)}"]`).waitFor({ timeout: 10_000 });
-  await page.waitForTimeout(400);
+  // opus-zonesweep1: the placement file's cards (an open plot, an upload) can rebuild the open deck after the names were read, and a
+  // card placed by file sorts in among the build's (Thin Ice before Signal Dunes), so the same index then names another card: Sky Reach's
+  // dot tapped Signal Dunes. Tap, then re-read the lit card's name, until it is the card asked for.
+  const want = names[index]?.trim().toLowerCase() ?? '';
+  for (let tries = 0; ; tries++) {
+    await clear();
+    await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).tap();
+    await page.locator(`.ws-menu-card.selected[data-i="${String(index)}"]`).waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(400);
+    const lit = (await page.locator('.ws-menu-card.selected b').first().textContent())?.trim().toLowerCase() ?? '';
+    if (lit === want) break;
+    if (tries >= 3) throw new Error(`Shard Select lit ${lit} for ${card} after ${String(tries + 1)} taps`);
+    names = await page.locator('.ws-menu-card b').allTextContents();
+    index = names.map((n) => n.trim().toLowerCase()).indexOf(want);
+    if (index === -1) throw new Error(`The ${card} card left Shard Select (cards: ${names.join(', ')})`);
+  }
   await clear();
   await sample();
   await page.locator('.ws-menu-play').tap();
