@@ -529,11 +529,15 @@ if [ "$COOK_READY" = 1 ]; then
   step "cook pnpm store readable by $COOK_GROUP" have_cook_store make_cook_store
 fi
 # What the running worker last read of cook.env, signed follow state and cook.settings, as a hash in its root-owned checkout.
-# A changed value restarts it; absent optional files preserve the legacy cook.env-only hash.
+# A changed value restarts it; absent optional files preserve the legacy cook.env-only hash. While cook.settings names both
+# keys it wins (cook_value), so the follow timer's new staging state changes nothing the worker runs and restarts nobody.
+cook_settings_pin() {
+  [ -r "${COOK_SETTINGS:-}" ] && grep -q '^COOK_ENGINE_REF=.' "$COOK_SETTINGS" && grep -q '^WILDSHARD_BUILD=.' "$COOK_SETTINGS"
+}
 cook_env_hash() {
   {
     cat "$COOK_ENV"
-    if [ -r "${COOK_STATE:-}" ]; then cat "$COOK_STATE"; fi
+    if [ -r "${COOK_STATE:-}" ] && ! cook_settings_pin; then cat "$COOK_STATE"; fi
     if [ -r "${COOK_SETTINGS:-}" ]; then cat "$COOK_SETTINGS"; fi
   } | sha256sum | cut -d' ' -f1
 }
@@ -624,7 +628,7 @@ if [ "$CHECK" = 0 ]; then
     install -m 750 -o root -g root "$HERE/cook-follow.mjs" "$COOK_LIB/cook-follow.mjs"
   fi
   systemctl daemon-reload
-  systemctl enable --quiet wildshard-cook-follow.timer
+  systemctl enable --now --quiet wildshard-cook-follow.timer
   if [ "$COOK_READY" = 1 ]; then
     if systemctl is-active --quiet wildshard-cook.service && [ "$COOK_UNIT_CHANGED" = 0 ] && [ "$COOK_SOURCE_CHANGED" = 0 ] \
       && [ "$(cat "$COOK_SRC/.wildshard-env" 2>/dev/null)" = "$(cook_env_hash)" ]; then say ok 'cook worker running'

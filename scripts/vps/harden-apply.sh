@@ -149,7 +149,8 @@ blacklist usb-storage
 EOF
 then :; fi
 
-# --- VH15: kernel and sysctl.
+# --- VH15: kernel and sysctl. `-e` skips a key this kernel lacks (Yama in a proof container), so the apply goes on;
+# harden.sh --check still demands every key on the box.
 if put /etc/sysctl.d/90-wildshard.conf 644 root:root VH15 <<'EOF'
 # VPS-HARDENING VH15. Docker is gone, so nothing here forwards or redirects.
 net.ipv4.ip_forward = 0
@@ -167,7 +168,7 @@ kernel.kptr_restrict = 1
 kernel.unprivileged_bpf_disabled = 1
 kernel.yama.ptrace_scope = 1
 EOF
-then sysctl -q -p /etc/sysctl.d/90-wildshard.conf; fi
+then sysctl -q -e -p /etc/sysctl.d/90-wildshard.conf; fi
 # apport sets fs.suid_dumpable=2 each time it starts, after sysctl.d, so VH15 drifted at every boot: it stays off.
 if systemctl list-unit-files apport.service >/dev/null 2>&1 && [ "$(systemctl is-enabled apport.service 2>/dev/null)" != masked ]; then
   systemctl disable --now --quiet apport.service 2>/dev/null || true; systemctl mask --quiet apport.service
@@ -260,7 +261,7 @@ fi
 if grep -Eq '^net/ipv4/conf/(all|default)/log_martians=0' /etc/ufw/sysctl.conf 2>/dev/null; then
   sed -i -E 's#^(net/ipv4/conf/(all|default)/log_martians)=0#\1=1#' /etc/ufw/sysctl.conf; say doing VH15 '/etc/ufw/sysctl.conf logs martians'
 fi
-sysctl -q -p /etc/sysctl.d/90-wildshard.conf
+sysctl -q -e -p /etc/sysctl.d/90-wildshard.conf
 
 # --- J266: the root-owned copy of these scripts the agents' allowlist runs, refreshed from wherever this runs (Jake's sudo,
 # or wildshard-apply's verified copy of a signed tag). Run from that copy, it is already current.

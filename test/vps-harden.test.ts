@@ -210,3 +210,12 @@ test('SC2: a metrics port off loopback, a remote_write or a missing drop-in fail
   expect(out.failed('SC2')).toEqual(['fail    SC2   wildshard.yml has a remote_write or remote_read', 'fail    SC2   prometheus-node-exporter.service.d/90-wildshard.conf is missing or not loopback']);
   expect(check(HARDENED).out).toContain("info    SC2   no box Prometheus yet (harden.sh installs it)");
 });
+
+test('VH15: the apply skips a key this kernel lacks (Yama in a container), and --check still demands it (MS3.1)', () => {
+  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8'), harden = readFileSync(HARDEN, 'utf8');
+  const loads = apply.match(/sysctl -q[^\n]*-p \/etc\/sysctl\.d\/90-wildshard\.conf/gu) ?? [];
+  expect(loads.length).toBe(2);
+  for (const load of loads) expect(load).toContain('sysctl -q -e -p');
+  expect(apply).toContain('\nkernel.yama.ptrace_scope = 1\n');
+  expect(harden).toContain('\nkernel.yama.ptrace_scope >= 1\n');
+});

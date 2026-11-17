@@ -83,16 +83,17 @@ row_clean() { if grep -qE "^fail +$2 " "$OUT/$1.txt"; then grep -E "^fail +$2 " 
 
 run 1-root bash /root/wildshard/scripts/vps/harden.sh --check
 [ "$(cat "$OUT/1-root.exit")" = 1 ] || fail '--check as root did not exit 1'
-for row in VH2 VH3 VH5 VH6 VH7 VH9 VH10 VH11 VH12 VH13 VH14 VH15; do row_fails 1-root "$row"; done
+for row in VH2 VH3 VH5 VH7 VH9 VH10 VH11 VH12 VH13 VH14 VH15; do row_fails 1-root "$row"; done
 has 1-root "sudo group is 'raynos,matt'"
 has 1-root 'a docker group exists'
 has 1-root '1 files under /home or /etc hold an OpenClaw token (sk_claw_): /home/raynos/.config/systemd/user/openclaw-gateway.service; delete them'
 has 1-root "sshd x11forwarding is 'yes'; want no"
-has 1-root 'no fail2ban caddy jail (jails: sshd)'
+has 1-root 'ok      VH6   fail2ban jail sshd'
+has 1-root 'info    VH6   no caddy jail: behind Cloudflare'
 has 1-root 'WARNING auth.log has 1 accepted SSH logins as root'
 has 1-root 'sudoers.d/90-cloud-init-users: 1 rules for matt, 1 NOPASSWD'
 has 1-root 'production sets no TRUST_PROXY'
-if grep -q 'ufw is active' "$OUT/1-root.txt"; then has 1-root 'ufw rules beyond 443 and tailscale0: 22/tcp'; fi
+if grep -q 'ufw is active' "$OUT/1-root.txt"; then has 1-root "ufw rules beyond tailscale0, 41641/udp and Cloudflare's 443: 22/tcp"; fi
 
 run 2-raynos runuser -u raynos -- bash /root/wildshard/scripts/vps/harden.sh --check
 [ "$(cat "$OUT/2-raynos.exit")" != 0 ] || fail '--check without root exited 0'

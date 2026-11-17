@@ -386,3 +386,40 @@ test('a blank COOK_STORE_DIR means R2, and the template leaves it commented', ()
   )
   expect(source).not.toMatch(/^COOK_STORE_DIR=$/mu)
 })
+
+test('MS2.4b: the follow timer starts when installed, not at the next boot', () => {
+  // `enable` alone left the box's timer inactive from its install until a reboot (opus-mmoserver, 2026-11-17).
+  expect(source).toContain('systemctl enable --now --quiet wildshard-cook-follow.timer')
+  expect(source).not.toMatch(/systemctl enable --quiet wildshard-cook-follow\.timer/u)
+})
+
+test('MS2.4b: while cook.settings names the ref, a new staging follow state restarts nobody', () => {
+  const root = scratch(),
+    env = join(root, 'cook.env'),
+    state = join(root, 'cook-release.env'),
+    settings = join(root, 'cook.settings')
+  writeFileSync(env, 'COOK_NOTIFY_TOKEN=t\n')
+  const hash = (settingsPath: string) =>
+    spawnSync(
+      'bash',
+      [
+        '-c',
+        `set -euo pipefail\nCOOK_ENV="$1" COOK_STATE="$2" COOK_SETTINGS="$3"\n${definition('cook_settings_pin')}\n${definition('cook_env_hash')}\ncook_env_hash`,
+        'cook',
+        env,
+        state,
+        settingsPath,
+      ],
+      { encoding: 'utf8' },
+    ).stdout.trim()
+  writeFileSync(settings, 'COOK_ENGINE_REF=v0.1.34\nWILDSHARD_BUILD=bc945fb23549cc9a41c645966f12c94c0f4f4c24\n')
+  writeFileSync(state, 'COOK_ENGINE_REF=server-staging-aaaa\nWILDSHARD_BUILD=aaaa\n')
+  const pinned = hash(settings)
+  writeFileSync(state, 'COOK_ENGINE_REF=server-staging-bbbb\nWILDSHARD_BUILD=bbbb\n')
+  expect(hash(settings)).toBe(pinned)
+  // Without the settings the follow state is what the worker runs, so a new one restarts it.
+  const missing = join(root, 'missing')
+  const before = hash(missing)
+  writeFileSync(state, 'COOK_ENGINE_REF=server-staging-cccc\nWILDSHARD_BUILD=cccc\n')
+  expect(hash(missing)).not.toBe(before)
+})
