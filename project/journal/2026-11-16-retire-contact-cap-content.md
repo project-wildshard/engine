@@ -24,3 +24,10 @@ item fixture's shell9/wood8 and iron10/heavy16. Types and game lint pass.
 Tests currently use packed format0.14.0-m1d.1. The registry pin, c3 immutable
 producer/fixture proofs and exact hosted CI must finish before landing;
 this is not a staging or published-engine delivery receipt.
+
+The single review found one MUST in the paired SDK producer, fixed by
+SDK1e1ab25: native hunt metadata must not stamp false over a distinct
+level exemption. The original verified captain fixture now retains
+absence. A real native captain actor with an empty replicated species id
+keeps its level-exempt 24-damage hit; explicit false caps it to 20 and true
+retains 24. All seven cap controls pass. No second review round was run.

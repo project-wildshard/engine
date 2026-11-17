@@ -1,3 +1,4 @@
+import { compileIncomingCapPolicy } from '@wildshard/format/incomingCapPolicy';
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { Events } from '../src/shared/engine/events/events';
@@ -7,9 +8,9 @@ import { PlayerHealth } from '../src/shared/engine/combat/health';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
-function body(id: string) {
+function body(id: string, kind = 'same.label') {
   const sample = SIM_LEVEL.entities[0]; if (sample === undefined) throw new Error('Missing creature spec');
-  return new AnimalSim({ ...sample.spec, kind: 'same.label', hp: 100 }, 17, 1, id, { heightAt: () => 0, random: () => 0, now: () => 0 });
+  return new AnimalSim({ ...sample.spec, kind, hp: 100 }, 17, 1, id, { heightAt: () => 0, random: () => 0, now: () => 0 });
 }
 function fixture(capExemptTags: readonly string[] = ['fixture.east', 'creature.fixture.east']) {
   const events = new Events(), scope = new Scope('declared-combat'), combat = new CombatPipeline(events, scope);
@@ -75,5 +76,19 @@ test('compiled tags retain environment ownership and match punctuation literally
 test('malformed exact tags refuse before installing a player rule', () => {
   for (const tags of [['undotted'], ['state.rage', 'state.rage']]) {
     expect(() => fixture(tags)).toThrow();
+  }
+});
+
+test('the native captain retains the level exemption even when hunt metadata omits it', () => {
+  const tags = compileIncomingCapPolicy({ capExempt: ['captain'] });
+  for (const [flag, expected] of [[undefined, 24], [false, 20], [true, 24]] as const) {
+    const f = fixture(tags), source = body('native.captain', 'captain');
+    f.player.attributes.incomingCap = 20; source.capExempt = flag;
+    try {
+      expect(source.species).toBe('');
+      const result = f.combat.hit({ source: source.combatActor(), sourceTags: source.combatActor().tags,
+        target: f.player, amount: 24, point: new Vector3(), dir: new Vector3() });
+      expect(result?.dealt).toBe(expected);
+    } finally { f.scope.dispose(); }
   }
 });
