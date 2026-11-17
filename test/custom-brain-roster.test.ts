@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import { parse } from "valibot";
+import { parseRows } from "@wildshard/format/rows";
+import { bindCreatureSenses } from "../src/server/game/shardfile/creatureSenses";
 import { CreaturesSchema, type ShardCreatures } from "@wildshard/format/creatures";
 import type { SpeciesBrain } from "../src/server/game/plugin/brain";
 import {
@@ -192,6 +194,96 @@ test("an admitted script cannot bypass the actual attack permission owner", asyn
     for (let tick = 0; tick < 30; tick++) sim.host.step();
     expect(player.health.attributes.health).toBe(93);
   } finally {
+    sim.dispose();
+  }
+});
+
+test("authored senses cannot grant custom-script observations or replace their trusted owner", async () => {
+  const f = fixture(),
+    species = f.source.rows.species[0];
+  if (species === undefined) throw new Error("Missing custom sensing source");
+  species.temperament = {
+    brain: "fixture.brain",
+    reaction: "aggressive",
+    leash: 200,
+    assist: 0,
+    home: { speed: 2, stop: 0.5 },
+  };
+  species.senses = {
+    notice: 0,
+    sight: { range: 0.01, cone: 0.3 },
+    hearing: { still: 0.1, crouch: 0.2, walk: 0.3, sprint: 12 },
+  };
+  f.source.rows = parseRows(f.source.rows);
+  const R = await rapier,
+    bytes = JSON.stringify(f.source);
+  expect(() => createShardfileSim(f.source, f.assets, { rapier: R })).toThrow(
+    "Missing custom brain port",
+  );
+  const observations: boolean[] = [],
+    replayed: boolean[] = [];
+  const trusted =
+    (out: boolean[]): NonNullable<ShardfileSimPorts["scriptBrains"]> =>
+    (host) => {
+      const actor = host.entities.get("fixture.actor");
+      if (actor === undefined) throw new Error("Missing trusted script actor");
+      const senses = bindCreatureSenses(host, actor, species.senses);
+      host.registerStrikeCatalogue(actor.entityId, f.source.rows.strikes);
+      return {
+        ports: {
+          observe: (body) => {
+            out.push(senses.notices(host.nearestPlayer(body.position)));
+            return [];
+          },
+          mayAttack: () => false,
+          strike: () => {
+            throw new Error("Denied script strike");
+          },
+        },
+      };
+    };
+  const sim = createShardfileSim(f.source, f.assets, {
+    rapier: R,
+    scriptBrains: trusted(observations),
+  });
+  const resumed = prepareShardfileSimRestore(f.source, f.assets, {
+    rapier: R,
+    scriptBrains: trusted(replayed),
+  });
+  try {
+    for (let tick = 0; tick < 30; tick++) sim.host.step();
+    expect(observations).toEqual(Array.from({ length: 10 }, () => false));
+    const player = sim.host.players.get("actor.player");
+    if (player === undefined) throw new Error("Missing actual custom observation player");
+    const commands = new Map([
+      [
+        player.id,
+        {
+          moveX: 0,
+          moveZ: 1,
+          yaw: 0,
+          commandVersion: 1 as const,
+          steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 },
+          sprint: true,
+        },
+      ],
+    ]);
+    for (let tick = 0; tick < 12; tick++) sim.host.step(commands);
+    expect(Math.hypot(player.velocity.x, player.velocity.z)).toBeGreaterThan(5.2);
+    expect(observations.at(-1)).toBe(true);
+    expect(player.health.attributes.health).toBe(100);
+    expect(sim.host.hasStep("brain.fixture.actor")).toBe(false);
+    expect(sim.host.entities.size).toBe(1);
+    resumed.restore(snapshotSimHost(sim.host));
+    expect(replayed).toEqual([]);
+    for (let tick = 0; tick < 30; tick++) {
+      sim.host.step(commands);
+      resumed.host.step(commands);
+    }
+    expect(snapshotSimHost(resumed.host)).toEqual(snapshotSimHost(sim.host));
+    expect(JSON.stringify(f.source)).toBe(bytes);
+  } finally {
+    resumed.host.dispose();
     sim.dispose();
   }
 });

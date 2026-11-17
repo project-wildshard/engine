@@ -1,5 +1,5 @@
 import { installDataCreatureBands } from '../shardfile/dataCreatureBands';
-import { bindCreatureSenses } from '../shardfile/creatureSenses';
+import { bindCreatureSenses, installCreatureSensesContract } from '../shardfile/creatureSenses';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { dataPerchBrains, preflightPlainPerches } from '../shardfile/dataPerchBrains';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
@@ -460,6 +460,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
   if (host.level.id !== levelId || host.level.seed !== shard.identity.seed || host.entities.size !== shard.creatures.spawns.length || shard.creatures.spawns.some((row) => !host.entities.has(row.id))) throw new Error('Shardfile simulation host mismatch');
   try {
     const creatures = prepareCreaturePolicies(shard.rows, shard.creatures);
+    installCreatureSensesContract(host, shard.rows, creatures.spawns);
     if (ports.brains === undefined && shard.runtime === null) installDataCreatureBands(host, shard.rows, creatures);
     installLadders(host, shard.modes?.traverse.filter(row => row.kind === 'ladder') ?? [], ports.ladders);
     const portals = portalLinkEntries(shard.entryways), portalErrors = portalLinkRules(portals, shard);

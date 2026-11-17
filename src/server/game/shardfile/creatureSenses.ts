@@ -1,12 +1,31 @@
 import { parse } from 'valibot';
 import { Vector3 } from 'three';
 import { CreatureSensesSchema, type CreatureSenses } from '@wildshard/format/creatureLayers';
+import type { ShardRows } from '@wildshard/format/rows';
+import type { ShardCreatures } from '@wildshard/format/creatures';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { SimHost } from '@wildshard/engine/sim';
 import { lineOfSight } from '@wildshard/engine/physics/query';
 
 type Player = ReturnType<SimHost['nearestPlayer']>;
 type Origin = Readonly<{ x: number; y: number; z: number }>;
+/** Authored perception is executable authority. Omitted sensing keeps the
+ * released adapter roster; a new sensed save cannot restore without its source. */
+export function installCreatureSensesContract(host: SimHost, rows: ShardRows, spawns: ShardCreatures['spawns']): void {
+  const species = new Map(rows.species.map(row => [row.id, row.senses]));
+  const bindings = spawns.flatMap(spawn => {
+    const input = species.get(spawn.species);
+    return input === undefined ? [] : [{ actor: spawn.id, species: spawn.species, senses: parse(CreatureSensesSchema, input) }];
+  }).sort((a, b) => a.actor.localeCompare(b.actor));
+  if (bindings.length === 0) return;
+  const id = 'creatures.senses', contract = JSON.stringify({ version: 1, bindings });
+  if (host.adapters.has(id)) throw new Error('Creature senses already installed');
+  const adapter = { snapshot: () => contract, restore: (saved: unknown) => {
+    if (saved !== contract) throw new Error('Incompatible creature senses continuation');
+  } };
+  host.adapters.set(id, adapter);
+  host.scope.onDispose(() => { if (host.adapters.get(id) === adapter) host.adapters.delete(id); });
+}
 /** Actual host observations only: no controller, body, random stream or mutable clock. */
 export function bindCreatureSenses(host: SimHost, actor: AnimalSim, input?: CreatureSenses, origin: Origin = actor.position): {
   notices: (player: Player) => boolean; nearest: () => Player | undefined;
