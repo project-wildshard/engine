@@ -329,6 +329,39 @@ try {
         return sent && copies === 1 ? { ...result, shot, injection: { socketMatches: await matchedSince(before, 'socket') }, recovery: 'the held line sent once' } : { outcome: 'ui-fail', reason: `held line sent ${String(copies)} times`, seen, shot };
       } finally { await heal(); await entered.context.close(); }
     },
+    // FM4 15b/17b/19b: under a banner, a real tap the world must hear (Attack, its key F) opens the banner's hold card instead of
+    // going out; the card closes by itself on the first frame back
+    heldTap: async item => {
+      const entered = await fresh(); const { page } = entered;
+      /** @type {Record<string, { banner: string, first: object, hold: object | null, waitMs: number }>} */
+      const plans = {
+        'drop/blocked': { banner: 'drop', first: { route: 'socket', kind: 'drop-after', afterMs: 0 }, hold: { route: 'socket', kind: 'refuse-upgrade', code: 503 }, waitMs: 6000 },
+        'half-open/blocked': { banner: 'half-open', first: { route: 'socket', kind: 'half-open' }, hold: null, waitMs: 6000 },
+        'resuming/blocked': { banner: 'resuming', first: { route: 'socket', kind: 'drop-after', afterMs: 0 }, hold: { route: 'socket', kind: 'refuse-upgrade', code: 503 }, waitMs: 45_000 },
+      };
+      const plan = plans[item.id];
+      if (plan === undefined) throw new Error(`heldTap has no plan for ${item.id}`);
+      try {
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        const before = await control();
+        await arm(item.id, [plan.first]);
+        for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
+        if (await matchedSince(before, 'socket') === 0) return { outcome: 'harness-fail', reason: 'the socket fault matched nothing' };
+        if (plan.hold !== null) await arm(`${item.id}-held`, [plan.hold]);
+        const banner = await screen(page, plan.banner, plan.waitMs);
+        if (banner === null) return { outcome: 'ui-fail', reason: `no ${plan.banner} banner to tap under`, notes: await onScreen(page) };
+        const started = Date.now();
+        await page.keyboard.press('KeyF');
+        const seen = await screen(page, item.screen, 4000, started), shot = await shoot(page, item.id.replace('/', '-'), seen === null ? 'missing' : 'card');
+        const result = await judged(seen, item, page);
+        await heal();
+        if (result.outcome !== 'pass') return { ...result, shot };
+        const closed = await page.locator(`[data-failmode~="${item.screen}"]`).waitFor({ state: 'detached', timeout: 20_000 }).then(() => true, () => false);
+        const back = closed && await recovered(page, 30_000);
+        return back ? { ...result, shot, injection: { tap: 'Attack (key F)', socketMatches: await matchedSince(before, 'socket') }, recovery: 'the card closed on the first frame' }
+          : { outcome: 'ui-fail', reason: closed ? 'no frames after heal' : 'the hold card stayed after the link came back', seen, shot };
+      } finally { await heal(); await entered.context.close(); }
+    },
     // a second tab of the same device takes the seat; Play here takes it back
     replaced: async item => {
       const entered = await fresh(); const { page, context } = entered;

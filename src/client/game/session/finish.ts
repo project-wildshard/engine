@@ -291,15 +291,19 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     if (queuedLinks()) await loadingStage('worldPrograms', () => linkWorldUnderLoader(game));
   }
   // DL11: setup overlapped the spawn download; control still waits for the whole set
-  // FM6 modes 36 and 44: a part out of its reads refuses the job (a broken or unreachable pack); the load then waits on the card's
-  // RETRY and the download-failed page, and the same download runs again, instead of ending the load on the startup refusal
+  // FM6 modes 36 and 44: a part out of its reads refuses the job (a broken or unreachable pack). The load runs the same download
+  // again once at once (the fault may have passed, as a single read's reload retry does); refused again, it waits on the card's
+  // RETRY and the download-failed page, then runs it again: never the startup refusal. A cancel is no refusal.
+  let rerun = false;
   for (let spawn = currentSpawnDownload(); spawn !== undefined && !spawn.snapshot().complete;) {
     try { await waitFor('Spawn download', spawn.ready, 'file'); break; } catch (failure) {
-      const given = downloadGiveUp();
-      if (given === null || spawn.snapshot().error === null) throw failure;
-      const { awaitContentRetry, ContentReadError } = await import('@wildshard/engine/boot/contentRead');
-      await awaitContentRetry(new ContentReadError(given.detail, 'the download stopped', failure, false,
-        { ...given.status === null ? {} : { status: given.status }, broken: given.status !== null && given.status < 400 }));
+      if (spawn.snapshot().error === null || (failure instanceof DOMException && failure.name === 'AbortError')) throw failure;
+      if (rerun) {
+        const given = downloadGiveUp(), { awaitContentRetry, ContentReadError } = await import('@wildshard/engine/boot/contentRead');
+        await awaitContentRetry(new ContentReadError(given?.detail ?? spawn.snapshot().error ?? 'spawn download', 'the download stopped', failure, false,
+          { ...given?.status === undefined || given.status === null ? {} : { status: given.status }, broken: given === null || (given.status !== null && given.status < 400) }));
+      }
+      rerun = true;
       spawn = retrySpawnDownload();
     }
   }
