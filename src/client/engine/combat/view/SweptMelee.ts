@@ -61,7 +61,6 @@ export interface SweptMeleeDefaults {
   readonly finisher: Move;
   readonly heavy: Move;
   readonly events: MeleeEvents;
-  readonly debris: (kind: string) => { surface: 'shell' | 'wood' | 'sand'; count: number; atFeet: boolean; sparks: boolean };
 }
 
 // ───────────────────────────── hit stars ─────────────────────────────
@@ -546,14 +545,15 @@ export class SweptMelee extends Melee {
     // move's 60 / 90 / 140 ms; the stars, trail fade and camera kick run on worldTime.realDt through it
     if (!this.hitDone) { this.hitDone = true; this.game.hitStop(move.hitStop * this.swingScale); this.jolt = move === this.mv.heavy ? 1.6 : 1; this.fx.kick(move.kick.pitch * 0.5, move.kick.roll * 0.5); }
     this.stars.burst(point, _fwd, move === this.mv.heavy ? 14 : 9);
-    // contact debris by what was struck (C4): shell shards off a crab, splinters off the sailor, a sand puff at anything
-    // else's feet; the iron blade throws sparks off shell and timber
+    // The admitted move declares contact materials and target-row overrides (C4).
     const heavyK = move === this.mv.heavy ? 1.6 : 1;
     const rowId = species === undefined || species === '' ? app.species.rowId(kind) ?? kind : species;
-    const debris = move.debris?.overrides?.find(row => row.target === rowId)?.effect ?? move.debris?.default ?? this.defaults.debris(kind);
-    const debrisPoint = debris.atFeet ? _v3.set(point.x, feetY + 0.05, point.z) : point;
-    this.impacts.burst(debris.surface, debrisPoint, _push, Math.round(debris.count * heavyK));
-    if (this.iron && debris.sparks) this.impacts.burst('sparks', point, _push, Math.round(10 * heavyK));
+    const debris = move.debris?.overrides?.find(row => row.target === rowId)?.effect ?? move.debris?.default;
+    if (debris !== undefined) {
+      const debrisPoint = debris.atFeet ? _v3.set(point.x, feetY + 0.05, point.z) : point;
+      this.impacts.burst(debris.surface, debrisPoint, _push, Math.round(debris.count * heavyK));
+      if (this.iron && debris.sparks) this.impacts.burst('sparks', point, _push, Math.round(10 * heavyK));
+    }
     this.defaults.events.onStrike?.(kind, point, move === this.mv.heavy ? 1 : move === this.defaults.finisher ? 0.75 : 0.5, killed);
     this.onHit?.(kind, false, killed);
     this.onImpact?.('flesh', point);

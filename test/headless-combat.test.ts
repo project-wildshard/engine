@@ -114,11 +114,11 @@ function pageWorld(resident: TrustedHeadlessResident, aimAt: Vector3) {
 }
 /** The page's own sword over `profile`, ready to swing. */
 function pageSword(page: ReturnType<typeof pageWorld>, targets: Targets, profile: MeleeProfile, blade?: 'wood' | 'iron'): SweptMelee {
-  const debris = { surface: 'sand', count: 1, atFeet: true, sparks: false } as const, moves = profile.moves;
+  const moves = profile.moves;
   if (moves === undefined) throw new Error('The starter sword declares its moves');
   const sword = new SweptMelee({ game: page.game, sky: page.sky, player: page.player, forest: page.forest }, targets,
     { ...(blade === undefined ? {} : {blade}), row: profile, profile, inputContext: 'weapon.melee', rig: { sword: new BoxGeometry(0.1, 0.1, 0.1), arms: new BoxGeometry(0.1, 0.1, 0.1), tipY: 0.62, baseY: 0.1, material: new MeshBasicMaterial() } },
-    { moves, slash: SLASH, finisher: FINISHER, heavy: HEAVY, events: {}, debris: () => debris });
+    { moves, slash: SLASH, finisher: FINISHER, heavy: HEAVY, events: {} });
   sword.setActive(true); sword.enabled = true;
   return sword;
 }
@@ -546,3 +546,20 @@ test('candidate native swords preserve original local and confirmed effects and 
     } finally {scope.dispose();app.levelScope = previous;live.dispose();restore();restore = () => undefined;}
   }
 }, 120000);
+
+test('a melee profile without contact debris does not invent a creature effect', async () => {
+  const { product, resident } = await shipped('driftwood-isle'), live = await resident();
+  try {
+    const crab = nearest(live, 'crab'); hold(live); tick(live, 2); facing(live, crab, 1.4); crab.hp = crab.maxHp = 10000;
+    const page = pageWorld(live, chest(crab)), profile = v.parse(MeleeWeaponProfileSchema, weaponRow(product.shardfile, 'weapon.driftwood-isle.wood').profile);
+    const omit = (move: typeof profile.moves.heavy) => { const { debris: _debris, ...plain } = move; return plain; };
+    const admitted = v.parse(MeleeWeaponProfileSchema, { ...profile, moves: { combo: profile.moves.combo.map(omit), heavy: omit(profile.moves.heavy) } });
+    const sword = pageSword(page, pageTargets(live), applyMeleeCombatProfile(SWORD_WOOD, admitted)), burst = vi.spyOn(Impacts.for(page.game), 'burst');
+    try {
+      sword.tryFire(); for (let frame = 0; frame < 30; frame++) sword.update(1 / 60, frame / 60);
+      expect(burst).not.toHaveBeenCalled();
+      sword.serverHit({ kind: crab.kind, species: '', at: chest(crab), head: false, killed: false, amount: 1, seq: 1 });
+      expect(burst).not.toHaveBeenCalled();
+    } finally { burst.mockRestore(); }
+  } finally { live.dispose(); }
+}, 120_000);

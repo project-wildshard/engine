@@ -1,3 +1,4 @@
+import { compileIncomingCapPolicy } from '@wildshard/format/incomingCapPolicy';
 
 import { readOnlySave, wirePage } from '../shardfile/wirePage';
 import { ownedSave } from '../../../shared/game/saves';
@@ -250,7 +251,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   const effects = new EffectService(app.levelRegistrations.list('effect'), game.levelScope, app.events);
   app.registerEffects(effects, game.levelScope);
   playerHealth.attributes.incomingCap = chunk.fight?.maxHitDamage ?? Infinity;
-  app.combat.playerRules(game.levelScope, { target: playerHealth, bossGod: params.has('bossGod'), capExempt: chunk.fight?.capExempt ?? [] });
+  app.combat.playerRules(game.levelScope, { target: playerHealth, bossGod: params.has('bossGod'), capExemptTags: compileIncomingCapPolicy(chunk.fight ?? {}) });
   const harvested = new Set<object>();
   // ── the in-game menu: MAP · INVENTORY · ACHIEVEMENTS · SETTINGS (src/client/engine/ui/Menu.ts) ──
   const progress = new Progress(manifest.slug);     // shard achievements → titles (src/shared/game/achievements.ts)

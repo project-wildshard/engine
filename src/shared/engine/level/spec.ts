@@ -21,7 +21,7 @@ import type { TickRate } from '../app/scheduler';
 
 export type EngineMechanism = 'weather' | 'dayCycle' | 'bosses' | 'elites' | 'spawns' | 'quests' | 'swim' | 'hover' | 'explore' | 'practice';
 export interface CreatureRenderSpec { lowPoly: boolean; waitForModels: boolean; furRim: boolean; tintRange: number; oneMaterial: boolean }
-export interface FightRules { input?: { bufferMs: number; coyoteMs: number }; telegraphed?: boolean; maxHitDamage?: number; capExempt?: readonly string[]; attackers?: number }
+export interface FightRules { input?: { bufferMs: number; coyoteMs: number }; telegraphed?: boolean; maxHitDamage?: number; capExempt?: readonly string[]; capExemptTags?: readonly string[]; attackers?: number }
 export interface Bounds { x0: number; x1: number; z0: number; z1: number; floor: number }
 // oxlint-disable-next-line typescript/no-empty-object-type, typescript/no-empty-interface -- Shards declare typed tier knobs through the public engine API.
 export interface TierKnobMap {}

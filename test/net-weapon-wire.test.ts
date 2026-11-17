@@ -45,7 +45,7 @@ function sword(wire: WeaponWire): { blade: BookedBlade; stops: ReturnType<typeof
   if (moves === undefined) throw new Error('The starter sword declares its moves');
   const blade = new BookedBlade({ game, sky: legacyDouble<SkyRig>({}), player, forest: legacyDouble<Forest>({}) }, undefined,
     { row: profile, profile, inputContext: 'weapon.melee', rig: { sword: new BoxGeometry(0.1, 0.1, 0.1), arms: new BoxGeometry(0.1, 0.1, 0.1), tipY: 0.62, baseY: 0.1, material: new MeshBasicMaterial() } },
-    { moves, slash: SLASH, finisher: FINISHER, heavy: HEAVY, events: {}, debris: () => ({ surface: 'sand', count: 1, atFeet: true, sparks: false }) });
+    { moves, slash: SLASH, finisher: FINISHER, heavy: HEAVY, events: {} });
   blade.setActive(true); blade.enabled = true; blade.wire = wire;
   blade.onHit = kind => { heard.push(kind); };
   return { blade, stops, heard, player, done: () => { app.physics = was; app.aimTargets = aimed; physics.dispose(); } };

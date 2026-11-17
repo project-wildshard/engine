@@ -1,3 +1,5 @@
+import { parse } from 'valibot';
+import { IncomingCapTagsSchema } from '@wildshard/format/incomingCapPolicy';
 import type { Vector3 } from 'three';
 import type { Scope } from '../app/scope';
 import type { Events } from '../events/events';
@@ -15,7 +17,7 @@ export interface HealthAttributes extends AttributeSet { health: number; maxHeal
 /** Simulation port. The legacy creature adapter owns flinch/ragdoll presentation until the AI migration. */
 export interface Actor {
   readonly id: string;
-  /** An admitted species policy; absence retains older source-tag exemptions. */
+  /** An admitted species policy; absence retains the admitted source-tag condition. */
   readonly capExempt?: boolean | undefined;
   readonly tags: readonly CombatTag[];
   readonly state: readonly CombatTag[];
@@ -61,6 +63,11 @@ const any = (tags: readonly CombatTag[], patterns: readonly CombatTag[] | undefi
 const playerTarget = (req: DamageRequest): boolean => matches(req.target.tags, 'actor.player');
 const hostileSource = (req: DamageRequest): boolean => any(req.sourceTags, ['creature.*', 'boss.*', 'elite.*', 'add.*']);
 
+function hasExactTag(tags: readonly CombatTag[], admitted: ReadonlySet<string>): boolean {
+  for (const tag of tags) { if (admitted.has(tag)) return true; }
+  return false;
+}
+
 /** One ordered damage pipeline; every source keeps its own base formula and rounding. */
 export class CombatPipeline {
   private readonly events: Events;
@@ -104,7 +111,8 @@ export class CombatPipeline {
       return { ...req, amount: Math.max(1, Math.round(req.amount * req.target.damageMul(req))) };
     }, scope, { order: 50 });
   }
-  playerRules(scope: Scope, { target, bossGod = false, capExempt = [] }: { target?: Actor; bossGod?: boolean; capExempt?: readonly string[] } = {}): void {
+  playerRules(scope: Scope, { target, bossGod = false, capExemptTags = [] }: { target?: Actor; bossGod?: boolean; capExemptTags?: readonly string[] } = {}): void {
+    const exemptions = new Set(parse(IncomingCapTagsSchema, capExemptTags));
     const applies = (req: DamageRequest): boolean => playerTarget(req) && (target === undefined || target === req.target);
     if (bossGod) this.events.answer('damage.modify', (req) => req !== null && applies(req) && any(req.sourceTags, ['boss.*', 'elite.*', 'add.*']) ? null : req, scope, { order: 1 });
     this.events.answer('damage.modify', (req) => req !== null && applies(req) && hostileSource(req)
@@ -112,7 +120,7 @@ export class CombatPipeline {
     this.events.answer('damage.modify', (req) => {
       const declared = req === null || req.source === 'env' ? undefined : req.source.capExempt;
       if (req === null || !applies(req) || !hostileSource(req)
-        || declared === true || declared === undefined && capExempt.some((kind) => req.sourceTags.some((tag) => tag === kind || tag === `creature.${kind}`))) return req;
+        || declared === true || declared === undefined && hasExactTag(req.sourceTags, exemptions)) return req;
       return { ...req, amount: Math.min(req.amount, req.target.attributes.incomingCap ?? Infinity) };
     }, scope, { order: 90 });
   }

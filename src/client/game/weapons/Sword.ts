@@ -12,13 +12,9 @@ export const REACH: number = SWORD_WOOD.reach;
 /** Compatibility options keep the starter profile and input-context defaults out of the engine. */
 export type SwordOptions = Omit<PlatformOptions, 'profile' | 'inputContext'> & { profile?: MeleeProfile };
 
-const shell = { surface: 'shell', count: 9, atFeet: false, sparks: true } as const;
-const timber = { surface: 'wood', count: 8, atFeet: false, sparks: true } as const;
-const sand = { surface: 'sand', count: 10, atFeet: true, sparks: false } as const;
 const defaults: SweptMeleeDefaults = {
   moves: { rest: REST, charge: CHARGE, sprint: SPRINT, combo: COMBO, heavy: HEAVY },
   slash: SLASH, finisher: FINISHER, heavy: HEAVY, events: swordEvents,
-  debris: (kind) => kind === 'crab' ? shell : kind === 'sailor' ? timber : sand,
 };
 
 /** The starter constructor: view, contact and input execution live in the platform family. */
