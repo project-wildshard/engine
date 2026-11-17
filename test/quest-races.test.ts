@@ -5,7 +5,9 @@ import { createSimHost } from '../src/server/engine/sim';
 import { FIXED_STEP } from '../src/shared/engine/core/fixedStep';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { questBooks } from '../src/shared/engine/quest/players';
+import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
+import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { DeclaredQuests } from '../src/shared/game/quest/declared';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
@@ -72,4 +74,22 @@ test('a running race and its best ride the save', async () => {
     books.importOf('other', saved);
     expect(quests.race('arch', 'other')).toEqual({ running, last: 4 * FIXED_STEP, best: 4 * FIXED_STEP, runs: 1 });
   } finally { host.dispose(); }
+});
+
+test('the lead\'s running race rides a region save and finishes after the restore, as an unbroken run does', async () => {
+  const loaded = await rapier, host = createSimHost(SIM_LEVEL, { rapier: loaded }), filed: [string, string][] = [];
+  let restored: ReturnType<typeof createSimHost> | undefined;
+  try {
+    new DeclaredQuests(host, data, { fact: () => undefined });
+    questBooks(host).lead.flags.set('run.go'); const started = host.state.tick; steps(host, 6);
+    const saved = decodeSimSnapshot(JSON.parse(serializeSimSnapshot(snapshotSimHost(host))));
+    let again: DeclaredQuests | undefined;
+    restored = restoreSimHost(SIM_LEVEL, { rapier: loaded }, saved, fresh => { again = new DeclaredQuests(fresh, data, { fact: (name, entity) => { filed.push([name, entity]); } }); });
+    const { flags, player } = questBooks(restored).lead;
+    expect(again?.race('arch', player)?.running).toBe(started);
+    steps(restored, 4); flags.set('run.end');
+    expect(filed).toEqual([['arch.time', 'arch']]);
+    expect(again?.race('arch', player)).toEqual({ running: null, last: 10 * FIXED_STEP, best: 10 * FIXED_STEP, runs: 1 });
+    expect(flags.has('run.go')).toBe(false);
+  } finally { restored?.dispose(); host.dispose(); }
 });

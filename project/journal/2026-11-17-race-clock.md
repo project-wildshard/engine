@@ -25,3 +25,14 @@ tick (`wirePage.tick()`), and when `.runs` rises it shows the finish
 time and the best for five seconds in a glass chip at the top centre
 (`RaceClockChip`). A page that joins after a finish records the count
 first and shows nothing stale.
+
+## The lead's run rides the region save (SS-MS1b's check)
+
+`wildshard check` on Mirror Salt with `world.race` failed its restore
+proof: "restored regional suffix diverged in flags.0". A one-player
+region save holds the lead's flags and quests but no book parts, so the
+lead's running start tick was lost at the checkpoint and the stop gate
+finished nothing after the restore. The `quest.declared` step snapshot
+now carries the lead's runs under `#races` beside its dialogue nodes,
+only when the shard declares races (no save without races changes). The
+new test saves mid-run, restores into a fresh host and finishes.

@@ -47,6 +47,8 @@ export interface DialogueView { id: string; lines: readonly string[]; choices: r
 export interface RaceRun { running: number | null; last: number | null; best: number | null; runs: number }
 type Race = NonNullable<QuestData['races']>[number];
 const freshRun = (): RaceRun => ({ running: null, last: null, best: null, runs: 0 });
+/** The lead's runs' key in the step snapshot beside its dialogue nodes. */
+const LEAD_RACES = '#races';
 /** Bind validated quest graphs to the existing engine journal/marker state and the host's snapshot boundary. */
 export class DeclaredQuests {
   readonly quests: readonly QuestState[];
@@ -193,8 +195,18 @@ export class DeclaredQuests {
     for (const flag of node.sets ?? []) flags.set(flag);
     nodes.set(id, null);
   }
-  snapshot(): SimValue { return Object.fromEntries(this.dialogue); }
-  restore(value: SimValue): void { this.restoreNodes(this.dialogue, value); }
+  /** The lead's dialogue nodes and, when the shard declares races, the lead's runs under `#races` (no dialogue id starts
+   *  with `#`): a one-player region save holds no book parts, so a run the lead had going finishes after a restore. */
+  snapshot(): SimValue {
+    const dialogue = Object.fromEntries(this.dialogue), runs = this.races.get(this.books.lead.player);
+    return runs === undefined ? dialogue : { ...dialogue, [LEAD_RACES]: Object.fromEntries([...runs].map(([id, run]) => [id, { ...run }])) };
+  }
+  restore(value: SimValue): void {
+    const runs = this.races.get(this.books.lead.player);
+    if (runs === undefined || value === null || typeof value !== 'object' || Array.isArray(value) || !(LEAD_RACES in value)) { this.restoreNodes(this.dialogue, value); return; }
+    const { [LEAD_RACES]: saved = null, ...dialogue } = value;
+    restoreRuns(runs, this.data.races ?? [], saved); this.restoreNodes(this.dialogue, dialogue);
+  }
   private restoreNodes(nodes: Map<string, string | null>, value: SimValue): void {
     if (value === null || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== this.data.dialogue.length) throw new Error('Invalid dialogue snapshot');
     for (const d of this.data.dialogue) {
