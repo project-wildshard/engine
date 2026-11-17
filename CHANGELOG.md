@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.38 (2026-11-17)
+
+- The sail’s boost lights as soon as you press it, and the wind pushes it as intended.
+- Placed zones show their own cover art in the zone selector.
+- Your sword stays steady at rest, and prompts have more room for their text.
+- Resuming a world from an older open tab handles updates and cancellations correctly.
+- Distant herds stay visible with less work, and loading the grid uses less memory on phones.
+
 ## v0.1.36 (2026-11-17)
 
 - Progress resets once before the MMO opens; sign-in and settings carry over.
