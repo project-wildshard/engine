@@ -1,5 +1,6 @@
 import type {GroupGuestBindingsV2} from '@wildshard/engine/ai/GroupBrain';
 import { ReturnProgramSchema } from '@wildshard/format/namedJsonContracts';
+import { SCRIPT_LIMITS } from '@wildshard/format/scriptLimits';
 import { DecisionModule } from '@wildshard/engine/script/decisionModule';
 import { scriptV1Layout, SCRIPT_V1_EVENTS, SCRIPT_V1_COMMANDS } from '@wildshard/format/scriptAbiV1';
 import { decisionScriptContract, parseDecisionScripts, SCRIPT_V1_REFERENCE_KINDS, type DecisionScriptRow } from '@wildshard/format/decisionScripts';
@@ -24,6 +25,7 @@ type RawReturnRow = ReturnModuleRow;
 interface ReturnOwnerBook {
   readonly instances: Map<string,{declaration:string;program:ReturnProgram}>;
   readonly memories: Map<string,{declaration:string;memory:PreparedScriptMemory}>;
+  readonly preflights: Map<string,string>;
   loan?: {readonly assets:ReadonlyMap<string,Uint8Array>;readonly rows:ReadonlyMap<string,RawReturnRow>};
 }
 // One book, including loans and instances, retired by its original scope.
@@ -31,8 +33,8 @@ const scoped = new Map<Scope,ReturnOwnerBook>();
 function ownerBook(owner:Scope):ReturnOwnerBook {
   if(owner.disposed||owner.disposing)throw new Error('Return owner disposed');
   const previous=scoped.get(owner);if(previous!==undefined)return previous;
-  const book:ReturnOwnerBook={instances:new Map(),memories:new Map()};scoped.set(owner,book);
-  owner.onDispose(()=>{book.instances.clear();book.memories.clear();delete book.loan;scoped.delete(owner);});
+  const book:ReturnOwnerBook={instances:new Map(),memories:new Map(),preflights:new Map()};scoped.set(owner,book);
+  owner.onDispose(()=>{book.instances.clear();book.memories.clear();book.preflights.clear();delete book.loan;scoped.delete(owner);});
   return book;
 }
 function rawModule(owner:Scope|undefined,row:ReturnType<typeof readProgram>,witness=false):Uint8Array|undefined {
@@ -189,6 +191,8 @@ export class ReturnProgram {
     if (owner.disposed || owner.disposing) throw new Error('Return owner disposed');
     const row = readProgram(input);
     const {key, declaration} = returnIdentity(row), book = ownerBook(owner), modules = book.instances;
+    const checked = book.preflights.get(key);
+    if (checked !== undefined && checked !== declaration) throw new Error('Shared return declaration changed');
     const raw=rawModule(owner,row),witness=rawModule(owner,row,true);
     const previous = modules.get(key);
     if (previous !== undefined) {
@@ -209,6 +213,8 @@ export class ReturnProgram {
    * cache consumes this fresh memory once when that consumer constructs. */
   static prepareMemory(input: unknown, owner: Scope): boolean {
     const row = readProgram(input), book = ownerBook(owner), {key, declaration} = returnIdentity(row);
+    const checked = book.preflights.get(key);
+    if (checked !== undefined && checked !== declaration) throw new Error('Shared return declaration changed');
     if (row.v2 === undefined) return false;
     const raw = rawModule(owner, row), witness = rawModule(owner, row, true);
     admitReturn(row, owner, witness);
@@ -220,6 +226,22 @@ export class ReturnProgram {
     const memory = ReturnProjectionV2.prepareMemory(row.v2, owner, raw);
     book.memories.set(key, {declaration, memory});
     return true;
+  }
+  /** Admit the real module and shared declaration without executing a request.
+   * Temporary callers dispose their scope; no game/body phase or RNG is lent. */
+  static preflight(input: unknown, owner: Scope): void {
+    const row = readProgram(input), book = ownerBook(owner), {key, declaration} = returnIdentity(row);
+    const previous = book.preflights.get(key) ?? book.instances.get(key)?.declaration ?? book.memories.get(key)?.declaration;
+    if (previous !== undefined && previous !== declaration) throw new Error('Shared return declaration changed');
+    const keys = new Set([...book.preflights.keys(), ...book.instances.keys(), ...book.memories.keys(), key]);
+    if (keys.size > SCRIPT_LIMITS.instances) throw new Error('Return preflight exceeds the native instance limit');
+    const raw = rawModule(owner, row), witness = rawModule(owner, row, true);
+    admitReturn(row, owner, witness);
+    if (row.v2 !== undefined && previous === undefined) {
+      const memory = ReturnProjectionV2.prepareMemory(row.v2, owner, raw);
+      book.memories.set(key, {declaration, memory});
+    }
+    book.preflights.set(key, declaration);
   }
   /** Read selected modules and their direct declared dependencies into the
    * original asset map. Witness sidecars are data, never executable admissions. */

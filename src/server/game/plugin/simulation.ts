@@ -1,4 +1,5 @@
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
+import { preflightPlainPerches } from '../shardfile/dataPerchBrains';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { parseNativeLoadoutRow, type NativeLoadoutRowSchema } from '@wildshard/format/nativeItems';
@@ -402,6 +403,7 @@ export interface ShardfileSimulation {
 /** One declared simulation core, used by the normal browser loader and the headless author validator. */
 function shardfileSimInput(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): {level: SimLevel; ports: SimHostPorts} {
   if (shard.nativeGround !== null) throw new Error('Native ground retains its native runtime simulation; a flat declared proxy is forbidden');
+  preflightPlainPerches(shard, assets, ports);
   const portals = portalLinkEntries(shard.entryways), portalErrors = portalLinkRules(portals, shard);
   if (portalErrors.length > 0) throw new Error(portalErrors.join('; '));
   validatePortalFloors(portals, shard, assets);
