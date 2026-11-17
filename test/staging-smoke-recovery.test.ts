@@ -25,6 +25,10 @@ test.skipIf(process.env['WS_SMOKE_BROWSER'] !== '1')('an old recovery reaches ti
     expect(await page.locator('.ws-main-select').isVisible()).toBe(true);
     await oldProfileTitle(page, { onDrop: () => { drops++; }, onRecovery: async () => { recoveries++; } });
     expect(drops).toBe(1); expect(recoveries).toBe(1);
+    await page.setContent(`<main inert><button class="ws-main-select">Zone Select</button></main>
+      <div class="ws-title-stack" data-screen="select"><button class="ws-menu-back" onclick="document.querySelector('main').inert=false;this.parentElement.hidden=true">Back</button></div>`);
+    await oldProfileTitle(page);
+    expect(await page.locator('.ws-main-select').evaluate(element => element.closest('[inert]') === null)).toBe(true);
     await page.setContent(`<button class="ws-main-settings ws-main-signin" onclick="window.picked='signin'">Sign in</button>
       <button class="ws-main-settings" onclick="window.picked='settings'">Settings</button>`);
     await page.locator(SEL.settings).tap();

@@ -204,8 +204,9 @@ export async function oldProfileTitle(page, { onDrop = () => undefined, onRecove
   const resumed = await page.locator(SEL.pause).isVisible() || await page.locator(SEL.exit).isVisible();
   if (resumed || await page.locator(SEL.dropDismiss).isVisible()) await onRecovery();
   if (await clearDrop(page)) onDrop();
-  if (await page.locator(SEL.titleSelect).isVisible()) return;
+  // The main screen can remain visibly rendered but inert behind an active restored deck. Back is the real way out.
   if (await page.locator(back).isVisible()) await page.locator(back).tap();
+  else if (await page.locator(SEL.titleSelect).isVisible()) return;
   else {
     if (!(await page.locator(SEL.exit).isVisible())) await page.locator(SEL.pause).tap();
     await page.locator(SEL.exit).tap();

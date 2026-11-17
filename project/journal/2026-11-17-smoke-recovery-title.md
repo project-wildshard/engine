@@ -14,3 +14,8 @@ stay unchanged. A headless browser regression proves the real button
 sequence and chooses Settings when both buttons share their base class.
 The generated declaration carries the new helper. Full SM5 rerun next;
 production v34 stays until every v35 acceptance gate passes.
+
+The36 baseline found a restored Zone Select deck: its main screen was
+visible but inert. Prefer its real Back button before accepting the
+main screen. The actual inert-deck browser regression passes, as do47
+smoke/gate controls, lint and types. No hard smoke check changed.
