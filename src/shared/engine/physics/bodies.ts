@@ -454,7 +454,13 @@ export class DynamicBodySlots<T> {
 }
 
 /** A contact/landing observation, consumed once in slot traversal order. Mechanics never call content. */
-export interface BodySlotEvent<T> { readonly kind: 'contact' | 'land'; readonly source: T | null; readonly at: Vec3; readonly age: number; readonly wet: number }
+export interface BodySlotEvent<T> { readonly kind: 'contact' | 'land'; readonly source: T | null; readonly at: Vec3; readonly age: number; readonly wet: number;
+  /** Borrowed actual pose for immediate host dispatch; legacy events keep their exact shape. */
+  readonly target?: Readonly<Vec3> }
+function bodySlotContains(contact: NonNullable<BodySlotsData['contact']>, at: Readonly<Vec3>, player: Readonly<Vec3>): boolean {
+  const y = Math.max(player.y, Math.min(player.y + contact.height, at.y));
+  return (at.x - player.x) ** 2 + (y - at.y) ** 2 + (at.z - player.z) ** 2 < contact.radius ** 2;
+}
 /** Row-owned ball volleys and settling drops over the existing native Bodies authority.
  * Page water uses the installed terrain/sea services; native water uses the actual simulation ground and clock.
  * Restore rebinds existing handles after world replacement, without drawing or creating new bodies. */
@@ -471,6 +477,7 @@ export class RowBodySlots<T extends { readonly entityId: string } = never> {
   private reattach: (() => void) | null = null;
   private service: Bodies | null;
   private readonly physics: Physics | null;
+  private contactTargets: readonly Readonly<Vec3>[] | undefined;
   constructor(input: unknown, service: Bodies | null, owner: unknown,
     physics: Physics | null = service?.physics ?? null, host?: SimHost) {
     this.service = service; this.physics = physics;
@@ -478,8 +485,8 @@ export class RowBodySlots<T extends { readonly entityId: string } = never> {
     const row = this.row;
     if (row.settle !== undefined && row.count !== 1) throw new Error('Settling body requires one slot');
     this.poses = Array.from({ length: row.count }, () => ({ at: { x: 0, y: 0, z: 0 }, rotation: new Quaternion(), visible: false }));
-    const emit = (kind: BodySlotEvent<T>['kind'], source: T | null, at: Vec3, age: number, wet: number): void => {
-      this.events.push({ kind, source, at: { ...at }, age, wet });
+    const emit = (kind: BodySlotEvent<T>['kind'], source: T | null, at: Vec3, age: number, wet: number, target?: Readonly<Vec3>): void => {
+      this.events.push({ kind, source, at: { ...at }, age, wet, ...(target === undefined ? {} : { target }) });
     };
     this.slots = new DynamicBodySlots<T>(row, {
       bodies: () => this.service,
@@ -493,10 +500,19 @@ export class RowBodySlots<T extends { readonly entityId: string } = never> {
       contact: (body, source, at, player) => {
         const contact = row.contact;
         if (contact === undefined) return false;
-        if (player === null) throw new Error('Body contact requires the current player pose');
-        const y = Math.max(player.y, Math.min(player.y + contact.height, at.y));
-        if (!((at.x - player.x) ** 2 + (y - at.y) ** 2 + (at.z - player.z) ** 2 < contact.radius ** 2)) return false;
-        emit('contact', source, at, 0, body.wet);
+        let target = player;
+        if (this.contactTargets !== undefined) {
+          target = null;
+          for (const candidate of this.contactTargets) {
+            if (bodySlotContains(contact, at, candidate)) { target = candidate; break; }
+          }
+        }
+        if (target === null) {
+          if (this.contactTargets === undefined) throw new Error('Body contact requires the current player pose');
+          return false;
+        }
+        if (!bodySlotContains(contact, at, target)) return false;
+        emit('contact', source, at, 0, body.wet, this.contactTargets === undefined ? undefined : target);
         const velocity = body.rb.linvel(); body.launch({ x: velocity.x * contact.horizontalBounce, y: contact.up, z: velocity.z * contact.horizontalBounce });
         return true;
       },
@@ -530,6 +546,18 @@ export class RowBodySlots<T extends { readonly entityId: string } = never> {
       }
     });
     const changed = this.changed; this.changed = false; return drew || changed;
+  }
+  /** Advance native slots once against the actual host player poses. */
+  updateTargets(dt: number, alpha: number, players: readonly Readonly<Vec3>[]): boolean {
+    // The defining shard host admits at most 32 players. Validate before any slot advances.
+    if (players.length > 32) throw new Error('Invalid native body-slot player poses');
+    for (const player of players) {
+      if (![player?.x, player?.y, player?.z].every(Number.isFinite)) throw new Error('Invalid native body-slot player poses');
+    }
+    this.contactTargets = players;
+    // Retain the native first-player landing-distance observation as contact expands.
+    try { return this.update(dt, alpha, players[0] ?? null); }
+    finally { this.contactTargets = undefined; }
   }
   takeEvents(): readonly BodySlotEvent<T>[] { const events = this.events; this.events = []; return events; }
   snapshot(sources: readonly string[]): ReturnType<DynamicBodySlots<T>['snapshot']> { return this.slots.snapshot(source => sources.indexOf(source.entityId)); }
