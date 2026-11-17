@@ -52,29 +52,39 @@ test('prepare is a local docs selection only for the allowed release metadata',c
  }
 });
 
-test('the real push gate skips the lease on exact hosted proof and runs it on an incomplete result',ctx=>{
- const {root,git,commit,tag}=fixture();
+test('a canonical tag push reuses hosted proof in its clean copy and leases the suite on a miss',ctx=>{
+ const {root,commit,tag}=fixture();
  ctx.onTestFinished(()=>rmSync(root,{recursive:true,force:true}));
- const bin=join(root,'bin'),tree=join(root,'release-tree');
+ const bin=join(root,'bin');
  mkdirSync(bin);
- git('worktree','add','--detach',tree,commit);
  writeFileSync(join(bin,'gh'),`#!/usr/bin/env node
 const complete = process.env.RELEASE_PROOF_COMPLETE === 'yes';
 const pass = {status:'completed',conclusion:'success'};
 const step = { name:"Run this job's packed share", ...pass };
-const jobs = [...Array.from({length:9},(_,at)=>({name:'tests ('+(at+1)+')',...pass,steps:[step]})),{name:'boundaries',...pass}];
+const boundary = { name:'Cook, attach, and play the same bytes', ...pass };
+const jobs = [...Array.from({length:9},(_,at)=>({name:'tests ('+(at+1)+')',...pass,steps:[step]})),{name:'boundaries',...pass,steps:[boundary]}];
 const run = { head_sha:${JSON.stringify(commit)}, head_branch:${JSON.stringify(NAME)}, event:'push',...pass,id:151,run_started_at:new Date(Date.now()-30_000).toISOString(),head_repository:{full_name:'project-wildshard/engine'} };
 console.log(JSON.stringify(process.argv.some(arg=>arg.includes('/jobs?'))
  ? {jobs:complete?jobs:jobs.slice(0,-1),total_count:jobs.length}
  : {workflow_runs:[run]}));
 `,{mode:0o700});
- writeFileSync(join(bin,'python3'),'#!/bin/sh\necho fixture-full-lease >&2\nexit 12\n',{mode:0o700});
+ const python=execFileSync('which',['python3'],{encoding:'utf8'}).trim();
+ writeFileSync(join(bin,'python3'),`#!/usr/bin/env node
+import {spawnSync} from 'node:child_process';
+const args=process.argv.slice(2);
+if(args[0]==='scripts/heavy-lane.py'){
+ console.error('fixture-full-lease');process.exitCode=12;
+}else{
+ process.exitCode=spawnSync(${JSON.stringify(python)},args,{stdio:'inherit'}).status??1;
+}
+`,{mode:0o700});
  const env={...process.env,PATH:[bin,process.env.PATH??''].join(delimiter),WS_PUSH_REFS:publish(TAG,tag),WS_PUSH_DESTINATION:ORIGIN};
  for(const key of ['CI','GITHUB_ACTIONS','SKIP_CHECK','WS_MAIN_PUSH_GATED','WS_LAND_MAIN_PUSH'])delete env[key];
  const check=complete=>spawnSync(process.execPath,[resolve('.githooks/run-checks.mjs'),'push'],
-  {cwd:tree,env:{...env,RELEASE_PROOF_COMPLETE:complete},encoding:'utf8',timeout:20_000});
+  {cwd:root,env:{...env,RELEASE_PROOF_COMPLETE:complete},encoding:'utf8',timeout:20_000});
  const skipped=check('yes');
  assert.equal(skipped.status,0,skipped.stderr);
+ assert.match(skipped.stderr,/gate in a clean copy/u);
  assert.match(skipped.stderr,/exact hosted CI proof 151/u);
  assert.doesNotMatch(skipped.stderr,/fixture-full-lease/u);
  const full=check('no');
@@ -93,7 +103,8 @@ test('exact finished release CI is reusable only for the admitted release identi
  const run={head_sha:commit,head_branch:NAME,event:'push',status:'completed',conclusion:'success',id:151,
   head_repository:{full_name:'project-wildshard/engine'},run_started_at:'2026-11-17T09:00:00-05:00'};
  const packed={name:'tests (1)',status:'completed',conclusion:'success',steps:[{name:"Run this job's packed share",status:'completed',conclusion:'success'}]};
- const jobs=[packed,{name:'boundaries',status:'completed',conclusion:'success'}];
+ const boundaryStep={name:'Cook, attach, and play the same bytes',status:'completed',conclusion:'success'};
+ const jobs=[packed,{name:'boundaries',status:'completed',conclusion:'success',steps:[boundaryStep]}];
  const check=({row=run,list=jobs,count=list.length,exclusions=scope}={})=>hostedReleaseProof(release,root,{now,scope:exclusions,api:path=>{
   if(path.includes('/jobs'))return {jobs:list,total_count:count};
   assert.ok(path.includes(`head_sha=${commit}&branch=${encodeURIComponent(row.head_branch)}`));
@@ -102,6 +113,7 @@ test('exact finished release CI is reusable only for the admitted release identi
  assert.deepEqual(check(),{run:151,branch:NAME,commit});
  for(const row of [{...run,head_sha:'a'.repeat(40)},{...run,head_repository:{full_name:'fork/engine'}},{...run,event:'pull_request'},{...run,conclusion:'failure'}])assert.equal(check({row}),null);
  assert.equal(check({list:[packed]}),null);
+ assert.equal(check({list:[packed,{...jobs[1],steps:[{...boundaryStep,conclusion:'skipped'}]}]}),null);
  assert.equal(check({list:[{...packed,steps:[{...packed.steps[0],conclusion:'skipped'}]},jobs[1]]}),null);
  assert.equal(check({count:jobs.length+1}),null);
  assert.equal(check({exclusions:time=>String(time===now)}),null);

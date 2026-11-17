@@ -14,3 +14,6 @@ boundaries verdict, and test exclusions must match the scope at proof
 time. A missing or incomplete run falls back to the local full proof or
 the existing complete gate. TC22's nightly check still runs before the
 tag gate can reuse either proof.
+
+The hook fixture exercises the canonical tag push and its clean copy.
+The boundaries job must have run its cook-and-play step.

@@ -19,7 +19,7 @@ function git(cwd,args){
  return execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:3000}).trimEnd();
 }
 
-/** A shortcut applies only to one new ref, including when another ref is being deleted.
+/** A shortcut applies to a push containing exactly one new ref.
  * @param {string|undefined} refs */
 function newRef(refs){
  const [source,object,target,previous,...other]=(refs??'').trim().split(/\s+/u);
@@ -88,7 +88,8 @@ export function hostedReleaseProof({commit,version},cwd,{api=github,scope=at=>ex
    if(!Number.isFinite(started)||started>now||scope(started)!==scope(now))continue;
    const jobs=api(`actions/runs/${run.id}/jobs?filter=latest&per_page=100`);
    if(!record(jobs)||!Array.isArray(jobs.jobs)||jobs.total_count!==jobs.jobs.length||!provesCode('ci.yml',jobs.jobs))continue;
-   if(!jobs.jobs.some(job=>record(job)&&job.name==='boundaries'&&job.status==='completed'&&job.conclusion==='success'))continue;
+   if(!jobs.jobs.some(job=>record(job)&&job.name==='boundaries'&&job.status==='completed'&&job.conclusion==='success'&&
+      Array.isArray(job.steps)&&job.steps.some(step=>record(step)&&step.name==='Cook, attach, and play the same bytes'&&step.status==='completed'&&step.conclusion==='success')))continue;
    return {run:run.id,branch,commit};
   }
  }catch{/* Missing Git or Actions evidence requires the existing gate. */}

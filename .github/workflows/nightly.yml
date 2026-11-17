@@ -141,9 +141,15 @@ jobs:
         run: echo "NET_FUZZ_SEEDS=$(node scripts/nightly-seed.ts "$GITHUB_RUN_ID")" >> "$GITHUB_ENV"
       - run: node scripts/scratch-dir.mjs ci-native-contention 'Serial native CPU-admission rehearsals'
       - name: Prove all three original files queue and pass in order
+        id: serial
         run: |
           set -o pipefail
           node scripts/native-contention-proof.mjs tmp/ci-native-contention | tee tmp/ci-native-contention/result.json
+      - name: Flag an incomplete serial rehearsal
+        if: ${{ always() && steps.serial.outcome != 'success' }}
+        run: |
+          echo '::warning::Native contention rehearsal failed or did not run. Inspect the native-contention-serial job and its evidence.'
+          echo 'Native contention rehearsal needs attention. See the native-contention job and native-contention-serial artifact.' >> "$GITHUB_STEP_SUMMARY"
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
