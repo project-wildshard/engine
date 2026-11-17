@@ -8,10 +8,12 @@ import type { ShardCreatures } from '@wildshard/format/creatures';
 import { stepCreatureLift } from '../../../shared/game/plugin/animation';
 import { createMemoryActionBrain } from '../plugin/brain';
 import type { DeclaredBrainPorts } from './brainRuntime';
+import { bindCreatureSenses } from './creatureSenses';
 
 /** Plain grounded recipes borrow original actor clocks, memory and contact. */
 export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCreatures['spawns']): DeclaredBrainPorts {
   const byId = new Map(spawns.map(row => [row.id, row]));
+  const species = new Map(rows.species.map(row => [row.id, row]));
   let memberships: Map<string, AnimalSim[]> | undefined;
   const herdOf = (id: string | undefined): readonly AnimalSim[] | null => {
     if (id === undefined) return null;
@@ -38,7 +40,10 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
       throw new Error(`${label} contact must fit its body attack clock`);
     const from = new Vector3(), point = new Vector3(), direction = new Vector3();
     let readSelected: (() => ReturnType<SimHost['nearestPlayer']> | undefined) | undefined;
-    const target = () => readSelected === undefined ? host.nearestPlayer(actor.position) : readSelected();
+    const spawn = byId.get(actor.entityId);
+    const origin = label === 'Guardian' ? { get x() { return actor.position.x; }, get y() { return actor.position.y - actor.yOffset; }, get z() { return actor.position.z; } } : actor.position;
+    const senses = bindCreatureSenses(host, actor, spawn === undefined ? undefined : species.get(spawn.species)?.senses, origin);
+    const target = () => readSelected === undefined ? senses.nearest() : readSelected();
     const packet = { actor, target: actor.position,
       canReach: () => { const player = target(); return player !== undefined && canReach(actor, player.position, host.physics); },
       hit: (selected: StrikeSpec) => {
@@ -50,7 +55,7 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
         host.combat.hit({ source: actor.combatActor(), sourceTags: selected.tags, target: player.health,
           amount: selected.damage, point, dir: direction, from, moveId: selected.id });
       } };
-    return { phase: strike.windup / duration, target,
+    return { phase: strike.windup / duration, target, nearest: senses.nearest,
       bindTarget: (read: () => ReturnType<SimHost['nearestPlayer']> | undefined) => { readSelected = read; }, hit: () => {
       const player = target();
       if (player === undefined || !player.health.alive || host.parked.has(player.id)) return;
@@ -75,13 +80,14 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
     const observe = (dt: number) => {
       const player = target(); observation.dt = dt; observation.player = player?.position ?? actor.position;
       observation.calm = player === undefined || !player.health.alive || host.parked.has(player.id);
+      if (player !== undefined && !host.parked.has(player.id)) host.focusPlayer(player.id);
       return observation;
     };
     const action = createMemoryActionBrain(actor, { stateKey: 'st', states: ['idle', 'sidestep', 'attack', 'flee'],
       actions: [{ state: 2, phase: binding.phase,
         effect: 'contact', once: { key: 'hit', value: 1, test: 'falsy' } }] },
     { decide: () => undefined, effects: new Map([['contact', binding.hit]]) });
-    return { observe, bindTarget: binding.bindTarget, body: dt => { action.act(observe(dt)); } };
+    return { observe, nearest: binding.nearest, bindTarget: binding.bindTarget, body: dt => { action.act(observe(dt)); } };
   }, guardian: (actor, _host, declaration) => {
     if (declaration === undefined) throw new Error('Missing parsed data-host guardian policy');
     const spawn = byId.get(actor.entityId);
@@ -100,12 +106,13 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
     const observe = (dt: number) => {
       const player = target(); context.dt = dt; context.player = player?.position ?? actor.position;
       context.calm = player === undefined || !player.health.alive || host.parked.has(player.id);
+      if (player !== undefined && !host.parked.has(player.id)) host.focusPlayer(player.id);
       return context;
     };
     const action = createMemoryActionBrain(actor, { stateKey: 'st', states: ['hide', 'rise', 'attack', 'guard', 'sink'],
       actions: [{ state: 2, phase: binding.phase, effect: 'contact', once: { key: 'hit', value: 1, test: 'falsy' } }] },
     { decide: () => undefined, effects: new Map([['contact', binding.hit]]) });
-    return { observe, bindTarget: binding.bindTarget, body: dt => {
+    return { observe, nearest: binding.nearest, bindTarget: binding.bindTarget, body: dt => {
       stepCreatureLift(actor, dt, 1.5, 1.5, declaration.hideOffset, 6, actor.state === 'flee' ? 'up' : undefined);
       action.act(observe(dt));
     } };

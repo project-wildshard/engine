@@ -405,6 +405,12 @@ export class SimHost {
   }
   /** The player `playerFocus` follows. */
   get focusedPlayer(): PlayerSim { return this.focused; }
+  /** A native recipe's observed player identity owns any attack started while it runs. */
+  focusPlayer(id: string): void {
+    const player = this.players.get(id);
+    if (player === undefined || this.parked.has(id)) throw new RangeError('Missing active simulation player');
+    this.focused = player;
+  }
   /** A parked or detached seat is not a player in this world. Dead players still own their respawn tick. */
   get hasPlayerInterest(): boolean {
     for (const player of this.players.values()) if (!this.parked.has(player.id) && player.hasMotor) return true;

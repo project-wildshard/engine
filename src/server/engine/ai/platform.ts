@@ -11,7 +11,7 @@ export interface PlatformBrainSpec {
 /** Stable spawn identities produce the exact same entity set when a fresh sim restores a snapshot. */
 export interface PlatformSpawn { id: string; species: string; variant: string; brain: string | null; strike: string | null; seed: number; scale: number; at: readonly [number, number, number]; yaw: number; group?: string }
 /** A perceived live target, identified independently of its renderer or collision handle. */
-export interface BrainTarget { id: string; position: { x: number; y: number; z: number }; alive: boolean }
+export interface BrainTarget { id: string; position: { x: number; y: number; z: number }; alive: boolean; noticed?: boolean }
 /** Read-only perception/navigation and an explicit attack request; the motor and damage pipeline stay authoritative. */
 export interface PlatformBrainPorts {
   targets: () => readonly BrainTarget[]; visible: (from: BrainTarget['position'], to: BrainTarget['position']) => boolean;
@@ -78,7 +78,7 @@ export class PlatformBrain {
     let target = targets.find((candidate) => candidate.id === this.state.target && candidate.alive);
     if (homeDistance > this.spec.leashRadius || (target && distance(target.position, this.home) > this.spec.leashRadius)) { target = undefined; this.state.mode = 'return'; }
     if (this.state.mode === 'return' && homeDistance > this.spec.stopDistance) { this.move(this.home, this.spec.returnSpeed); return; }
-    if (acquire) target ??= targets.filter((candidate) => candidate.alive && distance(at, candidate.position) <= this.spec.awareRadius && distance(candidate.position, this.home) <= this.spec.leashRadius && this.ports.visible(at, candidate.position))
+    if (acquire) target ??= targets.filter((candidate) => candidate.alive && candidate.noticed !== false && distance(at, candidate.position) <= this.spec.awareRadius && distance(candidate.position, this.home) <= this.spec.leashRadius && this.ports.visible(at, candidate.position))
       .sort((a, b) => distance(at, a.position) - distance(at, b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
     if (target) {
       this.state.target = target.id;
@@ -119,7 +119,7 @@ export function buildPlatformSpawns(rows: readonly PlatformSpawn[], species: Pla
 /** A bounded path port can be backed by the engine navmesh; direct pursuit still resolves collisions in the motor. */
 export type BrainNavigation = PlatformBrainPorts['path'];
 /** Validate and construct all pursuit policies without registering fixed-step work or consuming random state. */
-export function preparePlatformBrains(sim: SimHost, rows: readonly PlatformSpawn[], specs: readonly PlatformBrainSpec[], navigation: BrainNavigation = (_from, to) => [to]): ReadonlyMap<string, PlatformBrain> {
+export function preparePlatformBrains(sim: SimHost, rows: readonly PlatformSpawn[], specs: readonly PlatformBrainSpec[], navigation: BrainNavigation = (_from, to) => [to], notices?: (actor: AnimalSim, player: string) => boolean): ReadonlyMap<string, PlatformBrain> {
   const definitions = new Map(specs.map((spec) => [spec.id, spec])), result = new Map<string, PlatformBrain>();
   if (definitions.size !== specs.length) throw new Error('Duplicate brain archetype');
   for (const row of rows) {
@@ -127,7 +127,8 @@ export function preparePlatformBrains(sim: SimHost, rows: readonly PlatformSpawn
     const actor = sim.entities.get(row.id), spec = definitions.get(row.brain);
     if (!actor || !spec || result.has(row.id)) throw new Error('Unresolved brain/spawn');
     const brain = new PlatformBrain(actor, spec, { x: row.at[0], y: row.at[1], z: row.at[2] }, {
-      targets: () => Array.from(sim.players.values(), player => ({ id: player.id, position: player.position, alive: player.health.alive })),
+      targets: () => Array.from(sim.players.values(), player => ({ id: player.id, position: player.position,
+        alive: player.health.alive && !sim.parked.has(player.id), noticed: notices === undefined || notices(actor, player.id) })),
       visible: (from, to) => {
         const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z, length = Math.hypot(dx, dy, dz);
         if (length < 1e-6) return true;

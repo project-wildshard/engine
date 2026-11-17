@@ -15,6 +15,7 @@ import type { SimHost, SimStateAdapter } from '@wildshard/engine/sim';
 import type { ResolvedCreatureLayers } from './creatureLayers';
 import { bindCreatureTemperament } from './creatureTemperament';
 import { bindGroundTemperament } from './groundTemperament';
+import { bindCreatureSenses } from './creatureSenses';
 import { parseStalker, stalkerPreset, type ShardStalker, parseGuardianPattern, guardianPreset, type ShardGuardianPattern, parseSkirmisher, parseGuardian, parsePerchHunter, type ShardSkirmisher, type ShardGuardian, type ShardPerchHunter } from '@wildshard/format/brains';
 import { parseRamGrazer, parseChallengeGrazer, parseGrazer, grazerPreset, type ShardGrazer, type ShardRamGrazer, type ShardChallengeGrazer } from '@wildshard/format/grazers';
 import { parseDiver, diverPreset, type ShardDiver, parseOrbitDiver, parsePatrolDiver, parseBurstFlyer, type ShardOrbitDiver, type ShardPatrolDiver, type ShardBurstFlyer } from '@wildshard/format/flyers';
@@ -24,6 +25,8 @@ export type DeclaredNativeBrain = ShardStalker | ShardGuardianPattern | ShardDiv
 /** One host-owned actor's observations and body recipe; construction must not execute gameplay or consume RNG. */
 export interface DeclaredBrainRecipe<P> {
   observe: (dt: number) => P; body: (dt: number) => void;
+  /** Optional admitted acquisition; retained/provoked player identity stays with the existing native owner. */
+  nearest?: () => ReturnType<SimHost['nearestPlayer']> | undefined;
   /** Observation and contact must share this actual-player selection; undefined suppresses contact. */
   bindTarget?: (read: () => ReturnType<SimHost['nearestPlayer']> | undefined) => void;
 }
@@ -110,7 +113,12 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
       || (spec.kind === 'burst-flyer' && ports.burstFlyer === undefined)) throw new Error('Missing native brain port');
   }
   const pursueRows = rows.filter(row => row.brain !== null && definitions.get(row.brain)?.kind === 'pursue');
-  const pursuits = preparePlatformBrains(host, pursueRows, presets.filter(row => row.kind === 'pursue'), ports.navigation);
+  const perception = new Map(pursueRows.map(row => {
+    const actor = host.entities.get(row.id); if (actor === undefined) throw new Error('Missing pursuit senses body');
+    return [row.id, bindCreatureSenses(host, actor, layers?.get(row.species)?.senses)] as const;
+  }));
+  const pursuits = preparePlatformBrains(host, pursueRows, presets.filter(row => row.kind === 'pursue'), ports.navigation,
+    (actor, id) => { const player = host.players.get(id); return player !== undefined && perception.get(actor.entityId)?.notices(player) === true; });
   const social = new Map<string, { readonly id: string; readonly members: Set<ReturnType<AnimalSim['combatActor']>> }>();
   for (const row of rows) {
     if (row.group === undefined || layers?.get(row.species)?.temperament.pack !== true) continue;

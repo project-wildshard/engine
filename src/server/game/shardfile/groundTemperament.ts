@@ -26,8 +26,8 @@ export function bindGroundTemperament<P>(host: SimHost, actor: AnimalSim, diviso
     enabled = acquire;
     if (!actor.alive) { selected = null; pending = 0; enabled = false; return; }
     if (acquire && target() === undefined) {
-      const player = host.nearestPlayer(origin);
-      selected = living(player.id)?.id ?? null;
+      const player = recipe.nearest === undefined ? host.nearestPlayer(origin) : recipe.nearest();
+      selected = player === undefined ? null : living(player.id)?.id ?? null;
     }
     if (!acquire) { actor.cancelAttack(); if (target() === undefined) { selected = null; pending = 0; } }
     if (acquire && pending) {

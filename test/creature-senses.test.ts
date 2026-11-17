@@ -177,3 +177,22 @@ test("omitted senses preserve the actual native nearest-player behavior and do n
     f.sim.dispose();
   }
 });
+
+test("omitted senses retain the native dead-player observation fallback without granting acquisition", async () => {
+  const f = await fixture();
+  try {
+    f.sim.host.combat.hit({
+      source: "env",
+      sourceTags: [],
+      target: f.player.health,
+      amount: 1000,
+      point: f.player.position.clone(),
+      dir: new Vector3(),
+    });
+    const senses = bindCreatureSenses(f.sim.host, f.actor);
+    expect(senses.nearest()?.id).toBe(f.sim.host.nearestPlayer(f.actor.position).id);
+    expect(senses.notices(f.player)).toBe(false);
+  } finally {
+    f.sim.dispose();
+  }
+});

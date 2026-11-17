@@ -35,7 +35,7 @@ export function bindCreatureSenses(host: SimHost, actor: AnimalSim, input?: Crea
     return distance <= radius * radius;
   };
   return { notices, nearest: () => {
-    if (senses === undefined) { const player = host.nearestPlayer(origin); return notices(player) ? player : undefined; }
+    if (senses === undefined) return host.nearestPlayer(origin);
     let nearest: Player | undefined, best = Infinity;
     for (const player of host.players.values()) {
       if (!notices(player)) continue;
