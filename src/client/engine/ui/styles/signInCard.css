@@ -1,0 +1,24 @@
+/* ─── MMO-PLAN MP2.2e2: the title's sign-in card (src/client/engine/ui/signInCard.ts) ─── prefix ws-signin- ───
+   The Name prompt's glass card (namePrompt.css): square corners, the cyan line and its corner ticks, a Rajdhani head and mono
+   buttons. It fills the visible band viewport.ts marks, so a phone's keyboard never covers the email field. */
+.ws-signin { position: fixed; left: 0; top: 0; z-index: calc(var(--ws-layer-modal) + 10); box-sizing: border-box; width: 100%; height: var(--ws-vh, 100%); display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 6, 12, 0.62); pointer-events: auto; }
+html[data-ws-keyboard] .ws-signin { top: var(--ws-kb-top, 0px); height: calc(var(--ws-kb-bottom, 100%) - var(--ws-kb-top, 0px)); }
+.ws-signin * { box-sizing: border-box; }
+.ws-signin .ws-signin-card { position: relative; width: min(100%, 380px); display: grid; gap: 12px; padding: 22px 18px 16px; background: rgba(9, 22, 36, 0.94); border: 1px solid rgba(143, 227, 255, 0.4); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.ws-signin .ws-signin-card::before, .ws-signin .ws-signin-card::after { content: ''; position: absolute; width: 14px; height: 14px; pointer-events: none; border: 2px solid var(--ws-cyan); }
+.ws-signin .ws-signin-card::before { left: -3px; top: -3px; border-right: 0; border-bottom: 0; }
+.ws-signin .ws-signin-card::after { right: -3px; bottom: -3px; border-left: 0; border-top: 0; }
+.ws-signin .ws-signin-title { margin: 0; font-family: var(--ws-display); font-weight: 700; font-size: 24px; line-height: 1.15; letter-spacing: 0.04em; color: #eaf8ff; text-shadow: 0 0 14px rgba(143, 227, 255, 0.35); }
+.ws-signin .ws-signin-why, .ws-signin .ws-signin-who { margin: 0; color: rgba(214, 240, 255, 0.82); font-size: 14px; line-height: 1.4; }
+.ws-signin .ws-signin-who { color: #eaf8ff; overflow-wrap: anywhere; }
+.ws-signin .ws-signin-body { display: grid; gap: 10px; }
+.ws-signin .ws-signin-form { display: grid; gap: 10px; margin: 0; }
+.ws-signin .ws-signin-email { width: 100%; min-height: 48px; padding: 10px 12px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan-line); border-radius: 0; background: rgba(6, 10, 18, 0.85); color: #fff; font-family: var(--ws-mono); font-size: 16px; outline: none; }
+.ws-signin .ws-signin-email:focus { border-color: var(--ws-cyan); box-shadow: 0 0 0 1px rgba(143, 227, 255, 0.25), 0 0 16px rgba(143, 227, 255, 0.2); }
+.ws-signin .ws-signin-send, .ws-signin .ws-signin-alt, .ws-signin .ws-signin-close { width: 100%; min-height: 48px; padding: 10px 14px; appearance: none; -webkit-appearance: none; border-radius: 0; font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.ws-signin .ws-signin-send { border: 1px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.16); color: var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.18); }
+.ws-signin .ws-signin-alt { border: 1px solid var(--ws-cyan-line); background: rgba(6, 10, 18, 0.7); color: rgba(214, 240, 255, 0.9); }
+.ws-signin .ws-signin-close { border: 0; background: none; color: rgba(189, 238, 255, 0.6); min-height: 40px; }
+.ws-signin button:disabled { opacity: 0.5; cursor: default; }
+.ws-signin .ws-signin-note { margin: 0; color: #ffe2b0; font-size: 13px; line-height: 1.4; }
+.ws-signin .ws-signin-note[hidden] { display: none; }

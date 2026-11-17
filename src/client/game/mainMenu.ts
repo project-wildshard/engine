@@ -17,6 +17,8 @@ import { mobileDevice } from '@wildshard/engine/boot/titleArrival';
 import { dropFirstPlay, firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { lowPowerOn } from '@wildshard/engine/core/graphicsMode';
 import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
+import { openSignIn, takeLink, titleLogin, titleSignedIn } from '@wildshard/engine/ui/signInCard';
+import { engineString } from '@wildshard/engine/strings';
 import { lastEnd, type LastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type TitleDeck, type TitleDeckOptions } from './titleDeck';
@@ -124,6 +126,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
         <button class="ws-main-card ws-main-select" type="button"><span class="ws-main-icon">${CARDS_ICON}</span><b>${s.zoneSelect}</b></button>
       </div>
       <div class="ws-main-row">
+        <button class="ws-main-settings ws-main-signin" type="button" data-signed-in="${String(titleSignedIn())}">${engineString(titleSignedIn() ? 's_signin_account' : 's_signin_open')}</button>
         <button class="ws-main-settings" type="button">${s.settings}</button>
         <button class="ws-main-dev${dev ? ' on' : ''}" type="button" role="switch" aria-checked="${dev}" aria-label="${s.developerLabel}"><i class="ws-main-dev-track" aria-hidden="true"></i>${s.developer}</button>
       </div>
@@ -232,7 +235,19 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
       void load().catch(() => undefined); // Optional read-ahead never refuses a title tap.
     });
   };
-  deck.onTap(required(main, '.ws-main-settings', HTMLButtonElement), () => { opts.onSettings(); });
+  deck.onTap(required(main, '.ws-main-settings:not(.ws-main-signin)', HTMLButtonElement), () => { opts.onSettings(); });
+  // MMO-PLAN MP2.2e2: SIGN IN opens the sign-in card; a mailed link (`#login=…`) back on this page is spent here and opens it on
+  // its answer. The button says ACCOUNT once signed in.
+  const signIn = required(main, '.ws-main-signin', HTMLButtonElement);
+  const relabel = (): void => { const yes = titleSignedIn(); signIn.textContent = engineString(yes ? 's_signin_account' : 's_signin_open'); signIn.dataset['signedIn'] = String(yes); };
+  deck.onTap(signIn, () => { void openSignIn(owner, { parent: document.body, changed: relabel }); });
+  const login = titleLogin();
+  const landed = async (ports: NonNullable<typeof login>): Promise<void> => {
+    const note = await takeLink(ports);
+    if (note === undefined || owner.disposed) return;
+    relabel(); await openSignIn(owner, { parent: document.body, changed: relabel, note });
+  };
+  if (login !== undefined) void landed(login);
   // MS2 (J399, board B): CHECK CONNECTION left the main screen; Settings ▸ System's Connection doctor row opens the same page
   // E483 (Jake: "a better dev toggle … without having to go to the settings page"; E140's ask): the same live switch as
   // Settings ▸ Developer. Both title paths rebuild on the change (StartTitle / HUD `onDev`) on this screen, so the menu, the

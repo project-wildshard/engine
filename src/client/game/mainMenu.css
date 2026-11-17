@@ -175,3 +175,5 @@
   :root:has(.ws-title-stack:not(.hide) > .ws-main:not(.hide)):not(:has(.ws-gmenu.show)) { --ws-pill-line: calc(10px + env(safe-area-inset-top, 0px) + 0.475 * 28px); }
   :root:has(.ws-title-stack:not(.hide) > .ws-menu-carousel:not(.hide)):not(:has(.ws-gmenu.show)) { --ws-pill-line: calc(10px + env(safe-area-inset-top, 0px) + 20px - 0.7px); }
 }
+/* MP2.2e2: SIGN IN, beside SETTINGS; one line on a phone */
+.ws-main .ws-main-signin { min-width: 0; padding: 10px 14px; white-space: nowrap; letter-spacing: 0.16em; text-indent: 0.16em; }
