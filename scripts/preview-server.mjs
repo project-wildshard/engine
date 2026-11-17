@@ -176,6 +176,8 @@ const server = createServer((req, res) => {
   // DL15: a spawn part is its q11 Brotli body (see below); a missing one is a 404, never the page's fallback.
   const part = /^\/assets\/spawn\/(?:parts|server)\/[a-f0-9]{16}\.pack\.br$/u.test(pathname);
   let found = lookup(pathname);
+  // FM5b: a page with no retention file is a legacy page; production's asset host answers 404 (pages/wrangler.jsonc), never the page
+  if (found === null && pathname === '/code-retention.json') { res.setHeader('Cache-Control', 'no-store'); res.statusCode = 404; res.end(); return; }
   if (found === null && part) { res.removeHeader('Content-Encoding'); res.statusCode = 404; res.end(); return; }
   if (found === null) {
     const accept = req.headers.accept;

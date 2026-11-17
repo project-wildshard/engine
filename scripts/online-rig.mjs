@@ -2,7 +2,7 @@
 // nothing it does not stop, and it opens no port past loopback. Its key is made once for the build, and signs a file on 127.0.0.1 and nothing else.
 import { spawn, spawnSync } from 'node:child_process';
 import { sign } from 'node:crypto';
-import { createWriteStream, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { createWriteStream, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve as absolute } from 'node:path';
 import { Client } from 'pg';
@@ -11,6 +11,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { rigOptions } from './online-rig-options.mjs';
 import { claimFixture, fixtureKey, freeFixturePorts, ownedPostgres, ownedEphemeralPostgres, confirmPostgres } from './online-rig-owned.mjs';
+import { signRetention } from './code-retention.mjs';
 
 const ROOT = absolute(import.meta.dirname, '..');
 /** The rig's four loopback ports, from 18796 (a lane beside another rig names its own: WS_RIG_PORTS=18856; its dist is stamped
@@ -54,6 +55,10 @@ export async function intoWorld(page) {
  * 4 by default; staging runs 2). FM3: `origins` are loopback page origins the server also lets in, and `channel`
  * is the release file's channel (`production`).
  * FM8s: `pgBin` 'pglite:' runs the saves on PGlite in this process, behind a front the proof can hold or refuse (`rig.database`).
+ * FM5b4/mode 10: `nextDist` is a second build of the same stamp. The release port has two signed views (meta MMO-FAILURE-MODES-PLAN,
+ * the local chaos proxy): `/release.json` is the world's and `/__release.json` the page's (the proxy's page route), so `pageView`
+ * can run the page's ahead of the world's; `retain` serves a signed `/code-retention.json` on the page origin; `move` carries the
+ * world and the page origin to the other build, as a deploy does.
  * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean, port?: 0, gridRoot?: string }} options */
 export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
@@ -88,15 +93,26 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   if (nextBuild !== '') run(['scripts/server-origin.mjs', origin, nextBuild, `--grid=${absolute(gridRoot)}`, ...books], 'the next server book');
   run(['scripts/build-server.mjs', '--build', build, '--out', server], 'the server build');
 
-  let signed = '';
-  /** @param {number} serial @param {string} engineBuild @param {string} [signedChannel] @param {string} [publicSocket] */
+  let signed = '', pageSigned = '', current = { serial: 1, engineBuild: build, channel };
+  /** @param {{ serial: number, engineBuild: string, channel: string }} row */
+  const signRelease = row => {
+    const body = JSON.stringify({ channel: row.channel, serial: row.serial, engineBuild: row.engineBuild, saveEpoch: 2, shards: slugs.map(slug => ({ slug, revision: 1 })), socket: signedSocket });
+    return JSON.stringify({ body, signature: sign(null, Buffer.from(body), key.private).toString('hex') });
+  };
+  /** Both views name this release; a page view set before is dropped. @param {number} serial @param {string} engineBuild @param {string} [signedChannel] @param {string} [publicSocket] */
   const publish = (serial, engineBuild, signedChannel = channel, publicSocket = signedSocket) => {
     rigOptions({ saves: 'memory', socket: publicSocket }); signedSocket = publicSocket;
-    const body = JSON.stringify({ channel: signedChannel, serial, engineBuild, saveEpoch: 2, shards: slugs.map(slug => ({ slug, revision: 1 })), socket: signedSocket });
-    signed = JSON.stringify({ body, signature: sign(null, Buffer.from(body), key.private).toString('hex') });
+    current = { serial, engineBuild, channel: signedChannel };
+    signed = signRelease(current); pageSigned = '';
   };
   publish(1, build);
-  const release = createServer((_request, response) => { response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(signed); });
+  /** The page's view names another build until the next publish (null: the world's view again). The world never reads it.
+   * @param {string | null} engineBuild */
+  const pageView = engineBuild => { pageSigned = engineBuild === null ? '' : signRelease({ ...current, engineBuild }); };
+  const release = createServer((request, response) => {
+    const page = new URL(request.url ?? '/', 'http://127.0.0.1').pathname === '/__release.json' && pageSigned !== '';
+    response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(page ? pageSigned : signed);
+  });
   const releasePort = await listenLoopback(release, ephemeral ? 0 : RELEASE_PORT);
   resources.push(async () => { release.closeAllConnections(); await release[Symbol.asyncDispose](); });
 
@@ -187,7 +203,35 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     try { if (worldFront !== undefined) worldFront.point(await childListener(main, 'world-ready')); }
     catch (error) { await stopped(main); throw error; }
   };
-  return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(pagePort)}`, worldOrigin: `http://127.0.0.1:${String(worldPort)}`, releaseOrigin: `http://127.0.0.1:${String(releasePort)}`, socket: signedSocket, ports: { page: pagePort, world: worldPort, release: releasePort, ...(memory ? {} : { database: pgPort }) }, Client,
+  // FM5b4: the signed retention file, written into every build folder the page origin can serve, and removed at close
+  const folders = nextDist === '' ? [dist] : [dist, nextDist];
+  let retaining = false;
+  const unretain = () => { for (const folder of folders) rmSync(join(folder, 'code-retention.json'), { force: true }); };
+  unretain();
+  /** The page origin's `/code-retention.json`, signed with the rig key (null: none, a legacy page). `engineBuild` and `channel`
+   *  default to the page's view of the release, as the page reads it against a fresh release.
+   * @param {{ keptBuilds: string[], engineBuild?: string, channel?: string, retireAt?: number, issuedAt?: number } | null} spec */
+  const retain = spec => {
+    if (spec === null) { unretain(); return; }
+    const viewed = pageSigned === '' ? current : JSON.parse(JSON.parse(pageSigned).body);
+    const { keptBuilds, engineBuild = viewed.engineBuild, channel: signedChannel = viewed.channel, retireAt, issuedAt = Date.now() } = spec;
+    const text = signRetention({ purpose: 'code-retention', channel: signedChannel, engineBuild, keptBuilds, issuedAt, ...retireAt === undefined ? {} : { retireAt } }, key.private, key.public);
+    if (!retaining) { retaining = true; resources.push(unretain); }
+    for (const folder of folders) writeFileSync(join(folder, 'code-retention.json'), text);
+  };
+  /** A deploy, as online-proof.mjs --next makes it: both views name the build, `published` runs (the countdown is under way), the page
+   *  origin serves the build, the old world drains and the world starts on it. @param {string} built @param {{ published?: () => unknown }} [how] */
+  const move = async (built, { published } = {}) => {
+    if (nextBuild === '') throw new Error('A move needs a rig with a second build (nextDist)');
+    const target = buildOf(built);
+    if (target !== build && target !== nextBuild) throw new Error(`A rig moves only between its two builds, not ${target}`);
+    publish(current.serial + 1, target, current.channel);
+    await published?.();
+    pageFront?.clear(); await stopped(pages); pages = await serve(built);
+    await exited(main);
+    await start(target);
+  };
+  return { shard, build, nextBuild, publish, pageView, retain, move, DATABASE, base: `http://127.0.0.1:${String(pagePort)}`, worldOrigin: `http://127.0.0.1:${String(worldPort)}`, releaseOrigin: `http://127.0.0.1:${String(releasePort)}`, socket: signedSocket, ports: { page: pagePort, world: worldPort, release: releasePort, ...(memory ? {} : { database: pgPort }) }, Client,
     /** FM8s: a `pglite:` rig's database, broken on purpose: `hold` (queries wait), `refuse` (connections drop), `pass`. */
     ...dbFront === undefined ? {} : { database: { fault: dbFront.fault, mode: dbFront.mode, stats: dbFront.stats } },
     /** The server goes down, for a test of its coming back. */

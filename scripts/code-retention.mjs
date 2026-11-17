@@ -22,9 +22,15 @@ export function signCodeRetention({ directory, channel, privateKey, publicKey, n
       if (!Number.isSafeInteger(file.bytes) || file.bytes < 0 || statSync(join(directory, file.path)).size !== file.bytes) throw new Error('A retained-code file is missing or changed');
     }
   }
+  return signRetention(metadata, privateKey, publicKey);
+}
+/** Sign metadata the schema admits with the release trust root (the page publisher here; the online rig's fixture key in FM5b4).
+ * @param {unknown} metadata @param {string} privateKey @param {string} publicKey */
+export function signRetention(metadata, privateKey, publicKey) {
+  const checked = v.parse(CodeRetentionSchema, metadata);
   const key = createPrivateKey(privateKey);
   if (key.asymmetricKeyType !== 'ed25519' || createPublicKey(key).export({type: 'spki', format: 'der'}).toString('hex') !== publicKey) throw new Error('Code-retention signing key differs from the release trust root');
-  const body = JSON.stringify(metadata);
+  const body = JSON.stringify(checked);
   return JSON.stringify({ body, signature: sign(null, Buffer.from(body), key).toString('hex') });
 }
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
