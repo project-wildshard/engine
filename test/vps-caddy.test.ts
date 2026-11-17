@@ -62,3 +62,16 @@ test('VH9: Caddy lets in only the three game pages (the server unit ALLOWED_ORIG
   expect(patterns.length).toBeGreaterThan(0);
   for (const pattern of patterns) expect(pattern).toBe('^https://(play|staging|preview)\\.wildshard\\.io$');
 });
+
+test('MMO-PLAN MP2.5a: both sites pass a game page\'s account export and delete to their own server, and nothing past them', () => {
+  const caddyfile = render('203.0.113.7');
+  for (const [host, port] of [['rooms.wildshard.io', 8790], ['rooms-staging.wildshard.io', 8791]] as const) {
+    const block = site(caddyfile, host), start = block.indexOf('\thandle @account {\n');
+    expect(block, host).toContain('\t@account path /account/export /account/delete\n');
+    expect(start, host).toBeGreaterThanOrEqual(0);
+    const body = block.slice(start, block.indexOf('\n\t}\n', start) + 3);
+    expect(body, 'another site\'s page is refused first').toMatch(/^\thandle @account \{\n\t\trespond @foreign 403\n/u);
+    expect(body).toContain(`reverse_proxy 127.0.0.1:${String(port)} {`);
+    expect(body).toContain('header_up -CF-Connecting-IP');
+  }
+});

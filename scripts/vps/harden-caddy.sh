@@ -5,6 +5,7 @@
 # Cloudflare customer could point a proxied name here. A per-zone client certificate closes that, later, if it matters.
 #   rooms.wildshard.io          WebSocket upgrade on / to production 127.0.0.1:8790; /up is 200 while production's /health is
 #   rooms-staging.wildshard.io  the same to staging 127.0.0.1:8791 (D2), /up included, so Sentry can watch staging from outside
+# Both also pass /account/export and /account/delete (MMO-PLAN MP2.5a) from the game's pages.
 # Everything else is 404, /health included (it stays tailnet-only); a page outside the game's own hosts gets 403.
 # The client address is Cloudflare's CF-Connecting-IP, believed only from Cloudflare's ranges, and handed on as the one
 # X-Forwarded-For hop, which the server's TRUST_PROXY=caddy reads (VH10); CF-Connecting-IP itself never reaches the server.
@@ -64,6 +65,16 @@ https://$host {
 			header_up X-Forwarded-For {client_ip}
 			header_up -CF-Connecting-IP
 			stream_close_delay 5m
+		}
+	}
+	# MMO-PLAN MP2.5a: a signed-in page's export and delete (a POST with its join ticket, and the browser's preflight), from the
+	# game's pages only, as the socket is. The server checks the ticket; nothing else under /account is passed.
+	@account path /account/export /account/delete
+	handle @account {
+		respond @foreign 403
+		reverse_proxy 127.0.0.1:$port {
+			header_up X-Forwarded-For {client_ip}
+			header_up -CF-Connecting-IP
 		}
 	}
 	handle {
