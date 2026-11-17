@@ -20,3 +20,5 @@
 - Ring 1's step digests move for Blender template, Far Reach, Driftwood, Pine and Nine (Template, Dunes and Nalati step
   the same): re-recorded with this change. Shard repos' own walk checkpoints are keyed per engine version and move at
   their next engine bump.
+- Ring 1 recorded on darwin-arm64 after the rebase on `0bad938a`: two runs step the same; the five moved chains
+  were copied into linux-x64 (CI says if Linux ever parts from Darwin here).
