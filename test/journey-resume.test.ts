@@ -4,12 +4,12 @@
 import { expect, test } from 'vitest';
 import { judge, tapJourney } from '../scripts/journey-proof.mjs';
 
-function resumingPage() {
-  let nameOpen = true, reads = 0;
+function resumingPage(menuAfter = Infinity) {
+  let nameOpen = true, reads = 0, polls = 0;
   const taps: string[] = [];
   const locator = (selector: string) => ({
     first() { return this; },
-    isVisible: () => Promise.resolve(selector === '#ws-name-box [data-name=skip]' ? nameOpen : false),
+    isVisible: () => Promise.resolve(selector === '#ws-name-box [data-name=skip]' ? nameOpen : ['.ws-main-mmo', '.ws-main-select'].includes(selector) ? ++polls > menuAfter : false),
     tap: () => { taps.push(selector); if (selector === '#ws-name-box [data-name=skip]') nameOpen = false; return Promise.resolve(); },
     waitFor: () => Promise.reject(new Error(`${selector} never showed`)),
     textContent: () => Promise.resolve(''),
@@ -30,4 +30,11 @@ test('an old shell that resumes into its world is followed to play, its Name ski
     expect(judge(samples as never)).toEqual([]);
     expect(taps).toEqual(['#ws-name-box [data-name=skip]']);
   }
+});
+
+test('an old shell that updates into this build\'s main screen after its resume is tapped through as ever', { timeout: 15_000 }, async () => {
+  const { page, taps } = resumingPage(3);
+  const samples = await tapJourney(page, { card: 'driftwood-isle', path: 'mmo', budgetMs: 10_000, sampleMs: 10 }) as unknown as { resumed?: boolean };
+  expect(samples.resumed).toBeUndefined();
+  expect(taps).toContain('.ws-main-mmo');
 });

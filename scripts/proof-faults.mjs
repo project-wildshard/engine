@@ -77,6 +77,8 @@ export function cardNow() {
  * @param {import('playwright').Page} page @param {string[]} errors @param {string} [who] a prefix naming the page
  * @returns {Promise<{ settle: () => Promise<void> }>}
  */
+/** How near a page's navigation a WebKit access-control error counts as a cancelled fetch (SB44). */
+const CANCEL_MS = 3000;
 export async function watchFaults(page, errors, who = '') {
   /** which cards were already pushed: a chip's line changes once its report is sent (a ✓), it is still the one chip */
   /** @type {Set<string>} */
@@ -86,11 +88,22 @@ export async function watchFaults(page, errors, who = '') {
     if (card !== undefined) { if (cards.has(card)) return; cards.add(card); }
     errors.push(who === '' ? problem : `${who}: ${problem}`);
   };
-  page.on('pageerror', (error) => { push(`uncaught page error: ${error.message.slice(0, 240)}`); });
+  // SB44 (MU19c1b's class): WebKit reports each fetch a page had in flight when it reloads (an update, a resume) as an uncaught
+  // `… due to access control checks.`; one within 3 s of the page's own navigation is that cancel, not a fault. The rest still fail.
+  /** @type {{ at: number, text: string }[]} */
+  const cancels = [];
+  /** @type {number[]} */
+  const navigations = [];
+  page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations.push(Date.now()); });
+  page.on('pageerror', (error) => {
+    const text = `uncaught page error: ${error.message.slice(0, 240)}`;
+    if (error.message.endsWith(' due to access control checks.')) cancels.push({ at: Date.now(), text }); else push(text);
+  });
   page.on('console', (message) => { const problem = faultProblem(message.text()); if (problem !== null) push(problem); });
   await page.addInitScript(recordCards);
   return {
     async settle() {
+      for (const { at, text } of cancels.splice(0)) if (!navigations.some((t) => Math.abs(t - at) <= CANCEL_MS)) push(text);
       const onScreen = await page.evaluate(cardNow).catch(() => /** @type {string[]} */ ([]));
       for (const row of onScreen) push(`the ${row.replace(/: /u, ' showed: ')}`);
     },

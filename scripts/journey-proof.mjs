@@ -159,14 +159,23 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
     if (await skip.isVisible()) await skip.tap();
   };
   // SB44: a shell that ended mid-play (the browser killed, not a leave) resumes into its world on the next visit (SR4,
-  // `consumeGridRecovery`: `?chunk=<world>&glreload=1`, then the loading card): there is no menu to tap. Follow it as a player
-  // would (SKIP the Name, which asks over the loading card) and judge the loading card to play; the samples say `resumed`.
+  // `consumeGridRecovery`: `?chunk=<world>&glreload=1`, then the loading card), or, as an old shell, shows THE GAME RESTARTED
+  // UNEXPECTEDLY and updates into this build's main screen. Wait as a player would: SKIP the Name the resume asks over its loading
+  // card and DISMISS a drop note; a menu that shows is tapped as ever, a resume that reaches play is judged from there (`resumed`).
   /** @param {import('playwright').Locator} target @returns {Promise<boolean>} true: the page resumed into its world */
   const resumedBefore = async (target) => {
-    const until = Date.now() + 60_000;
+    const until = Date.now() + 90_000;
+    let resuming = false;
     while (Date.now() < until) {
-      if (/[?&](glreload=1|chunk=)/u.test(page.url())) return true;
+      if (/[?&](glreload=1|chunk=)/u.test(page.url())) resuming = true;
       if (await target.isVisible().catch(() => false)) return false;
+      if (resuming) {
+        await skipName().catch(() => undefined);
+        const dismiss = page.locator('#wsdrop .dismiss');
+        if (await dismiss.isVisible().catch(() => false)) await dismiss.tap().catch(() => undefined);
+        let s = null; try { s = await page.evaluate(screenNow); } catch { /* the document is changing */ }
+        if (label(s) === 'play') return true;
+      }
       await page.waitForTimeout(100);
     }
     await target.waitFor({ state: 'visible', timeout: 1 });

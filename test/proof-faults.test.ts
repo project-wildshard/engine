@@ -106,3 +106,23 @@ test('ZONE-ENTRY\'s proofs and the journey proof all use the shared check', () =
     expect(text, script).toMatch(/\.settle\(\)/u);
   }
 });
+
+test('SB44: a WebKit access-control error beside the page\'s own navigation is a cancelled fetch; one far from any still fails', async () => {
+  const handlers = new Map<string, ((value: unknown) => void)[]>();
+  const main = {};
+  const page = { mainFrame: () => main, on: (name: string, fn: (value: unknown) => void) => { handlers.set(name, [...handlers.get(name) ?? [], fn]); },
+    addInitScript: () => Promise.resolve(), evaluate: () => Promise.resolve([]) };
+  const emit = (name: string, value: unknown): void => { for (const fn of handlers.get(name) ?? []) fn(value); };
+  const errors: string[] = [];
+  const faults = await watchFaults(page as never, errors);
+  emit('pageerror', new Error('/packs.wildshard.io/content/3c89/shardfiles/pine-hollow/discovery.json?v=1 due to access control checks.'));
+  emit('framenavigated', main);
+  emit('pageerror', new Error('TypeError: x is undefined'));
+  await faults.settle();
+  expect(errors).toEqual(['uncaught page error: TypeError: x is undefined']);
+  const late: string[] = [], again = await watchFaults(page as never, late);
+  handlers.delete('framenavigated');
+  emit('pageerror', new Error('/packs.wildshard.io/a.json due to access control checks.'));
+  await again.settle();
+  expect(late).toEqual(['uncaught page error: /packs.wildshard.io/a.json due to access control checks.']);
+});
