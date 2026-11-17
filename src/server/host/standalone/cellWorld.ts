@@ -75,6 +75,10 @@ export interface CellWorldOptions {
   /** Each player's own goods. Left out, one purse is the session's. */
   readonly owned?: OwnedStores;
   readonly profiles?: CreatureRewardStore;
+  /** The name players' goods are stored under: a room's shard, as its save rows and reward store name it. A grid cell's shard can
+   *  differ from its product's identity slug (the Template's catalogue `_template` against its product's `template`). Left out, the
+   *  product's identity slug. */
+  readonly shard?: string;
   /** Where a player's facts go. Left out, they go in `saves`, the session's. */
   readonly facts?: (name: string, entity: string, player: string, input: HeadlessRuntimeInput) => FactReceipt | null;
   /** A room has no page, so no page's save seeds a fresh world. */
@@ -141,9 +145,9 @@ function bindDiscovery(host: SimHost, places: readonly { readonly id: string; re
 }
 
 /** What each player holds in a cell. A shard with goods sells them here. */
-function ownedOf(host: SimHost, input: HeadlessRuntimeInput, stores: OwnedStores | undefined, profiles?: CreatureRewardStore): OwnedBook {
+function ownedOf(host: SimHost, input: HeadlessRuntimeInput, stores: OwnedStores | undefined, profiles?: CreatureRewardStore, shard: string = input.shard.identity.slug): OwnedBook {
   const economy = input.shard.rows.loot.find(row => row.economy !== undefined)?.economy, sold = economy !== undefined && 'exchange' in economy ? economy.exchange : undefined;
-  return installPlayerOwned(host, input.shard.identity.slug, sold ?? null, !shardRows(host).owned.has(QUEST_OWNED), stores, input.shard, profiles);
+  return installPlayerOwned(host, shard, sold ?? null, !shardRows(host).owned.has(QUEST_OWNED), stores, input.shard, profiles);
 }
 
 /** The radius a data cell's place takes when its manifest POI names none. */
@@ -179,7 +183,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
     bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined, snapshot !== undefined);
     host.respawn.served = true; actRoutes(host).introLocks = true;
-    const owned = ownedOf(host, input, options.owned, options.profiles), fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
+    const owned = ownedOf(host, input, options.owned, options.profiles, options.shard), fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
     return { host, owned, fallFloor, fall: fallFloor(), resident, dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,
       adopt: () => { regionalRuntimeCheckpoint(options.saves, placed, input.shard.identity.revision).restore({ animals: [...host.entities.values()] }); return true; }, step: inputs => {
       const player = leadSeat(host);
@@ -194,7 +198,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
   bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product));
   host.respawn.served = true; actRoutes(host).introLocks = true;
   const fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
-  return { host, owned: ownedOf(host, input, options.owned, options.profiles), fallFloor, fall: fallFloor(), dispose, fact, effects: () => effects, adopt: saved => { const held = sim(); return held === undefined || (saved === undefined ? importPageProgress(options.saves, placed, input.shard, held) : carryRefusedSave(input.shard, held, saved)); }, step: inputs => {
+  return { host, owned: ownedOf(host, input, options.owned, options.profiles, options.shard), fallFloor, fall: fallFloor(), dispose, fact, effects: () => effects, adopt: saved => { const held = sim(); return held === undefined || (saved === undefined ? importPageProgress(options.saves, placed, input.shard, held) : carryRefusedSave(input.shard, held, saved)); }, step: inputs => {
     effects.length = 0;
     // A data shard's prompts answer whoever stands at them; an id they don't offer that player is dropped, since an input may not end the server.
     const routes = actRoutes(host);

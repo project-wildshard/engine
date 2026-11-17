@@ -150,7 +150,8 @@ export class DedicatedRoom implements CrossTarget {
       return seat;
     };
     // SERVER-PARITY HS1: the one world-build entry a shard's CI journeys tick too
-    const cell = await openWorld(input, { room: true, cell: options.cell ?? cellName(slug), saves, lone: options.road === undefined,
+    // TC-SHIP-e2: goods go under the room's shard, the name its saves are read by, never the product's own slug
+    const cell = await openWorld(input, { room: true, cell: options.cell ?? cellName(slug), shard: slug, saves, lone: options.road === undefined,
       owned: body => seated(body).store.slots,
       profiles: {
         read: identity => seats.get(identity)?.store.rewards.read(slug).players[identity] ?? null,
