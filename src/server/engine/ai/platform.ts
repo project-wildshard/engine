@@ -9,7 +9,7 @@ export interface PlatformBrainSpec {
   stopDistance: number; turnRate: number; thinkDivisor: number; attackCooldownTicks: number; wanderRadius: number; wanderEveryTicks: number;
 }
 /** Stable spawn identities produce the exact same entity set when a fresh sim restores a snapshot. */
-export interface PlatformSpawn { id: string; species: string; variant: string; brain: string | null; strike: string | null; seed: number; scale: number; at: readonly [number, number, number]; yaw: number }
+export interface PlatformSpawn { id: string; species: string; variant: string; brain: string | null; strike: string | null; seed: number; scale: number; at: readonly [number, number, number]; yaw: number; group?: string }
 /** A perceived live target, identified independently of its renderer or collision handle. */
 export interface BrainTarget { id: string; position: { x: number; y: number; z: number }; alive: boolean }
 /** Read-only perception/navigation and an explicit attack request; the motor and damage pipeline stay authoritative. */
@@ -46,6 +46,11 @@ export class PlatformBrain {
   get mode(): BrainState['mode'] { return this.state.mode; }
   /** The controller's actual selected target, for an owning layer's leash policy. */
   get targetId(): string | null { return this.state.target; }
+  /** Actual damage/assistance may select a living target outside the ordinary notice radius. */
+  provoke(targetId: string): void {
+    if (!this.ports.targets().some(candidate => candidate.id === targetId && candidate.alive)) return;
+    this.state.target = targetId; this.state.mode = 'pursue';
+  }
   /** Plain numeric continuation; no ports, actor objects or navigation heap are serialized. */
   snapshot(): SimValue { return { contract: this.contract, state: { ...this.state, waypoint: [...this.state.waypoint] } }; }
   /** Restore a validated continuation on a matching registered actor. */

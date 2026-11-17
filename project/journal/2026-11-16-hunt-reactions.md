@@ -65,3 +65,21 @@ previous owner when its scope ends. Returning still uses the same
 controller and home policy. Two real5m boundary controls fail before
 the fix; the normal pursuit entry and constraint-lifetime controls pass
 with the existing layer and45m return controls (20cases/twofiles).
+
+CC5b3b: actual player damage now provokes the selected pursuit and
+only same-group pack members within their authored assist radius. The
+preflight membership set holds actual combat identities; source kind
+labels, unrelated groups and remote members cannot grant assistance.
+The selected player remains in the original pursuit continuation.
+
+Two real-server controls fail without assistance, then pass for the
+14m/20m boundary and exact resumed bodies/controllers/shared RNG. M2
+uses the immutable format37e214e archive in owned scratch. This is an
+unreleased development pin: replace it with the final registry release
+before any engine land. M1 SDK and its0.14 registry pin stay separate.
+
+Preparation only creates the policy/continuation. Installation attaches
+the scoped damage listener and optional territory constraint; failed
+registration rolls those effects back with the ordinary step callbacks.
+The lifetime control checks that preparation leaves the previous
+constraint intact, then checks its restoration after the host ends.

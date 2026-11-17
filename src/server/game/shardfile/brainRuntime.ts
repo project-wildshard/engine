@@ -41,7 +41,7 @@ export interface DeclaredBrainPorts {
 }
 /** Stable spawn identity with optional explicitly authored per-body home authority. */
 export type DeclaredBrainSpawn = PlatformSpawn & { home?: ShardCreatureHome | undefined; phaseOffset?: number | undefined };
-interface Registration { id: string; run: (dt: number) => void; adapter: SimStateAdapter }
+interface Registration { id: string; run: (dt: number) => void; adapter: SimStateAdapter; install?: () => () => void }
 function nativeRegistration<P>(id: string, actor: AnimalSim, divisor: number, brain: SimStateAdapter & { think: (ports: P) => void }, recipe: DeclaredBrainRecipe<P>, host: SimHost): Registration {
   if (typeof recipe.observe !== 'function' || typeof recipe.body !== 'function') throw new Error('Missing native brain recipe');
   const contract = JSON.stringify({ divisor, policy: brain.snapshot() });
@@ -103,6 +103,15 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
   }
   const pursueRows = rows.filter(row => row.brain !== null && definitions.get(row.brain)?.kind === 'pursue');
   const pursuits = preparePlatformBrains(host, pursueRows, presets.filter(row => row.kind === 'pursue'), ports.navigation);
+  const social = new Map<string, { readonly id: string; readonly members: Set<ReturnType<AnimalSim['combatActor']>> }>();
+  for (const row of rows) {
+    if (row.group === undefined || layers?.get(row.species)?.temperament.pack !== true) continue;
+    if (!social.has(row.group)) social.set(row.group, { id: row.group, members: new Set() });
+    const membership = social.get(row.group), actor = host.entities.get(row.id);
+    if (membership === undefined || actor === undefined) throw new Error('Unresolved social group actor');
+    // Every set is built during preflight and read-only once callbacks start.
+    membership.members.add(actor.combatActor());
+  }
   const registrations: Registration[] = [];
   for (const row of rows) {
     if (row.brain === null) continue;
@@ -111,10 +120,12 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
     switch (spec.kind) {
       case 'pursue': {
         if (pursuit === undefined) throw new Error('Unresolved pursuit policy');
-        const source = { run: () => { pursuit.step(host.state.tick); }, adapter: pursuit }, layer = layers?.get(row.species);
-        const policy = layer?.temperament.reaction === 'aggressive'
+        const source = { run: () => { pursuit.step(host.state.tick); }, adapter: pursuit,
+          provoke: (targetId: string) => { pursuit.provoke(targetId); } }, layer = layers?.get(row.species);
+        const policy = layer !== undefined && (layer.temperament.reaction === 'aggressive' || layer.temperament.pack === true)
           ? bindCreatureTemperament(host, actor, row.at, layer.temperament, source,
-            () => { const target = pursuit.targetId; return target === null ? undefined : host.players.get(target)?.position; }) : source;
+            () => { const target = pursuit.targetId; return target === null ? undefined : host.players.get(target)?.position; },
+            row.group === undefined ? undefined : social.get(row.group)) : source;
         registrations.push({ id, ...policy }); break;
       }
       case 'skirmisher':
@@ -163,7 +174,10 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
   const result = new Map<string, SimStateAdapter>();
   const remove: (() => void)[] = [];
   try {
-    for (const registration of registrations) { remove.push(host.onStep(registration.id, registration.run, registration.adapter)); result.set(registration.id.slice(6), registration.adapter); }
+    for (const registration of registrations) {
+      const dispose = registration.install?.(); if (dispose !== undefined) remove.push(dispose);
+      remove.push(host.onStep(registration.id, registration.run, registration.adapter)); result.set(registration.id.slice(6), registration.adapter);
+    }
   } catch (error) { for (const undo of remove) undo(); throw error; }
   return result;
 }

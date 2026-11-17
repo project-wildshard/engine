@@ -2,7 +2,8 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { parseRows } from '@wildshard/format/rows';
-import type { ShardCreatures } from '@wildshard/format/creatures';
+import { CreaturesSchema, type ShardCreatures } from '@wildshard/format/creatures';
+import { parse } from 'valibot';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { emptyShardfile } from '../src/shared/host/author';
 import { createShardfileSim, prepareShardfileSimRestore } from '../src/server/game/plugin/simulation';
@@ -54,6 +55,60 @@ function pursuing(distance = 8) {
   row.senses = { notice: 24 }; shard.rows = parseRows(shard.rows);
   return shard;
 }
+
+function packing() {
+  const shard = pursuing(30), row = shard.rows.species[0], spawn = shard.creatures.spawns[0];
+  if (row?.temperament === undefined || spawn === undefined) throw new Error('Missing fixture species');
+  row.temperament.reaction = 'neutral'; row.temperament.pack = true; row.temperament.assist = 14; row.senses = { notice: 4 };
+  const members = [
+    { id: 'fixture.actor', group: 'fixture.pack', at: [0, 0, 0] },
+    { id: 'fixture.near1', group: 'fixture.pack', at: [10, 0, 0] },
+    { id: 'fixture.near2', group: 'fixture.pack', at: [0, 0, 13] },
+    { id: 'fixture.far', group: 'fixture.pack', at: [20, 0, 0] },
+    { id: 'fixture.other', group: 'fixture.other-pack', at: [6, 0, 6] },
+  ];
+  return { ...shard, rows: parseRows(shard.rows), creatures: parse(CreaturesSchema, {
+    brains: [], groups: [], spawns: members.map(member => ({ ...spawn, ...member })),
+  }) };
+}
+
+test('a real hit assists only the authored pack members inside 14m', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const sim = createShardfileSim(packing(), new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = sim.host.nearestPlayer(body.position);
+    for (let i = 0; i < 12; i++) sim.host.step();
+    for (const actor of sim.host.entities.values()) expect(actor.state).toBe('idle');
+    sim.host.combat.hit({ source: player.health, sourceTags: player.health.tags, target: body.combatActor(), amount: 1,
+      point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+    for (let i = 0; i < 6; i++) sim.host.step();
+    for (const id of ['fixture.near1', 'fixture.near2', 'fixture.actor']) expect(sim.host.entities.get(id)?.state, id).toBe('stalk');
+    for (const id of ['fixture.far', 'fixture.other']) expect(sim.host.entities.get(id)?.state, id).toBe('idle');
+  } finally { sim.host.dispose(); }
+});
+
+test('a restored assisted pack keeps its actual targets and shared RNG', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = packing();
+  const first = createShardfileSim(shard, new Map(), { rapier }), resumed = prepareShardfileSimRestore(shard, new Map(), { rapier });
+  try {
+    const body = first.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = first.host.nearestPlayer(body.position);
+    first.host.combat.hit({ source: player.health, sourceTags: player.health.tags, target: body.combatActor(), amount: 1,
+      point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+    for (let i = 0; i < 6; i++) first.host.step();
+    expect(first.host.entities.get('fixture.near1')?.state).toBe('stalk');
+    resumed.restore(snapshotSimHost(first.host));
+    for (let i = 0; i < 120; i++) { first.host.step(); resumed.host.step(); }
+    for (const [id, actor] of first.host.entities) {
+      expect(resumed.host.entities.get(id)?.snapshot(), id).toEqual(actor.snapshot());
+      expect(resumed.host.adapters.get(`brain.${id}`)?.snapshot(), id).toEqual(first.host.adapters.get(`brain.${id}`)?.snapshot());
+    }
+    expect(resumed.host.rng.snapshot()).toEqual(first.host.rng.snapshot());
+  } finally { resumed.host.dispose(); first.host.dispose(); }
+});
 
 test('an aggressive layer returns home across its 45m leash, heals and starts a fresh pursuit', async () => {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
@@ -147,8 +202,10 @@ test('a territorial constraint retains and restores the previous world constrain
   const previous: NonNullable<typeof body.motionConstraint> = (_from, to) => { sampled++; to.x = Math.min(to.x, 0); };
   body.motionConstraint = previous;
   try {
-    bindCreatureTemperament(sim.host, body, [0, 0, 0], { ...temperament, territorial: 5 },
+    const policy = bindCreatureTemperament(sim.host, body, [0, 0, 0], { ...temperament, territorial: 5 },
       { run: () => undefined, adapter: { snapshot: () => null, restore: () => undefined } }, () => undefined);
+    expect(body.motionConstraint).toBe(previous);
+    policy.install?.(); expect(body.motionConstraint).not.toBe(previous);
     body.impulse(new Vector3(30, 0, 30));
     for (let i = 0; i < 120; i++) {
       sim.host.step(); expect(body.position.x).toBeLessThanOrEqual(0.001);
