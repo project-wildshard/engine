@@ -15,8 +15,11 @@ export interface ProductSessionOptions {
   snapshot?: string;
 }
 
-/** Start replay admission while its caller records native input. A failed
- * admission is observed immediately, even before the caller asks for ready(). */
+/** Start replay admission while its caller records native input. With no `prepare`, the replay runs on the room's world
+ * (`openWorldAdapter`, as a dedicated room boots it), so record on that same world: `openWorld(input, { room: true })` or
+ * `openWorldAdapter`. A tape recorded on the bare `createTrustedHeadlessResident` leaves it once the worlds differ (Dunes'
+ * Signal: the Matriarch fight the fire summons, from tick 9280); that is two worlds, not replay drift (mini-replay).
+ * A failed admission is observed immediately, even before the caller asks for ready(). */
 export async function beginProductSession(slug: string, options: ProductSessionOptions = {}): Promise<{
   ready: () => Promise<ProductSimulation>; assets: ReadonlyMap<string, Uint8Array>;
   product: Awaited<ReturnType<typeof loadHeadlessProduct>>;
