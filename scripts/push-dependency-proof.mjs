@@ -9,7 +9,7 @@ import {homedir} from 'node:os';
 const selected=process.argv.find(arg=>arg.startsWith('--reader='))?.slice(9)??'scripts/push-dependencies.mjs';
 const toolOnly=process.argv.includes('--case=tools');
 const {pushDependencyIdentity}=await import(pathToFileURL(resolve(selected)).href);
-const parent=resolve('tmp/push-dependency-proof');mkdirSync(parent,{recursive:true});
+const parent=resolve(process.argv.find(arg=>arg.startsWith('--scratch='))?.slice(10)??'tmp/push-dependency-proof');mkdirSync(parent,{recursive:true});
 const work=mkdtempSync(join(parent,'run-')),began=performance.now(),version=JSON.parse(readFileSync('node_modules/valibot/package.json','utf8')).version;
 const configured=execFileSync('pnpm',['config','get','cache-dir'],{encoding:'utf8'}).trim();
 const cache=configured==='undefined'?join(homedir(),process.platform==='darwin'?'Library/Caches/pnpm':'.cache/pnpm'):configured;

@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {closeSync,constants,existsSync,fstatSync,lstatSync,openSync,readFileSync,readdirSync,realpathSync} from 'node:fs';
-import {isAbsolute,join,relative,resolve,sep} from 'node:path';
+import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {execFileSync} from 'node:child_process';
 
@@ -8,15 +8,24 @@ import {execFileSync} from 'node:child_process';
 const inside=(base,target)=>{const path=relative(base,target);return path===''||path!=='..'&&!path.startsWith(`..${sep}`)&&!isAbsolute(path);};
 
 /** Installed bytes are part of a portable proof. Never follow a live source
- * alias or an unsupported/global store; those layouts simply miss the cache.
+ * alias or an unsupported install layout; those simply miss the cache.
  * The full gate still runs, with its original source/ref checks.
  * @param {string} root @param {NodeJS.ProcessEnv} [env] @returns {string|null} */
 export function pushDependencyIdentity(root,env=process.env){
- return installedIdentity(root,env,false);
+ return installedIdentity(root,env);
 }
 
-/** @param {string} root @param {NodeJS.ProcessEnv} env @param {boolean} toolStore @returns {string|null} */
-function installedIdentity(root,env,toolStore){
+/** pnpm annotates fetched Git archives in its installed snapshot. Bind every
+ * resolution/path/commit and tolerate only that generated true flag.
+ * @param {Buffer} body */
+function snapshotLock(body){
+ const text=body.toString('utf8');
+ if(!Buffer.from(text).equals(body))throw new Error('Invalid installed lock text');
+ return text.replaceAll(/^([ \t]+resolution: \{)gitHosted: true, (?=[^}\r\n]*\btarball: https?:\/\/)/gmu,'$1');
+}
+
+/** @param {string} root @param {NodeJS.ProcessEnv} env @param {string} [managedBy] @returns {string|null} */
+function installedIdentity(root,env,managedBy){
  try{
   const base=realpathSync(root),manifest=resolve(base,'package.json');
   const pkg=existsSync(manifest)?JSON.parse(readFileSync(manifest,'utf8')):{};
@@ -24,15 +33,34 @@ function installedIdentity(root,env,toolStore){
   const tools=toolIdentity(base,pkg,env);if(tools===null)return null;
   if(names.length===0)return createHash('sha256').update('Node builtins; no declared installed packages').update(tools).digest('hex');
   const directory=resolve(base,'node_modules'),store=join(directory,'.pnpm'),lock=join(base,'pnpm-lock.yaml');
-  if(!lstatSync(store).isDirectory()||realpathSync(store)!==store||!readFileSync(lock).equals(readFileSync(join(store,'lock.yaml'))))return null;
-  // npr's actual frozen tool install can use pnpm's global virtual store.
-  // Read its public store location and bind the complete reachable byte graph,
-  // never arbitrary sibling checkout links or an entire unrelated store.
-  const global=toolStore?join(realpathSync(execFileSync('pnpm',['store','path'],{cwd:base,env,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:5000}).trim()),'links'):null;
+  if(!lstatSync(store).isDirectory()||realpathSync(store)!==store||snapshotLock(readFileSync(lock))!==snapshotLock(readFileSync(join(store,'lock.yaml'))))return null;
+  // Both engine and npr installs can use the pinned manager's global store.
+  // Resolve it lazily: a wholly local install needs no global configuration.
+  /** @type {string|null|undefined} */let global;
+  const globalRoot=()=>{
+   if(global===undefined)global=(managedBy??pkg.packageManager)?.startsWith('pnpm@')
+    ?join(realpathSync(execFileSync('pnpm',['store','path'],{cwd:base,env,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:5000}).trim()),'links'):null;
+   return global;
+  };
   /** @param {string} target */
-  const permitted=target=>inside(store,target)||global!==null&&inside(global,target);
+  const permitted=target=>{if(inside(store,target))return true;const scope=globalRoot();return scope!==null&&inside(scope,target);};
+  /** @param {string} target */
+  const managedKey=target=>{
+   if(inside(store,target))return relative(store,target);
+   const scope=globalRoot();if(scope===null)throw new Error('Unsupported installed proof link');
+   return `global:${relative(scope,target)}`;
+  };
+  /** Include the virtual package's dependency/peer aliases, which are siblings
+   * of its own package directory and participate in Node's module lookup.
+   * @param {string} target */
+  const container=target=>{
+   const scope=globalRoot();if(scope===null)throw new Error('Unsupported installed proof link');
+   for(let context=target;inside(scope,context)&&context!==scope;context=dirname(context))
+    if(basename(context)==='node_modules')return context;
+   throw new Error('Unsupported global package context');
+  };
   /** @type {Set<string>} */const external=new Set();
-  const hash=createHash('sha256');hash.update('managed pnpm bytes/2\0').update(tools).update('\0').update(readFileSync(lock));
+  const hash=createHash('sha256');hash.update('managed pnpm bytes/3\0').update(tools).update('\0').update(readFileSync(lock));
   for(const name of names){
    if(!/^(?:@[a-z0-9_.-]+\/)?[a-z0-9][a-z0-9_.-]*$/iu.test(name))return null;
    const target=realpathSync(join(directory,name));
@@ -40,13 +68,13 @@ function installedIdentity(root,env,toolStore){
    // unbound sibling checkout. Other live source aliases remain unsupported.
    if(target===base&&name===pkg.name){hash.update(name).update('\0self:checked-tree\0');continue;}
    if(!permitted(target))return null;
-   if(!inside(store,target))external.add(target);
-   hash.update(name).update('\0').update(relative(store,target)).update('\0');
+   if(!inside(store,target))external.add(container(target));
+   hash.update(name).update('\0').update(managedKey(target)).update('\0');
   }
   let count=0,bytes=0;
   const pending=[{file:store,key:'store'}];const bin=join(directory,'.bin');
   if(existsSync(bin))pending.push({file:bin,key:'root/.bin'});
-  for(const target of external)pending.push({file:target,key:`external:${target}`});
+  for(const target of external)pending.push({file:target,key:`external:${managedKey(target)}`});
   // Iteration includes discovered children and external dependencies. The set
   // terminates package cycles while retaining every symlink's own identity.
   for(const {file,key} of pending){
@@ -58,10 +86,15 @@ function installedIdentity(root,env,toolStore){
     }
     else if(before.isSymbolicLink()){
      const target=realpathSync(file);if(!permitted(target))throw new Error('Installed proof link leaves managed store');
-     if(!inside(store,target)&&!external.has(target)){external.add(target);pending.push({file:target,key:`external:${target}`});}
-     hash.update('link\0').update(relative(store,target)).update('\0');
+     if(!inside(store,target)){
+      const context=container(target);
+      if(!external.has(context)){external.add(context);pending.push({file:context,key:`external:${managedKey(context)}`});}
+     }
+     hash.update('link\0').update(managedKey(target)).update('\0');
     }else if(before.isFile()){
-     bytes+=Number(before.size);if(bytes>512*1024*1024)throw new Error('Installed proof bytes exceed cap');
+     // Actual engine closure: 21,840 entries / 1.09 GB, largest file 149 MB.
+     // Bound total IO and each allocation while retaining every installed byte.
+     bytes+=Number(before.size);if(bytes>2*1024*1024*1024||before.size>256n*1024n*1024n)throw new Error('Installed proof bytes exceed cap');
      const fd=openSync(file,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);let body;
      try{const opened=fstatSync(fd,{bigint:true});if(!opened.isFile()||opened.dev!==before.dev||opened.ino!==before.ino)throw new Error('Installed proof input changed before read');body=readFileSync(fd);}finally{closeSync(fd);}
      const after=lstatSync(file,{bigint:true});
@@ -93,5 +126,5 @@ function toolIdentity(base,pkg,env){
  const installed=join(env.XDG_CACHE_HOME??join(homedir(),'.cache'),'npm-bin-deps',key.digest('hex').slice(0,32));
  if(!lstatSync(join(installed,'.npr-installed')).isFile())return null;
  for(const name of files)if(!readFileSync(join(source,name)).equals(readFileSync(join(installed,name))))return null;
- return installedIdentity(installed,env,true);
+ return installedIdentity(installed,env,pkg.packageManager);
 }
