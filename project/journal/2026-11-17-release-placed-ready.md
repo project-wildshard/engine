@@ -16,3 +16,7 @@ Tests went red first because check and go-live previously accepted a
 new unready placement. Added coverage for publishing, already-ready
 heads, failed publication and a changed raw head during the cook.
 This does not freeze uploads after the alias or change API placement.
+
+The first push caught the new catch callback's unsafe inferred any.
+Annotate it unknown; focused push tests had already passed. Retry the
+normal gate after the lint correction, with no skip switch.

@@ -106,7 +106,7 @@ test('the four phases run in order and move the alias last', async () => {
     'run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging',
     'deployedDigests', 'packs.verify', 'state check',
     'run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging',
-    'deployedDigests', 'goLive', 'state go-live',
+    'deployedDigests', 'run node scripts/release-cook.mjs --staging --build=' + build, 'goLive', 'state go-live',
   ]);
   expect(lines.some(line => line.includes('alias last'))).toBe(true);
 });
@@ -578,5 +578,16 @@ test('a placement changes after check: staging rechecks it before aliasing', asy
     if (args.includes('scripts/release-placed-ready.mjs')) throw new Error('new placed head is unready');
   }};
   await expect(runPhase('go-live', guarded)).rejects.toThrow('new placed head is unready');
+  expect(rig_.calls).not.toContain('goLive');
+});
+
+test('staging cannot move the alias while the cook still runs the previous build', async () => {
+  const rig_ = rig();
+  await through(rig_.deps, 'check');
+  const guarded: Deps = {...rig_.deps, run: (file, args, env) => {
+    rig_.deps.run(file, args, env);
+    if (args.includes('scripts/release-cook.mjs')) throw new Error('cook is not staging');
+  }};
+  await expect(runPhase('go-live', guarded)).rejects.toThrow('cook is not staging');
   expect(rig_.calls).not.toContain('goLive');
 });

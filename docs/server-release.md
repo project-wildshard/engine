@@ -104,6 +104,15 @@ placement snapshot refuses the phase so it can be retried. This checks
 current placements before aliasing; later uploads still use the normal
 upload/cook activation path.
 
+Staging async uploads require the cook to use the same exact build.
+Before `go-live` moves the page alias it runs
+`node scripts/release-cook.mjs --staging --build=<sha>`. This verifies
+the signed staging server tag and uses the root helper's normal cook
+rebuild, health check and rollback. An older installed helper upgrades
+only through the existing signed-source/harden guard. A failed move
+refuses the alias. The later `release-cook.mjs vX.Y.Z` production step
+also refuses to rewind a newer staging cook.
+
 
 Each phase refuses until the one before it has run for the same SHA
 (results in `<clone>/tmp/page-release/<channel>-<sha>.json`). Production

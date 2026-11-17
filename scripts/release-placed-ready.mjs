@@ -73,7 +73,7 @@ async function main() {
   console.log(`PASS staging placed readiness ${build}: ${result.heads.length} extra heads, ${result.cooked} cooked, serial ${result.serial}`);
 }
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await main().catch(error => {
+  await main().catch((/** @type {unknown} */ error) => {
     console.error(`Placed readiness refused: ${error instanceof Error ? error.message : 'unknown failure'}`);
     process.exitCode = 1;
   });

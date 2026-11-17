@@ -262,7 +262,7 @@ test('AUTO-RELEASE AR2: wildshard-apply verify prints the signed commit and runs
 function cookBox(rebuildText = '#!/bin/bash\n[ "$1" = --cook ] || exit 9\nset -eu\ngrep -q v0.1.21 "$WILDSHARD_CONFIG_TEST_ROOT/etc/wildshard/cook.settings" 2>/dev/null && exit "${WILDSHARD_CONFIG_TEST_REBUILD_EXIT:-0}"\necho "rebuild $1"\n') {
   const root = etc(), one = 'e'.repeat(40), two = 'f'.repeat(40);
   writeFileSync(join(root, 'etc/wildshard/cook.env'), 'COOK_ENGINE_REF=v0.1.18\nWILDSHARD_BUILD=0000000000000000000000000000000000000000\nCOOK_NOTIFY_TOKEN=planted-cook-secret\n');
-  const { dir, key } = releases([{ tag: 'v0.1.20', commit: one }, { tag: 'v0.1.21', commit: two }]);
+  const { dir, key } = releases([{ tag: 'v0.1.20', commit: one }, { tag: 'v0.1.21', commit: two }, {tag: `server-staging-${two}`, commit: two}]);
   const wrapper = join(root, 'apply'), rebuild = join(root, 'rebuild.sh');
   writeFileSync(wrapper, `#!/bin/bash\nexec node ${JSON.stringify(APPLY)} "$@"\n`, { mode: 0o755 });
   writeFileSync(rebuild, rebuildText, { mode: 0o755 });
@@ -312,6 +312,18 @@ test('AUTO-RELEASE AR4: a cook move that does not come up is undone, and an old 
   expect(refused.status).toBe(1);
   expect(refused.out).toContain('has no --cook yet');
   expect(existsSync(join(old.root, 'etc/wildshard/cook.settings'))).toBe(false);
+});
+
+test('async staging uploads cook with the signed staging build before production is tagged', () => {
+  const {root, two, run} = cookBox();
+  const before = read(root, 'cook.env');
+  const tag = `server-staging-${two}`;
+  const moved = run({}, 'cook', tag);
+  expect(moved.status, moved.out).toBe(0);
+  expect(read(root, 'cook.settings')).toContain(`COOK_ENGINE_REF=${tag}\nWILDSHARD_BUILD=${two}\n`);
+  expect(read(root, 'cook.env')).toBe(before);
+  expect(run({}, 'cook', `server-staging-${'d'.repeat(40)}`).status).toBe(1);
+  expect(read(root, 'cook.settings')).toContain(`WILDSHARD_BUILD=${two}\n`);
 });
 
 test('wildshard-apply never reads a file a channel user owns', () => {

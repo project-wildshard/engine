@@ -178,7 +178,7 @@ def restart(channel):
 # release that names the tag, after checking GitHub's tag points at it. rebuild.sh --cook then moves the checkout, installs,
 # restarts the worker and waits for its /health.
 COOK_KEYS = ('COOK_ENGINE_REF', 'WILDSHARD_BUILD')
-COOK_TAG = r'v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}'
+COOK_TAG = r'(?:v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}|server-staging-[0-9a-f]{40})'
 COOK_HEADER = ['# AUTO-RELEASE AR4 (J355): the cook worker\'s engine tag and build, read after cook.env. Change them with',
                '# `sudo wildshard-config cook <tag>`; the secrets stay in cook.env.']
 CLEAN = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root', 'LANG': 'C.UTF-8'}
@@ -225,7 +225,7 @@ def show_cook():
 
 def cook(args):
     if len(args) != 2 or re.fullmatch(COOK_TAG, args[1]) is None:
-        stop('usage: wildshard-config cook vX.Y.Z')
+        stop('usage: wildshard-config cook vX.Y.Z | server-staging-<sha>')
     tag, rebuild = args[1], helper('rebuild')
     try:
         with open(rebuild, encoding='utf-8') as handle:

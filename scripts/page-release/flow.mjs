@@ -269,6 +269,10 @@ export async function runPhase(phase, deps) {
     if (gate.problem !== undefined) refuse(gate.problem);
     else if (checked !== undefined && gate.serial !== checked.serial) deps.log(`note: serial moved ${checked.serial} -> ${gate.serial} since check, still ${deps.build}`);
   }
+  if (channel.channel === 'staging') {
+    plan('move the cook to this signed staging build before moving the page alias');
+    if (!dry) deps.run('node', ['scripts/release-cook.mjs', '--staging', `--build=${deps.build}`]);
+  }
   for (const line of deps.host.describe('goLive', deployed)) plan(line);
   if (dry) return {refusals};
   await deps.host.goLive(deployed);

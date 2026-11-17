@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // AUTO-RELEASE AR5 (meta docs/plans/AUTO-RELEASE-PLAN.md, J355): the last step of an engine release, with no Jake command.
-// Moves the box's cook worker to the tag production now serves, through the agents' own account (J266).
+// Moves the cook with staging, before its page alias (async uploads need the same exact build).
 //   node scripts/release-cook.mjs vX.Y.Z [--dry-run]
+//   node scripts/release-cook.mjs --staging --build=<sha> [--dry-run]
 // 1. Production's signed release must name vX.Y.Z (read from packs.wildshard.io, public; the box checks the signature).
 // 2. If the box's wildshard-config has no `cook` verb yet, it is installed from a signed tag that carries it, by the
 //    allowlisted `wildshard-apply <tag> harden` (which refreshes /usr/local/sbin and /opt/wildshard-vps). Only after
@@ -12,6 +13,8 @@
 //    waits for its /health and rolls back if it does not come up. Then `show cook` and the worker's /health.
 // --dry-run reads the box and says what it would do; it writes nothing. Output never carries an address or a secret.
 import { spawnSync } from 'node:child_process';
+import {resolve as resolvePath} from 'node:path';
+import {pathToFileURL} from 'node:url';
 
 const HOST = 'wildshard-agent';
 const RELEASES = 'https://packs.wildshard.io/releases';
@@ -46,19 +49,21 @@ async function served(channel) {
 }
 
 /** True when engine `commit` ships the cook verb. @param {string} commit */
-function carries(commit) {
+function carries(commit, staging = false) {
   spawnSync('git', ['fetch', '--quiet', 'origin', commit], { encoding: 'utf8' });
   const shown = spawnSync('git', ['show', `${commit}:scripts/vps/wildshard-config`], { encoding: 'utf8', maxBuffer: 1 << 24 });
-  return shown.status === 0 && shown.stdout.includes(MARK);
+  return shown.status === 0 && shown.stdout.includes(MARK) && (!staging || shown.stdout.includes('|server-staging-'));
 }
 
 async function main() {
-  const args = process.argv.slice(2), dry = args.includes('--dry-run');
-  const tag = args.find(arg => arg !== '--dry-run');
-  if (tag === undefined || !TAG.test(tag) || args.length > (dry ? 2 : 1)) stop('usage: node scripts/release-cook.mjs vX.Y.Z [--dry-run]');
-  const production = await served('production');
-  if (production.tag !== tag) stop(`production serves ${production.tag || 'nothing'}, not ${tag}: the cook follows production`);
-  say('ok', `production serves ${tag} (${production.build.slice(0, 8)})`);
+  const args = process.argv.slice(2), dry = args.includes('--dry-run'), stagingMove = args.includes('--staging');
+  const expected = args.find(arg => arg.startsWith('--build='))?.slice('--build='.length);
+  const requested = args.find(arg => !arg.startsWith('--'));
+  if (stagingMove ? requested !== undefined || expected === undefined || !COMMIT.test(expected) || args.length !== (dry ? 3 : 2)
+    : requested === undefined || !TAG.test(requested) || args.length !== (dry ? 2 : 1)) stop('usage: release-cook.mjs vX.Y.Z | --staging --build=<sha> [--dry-run]');
+  const staging = await served('staging'), production = stagingMove ? staging : await served('production');
+  const tag = selectCookRelease(staging, production, stagingMove ? {build: expected ?? ''} : {tag: requested ?? ''}).tag;
+  say('ok', `${stagingMove ? 'staging' : 'production and staging'} serve ${tag} (${production.build.slice(0, 8)})`);
 
   const shown = box('sudo -n /usr/local/sbin/wildshard-config show cook');
   say('now', shown.status === 0 ? shown.out.trim().replaceAll('\n', ', ') : 'the box has no cook verb yet');
@@ -67,10 +72,11 @@ async function main() {
     if (health.out.includes('up')) { say('ok', `the cook worker already runs ${tag} and answers /health`); return; }
   }
 
-  if (box(`grep -qF '${MARK}' /usr/local/sbin/wildshard-config`).status !== 0) {
+  const needsHelper = box(`grep -qF '${MARK}' /usr/local/sbin/wildshard-config`).status !== 0
+    || (stagingMove && box("grep -qF '|server-staging-' /usr/local/sbin/wildshard-config").status !== 0);
+  if (needsHelper) {
     // The helper comes from a signed tag that carries it: production's if it does, else staging's.
-    const staging = await served('staging');
-    const source = carries(production.build) ? production : carries(staging.build) ? staging : null;
+    const source = carries(production.build, stagingMove) ? production : carries(staging.build, stagingMove) ? staging : null;
     if (source === null) stop('no signed release carries `wildshard-config cook` yet: it rides the next staging serial (AUTO-RELEASE AR8)');
     const check = box('sudo -n /usr/local/sbin/wildshard-harden --check');
     const fails = check.out.split('\n').filter(line => line.startsWith('fail') && !OFF_SSH_ROWS.has(line.split(/\s+/u)[1] ?? ''));
@@ -89,6 +95,7 @@ async function main() {
         status = box(running).status;
       } while (status !== 1);
       if (box(`grep -qF '${MARK}' /usr/local/sbin/wildshard-config`).status !== 0) stop('harden ran but the cook verb is not installed; see ~/release-cook-harden.log on the box');
+      if (stagingMove && box("grep -qF '|server-staging-' /usr/local/sbin/wildshard-config").status !== 0) stop('The signed helper still cannot follow staging; no alias may move');
       // A step that could cut SSH arms a 10-minute dead-man; this new session proves the way in, so stop it as harden asks.
       if (box('systemctl is-active --quiet wildshard-harden-deadman.timer').status === 0) {
         say('note', 'harden armed its dead-man, so it changed an SSH-side setting; this session got in, stopping the timer');
@@ -110,4 +117,18 @@ async function main() {
   say('done', `the cook worker runs ${tag} (${production.build.slice(0, 8)}) and answers /health`);
 }
 
-await main();
+/** Reject stale end-of-prod steps and bind staging moves to the exact signed build.
+ * @param {{tag: string, build: string}} staging
+ * @param {{tag: string, build: string}} production
+ * @param {{build: string} | {tag: string}} request
+ */
+export function selectCookRelease(staging, production, request) {
+  if ('build' in request) {
+    if (!COMMIT.test(request.build) || staging.build !== request.build || staging.tag !== `server-staging-${request.build}`) throw new Error('Cook move needs the exact signed staging build and server tag');
+    return staging;
+  }
+  if (!TAG.test(request.tag) || production.tag !== request.tag || production.build !== staging.build) throw new Error('Cook follows staging: production tag must match its exact build');
+  return production;
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolvePath(process.argv[1])).href) await main();
