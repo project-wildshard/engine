@@ -44,3 +44,11 @@ present at the next tick.
   after the run (none if it moved) and gains `--prime <dir>`;
   `verify-staging.sh` defaults to both cards. Tests red first: the old
   gate let go-live through with no journey at all.
+
+## Ring 1 digests for snapshot v4 (2026-11-17)
+
+- Every Ring 1 chain moved for all 8 shards: the snapshot is v4 now.
+  Each chain, re-encoded as v3 with `credit` and the books' `credited`
+  dropped, matched the old baseline for all 8, so nothing else moved.
+  darwin-arm64 recorded with `ring-step.ts --update`; linux-x64 had the
+  same digests and takes them again.
