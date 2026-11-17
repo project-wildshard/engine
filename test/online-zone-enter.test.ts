@@ -51,16 +51,16 @@ async function seated(): Promise<{ shell: OnlineShell; steer: (yaw: number | nul
   return { shell: page, steer: next => { yaw = next; }, regrids, closes: () => closes };
 }
 
-/** Off Driftwood's entryway on `side` (-1 west, +1 east) onto its road, then 4 m short of the next cell's edge and on into its buffer. */
+/** Walk across both real boundaries, starting 1 m inside each rather than spending time approaching them. */
 async function toGate(side: -1 | 1, steer: (yaw: number | null) => void): Promise<void> {
   const room = bench, home = room?.room(HOME), road = room?.road(roadName(HOME)), body = home?.bodyOf(IDENTITY.player);
   if (room === undefined || home === undefined || road === undefined || body === undefined) throw new Error('Driftwood and its road boot');
-  body.resetPose({ x: side * (CHUNK_HALF - 5), y: 1, z: 0 }, -side * Math.PI / 2);
+  body.resetPose({ x: side * (CHUNK_HALF - 1), y: 1, z: 0 }, -side * Math.PI / 2);
   steer(-side * Math.PI / 2);
   await vi.waitFor(() => { expect(road.holds(IDENTITY.player), 'onto the road').toBe(true); }, { timeout: 20_000, interval: 50 });
   const walker = road.bodyOf(IDENTITY.player);
   if (walker === undefined) throw new Error('the walker stands on the road');
-  walker.resetPose({ x: side * (EDGE - 4), y: walker.position.y + 1, z: 0 }, -side * Math.PI / 2);
+  walker.resetPose({ x: side * (EDGE - 1), y: walker.position.y + 1, z: 0 }, -side * Math.PI / 2);
   await vi.waitFor(() => { expect(side * (road.bodyOf(IDENTITY.player)?.position.x ?? 0), 'into the buffer').toBeGreaterThan(EDGE + 2); }, { timeout: 30_000, interval: 50 });
   steer(null);
 }
@@ -120,7 +120,7 @@ test('two others see the entry: B on the road sees A frozen then go, C in Nalati
   // B steps off Driftwood's east entryway and is placed on the road 6 m short of Nalati's edge, standing still
   const bBody = bench.room(HOME)?.bodyOf('device:b');
   if (bBody === undefined || road === undefined) throw new Error('B stands in Driftwood');
-  bBody.resetPose({ x: CHUNK_HALF - 5, y: 1, z: 0 }, -Math.PI / 2);
+  bBody.resetPose({ x: CHUNK_HALF - 1, y: 1, z: 0 }, -Math.PI / 2);
   b.thumb = () => ({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: -Math.PI / 2, pitch: 0, buttons: NET_BUTTONS.sprint });
   await vi.waitFor(() => { expect(road.holds('device:b'), 'B onto the road').toBe(true); }, { timeout: 20_000, interval: 50 });
   b.thumb = stillThumb;
