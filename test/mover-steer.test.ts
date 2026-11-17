@@ -94,3 +94,17 @@ test('the same stick goes further downwind than up, and a let-go sail is not pus
     expect(motion.pose(row.id).position).toEqual({ x: 0, y: 1, z: 0 });
   } finally { host.dispose(); }
 });
+
+// SS-MS2a3: the rider boosts with sprint (Shift, or a phone's stick pushed all the way), as the page sends it to any player.
+test('sprint boosts a ridden land-sail as boost does (SS-MS2a3)', async () => {
+  const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
+  const travel = (sprint: boolean): number => {
+    const host = createSimHost(level, { rapier }), motion = install(host);
+    try {
+      motion.command(row.id, 1); run(host, 1, 0, 0);
+      for (let i = 0; i < 90; i++) host.step(leadCommands(host, { moveX: 0, moveZ: -1, yaw: 0, commandVersion: 1, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, sprint }));
+      return -motion.pose(row.id).position.z;
+    } finally { host.dispose(); }
+  };
+  expect(travel(true)).toBeGreaterThan(travel(false) * 1.3);
+});

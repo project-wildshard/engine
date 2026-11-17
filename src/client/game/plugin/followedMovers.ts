@@ -28,6 +28,11 @@ export interface MoverRideTransition { readonly riding: boolean; readonly arrive
 export interface MoverRidePorts { readonly led: () => boolean; readonly has: (flag: string) => boolean }
 /** A carry that lands this near where it rests came home: a ride crosses water or sky, never a step. */
 const HOME_REACH = 2;
+/** A point given in a vehicle's own frame (x right, z back), where it stands at `pose` (the server's `vehiclePoint`). */
+export function vehiclePoint(pose: MoverPose, [x, y, z]: readonly [number, number, number]): [number, number, number] {
+  const cos = Math.cos(pose.euler.y), sin = Math.sin(pose.euler.y), p = pose.position;
+  return [p.x + cos * x + sin * z, p.y + y, p.z - sin * x + cos * z];
+}
 const turn = (a: number, b: number): number => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 /** Whether `pose` stands at `stop`, to a row's precision. */
 function standsAt(pose: MoverPose, stop: { readonly position: { readonly x: number; readonly y: number; readonly z: number }; readonly euler: { readonly x: number; readonly y: number; readonly z: number } }): boolean {
@@ -62,6 +67,10 @@ export class FollowedMovers {
   private endEvents: MoverEndEvent[] = [];
   /** C13: this page's player's ride on each carry mover, and whether its arrival was news when it boarded. */
   private readonly rides = new Map<string, { riding: boolean; fresh: boolean }>();
+  /** SS-MS2a3: each steer vehicle's prompts where they stand now: they ride with it, in its frame (x right, z back). */
+  private readonly steerPrompts = new Map<string, readonly { readonly local: readonly [number, number, number]; readonly at: Vector3 }[]>();
+  /** SS-MS2a3: the steer vehicle this page's player rides now, as the page's steer ride reads it (`steerRide.ts`), or null. */
+  steered: string | null = null;
   constructor(data: MoverData, ports: { readonly physics: Physics; readonly scope: Scope; readonly adopt?: (id: string) => MoverView | undefined; readonly restoreFlags?: ReadonlySet<string> }) {
     this.data = parseMovers(data);
     this.lifecycle = new MoverLifecycle(this.data.map(row => ({ id: row.id, ...(row.atEnd === undefined ? {} : { atEnd: row.atEnd }), ...(row.restoreFrom === undefined ? {} : { restoreFrom: row.restoreFrom }) })));
@@ -73,6 +82,7 @@ export class FollowedMovers {
       this.lifecycle.seed(row.id, entity.fields);
       const end = endPose(row); if (end !== null) this.ends.set(row.id, { pose: end, at: null });
       if (row.carry !== undefined) this.rides.set(row.id, { riding: false, fresh: false });
+      if (row.carry !== undefined && row.driver?.kind === 'steer') this.steerPrompts.set(row.id, row.carry.prompts.map(prompt => ({ local: prompt.at, at: new Vector3(...vehiclePoint(this.pose(row.id), prompt.at)) })));
     }
     for (const row of this.data) {
       const adopted = ports.adopt?.(row.id);
@@ -101,6 +111,7 @@ export class FollowedMovers {
   /** Pose a mover off a server's row: its collider and its view. */
   follow(id: string, pose: MoverPose): void {
     this.sinks.get(id)?.(pose); this.poses.set(id, pose);
+    for (const prompt of this.steerPrompts.get(id) ?? []) prompt.at.set(...vehiclePoint(pose, prompt.local));
     const end = this.ends.get(id);
     if (end !== undefined) {
       const at = standsAt(pose, end.pose);
@@ -155,9 +166,15 @@ export class FollowedMovers {
   }
   /** The declared prompts a carry takes: the press goes by `wireId`, and the server decides. */
   ridePrompts(): Interactable[] {
-    const busy = (): boolean => this.riding();
-    return this.data.flatMap(row => row.carry?.prompts.map((prompt, end): Interactable => ({ position: new Vector3(...prompt.at),
-      get radius() { return busy() ? 0 : prompt.radius; }, label: prompt.label, wireId: carryPrompt(row.id, end), onInteract: () => undefined })) ?? []);
+    const busy = (): boolean => this.data.some(row => row.driver?.kind !== 'steer' && this.riding(row.id));
+    return this.data.flatMap(row => row.carry?.prompts.map((prompt, end): Interactable => {
+      const steer = this.steerPrompts.get(row.id)?.[end];
+      // SS-MS2a3: a steer vehicle's board shows while nobody here rides it and it stands; its leave only to its own rider
+      const shown = steer === undefined ? (): boolean => !busy() : end === 0
+        ? (): boolean => this.steered === null && !this.riding(row.id) : (): boolean => this.steered === row.id;
+      return { position: steer?.at ?? new Vector3(...prompt.at), get radius() { return shown() ? prompt.radius : 0; }, label: prompt.label,
+        wireId: carryPrompt(row.id, end), onInteract: () => undefined };
+    }) ?? []);
   }
   /** Draw every adopted view at its declared rest pose, presentation only: the map bake reads it. */
   showRest(): void {

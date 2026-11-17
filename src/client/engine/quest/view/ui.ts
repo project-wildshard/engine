@@ -115,6 +115,27 @@ export class RaceClockChip {
   }
 }
 
+/** SHARD-SOURCE SS-MS2a3: a steer ride's chip at the bottom centre: its speed bar, BOOST lit while it boosts, and how to boost
+ *  (Shift; on a phone, the stick pushed all the way). Leaving is the vehicle's own prompt. */
+export class SteerChip {
+  readonly scope: Scope;
+  readonly root: HTMLDivElement = el('div', 'ws-steer');
+  private readonly bar = el('div', 'ws-steer-bar', this.root);
+  private readonly fill = el('div', 'ws-steer-fill', this.bar);
+  private readonly boost = el('div', 'ws-steer-boost', this.root);
+  constructor(owner: Scope) {
+    this.scope = uiScope('steer-ride', owner); mountUi(this.root, this.scope, hudRoot());
+    el('span', 'ws-steer-key', this.boost).textContent = engineString('s_steer_boost_key');
+    el('span', 'ws-steer-touch', this.boost).textContent = engineString('s_steer_boost_touch');
+  }
+  show(ride: { readonly speed: number; readonly boosting: boolean } | null): void {
+    this.root.classList.toggle('show', ride !== null);
+    if (ride === null) return;
+    this.fill.style.width = `${String(Math.round(ride.speed * 100))}%`;
+    this.root.classList.toggle('boosting', ride.boosting);
+  }
+}
+
 export class DialogueBox {
   readonly root: HTMLDivElement = el('div', 'ws-quest-talk');
   private name = el('div', 'ws-quest-talk-name', this.root);

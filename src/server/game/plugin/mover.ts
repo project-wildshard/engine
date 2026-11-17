@@ -184,13 +184,14 @@ export interface MoverInstallation {
 }
 /** What every player in the world stands on. A seat with no capsule is not in the world. */
 /** SS-MS2a1b: a rider's stick in a vehicle's frame (heading `yaw`), from the command the host read this tick: the world move
- *  the walk would take, split into forward (throttle) and right (turn); boost is the command's boost. None without a command. */
+ *  the walk would take, split into forward (throttle) and right (turn); boost is the command's sprint or boost (SS-MS2a3: Shift,
+ *  or a phone's stick pushed all the way, as sprint is on foot). None without a command. */
 export function riderStick(host: Pick<SimHost, 'tickCommand'>, player: string, yaw: number): MoverSteer | undefined {
   const command = host.tickCommand(player); if (command === undefined) return undefined;
   const move = { x: command.moveX, z: command.moveZ };
   if (command.commandVersion === 1 && command.steer !== undefined) localWalkingMove(command.steer, command.yaw, move);
   const sin = Math.sin(yaw), cos = Math.cos(yaw);
-  return { throttle: -sin * move.x - cos * move.z, turn: cos * move.x - sin * move.z, boost: command.boost === true };
+  return { throttle: -sin * move.x - cos * move.z, turn: cos * move.x - sin * move.z, boost: command.boost === true || command.sprint === true };
 }
 export function* playerGrounds(host: Pick<SimHost, 'players' | 'parked'>): Generator<CharacterMotor['result']> { for (const player of host.players.values()) if (player.hasMotor && !host.parked.has(player.id)) yield player.motor.result; }
 /** Trusted activation observes real grounded collider ownership and the admitted host shared state. */

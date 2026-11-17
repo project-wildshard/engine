@@ -790,7 +790,9 @@ export const ENGINE_STRINGS = {
   "s_ef691a454428": "Powered by Stability AI",
   "s_7fc7e56bbd7f": "Music: MiniMax-Music3",
   "s_hover_boost": "Boost",
-  "s_race_finish": "⟦0⟧ · best ⟦1⟧"
+  "s_race_finish": "⟦0⟧ · best ⟦1⟧",
+  "s_steer_boost_key": "Shift · boost",
+  "s_steer_boost_touch": "Push the stick · boost"
 } as const;
 export type EngineStringKey = keyof typeof ENGINE_STRINGS;
 const overrides: Partial<Record<EngineStringKey, string>> = {};
