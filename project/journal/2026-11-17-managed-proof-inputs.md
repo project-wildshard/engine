@@ -67,3 +67,15 @@ an actual `.generated/client.cjs` returned 1 then 2 while the dependency
 identity stayed unchanged. Only known manager/cache output is now omitted;
 hidden generated package source remains bound. Scope-folder metadata uses
 the same explicit output list.
+
+The first resumed full gate ran 1441.0 seconds: 9848 assertions passed;
+two failed, with four additional setup failures. The observer's reused
+fixture was ours: its Python driver also needed the sealed install.
+The repair keeps the observer's real Git, lease and recorder paths.
+
+The other failures use unchanged main sources: Driftwood's timing bar
+measured 29.28 ms against 16.67 ms at load 22.8, and four native files
+failed CPU lease setup with `Expected lease`. The preceding ss10f main
+landing already recorded that same lease flake and passed its isolated
+controls (receipt 2026-11-17 19:25). No successful full proof is claimed
+for this red gate; its JSON and log are retained until landing resolution.

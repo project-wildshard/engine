@@ -128,6 +128,11 @@ def fixture(parent, name, observer=False):
         subprocess.run(['git', '-c', 'user.name=Census fixture', '-c', 'user.email=census@example.test', *args],
                        cwd=repo, env=env, check=True, capture_output=True)
     git('init', '--quiet')
+    installer = (ENGINE / 'scripts/proof-fixture-install.mjs').as_uri()
+    subprocess.run(['node', '--input-type=module', '-e',
+                    'import {installProofFixture} from ' + json.dumps(installer) +
+                    ';installProofFixture(process.argv[1]);', str(repo)],
+                   cwd=ENGINE, env=env, check=True, capture_output=True)
     (repo / 'value.json').write_text('{"value":1}')
     git('add', 'value.json')
     git('commit', '--quiet', '-m', 'fixture')
