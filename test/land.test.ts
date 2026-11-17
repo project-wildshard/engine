@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
-import { CHECK_CSS, failedJobs, failureLine, flakyFiles, mainPushArgs, parseArgs, PINS_LEDGER, preflightSteps, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
+import { CHECK_CSS, failedJobs, failureLine, flakyFiles, localGateHatch, mainPushArgs, parseArgs, PINS_LEDGER, preflightSteps, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
 const LAND = resolve('scripts/land.mjs');
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -199,6 +199,45 @@ const GEN_STAMPS = "import {mkdirSync,readdirSync,statSync,writeFileSync} from '
 const prepushLines = (f: Fixture) => f.read(f.files.prepush).trim().split('\n').filter(Boolean);
 
 describe('land (J240): fast-forward main from a plan worktree after its branch CI is green', () => {
+  test('J381: malformed reasons cannot enter landing receipts', () => {
+    for (const reason of ['', '   ', 'a\nb', 'a\rb', 'a'.repeat(121)]) {
+      expect(() => localGateHatch({ SKIP_CHECK: '1', WS_LAND_J381_REASON: reason })).toThrow('one nonempty line');
+    }
+    expect(localGateHatch({ WS_LAND_J381_REASON: 'Reason alone' })).toBeUndefined();
+  });
+  test('J381: an explicit reason retains the local hatch without claiming a full proof', () => {
+    const f = fixture();
+    f.env['WS_LAND_MODE'] = 'local';
+    f.env['SKIP_CHECK'] = '1';
+    f.env['WS_LAND_J381_REASON'] = 'Owned repairs verified; unchanged timeout passes alone';
+    const wt = f.worktree('j381');
+    const tip = f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
+    writeFileSync(join(f.root, 'hooks/pre-push'), '#!/bin/sh\ncat >> "$PREPUSH_LOG"\n[ "${SKIP_CHECK:-}" = 1 ] || exit 1\n[ -z "${WS_LOCAL_LAND_DELTA:-}" ] || exit 1\nexit 0\n');
+    chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
+    const result = f.land(wt);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(f.remoteMain()).toBe(tip);
+    expect(f.read(f.files.receipts)).toContain('J381 SKIP_CHECK=1');
+    expect(f.read(f.files.receipts)).toContain(f.env['WS_LAND_J381_REASON']);
+    expect(result.stdout).not.toContain('local full proof');
+    expect(f.read(f.files.gh)).toBe('');
+  }, 60_000);
+
+  test('J381: an inherited skip without a reason keeps the ordinary local gate', () => {
+    const f = fixture();
+    f.env['WS_LAND_MODE'] = 'local';
+    f.env['SKIP_CHECK'] = '1';
+    const wt = f.worktree('unreasoned-skip');
+    f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
+    writeFileSync(join(f.root, 'hooks/pre-push'), '#!/bin/sh\ncat >> "$PREPUSH_LOG"\n[ -z "${SKIP_CHECK:-}" ] || exit 1\necho "pre-push RED actual failure" >&2\nexit 1\n');
+    chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
+    const before = f.remoteMain();
+    expect(f.land(wt).status).toBe(1);
+    expect(f.remoteMain()).toBe(before);
+    expect(f.read(f.files.receipts)).toContain('pre-push RED actual failure');
+    expect(f.read(f.files.receipts)).not.toContain('J381 SKIP_CHECK=1');
+  }, 60_000);
+
   test('J400: local default lands without a plan push or Actions lookup', () => {
     const f = fixture();
     delete f.env['WS_LAND_MODE'];

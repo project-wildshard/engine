@@ -1,6 +1,7 @@
 import type { SpawnSyncReturns } from 'node:child_process';
 
 export const LAND_WORKFLOWS: readonly string[];
+export function localGateHatch(env: NodeJS.ProcessEnv): string | undefined;
 export function smallPlanWarning(root: string, branch: string, now?: number, env?: NodeJS.ProcessEnv): string | null;
 export function githubSlug(remote: string): string | null;
 export function parseArgs(argv: string[], env?: NodeJS.ProcessEnv): { mode: 'local' | 'hosted'; pollSeconds: number; timeoutMinutes: number; appearMinutes: number; rounds: number; keep: boolean; preflight: boolean };

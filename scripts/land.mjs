@@ -6,6 +6,8 @@
 // exact CI, then exact/carried main push. --no-preflight affects only it.
 // Both modes preserve pin provenance, canonical sync, main-watch and
 // owned-worktree cleanup. A red main is fixed forward at once (J249).
+// J381 exception: SKIP_CHECK=1 plus WS_LAND_J381_REASON explicitly audits a
+// skipped local gate, never a full proof or a source for delta reuse.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {keepCopy,worktreeState} from './pin-keep-copy.mjs';
 import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
@@ -27,6 +29,17 @@ const PLAN_BRANCH=/^plan\/[a-z0-9][a-z0-9._-]*$/u;
 const SHA=/^[a-f0-9]{40}$/u;
 
 class StopError extends Error{name='StopError';}
+
+/** J381: explicit audited exception; inherited SKIP_CHECK alone never changes local land.
+ * @param {NodeJS.ProcessEnv} env @returns {string|undefined} */
+export function localGateHatch(env){
+ if(env.SKIP_CHECK!=='1'||env.WS_LAND_J381_REASON===undefined)return undefined;
+ const reason=env.WS_LAND_J381_REASON.trim();
+ if(reason.length===0||reason.length>120||reason.includes('\n')||reason.includes('\r')){
+  throw new StopError('WS_LAND_J381_REASON must be one nonempty line of at most 120 characters');
+ }
+ return reason;
+}
 
 /** DEV-SPEED DS22: the boot stamps the pre-push's gen:inputs rewrites from the tree (scripts/app-build/gen.ts). After a
  * rebase they go stale whenever main changed public/assets, and the pre-push's clean-tree check then refused the push
@@ -364,6 +377,7 @@ class Landing{
  /** @param {string} cwd @param {ReturnType<typeof parseArgs>} options @param {NodeJS.ProcessEnv} env */
  constructor(cwd,options,env){
   this.options=options;this.env=env;this.started=Date.now();
+  this.localHatch=options.mode==='local'?localGateHatch(env):undefined;
   /** @type {{file:string,plans:string[],run:number}[]} */this.pendingQuarantine=[];
   /** @type {string[]} */this.quarantined=[];
   this.quarantineAt=0;
@@ -795,13 +809,15 @@ class Landing{
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
   const args=mainPushArgs(head);
-  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${local?'; full local gate (J400)':carried?'; static pre-push on the rebased tree, no Vitest (LS3)':'; the hosted-green SHA, no local gate'}`);
+  const hatch=local?this.localHatch:undefined;
+  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${hatch===undefined?local?'; full local gate (J400)':carried?'; static pre-push on the rebased tree, no Vitest (LS3)':'; the hosted-green SHA, no local gate':`; J381 SKIP_CHECK=1: ${hatch}; no full proof`}`);
   // LS3 (J258): the pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
   /** @type {NodeJS.ProcessEnv} */
   const env={...this.env,WS_LAND_MAIN_PUSH:`${local?'local':carried?'carried':'exact'}:${head}`};
   Reflect.deleteProperty(env,'WS_LOCAL_LAND_DELTA');
-  if(local&&delta!==null)env.WS_LOCAL_LAND_DELTA=JSON.stringify(delta);
-  if(local)Reflect.deleteProperty(env,'SKIP_CHECK');
+  if(local&&delta!==null&&hatch===undefined)env.WS_LOCAL_LAND_DELTA=JSON.stringify(delta);
+  if(local&&hatch===undefined)Reflect.deleteProperty(env,'SKIP_CHECK');
+  if(hatch!==undefined)this.receipt(`J381 SKIP_CHECK=1 ${short(head)}: ${hatch}; no full proof`);
   const result=await gitTee(this.root,args,env);
   if(result.status===0)return 'landed';
   // A lost race is main having moved; anything else (a red pre-push) stops.
@@ -932,7 +948,10 @@ class Landing{
   /** @type {{baseMain:string,testedHead:string,incomingMain:string,head:string}|null} */let delta=null;
   for(let round=1;round<=this.options.rounds;round++){
    const testedHead=this.head(),baseMain=main;
-   if(await this.pushMain(false,true,delta)==='landed')return this.landed('local','local full proof plus verified delta when disjoint; no hosted branch run',round,main);
+   if(await this.pushMain(false,true,delta)==='landed'){
+    const hatch=this.localHatch;
+    return this.landed(hatch===undefined?'local':'local-hatch',hatch===undefined?'local full proof plus verified delta when disjoint; no hosted branch run':`J381 SKIP_CHECK=1: ${hatch}; no full proof`,round,main);
+   }
    main=this.fetchMain();
    this.say('moved',`main moved to ${short(main)}; rebase, then verify the prior full proof and incoming delta`);
    this.rebase(main);

@@ -102,3 +102,23 @@ live announcement has occurred. Current land.mjs strips SKIP_CHECK from
 local lands; the next owner must use an explicit, truthfully audited hatch
 without fabricating an authenticated full proof. SKIP_BUDGET=1 on this
 repair commit skips only the commit clock; installed checks still run.
+
+The resumed lane uses one explicit J381 exception after those repairs.
+Land now accepts SKIP_CHECK=1 only alongside WS_LAND_J381_REASON, a
+nonempty single line of at most 120 characters. Inherited SKIP_CHECK alone
+still runs the ordinary gate. The exception emits its reason before push,
+labels the landing local-hatch, omits delta composition and makes no full
+proof claim. The existing hook exits before proof capture when skipped.
+
+The real-Git counterexample failed first: land discarded the authorized
+skip. All 73 landing controls now pass, including ordinary red refusal,
+the explicit reason, rejection of malformed reasons and genuine races.
+The declaration, lint and types agree. Under both hosted markers, all 18
+selected delta/CPU cases pass; FL5b's authenticated disjoint-main reduction
+is already on main, with hosted refusal and overlap controls preserved.
+
+J381 for this one land: SKIP_CHECK=1 avoids repeating the first full suite
+after the 208-file/1055-case repaired revalidation and unchanged headless
+3/3. The original red included owned DOM/provenance defects, not just load
+flakes. The one human review is already complete; all MUSTs were repaired.
+Machine activation and real-lane pilot launches remain separate steps.
