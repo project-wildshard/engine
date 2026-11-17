@@ -27,6 +27,7 @@ import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
 import { textureBytes } from '@wildshard/engine/render/textureBytes';
+import { releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { gridPrefetchOrder, startGridPrefetch } from '../grid/prefetch';
@@ -39,7 +40,7 @@ import { settleTileDrivers, settlingTiles } from '../shardfile/tileDriver';
 import { observeTitlePreparation, prepareTitleFrame } from './titlePreparation';
 import { installCrashCheckpoint } from './crashResume';
 import { GAME_STRINGS } from '../../../shared/game/strings';
-import { currentSpawnDownload, dropStoredSpawnMembers, retrySpawnDownload } from '../boot/spawnDownload';
+import { currentSpawnDownload, dropStoredSpawnMembers, heldSpawnMembers, retrySpawnDownload } from '../boot/spawnDownload';
 import { downloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { waitEntryWork } from './entryReadiness';
 import { spawnViewThenNamed } from './readyFrame';
@@ -155,7 +156,10 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // mini QA 2026-11-17 row 19: the shaders step and the first frames are the boot's memory peak (every texture, buffer and
   // pipeline reaches the GPU, which iOS charges to the page). The parts the store already holds leave memory first (Nine:
   // 48 parts, 106.5 MB); a later read of their files is the store's checked copy.
-  bootMark('download:members-dropped', { count: dropStoredSpawnMembers() });
+  bootMark('download:members-dropped', { count: dropStoredSpawnMembers(), held: heldSpawnMembers() });
+  // and every geometry drawn so far lets its CPU copy go after each drawing step (play waits 240 renders, which the boot
+  // never reaches: Nine's phone held 88-147 MB of attribute arrays beside their GPU copies through its peak)
+  const releaseDrawn = (after: string): void => { bootMark('memory:geometry-released', { after, bytes: releaseDrawnGeometry(game.renderer) }); };
   try {
     // LS8 (J204): the shaders step's measured cost per program decides how the first frame slices its draws
     const shadersAt = diagnosticNow(), programsBefore = game.renderer.info.programs?.length ?? 0;
@@ -181,6 +185,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
         p.set(d, n, `${what} · ${programs()}`);
       }, { sliceMs: BOOT_SHADER_SLICE_MS, warmPost: true, drawnOnly: true, firstFrame, onStage: (phase, ms) => { if (phase === 'upload') uploadMs += ms; } });
     });
+    releaseDrawn('shaders');
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during shader compile');
     const shaderMs = diagnosticNow() - shadersAt, built = (game.renderer.info.programs?.length ?? 0) - programsBefore;
     const slowGpu = slowShaderGpu({ stepMs: shaderMs, uploadMs, programs: built });
@@ -200,6 +205,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       bootMark('app:first-frame-work-count', { done: passes, total: passes, detail: 'ready' });
       p.set(passes, passes, `ready · ${programs()}`);
     });
+    releaseDrawn('firstFrame');
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during first frame');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -255,6 +261,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     bootMark('app:first-game-frame-submitted');
     game.levelScope.raf(() => { bootMark('app:first-game-frame-opportunity'); });
   });
+  releaseDrawn('worldFrame');
   // FC2 (L15): the ready frame is one more hidden frame; the minimap's baked map decodes beside it
   // MF5 + FC2: what the hidden frames registered in the spawn view (the ring's L0 tiles the first draw asks for) refines
   // under the card too, before the reveal; the minimap's baked map decodes beside it
@@ -275,11 +282,12 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     const counted = <T>(job: Promise<T>): Promise<T> => job.then(value => { readyUnits(++readyDone); return value; });
     // QA row 27: Jake's Nine paste had 4.6 s of readyFrame with no entry before 'wait:Minimap': the spawn view's fence and
     // its tile settle, which the card names but the boot timeline did not; it is a named wait there too now
-    await spawnViewThenNamed(counted(bootTask('wait:Spawn view', () => prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); }), 'camera', settlingTiles))),
+    await spawnViewThenNamed(counted(bootTask('wait:Spawn view', () => prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); releaseDrawnGeometry(game.renderer); }), 'camera', settlingTiles))),
       // NB3: their own spans from their start too (the card names them only once the spawn view ends)
       [['Minimap', counted(bootTask('app:ready-minimap', () => waitEntryWork(game.levelScope, () => ctx.minimap.prepare())))],
         ['Horizon paintings', counted(bootTask('app:ready-horizon', () => edgeDressing.horizonReady))]]);
   });
+  releaseDrawn('readyFrame');
   // P0: the phone's spawn programs settle while loading still covers the reveal.
   // Undrawn world programs remain in the sliced after-control warm-up below.
   // A boot that lands on the title reveals nothing yet: it draws no frame before ENTER (CI's 0.3 fps runner spent ~70 s
@@ -288,11 +296,12 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   if (TIER === 'phone' && entersAtReveal) {
     // FC2: no world frames under the loader; the spawn view warms with counted offscreen draws (settlePrograms.ts)
     await loadingStage('spawnPrograms', () => settleEntryPrograms(game));
+    releaseDrawn('spawnPrograms');
     // QA8: on WebKit every compile runs in the GPU process, and a frame queues behind it: the ~17 world programs the
     // spawn view does not draw (Driftwood's off-screen graph materials, the loot coin) linked one a frame in play cost
     // an iPhone ~8 s at 7-11 fps (366 ms frames) right after PLAY. They link here, under the loader, paced the same way
     // and capped; what the cap leaves still links in play (warmRest).
-    if (queuedLinks()) await loadingStage('worldPrograms', () => linkWorldUnderLoader(game));
+    if (queuedLinks()) { await loadingStage('worldPrograms', () => linkWorldUnderLoader(game)); releaseDrawn('worldPrograms'); }
   }
   // DL11: setup overlapped the spawn download; control still waits for the whole set
   // FM6 modes 36 and 44: a part out of its reads refuses the job (a broken or unreachable pack). The load runs the same download

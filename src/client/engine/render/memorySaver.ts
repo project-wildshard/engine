@@ -150,7 +150,7 @@ function releasableAttribute(name: string, a: unknown): a is THREE.BufferAttribu
  * Computing them at release read geometries whose owner had already dropped its arrays (the far herd's view batch: its
  * attributes keep their count over an empty array, gpuOnly-style), so every vertex came back NaN (SF22d).
  */
-function releaseGeometry(g: THREE.BufferGeometry, label: string): void {
+function releaseGeometry(g: THREE.BufferGeometry, label: string): number {
   let bytes = 0;
   for (const [name, a] of Object.entries(g.attributes)) {
     if (!releasableAttribute(name, a)) continue;
@@ -171,7 +171,20 @@ function releaseGeometry(g: THREE.BufferGeometry, label: string): void {
     });
   }
   if (bytes > 0) markGpuOnly(LABEL);
+  return bytes;
 }
+
+/** mini QA 2026-11-17 row 19: each installed renderer's release of every drawn geometry now (`releaseDrawnGeometry`) */
+const releasesNow = new WeakMap<object, () => number>();
+/**
+ * Mini QA 2026-11-17 row 19 (Jake's iPhone 17 Pro killed Nine's page at boot): under the loading card the world is drawn a
+ * handful of times, never the 240 renders a geometry waits before its CPU copy goes, so every attribute array stayed beside
+ * its GPU copy through the boot's peak (Nine's phone tier: 88 MB at firstFrame, 147 MB at worldPrograms). The boot calls
+ * this after its first frames: every geometry drawn so far, unchanged since its first draw, lets go now, as the settle
+ * would later (`position`, skins and the index stay; a later read or write brings an array back from the GPU). A geometry
+ * that changed waits for the ordinary settle. Returns the bytes let go.
+ */
+export function releaseDrawnGeometry(renderer: object): number { return releasesNow.get(renderer)?.() ?? 0; }
 
 /** remember which GL buffer each attribute array went into (three's WebGLAttributes.createBuffer / a full re-upload) */
 function watchUploads(context: WebGL2RenderingContext): void {
@@ -207,7 +220,9 @@ export function installMemorySaver(renderer: Renderer): void {
   const settle = (frame: number): void => {
     while (head < queue.length) {
       const p = queue[head];
-      if (p === undefined || frame - p.at < SETTLE_RENDERS) break;
+      // a hole `releaseDrawnGeometry` left: that geometry went already
+      if (p === undefined) { head++; continue; }
+      if (frame - p.at < SETTLE_RENDERS) break;
       // Compaction may wait for 256 entries; consumed owners must not.
       queue[head++] = undefined;
       const geometry = p.geometry.deref();
@@ -218,6 +233,21 @@ export function installMemorySaver(renderer: Renderer): void {
     }
     if (head > 256 && head * 2 > queue.length) { queue.splice(0, head); head = 0; }
   };
+  releasesNow.set(renderer, () => {
+    let bytes = 0;
+    const end = queue.length;
+    for (let at = head; at < end; at++) {
+      const p = queue[at];
+      if (p === undefined) continue;
+      const geometry = p.geometry.deref();
+      if (geometry === undefined) { queue[at] = undefined; continue; }
+      // a geometry still changing keeps its place: the ordinary settle looks at it again later
+      if (!same(versions(geometry), p.versions)) continue;
+      queue[at] = undefined;
+      bytes += releaseGeometry(geometry, p.label);
+    }
+    return bytes;
+  });
   drawHooks(renderer).memory = (_camera, _scene, geometry, _material, object) => {
     // No pending release means no per-draw renderer-clock lookup. A newly
     // observed geometry still records the exact original render boundary.
