@@ -1,5 +1,4 @@
 [
   "test/grid-reentry.test.ts",
-  "test/map-source-inputs.test.ts",
   "test/native-oracle.test.ts"
 ]
