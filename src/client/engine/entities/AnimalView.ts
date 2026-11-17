@@ -173,7 +173,7 @@ export class Animal extends AnimalSim {
     for (const key of ['kind', 'variant', 'rarity', 'label', 'aggressive', 'mods', 'alive', 'hp', 'maxHp',
       'position', 'yaw', 'speed', 'state', 'herd', 'desiredYaw', 'desiredSpeed', 'turnRate', 'lastHitT',
       'lookTarget', 'lookWeight', 'seed', 'scale', 'strafe', 'desiredStrafe', 'yOffset', 'driven', 'levelGround',
-      'groundHeight', 'mem', 'attackTurnCap', 'scripted', 'harnessHold'] as const) share(key);
+      'hitVolumes', 'lockPoints', 'groundHeight', 'mem', 'attackTurnCap', 'scripted', 'harnessHold'] as const) share(key);
     Object.defineProperties(this, {
       combatActor: { value: sim.combatActor.bind(sim) }, applyDamage: { value: sim.applyDamage.bind(sim) },
       applyFinalDamage: { value: sim.applyFinalDamage.bind(sim) }, stagger: { value: sim.stagger.bind(sim) },

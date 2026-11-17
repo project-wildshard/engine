@@ -100,3 +100,34 @@ test.each(['procedural', 'own-rig'] as const)('%s body without hit overrides ret
     expect(snapshotSimHost(sim.host)).toEqual(snapshotSimHost(native.host));
   } finally { sim.dispose(); native.dispose(); }
 });
+
+for (const giant of [false, true]) test(`actual ${giant ? 'giant named' : 'biped chest'} sockets follow the same actor root`, async () => {
+  const { source, assets } = await creatureVolumeFixture(), body = source.rows.species[0]?.body;
+  if (body === undefined) throw new Error('Missing socket fixture');
+  if (giant) { body.size = 'giant'; body.lock = ['head', 'hand.L', 'chest']; }
+  const sim = createShardfileSim(source, assets, { rapier: await rapier });
+  try {
+    const actor = sim.host.entities.get('fixture.actor'); if (actor?.lockPoints === undefined) throw new Error('Missing actual socket actor');
+    const before = snapshotSimHost(sim.host), out = new Vector3(), points = actor.lockPoints;
+    expect(points.names).toEqual(giant ? ['head', 'hand.L', 'chest'] : ['chest']);
+    expect(points.point(0, out).toArray()).toEqual([0, giant ? 2 : 1, 7]);
+    for (let n = 0; n < 100; n++) points.point(n % points.names.length, out);
+    expect(snapshotSimHost(sim.host)).toEqual(before);
+    actor.position.set(10, 3, 20); actor.yaw = Math.PI / 2;
+    expect(points.point(0, out).toArray()).toEqual([10, giant ? 5 : 4, 20]);
+    if (giant) { const hand = points.point(1, out); expect(hand.x).toBeCloseTo(10); expect(hand.y).toBe(4); expect(hand.z).toBeCloseTo(19); }
+  } finally { sim.dispose(); }
+});
+test('missing authored lock socket refuses before the actor is returned', async () => {
+  const { source, assets } = await creatureVolumeFixture(), body = source.rows.species[0]?.body;
+  if (body === undefined) throw new Error('Missing socket fixture'); body.lock = ['absent'];
+  const physics = await rapier;
+  expect(() => createShardfileSim(source, assets, { rapier: physics })).toThrow('Missing creature lock socket absent');
+});
+test('an own-rig lock-only row keeps native hit volumes', async () => {
+  const { source, assets } = await creatureVolumeFixture(), body = source.rows.species[0]?.body;
+  if (body === undefined) throw new Error('Missing socket fixture'); delete body.skeleton; delete body.volumes; body.lock = ['head'];
+  const sim = createShardfileSim(source, assets, { rapier: await rapier });
+  try { const actor = sim.host.entities.get('fixture.actor'); expect(actor?.hitVolumes).toBeUndefined(); expect(actor?.lockPoints?.names).toEqual(['head']); }
+  finally { sim.dispose(); }
+});

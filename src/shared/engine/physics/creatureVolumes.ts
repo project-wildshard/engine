@@ -13,3 +13,9 @@ export interface CreatureVolumePose {
   /** World endpoints; equal for a sphere, capsule axis otherwise. Caller owns buffers. */
   segment: (index: number, rear: Vector3, front: Vector3) => void;
 }
+
+/** Named aiming sockets on the same creature; selecting one never creates an entity. */
+export interface CreatureLockPoints {
+  readonly names: readonly string[];
+  point: (index: number, out: Vector3) => Vector3;
+}

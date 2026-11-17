@@ -10,9 +10,11 @@ import { app } from '../app/runtime';
  * optional `dims` (`bodyY` = body height above the feet, `bodyRadius`). Anything else (velocity) the assist estimates
  * itself from position deltas, so a plain `{ alive, position }` object also works.
  */
+import type { CreatureLockPoints } from '../../../shared/engine/physics/creatureVolumes';
 import type * as THREE from 'three';
 
 export interface AimTarget {
+  lockPoints?: CreatureLockPoints | undefined;
   kind?: string;
   alive: boolean;
   hidden?: boolean;

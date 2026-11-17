@@ -5,6 +5,7 @@ import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { SimHost } from '@wildshard/engine/sim';
 import { RestCreatureVolumes } from '../../../shared/game/shardfile/creatureVolumes';
+import { RestCreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
 import { creatureRestRig } from '../../../shared/game/shardfile/creatureRestRig';
 
 /** The actual admitted skin supplies rest joints. Native rows with no body layer
@@ -29,13 +30,14 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     if (bytes === undefined) throw new Error(`species ${spawn.species}: missing admitted skin GLB`);
     const joints = creatureRestRig(bytes, skin.row.rig.joints[0] ?? []);
     const root = { position: actor.position, get yaw() { return actor.yaw; }, get scale() { return actor.scale * body.scale; } };
-    return [{ actor, pose: new RestCreatureVolumes(body, joints, root), contract: { id: spawn.id, body, skin: skin.hash, joints } }];
+    return [{ actor, pose: body.skeleton === undefined && body.volumes === undefined ? undefined : new RestCreatureVolumes(body, joints, root),
+      locks: body.skeleton === undefined && body.lock === undefined ? undefined : new RestCreatureSockets(body, joints, root), contract: { id: spawn.id, body, skin: skin.hash, joints } }];
   });
   if (pending.length === 0) return;
   const id = 'creatures.volumes', contract = JSON.stringify(pending.map(row => row.contract));
   if (host.adapters.has(id)) throw new Error('Creature volumes already installed');
   // All source/rig checks precede binding any actual actor.
-  for (const row of pending) row.actor.bindHitVolumes(row.pose);
+  for (const row of pending) { if (row.pose !== undefined) row.actor.bindHitVolumes(row.pose); if (row.locks !== undefined) row.actor.bindLockPoints(row.locks); }
   const adapter = { snapshot: () => contract, restore: (saved: unknown) => {
     if (saved !== contract) throw new Error('Incompatible creature volumes continuation');
   } };

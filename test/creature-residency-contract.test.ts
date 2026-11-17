@@ -98,3 +98,17 @@ test.each(['drawPinned', 'driven', 'brain', 'harnessHold', 'simulationBound'] as
       expect(f.animal.mesh.visible).toBe(false);
     }
   });
+
+test('a bound page view borrows authored hit and lock ports without a second owner', () => {
+  const f = fixture(), saved = f.animal.snapshot();
+  const core = new AnimalSim({ kind: saved.kind, label: saved.label, variant: saved.variant, rarity: saved.rarity,
+    hp: saved.motion.maxHp, aggressive: saved.flags.aggressive, dims: f.animal.dims, mods: saved.mods }, saved.motion.seed,
+    saved.motion.scale, f.animal.entityId, { heightAt: () => 0, random: () => .5 });
+  core.restore(saved); f.animal.bindSimulation(core);
+  const hits = { volumes: [{ part: 'head', multiplier: 2, radius: .3, halfLength: 0 }], segment: (_index: number, a: Vector3, b: Vector3) => { a.copy(core.position); b.copy(a); } };
+  const locks = { names: ['chest'], point: (_index: number, out: Vector3): Vector3 => out.copy(core.position).add(new Vector3(0, 1, 0)) };
+  core.bindHitVolumes(hits); core.bindLockPoints(locks);
+  expect(f.animal.hitVolumes).toBe(hits); expect(f.animal.lockPoints).toBe(locks);
+  expect(f.animal.snapshot()).toEqual(core.snapshot()); expect(core.snapshot()).toEqual(saved);
+  expect(f.animal.lockPoints?.point(0, new Vector3()).y).toBe(core.position.y + 1);
+});

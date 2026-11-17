@@ -6,7 +6,7 @@ import type { Actor, DamageRequest, DamageDealt } from '../combat/pipeline';
 import type { AnimalDims, Rarity, VariantMods } from './species/registry';
 import { tap } from '../core/harnessTap';
 import type { ANIMAL_STATES } from './animalStates';
-import type { CreatureVolumePose } from '../physics/creatureVolumes';
+import type { CreatureVolumePose, CreatureLockPoints } from '../physics/creatureVolumes';
 
 /** Shared behaviour state consumed by simulation and pose adapters. */
 export type AnimalState = typeof ANIMAL_STATES[number];
@@ -118,6 +118,12 @@ export class AnimalSim {
   bindHitVolumes(pose: CreatureVolumePose): void {
     if (this.authoredHitVolumes !== undefined || pose.volumes.length === 0 || pose.volumes.length > 16) throw new Error('Incompatible authored creature volumes');
     this.authoredHitVolumes = pose;
+  }
+  private authoredLockPoints: CreatureLockPoints | undefined;
+  get lockPoints(): CreatureLockPoints | undefined { return this.authoredLockPoints; }
+  bindLockPoints(points: CreatureLockPoints): void {
+    if (this.authoredLockPoints !== undefined || points.names.length === 0 || points.names.length > 16) throw new Error('Incompatible creature lock points');
+    this.authoredLockPoints = points;
   }
   private elapsed = 0;
   private readonly moveWant = { x: 0, y: 0, z: 0 };
