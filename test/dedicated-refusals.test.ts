@@ -43,7 +43,9 @@ test('four sockets an address, and ten connects a minute', { timeout: 30_000 }, 
   second.drop();
   await vi.waitFor(() => { expect(bench?.world.health().players).toBeLessThanOrEqual(2); });
   await new Promise(resolve => { setTimeout(resolve, 100); });
-  expect(await closed(bench.url), 'the refused attempt stores no extra history').toBe('no upgrade');
+  // SB42: the socket-cap refusal is not counted in the minute, so the dropped socket's room opens (third connect of three)
+  expect(await closed(bench.url), 'a socket-cap refusal stores no history').not.toBe('no upgrade');
+  expect(await closed(bench.url), 'the minute is full at three connects').toBe('no upgrade');
   expect(refusals()).toEqual({ connections: 2 });
 });
 

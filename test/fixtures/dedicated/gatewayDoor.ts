@@ -41,5 +41,5 @@ export async function gatewayDoor(options: Partial<WorldOptions> = {}) {
     const ready = (data: Buffer): void => { if (data[0] !== 4) return; socket.off('message', ready); socket.send(Buffer.from([5])); };
     socket.on('message', ready);
   });
-  return { world, seats, closes, upgrade, admit, close: async (): Promise<void> => { for (const socket of sockets) socket.terminate(); world.dispose(); for (const seat of seats) seat.port.close(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); } };
+  return { world, seats, closes, upgrade, admit, port: address.port, proxyHeader, arrivals, close: async (): Promise<void> => { for (const socket of sockets) socket.terminate(); world.dispose(); for (const seat of seats) seat.port.close(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); } };
 }

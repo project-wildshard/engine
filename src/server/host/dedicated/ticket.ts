@@ -68,3 +68,21 @@ export async function confirmed(text: string, spkiHex: string | undefined, nowMs
   if (expiresMs <= nowMs || expiresMs - nowMs > CONFIRM_MAX_MS) return undefined;
   return await signed(body, signature, spkiHex) ? `account:plr_${id}` : undefined;
 }
+
+// STAGING-BUGBASH SB42: our own proofs share one home address with Jake's phone, and the door's per-address budget (E7.7) let them
+// starve each other. A proof pass names a lane and rides the socket as a subprotocol (`wspass.…`, world.ts): `pass:<lane>.<expires>.<signature>`,
+// signed by the same key over everything before the last dot (`scripts/door-pass.mjs` mints one on the MacBook). It moves that
+// socket to the pass's own budget and nothing else: it seats nobody, and every hello is still admitted as before.
+const PASS = /^(?<signed>pass:(?<lane>[a-z0-9][a-z0-9-]{0,39})\.(?<expires>[0-9]{1,12}))\.(?<signature>[0-9a-f]{128})$/u;
+/** A pass reaching further ahead than this is refused, whoever signed it: the script mints twelve hours. */
+export const PASS_MAX_MS: number = 24 * 3600 * 1000;
+
+/** The lane a live proof pass under `spkiHex` names, and when it expires; undefined otherwise (expired, too long, unsigned, a ticket). */
+export async function passOf(text: string, spkiHex: string | undefined, nowMs: number): Promise<{ readonly lane: string; readonly expiresMs: number } | undefined> {
+  const groups = PASS.exec(text)?.groups;
+  if (groups === undefined) return undefined;
+  const { signed: body = '', lane = '', expires = '0', signature = '' } = groups;
+  const expiresMs = Number(expires) * 1000;
+  if (expiresMs <= nowMs || expiresMs - nowMs > PASS_MAX_MS) return undefined;
+  return await signed(body, signature, spkiHex) ? { lane, expiresMs } : undefined;
+}

@@ -13,7 +13,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { cleanName } from '@wildshard/engine/net/chatFilter';
 import { NetIdentitySchema } from '@wildshard/engine/net/identity';
-import { PLAYER_TICKET_PUBLIC_KEY, admit } from './ticket';
+import { PLAYER_TICKET_PUBLIC_KEY, admit, passOf } from './ticket';
 import { decodeFirstMessage, encodeHello, type Hello } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { decodeEnter, encodeArrive, encodeCountdown, encodeEnter, type WorldWord } from '@wildshard/engine/net/socketFrames';
@@ -43,6 +43,12 @@ import { SeatQueue } from './seatQueue';
 export const GRACE_MS = 60_000;
 /** E7.7: what one address may hold and open. */
 const SOCKETS_PER_IP = 4, CONNECTS_PER_MINUTE = 10, MINUTE_MS = 60_000;
+/** SB42: a socket the page closed having only read the door's word (no hello) moves to this budget, so a zone entry's word and its
+ *  join cost one connect, not two. A stranger's word sockets still meet a cap: this one, then the connects again. */
+const WORDS_PER_MINUTE = 10;
+/** SB42: a proof pass's own budget (`ticket.ts` `passOf`), apart from every address's; and how many bad passes an address may try
+ *  in a minute before the door stops reading its passes (each read is a signature check). */
+const PASS_SOCKETS = 16, PASS_CONNECTS_PER_MINUTE = 120, BAD_PASSES_PER_MINUTE = 5, MAX_KEPT_PASSES = 64;
 const MAX_TRACKED_IPS = 4096;
 /** A hello's and a load's wait (E7.7). */
 const HELLO_MS = 5000, READY_MS = 120_000;
@@ -74,6 +80,13 @@ function connectionKey(address: string): string {
   const words = (right === undefined ? head : [...head, ...Array.from({ length: 8 - head.length - tail.length }, () => '0'), ...tail]).map(word => Number.parseInt(word, 16));
   if (words.slice(0, 5).every(word => word === 0) && words[5] === 65535) return `${(words[6] ?? 0) >> 8}.${(words[6] ?? 0) & 255}.${(words[7] ?? 0) >> 8}.${(words[7] ?? 0) & 255}`;
   return `${words.slice(0, 4).map(word => word.toString(16)).join(':')}/64`;
+}
+
+/** SB42: a proof pass the page offers as a WebSocket subprotocol (`wspass.<lane>.<expires>.<signature>`, a header token cannot hold
+ *  `:`), in `ticket.ts`'s `pass:` form; null when none is offered. */
+function passText(header: string | undefined): string | null {
+  const offered = header?.split(',').map(word => word.trim()).find(word => word.startsWith('wspass.'));
+  return offered === undefined ? null : `pass:${offered.slice('wspass.'.length)}`;
 }
 
 /** What the door holds of one worker. */
@@ -177,6 +190,11 @@ export class World {
   private readonly replacing = new Set<WorkerLink>();
   private readonly sockets = new Map<string, number>();
   private readonly connects = new Map<string, ConnectAttempt[]>();
+  /** SB42: when each address's word-only sockets closed, this minute; and its bad passes. */
+  private readonly words = new Map<string, number[]>();
+  private readonly badPasses = new Map<string, number[]>();
+  /** SB42: passes read this run, by their text: the budget key and expiry, so a lane's next socket skips the signature check. */
+  private readonly passes = new Map<string, { readonly key: string; readonly expiresMs: number }>();
   private readonly ends = new Set<SocketTransport>();
   /** Links whose player quit (`ready` with `LEAVE_FLAG`) before a body was theirs. */
   private readonly quits = new WeakSet<SocketTransport>();
@@ -419,34 +437,75 @@ export class World {
     }
     if (this.draining) { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
     const ip = connectionKey(trustedAddress(request.socket.remoteAddress ?? '', request.headers, this.options.trustProxy ?? DEFAULT_TRUST_PROXY));
-    const attempt = this.attempt(ip);
+    const pass = passText(request.headers['sec-websocket-protocol']);
+    if (pass === null) { this.admitUpgrade(request, socket, head, ip, false); return; }
+    void this.passKey(pass, ip).then(key => { if (!socket.destroyed) this.admitUpgrade(request, socket, head, key ?? ip, key !== null); return undefined; });
+  }
+  private admitUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer, key: string, passed: boolean): void {
+    const attempt = this.attempt(key, passed);
     if (attempt === null) { this.refuse('connections'); socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
     const goto = gotoCell(request.url);
-    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, ip, attempt, goto); });
+    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, key, attempt, goto); });
+  }
+  /** SB42: the budget a live proof pass draws on (`pass:<lane>`), or null: no pass, a bad one, or an address past its bad passes. */
+  private async passKey(text: string, ip: string): Promise<string | null> {
+    const now = this.now(), kept = this.passes.get(text);
+    if (kept !== undefined && kept.expiresMs > Date.now()) return kept.key;
+    const bad = (this.badPasses.get(ip) ?? []).filter(at => now - at < MINUTE_MS);
+    if (bad.length >= BAD_PASSES_PER_MINUTE) return null;
+    const pass = await passOf(text, this.options.ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, Date.now());
+    if (pass === undefined) {
+      if (!this.badPasses.has(ip) && this.badPasses.size >= MAX_TRACKED_IPS) { const oldest = this.badPasses.keys().next().value; if (oldest !== undefined) this.badPasses.delete(oldest); }
+      bad.push(now); this.badPasses.set(ip, bad); this.refuse('bad-pass'); return null;
+    }
+    if (this.passes.size >= MAX_KEPT_PASSES) { const oldest = this.passes.keys().next().value; if (oldest !== undefined) this.passes.delete(oldest); }
+    const key = `pass:${pass.lane}`; this.passes.set(text, { key, expiresMs: pass.expiresMs });
+    return key;
   }
   /** Actual retained limiter state, also recorded in the worker operational log. */
   get connectionStats(): { readonly addresses: number; readonly attempts: number } {
     this.sweepConnects(this.now());
     return { addresses: this.connects.size, attempts: [...this.connects.values()].reduce((sum, times) => sum + times.length, 0) };
   }
-  private attempt(ip: string): ConnectAttempt | null {
-    const now = this.now(), recent = (this.connects.get(ip) ?? []).filter(row => now - row.at < MINUTE_MS);
-    if (recent.length >= (this.options.connectsPerMinute ?? CONNECTS_PER_MINUTE)) return null;
-    if (!this.connects.has(ip) && this.connects.size >= MAX_TRACKED_IPS) {
+  /** One connect against `key`'s minute and its open sockets, or null (429). SB42: a socket refused for the open-socket cap is not
+   *  counted in the minute: counting it let a page's redials behind a full address keep that address shut for a minute more. */
+  private attempt(key: string, passed = false): ConnectAttempt | null {
+    const now = this.now(), recent = (this.connects.get(key) ?? []).filter(row => now - row.at < MINUTE_MS);
+    if (recent.length >= (passed ? PASS_CONNECTS_PER_MINUTE : this.options.connectsPerMinute ?? CONNECTS_PER_MINUTE)) return null;
+    if ((this.sockets.get(key) ?? 0) >= (passed ? PASS_SOCKETS : this.options.socketsPerIp ?? SOCKETS_PER_IP)) return null;
+    if (!this.connects.has(key) && this.connects.size >= MAX_TRACKED_IPS) {
       const oldest = this.connects.keys().next().value;
       if (oldest !== undefined) this.connects.delete(oldest);
     }
-    const attempt = { at: now }; recent.push(attempt); this.connects.set(ip, recent);
-    return (this.sockets.get(ip) ?? 0) >= (this.options.socketsPerIp ?? SOCKETS_PER_IP) ? null : attempt;
+    const attempt = { at: now }; recent.push(attempt); this.connects.set(key, recent);
+    return attempt;
   }
   private sweepConnects(now: number): void {
     for (const [ip, times] of this.connects) if (now - (times.at(-1)?.at ?? -Infinity) >= MINUTE_MS) this.connects.delete(ip);
+    for (const [ip, times] of this.words) if (now - (times.at(-1) ?? -Infinity) >= MINUTE_MS) this.words.delete(ip);
+    for (const [ip, times] of this.badPasses) if (now - (times.at(-1) ?? -Infinity) >= MINUTE_MS) this.badPasses.delete(ip);
+  }
+  /** Take `attempt` out of `key`'s connects this minute. */
+  private refund(key: string, attempt: ConnectAttempt): void {
+    const kept = (this.connects.get(key) ?? []).filter(row => row !== attempt);
+    if (kept.length === 0) this.connects.delete(key); else this.connects.set(key, kept);
+  }
+  /** SB42: a word-only socket's connect moves to the word budget while that has room this minute. */
+  private wordOnly(key: string, attempt: ConnectAttempt): void {
+    const now = this.now(), words = (this.words.get(key) ?? []).filter(at => now - at < MINUTE_MS);
+    if (words.length >= WORDS_PER_MINUTE) return;
+    if (!this.words.has(key) && this.words.size >= MAX_TRACKED_IPS) { const oldest = this.words.keys().next().value; if (oldest !== undefined) this.words.delete(oldest); }
+    words.push(now); this.words.set(key, words); this.refund(key, attempt);
   }
   private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt, goto: string | null): void {
     const end = new SocketTransport(socket);
     this.sockets.set(ip, (this.sockets.get(ip) ?? 0) + 1); this.ends.add(end);
+    // SB42: whether a hello came, and whether the door closed it for want of one
+    let spoke = false, timedOut = false;
     end.onClose(reason => {
-      if (reason === 'retry') { const kept = (this.connects.get(ip) ?? []).filter(row => row !== attempt); if (kept.length === 0) this.connects.delete(ip); else this.connects.set(ip, kept); }
+      if (reason === 'retry') this.refund(ip, attempt);
+      // the page read the door's word and closed (GO4 `worldWord`), cleanly and before any hello: its own budget
+      else if (reason === 'closed' && !spoke && !timedOut) this.wordOnly(ip, attempt);
       this.ends.delete(end); const left = (this.sockets.get(ip) ?? 1) - 1; if (left === 0) this.sockets.delete(ip); else this.sockets.set(ip, left);
     });
     // QA row 16: a clean quit counts from the first byte, not only once seated (`pumpSocket`'s own). A quit that lands while the door
@@ -460,8 +519,8 @@ export class World {
     const moving = this.grace === null ? {} : { moving: { inS: Math.max(0, Math.ceil((this.grace.endsAt - diagnosticNow()) / 1000)) } };
     end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving} satisfies WorldWord)).buffer);
     end.onControl((control, bytes) => { if (control === 'device') this.deviceWord(end, bytes); });
-    const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
-    const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });
+    const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { timedOut = true; this.refuse('hello-timeout'); end.close('refused'); });
+    const off = end.onMessage((_channel, bytes) => { spoke = true; off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
   }
   /** DT4: a client's device word, untrusted: one per socket, read and bounded by `readDeviceWord`. A junk or oversized word is counted

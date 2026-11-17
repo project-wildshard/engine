@@ -93,6 +93,8 @@ async function cli() {
     await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
     if (blockWs) await context.routeWebSocket(/.*/u, (ws) => { void ws.close({ code: 4000, reason: 'zone-sweep: loads only' }); });
     await context.addInitScript(smokeProbes); // rAF capped at 60 fps: the GPU is Jake's
+    // SB42: the lane's door pass, so a sweep's joins never spend the address Jake's phone shares
+    const pass = (await import('./door-pass.mjs')).doorPassInit(process.env.WS_LANE_NAME ?? 'zone-sweep'); if (pass !== null) await context.addInitScript(pass);
     return context;
   };
   /** @type {SweepResult[]} */

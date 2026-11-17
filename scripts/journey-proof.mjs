@@ -303,6 +303,8 @@ async function cli() {
       ...(name === 'webkit' ? {} : { args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }),
     });
     await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
+    // SB42: the lane's door pass, so a proof's joins never spend the address Jake's phone shares
+    const pass = (await import('./door-pass.mjs')).doorPassInit(process.env.WS_LANE_NAME ?? 'journey-proof'); if (pass !== null) await context.addInitScript(pass);
     // --developer: Settings ▸ Developer on, for a local build whose only cards are Developer ones (T1's ring 1, `_template`)
     if (args.has('developer')) await (await import('./debug-settings.mjs')).saveFixture(context, { scope: 'device', key: 'devMode', data: true });
     try {

@@ -11,7 +11,16 @@ const ABNORMAL_CLOSE = 1006;
 export interface WebSocketOptions {
   readonly now?: () => number;
   /** The constructor to dial with. */
-  readonly socket?: new (url: string) => WebSocket;
+  readonly socket?: new (url: string, protocols?: string[]) => WebSocket;
+}
+
+/** SB42: a proof harness's door pass (`scripts/door-pass.mjs` sets `__wildshardDoorPass` in an init script); a player's page has none. */
+const harnessDoorPass = (): unknown => (globalThis as { __wildshardDoorPass?: unknown }).__wildshardDoorPass;
+/** SB42: the subprotocols a socket offers: this page's door pass as `wspass.<lane>.<expires>.<signature>` (the door counts a proof
+ *  lane's sockets apart from the address its players share), or none. A door that knows no pass picks it and goes on as before. */
+export function doorPassProtocols(read: () => unknown = harnessDoorPass): string[] {
+  const pass = read();
+  return typeof pass === 'string' && /^pass:[a-z0-9-]{1,40}\.[0-9]{1,12}\.[0-9a-f]{128}$/u.test(pass) ? [`wspass.${pass.slice('pass:'.length)}`] : [];
 }
 
 /** A socket's close event has no type on `Scope.listen`, which knows only the page's events. */
@@ -38,7 +47,7 @@ export class WebSocketTransport implements Transport {
   private recvBytes = 0;
   constructor(url: string, options: WebSocketOptions = {}) {
     this.now = options.now ?? diagnosticNow;
-    this.socket = new (options.socket ?? WebSocket)(url);
+    this.socket = new (options.socket ?? WebSocket)(url, doorPassProtocols());
     this.socket.binaryType = 'arraybuffer';
     this.scope.listen(this.socket, 'open', () => { this.opened(); });
     this.scope.listen(this.socket, 'message', (event: MessageEvent<unknown>) => { if (event.data instanceof ArrayBuffer) this.receive(event.data); });
