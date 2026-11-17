@@ -26,9 +26,11 @@ const angle = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
  */
 export function installSteerRide(movers: FollowedMovers, page: {
   readonly system: (spec: SystemSpec) => void; readonly led: () => boolean; readonly player: SteerRider; readonly view: SteerRideView;
+  /** whether the rider holds boost (sprint) now: the chip lights on the press, not on a speed a tail wind also reaches */
+  readonly boost: () => boolean;
 }): void {
   const rows = movers.data.flatMap(row => row.carry !== undefined && row.driver?.kind === 'steer'
-    ? [{ id: row.id, seat: row.carry.seat, top: row.driver.speed * row.driver.boost, plain: row.driver.speed }] : []);
+    ? [{ id: row.id, seat: row.carry.seat, top: row.driver.speed * row.driver.boost }] : []);
   if (rows.length === 0) return;
   let riding: (typeof rows)[number] | null = null, last: MoverPose | null = null, heading = 0, looked = 0, idle = 0, speed = 0;
   let shown: { speed: number; boosting: boolean } | null = null;
@@ -56,7 +58,7 @@ export function installSteerRide(movers: FollowedMovers, page: {
     const turned = angle(pose.euler.y - heading); heading = pose.euler.y; p.yaw = angle(p.yaw + turned);
     if (idle >= STEER_RECENTRE.idle && speed > RECENTRE_SPEED) p.yaw = angle(p.yaw + angle(heading - p.yaw) * (1 - Math.exp(-dt * STEER_RECENTRE.rate)));
     looked = p.yaw;
-    const next = { speed: Math.max(0, Math.min(1, speed / riding.top)), boosting: speed > riding.plain * 1.02 };
+    const next = { speed: Math.max(0, Math.min(1, speed / riding.top)), boosting: page.boost() && speed > RECENTRE_SPEED };
     if (shown === null || Math.abs(shown.speed - next.speed) > 0.01 || shown.boosting !== next.boosting) { shown = next; page.view.show(next); }
   } });
 }

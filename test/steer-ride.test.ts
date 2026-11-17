@@ -29,8 +29,8 @@ function page() {
   if (board === undefined || leave === undefined) throw new Error('Missing land-sail prompts');
   const systems: SystemSpec[] = [], shown: ({ speed: number; boosting: boolean } | null)[] = [];
   const player = { yaw: 2, position: { x: 5, y: 0, z: 5 } };
-  let led = false;
-  installSteerRide(movers, { system: spec => { systems.push(spec); }, led: () => led, player, view: { show: ride => { shown.push(ride); } } });
+  let led = false, boost = false;
+  installSteerRide(movers, { system: spec => { systems.push(spec); }, led: () => led, player, view: { show: ride => { shown.push(ride); } }, boost: () => boost });
   let pose: MoverPose = { position: { ...at }, euler: { ...euler }, enabled: true };
   /** One frame: the vehicle goes `metres` along its heading and turns by `turn`, the led body on its seat. */
   const frame = (metres = 0, turn = 0): void => {
@@ -40,7 +40,7 @@ function page() {
     if (led) player.position = { x: pose.position.x, y: pose.position.y + carry.seat, z: pose.position.z };
     for (const system of systems) system.run(DT, 0);
   };
-  return { movers, board, leave, shown, player, frame, pose: () => pose, lead: (on: boolean): void => { led = on; } };
+  return { movers, board, leave, shown, player, frame, pose: () => pose, lead: (on: boolean): void => { led = on; }, press: (on: boolean): void => { boost = on; } };
 }
 
 test('the board prompt shows to a player on foot and the leave prompt only to the rider, both riding with the vehicle', () => {
@@ -77,12 +77,14 @@ test('boarding faces the heading, the view turns with it, and a look away swings
   expect(Math.abs(player.yaw - pose().euler.y)).toBeLessThan(0.05); // back behind the sail
 });
 
-test('the chip shows the speed as a share of the boosted top speed and lights BOOST past the plain top speed', () => {
-  const { shown, frame, lead } = page();
+test('the chip shows the speed as a share of the boosted top speed and lights BOOST while the rider boosts, not on a tail wind', () => {
+  const { shown, frame, lead, press } = page();
   lead(true); frame();
   expect(shown.at(-1)).toEqual({ speed: 0, boosting: false });
   for (let i = 0; i < 60; i++) frame(8 * DT);
   expect(shown.at(-1)?.speed).toBeCloseTo(8 / 12, 2); expect(shown.at(-1)?.boosting).toBe(false);
-  for (let i = 0; i < 60; i++) frame(12 * DT);
-  expect(shown.at(-1)?.speed).toBeCloseTo(1, 2); expect(shown.at(-1)?.boosting).toBe(true);
+  for (let i = 0; i < 60; i++) frame(11 * DT); // a tail wind past the plain top speed is not a boost
+  expect(shown.at(-1)?.boosting).toBe(false);
+  press(true); for (let i = 0; i < 60; i++) frame(12 * DT);
+  expect(shown.at(-1)?.speed).toBeCloseTo(1, 1); expect(shown.at(-1)?.boosting).toBe(true);
 });

@@ -14,6 +14,7 @@ import { wirePage } from './wirePage';
 import { installRaceClock } from './raceClock';
 import { RaceClockChip, SteerChip } from '@wildshard/engine/quest/view/ui';
 import { installSteerRide } from '../plugin/steerRide';
+import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 import { installDataPageMovers } from './dataPageMovers';
 import { installDataPageBodies } from './touchViews';
 import { admitClientPlan, installClientPhase, type AdmittedClientPlan, type ClientPhase } from './clientPlan';
@@ -600,7 +601,8 @@ export class ShardfileClient {
       if (movers !== null) {
         ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });
         // SHARD-SOURCE SS-MS2a3: a steer vehicle's rider: its leave prompt, the view behind its heading, its speed and boost
-        if (movers.data.some(row => row.driver?.kind === 'steer')) installSteerRide(movers, { system: ctx.system, led: () => wirePage.led(), player: world.player, view: new SteerChip(ctx.scope) });
+        if (movers.data.some(row => row.driver?.kind === 'steer')) installSteerRide(movers, { system: ctx.system, led: () => wirePage.led(), player: world.player, view: new SteerChip(ctx.scope),
+          boost: () => (world.player.sampleHeldCommand().buttons & NET_BUTTONS.sprint) !== 0 });
         // side parity (SS1) reads the page's colliders beside a room's at tick 0: every mover's collider at its declared rest
         ctx.debug.expose('shardfileMovers', { rest: () => { for (const row of movers.data) { const at = { position: { ...row.at }, euler: { ...row.euler }, enabled: row.enabled }; movers.replayPose(row.id, at, at); } } });
       }
