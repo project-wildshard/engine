@@ -102,6 +102,8 @@ export class NetClient {
   private unacked: NetCommand[] = [];
   private fresh = 0;
   private seq = 0;
+  /** The last `lastSeq` this client trimmed by: an ack only ever moves on from it, and never past `seq`. */
+  private ackedSeq: number | null = null;
   private off: (() => void)[];
   private said: { readonly build: string; readonly identity: NetIdentity } = { build: '', identity: GUEST };
   private readonly rejoins = new Set<() => void>();
@@ -127,7 +129,7 @@ export class NetClient {
     for (const off of this.off) off();
     const { ledgerSerial, said } = this;
     this.left();
-    this.unacked = []; this.fresh = 0; this.seq = 0; this.closed = null;
+    this.unacked = []; this.fresh = 0; this.seq = 0; this.ackedSeq = null; this.closed = null;
     this.transport = transport; this.off = this.listen(transport);
     for (const listener of this.rejoins) listener();
     this.hello(said.build, said.identity, ledgerSerial);
@@ -210,8 +212,13 @@ export class NetClient {
   }
   /** Send this client frame's bundle: its new commands and up to REDUNDANT_COMMANDS older unacked ones, plus the ack. */
   flush(): void {
+    // MP1.6: a cell on another worker hears this link with a fresh queue whose `lastSeq` is 0 while `seq` runs on; past 0x8000 that 0
+    // reads as ahead of every command held here, which then all looked acked and none went out. An ack counts only when it moves on
+    // from the last one and doesn't pass what this client sent.
     const acked = this.latest?.lastSeq;
-    if (acked !== undefined) this.unacked = this.unacked.filter(command => seqAfter(command.seq, acked));
+    if (acked !== undefined && !seqAfter(acked, this.seq) && (this.ackedSeq === null || !seqAfter(this.ackedSeq, acked))) {
+      this.ackedSeq = acked; this.unacked = this.unacked.filter(command => seqAfter(command.seq, acked));
+    }
     const commands = this.unacked.slice(-(Math.min(this.fresh, 3) + REDUNDANT_COMMANDS));
     this.fresh = 0;
     const ackFrame = this.latest?.tick ?? NO_BASELINE;
