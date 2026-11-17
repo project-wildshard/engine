@@ -14,7 +14,7 @@ import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readF
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {stalePinFolders} from './pins-reuse.mjs';
+import {MANIFEST as PINS_MANIFEST,stalePinFolders,verifiedPinsOutputs} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {GitHubLimitError,backoffMs,ghFailure,readerEnv} from './gh-limit.mjs';
@@ -139,6 +139,26 @@ function gitTee(cwd,args,env,command='git'){
 const git=(cwd,args,env=process.env)=>execFileSync('git',args,{cwd,env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:64<<20}).trim();
 /** @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} [env] */
 const tryGit=(cwd,args,env=process.env)=>spawnSync('git',args,{cwd,env,encoding:'utf8',maxBuffer:64<<20});
+
+/** DS22 may commit only after the tracked assets and the full pin publication are present.
+ * @param {string} root @param {NodeJS.ProcessEnv} env @returns {string|undefined} */
+function bootStampInputProblem(root,env){
+ const assets='public/assets/',assetPins='test/pins/assets.json';
+ const tracked=new Set(git(root,['ls-files','-z','--',assets,assetPins,'test/pins/shardfiles.json'],env).split('\0').filter(Boolean));
+ for(const path of tracked){
+  try{if(lstatSync(join(root,path)).isFile())continue;}catch{/* Missing tracked input, including sparse checkouts. */}
+  return `tracked boot input ${path} is missing or is not a regular file. Materialize it in this worktree and retry`;
+ }
+ if(!tracked.has(assetPins))return undefined;
+ const {paths,key}=verifiedPinsOutputs(root);
+ if(key==='')return 'no current full pin publication. Run pnpm pins in this worktree and retry';
+ // verifiedPinsOutputs already validates the manifest and verifies the ledger's mounts by hash.
+ // Check completeness too: an old ledger can exist after files under public/assets are removed.
+ const manifest=JSON.parse(readFileSync(join(root,PINS_MANIFEST),'utf8'));
+ const missing=Object.keys(manifest.mounts).find(path=>path.startsWith(assets)&&!tracked.has(path)&&!paths.has(path));
+ if(missing!==undefined)return `pin boot input ${missing} is missing or does not match its manifest. Run pnpm pins in this worktree and retry`;
+ return undefined;
+}
 
 /** WL12: a recent small branch merits a mode reminder, never a refusal.
  * Reflog selectors carry branch-event time; commit time can predate branch creation.
@@ -500,6 +520,11 @@ class Landing{
  regenerate(){
   if(!existsSync(join(this.root,GEN[0])))return;
   const before=this.holds('before gen:inputs');
+  const problem=bootStampInputProblem(this.root,this.env);
+  if(problem!==undefined){
+   this.receipt(`STOP boot stamps: ${problem}`);
+   throw new StopError(`cannot regenerate boot stamps: ${problem}`);
+  }
   // the stamps it writes are committed here, so stale pin output refuses instead of warning (gen.ts, stalePinFolders)
   const ran=spawnSync(process.execPath,[...GEN],{cwd:this.root,env:{...this.env,WS_STALE_PINS:'refuse'},encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:300_000,maxBuffer:64<<20});
   const head=this.head();
