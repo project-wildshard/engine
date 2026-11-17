@@ -94,6 +94,17 @@ staging placement deploys preview even when no client input changed.
 | `check` | The uploaded page's `version.json`, `index.html`, `sw.js` and `deploy-chunks.json` equal the local build; the packs answer with CORS; then waits (`--wait=<minutes>`, 45) until the signed release file names this build, epoch and channel socket and the channel's tailnet `/health` shows this build at that serial. | moves the alias |
 | `go-live` | Re-reads the signed file and `/health` and refuses unless they still match, then moves the alias (last) and waits for the domain to serve the build. | runs without a fresh match |
 
+Staging `check` and `go-live` also ready the signed cells added after
+the built-in grid. `scripts/release-placed-ready.mjs staging` verifies
+their exact-build public cook indices, or runs the normal CookWorker
+with the existing `R2_ACCOUNT_ID`, `R2_BUCKET_PACKS` and
+`R2_PACKS_ACCESS_KEY_ID` / `R2_PACKS_SECRET_ACCESS_KEY`. Credentials stay
+in the parent; the restricted cook child receives none. A changed
+placement snapshot refuses the phase so it can be retried. This checks
+current placements before aliasing; later uploads still use the normal
+upload/cook activation path.
+
+
 Each phase refuses until the one before it has run for the same SHA
 (results in `<clone>/tmp/page-release/<channel>-<sha>.json`). Production
 `check` and `go-live` also need the `v<version>` tag on origin at this

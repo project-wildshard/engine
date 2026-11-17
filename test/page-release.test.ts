@@ -103,7 +103,9 @@ test('the four phases run in order and move the alias last', async () => {
   expect(fetched(calls)).toEqual([
     'prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'packs.publish', 'upload', 'state upload',
+    'run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging',
     'deployedDigests', 'packs.verify', 'state check',
+    'run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging',
     'deployedDigests', 'goLive', 'state go-live',
   ]);
   expect(lines.some(line => line.includes('alias last'))).toBe(true);
@@ -554,4 +556,27 @@ test('retention-enabled publisher signs before packaging and gates alias on its 
   deployedFiles.set('/out/code-retention.json', Buffer.from('different graph'));
   await expect(runPhase('go-live', deps)).rejects.toThrow('code-retention.json');
   expect(calls).not.toContain('goLive');
+});
+
+test('an unready placed head stops the staging check before acceptance', async () => {
+  const rig_ = rig();
+  await through(rig_.deps, 'upload');
+  const guarded: Deps = {...rig_.deps, run: (file, args, env) => {
+    rig_.deps.run(file, args, env);
+    if (args.includes('scripts/release-placed-ready.mjs')) throw new Error('placed head has no exact-build index');
+  }};
+  await expect(runPhase('check', guarded)).rejects.toThrow('placed head has no exact-build index');
+  expect(rig_.state['check']).toBeUndefined();
+  expect(rig_.calls).not.toContain('goLive');
+});
+
+test('a placement changes after check: staging rechecks it before aliasing', async () => {
+  const rig_ = rig();
+  await through(rig_.deps, 'check');
+  const guarded: Deps = {...rig_.deps, run: (file, args, env) => {
+    rig_.deps.run(file, args, env);
+    if (args.includes('scripts/release-placed-ready.mjs')) throw new Error('new placed head is unready');
+  }};
+  await expect(runPhase('go-live', guarded)).rejects.toThrow('new placed head is unready');
+  expect(rig_.calls).not.toContain('goLive');
 });

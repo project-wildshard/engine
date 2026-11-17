@@ -231,6 +231,10 @@ export async function runPhase(phase, deps) {
   if (channel.channel === 'production') await productionGates(phase, deps, refuse);
 
   if (phase === 'check') {
+    if (channel.channel === 'staging') {
+      plan('ready every signed extra placement for this exact build before checking the page');
+      if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/release-placed-ready.mjs', 'staging'], {WS_BUILD_ID: deps.build});
+    }
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);
     if (channel.solo) {
@@ -251,6 +255,10 @@ export async function runPhase(phase, deps) {
   // go-live: the alias move, last, on a fresh gate. Everything before it must still hold now.
   const checked = deps.state.read('check');
   if (checked?.build !== deps.build || checked?.channel !== channel.channel || checked?.deployment?.id !== deployment.id) refuse(`no ${channel.channel} check of ${deployment.id}: run the check phase first`);
+  if (channel.channel === 'staging') {
+    plan('recheck signed extra placements before the alias move');
+    if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/release-placed-ready.mjs', 'staging'], {WS_BUILD_ID: deps.build});
+  }
   for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
   if (!dry) await checkDeployed(deps, deployed, refuse);
   /** @type {{serial?: number, problem?: string}} */
