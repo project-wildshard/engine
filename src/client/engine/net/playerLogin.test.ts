@@ -106,6 +106,8 @@ describe('a player\'s own data', () => {
     const nothing = account({ [`${API}/api/players/me/export`]: () => ok({ player: {} }) });
     expect(await exportMine(nothing, DOOR, DEVICE), 'nothing saved on the server yet').toEqual({ api: { player: {} }, game: null });
     expect(await exportMine(account({}), DOOR, DEVICE), 'the API refused: no file').toBeUndefined();
+    const doorDown = account({ [`${API}/api/players/me/export`]: () => ok({ player: {} }), [`${DOOR}/account/export`]: () => new Response('', { status: 503 }) });
+    expect(await exportMine(doorDown, DOOR, DEVICE), 'review S1: a door that failed gives no file missing the saves').toBeUndefined();
   });
 
   test('delete: the door, then the API, then the page signs out; a player in the world is told to leave first', async () => {
@@ -120,6 +122,9 @@ describe('a player\'s own data', () => {
     expect(signedIn(playing), 'still signed in').toBeDefined();
     const down = account({ [`${API}/api/players/me/delete`]: () => ok({ deleted: true }) });
     expect(await deleteMine(down, DOOR, DEVICE), 'a door that fails stops it').toBe('failed');
+    const half = account({ [`${DOOR}/account/delete`]: () => ok({ deleted: true }), [`${API}/api/players/me/delete`]: () => new Response('', { status: 503 }) });
+    expect(await deleteMine(half, DOOR, DEVICE), 'review S4: saves gone, the account not yet').toBe('saves-gone');
+    expect(signedIn(half), 'still signed in, to try again').toBeDefined();
     const solo = account({ [`${API}/api/players/me/delete`]: () => ok({ deleted: true }) });
     expect(await deleteMine(solo, undefined, DEVICE), 'a build with no world deletes the account only').toBe('deleted');
   });

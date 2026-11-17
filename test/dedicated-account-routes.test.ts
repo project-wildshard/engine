@@ -21,7 +21,7 @@ function ticket(key: KeyObject, expires = Math.floor(Date.now() / 1000) + 600): 
 async function serve(options: Partial<AccountRoutes> & Pick<AccountRoutes, 'ticketKey'>): Promise<{ url: string; calls: string[] }> {
   const calls: string[] = [];
   const routes = accountRoutes({
-    allowedOrigins: [GAME], playing: () => false, log: () => undefined,
+    allowedOrigins: [GAME], hold: () => () => undefined, log: () => undefined,
     exportAccount: account => { calls.push(`export ${account}`); return Promise.resolve({ player: { id: account }, saves: [], receipts: [], places: [] }); },
     deleteAccount: account => { calls.push(`delete ${account}`); return Promise.resolve(true); },
     ...options,
@@ -58,14 +58,14 @@ test('a live ticket exports its account\'s data, to the game\'s pages only', asy
 test('delete takes the account away, never while it is in the world', async () => {
   const key = keys();
   let inWorld = true;
-  const { url, calls } = await serve({ ticketKey: key.spkiHex, playing: seat => inWorld && seat === ACCOUNT });
+  const { url, calls } = await serve({ ticketKey: key.spkiHex, hold: seat => inWorld && seat === ACCOUNT ? undefined : () => { calls.push(`release ${seat}`); } });
   const busy = await ask(url, '/account/delete', { ticket: ticket(key.privateKey), origin: GAME });
   expect(busy.status, 'still playing').toBe(409);
   inWorld = false;
   const done = await ask(url, '/account/delete', { ticket: ticket(key.privateKey), origin: GAME });
   expect(done.status).toBe(200);
   expect(await done.json()).toEqual({ deleted: true });
-  expect(calls).toEqual([`delete ${ACCOUNT}`]);
+  expect(calls, 'the seat is held through the delete, then let go').toEqual([`delete ${ACCOUNT}`, `release ${ACCOUNT}`]);
 });
 
 test('a database that fails answers 503 and logs no ticket', async () => {
@@ -75,4 +75,10 @@ test('a database that fails answers 503 and logs no ticket', async () => {
   expect((await ask(url, '/account/export', { ticket: raw, origin: GAME })).status).toBe(503);
   expect(lines.join('\n')).toContain('account.failed');
   expect(lines.join('\n')).not.toContain(raw.slice(-32));
+  lines.length = 0;
+  let released = false;
+  const failing = await serve({ ticketKey: key.spkiHex, log: line => { lines.push(JSON.stringify(line)); }, hold: () => () => { released = true; }, deleteAccount: () => Promise.reject(new Error(`duplicate key (player_id)=(${ACCOUNT})`)) });
+  expect((await ask(failing.url, '/account/delete', { ticket: raw, origin: GAME })).status).toBe(503);
+  expect(released, 'a failed delete lets the seat go').toBe(true);
+  expect(lines.join('\n'), 'review S6: a database message can quote the account').not.toContain(PLAYER);
 });

@@ -38,7 +38,7 @@ export interface AccountPorts {
   /** Hand the viewer a file. */
   readonly save: (name: string, text: string) => void;
 }
-const DELETED: Record<Deleted, string> = { deleted: 's_signin_deleted', playing: 's_signin_delete_playing', failed: 's_signin_account_failed' } as const;
+const DELETED: Record<Deleted, string> = { deleted: 's_signin_deleted', playing: 's_signin_delete_playing', failed: 's_signin_account_failed', 'saves-gone': 's_signin_delete_unfinished' } as const;
 /** A file download from the page. */
 export function saveFile(name: string, text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' })), link = document.createElement('a');
@@ -138,7 +138,8 @@ function accountRows(own: Scope, ports: LoginPorts, account: AccountPorts, say: 
   const download = button('ws-signin-alt', engineString('s_signin_export'), 'export'), remove = button('ws-signin-alt ws-signin-delete', engineString('s_signin_delete'), 'delete');
   const exporting = async (): Promise<void> => {
     download.disabled = true;
-    const data = await exportMine(ports, await account.door(), account.device());
+    // review M2: a door that can't be read (a bad release file, no network) says try again; the button never sticks
+    const data = await account.door().then(door => exportMine(ports, door, account.device())).catch(() => undefined);
     download.disabled = false;
     if (data === undefined) { say(engineString('s_signin_account_failed')); return; }
     account.save(`wildshard-account-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2));
@@ -148,7 +149,7 @@ function accountRows(own: Scope, ports: LoginPorts, account: AccountPorts, say: 
   const deleting = async (): Promise<void> => {
     if (!armed) { armed = true; remove.textContent = engineString('s_signin_delete_confirm'); return; }
     remove.disabled = true;
-    const result = await deleteMine(ports, await account.door(), account.device());
+    const result = await account.door().then(door => deleteMine(ports, door, account.device())).catch((): Deleted => 'failed');
     remove.disabled = false; armed = false; remove.textContent = engineString('s_signin_delete');
     if (result === 'deleted') done(engineString(DELETED[result] as 's_signin_deleted'));
     else say(engineString(DELETED[result] as 's_signin_deleted'));

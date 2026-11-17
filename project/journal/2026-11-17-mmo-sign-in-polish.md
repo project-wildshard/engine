@@ -32,3 +32,14 @@
   first, so a player still in the world keeps everything, then the API, then the page signs out).
 - The door is read on the tap from the signed release file (`client/game/accountDoor.ts`), believed only when the signature holds,
   since the join ticket goes there. The game layer can't import `shared/host/releaseRows`, so it reads only `socket` itself.
+
+## Review fixes (one-shot review of the plan/mmo4 land)
+
+- M1: a delete drained no queued save, and a join between its ticket and its seat was not "playing": the account could come back.
+  The delete now drains the account's queue first, and the door holds the seat (`World.holdForDelete`): a join in progress refuses
+  the delete (409), a join during a delete dials again. Mutants of both guards go red.
+- M2: a door that could not be read left the buttons stuck; the card now says try again.
+- S1/S4/S6: an export whose door failed gives no file; a delete whose API half failed says the saves are gone and to tap again; the
+  failure log carries the error's class, never a database message that can quote the account.
+- Still open, written in MMO-PLAN MP2.5: chat reports keep the account id; the hour-long join ticket alone can delete; guest expiry
+  deletes receipts where account delete keeps them anonymously.

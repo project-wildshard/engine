@@ -60,7 +60,9 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
     name: namesOver(db),
     claim: async (device, account) => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return claimSaves(db, device, account); },
     expire: days => expireGuests(db, days),
-    exportAccount: account => exportAccount(db, account), deleteAccount: account => deleteAccount(db, account),
+    exportAccount: account => exportAccount(db, account),
+    // review M1: a body's last save still queued would write the account back after its delete
+    deleteAccount: async account => { if (!await queue.drain(3000, account)) throw new Error('Player save is pending'); return deleteAccount(db, account); },
     report: (report: ChatReport, shard: string) => { const accepted = reports.post(report, shard); if (!accepted) log({ at: 'report.refused', reason: 'backlog' }); return accepted; } };
 }
 /** The saves database at `url`, migrated. */

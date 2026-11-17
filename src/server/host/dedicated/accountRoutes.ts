@@ -15,8 +15,8 @@ export interface AccountRoutes {
   readonly ticketKey: string;
   /** The game's pages; null lets any Origin in (`ALLOWED_ORIGINS=*`). */
   readonly allowedOrigins: readonly string[] | null;
-  /** Whether this seat has a body in the world now. */
-  readonly playing: (seat: string) => boolean;
+  /** Hold the seat out of the world for a delete: the release, or undefined while it is playing (linked, joining, held, loading or crossing). */
+  readonly hold: (seat: string) => (() => void) | undefined;
   readonly exportAccount: (account: string) => Promise<AccountExport | undefined>;
   readonly deleteAccount: (account: string) => Promise<boolean>;
   readonly log: (line: Record<string, unknown>) => void;
@@ -52,13 +52,15 @@ export function accountRoutes(options: AccountRoutes): (request: IncomingMessage
       const action = path === '/account/export' ? 'export' : 'delete';
       try {
         if (action === 'export') { const data = await options.exportAccount(account); send(data === undefined ? 404 : 200, data ?? { error: 'nothing saved' }); return; }
-        if (options.playing(account)) { send(409, { error: 'leave the world first' }); return; }
-        const deleted = await options.deleteAccount(account);
-        options.deleted?.(account);
+        const release = options.hold(account);
+        if (release === undefined) { send(409, { error: 'leave the world first' }); return; }
+        let deleted: boolean;
+        try { deleted = await options.deleteAccount(account); options.deleted?.(account); } finally { release(); }
         options.log({ at: 'account.deleted', found: deleted });
         send(200, { deleted });
       } catch (error) {
-        options.log({ at: 'account.failed', action, error: error instanceof Error ? error.message : String(error) });
+        // the database's message can quote the account id, which is never logged: the error's class only
+        options.log({ at: 'account.failed', action, error: error instanceof Error ? error.name : typeof error });
         send(503, { error: 'try again later' });
       }
     })();

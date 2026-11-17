@@ -171,11 +171,15 @@ export async function exportMine(ports: LoginPorts, door: string | undefined, de
   if (session === undefined) return undefined;
   const api = await json(await post(ports, '/api/players/me/export', {}, { session }));
   if (api === undefined) return undefined;
-  const game = door === undefined ? undefined : await json(await askDoor(ports, door, '/account/export', device));
-  return { api, game: game ?? null };
+  if (door === undefined) return { api, game: null };
+  // only a 404 means the door holds nothing; any other failure would hand over a file missing the saves
+  const asked = await askDoor(ports, door, '/account/export', device);
+  if (asked?.status === 404) return { api, game: null };
+  const game = asked?.ok === true ? await json(asked) : undefined;
+  return game === undefined ? undefined : { api, game };
 }
 /** How a delete went: everything gone and signed out, refused while the player is in the world, or stopped (nothing more deleted). */
-export type Deleted = 'deleted' | 'playing' | 'failed';
+export type Deleted = 'deleted' | 'playing' | 'failed' | 'saves-gone';
 /** Delete the player's saves at the door, then the API account, then sign the page out. A build with no world has only the account. */
 export async function deleteMine(ports: LoginPorts, door: string | undefined, device: string): Promise<Deleted> {
   const session = signedIn(ports)?.session;
@@ -185,7 +189,8 @@ export async function deleteMine(ports: LoginPorts, door: string | undefined, de
     if (saves?.status === 409) return 'playing';
     if (saves?.ok !== true) return 'failed';
   }
-  if ((await post(ports, '/api/players/me/delete', {}, { session }))?.ok !== true) return 'failed';
+  // the door's half went: a retry finishes it (the door answers deleted: false), and the card says so
+  if ((await post(ports, '/api/players/me/delete', {}, { session }))?.ok !== true) return door === undefined ? 'failed' : 'saves-gone';
   signOut(ports);
   return 'deleted';
 }

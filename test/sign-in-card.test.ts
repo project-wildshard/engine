@@ -128,3 +128,19 @@ test('Delete account takes two taps, then signs the card out; in the world it sa
   expect(card().querySelector('.ws-signin-note')?.textContent).toContain('Leave the world first');
   playing.dispose();
 });
+
+test('review M2: a door that can\'t be read says try again, and neither button sticks', async () => {
+  const scope = new Scope('sign-in'), api = signedInPorts({ '/api/players/me/export': () => Response.json({ player: {} }) });
+  void openSignIn(scope, { parent: document.body, ports: api, account: { door: () => Promise.reject(new Error('bad signature')), device: () => 'device:d1', save: () => undefined } });
+  const download = (): HTMLButtonElement | null => card().querySelector<HTMLButtonElement>('[data-signin="export"]'), remove = (): HTMLButtonElement | null => card().querySelector<HTMLButtonElement>('[data-signin="delete"]');
+  download()?.click();
+  await settle();
+  expect(card().querySelector('.ws-signin-note')?.textContent).toContain('Try again later');
+  expect(download()?.disabled).toBe(false);
+  remove()?.click(); remove()?.click();
+  await settle();
+  expect(remove()?.disabled).toBe(false);
+  expect(remove()?.textContent, 'disarmed').toBe('Delete account');
+  expect(api.asked.filter(route => route.includes('delete')), 'nothing deleted').toEqual([]);
+  scope.dispose();
+});

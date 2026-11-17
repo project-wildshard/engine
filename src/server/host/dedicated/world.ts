@@ -14,7 +14,7 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { cleanName } from '@wildshard/engine/net/chatFilter';
 import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { PLAYER_TICKET_PUBLIC_KEY, admit } from './ticket';
-import { decodeFirstMessage, encodeHello } from '@wildshard/wire/handshake';
+import { decodeFirstMessage, encodeHello, type Hello } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { decodeEnter, encodeArrive, encodeCountdown, encodeEnter, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
@@ -185,6 +185,9 @@ export class World {
   private readonly seated = new Map<string, string>();
   /** MP2.2g: accounts a claim found with progress (`moved` or `kept`): no later claim can move anything into them. Oldest go first. */
   private readonly settled = new Set<string>();
+  /** Review M1: seats inside a join between the ticket's read and their seat, and seats mid-delete, so neither starts beside the other. */
+  private readonly joiners = new Map<string, number>();
+  private readonly deleting = new Set<string>();
   /** MP2.4: the Name each body was seated with, which a held body keeps when its player comes back. */
   private readonly names = new Map<string, string>();
   /** Each seated device's voice seat, renamed to the body its cell seated it in (`seated`). */
@@ -527,13 +530,19 @@ export class World {
   }
   /** MP2.5a: whether this seat has a body in the world now (linked, held, loading, crossing or redialling). */
   isPlaying(seat: string): boolean {
-    return this.seated.has(seat) || this.pending.has(seat) || this.crossings.has(seat) || this.redials.has(seat) || this.entries.has(seat);
+    return this.joiners.has(seat) || this.seated.has(seat) || this.pending.has(seat) || this.crossings.has(seat) || this.redials.has(seat) || this.entries.has(seat);
   }
   /** MP2.5a: a deleted account starts empty again, so a later device's guest progress may be claimed into it. */
   forgetAccount(account: string): void { this.settled.delete(account); }
+  /** Review M1: hold a seat out of the world while it is deleted; undefined (nothing held) when it is playing. */
+  holdForDelete(seat: string): (() => void) | undefined {
+    if (this.isPlaying(seat) || this.deleting.has(seat)) return undefined;
+    this.deleting.add(seat);
+    return () => { this.deleting.delete(seat); };
+  }
   /** The join: check, find where they stand, let them load, seat them. */
   private async hello(end: SocketTransport, sent: ArrayBuffer, goto: string | null): Promise<void> {
-    let bytes = sent;
+    const bytes = sent;
     const view = new Uint8Array(bytes);
     // WR5 (5.5, J54 replaced): the door reads the v1 bootstrap. A v0.1.x hello or an older major reloads, a newer major
     // retries, and the minor window is one either way; builds no longer have to match.
@@ -548,13 +557,22 @@ export class World {
     const admitted = await admit(said.output.player, this.options.ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, Date.now());
     if (admitted === undefined) { this.refuse('identity'); end.close('refused'); return; }
     const { seat } = admitted;
+    // review M1: an account being deleted dials again in a moment, after which it is a fresh account
+    if (this.deleting.has(seat)) { end.close('retry'); return; }
+    this.joiners.set(seat, (this.joiners.get(seat) ?? 0) + 1);
+    try { await this.join(end, bytes, goto, hello, said.output, admitted); }
+    finally { const left = (this.joiners.get(seat) ?? 1) - 1; if (left > 0) this.joiners.set(seat, left); else this.joiners.delete(seat); }
+  }
+  private async join(end: SocketTransport, sent: ArrayBuffer, goto: string | null, hello: Hello, said: { readonly player: string; readonly name: string }, admitted: { readonly seat: string; readonly from?: string }): Promise<void> {
+    let bytes = sent;
+    const { seat } = admitted;
     // MP2.2d: the first sign-in from a device with guest progress moves it to the account, once (`saves/claim.ts`).
     if (admitted.from !== undefined) await this.claim(admitted.from, seat);
     // a link that quit while the ticket was read still goes on, so a held body of its player is let go (QA row 16, `leaveHeld`)
     if ((!end.isOpen && !this.quits.has(end)) || this.draining) return;
     // The cells read the seat, never the ticket: the hello they get names it (the ticket is a bearer credential, kept nowhere).
-    if (seat !== said.output.player) bytes = encodeHello({ ...hello, player: seat }).slice().buffer;
-    const device = seat, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
+    if (seat !== said.player) bytes = encodeHello({ ...hello, player: seat }).slice().buffer;
+    const device = seat, typed = cleanName(said.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
     // ZE9c: a zone entry this device's last socket left mid-load, while its road still holds the body: it goes on into the cell, as a goto
     const redial = this.redials.get(device);
     this.redials.delete(device);

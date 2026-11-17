@@ -124,7 +124,7 @@ let placements: PlacementWatch | null = null;
 let activationReceiver: ReturnType<typeof uploadActivationReceiver> | undefined;
 // MMO-PLAN MP2.5a: a signed-in page's export and delete, with its join ticket as the proof. Memory saves have none.
 const { exportAccount: exporting, deleteAccount: deleting } = saves;
-const accounts = exporting === undefined || deleting === undefined ? undefined : accountRoutes({ ticketKey: ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, allowedOrigins: trust.allowedOrigins, playing: seat => world.isPlaying(seat), exportAccount: exporting, deleteAccount: deleting, deleted: account => { world.forgetAccount(account); }, log });
+const accounts = exporting === undefined || deleting === undefined ? undefined : accountRoutes({ ticketKey: ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, allowedOrigins: trust.allowedOrigins, hold: seat => world.holdForDelete(seat), exportAccount: exporting, deleteAccount: deleting, deleted: account => { world.forgetAccount(account); }, log });
 const server = createServer((request, response) => {
   if (activationReceiver?.(request, response)) return;
   if (accounts?.(request, response) === true) return;

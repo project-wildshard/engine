@@ -108,3 +108,29 @@ test('MP2.2g: the door stops asking to claim once the account has progress; an e
   expect(bench.world.isPlaying(kept), 'and that it left').toBe(false);
   expect(claims, 'an account with progress is claimed into once, never again; one with none is asked at each join').toEqual([`device:phone>${kept}`, `device:pad>${empty}`, `device:pad>${empty}`]);
 });
+
+test('review M1: a join in progress counts as playing, and a seat held for its delete dials again later', { timeout: 60_000 }, async () => {
+  const key = keys(), expires = Math.floor(Date.now() / 1000) + 600, seat = `account:${PLAYER}`;
+  let letGo: (() => void) | undefined;
+  const asked = new Promise<void>(resolve => { letGo = resolve; });
+  let claimed: () => void = () => undefined;
+  const reached = new Promise<void>(resolve => { claimed = resolve; });
+  bench = await roomBench({ ticketKey: key.spkiHex, holdMs: 100, saves: { ...memoryPlayerSaves(), claim: async () => { claimed(); await asked; return 'kept'; } } });
+  const at = (device: string): string => ticket(key.privateKey, { player: PLAYER, device, expires });
+  const first = new RoomBot(bench.url, 'bench', at('device:phone'), 'Ann'); bots.push(first);
+  await reached;
+  expect(bench.world.isPlaying(seat), 'mid-join: past the ticket, not yet seated').toBe(true);
+  expect(bench.world.holdForDelete(seat), 'so a delete is refused').toBeUndefined();
+  letGo?.();
+  expect(await first.arrived()).toBe(true);
+  first.drop();
+  await vi.waitFor(() => { expect(bench?.world.isPlaying(seat)).toBe(false); }, { timeout: 10_000, interval: 50 });
+  const release = bench.world.holdForDelete(seat);
+  expect(release, 'out of the world: the delete holds the seat').toBeDefined();
+  expect(bench.world.holdForDelete(seat), 'one delete at a time').toBeUndefined();
+  const second = new RoomBot(bench.url, 'bench', at('device:desk'), 'Ann'); bots.push(second);
+  expect(await second.ended(), 'a join mid-delete dials again').toBe('retry');
+  release?.();
+  const third = new RoomBot(bench.url, 'bench', at('device:desk'), 'Ann'); bots.push(third);
+  expect(await third.arrived(), 'after the delete it joins').toBe(true);
+});

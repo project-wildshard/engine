@@ -91,6 +91,7 @@ export const ENGINE_STRINGS = {
   "s_signin_deleted": "Account deleted. This device plays as a guest.",
   "s_signin_delete_playing": "Leave the world first, then delete.",
   "s_signin_account_failed": "That didn't work. Try again later.",
+  "s_signin_delete_unfinished": "Your saves are deleted, the account isn't yet. Tap Delete account again.",
   "s_signin_close": "Close",
   "s_gfx_low": "Low · 1×",
   "s_gfx_high": "High · 2×",
