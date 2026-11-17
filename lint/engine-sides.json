@@ -1959,6 +1959,7 @@
     "src/shared/engine/physics/creatureVolumes.ts": "shared",
     "src/shared/game/shardfile/creatureRestRig.ts": "shared",
     "src/shared/game/shardfile/creatureSockets.ts": "shared",
+    "src/shared/game/shardfile/creatureClipSampler.ts": "shared",
     "src/shared/game/shardfile/creatureVolumes.ts": "shared"
   }
 }

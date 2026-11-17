@@ -137,6 +137,13 @@ export class CollisionPose {
     }
   }
 
+  /** Sampled GLB quaternions compose directly, without an Euler round trip. */
+  setQuaternion(index: number, position: Vector3, quaternion: Quaternion, scale: Vector3): void {
+    const matrix = this.local[index];
+    if (matrix === undefined || !finiteVector(position) || !finiteVector(quaternion) || !Number.isFinite(quaternion.w) || !finiteVector(scale)) throw new RangeError('Invalid sampled collision joint');
+    matrix.compose(position, quaternion, scale); this.lastOrder[index] = null;
+  }
+
   /** A collision anchor in joint-local units, resolved into the supplied frame. */
   point(index: number, at: readonly [number, number, number], out: Vector3): Vector3 {
     return out.set(...at).applyMatrix4(this.matrix(index));

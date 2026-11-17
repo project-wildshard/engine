@@ -5,7 +5,7 @@ import { parseGlbData, prepareGlbCost } from '@wildshard/format/glbCost';
 import { groundFixture } from './plain-ground';
 
 export const volumeJoints = ['body', 'chest', 'head', 'hand.L'];
-export function creatureVolumeGlb(): Uint8Array {
+export function creatureVolumeGlb(path: 'translation' | 'rotation' | 'scale' = 'translation'): Uint8Array {
   const chunks: Buffer[] = [], views: object[] = [], accessors: object[] = [];
   let at = 0;
   const add = (data: ArrayBufferView, type: string, count: number, componentType = 5126): number => {
@@ -18,13 +18,14 @@ export function creatureVolumeGlb(): Uint8Array {
   const joints = add(new Uint8Array(12), 'VEC4', 3, 5121), weights = add(new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]), 'VEC4', 3);
   const indices = add(new Uint16Array([0, 1, 2]), 'SCALAR', 3, 5123);
   const binds = add(new Float32Array([[0, 0, 0], [0, 1, 0], [0, 2, 0], [1, 1, 0]].flatMap(([x = 0, y = 0, z = 0]) => new Matrix4().makeTranslation(x, y, z).invert().elements)), 'MAT4', 4);
-  const times = add(new Float32Array([0, 1]), 'SCALAR', 2), moves = add(new Float32Array([0, 1, 0, 1, 1, 0]), 'VEC3', 2);
+  const values = path === 'rotation' ? [0, 0, 0, 1, 0, 0, Math.SQRT1_2, Math.SQRT1_2] : path === 'scale' ? [1, 1, 1, 2, 2, 2] : [0, 1, 0, 1, 1, 0];
+  const times = add(new Float32Array([0, 1]), 'SCALAR', 2), moves = add(new Float32Array(values), path === 'rotation' ? 'VEC4' : 'VEC3', 2);
   const doc = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0, 1] }],
     nodes: [{ name: 'fixture.mesh', mesh: 0, skin: 0 }, { name: 'body', children: [2] },
       { name: 'chest', translation: [0, 1, 0], children: [3, 4] }, { name: 'head', translation: [0, 1, 0] }, { name: 'hand.L', translation: [1, 0, 0] }],
     skins: [{ joints: [1, 2, 3, 4], inverseBindMatrices: binds }], materials: [{ name: 'Body' }],
     meshes: [{ primitives: [{ attributes: { POSITION: position, NORMAL: normal, JOINTS_0: joints, WEIGHTS_0: weights }, indices, material: 0 }] }],
-    animations: [{ name: 'idle', channels: [{ sampler: 0, target: { node: 3, path: 'translation' } }], samplers: [{ input: times, output: moves, interpolation: 'LINEAR' }] }],
+    animations: [{ name: 'idle', channels: [{ sampler: 0, target: { node: 3, path } }], samplers: [{ input: times, output: moves, interpolation: 'LINEAR' }] }],
     accessors, bufferViews: views, buffers: [{ byteLength: at }] };
   const json = Buffer.from(JSON.stringify(doc)), text = Buffer.concat([json, Buffer.alloc((4 - json.length % 4) % 4, 0x20)]), bin = Buffer.concat(chunks);
   const header = Buffer.alloc(20); header.writeUInt32LE(0x46546c67); header.writeUInt32LE(2, 4); header.writeUInt32LE(28 + text.length + bin.length, 8);
