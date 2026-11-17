@@ -363,9 +363,12 @@ jobs:
 
   nine-ring1:
     # Each real boot consumes the exact producer bytes under its own cap.
+    # Hosted Metal is virtualized: keep street evidence visible until a real
+    # GPU runner is wired in. Producer and the props load probe still block.
     needs: [products, nine-ring1-build]
     if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.kind == 'street' }}
     # Fixed-run load took 261 s; street hit the old cap at 317 s.
     # Include cold entry, the full 60 s sample and install/archive headroom.
     timeout-minutes: 10
@@ -398,6 +401,11 @@ jobs:
           bash scripts/ci-playwright-install.sh chromium
       - name: Refuse this load or street regression
         run: node scripts/nine-ring1.mjs ${{ matrix.kind == 'load' && 'boot' || 'bench' }}
+      - name: Explain the hosted street limitation
+        if: ${{ failure() && matrix.kind == 'street' }}
+        run: |
+          echo "::warning::NB6 hosted street is report-only pending a real-GPU runner; thresholds are unchanged. Inspect nine-ring1-street."
+          echo "NB6 street: report-only on hosted virtualized Metal. Real-GPU CI qualification remains open; load and producer still block." >> "$GITHUB_STEP_SUMMARY"
       - name: Keep Nine measurements and stock boot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

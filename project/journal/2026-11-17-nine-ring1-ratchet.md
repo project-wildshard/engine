@@ -72,3 +72,16 @@ Use macos-15 for the street leg's existing Metal backend, keeping CPU
 x4, route, DPR, ceilings and five-minute cap. The CPU load profiler
 remains on Linux. This matches NB1's measured backend rather than
 pretending a software GPU timed or walked the measured phone route.
+
+Hosted Metal run 44040033228 completes the street but reads 4.2 fps,
+100 ms frame p95 and 55.4 ms gpu~ p95. Producer and Linux load pass.
+The coordinator confirms hosted macos-15 uses a virtualized GPU and
+orders real mini-1 hardware if engine already targets it; otherwise
+hosted street is report-only until a real-GPU runner carries it. No
+engine workflow currently targets mini-1 or self-hosted. Apply only
+street job continue-on-error with an explicit warning and retained
+artifact. Producer/load remain blocking. Keep every workload and
+threshold unchanged; NB6 real-GPU CI qualification stays open. This
+is the coordinator's explicit scope change, not a gate escape flag.
+M11 recovery preserves the peer's newer ten-minute observation cap;
+this fix changes only street failure policy, not runtime budgets.
