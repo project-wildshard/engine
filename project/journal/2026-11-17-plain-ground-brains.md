@@ -74,3 +74,20 @@ The layer wiring and complete behavior matrices remain CC5b5b/c.
 Nine authority controls and the combined29case native/default-loader/
 restore controls pass; full typecheck and lint pass. Initial lint found
 a shadowed local in contact and was corrected. No engine main push or full land runs during the hold.
+
+## CC5b5b: skirmisher layers over the native owner
+
+Eight real default-loader policy controls fail before wiring. The existing
+temperament wrapper now owns reaction/home/social intent for layered
+skirmishers. Native decisions remain on their declared cadence, and the
+original body/contact runs once afterward even when the layer returns,
+hides or flees. Suppression cancels the original attack and clears native
+strafe before the layer's home/flight motion. Flat recipes stay unchanged.
+
+Thirteen actual skirmisher controls cover passive/skittish, neutral real
+hit/crowd, aggressive contact,45m home/heal/rearm,5m impulse territory,
+14m/20m social scope, dead-provoker strike cancellation, ambush reveal and
+pending/active exact continuation. Combined54cases across7files pass.
+Two test-helper types were corrected after the first full typecheck.
+Main is still held. Coordinator now prioritizes the held M1 SDK land over
+more M2; leave this source committed locally for the later combined land.

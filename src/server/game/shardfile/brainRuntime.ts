@@ -14,6 +14,7 @@ import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { SimHost, SimStateAdapter } from '@wildshard/engine/sim';
 import type { ResolvedCreatureLayers } from './creatureLayers';
 import { bindCreatureTemperament } from './creatureTemperament';
+import { bindGroundTemperament } from './groundTemperament';
 import { parseStalker, stalkerPreset, type ShardStalker, parseGuardianPattern, guardianPreset, type ShardGuardianPattern, parseSkirmisher, parseGuardian, parsePerchHunter, type ShardSkirmisher, type ShardGuardian, type ShardPerchHunter } from '@wildshard/format/brains';
 import { parseRamGrazer, parseChallengeGrazer, parseGrazer, grazerPreset, type ShardGrazer, type ShardRamGrazer, type ShardChallengeGrazer } from '@wildshard/format/grazers';
 import { parseDiver, diverPreset, type ShardDiver, parseOrbitDiver, parsePatrolDiver, parseBurstFlyer, type ShardOrbitDiver, type ShardPatrolDiver, type ShardBurstFlyer } from '@wildshard/format/flyers';
@@ -134,9 +135,19 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
             row.group === undefined ? undefined : social.get(row.group)) : { ...source, run: (dt: number) => { source.run(dt); } };
         registrations.push({ id, ...policy }); break;
       }
-      case 'skirmisher':
+      case 'skirmisher': {
         if (ports.skirmisher === undefined) throw new Error('Missing native brain port');
-        registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new SkirmisherBrain(actor, spec), ports.skirmisher(actor, host, spec), host)); break;
+        const brain = new SkirmisherBrain(actor, spec), recipe = ports.skirmisher(actor, host, spec), layer = layers?.get(row.species);
+        if (layer === undefined) registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, brain, recipe, host));
+        else {
+          const native = bindGroundTemperament(host, actor, spec.thinkDivisor, brain, recipe);
+          const policy = bindCreatureTemperament(host, actor, row.at, layer.temperament,
+            { ...native, notice: layer.senses?.notice ?? spec.awareRadius, escapeSpeed: spec.fleeSpeed },
+            () => native.target()?.position, row.group === undefined ? undefined : social.get(row.group));
+          registrations.push({ id, ...policy, run: dt => { policy.run(dt); if (actor.alive) recipe.body(dt); } });
+        }
+        break;
+      }
       case 'guardian':
         if (ports.guardian === undefined) throw new Error('Missing native brain port');
         registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new GuardianBrain(actor, spec), ports.guardian(actor, host, spec), host)); break;

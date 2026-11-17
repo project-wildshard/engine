@@ -56,19 +56,19 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
     if (!returning && (frightened || (flee !== undefined && actor.hp <= actor.maxHp * flee))) {
       if (player.health.alive && fromPlayer <= leash * leash) {
         host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack(); actor.state = 'flee';
-        actor.setMotion(Math.atan2(actor.position.x - player.position.x, actor.position.z - player.position.z), source.escapeSpeed ?? speed, 4); return;
+        actor.setStrafe(0); actor.setMotion(Math.atan2(actor.position.x - player.position.x, actor.position.z - player.position.z), source.escapeSpeed ?? speed, 4); return;
       }
       returning = true;
     }
     if (ambushing && !returning) {
       if (!player.health.alive || actor.position.distanceToSquared(player.position) > (source.notice ?? 0) ** 2) {
-        host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack(); actor.state = 'hide'; actor.setMotion(actor.yaw, 0, 3); return;
+        host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack(); actor.state = 'hide'; actor.setStrafe(0); actor.setMotion(actor.yaw, 0, 3); return;
       }
       ambushing = false;
       if (reaction === 'aggressive') source.provoke?.(player.id);
     }
     if (returning) {
-      host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack();
+      host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack(); actor.setStrafe(0);
       if (distance <= stop) {
         if (source.reset === undefined) source.adapter.restore(initial); else source.reset();
         actor.hp = actor.maxHp; returning = false; frightened = false; ambushing = temperament.ambush === true; actor.state = ambushing ? 'hide' : 'idle';
