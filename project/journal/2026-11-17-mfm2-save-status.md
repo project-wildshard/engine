@@ -19,3 +19,7 @@
   `tooOldScreens.ts`: a banner in play (countdown only from a signed `retireAt`, else "at the
   next load"; it never navigates), and the `too-old` page at the next zone entry, reconnect or
   before the first seat. Update is the Play-here reload, once.
+- FM4 leftover, a focus trap in cards: linkScreens' cards had one since 3c20f8e9a; the other
+  cards that stop play did not (the version-skew new-build page, download-failed, doctor-http).
+  The trap is `ui/focusTrap.ts` now and all four use it; the new-build page is aria-modal and
+  takes focus on its Reload.

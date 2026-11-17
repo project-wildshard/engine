@@ -6,6 +6,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import type { DownloadGiveUp } from '../boot/downloadGiveUp';
 import { copyText, diagnosticsSource } from './diagnosticsCopy';
 import { mountUi } from './ownership';
+import { trapFocus } from './focusTrap';
 import { engineString } from '../../../shared/engine/strings';
 import { showFailure } from '../telemetry/runtime';
 
@@ -31,6 +32,7 @@ export function downloadFailedPage(owner: Scope, given: DownloadGiveUp, measured
   const again = document.createElement('button'), check = document.createElement('button'), copy = document.createElement('button');
   const details = document.createElement('details'), summary = document.createElement('summary'), fact = document.createElement('p');
   root.dataset['failmode'] = 'download-failed'; root.dataset['tone'] = 'bad'; root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true');
+  trapFocus(page, root);
   showFailure(page, root, 'download-failed');
   root.setAttribute('aria-label', engineString('s_download_failed_title')); root.style.cssText = PAGE; box.style.cssText = BOX;
   tag.textContent = engineString('s_download_failed_tag'); tag.style.cssText = 'margin:0;font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;color:#ff9a9a';

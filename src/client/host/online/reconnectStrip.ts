@@ -1,5 +1,6 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import { showFailure } from '@wildshard/engine/telemetry/runtime';
+import { trapFocus } from '@wildshard/engine/ui/focusTrap';
 
 // FM4: the plain strip that lived here is linkScreens.ts's banner and cards now (meta MMO-FAILURE-MODES-PLAN).
 
@@ -13,12 +14,13 @@ export function newBuildPanel(scope: Scope, again: () => Promise<boolean>, reloa
   if (document.getElementById('ws-new-build') !== null) return;
   const panel = scope.ownNode(document.createElement('div')), words = document.createElement('p'), go = document.createElement('button');
   // FM5 mode 23 (`version-skew`): the page's build and the world's differ, and the one automatic reload didn't land
-  panel.id = 'ws-new-build'; panel.dataset['failmode'] = 'version-skew'; panel.setAttribute('role', 'alertdialog'); panel.style.cssText = NEW_BUILD;
+  panel.id = 'ws-new-build'; panel.dataset['failmode'] = 'version-skew'; panel.setAttribute('role', 'alertdialog'); panel.setAttribute('aria-modal', 'true'); panel.style.cssText = NEW_BUILD;
+  trapFocus(scope, panel);
   words.textContent = 'A new version is out. Reload to play on.'; words.style.margin = '0';
   go.type = 'button'; go.textContent = 'Reload'; go.style.cssText = NEW_BUILD_BUTTON;
   // RL3: the panel is already full-page; the tap's own turn turns it and its button into RELOADING
   scope.listen(go, 'click', () => { go.disabled = true; go.setAttribute('aria-busy', 'true'); go.textContent = 'Reloading…'; words.textContent = 'Reloading'; reload(); });
-  panel.append(words, go); parent.append(panel);
+  panel.append(words, go); parent.append(panel); go.focus();
   showFailure(scope, panel, 'version-skew');
   let asking = false;
   scope.interval(NEW_BUILD_RETRY_MS, () => {

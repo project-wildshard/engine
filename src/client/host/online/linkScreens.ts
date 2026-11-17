@@ -9,6 +9,7 @@ import type { LinkAway, LinkCause, LinkProgress, LinkState } from '@wildshard/en
 import type { Countdown } from '@wildshard/engine/net/socketFrames';
 import type { TransportStats } from '@wildshard/engine/net/transport';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { trapFocus } from '@wildshard/engine/ui/focusTrap';
 import { captureBrowserError } from '@wildshard/engine/telemetry/browserErrors';
 import { showFailure, clearFailure } from '@wildshard/engine/telemetry/runtime';
 import type { FailureClear } from '@wildshard/engine/telemetry/model';
@@ -147,17 +148,8 @@ export function card(scope: Scope, ids: string, tone: 'info' | 'warn' | 'bad', t
   root.dataset['failmode'] = ids; root.dataset['tone'] = tone; root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', title);
   showFailure(scope, root, ids);
   box.append(make('p', 'ws-link-tag', tag), make('h1', '', title)); root.append(box);
-  // aria-modal: Tab and Shift+Tab go round the card's own buttons (InputService leaves Tab to an alertdialog)
-  scope.listen(root, 'keydown', event => {
-    if (!(event instanceof KeyboardEvent) || event.code !== 'Tab') return;
-    // everything Tab can reach in the card: its enabled buttons and the Details summary
-    const all = [...root.querySelectorAll<HTMLElement>('button, summary')].filter(node => !(node instanceof HTMLButtonElement && node.disabled));
-    const first = all[0], last = all.at(-1), at = document.activeElement;
-    if (first === undefined || last === undefined) { event.preventDefault(); return; }
-    const inside = at instanceof HTMLElement && all.includes(at);
-    if (event.shiftKey && (at === first || !inside)) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && (at === last || !inside)) { event.preventDefault(); first.focus(); }
-  });
+  // aria-modal: Tab and Shift+Tab go round the card's own buttons and Details (InputService leaves Tab to an alertdialog)
+  trapFocus(scope, root);
   return { root, box };
 }
 export function buttons(scope: Scope, actions: readonly { readonly label: string; readonly primary?: true; readonly busy?: string; readonly act: () => void }[]): HTMLElement {

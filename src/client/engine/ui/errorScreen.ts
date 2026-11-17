@@ -5,6 +5,7 @@ import { engineString } from '../../../shared/engine/strings';
 import type { LoadFailure } from '../core/errorReport';
 import { app } from '../app/runtime';
 import { uiScope, mountUi } from './ownership';
+import { trapFocus } from './focusTrap';
 import { listenTap } from '../input/dom';
 import { copyText, diagnosticsSource, DOCTOR_EARLIER_KEY } from './diagnosticsCopy';
 import { Scope } from '../../../shared/engine/app/scope';
@@ -62,6 +63,7 @@ function doctorHttpCard(measured: string, again: () => Promise<boolean>): void {
   details.append(summary, fact);
   const owner = new Scope('doctor-http', scope), close = (cause: FailureClear): void => { clearFailure(card, cause, owner); if (doctorCardClose === close) doctorCardClose = null; owner.dispose(); card.remove(); };
   showFailure(owner, card, 'doctor-http');
+  trapFocus(owner, card);
   doctorCardClose = close;
   owner.listen(retry, 'click', () => { retry.disabled = true; retry.textContent = engineString('s_doctor_http_checking'); void again(); });
   owner.listen(back, 'click', () => { close('dismissed'); });

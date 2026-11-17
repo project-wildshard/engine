@@ -601,6 +601,7 @@
     "./ui/backGuard": "./src/client/engine/ui/backGuard.ts",
     "./ui/BossBar": "./src/client/engine/ui/BossBar.ts",
     "./ui/namePrompt": "./src/client/engine/ui/namePrompt.ts",
+    "./ui/focusTrap": "./src/client/engine/ui/focusTrap.ts",
     "./ui/signInCard": "./src/client/engine/ui/signInCard.ts",
     "./ui/offlineDownload": "./src/client/engine/ui/offlineDownload.ts",
     "./ui/Combat": "./src/client/engine/ui/Combat.ts",
