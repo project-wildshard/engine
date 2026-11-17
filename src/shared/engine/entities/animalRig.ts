@@ -17,28 +17,34 @@ export interface QuadrupedPoseClock {
 const P_BODY_Y=0,P_BODY_PITCH=1,P_BODY_ROLL=2,P_BODY_YAW=3,P_NECK1=4,P_NECK2=5,P_HEAD_P=6,P_HEAD_Y=7,P_NECK_Y=8;
 const P_EARL_P=9,P_EARL_Y=10,P_EARR_P=11,P_EARR_Y=12,P_TAIL_P=13,P_TAIL_Y=14,P_LEG=15;
 const smooth01=(t:number):number=>t*t*(3-2*t);
-type Quad=Record<'body'|'neck1'|'neck2'|'head'|'earL'|'earR'|'tail'|'belly',AnimalRigJoint>;
+type Quad=Record<'body'|'neck1'|'neck2'|'head'|'tail',AnimalRigJoint>&Record<'earL'|'earR'|'belly',AnimalRigJoint|undefined>;
 type Leg=readonly[AnimalRigJoint,AnimalRigJoint,AnimalRigJoint];
 /** The shipping scalar-to-joint expressions, without a skeleton, geometry, renderer or scheduler. */
 export class QuadrupedRigPose {
   private readonly quad:Quad;
   private readonly legs:readonly Leg[];
+  private readonly rest:readonly {readonly joint:AnimalRigJoint;readonly at:Vector3}[];
   private breathPhase=0;
-  constructor(bones:Readonly<Record<string,AnimalRigJoint>>) {
+  constructor(bones:Readonly<Record<string,AnimalRigJoint>>, canonicalKit=false) {
+    // Admitted kit binds are unrotated and unit scale. Reset their locals before
+    // the gait so an authored track cannot leak into a later untracked state.
+    this.rest=canonicalKit?Object.values(bones).map(joint=>({joint,at:joint.position.clone()})):[];
     const bone=(name:string):AnimalRigJoint=>{const value=bones[name];if(value===undefined)throw new Error(`Missing quadruped pose joint: ${name}`);return value;};
-    this.quad={body:bone('body'),neck1:bone('neck1'),neck2:bone('neck2'),head:bone('head'),earL:bone('earL'),earR:bone('earR'),tail:bone('tail'),belly:bone('belly')};
+    const decoration=(name:string):AnimalRigJoint|undefined=>canonicalKit?bones[name]:bone(name);
+    this.quad={body:bone('body'),neck1:bone('neck1'),neck2:bone('neck2'),head:bone('head'),earL:decoration('earL'),earR:decoration('earR'),tail:bone('tail'),belly:decoration('belly')};
     this.legs=[['FL_shoulder','FL_carpus','FL_fetlock'],['FR_shoulder','FR_carpus','FR_fetlock'],['BL_hip','BL_stifle','BL_hock'],['BR_hip','BR_stifle','BR_hock']].map(([a,b,c]):Leg=>{if(a===undefined||b===undefined||c===undefined)throw new Error('Missing quadruped leg');return[bone(a),bone(b),bone(c)];});
   }
   /** Apply only when the owner would pose a nearby quadruped. Locals do not publish collision matrices. */
   apply(pose: Float32Array, dt: number, clock: QuadrupedPoseClock): void {
+    for(const {joint,at} of this.rest){joint.position.copy(at);joint.rotation.set(0,0,0);joint.scale.set(1,1,1);}
     const p = pose, b = this.quad;
     b.body.position.y = clock.bodyY + (p[P_BODY_Y] ?? 0);
     b.body.rotation.set(p[P_BODY_PITCH] ?? 0, p[P_BODY_YAW] ?? 0, p[P_BODY_ROLL] ?? 0, 'YXZ');
     b.neck1.rotation.set(p[P_NECK1] ?? 0, (p[P_NECK_Y] ?? 0) * 0.5, 0);
     b.neck2.rotation.set(p[P_NECK2] ?? 0, (p[P_NECK_Y] ?? 0) * 0.5, 0);
     b.head.rotation.set(p[P_HEAD_P] ?? 0, p[P_HEAD_Y] ?? 0, 0);
-    b.earL.rotation.set(-(p[P_EARL_P] ?? 0), 0, -(p[P_EARL_Y] ?? 0));   // ear pitch: + = laid back
-    b.earR.rotation.set(-(p[P_EARR_P] ?? 0), 0, -(p[P_EARR_Y] ?? 0));
+    b.earL?.rotation.set(-(p[P_EARL_P] ?? 0), 0, -(p[P_EARL_Y] ?? 0));   // ear pitch: + = laid back
+    b.earR?.rotation.set(-(p[P_EARR_P] ?? 0), 0, -(p[P_EARR_Y] ?? 0));
     b.tail.rotation.set(p[P_TAIL_P] ?? 0, 0, p[P_TAIL_Y] ?? 0);
     const dead = !clock.alive ? smooth01(Math.max(0, clock.deathT)) : 0;
     for (let l = 0; l < 4; l++) {
@@ -59,7 +65,7 @@ export class QuadrupedRigPose {
       this.breathPhase += rate * dt * 2 * Math.PI * 0.45;
       const br = 0.5 + 0.5 * Math.sin(this.breathPhase);
       const sc = 1 + 0.045 * br;
-      b.belly.scale.set(sc, sc * 0.85, 1 + 0.01 * br);
+      b.belly?.scale.set(sc, sc * 0.85, 1 + 0.01 * br);
     }
   }
   /** Breathing is the only additional continuation; caller restores joint transforms separately. */
