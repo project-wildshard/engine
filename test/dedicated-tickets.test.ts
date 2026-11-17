@@ -1,5 +1,5 @@
 import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { PLAYER_TICKET_PUBLIC_KEY, admit, seatOf } from '../src/server/host/dedicated/ticket';
 import { NetIdentitySchema } from '../src/shared/engine/net/identity';
@@ -56,7 +56,7 @@ test('two devices\' tickets reach one player, with the api-server down; a bad ti
     return await realFetch(input, init);
   };
   const claims: string[] = [], saves = memoryPlayerSaves(), claim = saves.claim;
-  bench = await roomBench({ ticketKey: key.spkiHex, saves: { ...saves, claim: async (device, account) => { claims.push(`${device}>${account}`); return await claim?.(device, account) ?? false; } } });
+  bench = await roomBench({ ticketKey: key.spkiHex, saves: { ...saves, claim: async (device, account) => { claims.push(`${device}>${account}`); return await claim?.(device, account) ?? 'none'; } } });
   const join = async (player: string): Promise<RoomBot> => {
     const bot = new RoomBot(bench?.url ?? '', 'bench', player, 'Ann'); bots.push(bot);
     expect(await bot.arrived()).toBe(true);
@@ -83,4 +83,26 @@ test('two devices\' tickets reach one player, with the api-server down; a bad ti
   tab.drop();
   expect(asked, 'no join asked the api-server').toEqual([]);
   expect(claims, 'MP2.2d: a live ticket claims its device\'s guest progress, never while the account (the desktop, its body still held) or the guest (the tab) is live; a dead ticket claims nothing').toEqual([`device:phone>${account}`]);
+});
+
+test('MP2.2g: the door stops asking to claim once the account has progress; an empty account is asked again', { timeout: 60_000 }, async () => {
+  const key = keys(), expires = Math.floor(Date.now() / 1000) + 600, kept = `account:${PLAYER}`, empty = `account:${PLAYER.replace('0123', '4567')}`;
+  const claims: string[] = [];
+  bench = await roomBench({ ticketKey: key.spkiHex, holdMs: 100, saves: { ...memoryPlayerSaves(), claim: (device, account) => { claims.push(`${device}>${account}`); return Promise.resolve(account === kept ? 'kept' : 'none'); } } });
+  const room = (): ReturnType<RoomBench['room']> => bench?.room(SHARD);
+  const visit = async (player: string, seat: string): Promise<void> => {
+    const bot = new RoomBot(bench?.url ?? '', 'bench', player, 'Ann'); bots.push(bot);
+    expect(await bot.arrived()).toBe(true);
+    bot.drop();
+    await vi.waitFor(() => { expect(room()?.bodyOf(seat), 'the body goes once its hold ends').toBeUndefined(); }, { timeout: 10_000, interval: 50 });
+    await new Promise(resolve => { setTimeout(resolve, 200); }); // the door hears the leave after the room does
+  };
+  const at = (player: string, device: string): string => ticket(key.privateKey, { player, device, expires });
+  await visit(at(PLAYER, 'device:phone'), kept);
+  await visit(at(PLAYER, 'device:desk'), kept);
+  await visit(at(PLAYER, 'device:phone'), kept);
+  const other = PLAYER.replace('0123', '4567');
+  await visit(at(other, 'device:pad'), empty);
+  await visit(at(other, 'device:pad'), empty);
+  expect(claims, 'an account with progress is claimed into once, never again; one with none is asked at each join').toEqual([`device:phone>${kept}`, `device:pad>${empty}`, `device:pad>${empty}`]);
 });

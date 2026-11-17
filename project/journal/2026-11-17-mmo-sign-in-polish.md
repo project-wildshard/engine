@@ -5,3 +5,7 @@
   `data-login-door` script now moves the token into session storage before anything else reads the address; `takeLink` spends it
   from there (the hash is still read, for a cached document from before the door).
 - **"Signed in as" once.** A spent link's note repeated the card's own who line; the note is empty on success now.
+- **Claims stop once settled.** Every ticketed join ran the claim's transaction (insert, lock, three reads) after waiting up to 3 s
+  on the device's save queue. `claimSaves` now answers `moved`/`kept`/`none`; the door remembers accounts that answered `moved` or
+  `kept` (they can never take a claim again) and skips them. `none` keeps asking, so a fresh account's later device can still claim.
+- **Raw tickets refused** (commit before this): `NetRoom` refuses a `ticket:` player; only the door reads one.

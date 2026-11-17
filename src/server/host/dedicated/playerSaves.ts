@@ -74,9 +74,9 @@ export function memoryPlayerSaves(): PlayerSaves {
     // MP2.2d, as `saves/claim.ts`: the device's rows move to an account with none.
     claim: (device, account) => {
       const rows = [...held.values()];
-      if (rows.some(row => row.player === account)) return Promise.resolve(false);
+      if (rows.some(row => row.player === account)) return Promise.resolve('kept');
       const moving = rows.filter(row => row.player === device);
       for (const row of moving) { held.delete(`${device}\0${row.shard}`); held.set(`${account}\0${row.shard}`, { ...row, player: account }); }
-      return Promise.resolve(moving.length > 0);
+      return Promise.resolve(moving.length > 0 ? 'moved' : 'none');
     } };
 }

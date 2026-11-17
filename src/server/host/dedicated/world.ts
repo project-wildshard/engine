@@ -28,6 +28,7 @@ import { SaveNewerError, type PlayerDoc } from './playerDoc';
 import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
+import type { ClaimResult } from './saves/claim';
 import { workerTable } from './workerTable';
 import { cellName, cellShard, gridAssembly, placedCells, roadHome } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
@@ -45,6 +46,8 @@ const MAX_TRACKED_IPS = 4096;
 const HELLO_MS = 5000, READY_MS = 120_000;
 /** How long a stop gives each worker, and then the save queue. */
 const DRAIN_MS = 10_000;
+/** MP2.2g: how many settled accounts the door remembers; one it forgot is asked once more, which moves nothing. */
+const SETTLED_ACCOUNTS = 65_536;
 /** J177: one address, and no slug on it. */
 const WORLD_PATH = /^\/(?:\?.*)?$/u;
 /** GO7: the cell a page asks to be seated in (`/?chunk=<instance>`, `gotoSocket` in the online shell: the page's own `?chunk=` turned into
@@ -92,8 +95,8 @@ export interface PlayerSaves {
   /** Actual durable transaction observations. Memory-only stores omit this capability. */
   onSave?: (listener: (status: PersistenceStatus) => void) => () => void;
   report: (report: ChatReport, shard: string) => boolean;
-  /** MP2.2d: move a device's guest progress to an account with none; whether anything moved. Left out, nothing is claimed. */
-  claim?: (device: string, account: string) => Promise<boolean>;
+  /** MP2.2d: move a device's guest progress to an account with none (`saves/claim.ts`'s answer). Left out, nothing is claimed. */
+  claim?: (device: string, account: string) => Promise<ClaimResult>;
   /** MP2.4: claim a cleaned Name for this device and answer what everyone reads (`Name#1234`). Left out, the Name goes as typed. */
   name?: (device: string, name: string) => Promise<string>;
   /** Wait for what is on its way, at most `ms`. */
@@ -173,6 +176,8 @@ export class World {
   private readonly pending = new Map<string, PendingSeat>();
   /** Who has a body, by link or by hold, and in which cell. */
   private readonly seated = new Map<string, string>();
+  /** MP2.2g: accounts a claim found with progress (`moved` or `kept`): no later claim can move anything into them. Oldest go first. */
+  private readonly settled = new Set<string>();
   /** MP2.4: the Name each body was seated with, which a held body keeps when its player comes back. */
   private readonly names = new Map<string, string>();
   /** Each seated device's voice seat, renamed to the body its cell seated it in (`seated`). */
@@ -499,9 +504,19 @@ export class World {
   private async claim(device: string, account: string): Promise<void> {
     // Review M1: a body the door holds, loads, moves or redials (the guest's or the account's) would save over the move, so the
     // claim waits for a join with neither live; it is tried at every ticketed join, so it happens at a later one.
+    // MP2.2g: an account that has progress never takes a claim, so its later joins skip the transaction.
+    if (this.settled.has(account)) return;
     if ([device, account].some(id => this.seated.has(id) || this.pending.has(id) || this.crossings.has(id) || this.redials.has(id) || this.entries.has(id))) return;
-    try { if (await this.options.saves.claim?.(device, account) === true) this.options.log({ at: 'saves.claimed' }); }
+    try {
+      const claimed = await this.options.saves.claim?.(device, account);
+      if (claimed === 'moved') this.options.log({ at: 'saves.claimed' });
+      if (claimed === 'moved' || claimed === 'kept') this.settle(account);
+    }
     catch (error) { this.options.log({ at: 'saves.claim-failed', error: error instanceof Error ? error.message : String(error) }); }
+  }
+  private settle(account: string): void {
+    this.settled.add(account);
+    for (const oldest of this.settled) { if (this.settled.size <= SETTLED_ACCOUNTS) break; this.settled.delete(oldest); }
   }
   /** The join: check, find where they stand, let them load, seat them. */
   private async hello(end: SocketTransport, sent: ArrayBuffer, goto: string | null): Promise<void> {

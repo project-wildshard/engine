@@ -22,14 +22,14 @@ const coins = async (db: Database, player: string): Promise<number | null> => (a
 test('a guest with coins in Driftwood signs in and keeps them, once', async () => {
   const db = await fresh();
   await writeSave(db, 0, save('device:phone', 12));
-  expect(await claimSaves(db, 'device:phone', ACCOUNT), 'the first sign-in claims').toBe(true);
+  expect(await claimSaves(db, 'device:phone', ACCOUNT), 'the first sign-in claims').toBe('moved');
   expect(await coins(db, ACCOUNT), 'the account has the guest\'s coins').toBe(12);
   expect(await coins(db, 'device:phone'), 'and the guest no longer does').toBeNull();
   const moved = await db.query('select player_id, count(*)::int as n from ledger_receipt group by player_id');
   expect(moved.rows, 'the receipts went with the save').toEqual([{ player_id: ACCOUNT, n: 1 }]);
   const place = await db.query('select player_id, cell from player_place');
   expect(place.rows, 'and the place').toEqual([{ player_id: ACCOUNT, cell: SHARD }]);
-  expect(await claimSaves(db, 'device:phone', ACCOUNT), 'a second sign-in on that device claims nothing').toBe(false);
+  expect(await claimSaves(db, 'device:phone', ACCOUNT), 'a second sign-in on that device claims nothing: the account has progress (MP2.2g: the door stops asking)').toBe('kept');
   expect(await coins(db, ACCOUNT)).toBe(12);
 });
 
@@ -38,14 +38,14 @@ test('a second device\'s guest progress is not merged over the account\'s', asyn
   await writeSave(db, 0, save('device:phone', 12));
   await claimSaves(db, 'device:phone', ACCOUNT);
   await writeSave(db, 0, save('device:desk', 99));
-  expect(await claimSaves(db, 'device:desk', ACCOUNT), 'the account has progress: nothing moves').toBe(false);
+  expect(await claimSaves(db, 'device:desk', ACCOUNT), 'the account has progress: nothing moves').toBe('kept');
   expect(await coins(db, ACCOUNT)).toBe(12);
   expect(await coins(db, 'device:desk'), 'the desk keeps its own guest progress').toBe(99);
 });
 
 test('a device with nothing saved claims nothing, and the account is still made', async () => {
   const db = await fresh();
-  expect(await claimSaves(db, 'device:new', ACCOUNT)).toBe(false);
+  expect(await claimSaves(db, 'device:new', ACCOUNT), 'nothing to move, and the account still empty: a later device may claim').toBe('none');
   expect(await coins(db, ACCOUNT)).toBeNull();
 });
 
@@ -55,7 +55,7 @@ test('platform grants neither move nor count as progress (review M2)', async () 
   await grant('device:phone');
   await db.query("insert into player (id, name) values ($1, 'Ann')", [ACCOUNT]);
   await grant(ACCOUNT);
-  expect(await claimSaves(db, 'device:phone', ACCOUNT), 'an account with only a platform grant still claims').toBe(true);
+  expect(await claimSaves(db, 'device:phone', ACCOUNT), 'an account with only a platform grant still claims').toBe('moved');
   expect(await coins(db, ACCOUNT)).toBe(12);
   const platform = await db.query("select player_id from ledger_receipt where shard = '@platform' order by player_id");
   expect(platform.rows, 'each keeps its own platform grant').toEqual([{ player_id: ACCOUNT }, { player_id: 'device:phone' }]);

@@ -10,8 +10,14 @@ import type { Database } from './database';
 
 const MOVED = ['player_save', 'ledger_receipt', 'player_place'] as const;
 
-/** Move `device`'s progress to `account` unless the account has some; whether anything moved. */
-export function claimSaves(db: Database, device: string, account: string): Promise<boolean> {
+/**
+ * How a claim went. `moved`: the device's progress is the account's now. `kept`: the account already had progress, so nothing moved
+ * and nothing ever will (MP2.2g: the door stops asking for it). `none`: nothing to move and the account still empty.
+ */
+export type ClaimResult = 'moved' | 'kept' | 'none';
+
+/** Move `device`'s progress to `account` unless the account has some. */
+export function claimSaves(db: Database, device: string, account: string): Promise<ClaimResult> {
   return db.transaction(async sql => {
     await sql.query(`insert into player (id, name) select $2, coalesce((select name from player where id = $1), 'Guest')
       on conflict (id) do nothing`, [device, account]);
@@ -19,12 +25,12 @@ export function claimSaves(db: Database, device: string, account: string): Promi
     const held = await sql.query(`select 1 from player_save where player_id = $1 and shard <> '@platform'
       union all select 1 from ledger_receipt where player_id = $1 and shard <> '@platform'
       union all select 1 from player_place where player_id = $1 limit 1`, [account]);
-    if (held.rows.length > 0) return false;
+    if (held.rows.length > 0) return 'kept';
     let moved = 0;
     for (const table of MOVED) {
       const { rows } = await sql.query(`with moved as (update ${table} set player_id = $2 where player_id = $1${table === 'player_place' ? '' : " and shard <> '@platform'"} returning 1) select count(*)::int as n from moved`, [device, account]);
       moved += (rows[0] as { n?: number } | undefined)?.n ?? 0;
     }
-    return moved > 0;
+    return moved > 0 ? 'moved' : 'none';
   });
 }
