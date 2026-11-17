@@ -23,6 +23,7 @@ import { worldSceneSourceMaterial } from './worldSceneMaterials';
 import { WorldScenePlacement } from './worldScenePlacement';
 import { readWholeLibrary } from './wholeLibrary';
 import { SlabLibrary } from './slabLibrary';
+import { facedPart, faceParts } from './partFacing';
 import { wholeRefinementCover } from './wholeRefinementCover';
 import { lendWorldSceneTextures } from './worldSceneTextures';
 import { lendWorldSceneUniforms } from './worldSceneUniforms';
@@ -711,6 +712,10 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
       handles.publish(`${prefix}.root`, made.root);
       // T3: by tile, a merged part spanning tiles draws only the resident tiles' triangles (still one draw)
       made.root.updateMatrixWorld(true);
+      // NB8 (mini-nb8j): the phone's faced trees reorder their parts' indices before the tiles read them
+      const users = new Map<BufferGeometry, number>();
+      for (const part of made.parts.values()) if (mesh3(part)) users.set(part.geometry, (users.get(part.geometry) ?? 0) + 1);
+      await faceParts([...made.parts.values()].filter((part): part is Mesh => mesh3(part) && users.get(part.geometry) === 1 && facedPart(part, part.matrixWorld)), owner);
       for (const [index, draw] of buffered.entries()) {
         const content = tileBufferedDraws(`${prefix}.buffered.${String(index)}`, draw.root, draw.rows);
         if (content !== null) bufferedContents.push(content);
