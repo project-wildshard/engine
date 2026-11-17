@@ -221,6 +221,8 @@
     ]
   },
   "exports": {
+    "./game/population/census": "./src/shared/game/population/census.ts",
+    "./game/compendium/rules": "./src/shared/game/compendium/rules.ts",
     "./lint/sim-closure.mjs": "./lint/sim-closure.mjs",
     "./scripts/no-binary-json.mjs": "./scripts/no-binary-json.mjs",
     "./scripts/source-generation-outputs.json": "./scripts/source-generation-outputs.json",
