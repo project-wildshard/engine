@@ -17,3 +17,5 @@ Both the original real-Git case and the added stdout control failed
 first locally with the exact hosted "no output" receipt. Preserve
 the original refusal, zero Actions calls and unchanged remote main.
 All 71 landing and stop-cause cases then passed in 92.42 seconds.
+The ordinary push gate requested findLast for the final stdout lookup;
+that lint correction preserves the same last-line selection.

@@ -64,7 +64,7 @@ export function prePushCause(output,porcelain=''){
   ??hook.findLast(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
   ??lines.find(line=>/^!\s.*\[(?:remote )?rejected\]/u.test(line))
   ??hook.at(-1)
-  ??plain(porcelain).filter(line=>!GIT_OWN.test(line)).at(-1);
+  ??plain(porcelain).findLast(line=>!GIT_OWN.test(line));
  return pick===undefined?'no output':pick.slice(0,300);
 }
 
