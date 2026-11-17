@@ -23,8 +23,7 @@ async function writeReport(db: Database, { id, report, shard }: ReportWrite): Pr
  * MP2.4: one device's claims run one after another, each waiting for the last to finish in the database even when the door stopped
  * waiting for it, so a claim that timed out can never change the reservation under a later one.
  */
-function namesOver(db: Database): (device: string, name: string) => Promise<string> {
-  const running = new Map<string, Promise<unknown>>();
+function namesOver(db: Database, running: Map<string, Promise<unknown>>): (device: string, name: string) => Promise<string> {
   return (device, name) => {
     const work = (running.get(device) ?? Promise.resolve()).catch(() => undefined).then(() => claimName(db, device, name));
     running.set(device, work);
@@ -34,7 +33,7 @@ function namesOver(db: Database): (device: string, name: string) => Promise<stri
 }
 /** The world's saves over a database, in one save epoch. A read waits for a write on its way, so a quick rejoin never loads the save before last. */
 export function playerSavesOver(db: Database, epoch: number, log: (line: Record<string, unknown>) => void, contract?: (issue: string) => void): PlayerSaves & { readonly queue: SaveWriteQueue; readonly reports: ReportWriteQueue } {
-  const persistence = new PersistenceFeed();
+  const persistence = new PersistenceFeed(), naming = new Map<string, Promise<unknown>>();
   const queue = new SaveWriteQueue({ write: async write => {
     if (await writeSave(db, epoch, write)) persistence.publish({ player: write.player, shard: write.shard, sequence: write.seq, code: 'save-confirmed' });
   }, failed: (write, error) => {
@@ -57,12 +56,13 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
     where: async device => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return await placeOf(db, epoch, device) ?? await lastCell(db, epoch, device); },
     read:(device,shard)=>read(device,shard), readWitness:(device,shard)=>read(device,shard,true),
     recover: (device, shard, seq) => healSave(db, epoch, device, shard, seq),
-    name: namesOver(db),
+    name: namesOver(db, naming),
     claim: async (device, account) => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return claimSaves(db, device, account); },
     expire: days => expireGuests(db, days),
     exportAccount: account => exportAccount(db, account),
     // review M1: a body's last save still queued would write the account back after its delete
-    deleteAccount: async account => { if (!await queue.drain(3000, account)) throw new Error('Player save is pending'); return deleteAccount(db, account); },
+    // review 2: a Name claim still running in the database would insert the player row again after the delete
+    deleteAccount: async account => { await naming.get(account)?.catch(() => undefined); if (!await queue.drain(3000, account)) throw new Error('Player save is pending'); return deleteAccount(db, account); },
     report: (report: ChatReport, shard: string) => { const accepted = reports.post(report, shard); if (!accepted) log({ at: 'report.refused', reason: 'backlog' }); return accepted; } };
 }
 /** The saves database at `url`, migrated. */

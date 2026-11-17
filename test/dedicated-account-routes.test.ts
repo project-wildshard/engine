@@ -81,4 +81,8 @@ test('a database that fails answers 503 and logs no ticket', async () => {
   expect((await ask(failing.url, '/account/delete', { ticket: raw, origin: GAME })).status).toBe(503);
   expect(released, 'a failed delete lets the seat go').toBe(true);
   expect(lines.join('\n'), 'review S6: a database message can quote the account').not.toContain(PLAYER);
+  lines.length = 0;
+  const pending = await serve({ ticketKey: key.spkiHex, log: line => { lines.push(JSON.stringify(line)); }, deleteAccount: () => Promise.reject(new Error('Player save is pending')) });
+  expect((await ask(pending.url, '/account/delete', { ticket: raw, origin: GAME })).status).toBe(503);
+  expect(lines.join('\n'), 'review 2: the likely cause is named').toContain('save-pending');
 });

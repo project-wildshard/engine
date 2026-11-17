@@ -130,7 +130,10 @@ test('review M1: a join in progress counts as playing, and a seat held for its d
   expect(bench.world.holdForDelete(seat), 'one delete at a time').toBeUndefined();
   const second = new RoomBot(bench.url, 'bench', at('device:desk'), 'Ann'); bots.push(second);
   expect(await second.ended(), 'a join mid-delete dials again').toBe('retry');
+  bench.world.forgetAccount(seat);
   release?.();
   const third = new RoomBot(bench.url, 'bench', at('device:desk'), 'Ann'); bots.push(third);
-  expect(await third.arrived(), 'after the delete it joins').toBe(true);
+  expect(await third.arrived(), 'after the delete it plays').toBe(true);
+  expect(bench.world.isPlaying(seat), 'review 2 M1: a deleted account\'s live ticket never seats it again').toBe(false);
+  expect(bench.world.isPlaying('device:desk'), 'it plays as the device\'s guest').toBe(true);
 });

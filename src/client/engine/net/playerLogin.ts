@@ -160,6 +160,10 @@ export function doorOf(socket: string): string | undefined {
     return `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}`;
   } catch { return undefined; }
 }
+/** The door's own 404 (`accountRoutes.ts`), not a door without the routes. */
+async function nothingSaved(response: Response): Promise<boolean> {
+  try { const body: unknown = await response.json(); return typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'nothing saved'; } catch { return false; }
+}
 async function askDoor(ports: LoginPorts, door: string, route: string, device: string): Promise<Response | undefined> {
   const ticket = await ticketBeforeJoin(ports, device);
   if (ticket === undefined) return undefined;
@@ -174,7 +178,7 @@ export async function exportMine(ports: LoginPorts, door: string | undefined, de
   if (door === undefined) return { api, game: null };
   // only a 404 means the door holds nothing; any other failure would hand over a file missing the saves
   const asked = await askDoor(ports, door, '/account/export', device);
-  if (asked?.status === 404) return { api, game: null };
+  if (asked?.status === 404 && await nothingSaved(asked)) return { api, game: null };
   const game = asked?.ok === true ? await json(asked) : undefined;
   return game === undefined ? undefined : { api, game };
 }

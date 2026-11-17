@@ -103,11 +103,13 @@ describe('a player\'s own data', () => {
     expect(await exportMine(ports, DOOR, DEVICE)).toEqual({ api: { player: { email: 'a@b.co' } }, game: { player: { id: 'account:plr_x' } } });
     expect(ports.heard.find(row => row.url === `${DOOR}/account/export`)?.authorization).toBe(`Ticket ${live}`);
     expect(ports.heard.find(row => row.url === `${API}/api/players/me/export`)?.authorization).toBe('Bearer wss_s');
-    const nothing = account({ [`${API}/api/players/me/export`]: () => ok({ player: {} }) });
+    const nothing = account({ [`${API}/api/players/me/export`]: () => ok({ player: {} }), [`${DOOR}/account/export`]: () => Response.json({ error: 'nothing saved' }, { status: 404 }) });
     expect(await exportMine(nothing, DOOR, DEVICE), 'nothing saved on the server yet').toEqual({ api: { player: {} }, game: null });
     expect(await exportMine(account({}), DOOR, DEVICE), 'the API refused: no file').toBeUndefined();
     const doorDown = account({ [`${API}/api/players/me/export`]: () => ok({ player: {} }), [`${DOOR}/account/export`]: () => new Response('', { status: 503 }) });
     expect(await exportMine(doorDown, DOOR, DEVICE), 'review S1: a door that failed gives no file missing the saves').toBeUndefined();
+    const oldDoor = account({ [`${API}/api/players/me/export`]: () => ok({ player: {} }), [`${DOOR}/account/export`]: () => new Response('404 Not Found', { status: 404 }) });
+    expect(await exportMine(oldDoor, DOOR, DEVICE), 'review 2: a door without the routes is not "nothing saved"').toBeUndefined();
   });
 
   test('delete: the door, then the API, then the page signs out; a player in the world is told to leave first', async () => {

@@ -43,3 +43,7 @@
   failure log carries the error's class, never a database message that can quote the account.
 - Still open, written in MMO-PLAN MP2.5: chat reports keep the account id; the hour-long join ticket alone can delete; guest expiry
   deletes receipts where account delete keeps them anonymously.
+- Review 2: a deleted account's live ticket (an hour) seated it again after the delete; the door now seats such a ticket as the
+  device's guest for two hours. A delete also waits for a Name claim still running in the database, a bare 404 from a door without
+  the routes is not "nothing saved", and a drain timeout logs as `save-pending`. The hold is per door process: one door per saves
+  database is assumed (MP2.5's row says so).

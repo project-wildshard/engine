@@ -47,6 +47,8 @@ const MAX_TRACKED_IPS = 4096;
 const HELLO_MS = 5000, READY_MS = 120_000;
 /** How long a stop gives each worker, and then the save queue. */
 const DRAIN_MS = 10_000;
+/** Review 2 M1: how long the door refuses a deleted account's tickets: longer than any join ticket lives (an hour). */
+const GONE_MS = 2 * 60 * 60 * 1000;
 /** MP2.2g: how many settled accounts the door remembers; one it forgot is asked once more, which moves nothing. */
 const SETTLED_ACCOUNTS = 65_536;
 /** J177: one address, and no slug on it. */
@@ -188,6 +190,8 @@ export class World {
   /** Review M1: seats inside a join between the ticket's read and their seat, and seats mid-delete, so neither starts beside the other. */
   private readonly joiners = new Map<string, number>();
   private readonly deleting = new Set<string>();
+  /** Review 2 M1: accounts deleted here, until every join ticket they could hold has expired (api-server's tickets last an hour). */
+  private readonly gone = new Map<string, number>();
   /** MP2.4: the Name each body was seated with, which a held body keeps when its player comes back. */
   private readonly names = new Map<string, string>();
   /** Each seated device's voice seat, renamed to the body its cell seated it in (`seated`). */
@@ -533,7 +537,11 @@ export class World {
     return this.joiners.has(seat) || this.seated.has(seat) || this.pending.has(seat) || this.crossings.has(seat) || this.redials.has(seat) || this.entries.has(seat);
   }
   /** MP2.5a: a deleted account starts empty again, so a later device's guest progress may be claimed into it. */
-  forgetAccount(account: string): void { this.settled.delete(account); }
+  forgetAccount(account: string, now: number = Date.now()): void {
+    this.settled.delete(account);
+    for (const [id, until] of this.gone) if (until <= now) this.gone.delete(id);
+    this.gone.set(account, now + GONE_MS);
+  }
   /** Review M1: hold a seat out of the world while it is deleted; undefined (nothing held) when it is playing. */
   holdForDelete(seat: string): (() => void) | undefined {
     if (this.isPlaying(seat) || this.deleting.has(seat)) return undefined;
@@ -554,8 +562,10 @@ export class World {
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
     // MP2.2c: a live join ticket seats its account; anything else, the device it names.
-    const admitted = await admit(said.output.player, this.options.ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, Date.now());
-    if (admitted === undefined) { this.refuse('identity'); end.close('refused'); return; }
+    const ticketed = await admit(said.output.player, this.options.ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, Date.now());
+    if (ticketed === undefined) { this.refuse('identity'); end.close('refused'); return; }
+    // review 2 M1: a live ticket for an account deleted here plays as its device's guest, so nothing writes the account back
+    const admitted = ticketed.from !== undefined && (this.gone.get(ticketed.seat) ?? 0) > Date.now() ? { seat: ticketed.from } : ticketed;
     const { seat } = admitted;
     // review M1: an account being deleted dials again in a moment, after which it is a fresh account
     if (this.deleting.has(seat)) { end.close('retry'); return; }

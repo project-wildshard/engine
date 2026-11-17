@@ -60,7 +60,7 @@ export function accountRoutes(options: AccountRoutes): (request: IncomingMessage
         send(200, { deleted });
       } catch (error) {
         // the database's message can quote the account id, which is never logged: the error's class only
-        options.log({ at: 'account.failed', action, error: error instanceof Error ? error.name : typeof error });
+        options.log({ at: 'account.failed', action, error: error instanceof Error ? (error.message === 'Player save is pending' ? 'save-pending' : error.name) : typeof error });
         send(503, { error: 'try again later' });
       }
     })();
