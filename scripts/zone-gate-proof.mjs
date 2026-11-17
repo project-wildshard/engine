@@ -197,8 +197,10 @@ try {
       arrived = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { x: Number(p.position.x.toFixed(2)), z: Number(p.position.z.toFixed(2)), yaw: Number(p.yaw.toFixed(3)) }; });
       // settled where it arrived (the fresh boot below stands at the same pose for as long)
       await sleep(SETTLE_MS); controlMB = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
+      // the new home's origin in world feet: on the road the player's own position is the road's frame (online it rebinds there)
+      const homeAt = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
       for (const ends = Date.now() + 20_000; Date.now() < ends;) {
-        const x = await page.evaluate(() => /** @type {any} */ (window).__wildshard.world.player.position.x);
+        const x = (await state()).x - homeAt.x;
         if (dir * x < -HALF - 5) { walkedOut = true; break; }
         await face(dir * Math.PI / 2); await page.keyboard.down('KeyW'); await sleep(400); await page.keyboard.up('KeyW');
       }
