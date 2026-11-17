@@ -107,3 +107,20 @@ test("Brasscap's ledge marksmen hold their ledge and fire down", async () => {
     expect(body.position.y).toBeGreaterThan(ground(body.position) + 5);
   } finally { sim.dispose(); }
 }, 60_000);
+
+// QA 11-16 mini row 69 (new-shard-e2e F42): a data shard's creature strike carried no death cause, so a player its boar killed
+// read "Fell too far" on the death card, and Honeyknoll's idle arrivals beside two boars looked like falls through the ground.
+test('a player Mossgate\'s grey blob kills dies of the grey blob, not of a fall', async () => {
+  const input = await mossgate;
+  const sim = createShardfileSim(input.shard, input.assets, { rapier: await rapier, quest: { fact: () => undefined, coins: () => undefined } });
+  try {
+    const body = sim.host.entities.get('grey-blob:1'), player = sim.host.players.get(PLAYER);
+    if (body === undefined || player === undefined) throw new Error('Missing the grey blob or the player');
+    const causes: unknown[] = [];
+    sim.host.events.on('player.died', ({ cause }) => { causes.push(cause ?? null); }, sim.host.scope);
+    player.position.set(body.position.x + 2, body.position.y, body.position.z); player.motor.resetAt(player.position);
+    player.health.attributes.health = 1;
+    for (let tick = 0; tick < 60 * 20 && causes.length === 0; tick++) sim.host.step();
+    expect(causes).toEqual([{ kind: body.kind, label: body.label }]);
+  } finally { sim.dispose(); }
+}, 60_000);

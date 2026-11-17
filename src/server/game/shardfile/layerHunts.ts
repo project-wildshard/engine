@@ -51,7 +51,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
         now: () => host.clock.now * 1000, sound: () => undefined,
         charge: (body, damage) => { const target = host.nearestPlayer(body.position);
           host.combat.hit({ source: body.combatActor(), sourceTags: [`creature.${spawn.species}`], target: target.health,
-            amount: damage, point: body.position.clone(), dir: new Vector3().subVectors(target.position, body.position).normalize() }); },
+            amount: damage, point: body.position.clone(), dir: new Vector3().subVectors(target.position, body.position).normalize(), cause: { kind: body.kind, label: body.label } }); },
       } });
     hunt.adopt(actor, spawn.at[0], spawn.at[2]);
     const memory = hunt.memory(actor);

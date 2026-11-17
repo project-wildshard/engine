@@ -691,7 +691,9 @@ export class SimHost {
       this.hitOrigin.copy(actor.position); this.hitOrigin.y += source === undefined ? 1.2 : source.dims.bodyY * source.scale;
       this.hitPoint.copy(position); this.hitPoint.y += target === undefined ? 1.2 : target.dims.bodyY * target.scale;
       this.combat.hit({ source: source?.combatActor() ?? striker?.health ?? 'env', sourceTags: spec.tags, target: health,
-        amount: spec.damage, point: this.hitPoint, dir: this.direction, from: this.hitOrigin, moveId: spec.id, attackSeq: this.strikeSeqs.get(id) ?? 0 });
+        amount: spec.damage, point: this.hitPoint, dir: this.direction, from: this.hitOrigin, moveId: spec.id, attackSeq: this.strikeSeqs.get(id) ?? 0,
+        // QA 11-16 mini row 69: a creature's strike names its killer, or the death card reads "Fell too far"
+        ...(source === undefined ? {} : { cause: { kind: source.kind, label: source.label } }) });
     } });
   }
   /** Timed attack targets are host state; snapshot restoration must reconnect them before replay. */
