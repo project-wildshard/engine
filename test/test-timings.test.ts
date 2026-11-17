@@ -9,6 +9,7 @@ import { collectTimings, readTimings, readWeights, timingsDir, writeTimings } fr
 import { createEnginePlan } from '../scripts/engine-ci-plan.ts';
 import { readDurations } from '../scripts/test-shard-plan.ts';
 import amberRun from './fixtures/ci/amber-43792777770.json' with { type: 'json' };
+import shardSeven from './fixtures/ci/amber-44148096662.json' with { type: 'json' };
 
 mkdirSync(resolve('tmp'), { recursive: true });
 const scratch = mkdtempSync(resolve('tmp/test-timings-'));
@@ -99,6 +100,22 @@ test('the real shard-3 AMBER inventory fits the existing headroom without losing
   // Every old choice exhausted the 240 s reserve. The selected plan must
   // now meet the preferred 230 s bar with the same factor/setup charge.
   expect(plan.curve.filter(row => row.count <= 15).every(row => row.seconds > 240)).toBe(true);
+  expect(Math.max(...plan.shards.map(shard => shard.expectedSeconds))).toBeLessThanOrEqual(230);
+  expect(plan).toMatchObject({ factor: 1.35, setupSeconds: 70 });
+  const actual = plan.shards.flatMap(shard => [...shard.native, ...shard.ordinary]);
+  expect([...actual].sort()).toEqual([...files].sort());
+  expect(new Set(actual).size).toBe(files.length);
+});
+
+test('44148096662: the shard-7 AMBER clocks retain preferred headroom and every discovered file', () => {
+  process.env['WS_TIMINGS_DIR'] = join(scratch, 'shard-seven-replay');
+  writeTimings({ version: 1, run: shardSeven.run, sha: shardSeven.sha, measuredAt: 0, full: shardSeven.full, ring1: {} });
+  const files = [...Object.keys(shardSeven.full), ...shardSeven.unmeasured], plan = createEnginePlan('full', files);
+  // The original native and ordinary suites all passed; their charged wall
+  // crossed 300 s. Redistribute the real inventory instead of raising its cap.
+  expect(files).toHaveLength(1880);
+  expect(plan.unknown).toEqual(shardSeven.unmeasured);
+  expect(plan.curve.filter(row => row.count <= 24).every(row => row.seconds > 230)).toBe(true);
   expect(Math.max(...plan.shards.map(shard => shard.expectedSeconds))).toBeLessThanOrEqual(230);
   expect(plan).toMatchObject({ factor: 1.35, setupSeconds: 70 });
   const actual = plan.shards.flatMap(shard => [...shard.native, ...shard.ordinary]);
