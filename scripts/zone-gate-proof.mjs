@@ -35,7 +35,7 @@ const TARGETS = /** @type {Record<string, { name: string, axis: 'x' | 'z', dir: 
   'nalati-grasslands': { name: 'Nalati Grasslands', axis: 'x', dir: 1, approach: [[235, -194], [235, 0]] },
   'sunscar-dunes': { name: 'Signal Dunes', axis: 'x', dir: -1, approach: [[-235, -194], [-235, 0]] },
   'pine-hollow': { name: 'Pine Hollow', axis: 'z', dir: 1, approach: [[-235, -194], [-235, 0], [-200, 20], [-200, 235], [0, 235]] },
-  'far-reach': { name: 'Far Reach', axis: 'z', dir: -1, approach: [[0, -235]] } });
+  'far-reach': { name: 'Sky Reach', axis: 'z', dir: -1, approach: [[0, -235]] } });
 const targetSlug = flag('target', 'nalati-grasslands'), target = TARGETS[targetSlug];
 if (target === undefined) throw new Error(`--target is one of ${Object.keys(TARGETS).join(', ')}`);
 const dir = target.dir, ax = target.axis, pp = ax === 'x' ? 'z' : 'x';

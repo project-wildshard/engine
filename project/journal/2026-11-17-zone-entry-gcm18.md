@@ -16,3 +16,9 @@ rig already in the cell before binding it, so the cell clip's
 `childadded` watch (`borrowsBones`) and the renderer met a SkinnedMesh
 with no skeleton. Shells now bind first; `animal-shells.test.ts` is red
 on the old order.
+
+## Far Reach is Sky Reach on its card (opus-gcm18, 2026-11-17)
+
+`zone-gate-proof.mjs` looked for a "Far Reach" card on its fresh
+boot; the cell's card says "Sky Reach", so the Far Reach entry failed
+on the harness alone. The target now names the card it shows.
