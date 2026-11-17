@@ -104,7 +104,18 @@ export interface MapExtraImage { readonly image: CanvasImageSource; readonly x: 
 /** a text label at a point; one past the rim is pinned just inside it, in its direction */
 export interface MapExtraLabel { readonly x: number; readonly z: number; readonly text: string; readonly color: string;
   /** Optional cell-local label box in metres, with a shorter overview name. */
-  readonly width?: number; readonly height?: number; readonly short?: string }
+  readonly width?: number; readonly height?: number; readonly short?: string;
+  /** A place off this map (a neighbour's name across the road): drawn with an arrow toward it, never as this map's own title. */
+  readonly toward?: boolean }
+
+/** SB33: a label's text as the disc draws it. A `toward` label leads with an arrow pointing out at its place: down below the
+ *  arrow, up above it, and up along the left or right rim, where the text turns so its top faces out. `sy` is its centre's
+ *  row, `c` the disc's centre, `turn` its rotation. */
+export function minimapLabelText(label: MapExtraLabel, sy: number, c: number, turn: number): string {
+  const text = label.text.toUpperCase();
+  if (label.toward !== true) return text;
+  return `${turn === 0 && sy > c ? '▼' : '▲'} ${text}`;
+}
 
 /** a named place on the maps: the format's row (`@wildshard/format/minimap`); frozen legacy folders still name it here */
 type MapPoi = MapPoiRow;
@@ -535,7 +546,8 @@ export class Minimap {
       let dx = l.x - pos.x, dz = l.z - pos.z;
       const d = Math.hypot(dx, dz);
       if (d > inner) { dx *= inner / d; dz *= inner / d; }
-      const sprite = this.labelSprite(l.text.toUpperCase(), l.color, font, loaded), half = sprite.half;
+      // placed by the up-arrow's width (the down-arrow is as wide); a `toward` label then takes the arrow its place calls for
+      const placed = this.labelSprite(minimapLabelText(l, 0, 1, 0), l.color, font, loaded), half = placed.half;
       let sx = c - dx * k, sy = c - dz * k, turn = 0;
       if (Math.abs(dx) > Math.abs(dz) && Math.abs(dx) * k > c * 0.5) {
         turn = sx < c ? -Math.PI / 2 : Math.PI / 2; // along the left / right rim
@@ -545,6 +557,7 @@ export class Minimap {
         const chord = Math.max(half, Math.sqrt(Math.max(0, c * c - (sy - c) ** 2)) - 6 * s); // the text stays inside the disc at its row
         sx = Math.min(c + chord - half, Math.max(c - chord + half, sx));
       }
+      const sprite = l.toward === true ? this.labelSprite(minimapLabelText(l, sy, c, turn), l.color, font, loaded) : placed;
       ctx.save(); ctx.translate(sx, sy); ctx.rotate(turn);
       ctx.drawImage(sprite.canvas, -sprite.canvas.width / 2, -sprite.canvas.height / 2);
       ctx.restore();

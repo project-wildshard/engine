@@ -156,7 +156,7 @@ export function minimapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
     const toRoad = dx !== 0 ? edgeToRoad - dx * lx : edgeToRoad - dz * lz;
     if (toRoad > NAME_RANGE) continue;
     const along = Math.max(-CHUNK_HALF + 40, Math.min(CHUNK_HALF - 40, dx !== 0 ? lz : lx)), across = edgeToRoad + NAME_ACROSS;
-    labels.push({ x: inside.origin.x - ox + (dx !== 0 ? dx * across : along), z: inside.origin.z - oz + (dz !== 0 ? dz * across : along), text: host.name(next), color: NAME });
+    labels.push({ x: inside.origin.x - ox + (dx !== 0 ? dx * across : along), z: inside.origin.z - oz + (dz !== 0 ? dz * across : along), text: host.name(next), color: NAME, toward: true });
   }
   return { outside: VOID, baseAlpha: inside.instance === home.instance && homeImage === null ? 1 : 0, rects, images, labels };
 }
