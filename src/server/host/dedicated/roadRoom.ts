@@ -150,17 +150,19 @@ export class RoadRoom implements CrossTarget {
   }
   /**
    * GC15 (3): the seat walks off the road into `to`, a cell on another worker. Its client hears `travel` (`NetRoom.handOut`), the seat goes
-   * from here with no hold, and its port says `out` with the walker's motion, after everything else it was sent: the door moves the socket.
+   * from here with no hold, and its port says `out` with the walker's motion and last stepped `seq` (MP1.6b), after everything else it was
+   * sent: the door moves the socket.
    * False when nothing went (no live link here).
    */
   handOut(device: string, to: string): boolean {
     const seat = this.seats.get(device), transport = seat?.transport ?? null, player = seat === undefined ? undefined : this.host.players.get(seat.body);
     if (seat === undefined || !(transport instanceof SeatTransport) || seat.client === null || player === undefined || !this.opened.has(to)) return false;
     const motion = mountedPlayerOf(this.host, seat.body)?.mounted === true ? null : motionOf(player);
-    if (!this.net.handOut(seat.client, cellFrame(to))) return false;
+    const seq = this.net.handOut(seat.client, cellFrame(to));
+    if (seq === null) return false;
     mountedPlayerOf(this.host, seat.body)?.dismount();
     seat.closeOff?.(); seat.closeOff = null; seat.transport = null; seat.client = null;
-    transport.handOut(motion);
+    transport.handOut(motion, seq);
     this.release(seat);
     return true;
   }

@@ -229,16 +229,19 @@ export class NetRoom {
   /**
    * GC15 (3): a player crossed into cell `toFrame` on another worker. Their client hears `travel` here, then this room lets it go with its
    * link left open: the target room on the other worker hears the client's hello again and welcomes it (`travel`, `welcome`, full frame,
-   * as `handOff` does on one worker). False when there is nobody live to send.
+   * as `handOff` does on one worker). Null when there is nobody live to send; else the last command `seq` stepped here, which the target's
+   * queue starts from (`CommandQueue.after`, MP1.6b), as `handOff` carries the queue itself.
    */
-  handOut(id: number, toFrame: number): boolean {
+  handOut(id: number, toFrame: number): number | null {
     const client = this.clients.find(entry => entry.id === id);
-    if (client?.state !== 'live') return false;
+    if (client?.state !== 'live') return null;
     const tick = this.world.tick(), travel: NetEvent = { kind: 'travel', tick, from: this.world.cell(), to: toFrame };
     client.transport.send('reliable', eventsMessage(tick, [travel]).buffer);
     this.remove(client);
-    return true;
+    return client.queue.lastSeq;
   }
+  /** GC15 (3), MP1.6b: `join` for a client `handOut` let go on another worker, whose commands there were stepped up to `seq` (unknown: fresh). */
+  arrive(transport: Transport, player: NetPlayer, seq?: number): number { return this.join(transport, player, seq === undefined ? new CommandQueue() : CommandQueue.after(seq)); }
   /** GC15 (3): a client whose hello this room heard again after a travel from another worker reads this room's receipts from the start, as an adopted one does (its hello's ledger was the first room's). */
   travelled(id: number): void { const client = this.clients.find(entry => entry.id === id); if (client !== undefined) client.ledgerSeen = 0; }
   private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, said: { readonly identity: NetIdentity; readonly reader: WireClientReader | undefined; readonly capabilities: readonly number[] }): number | null {

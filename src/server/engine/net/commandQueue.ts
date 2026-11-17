@@ -54,6 +54,15 @@ export class CommandQueue {
   /** Commands refused by admission, and copies dropped as duplicates. */
   refused = 0; duplicates = 0;
   /**
+   * MMO-PLAN MP1.6b: the queue of a player arriving from another worker, where their command stream already stood at `seq`. A fresh
+   * queue's 0 reads as ahead of a client past 0x8000, whose predictor then stops reconciling; this one says `seq` until the next command.
+   */
+  static after(seq: number): CommandQueue {
+    const queue = new CommandQueue();
+    queue.lastSeq = seq & 0xffff; queue.newest = queue.lastSeq;
+    return queue;
+  }
+  /**
    * Queue a decoded bundle, oldest first. A replayed `seq` is dropped, so redundancy cannot repeat a jump. MMO-PLAN MP1.2:
    * every bundle repeats up to REDUNDANT_COMMANDS older commands, so a copy whose seq is already spent is dropped before
    * its schema check (it was checked on arrival), and counts as a duplicate even if the copy itself is malformed.

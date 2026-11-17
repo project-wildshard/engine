@@ -42,6 +42,8 @@ export interface ChurnReport {
   readonly bagMismatches: readonly string[];
   readonly socketCloses: number; readonly refused: readonly EnterWord[]; readonly crashes: number;
   readonly movedLines: number; readonly unmovedLines: number; readonly crossRefusals: number;
+  /** MP1.6b: owner blocks that said `lastSeq` 0 after the walker's commands had been stepped (a crossing's target forgot the source's). */
+  readonly zeroAcks: number;
 }
 
 interface Walker { readonly device: string; readonly bot: RoomBot; readonly arrivals: ArriveWord[]; readonly answers: EnterWord[]; closes: number; cell: string; fromDriftwood: number }
@@ -54,6 +56,7 @@ export async function crossingChurn(options: ChurnOptions): Promise<ChurnReport>
   const bots: RoomBot[] = [], log = options.log ?? ((): void => undefined);
   const counts = { crossings: 0, inside: 0, between: 0, roadExits: 0, retries: 0, lost: 0, doubled: 0, seatsMin: Infinity, seatsMax: -Infinity };
   const paid = new Map<string, number>(), bagMismatches: string[] = [], refused: EnterWord[] = [];
+  let zeroAcks = 0;
   const rooms = (): { readonly name: string; readonly holds: (device: string) => boolean }[] => [
     ...CELLS.flatMap(cell => { const room = bench.room(cell); return room === undefined ? [] : [{ name: cell, holds: (device: string) => room.holds(device) }]; }),
     ...[HOME, EAST].flatMap(cell => { const road = bench.road(roadName(cell)); return road === undefined ? [] : [{ name: road.name, holds: (device: string) => road.holds(device) }]; }),
@@ -72,6 +75,9 @@ export async function crossingChurn(options: ChurnOptions): Promise<ChurnReport>
         if (control === 'arrive') { const word = decodeArrive(bytes); if (word !== null) walker.arrivals.push(word); }
       });
       bot.transport.onClose(() => { walker.closes++; });
+      // MP1.6b: once the server has stepped this walker's commands, no owner block may say 0 again (its seq never wraps in a run)
+      let stepped = false;
+      bot.client.onFrame(frame => { if (frame.lastSeq !== 0) stepped = true; else if (stepped) zeroAcks++; });
       return walker;
     };
     // Bystanders: one stands in Driftwood the whole run, and one in Nalati (a fresh device lands in the first cell, Driftwood).
@@ -174,6 +180,7 @@ export async function crossingChurn(options: ChurnOptions): Promise<ChurnReport>
       movedLines: lines.filter(line => line['at'] === 'cell.crossed' && line['moved'] === true).length,
       unmovedLines: lines.filter(line => line['at'] === 'cell.crossed' && line['moved'] !== true).length,
       crossRefusals: lines.filter(line => line['at'] === 'cell.cross-refused').length,
+      zeroAcks,
     };
   } finally {
     if (sampler !== undefined) clearInterval(sampler);

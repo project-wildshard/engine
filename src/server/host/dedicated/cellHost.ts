@@ -297,7 +297,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
    * with the walker's motion, then the room hears the client's hello again and welcomes it (the client heard `travel` first).
    */
   const arrive = async (order: Extract<CellOrder, { kind: 'arrive' }>): Promise<void> => {
-    const { kind: _kind, from, to: slug, at, port: seatPort, hello, motion, ...entry } = order, cell = cells.get(slug);
+    const { kind: _kind, from, to: slug, at, port: seatPort, hello, motion, commandSeq, ...entry } = order, cell = cells.get(slug);
     // review MUST: the port's transport is made after the wait, as `seat`'s is: a close meanwhile stays queued on the port for it
     const refuse = (made?: SeatTransport): void => { (made ?? new SeatTransport(seatPort)).close('retry'); post({ kind: 'crossed', device: entry.device, name: entry.name, from, to: slug, moved: false, stays: false, body: entry.body }); };
     if (cell !== undefined) arrivals.add(cell);
@@ -308,7 +308,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
       if (typeof arrived === 'string') { refuse(transport); return; }
       const player = cell.room.host.players.get(arrived.body);
       if (motion !== null && player !== undefined) applyMotion(motion, player);
-      const client = cell.room.net.join(transport, cell.room.sim.playerOf(arrived.body));
+      const client = cell.room.net.arrive(transport, cell.room.sim.playerOf(arrived.body), commandSeq);
       transport.deliver('reliable', hello);
       cell.room.net.travelled(client);
       const moved = arrived.land(cell.room.net.live(client) ? client : null);

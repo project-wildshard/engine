@@ -588,13 +588,13 @@ export class World {
     } catch (error) { this.outs.delete(device); this.abandon(device, from); this.options.log({ at: 'cell.cross-refused', device, from, to, reason: String(error) }); }
   }
   /** GC15 (3): the source let the seat go and everything it said is on its way: the socket now pumps into the target's worker. */
-  private movedOut(device: string, end: SocketTransport, motion: unknown): void {
+  private movedOut(device: string, end: SocketTransport, motion: unknown, seq: number | undefined): void {
     const out = this.outs.get(device), kept = this.seatSockets.get(device), link = out === undefined ? undefined : this.linkOf(out.to);
     this.outs.delete(device);
     if (out === undefined || kept?.end !== end || link === undefined || !end.isOpen || this.draining) { this.abandon(device, out?.from ?? ''); end.close(this.draining ? 'restart' : 'retry'); return; }
     const { port1, port2 } = new MessageChannel(), hello = kept.hello.slice(0);
-    pumpSocket(end, port1, undefined, next => { this.movedOut(device, end, next); });
-    link.send({ kind: 'arrive', from: out.from, to: out.to, at: out.at, port: port2, hello, motion: motion as MotionSnapshot | null, ...out.entry }, [port2, hello]);
+    pumpSocket(end, port1, undefined, (next, nextSeq) => { this.movedOut(device, end, next, nextSeq); });
+    link.send({ kind: 'arrive', from: out.from, to: out.to, at: out.at, port: port2, hello, motion: motion as MotionSnapshot | null, ...(seq === undefined ? {} : { commandSeq: seq }), ...out.entry }, [port2, hello]);
   }
   /**
    * ZE9b (J352): road `from` froze a seat at the gate of `to` (its `enter`). The door tells the page `arrive` with the pose past the gate
@@ -685,7 +685,7 @@ export class World {
       const out = this.outs.get(entry.device);
       if (out !== undefined) { this.outs.delete(entry.device); this.abandon(entry.device, out.from); }
     });
-    pumpSocket(end, port1, undefined, motion => { this.movedOut(entry.device, end, motion); });
+    pumpSocket(end, port1, undefined, (motion, seq) => { this.movedOut(entry.device, end, motion, seq); });
     const rebody = this.voice.attach(end, slug, entry.name, entry.body);
     this.voiceBodies.set(entry.device, rebody);
     end.onClose(() => { if (this.voiceBodies.get(entry.device) === rebody) this.voiceBodies.delete(entry.device); });

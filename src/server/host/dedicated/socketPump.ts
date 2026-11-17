@@ -10,7 +10,7 @@ export const LEAVE_FLAG = 1;
 // GC15 (3): `out`, from the room's end: this seat left for a cell on another worker. Everything the room said before it went first, on
 // this same port, so the door moves the socket to the target's port only once the `travel` is on its way to the client.
 // ZE9a: `control`, either way: the client's `enter` word to the room, and the room's answer back to the client.
-type Pumped = { readonly channel: NetChannel; readonly bytes: ArrayBuffer } | { readonly close: string; readonly silentMs: number } | { readonly out: true; readonly motion: unknown }
+type Pumped = { readonly channel: NetChannel; readonly bytes: ArrayBuffer } | { readonly close: string; readonly silentMs: number } | { readonly out: true; readonly motion: unknown; readonly seq?: number }
   | { readonly control: PumpedControl; readonly bytes: ArrayBuffer };
 /** The controls a room hears and says through the pump (ZE9a). */
 type PumpedControl = 'enter';
@@ -22,7 +22,7 @@ const pumped = (value: unknown): Pumped | null => typeof value === 'object' && v
  * silence check and the keepalive, because those need the socket; the room hears the same bytes it would on any Transport. The port
  * closes with the socket, and what the room says after that goes nowhere.
  */
-export function pumpSocket(end: SocketTransport, port: MessagePort, now: () => number = diagnosticNow, out?: (motion: unknown) => void): void {
+export function pumpSocket(end: SocketTransport, port: MessagePort, now: () => number = diagnosticNow, out?: (motion: unknown, seq: number | undefined) => void): void {
   const off = end.onMessage((channel, bytes) => { port.postMessage({ channel, bytes }, [bytes]); });
   // E7.3: a clean quit from the menu: `ready` again, with a flag. The body goes at once.
   const quit = end.onControl((control, bytes) => {
@@ -37,7 +37,7 @@ export function pumpSocket(end: SocketTransport, port: MessagePort, now: () => n
     if ('out' in message) {
       // GC15 (3): the room let this seat go to another worker: the socket stays open and the door points it at the target's port
       off(); quit(); closed(); port.close();
-      if (out === undefined) end.close('retry'); else out(message.motion);
+      if (out === undefined) end.close('retry'); else out(message.motion, message.seq);
     } else if ('close' in message) { off(); quit(); closed(); end.close(message.close); port.close(); }
     else if ('control' in message) end.control(message.control, message.bytes);
     else end.send(message.channel, message.bytes);
@@ -89,10 +89,10 @@ export class SeatTransport implements Transport {
    * GC15 (3): this seat walks on to a cell on another worker. After everything already sent (the `travel`), the door hears `out` and
    * moves the socket; this end is done, and its close listeners never hear of it: nothing closed.
    */
-  handOut(motion: unknown): void {
+  handOut(motion: unknown, seq: number): void {
     if (!this.open) return;
     // oxlint-disable-next-line unicorn/require-post-message-target-origin -- A MessagePort has no origin.
-    this.port.postMessage({ out: true, motion });
+    this.port.postMessage({ out: true, motion, seq });
     this.open = false; this.closes.clear(); this.messages.clear(); this.controls.clear();
   }
   onClose(listener: (reason: string) => void): () => void { this.closes.add(listener); return () => { this.closes.delete(listener); }; }

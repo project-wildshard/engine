@@ -51,7 +51,10 @@ export type CellOrder =
    */
   | { readonly kind: 'handOut'; readonly from: string; readonly device: string; readonly to: string }
   /** GC15 (3): the seat `handOut` let go on another worker arrives in `to` at `at`: the room hears its `hello` again on the moved socket. */
-  | ({ readonly kind: 'arrive'; readonly from: string; readonly to: string; readonly at: ResumeAt; readonly port: MessagePort; readonly hello: ArrayBuffer; readonly motion: MotionSnapshot | null } & SeatEntry)
+  | ({ readonly kind: 'arrive'; readonly from: string; readonly to: string; readonly at: ResumeAt; readonly port: MessagePort; readonly hello: ArrayBuffer; readonly motion: MotionSnapshot | null;
+      /** MP1.6b: the last command `seq` the source stepped (the entry's `seq` is its save's): the target's queue starts there, so the client's
+       *  predictor goes on reconciling. Absent, the queue starts fresh (a 0 here would drop every command a client past 0x8000 sends). */
+      readonly commandSeq?: number } & SeatEntry)
   /** GC15 (3): cells on other workers a walker can stand in at their entryways: this worker's road drops its walls round them and crosses into them. */
   | { readonly kind: 'open'; readonly cells: readonly string[] }
   /** ZE9b: the zone entry of a seat frozen at a gate on road `from` is off (no `ready` in time, or the move refused): its body plays on. */

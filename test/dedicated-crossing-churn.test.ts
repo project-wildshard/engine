@@ -22,4 +22,6 @@ test('a client past half its seq range still moves after a crossing to another w
   const report = await crossingChurn({ crossings: 8, bots: 1, startSeq: 40_000 });
   expect(report.between, 'it changed worker').toBeGreaterThan(0);
   expect({ lost: report.lost, doubled: report.doubled, closes: report.socketCloses, unmoved: report.unmovedLines }).toEqual({ lost: 0, doubled: 0, closes: 0, unmoved: 0 });
+  // MP1.6b, the root: the hand-out carries the source queue's `lastSeq`, so the arriving owner block never says 0
+  expect(report.zeroAcks, 'owner blocks that forgot the stepped seq').toBe(0);
 });
