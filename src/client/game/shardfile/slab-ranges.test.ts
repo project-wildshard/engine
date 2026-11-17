@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { Box3, BufferAttribute, BufferGeometry, Frustum, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3, WebGLCoordinateSystem } from 'three';
+import { BackSide, Box3, BufferAttribute, BufferGeometry, type Camera, DoubleSide, Frustum, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, OrthographicCamera, PerspectiveCamera, Scene, Vector3, WebGLCoordinateSystem } from 'three';
 import { cullSlabRanges, spatialSlabRanges, visibleSlabDraws, visibleSlabRun, SLAB_LEAF_TRIANGLES, type SlabDraws } from './slabRanges';
 
 // NINE-DRAGON-BENCHMAX NB8: a made-up resident slab chunk, a 400 m street of small wall quads whose index is in a
@@ -310,4 +310,79 @@ test('a chunk with nothing in view draws its first leaf once (the warm), then is
     draw(part, camera(-190, 0.1));
     expect(calls).toHaveLength(2);
   }
+});
+
+// NB8 (mini-nb8h): the phone leaves out a leaf that shows the camera only its backs. Three rows of 1 m wall panels down a
+// 400 m street, each panel two-faced (a quad facing +z, its twin facing -z, as a kit wall's two sides), in scrambled order.
+function twoFacedStreet(): BufferGeometry {
+  const positions: number[] = [], corners: number[] = [];
+  for (let i = 0; i < 1500; i++) {
+    const x = -200 + (i * 7919 % 1500) * 400 / 1500, z = (i % 3) * 6 - 6, y = (i % 5) * 4;
+    const at = positions.length / 3;
+    positions.push(x, y, z, x + 1, y, z, x + 1, y + 3, z, x, y + 3, z);
+    if (i % 2 === 0) corners.push(at, at + 1, at + 2, at, at + 2, at + 3);
+    else corners.push(at, at + 2, at + 1, at, at + 3, at + 2);
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(Float32Array.from(positions), 3));
+  geometry.setIndex(new BufferAttribute(Uint32Array.from(corners), 1));
+  return geometry;
+}
+/** whether triangle `t` of `geometry`, drawn with `world`, shows `eye` its back (three's front face winds anticlockwise) */
+function showsBack(geometry: BufferGeometry, t: number, world: Matrix4, eye: Vector3): boolean {
+  const index = geometry.index, position = geometry.getAttribute('position'); if (index === null) throw new Error('no index');
+  const [a, b, c] = [0, 1, 2].map(k => new Vector3().fromBufferAttribute(position, index.getX(t * 3 + k)).applyMatrix4(world)) as [Vector3, Vector3, Vector3];
+  const normal = new Vector3().subVectors(b, a).cross(new Vector3().subVectors(c, a));
+  return new Vector3().subVectors(a, eye).dot(normal) > 0;
+}
+
+test('each leaf faces one way: every triangle\'s wound normal lies in its leaf\'s cone', () => {
+  const geometry = twoFacedStreet(), ranges = spatialSlabRanges(geometry, SLAB_LEAF_TRIANGLES, true);
+  if (ranges === null) throw new Error('expected ranges');
+  const index = geometry.index, position = geometry.getAttribute('position'); if (index === null) throw new Error('no index');
+  let leaves = 0;
+  for (let node = 0; node < ranges.nodes.length / 4; node++) {
+    if ((ranges.nodes[node * 4] ?? -1) >= 0) continue;
+    leaves++;
+    const axis = new Vector3(ranges.cones[node * 4] ?? 0, ranges.cones[node * 4 + 1] ?? 0, ranges.cones[node * 4 + 2] ?? 0), cos = ranges.cones[node * 4 + 3] ?? -1;
+    // a wall's two faces never share a leaf
+    expect(cos).toBeGreaterThan(0.999);
+    for (let t = ranges.nodes[node * 4 + 2] ?? 0; t < (ranges.nodes[node * 4 + 3] ?? 0); t++) {
+      const [a, b, c] = [0, 1, 2].map(k => new Vector3().fromBufferAttribute(position, index.getX(t * 3 + k))) as [Vector3, Vector3, Vector3];
+      expect(new Vector3().subVectors(b, a).cross(new Vector3().subVectors(c, a)).normalize().dot(axis)).toBeGreaterThanOrEqual(cos - 1e-6);
+    }
+  }
+  expect(leaves).toBeGreaterThan(3000 / SLAB_LEAF_TRIANGLES);
+});
+
+test('with facing the phone leaves out only triangles that show the camera their backs, about half of them', () => {
+  const geometry = twoFacedStreet(), ranges = spatialSlabRanges(geometry, SLAB_LEAF_TRIANGLES, true);
+  if (ranges === null) throw new Error('expected ranges');
+  const view = camera(-199, -Math.PI / 2), world = new Matrix4().makeTranslation(3, 0, 0);
+  // the camera beside the street (z = 20): every leaf of its -z faces shows it only backs
+  const plain = drawn(visibleSlabDraws(ranges, world, view, PHONE_ANGLE, blankDraws())), faced = visibleSlabDraws(ranges, world, view, PHONE_ANGLE, blankDraws(), true), kept = drawn(faced);
+  expect(kept.size).toBe(faced.total);
+  for (const t of kept) expect(plain.has(t)).toBe(true);
+  for (const t of plain) if (!kept.has(t)) expect(showsBack(geometry, t, world, view.position)).toBe(true);
+  expect(kept.size).toBeLessThan(plain.size * 0.7);
+  expect(kept.size).toBeGreaterThan(plain.size * 0.3);
+});
+
+test('the slab draw leaves backs out only for a front-sided material, a perspective camera and an unmirrored world', () => {
+  const view = camera(-190, 0.1), drawnBy = (material: MeshBasicMaterial, world: Matrix4, eye: Camera = view): number => {
+    const geometry = twoFacedStreet(), ranges = spatialSlabRanges(geometry, SLAB_LEAF_TRIANGLES, true);
+    if (ranges === null) throw new Error('expected ranges');
+    const part = new InstancedMesh(geometry, material, 1), { calls, draw } = fakeRenderer(true);
+    part.applyMatrix4(world); part.updateMatrixWorld(true);
+    cullSlabRanges(part, ranges, PHONE_ANGLE);
+    draw(part, eye as PerspectiveCamera);
+    return calls[0]?.triangles ?? 0;
+  };
+  const front = drawnBy(new MeshBasicMaterial(), new Matrix4()), both = drawnBy(new MeshBasicMaterial({ side: DoubleSide }), new Matrix4());
+  expect(front).toBeLessThan(both * 0.7);
+  expect(drawnBy(new MeshBasicMaterial({ side: BackSide }), new Matrix4())).toBe(both);
+  const mirror = new Matrix4().makeScale(-1, 1, 1);
+  expect(drawnBy(new MeshBasicMaterial(), mirror)).toBe(drawnBy(new MeshBasicMaterial({ side: DoubleSide }), mirror));
+  const flat = new OrthographicCamera(-50, 50, 50, -50, 0.1, 2000); flat.position.copy(view.position); flat.rotation.copy(view.rotation); flat.updateMatrixWorld(true);
+  expect(drawnBy(new MeshBasicMaterial(), new Matrix4(), flat)).toBe(drawnBy(new MeshBasicMaterial({ side: DoubleSide }), new Matrix4(), flat));
 });

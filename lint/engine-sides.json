@@ -1040,6 +1040,7 @@
     "src/client/game/shardfile/slabLibrary.ts": "client",
     "src/client/game/shardfile/slabMerge.ts": "client",
     "src/client/game/shardfile/slabRanges.ts": "client",
+    "src/client/game/shardfile/slabTree.worker.ts": "client",
     "src/client/game/shardfile/stillImage.ts": "client",
     "src/client/game/shardfile/streamingView.ts": "client",
     "src/client/game/shardfile/tileBufferedDraws.ts": "client",

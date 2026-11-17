@@ -20,6 +20,7 @@
  * `radiusBias` (a big copy switches later), `step` (re-chosen only once the eye moved that far), `bounds: 'sphere'`.
  */
 import * as THREE from 'three';
+import { TIER_CONFIG } from '../core/tier';
 
 /** when copies are dropped (all optional: none = only the frustum and the LODs) */
 export interface CullOptions {
@@ -88,7 +89,11 @@ interface CullView {
 /** metres: an eye shift under this (no turn, no zoom) keeps the copies chosen for the last view (`View.changed`) */
 const EYE_JITTER = 0.02;
 /** Legacy camera-driven instance thresholds. The padded view covers turns and translation between choices. */
-const VIEW_MARGIN = 7 * Math.PI / 180, VIEW_TURN = 3.5 * Math.PI / 360, VIEW_MOVE = 1;
+/** NINE-DRAGON-BENCHMAX NB8 (mini-nb8i): the tier's padding (degrees; the desktop's 7, the phone's 3). Margin, turn and
+ *  move scale together, so the padding still covers every pose until the next choice: the phone re-chooses more often for
+ *  copies held to a tighter view (Nine's walk p95 0.88 to 0.82 M triangles; a scene A/B 0-13 px at four poses) */
+const VIEW_PAD = TIER_CONFIG.cullViewPad / 7;
+const VIEW_MARGIN = 7 * VIEW_PAD * Math.PI / 180, VIEW_TURN = 3.5 * VIEW_PAD * Math.PI / 360, VIEW_MOVE = VIEW_PAD;
 /**
  * QD8: the padded views re-choose at their own thresholds, VIEW_MOVE and VIEW_TURN times 1 to 1.875 in eight steps, each
  * view's frustum margin its own move: walking crossed one shared metre every ~233 ms, and every culler re-chose on that one

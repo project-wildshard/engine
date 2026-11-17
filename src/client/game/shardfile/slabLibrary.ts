@@ -1,4 +1,4 @@
-import { Box3, BufferGeometry, InstancedBufferAttribute, InstancedMesh, Mesh, Sphere, Vector3, type Material, type Object3D } from 'three';
+import { Box3, BufferAttribute, BufferGeometry, InstancedBufferAttribute, InstancedMesh, Mesh, Sphere, Vector3, type Material, type Object3D } from 'three';
 import * as v from 'valibot';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -32,7 +32,7 @@ const waiting: { readonly part: InstancedMesh; readonly geometry: BufferGeometry
 let draining = false;
 function slabRuns(part: InstancedMesh, geometry: BufferGeometry, scope: Scope): void {
   const ranges = RANGES.get(geometry);
-  if (ranges !== undefined) { cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle); return; }
+  if (ranges !== undefined) { attach(part, geometry, ranges, scope); return; }
   if (!LATE.has(geometry)) return;
   waiting.push({ part, geometry, scope });
   if (!draining) { draining = true; void drainLate().finally(() => { draining = false; }); }
@@ -52,14 +52,73 @@ async function drainLate(): Promise<void> {
       for (let step = job.next(); ; step = job.next()) {
         if (step.done === true) { built = step.value; break; }
         if (slice.due()) await slice.yield();
-        if (scope.disposed || scope.disposing) break;
+        // mini-nb8i: the faced tree landed from its worker (its index rewritten): this job's place tree is not needed
+        if (scope.disposed || scope.disposing || RANGES.has(geometry)) break;
       }
-      if (built === undefined) continue;
+      if (built === undefined) { const now = RANGES.get(geometry); if (now !== undefined && !scope.disposed && !scope.disposing) attach(part, geometry, now, scope); continue; }
       LATE.delete(geometry);
       if (built !== null) { RANGES.set(geometry, built); ranges = built; }
     }
-    if (ranges !== undefined) cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle);
+    if (ranges !== undefined) attach(part, geometry, ranges, scope);
     if (slice.due()) await slice.yield();
+  }
+}
+
+/**
+ * NB8 (mini-nb8i): the phone's facing pass, off the main thread. The tree split by facing too (`slabRangesJob`'s
+ * `faced`: a leaf showing the camera only its backs is left out, which the GPU would cull after shading every vertex)
+ * costs a third more than the place tree, and built on the main thread it left the whole chunk drawn for ~1.2 s after
+ * control (mini-nb8h). So each phone chunk's index and positions go to a worker as the chunk is read, and the tree that
+ * comes back replaces whatever the chunk draws by then, its index rewritten in the same task: until it lands a part draws
+ * by the place tree (above), or whole while that waits for the settle. Without workers the place tree stays.
+ */
+const FACED = new WeakSet<SlabRanges>();
+const DRAWERS = new WeakMap<BufferGeometry, Map<InstancedMesh, Scope>>();
+function attach(part: InstancedMesh, geometry: BufferGeometry, ranges: SlabRanges, scope: Scope): void {
+  cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle);
+  let drawers = DRAWERS.get(geometry);
+  if (drawers === undefined) { drawers = new Map(); DRAWERS.set(geometry, drawers); }
+  drawers.set(part, scope);
+}
+let treeWorker: Worker | null | undefined;
+const asked = new Map<number, BufferGeometry>();
+let asks = 0;
+function facedTree(geometry: BufferGeometry): void {
+  if (!TIER_CONFIG.slabFacing || typeof Worker !== 'function' || treeWorker === null) return;
+  const index = geometry.index, position = geometry.getAttribute('position');
+  if (index === null || !(position instanceof BufferAttribute) || position.itemSize !== 3 || position.normalized || !(position.array instanceof Float32Array)) return;
+  if (treeWorker === undefined) {
+    try {
+      const worker = new Worker(new URL('slabTree.worker.ts', import.meta.url), { type: 'module', name: 'nb8-slab-tree' });
+      worker.onmessage = landed;
+      worker.onerror = (event: ErrorEvent): void => { event.preventDefault(); worker.terminate(); treeWorker = null; asked.clear(); };
+      treeWorker = worker;
+    } catch { treeWorker = null; return; }
+  }
+  const id = asks++, corners = Uint32Array.from(index.array), xyz = position.array.slice();
+  asked.set(id, geometry);
+  treeWorker.postMessage({ id, index: corners, xyz }, { transfer: [corners.buffer, xyz.buffer] });
+}
+function landed(event: MessageEvent<unknown>): void {
+  const reply = event.data;
+  if (typeof reply !== 'object' || reply === null) return;
+  const id: unknown = Reflect.get(reply, 'id'), tree: unknown = Reflect.get(reply, 'tree');
+  const geometry = typeof id === 'number' ? asked.get(id) : undefined;
+  if (typeof id === 'number') asked.delete(id);
+  if (asked.size === 0) { treeWorker?.terminate(); treeWorker = undefined; }
+  if (geometry === undefined || typeof tree !== 'object' || tree === null) return;
+  const order: unknown = Reflect.get(tree, 'index'), boxes: unknown = Reflect.get(tree, 'boxes'), nodes: unknown = Reflect.get(tree, 'nodes');
+  const size: unknown = Reflect.get(tree, 'size'), cones: unknown = Reflect.get(tree, 'cones'), triangles: unknown = Reflect.get(tree, 'triangles');
+  const index = geometry.index;
+  if (index === null || !(order instanceof Uint32Array) || !(boxes instanceof Float32Array) || !(nodes instanceof Int32Array) || !(size instanceof Float32Array)
+    || !(cones instanceof Float32Array) || typeof triangles !== 'number' || order.length !== index.count || triangles * 3 !== index.count) return;
+  // the same triangles in the tree's order: whatever order the chunk drew in, every range from here reads this one
+  (index.array as Uint32Array | Uint16Array).set(order); index.needsUpdate = true;
+  const ranges: SlabRanges = { boxes, nodes, triangles, size, cones };
+  FACED.add(ranges); RANGES.set(geometry, ranges); LATE.delete(geometry);
+  for (const [part, scope] of DRAWERS.get(geometry) ?? []) {
+    if (scope.disposed || scope.disposing) DRAWERS.get(geometry)?.delete(part);
+    else cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle);
   }
 }
 
@@ -106,6 +165,7 @@ async function readSlabChunks(owner: Scope, product: ShardProduct, tile: number,
       if (TIER_CONFIG.slabRanges && !merged.has(row.key)) {
         if (tilesSettling()) LATE.add(geometry);
         else { const ranges = spatialSlabRanges(geometry); if (ranges !== null) RANGES.set(geometry, ranges); }
+        facedTree(geometry);
       }
       const [x0, y0, z0, x1, y1, z1] = row.box, [sx, sy, sz, radius] = row.sphere;
       geometry.boundingBox = new Box3(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1));
@@ -190,14 +250,14 @@ export class SlabLibrary {
       const geometry = parts.length === at.length ? mergeSlabChunks(parts) : null;
       if (geometry === null) {
         // channels that differ: the key keeps its chunks, each with its own leaf tree
-        for (const part of parts) { ownSceneResource(part, scope); if (TIER_CONFIG.slabRanges) LATE.add(part); }
+        for (const part of parts) { ownSceneResource(part, scope); if (TIER_CONFIG.slabRanges) { LATE.add(part); facedTree(part); } }
         return;
       }
       const { box, sphere } = mergedSlabBounds(at.map(index => rows[index] ?? { box: [], sphere: [] }));
       geometry.boundingBox = box; geometry.boundingSphere = sphere;
       ownSceneResource(geometry, scope);
       // its leaf tree is a sliced job after the loader's settle (`drainLate`), never a long task on the read
-      if (TIER_CONFIG.slabRanges) LATE.add(geometry);
+      if (TIER_CONFIG.slabRanges) { LATE.add(geometry); facedTree(geometry); }
       for (const [order, index] of at.entries()) chunks[index] = order === 0 ? geometry : null;
       for (const part of parts) part.dispose();
     };

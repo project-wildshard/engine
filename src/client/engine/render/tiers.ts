@@ -63,6 +63,12 @@ export const TIER_TABLE = {
     // NB8 (mini-nb8e): with WEBGL_multi_draw, a frustum-culled slab key's chunks in a bank draw as one merged geometry
     // (`slabMerge.ts`): Nine's 12 plain chunks are 1 draw; the leaf cut keeps its triangles where they were
     slabMerge: true,
+    // NB8 (mini-nb8i): placed copies are chosen for the camera's view padded this many degrees (and re-chosen at a
+    // quarter of that turn, `cull.ts`): Nine's copies at 7° drew ~0.1 M triangles outside the portrait view
+    cullViewPad: 3,
+    // NB8 (mini-nb8i): each slab chunk's tree also splits by facing, built in a worker as the chunk is read
+    // (`slabLibrary.ts`), so a leaf showing the camera only its backs is left out: Nine's spawn 0.81 to 0.78 M
+    slabFacing: true,
   },
   desktop: {
     maxTexture: 4096, layerSize: 1024, dpr: 1.5, ao: true,
@@ -92,6 +98,8 @@ export const TIER_TABLE = {
     slabRanges: false,
     slabLodAngle: 0,
     slabMerge: false,
+    cullViewPad: 7,
+    slabFacing: false,
   },
 };
 
