@@ -506,6 +506,51 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     }
   }, 120_000);
 
+  for (const carried of [false, true]) test(`QA14: narrow fetch refreshes stale red plan provenance before ${carried ? 'carried' : 'exact'} main push`, () => {
+    const f = fixture(), wt = f.worktree('pin-refresh');
+    const ref = 'refs/heads/plan/pin-refresh', tracking = 'refs/remotes/origin/plan/pin-refresh';
+    f.git(f.repo, ['config', '--replace-all', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main']);
+    const stale = f.commit(wt, 'test/pins/rings.json', '{"ring":2}\n', 'test: update pins');
+    f.git(wt, ['push', '--quiet', 'origin', `${ref}:${ref}`]);
+    f.git(wt, ['update-ref', tracking, stale]);
+    const tested = f.commit(wt, 'src/fix.ts', 'export const fixed = true;\n', 'fix: heal branch CI');
+    // Exercise the production provenance decision with SHA-specific CI verdicts:
+    // the earlier tip carries identical pins but is red; only tested is green.
+    const hook = join(f.root, 'check-pins.mjs');
+    writeFileSync(hook, `import { readFileSync } from 'node:fs';
+import { checkPinPush } from ${JSON.stringify(new URL('../.githooks/pin-provenance.mjs', import.meta.url).href)};
+const verdict = checkPinPush({ cwd: process.cwd(), refs: readFileSync(0, 'utf8'), env: {}, ciState: sha => sha === '${tested}' ? 'green' : 'red' });
+console.error(JSON.stringify(verdict));
+process.exit(verdict.ok ? 0 : 1);
+`);
+    writeFileSync(join(f.root, 'hooks/pre-push'), `#!/bin/sh
+refs=$(cat)
+echo "$refs" >> "$PREPUSH_LOG"
+case "$refs" in *refs/heads/main*) printf '%s\\n' "$refs" | node '${hook}';; esac
+`);
+    chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
+    if (carried) f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(f.git(f.repo, ['rev-parse', tracking])).toBe(tested);
+    expect(f.git(f.remote, ['rev-parse', ref])).toBe(tested);
+    expect(f.git(f.remote, ['show', 'main:test/pins/rings.json'])).toBe('{"ring":2}');
+    expect(f.remoteMain() === tested).toBe(!carried);
+    expect(result.stdout + result.stderr).toContain(`origin/plan/pin-refresh ${tested.slice(0, 10)}, ci green`);
+  }, 60_000);
+
+  for (const removed of [false, true]) test(`QA14: a plan ${removed ? 'deleted' : 'replaced'} during hosted CI cannot land its old green tip`, () => {
+    const f = fixture(), wt = f.worktree('changed-remote');
+    const before = f.remoteMain(), ref = 'refs/heads/plan/changed-remote';
+    f.commit(wt, 'test/pins/rings.json', '{"ring":2}\n', 'test: update pins');
+    f.state({ once: { marker: join(f.root, 'once'), command: ['git', '--git-dir', f.remote, 'update-ref', ...(removed ? ['-d', ref] : [ref, before])] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout + result.stderr).toBe(1);
+    expect(result.stdout).toContain(removed ? 'git fetch origin plan/changed-remote failed' : 'changed after hosted CI');
+    expect(f.remoteMain()).toBe(before);
+    expect(prepushLines(f).some(line => line.includes('refs/heads/main'))).toBe(false);
+  }, 60_000);
+
   test('main moved to disjoint paths: rebase, carry the hosted proof, static pre-push, then return (main-watch follows)', () => {
     const f = fixture();
     const wt = f.worktree('foo');

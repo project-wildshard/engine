@@ -637,6 +637,19 @@ class Landing{
   this.planTip=sha;
  }
 
+ /** Refresh the hosted proof's remote tip immediately before pushing main. A narrow origin fetch config does not
+  * update origin/plan/* on push; the provenance hook must see the tested SHA, never an earlier red tip. A replaced
+  * or deleted remote branch stops the land rather than authorizing main from stale local provenance.
+  * @param {string} tested */
+ refreshPlanTip(tested){
+  const tracking=`refs/remotes/origin/${this.branch}`;
+  const fetched=tryGitLocked(this.root,['fetch','--quiet','origin',`+refs/heads/${this.branch}:${tracking}`],process.env,this.retry);
+  const tip=fetched.status===0?git(this.root,['rev-parse',tracking]):'';
+  const why=fetched.status!==0?`git fetch origin ${this.branch} failed: ${fetched.stderr.trim()}`
+   :tip!==tested?`origin ${this.branch} changed after hosted CI: tested ${short(tested)}, remote ${short(tip)}; run land again`:'';
+  if(why!==''){this.receipt(`STOP ${why}`);throw new StopError(why);}
+ }
+
  /** The local branch reached `tip`: some reflog entry of it is `tip` or a descendant (the newest 200).
   * @param {string} tip */
  /** TS10: re-run a red ci run's failed jobs once when every failure is a test file; on a green re-run, give each
@@ -930,6 +943,7 @@ class Landing{
     rule='carried';why=`clean rebase onto ${short(main)}: the branch's green run ${short(tested.sha)} carries (J249)`;
     this.say('carried',why);
    }
+   this.refreshPlanTip(tested.sha);
    const outcome=await this.pushMain(rule==='carried');
    if(outcome==='moved'){this.say('moved','main moved during the merge; rebasing and retrying');continue;}
    return this.landed(rule,why,round,main);
