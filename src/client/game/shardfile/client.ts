@@ -80,7 +80,7 @@ import { buildYield } from '@wildshard/engine/core/workSlice';
 import { clientScene, handledItemInputs, itemScene } from './clientItems';
 import { installShardfileColliders } from '../../../shared/game/shardfile/collisionBindings';
 import type { ClientAssets } from './clientAssets';
-import { installDeclaredItems, leverLines, rackMeleeRows, rackToolRows, takenLine, type DeclaredItems } from '../../../shared/game/shardfile/items';
+import { installDeclaredItems, leverLines, rackMeleeRows, rackToolRows, standScenes, takenLine, type DeclaredItems } from '../../../shared/game/shardfile/items';
 import { declaredLever } from '../plugin/weaponFamily';
 import { runtimeBoundWorldFiles, withoutRuntimeRows } from "../../../shared/game/plugin/runtimeRows";
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -680,9 +680,16 @@ export class ShardfileClient {
       racked.delete(weapon); play.weapons.unlock(weapon.id); play.weapons.select(weapon.id);
       return true;
     };
+    // off the wire: a stand's own scene takes its tool; the tool's other action-3 scene (its toggle) does nothing while it hangs there
+    const standIds = standScenes(source);
+    const standHere = (item: string, at: string): boolean => {
+      if (!onStands.has(item)) return takeRacked(item, true);
+      if (standIds.has(at)) return takeRacked(item, true);
+      return [...stands].some(tool => tool.row.id === item);
+    };
     takenHere = item => levers.some(lever => lever.row.id === item && lever.taken) || onRacks.has(item) && ![...racked].some(weapon => weapon.row.id === item)
       || onStands.has(item) && ![...stands].some(tool => tool.row.id === item);
-    const scene = clientScene(source, items.runtimes, () => undefined, (item, action) => relayItem(source, item, action) || takeHere(item, action) || action === 3 && takeRacked(item, true));
+    const scene = clientScene(source, items.runtimes, () => undefined, (item, action, at) => relayItem(source, item, action) || takeHere(item, action) || action === 3 && standHere(item, at));
     if (levers.length > 0 || racked.size > 0 || stands.size > 0) ctx.system({ id: 'shardfile.lever-lines', phase: 'update', run: () => {
       if (wirePage.client !== null) for (const weapon of racked) if (wirePage.line(takenLine(weapon.row.id)) > 0) takeRacked(weapon.row.id);
       if (wirePage.client !== null) for (const tool of stands) if (wirePage.line(takenLine(tool.row.id)) > 0) takeRacked(tool.row.id);

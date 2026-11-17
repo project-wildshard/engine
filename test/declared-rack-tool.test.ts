@@ -25,11 +25,11 @@ async function withRack(): Promise<{ readonly shard: Shardfile; readonly base: S
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const base = product.shardfile;
-  // the lantern leaves the loadout for a stand; the stand's take replaces the toggle's action-3 row
+  // the lantern leaves the loadout for a stand; its toggle key (`template.lantern.toggle`, action 3 with no prompt) stays
   const shard: Shardfile = { ...base, items: { ...base.items, loadout: { ...base.items.loadout, tools: base.items.loadout.tools.filter(id => id !== LANTERN) } },
     targets: { ...base.targets,
       interactions: [...base.targets.interactions, { id: USE, at: AT, radius: 2, label: 'Take the lantern', scene: SCENE }],
-      itemActions: [...(base.targets.itemActions ?? []).filter(row => row.item !== LANTERN || row.action !== 3), { scene: SCENE, item: LANTERN, action: 3 }] } };
+      itemActions: [...base.targets.itemActions ?? [], { scene: SCENE, item: LANTERN, action: 3 }] } };
   const ports = { rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), quest: { fact: () => undefined, coins: () => undefined } };
   return { shard, base, sim: createShardfileSim(shard, assets, ports), ports, assets };
 }
@@ -49,6 +49,11 @@ test('a lantern on a stand: taken near it into the kit lit and full, refilled by
   if (kit === null || player === undefined) throw new Error('Missing fixture bodies');
   const TAKEN = takenLine(LANTERN);
   tick(sim, kit);
+  expect(lines(sim).get(TAKEN)).toBe(0);
+  expect(lines(sim).get('template.lantern.lit')).toBe(0);
+  // Its toggle key is no take: it does nothing while the lantern hangs on its stand (review MUST-FIX, plan/ss10d).
+  expect(kit.scene(PLAYER, 'template.lantern.toggle')).toBe(true);
+  tick(sim, kit, 3);
   expect(lines(sim).get(TAKEN)).toBe(0);
   expect(lines(sim).get('template.lantern.lit')).toBe(0);
   // Far from the stand the take does nothing.
@@ -71,6 +76,14 @@ test('a lantern on a stand: taken near it into the kit lit and full, refilled by
   tick(sim, kit, 3);
   expect(lines(sim).get('template.lantern.lit')).toBe(1);
   expect(lines(sim).get('template.lantern.oil')).toBeGreaterThan(burnt);
+
+  // Once taken, the toggle key puts it out and lights it again: a toggle, never a refill.
+  expect(kit.scene(PLAYER, 'template.lantern.toggle')).toBe(true);
+  tick(sim, kit, 3);
+  expect(lines(sim).get('template.lantern.lit')).toBe(0);
+  expect(kit.scene(PLAYER, 'template.lantern.toggle')).toBe(true);
+  tick(sim, kit, 3);
+  expect(lines(sim).get('template.lantern.lit')).toBe(1);
 
   // A save keeps the take.
   const saved = serializeSimSnapshot(snapshotSimHostBytes(sim.host)), level = sim.host.level;

@@ -19,7 +19,7 @@ import type { AimCommand } from '@wildshard/engine/input/commands';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
-import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, rackMeleeRows, rackToolRows, SERVER_KIT_FAMILIES, takenLine, type LeverProfile } from '../../../shared/game/shardfile/items';
+import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, rackMeleeRows, rackToolRows, SERVER_KIT_FAMILIES, standScenes, takenLine, type LeverProfile } from '../../../shared/game/shardfile/items';
 import { playerSeats, type PlayerSeat } from '../plugin/playerSeats';
 import { nativeRangedHit } from '../plugin/nativeItems';
 import { installStatusEffects } from './statusEffects';
@@ -48,7 +48,7 @@ type Cycle = InstanceType<typeof RangedAction.Cycle>;
 interface LeverSeat { readonly act: Cycle; readonly store: { reserve: number }; taken: boolean; sinceEmpty: number }
 interface KitSeat extends PlayerSeat { readonly runtimes: ReadonlyMap<string, ItemRuntime>; readonly levers: ReadonlyMap<string, LeverSeat>; readonly racked: Set<string> }
 /** The continuation key of a player's rack weapons still on their racks (TC-E4): no item id starts with '#'. */
-const RACKED = '#racked';
+const RACKED = '#racked', RACKABLE = '#rackable';
 type LeverRow = Extract<Shardfile['items']['rows'][number], { kind: 'weapon' }>;
 const finiteNumber = v.pipe(v.number(), v.finite()), count = v.pipe(finiteNumber, v.integer(), v.minValue(0));
 const LeverSaved = v.strictObject({ tube: count, chambered: v.boolean(), caseInChamber: v.boolean(), hammerCocked: v.boolean(),
@@ -101,7 +101,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
   // TEMPLATE-E2E TC-E4 (J361: Mossgate's sword is found on a rack): a melee weapon a rack takes starts on that rack, per player
   const rackMelee = rackMeleeRows(shard);
   // SHARD-SOURCE SS-GF1a1a: a tool the loadout does not carry and a stand takes starts on that stand, per player
-  const rackTools = rackToolRows(shard), onRacks = new Set([...rackMelee, ...rackTools]);
+  const rackTools = rackToolRows(shard), stands = standScenes(shard), onRacks = new Set([...rackMelee, ...rackTools]);
   // A rack's prompt arrives by its own id (the page's wire id): a lever's or a racked melee weapon's names its scene
   const leverPrompts = new Map(shard.targets.interactions.flatMap(row => (shard.targets.itemActions ?? []).some(action => action.scene === row.scene && (levers.has(action.item) || onRacks.has(action.item))) ? [[row.id, row.scene] as const] : []));
   const fields = (shard.targets.itemFields ?? []).flatMap(row => {
@@ -148,7 +148,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         }
       },
       snapshot: (): SimValue => ({ ...Object.fromEntries([...runtimes].map(([id, runtime]) => [id, runtime.snapshot()])), ...Object.fromEntries([...seated].map(([id, seat]) => [id, leverSnapshot(seat)])),
-        ...(onRacks.size === 0 ? {} : { [RACKED]: [...racked].sort() }) }),
+        ...(onRacks.size === 0 ? {} : { [RACKED]: [...racked].sort(), [RACKABLE]: [...onRacks].sort() }) }),
       restore: value => {
         if (!isStates(value)) throw new Error('Invalid declared kit item continuation');
         // A player's document can come from an older room (E7.4): its tick is that room's. The runtime's tick only orders steps,
@@ -158,7 +158,13 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         for (const [id, seat] of seated) { const saved: unknown = value[id]; if (saved !== undefined) restoreLever(seat, saved); if (id === primary) seat.taken = true; }
         // A save from before TC-E4 has no rack list: its weapons stay on their racks, as a fresh player's do.
         const saved: unknown = value[RACKED];
-        if (Array.isArray(saved)) { racked.clear(); for (const id of saved) if (typeof id === 'string' && onRacks.has(id)) racked.add(id); }
+        if (Array.isArray(saved)) {
+          // SS-GF1a1a: what the save could have held on a rack (a save before stand tools knew only the melee racks); an item
+          // the save never knew starts on its rack, as a fresh player's does
+          const known: unknown = value[RACKABLE], universe = new Set(Array.isArray(known) ? known.filter(id => typeof id === 'string') : [...rackMelee]);
+          racked.clear(); for (const id of saved) if (typeof id === 'string' && onRacks.has(id)) racked.add(id);
+          for (const id of onRacks) if (!universe.has(id)) racked.add(id);
+        }
       } };
   });
   // Joined: a save made before this owner existed restores, and its items start fresh.
@@ -280,7 +286,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         return true;
       }
       // SS-GF1a1a: 3 takes a tool off its stand into the kit, lit and full; a later take refills it and never puts it out
-      if (taker !== undefined && row.action === 3 && rackTools.has(row.item)) {
+      if (taker !== undefined && stands.has(scene)) {
         const runtime = seats.of(taker).runtimes.get(row.item);
         if (runtime === undefined || !near(taker, scene)) return true;
         seats.of(taker).racked.delete(row.item);

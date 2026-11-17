@@ -14,7 +14,7 @@ const LANTERN = 'tool.template-lantern';
 test('a tool on a stand starts locked in the page\'s kit and works once unlocked', { timeout: 60_000 }, async () => {
   const base = (await loadHeadlessFolder(builtFolder('_template'))).shardfile;
   const shard: Shardfile = { ...base, items: { ...base.items, loadout: { ...base.items.loadout, tools: base.items.loadout.tools.filter(id => id !== LANTERN) } },
-    targets: { ...base.targets, itemActions: [...(base.targets.itemActions ?? []).filter(row => row.item !== LANTERN || row.action !== 3), { scene: 'fixture.lantern-rack.take', item: LANTERN, action: 3 }] } };
+    targets: { ...base.targets, interactions: [...base.targets.interactions, { id: 'fixture.lantern-rack.use', at: [20, 0, 20], radius: 2, label: 'Take the lantern', scene: 'fixture.lantern-rack.take' }], itemActions: [...(base.targets.itemActions ?? []).filter(row => row.item !== LANTERN || row.action !== 3), { scene: 'fixture.lantern-rack.take', item: LANTERN, action: 3 }] } };
   const scope = new Scope('page'), aim = { origin: { x: 0, y: 1.6, z: 0 }, direction: { x: 0, y: 0, z: -1 } };
   const input = { bind: () => undefined, held: () => false, register: () => undefined, has: () => true };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The kit's runtimes strike at nothing here.

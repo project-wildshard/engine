@@ -1,5 +1,6 @@
 import type { ItemRuntime } from '@wildshard/engine/combat/items';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { standScenes } from '../../../shared/game/shardfile/items';
 
 /** A tool's direct input callback already queues its toggle; plumbing supplies its keys/touch and only the other scenes. */
 export function handledItemInputs(source: Shardfile): ReadonlySet<string> {
@@ -11,15 +12,17 @@ export function handledItemInputs(source: Shardfile): ReadonlySet<string> {
   return handled;
 }
 
-export function clientScene(source: Shardfile, runtimes: ReadonlyMap<string, ItemRuntime>, fallback: (id: string) => void, relay?: (item: string, action: 3 | 4) => boolean): (id: string) => void {
+export function clientScene(source: Shardfile, runtimes: ReadonlyMap<string, ItemRuntime>, fallback: (id: string) => void, relay?: (item: string, action: 3 | 4, scene: string) => boolean): (id: string) => void {
   const actions = new Map((source.targets.itemActions ?? []).map((row) => [row.scene, row]));
   return (id) => {
     const action = actions.get(id); if (action === undefined) { fallback(id); return; }
     const item = runtimes.get(action.item); if (item === undefined) throw new Error('Missing admitted scene item');
-    if (relay?.(action.item, action.action) !== true) item.queue(action.action);
+    if (relay?.(action.item, action.action, id) !== true) item.queue(action.action);
   };
 }
 /** SR11 (C9): an item request as the scene the server takes it by. Undefined: the shard names no scene for it. */
-export function itemScene(source: Pick<Shardfile, 'targets'>, item: string, action: number): string | undefined {
-  return source.targets.itemActions?.find(row => row.item === item && row.action === action)?.scene;
+export function itemScene(source: Pick<Shardfile, 'targets' | 'items'>, item: string, action: number): string | undefined {
+  // SS-GF1a1a: a key never sends a stand's take (that is the stand prompt's), only the tool's own scene
+  const stands = standScenes(source);
+  return source.targets.itemActions?.find(row => row.item === item && row.action === action && !stands.has(row.scene))?.scene;
 }

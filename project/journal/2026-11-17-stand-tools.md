@@ -9,3 +9,8 @@ toggle off at a stand), the owned `.taken` line tells the page, and a save keeps
 it. The page keeps it in the kit locked (not drawn, not used) until that line, or
 off the wire the stand's own scene, unlocks it. Glowfen's spirit lanterns are the
 first user, through the sdk's `world.pickup` (SS-GF1a1b).
+
+Review fix (same day): only a stand prompt's own scene takes a tool. A tool's
+toggle key is action 3 too; it now does nothing while the tool hangs on its
+stand and toggles it once taken. Saves carry `#rackable`, so an item a save
+never knew starts on its rack.

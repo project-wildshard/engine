@@ -111,9 +111,18 @@ export function rackMeleeRows(shard: { readonly items: { readonly rows: readonly
 /** SHARD-SOURCE SS-GF1a1a: the declared tools a stand hands over (an item scene's take, action 3) that the loadout does not
  *  carry (a spirit lantern found on its stand). Each starts on its stand for every player; the take puts it in that player's
  *  kit, lit and full. */
-export function rackToolRows(shard: { readonly items: { readonly rows: readonly { readonly id: string; readonly kind?: string }[]; readonly loadout: { readonly tools: readonly string[] } }; readonly targets: { readonly itemActions?: readonly { readonly item: string; readonly action: number }[] | undefined } }): ReadonlySet<string> {
+export function rackToolRows(shard: StandShard): ReadonlySet<string> {
+  const scenes = standScenes(shard);
+  return new Set((shard.targets.itemActions ?? []).flatMap(row => scenes.has(row.scene) ? [row.item] : []));
+}
+interface StandShard { readonly items: { readonly rows: readonly { readonly id: string; readonly kind?: string }[]; readonly loadout: { readonly tools: readonly string[] } };
+  readonly targets: { readonly interactions: readonly { readonly scene: string }[]; readonly itemActions?: readonly { readonly scene: string; readonly item: string; readonly action: number }[] | undefined } }
+/** SS-GF1a1a: the stands' own scenes: a take (action 3) of a tool the loadout does not carry, run by a use prompt. A tool's other
+ *  action-3 scene (its toggle key) is never a take: it toggles the tool once taken, and does nothing while it hangs there. */
+export function standScenes(shard: StandShard): ReadonlySet<string> {
   const tools = new Set(shard.items.rows.filter(row => row.kind === 'tool' && !shard.items.loadout.tools.includes(row.id)).map(row => row.id));
-  return new Set((shard.targets.itemActions ?? []).flatMap(row => row.action === 3 && tools.has(row.item) ? [row.item] : []));
+  const prompted = new Set(shard.targets.interactions.map(row => row.scene));
+  return new Set((shard.targets.itemActions ?? []).flatMap(row => row.action === 3 && tools.has(row.item) && prompted.has(row.scene) ? [row.scene] : []));
 }
 /** Normal equipment factory result plus authoritative fixed-step runtimes, scoped to the one session. */
 export interface DeclaredItems {
