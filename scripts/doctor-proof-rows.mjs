@@ -1,4 +1,10 @@
 /** The native Doctor proof's row predicate. Private-health publication is proved separately on the tailnet. */
+/** Page metadata must agree with the already signature-verified release, including when proving an earlier release.
+ * @param {unknown} pageEpoch @param {unknown} signedEpoch */
+export function doctorEpochOK(pageEpoch, signedEpoch) {
+  return typeof signedEpoch === 'number' && Number.isSafeInteger(signedEpoch) && signedEpoch > 0 && pageEpoch === signedEpoch;
+}
+
 /** @param {readonly {id?:string,state?:string,value?:string|null}[]} rows @param {string} socket */
 export function doctorRowsOK(rows, socket) {
   if(rows.length!==7||rows.map(row=>row.id).join(',')!=='page,release,packs,server,join,latency,browser')return false;

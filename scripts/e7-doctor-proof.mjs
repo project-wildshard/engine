@@ -4,7 +4,7 @@ import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from "./browser-playwright.mjs";
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {PRIVATE_HEALTH_SKIPPED,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
-import {doctorRowsOK} from './doctor-proof-rows.mjs';
+import {doctorEpochOK,doctorRowsOK} from './doctor-proof-rows.mjs';
 import {SOCKET_READY,SOCKET_RELIABLE,SOCKET_PING} from '../src/shared/engine/net/socketFrames.ts';
 
 const [base,build,key]=process.argv.slice(2),human=process.argv.includes('--human-static'),origin=new URL(base).origin;
@@ -14,7 +14,7 @@ assert.equal(origin,human?'https://play.wildshard.io':'https://staging.wildshard
 const channel=human?'production':'staging',releaseURL=`https://packs.wildshard.io/releases/${channel}.json`;
 /** @param {string|URL} url */
 async function read(url){const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,String(url));return response;}
-const version=await(await read(new URL('/version.json',base))).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,2);
+const version=await(await read(new URL('/version.json',base))).json();assert.equal(version.build,build);
 const root=await(await read(new URL('/',base))).text(),document=await(await read(new URL('/doctor/',base))).text();
 assert.ok(root.includes('data-doctor-door'));
 const door=await fetch(new URL('/?doctor&chunk=driftwood-isle&from=link',base),{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(15000)});
@@ -24,8 +24,8 @@ assert.equal(destination.origin,origin);assert.equal(destination.pathname,'/doct
 const worldText=/globalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(document)?.[1];assert.ok(worldText,'Doctor needs a release stamp');const world=JSON.parse(worldText);assert.equal(world.release,releaseURL);assert.equal(world.key,key);
 const scripts=[...document.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map(match=>match[1]);assert.ok(scripts.length>0,'Doctor entry must be build scoped');assert.ok(scripts.every(path=>path!==undefined&&path.startsWith(`/b/${build}/doctor/`)),'Every external Doctor script must be build scoped');for(const path of scripts){assert.ok(path!==undefined);await read(new URL(path,base));}
 const signed=await(await read(releaseURL)).json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
-const release=JSON.parse(signed.body);assert.equal(release.channel,channel);assert.equal(release.engineBuild,build);assert.equal(release.saveEpoch,2);
-if(human){console.log('PASS human Doctor static publication',JSON.stringify({build,epoch:1,doctorEntry:true,signedProduction:true,productionSockets:0}));}else{
+const release=JSON.parse(signed.body);assert.equal(release.channel,channel);assert.equal(release.engineBuild,build);assert.ok(doctorEpochOK(version.saveEpoch,release.saveEpoch),'Page epoch must match the signature-verified release');
+if(human){console.log('PASS human Doctor static publication',JSON.stringify({build,epoch:release.saveEpoch,doctorEntry:true,signedProduction:true,productionSockets:0}));}else{
  // MS7.3: the socket is rooms-staging; D7 health stays private on the tailnet.
  const socket=release.socket.replace(/\/$/u,'');assert.ok(['wss://rooms-staging.wildshard.io'].includes(socket),socket);
  const healthURL=privateHealthURL();
@@ -60,7 +60,7 @@ if(human){console.log('PASS human Doctor static publication',JSON.stringify({bui
    const lines=splitRoomsHealthLines(errors,roomsHealthURL(socket));console.log('D7 rooms health lines (listed)',JSON.stringify(lines.health));
    assert.deepEqual(lines.other,[],'No other native exception or console error is filtered');
    if(healthURL!==undefined){const after=await(await read(healthURL)).json();assert.equal(after.build,build);console.log('Doctor player-count diagnostic (shared staging)',JSON.stringify({before:before?.players,after:after.players}));}
-   console.log('PASS live staging Doctor',JSON.stringify({engine,build,epoch:1,rows,prefixes,clipboard:true,noReadyFrame:true,productionSockets:0}));
+   console.log('PASS live staging Doctor',JSON.stringify({engine,build,epoch:release.saveEpoch,rows,prefixes,clipboard:true,noReadyFrame:true,productionSockets:0}));
   }finally{await context.close();await browser.close();}
  }
 }
