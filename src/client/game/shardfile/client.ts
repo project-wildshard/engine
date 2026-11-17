@@ -541,7 +541,9 @@ export class ShardfileClient {
     // A field a player may see, on this page: the server's row where it sends one. Only public shared fields have rows, so a player's own stands
     // at its authored default: no such row, and none invented here (RETIRE-FEED A6).
     // SR11 (C9): an item's field is an owned line once a wire is up; a line at zero is dropped from `owned`, so absent is zero.
-    const itemLines = new Set((source.targets.itemFields ?? []).flatMap(row => source.state.player.filter(field => field.id === row.fieldId).map(field => field.name)));
+    // SHARD-SOURCE SS-GF1a2: so is a script's own player field (a socket this player lit): the server's `script.player-fields`
+    const scriptLines = source.sim.scripts.length === 0 ? [] : source.state.player.filter(field => field.privacy !== 'host' && field.type !== 'string').map(field => field.name);
+    const itemLines = new Set([...(source.targets.itemFields ?? []).flatMap(row => source.state.player.filter(field => field.id === row.fieldId).map(field => field.name)), ...scriptLines]);
     // TE-ENG6: off the wire a lever's take is this page's own, so its projected field reads the page's lever (bound once the levers are).
     const takenFields = new Map((source.targets.itemFields ?? []).flatMap(row => row.property !== 'taken' ? [] : source.state.player.filter(field => field.id === row.fieldId).map(field => [field.name, row.item] as const)));
     let takenHere = (_item: string): boolean => false;

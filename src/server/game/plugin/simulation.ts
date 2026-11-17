@@ -43,7 +43,7 @@ import { addBakedTerrainCollider } from "@wildshard/engine/physics/terrainTiles"
 import { decodeTerrainTile, terrainTileHeight, type TerrainTileData } from "@wildshard/format/terrainTileBytes";
 import { fnv1a32 } from "@wildshard/engine/core/rng";
 import { installScriptLane, type ScriptLanePort } from "@wildshard/engine/script/lane";
-import { publishShardState, sayFightView } from '@wildshard/engine/sim/shardRows';
+import { publishOwned, publishShardState, sayFightView } from '@wildshard/engine/sim/shardRows';
 import type { EffectRules, ScriptEntity } from "@wildshard/engine/script/effects";
 import { declaredWaterBody } from "@wildshard/engine/world/water/declared";
 import { WaterBodies } from "@wildshard/engine/world/water/body";
@@ -600,6 +600,13 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       installScriptLane(host, 'script.declared', lane, ports.commands);
       const stateLane = lane;
       if (shard.state.shared.some(field => field.privacy === 'public')) publishShardState(host, () => stateLane.world.publicShared());
+      // SHARD-SOURCE SS-GF1a2: a script's own player field (a socket this player lit) is that player's owned line, as an item's
+      // projected field is (the kit publishes those); a host field never leaves the server
+      const projected = new Set((shard.targets.itemFields ?? []).map(row => row.fieldId));
+      const own = shard.state.player.filter(field => field.privacy !== 'host' && field.type !== 'string' && !projected.has(field.id)).map(field => field.name);
+      if (own.length > 0) publishOwned(host, 'script.player-fields', (id, out) => {
+        for (const name of own) { const value = stateLane.world.viewField(id, 'player', name); if (value !== undefined) out.set(name, value); }
+      });
     }
     if (shard.targets.panels.length > 0) {
       const targetLane = lane; if (targetLane === undefined) throw new Error('Target fields require an installed script lane');
