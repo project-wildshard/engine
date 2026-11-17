@@ -1,10 +1,13 @@
 import {execFileSync} from 'node:child_process';
+import {releasePreparation} from './release-gate.mjs';
 
 /** Complete pushed ranges, never an arbitrary recent commit or a time-budgeted subset.
- * @param {string | undefined} refs @param {string} [cwd] @param {{hosted?:boolean}} [options]
+ * @param {string | undefined} refs @param {string} [cwd] @param {{hosted?:boolean,releaseDestination?:string}} [options]
  * @returns {{mode:'full'|'related'|'docs',files:string[],reason:string,tests?:string[]}} */
 export function pushSelection(refs,cwd=process.cwd(),options={}) {
   if(!refs?.trim())return {mode:'full',files:[],reason:'no complete push range'};
+  if(!options.hosted&&releasePreparation(refs,options.releaseDestination,cwd))
+    return {mode:'docs',files:['CHANGELOG.md','package.json'],reason:'release prepare changed only version and notes; exact hosted release CI still runs'};
   /** @type {Set<string>} */ const files=new Set();
   for(const line of refs.trim().split('\n')){
     const [,local,,remote]=line.trim().split(/\s+/u);

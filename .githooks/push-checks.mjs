@@ -139,7 +139,7 @@ async function main(){
   // DS9: a plan branch push or a watching driver runs the split gate; hosted CI runs the rest.
   const split=splitRequested(env),profile=split?SPLIT_PROFILE:PUSH_PROFILE;
   /** @type {{mode:'full'|'related'|'docs',files:string[],reason:string,tests?:string[]}} */
-  let selection=pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS,process.cwd());
+  let selection=pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS,process.cwd(),{releaseDestination:env.WS_PUSH_DESTINATION});
   const context=capturePushTree(profile,env),proof=context===null?null:readPushProof(context,selection);
   /** @type {unknown} */let basis=null;
   if(!split&&context!==null&&process.env.WS_LOCAL_LAND_HEAD===context.commit&&process.env.WS_LOCAL_LAND_DELTA){

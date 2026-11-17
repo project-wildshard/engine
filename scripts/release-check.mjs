@@ -21,7 +21,7 @@ if(proof!==null){
 }else if(probe){
  console.error('release: no valid exact-tree full proof');process.exitCode=3;
 }else{
- console.log('release: no valid full proof; running the normal complete engine gate');
+ console.log('release: no valid local full proof; checking exact hosted release CI');
  const result=spawnSync(process.execPath,['.githooks/run-checks.mjs','push','--release-observation'],{env,stdio:'inherit'});
  if(result.error!==undefined)throw result.error;
  process.exitCode=result.status??1;

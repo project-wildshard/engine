@@ -19,9 +19,9 @@ const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value)
 
 /** The blocking suite's active J200 quarantine at the observation time.
  * Reuse requires the same set as when the branch run started.
- * @param {number} at */
-export function exclusionScope(at){
- return JSON.stringify(activeQuarantineFiles(at).sort());
+ * @param {number} at @param {string} [cwd] */
+export function exclusionScope(at,cwd=process.cwd()){
+ return JSON.stringify(activeQuarantineFiles(at,resolve(cwd,'test/quarantine.json')).sort());
 }
 
 /** @param {string} workflow e.g. `ci.yml` @param {NodeJS.ProcessEnv} [env]

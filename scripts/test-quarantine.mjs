@@ -45,9 +45,11 @@ export function readQuarantine(policyFile=new URL('../test/quarantine.json', imp
   });
 }
 
-/** Expiry restores blocking coverage automatically; it never drops a test. */
-export function activeQuarantineFiles(now = Date.now()) {
-  return readQuarantine().filter(entry => Date.parse(entry.addedAt)<=now&&Date.parse(quarantineDeadline(entry)) > now).map(entry => entry.file);
+/** Expiry restores blocking coverage automatically.
+ * @param {number} [now] @param {string|URL} [policyFile] */
+export function activeQuarantineFiles(now,policyFile) {
+  const at=now??Date.now();
+  return readQuarantine(policyFile).filter(entry => Date.parse(entry.addedAt)<=at&&Date.parse(quarantineDeadline(entry)) > at).map(entry => entry.file);
 }
 
 /** A rewritten date cannot restart an existing admission's 48-hour clock.
