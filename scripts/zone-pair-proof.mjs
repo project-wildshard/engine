@@ -15,6 +15,7 @@ import { join, resolve as absolute } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
+import { watchFaults } from './proof-faults.mjs';
 import { guardStagingSockets, playerNameSource } from './staging-proof-lines.mjs';
 
 const flag = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -43,7 +44,8 @@ async function seat(who, viewport) {
   for (const row of [{ key: 'firstPlayDone', data: true }, { key: 'devMode', data: true }]) await saveFixture(context, { scope: 'device', ...row });
   await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
   const page = await context.newPage();
-  page.on('pageerror', error => { result.errors.push(`${who}: ${error.message.slice(0, 240)}`); });
+  // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
+  const faults = await watchFaults(page, result.errors, who);
   page.on('console', message => { if (/\[grid\]|zone|hold|welcome|redial|refus/iu.test(message.text())) log(`${who} console ${message.type()}: ${message.text().slice(0, 300)}`); });
   await page.goto(`${base}/?mute=1&nolock=1&fps=60`, { waitUntil: 'load' });
   await page.locator('.ws-main-select').click({ timeout: 120_000 });
@@ -88,7 +90,7 @@ async function seat(who, viewport) {
   const others = () => page.evaluate(() => /** @type {any} */ (window).__onlinePlayers?.()?.map((/** @type {any} */ r) => ({ name: r.name, x: Number(r.x.toFixed(2)), z: Number(r.z.toFixed(2)), speed: Number(Number(r.speed).toFixed(2)) })) ?? null);
   const me = () => page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player.position; return { x: Number(p.x.toFixed(2)), z: Number(p.z.toFixed(2)) }; });
   log(`${who} seated as ${names[who]} in ${card} and walked: ${JSON.stringify(await state())} local ${JSON.stringify(await me())}`);
-  return { who, context, page, state, origin, face, walkTo, sockets, others, me, nalatiEdge: origin.x + PITCH - HALF };
+  return { who, context, page, faults, state, origin, face, walkTo, sockets, others, me, nalatiEdge: origin.x + PITCH - HALF };
 }
 
 /** Stand in Nalati's buffer to the gate's 0 and wait for control in Nalati on the same page. @param {Awaited<ReturnType<typeof seat>>} s */
@@ -172,6 +174,7 @@ try {
   const pass = { aSamePage: aIn.samePage && aIn.ready !== null, aOneSocket: oneSocket, bSawA: watching.b.some(row => row.t < zero && row.a !== null), bFrozenThenGone: frozenMs >= 1000 && drift !== null && drift <= 0.3 && goneAt !== null, cSawArrive: arrivedNear !== null, ...(d === null ? {} : { dSawArrive: dNear !== null }) };
   log(`PASS? ${JSON.stringify(pass)} frozenMs=${String(frozenMs)} drift=${String(drift)} goneAfterZeroMs=${String(result.b.goneAfterZeroMs)} cFirstSeen=${String(result.c.firstSeenAfterZeroMs)} cNear=${JSON.stringify(arrivedNear)} dFirstSeen=${String(result.d.firstSeenAfterZeroMs)} dNear=${JSON.stringify(dNear)} cView=${JSON.stringify(result.d.cView)} dView=${JSON.stringify(result.d.dView)}`);
   /** @type {any} */ (result).pass = pass;
+  for (const s of [a, b, c, d]) if (s !== null) await s.faults.settle();
   code = Object.values(pass).every(Boolean) && result.errors.length === 0 ? 0 : 1;
   console.log(`${code === 0 ? 'ok  ' : 'FAIL'} zone pair ${JSON.stringify(pass)} errors=${String(result.errors.length)}`);
   for (const s of [a, b, c, d]) if (s !== null) await s.context.close();

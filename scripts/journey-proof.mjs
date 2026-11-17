@@ -12,6 +12,7 @@
 // staging gate (J386), run before any prod promote. It only reads: every request but a GET is aborted.
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
+import { watchFaults } from './proof-faults.mjs';
 
 /** @typedef {import('playwright').Page} Page */
 /** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string }} Screen */
@@ -54,7 +55,7 @@ export function screenNow() {
     // J399: the detailed card, its START, DOWNLOAD and LOAD tracks on screen, never a plain one-bar card; and the zone it names
     detailed: load !== undefined && ['stHead', 'dlHead', 'suHead'].every((track) => [...load.querySelectorAll(`[data-el="${track}"]`)].some(seen)),
     zone: load?.querySelector('[data-el="slug"]')?.textContent ?? '',
-    hud: shown('.ws-touch') || shown('.ws-minimap'), modal: shown('#wsdrop, .ws-err, .ws-fail'),
+    hud: shown('.ws-touch') || shown('.ws-minimap'), modal: shown('#wsdrop, #wserr, .ws-fail'),
     // the grid's sky-down arrival (grid/reveal.ts): the world drawn under its ARRIVING caption, the HUD held back for 3 s
     reveal: shown('.ws-grid-reveal'),
   };
@@ -288,7 +289,8 @@ async function cli() {
         if (throttle > 1 && name !== 'webkit') await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
         /** @type {string[]} */
         const errors = [];
-        page.on('pageerror', (e) => { errors.push(e.message); });
+        // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
+        const faults = await watchFaults(page, errors);
         await page.goto(way === 'deeplink' ? `${url}/slug/${card}` : `${url}/`, { waitUntil: 'commit' });
         let n = 0;
         const dir = join(out, `${name}-${way}-${run}`);
@@ -298,6 +300,8 @@ async function cli() {
         } });
         const problems = judge(samples);
         if (problems.length === 0 && !(await stickMoves(page))) problems.push({ at: samples.at(-1)?.t ?? 0, text: 'the move stick did not move the player' });
+        await faults.settle();
+        for (const text of errors) problems.push({ at: samples.at(-1)?.t ?? 0, text });
         /** @type {string[]} */
         const path = [];
         for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t)}:${l}`); }

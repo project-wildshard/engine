@@ -40,7 +40,7 @@ export function checkScenario(s, ctx) {
   add('play', 'P0', s.status === 'ran' && s.legs.length > 0 && unplayed.length === 0,
     s.status === 'crashed' ? `the scenario stopped: ${s.reason ?? 'unknown'}` : `never reached play (${unplayed.join(', ') || 'no leg ran'})`);
   const errorCard = s.legs.some((leg) => (leg.modals ?? []).includes('error'));
-  add('error-card', 'P0', !errorCard, 'an error card (.ws-err, .ws-fail) opened');
+  add('error-card', 'P0', !errorCard, 'an error card (#wserr, .ws-fail) opened');
   const stuck = s.legs.filter((leg) => leg.stick === false).map((leg) => leg.name);
   add('stick', 'P0', stuck.length === 0, `the move stick did not move the player (${stuck.join(', ')})`);
   // P1
@@ -134,7 +134,7 @@ export function verdictOf(scenarios, ctx) {
 export function modalKind() {
   /** @param {string} sel */
   const up = (sel) => [...document.querySelectorAll(sel)].some((el) => { const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4 && getComputedStyle(el).display !== 'none'; });
-  if (up('.ws-err, .ws-fail')) return 'error';
+  if (up('#wserr, .ws-fail')) return 'error';
   if (up('#wsdrop')) return 'drop';
   return null;
 }

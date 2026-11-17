@@ -18,6 +18,7 @@ import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from 'playwright';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
+import { watchFaults } from './proof-faults.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 
 /** @param {string} name @param {string} fallback */
@@ -51,10 +52,11 @@ const SETTLE_MS = 10_000;
  * Boot a home by its Shard Select card in `context`, wait for control, stand at `pose` (the home's frame) for SETTLE_MS (after the
  * same 1.5 s the arrival waits), and return playingMB then.
  * @param {import('playwright').BrowserContext} context @param {string} card @param {{ x: number, z: number, yaw: number }} pose
+ * @param {string[]} errors the run's errors: this page's faults go there too (ZE23)
  */
-async function bootCard(context, card, pose) {
+async function bootCard(context, card, pose, errors) {
   if (staging) await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
-  const page = await context.newPage();
+  const page = await context.newPage(), faults = await watchFaults(page, errors, `fresh ${card}`);
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
@@ -70,6 +72,7 @@ async function bootCard(context, card, pose) {
   await sleep(1500);
   await page.evaluate(({ x, z, yaw }) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(x, z, yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, yaw); }, pose);
   await sleep(SETTLE_MS);
+  await faults.settle();
   return page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
 }
 const tag = `${engineName}${device === '' ? '' : '-phone'}${targetSlug === 'nalati-grasslands' ? '' : `-${targetSlug}`}`;
@@ -82,7 +85,8 @@ try {
   if (device !== '' && phone === undefined) throw new Error(`No Playwright device ${device}`);
   result.viewport = phone === undefined ? `${String(desk[0])}x${String(desk[1])}@${String(desk[2])}` : `${device} ${String(phone.viewport.width)}x${String(phone.viewport.height)}@${String(phone.deviceScaleFactor)}`;
   const context = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 }), page = await context.newPage();
-  page.on('pageerror', error => { result.errors.push(error.message.slice(0, 240)); });
+  // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
+  const faults = await watchFaults(page, result.errors);
   if (staging) await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
   // ZE10d2: every socket the page opens, and whether each is still open (the game's link is the one to the world's port)
   if (online) await context.addInitScript(() => {
@@ -240,7 +244,7 @@ try {
     // playingMB there is held within 50 MB of it (one world in memory)
     const freshContext = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 });
     let freshMB = /** @type {number | null} */ (null);
-    try { freshMB = await bootCard(freshContext, target.name, arrived ?? { x: ax === 'x' ? dir * (14 - HALF) : 0, z: ax === 'z' ? dir * (14 - HALF) : 0, yaw: yawTo(dir) }); } catch (error) { result.errors.push(`fresh ${target.name} boot: ${String(error).slice(0, 200)}`); }
+    try { freshMB = await bootCard(freshContext, target.name, arrived ?? { x: ax === 'x' ? dir * (14 - HALF) : 0, z: ax === 'z' ? dir * (14 - HALF) : 0, yaw: yawTo(dir) }, result.errors); } catch (error) { result.errors.push(`fresh ${target.name} boot: ${String(error).slice(0, 200)}`); }
     await freshContext.close();
     // ZE10d2: the same socket: the game link open before the 0 is still open, and no game link was dialled after it
     const socketsAfter = online ? await sockets() : null, game = (/** @type {any} */ row) => staging ? row.url.startsWith('wss://rooms-staging.wildshard.io') : /:\d+\/?$/u.test(row.url) && !row.url.includes(new URL(base).host);
@@ -256,6 +260,7 @@ try {
   const named = (/** @type {string} */ name) => /** @type {any} */ (result.shots.find(row => row.name === name))?.gate;
   const [at5, gone, again, at2] = ['gate-5', 'backed-away', 'gate-again', 'gate-2'].map(named);
   console.log(JSON.stringify({ at5, at2, gone, again, fired: result.fired }));
+  await faults.settle();
   await context.close();
   const fired = /** @type {any} */ (result.fired);
   // ZE10c: nothing of the target read before the old document went, and memory at control within 50 MB of a fresh boot
