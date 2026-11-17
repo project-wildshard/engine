@@ -126,7 +126,11 @@ release clone run `journey-proof.mjs` on Driftwood and Pine Hollow,
 cold and warm, and each `report.json` names the build staging served.
 Go-live refuses until all eight passed on this exact build, and names
 any that are missing or failed (`--journeys=<dir>` reads them from
-elsewhere; default `<root>/tmp/verify-staging`). `journey-proof.mjs
+elsewhere; default `<root>/tmp/verify-staging`). It also needs
+`--smoke=<verdict.json>` (meta STAGING-SMOKE SM5, J398): run
+`node scripts/staging-smoke.mjs --url https://staging.wildshard.io
+--release v<version>` on the release clone; go-live refuses without a
+verdict, for another build, or when it holds (a P0 or P1 finding). `journey-proof.mjs
 --prime <dir>` starts from saved profiles (`<dir>/chromium`,
 `<dir>/webkit`), an old shell as a returning phone holds one, and
 `--throttle 4` slows Chromium's CPU like a Low Power phone; primed runs
@@ -158,7 +162,7 @@ branch CI and the signed staging serial, then `staging check`,
 starts trusted npm publishing. `--published` waits for npm's listing;
 never rerun the publish job while npm processes it. Production build
 and upload may run once the build is green. Run `production check`,
-`verify-staging.sh` in both browsers, `production go-live --after-staging-proofs`, then the static Doctor
+`verify-staging.sh` in both browsers, `staging-smoke.mjs`, `production go-live --after-staging-proofs --smoke=<verdict.json>`, then the static Doctor
 with `--human-static` (J205).
 
 The cook follows production: `node scripts/release-cook.mjs vX.Y.Z`

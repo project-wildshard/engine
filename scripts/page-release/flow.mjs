@@ -116,6 +116,8 @@ export function pinnedReleaseKey(configured) {
  * @property {boolean} [afterStagingProofs]  Production go-live: the strict staging proofs passed on this build.
  * @property {readonly JourneyRow[]} [journeys]  Production go-live (SB3): the staging journey runs found for the release
  *   (page-release.mjs reads them from `tmp/verify-staging/<browser>/journey-<card>/report.json`).
+ * @property {SmokeVerdict} [smoke]  Production go-live (meta STAGING-SMOKE SM5, J398): the staging smoke's verdict.json
+ *   (`page-release.mjs --smoke=<file>`; `{problem}` when it could not be read).
  * @property {string} [releaseKey]  Defaults to RELEASE_PUBLIC_KEY; tests sign with their own.
  * @property {string} [catalogue]  Preview only (SA35): the catalogue the page bakes, staging's borrowed grid (scripts/preview-grid.ts);
  *   default the pinned `test/pins/catalogue.json`.
@@ -410,6 +412,27 @@ async function productionGates(phase, deps, refuse) {
   if (phase === 'go-live' && deps.afterStagingProofs !== true) refuse('production go-live needs --after-staging-proofs: Doctor 7/7 and the live proof on Chromium and WebKit over staging');
   const gaps = phase === 'go-live' ? journeyGaps(deps.journeys, deps.build) : [];
   if (gaps.length > 0) refuse(`production go-live needs the staging journey on this build (bash scripts/verify-staging.sh chromium|webkit): ${gaps.join(', ')}`);
+  const smoke = phase === 'go-live' ? smokeGap(deps.smoke, deps.build) : undefined;
+  if (smoke !== undefined) refuse(`production go-live needs a clean staging smoke on this build (node scripts/staging-smoke.mjs --url ${CHANNELS.staging.origin} --release ${tag}, then --smoke=<its verdict.json>): ${smoke}`);
+}
+
+/**
+ * @typedef {{ build?: string, hold?: boolean, findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string }} SmokeVerdict
+ */
+
+/**
+ * STAGING-SMOKE SM5 (J398: a P0 or P1 holds prod): why a staging smoke verdict does not let `build` go live, or undefined.
+ * @param {SmokeVerdict | undefined} smoke @param {string} build @returns {string | undefined}
+ */
+export function smokeGap(smoke, build) {
+  if (smoke === undefined) return 'no --smoke verdict';
+  if (smoke.problem !== undefined) return smoke.problem;
+  if (smoke.build !== build) return `the verdict is for ${smoke.build?.slice(0, 8) ?? 'no build'}, not ${build.slice(0, 8)}`;
+  if (smoke.hold !== false) {
+    const held = (smoke.findings ?? []).filter(f => f.severity === 'P0' || f.severity === 'P1').map(f => `${f.severity ?? ''} ${f.scenario ?? ''} ${f.text ?? ''}`.trim());
+    return `it holds: ${held.join('; ') || 'hold is not false'}`;
+  }
+  return undefined;
 }
 
 /**

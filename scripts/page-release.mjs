@@ -12,6 +12,8 @@
 //   --after-staging-proofs   production go-live: the strict staging proofs passed on this exact build
 //   --journeys=<dir>         production go-live (SB3): where verify-staging.sh wrote its journey reports, read as
 //                            <dir>/<browser>/journey-<card>/report.json (default <root>/tmp/verify-staging)
+//   --smoke=<verdict.json>   production go-live (meta STAGING-SMOKE SM5, J398): the staging smoke's verdict for this build;
+//                            go-live refuses without one, for another build, or when it holds (a P0 or P1)
 //   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
 //                            dist-content/ to packs.wildshard.io first (PAGE-SIZE PZ2,
 //                            page-release/content.mjs); preview.yml passes it (PZ6), staging and production with PZ8
@@ -48,6 +50,11 @@ function readJourneys(dir) {
   });
 }
 
+/** SM5: the staging smoke's verdict.json, or why it could not be read. @param {string} file */
+function readSmoke(file) {
+  try { return JSON.parse(readFileSync(file, 'utf8')); } catch (error) { return {problem: `${file}: ${error instanceof Error ? error.message : String(error)}`}; }
+}
+
 // The world-signing key reaches only the deployment publisher, never build tools or the host.
 const signingKey = process.env.E7_RELEASE_SIGNING_KEY;
 delete process.env.E7_RELEASE_SIGNING_KEY;
@@ -72,7 +79,7 @@ if (flag('print-env') !== undefined) {
   process.exit(0);
 }
 if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
-  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--journeys=<dir>] [--content] [--catalogue=<file>]');
+  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--journeys=<dir>] [--smoke=<verdict.json>] [--content] [--catalogue=<file>]');
   process.exit(2);
 }
 const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFileSync('git', argv, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
@@ -139,6 +146,7 @@ try {
       waitMs: Number(value('wait') ?? 45) * 60_000,
       afterStagingProofs: flag('after-staging-proofs') !== undefined,
       journeys: readJourneys(resolve(value('journeys') ?? join(root, 'tmp/verify-staging'))),
+      ...(value('smoke') === undefined ? {} : {smoke: readSmoke(resolve(value('smoke') ?? ''))}),
       // the build runs in `root`, so a relative path is the caller's
       ...(value('catalogue') === undefined ? {} : {catalogue: resolve(value('catalogue') ?? '')}),
     });

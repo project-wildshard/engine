@@ -8,7 +8,7 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {CHANNELS, CHECKED_DOCUMENTS, JOURNEY_GATE, PHASES, RELEASE_PUBLIC_KEY, journeyGaps, journeyRows, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
+import {CHANNELS, CHECKED_DOCUMENTS, JOURNEY_GATE, PHASES, RELEASE_PUBLIC_KEY, journeyGaps, journeyRows, smokeGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
@@ -17,6 +17,8 @@ const build = 'a'.repeat(40);
 /** SB3: the eight staging journeys production go-live reads (two cards, two browsers, cold and warm), all passing on `on`. */
 const journeysOn = (on: string = build) => JOURNEY_GATE.cards.flatMap(card => JOURNEY_GATE.browsers.flatMap(browser =>
   JOURNEY_GATE.runs.map(run => ({card, browser, run, build: on, ok: true, at: '2026-11-17T05:00:00.000Z'}))));
+/** STAGING-SMOKE SM5: a staging smoke verdict for `on`, clean unless `hold`. */
+const smokeOn = (on: string = build, hold = false) => ({build: on, hold, findings: hold ? [{scenario: 'K3', key: 'journey', severity: 'P1', text: 'the main menu came back after Enter World'}] : []});
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
 const key = publicKey.export({format: 'der', type: 'spki'}).toString('hex');
 const token = ['host', 'credential', 'marker'].join('-');
@@ -199,6 +201,7 @@ test('production go-live holds a candidate the world does not run, with the reas
   await through(deps, 'check');
   deps.afterStagingProofs = true;
   deps.journeys = journeysOn();
+  deps.smoke = smokeOn();
   live.release = signed('production', 8, 'd'.repeat(40));
   await expect(runPhase('go-live', deps)).rejects.toThrow(/production\.json serial 8 signs d+, not /u);
   live.release = signed('production', 7);
@@ -252,6 +255,7 @@ test('production needs its tag, staging live on the build and the strict staging
   deps.afterStagingProofs = true;
   await expect(runPhase('go-live', deps)).rejects.toThrow(/staging journey on this build/u);
   deps.journeys = journeysOn();
+  deps.smoke = smokeOn();
   await runPhase('go-live', deps);
   expect(fetched(calls).at(-2)).toBe('goLive');
 });
@@ -271,8 +275,30 @@ test('production go-live needs the staging journey passing on this build', async
   expect(calls).not.toContain('goLive');
   // a newer passing rerun of the same journey clears it
   deps.journeys = [...failed, {card: 'pine-hollow', browser: 'webkit', run: 'cold', build, ok: true, at: '2026-11-17T06:00:00.000Z'}];
+  deps.smoke = smokeOn();
   await runPhase('go-live', deps);
   expect(fetched(calls).at(-2)).toBe('goLive');
+});
+
+// STAGING-SMOKE SM5 (J398): a P0 or P1 from the staging smoke holds production. Go-live refuses with no verdict, a verdict for
+// another build, or a held one, naming the findings; a clean verdict for this build goes on.
+test('production go-live needs a clean staging smoke verdict for this build', async () => {
+  const {deps, calls} = rig('production');
+  await through(deps, 'check');
+  deps.afterStagingProofs = true;
+  deps.journeys = journeysOn();
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*no --smoke verdict/u);
+  deps.smoke = smokeOn('b'.repeat(40));
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*verdict is for bbbbbbbb, not aaaaaaaa/u);
+  deps.smoke = smokeOn(build, true);
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*holds: P1 K3 the main menu came back after Enter World/u);
+  deps.smoke = {problem: 'tmp/smoke/verdict.json: ENOENT'};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*ENOENT/u);
+  expect(calls).not.toContain('goLive');
+  deps.smoke = smokeOn();
+  await runPhase('go-live', deps);
+  expect(fetched(calls).at(-2)).toBe('goLive');
+  expect(smokeGap(smokeOn(), build)).toBeUndefined();
 });
 
 test('a journey report gives one row per run; a primed run is neither cold nor warm, and a moved build names none', () => {
@@ -507,6 +533,7 @@ test('the Workers host names production --env \'\' and preview --env preview', a
   const production = workersRig('production');
   production.deps.afterStagingProofs = true;
   production.deps.journeys = journeysOn();
+  production.deps.smoke = smokeOn();
   await through(production.deps, 'go-live');
   expect(production.wrangler.every(call => call.args.slice(-2).join('|') === '--env|')).toBe(true);
   expect(verbs(production.wrangler).at(-1)).toBe('versions deploy');
