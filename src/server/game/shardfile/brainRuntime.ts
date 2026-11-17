@@ -25,7 +25,7 @@ export interface DeclaredBrainRecipe<P> { observe: (dt: number) => P; body: (dt:
 /** Loader-injected native recipes retain navigation, vertical movement, attack tokens and strike ownership. */
 export interface DeclaredBrainPorts {
   navigation?: BrainNavigation;
-  skirmisher?: (actor: AnimalSim, host: SimHost) => DeclaredBrainRecipe<SkirmisherPorts<AnimalSim>>;
+  skirmisher?: (actor: AnimalSim, host: SimHost, declaration?: ShardSkirmisher) => DeclaredBrainRecipe<SkirmisherPorts<AnimalSim>>;
   guardian?: (actor: AnimalSim, host: SimHost) => DeclaredBrainRecipe<GuardianPorts<AnimalSim>>;
   perchHunter?: (actor: AnimalSim, host: SimHost) => DeclaredBrainRecipe<PerchHunterPorts<AnimalSim>>;
   /** Pure preparation binds the declared strike and native floor/body without executing gameplay. */
@@ -132,7 +132,7 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
       }
       case 'skirmisher':
         if (ports.skirmisher === undefined) throw new Error('Missing native brain port');
-        registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new SkirmisherBrain(actor, spec), ports.skirmisher(actor, host), host)); break;
+        registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new SkirmisherBrain(actor, spec), ports.skirmisher(actor, host, spec), host)); break;
       case 'guardian':
         if (ports.guardian === undefined) throw new Error('Missing native brain port');
         registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new GuardianBrain(actor, spec), ports.guardian(actor, host), host)); break;

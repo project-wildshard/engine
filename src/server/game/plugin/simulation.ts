@@ -71,6 +71,7 @@ import { prepareCreaturePolicies, resolveCreatureLayers } from "../shardfile/cre
 import { installLayerHunts } from "../shardfile/layerHunts";
 import { createShardfileScriptLane, verifiedScriptModules, type ScriptModuleAssets, type ShardScriptPorts } from "../shardfile/scripts";
 import { installDeclaredBrains, type DeclaredBrainPorts } from "../shardfile/brainRuntime";
+import { dataGroundBrains } from "../shardfile/dataGroundBrains";
 import { installDataRespawns } from "../shardfile/dataRespawn";
 import { createShardfileComposedLane, type DeclaredScriptBrainPorts } from "../shardfile/scriptComposition";
 import { bindPlayerColumns, dataCreaturePorts } from "../../../shared/game/shardfile/dataCreaturePorts";
@@ -529,6 +530,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     });
     if (brainBindings.length > 0 && ports.scriptBrains === undefined) throw new Error('Missing custom brain port');
     const dataPorts = shard.runtime === null ? dataCreaturePorts(host, shard.rows, creatures.spawns, ports.creatureImpulse) : undefined;
+    const dataBrains = dataPorts === undefined ? undefined : { ...dataPorts.brains, ...dataGroundBrains(host, shard.rows, creatures.spawns) };
     const groupIds = new Set(creatures.groups.map((group) => group.id));
     const preparedGroups = prepareDeclaredGroupBrains(host, creatures.groups, creatures.spawns, ports.groups ?? dataPorts?.groups ?? {},
       creatures.brains.map((brain) => brain.id), shard.encounters.map((row) => row.entity));
@@ -673,7 +675,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
         if (typeof state !== 'string') throw new Error('Invalid director row continuation'); director.restore(state);
       } });
     }
-    installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataPorts?.brains, resolveCreatureLayers(shard.rows, creatures.brains));
+    installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataBrains, resolveCreatureLayers(shard.rows, creatures.brains));
     installDataRespawns(host, creatures.spawns);
     installLayerHunts(host, shard.rows, creatures);
     dataPorts?.install();
