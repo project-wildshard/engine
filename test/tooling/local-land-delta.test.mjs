@@ -14,20 +14,22 @@ function fixture(mode='full'){
  const parent=resolve(process.env.VITEST_TMP_ROOT??'tmp/codex-pagesize','local-delta');mkdirSync(parent,{recursive:true});
  const root=mkdtempSync(join(parent,'case-'));roots.push(root);
  const env={...Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('GIT_'))),GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_NOSYSTEM:'1'};
+ // Model a local publisher inside the fixture; the actual test runner may be hosted CI.
+ const proofEnv={...env,CI:'',GITHUB_ACTIONS:'',WS_PUSH_REFS:''};
  const git=(...args)=>execFileSync('git',args,{cwd:root,env,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
  const put=(file,text)=>{mkdirSync(join(root,file,'..'),{recursive:true});writeFileSync(join(root,file),text);};
  const commit=(file,text)=>{put(file,text);git('add','--',file);git('-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','--quiet','-m','fixture');return git('rev-parse','HEAD');};
  git('init','--quiet','-b','main');commit('.gitignore','tmp/\n');commit('src/a.ts','export const a=1;');
  const baseMain=commit('src/b.ts','export const b=1;');
  const testedHead=commit('src/a.ts','export const a=2;');
- const context=capturePushTree('delta-fixture',env,root);if(context===null)throw new Error('Missing clean fixture proof context');
+ const context=capturePushTree('delta-fixture',proofEnv,root);if(context===null)throw new Error('Missing clean fixture proof context');
  if(mode!=='missing')writePushProof(context,{mode,files:['src/a.ts']},1);
  git('switch','--quiet','--detach',baseMain);
  const incomingMain=commit('src/b.ts','export const b=2;');
  git('-c','user.name=Fixture','-c','user.email=fixture@example.test','cherry-pick',testedHead);
  const head=git('rev-parse','HEAD');
- const current=()=>{const value=capturePushTree('delta-fixture',env,root);if(value===null)throw new Error('Missing current proof context');return value;};
- return {root,git,put,commit,current,original:context,basis:{baseMain,testedHead,incomingMain,head}};
+ const current=()=>{const value=capturePushTree('delta-fixture',proofEnv,root);if(value===null)throw new Error('Missing current proof context');return value;};
+ return {root,git,put,commit,current,proofEnv,original:context,basis:{baseMain,testedHead,incomingMain,head}};
 }
 
 test('FL5b authenticates a prior full proof and selects only incoming-main paths',()=>{
@@ -37,6 +39,13 @@ test('FL5b authenticates a prior full proof and selects only incoming-main paths
 });
 test.each(['missing','related'])('FL5b %s proof cannot carry a full gate',mode=>{
  const f=fixture(mode);expect(localDeltaPlan(f.current(),f.basis).eligible).toBe(false);
+});
+test.each(['CI','GITHUB_ACTIONS'])('FL5b %s still refuses local cache proofs',key=>{
+ const f=fixture('missing');
+ const env={...f.proofEnv,[key]:'true'};
+ expect(capturePushTree('delta-fixture',env,f.root)).toBeNull();
+ const refs=`refs/heads/main ${f.basis.head} refs/heads/main ${f.basis.incomingMain}`;
+ expect(capturePushTree('delta-fixture',{...env,WS_PUSH_REFS:refs},f.root)).toBeNull();
 });
 test('FL5b runtime changes and unavailable proof context keep the complete gate',()=>{
  const f=fixture();
