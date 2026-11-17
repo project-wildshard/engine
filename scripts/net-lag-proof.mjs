@@ -20,6 +20,7 @@ import { chromium, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
+import { watchFaults } from './proof-faults.mjs';
 import { bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
 
 const arg = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -99,7 +100,8 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'global', key: 'settings', data: { music: false, sfx: false, volume: 0 }, merge: true });
   const page = await context.newPage(), errors = /** @type {string[]} */ ([]), row = /** @type {Record<string, any>} */ ({ engine: engineName, layout, slug, delayMs: DELAY_MS * 2 });
-  page.on('pageerror', error => { errors.push(error.message.slice(0, 200)); });
+  // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
+  const faults = await watchFaults(page, errors);
   const t0 = Date.now();
   /** @type {ReturnType<typeof setInterval> | undefined} */
   let sampler;
@@ -184,6 +186,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
     await page.screenshot({ path: join(out, `${engineName}-${layout}-${slug}-error.png`) }).catch(() => undefined);
   }
   clearInterval(sampler);
+  await faults.settle();
   row.errors = errors.slice(0, 5);
   await context.close();
   return proofVerdict(row, bridgeOnly ? 'correctness' : 'timing');

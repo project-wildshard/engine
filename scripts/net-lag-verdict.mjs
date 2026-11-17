@@ -54,5 +54,5 @@ export function proofVerdict(row, mode) {
     return { ...result, measurement: mode, checked: ['b4'], ok: row.error === undefined && (row.errors?.length ?? 0) === 0 && row.b4?.ok === true };
   }
   return { ...row, measurement: mode, checked: ['b1', 'b2', 'b3', ...(row.b4 === undefined ? [] : ['b4'])],
-    ok: row.error === undefined && row.b1?.ok === true && row.b2?.ok === true && row.b3?.ok === true && (row.b4?.ok ?? true) };
+    ok: row.error === undefined && (row.errors?.length ?? 0) === 0 && row.b1?.ok === true && row.b2?.ok === true && row.b3?.ok === true && (row.b4?.ok ?? true) };
 }
