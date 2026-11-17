@@ -7,12 +7,11 @@ A gate is engine code that treats one shard differently from another by where it
 **delete** gates are not dangerous and go with the provenance option (OF10a). **dangerous** gates are renamed
 `dangerousX` (OF10b) and replaced by a budget tier (OF10c).
 
-6 gates: 2 delete (21 provenance references), 4 dangerous (3).
+5 gates: 1 delete (16 provenance references), 4 dangerous (3).
 
 | Gate | Verdict | What it does | Harm | Replaced by | Where |
 |---|---|---|---|---|---|
 | provenance-flag | delete | The provenance option itself: its field on `FolderOptions` and on a client-plan resident, `browserShardfileOptions`'s argument, and the literal `true` our client-plan shards, the grid prefetch and the server pass. | none | Nothing: with every other gate gone the option carries no meaning, so it goes (OF10a). | 16 references in 10 files |
-| catalogue-manifest | delete | The built-in catalogue path: a manifest's `shardfile` descriptor needs our own provenance, and selection keeps the other catalogue shards only for our own source. | none | The catalogue lists uploads; a selected shard is admitted like any upload. | 5 references in 1 files |
 | runtime-admission (`dangerousUnbudgetedRuntime`) | dangerous | A shard that declares a `runtime` is admitted only as our own (`folder.ts`, inline arrival, and the data-only source paths that refuse any runtime). | A runtime binds a native module compiled into the engine bundle (one shard's TypeScript), which runs with no CPU, memory or bandwidth limit of its own. | OF10c: the shard's tier CPU and memory limits, metered on the runtime's module. | 1 references in 1 files, 4 named lines |
 | declared-page (`dangerousUnbudgetedPageFeatures`) | dangerous | A shard with a declared client page (native page features) is admitted only as our own. | Native page features run engine page code paths the shard selects (stages, owners, plan features), outside the cost its admission charged. | OF10c: the shard's tier CPU and memory limits, charged per page feature. | 1 references in 1 files, 1 named lines |
 | runtime-ownership (`dangerousRuntimeOwnership`) | dangerous | Only our own runtime may own the page's world, audio or stages, run an empty client-plan policy, or keep a data resident (`clientSource.ts` bindings and the client-plan page module). | An owning runtime replaces the engine's admitted world, audio or stage owners, so its frame and memory cost escape admission entirely. | OF10c: the shard's tier CPU and memory limits, with the owned stages metered as the runtime's. | 1 references in 1 files, 6 named lines |

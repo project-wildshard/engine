@@ -15,3 +15,5 @@
   `account-upload.test.ts` proves a stranger's `dunes` upload is 403), so the engine's reserved-slug
   list goes. `admittedShardInstance`: a catalogue-placed slug saves under its placement's instance
   (our saves unchanged), anything else by (origin, slug). Private save namespaces refuse for all.
+- OF10a6 catalogue-manifest: a manifest's `shardfile` descriptor is admitted like any upload's
+  (same-origin, hash-checked), and selection keeps the catalogue's other shards for every shard.

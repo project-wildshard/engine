@@ -139,7 +139,7 @@ export async function installShardfileFolder(input: unknown, providedOptions: Fo
   if (admitted.source.runtime !== null) throw new Error('Custom runtime requires trusted hybrid composition');
   if (prepared !== undefined) await prepared();
   const source = clientSource(admitted, options, bindings);
-  return selectSource(source, options.firstParty);
+  return selectSource(source);
 }
 
 /**
@@ -179,11 +179,12 @@ export async function inlineHybridArrival(source: Shardfile, options: Pick<Folde
 /** Make an inline hybrid arrival (`inlineHybridArrival`) the selected shard, as catalogue selection does before admission. */
 export function selectInlineHybrid(manifest: ShardManifest): ShardManifest {
   ownInlineCandidate(manifest.slug.replace(/^_/u, ''));
-  return selectSource(manifest, true);
+  return selectSource(manifest);
 }
 
-function selectSource(source: ShardManifest, firstParty: boolean): ShardManifest {
-  const list = new Map(firstParty ? shards().map((manifest) => [manifest.slug.replace(/^_/u, ''), manifest]) : []);
+/** ONE-FORMAT OF10a6: selection keeps the catalogue's other shards for every selected shard, whoever made it. */
+function selectSource(source: ShardManifest): ShardManifest {
+  const list = new Map(shards().map((manifest) => [manifest.slug.replace(/^_/u, ''), manifest]));
   list.set(source.slug.replace(/^_/u, ''), source); installShards([...list.values()]);
   game.shard = source; _applyChunkConstants(source); configureLevel(toLevelSpec(source)); return source;
 }
@@ -192,13 +193,12 @@ function selectSource(source: ShardManifest, firstParty: boolean): ShardManifest
  * A trusted preparation barrier may overlap admission, but precedes every live binding and publication. */
 export async function installManifestShardfile(manifest: ShardManifest, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
-  // Fails closed for any manifest naming `shardfile`, a client-plan one included (OF8).
-  if (manifest.shardfile !== undefined && !options.firstParty) throw new Error('Manifest shardfile descriptors require first-party provenance');
+  // OF10a6: a manifest's `shardfile` descriptor is admitted like any upload's (same-origin, hash-checked below), whoever made it.
   const hybrid = hybridPointer(manifest);
   if (manifest.shardfile === undefined || hybrid !== undefined) {
     // Transitional entries bootstrap their native terrain before admitting the world plugin.
     // Read only the receipted header here; never retain an admission or pin its transport to the page owner.
-    if (!options.firstParty || hybrid === undefined) return manifest;
+    if (hybrid === undefined) return manifest;
     const url = new URL(hybrid, options.base);
     if (url.origin !== new URL(options.base).origin || url.search !== '' || url.hash !== '') throw new Error('Manifest shardfile must be an unqualified same-origin source');
     const source = await readFolderDescriptor({ ...options, base: new URL('.', url).href, descriptorPath: url.pathname });
@@ -206,7 +206,7 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     if (authoredIdentity !== expectedIdentity) throw new Error('Manifest and shardfile identities differ');
     if (!isBuildValidatedOutput(source) || source.runtime === null) return manifest;
     const ground = tiledBootstrapGround(manifest.ground, source.props, source.runtime.binds ?? []);
-    return ground === manifest.ground ? manifest : selectSource({ ...manifest, ground }, true);
+    return ground === manifest.ground ? manifest : selectSource({ ...manifest, ground });
   }
   const url = new URL(manifest.shardfile, options.base);
   if (url.origin !== new URL(options.base).origin || url.search !== '' || url.hash !== '') throw new Error('Manifest shardfile must be an unqualified same-origin source');
@@ -255,7 +255,7 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     ...(manifest.pois === undefined ? {} : { pois: manifest.pois }),
   };
   provideManifestAdmission(installed, admitted, folderOptions, manifestReader(client));
-  return selectSource(installed, true);
+  return selectSource(installed);
 }
 
 /** The prebuilt client's HTML supplies data, without a second boot loop or URL switch. */

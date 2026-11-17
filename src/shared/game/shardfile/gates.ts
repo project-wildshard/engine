@@ -52,13 +52,6 @@ export const GATES: readonly Gate[] = [
       'src/client/game/grid/regionalRuntime.ts': 1, 'src/client/game/shard/declaredEntry.ts': 1 },
   },
   {
-    id: 'catalogue-manifest', verdict: 'delete',
-    what: 'The built-in catalogue path: a manifest\'s `shardfile` descriptor needs our own provenance, and selection '
-      + 'keeps the other catalogue shards only for our own source.',
-    replacedBy: 'The catalogue lists uploads; a selected shard is admitted like any upload.',
-    refs: { [CLIENT_SOURCE]: 5 },
-  },
-  {
     id: 'runtime-admission', verdict: 'dangerous', name: 'dangerousUnbudgetedRuntime',
     what: 'A shard that declares a `runtime` is admitted only as our own (`folder.ts`, inline arrival, and the data-only '
       + 'source paths that refuse any runtime).',
