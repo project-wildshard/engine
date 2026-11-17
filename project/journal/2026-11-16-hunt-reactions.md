@@ -15,3 +15,10 @@ Five real-body/cadence controls cover close contact, stalk tuning,
 alert expiry, a restored charge and legacy damage. Three passive cases
 failed before the fix; both omitted-reaction controls already passed.
 The normal server layer and native cadence controls pass alongside them.
+
+CC5a2: skittish hunts flee immediately inside their admitted notice
+radius and after a damage notification. The radius gates their senses
+and panic trigger; a larger stalk or old sight radius cannot pull them
+outside that authored range. Without an explicit senses layer, use the
+existing authored hunting sight range. Both stalk/no-stalk controls
+failed before the change; passive and omitted-reaction controls remain.

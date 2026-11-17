@@ -6,7 +6,7 @@ import { Rng } from '../src/shared/engine/core/rng';
 import type { HuntGround, HuntTuning } from '../src/shared/engine/ai/huntPattern';
 import { FIXTURE_HUNT_TUNING } from './fixtures/hunt-tuning';
 
-function fixture(reaction: 'passive' | undefined, stalk: boolean, telegraphed = false) {
+function fixture(reaction: 'passive' | 'skittish' | undefined, stalk: boolean, telegraphed = false) {
   const body = new AnimalSim({ kind: 'fixture.hunter', label: 'Hunter', variant: 'plain', rarity: 'common', hp: 60, aggressive: true,
     dims: { bodyY: 1, bodyHalfLen: 0.5, bodyRadius: 0.3, headRadius: 0.3, legLen: 0.5, feet: [], halfWidth: 0.4 },
     mods: { speed: 1, chargeDist: 1, damageTaken: 1, chargeDamage: 12, relentless: false } },
@@ -20,7 +20,7 @@ function fixture(reaction: 'passive' | undefined, stalk: boolean, telegraphed = 
     wetAt: () => false, trees: () => [], treeless: () => true, terrain: () => true, chunkHalf: 250 };
   const brain = new StalkerBrain<AnimalSim>({ pattern: 'hunt', player, sampleTerrain: () => undefined,
     config: { rng, fight: { telegraphed }, faunaTuning: () => undefined,
-      species: () => ({ aggressive: true, tuning, chargeWindup: 0, ...(reaction === undefined ? {} : { reaction }) }) },
+      species: () => ({ aggressive: true, tuning, chargeWindup: 0, notice: 9, ...(reaction === undefined ? {} : { reaction }) }) },
     ports: { ground, nav: () => null, reach: () => true, wanderGoal: () => null, unaware: () => false,
       now: () => 0, sound: () => undefined, charge: (_body, damage) => { hits.push(damage); } } });
   brain.adopt(body, 0, 0);
@@ -57,4 +57,16 @@ test.each([false, true])('omitted reaction retains the original hunter contact, 
   const f = fixture(undefined, stalk);
   f.step(); expect(f.hits).toEqual([12]);
   expect(f.body.state).toBe(stalk ? 'stalk' : 'flee');
+});
+
+test.each([false, true])('skittish bolts at its authored notice radius without striking, stalk=%s', stalk => {
+  const f = fixture('skittish', stalk);
+  f.player.z = 9.1;
+  for (let i = 0; i < 60; i++) { f.step(); expect(f.body.state).not.toBe('flee'); }
+  f.player.z = 8.9; f.step(); expect(f.body.state).toBe('flee');
+  f.player.z = 1;
+  for (let i = 0; i < 100; i++) f.step();
+  f.hit(); expect(f.body.state).toBe('flee');
+  for (let i = 0; i < 100; i++) f.step();
+  expect(f.hits).toEqual([]);
 });

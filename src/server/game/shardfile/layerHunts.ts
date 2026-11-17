@@ -36,7 +36,8 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     const actor = host.entities.get(spawn.id), id = `brain.${spawn.id}`;
     if (actor === undefined || host.adapters.has(id) || spawn.brain !== null) throw new Error(`species \`${spawn.species}\`: competing or missing hunt body`);
     const tuning = layer.brain.tuning, presentation = layer.presentation;
-    const species = { tuning, ...layer.brain.motion, reaction: layer.temperament.reaction, aggressive: layer.temperament.reaction === 'aggressive',
+    const species = { tuning, ...layer.brain.motion, reaction: layer.temperament.reaction,
+      ...(layer.senses === undefined ? {} : { notice: layer.senses.notice }), aggressive: layer.temperament.reaction === 'aggressive',
       ...(presentation?.sounds.call === undefined || presentation.sounds.hurt === undefined ? {} : {
         sounds: { call: presentation.sounds.call, hurt: presentation.sounds.hurt },
       }) };
