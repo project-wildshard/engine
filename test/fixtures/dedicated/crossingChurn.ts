@@ -63,8 +63,9 @@ export async function crossingChurn(options: ChurnOptions): Promise<ChurnReport>
   try {
     const join = async (device: string): Promise<Walker> => {
       const bot = new RoomBot(bench.url, 'bench', device, device); bots.push(bot);
-      if (!await bot.arrived(60_000)) throw new Error(`${device} never arrived`);
+      // before its first command: a jump the server's queue had seen would read as a replay and be dropped, which isn't this case
       if (options.startSeq !== undefined) Reflect.set(bot.client, 'seq', options.startSeq);
+      if (!await bot.arrived(60_000)) throw new Error(`${device} never arrived`);
       const walker: Walker = { device, bot, arrivals: [], answers: [], closes: 0, cell: HOME, fromDriftwood: 0 };
       bot.transport.onControl((control, bytes) => {
         if (control === 'enter') { const word = decodeEnter(bytes); if (word !== null) walker.answers.push(word); }
