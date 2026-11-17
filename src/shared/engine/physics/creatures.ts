@@ -16,6 +16,8 @@ import { CharacterMotor } from './CharacterMotor';
 import { groups, queryGroups } from './groups';
 import { tagCollider } from './surface';
 import { creatureBodyDistance, creatureBodyShape, keepsCreatureBody } from '../sim/bands';
+import type { CreatureVolumePose } from './creatureVolumes';
+import { MIN_VOLUME_RADIUS } from '@wildshard/format/creatureSkeletons';
 
 /** What the physics needs of an animal (src/engine/entities/Animal.ts implements it). */
 export interface Creature {
@@ -34,12 +36,13 @@ export interface Creature {
   readonly driven: boolean;
   /** External host owns the movement body; this adapter creates query hitboxes only. */
   readonly simulationBound?: boolean;
+  readonly hitVolumes?: CreatureVolumePose | undefined;
 }
 
 /** The owner tag on a hitbox: which animal, which part. */
-export interface HitboxOwner<C extends Creature = Creature> { creature: C; part: 'head' | 'body' }
+export interface HitboxOwner<C extends Creature = Creature> { creature: C; part: string; multiplier?: number }
 
-export interface CreatureHit<C extends Creature = Creature> { creature: C; head: boolean; distance: number; point: THREE.Vector3 }
+export interface CreatureHit<C extends Creature = Creature> { creature: C; head: boolean; part: string; multiplier: number | undefined; distance: number; point: THREE.Vector3 }
 
 // The physics body LOD (NEAR 45 m / FAR 55 m) and the capsule recipe are sim/bands.ts's, shared with SimHost (SF72).
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3();
@@ -51,6 +54,10 @@ interface Boxes { head: Collider; body: Collider; fore: Collider | null; bodyHal
   readonly pose: Float64Array;
   /** Exact pre-normalization body / fore segment directions at the last projection. */
   readonly directions: Float64Array }
+interface VolumeBoxes {
+  readonly volumes: readonly { readonly collider: Collider; readonly pose: Float64Array; readonly directions: Float64Array }[];
+  on: boolean; slept: boolean;
+}
 /**
  * FC16: a hitbox is written only when its pose differs from the one sync last wrote. Most of a shard's creatures stand still
  * or hold a frozen far pose, and every write was a wasm call that Rapier also counts as a moved collider for its next step
@@ -78,7 +85,7 @@ function turnAlong(collider: Collider, pose: Float64Array, at: number, direction
 }
 
 export class CreatureBodies<C extends Creature = Creature> {
-  private readonly boxes = new Map<C, Boxes>();
+  private readonly boxes = new Map<C, Boxes | VolumeBoxes>();
   /** collider handle → the animal part it is: the only colliders cast() answers with. The HITBOX group is shared (the
    *  practice dummies' volumes, src/shared/engine/physics/trainingTargets.ts, sit in it too), so a tag's owner is never relied on to be
    *  an animal's — E300: a dummy hit came back as `animal: undefined` and the crossbow's aim readout threw on `.alive`. */
@@ -108,6 +115,18 @@ export class CreatureBodies<C extends Creature = Creature> {
     for (const c of creatures) {
       let b = this.boxes.get(c);
       const live = c.alive && !c.hidden;
+      if (!b && c.hitVolumes !== undefined) {
+        if (c.hitVolumes.volumes.length === 0 || c.hitVolumes.volumes.length > 16) throw new Error('Invalid creature volume count');
+        const volumes = c.hitVolumes.volumes.map(row => {
+          const radius = Math.max(MIN_VOLUME_RADIUS, row.radius);
+          const shape = row.halfLength === 0 ? R.ColliderDesc.ball(radius) : R.ColliderDesc.capsule(row.halfLength, radius);
+          const collider = world.createCollider(shape.setCollisionGroups(groups('HITBOX')));
+          const owner: HitboxOwner<C> = { creature: c, part: row.part, multiplier: row.multiplier };
+          tagCollider(collider, 'flesh', owner); this.owners.set(collider.handle, owner);
+          return { collider, pose: new Float64Array(7).fill(Number.NaN), directions: new Float64Array(3).fill(Number.NaN) };
+        });
+        b = { volumes, on: true, slept: false }; this.boxes.set(c, b);
+      }
       if (!b) {
         const s = c.scale, d = c.dims;
         const head = world.createCollider(R.ColliderDesc.ball(d.headRadius * s).setCollisionGroups(groups('HITBOX')));
@@ -126,21 +145,36 @@ export class CreatureBodies<C extends Creature = Creature> {
         this.boxes.set(c, b);
       }
       const wasLive = b.on, sleeping = live && asleep?.(c) === true;
-      if (live !== b.on) { b.on = live; b.head.setEnabled(live); b.body.setEnabled(live); b.fore?.setEnabled(live); }
+      if (live !== b.on) {
+        b.on = live;
+        if ('volumes' in b) { for (const box of b.volumes) box.collider.setEnabled(live); }
+        else { b.head.setEnabled(live); b.body.setEnabled(live); b.fore?.setEnabled(live); }
+      }
       const held = sleeping && b.slept && wasLive;
       b.slept = sleeping;
       if (live && !held) {
-        const pose = b.pose;
-        c.headWorld(_a);
-        moveTo(b.head, pose, 0, _a.x, _a.y, _a.z);
-        c.bodyCapsule(_a, _b);
-        _d.subVectors(_b, _a);
-        turnAlong(b.body, pose, 6, b.directions, 0);
-        moveTo(b.body, pose, 3, (_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2);
-        if (b.fore !== null && c.foreCapsule?.(_a, _b) === true) {
+        if ('volumes' in b) {
+          const pose = c.hitVolumes;
+          if (pose === undefined) throw new Error('Creature volume authority disappeared');
+          for (let index = 0; index < b.volumes.length; index++) {
+            const box = b.volumes[index]; if (box === undefined) break;
+            pose.segment(index, _a, _b);
+            _d.subVectors(_b, _a); turnAlong(box.collider, box.pose, 3, box.directions, 0);
+            moveTo(box.collider, box.pose, 0, (_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2);
+          }
+        } else {
+          const pose = b.pose;
+          c.headWorld(_a);
+          moveTo(b.head, pose, 0, _a.x, _a.y, _a.z);
+          c.bodyCapsule(_a, _b);
           _d.subVectors(_b, _a);
-          turnAlong(b.fore, pose, 13, b.directions, 3);
-          moveTo(b.fore, pose, 10, (_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2);
+          turnAlong(b.body, pose, 6, b.directions, 0);
+          moveTo(b.body, pose, 3, (_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2);
+          if (b.fore !== null && c.foreCapsule?.(_a, _b) === true) {
+            _d.subVectors(_b, _a);
+            turnAlong(b.fore, pose, 13, b.directions, 3);
+            moveTo(b.fore, pose, 10, (_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2);
+          }
         }
       }
       // the creature physics LOD
@@ -169,8 +203,8 @@ export class CreatureBodies<C extends Creature = Creature> {
     if (!hit) return null;
     const owner = this.owners.get(hit.collider.handle);
     if (owner === undefined) return null; // not an animal's hitbox (the filter already skips those; belt and braces)
-    const r = this.result ??= { creature: owner.creature, head: false, distance: 0, point: this.hitPoint };
-    r.creature = owner.creature; r.head = owner.part === 'head'; r.distance = hit.timeOfImpact;
+    const r = this.result ??= { creature: owner.creature, head: false, part: owner.part, multiplier: undefined, distance: 0, point: this.hitPoint };
+    r.creature = owner.creature; r.head = owner.part === 'head'; r.part = owner.part; r.multiplier = owner.multiplier; r.distance = hit.timeOfImpact;
     r.point.copy(origin).addScaledVector(dir, hit.timeOfImpact);
     return r;
   }
@@ -179,9 +213,13 @@ export class CreatureBodies<C extends Creature = Creature> {
   remove(c: C): void {
     const b = this.boxes.get(c);
     if (!b) return;
-    this.owners.delete(b.head.handle); this.owners.delete(b.body.handle);
-    this.physics.world.removeCollider(b.head, false); this.physics.world.removeCollider(b.body, false);
-    if (b.fore !== null) { this.owners.delete(b.fore.handle); this.physics.world.removeCollider(b.fore, false); }
+    if ('volumes' in b) {
+      for (const box of b.volumes) { this.owners.delete(box.collider.handle); this.physics.world.removeCollider(box.collider, false); }
+    } else {
+      this.owners.delete(b.head.handle); this.owners.delete(b.body.handle);
+      this.physics.world.removeCollider(b.head, false); this.physics.world.removeCollider(b.body, false);
+      if (b.fore !== null) { this.owners.delete(b.fore.handle); this.physics.world.removeCollider(b.fore, false); }
+    }
     this.boxes.delete(c);
     if (c.motor !== null) { c.motor.dispose(); c.motor = null; }
   }

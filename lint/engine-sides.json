@@ -1,5 +1,5 @@
 {
-  "about": "P1-E2 engine ownership map (tag first, move later): every non-test source under src/engine and src/game names its side, \"shared\", \"server\", \"client\" or \"cook\", or { \"side\", \"mixed\": true } for a sim/view mix that E4 splits. wildshard/engine-sides enforces client ↛ server, server ↛ client, shared ↛ client|server, cook ↛ client and no DOM or renderer in shared, server or cook; lint/engine-side-edges.json holds the counts that may only fall. Seeded from measure-cut (project-wildshard-meta docs/plans/multi-repo/tools) on 2026-11-05; a new file is tagged by its author.",
+  "about": "P1-E2 engine ownership map (tag first, move later): every non-test source under src/engine and src/game names its side, \"shared\", \"server\", \"client\" or \"cook\", or { \"side\", \"mixed\": true } for a sim/view mix that E4 splits. wildshard/engine-sides enforces client \u219b server, server \u219b client, shared \u219b client|server, cook \u219b client and no DOM or renderer in shared, server or cook; lint/engine-side-edges.json holds the counts that may only fall. Seeded from measure-cut (project-wildshard-meta docs/plans/multi-repo/tools) on 2026-11-05; a new file is tagged by its author.",
   "files": {
     "src/client/engine/ai/view/eliteController.ts": "client",
     "src/client/engine/ai/view/eliteEntry.ts": "client",
@@ -499,7 +499,6 @@
     "src/client/engine/ui/menuSettings.ts": "client",
     "src/client/engine/ui/namePrompt.ts": "client",
     "src/client/engine/ui/Minimap.ts": "client",
-    "src/client/engine/ui/musicStyleRow.ts": "client",
     "src/client/engine/ui/offlineDownload.ts": "client",
     "src/client/engine/ui/ownership.ts": "client",
     "src/client/engine/ui/panel.ts": "client",
@@ -658,9 +657,7 @@
     "src/client/game/grid/cellChanges.ts": "client",
     "src/client/game/grid/cellClip.ts": "client",
     "src/client/game/grid/cellCover.ts": "client",
-    "src/client/game/grid/cellLoading.ts": "client",
     "src/client/game/grid/cellPresence.ts": "client",
-    "src/client/game/grid/cellScreens.ts": "client",
     "src/client/game/grid/copyIdentity.ts": "client",
     "src/client/game/grid/copyLayout.ts": "client",
     "src/client/game/grid/copyPrompts.ts": "client",
@@ -1955,6 +1952,11 @@
     "src/server/engine/sim/stateAdapter.ts": "server",
     "src/cook/game/uploadTransport.ts": "cook",
     "src/server/host/dedicated/uploadActivation.ts": "server",
-    "src/shared/game/shardfile/uploadActivation.ts": "shared"
+    "src/shared/game/shardfile/uploadActivation.ts": "shared",
+    "src/server/game/shardfile/creatureVolumes.ts": "server",
+    "src/shared/engine/combat/targetDamage.ts": "shared",
+    "src/shared/engine/physics/creatureVolumes.ts": "shared",
+    "src/shared/game/shardfile/creatureRestRig.ts": "shared",
+    "src/shared/game/shardfile/creatureVolumes.ts": "shared"
   }
 }

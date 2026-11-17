@@ -486,6 +486,7 @@
     "./models/swimHands": "./src/client/engine/models/swimHands.ts",
     "./models/weld": "./src/client/engine/models/weld.ts",
     "./physics/CharacterMotor": "./src/shared/engine/physics/CharacterMotor.ts",
+    "./physics/creatureVolumes": "./src/shared/engine/physics/creatureVolumes.ts",
     "./physics/bodies": "./src/shared/engine/physics/bodies.ts",
     "./physics/box": "./src/shared/engine/physics/box.ts",
     "./physics/boxFrame": "./src/client/engine/physics/boxFrame.ts",
