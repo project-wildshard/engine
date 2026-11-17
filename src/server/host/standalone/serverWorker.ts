@@ -16,7 +16,13 @@ async function start(event: MessageEvent<unknown>): Promise<void> {
     event.ports[0]?.postMessage({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) });
   }
 }
+/** MG10: an early worker's first message (`prespawnStandalone`), before the page's start message */
+const isPrewarm = (data: unknown): boolean => typeof data === 'object' && data !== null && Reflect.get(data, 'prewarm') === true;
+async function prewarm(event: MessageEvent<unknown>): Promise<void> {
+  try { (await import('./serverRuntime')).prewarmServerWorker(event); } catch { /* the start message's import reports a refusal */ }
+}
 self.onmessage = (event: MessageEvent<unknown>): void => {
+  if (isPrewarm(event.data)) { void prewarm(event); return; }
   self.onmessage = null;
   void start(event);
 };

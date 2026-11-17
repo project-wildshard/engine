@@ -748,6 +748,7 @@
     "./input/commands": "./src/shared/engine/input/commands.ts",
     "./physics/edgeEntries": "./src/server/engine/physics/edgeEntries.ts",
     "./physics/rapier": "./src/shared/engine/physics/rapier.ts",
+    "./physics/rapierWarm": "./src/shared/engine/physics/rapierWarm.ts",
     "./boot/prefetchQuota": "./src/client/engine/boot/prefetchQuota.ts",
     "./boot/readContentResponse": "./src/client/engine/boot/readContentResponse.ts",
     "./boot/contentRead": "./src/client/engine/boot/contentRead.ts",

@@ -7,6 +7,8 @@ import { askHeldReads, type HeldRead } from '../../../shared/host/standalone/hel
 import { runStandaloneServer } from './serverHost';
 import { fetchGridCollision, fetchServerFolder } from './serverFolder';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
+import { warmRapier } from '@wildshard/engine/physics/rapierWarm';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
 
 /** What a page hands its server's worker: what its document holds and a worker's realm has no way to read. */
 export interface ServerWorkerStart {
@@ -28,6 +30,22 @@ const rapierOf = (held: HeldRead | undefined): Promise<Rapier> => {
   })();
   return physics;
 };
+
+/**
+ * MG10 (J410): a worker the page started early in its boot (`prespawnStandalone`) loads physics now, from the port the
+ * page answers held reads on, and warms it (`warmRapier`): the wasm tier-up of its hot functions lands here, while the page
+ * holds little, instead of on the first frame's loading peak. The start message that follows finds physics loaded.
+ */
+export function prewarmServerWorker(event: MessageEvent<unknown>): void {
+  bootMark('worker:prewarm-received');
+  const reads = event.ports[0];
+  void (async () => {
+    try {
+      const R = await rapierOf(reads === undefined ? undefined : askHeldReads(reads));
+      warmRapier(R, diagnosticNow); bootMark('server:rapier-warmed');
+    } catch { physics = undefined; /* the start message's boot loads physics again and reports there */ }
+  })();
+}
 
 /** NB19: whether `cell` is the page's own inline candidate, whose server files are read beside it (shell.ts `ownServer`). */
 const ownsServer = (start: ServerWorkerStart, cell: string): boolean => typeof start.ownServer === 'string' && start.ownServer === cell;

@@ -193,9 +193,35 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
     dispose: () => { disposed = true; scope.dispose(); client.dispose(); transport.close('disposed'); control.close(); end(); } };
 }
 
+const serverWorker = (): Worker => new Worker(new URL('../../../server/host/standalone/serverWorker.ts', import.meta.url), { type: 'module', name: 'standalone-server' });
+/** MG10 (J410): the server's worker, started early in the page's boot and waiting for its start message. */
+let spare: { readonly worker: Worker; readonly owner: Scope; failed: boolean } | null = null;
+/**
+ * MG10 (J410): start the server's worker now, early in the boot, so it loads and warms physics (the wasm tier-up, a
+ * ~120 MB compile spike) while the page holds little; `startStandalone` adopts it. `held` answers its physics read from
+ * this page's download (DL25). A worker that fails to load is dropped and `startStandalone` starts its own.
+ */
+export function prespawnStandalone(held?: HeldRead): void {
+  if (spare !== null) return;
+  const worker = serverWorker(), owner = new Scope('standalone.prespawn'), started = { worker, owner, failed: false }, reads = new MessageChannel();
+  owner.listen(worker, 'error', () => { started.failed = true; });
+  if (held !== undefined) answerHeldReads(reads.port1, held);
+  worker.postMessage({ prewarm: true }, [reads.port2]);
+  spare = started;
+}
+/** The early worker if one is waiting and loaded, else a new one (exported for its test). */
+export function adoptSpare(): Worker {
+  const taken = spare; spare = null;
+  if (taken === null) return serverWorker();
+  taken.owner.dispose();
+  if (!taken.failed) return taken.worker;
+  taken.worker.terminate();
+  return serverWorker();
+}
+
 /** Start the standalone target: the server always in a module worker, with no main-thread fallback (J49). */
 export function startStandalone(config: StandaloneConfig): StandaloneShell {
-  const worker = new Worker(new URL('../../../server/host/standalone/serverWorker.ts', import.meta.url), { type: 'module', name: 'standalone-server' });
+  const worker = adoptSpare();
   const bootstrapScope = new Scope('standalone.bootstrap');
   let failBoot: (error: Error) => void = () => undefined;
   const nativeFailure = new Promise<never>((_resolve, reject) => { failBoot = reject; });

@@ -26,3 +26,7 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
   released. Nine's slab chunks (merged on the phone) now release every channel but position and the index: buffers reachable
   from Nine's scene at ready 117 -> 53 MB. The loading peak did not move outside noise (Nine 970 -> 937 MB, 3 valid runs each;
   Sky Reach 555 -> 551): the peak there is garbage and the wasm tier-up, not these arrays.
+- The standalone server's worker now starts at the data step (`prespawnStandalone`) and warms Rapier with a synthetic world
+  (`warmRapier`, ~120 ms): the tier-up spike lands at `world`, when the page holds ~250 MB, not on `firstFrame`. Sky Reach's
+  loading renderer peak 558 -> 520 MB (4 alternating runs each, 541-573 vs 518-523); the peak is now the main thread's world
+  loading (`loadout`), where malloc carries a ~100 MB transient.

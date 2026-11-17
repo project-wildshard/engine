@@ -119,7 +119,8 @@ export interface WorkerClientPorts {
   /** Link what the first rows' bodies draw, under the card. A page that reveals nothing yet has no such step. */
   readonly linkBodies?: () => Promise<void>;
 }
-interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell }
+interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell;
+  readonly prespawnStandalone?: (held?: (url: string) => Promise<ArrayBuffer | null>) => void }
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** OF4: the page's keep for the last verified release file, in its own device saves (online.js's store has no storage). */
@@ -345,6 +346,14 @@ async function leaveEarly(shell: Promise<Shell>): Promise<void> {
   try { server = await shell; } catch { return; }
   server.pause();
   try { await atMostLeaveWait(server.save()); } catch { /* the stop goes on */ } finally { server.dispose(); }
+}
+/** MG10 (J410): the standalone server's worker, started at the boot's data step to load and warm physics while the page
+ *  holds little (shell.ts `prespawnStandalone`); the server's boot adopts it. Only a build with an in-page server. */
+export function prespawnWorkerServer(): void {
+  if (!earlyStandalone((globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__)) return;
+  void (async () => {
+    try { (await loadServerModules()).prespawnStandalone?.(url => spawnHeldBytes(url)); } catch { /* the server's boot loads them again */ }
+  })();
 }
 /** Start the standalone server now, for the Worker boot step to adopt. A one-shard page of a build with a world joins it at
  *  that step instead, as before. A level left before adoption saves and stops this server as an adopted one would. */
