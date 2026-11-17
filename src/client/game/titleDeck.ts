@@ -244,7 +244,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     <div class="ws-menu-deck">
       <div class="ws-menu-cards"><div class="ws-menu-deck-track"></div></div>
       <div class="ws-menu-dots"></div>
-      <div class="ws-menu-modes"><button class="ws-menu-mode ws-menu-play" type="button"><span class="ws-menu-mode-glyph">${SWORD}</span><b>Enter world</b><small></small></button></div>
+      <div class="ws-menu-modes"><button class="ws-menu-mode ws-menu-play" type="button"><span class="ws-menu-mode-glyph">${SWORD}</span><b>${GAME_STRINGS.mainMenu.enterZone}</b><small></small></button></div>
       <div class="ws-menu-row"><button class="ws-menu-settings" type="button">Settings</button></div>
     </div>`;
   const words = (tag: string, cls: string, text: string): HTMLElement => { const node = document.createElement(tag); node.className = cls; node.textContent = text; return node; };
@@ -336,7 +336,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     play.disabled = (!open && c.draft === null) || single?.closed !== undefined;
     explore.disabled = !canExplore(c, mode());
     explore.classList.toggle('off', !canExplore(c, mode())); // menu.css hides .off
-    required(play, 'b').textContent = c.draft ? (isDev() ? GAME_STRINGS.drafts.draftMode : GAME_STRINGS.drafts.followBuild) : c.upgrade !== undefined ? GAME_STRINGS.upgrade.badge : c.unavailable !== undefined ? GAME_STRINGS.unavailable.badge : c.closed === true ? GAME_STRINGS.notInWorld.badge : open ? single?.play ?? 'Enter world' : 'Coming soon';
+    required(play, 'b').textContent = c.draft ? (isDev() ? GAME_STRINGS.drafts.draftMode : GAME_STRINGS.drafts.followBuild) : c.upgrade !== undefined ? GAME_STRINGS.upgrade.badge : c.unavailable !== undefined ? GAME_STRINGS.unavailable.badge : c.closed === true ? GAME_STRINGS.notInWorld.badge : open ? single?.play ?? GAME_STRINGS.mainMenu.enterZone : 'Coming soon';
     paintSummary(c);
   };
   const select = (raw: number, smooth = true): void => {

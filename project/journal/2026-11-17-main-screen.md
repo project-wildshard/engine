@@ -10,3 +10,6 @@
   runs 56 px under ENTER THE MMO and fades to navy; above it the sky carries on in the shot's own edge and middle colours,
   with a masked band over the seam. ENTER THE MMO is the filled ice-cyan button, ZONE SELECT the outlined one. CHECK
   CONNECTION left the main screen: Settings ▸ System already has the Connection doctor row.
+- MS3: zone, not shard, on every menu screen. The deck's button and the deep link's read ENTER ZONE (J399); the deep link is
+  the one-zone select (ZONE SELECT, one card, one thumbnail, "Loads <zone>"); "Enter through zone select"; the grid's crash
+  note says "The MMO ended unexpectedly last time." `zone-words.test.ts` greps the menu words for "shard".

@@ -41,7 +41,10 @@ test('a placed slug: one card, its hero, PLAY enters through the deck\'s loading
   expect(document.querySelectorAll('.ws-slug .ws-menu-card')).toHaveLength(1);
   expect(document.querySelector('.ws-slug .ws-menu-card b')?.textContent).toBe('Driftwood Isle');
   expect((document.querySelector('.ws-slug .ws-menu-hero') as HTMLElement).style.backgroundImage).toContain('/t/driftwood-isle.jpg');
-  expect([play().disabled, play().querySelector('b')?.textContent, play().querySelector('small')?.textContent]).toEqual([false, 'Play', 'Spawns you on the grid']);
+  // MS3 (J399): the one-zone select: ZONE SELECT, one thumbnail, ENTER ZONE that says what it loads
+  expect(document.querySelector('.ws-slug .ws-menu-title')?.textContent).toBe('ZONE SELECT');
+  expect(document.querySelectorAll('.ws-slug .ws-menu-dots i')).toHaveLength(1);
+  expect([play().disabled, play().querySelector('b')?.textContent, play().querySelector('small')?.textContent]).toEqual([false, 'Enter zone', 'Loads Driftwood Isle']);
   tap(play());
   expect(loading()).toBe(true);
   await frames();
@@ -53,7 +56,7 @@ test('a slug with no grid cell: the card and hero, PLAY disabled, "Not on the gr
   const view = page(false, onEnter);
   expect(document.querySelector('.ws-slug .ws-menu-card b')?.textContent).toBe('Driftwood Isle');
   expect((document.querySelector('.ws-slug .ws-menu-hero') as HTMLElement).style.backgroundImage).toContain('/t/driftwood-isle.jpg');
-  expect([play().disabled, play().querySelector('b')?.textContent, play().querySelector('small')?.textContent]).toEqual([true, 'Play', 'Not on the grid yet']);
+  expect([play().disabled, play().querySelector('b')?.textContent, play().querySelector('small')?.textContent]).toEqual([true, 'Enter zone', 'Not on the grid yet']);
   tap(play()); view.activate();
   await frames();
   expect(loading()).toBe(false);

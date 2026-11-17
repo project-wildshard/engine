@@ -15,8 +15,8 @@ test('OF14: a one-shard page that ended unexpectedly names itself on the next ti
 });
 
 test('OF14: the grid that ended unexpectedly, or loops, shows "Infinite Wildshard"', () => {
-  expect(endedNote(end('grid', 'sunscar-dunes'), false, find)).toBe('Infinite Wildshard ended unexpectedly last time.');
-  expect(endedNote(end('grid', 'sunscar-dunes'), true, find)).toBe('Infinite Wildshard ended unexpectedly last time.');
-  expect(endedNote(end('', '', 'fresh'), true, find)).toBe('Infinite Wildshard ended unexpectedly last time.');
+  expect(endedNote(end('grid', 'sunscar-dunes'), false, find)).toBe('The MMO ended unexpectedly last time.');
+  expect(endedNote(end('grid', 'sunscar-dunes'), true, find)).toBe('The MMO ended unexpectedly last time.');
+  expect(endedNote(end('', '', 'fresh'), true, find)).toBe('The MMO ended unexpectedly last time.');
   expect(endedNote(end('', '', 'fresh'), false, find)).toBe('');
 });

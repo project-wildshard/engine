@@ -58,11 +58,11 @@ test('J313: with Developer off, the three unlocked shards enter with their label
   expect(decks[0]?.root.querySelector('.ws-menu-card-partial')?.textContent).toBe('Partial');
 });
 
-test('J313: ENTER WORLD reads Enter world, not Coming soon, on each unlocked card for a player', () => {
+test('J313: ENTER ZONE (MS3, was ENTER WORLD) reads Enter zone, not Coming soon, on each unlocked card for a player', () => {
   const deck = deckOf(false, PLAYER);
   for (const slug of ['nine-dragon-stack', 'sunscar-dunes', 'far-reach', '_template']) {
     deck.select(deck.cards.findIndex((card) => card.slug === slug), false);
-    expect(deck.root.querySelector('.ws-menu-play b')?.textContent).toBe('Enter world');
+    expect(deck.root.querySelector('.ws-menu-play b')?.textContent).toBe('Enter zone');
   }
 });
 

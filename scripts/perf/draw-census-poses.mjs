@@ -6,7 +6,7 @@ const goldenShards = ['driftwood-isle', 'nalati-grasslands', 'far-reach', 'sunsc
  * removed the LEGACY / SHARDFILE pair); a locked card's label is refused.
  * @param {string} primary */
 export function censusEntry(primary) {
-  if (primary.trim() === 'Enter world') return '.ws-menu-play';
+  if (['Enter world', 'Enter zone'].includes(primary.trim())) return '.ws-menu-play';
   throw new Error('Requested census entry is unavailable');
 }
 

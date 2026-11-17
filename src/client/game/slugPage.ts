@@ -5,6 +5,7 @@
  *
  *   const view = buildSlugPage({ manifest, placed, onEnter, onExplore, onSettings })   // a TitleDeckView for showStartTitle
  *
+ * MAIN-SCREEN MS3 (J399, "deep link ok"): it is the one-zone select, ZONE SELECT with one card, one thumbnail and ENTER ZONE.
  * It is Shard Select's own deck (src/client/game/titleDeck.ts) holding that one card, dressed the same (mainMenu.css
  * `.ws-menu-carousel`): the card, its hero behind, PLAY, SETTINGS. PLAY is ENTER WORLD: the same shardfile download, loading
  * shell and `onEnter`, which src/client/app/entry.ts points at `travel`, so the next page enters the grid at the shard's cell
@@ -50,7 +51,7 @@ export function buildSlugPage(opts: SlugPageOptions): TitleDeckView {
   const deck = buildTitleDeck({
     cards: [card], active: null, onSettings: opts.onSettings, gate,
     ...(opts.notice === undefined ? {} : { notice: opts.notice }), ...(opts.mode === undefined ? {} : { mode: opts.mode }),
-    single: { play: s.play, hint: s.placed, ...(opts.placed ? {} : { closed: s.unplaced }) },
+    single: { play: GAME_STRINGS.mainMenu.enterZone, hint: s.placed(card.name), ...(opts.placed ? {} : { closed: s.unplaced }) },
     onEnter: (entered) => { if (!(phone && !firstPlayDone() && startFirstPlay(entered.slug))) dropFirstPlay(); opts.onEnter(entered); },
     onExplore: (entered) => { dropFirstPlay(); opts.onExplore(entered); },
   });
@@ -65,7 +66,7 @@ export function buildSlugPage(opts: SlugPageOptions): TitleDeckView {
   back.textContent = s.menu;
   const title = document.createElement('div');
   title.className = 'ws-menu-title';
-  title.textContent = GAME_STRINGS.mainMenu.logo;
+  title.textContent = GAME_STRINGS.mainMenu.zoneSelect;
   bar.append(back, title);
   deck.root.querySelector('.ws-menu-head')?.prepend(bar);
   deck.onTap(back, () => { location.assign('/'); });

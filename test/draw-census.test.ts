@@ -6,6 +6,7 @@ import { censusSelection, censusEntry } from '../scripts/perf/draw-census-poses.
 test('census enters by the one ENTER WORLD and refuses a locked card', () => {
   expect(censusEntry('Enter world')).toBe('.ws-menu-play');
   expect(censusEntry(' Enter world ')).toBe('.ws-menu-play');
+  expect(censusEntry('Enter zone')).toBe('.ws-menu-play');
   expect(()=>censusEntry('Coming soon')).toThrow('unavailable');
 });
 

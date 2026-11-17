@@ -21,6 +21,8 @@ export const GAME_STRINGS = {
     enterMmoLine: 'ONE WORLD · EVERY ZONE · LIVE',
     /** J387: "Not shard select, zone select" */
     zoneSelect: 'ZONE SELECT',
+    /** J399 (Jake: "2 button enter zone"): the zone deck's and the deep link's big button */
+    enterZone: 'Enter zone',
     settings: 'SETTINGS',
     back: 'BACK',
     /** E483 (E140 again): the compact Developer switch beside SETTINGS, the same switch as Settings ▸ Developer */
@@ -34,12 +36,12 @@ export const GAME_STRINGS = {
       hide: 'HIDE UNTIL NEXT BUILD',
     },
   },
-  /** SA36 (Jake, grill Q14-Q16): the `/slug/<slug>` page, one shard's card and hero and PLAY, a link an author shares */
+  /** SA36 (Jake, grill Q14-Q16): the `/slug/<slug>` page, a link an author shares; MAIN-SCREEN MS3 (J399): the one-zone select,
+   *  ZONE SELECT with that one zone's card and thumbnail and ENTER ZONE, which enters the grid at its cell as Zone select does */
   slugPage: {
     menu: 'MAIN MENU',
-    play: 'Play',
-    /** under PLAY: it enters Infinite Wildshard at the shard's cell, the way Shard select does */
-    placed: 'Spawns you on the grid',
+    /** under ENTER ZONE: what a tap loads, as on the zone deck */
+    placed: (name: string): string => `Loads ${name}`,
     /** Q16: a slug with no grid cell (not placed yet, `--no-place`, an off-grid shard) */
     unplaced: 'Not on the grid yet',
   },
@@ -79,11 +81,11 @@ export const GAME_STRINGS = {
   },
   /** Infinite Wildshard, the 3 × 3 grid (SHARD-PLATFORM §3.3, G58, G79; SF21a) */
   grid: {
-    ended: 'Infinite Wildshard ended unexpectedly last time.',
+    ended: 'The MMO ended unexpectedly last time.',
     /** QB6: the same one line for a standalone world that ended unexpectedly (iOS's memory kill), by its name */
     shardEnded: (name: string): string => `${name} ended unexpectedly last time.`,
     waiting: (name: string): string => `${name} · NOT READY FOR GRID`,
-    waitingSelect: 'ENTER THROUGH SHARD SELECT',
+    waitingSelect: 'ENTER THROUGH ZONE SELECT',
     reveal: (home: string): string => `Arriving at ${home}`,
     revealSkip: 'Tap to skip',
     /** G78: the chip above ATTACK on the road and in no-man's land (the weapon is stowed there, G68) */
