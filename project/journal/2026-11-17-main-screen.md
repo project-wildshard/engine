@@ -13,3 +13,7 @@
 - MS3: zone, not shard, on every menu screen. The deck's button and the deep link's read ENTER ZONE (J399); the deep link is
   the one-zone select (ZONE SELECT, one card, one thumbnail, "Loads <zone>"); "Enter through zone select"; the grid's crash
   note says "The MMO ended unexpectedly last time." `zone-words.test.ts` greps the menu words for "shard".
+- MS4: the launch shell is the one fallback splash (J399): the main screen's logo, place and underline, and on a phone the
+  square first cut framed as mainMenu.css frames it (the screen's width, bottom 56 px under where ENTER THE MMO will stand,
+  from the same clamps), the sky carried on above and a fade to navy behind the bar and LOADING. Its only button is the
+  reload pill. The main screen then replaces it in place.

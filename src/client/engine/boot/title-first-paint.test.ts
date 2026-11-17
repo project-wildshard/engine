@@ -84,6 +84,22 @@ test('BUGBASH-LOOP (J385): the launch shell has no Shard Select of its own', () 
   expect(shell?.textContent).not.toMatch(/shard select/iu);
 });
 
+/** MAIN-SCREEN MS4 (J399, "fallback splash"): when the main screen can't be up at once, the one splash is the logo, the
+ *  hero framed as the main screen frames it (the square first cut the screen's width, on a phone), a moving bar and LOADING.
+ *  Nothing to tap but the build pill's reload, which works with every bundle missing. */
+test('MS4: the fallback splash has no button but the reload pill, and frames the phone hero as the main screen does', () => {
+  const window = firstDocument('');
+  const shell = window.document.querySelector('[data-title-shell]');
+  expect([...shell?.querySelectorAll('button, a, [role="button"]') ?? []].map(el => el instanceof window.HTMLElement && el.dataset['launchReload'] !== undefined)).toEqual([true]);
+  expect(shell?.querySelector('.ws-launch-brand')?.textContent).toBe('WILDSHARD');
+  expect(shell?.querySelector('[data-launch-load] .ws-launch-bar')).not.toBeNull();
+  const page = readFileSync('index.html', 'utf8');
+  const portrait = /@media \(orientation: portrait\) \{ \.ws-launch-hero \{([^}]*)\}/u.exec(page)?.[1] ?? '';
+  expect(portrait).toMatch(/background-image: url\('\/assets\/title\/main-crossroads-square-first-[a-f0-9]{16}\.jpg'\)/u);
+  expect(portrait).toContain('background-size: 100% auto, 100% 100%; background-position: 50% 100%, 0 0;');
+  expect(portrait).not.toMatch(/aspect-ratio|translateY/u);
+});
+
 test('environment flags alone (the phone harness, ?v=) launch the same title and hero preload', () => {
   for (const search of ['?v=build', '?tier=phone&touch=1&mute=1&nolock=1&sw=0']) {
     const window = firstDocument(search);
