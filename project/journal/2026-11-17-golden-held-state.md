@@ -14,3 +14,12 @@ fails with both before and after positions.
 Restore only the two globals the fixture changes. A broad Vitest
 unstub removed shared setup's localStorage and broke the next test;
 the ordinary push gate caught that fixture leak before publication.
+
+Exact-client hosted replay 44030536433 named the actual difference:
+player X 17.999985714116413 to 17.99998567712444 (3.7e-8 m), with
+identical frame, clock and camera. The values straddle a float32 rounding
+boundary but differ by much less than one native unit (1.9e-6 m there).
+Compare player separation with at most one float32 unit per coordinate,
+retaining both raw positions; the other fields stay exact. The actual
+hosted pair fails first, then passes; a 10 micrometre move and any frame
+advance still fail. No budget, camera, settlement or SSIM change.

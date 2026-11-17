@@ -127,6 +127,17 @@ export async function heldGoldenResidency() {
     if (Date.now()-start>=29000) throw new Error('Native publication did not settle');
   }
   const after=snapshot();
-  if (after!==before) throw new Error(`Native wait changed frame, clock, camera or player: ${JSON.stringify({before:JSON.parse(before),after:JSON.parse(after)})}`);
-  return {jobs:ledger.jobs,heldState:JSON.parse(before),turns,elapsedMs:Date.now()-start,pending:0};
+  const was=JSON.parse(before),now=JSON.parse(after);
+  // Contact correction changed X by 3.7e-8 m on hosted WebKit. At x=18
+  // one float32 transform unit is 1.9e-6 m. Rounding each value separately
+  // would still fail when that tiny difference straddles a rounding boundary.
+  // Keep raw positions, permit at most one native unit per coordinate, and
+  // retain exact comparison for the held frame, clock and camera.
+  const samePlayer=was.player.every((value,i)=>{
+    const other=now.player[i];
+    return Number.isFinite(value)&&Number.isFinite(other)&&Math.abs(value-other)<=2**(Math.floor(Math.log2(Math.max(1,Math.abs(value),Math.abs(other))))-23);
+  });
+  if (!samePlayer||JSON.stringify({...was,player:null})!==JSON.stringify({...now,player:null}))
+    throw new Error(`Native wait changed frame, clock, camera or player: ${JSON.stringify({before:was,after:now})}`);
+  return {jobs:ledger.jobs,heldState:was,playerAfter:now.player,playerPrecision:'one float32 unit',turns,elapsedMs:Date.now()-start,pending:0};
 }

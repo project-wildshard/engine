@@ -15,6 +15,17 @@ test('a held residency wait still refuses movement and names the before/after st
   try {
     replace('requestAnimationFrame',(draw:FrameRequestCallback)=>{draw(0);return 1;});
     await expect(heldGoldenResidency()).resolves.toMatchObject({pending:0,heldState:{frame:12,player:[0,125,0]}});
+    // Exact hosted values: a 3.7e-8 m correction straddles a rounding
+    // boundary but is far smaller than one native float32 transform unit.
+    expect(Math.fround(17.999985714116413)).not.toBe(Math.fround(17.99998567712444));
+    playerX=17.999985714116413;
+    replace('requestAnimationFrame',(draw:FrameRequestCallback)=>{playerX=17.99998567712444;draw(0);return 1;});
+    await expect(heldGoldenResidency()).resolves.toMatchObject({pending:0,playerAfter:[17.99998567712444,125,0]});
+    replace('requestAnimationFrame',(draw:FrameRequestCallback)=>{playerX+=0.00001;draw(0);return 1;});
+    await expect(heldGoldenResidency()).rejects.toThrow('Native wait changed');
+    replace('requestAnimationFrame',(draw:FrameRequestCallback)=>{game.frameCount++;draw(0);return 1;});
+    await expect(heldGoldenResidency()).rejects.toThrow('Native wait changed');
+    playerX=0;
     replace('requestAnimationFrame',(draw:FrameRequestCallback)=>{playerX=1;draw(0);return 1;});
     await expect(heldGoldenResidency()).rejects.toThrow(/Native wait changed.*"before".*"player":\[0,125,0\].*"after".*"player":\[1,125,0\]/u);
   } finally {
