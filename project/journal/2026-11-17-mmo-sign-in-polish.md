@@ -9,3 +9,10 @@
   on the device's save queue. `claimSaves` now answers `moved`/`kept`/`none`; the door remembers accounts that answered `moved` or
   `kept` (they can never take a claim again) and skips them. `none` keeps asking, so a fresh account's later device can still claim.
 - **Raw tickets refused** (commit before this): `NetRoom` refuses a `ticket:` player; only the door reads one.
+
+## MP2.3 guest expiry (switch off)
+
+- `saves/expiry.ts`: `expireGuests` deletes `device:` players unseen (`seen_at`, touched by every save and Name claim) for N days,
+  with their receipts, saves and place, 500 a transaction (`for update skip locked`). Accounts never expire here (MP2.5's).
+- The server sweeps an hour after boot, then every 24 h, only when `GUEST_EXPIRY_DAYS` is set (Jake's switch: it deletes every
+  Friends-grid guest idle that long). Boot logs `guests.expiry` with the days or `off`.

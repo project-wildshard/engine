@@ -6,6 +6,7 @@ import { healSave, lastCell, placeOf, readSave, recoveryReceipts, SaveQuarantine
 import { SaveWriteQueue } from './saves/writeQueue';
 import { claimName, CLAIM_MS } from './saves/names';
 import { claimSaves } from './saves/claim';
+import { expireGuests } from './saves/expiry';
 import { ReportWriteQueue, type ReportWrite } from './saves/reportQueue';
 import type { Database } from './saves/database';
 import type { PlayerSaves, SavedPlayer } from './world';
@@ -57,6 +58,7 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
     recover: (device, shard, seq) => healSave(db, epoch, device, shard, seq),
     name: namesOver(db),
     claim: async (device, account) => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return claimSaves(db, device, account); },
+    expire: days => expireGuests(db, days),
     report: (report: ChatReport, shard: string) => { const accepted = reports.post(report, shard); if (!accepted) log({ at: 'report.refused', reason: 'backlog' }); return accepted; } };
 }
 /** The saves database at `url`, migrated. */

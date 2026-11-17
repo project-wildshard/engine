@@ -97,6 +97,8 @@ export interface PlayerSaves {
   report: (report: ChatReport, shard: string) => boolean;
   /** MP2.2d: move a device's guest progress to an account with none (`saves/claim.ts`'s answer). Left out, nothing is claimed. */
   claim?: (device: string, account: string) => Promise<ClaimResult>;
+  /** MP2.3: delete guests unseen for this many days (`saves/expiry.ts`); how many went. Left out (memory saves), none expire. */
+  expire?: (days: number) => Promise<number>;
   /** MP2.4: claim a cleaned Name for this device and answer what everyone reads (`Name#1234`). Left out, the Name goes as typed. */
   name?: (device: string, name: string) => Promise<string>;
   /** Wait for what is on its way, at most `ms`. */

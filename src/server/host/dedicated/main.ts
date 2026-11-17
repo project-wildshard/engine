@@ -16,6 +16,8 @@ import type { WorkerNews } from './cellProtocol';
 import type { CellWorkerData } from './cellWorker';
 import { readPackFolder, readReleaseItems, type PackReads } from './packReader';
 import { openPlayerSaves, memoryPlayerSaves } from './playerSaves';
+import { guestExpiryDays, startGuestExpiry } from './saves/expiry';
+import { Scope } from '@wildshard/engine/app/scope';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
 import { savesUrl } from './saves/pgDatabase';
@@ -137,6 +139,10 @@ stop = (code): void => { if (draining) return; draining = true; void (async (): 
 await new Promise<void>(resolve => { server.listen(port, host, resolve); });
 const address = server.address();
 if (address === null || typeof address === 'string') throw new Error('Dedicated server has no bound TCP address');
+// MMO-PLAN MP2.3 (Q33): guests idle `GUEST_EXPIRY_DAYS` go nightly. Unset is off: switching it on is Jake's.
+const expiryDays = guestExpiryDays(process.env);
+log({ at: 'guests.expiry', days: expiryDays ?? 'off' });
+if (expiryDays !== undefined && saves.expire !== undefined) startGuestExpiry(new Scope('guest-expiry'), { days: expiryDays, sweep: saves.expire, log });
 if (process.connected && process.send !== undefined) process.send({ kind: 'world-ready', pid: process.pid, port: address.port });
 metrics?.watch(world);
 // A metrics port already taken never stops the game: the line says so, and the alarms see no scrape (SC3).
