@@ -58,6 +58,9 @@ export interface ContentReadOptions {
   /** OF17: asked when the read has failed twice, before it waits on RETRY. True throws the error instead: the caller has
    *  another copy to read (a texture's other form, held in the cache). */
   instead?: (error: ContentReadError) => Promise<boolean>;
+  /** FM6 mode 44: the caller's content check (its hash). False makes the read a broken one: retried with a cache reload, then
+   *  the card's RETRY (`packs-5xx pack-broken`), exactly as a short file; the failing bytes are never returned. */
+  verify?: (bytes: Uint8Array<ArrayBuffer>) => boolean | Promise<boolean>;
 }
 
 function html(bytes: Uint8Array): boolean {
@@ -206,15 +209,17 @@ async function busyWait(error: ContentReadError, ms: number, signal?: AbortSigna
 export async function readContent(url: string, maximum: number, options: ContentReadOptions): Promise<Uint8Array<ArrayBuffer>> {
   if (!Number.isSafeInteger(maximum) || maximum < 0 || maximum > 25_000_000) throw new Error('Invalid content wire cap');
   if (options.expectedBytes !== undefined && (!Number.isSafeInteger(options.expectedBytes) || options.expectedBytes < 0 || options.expectedBytes > maximum)) throw new Error('Invalid expected content length');
-  let retried = false, reads = 0;
+  // `bypass`: once any read failed, every later one skips the HTTP cache: a truncated 200 is kept there (FM6 mode 44)
+  let retried = false, bypass = false, reads = 0;
   for (;;) {
     options.signal?.throwIfAborted();
     reads++;
     try {
       let response: Response;
-      try { response = await options.fetch(url, { ...(retried ? { cache: 'reload' } : {}), ...(options.signal === undefined ? {} : { signal: options.signal }) }); }
+      try { response = await options.fetch(url, { ...(bypass ? { cache: 'reload' } : {}), ...(options.signal === undefined ? {} : { signal: options.signal }) }); }
       catch (error) { options.signal?.throwIfAborted(); throw new ContentReadError(url, 'connection unavailable', error); }
       const bytes = await body(response, url, maximum, options.read, options.expectedBytes, options.response);
+      if (options.verify !== undefined && !await options.verify(bytes)) throw new ContentReadError(url, 'content hash differs', undefined, false, { broken: true });
       // FM6 mode 36: a read that waited on RETRY now arrives, so the download works again: a later stall shows the card's line first
       if (reads > 2) clearDownloadGiveUp();
       return bytes;
@@ -224,6 +229,7 @@ export async function readContent(url: string, maximum: number, options: Content
       if (error.missing && options.missingThrows === true) throw error;
       // FM6 mode 34: a 429 that says when waits that long before the retry the budget already allows; the count is unchanged
       if (error.retryAfterMs !== null && error.retryAfterMs > 0) await busyWait(error, error.retryAfterMs, options.signal);
+      bypass = true;
       if (!retried) { retried = true; }
       else {
         if (options.instead !== undefined && await options.instead(error)) throw error;

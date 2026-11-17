@@ -250,3 +250,30 @@ test('FM6 mode 36: a read on RETRY for DOWNLOAD_GIVE_UP_MS shows the page, count
     expect(document.querySelector('[data-failmode~="download-failed"]')).toBeNull();
   } finally { vi.useRealTimers(); clearDownloadGiveUp(); }
 });
+
+test('FM6 mode 44: bytes that fail the caller\'s hash are a broken read: retried with a cache reload, never returned', async () => {
+  const good = new Uint8Array([1, 2, 3]), bad = new Uint8Array([1, 2, 9]);
+  const calls: RequestInit[] = [];
+  const bytes = await readContent(url, 3, { expectedBytes: 3, verify: read => read[2] === 3,
+    fetch: (_url, init) => { calls.push(init); return Promise.resolve(new Response(calls.length === 1 ? bad : good)); } });
+  expect(bytes).toEqual(good);
+  expect(calls.map(call => call.cache)).toEqual([undefined, 'reload']);
+  let failure: unknown, thrown: unknown;
+  try { await readContent(url, 3, { verify: () => false, fetch: () => Promise.resolve(new Response(bad)),
+    retry: error => { failure = error; return Promise.reject(error); } }); }
+  catch (error) { thrown = error; }
+  expect(thrown).toBe(failure);
+  expect(failure).toBeInstanceOf(ContentReadError);
+  expect((failure as ContentReadError).broken).toBe(true);
+  expect(contentFailure(failure as ContentReadError).failmode).toBe('packs-5xx pack-broken');
+});
+
+test('FM6 mode 44: after RETRY a broken file is read past the HTTP cache, which kept the truncated answer', async () => {
+  const good = new Uint8Array([1, 2, 3]), calls: RequestInit[] = [];
+  let retries = 0;
+  const bytes = await readContent(url, 3, { expectedBytes: 3,
+    fetch: (_url, init) => { calls.push(init); return Promise.resolve(new Response(calls.length <= 2 ? good.slice(0, 2) : good)); },
+    retry: () => { retries++; return Promise.resolve(); } });
+  expect(bytes).toEqual(good); expect(retries).toBe(1);
+  expect(calls.map(call => call.cache)).toEqual([undefined, 'reload', 'reload']);
+});

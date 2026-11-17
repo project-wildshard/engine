@@ -648,13 +648,14 @@ async function startSelected(): Promise<void> {
     if (source !== null || manifest.shardfile !== undefined) document.documentElement.classList.remove('title-first');
     installKitSpecies();
     installKitIcons();
-    const [{boundedResponse,browserContentHash},{publicBytes}] = await Promise.all([import('@wildshard/engine/game/shardfile/folder'),import('@wildshard/engine/boot/tables')]);
+    const [{browserContentHash},{publicBytes},{readContent}] = await Promise.all([import('@wildshard/engine/game/shardfile/folder'),import('@wildshard/engine/boot/tables'),import('@wildshard/engine/boot/contentRead')]);
     const pickupAssets=publicBytes(), pickupPath=/^\/assets\/baked\/common\/pickups\/([a-f0-9]{64})\.bin$/u;
+    // FM6 mode 44: a pickup file is a pack read like any other: a short or wrong-hash file retries, then waits on the card's RETRY
+    // (`packs-5xx pack-broken`), never the generic startup refusal; its bytes stay exact-length and hash-verified
     const pickupFiles=await preparePickupCatalogue({hasFile:file=>pickupPath.test(file)&&Object.hasOwn(pickupAssets,file),file:async file=>{
       const hash=pickupPath.exec(file)?.[1],cap=pickupAssets[file];
       if(hash===undefined||cap===undefined)throw new Error('Missing pickup asset declaration');
-      const bytes=await boundedResponse(await fetch(file),cap);
-      if(await browserContentHash(bytes)!==hash)throw new Error('Pickup asset hash differs');
+      const bytes=await readContent(file,cap,{fetch:(address,init)=>fetch(address,init),expectedBytes:cap,verify:async read=>await browserContentHash(read)===hash});
       return bytes;
     }},PICKUP_CATALOGUE,entryScope);
     installPickupCatalogue(PICKUP_CATALOGUE,pickupFiles);
