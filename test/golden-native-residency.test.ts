@@ -1,9 +1,22 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- The reader scans a real dist folder on disk.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Temp dist under the checkout's tmp folder.
 import { join } from 'node:path';
-import { buildCodeChunks } from '../scripts/goldens/native-residency.mjs';
+import { buildCodeChunks, heldGoldenResidency } from '../scripts/goldens/native-residency.mjs';
+
+test('a held residency wait still refuses movement and names the before/after state', async () => {
+  let playerX=0;
+  const game={hold:true,frameCount:12,app:{clock:{snapshot:()=>({frames:12})}},camera:{matrixWorld:{elements:[1,0,0,1]}}};
+  const ledger={jobs:[{id:'native-part',state:'published'}]};
+  vi.stubGlobal('window',{__wildshard:{world:{game,player:{position:{toArray:()=>[playerX,125,0]}}}},__goldenResidency:ledger});
+  try {
+    vi.stubGlobal('requestAnimationFrame',(callback:FrameRequestCallback)=>{callback(0);return 1;});
+    await expect(heldGoldenResidency()).resolves.toMatchObject({pending:0,heldState:{frame:12,player:[0,125,0]}});
+    vi.stubGlobal('requestAnimationFrame',(callback:FrameRequestCallback)=>{playerX=1;callback(0);return 1;});
+    await expect(heldGoldenResidency()).rejects.toThrow(/Native wait changed.*"before".*"player":\[0,125,0\].*"after".*"player":\[1,125,0\]/u);
+  } finally {vi.unstubAllGlobals();}
+});
 
 test('the Nine reader scans the build folder and the shared chunks its import map names', () => {
   mkdirSync('tmp', { recursive: true });

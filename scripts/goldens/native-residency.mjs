@@ -126,6 +126,7 @@ export async function heldGoldenResidency() {
     }
     if (Date.now()-start>=29000) throw new Error('Native publication did not settle');
   }
-  if (snapshot()!==before) throw new Error('Native wait changed frame, clock, camera or player');
+  const after=snapshot();
+  if (after!==before) throw new Error(`Native wait changed frame, clock, camera or player: ${JSON.stringify({before:JSON.parse(before),after:JSON.parse(after)})}`);
   return {jobs:ledger.jobs,heldState:JSON.parse(before),turns,elapsedMs:Date.now()-start,pending:0};
 }
