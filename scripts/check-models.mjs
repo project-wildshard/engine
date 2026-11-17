@@ -111,8 +111,6 @@ export const DONE = {
     'src/sharddev/bake/glb.ts': { why: '3b5ac8c9a: the offline curve weld for the existing Sky fan tassels, replacing their private cord geometry; no runtime world registration', counts: { mergeGeometries: 1 } },
     // bf05c8c27: same Pine wildlife / Nalati flock instance draw, shared owner.
     'src/client/game/looks/posedInstances.ts': { why: 'bf05c8c27: the existing posed creature instance owner shared by Pine wildlife and the Nalati flock (creatures, M5); geometry and poses stay with their model', counts: { InstancedMesh: 1 } },
-    'src/client/engine/entities/bakedHerd.ts': { why: 'ONE-FORMAT CC54a: the distance tier batches copies of a model rig using its geometry and baked gait, without creating new placed creatures', counts: { InstancedMesh: 1 } },
-    'src/client/engine/entities/herdSprites.ts': { why: 'ONE-FORMAT CC55a: one card batch draws the far tier from the creature model’s baked views and the existing herd transforms', counts: { InstancedMesh: 1 } },
     'src/sharddev/sceneGraph.ts': { why: 'DS1.2 authoring-only Node reconstruction of persisted scene data: restores the authored instance matrices for build compilers without a renderer, runtime host or newly placed world thing', counts: { InstancedMesh: 1 } },
     'src/client/engine/render/precompile.ts': { why: 'Compile-only detached shader stand-in borrows the source instance layout and buffers; never placed or drawn as world content', counts: { InstancedMesh: 1 } },
     'src/client/engine/render/calibrationGpu.ts': { why: 'E357 S1.6 synthetic unit-cost scene: temporary calibration geometry, never shard content or a Model Explorer asset', counts: { InstancedMesh: 1 } },
