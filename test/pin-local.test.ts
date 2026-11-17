@@ -8,7 +8,6 @@ import {afterEach, expect, test} from 'vitest';
 import {readTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {formatTemplate} from '../scripts/pin-format.ts';
-import {localProduct} from '../scripts/pin-local.ts';
 import {localCandidates, LOCAL_CANDIDATES} from '../scripts/local-candidates.ts';
 import {cookShard, openShardfile} from '../src/cook/game/shardCook.ts';
 import {productTarball} from '../src/cook/game/productTarball';
@@ -59,7 +58,7 @@ test('actual local admission, runtime open and published restoration leave the t
   const {root, source, product} = fixture(), pins = readFileSync(join(root, 'test/pins/shardfiles.json'));
   const admitted = await cli(root, ['install', '--from-dir', source]);
   expect(admitted.output).toContain('1 of 1 pins admitted'); expect(admitted.status).toBe(0);
-  const rows = localCandidates(root);
+  const rows = localCandidates(root, {CI: ''});
   expect(rows).toMatchObject([{slug: 'brasscap-mesa', path: source, indexHash: createHash('sha256').update(readFileSync(join(source, 'shard.json'))).digest('hex')}]);
   const installed = productTarball(join(root, 'out/brasscap-mesa'));
   expect(openShardfile(installed).slug).toBe('brasscap-mesa');
@@ -105,7 +104,9 @@ test('malformed input and symlinks refuse before replacing an installed product'
   expect((await cli(root, ['install', '--from-dir', source])).status).not.toBe(0);
   expect(readFileSync(join(root, 'out/brasscap-mesa/shard.json'))).toEqual(prior);
   symlinkSync(join(source, 'shard.json'), join(source, 'aliased.json'));
-  await expect(localProduct(source, root)).rejects.toThrow('non-regular');
+  const linked = await cli(root, ['install', '--from-dir', source]);
+  expect(linked.status).not.toBe(0);
+  expect(linked.output).toContain('non-regular');
 });
 
 test('a mount owned by another shard refuses without changing that owner', async () => {

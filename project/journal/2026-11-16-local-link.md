@@ -33,3 +33,10 @@ LL7 records the scoped mini habit in engine AGENTS: canonical links with
 receipts, actual local product proof, restoration before main-push, then
 explicit pushed candidate/baseline checks. M1 cuts LL2/LL3 worktree
 machinery; other machines keep their own execution rules.
+
+Hosted 44007180342 caught two fixture mistakes under CI=true: the local
+reader correctly ignores provenance by default, and the direct loader
+correctly refuses CI before inspecting symlinks. The test now observes
+its explicitly local fixture with CI unset and drives symlink refusal
+through the real CLI child. All fifteen new cases pass with CI=true;
+production CI refusal and file isolation stay unchanged.
