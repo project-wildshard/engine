@@ -68,14 +68,14 @@ export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSi
   if (index === null || index.count === 0) return;
   const attrs = names.map((name) => geometry.getAttribute(name)), sizes = attrs.map((a) => a.itemSize), stride = sizes.reduce((a, b) => a + b, 0);
   const count = attrs[0]?.count ?? 0, position = geometry.getAttribute('position');
-  const read = (n: number): Float64Array => {
-    const v = new Float64Array(stride); let o = 0;
+  const read = (n: number, into: Float64Array, at: number): void => {
+    let o = at;
     for (let k = 0; k < attrs.length; k++) {
       const a = attrs[k], size = sizes[k] ?? 0;
-      if (a !== undefined) for (let c = 0; c < size; c++) v[o + c] = a.array[n * size + c] ?? 0;
+      if (a !== undefined) for (let c = 0; c < size; c++) into[o + c] = a.array[n * size + c] ?? 0;
+      else for (let c = 0; c < size; c++) into[o + c] = 0;
       o += size;
     }
-    return v;
   };
   const at = names.indexOf('position'), px = at === -1 ? 0 : sizes.slice(0, at).reduce((a, b) => a + b, 0);
   const { extra, out } = yield* clipCore(index.count / 3, (i) => index.getX(i), count, stride, px, read, (n, axis) => position.array[n * position.itemSize + axis] ?? 0, pitch, tileSize);
@@ -97,28 +97,50 @@ export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSi
  * x then z, a new vertex interpolating all `stride` values linearly (position at `px`). A plan that reads only positions
  * gets exactly the builder's positions, new vertices and triangles: every value interpolates on its own.
  */
-function* clipCore(triangles: number, indexAt: (i: number) => number, count: number, stride: number, px: number, read: (n: number) => Float64Array, coordinate: (n: number, axis: number) => number, pitch: number, tileSize?: number, retain = true): Generator<void, { extra: Float64Array; out: Uint32Array; added: number; corners: number }> {
+function* clipCore(triangles: number, indexAt: (i: number) => number, count: number, stride: number, px: number, read: (n: number, into: Float64Array, at: number) => void, coordinate: (n: number, axis: number) => number, pitch: number, tileSize?: number, retain = true): Generator<void, { extra: Float64Array; out: Uint32Array; added: number; corners: number }> {
   // Most triangles fit one bin, so the index is about three corners a triangle; cut triangles grow it.
   const { size: s, offset } = binGrid(pitch, tileSize), extra = growF64(retain ? stride * 64 : 0), out = growU32(retain ? triangles * 3 + 64 : 0);
   let added = 0, corners = 0;
-  // Count-only admission needs no final index or copied interpolation channels.
-  // Polygon vertices still retain every value used by the original split.
-  const add = (v: Float64Array): number => { if (retain) for (const x of v) extra.push(x); return count + added++; };
-  interface V { n: number; v: Float64Array }
-  /** Split a convex polygon by the line axis = c into its below and above parts (new vertices interpolated). */
-  const split = (poly: readonly V[], axis: number, c: number): [V[], V[]] => {
-    const lo: V[] = [], hi: V[] = [];
-    poly.forEach((a, i) => {
-      const b = poly[(i + 1) % poly.length]; if (b === undefined) return;
-      const da = (a.v[px + axis] ?? 0) - c, db = (b.v[px + axis] ?? 0) - c;
-      (da < 0 ? lo : hi).push(a);
+  // SB38 (WILDSHARD-GAME-8Z): a cut triangle's polygons live in scratch, reused for every triangle: each vertex's values
+  // in `pool` (a slot of `stride` values) with its index in `ids`, each polygon a run of slots. Before, every cut
+  // triangle made a Float64Array and an object a vertex and arrays a polygon and a split, garbage JavaScriptCore grows
+  // its heap for while the page builds the road beside play. The order of new vertices, their interpolation and the
+  // index order are the old split's. Count-only admission (`retain` false) keeps no final index or copied channels.
+  let pool = new Float64Array(stride * 32), ids = new Float64Array(32), used = 0;
+  const slot = (n: number): number => {
+    if (used === ids.length) {
+      const grown = new Float64Array(pool.length * 2); grown.set(pool); pool = grown;
+      const grownIds = new Float64Array(ids.length * 2); grownIds.set(ids); ids = grownIds;
+    }
+    ids[used] = n; return used++;
+  };
+  const value = (at: number, k: number): number => pool[at * stride + k] ?? 0;
+  // polygon lists: `polys`/`next` hold runs (start, length) into their slot lists; `work`, `lo` and `hi` are one polygon each
+  let polySlots: number[] = [], polyRuns: number[] = [], polyCount = 0;
+  let nextSlots: number[] = [], nextRuns: number[] = [], nextCount = 0, nextFill = 0;
+  const lo: number[] = [];
+  let work: number[] = [], hi: number[] = [];
+  let workLength = 0, loLength = 0, hiLength = 0;
+  const pushNext = (from: readonly number[], length: number): void => {
+    nextRuns[nextCount * 2] = nextFill; nextRuns[nextCount * 2 + 1] = length; nextCount++;
+    for (let i = 0; i < length; i++) nextSlots[nextFill++] = from[i] ?? 0;
+  };
+  /** Split `work` by the line axis = c into `lo` and `hi` (new vertices interpolated, added in edge order). */
+  const split = (axis: number, c: number): void => {
+    loLength = 0; hiLength = 0;
+    for (let i = 0; i < workLength; i++) {
+      const a = work[i] ?? 0, b = work[(i + 1) % workLength] ?? 0;
+      const da = value(a, px + axis) - c, db = value(b, px + axis) - c;
+      if (da < 0) lo[loLength++] = a; else hi[hiLength++] = a;
       if ((da < 0) !== (db < 0)) {
-        const t = da / (da - db), v = new Float64Array(stride);
-        for (let k = 0; k < stride; k++) v[k] = (a.v[k] ?? 0) + ((b.v[k] ?? 0) - (a.v[k] ?? 0)) * t;
-        v[px + axis] = c; const m = { n: add(v), v }; lo.push(m); hi.push(m);
+        const t = da / (da - db), m = slot(0), at = m * stride, from = a * stride, to = b * stride;
+        for (let k = 0; k < stride; k++) pool[at + k] = (pool[from + k] ?? 0) + ((pool[to + k] ?? 0) - (pool[from + k] ?? 0)) * t;
+        pool[at + px + axis] = c;
+        if (retain) for (let k = 0; k < stride; k++) extra.push(pool[at + k] ?? 0);
+        ids[m] = count + added++;
+        lo[loLength++] = m; hi[hiLength++] = m;
       }
-    });
-    return [lo, hi];
+    }
   };
   for (let t = 0; t < triangles; t++) {
     if (t % 256 === 0) yield;
@@ -129,25 +151,33 @@ function* clipCore(triangles: number, indexAt: (i: number) => number, count: num
       && !crossesBin(coordinate(a, 2), coordinate(b, 2), coordinate(third, 2), s, offset)) {
       corners += 3; if (retain) { out.push(a); out.push(b); out.push(third); } continue;
     }
-    const tri: V[] = [a, b, third].map((n) => ({ n, v: read(n) }));
-    let polys: V[][] = [tri];
-    for (const axis of [0, 2]) {
-      const next: V[][] = [];
-      for (let poly of polys) {
-        const values = poly.map((p) => p.v[px + axis] ?? 0), lo = Math.min(...values), hi = Math.max(...values);
-        for (let k = Math.ceil(lo / s - offset); (k + offset) * s < hi; k++) {
-          const c = (k + offset) * s; if (c <= lo) continue;
-          const [below, above] = split(poly, axis, c);
-          if (below.length >= 3) next.push(below);
-          poly = above;
+    used = 0;
+    const sa = slot(a), sb = slot(b), sc = slot(third); // slots before reads: a growth replaces `pool`
+    read(a, pool, sa * stride); read(b, pool, sb * stride); read(third, pool, sc * stride);
+    polySlots[0] = 0; polySlots[1] = 1; polySlots[2] = 2; polyRuns[0] = 0; polyRuns[1] = 3; polyCount = 1;
+    for (let axis = 0; axis <= 2; axis += 2) {
+      nextCount = 0; nextFill = 0;
+      for (let p = 0; p < polyCount; p++) {
+        const from = polyRuns[p * 2] ?? 0; workLength = polyRuns[p * 2 + 1] ?? 0;
+        let low = Infinity, high = -Infinity;
+        for (let i = 0; i < workLength; i++) { const at = polySlots[from + i] ?? 0; work[i] = at; const v = value(at, px + axis); low = Math.min(low, v); high = Math.max(high, v); }
+        for (let k = Math.ceil(low / s - offset); (k + offset) * s < high; k++) {
+          const c = (k + offset) * s; if (c <= low) continue;
+          split(axis, c);
+          if (loLength >= 3) pushNext(lo, loLength);
+          const spare = work; work = hi; hi = spare; workLength = hiLength;
         }
-        if (poly.length >= 3) next.push(poly);
+        if (workLength >= 3) pushNext(work, workLength);
       }
-      polys = next;
+      const slots = polySlots, runs = polyRuns; polySlots = nextSlots; polyRuns = nextRuns; nextSlots = slots; nextRuns = runs;
+      polyCount = nextCount;
     }
-    for (const poly of polys) for (let k = 1; k + 1 < poly.length; k++) {
-      corners += 3;
-      if (retain) { out.push(poly[0]?.n ?? 0); out.push(poly[k]?.n ?? 0); out.push(poly[k + 1]?.n ?? 0); }
+    for (let p = 0; p < polyCount; p++) {
+      const from = polyRuns[p * 2] ?? 0, length = polyRuns[p * 2 + 1] ?? 0, first = ids[polySlots[from] ?? 0] ?? 0;
+      for (let k = 1; k + 1 < length; k++) {
+        corners += 3;
+        if (retain) { out.push(first); out.push(ids[polySlots[from + k] ?? 0] ?? 0); out.push(ids[polySlots[from + k + 1] ?? 0] ?? 0); }
+      }
     }
   }
   return { extra: extra.view(), out: out.view(), added, corners };
@@ -309,7 +339,7 @@ export interface CullCounts { readonly vertices: number; readonly clipped: numbe
 export function* cullCountsSteps(sources: readonly CullSource[], pitch: number, lod?: readonly CullLod[], tileSize?: number): Generator<void, CullCounts> {
   let vertices = 0, clipped = 0, source = 0;
   for (const run of sources) {
-    const read = (n: number): Float64Array => Float64Array.of(run.position(n * 3), run.position(n * 3 + 1), run.position(n * 3 + 2));
+    const read = (n: number, into: Float64Array, at: number): void => { into[at] = run.position(n * 3); into[at + 1] = run.position(n * 3 + 1); into[at + 2] = run.position(n * 3 + 2); };
     // Only an omitted tier list is privately known to stay empty. A supplied
     // empty array may acquire a tier while the original generator is paused.
     const { extra, out, added, corners } = yield* clipCore(run.indices.length / 3, (i) => run.indices[i] ?? 0, run.vertices, 3, 0, read, (n, axis) => run.position(n * 3 + axis), pitch, tileSize, lod !== undefined);
