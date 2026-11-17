@@ -14,3 +14,8 @@ Mac digests all match the original golden. All three portable
 digests match 80eb37f5. The golden comes from the pre-cut source and
 still covers positions, colours, indices and feature values. The
 production paths and 160 MiB allocation budget stay the same.
+
+The shared push included pending rig and telemetry commits. Its
+checks passed, but regenerating the three asset stamps made the
+candidate differ from its commit. Regenerated those stamps from the
+shared checkout for the next normal push.
