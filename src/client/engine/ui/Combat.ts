@@ -8,7 +8,7 @@ import type { Animal } from '../entities/AnimalView';
 import type { Weapon } from '../../../shared/engine/combat/Weapon';
 import { TIER } from '../core/tier';
 import { viewportHeight } from '../core/viewport';
-import { lockOn } from '../player/AimTargets';
+import { lockOn, socketAimPoint, type AimTarget } from '../player/AimTargets';
 import './styles/combat.css';
 
 /**
@@ -66,7 +66,7 @@ export function floatLook(own: boolean, head: boolean, died: boolean): { readonl
 
 const _t = new THREE.Vector3();
 /** What a health bar reads of a body: a page's own `Animal`, or a grid data cell's server-owned creature (`addCombatTargets`). */
-export interface CombatTarget {
+export interface CombatTarget extends Pick<AimTarget, 'lockPoints'> {
   readonly hidden: boolean; readonly kind: string; readonly mem: Readonly<Record<string, number | undefined>>; readonly lastHitT: number;
   readonly position: THREE.Vector3; readonly scale: number; readonly hp: number; readonly maxHp: number; readonly alive: boolean; readonly label: string;
   readonly headWorld: (out: THREE.Vector3) => THREE.Vector3;
@@ -290,7 +290,7 @@ export class Combat {
       const a = s.animal;
       let on = false;
       if (a) {
-        a.headWorld(_v); _v.y += 0.32 * a.scale;
+        combatBarPoint(a, _v);
         if (this.project(_v)) {
           on = true;
           s.el.style.transform = `translate3d(${_v.x.toFixed(1)}px,${_v.y.toFixed(1)}px,0)`;
@@ -345,4 +345,10 @@ export class Combat {
     a.headWorld(_v); _v.y += 0.2;
     return this.project(_v);
   }
+}
+
+/** Bars and lock camera share the selected socket; legacy tags keep their head lift. */
+export function combatBarPoint(a: CombatTarget, out: THREE.Vector3): THREE.Vector3 {
+  if (socketAimPoint(a, out) !== null) return out;
+  a.headWorld(out); out.y += 0.32 * a.scale; return out;
 }

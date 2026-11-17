@@ -12,6 +12,8 @@
  * creatures stay hidden, so a neighbour shows only its tiles.
  */
 import { Bone, Skeleton, SkinnedMesh, Vector3, type Group, type Object3D } from 'three';
+import { RestCreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
+import type { CreatureLockPoints } from '@wildshard/engine/physics/creatureVolumes';
 import { addCombatTargets, reportCombatHit, type CombatTarget } from '@wildshard/engine/ui/Combat';
 import { addAimTargets, type AimTarget } from '@wildshard/engine/player/AimTargets';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -47,6 +49,7 @@ export interface NeighbourLifeCell { readonly instance: string; readonly creatur
 
 /** TEMPLATE-E2E TC-B10: a drawn creature as the page's health bars read it (Combat's `CombatTarget`), in world space. */
 class CreatureTarget implements CombatTarget, AimTarget {
+  lockPoints: CreatureLockPoints | undefined;
   hidden = true; lastHitT = -Infinity; hp: number; maxHp: number; alive = true; scale: number; lastHp: number | null = null;
   readonly mem: Readonly<Record<string, number | undefined>> = {};
   readonly position = new Vector3();
@@ -124,6 +127,15 @@ export class NeighbourLife {
       const variant = variants.find((row) => row.id === spawn.variant) ?? variants[0], head = species.dims.headRadius;
       const target = new CreatureTarget(species.kind, variant?.label ?? species.label, Math.max(1, variant?.hp ?? 1), spawn.scale, species.dims.bodyY * 2 + (Number.isFinite(head) ? head : 0.3),
         { bodyY: species.dims.bodyY, bodyRadius: species.dims.bodyRadius }, species.lockable);
+      if (species.body !== undefined && (species.body.skeleton !== undefined || species.body.lock !== undefined)) {
+        const joints = selected.bones.map(def => {
+          const parent = def.parent === null ? -1 : selected.bones.findIndex(row => row.name === def.parent), previous = selected.bones[parent];
+          return { name: def.name, parent, position: [def.pos[0] - (previous?.pos[0] ?? 0), def.pos[1] - (previous?.pos[1] ?? 0), def.pos[2] - (previous?.pos[2] ?? 0)] as const };
+        });
+        const body = species.body, points = new RestCreatureSockets(body, joints, { position: mesh.position,
+          get yaw() { return mesh.rotation.y; }, get scale() { return mesh.scale.x * body.scale; } });
+        target.lockPoints = { names: points.names, point: (index, out) => { root.updateWorldMatrix(true, false); return points.point(index, out).applyMatrix4(root.matrixWorld); } };
+      }
       const view: CreatureView = { id, mesh, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale: spawn.scale }, bodyY: species.dims.bodyY * spawn.scale, target, t: (spawn.seed % 97) / 13, phase: 0 };
       mesh.position.set(spawn.at[0], spawn.at[1], spawn.at[2]); mesh.rotation.set(0, spawn.yaw, 0, 'YXZ'); mesh.scale.setScalar(spawn.scale);
       // ZE3a: hidden from birth unless its cell is the active one: an admission that resolves between the late phase (which

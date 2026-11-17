@@ -27,7 +27,7 @@ import type { InputService } from '../input/InputService';
 import * as THREE from 'three';
 import type { Player } from './Player';
 import type { EquipmentService } from '../combat/EquipmentService';
-import { liveAimTargets, lockOn, type AimTarget } from './AimTargets';
+import { liveAimTargets, lockOn, socketAimPoint, type AimTarget } from './AimTargets';
 import { targetRadius } from '../../../shared/engine/combat/lungeTarget';
 import { lineOfSight } from '../../../shared/engine/physics/query';
 import { getNumber, getSetting } from '../ui/Settings';
@@ -130,6 +130,7 @@ const _eye = new THREE.Vector3(), _aim = new THREE.Vector3(), _proj = new THREE.
 
 /** the point the view locks onto: the body centre; on a tall enemy halfway up to the head (the chest) */
 export function aimPoint(t: AimTarget, out: THREE.Vector3): THREE.Vector3 {
+  if (socketAimPoint(t, out) !== null) return out;
   const s = t.scale ?? 1, bodyY = (t.dims?.bodyY ?? 0.5) * s;
   out.copy(t.position); out.y += bodyY;
   if (bodyY > 0.9 && t.headWorld) { const hy = t.headWorld(_head).y; out.y = (out.y + hy) / 2; }
@@ -201,6 +202,18 @@ export class LockOnSystem {
     this.onLock?.();
   }
 
+  /** Tab walks sockets on the same giant, retaining network/orbit/damage identity. */
+  cyclePoint(): boolean {
+    const t = lockOn.target;
+    if (lockOn.state !== 'locked' || t === null) return false;
+    if (!t.alive || t.hidden || ![...liveAimTargets()].includes(t)) { this.unlock(true); return false; }
+    const points = t.lockPoints;
+    if (points === undefined || points.names.length < 2) return false;
+    lockOn.point = (lockOn.point + 1) % points.names.length;
+    this.engageT = LOCK.ENGAGE_T; this.lastBear = null; this.losLostT = 0;
+    this.onSwitch?.(); return true;
+  }
+
   flick(dir: FlickDir): void {
     if (lockOn.state !== 'locked' || lockOn.target === null || this.refractoryT > 0) return;
     const cur = this.bearing(lockOn.target);
@@ -235,7 +248,7 @@ export class LockOnSystem {
   }
 
   private lock(t: AimTarget): void {
-    lockOn.target = t; lockOn.state = 'locked'; lockOn.candidate = null;
+    lockOn.point = 0; lockOn.target = t; lockOn.state = 'locked'; lockOn.candidate = null;
     lockOn.offYaw = 0; lockOn.offPitch = 0;
     const p = this.player.position;
     lockOn.r0 = Math.hypot(t.position.x - p.x, t.position.z - p.z);
@@ -244,7 +257,7 @@ export class LockOnSystem {
 
   unlock(broke = false): void {
     if (lockOn.state !== 'locked') return;
-    lockOn.target = null; lockOn.state = 'off'; lockOn.left = lockOn.right = null;
+    lockOn.point = 0; lockOn.target = null; lockOn.state = 'off'; lockOn.left = lockOn.right = null;
     lockOn.offYaw = lockOn.offPitch = 0;
     this.scanT = 0; this.deadT = -1;
     this.onUnlock?.();
@@ -333,6 +346,7 @@ export class LockOnSystem {
 
     const t = lockOn.target;
     if (lockOn.state === 'locked' && t !== null) {
+      if (t.lockPoints !== undefined && ![...liveAimTargets()].includes(t)) { this.unlock(true); return; }
       // the kill: a beat, then the next enemy close by (Auto re-lock) or unlock
       if (!t.alive || t.hidden) {
         if (this.deadT < 0) this.deadT = LOCK.NEXT_DELAY;

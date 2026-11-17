@@ -18,7 +18,7 @@ import { engineString } from '../../../shared/engine/strings';
  * when nothing is framed or the target is behind the camera. Every write is skipped when nothing changed.
  */
 import * as THREE from 'three';
-import { lockOn, meleeLock, type AimTarget } from '../player/AimTargets';
+import { lockOn, meleeLock, socketAimPoint, type AimTarget } from '../player/AimTargets';
 import { targetRadius } from '../../../shared/engine/combat/lungeTarget';
 import { aimPoint, type FlickDir } from '../player/LockOnTarget';
 import { viewportHeight } from '../core/viewport';
@@ -95,6 +95,7 @@ export class LockOn {
 
   /** a point just over the enemy's back / head */
   private above(t: AimTarget, out: THREE.Vector3): THREE.Vector3 {
+    if (socketAimPoint(t, out) !== null) return out;
     const s = t.scale ?? 1;
     out.copy(t.position); out.y += ((t.dims?.bodyY ?? 0.5) + 0.35) * s + 0.25;
     return out;
@@ -109,7 +110,7 @@ export class LockOn {
   /** place the brackets round `t`; false when it is behind the camera */
   private frame(t: AimTarget): boolean {
     const s = t.scale ?? 1;
-    _c.copy(t.position); _c.y += (t.dims?.bodyY ?? 0.5) * s;
+    if (socketAimPoint(t, _c) === null) { _c.copy(t.position); _c.y += (t.dims?.bodyY ?? 0.5) * s; }
     _right.setFromMatrixColumn(this.camera.matrixWorld, 0);
     _e.copy(_c).addScaledVector(_right, Math.max(targetRadius(t), (t.dims?.bodyHalfLen ?? 0) * s) * 1.3).project(this.camera); // half-length: a boar side-on fits
     _c.project(this.camera);

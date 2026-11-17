@@ -920,6 +920,7 @@
     "src/client/game/session/finish.ts": "client",
     "src/client/game/session/hudAccent.ts": "client",
     "src/client/game/session/loadout.ts": "client",
+    "src/client/game/session/lockTab.ts": "client",
     "src/client/game/session/play.ts": "client",
     "src/client/game/session/positions.ts": "client",
     "src/client/game/session/readyFrame.ts": "client",

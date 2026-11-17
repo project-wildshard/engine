@@ -63,8 +63,17 @@ export const meleeLock: { target: AimTarget | null; lunging: boolean } = { targe
  * next targets a flick would switch to (the HUD's edge chevrons), with their distances.
  */
 export const lockOn: {
+  point: number;
   state: 'off' | 'available' | 'locked';
   target: AimTarget | null; candidate: AimTarget | null;
   offYaw: number; offPitch: number; r0: number;
   left: AimTarget | null; right: AimTarget | null; leftDist: number; rightDist: number;
-} = { state: 'off', target: null, candidate: null, offYaw: 0, offPitch: 0, r0: 0, left: null, right: null, leftDist: 0, rightDist: 0 };
+} = { point: 0, state: 'off', target: null, candidate: null, offYaw: 0, offPitch: 0, r0: 0, left: null, right: null, leftDist: 0, rightDist: 0 };
+
+/** The selected socket for this exact entity; unlocked candidates use its first socket. */
+export function socketAimPoint(t: Pick<AimTarget, 'lockPoints'>, out: THREE.Vector3): THREE.Vector3 | null {
+  const points = t.lockPoints;
+  if (points === undefined || points.names.length === 0) return null;
+  const index = lockOn.state === 'locked' && lockOn.target === t ? lockOn.point : 0;
+  return points.point(index >= 0 && index < points.names.length ? index : 0, out);
+}

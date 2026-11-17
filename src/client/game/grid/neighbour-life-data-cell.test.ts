@@ -2,7 +2,7 @@
 // TEMPLATE-E2E TC-E1a: a grid data cell draws every creature it spawns, not only the ones its client scripts bind. Brasscap
 // binds only particles, and on staging its 12 bodies were on the wire and never drawn.
 import { expect, test } from 'vitest';
-import { BoxGeometry, Group, MeshLambertMaterial, SkinnedMesh } from 'three';
+import { BoxGeometry, Group, MeshLambertMaterial, SkinnedMesh, Vector3 } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { ClientSkin } from '../shardfile/clientSkins';
@@ -27,6 +27,22 @@ async function admitted(source: Shardfile, rows: (id: string) => NeighbourCreatu
   await life.admit(cell, root, source, new Map(), (() => undefined) as never, new Map([['blender-template', Promise.resolve(new Map([['look.bandit', loadedSkin]]))]]));
   return { life, root, scope };
 }
+
+test('a data-cell chest socket follows the actual cell world transform', async () => {
+  const source = shard([]), species = source.rows.species[0];
+  if (species === undefined) throw new Error('Missing socket species');
+  species.body = { skeleton: 'biped', size: 'medium', scale: 1, look: 'look.bandit' };
+  const loaded: ClientSkin = { ...skin, bones: [{ name: 'body', parent: null, pos: [0, 0, 0] },
+    { name: 'chest', parent: 'body', pos: [0, 1, 0] }, { name: 'head', parent: 'chest', pos: [0, 2, 0] }] };
+  const { life, root, scope } = await admitted(source, () => undefined, loaded);
+  try {
+    root.position.set(100, 3, 200); root.rotation.y = Math.PI / 2; life.late(1 / 60);
+    const target = combatSourceState().targets.find(row => Math.abs(row.position.x - 80) < 1e-6);
+    expect(target?.lockPoints?.names).toEqual(['chest']);
+    const at = target?.lockPoints?.point(0, new Vector3());
+    expect(at?.x).toBeCloseTo(80); expect(at?.y).toBe(4); expect(at?.z).toBeCloseTo(210);
+  } finally { scope.dispose(); }
+});
 
 test('a data cell with no creature binding draws every spawn', async () => {
   const { life, root } = await admitted(shard([]));
