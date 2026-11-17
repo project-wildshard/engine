@@ -23,6 +23,7 @@ import { Player } from '../src/client/engine/player/Player';
 // phone's two frame rates. No A row may change a hash; A14's swell phase is the one allowed exception. A red here means the
 // page's feel moved. Re-record (MOTION_TRACE_RECORD=1) only for a change Jake ruled on, in the commit that makes it.
 // NET-LAG NL13 re-recorded for J280: partial floor stalls retry and flat rest uses the measured skin plane.
+// NL13b4 re-recorded for J280: grounded sideways moves on flat static support start 0.5 mm clear of the floor.
 
 const TICKS = 40_000, HASH_EVERY = 500, SEGMENT = 900;
 const BASELINE = 'test/fixtures/motion-trace/page-law.json';

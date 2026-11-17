@@ -31,6 +31,8 @@ import {lendFrozenPasture as lendNalatiRiding} from '../frozen/runtimePrograms';
 // platform: this is what fails when a Mac and a Linux server stop agreeing (J97).
 // NL13b2 (J280): flat static support changes the law. Disabling only that rest call matches all eight old chains;
 // the corrected law is re-recorded with the same seeds, mode coverage, tick counts and repeat-run checks.
+// NL13b4 (J280): a grounded sideways move on flat static support starts 0.5 mm clear of the floor; with that lift switched
+// off all eight old chains match, and the new law is re-recorded the same way.
 
 const TICKS = 40_000, HASH_EVERY = 500, SEGMENT = 900;
 const BASELINE = 'test/fixtures/motion-trace/seven-traces.json', RECORDING = process.env['MOTION_TRACE_RECORD'] === '1';

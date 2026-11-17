@@ -22,3 +22,6 @@
   their next engine bump.
 - Ring 1 recorded on darwin-arm64 after the rebase on `0bad938a`: two runs step the same; the five moved chains
   were copied into linux-x64 (CI says if Linux ever parts from Darwin here).
+- The land gate then caught the recorded laws this moves: the eight motion traces, the page law at 60 and 24.3 frames/s
+  and both Nalati room-bytes digests. With the lift switched off all twelve match the old records (the old-law
+  control); re-recorded with MOTION_TRACE_RECORD=1 and the new room digests, two repeat runs the same.

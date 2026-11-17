@@ -76,11 +76,13 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
  *  of this bare resident fell through to y -300 for ever; its fall net now puts them back at the spawn. Re-taken for
  *  REMOTE-PLAYERS RP6, whose player row for others carries a swing count, its weight and the airborne bit. Re-taken for GRID-CROSSING
  *  GC36 (J322, no walls): Nalati's bake holds untagged chunk-edge walls, which no world stands now. Re-taken for
- *  NET-LAG NL13 (J280): partial stalls retry, and grounded flat support starts from its measured skin plane. */
-const EXPECTED = '53c0f3a2b381ad9a28c1bac7627e659664d6af1ef1963eee752e70f7d418f380';
+ *  NET-LAG NL13 (J280): partial stalls retry, and grounded flat support starts from its measured skin plane. Re-taken for
+ *  NL13b4 (J280): a grounded sideways move on flat static support starts 0.5 mm clear of the floor (old law: 53c0f3a2). */
+const EXPECTED = 'ec2c462e5f6257e25bc0b518675ebd2ed8e5ed1f78d2b807c88305a74989af4d';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
  *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. Re-taken
  *  for RP6 as above. Re-taken for GC36 and NL13 as above. Re-taken for Nalati continuation af0adf3f:
  *  the King now owns its native contact pose, and adapter state retains it and the view guest clocks/globals.
- *  The unarmed wire/body oracle above remains unchanged. Previous armed digest: b891e9d2451520250c7540b96103e86fea17bf710418e784519058e4ea2c829a. */
-const EXPECTED_ROOM = 'cd2d9048389c714bfe8c2902ee42a2f6ddd15b627cd34abd96bcd44137d5c248';
+ *  The unarmed wire/body oracle above remains unchanged. Previous armed digest: b891e9d2451520250c7540b96103e86fea17bf710418e784519058e4ea2c829a.
+ *  Re-taken for NL13b4 as above (old law: cd2d9048). */
+const EXPECTED_ROOM = 'f231d52d2673b0110fde88e8f1b8082b2085d96f854eb7e0963b5e037990777b';
