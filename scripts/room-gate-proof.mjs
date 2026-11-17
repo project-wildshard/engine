@@ -52,6 +52,7 @@ function sample(){
   }
  }
 }
+/** @type {(reason:unknown)=>void} */let rejectObservation=()=>{/* Assigned before watchers start. */};
 function observe(){
  if(!existsSync(events))return;
  const lines=readFileSync(events,'utf8').split('\n');
@@ -67,7 +68,10 @@ function observe(){
    const owner=state.cpuActive.find(row=>(row.holder??row.pid)===event.pid&&row.repo===repo);
    assert.ok(owner!==undefined,'Actual room worker must own its grant');
    assert.equal(owner.slots,state.cpuCapacity,'Original room owns the complete admitted budget');
-   const build=launch(`server-${event.slug}`,['python3','scripts/heavy-lane.py','build','--max','3','--admission-wait-seconds','1200','--',process.execPath,'scripts/build-server.mjs','--build',source,'--out',join(directory,`server-${event.slug}`)]);
+   // The build's ordinary 300s admission clock starts here, during timing,
+   // rather than at the beginning of the complete gate.
+   const build=launch(`server-${event.slug}`,['python3','scripts/heavy-lane.py','build','--max','3','--',process.execPath,'scripts/build-server.mjs','--build',source,'--out',join(directory,`server-${event.slug}`)]);
+   void build.done.then(code=>code===0?undefined:rejectObservation(new Error(`Actual server build exited ${code}; see ${build.log}`)),rejectObservation);
    rooms.set(event.slug,{slug:event.slug,pid:event.pid,start:event.at,build,observationMs:event.observationMs});
   }else{
    assert.equal(event.phase,'end');const room=rooms.get(event.slug);assert.ok(room!==undefined);assert.equal(room.pid,event.pid);room.end=event.at;
@@ -84,7 +88,6 @@ async function stop(actor){
  signal('SIGTERM');const hard=setTimeout(()=>signal('SIGKILL'),12000);
  try{await actor.done;}finally{clearTimeout(hard);}
 }
-/** @type {(reason:unknown)=>void} */let rejectObservation=()=>{/* Assigned synchronously by the executor below. */};
 /** @type {Promise<never>} */ const failed=new Promise((_resolve,reject)=>{rejectObservation=reject;});
 const guarded=(/** @type {()=>void} */ action)=>()=>{try{action();}catch(error){rejectObservation(error);}};
 const onSignal=()=>{rejectObservation(new Error('Room gate observation interrupted'));};

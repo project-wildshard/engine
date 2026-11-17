@@ -44,3 +44,13 @@ setup81%, cases17%; Sunscar p95 2.65ms and Driftwood4.04ms. The observation
 cost is recorded separately at each boundary. These are command costs,
 not an isolated causal startup delta or a free speed gain. Full types,
 game lint and210hook controls pass; the complete gate remains owed.
+
+First rebased full gate refused a stale installed format0.12 against the
+new0.13 lockfile; frozen install repaired the worktree. Refreshed full
+gate passed types and reached Driftwood p954.32ms. Measurement then
+refused because explicit admission wait is a full-test-only wrapper
+option. Remove that invalid option: the actual build's ordinary300s
+queue clock begins at room start, after gate startup, so the review's
+whole-gate wait concern does not apply. Actual build refusal now fails
+the observer immediately. Both failed observations drained all owned
+CPU rows; neither is a complete-gate verdict.
