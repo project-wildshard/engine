@@ -1539,7 +1539,7 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
   // when isolated, and a predicted overshoot waits for the next frame instead of the 12 ms check after the fact.
   const batch = uploadBudget !== undefined ? newUploadBatch(uploadBudget) : undefined;
   let imageBytes = 0, slowestUpload = 0, credited = 0;
-  const credit = (): void => { credited++; onProgress?.(base + credited, base + uploadTextures.length, `${credited} / ${uploadTextures.length} textures uploaded`); };
+  const credit = (): void => { if (!current()) return; credited++; onProgress?.(base + credited, base + uploadTextures.length, `${credited} / ${uploadTextures.length} textures uploaded`); };
   // SB32b: under the loader the compressed uploads go to their queue together, which batches them per painted frame
   // (compressedUpload LOADING_UPLOAD_SLICE_MS); awaited one by one, each still cost a frame of its own
   const overlap = !isolateImageUploads && uploadBudget === undefined && !presenting();
@@ -1584,7 +1584,9 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     }
     else if (isolateImageUploads ? imageUpload : performance.now() - tSlice > heldBudget(sliceMs)) { await pause(); checkCurrent(); tSlice = performance.now(); }
   }
-  await Promise.all(inflight);
+  // every upload settles before a failure is thrown, so none credits a step that has already failed
+  const failed = (await Promise.allSettled(inflight)).find(result => result.status === 'rejected');
+  if (failed !== undefined) throw failed.reason;
   // The batch's last uploads keep their own drawn frame before whatever follows warm-up, as isolation did.
   if (batch?.pending() === true) await pause();
   checkCurrent();

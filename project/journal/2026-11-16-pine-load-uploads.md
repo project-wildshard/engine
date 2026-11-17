@@ -14,3 +14,4 @@ frame until a 32 ms slice is spent; in play nothing changes. The
 shaders step hands its uploads to the queue together, and the slow-GPU
 reading leaves the uploads out. Local preview, headless Chromium, tap
 to play: Pine 16.4 -> 7.8 s, Driftwood unchanged.
+- 2026-11-16 (later): the review of the batching commit closed a gap where an upload queued between a batch paint's frame and its task reused that paint; the shaders step now settles every in-flight upload before it throws.

@@ -33,9 +33,12 @@ const frame = (): Promise<void> => new Promise(resolve => {
  *  its 16 s in a headless preview, its shaders step 2.4 s for 63 programs (Driftwood 0.29 s for 57). In play every upload
  *  keeps its own paint on each side. */
 export const LOADING_UPLOAD_SLICE_MS = 32;
-/** The current loading batch's painted frame, shared by every upload in it; it opens the next batch. */
+/** The current loading batch's painted frame, shared by every upload in it. The batch closes when that frame starts, so an
+ *  upload queued between the frame and its task asks for a paint of its own; the next batch's slice starts there too. */
 function batchPaint(queue: UploadState): Promise<void> {
-  queue.paint ??= (async (): Promise<void> => { await frame(); queue.paint = null; queue.sliceAt = diagnosticNow(); })();
+  queue.paint ??= new Promise<void>(resolve => {
+    pageScope.raf(() => { queue.paint = null; queue.sliceAt = diagnosticNow(); pageScope.timeout(0, resolve); });
+  });
   return queue.paint;
 }
 
