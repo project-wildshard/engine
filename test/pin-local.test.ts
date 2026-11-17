@@ -11,8 +11,8 @@ import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {formatTemplate} from '../scripts/pin-format.ts';
 import {localCandidates, LOCAL_CANDIDATES} from '../scripts/local-candidates.ts';
 import {cookShard, openShardfile} from '../src/cook/game/shardCook.ts';
-import {productTarball} from '../src/cook/game/productTarball';
-import {loadCookedProduct} from '../src/server/host/headlessProduct';
+import {folderTarball} from '../src/cook/game/folderTarball';
+import {loadCookedFolder} from '../src/server/host/headlessFolder';
 import {openWorld} from '../src/server/host/openWorld';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 
@@ -61,14 +61,14 @@ test('actual local admission, runtime open and published restoration leave the t
   expect(admitted.output).toContain('1 of 1 pins admitted'); expect(admitted.status).toBe(0);
   const rows = localCandidates(root, {CI: ''});
   expect(rows).toMatchObject([{slug: 'brasscap-mesa', path: source, indexHash: createHash('sha256').update(readFileSync(join(source, 'shard.json'))).digest('hex')}]);
-  const installed = productTarball(join(root, 'out/brasscap-mesa'));
+  const installed = folderTarball(join(root, 'out/brasscap-mesa'));
   expect(openShardfile(installed).slug).toBe('brasscap-mesa');
   expect(createHash('sha256').update(installed).digest('hex')).not.toBe(product.pin.hash);
   const cooked = await cookShard(installed, join(root, 'cooked'), {wireBytes: (_url, body) => body.length, now: () => performance.now()});
   expect(cooked.manifests.length).toBeGreaterThan(0);
   expect(existsSync(join(root, 'cooked', cooked.server.index))).toBe(true);
   const rapier = await loadRapier(readFileSync(createRequire(import.meta.url).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm')));
-  const input = await loadCookedProduct(join(root, 'out/brasscap-mesa'), rapier);
+  const input = await loadCookedFolder(join(root, 'out/brasscap-mesa'), rapier);
   const world = await openWorld(input, {room: true});
   try {
     expect(world.host.players.size).toBeGreaterThan(0);
