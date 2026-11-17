@@ -22,7 +22,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # vitest.config.ts reads lift-pending ownership from the introducing commits: a shallow clone stops Vitest at startup
           fetch-depth: 0
       - uses: ./.github/actions/ring-setup
       - run: node scripts/pins.ts install --ring 1

@@ -5,10 +5,9 @@
 // Same SHA, same tree, same workflow file. Anything uncertain (no token, API
 // error, a docs-only or partial branch run, an exclusion that expired since,
 // a rebased SHA nobody ran) fails closed and the run goes ahead in full.
-import {appendFileSync,existsSync} from 'node:fs';
+import {appendFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {readLiftPending} from './lift-pending.mjs';
 import {activeQuarantineFiles} from './test-quarantine.mjs';
 import {PROOF_SHAPES,provesCode} from './ci-proof-jobs.mjs';
 
@@ -18,12 +17,11 @@ export {PROOF_SHAPES as REQUIRED_JOBS} from './ci-proof-jobs.mjs';
 /** @param {unknown} value @returns {value is Record<string,unknown>} */
 const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 
-/** Which tests the blocking suite excluded at a time: J200 quarantine and lift-pending.
- * A reuse is valid only if this is the same now as when the branch run started.
- * @param {number} at @param {string} [cwd] */
-export function exclusionScope(at,cwd=process.cwd()){
- const lift=existsSync(resolve(cwd,'test/lift-pending-policy.json'))?readLiftPending(cwd,at).excluded:[];
- return JSON.stringify({quarantine:[...activeQuarantineFiles(at)].sort(),lift:[...lift].sort()});
+/** The blocking suite's active J200 quarantine at the observation time.
+ * Reuse requires the same set as when the branch run started.
+ * @param {number} at */
+export function exclusionScope(at){
+ return JSON.stringify(activeQuarantineFiles(at).sort());
 }
 
 /** @param {string} workflow e.g. `ci.yml` @param {NodeJS.ProcessEnv} [env]
@@ -58,7 +56,7 @@ export async function exactBranchProof(workflow,env=process.env,options={}){
    if(!provesCode(workflow,raw.jobs))continue;
    const stamp=typeof run.run_started_at==='string'?run.run_started_at:typeof run.created_at==='string'?run.created_at:'',started=Date.parse(stamp);
    if(!Number.isFinite(started))continue;
-   if(scope(started)!==scope(now))return full(`${workflow} run ${run.id} predates a quarantine or lift-pending change in what the suite excludes; run in full`);
+   if(scope(started)!==scope(now))return full(`${workflow} run ${run.id} predates a quarantine change in what the suite excludes; run in full`);
    return {reused:true,run:run.id,reason:`${workflow} run ${run.id} on ${run.head_branch} ran every blocking job green for exactly ${sha}; main reuses it (J240)`};
   }
   return full('No complete green plan-branch run of this exact SHA; run in full');

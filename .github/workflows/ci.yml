@@ -93,9 +93,6 @@ jobs:
       - name: Enforce quarantine admission dates and the 48-hour cap
         if: matrix.job == 1
         run: node scripts/test-quarantine.mjs --check-history
-      - name: Report every inherited migration owner and fixed deadline
-        if: matrix.job == 1
-        run: node scripts/lift-pending.mjs
       - name: Scan the complete incoming history
         if: matrix.job == 1
         env:
@@ -160,7 +157,7 @@ jobs:
           path: ~/.cache/wildshard/gen/spawn-parts-br
           key: ring1-spawn-parts-br-${{ github.sha }}
           restore-keys: ring1-spawn-parts-br-
-      # Every share plans the same suite: same tree, and quarantine and lift-pending judged at the run's own start,
+      # Every share plans the same suite: same tree, and quarantine judged at the run's own start,
       # not at whenever each job got a runner, so no file can fall between two shares' plans.
       - name: Judge exclusions at the run's start
         if: steps.code.outputs.run == 'true'

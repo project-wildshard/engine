@@ -1,8 +1,6 @@
 // A green docs-only verdict is never evidence that the code was tested.
 import {execFileSync} from 'node:child_process';
-import {appendFileSync,existsSync} from 'node:fs';
-import {resolve} from 'node:path';
-import {readLiftPending} from './lift-pending.mjs';
+import {appendFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {pushSelection} from './push-selection.mjs';
 import {provesCode} from './ci-proof-jobs.mjs';
@@ -42,13 +40,6 @@ export async function selectCI(env=process.env,cwd=process.cwd()){
    }
    if(!provesCode('ci.yml',jobs))continue;
    const selected=pushSelection(`refs/heads/main ${sha} refs/heads/main ${run.head_sha}`,cwd,{hosted:true});
-   // Unchanged source is insufficient after a time-based discovery exclusion
-   // expires. Stay full until the inherited inventory is actually disposed;
-   // an older green run did not prove those newly required files.
-   if(selected.mode==='docs'&&existsSync(resolve(cwd,'test/lift-pending-policy.json'))){
-    const pending=readLiftPending(cwd);
-    if(pending.files.length>0&&pending.excluded.length===0)return full('Inherited migration exclusion expired; require the complete current test inventory');
-   }
    // EV9: tests that read a changed doc's content run in the docs lane (scripts/ci-static.sh docs).
    return {docs:selected.mode==='docs',base:run.head_sha,tests:selected.mode==='docs'?selected.tests??[]:[],reason:`Compared with code-proving CI run ${run.id}: ${selected.reason}`};
   }

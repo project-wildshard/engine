@@ -1,1 +1,0 @@
-export function readLiftPending(root?: string, now?: number): {owner:string;deadline:string|null;originalDeadline:string;extended:boolean;reason:string;files:string[];excluded:string[];batches:{id:string;owner:string;files:string[];deadline:string|null;waitingFor:string[]}[]};

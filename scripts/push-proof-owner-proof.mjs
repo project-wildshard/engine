@@ -43,6 +43,13 @@ try{
  const preLease=capturePushTree(PUSH_PROFILE,env,root);assert.ok(preLease);
  assert.equal(readPushProof(preLease,full)?.run,proof.run,'pre-lease and release-check capture reuses the actual producer');
  assert.deepEqual(probes(),['python3','ps'],'comparison and reuse must not run discarded probes');
+ assert.equal(proof.version,2);
+ assert.deepEqual(proof.exclusions,{files:[],deadline:null});
+ const localOnly={...later,sharedFile:null};
+ for(const exclusions of [{files:['test/omitted.test.ts'],deadline:null},{files:[],deadline:proof.finished}]){
+  writeFileSync(first.file,JSON.stringify({...proof,exclusions}));
+  assert.equal(readPushProof(localOnly,full),null,'Version 2 rejects receipts with excluded tests or a deadline');
+ }
  const {measurement:_measurement,...legacy}=proof;
  writeFileSync(first.file,JSON.stringify(legacy));const old=readPushProof(later,full);assert.ok(old);
  assert.equal(old.run,proof.run);assert.equal(old.measurement,undefined,'v2 receipts without measurement still reuse');

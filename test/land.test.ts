@@ -103,8 +103,8 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect((await reused([run()], ciJobs.map(job => (job.name.startsWith('tests') ? { ...job, conclusion: 'skipped' } : job)))).reused).toBe(false);
     expect((await reused([run()], ciJobs.filter(job => !job.name.startsWith('tests')))).reused).toBe(false);
     expect((await reused([run()], ciJobs.filter(job => job.name !== 'e2e'))).reused).toBe(false);
-    // The suite's exclusions changed since the branch run started (a quarantine or lift deadline passed).
-    expect((await reused([run()], ciJobs, {}, { scope: (at: number) => String(at > Date.parse('2026-11-10T20:10:00Z')), now: steady.now })).reason).toMatch(/predates a quarantine or lift-pending change/u);
+    // The suite's exclusions changed since the branch run started (a quarantine deadline passed).
+    expect((await reused([run()], ciJobs, {}, { scope: (at: number) => String(at > Date.parse('2026-11-10T20:10:00Z')), now: steady.now })).reason).toMatch(/predates a quarantine change/u);
     expect((await exactBranchProof('ci.yml', env('http://127.0.0.1:9'), steady)).reused).toBe(false);
   });
   test('main pushes coalesce while release branches run independently (RB1)', () => {

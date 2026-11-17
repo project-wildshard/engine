@@ -41,7 +41,7 @@ fi
 check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then
   check parity pnpm check:parity
-  # Space-separated repo paths from scripts/ci-selection.mjs. A file the config excludes (lift-pending, quarantine)
+  # Space-separated repo paths from scripts/ci-selection.mjs. A file the config quarantines
   # is excluded from the full suite too, so zero selected files is green here.
   # shellcheck disable=SC2086
   if [ -n "${DOCS_TESTS:-}" ]; then check doc-tests node scripts/vitest-tmp.ts run --passWithNoTests $DOCS_TESTS; fi

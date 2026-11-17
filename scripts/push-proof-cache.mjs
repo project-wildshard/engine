@@ -1,11 +1,10 @@
 import {execFileSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
-import {existsSync,lstatSync,mkdirSync,readFileSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
+import {lstatSync,mkdirSync,readFileSync,renameSync,writeFileSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
 import {homedir,hostname} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import * as v from 'valibot';
-import {readLiftPending} from './lift-pending.mjs';
 import {pushDependencyIdentity} from './push-dependencies.mjs';
 import {verifiedPinsOutputs} from './pins-reuse.mjs';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
@@ -22,7 +21,9 @@ function sharedProofFile(root,env,tree,runtime){
  }catch{return null;}
 }
 
-const exclusionsSchema=v.object({files:v.array(v.string()),deadline:v.nullable(v.string())});
+// Version 2 receipts retain this field for gate census readers.
+const noExclusions=Object.freeze({files:Object.freeze([]),deadline:null});
+const exclusionsSchema=v.strictObject({files:v.strictTuple([]),deadline:v.null_()});
 const pidSchema=v.pipe(v.number(),v.integer(),v.minValue(2));
 const ownerSchema=v.object({pid:pidSchema,identity:v.string(),bornNs:v.string(),uid:v.pipe(v.number(),v.integer(),v.minValue(0))});
 const leaseSchema=v.object({token:v.string(),runnerPid:pidSchema,childPid:v.nullable(pidSchema),resources:v.array(v.string()),
@@ -51,23 +52,6 @@ function producerMeasurement(profile,env){
   }catch{ /* No validated current lease: scope cannot be inferred from a resource name. */ }}
   return {profile,captured:new Date().toISOString(),machine:hostname(),platform:process.platform,arch:process.arch,owner,lease};
 }
-/** Expired policies with no exclusions are already the complete inventory.
- * @param {v.InferOutput<typeof exclusionsSchema>} scope */
-// Null is a policy with no time-only transition (no exclusions, or J237
-// batches still waiting on integration). exclusionScope revalidates Git's
-// landing markers on every read/write; it cannot conceal an omitted receipt.
-const scopeLive=scope=>scope.files.length===0||scope.deadline===null||Date.now()<Date.parse(scope.deadline);
-/** Local pushEnvironment removes ring/quarantine modes. The lift policy is the
- * same time-dependent exclusion reader used by the actual Vitest config.
- * @param {string} root */
-function exclusionScope(root){
-  const inventory=existsSync(resolve(root,'test/lift-pending.json')),policy=existsSync(resolve(root,'test/lift-pending-policy.json'));
-  if(inventory!==policy)throw new Error('Incomplete time-based test exclusion policy');
-  if(!inventory)return {files:[],deadline:null};
-  const state=readLiftPending(root);
-  return {files:[...state.excluded].sort(),deadline:state.deadline};
-}
-
 /** The porcelain lines that make `cwd` an unclean checked tree: every change and untracked file, minus the pins
  * outputs this tree's own install published (verifiedPinsOutputs). Land's preflight (DS22) uses the same list, so it
  * stops on exactly what this check would refuse, before the gate instead of minutes into it.
@@ -116,13 +100,12 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   // location is metadata; installed bytes, host and compiler inputs still bind.
   const excluded=/^(?:PWD|WS_PUSH_REFS|WS_PUSH_DESTINATION|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
-  const exclusions=exclusionScope(cwd);
   const dependencies=pushDependencyIdentity(cwd,env);
-  const execution=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,pins:pinned.key})).digest('hex');
+  const execution=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions:noExclusions,pins:pinned.key})).digest('hex');
   const runtime=createHash('sha256').update(JSON.stringify({execution,dependencies})).digest('hex');
   // Captures also serve pre-lease reuse and after-check comparisons. Retain
   // only the publication inputs; discarded captures need no kernel probe.
-  return {tree,commit,runtime,execution,root:resolve(cwd),exclusions,dependencies,profile,
+  return {tree,commit,runtime,execution,root:resolve(cwd),dependencies,profile,
     producerEnv:{WS_HEAVY_ROOT:env.WS_HEAVY_ROOT,WS_HEAVY_TOKEN:env.WS_HEAVY_TOKEN},
     sharedFile:dependencies===null?null:sharedProofFile(cwd,env,tree,runtime),file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
 }
@@ -153,16 +136,15 @@ export function readPushProof(context,selection){
     const info=lstatSync(file);if(!info.isFile()||info.uid!==process.getuid?.()||(info.mode&0o022)!==0)continue;
     const proof=v.parse(receiptSchema,JSON.parse(readFileSync(file,'utf8')));
     if(proof.tree!==context.tree||proof.runtime!==context.runtime||!Number.isFinite(Date.parse(proof.finished))||proof.seconds<0||proof.run==='')continue;
-    if(JSON.stringify(proof.exclusions)!==JSON.stringify(context.exclusions)||JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions))continue;
     const covers=proof.mode==='full'||(proof.mode===selection.mode&&selection.files.every(selected=>proof.files.includes(selected)));
-    if(covers&&scopeLive(context.exclusions))return proof;
+    if(covers)return proof;
   }catch{ /* An absent or invalid candidate never substitutes for the gate. */ }
   }
   return null;
 }
 
 /** Authenticate an earlier full tree with this checkout's actual current
- * runtime, exclusions, installed bytes, pins and publishing scope.
+ * runtime, installed bytes, pins and publishing scope.
  * @param {NonNullable<ReturnType<typeof capturePushTree>>} context
  * @param {string} commit */
 export function readPriorFullProof(context,commit){
@@ -182,10 +164,9 @@ export function readPriorFullProof(context,commit){
  * @param {{mode:'full'|'related'|'docs',files:string[]}} selection @param {number} seconds
  * @param {{run:string,commit:string}} [inherited] */
 export function writePushProof(context,selection,seconds,inherited){
-  if(JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions)||!scopeLive(context.exclusions))throw new Error('Push proof exclusion scope changed while checking; rerun the full gate');
   const measurement=producerMeasurement(context.profile,context.producerEnv);
   const proof={version:2,tree:context.tree,runtime:context.runtime,run:randomUUID(),commit:context.commit,
-    finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files,exclusions:context.exclusions,
+    finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files,exclusions:noExclusions,
     measurement,...(inherited===undefined?{}:{inherited})};
   mkdirSync(dirname(context.file),{recursive:true});
   const temporary=`${context.file}.${process.pid}`;writeFileSync(temporary,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(temporary,context.file);
@@ -193,6 +174,5 @@ export function writePushProof(context,selection,seconds,inherited){
     mkdirSync(dirname(context.sharedFile),{recursive:true,mode:0o700});
     const shared=`${context.sharedFile}.${process.pid}.tmp`;writeFileSync(shared,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(shared,context.sharedFile);
   }
-  if(!scopeLive(context.exclusions)){unlinkSync(context.file);if(selection.mode==='full'&&context.sharedFile!==null)unlinkSync(context.sharedFile);throw new Error('Push proof exclusion scope changed while writing; rerun the full gate');}
   return proof;
 }
