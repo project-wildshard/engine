@@ -38,7 +38,8 @@ const epoch=JSON.parse(readFileSync('save-epoch.json','utf8')) as {saveEpoch:num
 for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refused===undefined?'resumes in place and keeps walking':'is refused whole on its changed level'}`,async()=>{
   const {slug}=fixture;
   expect(fixture.refused??fixture.pin??fixture.shardfile).toBe(pins.shards.find(row=>row.slug===slug)?.hash);
-  expect(fixture.saveEpoch).toBe(epoch.saveEpoch);
+  // WR8b: a pin from an earlier epoch stays a codec pin (no build boots it, but a restore tool would need to read it).
+  expect(fixture.saveEpoch).toBeLessThanOrEqual(epoch.saveEpoch);
   const bytes=readFileSync(fixture.remote===true?join(process.env['WILDSHARD_PIN_CACHE']??join(homedir(),'.cache/wildshard/pins'),fixture.file):`test/pins/saves/${fixture.file}`);
   expect(createHash('sha256').update(bytes).digest('hex')).toBe(fixture.sha256);
   const saved=brotliDecompressSync(bytes).toString('utf8');
@@ -102,8 +103,10 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refu
 // key and no schema report. The epoch check above makes the epoch-2 cut (WR8) recapture them: test/save-whole-documents.test.ts.
 interface DocumentPin {release:string;saveEpoch:number;shard:string;docs:Record<string,unknown>;player:{saveVersion:number;doc:unknown}}
 const documentPins=readdirSync('test/pins/saves/documents').filter(name=>name.endsWith('.json')).map(name=>JSON.parse(readFileSync(`test/pins/saves/documents/${name}`,'utf8')) as DocumentPin);
-for(const pin of documentPins)test(`released ${pin.release} whole save documents load with no .corrupt key`,()=>{
-  expect(pin.saveEpoch).toBe(epoch.saveEpoch);
+// WR8b: the epoch-2 cut keeps documents/epoch-1.json as a codec pin and captures epoch-2.json from the cut build.
+test('the current save epoch has a whole-document pin',()=>{expect(documentPins.map(pin=>pin.saveEpoch)).toContain(epoch.saveEpoch);});
+for(const pin of documentPins)test(`released ${pin.release} epoch ${String(pin.saveEpoch)} whole save documents load with no .corrupt key`,()=>{
+  expect(pin.saveEpoch).toBeLessThanOrEqual(epoch.saveEpoch);
   const values=new Map<string,string>(),local:SaveStorage={get length(){return values.size;},key:index=>[...values.keys()][index]??null,getItem:name=>values.get(name)??null,setItem:(name,value)=>{values.set(name,value);},removeItem:name=>{values.delete(name);}};
   const failures:SchemaFailure[]=[],store=new SaveStore({local,session:local,report:failure=>{failures.push(failure);}}),defs=[...definitions().values()];
   const probe=defs.find(definition=>definition.scope==='global');if(probe===undefined)throw new Error('No global key');

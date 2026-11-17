@@ -372,7 +372,7 @@ function logPhases() {
 /** The device's last-end records go before each document, so a deck entry lands on the title and not on a resume. */
 function clearLastEnd() {
   try {
-    const name = 'wildshard.save.v2@1.device', doc = JSON.parse(localStorage.getItem(name) ?? '{"keys":{}}');
+    const name = 'wildshard.save.v2@2.device', doc = JSON.parse(localStorage.getItem(name) ?? '{"keys":{}}');
     for (const key of Object.keys(doc.keys ?? {})) if (key.startsWith('life.')) Reflect.deleteProperty(doc.keys, key);
     localStorage.setItem(name, JSON.stringify(doc));
   } catch { /* opaque origin */ }

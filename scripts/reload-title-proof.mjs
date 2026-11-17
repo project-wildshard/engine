@@ -68,7 +68,7 @@ try {
     const { context, page, consoleLines } = await tab();
     let documents = 0, versions = 0;
     page.on('domcontentloaded', () => { documents++; });
-    await page.route(/\/version\.json(?:\?.*)?$/u, route => { versions++; void route.fulfill({ contentType: 'application/json', body: JSON.stringify({ build: 'proof-newer-build', saveEpoch: 1 }) }); });
+    await page.route(/\/version\.json(?:\?.*)?$/u, route => { versions++; void route.fulfill({ contentType: 'application/json', body: JSON.stringify({ build: 'proof-newer-build', saveEpoch: 2 }) }); });
     await page.goto(`${base}/?chunk=${shard}&sw=0`);
     check(await loadingShard(page), `the shard is loading before the stale chunk fails`);
     const chunk = await page.evaluate(() => {

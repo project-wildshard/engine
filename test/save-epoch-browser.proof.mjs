@@ -5,6 +5,8 @@ import { createServer } from 'node:http';
 import { rolldown } from 'rolldown';
 import { resolve as resolvePath } from 'node:path';
 import { chromium, webkit, devices } from "../scripts/browser-playwright.mjs";
+// e5ac68ca put this import inside the bundled page entry, where the Chromium launch never saw it (WR8b).
+import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
 
 const entry = resolvePath('epoch-proof-entry.ts');
 const compiler = await rolldown({ input: entry, platform: 'browser', plugins: [{ name: 'epoch-proof-entry', resolveId(id) { if (id === entry) return entry; return null; }, load(id) { if (id === entry) return `
@@ -14,7 +16,6 @@ import { SaveStore } from './src/shared/engine/saves/store';
 import { openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport } from './src/client/engine/saves/indexed';
 import { deviceIdentity } from './src/shared/engine/net/identity';
 import * as v from 'valibot';
-import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
 installAppIdentity(WILDSHARD_IDENTITY);
 window.epochProof = { SaveStore, openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport, deviceIdentity, installAppIdentity, WILDSHARD_IDENTITY, v };
 `; return null; } }] });
@@ -68,9 +69,10 @@ try {
         await page.goto(`http://127.0.0.1:${address.port}`);
         await page.waitForFunction(() => window.epochProof !== undefined);
         const first = await page.evaluate(async () => {
-          const api = window.epochProof, old = 'wildshard.save.v2.', prefix = 'wildshard.save.v2@1.';
-          const legacy = await api.openIndexedSaves('wildshard-saves');
-          await legacy.write(`device:${old}identity`, JSON.stringify({ player: 'device:kept', name: 'Jake' }));
+          // WR8b: the shipped identity is epoch 2; its previous epoch is 1, whose database holds the stable identity key.
+          const api = window.epochProof, stable = 'wildshard.save.v2.', old = 'wildshard.save.v2@1.', prefix = 'wildshard.save.v2@2.';
+          const legacy = await api.openIndexedSaves('wildshard-saves@1');
+          await legacy.write(`device:${stable}identity`, JSON.stringify({ player: 'device:kept', name: 'Jake' }));
           await legacy.write(`${old}standalone-lone-driftwood-isle`, '{"tick":900}'); legacy.close();
           localStorage.setItem(`${old}global`, JSON.stringify({ keys: { settings: { v: 1, data: false }, gfx: { v: 1, data: 'low' }, hints: { v: 1, data: true } } }));
           const store = new api.SaveStore({ local: localStorage, session: sessionStorage });

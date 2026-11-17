@@ -91,7 +91,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   /** @param {number} serial @param {string} engineBuild @param {string} [signedChannel] @param {string} [publicSocket] */
   const publish = (serial, engineBuild, signedChannel = channel, publicSocket = signedSocket) => {
     rigOptions({ saves: 'memory', socket: publicSocket }); signedSocket = publicSocket;
-    const body = JSON.stringify({ channel: signedChannel, serial, engineBuild, saveEpoch: 1, shards: slugs.map(slug => ({ slug, revision: 1 })), socket: signedSocket });
+    const body = JSON.stringify({ channel: signedChannel, serial, engineBuild, saveEpoch: 2, shards: slugs.map(slug => ({ slug, revision: 1 })), socket: signedSocket });
     signed = JSON.stringify({ body, signature: sign(null, Buffer.from(body), key.private).toString('hex') });
   };
   publish(1, build);

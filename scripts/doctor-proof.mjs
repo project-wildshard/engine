@@ -33,7 +33,7 @@ run(['scripts/build-server.mjs', '--build', build, '--out', server], 'the server
 /** What the release server says: a good file naming the world, the same file under another key, or one naming the refusing proxy. */
 let mode = /** @type {'good' | 'wrong-key' | 'blocked'} */ ('good');
 const releaseText = () => {
-  const body = JSON.stringify({ channel: 'production', serial: 1, engineBuild: build, saveEpoch: 1, shards: [{ slug: SHARD, revision: 1 }], socket: `ws://127.0.0.1:${String(mode === 'blocked' ? BLOCK_PORT : WORLD_PORT)}/` });
+  const body = JSON.stringify({ channel: 'production', serial: 1, engineBuild: build, saveEpoch: 2, shards: [{ slug: SHARD, revision: 1 }], socket: `ws://127.0.0.1:${String(mode === 'blocked' ? BLOCK_PORT : WORLD_PORT)}/` });
   return JSON.stringify({ body, signature: sign(null, Buffer.from(body), mode === 'wrong-key' ? wrongKey : key.private).toString('hex') });
 };
 // The release server is the packs origin too, as the packs Worker is: the release file, and the book and parts under /assets/spawn/.

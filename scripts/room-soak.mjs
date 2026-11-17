@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url';
 
 const [server, origin, cache, slug, build, secondsArg, portArg = '18790'] = process.argv.slice(2), seconds = Number(secondsArg), log = join(cache, `..`, `soak-${slug}.log`);
 const out = createWriteStream(log), { publicKey, privateKey } = generateKeyPairSync('ed25519'), release = join(cache, 'soak-release.json');
-const body = JSON.stringify({ channel: 'production', serial: 1, engineBuild: build, saveEpoch: 1, shards: [{ slug, revision: 1 }] });
+const body = JSON.stringify({ channel: 'production', serial: 1, engineBuild: build, saveEpoch: 2, shards: [{ slug, revision: 1 }] });
 mkdirSync(cache, { recursive: true });
 writeFileSync(release, JSON.stringify({ body, signature: sign(null, Buffer.from(body), privateKey).toString('hex') }));
 const room = spawn(process.execPath, [join(server, 'main.mjs')], { env: { ...process.env, PACK_ORIGIN: origin, PACK_CACHE: cache, DATABASE_URL: 'memory:', SEAT_SECRET: 'soak', HOST: '127.0.0.1', PORT: portArg, WILDSHARD_BUILD: build, WORLD_CELLS: slug,

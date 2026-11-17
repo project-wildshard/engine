@@ -45,7 +45,7 @@ if(remote!==undefined){
   assert.equal(target.search,'');assert.equal(target.hash,'');assert.equal(target.username,'');assert.equal(target.password,'');
   assert.equal(delayKind,undefined,'Network fault proxies require a local finished build');
   const response=await fetch(`${remote}/version.json`,{cache:'no-store'}),version=await response.json();
-  assert.ok(response.ok);assert.equal(version.build,option('expect-build-id'));assert.equal(version.saveEpoch,1);
+  assert.ok(response.ok);assert.equal(version.build,option('expect-build-id'));assert.equal(version.saveEpoch,2);
   console.log('Exact served timing proof',JSON.stringify(version));
 }
 const html = remote === undefined ? readFileSync(resolvePath(root, 'dist/index.html'), 'utf8') : await (await fetch(remote)).text();

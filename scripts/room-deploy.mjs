@@ -41,7 +41,7 @@ const address = origin.address(), at = `http://127.0.0.1:${typeof address === 'o
  * @param {{ name: string, sha256: string }} bundle
  */
 const publish = (serial, engineBuild, bundle) => {
-  const body = JSON.stringify({ channel: 'production', serial, engineBuild, saveEpoch: 1, shards: [{ slug: 'driftwood-isle', revision: 1 }], bundle });
+  const body = JSON.stringify({ channel: 'production', serial, engineBuild, saveEpoch: 2, shards: [{ slug: 'driftwood-isle', revision: 1 }], bundle });
   releaseText = JSON.stringify({ body, signature: sign(null, Buffer.from(body), privateKey).toString('hex') });
 };
 const env = { ...process.env, RELEASE_URL: `${at}/release.json`, RELEASE_PUBLIC_KEY: publicKey.export({ type: 'spki', format: 'der' }).toString('hex'), BUNDLE_ORIGIN: at, WILDSHARD_HOME: join(work, 'home'), PULL_SCRIPT: PULL,

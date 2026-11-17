@@ -25,7 +25,7 @@ const out = mkdtempSync(join(scratch, "sweep-input-proof-")),
 let build = "aaaaaaa-one";
 const server = createServer((_request, response) => {
   response.setHeader("Content-Type", "application/json");
-  response.end(JSON.stringify({ build, saveEpoch: 1 }));
+  response.end(JSON.stringify({ build, saveEpoch: 2 }));
 });
 /** @type {Promise<void>} */
 const listening = new Promise((resolve) => {

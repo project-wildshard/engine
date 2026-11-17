@@ -86,7 +86,7 @@ try {
   await to.locator('.ws-main-select').waitFor({ state: 'visible', timeout: 60_000 });
   await to.goto(url, { waitUntil: 'load' }); await enter(to);
   const out = await to.evaluate(() => ({ restored: (/** @type {WorkerWindow} */ (window)).__workerClient().restored, finish: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned,
-    taken: JSON.parse(localStorage.getItem('wildshard.save.v2@1.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
+    taken: JSON.parse(localStorage.getItem('wildshard.save.v2@2.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
   const ok = out.restored && out.finish && out.owned['finish.ghost-stag'] === 1 && out.owned['journal.ghost-stag.taken'] === 2 && out.taken === 1 && await identity(to) === destination && errors.length === 0;
   console.log(`${ok ? 'PASS' : 'FAIL'} actual file import restores rewards on another browser ${JSON.stringify({ ...out, identityKept: await identity(to) === destination, errors })}`);
   if (!ok) process.exitCode = 1;

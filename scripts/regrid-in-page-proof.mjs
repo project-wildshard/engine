@@ -28,7 +28,7 @@ const note = (step, ok, detail) => { steps.push({ step, ok, ...detail === undefi
 const catalogue = JSON.parse(readFileSync(join(dist, 'catalogue.json'), 'utf8'));
 const instanceOf = (/** @type {string} */ slug) => catalogue.grid.cells.find(row => row.slug === slug)?.instance ?? '?';
 const DRIFTWOOD = instanceOf('driftwood-isle'), DUNES = instanceOf('sunscar-dunes');
-const DEVICE_DOC = 'wildshard.save.v2@1.device';
+const DEVICE_DOC = 'wildshard.save.v2@2.device';
 
 const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: 'driftwood-isle', more: ['sunscar-dunes'], cells: 'grid', workers: 2 });
 let code = 1, browser = /** @type {import('./browser-playwright.mjs').Browser | null} */ (null);

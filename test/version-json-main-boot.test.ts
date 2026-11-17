@@ -11,7 +11,8 @@ test.each([mainVersion, '0.1.30', '0.1.31', '0.1.32', '0.2.0'])('a %s build ente
   try {
     const document = { clientVersion: version, minClient: clientFloor(version) };
     expect(olderClient(document.clientVersion, document.minClient)).toBe(false);
-    expect(document.minClient).toBe(version === '0.1.29' || version === '0.1.30' ? version : '0.1.31');
+    // WR8b: the epoch-2 cut raised the floor to 0.1.36; an older build clamps to itself.
+    expect(document.minClient).toBe(olderClient(version, '0.1.36') ? version : '0.1.36');
     const reload = vi.fn();
     vi.stubGlobal('location', { reload });
     vi.stubGlobal('caches', { has: () => Promise.resolve(false) });

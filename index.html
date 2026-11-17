@@ -638,7 +638,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       }
       // Developer mode controls the hold switch, frame meter and build id.
       // Loading progress stays detailed for everyone (G846). No URL switch (E162).
-      try { if (JSON.parse(localStorage.getItem('wildshard.save.v2@1.device') || '{}').keys?.devMode?.data === true) document.documentElement.setAttribute('data-dev', ''); } catch { /* storage blocked: player mode */ }
+      try { if (JSON.parse(localStorage.getItem('wildshard.save.v2@2.device') || '{}').keys?.devMode?.data === true) document.documentElement.setAttribute('data-dev', ''); } catch { /* storage blocked: player mode */ }
     </script>
     <!-- Plain launches paint this approved title art without waiting for a bundle.
          StartTitle removes it only after the real title has mounted. -->
@@ -729,9 +729,9 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         const pending = document.getElementById('ws-loading-shell');
         if (document.documentElement.hasAttribute('data-booted') || !document.querySelector('[data-title-shell]') || !(document.querySelector('.ws-load[data-shell]') || pending instanceof HTMLTemplateElement && pending.content.querySelector('.ws-load[data-shell]'))) return;
         try { // the session save key boot.selfReload (src/client/engine/saves/slots.ts), shared with stuck.ts's one retry
-          const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@1.session') || '{"keys":{}}');
+          const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') || '{"keys":{}}');
           if (doc.keys?.['boot.selfReload']) return;
-          (doc.keys ??= {})['boot.selfReload'] = { v: 1, data: String(Date.now()) }; sessionStorage.setItem('wildshard.save.v2@1.session', JSON.stringify(doc));
+          (doc.keys ??= {})['boot.selfReload'] = { v: 1, data: String(Date.now()) }; sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify(doc));
         } catch { return; }
         (globalThis.__wsShellReload || location.reload.bind(location))();
       }, 12000);
@@ -745,7 +745,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         const template = document.getElementById('ws-loading-shell');
         try {
         const card = template instanceof HTMLTemplateElement ? template.content.querySelector('.ws-load[data-shell]') : document.querySelector('.ws-load[data-shell]'), slug = new URLSearchParams(location.search).get('chunk');
-        const field = name => card.querySelector('[data-el="' + name + '"]'), entry = (store, scope, key) => { try { const item = JSON.parse(store().getItem('wildshard.save.v2@1.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; } catch { return null; } };
+        const field = name => card.querySelector('[data-el="' + name + '"]'), entry = (store, scope, key) => { try { const item = JSON.parse(store().getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; } catch { return null; } };
         if (!card || !slug) return;
         const found = [entry(() => sessionStorage, 'session', 'titleArrival'), entry(() => localStorage, 'device', 'titleArrival.once')].find(a => a?.slug === slug && Date.now() - a.at < 60000);
         // Adopt the clock's existing parsed handoff; no extra storage read on boot.

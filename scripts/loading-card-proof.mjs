@@ -59,7 +59,7 @@ if (remote !== undefined) {
   if (
     !response.ok ||
     version.build !== option('expect-build-id') ||
-    version.saveEpoch !== 1
+    version.saveEpoch !== 2
   )
     throw new Error('Unexpected production build or save epoch')
   console.log('Exact production loading proof', JSON.stringify(version))

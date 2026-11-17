@@ -206,7 +206,7 @@ const freePort = () => new Promise((resolve, reject) => {
 function clearLastEnd() {
   try {
     if (sessionStorage.getItem('of1-clear')) return;
-    const name = 'wildshard.save.v2@1.device', doc = JSON.parse(localStorage.getItem(name) ?? '{"keys":{}}');
+    const name = 'wildshard.save.v2@2.device', doc = JSON.parse(localStorage.getItem(name) ?? '{"keys":{}}');
     for (const key of Object.keys(doc.keys ?? {})) if (key.startsWith('life.')) Reflect.deleteProperty(doc.keys, key);
     localStorage.setItem(name, JSON.stringify(doc));
     sessionStorage.setItem('of1-clear', '1');

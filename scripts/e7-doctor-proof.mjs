@@ -14,7 +14,7 @@ assert.equal(origin,human?'https://play.wildshard.io':'https://staging.wildshard
 const channel=human?'production':'staging',releaseURL=`https://packs.wildshard.io/releases/${channel}.json`;
 /** @param {string|URL} url */
 async function read(url){const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,String(url));return response;}
-const version=await(await read(new URL('/version.json',base))).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,1);
+const version=await(await read(new URL('/version.json',base))).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,2);
 const root=await(await read(new URL('/',base))).text(),document=await(await read(new URL('/doctor/',base))).text();
 assert.ok(root.includes('data-doctor-door'));
 const door=await fetch(new URL('/?doctor&chunk=driftwood-isle&from=link',base),{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(15000)});
@@ -24,7 +24,7 @@ assert.equal(destination.origin,origin);assert.equal(destination.pathname,'/doct
 const worldText=/globalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(document)?.[1];assert.ok(worldText,'Doctor needs a release stamp');const world=JSON.parse(worldText);assert.equal(world.release,releaseURL);assert.equal(world.key,key);
 const scripts=[...document.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map(match=>match[1]);assert.ok(scripts.length>0,'Doctor entry must be build scoped');assert.ok(scripts.every(path=>path!==undefined&&path.startsWith(`/b/${build}/doctor/`)),'Every external Doctor script must be build scoped');for(const path of scripts){assert.ok(path!==undefined);await read(new URL(path,base));}
 const signed=await(await read(releaseURL)).json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
-const release=JSON.parse(signed.body);assert.equal(release.channel,channel);assert.equal(release.engineBuild,build);assert.equal(release.saveEpoch,1);
+const release=JSON.parse(signed.body);assert.equal(release.channel,channel);assert.equal(release.engineBuild,build);assert.equal(release.saveEpoch,2);
 if(human){console.log('PASS human Doctor static publication',JSON.stringify({build,epoch:1,doctorEntry:true,signedProduction:true,productionSockets:0}));}else{
  // MS7.3: the socket is rooms-staging; D7 health stays private on the tailnet.
  const socket=release.socket.replace(/\/$/u,'');assert.ok(['wss://rooms-staging.wildshard.io'].includes(socket),socket);

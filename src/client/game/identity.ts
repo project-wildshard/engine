@@ -3,15 +3,16 @@ import type { AppIdentity } from '@wildshard/engine/app/identity';
 /**
  * Wildshard, as the engine sees it (E405 E414): the values the saves, the tools and the first paint already use.
  * The save prefix and format, the file names and the two window handles are wire contracts: a player's progress and
- * every capture script depend on them, so they never change. src/client/app/identity.ts installs this before anything runs.
+ * every capture script depend on them, so they never change except at an epoch cut. Epoch 2 (WIRE-STABILITY WR8b, J197/J210)
+ * is the last planned one: raising it again needs a J-number. src/client/app/identity.ts installs this before anything runs.
  */
 export const WILDSHARD_IDENTITY: AppIdentity = {
   name: 'Wildshard',
   wordmark: 'Project <b>Wildshard</b>',
   tagline: 'A world that does not exist yet, arriving one chunk at a time.',
-  savePrefix: 'wildshard.save.v2@1.',
-  saveEpoch: 1,
-  previousSavePrefix: 'wildshard.save.v2.',
+  savePrefix: 'wildshard.save.v2@2.',
+  saveEpoch: 2,
+  previousSavePrefix: 'wildshard.save.v2@1.',
   identityPrefix: 'wildshard.save.v2.',
   saveFormat: 'wildshard.save',
   fileSlug: 'wildshard',

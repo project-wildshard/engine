@@ -30,7 +30,7 @@ const body = JSON.stringify({
   channel: "staging",
   serial: 1,
   engineBuild: build,
-  saveEpoch: 1,
+  saveEpoch: 2,
   shards: [{ slug: "fixture", revision: 1 }],
 });
 const release = JSON.stringify({
@@ -65,7 +65,7 @@ const server = createServer((request, response) => {
     path === "/entry.js"
       ? bundle
       : path === "/version.json"
-        ? JSON.stringify({ build, saveEpoch: 1 })
+        ? JSON.stringify({ build, saveEpoch: 2 })
         : path === "/release.json"
           ? release
           : path === `/assets/spawn/server-${build}.json`
