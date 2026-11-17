@@ -14,7 +14,7 @@ import { readGridEdges } from '../src/client/game/grid/edgeSources.ts';
 import { readGridFolderEdges } from '../src/client/game/grid/folders.ts';
 import { findShard } from '../src/client/game/shard/registry.ts';
 import { platformInputs } from '../src/shared/game/grid/platformInputs.ts';
-import { generatePlatform } from '../src/shared/engine/sim/strips.ts';
+import { generatePlatform, platformShapeKeys } from '../src/shared/engine/sim/strips.ts';
 import { platformGeometrySource } from '../src/shared/game/grid/compiledStrips.ts';
 import { writeGridCollision } from '../src/cook/game/gridCollision.ts';
 import { gridStripSetBudget, writeGridStripBlocks } from '../src/cook/game/gridStripPages.ts';
@@ -83,7 +83,7 @@ for (const developer of modes) for (const devserver of modes) for (const nineDra
   // C2: the worker's road is the page's, from the catalogue a plain visit reads.
   if (mode === '000') writeGridCollision(outputRoot, source, strips);
   if (collisionOnly) continue;
-  compiled.push({ source, pitch: assembly.pitch, strips, homes: assembly.cells.map(cell => ({ instance: cell.instance, slug: cell.slug, origin: cell.origin })) });
+  compiled.push({ source, pitch: assembly.pitch, strips, keys: platformShapeKeys(cells, input.empty), homes: assembly.cells.map(cell => ({ instance: cell.instance, slug: cell.slug, origin: cell.origin })) });
 }
 // Edge reads complete concurrently. Their completion order must not change the
 // content URL (and every importing chunk) when all certified values are equal.

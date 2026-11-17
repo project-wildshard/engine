@@ -116,7 +116,7 @@ import { GAME_STRINGS } from '../../../shared/game/strings';
 import { classifyRefusal, pageShardRefusals, type ShardRefusal } from './refusal';
 import { tileRing } from '../shardfile/tileDriver';
 import { readGridSeamData, type GridSeamAddress } from '../../../shared/game/grid/seamData';
-import { readCompiledGridStrips } from '../../../shared/game/grid/compiledStrips';
+import { readGridStripsOrSeeds } from '../../../shared/game/grid/compiledStrips';
 import { startRoadGrain } from './roadGrainPreparation';
 import { startRoadSigns } from './roadSignPreparation';
 import { RoadMapShare } from './roadResources';
@@ -500,19 +500,24 @@ export class GridSession {
       return nativePlans;
     };
     const original = platformInputs(assembly, edges);
-    const compiled = await readCompiledGridStrips(address.geometry, original, instance, { scope: host.scope, allocator },
+    const initialRead = await readGridStripsOrSeeds(address.geometry, original, instance, { scope: host.scope, allocator },
       (url, signal) => fetch(url, { signal }), async () => {
         progress?.detail(`Terrain seams · ${++batches} verified shapes`); await construction.check();
       }, ring); // ZE4: the home's shared blocks, keeping its ring's strips
+    // SB38e: placements changed since the build, so the page builds its ring, from every baked shape it still names
+    const compiled = initialRead !== null && 'strips' in initialRead ? initialRead : null;
+    // a let, cleared once built: a closure here keeps its context for the page's life (T10's spawn-heap note below)
+    let initialSeeds = initialRead !== null && 'seeds' in initialRead ? initialRead.seeds : undefined;
     const fallbackPlans = compiled === null ? await seamPlans() : undefined;
     let flatPlatform = false;
     const preparedOuter = compiled?.readOuter;
     const strips = [...(compiled?.strips ?? await platformStrips(assembly, edges, (platform, edge) => generatePlatformSliced(platform, edge, async () => {
       progress?.detail(`Terrain seams · ${++batches} batches`); await construction.check();
-    }, 12, fallbackPlans, ring), () => {
+    }, 12, fallbackPlans, ring, initialSeeds), () => {
       if (host.scope.disposed || host.scope.disposing) throw new Error('Grid admission scope disposed');
       flatPlatform = true;
     }))];
+    initialSeeds = undefined;
     timing?.mark('compiled-page');
     if (grain !== undefined) await waitFor('Grid road grain', grain.ready, 'worker');
     if (signs !== undefined) await waitFor('Grid road signs', signs.ready, 'worker');
@@ -534,9 +539,11 @@ export class GridSession {
         await background.check();
       };
       if (preparedOuter !== undefined) return preparedOuter(owner, pause);
-      const compiledOuter = await readCompiledGridStrips(address.geometry, source, instance, { scope: owner, allocator },
+      const outerRead = await readGridStripsOrSeeds(address.geometry, source, instance, { scope: owner, allocator },
         (url, signal) => fetch(url, { signal }), pause, (x, z) => !ring(x, z), 'outer');
-      return compiledOuter?.strips ?? generatePlatformSliced(source.cells, source.empty, pause, OUTER_RING_STRETCH_MS, await seamPlans(), (x, z) => !ring(x, z)); // T10: built in play after controls, short stretches beside the frame
+      if (outerRead !== null && 'strips' in outerRead) return outerRead.strips;
+      // T10: built in play after controls, short stretches beside the frame; SB38e: only the shapes the build never made
+      return generatePlatformSliced(source.cells, source.empty, pause, OUTER_RING_STRETCH_MS, await seamPlans(), (x, z) => !ring(x, z), outerRead?.seeds);
     };
     const maps = new RoadMapShare();
     await waitFor('Grid road surfaces', prepareRoadSurfaceMaps(admission, maps), 'worker');
