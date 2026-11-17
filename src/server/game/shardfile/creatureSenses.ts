@@ -41,11 +41,14 @@ export function bindCreatureSenses(host: SimHost, actor: AnimalSim, input?: Crea
     const sight = senses.sight;
     if (sight === undefined) {
       if (distance <= senses.notice * senses.notice) return true;
-    } else if (distance <= sight.range * sight.range
+    } else {
+      const range = actor.state === 'graze' ? sight.graze ?? sight.range : sight.range;
+      if (distance <= range * range
       && dx * Math.sin(actor.yaw) + dz * Math.cos(actor.yaw) >= Math.hypot(dx, dz) * cone) {
-      eye.set(origin.x, origin.y + actor.dims.bodyY * actor.scale, origin.z);
-      chest.copy(player.position); chest.y += 1.2;
-      if (lineOfSight(host.physics, eye, chest)) return true;
+        eye.set(origin.x, origin.y + actor.dims.bodyY * actor.scale, origin.z);
+        chest.copy(player.position); chest.y += 1.2;
+        if (lineOfSight(host.physics, eye, chest)) return true;
+      }
     }
     const hearing = senses.hearing;
     if (hearing === undefined) return false;

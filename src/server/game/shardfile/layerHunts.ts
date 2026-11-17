@@ -8,6 +8,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { ShardCreatures } from '@wildshard/format/creatures';
 import { resolveCreatureLayers } from './creatureLayers';
+import { bindCreatureSenses } from './creatureSenses';
 
 const finite = v.pipe(v.number(), v.finite());
 const Saved = v.strictObject({ contract: v.string(), clock: finite, memory: v.unknown(),
@@ -35,7 +36,19 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     if (layer?.brain.kind !== 'hunt') return [];
     const actor = host.entities.get(spawn.id), id = `brain.${spawn.id}`;
     if (actor === undefined || host.adapters.has(id) || spawn.brain !== null) throw new Error(`species \`${spawn.species}\`: competing or missing hunt body`);
-    const tuning = layer.brain.tuning, presentation = layer.presentation;
+    const senses = layer.senses, original = layer.brain.tuning, presentation = layer.presentation;
+    // Omnidirectional notice/reveal use the existing native hearing-rate
+    // path. Sight, grazing and every noise band keep the native awareness
+    // meter, wary multiplier and cadence; no second detector clock appears.
+    const omni = senses === undefined ? 0 : Math.max(senses.sight === undefined ? senses.notice : 0, senses.reveal ?? 0);
+    const tuning = senses === undefined ? original : { ...original,
+      sightRange: senses.sight?.range ?? senses.notice,
+      sightRangeGraze: senses.sight?.graze ?? senses.sight?.range ?? senses.notice,
+      sightCone: senses.sight?.cone ?? Math.PI,
+      hearStill: Math.max(senses.hearing?.still ?? 0, omni), hearCrouch: Math.max(senses.hearing?.crouch ?? 0, omni),
+      hearWalk: Math.max(senses.hearing?.walk ?? 0, omni), hearSprint: Math.max(senses.hearing?.sprint ?? 0, omni),
+      ...(original.stalk === undefined ? {} : { stalk: { ...original.stalk, detect: 0 } }),
+    };
     const legacySpecies = { tuning, ...layer.brain.motion, aggressive: layer.temperament.reaction === 'aggressive',
       ...(presentation?.sounds.call === undefined || presentation.sounds.hurt === undefined ? {} : {
         sounds: { call: presentation.sounds.call, hurt: presentation.sounds.hurt },
@@ -43,14 +56,18 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     const species = { ...legacySpecies, reaction: layer.temperament.reaction, ...(layer.senses === undefined ? {} : { notice: layer.senses.notice }) };
     // Aggressive hunts without authored notice retain the exact released M1 contract.
     const contractSpecies = species.reaction === 'aggressive' && layer.senses === undefined ? legacySpecies : species;
-    return [{ spawn, actor, id, species, contract: JSON.stringify({ spawn, species: contractSpecies, temperament: layer.temperament }) }];
+    const perception = senses === undefined ? undefined : bindCreatureSenses(host, actor, senses);
+    return [{ spawn, actor, id, species, perception, contract: JSON.stringify({ spawn, species: contractSpecies, temperament: layer.temperament }) }];
   });
-  for (const { spawn, actor, id, species, contract } of prepared) {
+  for (const { spawn, actor, id, species, perception, contract } of prepared) {
     const player = new Vector3().copy(host.nearestPlayer(actor.position).position);
     const hunt = new StalkerBrain<AnimalSim>({ pattern: 'hunt', config: { rng: host.rng.stream('ai'),
       fight: {}, faunaTuning: () => undefined, species: () => species }, player, sampleTerrain: () => undefined,
       ports: { ground, nav: () => null, reach: (body, target) => canReach(body, target, host.physics),
-        wanderGoal: () => null, unaware: () => !host.nearestPlayer(actor.position).health.alive,
+        wanderGoal: () => null, unaware: () => {
+          const nearest = host.nearestPlayer(actor.position);
+          return !nearest.health.alive || perception?.notices(nearest) === false;
+        },
         now: () => host.clock.now * 1000, sound: () => undefined,
         charge: (body, damage) => { const target = host.nearestPlayer(body.position);
           host.combat.hit({ source: body.combatActor(), sourceTags: [`creature.${spawn.species}`], target: target.health,
