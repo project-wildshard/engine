@@ -45,3 +45,10 @@ A manual local-link workflow runs the fifteen production-boundary cases
 on a clean hosted Linux checkout and retains the raw JSON proof. It
 uses normal frozen dependencies and npr, with no local candidate input.
 The full main CI remains unchanged and independently watched.
+
+The first focused hosted run44009367792 stopped at the existing
+ownership-history preflight: checkout was shallow. Fetch full history,
+as the normal engine job does. The world proof now reads physics from
+the frozen Rapier dependency instead of a generated public copy, so a
+clean source checkout needs no unrelated boot generation. Fifteen
+CI=true cases pass, with a raw JSON report retained.

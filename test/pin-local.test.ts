@@ -1,6 +1,7 @@
 /* oxlint-disable import/no-nodejs-modules -- Drive the real pin CLI with admitted product bytes. */
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync} from 'node:fs';
 import {dirname, join, resolve as resolvePath} from 'node:path';
@@ -66,7 +67,7 @@ test('actual local admission, runtime open and published restoration leave the t
   const cooked = await cookShard(installed, join(root, 'cooked'), {wireBytes: (_url, body) => body.length, now: () => performance.now()});
   expect(cooked.manifests.length).toBeGreaterThan(0);
   expect(existsSync(join(root, 'cooked', cooked.server.index))).toBe(true);
-  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const rapier = await loadRapier(readFileSync(createRequire(import.meta.url).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm')));
   const input = await loadCookedProduct(join(root, 'out/brasscap-mesa'), rapier);
   const world = await openWorld(input, {room: true});
   try {
