@@ -30,3 +30,17 @@ owned memory; generic save/restore keeps that flag, while the original
 native codec fields and draw order stay unchanged. The flag clears
 when a stalk gives up or a fleeing animal reaches safety. Red-first
 controls cover both tuning shapes, both provocations and continuation.
+
+CC5a4: actual server controls exposed an unconnected body clock:
+layer hunts decided but never advanced charges or checked contact.
+Use the host's existing before/after-body callback phases, reading its
+body cadence; keep the one host body step and native manager hooks.
+Held, dead, stunned and paused bodies cannot deliver contact. The
+actual damage event drains at its normal host phase boundary.
+
+Plain admitted passive/skittish/neutral rows now react to actual damage;
+aggressive and crowded-neutral controls really hurt the player. A
+provoked neutral host restores and matches uninterrupted body, health,
+brain memory and shared RNG. Three integration controls failed before
+the body-clock connection; the five new controls pass with the original
+inline-policy continuation tests.

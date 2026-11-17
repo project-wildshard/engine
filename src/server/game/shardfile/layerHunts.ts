@@ -64,6 +64,8 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     host.onStep(id, dt => {
       player.copy(host.nearestPlayer(actor.position).position);
       hunt.beginTick(dt); clock += dt; cadence.observe(dt); cadence.decide();
+      const bodyDt = host.bodyDt(actor.entityId);
+      if (bodyDt > 0 && actor.alive && !actor.stunned && !actor.harnessHold && actor.state === 'charge') hunt.advanceCharge(actor, bodyDt, player);
     }, { snapshot: () => JSON.stringify({ contract, clock, memory: huntMemoryCodec.save(memory),
       noise: { seen: noise.seen, speed: noise.speed, prev: noise.prev.toArray() }, sight }),
     restore: saved => {
@@ -74,6 +76,10 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       hunt.beginTick(state.clock - clock); clock = state.clock;
       noise.seen = state.noise.seen; noise.speed = state.noise.speed; noise.prev.set(...state.noise.prev); sight[0] = state.sight[0] ?? null;
     } });
+    host.onStep(`${id}.contact`, () => {
+      if (host.bodyDt(actor.entityId) <= 0 || !actor.alive || actor.stunned || actor.harnessHold || actor.state !== 'charge') return;
+      player.copy(host.nearestPlayer(actor.position).position); hunt.chargeContact(actor, player);
+    }, undefined, 'afterBodies');
     host.events.on('damage.dealt', ({ req, killed }) => {
       if (req.target !== actor.combatActor()) return;
       player.copy(host.nearestPlayer(actor.position).position); cadence.damaged(req.target, killed);
