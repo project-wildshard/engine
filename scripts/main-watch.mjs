@@ -170,8 +170,9 @@ export function liveIo(env=process.env){
       const judged=new Set(readState(state)?.judged);
       return /** @type {Run[]} */(JSON.parse(read(['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs)
         .filter(row=>row.event==='push'||row.event==='workflow_dispatch').map(row=>{
-          if(!finished(row)||row.conclusion==='success'||judged.has(row.id))return row;
+          if(!finished(row)||row.conclusion==='success')return row;
           if(cancelled(row)){
+            if(judged.has(row.id))return row;
             const kept=prior.find(old=>old.id===row.id&&typeof old.started==='boolean'&&(old.run_attempt??1)===(row.run_attempt??1));
             if(kept!==undefined)return kept;
             // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
