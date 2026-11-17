@@ -9,6 +9,7 @@ import {logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../scri
 import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
 import {gateEnvironment} from '../scripts/push-environment.mjs';
+import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
@@ -182,7 +183,8 @@ async function main(){
   // Known reds (scripts/push-known-red.mjs): a split gate keeps a JSON report, so a red that origin/main has too never
   // refuses the push. WS_KNOWN_RED=0 refuses on every red again.
   const knownRed=split&&env.WS_KNOWN_RED!=='0'&&(local?.length??0)>0;
-  const report=env.WS_PUSH_TIMINGS??(knownRed?resolve('tmp',`push-known-red-${process.pid}.json`):undefined);
+  const localReport=gateReport(process.env);
+  const report=localReport??(knownRed?resolve('tmp',`push-known-red-${process.pid}.json`):undefined);
   if(report!==undefined&&env.WS_PUSH_TIMINGS===undefined)mkdirSync(dirname(report),{recursive:true});
   const reporters=report===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${report}`];
   const vitest=local===null
@@ -214,7 +216,8 @@ async function main(){
       }catch(error){console.error(`  !! known-red: could not read origin/main's reds (${error instanceof Error?error.message:String(error)}); the red stands`);}
     }
   }
-  if(report!==undefined&&env.WS_PUSH_TIMINGS===undefined)rmSync(report,{force:true});
+  if(report!==undefined&&process.env.WS_LOCAL_LAND_HEAD)printGateReport(report,process.cwd());
+  if(report!==undefined&&localReport===undefined)rmSync(report,{force:true});
   const seconds=(Date.now()-began)/1000;
   if(seconds>PUSH_BUDGET.warnSeconds)console.error(`  !! full pre-push ${seconds.toFixed(1)} s exceeds ${PUSH_BUDGET.warnSeconds} s target (warning; all proofs retained)`);
   console.error(`  - ${split?'split ':''}push lane ${result.ok?'green':'RED'} in ${seconds.toFixed(1)} s; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);

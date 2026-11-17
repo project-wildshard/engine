@@ -78,7 +78,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
       // No push refs means conservative FULL selection in push-checks, never
       // DS9's related/split path or the known-red allowance. Retain the normal
       // lease and environment policy used by WL22; no patch-id carry on rebase.
-      const full={...env,WS_LOCAL_LAND_HEAD:process.env.WS_LAND_MAIN_PUSH?.slice(6)??''};Reflect.deleteProperty(full,'WS_PUSH_REFS');
+      const full={...env,WS_LOCAL_LAND_HEAD:process.env.WS_LAND_MAIN_PUSH?.slice(6)??'',WS_LANE_NAME:process.env.WS_LANE_NAME??'local-land'};Reflect.deleteProperty(full,'WS_PUSH_REFS');
       const ran=spawn('python3',['scripts/heavy-lane.py','full-test','--checkout-scope','--',process.execPath,'scripts/land-local-gate.mjs'],{cwd:root,env:full,stdio:'inherit'});
       process.on('SIGINT',()=>ran.kill('SIGINT'));process.on('SIGTERM',()=>ran.kill('SIGTERM'));
       process.exit(await new Promise(done=>{ran.once('error',()=>done(1));ran.once('close',code=>done(code??1));}));

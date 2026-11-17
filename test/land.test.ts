@@ -259,6 +259,21 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['ls-tree', 'main', '--', 'src/local.ts'])).toBe('');
   }, 60_000);
 
+  test('J400: remote rejection after a green race cannot blame a passing CPU control', () => {
+    const f = fixture();
+    f.env['WS_LAND_MODE'] = 'local';
+    const wt = f.worktree('cpu-control-race');
+    const head = f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
+    writeFileSync(f.files.raceScript, readFileSync(f.peerScript('src/racer.ts', null, 'export const racer = 3;'), 'utf8'));
+    writeFileSync(f.files.race, '');
+    writeFileSync(join(f.root, 'hooks/pre-push'), PRE_PUSH.replace('exit 0\n', 'echo "Error: Inherited CPU grant is unavailable or is not an actual ancestor grant"\nexit 0\n'));
+    writeFileSync(join(f.remote, 'hooks/update'), `#!/bin/sh\n[ "$3" = '${head}' ] && exit 1\nexit 0\n`);
+    const result = f.land(wt);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(prepushLines(f)).toHaveLength(2);
+    expect(f.git(wt, ['show', 'HEAD:src/racer.ts'])).toContain('racer = 3');
+  }, 60_000);
+
   test('J400: a local red cannot move main and a race gates the rebased tree again', () => {
     const f = fixture();
     f.env['WS_LAND_MODE'] = 'local';
@@ -765,6 +780,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
       .toBe('!\trefs/heads/plan/x:refs/heads/plan/x\t[remote rejected] (hook declined)');
     // A passing check's logged Error never outranks the check that went RED.
     expect(prePushCause('  - tests green in 9 s\nError: expected in a passing test\n  - lint RED in 3.0 s\n')).toBe('lint RED in 3.0 s');
+    expect(prePushCause('Error: Inherited CPU grant is unavailable or is not an actual ancestor grant\nTo /remote.git\n!\tHEAD:refs/heads/main\t[remote rejected] (failed to update ref)\nDone\n'))
+      .toContain('[remote rejected] (failed to update ref)');
     expect(prePushCause('')).toBe('no output');
   });
 

@@ -58,11 +58,21 @@ export function prePushCause(output){
  // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
  const lines=output.split('\n').map(line=>line.replaceAll(/\u001B\[[0-9;]*m/gu,'').trim()).filter(line=>line!=='');
  const hook=lines.filter(line=>!GIT_OWN.test(line));
- const pick=hook.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
+ const pick=remoteRejection(output)
+  ??hook.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
   ??hook.findLast(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
   ??lines.find(line=>/^!\s.*\[(?:remote )?rejected\]/u.test(line))
   ??hook.at(-1);
  return pick===undefined?'no output':pick.slice(0,300);
+}
+
+/** Only Git's final porcelain trailer proves the hook passed and the remote refused.
+ * Passing tests can print expected errors (and even sample porcelain output).
+ * @param {string} output @returns {string|undefined} */
+function remoteRejection(output){
+ const trailer=output.slice(output.lastIndexOf('\nTo ')+1);
+ if(!trailer.startsWith('To ')||!/^Done\s*$/mu.test(trailer))return undefined;
+ return trailer.split('\n').find(line=>/^!\t[^\t]+\t\[(?:remote )?rejected\]/u.test(line));
 }
 
 /** Run git with its stderr shown live (the pre-push's progress) and kept, for the receipt's cause.
@@ -783,7 +793,7 @@ class Landing{
   // A lost race is main having moved; anything else (a red pre-push) stops.
   const now=this.fetchMain();
   if(isAncestor(this.root,head,now))return 'landed';
-  const rejected=/^!\s.*\[(?:remote )?rejected\].*(?:fetch first|non-fast-forward|incorrect old value provided)/mu.test(result.stdout);
+  const rejected=remoteRejection(result.stdout)!==undefined;
   if(!result.interrupted&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
   const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(`${result.stdout}\n${result.stderr}`);
   this.receipt(`STOP main push of ${short(head)} refused: ${cause}`);

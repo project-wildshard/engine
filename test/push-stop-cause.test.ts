@@ -1,12 +1,34 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Real process groups, a real CPU broker and real signals.
 import { spawn } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- The owner fixture and the broker's private scheduler root.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { parallelChecks } from '../.githooks/push-checks.mjs';
 import { prePushCause } from '../scripts/land.mjs';
+import { gateReport, printGateReport } from '../scripts/gate-report.mjs';
+
+test('local gate keeps a JSON report and names assertion and setup failures', () => {
+  const work = mkdtempSync(resolve('tmp/gate-report-'));
+  try {
+    const path = gateReport({ WS_LOCAL_LAND_HEAD: 'a'.repeat(40), WS_LANE_NAME: 'fixture' }, work);
+    if (path === undefined) throw new Error('Local gate produced no report path');
+    expect(path).toMatch(/tmp\/fixture\/vitest-.+\.json$/u);
+    writeFileSync(path, JSON.stringify({ testResults: [
+      { name: join(work, 'test/assert.test.ts'), assertionResults: [{ status: 'failed', fullName: 'real assertion' }] },
+      { name: join(work, 'test/setup.test.ts'), status: 'failed', assertionResults: [] },
+    ] }));
+    const lines: string[] = [];
+    printGateReport(path, work, line => { lines.push(line); });
+    expect(lines.join('\n')).toContain('test/assert.test.ts');
+    expect(lines.join('\n')).toContain('test/setup.test.ts');
+    expect(lines.join('\n')).toContain(path);
+    expect(readFileSync(path, 'utf8')).toContain('real assertion');
+    printGateReport(join(work, 'missing.json'), work, line => { lines.push(line); });
+    expect(lines.at(-1)).toContain('missing or unreadable');
+  } finally { rmSync(work, { recursive: true, force: true }); }
+});
 
 // CPU-BROKER (2026-11-16): a red check:saves made the gate stop every other task, the vitest run and its CPU broker
 // among them. The run then printed "CPU broker exited before its owner" as if the broker were the fault, and the push
