@@ -4,6 +4,9 @@
 // six overlapping rotated strips, and a capsule crossing one strip's edges buried in another took whichever edge the world's
 // tree gave it first. Same command, same state, different feet: 0.1 mm on the deck at once, 6.7 mm in four seconds, then 2 to
 // 5 cm against the windmill. A deck shard's walkable ground must give the same walk in any collider order.
+// NL13b4: rev 4's prism decks fixed the open deck, and staging still corrected Chromium 8.5 to 18.4 a minute at the windmill,
+// whose tower box (corners at r 3.25) poked out of its sixteen-sided drum (r 3): a capsule against that corner touched two
+// overlapping convex shapes. A walk hugging every piece that stands on a deck must not depend on the order either.
 // oxlint-disable-next-line import/no-nodejs-modules -- reads the pinned shard's physics plan and the shipped Rapier
 import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
@@ -15,23 +18,28 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 let R: Rapier;
 beforeAll(async () => { R = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))); });
 
-interface Piece { readonly id: string; readonly category?: string; readonly colliders: readonly { readonly x?: number; readonly y?: number; readonly z?: number; readonly hy?: number }[] }
-const ground = (slug: string): Piece[] => (JSON.parse(readFileSync(`out/${slug}/sections/sim/runtime-plan.json`, 'utf8')) as { baked: { pieces: Piece[] } })
-  .baked.pieces.filter(piece => piece.category === 'ground');
+interface Piece { readonly id: string; readonly category?: string; readonly colliders: readonly { readonly x?: number; readonly y?: number; readonly z?: number; readonly hx?: number; readonly hy?: number; readonly hz?: number }[] }
+const pieces = (slug: string): Piece[] => (JSON.parse(readFileSync(`out/${slug}/sections/sim/runtime-plan.json`, 'utf8')) as { baked: { pieces: Piece[] } })
+  .baked.pieces;
+const ground = (slug: string): Piece[] => pieces(slug).filter(piece => piece.category === 'ground');
 
-/** Across a deck through its middle for four seconds, weaving, in a world whose other colliders came first or last. */
-function walk(pieces: readonly Piece[], centre: { x: number; y: number; z: number }, othersFirst: boolean): number[] {
+type Step = (feet: { x: number; y: number; z: number }, tick: number) => { x: number; y: number; z: number };
+/** Across a deck through its middle for four seconds, weaving. */
+const weave: Step = (_feet, tick) => ({ x: tick % 90 > 60 && tick % 90 < 70 ? -2 / 60 : 0, y: -22 / 3600, z: -4.3 / 60 });
+
+/** `steps` from `start` for four seconds in a world whose other colliders came first or last. */
+function walk(pieces: readonly Piece[], start: { x: number; y: number; z: number }, othersFirst: boolean, step: Step = weave): number[] {
+  const centre = start;
   const physics = new Physics(R), others = (): void => { for (let i = 0; i < 3; i++) physics.world.createCollider(R.ColliderDesc.cuboid(1, 1, 1).setTranslation(centre.x + 400 + i * 5, 0, centre.z)); };
   if (othersFirst) others();
   const motor = new CharacterMotor(physics, { ...PLAYER_CAPSULE, ...PLAYER_BODY });
   addBakedPieces(physics, pieces);
   if (!othersFirst) others();
-  const feet = { x: centre.x - 1.6, y: centre.y + 0.02, z: centre.z + 9 }, path: number[] = [];
+  const feet = { ...start }, path: number[] = [];
   try {
     for (let tick = 0; tick < 240; tick++) {
       physics.step();
-      const side = tick % 90 > 60 && tick % 90 < 70 ? -2 / 60 : 0;
-      motor.move(feet, { x: side, y: -22 / 3600, z: -4.3 / 60 });
+      motor.move(feet, step(feet, tick));
       path.push(feet.x, feet.y, feet.z);
     }
   } finally { motor.dispose(); physics.dispose(); }
@@ -43,8 +51,34 @@ test.each(['far-reach'])('%s: every deck walks the same in any collider order', 
   expect(decks.length).toBeGreaterThan(0);
   for (const deck of decks) {
     const c = deck.colliders[0], centre = { x: c?.x ?? 0, y: (c?.y ?? 0) + (c?.hy ?? 1), z: c?.z ?? 0 };
-    const a = walk([deck], centre, true), b = walk([deck], centre, false);
+    const start = { x: centre.x - 1.6, y: centre.y + 0.02, z: centre.z + 9 };
+    const a = walk([deck], start, true), b = walk([deck], start, false);
     const worst = a.reduce((most, value, i) => Math.max(most, Math.abs(value - (b[i] ?? Number.NaN))), 0);
     expect(worst, `${deck.id}: the walk parts by ${worst.toExponential(2)} m with the colliders' order`).toBe(0);
   }
+});
+
+/**
+ * NL13b4 (open): rev 4's prism decks fixed the open deck; staging still corrected Chromium 8.5 to 18.4 a minute at the windmill.
+ * The cause is not the windmill's shape. A grounded capsule leaning on any wall meets the floor and the wall at time 0 (both
+ * within the controller's skin) and Rapier keeps whichever its query tree visits first, so the order the world was built in
+ * picks the slide. A plain box wall on a box floor off its centre parts too; one convex windmill hull, or a drum that holds
+ * the tower's corners, parts as often (opus-netlag2 probes, plan row). `fails` until the motor breaks that tie (NL13b5): then
+ * this goes red, and the marker comes off.
+ */
+test.fails('far-reach: a walk glancing off the windmill is the same in any collider order', () => {
+  const all = pieces('far-reach'), decks = all.filter(piece => piece.category === 'ground'), mill = all.filter(piece => piece.id === 'far.windmill');
+  expect(mill).toHaveLength(1);
+  const at = { x: mill[0]?.colliders[0]?.x ?? 0, z: mill[0]?.colliders[0]?.z ?? 0 };
+  const glance = (start: number, lateral: number): Step => {
+    const tx = at.x - lateral * Math.sin(start) - 6 * Math.cos(start), tz = lateral * Math.cos(start) - 6 * Math.sin(start), tl = Math.hypot(tx, tz);
+    return () => ({ x: tx / tl * 4.3 / 60, y: -22 / 3600, z: tz / tl * 4.3 / 60 });
+  };
+  let worst = 0;
+  for (let k = 0; k < 16; k++) {
+    const start = k * Math.PI / 8 + 0.1, from = { x: at.x + 6 * Math.cos(start), y: 30.02, z: at.z + 6 * Math.sin(start) };
+    const a = walk([...decks, ...mill], from, true, glance(start, 1.5)), b = walk([...mill, ...decks], from, false, glance(start, 1.5));
+    worst = Math.max(worst, a.reduce((most, value, i) => Math.max(most, Math.abs(value - (b[i] ?? Number.NaN))), 0));
+  }
+  expect(worst, `a walk along the windmill parts by ${worst.toExponential(2)} m with the colliders' order`).toBe(0);
 });
