@@ -153,6 +153,7 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
         const layer = layers?.get(row.species);
         const source = { run: (_dt: number, acquire = true) => { pursuit.step(host.state.tick, acquire, host.brainDt(actor.entityId, false, spec.thinkDivisor) > 0); }, adapter: pursuit,
           notice: layer?.senses?.notice ?? spec.awareRadius, escapeSpeed: spec.speed, crowd: spec.stopDistance,
+          ...(layer?.senses === undefined ? {} : { nearest: () => perception.get(row.id)?.nearest() }),
           provoke: (targetId: string) => { pursuit.provoke(targetId); } };
         const policy = layer !== undefined
           ? bindCreatureTemperament(host, actor, row.at, layer.temperament, source,

@@ -30,3 +30,11 @@ the cone for all three families, exact second-player attack identity,
 full restored snapshots, no-senses native controls and the dead-player
 observation fallback. Full types/lint pass. Source/authority fencing
 and the remaining native recipes remain explicitly open.
+
+A follow-up finds six real skittish/ambush refusals: the outer reaction
+owner still queried raw distance and could latch a reaction before the
+native sensing gate ran. It now borrows the same admitted nearest-player
+reader for fresh skittish/ambush triggers. Existing retained fright,
+damage/crowd provocation, native reset and saved memory are unchanged.
+All three families reject a hidden player and react to actual reveal.
+The105case/5file matrix passes, including the full legacy/source roster.

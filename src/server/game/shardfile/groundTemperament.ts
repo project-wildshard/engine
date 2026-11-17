@@ -18,7 +18,7 @@ export function bindGroundTemperament<P>(host: SimHost, actor: AnimalSim, diviso
   };
   const target = () => selected === null ? undefined : living(selected);
   recipe.bindTarget(() => enabled ? target() : undefined);
-  return { target, provoke: id => {
+  return { target, ...(recipe.nearest === undefined ? {} : { nearest: recipe.nearest }), provoke: id => {
     if (living(id) === undefined) return;
     if (selected !== id) { selected = id; pending = 2; }
     else if (pending === 0) pending = 1;

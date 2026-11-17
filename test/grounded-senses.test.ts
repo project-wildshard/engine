@@ -124,3 +124,31 @@ test.each(kinds)("actual %s hears real sprint input behind its cone", async (kin
     sim.dispose();
   }
 });
+
+test.each(kinds.flatMap((kind) => ["skittish", "ambush"].map((mode) => ({ kind, mode }))))(
+  "actual $kind $mode acquisition respects authored sensing before it latches a reaction",
+  async ({ kind, mode }) => {
+    for (const revealed of [false, true]) {
+      const shard = source(kind),
+        species = shard.rows.species[0];
+      if (species?.temperament === undefined || species.senses === undefined)
+        throw new Error("Missing actual reaction layers");
+      if (mode === "skittish") species.temperament.reaction = "skittish";
+      else species.temperament.ambush = true;
+      if (revealed) species.senses.reveal = 12;
+      shard.rows = parseRows(shard.rows);
+      const sim = createShardfileSim(shard, new Map(), { rapier: await rapier });
+      try {
+        const actor = sim.host.entities.get("fixture.actor");
+        if (actor === undefined) throw new Error("Missing reaction body");
+        for (let tick = 0; tick < 60; tick++) sim.host.step();
+        if (mode === "skittish") expect(actor.state === "flee").toBe(revealed);
+        else expect(actor.state === "hide").toBe(!revealed);
+        if (!revealed)
+          expect(sim.host.players.get("actor.player")?.health.attributes.health).toBe(100);
+      } finally {
+        sim.dispose();
+      }
+    }
+  },
+);
