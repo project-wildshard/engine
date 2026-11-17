@@ -2,7 +2,7 @@ import { prepareClientModuleGroups } from './clientModules';
 import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/shardfile/outputDescriptor';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { dangerousRuntimeOwnership, dangerousUnbudgetedRuntime } from '../../../shared/game/shardfile/dangerousGates';
+import { dangerousRuntimeOwnership, dangerousUnbudgetedRuntime, type DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
 import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { contentCost } from '@wildshard/format/contentCost';
@@ -153,7 +153,7 @@ export async function installShardfileFolder(input: unknown, providedOptions: Fo
  * inline candidate (a released page's inline product is never first-party), and a candidate whose discovery names no
  * client-plan entry, another identity or another descriptor. Returns null when the candidate declares no runtime.
  */
-export async function inlineHybridArrival(source: Shardfile, options: Pick<FolderOptions, 'base' | 'firstParty'>,
+export async function inlineHybridArrival(source: Shardfile, options: Pick<FolderOptions, 'base'> & DangerousProvenance,
   read: (url: string) => Promise<unknown>, discover: (document: unknown) => ShardManifest = shardFromDiscovery): Promise<ShardManifest | null> {
   if (source.runtime === null) return null;
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row

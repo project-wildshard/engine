@@ -56,6 +56,7 @@ test('OF10b: every dangerous gate is one deprecated function of its name, naming
   const text = readFileSync(resolve(ROOT, DANGEROUS_GATES), 'utf8');
   const exported = [...text.matchAll(/^export function (\w+)\(/gmu)].map(match => match[1]);
   const named = GATES.filter(gate => gate.verdict === 'dangerous').map(gate => gate.name);
-  expect(exported.sort()).toEqual([...named].sort());
+  // OF10a7: plus the host's grant, the dangerous gates' one input until OF10c deletes them
+  expect(exported.sort()).toEqual([...named, 'dangerousTrust'].sort());
   for (const name of named) expect(text, name).toMatch(new RegExp(`/\\*\\* @deprecated ONE-FORMAT OF10c\\d[^]*?\\*/\\nexport function ${name ?? ''}\\(`, 'u'));
 });

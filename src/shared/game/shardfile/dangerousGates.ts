@@ -6,7 +6,12 @@ import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
  * deprecated: its OF10c row replaces it with the budget tier its comment names, then deletes it. A gate site calls one of
  * these; nothing else reads the provenance option for these capabilities.
  */
-interface Provenance { readonly firstParty?: boolean }
+/** ONE-FORMAT OF10a7: the provenance option survives only as these dangerous gates' input. Nothing else reads it; each
+ * OF10c row deletes one reader, and the last deletes this and `dangerousTrust`. */
+export interface DangerousProvenance { readonly firstParty?: boolean }
+type Provenance = DangerousProvenance;
+/** The host's grant of the dangerous capabilities (runtime, page features, ownership) until OF10c budgets them. */
+export function dangerousTrust(trusted = true): DangerousProvenance { return trusted ? { firstParty: true } : {}; }
 
 /** @deprecated ONE-FORMAT OF10c1: a declared `runtime` binds a native engine module with no CPU, memory or bandwidth limit
  * of its own; the shard's tier CPU and memory limits, metered on that module, replace this provenance check. */

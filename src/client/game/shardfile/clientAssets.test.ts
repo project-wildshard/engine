@@ -44,7 +44,7 @@ test('native first-party demand uses the canonical URL and no page cache or hash
       decoded: 3, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false }],
   });
   const read = (): Promise<Uint8Array> => Promise.reject(new Error('No section in this emitted index'));
-  const source = await resolveOutputDescriptor(index, { offline: false, firstParty: true, read, hash: f.options.hash,
+  const source = await resolveOutputDescriptor(index, { offline: false, read, hash: f.options.hash,
     built: { indexHash: 'b'.repeat(64), read } });
   if (!isBuildValidatedOutput(source)) throw new Error('Missing build-owned output fixture');
   const assets = new ClientAssets(source, new Map(), { ...f.options, firstPartyRead: (url, bytes, _read, hash, priority) => {

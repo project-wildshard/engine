@@ -25,7 +25,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 
 import type { RuntimeDeclaration } from '@wildshard/format/runtime';
 import type { AudioData } from '@wildshard/format/audio';
-import { dangerousRuntimeOwnership } from '../../../shared/game/shardfile/dangerousGates';
+import { dangerousRuntimeOwnership, type DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
 
 async function runtimeClientPhase(ctx: ShardContext, phase: ClientPhase, resident: Scope, lifetime?: 'entered'): Promise<void> {
   if (!ctx.product.has('client/plan')) return;
@@ -48,7 +48,8 @@ export interface HybridResident {
   readonly declaration: RuntimeDeclaration | null;
   /** Required actual admitted product when compiled client features own every stage. */
   readonly product?: ShardFolder;
-  readonly firstParty: boolean;
+  /** OF10a7: the host's grant of the dangerous capabilities (`dangerousTrust`) until OF10c. */
+  readonly trust: DangerousProvenance;
   readonly scope: Scope;
   readonly runtime: ShardRuntime;
   /** Scoped render preparation can overlap the private world; gates afterWorld and drains before teardown. */
@@ -293,7 +294,7 @@ export class HybridShardPlugin extends ShardPlugin {
 }
 
 /** Admit declared data and trusted hooks; catalogue placement and cell activation stay in the game layer. */
-export async function prepareHybridShard(product: ShardFolder, options: FolderOptions | { firstParty: true },
+export async function prepareHybridShard(product: ShardFolder, options: FolderOptions | { trusted: true },
   bindings: Omit<ShardfileClientBindings, 'instance' | 'trustedRuntime'> & {
     /** The game adapter forwards the page owner; the shard need not read or own another service. */
     readonly residencyContext?: Pick<ShardContext, 'game' | 'scope'>;
@@ -304,12 +305,12 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
     readonly stagesOwner?: 'declared' | 'runtime';
   }): Promise<ShardPlugin> {
   // Every entry passes the product already loaded before its hooks.
-  const folderOptions = 'base' in options ? options : browserShardfileOptions(folderBase(product.slug), options.firstParty);
+  const folderOptions = 'base' in options ? options : browserShardfileOptions(folderBase(product.slug), options.trusted);
   const source = product.shardfile;
   if (source.runtime === null) throw new Error('Hybrid requires a compiled client-plan runtime declaration');
   provideHybridDeclaration(source);
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(options)) throw new Error('Runtime stage ownership requires a trusted first-party shard');
+  if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(folderOptions)) throw new Error('Runtime stage ownership requires a trusted first-party shard');
   const { residencyContext, retainHomeRuntime, stagesOwner, ...providedBindings } = bindings;
   const residency = residencyContext?.game.residency;
   if (residency !== undefined && providedBindings.residency !== undefined && residency !== providedBindings.residency) {
@@ -377,7 +378,7 @@ export class HybridRuntimeSession {
     const prior = this.prepared.get(instance); if (prior !== undefined) return prior;
     const product = resident.product;
     // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-    if (!dangerousRuntimeOwnership(resident) || product === undefined || !product.has('client/plan')) return Promise.reject(new Error('Data resident requires its admitted client plan'));
+    if (!dangerousRuntimeOwnership(resident.trust) || product === undefined || !product.has('client/plan')) return Promise.reject(new Error('Data resident requires its admitted client plan'));
     admittedFolderClientPlan(product);
     const prepared = Promise.resolve(ClientPlanRuntime);
     this.prepared.set(instance, prepared);

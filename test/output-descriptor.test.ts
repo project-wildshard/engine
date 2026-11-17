@@ -203,7 +203,7 @@ test('receipt lookup refuses authored accessors without invoking them', async ()
   const f = fixture(); let reads = 0;
   const input = { ...f.index };
   Object.defineProperty(input, 'build', { enumerable: true, get: () => { reads++; return f.index.build; } });
-  await expect(resolveOutputDescriptor(input, { read: sectionReader(f.wires), hash, offline: false, firstParty: true })).rejects.toThrow('bounded plain JSON');
+  await expect(resolveOutputDescriptor(input, { read: sectionReader(f.wires), hash, offline: false })).rejects.toThrow('bounded plain JSON');
   expect(reads).toBe(0);
 });
 
@@ -213,7 +213,7 @@ test('an unchanged entry-read hash cannot prefetch a newly tagged other-device p
   file.tier = 'desktop';
   const restore = installIndexReceipt(f.index);
   try {
-    const source = await resolveOutputDescriptor(f.index, { read: sectionReader(f.wires), hash, offline: false, firstParty: true });
+    const source = await resolveOutputDescriptor(f.index, { read: sectionReader(f.wires), hash, offline: false });
     if (!isBuildValidatedOutput(source)) throw new Error('Missing exact fixture receipt');
     const read = { url: `/shardfiles/${f.index.identity.slug}/${file.path}`, hash: file.hash, bytes: file.compressed };
     const rows = parseEntryReadSet(['phone', 'desktop'].map(tier => ({ region: f.index.identity.slug, tier, at: [0, 0], reads: [read] })));
@@ -229,7 +229,7 @@ test('build receipt skips descriptor grammar and owns the index across pauses', 
   const grammar = vi.spyOn(await import('@wildshard/format/outputIndex'), 'parseOutputDescriptorIndex');
   let paused = false;
   try {
-    const source = await resolveOutputDescriptor(f.index, { read: sectionReader(f.wires), hash, offline: false, firstParty: true,
+    const source = await resolveOutputDescriptor(f.index, { read: sectionReader(f.wires), hash, offline: false,
       pause: () => { paused = true; f.index.identity.name = 'Changed after intake'; return Promise.resolve(); } });
     expect(paused).toBe(true);
     expect(source).toEqual(f.source);
@@ -246,7 +246,7 @@ test('build index proof still refuses changed section bytes', async () => {
   const changed = new Uint8Array(wire), first = changed[0]; if (first === undefined) throw new Error('Empty fixture wire');
   changed[0] = first ^ 1; f.wires.set(entry.path, changed);
   try {
-    await expect(resolveOutputDescriptor(f.index, { read: sectionReader(f.wires), hash, offline: false, firstParty: true }))
+    await expect(resolveOutputDescriptor(f.index, { read: sectionReader(f.wires), hash, offline: false }))
       .rejects.toThrow(/section hash or size mismatch/u);
     expect(grammar).not.toHaveBeenCalled();
   } finally { grammar.mockRestore(); restore(); }
@@ -257,7 +257,7 @@ test('a changed index cannot borrow its original build receipt', async () => {
   const grammar = vi.spyOn(await import('@wildshard/format/outputIndex'), 'parseOutputDescriptorIndex');
   f.index.identity.name = 'Changed before intake';
   try {
-    const source = await resolveOutputDescriptor(f.index, { read: sectionReader(f.wires), hash, offline: false, firstParty: true });
+    const source = await resolveOutputDescriptor(f.index, { read: sectionReader(f.wires), hash, offline: false });
     expect(source).toMatchObject({ identity: { name: 'Changed before intake' } });
     expect(isBuildValidatedOutput(source)).toBe(false);
     expect(grammar).toHaveBeenCalledOnce();
@@ -855,7 +855,7 @@ test('custom sections and their schema inventory refuse before reads or cache ad
     {...index,schemas:[measured]},
   ]) {
     await expect(resolveOutputDescriptor(input,reader)).rejects.toThrow();
-    await expect(resolveOutputDescriptor(input,{...reader,firstParty:true})).rejects.toThrow();
+    await expect(resolveOutputDescriptor(input,{...reader})).rejects.toThrow();
     await expect(resolveOutputDescriptor(input,{...reader,offline:true})).rejects.toThrow();
   }
   expect(reads).toBe(0);expect(pauses).toBe(0);
@@ -865,7 +865,7 @@ test('concurrent platform reads paint before their consumers resume', async () =
   const {index,wires}=fixture();let blocked=true,completed=0,pauses=0;
   const release:(()=>void)[]=[];
   const pause=():Promise<void>=>{pauses++;return blocked?new Promise(resolve=>{release.push(resolve);}):Promise.resolve();};
-  const read=()=>resolveOutputDescriptor(index,{offline:false,firstParty:true,hash,pause,read:file=>{
+  const read=()=>resolveOutputDescriptor(index,{offline:false,hash,pause,read:file=>{
     const bytes=wires.get(file);if(bytes===undefined)throw new Error('Missing section');return Promise.resolve(bytes);
   }});
   const products=[read(),read()].map(async product=>{const result=await product;completed++;return result;});
@@ -1244,7 +1244,7 @@ test('build-owned client sections assemble exact hosts without hashing or downlo
   f.wires.set(path,wire);
   const reads:string[]=[],digest=vi.fn<(bytes:Uint8Array)=>Promise<string>>(()=>{throw new Error('No client digest');});
   let active=0,maximum=0;
-  const source=await resolveOutputDescriptor(index,{offline:false,firstParty:true,hash:digest,read:()=>{throw new Error('No checked-reader fallback');},
+  const source=await resolveOutputDescriptor(index,{offline:false,hash:digest,read:()=>{throw new Error('No checked-reader fallback');},
     parseJson:async bytes=>{active++;maximum=Math.max(maximum,active);try{await Promise.resolve();const parsed:unknown=JSON.parse(new TextDecoder().decode(bytes));return parsed;}finally{active--; }},
     built:{indexHash:'compiled-index-key',read:(name,bytes)=>{reads.push(name);const body=f.wires.get(name);if(body===undefined||body.length!==bytes)throw new Error('Missing emitted bytes');return Promise.resolve(body);}}});
   expect(source).toStrictEqual(f.source);expect(digest).not.toHaveBeenCalled();expect(reads).toEqual(index.sections.map(row=>row.path));expect(reads).not.toContain(schemaPath);
@@ -1253,11 +1253,10 @@ test('build-owned client sections assemble exact hosts without hashing or downlo
   expect(outputDescriptor(source)?.sections.get('ui/strings')).toStrictEqual(value);expect(outputDescriptor(source)?.indexHash).toBe('compiled-index-key');
 });
 
-test('an index read without the build reader takes the checked path, whoever made it (OF10a3)',async()=>{
+test('an index read without the build reader takes the checked path (OF10a3)',async()=>{
   const f=fixture(),first=f.index.sections[0];if(first===undefined)throw new Error('Missing section');
   const corrupt=new Uint8Array(f.wires.get(first.path)??[]);corrupt[0]=0;
-  for(const firstParty of [false,true])
-    await expect(resolveOutputDescriptor(f.index,{offline:false,firstParty,hash:bytes=>Promise.resolve(hash(bytes)),read:path=>Promise.resolve(path===first.path?corrupt:f.wires.get(path)??new Uint8Array())})).rejects.toThrow('section hash or size mismatch');
+  await expect(resolveOutputDescriptor(f.index,{offline:false,hash:bytes=>Promise.resolve(hash(bytes)),read:path=>Promise.resolve(path===first.path?corrupt:f.wires.get(path)??new Uint8Array())})).rejects.toThrow('section hash or size mismatch');
 });
 
 test('native first-party loading has no visited fallback, digest or client admission phases',async()=>{
@@ -1302,7 +1301,7 @@ test('built product residency is the emitted value without another source walk',
   const postCost={passes:1,instructions:7,inputs:{colour:true,depth:false,normal:false}};
   Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',{configurable:true,value:[{sourceHash:f.index.build.sourceHash,residentBytes:expected,postCost}]});
   try{
-    const source=await resolveOutputDescriptor(f.index,{firstParty:true,offline:false,hash:()=>{throw new Error('No client hash');},read:()=>{throw new Error('No checked fallback');},
+    const source=await resolveOutputDescriptor(f.index,{offline:false,hash:()=>{throw new Error('No client hash');},read:()=>{throw new Error('No checked fallback');},
       built:{indexHash:'compiled',read:path=>{const bytes=f.wires.get(path);if(bytes===undefined)throw new Error('Missing section');return Promise.resolve(bytes);}}});
     if(!isBuildValidatedOutput(source))throw new Error('Missing built source');
     expect(folderResidentBytes(source)).toBe(expected);
@@ -1322,7 +1321,7 @@ test('a built product stamped below its own wire still releases all of its trans
   Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',{configurable:true,value:[{sourceHash:f.index.build.sourceHash,residentBytes:stale,postCost}]});
   const allocator=new ResidencyAllocator(),leases=new FolderLeases<string>(allocator,'grid');
   try{
-    const source=await resolveOutputDescriptor(f.index,{firstParty:true,offline:false,hash:()=>{throw new Error('No client hash');},read:()=>{throw new Error('No checked fallback');},
+    const source=await resolveOutputDescriptor(f.index,{offline:false,hash:()=>{throw new Error('No client hash');},read:()=>{throw new Error('No checked fallback');},
       built:{indexHash:'compiled',read:path=>{const bytes=f.wires.get(path);if(bytes===undefined)throw new Error('Missing section');return Promise.resolve(bytes);}}});
     if(!isBuildValidatedOutput(source))throw new Error('Missing built source');
     const lease=await leases.acquire('blender-template',async(reserve,releaseBytes)=>{
@@ -1348,7 +1347,7 @@ test('the browser cannot fall back to Node admission when its native build reade
     expect(()=>folderResidentBytes(f.source)).toThrow('build-owned residency');
     expect(()=>folderResidentBytesSteps(f.source).next()).toThrow('build-owned residency');
     expect(()=>folderPostCost(f.source,()=>undefined)).toThrow('build-owned post cost');
-    await expect(resolveOutputDescriptor(f.index,{firstParty:true,offline:false,read:()=>Promise.resolve(new Uint8Array()),hash:native.hash})).rejects.toThrow('build-owned reader');
+    await expect(resolveOutputDescriptor(f.index,{offline:false,read:()=>Promise.resolve(new Uint8Array()),hash:native.hash})).rejects.toThrow('build-owned reader');
   }finally{vi.unstubAllEnvs();}
 });
 

@@ -17,3 +17,8 @@
   (our saves unchanged), anything else by (origin, slug). Private save namespaces refuse for all.
 - OF10a6 catalogue-manifest: a manifest's `shardfile` descriptor is admitted like any upload's
   (same-origin, hash-checked), and selection keeps the catalogue's other shards for every shard.
+- OF10a7 provenance-flag: `FolderOptions.firstParty` and the descriptor reader's field go.
+  What is left of the option is the dangerous gates' input only: `DangerousProvenance` and the
+  host's grant `dangerousTrust()` in `dangerousGates.ts`, the one file that still spells it.
+  `browserShardfileOptions(base, trusted)`, `prepareHybridShard(.., { trusted })`,
+  `HybridResident.trust`.

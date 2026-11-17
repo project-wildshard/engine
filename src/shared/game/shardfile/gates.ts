@@ -33,24 +33,13 @@ export interface Gate {
 }
 
 const FOLDER = 'src/client/game/shardfile/folder.ts';
-const RUNTIME_FOLDER = 'src/client/game/shardfile/runtimeFolder.ts';
 const CLIENT_SOURCE = 'src/client/game/shardfile/clientSource.ts';
 // OF15 renames this file; until then its path is the one place the ledger names the retired word.
 const PLAN_PAGE = 'src/client/game/shardfile/hybrid.ts';
-const DESCRIPTOR = 'src/shared/game/shardfile/outputDescriptor.ts';
 /** OF10b: each dangerous gate is one deprecated function here; its sites call it by name. */
 export const DANGEROUS_GATES = 'src/shared/game/shardfile/dangerousGates.ts';
 
 export const GATES: readonly Gate[] = [
-  {
-    id: 'provenance-flag', verdict: 'delete',
-    what: 'The provenance option itself: its field on `FolderOptions` and on a client-plan resident, '
-      + '`browserShardfileOptions`\'s argument, and the literal `true` our client-plan shards, the grid prefetch and the server pass.',
-    replacedBy: 'Nothing: with every other gate gone the option carries no meaning, so it goes (OF10a).',
-    refs: { [FOLDER]: 4, [RUNTIME_FOLDER]: 2, [PLAN_PAGE]: 3, [DESCRIPTOR]: 1, [CLIENT_SOURCE]: 1, [DANGEROUS_GATES]: 1,
-      'src/server/host/standalone/serverFolder.ts': 1, 'src/client/game/grid/prefetchIndexCore.ts': 1,
-      'src/client/game/grid/regionalRuntime.ts': 1, 'src/client/game/shard/declaredEntry.ts': 1 },
-  },
   {
     id: 'runtime-admission', verdict: 'dangerous', name: 'dangerousUnbudgetedRuntime',
     what: 'A shard that declares a `runtime` is admitted only as our own (`folder.ts`, inline arrival, and the data-only '
@@ -58,7 +47,8 @@ export const GATES: readonly Gate[] = [
     harm: 'A runtime binds a native module compiled into the engine bundle (one shard\'s TypeScript), which runs with no CPU, '
       + 'memory or bandwidth limit of its own.',
     budget: 'OF10c: the shard\'s tier CPU and memory limits, metered on the runtime\'s module.',
-    refs: { [DANGEROUS_GATES]: 1 },
+    // OF10a7: plus the option's last two spellings, `DangerousProvenance` and `dangerousTrust`, the dangerous gates' input
+    refs: { [DANGEROUS_GATES]: 3 },
     snippets: [
       { file: FOLDER, text: 'if (source.runtime !== null && !dangerousUnbudgetedRuntime(options)) throw' },
       { file: CLIENT_SOURCE, text: 'if (!dangerousUnbudgetedRuntime(options)) throw' },
@@ -87,9 +77,9 @@ export const GATES: readonly Gate[] = [
       { file: CLIENT_SOURCE, text: "=== true && (!dangerousRuntimeOwnership(options)" },
       { file: CLIENT_SOURCE, text: "if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options)" },
       { file: CLIENT_SOURCE, text: "if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options)" },
-      { file: PLAN_PAGE, text: "if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(options)) throw" },
+      { file: PLAN_PAGE, text: "if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(folderOptions)) throw" },
       { file: PLAN_PAGE, text: 'preparePageRuntime(product, dangerousRuntimeOwnership(folderOptions))' },
-      { file: PLAN_PAGE, text: 'if (!dangerousRuntimeOwnership(resident) ||' },
+      { file: PLAN_PAGE, text: 'if (!dangerousRuntimeOwnership(resident.trust) ||' },
     ],
   },
   {

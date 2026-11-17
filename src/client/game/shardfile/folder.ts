@@ -1,5 +1,5 @@
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { dangerousUnbudgetedPageFeatures, dangerousUnbudgetedRuntime } from '../../../shared/game/shardfile/dangerousGates';
+import { dangerousUnbudgetedPageFeatures, dangerousUnbudgetedRuntime, type DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
 
 import { waitFor } from '@wildshard/engine/boot/waits';
 import type { TextureTranscodeSupport } from '@wildshard/format/contentBounds';
@@ -59,8 +59,9 @@ export interface FolderProgress {
   /** Canonical descriptor/member URI, separate from the player-facing role. */
   resource?: string;
 }
-/** Loading is explicit about connectivity and first-party provenance, never inferred from an author field. */
-export interface FolderOptions {
+/** Loading is explicit about connectivity, never inferred from an author field; the dangerous gates' grant is the host's
+ * (`DangerousProvenance`, OF10a7) until OF10c budgets them. */
+export interface FolderOptions extends DangerousProvenance {
   /** Native first-party build capability. Publication validates the content;
    * this reader fetches its canonical URL and compares the declared length.
    * Node author and external readers omit it and retain checked admission. */
@@ -81,7 +82,7 @@ export interface FolderOptions {
   descriptorHash?: string;
   /** Caller-owned descriptor pathname for progress only; never a fetch or validation input. */
   descriptorPath?: string;
-  base: string; cache?: FolderCache; offline: boolean; firstParty: boolean;
+  base: string; cache?: FolderCache; offline: boolean;
   /** Optional URL-cache hint for sections and blobs; readers still verify declared sizes and hashes. */
   cachedResponse?: (url: string, hash: string, maximum: number) => Promise<Uint8Array | null>;
   /** Trusted URL-cache read returning owned checked bytes; replaces raw URL hints for asset reads when present. */
@@ -232,7 +233,7 @@ function resolveDescriptor(input: unknown, options: FolderOptions, lineage = fal
   const base = new URL('.', options.base).href, cache = options.cache, backgroundStore = cache?.putAssetBackground;
   const builtRead=options.firstPartyRead;
   if(builtRead!==undefined)return resolveOutputDescriptor(input,{
-    firstParty:true,offline:options.offline,deferAssetDeclarations:true,hash:options.hash,
+    offline:options.offline,deferAssetDeclarations:true,hash:options.hash,
     built:{read:(path,bytes,hash)=>builtRead(new URL(path,base).href,bytes,undefined,hash),
       indexHash:options.descriptorHash??builtIndexHash(new URL(options.descriptorPath??'shard.json',base).pathname)??''},
     read:(path,bytes)=>builtRead(new URL(path,base).href,bytes),
@@ -242,7 +243,7 @@ function resolveDescriptor(input: unknown, options: FolderOptions, lineage = fal
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned reader');
   return resolveOutputDescriptor(input, {
     ...(options.parseJson === undefined ? {} : { parseJson: options.parseJson }),
-    offline: options.offline, hash: options.hash, firstParty: options.firstParty, deferAssetDeclarations: true, ...(lineage ? { lineage } : {}),
+    offline: options.offline, hash: options.hash, deferAssetDeclarations: true, ...(lineage ? { lineage } : {}),
     ...(options.cacheHintTurn === undefined ? {} : { cacheHintTurn: options.cacheHintTurn }),
     ...(options.pause === undefined ? {} : { pause: options.pause }),
 

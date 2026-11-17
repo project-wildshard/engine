@@ -12,7 +12,7 @@ export async function prepareClientPlanShard(ctx: ShardContext, policy: ClientPl
   prepare?: typeof PrepareHybrid): Promise<ShardPlugin> {
   if (!ctx.product.has('client/plan') || ctx.product.shardfile.runtime === null) throw new Error('Client-plan entry requires its compiled runtime declaration');
   // the hybrid admission stays its own lazy chunk, fetched when world() runs (as before LD9)
-  return (prepare ?? (await import('../shardfile/hybrid')).prepareHybridShard)(ctx.product, { firstParty: true }, { residencyContext: ctx,
+  return (prepare ?? (await import('../shardfile/hybrid')).prepareHybridShard)(ctx.product, { trusted: true }, { residencyContext: ctx,
     retainHomeRuntime: policy.retainHomeRuntime, stagesOwner: policy.stagesOwner,
     catalogue: [], items: new Map(), recipes: new Map(), voices: () => new Map(),
     icon: () => { throw new Error('Client-plan runtime has no declared item icon'); },

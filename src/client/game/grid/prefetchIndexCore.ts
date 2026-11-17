@@ -29,7 +29,7 @@ export async function preparePrefetchIndex(request:PrefetchIndexRequest, authorC
   ]);
   const base=new URL('.',request.url).href;
   const digest = nativeRead === undefined ? await contentHash(bytes) : known[0]; if (digest === undefined) return null;
-  const source=await resolveOutputDescriptor(input,{offline:false,firstParty:true,hash:contentHash,
+  const source=await resolveOutputDescriptor(input,{offline:false,hash:contentHash,
     ...(nativeRead === undefined ? {} : { built: { indexHash: digest, read: (path: string, size: number, hash?: string) => nativeRead(new URL(path, base).href, size, hash) } }),
     pause:yieldTask,
     read:(path,maximum)=>read(new URL(path,base).href,maximum),

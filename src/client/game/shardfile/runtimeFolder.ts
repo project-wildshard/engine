@@ -30,6 +30,7 @@ import { keptGraphFileTextureRefs } from './clientGraphs';
 import type { ShardContext } from '../plugin/context';
 import { readAsset } from './readAsset';
 import { legacyAsset } from './legacyAsset';
+import { dangerousTrust } from '../../../shared/game/shardfile/dangerousGates';
 
 import { folderResourceRole } from '../../../shared/game/shardfile/resourceRole';
 import { entryTransport } from './entryTransport';
@@ -79,7 +80,7 @@ let folderControlsReady = false, observesFolderControl = false;
 /** ZE10a3: a same-page entry's next session boots before control again (its parser, revalidation and pacing as a fresh page's). */
 export function resetFolderControl(): void { folderControlsReady = false; }
 /** Browser connectivity and visited-product storage feed the same admission path as headless validation. */
-export function browserShardfileOptions(base: string, firstParty = false): FolderOptions {
+export function browserShardfileOptions(base: string, trusted = false): FolderOptions {
   const spawn = currentSpawnDownload(), resolve = (url: string): string => spawn?.resolve(url) ?? url;
   if (typeof document !== 'undefined' && !observesFolderControl) {
     observesFolderControl = true;
@@ -115,7 +116,7 @@ export function browserShardfileOptions(base: string, firstParty = false): Folde
     }, navigator.serviceWorker?.controller === null || navigator.serviceWorker?.controller === undefined ? storage : undefined), 'file', address);
     entryTransport()?.expand(); return result;
   };
-  return { ...(parseJson === undefined ? {} : { parseJson }), base, firstParty, ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
+  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...dangerousTrust(trusted), ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
     firstPartyRead,
     backgroundFetch: (url, signal) => fetch(contentURL(resolve(url)), { priority: 'low', ...(signal === undefined ? {} : { signal }) }),
     fetch: (url, signal) => waitFor(`Read ${folderResourceRole(url, base)}`, (async () => {

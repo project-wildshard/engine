@@ -160,7 +160,7 @@ export async function readServerFolder(root: string, build: () => string, source
   // Nalati's boot was mostly this: 900 ms of 1.16 s in Node, 3-5 s on the Simulator, each file's schema compiled and checked again
   // on bytes its build has already checked and the page has just read without checking. As on the page, only a build's own verdict
   // for exactly these bytes spares the checks. A product with none, an outside one, keeps them.
-  const assembled = await bootTask('server:descriptor-read-and-verification', () => resolveOutputDescriptor(input, { offline: false, firstParty: true, hash: contentHash, read, checks: nodeOutputDescriptorChecks }));
+  const assembled = await bootTask('server:descriptor-read-and-verification', () => resolveOutputDescriptor(input, { offline: false, hash: contentHash, read, checks: nodeOutputDescriptorChecks }));
   const built = isBuildValidatedOutput(assembled), parsed = built ? assembled : parseShardfile(assembled, outputDescriptor(assembled)?.sections);
   if (!built) carryOutputDescriptor(assembled, parsed);
   const shard = patch === undefined ? parsed : patch(parsed);

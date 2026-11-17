@@ -28,7 +28,7 @@ test.each([false, true])('boot stays main and only live decoding uses bounded pa
     currentSpawnDownload: () => undefined, contentURL: (url: string) => url, // PZ3: no content base
     browserLiveJsonParser: () => { calls.push('parser'); return parser; },
     TIER_CONFIG: {}, TIER: 'phone', splatDrawTier: () => 'phone', builtIndexes: null, ktx2TranscodeSupport: () => ({}),
-    pauseDescriptor: () => pause,
+    pauseDescriptor: () => pause, dangerousTrust: (trusted = true) => (trusted ? { firstParty: true } : {}),
   });
   if (typeof method !== 'function') throw new Error('Product options factory is not callable');
   const result: unknown = Reflect.apply(method, undefined, ['https://game.test/shardfiles/fixture/', true]);

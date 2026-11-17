@@ -56,8 +56,6 @@ export interface OutputDescriptorReader {
   /** A client may let its loading panel draw between complete schema checks. */
   pause?: () => Promise<void>;
   offline: boolean;
-  /** Only a matching build-pinned index and source receipt permits unchecked assembly. */
-  firstParty?: boolean;
   /** A previous visit read for its state lineage only: all sections remain hash-checked, but only identity/state are
    * returned, never admitted. The portable reader ignores obsolete host declarations; the caller checks state semantics. */
   lineage?: boolean;
