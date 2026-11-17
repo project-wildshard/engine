@@ -9,3 +9,7 @@
   twelve-sided convex prism per deck, published from Actions run 44100749664) parts by 0.
 - Pinned with `node scripts/pin-shard.ts far-reach 4 5bc5adcf… staging` (publish's own engine dispatch was skipped:
   no app token). The staging snapshot refresh also picks up the catalogue's current placements, as pin-shard does.
+- The first local gate (J400) went red on three fixtures cut from rev 3: Ring 1's server slice (re-cut with
+  `node scripts/pins.ts slice`), the released Far Reach save's proven pin (moved to rev 4; it still resumes in place and
+  keeps walking), and side parity's recorded page half (re-recorded with `scripts/side-parity.mjs --record
+  --shard=far-reach` on a fresh `pnpm build:game`: each deck is now one hull on the page as in the room, 0 findings).
