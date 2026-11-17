@@ -488,11 +488,11 @@ try {
           if (!warned) return { outcome: 'ui-fail', reason: 'Keep playing left no lasting warning', seen, shot: warnShot };
           // play goes on under the lasting warning: frames keep coming (a notice, not a card)
           const before = await frames(page); await sleep(3000);
-          const playing = await frames(page) > before + 10 && await page.locator('[role="alertdialog"]').count() === 0;
+          const moved = await frames(page) - before, cards = await page.locator('[role="alertdialog"]:visible').count(), playing = moved > 10 && cards === 0;
           db.fault('pass');
           const cleared = await gone('save-failed', 30_000), back = cleared && await recovered(page, 20_000);
           return back && playing ? { ...result, injection: { ...injection, refusedConnections: db.stats.refused }, shot, warning: warnShot, recovery: 'Keep playing: a lasting warning, play on; pass: the retried save lands and it clears' }
-            : { outcome: 'ui-fail', reason: !playing ? 'play stopped under the warning' : cleared ? 'no frames after the save landed' : 'the warning stayed after the save landed', seen, shot: warnShot };
+            : { outcome: 'ui-fail', reason: !playing ? `play stopped under the warning (${String(moved)} frames in 3 s, ${String(cards)} cards up)` : cleared ? 'no frames after the save landed' : 'the warning stayed after the save landed', seen, shot: warnShot };
         }
         db.fault('hold');
         const chip = await screen(page, 'save-slow', 110_000, started), chipShot = await shoot(page, item.id.replace('/', '-'), chip === null ? 'missing' : 'chip');
