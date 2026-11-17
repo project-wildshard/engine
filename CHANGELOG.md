@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.35 (2026-11-17)
+
+- Keep Template coins and goods when leaving and returning to a room.
+- Enter worlds from the new main screen with a detailed loading card.
+- Find every placed upload in Shard Select and load its far view reliably.
+- Keep a racked sword equipped after reloading the world.
+- Sign in through a mailed link and keep online world recovery in the world.
+
 ## v0.1.34 (2026-11-17)
 
 - Fix repeated Template whip attacks and melee hits on large enemies.
