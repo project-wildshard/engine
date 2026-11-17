@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.32 (2026-11-16)
+
+- Settings opens from the title screen on phones and desktop.
+- A brief connection drop while loading a world recovers when the connection returns.
+- Forced updates return quietly to the title screen.
+- A busy frame no longer triggers a false reconnect message.
+- Loading offers retry and connection help when the world’s address cannot be verified in time.
+
 ## v0.1.31 (2026-11-16)
 
 - Restore reliable world entry and full-screen loading from Shard Select.
