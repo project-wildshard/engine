@@ -66,6 +66,7 @@ class BloodFX {
     this.physics = physics;
     const mat = new THREE.PointsMaterial({ color: new THREE.Color(0.09, 0.004, 0.003), size: 0.035, sizeAttenuation: true, transparent: true, opacity: 0.95, depthWrite: false, map: makeDropTexture(), alphaTest: 0.3 });
     this.pool = new ParticlePool({ capacity: MAX_P, material: mat, renderOrder: 5, attributes: {}, parkY: -1000 }); // PointsMaterial draws every slot: the free ones wait far below
+    this.pool.settle(0); // NB8: no blood yet, no draw (after the first, which builds its program)
     this.group.add(this.pool.points);
     const dmat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0.035, 0.002, 0.002), roughness: 0.35, metalness: 0, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     sky.setupMaterial(dmat);
@@ -130,6 +131,7 @@ class BloodFX {
     }
     this.active = alive;
     this.pool.posAttr.needsUpdate = true;
+    this.pool.settle(alive);
   }
 }
 

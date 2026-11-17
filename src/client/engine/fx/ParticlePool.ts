@@ -31,6 +31,9 @@ export class ParticlePool<K extends string = never> {
   /** each declared attribute */
   readonly attr: Readonly<Record<K, THREE.BufferAttribute>>;
   private cursor = 0;
+  /** NB8 (mini-nb8d): the live particles its owner last counted (`settle`), -1 for a pool whose owner never counts */
+  private live = -1;
+  private drawn = false;
 
   constructor(spec: ParticlePoolSpec<K>) {
     const n = spec.capacity;
@@ -52,12 +55,25 @@ export class ParticlePool<K extends string = never> {
     this.points = new THREE.Points(g, spec.material);
     this.points.frustumCulled = false;
     this.points.renderOrder = spec.renderOrder;
+    this.points.onAfterRender = () => { this.drawn = true; if (this.live === 0) this.points.visible = false; };
+  }
+
+  /**
+   * NB8 (mini-nb8d): the owner's count of live particles after its step. A settled pool with none live hides once it has
+   * drawn: its parked or faded slots show nothing, but a visible pool cost a draw every frame (Nine's street drew the
+   * blood, splash and hit-star pools of every region, idle, 3 of its ~115). The first draw is kept, so the program and its
+   * pipeline exist before a burst needs them; `claim()` shows the pool again. A pool never settled draws every frame.
+   */
+  settle(alive: number): void {
+    this.live = alive;
+    if (alive === 0 && this.drawn) this.points.visible = false;
   }
 
   /** the next slot (the ring wraps onto the oldest) */
   claim(): number {
     const i = this.cursor;
     this.cursor = (this.cursor + 1) % this.capacity;
+    if (this.live >= 0) { this.live++; this.points.visible = true; }
     return i;
   }
 

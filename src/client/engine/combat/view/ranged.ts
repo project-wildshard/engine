@@ -287,6 +287,7 @@ export class Puffs {
       attributes: { aSize: { itemSize: 1, dynamic: true }, aAlpha: { itemSize: 1, dynamic: true }, aColor: { itemSize: 3, dynamic: false } },
     });
     this.points = this.pool.points;
+    this.pool.settle(0); // NB8: an idle pool draws nothing (after its first draw)
   }
 
   private tmpN = new THREE.Vector3();
@@ -330,6 +331,7 @@ export class Puffs {
       size[i] = (size[i] ?? 0) + dt * 0.06;
     }
     if (any) { this.pool.posAttr.needsUpdate = true; this.pool.attr.aAlpha.needsUpdate = true; this.pool.attr.aSize.needsUpdate = true; }
+    this.pool.settle(any ? 1 : 0);
   }
 }
 

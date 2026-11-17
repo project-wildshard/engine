@@ -82,6 +82,7 @@ class Stars {
     });
     this.pool = new ParticlePool({ capacity: STAR_COUNT, material: this.mat, renderOrder: 1001, attributes: { aAlpha: { itemSize: 1, dynamic: true }, aSize: { itemSize: 1, dynamic: true } } });
     this.points = this.pool.points;
+    this.pool.settle(0); // NB8: an idle pool draws nothing (after its first draw)
   }
   burst(point: THREE.Vector3, dir: THREE.Vector3, n = 9) {
     const { vel, life } = this.pool, { aAlpha: alpha, aSize: size } = this.pool.data;
@@ -106,6 +107,7 @@ class Stars {
       alpha[i] = life > 0 ? Math.min(1, life * 5) : 0;
     }
     if (any) { this.pool.posAttr.needsUpdate = true; this.pool.attr.aAlpha.needsUpdate = true; this.pool.attr.aSize.needsUpdate = true; }
+    this.pool.settle(any ? 1 : 0);
   }
 }
 

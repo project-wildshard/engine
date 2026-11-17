@@ -53,7 +53,7 @@ export class PopulationProjection {
     const map = scope.own(dropTexture()), material = scope.own(new THREE.PointsMaterial({ color: new THREE.Color(...row.splash.colour), size: row.splash.size,
       sizeAttenuation: true, transparent: true, opacity: row.splash.opacity, depthWrite: false, map, alphaTest: .3 }));
     this.drops = new ParticlePool({ capacity: row.splash.capacity, material, renderOrder: 5, attributes: {}, parkY: -1000 });
-    scope.own(this.drops.points.geometry); this.group.add(this.drops.points);
+    scope.own(this.drops.points.geometry); this.group.add(this.drops.points); this.drops.settle(0); // NB8: idle splashes draw nothing
     this.observers = row.effects.map(effect => ({ row: effect, actor: null, state: 0, elapsed: 0 }));
     // A body a server runs has no memory here but what its rows say: these views ask for theirs as a pose program does.
     for (const name of [...row.effects.flatMap(effect => [effect.state, effect.periodic.x, effect.periodic.z]), row.light.rise, row.light.rising]) poseInputNames.add(name);
@@ -167,7 +167,7 @@ export class PopulationProjection {
         alive++; const j = k * 3; vel[j + 1] = (vel[j + 1] ?? 0) - row.splash.gravity * step;
         for (let axis = 0; axis < 3; axis++) pos[j + axis] = (pos[j + axis] ?? 0) + (vel[j + axis] ?? 0) * step;
       }
-      this.active = alive; this.drops.posAttr.needsUpdate = true;
+      this.active = alive; this.drops.posAttr.needsUpdate = true; this.drops.settle(alive);
     }
     this.seatRowLights();
     for (const light of this.lights) {

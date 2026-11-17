@@ -4,12 +4,12 @@
  * looked the same. Each copy now reads distinct without a second product: its catalogue placement declares an `identity`
  * (data only, `catalogue.ts`): a HUD accent from the platform's 20 (the HUD swaps to it inside that cell, gridHud.ts) and
  * the cell-local spots where its number stands as a panel on its own structures (the tower landmark, each entry's set
- * piece). The panels are seven-segment digits in the copy's accent on a dark plate, built here as two merged meshes per
- * copy (≈ 2 draws, a few KB of vertices), unlit so they read through the haze, no collider (flush with or above the
+ * piece). The panels are seven-segment digits in the copy's accent on a dark plate, built here as one merged mesh per
+ * copy (one draw, a few KB of vertices; NB8: the plate and the digits were two), unlit so they read through the haze, no collider (flush with or above the
  * structure they name). A declared `layout` adds the copy's own landmarks on its plots (copyLayout.ts). A placement without
  * `identity` (every ordinary shard, the solo template) gets nothing.
  */
-import { BufferGeometry, Float32BufferAttribute, Group, Matrix4, Mesh, MeshBasicMaterial, Vector3 } from 'three';
+import { BufferGeometry, Color, Float32BufferAttribute, Group, Matrix4, Mesh, MeshBasicMaterial, Vector3 } from 'three';
 import { catalogueDocument } from '../../../shared/game/grid/catalogueDocument';
 import { ACCENTS } from '@wildshard/format/accent';
 import { parseGridCatalogue, type CopyIdentity } from '../../../shared/game/grid/catalogue';
@@ -87,12 +87,18 @@ export function copyMarks(instance: string, identity: CopyIdentity | undefined):
     pushQuad(plates, m, quads.plate, mark.size, 0.04);
     for (const q of quads.digits) pushQuad(digits, m, q, mark.size, 0.08);
   }
-  const geometry = (positions: number[]): BufferGeometry => { const g = new BufferGeometry(); g.setAttribute('position', new Float32BufferAttribute(positions, 3)); g.computeBoundingSphere(); return g; };
-  const digitGeometry = geometry(digits), plateGeometry = geometry(plates);
-  const digitMaterial = new MeshBasicMaterial({ color: ACCENTS[identity.accent] }), plateMaterial = new MeshBasicMaterial({ color: PLATE });
+  // NINE-DRAGON-BENCHMAX NB8 (mini-nb8d): the plates then the digits in one unlit draw, each vertex in its colour (linear,
+  // as the two materials held them); the digits stand 0.04 in front of their plate, so the order within the draw is the
+  // order the two draws had (the number's renderOrder 1)
+  const plateColour = new Color(PLATE), digitColour = new Color(ACCENTS[identity.accent]), colours: number[] = [];
+  for (let k = 0; k < plates.length / 3; k++) colours.push(plateColour.r, plateColour.g, plateColour.b);
+  for (let k = 0; k < digits.length / 3; k++) colours.push(digitColour.r, digitColour.g, digitColour.b);
+  const panelGeometry = new BufferGeometry();
+  panelGeometry.setAttribute('position', new Float32BufferAttribute([...plates, ...digits], 3)); panelGeometry.setAttribute('color', new Float32BufferAttribute(colours, 3));
+  panelGeometry.computeBoundingSphere();
+  const panelMaterial = new MeshBasicMaterial({ vertexColors: true });
   const object = new Group(); object.name = `copy-identity:${instance}`;
-  const plate = new Mesh(plateGeometry, plateMaterial), number = new Mesh(digitGeometry, digitMaterial);
-  plate.name = 'copy-identity-plate'; number.name = 'copy-identity-number'; number.renderOrder = 1;
-  object.add(plate, number); if (layout !== null) object.add(layout.mesh);
-  return { object, dispose: () => { digitGeometry.dispose(); plateGeometry.dispose(); digitMaterial.dispose(); plateMaterial.dispose(); layout?.dispose(); object.removeFromParent(); } };
+  const panels = new Mesh(panelGeometry, panelMaterial); panels.name = 'copy-identity-panels';
+  object.add(panels); if (layout !== null) object.add(layout.mesh);
+  return { object, dispose: () => { panelGeometry.dispose(); panelMaterial.dispose(); layout?.dispose(); object.removeFromParent(); } };
 }
