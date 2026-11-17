@@ -24,11 +24,19 @@ export function installDataRespawns(host: SimHost, rows: readonly RespawnRow[]):
     const body = host.entities.get(row.id); if (body === undefined) return;
     body.place(row.at[0], row.at[2], row.yaw, row.at[1]);
     body.revive();
+    host.flags.clear(`dead:${row.id}`);
     // A data cell keeps a dead body's motor (no body bands drop it): stand its capsule at the spawn, no sweep. Under body
     // bands a dead body has none, and the next sync makes one where it now stands.
     body.motor?.resetAt?.(body.position);
   };
   host.onStep(DATA_RESPAWN_STEP, (dt) => {
+    // Logical revision migration carries body health and flags, without adapter clocks or death events.
+    // Reconcile after restore, never during installation (exact restore still supplies its remaining wait).
+    for (const [id, row] of timed) {
+      const body = host.entities.get(id);
+      if (body?.alive === false && !waits.has(id) && row.respawn !== undefined) waits.set(id, row.respawn);
+      else if (body?.alive === true) host.flags.clear(`dead:${id}`);
+    }
     for (const [id, left] of waits) {
       const next = left - dt;
       if (next > 0) { waits.set(id, next); continue; }

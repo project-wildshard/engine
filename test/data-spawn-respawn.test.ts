@@ -7,6 +7,8 @@ import { createShardfileSim, bindShardfileSim, type ShardfileSimulation } from '
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
+import { questBooks } from '../src/shared/engine/quest/players';
+import { captureClientState, restoreClientState } from '../src/shared/game/shardfile/clientState';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 // TEMPLATE-E2E TC-E2 (J361): a data spawn's `respawn` (shard-format 0.5.8) brings its body back, whole, at its `at` that
@@ -61,4 +63,41 @@ test('a save mid-wait keeps the respawn clock', async () => {
     steps(restored, 60 * 2 - 2); expect(back.alive).toBe(false);
     steps(restored, 4); expect(back.alive).toBe(true);
   } finally { sim.dispose(); resumed?.dispose(); }
+});
+
+test('a respawn clears its death flag and a later MMO player can earn the next kill', async () => {
+  const f = fixture();
+  f.source.quests = { flags: ['bear.dead'], quests: [], dialogue: [], triggers: [{ id: 'bear-kill', kind: 'death', tag: 'creature.bandit', flag: 'bear.dead' }] };
+  const sim = createShardfileSim(f.source, f.assets, { sections: f.sections, rapier: await rapier });
+  try {
+    kill(sim, 'back'); sim.host.step();
+    expect(sim.host.flags.has('dead:back')).toBe(true);
+    steps(sim.host, 60 * 5 + 2);
+    expect(sim.host.flags.has('dead:back')).toBe(false);
+    sim.host.addPlayer('late-player', { x: 0, y: 0, z: 0 });
+    expect(questBooks(sim.host).of('late-player').flags.has('bear.dead')).toBe(false);
+    kill(sim, 'back'); sim.host.step();
+    expect(questBooks(sim.host).of('late-player').flags.has('bear.dead')).toBe(true);
+  } finally { sim.dispose(); }
+});
+
+test('a new revision carries a dead body and resumes its authored timer without the old clock', async () => {
+  const f = fixture(), R = await rapier, sim = createShardfileSim(f.source, f.assets, { sections: f.sections, rapier: R });
+  let next: ShardfileSimulation | undefined;
+  try {
+    kill(sim, 'back'); kill(sim, 'gone'); sim.host.step();
+    const saved = captureClientState(f.source, sim, new Map());
+    f.source.identity.revision++;
+    next = createShardfileSim(f.source, f.assets, { sections: f.sections, rapier: R });
+    expect(restoreClientState(f.source, next, new Map(), saved)).toBe(true);
+    const body = next.host.entities.get('back'); if (body === undefined) throw new Error('Missing body');
+    expect(body.alive).toBe(false);
+    next.host.step(); // reconstruct the missing timer, then spend asleep time as declared homes do
+    next.host.events.emit('world.slept', { seconds: 6 });
+    steps(next.host, 2);
+    expect(body.alive).toBe(true);
+    expect(next.host.flags.has('dead:back')).toBe(false);
+    expect(next.host.entities.get('gone')?.alive).toBe(false);
+    expect(next.host.flags.has('dead:gone')).toBe(true);
+  } finally { sim.dispose(); next?.dispose(); }
 });
