@@ -14,4 +14,4 @@ const files=shard[phase];
 if(files.length===0)throw new Error('An empty phase must not run Vitest');
 for(const file of files)readFileSync(file);
 // oxlint-disable-next-line import/no-default-export -- Vitest's config entry point.
-export default defineConfig(withTestEnvironments({...base,test:{...base.test,include:files,maxWorkers:phase==='native'?1:2,isolate:true,pool:'forks',sequence:{sequencer:EngineCISequencer}}}));
+export default defineConfig(withTestEnvironments({...base,test:{...base.test,include:files,maxWorkers:phase==='native'?1:plan.ordinaryWorkers,isolate:true,pool:'forks',sequence:{sequencer:EngineCISequencer}}}));

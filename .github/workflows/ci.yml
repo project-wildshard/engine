@@ -192,7 +192,7 @@ jobs:
         run: node scripts/test-timings.mjs fetch --strict --before="$WS_CI_EXCLUSION_AT"
       - name: Plan the smallest useful shards from actual discovery
         if: steps.code.outputs.run == 'true'
-        run: node scripts/engine-ci-plan.ts
+        run: node scripts/engine-ci-plan.ts --ordinary-workers=3
       # The packed static unit shellchecks the agent hook scripts at this exact version
       # (.agents/hooks/test/shellcheck.test.mjs refuses any other on CI).
       # Meta HOW-WE-BUILD MR6: hosted runners are Linux/X64, the Mac mini's VM

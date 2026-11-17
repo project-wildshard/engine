@@ -11,8 +11,10 @@ import {CI_NATIVE_GROUPS} from './vitest-ci-files.ts';
 const number=v.pipe(v.number(),v.finite(),v.minValue(0));
 const positive=v.pipe(v.number(),v.integer(),v.minValue(1));
 const paths=v.array(v.string());
+const width=v.picklist([1,2,3]);
+const LEGACY_WIDTH=2;
 const schema=v.object({version:v.literal(1),sha:v.string(),ring:v.picklist(['full','1']),inventoryHash:v.string(),
-  files:paths,unknown:paths,count:positive,setupSeconds:number,factor:number,
+  files:paths,unknown:paths,count:positive,setupSeconds:number,factor:number,ordinaryWorkers:v.optional(width,LEGACY_WIDTH),
   curve:v.array(v.object({count:positive,seconds:number,gain:number})),
   shards:v.array(v.object({index:positive,native:paths,ordinary:paths,expectedSeconds:number})),
   timings:v.optional(v.picklist(['measured','default']))});
@@ -44,7 +46,8 @@ export function readEnginePlan(file:string,expected?:readonly string[]):EnginePl
   return plan;
 }
 
-export function createEnginePlan(ring:'full'|'1',files:readonly string[]):EnginePlan{
+export function createEnginePlan(ring:'full'|'1',files:readonly string[],ordinaryWorkers:EnginePlan['ordinaryWorkers']=LEGACY_WIDTH):EnginePlan{
+  v.parse(width,ordinaryWorkers);
   // LS2 (J250): the weights are main's last measured run (scripts/test-timings.mjs), not a committed file.
   const baseline=readWeights(ring),measured=Object.keys(baseline).length>0;
   // An unmeasured file must satisfy the existing sixty-second CI file gate.
@@ -65,11 +68,11 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
     const units=files.filter(file=>!grouped.has(file));
     const cost=new Map(units.map(file=>[file,weights.get(file)??fallback]));
     const sum=(members:readonly string[]):number=>members.reduce((total,file)=>total+(weights.get(file)??fallback),0);
-    for(const group of nativeGroups){units.push(group.name);cost.set(group.name,2*sum(group.files));}
+    for(const group of nativeGroups){units.push(group.name);cost.set(group.name,ordinaryWorkers*sum(group.files));}
     const shards=(count:number):EnginePlan['shards']=>packShards(units,cost,count,0).map((members,index)=>{
       const native=members.flatMap(name=>nativeGroups.find(group=>group.name===name)?.files??[]);
       const ordinary=members.filter(name=>!name.startsWith('@native:'));
-      const normal=packShards(ordinary,weights,2,0);
+      const normal=packShards(ordinary,weights,ordinaryWorkers,0);
       return {index:index+1,native,ordinary,expectedSeconds:setupSeconds+(sum(native)+Math.max(0,...normal.map(sum)))*factor};
     });
     const curve=Array.from({length:maxShards},(_,index)=>({count:index+1,seconds:Math.max(...shards(index+1).map(shard=>shard.expectedSeconds)),gain:0}));
@@ -105,13 +108,16 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
   }
   const {shards,curve}=plan;
   return {version:1,sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),ring,files:[...files],inventoryHash:digest(files),
-    unknown,count:selected.count,setupSeconds,factor,curve,shards:shards(selected.count),timings:measured?'measured':'default'};
+    unknown,count:selected.count,setupSeconds,factor,ordinaryWorkers,curve,shards:shards(selected.count),timings:measured?'measured':'default'};
 }
 
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const ring=process.argv.includes('--ring=1')?'1':'full',out=process.argv.find(arg=>arg.startsWith('--out='))?.slice(6)??'tmp/engine-ci/plan.json';
-  const plan=createEnginePlan(ring,discoverEngineTests(ring));mkdirSync(dirname(out),{recursive:true});writeFileSync(out,`${JSON.stringify(plan,null,2)}\n`);
+  const widthArgs=process.argv.slice(2).filter(arg=>arg==='--ordinary-workers'||arg.startsWith('--ordinary-workers='));
+  if(widthArgs.length>1||widthArgs.some(arg=>!/^--ordinary-workers=[1-3]$/u.test(arg)))throw new Error('Use one --ordinary-workers=1, =2 or =3');
+  const ordinaryWorkers=widthArgs.length===0?LEGACY_WIDTH:v.parse(width,Number(widthArgs[0]?.slice('--ordinary-workers='.length)));
+  const plan=createEnginePlan(ring,discoverEngineTests(ring),ordinaryWorkers);mkdirSync(dirname(out),{recursive:true});writeFileSync(out,`${JSON.stringify(plan,null,2)}\n`);
   readEnginePlan(out,plan.files);
-  console.log(JSON.stringify({ring:plan.ring,timings:plan.timings,files:plan.files.length,unmeasured:plan.unknown.length,selected:plan.count,curve:plan.curve}));
+  console.log(JSON.stringify({ring:plan.ring,timings:plan.timings,files:plan.files.length,unmeasured:plan.unknown.length,selected:plan.count,ordinaryWorkers:plan.ordinaryWorkers,curve:plan.curve}));
   const {GITHUB_OUTPUT:output}=process.env;if(output!==undefined){const {appendFileSync}=await import('node:fs');appendFileSync(output,`matrix=${JSON.stringify({shard:plan.shards.map(shard=>shard.index)})}\n`);}
 }

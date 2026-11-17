@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, afterEach, expect, test } from 'vitest';
 import { collectTimings, readTimings, readWeights, timingsDir, writeTimings } from '../scripts/test-timings.mjs';
-import { createEnginePlan } from '../scripts/engine-ci-plan.ts';
+import { createEnginePlan, readEnginePlan } from '../scripts/engine-ci-plan.ts';
 import { readDurations } from '../scripts/test-shard-plan.ts';
 import amberRun from './fixtures/ci/amber-43792777770.json' with { type: 'json' };
 import shardSeven from './fixtures/ci/amber-44148096662.json' with { type: 'json' };
@@ -51,6 +51,23 @@ test('readers share one table, and with none they get defaults instead of a comm
   write(join(scratch, 'bad/timings.json'), { version: 1, run: '7', sha: 'c', full: { 'test/a.test.ts': -1 }, ring1: {} });
   process.env['WS_TIMINGS_DIR'] = join(scratch, 'bad');
   expect(readTimings()).toBeNull();
+});
+
+test('the exact plan uses its ordinary width for both cost and dispatch', () => {
+  const files = Array.from({ length: 6 }, (_, index) => `test/ordinary-${String(index)}.test.ts`);
+  process.env['WS_TIMINGS_DIR'] = join(scratch, 'width');
+  writeTimings({ version: 1, run: '11', sha: 'd'.repeat(40), measuredAt: 2, full: Object.fromEntries(files.map(file => [file, 10])), ring1: {} });
+  const legacy = createEnginePlan('full', files), widened = createEnginePlan('full', files, 3);
+  expect(legacy.curve[0]?.seconds).toBe(legacy.setupSeconds + 30 * legacy.factor);
+  expect(widened.curve[0]?.seconds).toBe(widened.setupSeconds + 20 * widened.factor);
+  const path = join(scratch, 'width/plan.json');
+  write(path, widened);
+  expect(readEnginePlan(path, files).ordinaryWorkers).toBe(3);
+  const { ordinaryWorkers: _ordinary, ...historic } = legacy;
+  write(path, historic);
+  expect(readEnginePlan(path, files).ordinaryWorkers).toBe(2);
+  write(path, { ...widened, ordinaryWorkers: 4 });
+  expect(() => readEnginePlan(path, files)).toThrow();
 });
 
 test('the planner uses the table when it has one, and on a miss plans every shard it may and says so', () => {
