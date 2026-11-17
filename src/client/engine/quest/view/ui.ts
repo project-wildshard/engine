@@ -119,14 +119,14 @@ export class RaceClockChip {
  *  (Shift; on a phone, the stick pushed all the way). Leaving is the vehicle's own prompt. */
 export class SteerChip {
   readonly scope: Scope;
-  readonly root: HTMLDivElement = el('div', 'ws-steer');
-  private readonly bar = el('div', 'ws-steer-bar', this.root);
-  private readonly fill = el('div', 'ws-steer-fill', this.bar);
-  private readonly boost = el('div', 'ws-steer-boost', this.root);
+  readonly root: HTMLDivElement = el('div', 'ws-quest-steer');
+  private readonly bar = el('div', 'ws-quest-steer-bar', this.root);
+  private readonly fill = el('div', 'ws-quest-steer-fill', this.bar);
+  private readonly boost = el('div', 'ws-quest-steer-boost', this.root);
   constructor(owner: Scope) {
     this.scope = uiScope('steer-ride', owner); mountUi(this.root, this.scope, hudRoot());
-    el('span', 'ws-steer-key', this.boost).textContent = engineString('s_steer_boost_key');
-    el('span', 'ws-steer-touch', this.boost).textContent = engineString('s_steer_boost_touch');
+    el('span', 'ws-quest-steer-key', this.boost).textContent = engineString('s_steer_boost_key');
+    el('span', 'ws-quest-steer-touch', this.boost).textContent = engineString('s_steer_boost_touch');
   }
   show(ride: { readonly speed: number; readonly boosting: boolean } | null): void {
     this.root.classList.toggle('show', ride !== null);

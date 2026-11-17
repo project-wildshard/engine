@@ -38,21 +38,21 @@
 #hud.intro .ws-quest-race { display: none; }
 
 /* ── SS-MS2a3: a steer ride's chip, bottom centre: the speed bar, BOOST lit while it boosts ── */
-.ws-steer {
+.ws-quest-steer {
   position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); transform: translate(-50%, 6px); width: min(60vw, 260px);
   padding: 6px 12px; display: flex; flex-direction: column; gap: 5px; pointer-events: none; opacity: 0; transition: opacity 0.25s, transform 0.25s;
   background: var(--ws-glass); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
-.ws-steer.show { opacity: 1; transform: translate(-50%, 0); }
-.ws-steer-bar { height: 4px; background: rgba(255, 255, 255, 0.12); }
-.ws-steer-fill { height: 100%; width: 0; background: var(--ws-cyan); transition: width 0.1s linear; }
-.ws-steer.boosting .ws-steer-fill { background: var(--ws-amber); }
-.ws-steer-boost { font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); text-align: center; }
-.ws-steer.boosting .ws-steer-boost { color: var(--ws-amber); }
-.ws-steer-touch, #hud.touch .ws-steer-key { display: none; }
-#hud.touch .ws-steer-touch { display: inline; }
-#hud.touch .ws-steer { bottom: calc(env(safe-area-inset-bottom, 0px) + 170px); }
-#hud.intro .ws-steer { display: none; }
+.ws-quest-steer.show { opacity: 1; transform: translate(-50%, 0); }
+.ws-quest-steer-bar { height: 4px; background: rgba(255, 255, 255, 0.12); }
+.ws-quest-steer-fill { height: 100%; width: 0; background: var(--ws-cyan); transition: width 0.1s linear; }
+.ws-quest-steer.boosting .ws-quest-steer-fill { background: var(--ws-amber); }
+.ws-quest-steer-boost { font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); text-align: center; }
+.ws-quest-steer.boosting .ws-quest-steer-boost { color: var(--ws-amber); }
+.ws-quest-steer-touch, #hud.touch .ws-quest-steer-key { display: none; }
+#hud.touch .ws-quest-steer-touch { display: inline; }
+#hud.touch .ws-quest-steer { bottom: calc(env(safe-area-inset-bottom, 0px) + 170px); }
+#hud.intro .ws-quest-steer { display: none; }
 
 /* ── dialogue: a glass panel above the touch bar / the bottom of the screen ── */
 .ws-quest-talk { position: absolute; z-index: calc(var(--ws-layer-hud) + 7); left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); width: min(92vw, 560px); transform: translate(-50%, 12px); opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; padding: 12px 16px 12px 16px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 14px 40px rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
