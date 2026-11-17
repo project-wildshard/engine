@@ -468,13 +468,38 @@ async function contentRead(request) {
     if (held !== undefined && !isHtml(held)) return held;
   } catch { stores.delete(CONTENT_CACHE); /* Storage denial keeps online fetch working. */ }
   let response;
-  if (request.mode !== 'no-cors') response = await fetch(request);
-  else {
-    try { response = await fetch(corsRequest(request)); }
-    catch { return fetch(request); }
+  try {
+    if (request.mode !== 'no-cors') response = await fetch(request);
+    else {
+      try { response = await fetch(corsRequest(request)); }
+      catch { return await fetch(request); }
+    }
+  } catch (error) {
+    const copy = key === request.url ? undefined : await pageCopy(request.url, key);
+    if (copy !== undefined) return copy;
+    throw error;
   }
   if (cache !== undefined && keepContent(response)) await cache.put(key, response.clone()).catch(() => undefined);
   return response;
+}
+
+/** OFFLINE OF21: a content read the network can't answer (offline) is answered by this origin's copy of the same named file,
+ *  when the asset cache holds one. The precache keeps the boot tables, and the spawn download keeps a level's members, under
+ *  their page URLs (J138), so a reopen offline after a short online visit holds every byte its entry reads, though the content
+ *  cache never saw them. Only a content-named or versioned file (its key differs from its URL): the same name is the same bytes.
+ *  @param {string} href @param {string} key */
+async function pageCopy(href, key) {
+  if (CONTENT_URL === undefined) return undefined;
+  const address = new URL(href), keyed = new URL(key);
+  const path = address.pathname.slice(CONTENT_URL.pathname.length - 1);
+  try {
+    const assets = await store(ASSETS);
+    for (const search of new Set([address.search, keyed.search])) {
+      const held = await assets.match(new URL(`${path}${search}`, self.location.origin).href, MATCH);
+      if (held !== undefined && held.status === 200 && !isHtml(held)) return held;
+    }
+  } catch { /* storage denial: the read fails as it would have */ }
+  return undefined;
 }
 
 /** The document baked into this worker: its build's own page, whatever URL asked (the page reads its route from the URL). */

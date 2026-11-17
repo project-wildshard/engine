@@ -689,6 +689,22 @@ test('PZ10: the content cache stores only a cors 200, never an opaque answer or 
   expect(await (await f.open(CONTENT_CACHE)).keys()).toEqual([]);
 });
 
+test('OF21: offline, a named content read the content cache misses is answered by the page-URL copy the asset cache holds', async () => {
+  const f = fixture(() => Promise.reject(new TypeError('Failed to fetch'))), worker = f.load('A', [], [], { base });
+  const assets = await f.open(ASSET_CACHE_NAME);
+  const member = '/shardfiles/fx/sections/world/terrain.json?v=0123abcd', tables = '/assets/boot-tables-e42a1de3.json', plain = '/shardfiles/fx/shard.json';
+  for (const path of [member, tables, plain]) await assets.put(url(path), new Response(`page:${path}`));
+  expect(await (await worker.dispatch('fetch', { request: new Request(`${base}${member.slice(1)}`) }))?.text()).toBe(`page:${member}`);
+  expect(await (await worker.dispatch('fetch', { request: new Request(`${base}${tables.slice(1)}`) }))?.text()).toBe(`page:${tables}`);
+  // a mutable name may differ from the page's copy: it fails as before
+  await expect(worker.dispatch('fetch', { request: new Request(`${base}${plain.slice(1)}`) })).rejects.toThrow('Failed to fetch');
+  // online, the network still answers (the page copy is only the offline fallback)
+  f.fetch.mockImplementation((input: Request | string) => Promise.resolve(typed(`cdn:${typeof input === 'string' ? input : input.url}`, 'cors')));
+  const fresh = '/shardfiles/fx/sections/world/water.json?v=89abcdef';
+  await assets.put(url(fresh), new Response('page copy'));
+  expect(await (await worker.dispatch('fetch', { request: new Request(`${base}${fresh.slice(1)}`) }))?.text()).toBe(`cdn:${base}${fresh.slice(1)}`);
+});
+
 test('PZ10: no activate deletes ws-content-v1', async () => {
   const f = fixture(request => Promise.resolve(typed(`cdn:${request.url}`, 'cors')));
   const first = f.load('A', ['/b/A/a-aaaaaaaa.js'], [], { base });
