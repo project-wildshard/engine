@@ -36,12 +36,6 @@ export const CI_NATIVE_GROUPS = {
   // cook-stale-preparation.test.ts, which passed the 60 s file budget, it keeps the same no-neighbour placement.
   'native-cook-stale': ['test/cook-stale-preparation-worker.test.ts'],
   'native-cook-cpu': ['test/cook-cpu-limit.test.ts'],
-  // EV6 real original-file controls must have the same no-sibling placement.
-  'native-contention': [
-    'test/tooling/native-contention-net.test.mjs',
-    'test/tooling/native-contention-nalati.test.mjs',
-    'test/tooling/native-contention-shards.test.mjs',
-  ],
   'driftwood-population': [
     'test/driftwood-headless-population.test.ts',
   ],
@@ -84,13 +78,13 @@ export const CI_NATIVE_GROUPS = {
   ],
 } as const;
 export const CI_SERIAL_TESTS = Object.values(CI_NATIVE_GROUPS).flat();
+/** Real files whose before-collection admission also gets a serial nightly rehearsal. */
+export const NATIVE_CONTENTION_SUITES = [
+  'test/net-fuzz.test.ts', 'test/physics-nalati-headless.test.ts', 'test/physics-shards-headless.test.ts',
+] as const;
 /** Timing, uncapped encoding and load-sensitive cold native setup own the full
  * budget before collection. Split gates leave these files to hosted CI. */
 export const CPU_EXCLUSIVE_TESTS = [
   'test/net-bots.test.ts', 'test/net-bots-driftwood.test.ts', 'test/cook-cpu-limit.test.ts',
-  // EV6: these original native setup clocks expired beside other admitted work.
-  'test/net-fuzz.test.ts', 'test/physics-nalati-headless.test.ts', 'test/physics-shards-headless.test.ts',
-  // The real-process regression runs the original suites in a private ledger;
-  // its outer grant still accounts for their actual machine CPU work.
-  ...CI_NATIVE_GROUPS['native-contention'],
+  ...NATIVE_CONTENTION_SUITES,
 ] as const;

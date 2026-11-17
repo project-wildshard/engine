@@ -2,7 +2,7 @@ import { afterAll, expect, it } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
 import {execFileSync} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
-import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
 import {join, resolve} from 'node:path';
 import {BROWSER_TESTS, LOCAL_FILE_SECONDS, MAIN_PUSH_SPLIT, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, mainPushed, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
@@ -11,6 +11,22 @@ import { capRelated, folderReaderTests, scriptScenarioTests, pushGuards, forceRe
 
 const durations = new Map([['test/slow.test.ts', 40], ['test/cheap.test.ts', 1], ['test/mid.test.ts', 8], ['test/cover-grid.test.ts', 30]]);
 const related = [...durations.keys()];
+
+it('runs native contention rehearsals outside the full gate and keeps original file admission', () => {
+  const rehearsals = ['net', 'shards', 'nalati'].map(name => `test/tooling/native-contention-${name}.test.mjs`);
+  const nightlyTests: unknown = JSON.parse(readFileSync('test/pins/ring-2-tests.json', 'utf8'));
+  expect(rehearsals.filter(file => existsSync(file) || NATIVE_TESTS.includes(file) || TIMING_TESTS.includes(file))).toEqual([]);
+  for (const file of rehearsals) expect(nightlyTests).not.toContain(file);
+  for (const file of ['test/net-fuzz.test.ts', 'test/physics-shards-headless.test.ts', 'test/physics-nalati-headless.test.ts']) {
+    expect(NATIVE_TESTS).toContain(file);
+    expect(TIMING_TESTS).toContain(file);
+  }
+  const nightly = readFileSync('.github/workflows/nightly.yml', 'utf8');
+  const isolated = /^  native-contention:\n((?: {4}.*\n|\n)+)/mu.exec(nightly)?.[1];
+  expect(isolated).toContain('runs-on: ubuntu-24.04');
+  expect(isolated).toContain('node scripts/native-contention-proof.mjs tmp/ci-native-contention');
+  expect(isolated).not.toContain('matrix:');
+});
 
 it('requires guards and limits forced reruns to root configuration', () => {
   const fixed = ['test/host-callbacks.test.ts', 'test/shardfile-boundaries.test.ts',

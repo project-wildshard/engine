@@ -6,10 +6,12 @@ import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {join,resolve as resolvePath} from 'node:path';
 import {holdCpu} from './cpu-admission.mjs';
 import {startCpuBroker} from './cpu-broker.mjs';
+import {NATIVE_CONTENTION_SUITES} from './vitest-ci-files.ts';
 
 const repo=process.cwd(),directory=resolvePath(process.argv[2]??'tmp/native-contention',`run-${process.pid}`);
 mkdirSync(directory,{recursive:true});
-const original=['test/net-fuzz.test.ts','test/physics-nalati-headless.test.ts','test/physics-shards-headless.test.ts'];
+/** @type {readonly string[]} */
+const original=NATIVE_CONTENTION_SUITES;
 const selected=process.argv[3];
 assert.ok(selected===undefined||original.includes(selected),'Unknown native contention file');
 const files=selected===undefined?original:[selected];

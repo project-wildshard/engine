@@ -118,6 +118,41 @@ jobs:
           path: tmp/nightly/reports/tests-*.json
           if-no-files-found: error
           retention-days: 7
+  # EV6: run the three original-file contention rehearsals under one outer
+  # machine grant on a dedicated runner. Their nested proofs stay out of the
+  # local full gate and out of the Ring 2 matrix that feeds the release verdict.
+  native-contention:
+    if: ${{ github.event_name == 'schedule' || inputs.suite_only }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    continue-on-error: true
+    env:
+      WS_LANE_NAME: native-contention
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - run: pnpm pins && pnpm gen:inputs
+      - name: Choose a bounded replayable network fuzz seed
+        run: echo "NET_FUZZ_SEEDS=$(node scripts/nightly-seed.ts "$GITHUB_RUN_ID")" >> "$GITHUB_ENV"
+      - run: node scripts/scratch-dir.mjs ci-native-contention 'Serial native CPU-admission rehearsals'
+      - name: Prove all three original files queue and pass in order
+        run: |
+          set -o pipefail
+          node scripts/native-contention-proof.mjs tmp/ci-native-contention | tee tmp/ci-native-contention/result.json
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-contention-serial
+          path: |
+            tmp/ci-native-contention/result.json
+            tmp/ci-native-contention/run-*/native-*.log
+          retention-days: 7
+          if-no-files-found: ignore
   heads:
     if: ${{ !inputs.cook_cache_only && !inputs.api_health_only && !inputs.suite_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
     needs: plan
