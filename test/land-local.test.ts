@@ -3,8 +3,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Install and inspect owned fixture hooks.
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-// oxlint-disable-next-line import/no-nodejs-modules -- The queue tests coordinate independent clones over loopback.
-import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve fixture and script paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
