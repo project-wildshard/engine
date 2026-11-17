@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 
 /** Require an actual queued machine-lane ancestor, rather than trusting a copied environment flag.
- * @param {'full-test'|'build'} resource
+ * @param {'full-test'|'build'|'full-gate'} resource
  * @param {NodeJS.ProcessEnv} [env]
  */
 export function assertHeavyLease(resource, env = process.env) {

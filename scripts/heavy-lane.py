@@ -24,8 +24,8 @@ import uuid
 # G620: three app-build slots; pre-push never acquires a build lease.
 # Keep the original build lock as slot one so running old wrappers remain accounted for.
 BUILD_SLOTS = ('build', 'build-2', 'build-3')
-RESOURCES = {'full-test': ('full-test',), 'build': ('build',), 'check': ('full-test', 'build')}
-LANES = ('full-test', *BUILD_SLOTS)
+RESOURCES = {'full-test': ('full-test',), 'full-gate': ('full-gate',), 'build': ('build',), 'check': ('full-test', 'build')}
+LANES = ('full-test', 'full-gate', *BUILD_SLOTS)
 WAIT_SECONDS = 5 * 60
 
 
@@ -157,6 +157,42 @@ def read_entry(path):
         return json.loads(path.read_text())
     except (OSError, ValueError):
         return {}
+
+
+def active_gate(root):
+    with (root / 'full-gate.lock').open('a+') as probe:
+        try:
+            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return None
+        except BlockingIOError:
+            return read_entry(root / 'full-gate.active.json')
+
+
+def report_gate_position(root, entry, previous):
+    """Observe the FIFO under its scheduler; kernel locks decide admission."""
+    with scheduler(root) as state:
+        pending = sorted((row for row in state['queue'] if 'full-gate' in row['resources']),
+                         key=lambda row: (row['priority'], row['ticket']))
+        active = active_gate(root)
+        earlier = [row for row in pending if row['ticket'] < entry['ticket']]
+        position = 1 + len(earlier) + (active is not None)
+        owner = active if active is not None else (earlier[0] if earlier else {})
+        branch = identity(owner['cwd']).get('branch') if owner.get('cwd') else None
+        key = (position, owner.get('pid'), owner.get('lane'), branch)
+        if key == previous:
+            return previous
+        label = ('lane=%s pid=%s branch=%s' % (owner.get('lane', 'unknown'),
+                 owner.get('pid', 'unavailable'), branch or 'unknown')) if owner else 'none'
+        message = 'full-gate queue position %s; holder %s' % (position, label)
+        receipt = Path(os.environ.get('WS_LANE_RECEIPTS', str(Path.home() / '.cache/wildshard/lane-receipts.log')))
+        receipt.parent.mkdir(parents=True, exist_ok=True)
+        own_branch = identity(entry['cwd']).get('branch') or 'unknown'
+        line = '%s UTC %s land %s %s' % (datetime.now(timezone.utc).strftime('%H:%M'),
+                                        entry['lane'], own_branch, message)
+        with receipt.open('a') as stream:
+            stream.write(line[:200] + '\n')
+        print('heavy-lane: ' + message, file=sys.stderr, flush=True)
+        return key
 
 
 def wait_label(seconds):
@@ -551,7 +587,7 @@ def mirror_first(command, wrapper):
 
 def launch_command(kind, command, env):
     """G668: foreground gen/build callers keep normal QoS; background work yields."""
-    if kind == 'full-test' and env.get('WS_PUSH_GATE_PROFILE') == 'full-v1':
+    if kind == 'full-gate' or kind == 'full-test' and env.get('WS_PUSH_GATE_PROFILE') == 'full-v1':
         # J192: a real queued push owns the complete CPU profile, not a focused lane.
         return command
     launch = command if 'build' in RESOURCES[kind] else ['nice', '-n', '10', *command]
@@ -672,13 +708,16 @@ def main():
     admission_wait_seconds = WAIT_SECONDS if args.admission_wait_seconds is None else args.admission_wait_seconds
     if not math.isfinite(admission_wait_seconds) or not 0 < admission_wait_seconds <= 6000:
         parser.error('admission wait must be positive and at most 6000 seconds')
-    if args.admission_wait_seconds is not None and args.kind != 'full-test':
-        parser.error('explicit admission waiting is only supported for full-test gates')
+    if args.admission_wait_seconds is not None and args.kind not in ('full-test', 'full-gate'):
+        parser.error('explicit admission waiting is only supported for full-test/full-gate gates')
     if args.checkout_scope and args.kind != 'full-test':
         parser.error('checkout scope is only valid for a coordinated full-test gate')
     if args.background:
         os.environ['WS_HEAVY_BACKGROUND'] = '1'
     root = Path(os.environ.get('WS_HEAVY_SCHEDULER_ROOT', os.environ.get('WS_HEAVY_ROOT', str(Path.home() / '.wildshard-heavy-lanes')))).resolve()
+    if args.kind == 'full-gate':
+        # Deliberately independent of checkout-scoped heavy/CPU views.
+        root = Path(os.environ.get('WS_FULL_GATE_ROOT', str(Path.home() / '.wildshard-heavy-lanes'))).resolve()
     root.mkdir(parents=True, exist_ok=True)
     if args.kind == 'status':
         print(json.dumps(status(root), indent=2))
@@ -736,7 +775,7 @@ def main():
     if args.kind in ('full-test', 'check') and not full_suite_allowed():
         print(FULL_SUITE_REFUSAL, file=sys.stderr)
         return 2
-    if os.environ.get('WS_HEAVY_TOKEN'):
+    if os.environ.get('WS_HEAVY_TOKEN') and args.kind != 'full-gate':
         parser.error('cannot upgrade an inherited lane; release it before requesting different resources')
     token = uuid.uuid4().hex
     entry = {'token': token, 'pid': os.getpid(), 'runnerPid': os.getpid(), 'childPid': None,
@@ -762,13 +801,23 @@ def main():
     signal.signal(signal.SIGINT, interrupted)
     try:
         with scheduler(root, deadline, admission_wait_seconds) as state:
+            if args.kind == 'full-gate':
+                owners = [row for row in state['queue'] if 'full-gate' in row['resources']]
+                active = active_gate(root)
+                if active is not None:
+                    owners.append(active)
+                if any(row.get('cwd') == entry['cwd'] for row in owners):
+                    raise RuntimeError('land already queued or active for this worktree')
             entry['ticket'] = state['next']
             state['next'] += 1
             state['queue'].append(entry)
         print('heavy-lane: queued ' + args.kind + ' ticket ' + str(entry['ticket']), file=sys.stderr, flush=True)
+        gate_position = None
         while held is None:
             if time.monotonic() >= deadline:
                 raise queue_timeout(root, entry)
+            if args.kind == 'full-gate':
+                gate_position = report_gate_position(root, entry, gate_position)
             held = acquire(root, entry, deadline)
             if held is None:
                 if cpu_parent is not None:
@@ -783,6 +832,10 @@ def main():
         compat = write_compat(root, entry)
         env = {**os.environ, 'WS_HEAVY_TOKEN': token, 'WS_HEAVY_ROOT': str(compat),
                'WS_HEAVY_SCHEDULER_ROOT': str(root)}
+        if args.kind == 'full-gate':
+            # Coordination grants no CPU/build authority. Land removes these
+            # controller credentials before starting its hook/proof runtime.
+            env = {**os.environ, 'WS_FULL_GATE_TOKEN': token, 'WS_FULL_GATE_ROOT': str(root)}
         # Nested wrappers inherit their owner's QoS; CI has no taskpolicy.
         launch = launch_command(args.kind, command, env)
         if args.kind == 'build' and not service:

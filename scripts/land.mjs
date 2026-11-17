@@ -21,6 +21,7 @@ import {GitHubLimitError,backoffMs,ghFailure,readerEnv} from './gh-limit.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 import {assertNoLocalCandidates} from './local-candidates.ts';
 import {beginLocalHook} from './land-hook-ack.mjs';
+import {assertHeavyLease} from './heavy-lane-lease.mjs';
 
 /** The hosted workflows a landing needs green, by workflow name (J195, J240). */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
@@ -92,19 +93,19 @@ function remoteRejection(output){
 }
 
 /** Run git with its stderr shown live (the pre-push's progress) and kept, for the receipt's cause.
- * @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} env
+ * @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} env @param {string} [command]
  * @returns {Promise<{status:number,stdout:string,stderr:string,interrupted:boolean,hookGreen:boolean}>} */
-function gitTee(cwd,args,env){
+function gitTee(cwd,args,env,command='git'){
  return new Promise(_resolve=>{
   // WL22's keepalive policy also belongs to the parent SSH session: the
   // pre-push may spend minutes in a full gate before Git sends main.
   /** @type {NodeJS.ProcessEnv} */
   const network={...env,GIT_SSH_COMMAND:env.GIT_SSH_COMMAND??'ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes'};
-  const localHead=/^local:([a-f0-9]{40})$/u.exec(env.WS_LAND_MAIN_PUSH??'')?.[1];
+  const localHead=command==='git'?/^local:([a-f0-9]{40})$/u.exec(env.WS_LAND_MAIN_PUSH??'')?.[1]:undefined;
   const ack=localHead===undefined?null:beginLocalHook(cwd,localHead);
   Reflect.deleteProperty(network,'WS_LAND_HOOK_ACK');
   if(ack!==null)network.WS_LAND_HOOK_ACK=ack.token;
-  const groups=process.platform!=='win32',child=spawn('git',args,{cwd,env:network,stdio:['ignore','pipe','pipe'],detached:groups});
+  const groups=process.platform!=='win32',child=spawn(command,args,{cwd,env:network,stdio:['ignore','pipe','pipe'],detached:groups});
   let stdout='',stderr='',interrupted=false,settled=false;
   /** @type {ReturnType<typeof setTimeout>|undefined} */let forced;
   const signal=(/** @type {NodeJS.Signals} */kind)=>{
@@ -118,7 +119,7 @@ function gitTee(cwd,args,env){
    clearTimeout(forced);process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);
    _resolve({status,stdout,stderr:`${stderr}${error}`,interrupted,hookGreen:ack?.finish()??false});
   };
-  child.stdout.on('data',chunk=>{stdout+=String(chunk);});
+  child.stdout.on('data',chunk=>{stdout+=String(chunk);if(command!=='git')process.stdout.write(chunk);});
   child.stderr.on('data',chunk=>{process.stderr.write(chunk);stderr=`${stderr}${String(chunk)}`.slice(-(1<<16));});
   child.once('error',error=>{finish(1,`\n${error.message}`);});
   child.once('close',code=>{finish(code??1);});
@@ -827,6 +828,8 @@ class Landing{
   // LS3 (J258): the pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
   /** @type {NodeJS.ProcessEnv} */
   const env={...this.env,WS_LAND_MAIN_PUSH:`${local?'local':carried?'carried':'exact'}:${head}`};
+  // The outer queue authenticates this controller, never a hook or proof.
+  for(const key of Object.keys(env))if(key.startsWith('WS_FULL_GATE_'))Reflect.deleteProperty(env,key);
   Reflect.deleteProperty(env,'WS_LOCAL_LAND_DELTA');
   if(local&&delta!==null&&hatch===undefined)env.WS_LOCAL_LAND_DELTA=JSON.stringify(delta);
   if(local&&hatch===undefined)Reflect.deleteProperty(env,'SKIP_CHECK');
@@ -1110,6 +1113,18 @@ export async function land(argv,cwd=process.cwd(),env=process.env){
  try{
   try{assertNoLocalCandidates(cwd,env);}catch(error){throw new StopError(error instanceof Error?error.message:String(error));}
   const landing=new Landing(cwd,parseArgs(argv,env),env);
+  if(landing.options.mode==='local'&&landing.localHatch===undefined){
+   if(env.WS_FULL_GATE_TOKEN===undefined){
+    // Refuse an active same-tree controller before joining the machine FIFO.
+    const release=landing.lock();release();landing.clean();
+    const result=await gitTee(landing.root,[resolve(import.meta.dirname,'heavy-lane.py'),'full-gate','--max=45','--admission-wait-seconds=6000','--',process.execPath,resolve(import.meta.dirname,'land.mjs'),...argv],
+     {...env,WS_FULL_GATE_EXPECTED_HEAD:landing.head(),WS_FULL_GATE_EXPECTED_BRANCH:landing.branch},'python3');
+    return result.interrupted?1:result.status;
+   }
+   try{assertHeavyLease('full-gate',{...env,WS_HEAVY_ROOT:env.WS_FULL_GATE_ROOT,WS_HEAVY_TOKEN:env.WS_FULL_GATE_TOKEN});}
+   catch{throw new StopError('full-gate controller needs its live machine queue ancestor');}
+   if(landing.head()!==env.WS_FULL_GATE_EXPECTED_HEAD||landing.branch!==env.WS_FULL_GATE_EXPECTED_BRANCH)throw new StopError('queued worktree changed; run land again');
+  }
   unlock=landing.lock();
   const code=await landing.run();
   // Cleanup runs under the land lock (J206 review): no second land can start here meanwhile. The lock file lives in

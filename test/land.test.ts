@@ -119,8 +119,9 @@ exit 0
 type Fixture = ReturnType<typeof fixture>;
 
 function fixture() {
-  mkdirSync('tmp/codex-netlag', { recursive: true });
-  const root = mkdtempSync(resolve('tmp/codex-netlag', 'land-'));
+  const scratch = process.env['VITEST_TMP_ROOT'] ?? 'tmp/codex-pagesize';
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(resolve(scratch, 'land-'));
   roots.push(root);
   const remote = join(root, 'remote.git'), repo = join(root, 'engine'), peer = join(root, 'peer'), bin = join(root, 'bin'), hooks = join(root, 'hooks');
   const files = { pushed: join(root, 'pushed.log'), gh: join(root, 'gh.log'), prepush: join(root, 'prepush.log'), delta: join(root, 'delta.log'), receipts: join(root, 'receipts.log'), state: join(root, 'gh-state.json'), fail: join(root, 'prepush-fail'), race: join(root, 'prepush-race'), raceScript: join(root, 'race.sh') };
@@ -134,6 +135,7 @@ function fixture() {
     // MF12: never mint a real reader App token from a fixture, even on a machine that has the App's key.
     WS_GH_READER: '0', WS_LAND_MODE: 'hosted',
     WS_STORE_USERS: join(root, 'store-users'), WS_STORE_RESERVATION: join(root, 'store-maintenance.lock'),
+    WS_FULL_GATE_ROOT: join(root, 'full-gate'),
   };
   for (const key of Object.keys(env)) if (key.startsWith('GIT_') && !['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL'].includes(key)) Reflect.deleteProperty(env, key);
   const git = (cwd: string, args: readonly string[]): string => execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -199,6 +201,104 @@ const GEN_STAMPS = "import {mkdirSync,readdirSync,statSync,writeFileSync} from '
 const prepushLines = (f: Fixture) => f.read(f.files.prepush).trim().split('\n').filter(Boolean);
 
 describe('land (J240): fast-forward main from a plan worktree after its branch CI is green', () => {
+  test.each(['release', 'cancel-waiter', 'cancel-holder', 'shared-origin', 'changed-waiter'])('FL8: independent clones queue full gates and cancel safely (%s)', async mode => {
+    const cancelWaiter = mode === 'cancel-waiter';
+    const a = fixture(), b = fixture();
+    if (mode === 'shared-origin') {
+      b.git(b.repo, ['remote', 'set-url', 'origin', a.remote]);
+      b.git(b.repo, ['fetch', '--quiet', 'origin', 'main']);
+      b.git(b.repo, ['reset', '--hard', 'FETCH_HEAD']);
+    }
+    const wa = a.worktree('a'), wb = b.worktree('b');
+    const c = cancelWaiter ? fixture() : undefined, wc = c?.worktree('c');
+    a.env['WS_LAND_MODE'] = 'local'; b.env['WS_LAND_MODE'] = 'local';
+    a.env['WS_LANE_NAME'] = 'fixture-a'; b.env['WS_LANE_NAME'] = 'fixture-b';
+    b.env['WS_FULL_GATE_ROOT'] = a.env['WS_FULL_GATE_ROOT'];
+    if (c !== undefined) { c.env['WS_LAND_MODE'] = 'local'; c.env['WS_LANE_NAME'] = 'fixture-c'; c.env['WS_FULL_GATE_ROOT'] = a.env['WS_FULL_GATE_ROOT']; }
+    a.env['WS_HEAVY_ROOT'] = join(a.root, 'different-heavy-root');
+    b.env['WS_HEAVY_ROOT'] = join(b.root, 'different-heavy-root');
+    const ta = a.commit(wa, 'src/a.ts', 'export const a = 1;', 'feat: a');
+    const tb = b.commit(wb, 'src/b.ts', 'export const b = 1;', 'feat: b');
+    const tc = c === undefined || wc === undefined ? undefined : c.commit(wc, 'src/c.ts', 'export const c = 1;', 'feat: c');
+    const sockets = new Map<string, import('node:net').Socket>();
+    let first: () => void = () => {}, second: () => void = () => {}, third: () => void = () => {}, verdict: (value: string) => void = () => {}, queuedThird: () => void = () => {}, advancedThird: () => void = () => {};
+    const readyA = new Promise<void>(done => { first = done; });
+    const readyB = new Promise<void>(done => { second = done; });
+    const queuedB = new Promise<string>(done => { verdict = done; });
+    const readyC = new Promise<void>(done => { third = done; });
+    const queuedC = new Promise<void>(done => { queuedThird = done; });
+    const advancedC = new Promise<void>(done => { advancedThird = done; });
+    const { createServer: gateServer } = await import('node:net');
+    const server = gateServer(socket => { socket.once('data', chunk => {
+      const name = chunk.toString(); sockets.set(name, socket);
+      if (name === 'a') first(); else if (name === 'b') { second(); verdict('started'); } else third();
+    }); });
+    await new Promise<void>(done => { server.listen(0, '127.0.0.1', done); });
+    const address = server.address(); if (address === null || typeof address === 'string') throw new Error('Missing gate endpoint');
+    const children: ReturnType<typeof spawn>[] = [];
+    const stopped: Promise<void>[] = [];
+    const start = (f: Fixture, wt: string, name: string) => {
+      const worker = join(f.root, 'gate.mjs');
+      const refresh = mode === 'shared-origin' && name === 'b' ? "if(!existsSync('src/a.ts'))throw new Error('Queued gate started without incoming main');" : '';
+      writeFileSync(worker, `import {connect} from 'node:net';import {existsSync} from 'node:fs';${refresh}const socket=connect({host:'127.0.0.1',port:${address.port}},()=>socket.write(${JSON.stringify(name)}));socket.on('data',()=>socket.end());`);
+      writeFileSync(join(f.root, 'hooks/pre-push'), `#!/bin/sh\ncat >/dev/null\nnode '${worker}'\n[ -n "\${WS_LAND_HOOK_ACK:-}" ] && node "$ACK_SCRIPT"\n`); chmodSync(join(f.root, 'hooks/pre-push'), 0o755);
+      const child = spawn(process.execPath, [LAND, '--keep'], { cwd: wt, env: f.env, stdio: ['ignore', 'pipe', 'pipe'] }); children.push(child);
+      let output = '';
+      for (const stream of [child.stdout, child.stderr]) stream?.on('data', chunk => {
+        output += String(chunk);
+        if (name === 'b' && output.includes('full-gate queue position 2')) verdict('queued');
+        if (name === 'c' && output.includes('full-gate queue position 3')) queuedThird();
+        if (name === 'c' && output.includes('full-gate queue position 2')) advancedThird();
+      });
+      const done = new Promise<{code: number | null; output: string}>(finish => { child.once('close', code => { finish({code,output}); }); });
+      stopped.push(done.then(() => {})); return done;
+    };
+    try {
+      const pa = start(a, wa, 'a'); await readyA;
+      const pb = start(b, wb, 'b'); expect(await queuedB).toBe('queued');
+      expect(sockets.has('b')).toBe(false);
+      expect(b.read(b.files.receipts)).toContain('queue position 2');
+      expect(b.read(b.files.receipts)).toContain('fixture-a');
+      if (mode === 'changed-waiter') {
+        b.commit(wb, 'src/new.ts', 'export const changed = true;', 'feat: changed');
+        sockets.get('a')?.end('release'); expect((await pa).code).toBe(0);
+        const result = await pb; expect(result.code).toBe(1); expect(result.output).toContain('queued worktree changed');
+        expect(sockets.has('b')).toBe(false); return;
+      }
+      if (c !== undefined && wc !== undefined) {
+        const pc = start(c, wc, 'c'); await queuedC;
+        children[1]?.kill('SIGTERM'); expect((await pb).code).toBe(1); await advancedC;
+        expect(sockets.has('b')).toBe(false); expect(sockets.has('c')).toBe(false);
+        sockets.get('a')?.end('release'); expect((await pa).code).toBe(0);
+        await readyC; sockets.get('c')?.end('release'); expect((await pc).code).toBe(0);
+        expect(c.remoteMain()).toBe(tc); expect(b.remoteMain()).not.toBe(tb);
+      } else {
+        if (mode === 'cancel-holder') {
+          children[0]?.kill('SIGTERM'); expect((await pa).code).toBe(1);
+        } else { sockets.get('a')?.end('release'); expect((await pa).code).toBe(0); }
+        await Promise.race([readyB, pb.then(result => { throw new Error(result.output); })]);
+        sockets.get('b')?.end('release'); expect((await pb).code).toBe(0);
+        if (mode === 'shared-origin') {
+          expect(a.git(a.remote, ['show', 'main:src/a.ts'])).toContain('a = 1');
+          expect(a.git(a.remote, ['show', 'main:src/b.ts'])).toContain('b = 1');
+        } else expect(b.remoteMain()).toBe(tb);
+      }
+      if (mode !== 'cancel-holder' && mode !== 'shared-origin') expect(a.remoteMain()).toBe(ta);
+    } finally {
+      for (const socket of sockets.values()) socket.destroy();
+      for (const child of children) if (child.exitCode === null) child.kill('SIGTERM');
+      await Promise.all(stopped);
+      await new Promise<void>(done => { server.close(() => { done(); }); });
+    }
+  }, 60000);
+
+  test('FL8: a copied queue token cannot bypass machine admission', () => {
+    const f = fixture(); f.env['WS_LAND_MODE'] = 'local'; f.env['WS_FULL_GATE_TOKEN'] = 'copied';
+    const wt = f.worktree('copied-token'); f.commit(wt, 'src/new.ts', 'export {};', 'feat: new');
+    const result = f.land(wt); expect(result.status).toBe(1);
+    expect(result.stdout).toContain('live machine queue ancestor'); expect(prepushLines(f)).toHaveLength(0);
+  });
+
   test('J381: malformed reasons cannot enter landing receipts', () => {
     for (const reason of ['', '   ', 'a\nb', 'a\rb', 'a'.repeat(121)]) {
       expect(() => localGateHatch({ SKIP_CHECK: '1', WS_LAND_J381_REASON: reason })).toThrow('one nonempty line');
