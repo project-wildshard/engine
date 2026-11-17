@@ -10,3 +10,4 @@
   latest engine/sdk/shard-format, and answers yes/no per channel for a SHA (local git, else GitHub's compare API).
   First real run, 20:13 Cancún: staging's release is serial 96 on `12886742` while the box still runs serial 95
   `5e0fb5ef`, so it says "behind the release".
+- MA3 lint: the gate's typed lint refused shadowed names, async with no await and String() of unknown values; fixed.

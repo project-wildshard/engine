@@ -29,6 +29,8 @@ const TIMEOUT_MS=15_000;
 
 /** @param {unknown} value @returns {Record<string,unknown>} */
 const record=value=>(typeof value==='object'&&value!==null?/** @type {Record<string,unknown>} */(value):{});
+/** A string or number as text; anything else as ''. @param {unknown} value */
+const text=value=>(typeof value==='string'?value:typeof value==='number'?String(value):'');
 /** @param {unknown} error */
 const reason=error=>(error instanceof Error?error.message:String(error)).split('\n')[0]??'';
 
@@ -43,15 +45,15 @@ export async function getJson(url){
  * @param {unknown} file @returns {Served} */
 export function releaseServed(file){
  const body=record(JSON.parse(String(record(file).body)));
- const bundle=String(record(body.bundle).name??'');
+ const bundle=text(record(body.bundle).name);
  const tag=/^v\d+\.\d+\.\d+(?=\/)/u.exec(bundle)?.[0];
- return {build:String(body.engineBuild),serial:Number(body.serial),...(tag===undefined?{}:{version:tag})};
+ return {build:text(body.engineBuild),serial:Number(body.serial),...(tag===undefined?{}:{version:tag})};
 }
 
 /** @param {unknown} file @returns {Served} */
-const pageServed=file=>{const page=record(file);return {build:String(page.build),version:`v${String(page.clientVersion)}`};};
+const pageServed=file=>{const page=record(file);return {build:text(page.build),version:`v${text(page.clientVersion)}`};};
 /** @param {unknown} file @returns {Served} */
-const boxServed=file=>{const health=record(file);return {build:String(health.build),serial:Number(health.serial)};};
+const boxServed=file=>{const health=record(file);return {build:text(health.build),serial:Number(health.serial)};};
 
 /** Read every source. A source that fails leaves its field out and adds a line to `errors`.
  * @param {GetJson} [get] @returns {Promise<Live>} */
@@ -59,21 +61,21 @@ export async function readLive(get=getJson){
  /** @type {<T>(url:string,shape:(value:unknown)=>T,errors:string[])=>Promise<T|undefined>} */
  const read=async(url,shape,errors)=>{try{return shape(await get(url));}catch(error){errors.push(reason(error));return undefined;}};
  /** @param {string} channel @param {{release?:string,page?:string,box?:string}} urls @returns {Promise<Channel>} */
- const channel=async(channel,urls)=>{
+ const channel=async(name,urls)=>{
   /** @type {string[]} */ const errors=[];
   const [page,server,box]=await Promise.all([
    urls.page===undefined?undefined:read(urls.page,pageServed,errors),
    urls.release===undefined?undefined:read(urls.release,releaseServed,errors),
    urls.box===undefined?undefined:read(urls.box,boxServed,[]),
   ]);
-  return {channel,...(page===undefined?{}:{page}),...(server===undefined?{}:{server}),...(box===undefined?{}:{box}),errors};
+  return {channel:name,...(page===undefined?{}:{page}),...(server===undefined?{}:{server}),...(box===undefined?{}:{box}),errors};
  };
  /** @type {string[]} */ const errors=[];
  const [staging,production,preview,api,...npm]=await Promise.all([
   channel('staging',SOURCES.staging),channel('production',SOURCES.production),channel('preview',SOURCES.preview),
-  read(SOURCES.api,value=>{const health=record(value);return {version:String(health.version),...(health.shardFormat===undefined?{}:{shardFormat:String(health.shardFormat)})};},errors),
+  read(SOURCES.api,value=>{const health=record(value);return {version:text(health.version),...(health.shardFormat===undefined?{}:{shardFormat:text(health.shardFormat)})};},errors),
   ...SOURCES.npm.map(name=>read(`https://registry.npmjs.org/${name.replace('/','%2f')}`,value=>{
-   const latest=String(record(record(value)['dist-tags']).latest);
+   const latest=text(record(record(value)['dist-tags']).latest);
    const gitHead=record(record(record(value).versions)[latest]).gitHead;
    return {name,version:latest,...(typeof gitHead==='string'?{gitHead}:{})};
   },errors)),
@@ -97,12 +99,15 @@ export async function githubContains(sha,build){
  const reply=await fetch(`https://api.github.com/repos/${REPO}/compare/${sha}...${build}`,{signal:AbortSignal.timeout(TIMEOUT_MS),
   headers:{accept:'application/vnd.github+json',...(token===undefined?{}:{authorization:`Bearer ${token}`})}});
  if(!reply.ok)return undefined;
- const status=String(record(await reply.json()).status);
+ const status=text(record(await reply.json()).status);
  return status==='ahead'||status==='identical'?true:status==='behind'||status==='diverged'?false:undefined;
 }
 
 /** @type {Contains} */
-export const contains=async(sha,build)=>gitContains(sha,build)??githubContains(sha,build).catch(()=>undefined);
+export const contains=(sha,build)=>{
+ const local=gitContains(sha,build);
+ return local===undefined?githubContains(sha,build).catch(()=>undefined):Promise.resolve(local);
+};
 
 /** @param {Served|undefined} served @param {string} [source] */
 const show=(served,source)=>served===undefined?'unread':
@@ -121,18 +126,18 @@ export function render(live,question){
  lines.push(`${'api'.padEnd(10)} ${live.api===undefined?'unread':`${live.api.version}${live.api.shardFormat===undefined?'':` shard-format ${live.api.shardFormat}`}`}`);
  lines.push(`${'npm'.padEnd(10)} ${live.npm.map(row=>`${row.name} ${row.version}${row.gitHead===undefined?'':` (${row.gitHead.slice(0,8)})`}`).join(', ')}`);
  if(question!==undefined)for(const row of live.channels){
-  const answer=question.answers[row.channel]??{};
-  lines.push(`${question.sha.slice(0,8)} in ${row.channel}: page ${yesNo(answer.page)}${row.channel==='preview'?'':`, server ${yesNo(answer.server)}`}${answer.box===undefined?'':`, box ${yesNo(answer.box)}`}`);
+  const got=question.answers[row.channel]??{};
+  lines.push(`${question.sha.slice(0,8)} in ${row.channel}: page ${yesNo(got.page)}${row.channel==='preview'?'':`, server ${yesNo(got.server)}`}${got.box===undefined?'':`, box ${yesNo(got.box)}`}`);
  }
  for(const error of live.errors)lines.push(`unread: ${error}`);
  return lines.join('\n');
 }
 
 /** Answer whether `sha` is inside each channel's page, server and running box. @param {Live} live @param {string} sha @param {Contains} [inside] */
-export async function answer(live,sha,inside=contains){
+export async function whereIs(live,sha,inside=contains){
  /** @type {Record<string,{page?:boolean,server?:boolean,box?:boolean}>} */ const answers={};
  /** @param {Served|undefined} served */
- const ask=async served=>(served===undefined?undefined:inside(sha,served.build));
+ const ask=served=>(served===undefined?Promise.resolve(undefined):inside(sha,served.build));
  for(const row of live.channels){
   const [page,server,box]=await Promise.all([ask(row.page),ask(row.server),ask(row.box)]);
   answers[row.channel]={...(page===undefined?{}:{page}),...(server===undefined?{}:{server}),...(box===undefined?{}:{box})};
@@ -149,7 +154,7 @@ if(import.meta.url===pathToFileURL(process.argv[1]??'').href){
   const live=await readLive();
   const given=rest[0];
   const full=given===undefined?undefined:spawnSync('git',['rev-parse','--verify','--quiet',`${given}^{commit}`],{cwd:import.meta.dirname,encoding:'utf8'}).stdout.trim()||given;
-  const question=full===undefined?undefined:{sha:full,answers:await answer(live,full)};
+  const question=full===undefined?undefined:{sha:full,answers:await whereIs(live,full)};
   process.stdout.write(`${json?JSON.stringify({...live,...(question===undefined?{}:{question})},null,1):render(live,question)}\n`);
   process.exitCode=live.errors.length===0?0:1;
  }

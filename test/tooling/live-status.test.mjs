@@ -1,6 +1,6 @@
 // Meta MINI-AUTONOMY MA3: live-status reads public release files, version.json, health and npm, and answers per channel.
 import {expect, test} from 'vitest';
-import {SOURCES, answer, readLive, releaseServed, render} from '../../scripts/live-status.mjs';
+import {SOURCES, readLive, releaseServed, render, whereIs} from '../../scripts/live-status.mjs';
 
 const STAGED = '5e0fb5efb35358fc88f8b8f34fd27ba445d90828';
 const NEXT = '1288674288946e831f2f923d3ec92d0169af453c';
@@ -33,7 +33,7 @@ test('prints what each channel serves and whether a SHA is inside each', async (
   const live = await readLive(get);
   expect(live.errors).toEqual([]);
   const inside = async (/** @type {string} */ _sha, /** @type {string} */ build) => build === NEXT;
-  const report = render(live, {sha: NEXT, answers: await answer(live, NEXT, inside)});
+  const report = render(live, {sha: NEXT, answers: await whereIs(live, NEXT, inside)});
   expect(report.split('\n')).toEqual([
     'staging    page v0.1.31 5e0fb5ef  server 12886742 serial 96 (release)  box 5e0fb5ef serial 95 (behind the release)',
     'production page v0.1.31 5e0fb5ef  server v0.1.31 5e0fb5ef serial 24 (release)',
