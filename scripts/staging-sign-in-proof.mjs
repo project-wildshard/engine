@@ -49,14 +49,21 @@ async function linkAfter(before) {
 }
 
 for (const engine of engines) {
+  /** @type {import('playwright').Page | undefined} */
+  let page;
   const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS] });
   try {
-    const context = await browser.newContext({ viewport: { width: 402, height: 874 }, isMobile: engine !== 'webkit', hasTouch: true }), page = await context.newPage();
+    const context = await browser.newContext({ viewport: { width: 402, height: 874 }, isMobile: engine !== 'webkit', hasTouch: true });
+    page = await context.newPage();
     await page.goto(`${PAGE}/?mute=1&nolock=1`, { waitUntil: 'load' });
     await page.locator('.ws-main-signin').waitFor({ timeout: 150_000 });
     const version = await page.evaluate(async () => (await (await fetch('/version.json', { cache: 'no-store' })).json()).clientVersion);
     note(`${engine}: staging page up`, true, { version });
-    await page.locator('.ws-main-signin').click();
+    // the button can show before the menu wires its tap: tap until the card opens
+    for (let tries = 0; tries < 10 && !await page.locator('#ws-signin .ws-signin-email').isVisible(); tries++) {
+      await page.locator('.ws-main-signin').click();
+      await page.waitForTimeout(1500);
+    }
     const before = mailKeys();
     await page.locator('#ws-signin .ws-signin-email').fill(EMAIL);
     await page.locator('#ws-signin .ws-signin-send').click();
@@ -86,6 +93,10 @@ for (const engine of engines) {
     note(`${engine}: the proof's account is deleted again`, answers.deleted === 200, { deleted: answers.deleted });
     await context.close();
   } catch (error) {
+    // what the card said, for the receipt; a token never reaches it (the card shows no link)
+    const card = await page?.locator('#ws-signin').textContent({ timeout: 2000 }).catch(() => null);
+    await page?.screenshot({ path: join(shots, `${engine}-failed.png`) }).catch(() => undefined);
+    note(`${engine}: the card read`, false, { card: card?.replaceAll(/\s+/gu, ' ').slice(0, 200) ?? null });
     note(`${engine}: ran`, false, { error: error instanceof Error ? error.message.replaceAll(/wsl_[\w-]+|wss_[\w-]+/gu, '<redacted>') : String(error) });
   } finally {
     await browser.close();
