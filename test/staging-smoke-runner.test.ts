@@ -31,6 +31,15 @@ test('the CLI reads flags and refuses production', async () => {
   await expect(runSmoke({ url: 'https://wildshard.io', release: 'v0', out: join(OUT, 'prod'), log: () => undefined })).rejects.toThrow(/never production/u);
 });
 
+test('SM8: the runner prints its total time and warns over its budget', async () => {
+  const lines: string[] = [];
+  await runSmoke({ url: 'http://127.0.0.1:9', release: 'v0', out: join(OUT, 'budget'), only: [], runBudgetS: -1, log: line => { lines.push(line); } });
+  expect(lines.find(line => line.startsWith('staging-smoke v0:'))).toMatch(/0 scenarios in \d+ s WARNING: over the -0\.0\d+-minute budget \(SM8\)/u);
+  const quiet: string[] = [];
+  await runSmoke({ url: 'http://127.0.0.1:9', release: 'v0', out: join(OUT, 'budget'), only: [], log: line => { quiet.push(line); } });
+  expect(quiet.find(line => line.startsWith('staging-smoke v0:'))).toMatch(/0 scenarios in \d+ s$/u);
+});
+
 test.skipIf(!BROWSER)('a stub that serves the main menu after Enter World fails K3', async () => {
   const html = readFileSync('test/fixtures/staging-smoke/menu-loop.html');
   const server = createServer((request, response) => {
