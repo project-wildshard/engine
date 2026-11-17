@@ -12,6 +12,8 @@ import { CreatureHomeSchema, type ShardCreatureHome } from '@wildshard/format/cr
 import type { StrikeSpec } from '@wildshard/engine/ai/strikes';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { SimHost, SimStateAdapter } from '@wildshard/engine/sim';
+import type { ResolvedCreatureLayers } from './creatureLayers';
+import { bindCreatureTemperament } from './creatureTemperament';
 import { parseStalker, stalkerPreset, type ShardStalker, parseGuardianPattern, guardianPreset, type ShardGuardianPattern, parseSkirmisher, parseGuardian, parsePerchHunter, type ShardSkirmisher, type ShardGuardian, type ShardPerchHunter } from '@wildshard/format/brains';
 import { parseRamGrazer, parseChallengeGrazer, parseGrazer, grazerPreset, type ShardGrazer, type ShardRamGrazer, type ShardChallengeGrazer } from '@wildshard/format/grazers';
 import { parseDiver, diverPreset, type ShardDiver, parseOrbitDiver, parsePatrolDiver, parseBurstFlyer, type ShardOrbitDiver, type ShardPatrolDiver, type ShardBurstFlyer } from '@wildshard/format/flyers';
@@ -64,7 +66,7 @@ function mutableRegistration<P>(id: string, actor: AnimalSim, divisor: number,
   } } };
 }
 /** Preflight every actor, declaration and native port before registering any callback; restore installs without running recipes. */
-export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrainSpawn[], declarations: readonly DeclaredNativeBrain[], ports: DeclaredBrainPorts = {}): ReadonlyMap<string, SimStateAdapter> {
+export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrainSpawn[], declarations: readonly DeclaredNativeBrain[], ports: DeclaredBrainPorts = {}, layers?: ReadonlyMap<string, ResolvedCreatureLayers>): ReadonlyMap<string, SimStateAdapter> {
   const presets = declarations.map(row => row.kind === 'stalker' ? stalkerPreset(parseStalker(row)) : row.kind === 'guardian' && 'pattern' in row ? guardianPreset(parseGuardianPattern(row)) : row.kind === 'grazer' ? grazerPreset(parseGrazer(row)) : row.kind === 'diver' ? diverPreset(parseDiver(row)) : row);
   const definitions = new Map(presets.map(row => [row.id, row]));
   if (definitions.size !== declarations.length || new Set(rows.map(row => row.id)).size !== rows.length) throw new Error('Duplicate declared brain identity');
@@ -107,9 +109,14 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
     const spec = definitions.get(row.brain), actor = host.entities.get(row.id), pursuit = pursuits.get(row.id), id = `brain.${row.id}`;
     if (spec === undefined || actor === undefined) throw new Error('Unresolved declared actor');
     switch (spec.kind) {
-      case 'pursue':
+      case 'pursue': {
         if (pursuit === undefined) throw new Error('Unresolved pursuit policy');
-        registrations.push({ id, run: () => { pursuit.step(host.state.tick); }, adapter: pursuit }); break;
+        const source = { run: () => { pursuit.step(host.state.tick); }, adapter: pursuit }, layer = layers?.get(row.species);
+        const policy = layer?.temperament.reaction === 'aggressive'
+          ? bindCreatureTemperament(host, actor, row.at, layer.temperament, source,
+            () => { const target = pursuit.targetId; return target === null ? undefined : host.players.get(target)?.position; }) : source;
+        registrations.push({ id, ...policy }); break;
+      }
       case 'skirmisher':
         if (ports.skirmisher === undefined) throw new Error('Missing native brain port');
         registrations.push(nativeRegistration(id, actor, spec.thinkDivisor, new SkirmisherBrain(actor, spec), ports.skirmisher(actor, host), host)); break;

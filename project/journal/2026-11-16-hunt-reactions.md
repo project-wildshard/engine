@@ -1,7 +1,7 @@
 # Author the hunt reaction
 
 > Written by: Codex
-> **State:** M2 source work, 2026-11-16. ONE-FORMAT, codex-te2e.
+> **State:** M2 source work, 2026-11-16–17. ONE-FORMAT, codex-te2e.
 
 CC5a1: layer hunts discarded the reaction after reducing it to an
 aggression boolean. A passive animal with stalk tuning could hunt and
@@ -44,3 +44,16 @@ provoked neutral host restores and matches uninterrupted body, health,
 brain memory and shared RNG. Three integration controls failed before
 the body-clock connection; the five new controls pass with the original
 inline-policy continuation tests.
+
+CC5b1: aggressive layer pursuit now owns its home/return policy around
+the existing PlatformBrain. It reads that controller's actual selected
+target, cancels the existing strike while returning, then restores the
+initial pursuit continuation and full health inside the authored home
+stop. The real motor slows toward home so it can turn and brake into
+that stop; there is no teleport or second body clock. Plain/native
+callers without this explicit layer retain their original adapter.
+
+Both real-server return tests fail with this binding removed, then
+pass: a player beyond45m provokes return, arrival heals, re-entry starts
+a fresh pursuit, and a mid-return snapshot resumes body/controller/RNG
+exactly. All35cases/fivefiles and defining types/lint pass.

@@ -67,7 +67,7 @@ import { createQuestScriptPorts, DeclaredQuests, type QuestDataPorts, type Quest
 import { installDeclaredEncounters } from "../shard/declaredEncounters";
 import type { Shardfile } from "@wildshard/format/shardSchema";
 import { speciesResolver, simStrikes } from "./brain";
-import { prepareCreaturePolicies } from "../shardfile/creatureLayers";
+import { prepareCreaturePolicies, resolveCreatureLayers } from "../shardfile/creatureLayers";
 import { installLayerHunts } from "../shardfile/layerHunts";
 import { createShardfileScriptLane, verifiedScriptModules, type ScriptModuleAssets, type ShardScriptPorts } from "../shardfile/scripts";
 import { installDeclaredBrains, type DeclaredBrainPorts } from "../shardfile/brainRuntime";
@@ -673,7 +673,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
         if (typeof state !== 'string') throw new Error('Invalid director row continuation'); director.restore(state);
       } });
     }
-    installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataPorts?.brains);
+    installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataPorts?.brains, resolveCreatureLayers(shard.rows, creatures.brains));
     installDataRespawns(host, creatures.spawns);
     installLayerHunts(host, shard.rows, creatures);
     dataPorts?.install();

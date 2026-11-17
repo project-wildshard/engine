@@ -44,6 +44,8 @@ export class PlatformBrain {
   }
   /** Observable state for diagnostics and data-driven encounter hooks. */
   get mode(): BrainState['mode'] { return this.state.mode; }
+  /** The controller's actual selected target, for an owning layer's leash policy. */
+  get targetId(): string | null { return this.state.target; }
   /** Plain numeric continuation; no ports, actor objects or navigation heap are serialized. */
   snapshot(): SimValue { return { contract: this.contract, state: { ...this.state, waypoint: [...this.state.waypoint] } }; }
   /** Restore a validated continuation on a matching registered actor. */

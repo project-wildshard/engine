@@ -44,6 +44,60 @@ function hunting(reaction: 'passive' | 'skittish' | 'neutral' | 'aggressive', di
   return shard;
 }
 
+function pursuing(distance = 8) {
+  const shard = fixture(), row = shard.rows.species[0], spawn = shard.creatures.spawns[0];
+  if (row?.temperament === undefined || spawn === undefined) throw new Error('Missing fixture species');
+  shard.spawn = { x: 0, y: 0, z: distance, yaw: Math.PI }; spawn.at = [0, 0, 0];
+  row.temperament.reaction = 'aggressive'; row.temperament.leash = 45; row.temperament.home = { speed: 6, stop: 0.5 };
+  row.temperament.tuning = { speed: 6, turnRate: 8, thinkDivisor: 3, attackCooldownTicks: 60, wanderRadius: 0, wanderEveryTicks: 420 };
+  row.senses = { notice: 24 }; shard.rows = parseRows(shard.rows);
+  return shard;
+}
+
+test('an aggressive layer returns home across its 45m leash, heals and starts a fresh pursuit', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const sim = createShardfileSim(pursuing(), new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = sim.host.nearestPlayer(body.position);
+    for (let i = 0; i < 60; i++) sim.host.step();
+    expect(body.position.z).toBeGreaterThan(1);
+    sim.host.combat.hit({ source: player.health, sourceTags: player.health.tags, target: body.combatActor(), amount: 30,
+      point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+    expect(body.hp).toBe(87);
+    player.position.set(0, 0, 46); player.motor?.resetAt(player.position);
+    for (let i = 0; i < 180; i++) sim.host.step();
+    expect(Math.hypot(body.position.x, body.position.z)).toBeLessThan(0.7);
+    expect(body.hp).toBe(117); expect(body.state).toBe('idle');
+    player.position.set(0, 0, 8); player.motor?.resetAt(player.position);
+    for (let i = 0; i < 60; i++) sim.host.step();
+    expect(body.position.z).toBeGreaterThan(1); expect(body.state).toBe('stalk');
+  } finally { sim.host.dispose(); }
+});
+
+test('an aggressive return restores the exact controller and body continuation', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = pursuing(20);
+  const first = createShardfileSim(shard, new Map(), { rapier }), resumed = prepareShardfileSimRestore(shard, new Map(), { rapier });
+  try {
+    const body = first.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = first.host.nearestPlayer(body.position);
+    for (let i = 0; i < 60; i++) first.host.step();
+    first.host.combat.hit({ source: player.health, sourceTags: player.health.tags, target: body.combatActor(), amount: 30,
+      point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+    player.position.set(0, 0, 46); player.motor?.resetAt(player.position);
+    for (let i = 0; i < 12; i++) first.host.step();
+    expect(body.hp).toBe(87); expect(body.position.z).toBeGreaterThan(1);
+    resumed.restore(snapshotSimHost(first.host));
+    for (let i = 0; i < 120; i++) { first.host.step(); resumed.host.step(); }
+    expect(body.hp).toBe(117);
+    expect(resumed.host.entities.get(body.entityId)?.snapshot()).toEqual(body.snapshot());
+    expect(resumed.host.adapters.get('brain.fixture.actor')?.snapshot()).toEqual(first.host.adapters.get('brain.fixture.actor')?.snapshot());
+    expect(resumed.host.rng.snapshot()).toEqual(first.host.rng.snapshot());
+  } finally { resumed.host.dispose(); first.host.dispose(); }
+});
+
 test.each(['passive', 'skittish', 'neutral'] as const)('an admitted %s hunt reacts to actual server damage', async reaction => {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const sim = createShardfileSim(hunting(reaction), new Map(), { rapier });
