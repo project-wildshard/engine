@@ -80,10 +80,12 @@ export function settleRefusedBuild(): void {
   try { saveStorage('session').removeItem('boot.selfReload'); } catch { /* a page with no session storage reloads once, and stops */ }
 }
 
-/** A player's tap on a stale tab: the next document comes from the network, whatever worker holds this one, and the tab may reload itself once more. */
+/** A player's tap on a stale tab (the new-build panel, too-old's Update, Play here): the next document comes from the network,
+ * whatever worker holds this one, and the tab may reload itself once more. R3 (RL3): the RELOADING cover goes up first, in the
+ * tap's turn when its module is loaded, and the reload waits for it (FM5b4: a retired build's Update paints the cover at once). */
 export async function reloadPastWorker(): Promise<void> {
   settleRefusedBuild();
-  await leavePastWorker('new build panel');
+  await leavePastWorker('new build panel', showReloadingSoon('Updating · getting the new version'));
 }
 /** Drop this tab's worker, then reload: the next document comes from the network. `cover`: the RELOADING cover going up,
  * which the reload waits for too, then leaves one painted frame later (leaveAfterPaint). */

@@ -20,3 +20,15 @@ test('RL8: a stale-build reload puts the RELOADING cover up even when the cover 
   expect(coverAtReload).toEqual([true]);
   expect(document.querySelectorAll('#ws-reloading')).toHaveLength(1);
 });
+
+test('FM5b4/R3: a player\'s reload past the worker (too-old Update, the new-build panel) puts the RELOADING cover up before the page leaves', async () => {
+  vi.stubGlobal('__BUILD_ID__', '40e08ff-old');
+  const coverAtReload: boolean[] = [];
+  const reload = vi.fn(() => { coverAtReload.push(document.getElementById('ws-reloading') !== null); });
+  vi.stubGlobal('location', Object.assign(new URL('https://example.com/?chunk=driftwood-isle'), { reload, replace: vi.fn() }));
+  const { reloadPastWorker } = await import('./browserChunkRecovery');
+  await reloadPastWorker();
+  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 5000 });
+  expect(coverAtReload).toEqual([true]);
+  expect(document.getElementById('ws-reloading')?.textContent).toContain('new version');
+});

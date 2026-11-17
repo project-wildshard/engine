@@ -5,3 +5,5 @@
   second signed view; the world only reads `/release.json`. `signRetention` is shared with the page publisher's signer.
 - The preview server's SPA fallback answered a missing `/code-retention.json` with the page (200); production's asset host
   answers 404, which the page reads as a legacy page. Now the preview server does too.
+- `reloadPastWorker` (too-old's Update, the new-build panel, Play here) never raised the RELOADING cover, so a player's tap left
+  the old page standing for up to the worker drop's 3 s. It now puts the cover up first (R3/RL3), as the stale-build reload does.
