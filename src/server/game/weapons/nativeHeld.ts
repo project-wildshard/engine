@@ -172,19 +172,19 @@ export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'secti
     const random=():number=>host.rng.stream('gameplay').next();
     const ray=(from:Vector3,dir:Vector3,distance:number)=>{
       const original=nativeRangedHit(bodies(),from,dir,distance);
-      const hit=contacts===undefined?original:contacts(host,from,dir,distance,original);return hit===null||hit.body===null?null:{animal:hit.body,point:hit.point,distance:hit.distance,headshot:hit.head};
+      const hit=contacts===undefined?original:contacts(host,from,dir,distance,original);return hit===null||hit.body===null?null:{animal:hit.body,point:hit.point,distance:hit.distance,headshot:hit.head,...(hit.part===undefined?{}:{part:hit.part,multiplier:hit.multiplier})};
     };
     const spearContacts=new PolearmContact<AnimalSim>({raycast:ray,same:(animal,target)=>animal===target,
-      contact:(animal,amount,point,dir,from,moveId)=>host.combat.hit({source:striker,sourceTags:['actor.player',spearItem.id,'dmg.melee'],
-        target:body(key(animal)).combatActor(),amount,point,dir,from,weaponId:spearItem.id,moveId,...(swing===0?{}:{attackSeq:swing})}),struck:()=>undefined},polearm);
+      contact:(animal,amount,point,dir,from,moveId,part)=>host.combat.hit({source:striker,sourceTags:['actor.player',spearItem.id,'dmg.melee'],
+        target:body(key(animal)).combatActor(),amount,point,dir,from,weaponId:spearItem.id,moveId,...(part===undefined?{}:{part,headshot:part==='head'}),...(swing===0?{}:{attackSeq:swing})}),struck:()=>undefined},polearm);
     const floor=(x:number,y:number,z:number):number=>floorBelow(host.physics,x,z,y+.3,60)??host.groundHeightAt(x,z);
     /** A shot's blow in a room: this player's, so it earns and it answers its press. A shard's own target takes it as ever. */
-    const landed=(animal:TargetAnimal,amount:number,point:Vector3,dir:Vector3,weaponId:string,attackSeq:number):boolean=>{
+    const landed=(animal:TargetAnimal,amount:number,point:Vector3,dir:Vector3,weaponId:string,attackSeq:number,part?:string):boolean=>{
       for(const actor of host.entities.values())if(actor===animal)return host.combat.hit({source:striker,sourceTags:['actor.player',`weapon.${weaponId}`,'dmg.ranged','cover.checked'],
-        target:actor.combatActor(),amount,point,dir,weaponId,attackSeq})?.killed??false;
-      return animal.applyDamage(amount,point,dir);
+        target:actor.combatActor(),amount,point,dir,weaponId,attackSeq,...(part===undefined?{}:{part,headshot:part==='head'})})?.killed??false;
+      return part===undefined?animal.applyDamage(amount,point,dir):animal.applyDamage(amount,point,dir,part);
     };
-    const arrows=new ProjectileLaw(bow.rows.arrow.maxFlying>0?{...bow.rows.arrow,length,
+    const arrows=new ProjectileLaw<{seq:number},null>(bow.rows.arrow.maxFlying>0?{...bow.rows.arrow,length,
       substeps:bow.base.projectile?.substeps??4,lifetime:bow.base.projectile?.lifetime??12}:(()=>{throw new Error('Missing bow flight slots');})(),{
       feet:player.position,extent:host.level.ground.size/2,floorAt:floor,world:(from,to,radius)=>worldHit(host.physics,from,to,radius),
       targets:(from,dir,distance)=>{const hit=ray(from,dir,distance);return arrowTargets===undefined?hit:arrowTargets.ray(host,from,dir,distance,hit);},
@@ -192,11 +192,11 @@ export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'secti
       random,canRecover:()=>bolts<bow.base.quiver,recover:survived=>{if(survived)bolts=Math.min(bow.base.quiver,bolts+1);},
       flight:()=>({seq:0}),stuck:()=>null,moved:()=>undefined,ended:()=>undefined,settled:()=>undefined,changed:()=>undefined,removed:()=>undefined,impact:()=>undefined,
       playerHit:()=>{throw new Error('Player bow cannot become an enemy projectile');},targetHit:()=>undefined,hit:()=>undefined,
-      ...(room?{strike:(flight:{readonly seq:number},animal:TargetAnimal,amount:number,point:Vector3,dir:Vector3)=>landed(animal,amount,point,dir,bowSlot.id,flight.seq)}:{}),
+      ...(room?{strike:(flight:{readonly seq:number},animal:TargetAnimal,amount:number,point:Vector3,dir:Vector3,part?:string)=>landed(animal,amount,point,dir,bowSlot.id,flight.seq,part)}:{}),
     });
     const javelins:JavelinSlot[]=Array.from({length:thrown.pool},()=>({state:0,pos:new Vector3(),vel:new Vector3(),q:new Quaternion(),age:0}));
     const flight=new JavelinFlight<NonNullable<ReturnType<typeof ray>>>(javelins,thrown,{worldHit:(from,to,radius)=>worldHit(host.physics,from,to,radius),raycast:ray,
-      strike:(hit,damage,dir)=>{const killed=room?landed(hit.animal,damage,hit.point,dir,spearItem.id,swing):hit.animal.applyDamage(damage,hit.point,dir);if(!killed)hit.animal.stagger(scratch.set(dir.x,0,dir.z).normalize(),thrown.stagger);},
+      strike:(hit,damage,dir)=>{const killed=room?landed(hit.animal,damage,hit.point,dir,spearItem.id,swing,hit.part):hit.part===undefined?hit.animal.applyDamage(damage,hit.point,dir):hit.animal.applyDamage(damage,hit.point,dir,hit.part);if(!killed)hit.animal.stagger(scratch.set(dir.x,0,dir.z).normalize(),thrown.stagger);},
       impact:()=>undefined,water:(x,z)=>host.waterSurfaceAt(x,z),floor,random,damageScale:sneak,
       surface:material=>material==='flesh'?'flesh':material==='wood'||material==='planks'?'wood':'ground'});
     const extra=[bladeMoves.passes.left,bladeMoves.passes.right];
@@ -275,7 +275,7 @@ export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'secti
               if(Math.abs(move.sweep)<.6)strikeDirection.y-=.35*(1-Math.abs(move.sweep));strikeDirection.normalize();
               const result=host.combat.hit({source:striker,sourceTags:['actor.player',bladeItem.id,'dmg.melee','cover.checked'],
                 target:body(key(hit.animal)).combatActor(),amount:Math.round(sweptMoveDamage(passDamage,move,move===bladeMoves.heavy,1)),
-                point:hit.point,dir:strikeDirection,from:eye,weaponId:bladeItem.id,moveId:`move.${move.name}`,...(swing===0?{}:{attackSeq:swing})});
+                point:hit.point,dir:strikeDirection,from:eye,...(hit.part===undefined?{}:{part:hit.part,partMultiplier:hit.multiplier,headshot:hit.part==='head'}),weaponId:bladeItem.id,moveId:`move.${move.name}`,...(swing===0?{}:{attackSeq:swing})});
               if(result===null)return;bladeContacts++;
               push.set(forward.x,0,forward.z).normalize().multiplyScalar(.8).addScaledVector(left,.5*move.sweep);
               if(!result.killed)hit.animal.stagger?.(push,move.stagger);

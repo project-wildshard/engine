@@ -6,6 +6,7 @@ import type { Actor, DamageRequest, DamageDealt } from '../combat/pipeline';
 import type { AnimalDims, Rarity, VariantMods } from './species/registry';
 import { tap } from '../core/harnessTap';
 import type { ANIMAL_STATES } from './animalStates';
+import type { CreatureVolumePose } from '../physics/creatureVolumes';
 
 /** Shared behaviour state consumed by simulation and pose adapters. */
 export type AnimalState = typeof ANIMAL_STATES[number];
@@ -111,6 +112,13 @@ export class AnimalSim {
   protected readonly simSpec: AnimalSimSpec;
   protected readonly simPorts: AnimalSimPorts;
   private volumePort: AnimalVolumePort | null = null;
+  private authoredHitVolumes: CreatureVolumePose | undefined;
+  get hitVolumes(): CreatureVolumePose | undefined { return this.authoredHitVolumes; }
+  /** Immutable admitted geometry; it reads this body's root and owns no motion. */
+  bindHitVolumes(pose: CreatureVolumePose): void {
+    if (this.authoredHitVolumes !== undefined || pose.volumes.length === 0 || pose.volumes.length > 16) throw new Error('Incompatible authored creature volumes');
+    this.authoredHitVolumes = pose;
+  }
   private elapsed = 0;
   private readonly moveWant = { x: 0, y: 0, z: 0 };
 
@@ -261,10 +269,11 @@ export class AnimalSim {
     const cy = this.position.y + d.bodyY * this.scale;
     a.set(this.position.x - x, cy - y, this.position.z - z); b.set(this.position.x + x, cy + y, this.position.z + z);
   }
-  applyDamage(amount: number, hitPoint: Vector3, dir: Vector3): boolean {
+  applyDamage(amount: number, hitPoint: Vector3, dir: Vector3, part?: string): boolean {
     if (!this.alive) return false;
     return this.simPorts.hit === undefined ? this.applyFinalDamage(amount, hitPoint, dir)
-      : this.simPorts.hit({ source: 'env', sourceTags: ['dmg.legacy', 'cover.checked'], target: this.combatActor(), amount, point: hitPoint, dir })?.killed ?? false;
+      : this.simPorts.hit({ source: 'env', sourceTags: ['dmg.legacy', 'cover.checked'], target: this.combatActor(), amount, point: hitPoint, dir,
+        ...(part === undefined ? {} : { part, headshot: part === 'head' }) })?.killed ?? false;
   }
   combatActor(): Actor {
     const cached = actors.get(this); if (cached !== undefined) return cached;

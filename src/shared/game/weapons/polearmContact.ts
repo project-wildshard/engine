@@ -10,7 +10,7 @@ import type { TargetAnimal, TargetHit } from '@wildshard/engine/combat/types';
 export interface PolearmContactPorts<T> {
   readonly raycast: ((origin: THREE.Vector3, dir: THREE.Vector3, max: number) => TargetHit | null) | null;
   readonly contact: (animal: TargetAnimal, amount: number, point: THREE.Vector3, dir: THREE.Vector3, from: THREE.Vector3,
-    moveId: 'move.thrust' | 'move.lance') => { readonly killed: boolean } | null;
+    moveId: 'move.thrust' | 'move.lance', part?: string) => { readonly killed: boolean } | null;
   readonly same: (animal: TargetAnimal, target: T) => boolean;
   readonly struck: (hit: TargetHit, killed: boolean) => void;
 }
@@ -30,6 +30,12 @@ export class PolearmContact<T extends PolearmLanceTarget> {
   private readonly ports: PolearmContactPorts<T>;
   private readonly decision: PolearmContactDecision<T>;
   constructor(ports: PolearmContactPorts<T>, decision: PolearmContactDecision<T>) { this.ports = ports; this.decision = decision; }
+  private contact(hit: TargetHit, amount: number, dir: THREE.Vector3, from: THREE.Vector3, move: 'move.thrust' | 'move.lance'): { readonly killed: boolean } | null {
+    if (hit.multiplier === 0) return null;
+    const damage = amount * (hit.multiplier ?? 1);
+    return hit.part === undefined ? this.ports.contact(hit.animal, damage, hit.point, dir, from, move)
+      : this.ports.contact(hit.animal, damage, hit.point, dir, from, move, hit.part);
+  }
 
   /** The thrust's strike from the aim pose (`origin`, `rotation`, its forward `forward`): the fan's rays in order, pitch
    *  then yaw, out to the reach; the first living animal the combat hit accepts is staggered along the aim and marks the
@@ -44,7 +50,7 @@ export class PolearmContact<T extends PolearmLanceTarget> {
       _dir.set(0, 0, -1).applyQuaternion(_q);
       const hit = raycast(origin, _dir, profile.reach);
       if (!hit || !hit.animal.alive) continue;
-      const result = this.ports.contact(hit.animal, profile.thrust.damage, hit.point, forward, origin, 'move.thrust');
+      const result = this.contact(hit, profile.thrust.damage, forward, origin, 'move.thrust');
       if (!result) continue;
       const killed = result.killed;
       if (!killed) hit.animal.stagger?.(_push.set(forward.x, 0, forward.z).normalize(), profile.thrust.stagger);
@@ -63,7 +69,7 @@ export class PolearmContact<T extends PolearmLanceTarget> {
     _dir.subVectors(_at, origin); const len = _dir.length(); _dir.multiplyScalar(1 / Math.max(len, 0.0001));
     const hit = this.ports.raycast?.(origin, _dir, len + 1) ?? null;
     if (hit === null || !this.ports.same(hit.animal, target)) return null;
-    const result = this.ports.contact(hit.animal, damage, hit.point, _dir, origin, 'move.lance');
+    const result = this.contact(hit, damage, _dir, origin, 'move.lance');
     if (!result) return null;
     this.decision.struck(target, t);
     if (!result.killed) hit.animal.stagger?.(_push.set(target.position.x - player.x, 0, target.position.z - player.z).normalize(), 1);

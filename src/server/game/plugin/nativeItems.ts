@@ -158,7 +158,7 @@ function boltItem(host: SimHost, frame: NativeCombatFrame, row: Policy, input: u
     target: (from, direction, distance) => { const hit = bodyAlong(host, view, from, direction, distance); return hit?.body === null ? null : hit; },
     hit: (bolt, hit, direction) => {
       const body = hit.body; if (body === null) return;
-      req.target = body.combatActor(); req.amount = body.damageFor(hit.head, hit.point.distanceTo(player.position)) * ammoDamage(row, bolt.ammo, body.kind) * p.damageScale;
+      req.target = body.combatActor(); req.amount = hit.multiplier === 0 ? 0 : body.damageFor(hit.multiplier === undefined && hit.head, hit.point.distanceTo(player.position)) * ammoDamage(row, bolt.ammo, body.kind) * p.damageScale;
       req.point.copy(hit.point); req.dir.copy(direction); req.headshot = hit.head; req.attackSeq = bolt.seq;
       host.combat.hit(seenRequest(req, hit));
     },
@@ -248,7 +248,7 @@ function cycleItem(host: SimHost, frame: NativeCombatFrame, row: Policy, input: 
     const wall = worldHit(host.physics, eye, end.copy(eye).addScaledVector(dir, profile.range), 0);
     const hit = bodyAlong(host, own.viewTick, eye, dir, wall ? wall.distance : profile.range), body = hit?.body ?? null;
     if (hit === null || body === null) return;
-    req.target = body.combatActor(); req.amount = body.damageFor(hit.head, hit.distance) * profile.damageScale;
+    req.target = body.combatActor(); req.amount = hit.multiplier === 0 ? 0 : body.damageFor(hit.multiplier === undefined && hit.head, hit.distance) * profile.damageScale;
     req.point.copy(hit.point); req.headshot = hit.head; req.attackSeq = own.seq;
     host.combat.hit(seenRequest(req, hit));
   };
@@ -317,7 +317,7 @@ function bowItem(host: SimHost, frame: NativeCombatFrame, row: Policy, input: un
     target: (from, direction, distance) => { const hit = bodyAlong(host, view, from, direction, distance); return hit?.body === null ? null : hit; },
     hit: (arrow, hit, direction) => {
       const body = hit.body; if (body === null) return;
-      req.target = body.combatActor(); req.amount = Math.max(1, Math.round(body.damageFor(hit.head, hit.point.distanceTo(arrow.origin)) * profile.damageScale));
+      req.target = body.combatActor(); req.amount = hit.multiplier === 0 ? 0 : Math.max(1, Math.round(body.damageFor(hit.multiplier === undefined && hit.head, hit.point.distanceTo(arrow.origin)) * profile.damageScale));
       req.point.copy(hit.point); req.dir.copy(direction); req.headshot = hit.head; req.attackSeq = arrow.seq;
       host.combat.hit(seenRequest(req, hit));
       stuck.stop(hit.point, direction, true, body.alive ? body.entityId : null);

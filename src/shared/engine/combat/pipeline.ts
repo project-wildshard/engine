@@ -33,6 +33,8 @@ export interface DamageRequest {
   source: Actor | 'env'; sourceTags: readonly CombatTag[]; target: Actor; amount: number;
   point: Vector3; dir: Vector3; surface?: string; weaponId?: string; moveId?: string;
   headshot?: boolean; stagger?: number; knockback?: number; throughWalls?: boolean;
+  /** Authored collision part. Its multiplier replaces a weapon's legacy head bonus. */
+  part?: string; partMultiplier?: number;
   from?: Vector3; distance?: number; scale?: number; cause?: DeathCause; toast?: StringKey;
   /** The command `seq` of the swing or shot behind this hit, which its `hit` event confirms (J47); 0 or absent off the wire. */
   attackSeq?: number;
@@ -136,8 +138,9 @@ export class CombatPipeline {
   }
   hit(input: DamageRequest): DamageDealt | null {
     if (!input.target.alive) return null;
+    if (input.partMultiplier === 0) return null;
     // Raycast/weapon scratch vectors are reused; queued listeners must see this hit's contact frame.
-    const req: DamageRequest = { ...input, point: input.point.clone(), dir: input.dir.clone(),
+    const req: DamageRequest = { ...input, ...(input.partMultiplier === undefined ? {} : { amount: input.amount * input.partMultiplier }), point: input.point.clone(), dir: input.dir.clone(),
       ...(input.from === undefined ? {} : { from: input.from.clone() }), ...(input.seen === undefined ? {} : { seen: input.seen.clone() }),
       sourceTags: input.source === 'env' ? [...input.sourceTags] : [...input.sourceTags, ...input.source.tags, ...input.source.state, ...input.source.effectTags ?? []] };
     if (this.events.ask('damage.admit', req) === null) return null;

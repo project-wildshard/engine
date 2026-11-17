@@ -22,6 +22,8 @@ export function seenRay(bodies: readonly RewoundBody[], origin: Vector3, directi
   const hit = rays.ray(bodies, origin, direction, max), body = hit?.body ?? null;
   if (hit === null || body === null) return null;
   contact.body = body.body; contact.head = hit.head; contact.distance = hit.distance;
+  if (hit.part === undefined) { delete contact.part; delete contact.multiplier; }
+  else { contact.part = hit.part; if (hit.multiplier === undefined) delete contact.multiplier; else contact.multiplier = hit.multiplier; }
   contact.seen.copy(hit.point); body.present(hit.point, contact.point);
   if(body.rewind===undefined)delete contact.rewind;else contact.rewind=body.rewind;
   return contact;
@@ -32,6 +34,8 @@ export function seenShift(host: SimHost, viewTick: number, target: AnimalSim, ou
   return seen === undefined ? null : out.subVectors(seen.position, target.position);
 }
 /** A blow as the pipeline should settle it: the wire keeps where its shooter saw it. */
-export function seenRequest(req: DamageRequest, hit: { readonly seen?: Vector3;readonly rewind?:HitRewind }): DamageRequest {
-  return hit.seen === undefined ? req : { ...req, seen: hit.seen,...(hit.rewind===undefined?{}:{rewind:hit.rewind}) };
+export function seenRequest(req: DamageRequest, hit: { readonly seen?: Vector3;readonly rewind?:HitRewind; readonly part?: string; readonly multiplier?: number }): DamageRequest {
+  if (hit.seen === undefined && hit.part === undefined) return req;
+  return { ...req, ...(hit.part === undefined ? {} : { part: hit.part, partMultiplier: hit.multiplier, headshot: hit.part === 'head' }),
+    ...(hit.seen === undefined ? {} : { seen: hit.seen }), ...(hit.rewind === undefined ? {} : { rewind: hit.rewind }) };
 }

@@ -20,7 +20,7 @@ export interface JavelinFlightProfile {
   readonly radius: number; readonly headOffset: number;
 }
 /** a creature the head swept into */
-export interface JavelinTargetHit { readonly animal: { readonly alive: boolean }; readonly point: THREE.Vector3; readonly headshot: boolean }
+export interface JavelinTargetHit { readonly animal: { readonly alive: boolean }; readonly point: THREE.Vector3; readonly headshot: boolean; readonly part?: string; readonly multiplier?: number }
 export interface JavelinPorts<H extends JavelinTargetHit> {
   /** the world along the head's sweep (the physics query), null: clear */
   readonly worldHit: (from: THREE.Vector3, to: THREE.Vector3, radius: number) => Hit | null;
@@ -85,8 +85,8 @@ export class JavelinFlight<H extends JavelinTargetHit = JavelinTargetHit> {
         if (ports.raycast !== null) {
           const hit = ports.raycast(v3, dir, wall ? wall.distance : len);
           if (hit?.animal.alive === true) {
-            const dmg = Math.round(profile.damage * (hit.headshot ? profile.headMultiplier : 1) * ports.damageScale());
-            ports.strike(hit, dmg, dir);
+            const dmg = Math.round(profile.damage * (hit.multiplier ?? (hit.headshot ? profile.headMultiplier : 1)) * ports.damageScale());
+            if (hit.multiplier !== 0) ports.strike(hit, dmg, dir);
             this.drop(j, hit.point);
             break;
           }

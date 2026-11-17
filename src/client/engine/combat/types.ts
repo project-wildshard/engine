@@ -7,7 +7,7 @@ export interface TargetAnimal {
   /** Ambient presentation owns this target; it has no replicated damage row. */
   readonly presentationOnly?: boolean;
   hitFlash?: (strength: number) => void;
-  applyDamage: (amount: number, point: Vector3, dir: Vector3) => boolean;
+  applyDamage: (amount: number, point: Vector3, dir: Vector3, part?: string) => boolean;
   damageFor: (headshot: boolean, dist: number) => number;
   kind: string;
   position: Vector3;
@@ -18,5 +18,5 @@ export interface TargetAnimal {
   readonly dims?: { readonly bodyY: number; readonly bodyRadius?: number };
   readonly scale?: number;
 }
-export interface TargetHit { animal: TargetAnimal; point: Vector3; distance: number; headshot: boolean }
+export interface TargetHit { animal: TargetAnimal; point: Vector3; distance: number; headshot: boolean; part?: string; multiplier?: number }
 export interface Targets { raycast: (origin: Vector3, dir: Vector3, maxDist: number) => TargetHit | null }

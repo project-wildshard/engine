@@ -4,6 +4,7 @@ import type { ImpactSurface } from './Weapon';
 import type { TargetAnimal, TargetHit } from '../../../client/engine/combat/types';
 import { projectileFlightStep, ProjectileSlots, type FlightSlot, type ProjectileFlight } from './projectileFlight';
 import { ProjectileContact, StoppedProjectileSlots, type StoppedProjectile } from './projectileContact';
+import { rangedTargetDamage, applyTargetDamage } from './targetDamage';
 
 /**
  * A drawn projectile's whole law with no scene (an arrow, a patrol's arrow at the player): the flight slots, the wind,
@@ -44,7 +45,7 @@ export interface ProjectileLawPorts<V extends object, S> {
   readonly targetHit: (hit: TargetHit) => void;
   readonly hit: (kind: string, headshot: boolean, killed: boolean, point: Vector3, damage: number) => void;
   /** Who lands a shot's damage, and whether it killed. Absent, it lands on the target with no owner. */
-  readonly strike?: (flight: V, animal: TargetAnimal, damage: number, point: Vector3, direction: Vector3) => boolean;
+  readonly strike?: (flight: V, animal: TargetAnimal, damage: number, point: Vector3, direction: Vector3, part?: string) => boolean;
 }
 
 /** the ball an arrow sweeps through the world (the broadhead) */
@@ -108,8 +109,9 @@ export class ProjectileLaw<V extends object, S> {
         // an own shot off the wire is the server's to settle: here it only stops where it struck
         if (flight.shot !== 0) { this.stop(flight, hit.point, direction, 'flesh', animal.alive ? animal : null, true); return; }
         ports.targetHit(hit);
-        const damage = Math.max(1, Math.round(animal.damageFor(hit.headshot, hit.point.distanceTo(flight.origin)) * flight.scale * (flight.hitScale?.(hit) ?? 1)));
-        const killed = ports.strike?.(flight, animal, damage, hit.point, direction) ?? animal.applyDamage(damage, hit.point, direction);
+        const damage = hit.multiplier === 0 ? 0 : Math.max(1, Math.round(rangedTargetDamage(hit, hit.point.distanceTo(flight.origin)) * flight.scale * (flight.hitScale?.(hit) ?? 1)));
+        const killed = damage === 0 ? false : ports.strike === undefined ? applyTargetDamage(hit, damage, direction)
+          : hit.part === undefined ? ports.strike(flight, animal, damage, hit.point, direction) : ports.strike(flight, animal, damage, hit.point, direction, hit.part);
         ports.hit(animal.kind, hit.headshot, killed, hit.point, damage);
         this.stop(flight, hit.point, direction, 'flesh', animal.alive ? animal : null, true);
         if (!animal.alive) this.stopped.dropLast();

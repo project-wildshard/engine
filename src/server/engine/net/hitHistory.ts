@@ -5,6 +5,7 @@ import type { AnimalSim } from '../../../shared/engine/entities/AnimalSim';
 import { hitHistoryOf, publishHitHistory } from '../combat/rewind';
 import type { SimHost } from '../sim';
 import type {HitRewind} from '../../../shared/engine/net/measurements';
+import type { CreatureVolumePose } from '../../../shared/engine/physics/creatureVolumes';
 
 /** The furthest back a hit reads, in ticks: 200 ms at 60 Hz (J50). Past it the shooter leads. */
 export const REWIND_TICKS = 12;
@@ -24,7 +25,13 @@ export class RewoundBody {
   readonly position: Vector3 = new Vector3();
   readonly body: AnimalSim;
   private cos = 1; private sin = 0;
-  constructor(body: AnimalSim) { this.body = body; }
+  readonly hitVolumes: CreatureVolumePose | undefined;
+  constructor(body: AnimalSim) {
+    this.body = body;
+    const authored = body.hitVolumes;
+    this.hitVolumes = authored === undefined ? undefined : { volumes: authored.volumes,
+      segment: (index, rear, front) => { authored.segment(index, rear, front); this.past(rear); this.past(front); } };
+  }
   get entityId(): string { return this.body.entityId; }
   get alive(): boolean { return this.body.alive; }
   get hidden(): boolean { return 'hidden' in this.body && this.body.hidden === true; }

@@ -1,5 +1,7 @@
 import { installDataCreatureBands } from '../shardfile/dataCreatureBands';
 import { bindCreatureSenses, installCreatureSensesContract } from '../shardfile/creatureSenses';
+import { installCreatureVolumes } from '../shardfile/creatureVolumes';
+import type { CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { dataPerchBrains, preflightPlainPerches } from '../shardfile/dataPerchBrains';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
@@ -461,6 +463,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
   try {
     const creatures = prepareCreaturePolicies(shard.rows, shard.creatures);
     installCreatureSensesContract(host, shard.rows, creatures.spawns);
+    installCreatureVolumes(host, shard, assets);
     if (ports.brains === undefined && shard.runtime === null) installDataCreatureBands(host, shard.rows, creatures);
     installLadders(host, shard.modes?.traverse.filter(row => row.kind === 'ladder') ?? [], ports.ladders);
     const portals = portalLinkEntries(shard.entryways), portalErrors = portalLinkRules(portals, shard);
@@ -1610,7 +1613,7 @@ export interface NativeContactVolumes extends NativeMeleeVolumes {
   readonly fore?: { readonly a: Vector3; readonly b: Vector3; readonly radius: number } | null;
 }
 /** Caller-owned result storage, refilled without per-query allocation. */
-export interface NativeVolumeContact { distance: number; point: Vector3; head: boolean }
+export interface NativeVolumeContact { distance: number; point: Vector3; head: boolean; part?: string; multiplier?: number }
 const contactAp = new Vector3(), contactAb = new Vector3(), contactAo = new Vector3();
 /** The distance along the unit ray (origin, dir) to a ball, within `max`, or Infinity (0 from inside it, as Rapier's solid cast). */
 function contactSphereRay(origin: Vector3, dir: Vector3, centre: Vector3, r: number, max: number): number {
@@ -1682,6 +1685,7 @@ export interface NativeTargetPose {
   readonly headWorld: (out: Vector3) => Vector3;
   readonly bodyCapsule: (rear: Vector3, front: Vector3) => void;
   readonly foreCapsule?: (rear: Vector3, front: Vector3) => boolean;
+  readonly hitVolumes?: CreatureVolumePose | undefined;
 }
 /** Minimal actor query port. Ownership, bodies and hit events stay with the host. */
 export interface NativeTargetBody extends NativeTargetPose {
@@ -1693,6 +1697,7 @@ export interface NativeTargetBody extends NativeTargetPose {
 /** Reused nearest ray result. Copy its point before another query if retained. */
 export interface NativeTargetHit<T extends NativeTargetBody> {
   body: T | null; head: boolean; distance: number; point: Vector3;
+  part?: string; multiplier?: number;
 }
 /** One owned pose/scratch reader, with bounded original-order roster queries. */
 export interface NativeTargetQueries<T extends NativeTargetBody> {
@@ -1713,6 +1718,7 @@ export function createNativeTargetQueries<T extends NativeTargetBody>(ports: {
   const fore = { a: new Vector3(), b: new Vector3(), radius: 0 };
   const result = { distance: 0, point: new Vector3(), head: false };
   const hit: NativeTargetHit<T> = { body: null, head: false, distance: 0, point: new Vector3() };
+  const rear = new Vector3(), front = new Vector3();
   const read = (body: T): void => {
     const pose = ports.pose?.(body) ?? body, d = body.dims, s = body.scale;
     pose.headWorld(volumes.head); volumes.headRadius = d.headRadius * s;
@@ -1728,17 +1734,43 @@ export function createNativeTargetQueries<T extends NativeTargetBody>(ports: {
       for (let i = 0; i < 512; i++) {
         const body = bodies[i]; if (body === undefined) break;
         if (!body.alive || body.hidden === true) continue;
+        const authored = body.hitVolumes;
+        if (authored !== undefined) {
+          for (let index = 0; index < authored.volumes.length; index++) {
+            const volume = authored.volumes[index]; if (volume === undefined) break;
+            authored.segment(index, rear, front);
+            const distance = contactCapsuleRay(origin, direction, rear, front, volume.radius, best);
+            if (distance < best) {
+              best = distance; found = true; hit.body = body; hit.head = volume.part === 'head';
+              hit.part = volume.part; hit.multiplier = volume.multiplier;
+              hit.distance = best; hit.point.copy(origin).addScaledVector(direction, best);
+            }
+          }
+          continue;
+        }
         const d = body.dims, s = body.scale;
         if (body.position.distanceTo(origin) > best + (d.bodyHalfLen + d.bodyRadius + d.headRadius) * s + d.bodyY * s + 2) continue;
         read(body);
         if (nativeVolumeContact(origin, direction, best, volumes, result) && result.distance < best) {
           best = result.distance; found = true; hit.body = body; hit.head = result.head;
+          delete hit.part; delete hit.multiplier;
           hit.distance = best; hit.point.copy(result.point);
         }
       }
       return found ? hit : null;
     },
-    closest: (body, origin, limit, out) => { read(body); return nativeVolumeContact(origin, null, limit, volumes, out); },
+    closest: (body, origin, limit, out) => {
+      const authored = body.hitVolumes;
+      if (authored === undefined) { delete out.part; delete out.multiplier; read(body); return nativeVolumeContact(origin, null, limit, volumes, out); }
+      let best = Infinity;
+      for (let index = 0; index < authored.volumes.length; index++) {
+        const volume = authored.volumes[index]; if (volume === undefined) break;
+        authored.segment(index, rear, front);
+        const distance = contactCapsuleSkin(origin, rear, front, volume.radius, best, out);
+        if (distance < best) { best = distance; out.part = volume.part; out.multiplier = volume.multiplier; out.head = volume.part === 'head'; }
+      }
+      out.distance = best; return best <= limit;
+    },
   };
 }
 

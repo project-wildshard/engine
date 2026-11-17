@@ -207,7 +207,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
     const hit = nativeRangedHit([...host.entities.values()], eyeAt, along, wall === null ? profile.range : wall.distance), body = hit?.body ?? null;
     if (hit === null || body === null) return;
     host.combat.hit({ source: player.health, sourceTags: row.light.tags, target: body.combatActor(), amount: row.light.damage, from: eyeAt.clone(), point: hit.point.clone(),
-      dir: along.clone(), weaponId: row.id, moveId: row.light.id, headshot: hit.head, attackSeq: seq });
+      dir: along.clone(), weaponId: row.id, moveId: row.light.id, headshot: hit.head, attackSeq: seq,
+      ...(hit.part === undefined ? {} : { part: hit.part, partMultiplier: hit.multiplier }) });
   };
   // Pine's trigger (`cycleItem`): a chambered round fires; an empty chamber throws the lever, or starts a reload when the tube is dry too.
   const pull = (player: PlayerSim, lever: NonNullable<ReturnType<typeof heldLever>>, direction: AimCommand['direction'], seq: number): void => {
