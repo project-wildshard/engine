@@ -1234,7 +1234,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     // NB6 adds a blocking Nine observation beside the packed shares. Its
     // build may run separately; neither job changes J400's reporting split.
     const nineJobs = new Set(['nine-ring1', 'nine-ring1-build']);
-    expect([...jobs.keys()].filter(name => !nineJobs.has(name))).toEqual(['tests', 'products', 'boundaries']);
+    expect([...jobs.keys()].filter(name => !nineJobs.has(name ?? ''))).toEqual(['tests', 'products', 'boundaries']);
     expect(jobs.has('nine-ring1')).toBe(true);
     expect(text).toContain('job: [1, 2, 3, 4, 5, 6, 7, 8]');
     expect(jobs.get('products')).toContain('job: [9]');

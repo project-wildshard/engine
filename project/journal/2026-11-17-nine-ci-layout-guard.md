@@ -17,5 +17,7 @@ Nine may consume products without delaying those original jobs.
 The original focused case failed first against both the published
 single Nine job and the peer's pending split build/observation layout.
 All 66 cases in test/land.test.ts then passed in 94.17 seconds.
+The normal push gate caught an optional regex capture in the job-name
+filter; handling that capture explicitly retains the same assertion.
 Only this test and journal belong to codex-tc48. Peer workflow and
 native-residency edits remain outside this fix. No pins or bypasses.
