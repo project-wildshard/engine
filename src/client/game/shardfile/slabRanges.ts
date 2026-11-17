@@ -434,7 +434,7 @@ function backs(ranges: SlabRanges, node: number): boolean {
   return cos * reach > Math.sqrt(Math.max(0, 1 - cos * cos)) * Math.sqrt(fx * fx + fy * fy + fz * fz) + 1e-4 * reach;
 }
 /** NB23 (b): each far level's ranges while a view is collected, appended after the leaves' own (`visibleSlabDraws`) */
-const farDraws: SlabDraws[] = [];
+const farDraws: (SlabDraws | undefined)[] = [];
 function collect(ranges: SlabRanges, node: number, angle: number, facing: boolean, out: SlabDraws, farAngle: number): void {
   if (!visible(ranges.boxes, node)) return;
   const { nodes, boxes, size } = ranges, left = nodes[node * 4] ?? -1;
@@ -474,14 +474,18 @@ export function visibleSlabDraws(ranges: SlabRanges, world: Matrix4, camera: Cam
   frustum.setFromProjectionMatrix(clip, WebGLCoordinateSystem, camera.reversedDepth);
   local.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inverse.copy(world).invert());
   out.n = 0; out.total = 0;
-  for (const draws of farDraws) { draws.n = 0; draws.total = 0; }
+  for (const draws of farDraws) if (draws !== undefined) { draws.n = 0; draws.total = 0; }
   collect(ranges, 0, angle, facing, out, farAngle);
   // NB23 (b): the far levels' ranges after the leaves' own (each level's run is in index order, so it joins as the leaves'
   // own do; two levels never join)
-  for (const draws of farDraws) for (let i = 0; i < draws.n; i++) {
-    const n = out.n;
-    if (n === out.starts.length) { const starts = new Int32Array(n * 2), counts = new Int32Array(n * 2); starts.set(out.starts); counts.set(out.counts); out.starts = starts; out.counts = counts; }
-    out.starts[n] = draws.starts[i] ?? 0; out.counts[n] = draws.counts[i] ?? 0; out.n = n + 1; out.total += draws.counts[i] ?? 0;
+  for (const draws of farDraws) {
+    // A coarser level can draw before the finer levels have scratch buffers.
+    if (draws === undefined) continue;
+    for (let i = 0; i < draws.n; i++) {
+      const n = out.n;
+      if (n === out.starts.length) { const starts = new Int32Array(n * 2), counts = new Int32Array(n * 2); starts.set(out.starts); counts.set(out.counts); out.starts = starts; out.counts = counts; }
+      out.starts[n] = draws.starts[i] ?? 0; out.counts[n] = draws.counts[i] ?? 0; out.n = n + 1; out.total += draws.counts[i] ?? 0;
+    }
   }
   nothingInView = out.n === 0;
   if (out.n === 0) { let node = 0; while ((ranges.nodes[node * 4] ?? -1) >= 0) node = ranges.nodes[node * 4] ?? 0; push(out, ranges.nodes[node * 4 + 2] ?? 0, ranges.nodes[node * 4 + 3] ?? 0); }

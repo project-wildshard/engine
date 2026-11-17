@@ -452,6 +452,19 @@ test('a far level that does not fit the room is left out; a finer one that fits 
   expect(Array.from(far.starts).some((start, at) => at % levels === 0 && start >= 0)).toBe(true);
 });
 
+// Keep this before the other far-angle draws so the finer-level scratch is empty.
+test('the first slab draw can use only the coarsest far level', () => {
+  const { ranges } = farWall([0.3, 0.8]), world = new Matrix4();
+  const view = new PerspectiveCamera(70, 402 / 874, 0.1, 2000);
+  view.position.set(0, 1.5, 100); view.lookAt(0, 1.5, 0); view.updateMatrixWorld(true);
+  const out = blankDraws();
+  const first = visibleSlabDraws(ranges, world, view, 0.001, out, false, 0.02);
+  expect(first.total).toBeGreaterThan(0);
+  expect(first.starts[0]).toBeGreaterThanOrEqual(ranges.triangles);
+  const total = first.total;
+  expect(visibleSlabDraws(ranges, world, view, 0.001, out, false, 0.02).total).toBe(total);
+});
+
 test('a leaf at least cell / farAngle away draws its far level, a nearer one its own triangles, and angle 0 draws none', () => {
   const { ranges } = farWall([0.3, 0.8]), world = new Matrix4();
   const out: SlabDraws = { starts: new Int32Array(8), counts: new Int32Array(8), n: 0, total: 0 };
