@@ -331,6 +331,39 @@ jobs:
     env: *packed-env
     steps: *packed-steps
 
+  nine-ring1:
+    # NB6 needs full Nine; the packed products unit installs only its server
+    # slice. Keep its standalone props check and measured street workload
+    # blocking, without promoting or rewriting any pin or NB8/NB23 target.
+    needs: products
+    if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WS_LANE_NAME: nine-ring1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Own the benchmark scratch folder
+        run: node scripts/scratch-dir.mjs nine-ring1 'NB6 pinned Nine load and street ratchet'
+      - name: Install Chromium
+        run: bash scripts/ci-playwright-install.sh --no-shell chromium
+      - name: Build full pinned Nine
+        run: node scripts/nine-ring1.mjs build
+      - name: Refuse load stalls and street workload regressions
+        run: node scripts/nine-ring1.mjs boot && node scripts/nine-ring1.mjs bench
+      - name: Keep Nine measurements and stock boot evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nine-ring1
+          path: |
+            tmp/nine-ring1/street.json
+            tmp/nine-ring1/boot
+          retention-days: 7
+
   boundaries:
     # TS15: blocking after main run 43768938893's green soak, 2026-11-15. Cook Ring 1, attach, and play the same bytes.
     # Its own runner starts at t=0 (EV3b), never behind products.

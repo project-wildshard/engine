@@ -15,16 +15,19 @@
 //   --seconds 600: NINE-DRAGON-BENCHMAX NB5's sustained run, printed per minute.
 //   --warm-base <url>: revisit on the same origin with another build, retaining the native caches.
 //   --assert-home-spans: NB13 refuses an unnamed home interval longer than one second.
+//   --ratchet: NB6 holds the measured Nine street workload, load stalls, and hardware timing (nine-ratchet.mjs).
 import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { chromium, devices } from 'playwright';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays } from '../debug-settings.mjs';
-import { bootTimelineEntries, clockMarkExpression, profileAnchor, profileIdle, stageStalls, stageGaps, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
+import { bootTimelineEntries, clockMarkExpression, profileAnchor, profileIdle, stageStalls, stageGaps, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
+import {nineFaults} from './nine-ratchet.mjs';
+import {holdCpu} from '../cpu-admission.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
   seconds: { type: 'string', default: '60' }, json: { type: 'string' }, profile: { type: 'string' },
-  dpr: { type: 'string', default: '2' }, window: { type: 'string' }, 'warm-base': {type: 'string'}, 'assert-home-spans': {type: 'boolean', default: false}, route: { type: 'string', default: 'auto' } } });
+  dpr: { type: 'string', default: '2' }, window: { type: 'string' }, 'warm-base': {type: 'string'}, 'assert-home-spans': {type: 'boolean', default: false}, route: { type: 'string', default: 'auto' }, ratchet: {type:'boolean',default:false}, angle:{type:'string'} } });
 if (values.base === undefined) { console.error('usage: benchmax.mjs --base <url> [--shard <card title regex>] [--throttle 4] [--seconds 60] [--dpr 2] [--json <file>] [--profile <file>]'); process.exit(2); }
 // --window <css W>x<css H>@<scale>: a desktop browser window instead of the phone (NB5, Jake's Mac: 1496x717@2 is 2992x1434), desktop tier
 const desktop = /^(\d+)x(\d+)@([\d.]+)$/u.exec(values.window ?? '');
@@ -42,8 +45,10 @@ const ROUTES = { spin: null, nine: { reach: 6, points: [[3, -20], [6, -60], [5, 
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
-const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const cpu = await holdCpu(1, {inherit:true});
+let browser;
 try {
+  browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', `--use-angle=${values.angle ?? (process.platform === 'darwin' ? 'metal' : 'swiftshader')}`, '--ignore-gpu-blocklist'] });
   const context = desktop === null ? await browser.newContext({ ...devices['iPhone 16 Pro'], viewport: { width: 402, height: 874 }, deviceScaleFactor: 2 })
     : await browser.newContext({ viewport: { width: Number(desktop[1]), height: Number(desktop[2]) }, deviceScaleFactor: Number(desktop[3]) });
   await developerSettings(context, { tier: desktop === null ? 'phone' : 'desktop', volume: 0 });
@@ -97,19 +102,21 @@ try {
   if (!await until(`document.querySelector('.ws-menu-card.selected')?.dataset.i === '${target}' && !document.querySelector('.ws-menu-play')?.disabled`, 15_000)) throw new Error(`${titles[target]} never selectable`);
   await sleep(800);
   // --profile: a Chromium CPU profile (1 ms samples) from the tap to control, for naming a stretch's main-thread work
-  if (values.profile !== undefined) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
+  if (values.profile !== undefined || values.ratchet) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
   await page.evaluate(`setTimeout(() => document.querySelector('.ws-menu-play').click(), 0)`);
   const control = `(() => { const w = window.__wildshard?.world, l = document.querySelector('.ws-load');
     const shown = !!l && l.isConnected && l.getClientRects().length > 0 && getComputedStyle(l).display !== 'none' && Number(getComputedStyle(l).opacity) > .05;
     try { return !!w?.hud.entered && !w.hud.paused && w.game.frameGate() && !shown; } catch { return false; } })()`;
   if (!await until(control, 240_000)) throw new Error('never reached control');
-  if (values.profile !== undefined) {
+  const loadFaults = [];
+  if (values.profile !== undefined || values.ratchet) {
     // the profile's end is the page's `performance.now()` read just before the stop (its clock is the profiler's own)
     const markPageMs = Number(await page.evaluate(clockMarkExpression())), pageEnd = await page.evaluate('performance.now()');
     const { profile } = await cdp.send('Profiler.stop');
-    writeFileSync(values.profile, JSON.stringify({ pageEnd, profile }));
+    if (values.profile !== undefined) writeFileSync(values.profile, JSON.stringify({ pageEnd, profile }));
     // NB6: the ring-1 stall ratchet's own reading of this load (stalls.mjs), every load stage
     const entries = await page.evaluate(bootTimelineEntries), idle = profileIdle(profile, profileAnchor(profile, markPageMs));
+    if (values.ratchet) loadFaults.push(...stallFaults(entries, idle));
     for (const row of stageStalls(entries, idle, ['product', 'sky', 'props', 'level.kit', 'weapon', 'finish', 'shaders', 'firstFrame', 'readyFrame', 'server'])) {
       console.log(`stall ratchet ${row.stage.padEnd(11)} worst ${(row.idleMs / 1000).toFixed(2)} s idle of a ${(STALL_WINDOW_MS / 1000).toFixed(1)} s window (limit ${(STALL_WINDOW_MS * STALL_IDLE_SHARE / 1000).toFixed(2)})`);
     }
@@ -297,6 +304,10 @@ try {
   const network = transfers.filter(row => !row.fromServiceWorker && !row.fromDiskCache);
   const cacheCheck = {spawnParts: network.filter(row => /\/assets\/spawn\/parts\/.*\.pack\.br/u.test(row.url)).length, paint: network.filter(row => /\/assets\/nine-dragon\/paint\/.*\.phone\.webp/u.test(row.url)).length};
   console.log(`network: ${cacheCheck.spawnParts} spawn parts, ${cacheCheck.paint} phone paint files`);
-  if (values.json !== undefined) writeFileSync(visit === 0 ? values.json : values.json.replace(/(\.json)?$/u, '-warm.json'), `${JSON.stringify({ shard: titles[target], base: visitBase, throttle, dpr: values.dpr, load, play, shadow, where, cacheCheck, transfers, resources }, null, 1)}\n`);
+  const renderer = await page.evaluate(() => { const gl = window.__wildshard.requireWorld().game.renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'); return String(gl.getParameter(ext === null ? gl.RENDERER : ext.UNMASKED_RENDERER_WEBGL)); });
+  const reading = {renderer, seconds, throttle, dpr: Number(values.dpr), phone: desktop === null, load, play};
+  const faults = values.ratchet ? [...loadFaults,...nineFaults(reading)] : [];
+  if (values.ratchet) { console.log(`NB6 ${renderer}: ${faults.length === 0 ? 'GREEN' : 'RED'}`); for (const fault of faults) console.error(fault); if (faults.length > 0) process.exitCode = 1; }
+  if (values.json !== undefined) writeFileSync(visit === 0 ? values.json : values.json.replace(/(\.json)?$/u, '-warm.json'), `${JSON.stringify({ shard: titles[target], base: visitBase, ...reading, shadow, where, cacheCheck, transfers, resources, faults }, null, 1)}\n`);
   }
-} finally { await browser.close(); }
+} finally { try { await browser?.close(); } finally { await cpu.release(); } }
