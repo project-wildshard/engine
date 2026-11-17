@@ -14,7 +14,7 @@ clock and all stall thresholds. An unrelated clock read cannot count.
 Missing mark evidence remains fatal and now names node/sample counts.
 
 The hosted raw profile was not retained. A real Chromium control
-reproduces the same missing-mark error in 100 of 100 profiles with
+reproduces the same missing-mark error in 83 of 100 profiles with
 sampled children and a present marker. The patch anchors all 100.
 The ordinary clock also passed 100 profiles before the change.
 The sampled-child unit failed first; absent-marker controls still fail.
