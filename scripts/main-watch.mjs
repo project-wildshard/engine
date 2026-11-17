@@ -28,7 +28,7 @@ import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 export const REPO='project-wildshard/engine';
 const KEEP=500;
 
-/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean}} Run */
+/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,started?:boolean}} Run */
 /** @typedef {{judged:number[],dispatched:string[]}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
@@ -158,17 +158,27 @@ export function liveIo(env=process.env){
   // MF12 (4): reads go through the reader App when this machine has it; the dispatch stays on the user's login.
   const read=(/** @type {string[]} */args)=>execFileSync('gh',args,{cwd:root,encoding:'utf8',env:readerEnv(env),stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
   const runsCache=resolve(env.WS_MAIN_WATCH_RUNS_CACHE??join(homedir(),'.cache/wildshard/main-watch-runs.json'));
+  const state=resolve(env.WS_MAIN_WATCH_STATE??join(homedir(),'.cache/wildshard/main-watch.json'));
   return {
     repo,
     quotaReset:()=>quotaReset(),
-    state:resolve(env.WS_MAIN_WATCH_STATE??join(homedir(),'.cache/wildshard/main-watch.json')),
+    state,
     // MF12: every land leaves a follow running for up to 90 min, so one machine can hold several; they share one fetch.
     runs:()=>sharedRuns(runsCache,()=>{
       /** @type {Run[]} */let prior=[];
       try{const kept=JSON.parse(readFileSync(runsCache,'utf8')).runs;if(Array.isArray(kept))prior=kept;}catch{/* First fetch. */}
+      const judged=new Set(readState(state)?.judged??[]);
       return /** @type {Run[]} */(JSON.parse(read(['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs)
         .filter(row=>row.event==='push'||row.event==='workflow_dispatch').map(row=>{
-          if(!finished(row)||cancelled(row)||row.conclusion==='success')return row;
+          if(!finished(row)||row.conclusion==='success'||judged.has(row.id))return row;
+          if(cancelled(row)){
+            const kept=prior.find(old=>old.id===row.id&&typeof old.started==='boolean'&&(old.run_attempt??1)===(row.run_attempt??1));
+            if(kept!==undefined)return kept;
+            // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
+            // the jobs, rather than that workflow timestamp, say whether any work actually started.
+            const jobs=/** @type {{started_at:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
+            return {...row,started:jobs.some(job=>job.started_at!==null)};
+          }
           const kept=prior.find(old=>old.id===row.id&&old.blockingChecked===true&&(old.run_attempt??1)===(row.run_attempt??1));
           if(kept!==undefined)return kept;
           const jobs=/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
@@ -229,7 +239,9 @@ export function sweep(io,hint={}){
       // Everything a report needs is read first; the run is recorded; only then does the report go out. A failed
       // read leaves the run for the next sweep, and a report is never sent twice.
       /** @type {string[]} */const lines=[];/** @type {{lane:string,pane:string|undefined,text:string}[]} */const messages=[];
-      if(verdict.kind==='superseded')lines.push(`main ${short(run.head_sha)} superseded by ${short(verdict.by)} (run ${run.id} cancelled; never red)`);
+      if(verdict.kind==='superseded')lines.push(run.started===false
+        ?`main ${short(run.head_sha)} skipped (pending, replaced) by ${short(verdict.by)} (run ${run.id}; never started; never red)`
+        :`main ${short(run.head_sha)} superseded by ${short(verdict.by)} (run ${run.id} cancelled; never red)`);
       else if(verdict.kind==='dispatch')lines.push(`main ${short(run.head_sha)} has only a cancelled run (${run.id}) and nothing newer; dispatched ci on main once`);
       else{
         const commits=io.commits(verdict.from??null,run.head_sha),range=`${short(verdict.from)||'start'}..${short(run.head_sha)}`;

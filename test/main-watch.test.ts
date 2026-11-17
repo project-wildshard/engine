@@ -89,6 +89,21 @@ test('a first run only records what is finished; later sweeps report each new ru
   expect(sweep(io)).toEqual([]);
 });
 
+test('CIQ1 names replaced pending runs as skipped while started cancellations stay superseded', () => {
+  const w = world(replay.slice(0, 1)), io = fake('pending-replaced', w);
+  sweep(io);
+  w.runs = replay.map(row => ({ ...row, started: row.id === 42965336189 ? false : true }));
+  w.tip = sha('652afa6c');
+  sweep(io); sweep(io);
+  expect(w.receipts.filter(line => line.includes('never red'))).toEqual([
+    'main 7257ca5300 skipped (pending, replaced) by 6363b3f300 (run 42965336189; never started; never red)',
+    'main 6363b3f300 superseded by 652afa6c00 (run 42966114949 cancelled; never red)',
+  ]);
+  expect(w.dispatched).toBe(0);
+  expect(w.sent).toEqual([]);
+  expect(verdictFor(w.runs, sha('7257ca53'), contains)?.state).toBe('green');
+});
+
 test('a real red gives exactly one receipt with its range and landers over two sweeps, and messages each lander', () => {
   const log = [
     '05:50 UTC opus-red land plan/red-plan landed aaaa111100 on main (652afa6c00..aaaa111100); carried; rounds 1',
