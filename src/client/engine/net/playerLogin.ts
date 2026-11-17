@@ -151,7 +151,8 @@ export async function addPasskey(ports: LoginPorts, game: string): Promise<boole
 }
 
 // MMO-PLAN MP2.5c (delete and export): a signed-in player's own data lives in two places, the door's saves (engine
-// `host/dedicated/accountRoutes.ts`, asked with this device's join ticket) and the API's account (asked with the session).
+// `host/dedicated/accountRoutes.ts`) and the API's account (asked with the session). MP2.5e (review S3): the door takes only a
+// five-minute confirm the API mints for the session on the tap (`/api/players/me/confirm`), never the join ticket hellos carry.
 /** The door's HTTP origin beside its rooms socket (`wss://rooms…` → `https://rooms…`), or undefined. */
 export function doorOf(socket: string): string | undefined {
   try {
@@ -164,20 +165,21 @@ export function doorOf(socket: string): string | undefined {
 async function nothingSaved(response: Response): Promise<boolean> {
   try { const body: unknown = await response.json(); return typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'nothing saved'; } catch { return false; }
 }
-async function askDoor(ports: LoginPorts, door: string, route: string, device: string): Promise<Response | undefined> {
-  const ticket = await ticketBeforeJoin(ports, device);
-  if (ticket === undefined) return undefined;
+const CONFIRM = /^confirm:[0-9a-f]{32}\.[0-9]{1,12}\.[0-9a-f]{128}$/u;
+async function askDoor(ports: LoginPorts, door: string, route: string, session: string): Promise<Response | undefined> {
+  const ticket = (await json(await post(ports, '/api/players/me/confirm', {}, { session })))?.['ticket'];
+  if (typeof ticket !== 'string' || !CONFIRM.test(ticket)) return undefined;
   try { return await ports.fetch(`${door}${route}`, { method: 'POST', headers: { authorization: `Ticket ${ticket}` } }); } catch { return undefined; }
 }
 /** Both halves of the player's data for one file: `game` is null when the door has nothing (or no door). Undefined: the API refused. */
-export async function exportMine(ports: LoginPorts, door: string | undefined, device: string): Promise<{ readonly api: unknown; readonly game: unknown } | undefined> {
+export async function exportMine(ports: LoginPorts, door: string | undefined): Promise<{ readonly api: unknown; readonly game: unknown } | undefined> {
   const session = signedIn(ports)?.session;
   if (session === undefined) return undefined;
   const api = await json(await post(ports, '/api/players/me/export', {}, { session }));
   if (api === undefined) return undefined;
   if (door === undefined) return { api, game: null };
   // only a 404 means the door holds nothing; any other failure would hand over a file missing the saves
-  const asked = await askDoor(ports, door, '/account/export', device);
+  const asked = await askDoor(ports, door, '/account/export', session);
   if (asked?.status === 404 && await nothingSaved(asked)) return { api, game: null };
   const game = asked?.ok === true ? await json(asked) : undefined;
   return game === undefined ? undefined : { api, game };
@@ -185,11 +187,11 @@ export async function exportMine(ports: LoginPorts, door: string | undefined, de
 /** How a delete went: everything gone and signed out, refused while the player is in the world, or stopped (nothing more deleted). */
 export type Deleted = 'deleted' | 'playing' | 'failed' | 'saves-gone';
 /** Delete the player's saves at the door, then the API account, then sign the page out. A build with no world has only the account. */
-export async function deleteMine(ports: LoginPorts, door: string | undefined, device: string): Promise<Deleted> {
+export async function deleteMine(ports: LoginPorts, door: string | undefined): Promise<Deleted> {
   const session = signedIn(ports)?.session;
   if (session === undefined) return 'failed';
   if (door !== undefined) {
-    const saves = await askDoor(ports, door, '/account/delete', device);
+    const saves = await askDoor(ports, door, '/account/delete', session);
     if (saves?.status === 409) return 'playing';
     if (saves?.ok !== true) return 'failed';
   }

@@ -26,7 +26,7 @@ export interface SignInOptions {
   readonly note?: string;
   /** Tests: the API and storage the card talks to. */
   readonly ports?: LoginPorts;
-  /** MP2.5c: where the player's saves are (the world's door) and this device's id; without it the card offers no data rows. */
+  /** MP2.5c: where the player's saves are (the world's door); without it the card offers no data rows. */
   readonly account?: AccountPorts;
 }
 
@@ -34,7 +34,6 @@ export interface SignInOptions {
 export interface AccountPorts {
   /** The door's HTTP origin, or undefined on a build with no world. */
   readonly door: () => Promise<string | undefined>;
-  readonly device: () => string;
   /** Hand the viewer a file. */
   readonly save: (name: string, text: string) => void;
 }
@@ -139,7 +138,7 @@ function accountRows(own: Scope, ports: LoginPorts, account: AccountPorts, say: 
   const exporting = async (): Promise<void> => {
     download.disabled = true;
     // review M2: a door that can't be read (a bad release file, no network) says try again; the button never sticks
-    const data = await account.door().then(door => exportMine(ports, door, account.device())).catch(() => undefined);
+    const data = await account.door().then(door => exportMine(ports, door)).catch(() => undefined);
     download.disabled = false;
     if (data === undefined) { say(engineString('s_signin_account_failed')); return; }
     account.save(`wildshard-account-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2));
@@ -149,7 +148,7 @@ function accountRows(own: Scope, ports: LoginPorts, account: AccountPorts, say: 
   const deleting = async (): Promise<void> => {
     if (!armed) { armed = true; remove.textContent = engineString('s_signin_delete_confirm'); return; }
     remove.disabled = true;
-    const result = await account.door().then(door => deleteMine(ports, door, account.device())).catch((): Deleted => 'failed');
+    const result = await account.door().then(door => deleteMine(ports, door)).catch((): Deleted => 'failed');
     remove.disabled = false; armed = false; remove.textContent = engineString('s_signin_delete');
     if (result === 'deleted') done(engineString(DELETED[result] as 's_signin_deleted'));
     else say(engineString(DELETED[result] as 's_signin_deleted'));

@@ -18,9 +18,6 @@ import { dropFirstPlay, firstPlayDone, startFirstPlay } from '@wildshard/engine/
 import { lowPowerOn } from '@wildshard/engine/core/graphicsMode';
 import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
 import { openSignIn, saveFile, takeLink, titleLogin, titleSignedIn, type AccountPorts } from '@wildshard/engine/ui/signInCard';
-import { deviceIdentity } from '@wildshard/engine/net/identity';
-import { appIdentity } from '@wildshard/engine/app/identity';
-import { saveEnvironment } from '@wildshard/engine/saves/environment';
 import { engineString } from '@wildshard/engine/strings';
 import { lastEnd, type LastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
@@ -244,10 +241,9 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const signIn = required(main, '.ws-main-signin', HTMLButtonElement);
   const relabel = (): void => { const yes = titleSignedIn(); signIn.textContent = engineString(yes ? 's_signin_account' : 's_signin_open'); signIn.dataset['signedIn'] = String(yes); };
   // MMO-PLAN MP2.5c: ACCOUNT's Download my data and Delete account reach the world's door (read from the signed release file on the
-  // tap, `accountDoor.ts`) with this device's join ticket; the device id is the one the online join sends.
+  // tap, `accountDoor.ts`) with a five-minute confirm the API mints for the session (MP2.5e).
   const account: AccountPorts = {
     door: async () => (await import('./accountDoor')).worldDoor(),
-    device: () => { const page = saveEnvironment().storage('shard'); return page === null ? `device:${crypto.randomUUID()}` : deviceIdentity(page, appIdentity().savePrefix).player; },
     save: saveFile,
   };
   deck.onTap(signIn, () => { void openSignIn(owner, { parent: document.body, changed: relabel, account }); });

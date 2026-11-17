@@ -39,7 +39,7 @@ async function signed(text: string, signature: string, spkiHex: string | undefin
  */
 export async function admit(player: string, spkiHex: string | undefined, nowMs: number): Promise<Admission | undefined> {
   const groups = TICKET.exec(player)?.groups;
-  if (groups === undefined) return player.startsWith('account:') || player.startsWith('ticket:') ? undefined : { seat: player };
+  if (groups === undefined) return player.startsWith('account:') || player.startsWith('ticket:') || player.startsWith('confirm:') ? undefined : { seat: player };
   const { signed: text = '', player: id = '', device = '', expires = '0', signature = '' } = groups;
   const live = Number(expires) * 1000 > nowMs && await signed(text, signature, spkiHex);
   return live ? { seat: `account:plr_${id}`, from: device } : { seat: device };
@@ -48,4 +48,22 @@ export async function admit(player: string, spkiHex: string | undefined, nowMs: 
 /** Just the seat (`admit`'s). */
 export async function seatOf(player: string, spkiHex: string | undefined, nowMs: number): Promise<string | undefined> {
   return (await admit(player, spkiHex, nowMs))?.seat;
+}
+
+// MMO-PLAN MP2.5e (review S3): the door's account routes (`accountRoutes.ts`) take a confirm, never a join ticket. The api-server
+// mints one only for a live session (`POST /api/players/me/confirm`), five minutes long: `confirm:<player>.<expires>.<signature>`,
+// signed by the same key over everything before the last dot. Its own prefix keeps it out of joins (`admit` refuses it) and keeps
+// a join ticket, which every hello carries for an hour, from passing as one.
+const CONFIRM = /^(?<signed>confirm:(?<player>[0-9a-f]{32})\.(?<expires>[0-9]{1,12}))\.(?<signature>[0-9a-f]{128})$/u;
+/** A confirm reaching further ahead than this is refused, whoever signed it: the API mints five minutes. */
+const CONFIRM_MAX_MS = 600_000;
+
+/** The account a live confirm under `spkiHex` names, or undefined (a join ticket, expired, too long, unsigned). */
+export async function confirmed(text: string, spkiHex: string | undefined, nowMs: number): Promise<string | undefined> {
+  const groups = CONFIRM.exec(text)?.groups;
+  if (groups === undefined) return undefined;
+  const { signed: body = '', player: id = '', expires = '0', signature = '' } = groups;
+  const expiresMs = Number(expires) * 1000;
+  if (expiresMs <= nowMs || expiresMs - nowMs > CONFIRM_MAX_MS) return undefined;
+  return await signed(body, signature, spkiHex) ? `account:plr_${id}` : undefined;
 }

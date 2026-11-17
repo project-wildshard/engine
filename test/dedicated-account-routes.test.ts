@@ -2,10 +2,12 @@ import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { afterEach, expect, test } from 'vitest';
 import { accountRoutes, type AccountRoutes } from '../src/server/host/dedicated/accountRoutes';
+import { admit, confirmed } from '../src/server/host/dedicated/ticket';
 
-// MMO-PLAN MP2.5a: a signed-in page asks the door for its saves (export) or to delete them, with a live join ticket as its proof
-// (the same ticket the hello sends, checked offline against the pinned key). A guest, a dead ticket or another site's page gets
-// nothing; an account still in the world can't be deleted from under its body.
+// MMO-PLAN MP2.5a: a signed-in page asks the door for its saves (export) or to delete them, with a live proof checked offline against
+// the pinned key. A guest, a dead proof or another site's page gets nothing; an account still in the world can't be deleted from
+// under its body. MP2.5e (review S3): the proof is the API's five-minute `confirm:` ticket, minted only for a live session, never
+// the hour-long join ticket every hello carries.
 const PLAYER = 'plr_0123456789abcdef0123456789abcdef', ACCOUNT = `account:${PLAYER}`, GAME = 'https://staging.wildshard.io';
 let server: Server | undefined;
 afterEach(async () => { await new Promise(resolve => { server?.close(resolve); if (server === undefined) resolve(undefined); }); server = undefined; });
@@ -14,8 +16,12 @@ function keys(): { privateKey: KeyObject; spkiHex: string } {
   const { privateKey, publicKey } = generateKeyPairSync('ed25519');
   return { privateKey, spkiHex: publicKey.export({ type: 'spki', format: 'der' }).toString('hex') };
 }
-function ticket(key: KeyObject, expires = Math.floor(Date.now() / 1000) + 600): string {
+function joinTicket(key: KeyObject, expires = Math.floor(Date.now() / 1000) + 600): string {
   const signed = `ticket:${PLAYER.slice(4)}.device:phone.${String(expires)}`;
+  return `${signed}.${sign(null, Buffer.from(signed), key).toString('hex')}`;
+}
+function ticket(key: KeyObject, expires = Math.floor(Date.now() / 1000) + 300): string {
+  const signed = `confirm:${PLAYER.slice(4)}.${String(expires)}`;
   return `${signed}.${sign(null, Buffer.from(signed), key).toString('hex')}`;
 }
 async function serve(options: Partial<AccountRoutes> & Pick<AccountRoutes, 'ticketKey'>): Promise<{ url: string; calls: string[] }> {
@@ -85,4 +91,25 @@ test('a database that fails answers 503 and logs no ticket', async () => {
   const pending = await serve({ ticketKey: key.spkiHex, log: line => { lines.push(JSON.stringify(line)); }, deleteAccount: () => Promise.reject(new Error('Player save is pending')) });
   expect((await ask(pending.url, '/account/delete', { ticket: raw, origin: GAME })).status).toBe(503);
   expect(lines.join('\n'), 'review 2: the likely cause is named').toContain('save-pending');
+});
+
+test('review S3: a live join ticket deletes and exports nothing; only a fresh confirm does', async () => {
+  const key = keys(), { url, calls } = await serve({ ticketKey: key.spkiHex });
+  for (const path of ['/account/delete', '/account/export']) {
+    expect((await ask(url, path, { ticket: joinTicket(key.privateKey), origin: GAME })).status, `${path} by a join ticket`).toBe(401);
+  }
+  const far = Math.floor(Date.now() / 1000) + 3600;
+  expect((await ask(url, '/account/delete', { ticket: ticket(key.privateKey, far), origin: GAME })).status, 'a confirm an hour long is no confirm').toBe(401);
+  const forged = ticket(key.privateKey).replace(/^confirm:0/u, 'confirm:1');
+  expect((await ask(url, '/account/delete', { ticket: forged, origin: GAME })).status, 'another player under the same signature').toBe(401);
+  expect(calls).toEqual([]);
+  expect((await ask(url, '/account/delete', { ticket: ticket(key.privateKey), origin: GAME })).status).toBe(200);
+  expect(calls).toEqual([`delete ${ACCOUNT}`]);
+});
+
+test('review S3: a confirm never seats a hello, and a join ticket is never a confirm', async () => {
+  const key = keys();
+  expect(await admit(ticket(key.privateKey), key.spkiHex, Date.now()), 'a confirm as a hello is refused').toBeUndefined();
+  expect(await confirmed(joinTicket(key.privateKey), key.spkiHex, Date.now())).toBeUndefined();
+  expect(await confirmed(ticket(key.privateKey), key.spkiHex, Date.now())).toBe(ACCOUNT);
 });

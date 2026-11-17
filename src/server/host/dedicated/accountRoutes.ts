@@ -1,12 +1,13 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- the door's HTTP server hands these routes its request and response.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AccountExport } from './saves/account';
-import { admit } from './ticket';
+import { confirmed } from './ticket';
 
 // MMO-PLAN MP2.5a (delete and export): a signed-in page's own data, from the door. `POST /account/export` answers everything the
 // saves database holds for the account; `POST /account/delete` deletes it, leaving anonymous ledger rows only (`saves/account.ts`).
-// The proof is a live join ticket in `Authorization: Ticket <ticket>`, checked offline as a hello's is (`ticket.ts`); a guest id, a
-// dead ticket or one another key signed gets 401. Only the game's pages may ask from a browser (the WebSocket's `ALLOWED_ORIGINS`).
+// The proof is a live confirm in `Authorization: Ticket <confirm>`, checked offline against the pinned key (`ticket.ts`): the API mints
+// one, five minutes long, only for a live session (MP2.5e, review S3). A join ticket (an hour long, in every hello), a guest id, a
+// dead confirm or one another key signed gets 401. Only the game's pages may ask from a browser (the WebSocket's `ALLOWED_ORIGINS`).
 // An account still in the world (a body linked, held, loading or crossing) can't be deleted: 409, play leaves first. Neither the
 // ticket nor the account is ever logged.
 
@@ -46,8 +47,7 @@ export function accountRoutes(options: AccountRoutes): (request: IncomingMessage
     request.resume(); // no body is read
     void (async (): Promise<void> => {
       const ticket = TICKET.exec(request.headers.authorization ?? '')?.groups?.['ticket'] ?? '';
-      const admitted = ticket.startsWith('ticket:') ? await admit(ticket, options.ticketKey, Date.now()) : undefined;
-      const account = admitted?.from === undefined ? undefined : admitted.seat;
+      const account = await confirmed(ticket, options.ticketKey, Date.now());
       if (account === undefined) { send(401, { error: 'sign in again' }); return; }
       const action = path === '/account/export' ? 'export' : 'delete';
       try {

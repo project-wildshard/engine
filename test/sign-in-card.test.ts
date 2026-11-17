@@ -84,7 +84,7 @@ function signedInPorts(answers: Record<string, () => Response>): LoginPorts & { 
     fetch: input => {
       const route = typeof input === 'string' ? input : '';
       asked.push(route);
-      if (route === '/api/players/ticket') return Promise.resolve(Response.json({ ticket: `ticket:${'a'.repeat(32)}.device:d1.9999999999.${'b'.repeat(128)}`, expiresAt: '' }));
+      if (route === '/api/players/me/confirm') return Promise.resolve(Response.json({ ticket: `confirm:${'a'.repeat(32)}.9999999999.${'b'.repeat(128)}`, expiresAt: '' }));
       return Promise.resolve(answers[route]?.() ?? new Response('', { status: 404 }));
     },
   };
@@ -94,7 +94,7 @@ const DOOR = 'https://rooms.test';
 test('Download my data saves one file with the account and the saves', async () => {
   const scope = new Scope('sign-in'), saved: { name: string; text: string }[] = [];
   const api = signedInPorts({ '/api/players/me/export': () => Response.json({ player: { email: 'ann@b.co' } }), [`${DOOR}/account/export`]: () => Response.json({ saves: [{ shard: 'driftwood-isle' }] }) });
-  void openSignIn(scope, { parent: document.body, ports: api, account: { door: () => Promise.resolve(DOOR), device: () => 'device:d1', save: (name, text) => { saved.push({ name, text }); } } });
+  void openSignIn(scope, { parent: document.body, ports: api, account: { door: () => Promise.resolve(DOOR), save: (name, text) => { saved.push({ name, text }); } } });
   card().querySelector<HTMLButtonElement>('[data-signin="export"]')?.click();
   await settle();
   expect(saved).toHaveLength(1);
@@ -107,7 +107,7 @@ test('Delete account takes two taps, then signs the card out; in the world it sa
   const scope = new Scope('sign-in');
   const api = signedInPorts({ [`${DOOR}/account/delete`]: () => Response.json({ deleted: true }), '/api/players/me/delete': () => Response.json({ deleted: true }) });
   let changes = 0;
-  void openSignIn(scope, { parent: document.body, ports: api, changed: () => { changes++; }, account: { door: () => Promise.resolve(DOOR), device: () => 'device:d1', save: () => undefined } });
+  void openSignIn(scope, { parent: document.body, ports: api, changed: () => { changes++; }, account: { door: () => Promise.resolve(DOOR), save: () => undefined } });
   const remove = (): HTMLButtonElement | null => card().querySelector<HTMLButtonElement>('[data-signin="delete"]');
   remove()?.click();
   await settle();
@@ -121,7 +121,7 @@ test('Delete account takes two taps, then signs the card out; in the world it sa
   expect(changes).toBe(1);
   scope.dispose();
   const playing = new Scope('sign-in'), busy = signedInPorts({ [`${DOOR}/account/delete`]: () => new Response('', { status: 409 }) });
-  void openSignIn(playing, { parent: document.body, ports: busy, account: { door: () => Promise.resolve(DOOR), device: () => 'device:d1', save: () => undefined } });
+  void openSignIn(playing, { parent: document.body, ports: busy, account: { door: () => Promise.resolve(DOOR), save: () => undefined } });
   remove()?.click(); remove()?.click();
   await settle();
   expect(card().dataset['signedIn']).toBe('true');
@@ -131,7 +131,7 @@ test('Delete account takes two taps, then signs the card out; in the world it sa
 
 test('review M2: a door that can\'t be read says try again, and neither button sticks', async () => {
   const scope = new Scope('sign-in'), api = signedInPorts({ '/api/players/me/export': () => Response.json({ player: {} }) });
-  void openSignIn(scope, { parent: document.body, ports: api, account: { door: () => Promise.reject(new Error('bad signature')), device: () => 'device:d1', save: () => undefined } });
+  void openSignIn(scope, { parent: document.body, ports: api, account: { door: () => Promise.reject(new Error('bad signature')), save: () => undefined } });
   const download = (): HTMLButtonElement | null => card().querySelector<HTMLButtonElement>('[data-signin="export"]'), remove = (): HTMLButtonElement | null => card().querySelector<HTMLButtonElement>('[data-signin="delete"]');
   download()?.click();
   await settle();
