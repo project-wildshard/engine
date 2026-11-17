@@ -46,6 +46,8 @@ import { assertKtx2TableTargets } from '../src/shared/game/shardfile/ktx2Targets
 import { trackedPublic } from './tracked-public.mjs';
 import { catalogueSlugs, documentSlugs, pinnedSlugs, releaseNamed, unlistedMessage, unlistedSlugs } from './pins-catalogue.ts';
 import { servedSlug } from './server-release/served-slug.mjs';
+import {clearLocalCandidates, recordLocalCandidate} from './local-candidates.ts';
+import type {localProduct} from './pin-local.ts';
 
 interface Pin { readonly slug: string; readonly revision: number; readonly hash: string; readonly bytes: number }
 interface PinFile { readonly api: string; readonly shards: readonly Pin[] }
@@ -216,12 +218,16 @@ function pruneStale(root: string): void {
 }
 
 /** One install of this tree at a time, full or reused: out/.pins.lock (pins-reuse.mjs). */
-async function install(only: readonly string[], source: 'pins' | 'format' | 'ring' = 'pins'): Promise<readonly Pin[]> {
+type LocalProduct = Awaited<ReturnType<typeof localProduct>>;
+async function install(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' = 'pins', localPath?: string): Promise<readonly Pin[]> {
   const release = lockPins(process.cwd());
-  try { return await installLocked(only, source); } finally { release?.(); }
+  try {
+    const local = localPath === undefined ? undefined : await (await import('./pin-local.ts')).localProduct(localPath, process.cwd());
+    return await installLocked(local === undefined ? only : [local.pin.slug], source, local);
+  } finally { release?.(); }
 }
 
-async function installLocked(only: readonly string[], source: 'pins' | 'format' | 'ring'): Promise<readonly Pin[]> {
+async function installLocked(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local', local?: LocalProduct): Promise<readonly Pin[]> {
   // DS12: a full install whose pins match this tree's last one, or another worktree's, clones and verifies (pins-reuse.mjs).
   const full = only.length === 0 && source === 'pins', root = process.cwd();
   const key = full ? pinsKey(root, shardfileValidationRevision(root)) : '';
@@ -233,6 +239,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       excludePublished(paths);
       await installSaves((readJson(PINS) as PinFile).shards.map(row => row.slug));
       pruneStale(root);
+      clearLocalCandidates(root);
       const from = reused.source === root ? 'this tree, unchanged' : `${reused.mode} of ${reused.source}`;
       console.log(`pins reused: ${from}; ${reused.files} files, ${(reused.bytes / 2 ** 20).toFixed(0)} MiB verified by sha256 (clone ${reused.seconds.clone.toFixed(1)}s, verify ${reused.seconds.verify.toFixed(1)}s), ${paths.length} mounts published`);
       return (readJson(PINS) as PinFile).shards;
@@ -250,8 +257,9 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   await prepareAssetDecoders();
   if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly one product: blender-template or brasscap-mesa');
   const formatSlug = source === 'format' ? only[0] : (source === 'ring' && only.includes('blender-template') ? 'blender-template' : undefined);
-  const dependency = formatSlug === undefined ? undefined : (await import('./pin-format.ts')).formatTemplate(formatSlug);
-  const trackedPins = source === 'format' ? [] : (readJson(PINS) as PinFile).shards;
+  const dependency = local ?? (formatSlug === undefined ? undefined : (await import('./pin-format.ts')).formatTemplate(formatSlug));
+  const overlay = source === 'format' || source === 'local';
+  const trackedPins = overlay ? [] : (readJson(PINS) as PinFile).shards;
   const shards = dependency === undefined ? trackedPins : [...trackedPins.filter(row => row.slug !== dependency.pin.slug), dependency.pin];
   const pins = only.length === 0 ? shards : shards.filter(row => only.includes(row.slug));
   const unknown = only.filter(slug => !shards.some(row => row.slug === slug));
@@ -263,11 +271,14 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   // T2E-1: --from-format adds Template 2 beside whatever is installed, so `pnpm test:e2e` never strips a worktree's other
   // pins (their public assets feed the committed boot tables); only the Template 2 it replaces leaves. Every other
   // install replaces the whole set.
-  const replaced = dependency === undefined || source !== 'format' ? new Set<string>() : mountsOf(resolve('out', dependency.pin.slug));
+  const replaced = dependency === undefined || !overlay ? new Set<string>() : mountsOf(resolve('out', local?.folder ?? dependency.pin.slug));
+  for (const path of local?.preservedMounts ?? []) replaced.delete(path);
   const before = existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : [];
+  // Mark before writing: a failed local install must still prevent publication.
+  if (local !== undefined) recordLocalCandidate(root, {slug: local.pin.slug, ...local.source});
   // Only plain public/ paths, under folders that are this tree's own: a ledger or a linked folder never reaches outside.
   for (const path of before) {
-    if (source === 'format' && !replaced.has(path)) continue;
+    if (overlay && !replaced.has(path)) continue;
     if (!mountPath(path)) continue;
     insideTree(root, dirname(path));
     rmSync(path, { force: true });
@@ -346,7 +357,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   if (failed > 0) process.exitCode = 1;
   mkdirSync('out', { recursive: true });
-  const kept = source === 'format' ? before.filter(path => !replaced.has(path) && existsSync(path)) : [];
+  const kept = overlay ? before.filter(path => !replaced.has(path) && existsSync(path)) : [];
   const paths = [...new Set([...kept, ...published.keys()])].sort((a, b) => a.localeCompare(b));
   writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
   // The shared exclude file is the canonical checkout's alone; a plan worktree leaves it untouched (pins-exclude.mjs).
@@ -355,6 +366,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   // The manifest certifies these bytes only for the inputs the install read: a pin or source edited meanwhile changes the key.
   if (full && failed === 0 && pinsKey(root, shardfileValidationRevision(root)) === key) writeManifest(root, key, productHashes, mountHashes);
   if (full) pruneStale(root);
+  if (full && failed === 0) clearLocalCandidates(root);
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
   return pins;
 }
@@ -488,6 +500,10 @@ if (command === 'refresh') {
 }
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1');
 else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), 'format');
+else if (command === 'install' && rest[0] === '--from-dir') {
+  if (rest.length !== 2 || !rest[1]) throw new Error('usage: pins.ts install --from-dir <built out/slug directory>');
+  await install([], 'local', rest[1]);
+}
 else if (command === 'install') await install(rest);
 else if (command === 'slice') await slice();
 else if (command === 'verify-slices') await slice(true);

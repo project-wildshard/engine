@@ -354,6 +354,8 @@
     "../scripts/preview-grid.ts",
     "../scripts/nightly-model.ts",
     "../scripts/pin-format.ts",
+    "../scripts/pin-local.ts",
+    "../scripts/local-candidates.ts",
     "../scripts/engine-ci-plan.ts",
     "../scripts/engine-ci-budget.ts",
     "../pages/worker.ts",
