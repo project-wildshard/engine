@@ -522,7 +522,8 @@ export class World {
     const { seat } = admitted;
     // MP2.2d: the first sign-in from a device with guest progress moves it to the account, once (`saves/claim.ts`).
     if (admitted.from !== undefined) await this.claim(admitted.from, seat);
-    if (!end.isOpen || this.draining) return;
+    // a link that quit while the ticket was read still goes on, so a held body of its player is let go (QA row 16, `leaveHeld`)
+    if ((!end.isOpen && !this.quits.has(end)) || this.draining) return;
     // The cells read the seat, never the ticket: the hello they get names it (the ticket is a bearer credential, kept nowhere).
     if (seat !== said.output.player) bytes = encodeHello({ ...hello, player: seat }).slice().buffer;
     const device = seat, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
