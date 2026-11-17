@@ -25,7 +25,7 @@ import type { Player } from '../src/client/engine/player/Player';
 import type { Forest } from '../src/client/engine/world/forest/Forest';
 import type { SkyRig } from '../src/client/engine/world/skyRig';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { SWORD_WOOD } from '../src/shared/game/weapons/starterMeleeProfile';
+import { SWORD_WOOD, SWORD_IRON } from '../src/shared/game/weapons/starterMeleeProfile';
 import { HEAVY, SLASH, FINISHER } from '../src/shared/game/weapons/starterMoves';
 import { nativeMeleeItem, readNativeRangedItem } from '../src/server/game/plugin/nativeItems';
 import { weaponRow } from '../src/server/game/plugin/simulation';
@@ -40,6 +40,9 @@ import { tickCommands, type HeadlessCommand } from '../src/shared/host/tickProto
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtProduct } from '../src/test/game/builtProduct';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { parseShardfileField } from '@wildshard/format/shardSchema';
+import originalNativeItems from './fixtures/native-explicit-combat-items.json' with {type: 'json'};
+const nativeSwordItems = parseShardfileField('items', originalNativeItems.items);
 
 // P1-E3.2: hits and damage settled by the shipped headless host (`createTrustedHeadlessResident`, what the standalone
 // worker runs) on real shards: Driftwood's swept swords, Pine's bow and lever rifle. Each is held against the browser's own
@@ -110,11 +113,11 @@ function pageWorld(resident: TrustedHeadlessResident, aimAt: Vector3) {
   return { game, player, eye, direction, sky: legacyDouble<SkyRig>({}), forest: legacyDouble<Forest>({}) };
 }
 /** The page's own sword over `profile`, ready to swing. */
-function pageSword(page: ReturnType<typeof pageWorld>, targets: Targets, profile: MeleeProfile): SweptMelee {
+function pageSword(page: ReturnType<typeof pageWorld>, targets: Targets, profile: MeleeProfile, blade?: 'wood' | 'iron'): SweptMelee {
   const debris = { surface: 'sand', count: 1, atFeet: true, sparks: false } as const, moves = profile.moves;
   if (moves === undefined) throw new Error('The starter sword declares its moves');
   const sword = new SweptMelee({ game: page.game, sky: page.sky, player: page.player, forest: page.forest }, targets,
-    { row: profile, profile, inputContext: 'weapon.melee', rig: { sword: new BoxGeometry(0.1, 0.1, 0.1), arms: new BoxGeometry(0.1, 0.1, 0.1), tipY: 0.62, baseY: 0.1, material: new MeshBasicMaterial() } },
+    { ...(blade === undefined ? {} : {blade}), row: profile, profile, inputContext: 'weapon.melee', rig: { sword: new BoxGeometry(0.1, 0.1, 0.1), arms: new BoxGeometry(0.1, 0.1, 0.1), tipY: 0.62, baseY: 0.1, material: new MeshBasicMaterial() } },
     { moves, slash: SLASH, finisher: FINISHER, heavy: HEAVY, events: {}, debris: () => debris });
   sword.setActive(true); sword.enabled = true;
   return sword;
@@ -509,3 +512,37 @@ test('J105: on Driftwood each player who hurt a crab gets their own coins, a chi
     expect(snapshotSimHost(solo.host).damage).toBeUndefined();
   } finally { live.dispose(); solo.dispose(); }
 }, 120_000);
+
+test('candidate native swords preserve original local and confirmed effects and heavy sparks', async () => {
+  for (const [kind, surface, count] of [['crab', 'shell', 9], ['sailor', 'wood', 8]] as const) for (const blade of ['wood', 'iron'] as const) {
+    const {product, resident} = await shipped('driftwood-isle'), live = await resident();
+    const previous = app.levelScope, scope = new Scope('original-native-effects'); app.levelScope = scope;
+    try {
+      const metadata = product.section('actors/species-programs');
+      for (const row of [...metadata.program?.species ?? [], ...metadata.page]) app.species.registerRow(row, scope);
+      const target = nearest(live, kind);hold(live);tick(live, 2);facing(live, target, 1.4);target.hp = target.maxHp = 10000;
+      const authored = nativeSwordItems.rows.find(row => row.id === `weapon.driftwood-isle.${blade}`);
+      if (authored?.kind !== 'weapon' || authored.profile?.family !== 'melee') throw new Error('Missing original declared sword');
+      expect(weaponRow(product.shardfile, authored.id).id).toBe(authored.id);
+      const page = pageWorld(live, chest(target)), profile = v.parse(MeleeWeaponProfileSchema, authored.profile);
+      expect(profile.moves.combo[0]?.debris?.overrides).toContainEqual({target: `creature.${kind}`, effect: {surface, count, atFeet: false, sparks: true}});
+      const targets = pageTargets(live), sword = pageSword(page, targets, applyMeleeCombatProfile(blade === 'iron' ? SWORD_IRON : SWORD_WOOD, profile), blade);
+      expect(targets.raycast(page.eye, page.direction, 3.5)?.animal).toBe(target);
+      const burst = vi.spyOn(Impacts.for(page.game), 'burst');
+      try {
+        sword.tryFire();for (let frame = 0;frame < 30;frame++) sword.update(1/60, frame/60);
+        expect(burst).toHaveBeenCalledWith(surface, expect.any(Vector3), expect.any(Vector3), count);
+        if (blade === 'iron') expect(burst).toHaveBeenCalledWith('sparks', expect.any(Vector3), expect.any(Vector3), 10);
+        burst.mockClear();sword.serverHit({kind, species: '', at: chest(target), head: false, killed: false, amount: 1, seq: 1});
+        expect(burst).toHaveBeenCalledWith(surface, expect.any(Vector3), expect.any(Vector3), count);
+        if (blade === 'iron') expect(burst).toHaveBeenCalledWith('sparks', expect.any(Vector3), expect.any(Vector3), 10);
+        sword.adsHeld = true;for (let frame = 30;frame < 110;frame++) sword.update(1/60, frame/60);
+        sword.adsHeld = false;sword.update(1/60, 110/60);expect(sword.heavySwing).toBe(true);
+        burst.mockClear();sword.serverHit({kind, species: '', at: chest(target), head: false, killed: false, amount: 1, seq: 2});
+        expect(burst).toHaveBeenCalledWith(surface, expect.any(Vector3), expect.any(Vector3), Math.round(count * 1.6));
+        if (blade === 'iron') expect(burst).toHaveBeenCalledWith('sparks', expect.any(Vector3), expect.any(Vector3), 16);
+        expect(target.species).toBe('');
+      } finally {burst.mockRestore();}
+    } finally {scope.dispose();app.levelScope = previous;live.dispose();restore();restore = () => undefined;}
+  }
+}, 120000);
