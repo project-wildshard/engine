@@ -389,9 +389,9 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   // FM5: with no kept copy and no file, the page says why (offline, the file's server down or busy, a portal, a bad signature) and
   // reads again by release.ts's policy until a verified file answers; Title screen stops the load
   const waiting = new Scope('online.release-wait');
-  const toTitle = (): void => { leaving.unload('release page: title screen'); location.replace(new URL('/', location.origin).toString()); };
+  const toTitle = (from = 'release page'): void => { leaving.unload(`${from}: title screen`); location.replace(new URL('/', location.origin).toString()); };
   let dial: Awaited<ReturnType<typeof releaseToDial>>;
-  try { dial = await releaseToDial(at, key, { keep: keep ?? NO_KEEP, wait: releaseScreens(waiting, { doctor, title: toTitle }) }); } finally { waiting.dispose(); }
+  try { dial = await releaseToDial(at, key, { keep: keep ?? NO_KEEP, wait: releaseScreens(waiting, { doctor, title: () => { toTitle(); } }) }); } finally { waiting.dispose(); }
   const { file: release, fresh } = dial, { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
   const entering = (slug: string): void => { leaving.arrive(slug); };
@@ -411,7 +411,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const screens = linkScreens(scope, {
     retry: () => { shellNow?.retry(); }, dialNow: () => { shellNow?.dialNow(); }, doctor,
     // Play here / Play again reload into the world: the tap that brought the player here comes along (QA row 16)
-    reload: () => { entering(loadedNow); void leaving.reloadByHand(); },
+    reload: () => { entering(loadedNow); void leaving.reloadByHand(); }, title: () => { toTitle('removed (banned)'); },
     progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',
     // FM4b modes 21 and 22: the Slow and Unstable chips read the link's own measurements
     stats: () => shellNow?.client.stats,

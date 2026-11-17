@@ -2,19 +2,20 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { Redial, type LinkCause, type LinkState } from '../src/client/engine/net/redial';
 import type { DecodedFrame } from '../src/shared/engine/net/frame';
+import type { SocketCloseInfo } from '../src/shared/engine/net/socketClose';
 import type { NetChannel, Transport, TransportStats } from '../src/shared/engine/net/transport';
 
 // E7.1b: when a link is watched, dropped and dialled, on a clock this test holds.
 class FakeLink implements Transport {
   readonly stats: TransportStats = { rttMs: 0, lossPct: 0, sentBytes: 0, recvBytes: 0 };
   closedAs: string | null = null;
-  private readonly closes = new Set<(reason: string) => void>();
+  private readonly closes = new Set<(reason: string, info?: SocketCloseInfo | null) => void>();
   send(_channel: NetChannel, _bytes: ArrayBuffer): void { /* nothing listens */ }
   onMessage(): () => void { return () => undefined; }
-  onClose(listener: (reason: string) => void): () => void { this.closes.add(listener); return () => { this.closes.delete(listener); }; }
+  onClose(listener: (reason: string, info?: SocketCloseInfo | null) => void): () => void { this.closes.add(listener); return () => { this.closes.delete(listener); }; }
   close(reason = 'closed'): void { this.closedAs ??= reason; this.fail(reason); }
   /** The far end, or the network, ended it. */
-  fail(reason: string): void { for (const listener of [...this.closes]) listener(reason); this.closes.clear(); }
+  fail(reason: string, info?: SocketCloseInfo): void { for (const listener of [...this.closes]) listener(reason, info ?? null); this.closes.clear(); }
 }
 const frame = { tick: 1 } as DecodedFrame;
 function harness(random = 0.5, online: () => boolean = () => true): { client: NetClient; redial: Redial; links: FakeLink[]; states: LinkState[]; causes: LinkCause[]; dialTimes: number[]; now: () => number; heard: () => void; run: (ms: number) => void; failDials: (reason: string) => void; away: (ms: number) => void } {
@@ -77,6 +78,24 @@ test('a server that says stop is obeyed: no redial', () => {
     expect(states).toEqual(['ended']);
     redial.dispose();
   }
+});
+
+test('FM8m mode 41: a coded banned close ends the link with its fact, even before the first frame; no redial', () => {
+  for (const [heardFirst, info] of [[true, { code: 'banned', untilMs: 1_800_000_000_000 }], [false, { code: 'banned' }]] as const) {
+    const { heard, run, states, links, redial } = harness();
+    if (heardFirst) heard();
+    links[0]?.fail('refused', info); run(60_000);
+    expect(links, 'never dialled again').toHaveLength(1);
+    expect(states).toEqual(['ended']);
+    expect(redial.progress.ended).toEqual(info);
+    redial.dispose();
+  }
+  // a plain refusal carries no fact, and before the first frame is still the old server's cut
+  const { run, links, redial } = harness();
+  links[0]?.fail('refused'); run(1000);
+  expect(redial.progress.ended).toBeUndefined();
+  expect(redial.why).toBe('updating');
+  redial.dispose();
 });
 
 test('a full world says so and asks again every 30 s, for as long as it takes', () => {

@@ -1,6 +1,7 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { Rng } from '../../../shared/engine/core/rng';
+import type { SocketCloseInfo } from '../../../shared/engine/net/socketClose';
 import type { Transport } from '../../../shared/engine/net/transport';
 import type { NetClient } from './client';
 
@@ -11,7 +12,9 @@ export type LinkState = 'live' | 'reconnecting' | 'resuming' | 'lost' | 'full' |
  *  page was out of view, `offline` is a device that says it has no network (FM4b mode 2). It rides `onState`'s reason for `reconnecting` and `resuming`. */
 export type LinkCause = 'silent' | 'closed' | 'restart' | 'hidden' | 'updating' | 'offline';
 /** Where the dial is, for a screen that shows it: dials so far, the wait to the next (null while one is out), and how long it's been down. */
-export interface LinkProgress { readonly dials: number; readonly nextDialMs: number | null; readonly downMs: number; readonly away?: LinkAway }
+export interface LinkProgress { readonly dials: number; readonly nextDialMs: number | null; readonly downMs: number; readonly away?: LinkAway;
+  /** FM8m: the server's coded fact on a final close (FM7b1's close reason, e.g. `banned` with an optional end time); absent is no fact */
+  readonly ended?: SocketCloseInfo }
 /** FM4b modes 4 and 45: the page was away for `ms` and came back to a quiet or closed link. `hidden` is time out of view the page
  *  measured (visibilitychange); `asleep` is a gap in the page's own clock ticks while it wasn't known hidden (a sleep, a frozen tab).
  *  It says nothing about the world's hold on the seat (J114): only what this page measured. */
@@ -90,6 +93,7 @@ export class Redial {
   /** The watch's last tick: a gap after it is time the page did nothing at all (FM4b mode 45). */
   private tickAt: number;
   private awayFor: LinkAway | null = null;
+  private endedWith: SocketCloseInfo | null = null;
   /** STAGING-BUGBASH SB31: when the page last came back from a freeze of its own (a long task, no tick for a second or more). */
   private thawedAt = -Infinity;
   /** A link lost to the page's own freeze is dialled before the player is told: the strip waits until then. */
@@ -112,8 +116,8 @@ export class Redial {
   /** The dial's progress now. */
   get progress(): LinkProgress {
     const now = this.now(), down = this.phase !== 'up';
-    const away = this.awayFor === null ? {} : { away: this.awayFor };
-    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0, ...away };
+    const away = this.awayFor === null ? {} : { away: this.awayFor }, ended = this.endedWith === null ? {} : { ended: this.endedWith };
+    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0, ...away, ...ended };
   }
   /** The page came back into view (an iPhone returning to Safari): a link that went quiet while hidden redials at once.
    *  `hiddenMs` is how long the page measured itself out of view (FM4b mode 4). */
@@ -186,9 +190,9 @@ export class Redial {
     this.dialled = null; this.dialAt = now + wait * (1 + (this.random() * 2 - 1) * DIAL_JITTER);
   }
   private watchClose(transport: Transport): () => void {
-    return transport.onClose(reason => { if (transport === this.transport) this.closed(reason); });
+    return transport.onClose((reason, info) => { if (transport === this.transport) this.closed(reason, info ?? null); });
   }
-  private closed(reason: string): void {
+  private closed(reason: string, info: SocketCloseInfo | null = null): void {
     const now = this.now();
     // SB31: the server closes a client it heard no byte from for 3 s (SILENCE_MS); a page frozen that long sent no ping. That is
     // the page, not the link: dial at once, and say nothing unless the link is still down a second later.
@@ -197,8 +201,10 @@ export class Redial {
     }
     // 5.5: `retry` is a newer client at an older server: back off and dial again, never reload. A refusal before the first
     // frame may be the cut (an old server); the page decides from version.json, and until then the server is updating.
-    const cut = (reason === 'reload' || reason === 'refused') && this.heardAt === null;
-    if (FINAL.has(reason) && !cut) { this.stop(); this.show('ended', reason); return; }
+    // FM8m: a coded ban is a new server's word, never an old server's cut, so it ends the link even before the first frame
+    const banned = reason === 'refused' && info?.code === 'banned';
+    const cut = (reason === 'reload' || reason === 'refused') && this.heardAt === null && !banned;
+    if (FINAL.has(reason) && !cut) { this.endedWith = info; this.stop(); this.show('ended', reason); return; }
     if (reason === 'retry' || cut) this.because('updating');
     if (cut) this.options.onCut?.(reason);
     if (reason === 'full') { this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return; }

@@ -105,6 +105,8 @@ export interface LinkScreenHooks {
   readonly doctor?: (from: string) => void;
   /** Reload this page into the world, taking the seat back (another tab, a turned-away link). */
   readonly reload: () => void;
+  /** FM8m: leave for the title screen (a removed player has no world to rejoin). Absent: the card offers Details only. */
+  readonly title?: () => void;
   /** FM4b modes 21 and 22: the link's measured pong RTT and the server's reported frame skips (`NetClient.stats`) */
   readonly stats?: () => TransportStats | undefined;
   /** S13: where a failed link's stop card reports (the browser error tracker; a test observes its own) */
@@ -399,6 +401,14 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     } else if (state === 'ended' && reason === 'replaced') {
       stop('replaced', 'info', 'Another tab', 'Playing somewhere else', 'This world is open in another tab or on another device. Only one can play at a time.',
         [{ label: 'Play here', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }], 'close "replaced" (4003)');
+    } else if (state === 'ended' && reason === 'refused' && hooks.progress().ended?.code === 'banned') {
+      // FM8m mode 41: the server's coded fact, not a moderator's words (J229): an end time only when it sent one; no redial, no Play again
+      const ended = hooks.progress().ended, untilMs = ended?.code === 'banned' ? ended.untilMs : undefined;
+      const when = untilMs === undefined ? null : new Date(untilMs).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+      stop('banned', 'bad', 'Removed', 'You were removed from the world',
+        `${when === null ? 'You can\'t rejoin for now: no end time was given.' : `You can't rejoin until ${when}.`} You can still look around the title and your settings.`,
+        hooks.title === undefined ? [] : [{ label: 'Title screen', primary: true, busy: 'Leaving…', act: () => { hooks.title?.(); } }],
+        `close "banned"${untilMs === undefined ? ' · no end time' : ` · until ${new Date(untilMs).toISOString()}`}`);
     } else if (state === 'ended' && reason !== 'reload') {
       reportStop('link-refused', `close "${String(reason)}"`, report);
       stop('refused', 'bad', 'Turned away', 'The world turned this connection away', 'The server ended this link and won\'t take it back by itself.',

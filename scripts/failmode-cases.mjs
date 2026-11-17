@@ -62,7 +62,7 @@ export const CASES = Object.freeze([
   { mode: '38', id: 'captive-portal', owner: 'FM5', phase: 'boot', screen: 'captive-portal', inject: 'release body: an HTML sign-in page', recover: 'heal, Try again: the world loads', run: 'releaseFault' },
   { mode: '39', id: 'release-unsigned', owner: 'FM5', phase: 'boot', screen: 'release-unsigned', inject: 'release body: a file with a bad signature', recover: 'heal, Try again: the world loads; no dial while bad', run: 'releaseFault' },
   { mode: '40', id: 'refused', owner: 'FM4', phase: 'play', screen: 'refused', inject: 'socket close 4001 on every connection', recover: 'heal, Play again: seated', run: 'socketDown' },
-  { mode: '41', id: 'banned', owner: 'FM8m', phase: 'play', screen: 'banned', inject: 'coded terminal close', recover: 'none: no redial', blocked: 'FM7b terminal-reason contract not built' },
+  { mode: '41', id: 'banned', owner: 'FM8m', phase: 'play', screen: 'banned', inject: 'coded terminal close', recover: 'none: no redial', run: 'banned' },
   { mode: '42', id: 'clock-skew', owner: 'FM4b', phase: 'doctor', screen: 'clock-skew', inject: 'the page clock 2 min ahead, socket refused', recover: 'Run again with the clock right', run: 'clockSkew' },
   { mode: '43', id: 'storage-full', owner: 'FM6', phase: 'load', screen: 'storage-full', inject: 'Cache API put throws QuotaExceededError (labelled injection)', recover: 'plays on from memory', run: 'storageFull' },
   { mode: '44', id: 'pack-broken', owner: 'FM6', phase: 'load', screen: 'packs-5xx', inject: 'packs truncate 64 bytes, healed after 6 s', recover: 'the world loads with verified bytes', run: 'packsFault' },

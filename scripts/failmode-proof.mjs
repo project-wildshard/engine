@@ -331,6 +331,42 @@ try {
         return back ? { ...result, ...shot === undefined ? {} : { shot }, injection: { secondTab: true }, recovery: 'Play here: seated' } : { outcome: 'ui-fail', reason: 'Play here never seated', seen, notes: await onScreen(page) };
       } finally { await entered.context.close(); }
     },
+    // FM8m mode 41: the proxy sends the server's coded close (FM7b1: 4001 `refused` with {v:1,code:'banned'}); the page shows the
+    // removed card, says the end time only when one was sent, and never dials again. Two joins: with an end time, then without one.
+    banned: async item => {
+      const entered = await fresh(); const { page } = entered;
+      /** @param {number | undefined} untilMs */
+      const rule = untilMs => ({ route: 'socket', kind: 'close', code: 4001, reason: JSON.stringify({ v: 1, code: 'banned', ...untilMs === undefined ? {} : { untilMs } }) });
+      try {
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        const before = await control(), started = Date.now(), untilMs = Date.now() + 26 * 3_600_000;
+        await arm(item.id, [rule(untilMs)]);
+        const seen = await screen(page, item.screen, 15_000, started), shot = seen === null ? undefined : await shoot(page, item.id, 'until');
+        const result = await judged(seen, item, page);
+        if (result.outcome !== 'pass') return { ...result, ...shot === undefined ? {} : { shot } };
+        if (!/until /u.test(seen?.copy ?? '')) return { outcome: 'ui-fail', reason: 'the sent end time is not said', seen, shot };
+        const closes = await matchedSince(before, 'socket');
+        if (closes === 0) return { outcome: 'harness-fail', reason: 'the coded close matched nothing', seen };
+        await sleep(10_000);
+        const redials = await matchedSince(before, 'socket') - closes;
+        if (redials !== 0) return { outcome: 'ui-fail', reason: `the page dialled ${String(redials)} times after the ban`, seen, shot };
+        // no end time sent: the card claims none. The ban lands before the first frame of this join (never an old server's cut)
+        await arm(`${item.id}-open`, [rule(undefined)]);
+        const titled = page.waitForURL(url => new URL(url).pathname === '/', { timeout: 15_000 }).then(() => true, () => false);
+        await press(page, item.screen, 'Title screen').catch(() => undefined);
+        const toTitle = await titled;
+        if (!toTitle) return { outcome: 'ui-fail', reason: 'Title screen did not leave for the title', seen, shot };
+        const again = Date.now(); await page.goto(URL_PLAY);
+        const open = await screen(page, item.screen, 60_000, again), openShot = open === null ? undefined : await shoot(page, item.id, 'no-end');
+        const openResult = await judged(open, item, page);
+        if (openResult.outcome !== 'pass') return { ...openResult, shot };
+        if (/until /u.test(open?.copy ?? '') || !/no end time/u.test(open?.copy ?? '')) return { outcome: 'ui-fail', reason: 'an absent end time was not said as absent', seen: open, shot: openShot };
+        const settled = await matchedSince(before, 'socket'); await sleep(10_000);
+        const later = await matchedSince(before, 'socket') - settled;
+        if (later !== 0) return { outcome: 'ui-fail', reason: `the page dialled ${String(later)} times after the open-ended ban`, seen: open, shot: openShot };
+        return { ...result, shot, injection: { closes: settled, untilMs, redials: 0 }, noEnd: { seen: open, shot: openShot }, recovery: 'none: no redial; Title screen leaves for the title' };
+      } finally { await heal(); await entered.context.close(); }
+    },
     // --refusal=injection: a fault on a route this page never reads matches nothing, and that is a harness failure, never a pass
     unmatched: async () => {
       const entered = await fresh(); const { page } = entered;
@@ -498,7 +534,9 @@ try {
         if (result.outcome !== 'pass') return { ...result, injection, shot };
         // the budgeted retries were spent before the line showed: healed, the card's Retry is the player's way on
         // mode 36's page covers the card: its Try again is the same RETRY
-        const retry = item.id === 'download-failed' ? page.locator('[data-failmode~="download-failed"] button', { hasText: 'Try again' }).first() : page.locator('.ws-load-retry:visible').first();
+        // a broken pack is refused by every read of its part, so the spawn job may give up (mode 36's page) before the heal: press what shows
+        const covered = item.id === 'download-failed' || (await visibleIds(page)).some(ids => /\bdownload-failed\b/u.test(ids));
+        const retry = covered ? page.locator('[data-failmode~="download-failed"] button', { hasText: 'Try again' }).first() : page.locator('.ws-load-retry:visible').first();
         const pressed = await retry.click({ timeout: 5000 }).then(() => true, () => false);
         await intoWorld(entered, 90_000).catch(() => undefined);
         return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: pressed ? 'heal, Retry: the world loads' : 'heal: the world loads' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen, injection, shot, notes: await onScreen(page) };
