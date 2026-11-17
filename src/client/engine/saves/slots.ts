@@ -33,7 +33,10 @@ export function saveStorage(scope: 'global' | 'device' | 'session'): { getItem: 
   return {
     getItem: (key) => { const { slot, suffix } = resolve(key); const whole = slot.read(); const data = suffix === undefined ? whole : typeof whole === 'object' && whole !== null && !Array.isArray(whole) ? whole[suffix] ?? null : null;
       return data === null ? null : strings.has(key) || key.startsWith('ui.fold:') || key.startsWith('ktx2set:') ? typeof data === 'string' ? data : JSON.stringify(data) : key === 'devMode' ? data === true ? '1' : null : JSON.stringify(data); },
-    setItem: (key, raw) => { const { slot, suffix } = resolve(key); const data: Json = key === 'devMode' ? raw === '1' : strings.has(key) || key.startsWith('ui.fold:') || key.startsWith('ktx2set:') ? raw : v.parse(jsonSchema, JSON.parse(raw) as unknown);
+    // MG10 (J410): JSON.parse yields only JSON values, and `slot.write` validates them against the slot's schema before it
+    // keeps anything (a non-finite number from an overflowing literal is refused there). Parsing it with `jsonSchema` here
+    // too made every boot-trace write validate its record twice: ~80 MB of garbage on Nine's boot.
+    setItem: (key, raw) => { const { slot, suffix } = resolve(key); const data: Json = key === 'devMode' ? raw === '1' : strings.has(key) || key.startsWith('ui.fold:') || key.startsWith('ktx2set:') ? raw : JSON.parse(raw) as Json;
       let persisted: boolean;
       if (suffix === undefined) persisted = slot.write(data); else { const whole = slot.read(); persisted = slot.write({ ...(typeof whole === 'object' && whole !== null && !Array.isArray(whole) ? whole : {}), [suffix]: data }); }
       if (!persisted) throw new Error('Save storage unavailable or full'); },

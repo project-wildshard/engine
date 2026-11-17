@@ -10,3 +10,14 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
 - Ruled out by A/B: the phone slab facing tree and far levels (NB8, NB23 b) cost no measurable peak.
 - Chromium's GPU-process jump at the reveal (ANGLE Metal, +1.3-1.9 GB) disappears with WEBGL_multi_draw hidden (367 MB);
   the slab multi-draw is what ANGLE Metal holds memory for. Not the phone's meter (mini-memcal), noted for the record.
+
+## mini-ninemem2 (relay), 2026-11-17 evening
+
+- The title page alone is ~52 MB of renderer, not 270: the ~270 MB is the boot's floor by `selected-discovery`/`admission`
+  (spawn parts, engine modules, the WebGL context). An empty zone (Template) peaks at ~424 MB renderer (MG11 table).
+- Sky Reach's loading peak (~550 MB, ±10 over 4 runs) is a ~120-130 MB spike at `firstFrame`: V8's wasm tier-up (TurboFan)
+  of the standalone server's Rapier, reported as `v8/<isolate>/malloc` in every isolate at once (one process-wide zone);
+  `--js-flags=--liftoff-only` removes it. Starting the server later only moves the spike to `ready`.
+- Nine's peak (~970 MB at `finish`) carries 475-625 MB of JS heap, most of it garbage: 1.2 GB is allocated on the main
+  thread before ready (valibot ~240 MB, graph GLSL emission ~140, placement pages ~110, boot-trace writes ~170).
+- `saveStorage.setItem` validated each write twice (its own `jsonSchema` parse, then the slot's): boot-trace writes 173 -> 91 MB.
