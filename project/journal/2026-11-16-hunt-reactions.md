@@ -116,3 +116,31 @@ restore path accepts the original M1 base pursuit contract only without
 new modifiers or group membership, then delegates all payload validation
 to that unchanged base parser. The real M1-shaped continuation resumes
 with identical body/controller/RNG.
+
+
+## Paired M2 review corrections (2026-11-17)
+
+The single read-only paired engine/format review identified three MUSTs.
+Five real-server controls reproduced all three before correction: dead
+neutral provokers cannot transfer aggro to another player, the released
+aggressive hunt contract without an authored notice field still restores,
+and aggressive/passive/skittish ambushers hide again after actual timed
+respawn. The unchanged aggressive hunt species contract remains byte-for-byte
+compatible; changed reaction contracts remain strict. Dead temperament flags
+reset before the normal source controller's dead step. The target accessor
+now requires the selected player's actual live health.
+
+The review also caught a callback signature mismatch: a flat pursuit now
+wraps the host callback so the host cannot become the acquisition boolean.
+Neutral hunt damage notifications require the actual player source; env and
+creature damage cannot provoke. A real environment-hit control covers this.
+
+The existing home leash is a 3-D distance; territorial displacement is an XZ
+radius. Fully buried row guardians share concealment with ambushers, while
+positive rise stays visible. Safe return heals immediately at home, including
+an out-of-leash attacker: this is the evade/reset rule, not damage immunity
+inside the leash. Hunt modifiers beyond reactions remain outside this
+checkpoint: pack/territory/ambush/flee are implemented on pursuit here;
+CC5b5 integrates guardian/skirmisher after OF26. Spawn social ids and
+controller-owning creatures.groups ids are separate namespaces; matching
+strings do not attach a controller. No format MUSTs were identified.

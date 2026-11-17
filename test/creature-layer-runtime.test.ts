@@ -440,3 +440,87 @@ test('hunting numbers and health refuse missing, partial and nonfinite values', 
   expect(speciesHealth('fixture', undefined, 117, false)).toBe(117);
   for (const hp of [NaN, Infinity, 0, -1]) expect(() => speciesHealth('fixture', hp, undefined, false)).toThrow('fixture');
 });
+
+
+test('a neutral pursuit drops a dead provoker without acquiring an uninvolved player', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = pursuing(8), row = shard.rows.species[0];
+  if (row?.temperament === undefined) throw new Error('Missing fixture temperament');
+  row.temperament.reaction = 'neutral';
+  const sim = createShardfileSim(shard, new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = sim.host.nearestPlayer(body.position);
+    sim.host.addPlayer('bot:1', { x: 8, y: 0, z: 0 });
+    sim.host.combat.hit({ source: player.health, sourceTags: player.health.tags, target: body.combatActor(), amount: 1,
+      point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+    for (let i = 0; i < 6; i++) sim.host.step();
+    expect(body.state).toBe('stalk');
+    sim.host.combat.hit({ source: 'env', sourceTags: [], target: player.health, amount: 1000,
+      point: player.position.clone(), dir: new Vector3() });
+    expect(player.health.alive).toBe(false);
+    for (let i = 0; i < 6; i++) sim.host.step();
+    const continuation = sim.host.adapters.get('brain.fixture.actor')?.snapshot();
+    expect(continuation).toEqual(expect.arrayContaining([expect.objectContaining({ state: expect.objectContaining({ target: null }) })]));
+    expect(body.state).not.toBe('stalk');
+  } finally { sim.host.dispose(); }
+});
+
+test('the released aggressive hunt contract restores without reaction or notice fields', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = hunting('aggressive');
+  const row = shard.rows.species[0]; if (row === undefined) throw new Error('Missing fixture species');
+  delete row.senses;
+  const first = createShardfileSim(shard, new Map(), { rapier }), resumed = prepareShardfileSimRestore(shard, new Map(), { rapier });
+  try {
+    for (let i = 0; i < 6; i++) first.host.step();
+    resumed.restore(snapshotSimHost(first.host));
+    const saved = first.host.adapters.get('brain.fixture.actor')?.snapshot();
+    if (typeof saved !== 'string') throw new Error('Missing hunt continuation');
+    const legacy = JSON.parse(saved), contract = JSON.parse(legacy.contract);
+    delete contract.species.reaction; delete contract.species.notice; legacy.contract = JSON.stringify(contract);
+    expect(() => resumed.host.adapters.get('brain.fixture.actor')?.restore(JSON.stringify(legacy))).not.toThrow();
+    for (let i = 0; i < 60; i++) { first.host.step(); resumed.host.step(); }
+    expect(resumed.host.entities.get('fixture.actor')?.snapshot()).toEqual(first.host.entities.get('fixture.actor')?.snapshot());
+    expect(resumed.host.rng.snapshot()).toEqual(first.host.rng.snapshot());
+  } finally { resumed.host.dispose(); first.host.dispose(); }
+});
+
+test.each(['aggressive', 'passive', 'skittish'] as const)('a respawn resets the authored %s temperament', async reaction => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), shard = ambushing(), row = shard.rows.species[0], spawn = shard.creatures.spawns[0];
+  if (row?.temperament === undefined || spawn === undefined) throw new Error('Missing fixture species');
+  row.temperament.reaction = reaction; spawn.respawn = 1;
+  const sim = createShardfileSim(shard, new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = sim.host.nearestPlayer(body.position);
+    sim.host.combat.hit({ source: player.health, sourceTags: player.health.tags, target: body.combatActor(), amount: 1,
+      point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+    for (let i = 0; i < 6; i++) sim.host.step();
+    expect(body.state).not.toBe('hide');
+    sim.host.combat.hit({ source: player.health, sourceTags: player.health.tags, target: body.combatActor(), amount: 1000,
+      point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+    expect(body.alive).toBe(false);
+    player.position.set(0, 0, 30); player.motor?.resetAt(player.position);
+    for (let i = 0; i < 90; i++) sim.host.step();
+    expect(body.alive).toBe(true); expect(body.state).toBe('hide');
+    const saved = sim.host.adapters.get('brain.fixture.actor')?.snapshot();
+    expect(Array.isArray(saved) ? saved.slice(1, 4) : saved).toEqual([false, true, false]);
+  } finally { sim.host.dispose(); }
+});
+
+
+test('environmental damage does not provoke an admitted neutral hunt', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const sim = createShardfileSim(hunting('neutral'), new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    const player = sim.host.nearestPlayer(body.position);
+    sim.host.combat.hit({ source: 'env', sourceTags: [], target: body.combatActor(), amount: 1,
+      point: body.position.clone(), dir: new Vector3(0, 0, -1) });
+    for (let i = 0; i < 12; i++) sim.host.step();
+    expect(body.hp).toBe(116); expect(body.state).not.toBe('charge'); expect(body.state).not.toBe('stalk');
+    expect(player.health.attributes.health).toBe(100);
+  } finally { sim.host.dispose(); }
+});

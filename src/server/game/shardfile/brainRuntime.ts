@@ -126,8 +126,8 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
           provoke: (targetId: string) => { pursuit.provoke(targetId); } };
         const policy = layer !== undefined
           ? bindCreatureTemperament(host, actor, row.at, layer.temperament, source,
-            () => { const target = pursuit.targetId; return target === null ? undefined : host.players.get(target)?.position; },
-            row.group === undefined ? undefined : social.get(row.group)) : source;
+            () => { const target = pursuit.targetId; const player = target === null ? undefined : host.players.get(target); return player?.health.alive === true ? player.position : undefined; },
+            row.group === undefined ? undefined : social.get(row.group)) : { ...source, run: (dt: number) => { source.run(dt); } };
         registrations.push({ id, ...policy }); break;
       }
       case 'skirmisher':

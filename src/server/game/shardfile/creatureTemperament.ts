@@ -48,7 +48,7 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
     }
     return () => { scope.dispose(); };
   }, run: dt => {
-    if (!actor.alive) { source.run(dt); return; }
+    if (!actor.alive) { returning = false; frightened = false; ambushing = temperament.ambush === true; source.run(dt); return; }
     const player = host.nearestPlayer(actor.position), fromPlayer = actor.position.distanceToSquared(player.position);
     const distance = Math.hypot(actor.position.x - x, actor.position.y - y, actor.position.z - z), foe = target();
     if (distance > leash || (foe !== undefined && Math.hypot(foe.x - x, foe.y - y, foe.z - z) > leash)) returning = true;

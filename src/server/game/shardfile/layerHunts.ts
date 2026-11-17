@@ -36,12 +36,14 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     const actor = host.entities.get(spawn.id), id = `brain.${spawn.id}`;
     if (actor === undefined || host.adapters.has(id) || spawn.brain !== null) throw new Error(`species \`${spawn.species}\`: competing or missing hunt body`);
     const tuning = layer.brain.tuning, presentation = layer.presentation;
-    const species = { tuning, ...layer.brain.motion, reaction: layer.temperament.reaction,
-      ...(layer.senses === undefined ? {} : { notice: layer.senses.notice }), aggressive: layer.temperament.reaction === 'aggressive',
+    const legacySpecies = { tuning, ...layer.brain.motion, aggressive: layer.temperament.reaction === 'aggressive',
       ...(presentation?.sounds.call === undefined || presentation.sounds.hurt === undefined ? {} : {
         sounds: { call: presentation.sounds.call, hurt: presentation.sounds.hurt },
       }) };
-    return [{ spawn, actor, id, species, contract: JSON.stringify({ spawn, species, temperament: layer.temperament }) }];
+    const species = { ...legacySpecies, reaction: layer.temperament.reaction, ...(layer.senses === undefined ? {} : { notice: layer.senses.notice }) };
+    // Aggressive hunts without authored notice retain the exact released M1 contract.
+    const contractSpecies = species.reaction === 'aggressive' && layer.senses === undefined ? legacySpecies : species;
+    return [{ spawn, actor, id, species, contract: JSON.stringify({ spawn, species: contractSpecies, temperament: layer.temperament }) }];
   });
   for (const { spawn, actor, id, species, contract } of prepared) {
     const player = new Vector3().copy(host.nearestPlayer(actor.position).position);
@@ -82,6 +84,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     }, undefined, 'afterBodies');
     host.events.on('damage.dealt', ({ req, killed }) => {
       if (req.target !== actor.combatActor()) return;
+      if (species.reaction === 'neutral' && (req.source === 'env' || host.players.get(req.source.id)?.health !== req.source)) return;
       player.copy(host.nearestPlayer(actor.position).position); cadence.damaged(req.target, killed);
     }, host.scope);
   }
