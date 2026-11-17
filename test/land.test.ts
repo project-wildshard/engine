@@ -1416,6 +1416,22 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
     const build = jobs.get('nine-ring1-build') ?? '', observe = jobs.get('nine-ring1') ?? '';
+    // Even a cancelled macOS job cannot change or hold ci's verdict when
+    // it runs only in the workflow_run follow-up. A job-level error waiver
+    // inside ci did not isolate cancellation (44139343442).
+    expect(observe).not.toContain('kind: street');
+    expect(observe).not.toContain('macos-15');
+    const reports = readFileSync('.github/workflows/ci-reports.yml', 'utf8');
+    const reportJobs = new Map([...reports.slice(reports.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
+    const street = reportJobs.get('nine-street') ?? '';
+    expect(street).toContain('runs-on: macos-15');
+    expect(street).toContain('ref: ${{ github.event.workflow_run.head_sha }}');
+    expect(street).toContain('run-id: ${{ steps.source.outputs.run }}');
+    expect(street).toContain('name: nine-ring1-client');
+    expect(street).toContain('node scripts/nine-street-source.mjs');
+    expect(street).toContain('node scripts/nine-ring1.mjs bench');
+    expect(street).toContain('name: nine-ring1-street');
+    expect(street).toContain('if: always()');
     expect(build).not.toMatch(/^ {4}needs:/mu);
     expect(build).toContain('node scripts/ci-exact-reuse.mjs ci.yml');
     expect(build).toContain('node scripts/ci-selection.mjs');
@@ -1427,7 +1443,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     for (const job of [build, observe]) expect(job).toContain('name: nine-ring1-client');
     expect([...observe.matchAll(/uses: actions\/download-artifact@/gu)]).toHaveLength(1);
     expect(build).toContain('node scripts/nine-ring1.mjs build');
-    expect(observe).toContain("node scripts/nine-ring1.mjs ${{ matrix.kind == 'load' && 'boot' || 'bench' }}");
+    expect(observe).toContain('node scripts/nine-ring1.mjs boot');
     // Observed free-runner budgets: the previous dependency chain took
     // products496 + build216 + observation317 seconds, despite packed max571.
     const costs = new Map([['products', 496], ['nine-ring1-build', 216], ['nine-ring1', 317]]);

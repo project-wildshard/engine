@@ -9,6 +9,77 @@ permissions:
   contents: read
   actions: read
 jobs:
+  # Job-level continue-on-error inside ci did not isolate cancelled street
+  # observations (44139343442). Keep the whole macOS observation outside ci.
+  nine-street:
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: macos-15
+    timeout-minutes: 10
+    continue-on-error: true
+    env:
+      WS_LANE_NAME: nine-ring1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+      - name: Select the exact Nine client source run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+        run: node scripts/nine-street-source.mjs
+      - if: steps.source.outputs.artifact == 'true'
+        uses: ./.github/actions/ring-setup
+      - name: Own the advisory benchmark scratch folder
+        if: steps.source.outputs.artifact == 'true'
+        run: node scripts/scratch-dir.mjs nine-ring1 'NB6 report-only exact client street'
+      - if: steps.source.outputs.artifact == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.source.outputs.run }}
+          name: nine-ring1-client
+          path: tmp/nine-ring1
+      - name: Restore the exact client and install Chromium
+        if: steps.source.outputs.artifact == 'true'
+        run: |
+          mkdir -p tmp/nine-ring1/preview
+          tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
+          rm tmp/nine-ring1/client.tar
+          bash scripts/ci-playwright-install.sh chromium
+      - name: Observe the unchanged Nine street ratchet
+        id: street
+        if: steps.source.outputs.artifact == 'true'
+        continue-on-error: true
+        shell: bash
+        run: node scripts/nine-ring1.mjs bench 2>&1 | tee tmp/nine-ring1/street.log
+      - name: Explain the hosted street limitation
+        if: ${{ always() && steps.source.outputs.artifact == 'true' }}
+        env:
+          SOURCE_RUN: ${{ steps.source.outputs.run }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          STREET_OUTCOME: ${{ steps.street.outcome }}
+        run: |
+          echo "NB6 street: report-only on hosted virtualized Metal; source $SOURCE_SHA run $SOURCE_RUN; outcome $STREET_OUTCOME. Thresholds unchanged; real-GPU qualification open." >> "$GITHUB_STEP_SUMMARY"
+          if [ "$STREET_OUTCOME" != success ]; then
+            echo "::warning::NB6 street observation failed; inspect nine-ring1-street. Producer and props load remain blocking in ci."
+          fi
+      - name: Keep Nine street measurements and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nine-ring1-street
+          path: |
+            tmp/nine-ring1/street.json
+            tmp/nine-ring1/street.log
+          retention-days: 7
+          if-no-files-found: ignore
+
   timings:
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ubuntu-latest

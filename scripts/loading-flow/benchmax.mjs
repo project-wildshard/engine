@@ -47,6 +47,9 @@ const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
 const cpu = await holdCpu(1, {inherit:true});
 let browser;
+let reportPath=values.json;
+/** @type {Record<string,unknown>} */
+const diagnostic={base,seconds,throttle,dpr:Number(values.dpr),phase:'setup'};
 try {
   browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', `--use-angle=${values.angle ?? (process.platform === 'darwin' ? 'metal' : 'swiftshader')}`, '--ignore-gpu-blocklist'] });
   const context = desktop === null ? await browser.newContext({ ...devices['iPhone 16 Pro'], viewport: { width: 402, height: 874 }, deviceScaleFactor: 2 })
@@ -72,6 +75,8 @@ try {
 
   const visits = values['warm-base'] === undefined ? [base] : [base, values['warm-base']];
   for (const [visit, visitBase] of visits.entries()) {
+  reportPath=values.json===undefined?undefined:visit===0?values.json:values.json.replace(/(\.json)?$/u,'-warm.json');
+  diagnostic.base=visitBase;diagnostic.phase='load';
   if (visit > 0) {
     // Adopt the next build's document while keeping Cache Storage and disk state.
     await page.evaluate(async () => { for (const registration of await navigator.serviceWorker.getRegistrations()) await registration.unregister(); });
@@ -96,6 +101,7 @@ try {
   const titles = await page.evaluate(`[...document.querySelectorAll('.ws-menu-card')].map(c => (c.querySelector('b')?.textContent ?? c.textContent ?? '').trim().slice(0, 40))`);
   const target = titles.findIndex((/** @type {string} */ title) => shard.test(title));
   if (target === -1) throw new Error(`no card matches ${shard} in ${JSON.stringify(titles)}`);
+  diagnostic.shard=titles[target];
   // Only the requested shard: opening the deck may prefetch the default card.
   transfers.length = 0;
   await tap(`.ws-menu-dots i[data-i="${target}"]`);
@@ -163,8 +169,9 @@ try {
   // the play: walk 10 s, then the hoverboard at boost; the game's own frame ring, read every 250 ms
   const route = ROUTES[values.route === 'auto' ? (shard.test('Nine') ? 'nine' : 'spin') : values.route ?? 'spin'];
   if (route === undefined) throw new Error(`--route wants auto, spin or one of ${Object.keys(ROUTES).join(', ')}`);
-  await page.evaluate(`(() => { const w = window.__wildshard.world, input = w.game.app.input, p = w.player, t0 = performance.now(), route = ${JSON.stringify(route)};
-    const nav = window.__benchRoute = { name: ${JSON.stringify(values.route === 'auto' ? (shard.test('Nine') ? 'nine' : 'spin') : values.route)}, reached: 0, stuck: [], path: [] };
+  diagnostic.load=load;diagnostic.phase='play';
+  const sample = await page.evaluateHandle(`(() => { const w = window.__wildshard.world, input = w.game.app.input, p = w.player, t0 = performance.now(), route = ${JSON.stringify(route)};
+    const nav = { name: ${JSON.stringify(values.route === 'auto' ? (shard.test('Nine') ? 'nine' : 'spin') : values.route)}, reached: 0, stuck: [], path: [] };
     let at = 0, last = t0, check = { t: t0, x: p.position.x, z: p.position.z };
     // put the player at rest at (x, y, z) facing yaw; the page and the worker's server both hear it (the server owns the
     // position). y is the feet's: a built floor (Nine's is at 125 m) is not the ground spawn() would find under it
@@ -200,16 +207,20 @@ try {
       }
       setTimeout(step, 16); };
     step();
-    const g = w.game, rows = window.__benchRows = []; let seen = g.frameCount;
+    const g = w.game, rows = []; let seen = g.frameCount;
     const read = () => { const n = g.frameCount - seen; seen = g.frameCount;
       for (let k = Math.min(n, g.frameMs.length); k >= 1; k--) { const i = (g.frameI - k + g.frameMs.length) % g.frameMs.length;
         rows.push([performance.now() - t0, g.frameMs[i], g.updateMs[i] + g.renderMs[i], g.lastFrame.calls, g.lastFrame.triangles]); }
-      const nav = window.__benchRoute; nav.path.push([Math.round(performance.now() - t0), +p.position.x.toFixed(1), +p.position.z.toFixed(1), +p.yaw.toFixed(2), g.lastFrame.triangles]);
+      nav.path.push([Math.round(performance.now() - t0), +p.position.x.toFixed(1), +p.position.z.toFixed(1), +p.yaw.toFixed(2), g.lastFrame.triangles]);
       if (performance.now() - t0 < ${seconds * 1000}) setTimeout(read, 250); };
-    read(); })()`);
+    read(); return {world:w,rows,route:nav}; })()`);
+  let play;
+  try {
   await sleep(seconds * 1000 + 1500);
-  const play = await page.evaluate(`(() => {
-    const w = window.__wildshard.world, rows = window.__benchRows, cap = 1000 / 30;
+  play = await sample.evaluate(captured => {
+    const {world:w,rows,route:nav}=captured, cap = 1000 / 30;
+    if(window.__wildshard?.world!==w) throw new Error('benchmark world changed during play; sample invalid');
+    if(rows.length===0) throw new Error('benchmark produced no drawn frames; sample invalid');
     const pct = (list, q) => { const s = [...list].sort((a, b) => a - b); return s.length === 0 ? 0 : s[Math.min(s.length - 1, Math.floor(s.length * q))]; };
     const sum = (list, from, to) => { const rs = list.filter(r => r[0] >= from && r[0] < to), gpu = rs.map(r => Math.max(0, r[1] - Math.max(r[2], cap)));
       return { fps: rs.length / ((to - from) / 1000), p50: pct(rs.map(r => r[1]), 0.5), p95: pct(rs.map(r => r[1]), 0.95), gpu50: pct(gpu, 0.5), gpu95: pct(gpu, 0.95), draws95: pct(rs.map(r => r[3]), 0.95), tris95: pct(rs.map(r => r[4]), 0.95) }; };
@@ -220,8 +231,10 @@ try {
       const to = Math.min(span, from + 60_000), rs = rows.filter(r => r[0] >= from && r[0] < to);
       minutes.push({ ...sum(rows, from, to), draws95: pct(rs.map(r => r[3]), 0.95), tris95: pct(rs.map(r => r[4]), 0.95) });
     }
-    return { route: window.__benchRoute, minutes, scriptMemory: w.scriptMemory?.() ?? window.__wildshard?.scriptMemory?.() ?? null, all: sum(rows, 0, span), tens, draws: w.game.lastFrame.calls, triangles: w.game.lastFrame.triangles, dpr: devicePixelRatio, pixelRatio: w.game.renderer.getPixelRatio() };
-  })()`);
+    return { route: nav, minutes, scriptMemory: w.scriptMemory?.() ?? window.__wildshard?.scriptMemory?.() ?? null, all: sum(rows, 0, span), tens, draws: w.game.lastFrame.calls, triangles: w.game.lastFrame.triangles, dpr: devicePixelRatio, pixelRatio: w.game.renderer.getPixelRatio() };
+  });
+  } finally { await sample.dispose(); }
+  diagnostic.play=play;diagnostic.phase='census';
 
   // NB5: what the shadow pass submits (the frame's draws and triangles with the shadow map redrawn, then held)
   const shadow = await page.evaluate(`(async () => {
@@ -308,6 +321,11 @@ try {
   const reading = {renderer, seconds, throttle, dpr: Number(values.dpr), phone: desktop === null, load, play};
   const faults = values.ratchet ? [...loadFaults,...nineFaults(reading)] : [];
   if (values.ratchet) { console.log(`NB6 ${renderer}: ${faults.length === 0 ? 'GREEN' : 'RED'}`); for (const fault of faults) console.error(fault); if (faults.length > 0) process.exitCode = 1; }
-  if (values.json !== undefined) writeFileSync(visit === 0 ? values.json : values.json.replace(/(\.json)?$/u, '-warm.json'), `${JSON.stringify({ shard: titles[target], base: visitBase, ...reading, shadow, where, cacheCheck, transfers, resources, faults }, null, 1)}\n`);
+  if (reportPath !== undefined) writeFileSync(reportPath, `${JSON.stringify({ shard: titles[target], base: visitBase, ...reading, shadow, where, cacheCheck, transfers, resources, faults }, null, 1)}\n`);
   }
+} catch(error) {
+  // A lost document/world is missing evidence, never an empty green sample.
+  // Keep the completed load and failure identity in the advisory artifact.
+  if(reportPath!==undefined)writeFileSync(reportPath,`${JSON.stringify({...diagnostic,error:String(error?.stack??error),faults:[String(error?.message??error)]},null,1)}\n`);
+  throw error;
 } finally { try { await browser?.close(); } finally { await cpu.release(); } }
