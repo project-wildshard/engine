@@ -58,7 +58,11 @@ export function checkScenario(s, ctx) {
   // the old cache (K1, K2): the candidate on the first page, a forced update's wipe, the save kept
   if (s.oldCache !== undefined) {
     const { before, after, minClient } = s.oldCache;
-    add('old-cache-build', 'P0', after.build !== undefined && after.build === v.build, `the old profile opened ${after.build?.slice(0, 8) ?? 'no build'}, not the candidate ${v.build?.slice(0, 8) ?? ''}`);
+    // P0 only when the old profile never reaches the candidate; a first page on the old build that the world entry then
+    // replaces is P2 (SM9, staging v0.1.34: WebKit showed the v0.1.32 title for 60 s, then entered on the candidate)
+    const end = s.endState?.build ?? after.build;
+    add('old-cache-build', 'P0', end !== undefined && end === v.build, `the old profile never reached the candidate ${v.build?.slice(0, 8) ?? ''}: it ended on ${end?.slice(0, 8) ?? 'no build'}`);
+    if (end === v.build) add('old-cache-first-page', 'P2', after.build === v.build, `the old profile first showed the ${after.build?.slice(0, 8) ?? 'unknown'} title, not the candidate ${v.build?.slice(0, 8) ?? ''}; entering the world loaded the candidate`);
     const saves = before.databases.filter((name) => name.startsWith('wildshard-saves'));
     const lost = saves.filter((name) => !after.databases.includes(name));
     add('old-cache-save', 'P0', lost.length === 0, `the save was lost (${lost.join(', ')})`);
@@ -67,8 +71,8 @@ export function checkScenario(s, ctx) {
       // read once play has held: the new worker drops the old shell on activation, a few seconds after the title shows, and the
       // new build writes its own ws-built-home-v1, so only caches named for the old build count. P2: the build and save checks
       // above hold what a player meets; a stale cache left behind is disk (SM4, opus-smoke 2026-11-17)
-      const end = s.endState ?? after, stamp = before.build?.slice(0, 7);
-      const kept = stamp === undefined ? [] : end.caches.filter((name) => before.caches.includes(name) && name.includes(stamp));
+      const last = s.endState ?? after, stamp = before.build?.slice(0, 7);
+      const kept = stamp === undefined ? [] : last.caches.filter((name) => before.caches.includes(name) && name.includes(stamp));
       add('old-cache-wipe', 'P2', kept.length === 0, `a forced update (${before.clientVersion ?? ''} below minClient ${minClient ?? ''}) left ${kept.join(', ')} after play`);
     }
     add('forced-drop', 'P2', (s.drops ?? 0) === 0 && dropped.length === 0, 'a drop modal after the forced update (SB30)');
@@ -84,10 +88,13 @@ export function checkScenario(s, ctx) {
   return checks;
 }
 
+/** Checks whose evidence is the title frame, not the last one. */
+const TITLE_CHECKS = new Set(['settings', 'version', 'old-cache-first-page']);
+
 /** The failed checks as findings, worst first. @param {ScenarioResult} s @param {Check[]} checks @returns {Finding[]} */
 export function findingsOf(s, checks) {
-  const frame = s.frames.last ?? s.frames.play10 ?? s.frames.play1;
   return checks.filter((c) => !c.ok).map((c) => {
+    const frame = (TITLE_CHECKS.has(c.key) ? s.frames.title : undefined) ?? s.frames.last ?? s.frames.play10 ?? s.frames.play1;
     /** @type {Finding} */
     const f = { scenario: s.id, key: c.key, severity: c.severity, text: c.text, source: 'check' };
     if (frame !== undefined) f.frame = frame;

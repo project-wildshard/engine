@@ -67,15 +67,15 @@ test.skipIf(!FFMPEG)('the vision judge: regressed P1 holds, a matching bullet is
   // this release: the main menu where play was
   const frames = Object.fromEntries(KEYFRAMES.map(k => [k, frame(join(out, 'K3', 'frames', `${k}.jpg`), 'navy')]));
   const scenarios = [{ id: 'K3', title: 'Driftwood chain (WebKit)', status: 'ran', frames }];
-  const regressed = visionPass({ scenarios, release: 'v0.1.34', last, bullets: ['Faster loading.'], out });
+  const regressed = visionPass({ scenarios, release: 'v0.1.34', ...(last === undefined ? {} : { last }), bullets: ['Faster loading.'], out });
   expect(regressed).toMatchObject([{ scenario: 'K3', verdict: 'regressed', severity: 'P1' }]);
   expect(existsSync(regressed[0]?.sheet ?? '')).toBe(true);
   expect(holds(visionFindings(regressed))).toBe(true);
   expect(readFileSync(join(ROOT, 'calls.log'), 'utf8')).toContain('--model claude-opus-5-5');
-  const changed = visionPass({ scenarios, release: 'v0.1.34', last, bullets: ['The new main menu shows every zone.'], out });
+  const changed = visionPass({ scenarios, release: 'v0.1.34', ...(last === undefined ? {} : { last }), bullets: ['The new main menu shows every zone.'], out });
   expect(changed).toMatchObject([{ scenario: 'K3', verdict: 'changed', bullet: 'The new main menu shows every zone.' }]);
   expect(visionFindings(changed)).toEqual([]);
-  const baseline = visionPass({ scenarios, release: 'v0.1.34', last: undefined, bullets: [], out });
+  const baseline = visionPass({ scenarios, release: 'v0.1.34', bullets: [], out });
   expect(baseline).toMatchObject([{ scenario: 'K3', verdict: 'baseline' }]);
 });
 

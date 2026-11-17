@@ -250,7 +250,7 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
       await open('/');
       // an old shell may reload itself (J383's wipe, or the worker's update): wait for the candidate, then the title
       if (candidateBuild !== undefined) {
-        await page.waitForFunction((b) => Reflect.get(globalThis, '__WS_BUILD_ID__') === b, candidateBuild, { timeout: 60_000 }).catch(() => undefined);
+        await page.waitForFunction((b) => Reflect.get(globalThis, '__WS_BUILD_ID__') === b, candidateBuild, { timeout: 20_000 }).catch(() => undefined);
       }
       await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 90_000 });
       const after = await page.evaluate(storageState);
