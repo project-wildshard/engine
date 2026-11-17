@@ -877,8 +877,10 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     // (a fact no rule rewards is still a fact the tape may require). MU6: the proof filed every fact as `quest:<id>`, which no
     // shard's rule names, so any shard with a ledger rule, or a quest fact and none, refused.
     const filed = facts.flatMap((fact, ordinal) => {
-      const quest = source.quests.quests.find(row => row.id === fact.actorId && row.onComplete?.fact === fact.name);
-      if (quest === undefined) throw new Error('Missing native quest fact provenance');
+      // a quest's onComplete files its fact, and so does a race (SS-MS1a2) under its own id
+      const declared = source.quests.quests.some(row => row.id === fact.actorId && row.onComplete?.fact === fact.name)
+        || (source.quests.races ?? []).some(race => race.id === fact.actorId && race.fact === fact.name);
+      if (!declared) throw new Error('Missing native quest fact provenance');
       const rule = source.ledger.find(row => row.fact === fact.name);
       return rule === undefined ? [] : [{ instance, shard: source.identity.slug, revision: source.identity.revision, entity: fact.actorId, tick: fact.tick, ordinal,
         name: fact.name, origin: rule.origin }];

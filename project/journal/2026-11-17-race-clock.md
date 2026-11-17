@@ -36,3 +36,9 @@ finished nothing after the restore. The `quest.declared` step snapshot
 now carries the lead's runs under `#races` beside its dialogue nodes,
 only when the shard declares races (no save without races changes). The
 new test saves mid-run, restores into a fresh host and finishes.
+
+The same check then refused "Missing native quest fact provenance": the
+author proof read every filed fact as some quest's `onComplete`. A race
+files its fact under its own id, so the proof now takes a race row too
+(`test/author-proof-race.test.ts`, failed first). The live filing path
+never asked.
