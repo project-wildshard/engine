@@ -44,6 +44,22 @@ test('a data-cell chest socket follows the actual cell world transform', async (
   } finally { scope.dispose(); }
 });
 
+test('a sized grid skin and target use the defining free/class scale before its host row arrives', async () => {
+  const source = shard([]), species = source.rows.species[0];
+  if (species === undefined) throw new Error('Missing sized grid species');
+  const placement = source.creatures.spawns[0]; if (placement === undefined) throw new Error('Missing sized grid placement'); placement.at = [-33, 0, -20];
+  species.body = { skeleton: 'biped', size: 'large', scale: 1.2, look: 'look.bandit' };
+  const loaded: ClientSkin = { ...skin, bones: [{ name: 'body', parent: null, pos: [0, 0, 0] },
+    { name: 'chest', parent: 'body', pos: [0, 1, 0] }, { name: 'head', parent: 'chest', pos: [0, 2, 0] }] };
+  const { life, root, scope } = await admitted(source, () => undefined, loaded);
+  try {
+    life.late(1 / 60);
+    const target = combatSourceState().targets.find(row => row.position.x === -33), mesh = root.children.find(child => child instanceof SkinnedMesh && child.position.x === -33);
+    expect(target?.scale).toBe(2.4); expect(mesh?.scale.toArray()).toEqual([2.4, 2.4, 2.4]);
+    expect(target?.lockPoints?.point(0, new Vector3()).y).toBe(2.4);
+  } finally { scope.dispose(); }
+});
+
 test('a data cell with no creature binding draws every spawn', async () => {
   const { life, root } = await admitted(shard([]));
   life.late(1 / 60);

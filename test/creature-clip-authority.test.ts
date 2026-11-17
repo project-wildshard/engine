@@ -17,7 +17,7 @@ import { creatureVolumeFixture } from './fixtures/creature-volume-skin';
 const rapier = loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 async function fixture(path: 'translation' | 'rotation' | 'scale' = 'translation', clip = true) {
   const f = await creatureVolumeFixture(path), body = f.source.rows.species[0]?.body;
-  if (body === undefined) throw new Error('Missing clip body'); body.size = 'giant'; body.hits = clip ? 'clip' : 'rest';
+  if (body === undefined) throw new Error('Missing clip body'); body.size = 'giant'; body.scale = .25; body.hits = clip ? 'clip' : 'rest';
   const sim = createShardfileSim(f.source, f.assets, { rapier: await rapier }), actor = sim.host.entities.get('fixture.actor');
   if (actor?.hitVolumes === undefined) { sim.dispose(); throw new Error('Missing clip authority'); }
   return { ...f, sim, actor, pose: actor.hitVolumes };

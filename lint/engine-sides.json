@@ -1955,10 +1955,12 @@
     "src/server/host/dedicated/uploadActivation.ts": "server",
     "src/shared/game/shardfile/uploadActivation.ts": "shared",
     "src/server/game/shardfile/creatureVolumes.ts": "server",
+    "src/server/game/shardfile/creatureSizes.ts": "server",
     "src/shared/engine/combat/targetDamage.ts": "shared",
     "src/shared/engine/physics/creatureVolumes.ts": "shared",
     "src/shared/game/shardfile/creatureRestRig.ts": "shared",
     "src/shared/game/shardfile/creatureSockets.ts": "shared",
+    "src/shared/game/shardfile/creatureSkinBounds.ts": "shared",
     "src/shared/game/shardfile/creatureClipSampler.ts": "shared",
     "src/shared/game/shardfile/creatureClipVolumes.ts": "shared",
     "src/shared/game/shardfile/creatureVolumes.ts": "shared"

@@ -104,7 +104,7 @@ test.each(['procedural', 'own-rig'] as const)('%s body without hit overrides ret
 for (const giant of [false, true]) test(`actual ${giant ? 'giant named' : 'biped chest'} sockets follow the same actor root`, async () => {
   const { source, assets } = await creatureVolumeFixture(), body = source.rows.species[0]?.body;
   if (body === undefined) throw new Error('Missing socket fixture');
-  if (giant) { body.size = 'giant'; body.lock = ['head', 'hand.L', 'chest']; }
+  if (giant) { body.size = 'giant'; body.scale = .25; body.lock = ['head', 'hand.L', 'chest']; }
   const sim = createShardfileSim(source, assets, { rapier: await rapier });
   try {
     const actor = sim.host.entities.get('fixture.actor'); if (actor?.lockPoints === undefined) throw new Error('Missing actual socket actor');

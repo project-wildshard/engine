@@ -112,3 +112,13 @@ test('a bound page view borrows authored hit and lock ports without a second own
   expect(f.animal.snapshot()).toEqual(core.snapshot()); expect(core.snapshot()).toEqual(saved);
   expect(f.animal.lockPoints?.point(0, new Vector3()).y).toBe(core.position.y + 1);
 });
+
+test('a bound page rig takes the actual compiled host scale once', () => {
+  const f = fixture(), original = f.animal.snapshot(), saved = { ...original, motion: { ...original.motion, scale: 2.4 } };
+  const core = new AnimalSim({ kind: saved.kind, label: saved.label, variant: saved.variant, rarity: saved.rarity,
+    hp: saved.motion.maxHp, aggressive: saved.flags.aggressive, dims: f.animal.dims, mods: saved.mods }, saved.motion.seed,
+    saved.motion.scale, f.animal.entityId, { heightAt: () => 0, random: () => .5 });
+  core.restore(saved); f.animal.bindSimulation(core);
+  expect(f.animal.scale).toBe(2.4); expect(f.animal.mesh.scale.toArray()).toEqual([2.4, 2.4, 2.4]);
+  expect(f.animal.position).toBe(core.position); expect(f.animal.snapshot()).toEqual(saved);
+});

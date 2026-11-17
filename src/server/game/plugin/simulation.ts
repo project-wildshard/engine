@@ -1,6 +1,7 @@
 import { installDataCreatureBands } from '../shardfile/dataCreatureBands';
 import { bindCreatureSenses, installCreatureSensesContract } from '../shardfile/creatureSenses';
 import { installCreatureVolumes } from '../shardfile/creatureVolumes';
+import { sizeCreatureSpawns } from '../shardfile/creatureSizes';
 import type { CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { dataPerchBrains, preflightPlainPerches } from '../shardfile/dataPerchBrains';
@@ -421,7 +422,7 @@ function shardfileSimInput(shard: Shardfile, assets: ReadonlyMap<string, Uint8Ar
   const weapon = ports.weapon ?? HOST_PROBE;
   return {level: { version: SIM_API_VERSION, id: shard.identity.slug, seed: shard.identity.seed,
     ground: { size: 500, height: 0 }, player: { at: { x: shard.spawn.x, y: shard.spawn.y, z: shard.spawn.z }, yaw: shard.spawn.yaw, speed: Math.min(5, shard.authorCaps.speed) },
-    entities: buildPlatformSpawns(shard.creatures.spawns, speciesResolver(shard.rows, shard.creatures.brains), simStrikes(shard.rows)), weapon, quests: [],
+    entities: sizeCreatureSpawns(buildPlatformSpawns(shard.creatures.spawns, speciesResolver(shard.rows, shard.creatures.brains), simStrikes(shard.rows)), shard.rows, shard.creatures.spawns), weapon, quests: [],
   }, ports: { ...ports, ground: ports.ground !== false && terrain === undefined && shard.meshCollision === null && shard.entryways.some(entry => (entry.kind ?? 'ground') === 'ground'), heightAt }};
 }
 /** Install the ordinary native simulation once. */

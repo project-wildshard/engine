@@ -16,12 +16,10 @@ export class ClipCreatureVolumes implements CreatureVolumePose {
   private readonly endpoints: { rear: Vector3; front: Vector3 }[];
   private frame = '';
   private readonly centre = new Vector3(); private readonly axis = new Vector3();
-  private readonly roots: ReadonlySet<string>;
   constructor(body: CreatureBody, bytes: Uint8Array, joints: readonly CreatureRestJoint[], private readonly actor: AnimalSim,
     private readonly now: () => number, private readonly attackSpan: number) {
     if (body.size !== 'giant' || body.hits !== 'clip') throw new Error('Clip hit authority needs an opted-in giant');
     this.sampler = new CreatureClipSampler(bytes, joints);
-    this.roots = new Set(joints.filter(joint => joint.parent === -1).map(joint => joint.name));
     if (!this.sampler.has('idle')) throw new Error('Clip hit authority needs an idle clip');
     const defaults = body.skeleton === undefined ? [] : CREATURE_SKELETONS[body.skeleton].volumes;
     const rows = new Map<string, CreatureVolume>(defaults.map(row => [row.part, row]));
@@ -33,9 +31,7 @@ export class ClipCreatureVolumes implements CreatureVolumePose {
     });
     this.shapes = this.definitions.map(({ row }) => ({ part: row.part, multiplier: row.multiplier, radius: MIN_VOLUME_RADIUS, halfLength: 0 }));
     this.endpoints = this.definitions.map(() => ({ rear: new Vector3(), front: new Vector3() }));
-    this.scale = body.scale;
   }
-  private readonly scale: number;
   get volumes(): CreatureVolumePose['volumes'] { this.refresh(); return this.shapes; }
   private refresh(): void {
     const a = this.actor, sampler = this.sampler, now = this.now();
@@ -46,7 +42,7 @@ export class ClipCreatureVolumes implements CreatureVolumePose {
     else if (hit >= 0 && sampler.has('hit') && hit < sampler.duration('hit')) { name = 'hit'; time = hit; loop = false; }
     else if (Math.hypot(a.speed, a.strafe) / a.scale > .15 && sampler.has('walk')) name = 'walk';
     else if (a.state === 'graze' && sampler.has('idle.graze')) name = 'idle.graze';
-    const scale = a.scale * this.scale, key = `${name}:${time}:${scale}`;
+    const scale = a.scale, key = `${name}:${time}:${scale}`;
     if (key === this.frame) return;
     if (!Number.isFinite(scale) || scale <= 0) throw new Error('Invalid creature clip scale');
     const pose = sampler.sample(name, time, loop);
@@ -72,9 +68,7 @@ export class ClipCreatureVolumes implements CreatureVolumePose {
     world(row.rear, rear); world(row.front, front);
   }
   joint(name: string, position: Vector3, quaternion: Quaternion, scale: Vector3): boolean {
-    this.refresh(); const found = this.sampler.joint(name, position, quaternion, scale);
-    if (found && this.roots.has(name)) { position.multiplyScalar(this.scale); scale.multiplyScalar(this.scale); }
-    return found;
+    this.refresh(); return this.sampler.joint(name, position, quaternion, scale);
   }
   capture(): CreatureVolumeFrame {
     const volumes = this.volumes.map(row => ({ ...row })), points = new Float32Array(volumes.length * 6), rear = new Vector3(), front = new Vector3();

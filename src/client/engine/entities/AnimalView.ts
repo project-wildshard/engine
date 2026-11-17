@@ -166,6 +166,7 @@ export class Animal extends AnimalSim {
     if (this.externalSimulation !== null || this.motor !== null || this.ragdoll !== null
       || sim === this || sim.entityId !== this.entityId || sim.kind !== this.kind) throw new Error('Incompatible creature view binding');
     this.externalSimulation = sim;
+    this.mesh.scale.setScalar(sim.scale);
     const share = (key: keyof AnimalSim): void => {
       Object.defineProperty(this, key, { configurable: false, enumerable: true,
         get: () => sim[key], set: (value: unknown) => { Reflect.set(sim, key, value); } });

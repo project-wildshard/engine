@@ -14,6 +14,7 @@
 import { Bone, Skeleton, SkinnedMesh, Vector3, type Group, type Object3D } from 'three';
 import { RestCreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
 import type { CreatureLockPoints, CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
+import { creatureScale } from '@wildshard/format/creatureSizes';
 import { addCombatTargets, reportCombatHit, type CombatTarget } from '@wildshard/engine/ui/Combat';
 import { addAimTargets, type AimTarget } from '@wildshard/engine/player/AimTargets';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -123,10 +124,11 @@ export class NeighbourLife {
       if (spawn === undefined || species === undefined || skin === undefined) continue; // a non-skin look has no neighbour view yet
       const selected = clientVariantSkin(skin, spawn.variant);
       const { mesh, bones } = skinMesh(selected), driver = new SkinDriver(selected, bones);
+      const scale = creatureScale(species.body, spawn.scale);
       // a hand-made row (a test's) may carry no variants or head size: the bar then reads the row's own hp as its full
       const variants: readonly { id: string; label: string; hp: number }[] = Array.isArray(species.variants) ? species.variants : [];
       const variant = variants.find((row) => row.id === spawn.variant) ?? variants[0], head = species.dims.headRadius;
-      const target = new CreatureTarget(species.kind, variant?.label ?? species.label, Math.max(1, variant?.hp ?? 1), spawn.scale, species.dims.bodyY * 2 + (Number.isFinite(head) ? head : 0.3),
+      const target = new CreatureTarget(species.kind, variant?.label ?? species.label, Math.max(1, variant?.hp ?? 1), scale, species.dims.bodyY * 2 + (Number.isFinite(head) ? head : 0.3),
         { bodyY: species.dims.bodyY, bodyRadius: species.dims.bodyRadius }, species.lockable);
       if (species.body !== undefined && (species.body.skeleton !== undefined || species.body.lock !== undefined)) {
         const joints = selected.bones.map(def => {
@@ -134,11 +136,11 @@ export class NeighbourLife {
           return { name: def.name, parent, position: [def.pos[0] - (previous?.pos[0] ?? 0), def.pos[1] - (previous?.pos[1] ?? 0), def.pos[2] - (previous?.pos[2] ?? 0)] as const };
         });
         const body = species.body, points = new RestCreatureSockets(body, joints, { position: mesh.position,
-          get yaw() { return mesh.rotation.y; }, get scale() { return mesh.scale.x * body.scale; } });
+          get yaw() { return mesh.rotation.y; }, get scale() { return mesh.scale.x; } });
         target.lockPoints = { names: points.names, point: (index, out) => { root.updateWorldMatrix(true, false); return points.point(index, out).applyMatrix4(root.matrixWorld); } };
       }
-      const view: CreatureView = { id, mesh, bones, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale: spawn.scale }, bodyY: species.dims.bodyY * spawn.scale, target, t: (spawn.seed % 97) / 13, phase: 0 };
-      mesh.position.set(spawn.at[0], spawn.at[1], spawn.at[2]); mesh.rotation.set(0, spawn.yaw, 0, 'YXZ'); mesh.scale.setScalar(spawn.scale);
+      const view: CreatureView = { id, mesh, bones, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale }, bodyY: species.dims.bodyY * scale, target, t: (spawn.seed % 97) / 13, phase: 0 };
+      mesh.position.set(spawn.at[0], spawn.at[1], spawn.at[2]); mesh.rotation.set(0, spawn.yaw, 0, 'YXZ'); mesh.scale.setScalar(scale);
       // ZE3a: hidden from birth unless its cell is the active one: an admission that resolves between the late phase (which
       // hides a frozen cell's creatures) and the draw drew them once, and that draw linked their programs on the frame (a
       // neighbour's barrow warden, 114 ms, on the laptop's whole-road drive past an open plot, 2026-11-15)
