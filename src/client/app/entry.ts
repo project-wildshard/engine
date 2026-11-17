@@ -434,7 +434,8 @@ async function startPage(): Promise<void> {
       // Admission can refuse before startSession installs its fatal-load boundary. main starts asynchronously;
       // paint the same fatal card here, naming the step it died on, instead of leaving a rejected boot behind the loader.
       const { showError } = await import('@wildshard/engine/ui/ErrorModal');
-      showError(stuckMessage(progressOfCard(card()).step, { error }), error instanceof Error ? error.stack ?? '' : '', stall());
+      const refusal = error instanceof Error && error.name === 'ShardMemoryRefusalError' ? error.message : undefined;
+      showError(stuckMessage(progressOfCard(card()).step, { error }), error instanceof Error ? error.stack ?? '' : '', stall(), refusal);
       return;
     }
     clearGridRecovery();

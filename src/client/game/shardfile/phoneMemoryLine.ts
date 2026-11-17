@@ -14,7 +14,7 @@ export class ShardMemoryRefusalError extends Error {
   readonly owner: string; readonly playingBytes: number; readonly lineBytes: number;
   constructor(owner: string, playingBytes: number, lineBytes: number) {
     const gb = (bytes: number): string => (bytes / 1e9).toFixed(2);
-    super(`This world needs about ${gb(playingBytes)} GB of memory and a phone has ${gb(lineBytes)} GB to give it, so it does not load here: it would close the page. Pick another world, or play it on a computer.`);
+    super(`This world needs about ${gb(playingBytes)} GB of memory and a phone has ${gb(lineBytes)} GB to give it. Pick another world, or play it on a computer.`);
     this.name = 'ShardMemoryRefusalError'; this.owner = owner; this.playingBytes = playingBytes; this.lineBytes = lineBytes;
   }
 }

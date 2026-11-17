@@ -311,6 +311,7 @@ export const ENGINE_STRINGS = {
   "s_078b1e7bbe5e": "Reload at spawn",
   "s_f589420f0639": "A glitch was reported",
   "s_456509849d2d": " ✓",
+  "s_err_phone_memory": "This world needs more memory",
   "s_err_what": "⟦0⟧: ⟦1⟧",
   "s_err_system": "system ⟦0⟧\n⟦1⟧",
   "s_err_report_id": "report ⟦0⟧\n⟦1⟧",

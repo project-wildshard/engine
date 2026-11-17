@@ -184,7 +184,7 @@ function setSent(o: ReportOutcome): void {
 }
 
 /** The fatal modal (first error wins the headline; later ones tick the counter). */
-function showFatal(message: string, stack: string, sent: Promise<ReportOutcome> | null, system = 'boot'): void {
+function showFatal(message: string, stack: string, sent: Promise<ReportOutcome> | null, system = 'boot', memoryRefusal?: string): void {
   try {
     count++;
     if (!root) {
@@ -194,7 +194,14 @@ function showFatal(message: string, stack: string, sent: Promise<ReportOutcome> 
       firstText = message;
       // what failed, in one line: the system and the error's first line
       const first = (message.split('\n')[0] ?? '').trim();
-      q(root, '.what').textContent = engineString('s_err_what', [system, first.length > 140 ? `${first.slice(0, 139)}…` : first]);
+      q(root, '.what').textContent = memoryRefusal ?? engineString('s_err_what', [system, first.length > 140 ? `${first.slice(0, 139)}…` : first]);
+      if (memoryRefusal !== undefined) {
+        q(root, 'h1').textContent = engineString('s_err_phone_memory');
+        q(root, '.line').hidden = true;
+        q(root, '.here').hidden = true;
+        root.querySelector<HTMLElement>('.doctor')?.setAttribute('hidden', '');
+        q(root, '.title').classList.add('go');
+      }
       q(root, '.msg').textContent = message;
       q(root, '.stack').textContent = stack || engineString('s_79b59ea37a9c');
       q(root, '.meta').textContent = engineString('s_err_system', [system, meta()]);
@@ -213,7 +220,7 @@ function showFatal(message: string, stack: string, sent: Promise<ReportOutcome> 
       : alive
         ? engineString('s_94fef1ec7b83')
         : loopState() === 'boot' ? engineString('s_d80080606a96') : engineString('s_da009164dfc2');
-    q(root, '.keep').hidden = !alive;
+    q(root, '.keep').hidden = !alive || q(root, '.here').hidden;
     q(root, '.n').textContent = count > 1 ? engineString('s_ffd7f4e8c95a', [count - 1, firstText.slice(0, 40)]) : '';
   } catch { /* the modal must never throw */ }
 }
@@ -271,11 +278,11 @@ function handle(f: Fault): void {
 
 /** Show the fatal modal explicitly (main().catch: the boot failed) and report it. */
 /** `stall`: S4's context for a stuck or failed start (stuckStep.ts stuckContext); it rides the report as `stall`. */
-export function showError(message: string, stack = '', stall?: Record<string, unknown>): void {
+export function showError(message: string, stack = '', stall?: Record<string, unknown>, memoryRefusal?: string): void {
   app.setState('error');
   try {
     const screen: ErrorScreen | undefined = root ? undefined : stall === undefined ? 'error-modal' : 'stuck-step';
-    showFatal(message, stack, report('boot', new DescribedError(message, stack), { fatal: true, ...(stall === undefined ? {} : { stall }), ...(screen === undefined ? {} : { screen }) }));
+    showFatal(message, stack, report('boot', new DescribedError(message, stack), { fatal: true, ...(stall === undefined ? {} : { stall }), ...(screen === undefined ? {} : { screen }) }), 'boot', memoryRefusal);
   } catch { /* the modal must never throw */ }
 }
 
