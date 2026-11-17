@@ -14,6 +14,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { poseEvery } from '../../src/shared/engine/entities/poseCadence';
+import { BakedHerd, bakeGait } from '../../src/client/engine/entities/bakedHerd';
 
 type Mode = 'skinned' | 'baked' | 'sprite';
 interface BenchResult {
@@ -91,6 +92,7 @@ async function main(): Promise<void> {
   let skinnedProto: THREE.SkinnedMesh | null = null;
   proto.traverse((o) => { if (skinnedProto === null && o instanceof THREE.SkinnedMesh) skinnedProto = o; });
   if (skinnedProto === null) throw new Error('deer.glb has no skinned mesh');
+  const deerMesh: THREE.SkinnedMesh = skinnedProto;
 
   const spots = Array.from({ length: n }, (_, i) => herdSpot(i));
   const near = dist < ANIM_LOD;
@@ -115,6 +117,12 @@ async function main(): Promise<void> {
       if (!near) return;
       for (const d of herd) if ((frame + d.phase) % every === 0) poseGait(d.bones, d.rest, t, d.seed);
     };
+  } else if (mode === 'baked') {
+    const bake = bakeGait(deerMesh, (bones, rest, t) => { poseGait(bones, rest, t, 0); }, { frames: 32, seconds: 1 / GAIT_HZ });
+    const herd = new BakedHerd(deerMesh, bake, n, (deerMesh.material as THREE.Material).clone());
+    spots.forEach((s, i) => { herd.place(i, new THREE.Vector3(s.x, 0, s.z), s.yaw, 1, s.seed); });
+    scene.add(herd.mesh);
+    tick = (t) => { herd.update(t); };
   } else {
     throw new Error(`mode ${mode} is not built yet`);
   }
