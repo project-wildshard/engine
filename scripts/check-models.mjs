@@ -118,6 +118,8 @@ export const DONE = {
     'src/client/engine/entities/bakedHerd.ts': { why: "ONE-FORMAT CC54: a species' far herd skinned from its baked gait, one draw; the rig's own skinned geometry and materials (shared, not copied), each copy one of its creature model's live animals: a LOD, no new world thing", counts: { InstancedMesh: 1 } },
     'src/client/engine/entities/herdSprites.ts': { why: "ONE-FORMAT CC55: past the far distance a creature model's animals as one draw of camera-facing cards shot from that model's rest pose: a LOD of its live animals, no new world thing", counts: { InstancedMesh: 1 } },
     'src/client/engine/entities/AnimalFactory.ts': { why: "the species rigs' builder: a creature's parts merged per bone (creatures are models, M5: each shard's roster)", counts: { mergeGeometries: 4 } },
+    'src/client/engine/entities/bakedHerd.ts': { why: "One animated LOD draw batches existing model-owned creatures; it borrows the source geometry and never registers a world object", counts: { InstancedMesh: 1 } },
+    'src/client/engine/entities/herdSprites.ts': { why: "One billboard LOD draw batches existing model-owned creatures and keeps the same population owner", counts: { InstancedMesh: 1 } },
     'src/client/engine/fx/Impacts.ts': { why: 'hit sparks and debris: an effect', counts: { InstancedMesh: 1 } },
     'src/client/game/loot/CoinBurst.ts': { why: 'the coins bursting from a kill: an effect', counts: { InstancedMesh: 1 } },
     'src/client/game/cosmetics/bodyShadow.ts': { why: "the player's own shadow-casting body: the player, not a thing in the world", counts: { mergeGeometries: 2 } },
