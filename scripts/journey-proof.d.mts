@@ -20,5 +20,7 @@ export const PHONE: {
 export function screenNow(): Screen;
 export function label(s: Screen | null): string;
 export function judge(samples: readonly Sample[], options?: { blankMs?: number; budgetMs?: number }): Problem[];
+/** SS-JP1: the index of `card`'s Shard Select card among the cards' names (title row, else the slug, else its words), or -1. */
+export function titleCardIndex(rows: unknown, names: readonly string[], card: string): number;
 export function tapJourney(page: Page, options: { card: string; path?: JourneyPath; budgetMs?: number; sampleMs?: number; frames?: (row: Sample) => Promise<void> }): Promise<Sample[]>;
 export function stickMoves(page: Page): Promise<boolean>;

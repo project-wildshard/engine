@@ -1,7 +1,7 @@
 // STAGING-BUGBASH SB5: the journey judge (scripts/journey-proof.mjs) fails a blank over half a second; the grid's sky-down
 // arrival under its ARRIVING caption is a screen of its own, not a blank.
 import { expect, test } from 'vitest';
-import { judge, label } from '../scripts/journey-proof.mjs';
+import { judge, label, titleCardIndex } from '../scripts/journey-proof.mjs';
 
 const screen = (over: Record<string, boolean>) => ({ doc: 1, path: '/w', shell: false, title: false, select: false, loading: false, bar: false, hud: false, modal: false, ...over });
 
@@ -23,4 +23,17 @@ test('MS5: a plain loading card fails, and the main menu is allowed only before 
   // has come back
   expect(judge(path([{ title: true }, { title: true, bar: true }, { hud: true }])).map((p) => p.text)).toEqual(['the loading card is shrunk to a bar']);
   expect(judge(path([{ title: true }, { title: true, loading: true, detailed: true }, { title: true }, { hud: true }])).map((p) => p.text)).toEqual(['the main menu came back after Enter World']);
+});
+
+// meta SHARD-SOURCE SS-JP1 (F17): a shard the API placed after the build has no row in `#ws-title-rows`; its Shard Select card is
+// carded from the catalogue (SA46), so the journey takes it by the slug as words.
+test('SS-JP1: the card is found by its title row, else by the slug, else by the slug as words', () => {
+  const rows = [{ slug: 'driftwood-isle', name: 'Driftwood Isle' }, { slug: 'nalati', name: 'Nalati Highlands' }];
+  const names = ['Driftwood Isle', 'Nalati Highlands', 'Glowfen', 'Mirror Salt'];
+  expect(titleCardIndex(rows, names, 'nalati')).toBe(1);
+  expect(titleCardIndex(rows, names, 'Driftwood Isle')).toBe(0);
+  expect(titleCardIndex(rows, names, 'glowfen')).toBe(2);
+  expect(titleCardIndex(rows, names, 'mirror-salt')).toBe(3);
+  expect(titleCardIndex('junk', names, 'mirror-salt')).toBe(3);
+  expect(titleCardIndex(rows, names, 'cinder-springs')).toBe(-1);
 });
