@@ -126,14 +126,19 @@ export class StaleClientError extends Error {
 }
 /** Parse fetched index bytes; a first-party index outside the bundle's own catalogue reloads once before any parsing. */
 export async function readIndexBytes(bytes: Uint8Array, options: FolderOptions): Promise<unknown> {
-  const built = options.firstParty&&options.firstPartyRead===undefined ? options.built : undefined;
+  const built = options.firstPartyRead===undefined ? listedBuilt(options) : undefined;
   if (built !== undefined) await checkBuiltIndex(await options.hash(bytes), options);
   await options.pause?.();
   return options.parseJson === undefined ? JSON.parse(descriptorDecoder.decode(bytes)) : options.parseJson(bytes);
 }
-/** A first-party index whose bytes' `hash` this build does not list takes stale-client recovery (a no-op otherwise). */
+/** ONE-FORMAT OF10a3: the stale-client check covers a product whose path the build's verdict table lists (its own
+ * catalogue and the placed uploads' cook rows), whoever made it; an unlisted product is never stale. */
+function listedBuilt(options: FolderOptions): FolderOptions['built'] {
+  return options.built !== undefined && builtIndexHash(new URL('shard.json', new URL('.', options.base)).pathname) !== null ? options.built : undefined;
+}
+/** A listed index whose bytes' `hash` this build does not list takes stale-client recovery (a no-op otherwise). */
 export async function checkBuiltIndex(hash: string, options: FolderOptions): Promise<void> {
-  const built = options.firstParty ? options.built : undefined;
+  const built = listedBuilt(options);
   if (built !== undefined && !built.indexes.has(hash)) {
     await built.stale(); // pends while the reload navigates; returns when the reload budget is spent
     throw new StaleClientError();
@@ -312,7 +317,8 @@ export async function readFolderDescriptor(options: FolderOptions, declaredUrl?:
   const base = new URL('.', options.base).href;
   const url = new URL(declaredUrl?.href ?? 'shard.json', base);
   if (new URL('.', url).href !== base || url.pathname.endsWith('/') || url.search !== '' || url.hash !== '') throw new Error('Descriptor must be an unqualified file in its product directory');
-  const indexHash = options.firstParty && url.pathname.endsWith('/shard.json') ? builtIndexHash(url.pathname) : null;
+  // OF10a3: the build's verdict table (its own products and the placed uploads' cook rows) pins any product it lists
+  const indexHash = url.pathname.endsWith('/shard.json') ? builtIndexHash(url.pathname) : null;
   if (indexHash !== null && options.descriptorHash !== undefined && options.descriptorHash !== indexHash) throw new Error('Shardfile descriptor hash mismatch');
   if (indexHash !== null) url.searchParams.set('v', indexHash.slice(0, 8));
   const builtRead=options.firstParty?options.firstPartyRead:undefined;
@@ -475,7 +481,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   await options.pause?.();
   if (!isBuildValidatedOutput(raw)) await preflightFolder(raw, options.pause);
   if (!compatibleShardfileVersion(version(raw))) throw new Error('Shardfile needs the current or previous additive format');
-  const source = options.firstParty && isBuildValidatedOutput(raw) ? raw : await parseCheckedFolder(raw, outputDescriptor(raw)?.sections), assets = new Map<string, Uint8Array>(), hashes = new Map<Uint8Array, string>();
+  const source = isBuildValidatedOutput(raw) ? raw : await parseCheckedFolder(raw, outputDescriptor(raw)?.sections), assets = new Map<string, Uint8Array>(), hashes = new Map<Uint8Array, string>();
   carryOutputDescriptor(raw, source);
   if (!options.firstParty) assertExternalShardSlug(source.identity.slug);
   // A newly reconstructed private root already proved its exact declaration.
@@ -496,7 +502,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   const reference = sourceHash === '' ? descriptorPath : sourceHash.slice(0, 12);
   // A build receipt is pinned inside this client, never fetched from data.
   const receipt = revisionKey !== null
-    ? readValidationReceipt(visited?.validation, sourceHash) ?? (options.firstParty ? builtValidationReceipt(sourceHash) : null) : null;
+    ? readValidationReceipt(visited?.validation, sourceHash) ?? builtValidationReceipt(sourceHash) : null;
   const worst = receipt?.worst ?? await checkedFolderCosts(source, options.memory);
   if (receipt !== null) acceptValidatedCost(source, worst, options.memory);
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row

@@ -133,7 +133,7 @@ export function browserShardfileOptions(base: string, firstParty = false): Folde
     },
     ...(firstParty ? { fetchRange: (url: string, start: number, end: number, priority?: 'low') => waitFor(`Fetch pack range ${start}-${end}`, fetch(contentURL(url), { headers: { Range: `bytes=${start}-${end}` }, ...(priority === undefined ? {} : { priority }) }), 'file') } : {}),
     pause, cacheBatch: true,
-    ...(firstParty && builtIndexes !== null ? { built: { indexes: builtIndexes, stale: staleRecovery } } : {}),
+    ...(builtIndexes !== null ? { built: { indexes: builtIndexes, stale: staleRecovery } } : {}),
   };
 }
 
@@ -236,7 +236,7 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
       if (entry === undefined) {
         const assets = new ClientAssets(source, new Map(), options);
         entry = { source, assets, options, key, owners: new Set(), requests: new Set(),
-          product: shardFolderData(source, base, ref => assets.read(ref), descriptor?.receipt === undefined, options.firstParty) };
+          product: shardFolderData(source, base, ref => assets.read(ref), descriptor?.receipt === undefined, descriptor?.receipt !== undefined) };
         if (options.tier === 'phone' && descriptor?.receipt !== undefined && source.late !== undefined) {
           let prepared: Promise<ReturnType<typeof folderCacheCompletion>> | undefined;
           const receipt = descriptor.receipt;
@@ -318,11 +318,11 @@ export function shardFolderFromAdmission(admitted: AdmittedFolder, scope: Scope,
   const opts = options ?? browserShardfileOptions(folderBase(admitted.source.identity.slug), true);
   let product = admittedFolders.get(admitted.source.files)?.deref();
   if (product === undefined) {
-    const reader = new ClientAssets(admitted.source, new Map(), opts);
+    const reader = new ClientAssets(admitted.source, new Map(), opts), checked = outputDescriptor(admitted.source)?.receipt === undefined;
     product = shardFolderData(admitted.source, opts.base, ref => {
       const present = admitted.assets.get(ref);
       return present === undefined ? reader.read(ref) : pacedResolve(present);
-    }, outputDescriptor(admitted.source)?.receipt === undefined, opts.firstParty);
+    }, checked, !checked);
     admittedFolders.set(admitted.source.files, new WeakRef(product));
   }
   const release = opts.cache?.pin?.(outputDescriptor(admitted.source)?.index.sections.map(section => section.hash) ?? []);

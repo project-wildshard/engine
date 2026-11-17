@@ -131,7 +131,7 @@ function buildValidatedIndex(value: unknown, digest: string): value is OutputInd
   return indexReceipt(value, digest) !== null;
 }
 async function ownedBuildIndex(input: unknown, reader: OutputDescriptorReader): Promise<{ index: OutputIndex; receipt: ValidationReceipt; digest: string } | null> {
-  if (reader.firstParty !== true || indexReceipt(input) === null || !isJsonDataWithFileSchemas(input)) return null;
+  if (indexReceipt(input) === null || !isJsonDataWithFileSchemas(input)) return null;
   // Clone before the first caller pause/hash callback. Neither can mutate the
   // private snapshot while its canonical bytes are encoded and verified.
   const owned: unknown = structuredClone(input);
@@ -178,7 +178,7 @@ async function readBuiltOutput(index:OutputIndex,reader:OutputDescriptorReader,b
 /** The native build reader is the type authority here, not an authored field.
  * G887 moves schema proof to publication; no client source hash or parser is involved. */
 function isBuiltClientSource(value:unknown,reader:OutputDescriptorReader):value is Shardfile{
-  return typeof value==='object'&&value!==null&&reader.firstParty===true&&reader.built!==undefined;
+  return typeof value==='object'&&value!==null&&reader.built!==undefined;
 }
 
 /**
@@ -187,14 +187,14 @@ function isBuiltClientSource(value:unknown,reader:OutputDescriptorReader):value 
  * remain host inputs; disk readers separately require a format-2 index.
  */
 export async function resolveOutputDescriptor(input: unknown, reader: OutputDescriptorReader): Promise<unknown> {
-  if(reader.firstParty===true&&reader.built!==undefined){
+  if(reader.built!==undefined){
     if(isBuildValidatedOutput(input))return input;
     return readBuiltOutput(input as OutputIndex,reader,reader.built);
   }
   if(!(import.meta.env?.SSR??true)&&reader.checks===undefined)throw new Error('Client product needs its build-owned reader');
   // This root was reconstructed here already. Admission still rechecks exposed
   // values; recognizing a model must not load the disk-index grammar again.
-  if (reader.firstParty === true && isBuildValidatedOutput(input)) {
+  if (isBuildValidatedOutput(input)) {
     if (!isJsonDataWithFileSchemas(input)) throw new Error('Shardfile descriptor requires bounded plain JSON');
     return input;
   }
@@ -276,7 +276,7 @@ export async function resolveOutputDescriptor(input: unknown, reader: OutputDesc
     return { identity: inventory.identity, state: typeof state === 'object' && state !== null && 'state' in state ? state.state : undefined };
   }
   const index = current;
-  const candidate = pinned?.receipt ?? (reader.firstParty === true ? builtValidationReceipt(index.build.sourceHash) : null);
+  const candidate = pinned?.receipt ?? builtValidationReceipt(index.build.sourceHash);
   const indexHash = pinned?.digest ?? (candidate === null ? undefined : await reader.hash(await receiptBytes(input, reader)));
   const receipt = pinned?.receipt ?? (indexHash === undefined ? null : builtValidationReceipt(index.build.sourceHash, indexHash));
   // Unproved products keep the original serialized schema phase before paced

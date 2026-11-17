@@ -103,16 +103,16 @@ test('a rejected descriptor request uses a checked revisit, never elapsed time',
 });
 
 test('a failed request cannot admit an absent, changed or incomplete visited product', async () => {
-  for (const refused of ['absent', 'changed', 'catalogue', 'incomplete'] as const) {
+  for (const refused of ['absent', 'changed', 'incomplete'] as const) {
     const f = fixture(), store = cacheStore(), opts = options(f.wires, store.cache);
     if (refused !== 'absent') await admitFolder(await readFolderDescriptor(opts), opts);
     if (refused === 'incomplete') store.bytes.clear();
     const held: FolderOptions = { ...opts, ...(refused === 'changed' ? { descriptorHash: 'f'.repeat(64) } : {}),
-      ...(refused === 'catalogue' ? { built: { indexes: new Set<string>(), stale: () => Promise.resolve() } } : {}), fetch: () => Promise.reject(new TypeError('Native connection failed')) };
+      fetch: () => Promise.reject(new TypeError('Native connection failed')) };
     vi.useFakeTimers();
     try {
       const expected = expect(readFolderDescriptor(held)).rejects.toThrow(refused === 'changed' ? 'descriptor hash mismatch'
-        : refused === 'catalogue' ? 'older than the shard' : refused === 'incomplete' ? 'incomplete section cache' : 'Native connection failed');
+        : refused === 'incomplete' ? 'incomplete section cache' : 'Native connection failed');
       await expected;
       expect(vi.getTimerCount()).toBe(0);
     } finally { vi.useRealTimers(); }
@@ -1253,12 +1253,11 @@ test('build-owned client sections assemble exact hosts without hashing or downlo
   expect(outputDescriptor(source)?.sections.get('ui/strings')).toStrictEqual(value);expect(outputDescriptor(source)?.indexHash).toBe('compiled-index-key');
 });
 
-test('a supplied build reader cannot bypass external descriptor validation',async()=>{
+test('an index read without the build reader takes the checked path, whoever made it (OF10a3)',async()=>{
   const f=fixture(),first=f.index.sections[0];if(first===undefined)throw new Error('Missing section');
   const corrupt=new Uint8Array(f.wires.get(first.path)??[]);corrupt[0]=0;
-  const built=vi.fn<(path:string,bytes:number)=>Promise<Uint8Array>>(()=>{throw new Error('External input has no build authority');});
-  await expect(resolveOutputDescriptor(f.index,{offline:false,firstParty:false,hash:bytes=>Promise.resolve(hash(bytes)),built:{read:built,indexHash:'not-authority'},read:path=>Promise.resolve(path===first.path?corrupt:f.wires.get(path)??new Uint8Array())})).rejects.toThrow('section hash or size mismatch');
-  expect(built).not.toHaveBeenCalled();
+  for(const firstParty of [false,true])
+    await expect(resolveOutputDescriptor(f.index,{offline:false,firstParty,hash:bytes=>Promise.resolve(hash(bytes)),read:path=>Promise.resolve(path===first.path?corrupt:f.wires.get(path)??new Uint8Array())})).rejects.toThrow('section hash or size mismatch');
 });
 
 test('native first-party loading has no visited fallback, digest or client admission phases',async()=>{

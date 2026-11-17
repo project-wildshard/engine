@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { readIndexBytes, StaleClientError, type FolderOptions } from '../src/client/game/shardfile/folder';
 import { staleClientRecovery } from '../src/client/engine/boot/stuck';
@@ -7,8 +7,12 @@ const hash = (bytes: Uint8Array): Promise<string> => Promise.resolve(hashImmutab
 const known = new TextEncoder().encode('{"format":"known"}');
 // Newer products may carry fields an old client rejects; the stale path must never parse them.
 const newer = new TextEncoder().encode('{"feature":"population.wildlife"');
-function options(firstParty: boolean, stale = vi.fn(() => Promise.resolve())): { options: FolderOptions; stale: typeof stale } {
-  return { stale, options: { base: 'https://example.test/shardfiles/a/', offline: false, firstParty, hash,
+// OF10a3: the build's verdict table lists `a`'s path; `b` (any maker's product it does not list) is never stale
+beforeAll(() => { Object.defineProperty(globalThis, '__SHARDFILE_VERDICTS__', { configurable: true, writable: true,
+  value: [{ path: '/shardfiles/a/shard.json', indexHash: hashImmutableBytes(known) }] }); });
+afterAll(() => { Reflect.deleteProperty(globalThis, '__SHARDFILE_VERDICTS__'); });
+function options(listed: boolean, stale = vi.fn(() => Promise.resolve())): { options: FolderOptions; stale: typeof stale } {
+  return { stale, options: { base: `https://example.test/shardfiles/${listed ? 'a' : 'b'}/`, offline: false, firstParty: true, hash,
     fetch: () => Promise.reject(new Error('unused')), built: { indexes: new Set([hashImmutableBytes(known)]), stale } } };
 }
 
@@ -27,7 +31,7 @@ test('a newer index recovers once before parsing and then refuses with the typed
   expect(await Promise.race([readIndexBytes(newer, pending).then(() => 'settled', () => 'settled'), new Promise(resolve => { setTimeout(resolve, 20, 'pending'); })])).toBe('pending');
 });
 
-test('dev, unbundled and third-party products are never checked', async () => {
+test('dev, unbundled and unlisted products are never checked', async () => {
   const third = options(false);
   await expect(readIndexBytes(newer, third.options)).rejects.toBeInstanceOf(SyntaxError);
   expect(third.stale).not.toHaveBeenCalled();

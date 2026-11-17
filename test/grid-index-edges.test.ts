@@ -58,11 +58,12 @@ test('native first-party grid metadata reads canonical URLs with declared hashes
   await expect(readGridFolderEdges(f.url,'wrong-cell',options)).rejects.toThrow('identity');
 });
 
-test.each(['third-party', 'unbundled'] as const)('%s grid metadata still loads checked grammar', async mode => {
+test.each(['unlisted', 'unbundled'] as const)('%s grid metadata still loads checked grammar', async mode => {
   const f = fixture(`${mode}-edge-fixture`), wire = f.wires.get(f.url);
   if (wire === undefined) throw new Error('Missing index fixture');
-  const options = mode === 'third-party'
-    ? { ...f.options, built: { indexes: new Set([hashImmutableBytes(wire)]), stale: () => Promise.resolve() } }
+  const options = mode === 'unlisted'
+    // OF10a3: an index the build's verdict table does not list (any maker's) takes the checked grammar
+    ? { ...f.options, built: { indexes: new Set(['0'.repeat(64)]), stale: () => Promise.resolve() } }
     : { ...f.options, firstParty: true };
   const grammar = vi.spyOn(await import('@wildshard/format/outputIndex'), 'parseOutputIndex');
   try {
@@ -85,9 +86,13 @@ test('grid edge metadata keeps identity, byte count and immutable hash checks', 
   await expect(readGridFolderEdges(f.url, f.source.identity.slug, f.options)).rejects.toThrow('hash or size');
 });
 
-test('a newer first-party index still takes stale-client recovery before reading its edge section', async () => {
+test('a newer index at a path the build lists still takes stale-client recovery before reading its edge section', async () => {
   const f = fixture(), stale = vi.fn(() => Promise.resolve());
-  await expect(readGridFolderEdges(f.url, f.source.identity.slug, { ...f.options, firstParty: true, built: { indexes: new Set(), stale } })).rejects.toThrow('older');
+  // OF10a3: listed by the build's verdict table (its path), whoever made it
+  Object.defineProperty(globalThis, '__SHARDFILE_VERDICTS__', { configurable: true, writable: true, value: [{ path: new URL(f.url).pathname, indexHash: '0'.repeat(64) }] });
+  try {
+    await expect(readGridFolderEdges(f.url, f.source.identity.slug, { ...f.options, built: { indexes: new Set(), stale } })).rejects.toThrow('older');
+  } finally { Reflect.deleteProperty(globalThis, '__SHARDFILE_VERDICTS__'); }
   expect(stale).toHaveBeenCalledOnce(); expect(f.fetch).toHaveBeenCalledExactlyOnceWith(f.url);
 });
 

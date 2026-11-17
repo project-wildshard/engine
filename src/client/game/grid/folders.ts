@@ -47,7 +47,7 @@ const parsedIndexes = new Map<string, OutputIndex>();
 // The input below is parsed privately from these exact wire bytes. Only the
 // bundle's own validated index inventory proves its schema output type.
 function builtGridIndex(input: unknown, hash: string, options: FolderOptions): input is OutputIndex {
-  return typeof input === 'object' && input !== null && options.firstParty && (options.firstPartyRead!==undefined||options.built?.indexes.has(hash) === true);
+  return typeof input === 'object' && input !== null && (options.firstPartyRead!==undefined||options.built?.indexes.has(hash) === true);
 }
 async function readGridFolderIndex(url: string, identity: string, options: FolderOptions): Promise<GridFolderIndex> {
   const native=options.firstParty?options.firstPartyRead:undefined,address=new URL(url);

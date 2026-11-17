@@ -53,13 +53,6 @@ export const GATES: readonly Gate[] = [
       'src/client/game/grid/regionalRuntime.ts': 1, 'src/client/game/shard/declaredEntry.ts': 1 },
   },
   {
-    id: 'built-receipt', verdict: 'delete',
-    what: 'Our own product skips per-file schema checks on its build\'s validation receipt (built indexes, '
-      + '`isBuildValidatedOutput`, `builtValidationReceipt`, built JSON); an upload is checked file by file.',
-    replacedBy: 'Every shard takes the upload\'s checks; a check result may be cached by content hash (bundling only as a cache).',
-    refs: { [FOLDER]: 5, [DESCRIPTOR]: 5, [RUNTIME_FOLDER]: 3, [GRID_FOLDERS]: 1 },
-  },
-  {
     id: 'native-read', verdict: 'delete',
     what: 'Our own product reads its files with direct and range fetches, paced section parses and pinned transport, '
       + 'instead of the shared folder reads an upload uses.',

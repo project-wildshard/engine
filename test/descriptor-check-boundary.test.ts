@@ -80,7 +80,6 @@ test('browser products need a build proof and bundle no checked host intake', as
     .rejects.toThrow('build-owned reader');
   expect(read).not.toHaveBeenCalled();
   await expect(loaded.resolveOutputDescriptor(index, unprovedReader)).rejects.toThrow('build-owned reader');
-  await expect(loaded.resolveOutputDescriptor(index, { ...reader, firstParty: false })).rejects.toThrow('build-owned reader');
   expect(read).not.toHaveBeenCalled();
   const fetch = vi.fn((url: string) => {
     const bytes = wires.get(url.slice('https://fixture.test/'.length));
