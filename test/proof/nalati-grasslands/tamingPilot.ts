@@ -4,19 +4,23 @@ import {nativeTamingOf} from '../../../src/server/game/riding/nativeTaming';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /** The pilot observes only the living horse position, live prompt and published trust/balance gauges. No trust/position grants or forceBreak. */
-export function nalatiTamingPilot(host: SimHost, stallionId: string, previousBalance: number): { balance: number; commands: HeadlessCommand[] } {
+function nalatiTamingPilot(host: SimHost, stallionId: string, previousBalance: number, approach: 'direct' | 'offer-first'): { balance: number; commands: HeadlessCommand[] } {
   const taming = nativeTamingOf(host), original = host.entities.get(stallionId);
   if(taming===undefined)throw new Error('Missing native taming owner');
   if (original === undefined) throw new Error('Missing original living stallion');
   let x = 0, z = 0, sneak = true;
   if (taming.phase !== 'breaking') {
     const dx = original.position.x - leadPlayer(host).position.x, dz = original.position.z - leadPlayer(host).position.z, length = Math.hypot(dx, dz);
-    // Offer inside the real 12 m reach, outside the herd's 10 m fear distance until trust reaches 60.
-    // Back away when needed: chasing a shy stallion at arm's length repeatedly starts its flight again.
-    const distance = (taming.view.trust ?? 0) < 60 ? 10.5 : 2.2;
-    const direction = length > distance + .2 ? 1 : length < distance - .2 ? -1 : 0;
-    if (length > 0) { x = direction * dx / length; z = direction * dz / length; }
-    sneak = length < 25; // Keep the native slow-approach trust while within its 25 m range.
+    if (approach === 'offer-first') {
+      // Offer inside 12 m and outside the herd's 10 m fear distance until trust reaches 60.
+      const distance = (taming.view.trust ?? 0) < 60 ? 10.5 : 2.2;
+      const direction = length > distance + .2 ? 1 : length < distance - .2 ? -1 : 0;
+      if (length > 0) { x = direction * dx / length; z = direction * dz / length; }
+      sneak = length < 25;
+    } else {
+      if (length > 2.2) { x = dx / length; z = dz / length; }
+      sneak = length < 8;
+    }
   }
   const balance = taming.view.balance, lean = Math.max(-1, Math.min(1, balance * 12 + (balance - previousBalance) * 60 * 3));
   return { balance, commands: [{ kind: 'player', moveX: x, moveZ: z, yaw: 0, commandVersion: 1, crouch: sneak,
@@ -27,11 +31,11 @@ export function nalatiTamingPilot(host: SimHost, stallionId: string, previousBal
 
 /** Keep the observed gauge velocity between its actual 10 Hz publications.
  * Re-reading the same gauge at 60 Hz must not erase the latest movement. */
-export function createNalatiTamingPilot(): (host:SimHost,stallionId:string)=>HeadlessCommand[] {
+export function createNalatiTamingPilot(approach: 'direct' | 'offer-first' = 'direct'): (host:SimHost,stallionId:string)=>HeadlessCommand[] {
   let breaking=false,balance=0,speed=0,sampledTick=0;
   return (host,stallionId)=>{
     const taming=nativeTamingOf(host);if(taming===undefined)throw new Error('Missing native taming owner');
-    const pilot=nalatiTamingPilot(host,stallionId,balance);
+    const pilot=nalatiTamingPilot(host,stallionId,balance,approach);
     if(taming.phase!=='breaking'){breaking=false;balance=pilot.balance;speed=0;return pilot.commands;}
     if(!breaking){breaking=true;balance=pilot.balance;speed=0;sampledTick=host.state.tick;}
     if(pilot.balance!==balance){speed=(pilot.balance-balance)/((host.state.tick-sampledTick)/60);balance=pilot.balance;sampledTick=host.state.tick;}

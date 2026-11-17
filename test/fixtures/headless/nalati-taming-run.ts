@@ -110,7 +110,7 @@ export async function runNalatiFieldApproach(options:TamingProofOptions):Promise
     assert.equal(leadPlayer(first.host).position.x,spawn.x);assert.equal(leadPlayer(first.host).position.z,spawn.z);
     walkNalatiHorsePlains(first.host,step);const approachTicks=first.host.state.tick;
     standBy(first,stallion,options.approach);
-    const pilot=createNalatiTamingPilot();let promptTick=0;
+    const pilot=createNalatiTamingPilot('offer-first');let promptTick=0;
     for(let tick=0;tick<40000&&taming.phase!=='breaking';tick++){
       if(promptTick===0&&taming.interactable.radius>0)promptTick=first.host.state.tick;
       step(pilot(first.host,original.entityId));
