@@ -1125,6 +1125,8 @@ export class LiveGridSession {
   /** A cell's quest flags, as the server holds them: only where the wire stands. */
   areaFlags(instance: string): readonly string[] { return this.wire?.site() === instance ? this.wire.flags?.() ?? [] : []; }
   /** What draws a cell's life: the server's rows, which exist only where the page stands. */
+  /** A cell's public shared state row, as its client lane reads it: only where the wire stands. */
+  lifeField(instance: string, name: string): number | undefined { return this.wire?.site() === instance ? wirePage.row(name) : undefined; }
   lifeRegion(instance: string): NeighbourRegion | undefined { return this.wire?.site() === instance ? this.wire.rows : undefined; }
 
   /** Fresh per-frame travel facts; setup/final witnesses use the complete state readout. */

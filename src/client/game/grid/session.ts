@@ -853,7 +853,8 @@ export class GridSession {
       return view;
     } };
     // SF25 / G66: frozen neighbours look alive (presentation-only client scripts; their sims never step here)
-    this.life = new NeighbourLife({ scope: host.scope, simulation: (id) => this.live?.lifeRegion(id), active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id });
+    this.life = new NeighbourLife({ scope: host.scope, simulation: (id) => this.live?.lifeRegion(id), active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id,
+      field: (id, name) => this.live?.lifeField(id, name) });
     // its feet in the scene's home frame: the player stands in the active frame's metres (live.ts worldFeet), the cell roots in the home's
     this.sceneLife = new CellSceneLife({ scope: host.scope, phone: TIER === 'phone', feet: () => { const at = this.world(); return { x: at.x - home.origin.x, y: host.feet().y, z: at.z - home.origin.z }; }, active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id });
     // one late system for the grid (the page's onLate takes one label): the alive neighbours, then the one frame's weights
