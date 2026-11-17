@@ -39,11 +39,12 @@ test('a live owner keeps its occupied port when another listener is refused', as
 
 test('FM8s: the database front holds queries without failing them, then refuses, then passes again', async () => {
   const { PGlite } = await import('@electric-sql/pglite'), { PGLiteSocketServer } = await import('@electric-sql/pglite-socket'), { Client } = await import('pg');
-  const { mkdtempSync, rmSync } = await import('node:fs'), { join } = await import('node:path'), { tmpdir } = await import('node:os');
-  const dir = mkdtempSync(join(tmpdir(), 'dbfront-')), db = new PGlite(), socket = new PGLiteSocketServer({ db, path: join(dir, 'pg.sock'), maxConnections: 8 });
+  // the database on a loopback port: the full suite's TMPDIR is deep in the repo, past the Unix socket path limit
+  const spare = createServer(), dbPort = await listenLoopback(spare); spare.close();
+  const db = new PGlite(), socket = new PGLiteSocketServer({ db, host: '127.0.0.1', port: dbPort, maxConnections: 8 });
   await socket.start();
   const holder = createServer(), port = await listenLoopback(holder); holder.close();
-  const front = await databaseFront(port, join(dir, 'pg.sock')), clients = [];
+  const front = await databaseFront(port, dbPort), clients = [];
   const open = async () => { const client = new Client({ host: '127.0.0.1', port, user: 'postgres', database: 'postgres', connectionTimeoutMillis: 2000 }); client.on('error', () => undefined); clients.push(client); await client.connect(); return client; };
   try {
     const first = await open();
@@ -68,6 +69,6 @@ test('FM8s: the database front holds queries without failing them, then refuses,
     assert.equal((await (await open()).query('select 5 as five')).rows[0].five, 5);
   } finally {
     await Promise.all(clients.map(client => client.end().catch(() => undefined)));
-    await front.close(); await socket.stop(); await db.close(); rmSync(dir, { recursive: true, force: true });
+    await front.close(); await socket.stop(); await db.close();
   }
 }, 30_000);

@@ -56,11 +56,12 @@ export function childListener(child, kind) {
   });
 }
 
-/** FM8s: the rig database's own front door, on a fixed loopback port, before an owned database (`path`, a Unix socket). It can break the
+/** FM8s: the rig database's own front door, on a fixed loopback port, before an owned database (`path`, a Unix socket, or a loopback port: a socket path
+ *  over the OS limit, ~104 bytes on macOS, cannot listen). It can break the
  *  database on purpose: `hold` lets connections open (startup through its first ReadyForQuery) but sends no query on until `pass`, as a
  *  stalled database does, so a write waits rather than fails; `refuse` drops every connection and every new one, as a database that is
  *  down does. `stats` counts what it held and refused.
- * @param {number} port @param {string} path */
+ * @param {number} port @param {string | number} path */
 export async function databaseFront(port, path) {
   /** @type {'pass' | 'hold' | 'refuse'} */
   let mode = 'pass';
@@ -71,7 +72,7 @@ export async function databaseFront(port, path) {
     stats.connections++;
     client.on('error', () => { client.destroy(); });
     if (mode === 'refuse') { stats.refused++; client.destroy(); return; }
-    const upstream = connect({ path }), pair = { client, upstream, ready: false, held: /** @type {Buffer[]} */ ([]) };
+    const upstream = typeof path === 'number' ? connect({ host: '127.0.0.1', port: path }) : connect({ path }), pair = { client, upstream, ready: false, held: /** @type {Buffer[]} */ ([]) };
     pairs.add(pair);
     upstream.on('error', () => { upstream.destroy(); });
     const end = () => { pairs.delete(pair); client.destroy(); upstream.destroy(); };
