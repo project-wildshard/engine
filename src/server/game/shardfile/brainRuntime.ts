@@ -121,9 +121,10 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
       case 'pursue': {
         if (pursuit === undefined) throw new Error('Unresolved pursuit policy');
         const layer = layers?.get(row.species);
-        const source = { run: () => { pursuit.step(host.state.tick); }, adapter: pursuit, notice: layer?.senses?.notice ?? spec.awareRadius,
+        const source = { run: (_dt: number, acquire = true) => { pursuit.step(host.state.tick, acquire); }, adapter: pursuit,
+          notice: layer?.senses?.notice ?? spec.awareRadius, escapeSpeed: spec.speed, crowd: spec.stopDistance,
           provoke: (targetId: string) => { pursuit.provoke(targetId); } };
-        const policy = layer !== undefined && (layer.temperament.reaction === 'aggressive' || layer.temperament.pack === true || layer.temperament.ambush === true)
+        const policy = layer !== undefined
           ? bindCreatureTemperament(host, actor, row.at, layer.temperament, source,
             () => { const target = pursuit.targetId; return target === null ? undefined : host.players.get(target)?.position; },
             row.group === undefined ? undefined : social.get(row.group)) : source;

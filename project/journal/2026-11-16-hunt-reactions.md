@@ -99,3 +99,20 @@ J381, CC5b4a: normal commit lint/format/types passed but exceeded the
 8s elapsed gate at17.5s on the shared machine. SKIP_BUDGET=1 retains
 those real checks and bypasses only the clock. Recorded in the plan
 and codex-te2e receipt; no implementation validation is disabled.
+
+CC5b4b: remaining-health flight and frightened passive/skittish members
+cancel the actual strike before the host advances it. They use the
+controller's authored escape speed over the existing motor, then return
+and reset when safe. Assistance cannot grant these reactions an attack.
+The original pursuit still owns idle/wander behavior with acquisition
+disabled; an unprovoked neutral does not lose its movement tuning.
+
+Four controls fail first. The real strike positive/negative control,
+21%/20% boundary, fleeing restore, and assisted passive/skittish controls
+pass with59cases/sevenfiles, defining types and lint. The inline pursuit
+fixture now explicitly asks for aggressive behavior; its earlier motion
+assertion depended on the old neutral-notice attack bug. A bounded legacy
+restore path accepts the original M1 base pursuit contract only without
+new modifiers or group membership, then delegates all payload validation
+to that unchanged base parser. The real M1-shaped continuation resumes
+with identical body/controller/RNG.

@@ -59,10 +59,11 @@ export class PlatformBrain {
     this.state = checked.state;
   }
   /** Think at the authored divisor; motion remains fixed-step through AnimalSim and its collision motor. */
-  step(tick: number): void {
+  step(tick: number, acquire = true): void {
     if (!Number.isSafeInteger(tick) || tick <= this.state.tick) throw new Error('Non-monotonic brain tick');
     this.state.tick = tick; this.state.cooldown = Math.max(0, this.state.cooldown - 1);
-    this.decide(tick); this.publishState();
+    if (!acquire && this.state.target !== null) { this.state.target = null; this.state.mode = 'idle'; this.actor.cancelAttack(); this.actor.setMotion(this.actor.yaw, 0, this.spec.turnRate); }
+    this.decide(tick, acquire); this.publishState();
   }
   /** TEMPLATE-E2E TC-NE24c: the body's state names the brain's mode (never `charge`, which the hunt's contact reads). */
   private publishState(): void {
@@ -70,14 +71,14 @@ export class PlatformBrain {
     const now = this.state.mode;
     this.actor.state = now === 'pursue' ? 'stalk' : now === 'attack' ? 'attack' : now === 'wander' || now === 'return' ? 'wander' : 'idle';
   }
-  private decide(tick: number): void {
+  private decide(tick: number, acquire: boolean): void {
     if (!this.actor.alive) { this.state.mode = 'dead'; this.state.target = null; this.actor.setMotion(this.actor.yaw, 0, this.spec.turnRate); return; }
     if (tick % this.spec.thinkDivisor !== 0) return;
     const at = this.actor.position, homeDistance = distance(at, this.home), targets = this.ports.targets();
     let target = targets.find((candidate) => candidate.id === this.state.target && candidate.alive);
     if (homeDistance > this.spec.leashRadius || (target && distance(target.position, this.home) > this.spec.leashRadius)) { target = undefined; this.state.mode = 'return'; }
     if (this.state.mode === 'return' && homeDistance > this.spec.stopDistance) { this.move(this.home, this.spec.returnSpeed); return; }
-    target ??= targets.filter((candidate) => candidate.alive && distance(at, candidate.position) <= this.spec.awareRadius && distance(candidate.position, this.home) <= this.spec.leashRadius && this.ports.visible(at, candidate.position))
+    if (acquire) target ??= targets.filter((candidate) => candidate.alive && distance(at, candidate.position) <= this.spec.awareRadius && distance(candidate.position, this.home) <= this.spec.leashRadius && this.ports.visible(at, candidate.position))
       .sort((a, b) => distance(at, a.position) - distance(at, b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
     if (target) {
       this.state.target = target.id;
