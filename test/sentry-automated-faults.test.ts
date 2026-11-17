@@ -91,6 +91,9 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 test('an automated page: the system that throws, the core render that stops the loop and its card all reach Sentry, as automation', async () => {
   page({ automated: true, agent: desktop.replace('Chrome/', 'HeadlessChrome/') });
   nalati(await install());
+  // the reports go out after the telemetry module's lazy imports: a cold module graph (the push gate's clean copy) takes
+  // more than settle()'s 40 turns (mini-ninemem, 2026-11-17), so wait for them, bounded
+  await vi.waitFor(() => { expect(sdk.sent.filter((s) => s.tags['system'] !== undefined).length).toBeGreaterThanOrEqual(3); }, { timeout: 5000 });
   await settle();
   expect(document.querySelector('#wserr')).not.toBeNull(); // the card the proof saw
   expect(sdk.inits.map((o) => o['environment'])).toEqual(['staging-automation']);
@@ -103,6 +106,7 @@ test('an automated page: the system that throws, the core render that stops the 
 test('a player on the same page reports the same faults under the plain environment', async () => {
   page({ automated: false });
   nalati(await install());
+  await vi.waitFor(() => { expect(sdk.sent.length).toBeGreaterThanOrEqual(3); }, { timeout: 5000 });
   await settle();
   expect(sdk.inits.map((o) => o['environment'])).toEqual(['staging']);
   expect(sdk.sent.map((s) => s.tags['system']).sort()).toEqual(['grid.runtime.nalati-grasslands.animals', 'render', 'render']); // render: its first throw, then the stop
