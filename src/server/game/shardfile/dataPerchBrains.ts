@@ -110,7 +110,7 @@ export function dataPerchBrains(host: SimHost, shard: Shardfile, assets: Readonl
       .filter(candidate => candidate.group === spawn.group && candidate.perchBody === row.id)
       .map(candidate => { const body = host.entities.get(candidate.id); if (body === undefined) throw new Error('Missing perch herd body'); return body; });
     let selected: ReturnType<SimHost['nearestPlayer']> | undefined;
-    const from = new Vector3(), point = new Vector3(), direction = new Vector3();
+    const point = new Vector3(), direction = new Vector3();
     const context = {
       dt: 0, player: actor.position, calm: true, rng, herd,
       world: { ...habitat, throwCoconut: (start: Vector3, target: Vector3, source: AnimalSim) => { pools.throw(row.id, start, target, source, rng); } },
@@ -127,15 +127,15 @@ export function dataPerchBrains(host: SimHost, shard: Shardfile, assets: Readonl
       reach: (body: AnimalSim) => selected !== undefined && canReach(body, selected.position, host.physics),
       hurt: (damage: number) => {
         if (selected === undefined || !selected.health.alive || host.parked.has(selected.id)) return;
-        point.copy(selected.position); point.y += 1.2;
-        from.copy(actor.position); from.y += actor.dims.bodyY * actor.scale;
-        direction.subVectors(point, from).normalize();
+        // Native bite reactions originate at the attacking body. The action
+        // owner's contact/reach tests already admit this hit.
+        point.copy(actor.position);
         host.combat.hit({ source: actor.combatActor(), sourceTags: strike.tags, target: selected.health,
-          amount: damage, point, dir: direction, from, moveId: strike.id,
+          amount: damage, point, dir: direction, moveId: strike.id,
           cause: { kind: actor.kind, label: actor.label } });
       },
     };
-    const cooldown = { range: (min: number, max: number) => host.rng.stream(row.policy.attackStream ?? 'ai').range(min, max) };
+    const cooldown = host.rng.stream(row.policy.attackStream ?? 'ai');
     const prepared = preparePerchBody(actor, context, strike, ReturnProgram.native(host, row.program), row.policy, cooldown);
     const observe = (dt: number) => {
       const player = host.nearestPlayer(actor.position);

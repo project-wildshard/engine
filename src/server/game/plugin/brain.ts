@@ -1285,10 +1285,11 @@ export function createNativeHunt(host: SimHost, row: NativeHuntRow, ports: {
     player: row.player === 'host' ? host.playerFocus : new Vector3(), sampleTerrain: actor => { actor.sampleTerrain(); } });
   return { hunt, reach };
 }
-/** Native species observations over an existing body and hunt owner. Policy and continuation remain caller-owned.
+/** Native species observations over an existing body and hunt owner. No view/roster-only body members are needed.
+ * Policy and continuation remain caller-owned.
  * The context allocates once per body; each policy call refreshes only its dt and the actual host clock. */
-export function createNativeSpeciesContext<W, A extends HuntBody = HuntBody>(shared: {
-  readonly host: SimHost; readonly hunt: StalkerBrain<A>; readonly rng: Rng;
+export function createNativeSpeciesContext<W, A extends AnimalSim = HuntBody>(shared: {
+  readonly host: SimHost; readonly hunt: Pick<StalkerBrain<A>, 'facing' | 'steerAny' | 'confine' | 'tokens'>; readonly rng: Rng;
   readonly world: W; readonly heightAt: (x: number, z: number) => number; readonly waterLevel: number;
 }, actor: A, herd: readonly A[] | null, label: string = actor.label): {
   observation: {
