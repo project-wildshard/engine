@@ -258,7 +258,7 @@ export class DiverBrain<A extends AnimalSim> {
     if (c.calm) { if (this.state !== 'circle') { this.strikes.cancel(); a.cancelAttack(); this.mode = 'circle'; } return; }
     this.rest -= c.dt; this.timer += c.dt;
     const d = Math.hypot(c.player.x - a.position.x, c.player.z - a.position.z);
-    if (this.state === 'circle' && this.rest <= 0 && d < profile.spec.noticeRadius && c.mayAttack(a)) { this.timer = 0; this.mode = 'stalk'; }
+    if (this.state === 'circle' && this.rest <= 0 && d < profile.spec.noticeRadius * (a.aggroScale ?? 1) && c.mayAttack(a)) { this.timer = 0; this.mode = 'stalk'; }
     else if (this.state === 'stalk' && (d > profile.spec.giveUpRadius || this.timer > profile.spec.stalkMaxSeconds)) this.mode = 'rise';
     else if (this.state === 'rise' && a.position.y > profile.home.y - profile.spec.riseMargin) this.mode = 'circle';
   }
@@ -308,7 +308,7 @@ export class DiverBrain<A extends AnimalSim> {
       if (this.clock > s.climbSeconds) { this.mode = 'glide'; this.rest = s.restSeconds; }
       return;
     }
-    const near = !c.calm && a.mem[s.heldField] !== 1 && Math.hypot(c.player.x - a.position.x, c.player.z - a.position.z) < s.noticeRadius;
+    const near = !c.calm && a.mem[s.heldField] !== 1 && Math.hypot(c.player.x - a.position.x, c.player.z - a.position.z) < s.noticeRadius * (a.aggroScale ?? 1);
     const cx = near ? c.player.x : profile.home.x, cz = near ? c.player.z : profile.home.z;
     const r = near ? s.circleRadius : s.patrolRadius, alt = near ? s.glideAltitude : s.patrolAltitude;
     const around = Math.atan2(a.position.x - cx, a.position.z - cz) + s.orbitLead;
@@ -316,7 +316,7 @@ export class DiverBrain<A extends AnimalSim> {
   }
   private thinkBurst(c: BurstFlyerPorts<A>, profile: Extract<DiverProfile, { pattern: 'burst' }>): void {
     const a = this.actor; if (!a.alive || this.state === 'dart') return;
-    if (!c.calm && a.position.distanceTo(c.player) < profile.spec.noticeRadius && !this.strikes.busy && c.claim(a)) {
+    if (!c.calm && a.position.distanceTo(c.player) < profile.spec.noticeRadius * (a.aggroScale ?? 1) && !this.strikes.busy && c.claim(a)) {
       this.context(c, profile); this.strikes.start(profile.strike, a, this.chest); this.dart = 0; this.mode = 'dart';
     }
   }

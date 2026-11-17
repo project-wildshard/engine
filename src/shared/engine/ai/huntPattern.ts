@@ -494,10 +494,10 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
     const wary = br.wary > 0 ? T.waryBoost : 1;
     const pSpeed = sprinting ? 7.2 : playerSpeed;
     let rate = 0;
-    const observing = !unaware && (sp.reaction !== 'skittish' || dPlayer < (sp.notice ?? T.sightRange));
+    const observing = !unaware && (sp.reaction !== 'skittish' || dPlayer < (sp.notice ?? T.sightRange) * (a.aggroScale ?? 1));
     if (observing && dPlayer > 0.01) {
       const grazing = a.state === 'graze';
-      const sight = (grazing ? T.sightRangeGraze : T.sightRange) * wary;
+      const sight = (grazing ? T.sightRangeGraze : T.sightRange) * wary * (a.aggroScale ?? 1);
       if (dPlayer < sight) {
         let rel = Math.atan2(dx, dz) - a.yaw;
         rel = Math.atan2(Math.sin(rel), Math.cos(rel));
@@ -507,7 +507,7 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
         }
       }
       // hearing: any direction, radius from the noise the player makes
-      const hear = (pSpeed < 0.4 ? T.hearStill : pSpeed < 2.6 ? T.hearCrouch : pSpeed < 5.2 ? T.hearWalk : T.hearSprint) * wary;
+      const hear = (pSpeed < 0.4 ? T.hearStill : pSpeed < 2.6 ? T.hearCrouch : pSpeed < 5.2 ? T.hearWalk : T.hearSprint) * wary * (a.aggroScale ?? 1);
       if (dPlayer < hear) rate = Math.max(rate, T.noticeRate * 1.5 * (1 + (1 - dPlayer / hear)));
       if (T.stalk !== undefined && dPlayer < T.stalk.detect) rate = Math.max(rate, T.noticeRate * 3);   // a hunter smells you
     }

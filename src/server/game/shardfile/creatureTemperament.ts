@@ -55,7 +55,7 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
     const fromNoticed = noticed === undefined ? Infinity : (origin.x - noticed.position.x) ** 2 + (origin.y - noticed.position.y) ** 2 + (origin.z - noticed.position.z) ** 2;
     const distance = Math.hypot(origin.x - x, origin.y - y, origin.z - z), foe = target();
     if (distance > leash || (foe !== undefined && Math.hypot(foe.x - x, foe.y - y, foe.z - z) > leash)) returning = true;
-    if (reaction === 'skittish' && noticed?.health.alive === true && fromNoticed < (source.notice ?? 0) ** 2) frightened = true;
+    if (reaction === 'skittish' && noticed?.health.alive === true && fromNoticed < ((source.notice ?? 0) * actor.aggroScale) ** 2) frightened = true;
     if (!returning && (frightened || (flee !== undefined && actor.hp <= actor.maxHp * flee))) {
       if (player.health.alive && fromPlayer <= leash * leash) {
         host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack(); actor.state = 'flee';
@@ -64,7 +64,7 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
       returning = true;
     }
     if (ambushing && !returning) {
-      if (noticed?.health.alive !== true || fromNoticed > (source.notice ?? 0) ** 2) {
+      if (noticed?.health.alive !== true || fromNoticed > ((source.notice ?? 0) * actor.aggroScale) ** 2) {
         host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack(); actor.state = 'hide'; actor.setStrafe(0); actor.setMotion(actor.yaw, 0, 3); return;
       }
       ambushing = false;

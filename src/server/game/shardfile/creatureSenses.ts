@@ -31,19 +31,19 @@ export function bindCreatureSenses(host: SimHost, actor: AnimalSim, input?: Crea
   notices: (player: Player) => boolean; nearest: () => Player | undefined;
 } {
   const senses = input === undefined ? undefined : parse(CreatureSensesSchema, input);
-  const eye = new Vector3(), chest = new Vector3(), cone = senses?.sight === undefined ? 0 : Math.cos(senses.sight.cone);
+  const rangeScale = actor.aggroScale, eye = new Vector3(), chest = new Vector3(), cone = senses?.sight === undefined ? 0 : Math.cos(senses.sight.cone);
   const notices = (player: Player): boolean => {
     if (host.players.get(player.id) !== player || !player.health.alive || host.parked.has(player.id)) return false;
     if (senses === undefined) return true;
     const dx = player.position.x - origin.x, dy = player.position.y - origin.y, dz = player.position.z - origin.z;
     const distance = dx * dx + dy * dy + dz * dz;
-    if (senses.reveal !== undefined && distance <= senses.reveal * senses.reveal) return true;
+    if (senses.reveal !== undefined && distance <= (senses.reveal * rangeScale) ** 2) return true;
     const sight = senses.sight;
     if (sight === undefined) {
-      if (distance <= senses.notice * senses.notice) return true;
+      if (distance <= (senses.notice * rangeScale) ** 2) return true;
     } else {
       const range = actor.state === 'graze' ? sight.graze ?? sight.range : sight.range;
-      if (distance <= range * range
+      if (distance <= (range * rangeScale) ** 2
       && dx * Math.sin(actor.yaw) + dz * Math.cos(actor.yaw) >= Math.hypot(dx, dz) * cone) {
         eye.set(origin.x, origin.y + actor.dims.bodyY * actor.scale, origin.z);
         chest.copy(player.position); chest.y += 1.2;
@@ -54,7 +54,7 @@ export function bindCreatureSenses(host: SimHost, actor: AnimalSim, input?: Crea
     if (hearing === undefined) return false;
     const speed = Math.hypot(player.velocity.x, player.velocity.z);
     const radius = speed < 0.4 ? hearing.still : speed < 2.6 ? hearing.crouch : speed < 5.2 ? hearing.walk : hearing.sprint;
-    return distance <= radius * radius;
+    return distance <= (radius * rangeScale) ** 2;
   };
   return { notices, nearest: () => {
     if (senses === undefined) return host.nearestPlayer(origin);

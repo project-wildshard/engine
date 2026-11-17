@@ -326,7 +326,7 @@ export class GrazerBrain<A extends AnimalSim> extends GroupBrain<A> {
     const a = this.actor; if (!a.alive) return;
     const d = a.position.distanceTo(c.player), level = Math.abs(c.player.y - a.position.y) < p.spec.levelTolerance;
     if (this.state === 'ram' || this.state === 'fall') return;
-    this.phase = !c.calm && level && d < p.spec.noticeRadius ? 'threat' : 'graze';
+    this.phase = !c.calm && level && d < p.spec.noticeRadius * (a.aggroScale ?? 1) ? 'threat' : 'graze';
     this.wanderT -= c.dt;
     if (this.wanderT <= 0) { this.wanderT = c.rng.range(p.spec.wanderMinSeconds, p.spec.wanderMaxSeconds); this.wanderYaw = c.rng.range(-Math.PI, Math.PI); }
     if (this.state === 'threat' && !this.strikes.busy && d < p.strike.range && c.claim(a)) {
@@ -356,7 +356,7 @@ export class GrazerBrain<A extends AnimalSim> extends GroupBrain<A> {
     const a = this.actor; if (!a.alive) return;
     const d = Math.hypot(c.player.x - a.position.x, c.player.z - a.position.z);
     if (c.calm || (this.state !== 'graze' && d > p.spec.loseRadius)) { if (this.state !== 'graze') this.phase = 'graze'; return; }
-    if (this.state === 'graze' && (d < p.spec.noticeRadius || a.hp < a.maxHp)) { this.phase = 'notice'; this.clock = 0; }
+    if (this.state === 'graze' && (d < p.spec.noticeRadius * (a.aggroScale ?? 1) || a.hp < a.maxHp)) { this.phase = 'notice'; this.clock = 0; }
     if (this.state === 'fight' && !this.strikes.busy && c.reach(a) && c.claim(a)) {
       const pick = this.strikes.pick([p.charge, p.close], this.context(c)); if (pick) this.strikes.start(pick, a, c.player);
     }

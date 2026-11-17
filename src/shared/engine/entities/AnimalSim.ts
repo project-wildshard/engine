@@ -14,6 +14,8 @@ export type AnimalState = typeof ANIMAL_STATES[number];
 export interface AnimalSimSpec {
   kind: string; label: string; variant: string; rarity: Rarity; hp: number; aggressive: boolean;
   dims: AnimalDims; mods: VariantMods; flight?: SpeciesFlight; lockable?: boolean;
+  /** Resolved class policy; free model scale remains geometry only. */
+  sizePolicy?: { readonly stride: number; readonly aggro: number; readonly cellWeight: number };
 }
 /** Collision-only displacement port; the creature retains its own feet position. */
 export interface AnimalMotor {
@@ -136,6 +138,10 @@ export class AnimalSim {
     this.flight = spec.flight === undefined ? null : new FlightMotion(spec.flight);
   }
   get dims(): AnimalDims { return this.simSpec.dims; }
+  get strideScale(): number { return this.simSpec.sizePolicy?.stride ?? 1; }
+  get aggroScale(): number { return this.simSpec.sizePolicy?.aggro ?? 1; }
+  /** One class-weight source for the population/cell cap owner. */
+  get cellWeight(): number { return this.simSpec.sizePolicy?.cellWeight ?? 1; }
   /** Copy just pose inputs into a reused view buffer, without allocating a snapshot. */
   samplePose(out: AnimalPoseSample): void {
     out.attackT = this.attackT; out.attackDur = this.attackDur; out.groundY = this.groundY;
@@ -209,7 +215,7 @@ export class AnimalSim {
     this.groundY = this.position.y; this.falling = false; this.fallVelocity = 0;
     this.yaw = this.desiredYaw = yaw;
   }
-  setMotion(desiredYaw: number, desiredSpeed: number, turnRate = 2.5): void { this.desiredYaw = desiredYaw; this.desiredSpeed = desiredSpeed; this.turnRate = turnRate; }
+  setMotion(desiredYaw: number, desiredSpeed: number, turnRate = 2.5): void { this.desiredYaw = desiredYaw; this.desiredSpeed = desiredSpeed * this.strideScale; this.turnRate = turnRate; }
   impulse(velocity: Vector3): void {
     if (![velocity.x, velocity.y, velocity.z].every(Number.isFinite)) throw new Error('Creature impulse must be finite');
     if (!this.alive) return;
@@ -221,7 +227,7 @@ export class AnimalSim {
     if (this.flight === null) throw new Error('Species must declare flight before flying');
     this.flight.target(altitude); this.setMotion(yaw, speed, turnRate);
   }
-  setStrafe(mps: number): void { this.desiredStrafe = mps; }
+  setStrafe(mps: number): void { this.desiredStrafe = mps * this.strideScale; }
   startAttack(dur: number): void { this.attackT = 0; this.attackDur = Math.max(0.05, dur); this.simPorts.attackStarted?.(); this.attackStarted(this.attackDur); }
   get attackPhase(): number { return this.attackT < 0 ? -1 : Math.min(1, this.attackT / this.attackDur); }
   /** Existing saved death timer; clip reads never advance it. */

@@ -646,7 +646,7 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
     if (a === null) return;
     this.pouncerPorts.ring.setTime(t);
     if (leashing && this.st !== 'home') this.st = 'home';
-    if ((this.st === 'lurk' || (this.st === 'home' && !leashing)) && (engaged || a.position.distanceTo(this.pouncerPorts.player.position) < this.pouncerPorts.awareRadius)) { this.st = 'stalk'; this.cd = this.pouncerSpec.awareCooldown; }
+    if ((this.st === 'lurk' || (this.st === 'home' && !leashing)) && (engaged || a.position.distanceTo(this.pouncerPorts.player.position) < this.pouncerPorts.awareRadius * (a.aggroScale ?? 1))) { this.st = 'stalk'; this.cd = this.pouncerSpec.awareCooldown; }
     this.stT += dt;
     // Stand on the declared solid ledge, whose top need not be the terrain height.
     if (this.st !== 'leap') a.yOffset += ((this.pouncerStandY(a.position.x, a.position.z) - this.pouncerPorts.heightAt(a.position.x, a.position.z)) - a.yOffset) * Math.min(1, dt * this.pouncerSpec.standRate);
@@ -698,7 +698,7 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
     if (a.lastHitT > m.hitT) { m.hitT = a.lastHitT; a.cancelAttack(); if (m.st !== ST_FLEE) { m.st = ST_ENGAGE; m.cd = Math.max(m.cd, this.skirmishSpec.alertCooldown); } }
     // A dead leader makes its subordinate variants scatter and remain shy.
     if (a.variant === this.skirmishSpec.subordinateVariant && !m.scat && c.herd?.some((h) => h.variant === this.skirmishSpec.leaderVariant && !h.alive)) { m.scat = 1; m.shy = 1; m.st = ST_FLEE; m.tm = rng.range(5, 7); a.cancelAttack(); c.sound(this.skirmishSpec.noticeCue); }
-    const engageR = m.shy ? this.skirmishSpec.shyRadius : this.skirmishSpec.awareRadius;
+    const engageR = (m.shy ? this.skirmishSpec.shyRadius : this.skirmishSpec.awareRadius) * (a.aggroScale ?? 1);
     switch (m.st) {
       case ST_IDLE: {
         a.state = 'idle';

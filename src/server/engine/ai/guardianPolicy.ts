@@ -133,7 +133,7 @@ export class GuardianPolicy<A extends AnimalSim> {
     m.st = INTERIOR_HIDE; a.state = 'hide';
     a.yOffset = spec.hideOffset;
   }
-  const cx = H?.x ?? m.hx, cz = H?.z ?? m.hz, wakeR = H?.r ?? spec.wakeRadius, guardR = H?.guardR ?? spec.guardRadius;
+  const cx = H?.x ?? m.hx, cz = H?.z ?? m.hz, wakeR = (H?.r ?? spec.wakeRadius) * (a.aggroScale ?? 1), guardR = H?.guardR ?? spec.guardRadius;
   const dx = c.player.x - a.position.x, dz = c.player.z - a.position.z, d = Math.hypot(dx, dz);
   const toPlayer = Math.atan2(dx, dz);
   const dPlayerHold = Math.hypot(c.player.x - cx, c.player.z - cz);

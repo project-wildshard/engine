@@ -78,7 +78,7 @@ export class PlatformBrain {
     let target = targets.find((candidate) => candidate.id === this.state.target && candidate.alive);
     if (homeDistance > this.spec.leashRadius || (target && distance(target.position, this.home) > this.spec.leashRadius)) { target = undefined; this.state.mode = 'return'; }
     if (this.state.mode === 'return' && homeDistance > this.spec.stopDistance) { this.move(this.home, this.spec.returnSpeed); return; }
-    if (acquire) target ??= targets.filter((candidate) => candidate.alive && candidate.noticed !== false && distance(at, candidate.position) <= this.spec.awareRadius && distance(candidate.position, this.home) <= this.spec.leashRadius && this.ports.visible(at, candidate.position))
+    if (acquire) target ??= targets.filter((candidate) => candidate.alive && candidate.noticed !== false && distance(at, candidate.position) <= this.spec.awareRadius * (this.actor.aggroScale ?? 1) && distance(candidate.position, this.home) <= this.spec.leashRadius && this.ports.visible(at, candidate.position))
       .sort((a, b) => distance(at, a.position) - distance(at, b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
     if (target) {
       this.state.target = target.id;

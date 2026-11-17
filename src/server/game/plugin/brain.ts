@@ -11,6 +11,7 @@ import type { SimStrike, SimValue, SimHost } from "@wildshard/engine/sim";
 import { type StrikeSpec, StrikeRunner, type StrikeContext } from "@wildshard/engine/ai/strikes";
 import type { ShardRows } from "@wildshard/format/rows";
 import { resolveCreatureLayers } from '../shardfile/creatureLayers';
+import { CREATURE_SIZES } from '@wildshard/format/creatureSizes';
 import { parseScriptSpecies, type ScriptSpeciesSchema, type ScriptSpeciesData } from "@wildshard/format/speciesScripts";
 import { parseEliteScript, type EliteScriptData } from "@wildshard/format/eliteScripts";
 import * as v from "valibot";
@@ -308,6 +309,7 @@ export function speciesResolver(rows: ShardRows, brains: ShardCreatures['brains'
     const resolved = layers.get(speciesId);
     return { kind: row.kind, label: selected.label, variant: selected.id, rarity: selected.rarity, hp: selected.hp,
       aggressive: resolved === undefined ? row.aggressive : resolved.temperament.reaction === 'aggressive', lockable: row.lockable,
+      ...(row.body === undefined || row.body.size === 'medium' ? {} : { sizePolicy: CREATURE_SIZES[row.body.size] }),
       dims: { ...row.dims, feet: row.dims.feet.map(([x, z]) => [x, z]) }, mods: { ...selected.mods }, ...(row.flight === undefined ? {} : { flight: { ...row.flight } }) };
   };
 }
