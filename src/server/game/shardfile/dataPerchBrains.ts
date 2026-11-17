@@ -1,6 +1,8 @@
 import { parse } from 'valibot';
-import { CreaturePerchBodiesSchema, creaturePerchRules, type CreaturePerchBody } from '@wildshard/format/creaturePerch';
+import { CreaturePerchBodiesSchema, creaturePerchRules, creaturePerchAdmissionRows, type CreaturePerchBody } from '@wildshard/format/creaturePerch';
 import { CreatureHomeSchema } from '@wildshard/format/creatures';
+import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
+import { SCRIPT_LIMITS } from '@wildshard/format/scriptLimits';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { Scope } from '@wildshard/engine/app/scope';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
@@ -11,8 +13,28 @@ interface PerchPreparationPorts {
   readonly scope?: Scope;
   readonly sections?: ReadonlyMap<string, unknown> | undefined;
 }
+/** Use the same metadata and instance limit as full file admission. */
+function preflightInstanceCap(shard: Shardfile, bodies: readonly CreaturePerchBody[], sections?: ReadonlyMap<string, unknown>): void {
+  const existing = scriptAdmissionRows(sections);
+  const rows = [...existing, ...creaturePerchAdmissionRows(bodies, existing)];
+  const modules = new Set(rows.filter(row => row.side === 'sim').map(row => row.module));
+  if (shard.sim.scripts.length + modules.size > SCRIPT_LIMITS.instances) throw new Error('Exceeded perch whole-host instance cap');
+}
+/** A child loan must cover its entire selected closure, or it would hide a
+ * valid ancestor loan. Unrelated lazy return modules never enter this loan. */
+function lendPerchClosure(owner: Scope, assets: ReadonlyMap<string, Uint8Array>, bodies: readonly CreaturePerchBody[]): void {
+  const raw = bodies.filter(body => body.program.bytes === '' || body.program.v2?.bytes === '');
+  if (raw.length === 0) return;
+  const rows = serverReturnRows(creaturePerchAdmissionRows(raw));
+  const hashes = new Set(rows.map(row => row.module.slice('blobs/wasm/'.length, -'.wasm'.length)));
+  for (const body of raw) {
+    if (body.program.bytes === '') hashes.add(body.program.script.module.slice('blobs/wasm/'.length, -'.wasm'.length));
+  }
+  if ([...hashes].every(hash => assets.get(hash) instanceof Uint8Array)) ReturnProgram.lendModules(owner, assets, rows);
+}
 /** Resolve actual plain authority before host construction, callbacks or random draws.
- * The original return owner verifies hash, ABI, shared identity and native limits. */
+ * The original return owner verifies hash, ABI and identity within the perch set;
+ * full file admission and this preparation both apply the whole-host limit. */
 export function preflightPlainPerches(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: PerchPreparationPorts = {}): ReadonlyMap<string, CreaturePerchBody> {
   const catalogue = parse(CreaturePerchBodiesSchema, shard.creatures.perchBodies ?? []);
   const errors = creaturePerchRules({ ...shard.creatures, perchBodies: catalogue });
@@ -21,10 +43,10 @@ export function preflightPlainPerches(shard: Shardfile, assets: ReadonlyMap<stri
   if (result.size === 0) return result;
   const strikes = new Set(shard.rows.strikes.map(row => row.id));
   const sections = ports.sections ?? outputDescriptor(shard)?.sections;
-  const returns = serverReturnRows(sections?.get('actors/return-scripts') ?? []);
+  preflightInstanceCap(shard, catalogue, sections);
   const owner = new Scope('plain-perch.preflight', ports.scope);
   try {
-    if (returns.length > 0) ReturnProgram.lendModules(owner, assets, returns);
+    lendPerchClosure(owner, assets, catalogue);
     for (const spawn of shard.creatures.spawns) {
       if (spawn.perchBody !== undefined) parse(CreatureHomeSchema, spawn.home);
     }

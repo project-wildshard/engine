@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
+import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { Scope } from '../src/shared/engine/app/scope';
 import { Rng } from '../src/shared/engine/core/rng';
 import { sha256 } from '../src/shared/game/plugin/moduleHash';
@@ -10,7 +11,7 @@ import { preflightPlainPerches } from '../src/server/game/shardfile/dataPerchBra
 import { createShardfileSim, prepareShardfileSimRestore } from '../src/server/game/plugin/simulation';
 import { perchFixture } from './fixtures/plain-perch';
 import { frozenTitanInline } from './fixtures/frozen/runtimePrograms';
-import { lendFrozenReturns } from './fixtures/frozen/returns';
+import { lendFrozenReturns, frozenReturnInline } from './fixtures/frozen/returns';
 
 const assets = () => new Map<string, Uint8Array>();
 
@@ -64,10 +65,52 @@ test('ABI-2 preflight owns and retires actual admitted memory without executing 
     expect(scope.census).toEqual(reserved);
     const forged = structuredClone(frozenTitanInline.attack);
     forged.v2.bytes = 'AGFzbQEAAAA=';
-    expect(() => ReturnProgram.preflight(forged, scope)).toThrow();
+    expect(() => ReturnProgram.preflight(forged, scope)).toThrow('Shared return declaration changed');
     expect(project).not.toHaveBeenCalled();
   } finally { project.mockRestore(); scope.dispose(); }
   expect(Object.values(scope.census).every(count => count === 0)).toBe(true);
+});
+
+test('fresh ABI-2 forgery reaches actual projection hash admission before allocating memory', () => {
+  const scope = new Scope('perch.fresh.abi2');
+  const forged = structuredClone(frozenTitanInline.attack);
+  forged.v2.bytes = 'AGFzbQEAAAA=';
+  const before = scope.census;
+  try {
+    expect(() => ReturnProgram.preflight(forged, scope)).toThrow('Return projection hash mismatch');
+    expect(scope.census).toEqual({ ...before, disposers: before.disposers + 1 });
+  } finally { scope.dispose(); }
+  expect(Object.values(scope.census).every(count => count === 0)).toBe(true);
+});
+
+test('a valid parent loan survives partial local assets and unrelated unloaded return rows', () => {
+  const scope = lendFrozenReturns(new Scope('perch.parent.partial'));
+  const shard = perchFixture(), body = shard.creatures.perchBodies?.[0];
+  if (body === undefined) throw new Error('Missing fixture body');
+  body.program.bytes = '';
+  const artifact = frozenTitanInline.attack.v2.artifact;
+  const unrelated = { id: 'unrelated.projection', side: 'sim', module: `blobs/wasm/${artifact.hash}.wasm`, abi: 2,
+    lane: artifact.lane, pages: artifact.pages, ioBytes: artifact.ioBytes,
+    compilerRevision: artifact.compilerRevision, admissionRevision: artifact.admissionRevision };
+  const sections = new Map([['actors/return-scripts', [frozenReturnInline.script, unrelated]]]);
+  const local = new Map([[body.program.script.module.slice('blobs/wasm/'.length, -'.wasm'.length),
+    Uint8Array.from(Buffer.from(frozenReturnInline.bytes, 'base64'))]]);
+  const before = scope.census;
+  try {
+    expect(preflightPlainPerches(shard, local, { scope, sections }).size).toBe(1);
+    expect(preflightPlainPerches(shard, assets(), { scope, sections }).size).toBe(1);
+    expect(scope.census).toEqual(before);
+  } finally { scope.dispose(); }
+});
+
+test('the real whole-host module cap includes decision modules beside the perch VM', () => {
+  const shard = perchFixture();
+  const bytes = Uint8Array.from(Buffer.from(frozenReturnInline.bytes, 'base64'));
+  const scripts = parseDecisionScripts(Array.from({ length: 9 }, (_, index) => {
+    const binary = new Uint8Array([...bytes, 0, 2, 1, 65 + index]);
+    return { ...frozenReturnInline.script, id: `other.${index}`, module: `blobs/wasm/${sha256(binary)}.wasm` };
+  }));
+  expect(() => preflightPlainPerches(shard, assets(), { sections: new Map([['sim/scripts', scripts]]) })).toThrow('perch whole-host instance cap');
 });
 
 test('raw native bytes use the real parent loan and leave its scope census unchanged', () => {
