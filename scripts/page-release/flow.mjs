@@ -128,12 +128,32 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
 /**
  * One tapped journey run on staging (scripts/journey-proof.mjs): the card, the browser, cold or warm, the build staging
  * served through the whole run (absent when it changed mid-run or could not be read), whether it passed, and when.
- * @typedef {{card: string, browser: string, run: string, build?: string, ok: boolean, at: string}} JourneyRow
+ * A zone sweep (scripts/zone-sweep.mjs) is one row, card `zone-sweep`, run `sweep`, naming the zones that failed.
+ * @typedef {{card: string, browser: string, run: string, build?: string, ok: boolean, at: string, failed?: readonly string[]}} JourneyRow
  */
 
 /** SB3 (meta STAGING-BUGBASH, J386): production go-live needs the tapped journey passing on staging, on this exact build,
  * for each of these cards in each browser, cold and warm: the journey Jake's phone takes. */
 export const JOURNEY_GATE = Object.freeze({cards: ['driftwood-isle', 'pine-hollow'], browsers: ['chromium', 'webkit'], runs: ['cold', 'warm']});
+
+/** Meta QA-FEEDBACK-2026-11-17 row 21 (Jake: "i have no confidence that each one of the zones in zone select will open"): production
+ * go-live also needs every Zone select card opening on staging, on this exact build (verify-staging.sh runs scripts/zone-sweep.mjs). */
+export const ZONE_SWEEP_GATE = Object.freeze({browsers: ['chromium']});
+
+/**
+ * The row of one zone-sweep `results.json`: ok only when it opened at least one zone and every zone it tried passed.
+ * @param {unknown} report @returns {JourneyRow[]}
+ */
+export function zoneSweepRows(report) {
+  if (report === null || typeof report !== 'object') return [];
+  const {browser, build, at, results} = /** @type {{browser?: unknown, build?: unknown, at?: unknown, results?: unknown}} */ (report);
+  if (typeof browser !== 'string' || typeof at !== 'string' || !Array.isArray(results)) return [];
+  const failed = results.flatMap(row => {
+    const {slug, pass} = /** @type {{slug?: unknown, pass?: unknown}} */ (row ?? {});
+    return pass === true ? [] : [typeof slug === 'string' ? slug : '?'];
+  });
+  return [{card: 'zone-sweep', browser, run: 'sweep', ok: results.length > 0 && failed.length === 0, at, failed, ...(typeof build === 'string' ? {build} : {})}];
+}
 
 /**
  * The rows of one journey-proof `report.json`. A report that is not one gives none.
@@ -164,6 +184,12 @@ export function journeyGaps(journeys, build) {
       .sort((a, b) => b.at.localeCompare(a.at))[0];
     if (newest === undefined) gaps.push(`${card} ${browser} ${run} not run on this build`);
     else if (!newest.ok) gaps.push(`${card} ${browser} ${run} FAIL`);
+  }
+  for (const browser of ZONE_SWEEP_GATE.browsers) {
+    const newest = (journeys ?? []).filter(row => row.card === 'zone-sweep' && row.browser === browser && row.build === build)
+      .sort((a, b) => b.at.localeCompare(a.at))[0];
+    if (newest === undefined) gaps.push(`zone sweep ${browser} not run on this build`);
+    else if (!newest.ok) gaps.push(`zone sweep ${browser} FAIL${(newest.failed ?? []).length === 0 ? '' : `: ${(newest.failed ?? []).join(', ')}`}`);
   }
   return gaps;
 }

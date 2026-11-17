@@ -8,15 +8,17 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {CHANNELS, CHECKED_DOCUMENTS, JOURNEY_GATE, PHASES, RELEASE_PUBLIC_KEY, journeyGaps, journeyRows, smokeGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
+import {CHANNELS, CHECKED_DOCUMENTS, JOURNEY_GATE, PHASES, RELEASE_PUBLIC_KEY, journeyGaps, journeyRows, smokeGap, ZONE_SWEEP_GATE, zoneSweepRows, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
 
 const build = 'a'.repeat(40);
 /** SB3: the eight staging journeys production go-live reads (two cards, two browsers, cold and warm), all passing on `on`. */
-const journeysOn = (on: string = build) => JOURNEY_GATE.cards.flatMap(card => JOURNEY_GATE.browsers.flatMap(browser =>
-  JOURNEY_GATE.runs.map(run => ({card, browser, run, build: on, ok: true, at: '2026-11-17T05:00:00.000Z'}))));
+const journeysOn = (on: string = build) => [...JOURNEY_GATE.cards.flatMap(card => JOURNEY_GATE.browsers.flatMap(browser =>
+  JOURNEY_GATE.runs.map(run => ({card, browser, run, build: on, ok: true, at: '2026-11-17T05:00:00.000Z'})))),
+  // QA 11-17 row 21: and a clean zone sweep (every Zone select card) per gated browser
+  ...ZONE_SWEEP_GATE.browsers.map(browser => ({card: 'zone-sweep', browser, run: 'sweep', build: on, ok: true, at: '2026-11-17T05:00:00.000Z', failed: []}))];
 /** STAGING-SMOKE SM5: a staging smoke verdict for `on`, clean unless `hold`. */
 const smokeOn = (on: string = build, hold = false) => ({build: on, url: CHANNELS.staging.origin, scenarios: ['K1', 'K2', 'K3', 'K4', 'K5'].map(id => ({id, status: id === 'K1' ? 'skip' : 'ran'})), hold, findings: hold ? [{scenario: 'K3', key: 'journey', severity: 'P1', text: 'the main menu came back after Enter World'}] : []});
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
@@ -318,6 +320,28 @@ test('a journey report gives one row per run; a primed run is neither cold nor w
   const {build: _moved, ...moved} = report;
   expect(journeyGaps(journeyRows(moved), build)).toContain('pine-hollow chromium cold not run on this build');
   expect(journeyRows('not a report')).toEqual([]);
+});
+
+test('production go-live needs every Zone select card opening on staging, on this build (QA 11-17 row 21)', async () => {
+  const sweep = {url: CHANNELS.staging.origin, build, browser: 'chromium', at: '2026-11-17T20:00:00.000Z',
+    results: [{slug: 'driftwood-isle', pass: true}, {slug: 'glowfen', pass: false}]};
+  expect(zoneSweepRows(sweep)).toEqual([{card: 'zone-sweep', browser: 'chromium', run: 'sweep', build, ok: false, at: sweep.at, failed: ['glowfen']}]);
+  expect(zoneSweepRows({...sweep, results: []})[0]?.ok).toBe(false);
+  expect(zoneSweepRows('not a sweep')).toEqual([]);
+  const others = journeysOn().filter(row => row.card !== 'zone-sweep');
+  expect(journeyGaps(others, build)).toEqual(['zone sweep chromium not run on this build']);
+  expect(journeyGaps([...others, ...zoneSweepRows(sweep)], build)).toEqual(['zone sweep chromium FAIL: glowfen']);
+  const {build: _moved, ...moved} = sweep;
+  expect(journeyGaps([...others, ...zoneSweepRows({...moved, results: [{slug: 'glowfen', pass: true}]})], build)).toEqual(['zone sweep chromium not run on this build']);
+  // the newest sweep on the build wins: a rerun that opens Glowfen clears the gate
+  expect(journeyGaps([...others, ...zoneSweepRows(sweep), ...zoneSweepRows({...sweep, at: '2026-11-17T21:00:00.000Z', results: [{slug: 'glowfen', pass: true}]})], build)).toEqual([]);
+  const {deps, calls} = rig('production');
+  await through(deps, 'check');
+  deps.afterStagingProofs = true;
+  deps.smoke = smokeOn();
+  deps.journeys = [...others, ...zoneSweepRows(sweep)];
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/zone sweep chromium FAIL: glowfen/u);
+  expect(calls).not.toContain('goLive');
 });
 
 test('a dirty tree or another HEAD refuses before the host is touched', async () => {

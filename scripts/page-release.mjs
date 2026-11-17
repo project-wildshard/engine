@@ -31,12 +31,12 @@ import {execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, journeyRows, runPhase} from './page-release/flow.mjs';
+import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, journeyRows, runPhase, zoneSweepRows} from './page-release/flow.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 
-/** SB3: every journey row verify-staging.sh left under `dir` (<browser>/journey-<card>/report.json); none when absent.
+/** SB3: every journey row verify-staging.sh left under `dir` (<browser>/journey-<card>/report.json, and <browser>/zone-sweep/results.json); none when absent.
  * @param {string} dir */
 function readJourneys(dir) {
   if (!existsSync(dir)) return [];
@@ -44,8 +44,11 @@ function readJourneys(dir) {
     /** @type {string[]} */
     let names = [];
     try { names = readdirSync(join(dir, browser)); } catch { return []; }
-    return names.filter(name => name.startsWith('journey-')).flatMap(name => {
-      try { return journeyRows(JSON.parse(readFileSync(join(dir, browser, name, 'report.json'), 'utf8'))); } catch { return []; }
+    return names.flatMap(name => {
+      try {
+        if (name === 'zone-sweep') return zoneSweepRows(JSON.parse(readFileSync(join(dir, browser, name, 'results.json'), 'utf8')));
+        return name.startsWith('journey-') ? journeyRows(JSON.parse(readFileSync(join(dir, browser, name, 'report.json'), 'utf8'))) : [];
+      } catch { return []; }
     });
   });
 }

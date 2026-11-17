@@ -53,9 +53,13 @@ export interface Deps {
   releaseKey?: string;
   catalogue?: string;
 }
-export interface JourneyRow { card: string; browser: string; run: string; build?: string; ok: boolean; at: string }
+export interface JourneyRow { card: string; browser: string; run: string; build?: string; ok: boolean; at: string; failed?: readonly string[] }
 export const JOURNEY_GATE: Readonly<{ cards: string[]; browsers: string[]; runs: string[] }>;
 export function journeyRows(report: unknown): JourneyRow[];
+/** Every Zone select card opening on staging (scripts/zone-sweep.mjs): the browsers production go-live needs a clean sweep in. */
+export const ZONE_SWEEP_GATE: Readonly<{ browsers: string[] }>;
+/** The one row of a zone-sweep results.json: ok only when it tried a zone and every zone passed. */
+export function zoneSweepRows(report: unknown): JourneyRow[];
 export function journeyGaps(journeys: readonly JourneyRow[] | undefined, build: string): string[];
 export const SMOKE_SCENARIOS: readonly string[];
 export interface SmokeVerdict { build?: string; url?: string; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }

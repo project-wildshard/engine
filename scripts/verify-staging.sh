@@ -4,7 +4,7 @@
 #   bash scripts/verify-staging.sh chromium|webkit [<build>] [<cards, comma separated>]
 # <build> defaults to what staging.wildshard.io serves now; <cards> to Driftwood and Pine Hollow, the two production go-live
 # reads (SB3: page-release.mjs refuses go-live until both pass cold and warm in both browsers on the build). The proofs: J386's tapped journey (journey-proof.mjs) per
-# card, cold then warm; Doctor (e7-doctor-proof.mjs); the live two-player proof (e7-live-staging-proof.mjs). Off the
+# card, cold then warm; every Zone select card once (zone-sweep.mjs); Doctor (e7-doctor-proof.mjs); the live two-player proof (e7-live-staging-proof.mjs). Off the
 # tailnet (a hosted runner) set WS_PRIVATE_HEALTH=skip; the box's own build and serial are then left to live-status.
 # Exit 0 when every proof passed. Output in tmp/verify-staging/<browser>.
 set -uo pipefail
@@ -40,6 +40,8 @@ proof() {
 for card in ${cards//,/ }; do
   proof "journey-$card" node scripts/journey-proof.mjs --url "$base" --card "$card" --browsers "$browser" --out "$out/journey-$card"
 done
+# meta QA-FEEDBACK-2026-11-17 row 21: every card Zone select shows opens (production go-live reads its results.json)
+proof zone-sweep node scripts/zone-sweep.mjs --url "$base" --browser "$browser" --out "$out/zone-sweep"
 proof doctor node scripts/e7-doctor-proof.mjs "$base" "$build" "$key" "--engine=$browser"
 proof live node scripts/e7-live-staging-proof.mjs "$base" "$build" "$key" "$browser"
 {
