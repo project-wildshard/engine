@@ -10,10 +10,27 @@ import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {formatTemplate} from '../scripts/pin-format.ts';
 import {localProduct} from '../scripts/pin-local.ts';
 import {localCandidates, LOCAL_CANDIDATES} from '../scripts/local-candidates.ts';
-import {openShardfile} from '../src/cook/game/shardCook.ts';
+import {cookShard, openShardfile} from '../src/cook/game/shardCook.ts';
+import {productTarball} from '../src/cook/game/productTarball';
+import {loadCookedProduct} from '../src/server/host/headlessProduct';
+import {openWorld} from '../src/server/host/openWorld';
+import {loadRapier} from '../src/shared/engine/physics/rapier';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, {recursive: true, force: true}); });
+function addLocalMount(source: string): void {
+  const digest = (body: Uint8Array): string => createHash('sha256').update(body).digest('hex');
+  const url = '/assets/local-proof/shared.json', bytes = Buffer.from('{}'), path = `mounts${url}`;
+  mkdirSync(dirname(join(source, path)), {recursive: true}); writeFileSync(join(source, path), bytes);
+  const cook = JSON.parse(readFileSync(join(source, 'cook.json'), 'utf8')) as {mounts: {url: string; path: string; hash: string; bytes: number}[]};
+  cook.mounts.push({url, path, hash: digest(bytes), bytes: bytes.length});
+  const cookBytes = validationSourceBytes(cook); writeFileSync(join(source, 'cook.json'), cookBytes);
+  const index = JSON.parse(readFileSync(join(source, 'shard.json'), 'utf8')) as {cook: {bytes: number; hash: string}};
+  index.cook.bytes = cookBytes.length; index.cook.hash = digest(cookBytes);
+  const indexBytes = validationSourceBytes(index); writeFileSync(join(source, 'shard.json'), indexBytes);
+  const receipt = JSON.parse(readFileSync(join(source, 'validation.json'), 'utf8')) as {indexHash: string};
+  receipt.indexHash = digest(indexBytes); writeFileSync(join(source, 'validation.json'), JSON.stringify(receipt));
+}
 function fixture() {
   mkdirSync('tmp/codex-pins-ll4-tests', {recursive: true});
   const root = mkdtempSync(resolvePath('tmp/codex-pins-ll4-tests/product-')); roots.push(root);
@@ -21,6 +38,7 @@ function fixture() {
   for (const [path, bytes] of readTar(product.bytes)) {
     mkdirSync(dirname(join(source, path)), {recursive: true}); writeFileSync(join(source, path), bytes);
   }
+  addLocalMount(source);
   mkdirSync(join(root, 'test/pins'), {recursive: true});
   writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({api: 'local', shards: [product.pin]}));
   writeFileSync(join(root, 'test/pins/assets.json'), JSON.stringify({version: 1, assets: []}));
@@ -42,8 +60,26 @@ test('actual local admission, runtime open and published restoration leave the t
   const admitted = await cli(root, ['install', '--from-dir', source]);
   expect(admitted.output).toContain('1 of 1 pins admitted'); expect(admitted.status).toBe(0);
   const rows = localCandidates(root);
-  expect(rows).toMatchObject([{slug: 'brasscap-mesa', path: source, indexHash: product.source.indexHash}]);
-  expect(openShardfile(product.bytes)).toBeDefined();
+  expect(rows).toMatchObject([{slug: 'brasscap-mesa', path: source, indexHash: createHash('sha256').update(readFileSync(join(source, 'shard.json'))).digest('hex')}]);
+  const installed = productTarball(join(root, 'out/brasscap-mesa'));
+  expect(openShardfile(installed).slug).toBe('brasscap-mesa');
+  expect(createHash('sha256').update(installed).digest('hex')).not.toBe(product.pin.hash);
+  const cooked = await cookShard(installed, join(root, 'cooked'), {wireBytes: (_url, body) => body.length, now: () => performance.now()});
+  expect(cooked.manifests.length).toBeGreaterThan(0);
+  expect(existsSync(join(root, 'cooked', cooked.server.index))).toBe(true);
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const input = await loadCookedProduct(join(root, 'out/brasscap-mesa'), rapier);
+  const world = await openWorld(input, {room: true});
+  try {
+    expect(world.host.players.size).toBeGreaterThan(0);
+    const player = world.host.players.values().next().value;
+    expect(player).toBeDefined();
+    if (player === undefined) throw new Error('World did not spawn a player');
+    expect(Number.isFinite(player.position.x)).toBe(true);
+    const before = world.host.state.tick;
+    world.step([]);
+    expect(world.host.state.tick).toBeGreaterThan(before);
+  } finally { world.dispose(); }
   expect(JSON.parse(readFileSync(join(root, 'out/brasscap-mesa/validation.json'), 'utf8'))).toMatchObject({source: {kind: 'local-directory', path: source}});
   const server = createServer((request, response) => {
     if (request.url === `/${product.pin.hash}.tar`) response.end(product.bytes);
@@ -55,6 +91,7 @@ test('actual local admission, runtime open and published restoration leave the t
     const restored = await cli(root, ['install'], {WILDSHARD_PIN_MIRROR: `http://127.0.0.1:${address.port}`, WILDSHARD_PIN_CACHE: join(root, 'cache')});
     expect(restored.output).toContain('1 of 1 pins admitted'); expect(restored.status).toBe(0);
     expect(existsSync(join(root, LOCAL_CANDIDATES))).toBe(false);
+    expect(existsSync(join(root, 'public/assets/local-proof/shared.json'))).toBe(false);
     expect(readFileSync(join(root, 'test/pins/shardfiles.json'))).toEqual(pins);
     expect(JSON.parse(readFileSync(join(root, 'out/brasscap-mesa/validation.json'), 'utf8'))).not.toHaveProperty('source');
   } finally { server.closeAllConnections(); server.close(); }
@@ -73,17 +110,6 @@ test('malformed input and symlinks refuse before replacing an installed product'
 
 test('a mount owned by another shard refuses without changing that owner', async () => {
   const {root, source} = fixture(), url = '/assets/local-proof/shared.json';
-  const digest = (body: Uint8Array): string => createHash('sha256').update(body).digest('hex');
-  const bytes = Buffer.from('{}'), path = `mounts${url}`;
-  mkdirSync(dirname(join(source, path)), {recursive: true}); writeFileSync(join(source, path), bytes);
-  const cook = JSON.parse(readFileSync(join(source, 'cook.json'), 'utf8')) as {mounts: {url: string; path: string; hash: string; bytes: number}[]};
-  cook.mounts.push({url, path, hash: digest(bytes), bytes: bytes.length});
-  const cookBytes = validationSourceBytes(cook); writeFileSync(join(source, 'cook.json'), cookBytes);
-  const index = JSON.parse(readFileSync(join(source, 'shard.json'), 'utf8')) as {cook: {bytes: number; hash: string}};
-  index.cook.bytes = cookBytes.length; index.cook.hash = digest(cookBytes);
-  const indexBytes = validationSourceBytes(index); writeFileSync(join(source, 'shard.json'), indexBytes);
-  const receipt = JSON.parse(readFileSync(join(source, 'validation.json'), 'utf8')) as {indexHash: string};
-  receipt.indexHash = digest(indexBytes); writeFileSync(join(source, 'validation.json'), JSON.stringify(receipt));
   const target = join(root, 'public', url);
   mkdirSync(dirname(target), {recursive: true}); writeFileSync(target, 'other shard bytes');
   mkdirSync(join(root, 'out/other'), {recursive: true});
