@@ -1,7 +1,7 @@
 # Native contact reader context
 
 > Written by: Codex
-> State: source checkpoint only, 2026-11-16. OF31d3b2b2.
+> State: local preflight passed; exact hosted CI pending, 2026-11-16. OF31d3b2b2.
 
 Thread the actual verified species-program section through Node, client,
 standalone and worker re-parses and asset admission. The worker context
@@ -29,3 +29,11 @@ admission. A real session control failed at that admission before the fix;
 passing the same context restores all six product/worker/session controls.
 The review found no other required reader correction. Format main CI
 43987122625 is green; release 0.13 is running on its exact release head.
+
+Registry format 0.13 is now installed and frozen; candidate pins are
+removed. Rebased onto main 986f3f56a, refreshed all 27 pins, and passed
+lint, types, CSS, product/reader/save controls and the exported harness.
+The install added gitHosted to the retained wire subdirectory entry; its
+existing refusal test caught this. Restored the canonical path-only
+resolution and verified frozen install plus both original wire controls.
+No wire assertion or source/asset admission contract was weakened.
