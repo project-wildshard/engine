@@ -144,3 +144,19 @@ checkpoint: pack/territory/ambush/flee are implemented on pursuit here;
 CC5b5 integrates guardian/skirmisher after OF26. Spawn social ids and
 controller-owning creatures.groups ids are separate namespaces; matching
 strings do not attach a controller. No format MUSTs were identified.
+
+
+## M2a registry dependency (2026-11-17)
+
+Format 0.15.0 is published from release head 8e97487 after exact hosted
+CI44030535838 and trusted npm workflow44032224799 passed. The registry
+reports that gitHead. Replace the temporary packed development dependency
+with the exact npm alias and its published integrity; keep the original
+wire lock metadata unchanged. The immutable archive remains proof only.
+
+Before replacing the dependency, the clean engine rebase passes full
+lint/types and 82 focused cases in ten files. The actual published install,
+frozen lock, fresh checks and normal land qualify this checkpoint. The
+single paired source review and its red-first corrections remain the
+review; no repeated review is needed. Use hosted land until the J400 grant
+repair is announced. No preflight, test or publication hatch is used here.
