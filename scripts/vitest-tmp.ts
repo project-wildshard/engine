@@ -3,7 +3,7 @@ import { constants } from 'node:os';
 import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vitest/config';
-import {PUSH_PROFILE} from './push-budget.mjs';
+import {PUSH_BUDGET,PUSH_PROFILE} from './push-budget.mjs';
 import type {startCpuBroker} from './cpu-broker.mjs';
 import { temporaryRun as sharedRun, viteTmpRoot } from './vite-tmp.mjs';
 
@@ -34,16 +34,17 @@ export async function runVitest(args: readonly string[]): Promise<number> {
     const { assertVitestLane,isFullVitest } = await import('./vitest-lane.ts');
     assertVitestLane(args);
     const {WS_PUSH_GATE_PROFILE:profile,WS_CPU_ADMISSION:admission}=process.env;
+    const full=profile===PUSH_PROFILE&&isFullVitest(args)&&!args.some(arg=>arg==='--config'||arg.startsWith('--config=')||arg.startsWith('--shard'));
     if(profile===PUSH_PROFILE&&admission==='1'){
       const {assertHeavyLease}=await import('./heavy-lane-lease.mjs');
       assertHeavyLease('full-test');
       const {startCpuBroker}=await import('./cpu-broker.mjs');
-      broker=await startCpuBroker();
+      broker=await startCpuBroker(full?{cohortSlots:PUSH_BUDGET.workers}:{});
     }
     // Each real file now owns CPU admission before collection. Performance and
     // uncapped encoder files reserve the whole budget, so their original clocks
     // remain alone while other native/ordinary work can share the available cores.
-    const phases=profile===PUSH_PROFILE&&isFullVitest(args)&&!args.some(arg=>arg==='--config'||arg.startsWith('--config=')||arg.startsWith('--shard'))?['admitted']:[undefined];
+    const phases=full?['admitted']:[undefined];
     for(const phase of phases){
     const entry = fileURLToPath(new URL('vitest.mjs', import.meta.resolve('vitest/package.json')));
     const child = spawn(process.execPath, [entry, ...args,...(phase===undefined?[]:['--config','scripts/push-vitest.config.ts'])], {

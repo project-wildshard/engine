@@ -4,7 +4,7 @@ import {CPU_EXCLUSIVE_TESTS} from './vitest-ci-files.ts';
 import {readWeights} from './test-timings.mjs';
 
 /** Longest first, so no long file starts late and finishes alone (VITEST-BENCH VB8).
- * The bounded cook worker (a 4-slot grant) is ordered by its own weight. Files that
+ * The bounded cook worker is ordered by its own weight. Files that
  * hold the whole CPU budget start last: the broker is strict FIFO, so an all-slot
  * request queued mid-run stalls every worker until the longest running file ends,
  * while at the end it waits only for the short files still in flight. */

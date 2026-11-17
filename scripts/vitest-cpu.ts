@@ -9,8 +9,8 @@ import {reserveMachineBrowserAdmission} from './browser-machine-loader.mjs';
 
 interface CookEnvironment extends NodeJS.ProcessEnv { WS_CPU_SLOTS?:string }
 const {WS_CPU_ADMISSION:enabled}=process.env;
-// The cook worker's cases, split over three files, each still run their jobs under the admitted grant.
-const COOK_WORKER_TESTS=new Set(['test/cook-worker.test.ts','test/cook-worker-publish.test.ts','test/cook-worker-limits.test.ts']);
+// The limits file drives no real cook. Pin the two real cook callers to their admitted grant.
+const COOK_WORKER_TESTS=new Set(['test/cook-worker.test.ts','test/cook-worker-publish.test.ts']);
 if(enabled==='1'||(!process.env.CI&&!process.env.GITHUB_ACTIONS)){
   if(enabled==='1')assertHeavyLease('full-test');
   // Reused workers can return after failed collection or a fixture can
