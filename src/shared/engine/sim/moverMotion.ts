@@ -6,10 +6,34 @@ import type { ScriptEntity, ScriptEffect } from '../script/effects';
 /** Admitted stop/driver data; native execution never accepts a function or an executable URL. */
 export type NativeMoverMotion = MoverMotion & { at: { x: number; y: number; z: number }; euler: { x: number; y: number; z: number }; carry?: CarryRows };
 /** The existing caller supplies time, command and permission; the mechanic installs no clock. */
-export interface MoverFrame { readonly tick: number; readonly dt: number; readonly action: number; readonly permission: number; readonly time?: number }
+export interface MoverFrame { readonly tick: number; readonly dt: number; readonly action: number; readonly permission: number; readonly time?: number;
+  /** SS-MS2a1b: a steer vehicle's rider's stick this tick, in the vehicle's frame (throttle forward, turn right, each -1 to 1). */
+  readonly steer?: MoverSteer;
+  /** The ground height under a steer vehicle that follows the ground, when the caller found one. */
+  readonly ground?: number }
+/** A rider's stick for a steer vehicle. */
+export interface MoverSteer { readonly throttle: number; readonly turn: number; readonly boost: boolean }
+/** Fields a steer vehicle publishes: heading (as every mover), speed as a share of its boosted top speed (fields are 0 to 1),
+ *  and whether it is ridden. */
+export const STEER_FIELDS = { yaw: 2, speed: 5, ridden: 6 } as const;
+const signed = (x: number): number => Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
+const COORD = 250;
+/** Where a steer vehicle's frame rides the mover's numeric input, after the 12 numbers every mover reads. */
+const STEER_INPUT = 12;
+/** A steer vehicle's stick and ground as numeric mover input (the composed lane's one ABI). */
+export function steerInput(stick: MoverSteer | undefined, ground: number | undefined): number[] {
+  return [signed(stick?.throttle ?? 0), signed(stick?.turn ?? 0), Number(stick?.boost === true), Number(ground !== undefined), ground ?? 0];
+}
+/** The frame fields `steerInput` wrote, or none for any other mover's input. */
+export function steerFrame(input: readonly number[]): Pick<MoverFrame, 'steer' | 'ground'> {
+  if (input.length < STEER_INPUT + 5) return {};
+  const [throttle = 0, turn = 0, boost = 0, grounded = 0, ground = 0] = input.slice(STEER_INPUT);
+  return { steer: { throttle, turn, boost: boost === 1 }, ...(grounded === 1 ? { ground } : {}) };
+}
 /** A detached next state; the existing world validates and commits it before publishing collision or views. */
 export interface MoverAdvance { readonly entity: ScriptEntity; readonly effects: readonly ScriptEffect[] }
 const tau = 2 * Math.PI;
+const wrap = (angle: number): number => angle - Math.floor(angle / tau + 0.5) * tau;
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const clamp = (x: number): number => Math.min(1, Math.max(0, x));
 function sine(value: number): number {
@@ -48,6 +72,23 @@ export class MoverMechanic {
     const p = (i: number): number => { const value = this.parameters[i]; if (value === undefined) throw new Error('Missing mover parameter'); return value; };
     const { driver, track, trigger } = motion;
     if (driver.kind === 'static') { field(4, 1); return { entity, effects }; }
+    if (driver.kind === 'steer') {
+      // SS-MS2a1b: board (1) and leave (2) are carry's prompts; a ridden vehicle takes its rider's stick, a riderless one
+      // slows to a stand. It does not reverse: a back stick brakes. Heading follows the player's convention: forward is (-sin yaw, -cos yaw), a right turn lowers yaw.
+      const top = driver.speed * driver.boost;
+      let speed = (fields[STEER_FIELDS.speed] ?? 0) * top, ridden = fields[STEER_FIELDS.ridden] ?? 0, yaw = fields[STEER_FIELDS.yaw] ?? motion.euler.y;
+      if (frame.action === 1) ridden = 1; else if (frame.action === 2) ridden = 0;
+      const stick = ridden === 1 ? frame.steer : undefined, throttle = Math.max(0, signed(stick?.throttle ?? 0)), turn = signed(stick?.turn ?? 0);
+      const target = throttle * driver.speed * (stick?.boost === true ? driver.boost : 1), change = driver.accel * frame.dt;
+      speed = speed < target ? Math.min(target, speed + change) : Math.max(target, speed - change);
+      yaw = wrap(yaw - turn * driver.turn * frame.dt);
+      const [x0, y0, z0] = before.position, step = speed * frame.dt;
+      const x = Math.max(-COORD, Math.min(COORD, x0 - Math.sin(yaw) * step)), z = Math.max(-COORD, Math.min(COORD, z0 - Math.cos(yaw) * step));
+      // a ground follower keeps its last height over a gap; a level vehicle keeps its rest height
+      const y = !driver.ground ? motion.at.y : frame.ground !== undefined && Number.isFinite(frame.ground) ? Math.max(-COORD, Math.min(COORD, frame.ground)) : y0;
+      position(x, y, z); field(1, 0); field(STEER_FIELDS.yaw, yaw); field(3, 0); field(4, 1);
+      field(STEER_FIELDS.speed, Math.min(1, speed / top)); field(STEER_FIELDS.ridden, ridden); return { entity, effects };
+    }
     if (driver.kind === 'winch' && driver.mode === 'hinge') {
       let angle = fields[1] ?? 0, raised = fields[5] ?? 0, raising = fields[6] ?? 0;
       if (frame.action === 3) { angle = 0; raised = 1; raising = 0; }

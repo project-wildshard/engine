@@ -20,7 +20,9 @@ import { KinematicMover, type MoverPose } from "@wildshard/engine/physics/mover"
 import { RopeChain } from "@wildshard/engine/physics/ropeChain";
 import { MOVER_FIELDS, MOVER_FIELD_RANGES, moverScriptEntities } from "../../../shared/game/shardfile/movers";
 import { MoverLifecycle, MoverLifecycleStateSchema, moverEndState, type MoverEndEvent } from '@wildshard/engine/sim/moverLifecycle';
-import { MoverMechanic, type NativeMoverMotion } from '@wildshard/engine/sim/moverMotion';
+import { MoverMechanic, steerFrame, steerInput, type MoverSteer, type NativeMoverMotion } from '@wildshard/engine/sim/moverMotion';
+import { floorBelow } from '@wildshard/engine/physics/query';
+import { localWalkingMove } from '@wildshard/engine/player/walk';
 import { parseMovers, type MoverData } from "@wildshard/format/movers";
 import { carryPrompt } from "../../../shared/game/shardfile/wirePrompts";
 import { actRoutes } from "@wildshard/engine/sim/actRoutes";
@@ -37,6 +39,13 @@ export interface TerrainEntryWalk {
     readonly halfWidths: Readonly<Record<TerrainEntryway['edge'], number>>; readonly stride: number; readonly look: number };
 }
 /** The player's capsule (the engine's edge walk's). */
+/** How far above and below a ground-following steer vehicle its ground probe reaches (m). */
+const STEER_PROBE_UP = 2, STEER_PROBE_DOWN = 4;
+/** A point given in a vehicle's own frame (x right, z back), where it stands in the world now. */
+function vehiclePoint(entity: { readonly position: readonly [number, number, number]; readonly fields: Readonly<Record<number, number>> }, [x, y, z]: readonly [number, number, number]): [number, number, number] {
+  const yaw = entity.fields[MOVER_FIELDS.yaw] ?? 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
+  return [entity.position[0] + cos * x + sin * z, entity.position[1] + y, entity.position[2] - sin * x + cos * z];
+}
 /** Metres past a carry prompt's radius a press still lands: it is judged a command behind the page. */
 const CARRY_REACH = 2;
 const CAPSULE = { radius: 0.35, height: 1.8, step: 0.3, maxClimbDeg: 45, snap: 0.2, group: 'PLAYER', blockedBy: ['WORLD'] } as const;
@@ -174,10 +183,21 @@ export interface MoverInstallation {
   activation?: MoverActivationPorts;
 }
 /** What every player in the world stands on. A seat with no capsule is not in the world. */
+/** SS-MS2a1b: a rider's stick in a vehicle's frame (heading `yaw`), from the command the host read this tick: the world move
+ *  the walk would take, split into forward (throttle) and right (turn); boost is the command's boost. None without a command. */
+export function riderStick(host: Pick<SimHost, 'tickCommand'>, player: string, yaw: number): MoverSteer | undefined {
+  const command = host.tickCommand(player); if (command === undefined) return undefined;
+  const move = { x: command.moveX, z: command.moveZ };
+  if (command.commandVersion === 1 && command.steer !== undefined) localWalkingMove(command.steer, command.yaw, move);
+  const sin = Math.sin(yaw), cos = Math.cos(yaw);
+  return { throttle: -sin * move.x - cos * move.z, turn: cos * move.x - sin * move.z, boost: command.boost === true };
+}
 export function* playerGrounds(host: Pick<SimHost, 'players' | 'parked'>): Generator<CharacterMotor['result']> { for (const player of host.players.values()) if (player.hasMotor && !host.parked.has(player.id)) yield player.motor.result; }
 /** Trusted activation observes real grounded collider ownership and the admitted host shared state. */
 export interface MoverActivationPorts {
   ground?: () => Iterable<CharacterMotor['result']>;
+  /** SS-MS2a1b: a steer vehicle's rider's stick this tick, in the vehicle's frame (heading `yaw`); the owner when `rider` is absent. */
+  steer?: (rider: string | undefined, yaw: number) => MoverSteer | undefined;
   shared?: (field: number) => number | boolean | undefined;
 }
 /** The shared script host already owns modules, entity handles and one beginTick per fixed step. */
@@ -282,7 +302,11 @@ export class MoverRuntime {
   command(id: string, action: 1 | 2 | 3, player?: string): void {
     const rider = player === this.nativeOwner ? undefined : player;
     const row = this.data.find(m => m.id === id); if (row === undefined) throw new Error('Unknown mover');
-    if (row.carry !== undefined) {
+    if (row.carry !== undefined && row.driver?.kind === 'steer') {
+      // SS-MS2a1b: a steer vehicle is boarded when free and left only by its own rider
+      if (action === 3 || (action === 1 ? this.riding(id) || this.carrying(rider) : !this.riding(id) || this.riders.get(id) !== rider)) return;
+      if (action === 1) { if (rider === undefined) this.riders.delete(id); else this.riders.set(id, rider); }
+    } else if (row.carry !== undefined) {
       if (this.riding(id) || this.carrying(rider) || action === 3) return;
       if (rider === undefined) this.riders.delete(id); else this.riders.set(id, rider);
     }
@@ -301,9 +325,14 @@ export class MoverRuntime {
   /** Borrow the same declared prompts on the page; the native command names are the stable mover ids. */
   ridePrompts(): Interactable[] {
     const busy = (): boolean => this.riding();
-    return this.data.flatMap(row => row.carry?.prompts.map((prompt, end): Interactable => ({ position: new Vector3(...prompt.at),
+    return this.data.flatMap(row => row.carry?.prompts.map((prompt, end): Interactable => ({ position: new Vector3(...this.promptAt(row, prompt.at)),
       get radius() { return busy() ? 0 : prompt.radius; }, label: prompt.label,
       wireId: carryPrompt(row.id, end), onInteract: () => { this.command(row.id, end === 0 ? 1 : 2); } })) ?? []);
+  }
+  /** A carry prompt where it stands now: a steer vehicle's prompts ride with it (SS-MS2a1b), every other carry's are fixed. */
+  private promptAt(row: MoverData[number], at: readonly [number, number, number]): readonly [number, number, number] {
+    const entity = row.driver?.kind === 'steer' ? this.host.world.entity(row.entity) : undefined;
+    return entity === undefined ? at : vehiclePoint(entity, at);
   }
   private publishCarry(row: MoverData[number], entity: NonNullable<ReturnType<ScriptWorld['entity']>>): void {
     const carry = row.carry; if (carry === undefined) return;
@@ -313,7 +342,8 @@ export class MoverRuntime {
     const flags = this.riderFlags === undefined ? this.flags : this.riderFlags(this.riders.get(row.id));
     const arrived = active === 0.25 ? 1 : -1, hint = !riding && arrived === 1 && carry.arrival !== undefined && flags?.has(carry.arrival.flag) === false ? carry.arrival.hint : undefined;
     if (!riding && arrived === 1 && carry.arrival !== undefined) flags?.set(carry.arrival.flag);
-    this.carryPoses.set(row.id, { riding, at: riding ? [entity.position[0], entity.position[1] + carry.seat, entity.position[2]] : carry.landings[arrived === 1 ? 1 : 0], yaw: (entity.fields[2] ?? 0) + carry.yaw });
+    const landing = row.driver?.kind === 'steer' ? vehiclePoint(entity, carry.landings[0]) : carry.landings[arrived === 1 ? 1 : 0];
+    this.carryPoses.set(row.id, { riding, at: riding ? [entity.position[0], entity.position[1] + carry.seat, entity.position[2]] : landing, yaw: (entity.fields[2] ?? 0) + carry.yaw });
     if (was !== riding) {
       const queue = this.rideEvents.get(row.id); if ((queue?.length ?? 0) >= 2) throw new Error('Mover ride transitions were not consumed');
       queue?.push({ riding, ...(!riding ? { arrived } : {}), ...(hint === undefined ? {} : { hint }) });
@@ -341,9 +371,9 @@ export class MoverRuntime {
     host.events.answer('player.carrying', carried => carried || this.carrying(), host.scope);
     host.leading.push(body => this.carrying(body.id === owner ? undefined : body.id)); // a client's capsule stays out of a boat's way
     const routes = actRoutes(host);
-    for (const row of this.data) row.carry?.prompts.forEach(({ at: [x, y, z], radius }, end) => {
+    for (const row of this.data) row.carry?.prompts.forEach(({ at: local, radius }, end) => {
       routes.claims.set(carryPrompt(row.id, end), player => {
-        const body = host.players.get(player)?.position;
+        const body = host.players.get(player)?.position, [x, y, z] = this.promptAt(row, local);
         if (body !== undefined && Math.hypot(body.x - x, body.y - y, body.z - z) <= radius + CARRY_REACH) this.command(row.id, end === 0 ? 1 : 2, player === owner ? undefined : player);
         else routes.refused++;
       });
@@ -368,9 +398,15 @@ export class MoverRuntime {
       gate = Number(value === m.trigger.equals);
     } else if (m.trigger?.kind === 'interact') gate = permission === m.trigger.permission
       ? m.driver?.kind === 'winch' && m.driver.mode === 'hinge' ? permission : 1 : 0;
-    return [tick, 1 / 60, this.pending.get(m.id) ?? 0, m.entity, gate, m.input.length,
+    const input = [tick, 1 / 60, this.pending.get(m.id) ?? 0, m.entity, gate, m.input.length,
       e.fields[MOVER_FIELDS.pitch] ?? 0, e.fields[MOVER_FIELDS.yaw] ?? 0, e.fields[MOVER_FIELDS.roll] ?? 0,
       e.fields[MOVER_FIELDS.enabled] ?? 0, e.fields[MOVER_FIELDS.raised] ?? 0, e.fields[MOVER_FIELDS.raising] ?? 0];
+    if (m.driver?.kind !== 'steer') return input;
+    // SS-MS2a1b: the rider's stick (only while ridden) and the ground under the vehicle ride after the common twelve
+    const yaw = e.fields[MOVER_FIELDS.yaw] ?? 0, ridden = e.fields[MOVER_FIELDS.raising] === 1;
+    const stick = ridden ? this.activation.steer?.(this.riders.get(m.id), yaw) : undefined;
+    const ground = m.driver.ground ? floorBelow(this.physics(), e.position[0], e.position[2], e.position[1] + STEER_PROBE_UP, STEER_PROBE_UP + STEER_PROBE_DOWN) : undefined;
+    return [...input, ...steerInput(stick, ground)];
   }
   /** Anyone's real ground: one player on a plate holds it down for the room. */
   private stoodOn(id: string): boolean {
@@ -396,7 +432,7 @@ export class MoverRuntime {
       if (mechanic === undefined) { const call = this.host.call(m.module, m.entity, input); this.publish(m.id, call.ok); }
       else {
         const entity = this.host.world.entity(m.entity); if (entity === undefined) throw new Error('Missing native mover');
-        const next = mechanic.step(entity, { tick, dt: 1 / 60, action: input[2] ?? 0, permission: input[4] ?? 0 });
+        const next = mechanic.step(entity, { tick, dt: 1 / 60, action: input[2] ?? 0, permission: input[4] ?? 0, ...steerFrame(input) });
         this.host.world.prepare(next.effects, m.entity, 0, 0).commit(); this.publish(m.id, true);
       }
     }
@@ -557,7 +593,7 @@ export class MoverScriptDriver {
     const runtime = new MoverRuntime(this.data, { lane, flags: sim.flags, ...(riderFlags === undefined ? {} : { riderFlags }), host: lane.host, physics: () => sim.physics, scope: sim.scope,
       ...(options.restoring === undefined ? {} : { restoring: options.restoring }),
       ...(options.restoreFlags === undefined ? {} : { restoreFlags: options.restoreFlags }),
-      activation: { ground: () => playerGrounds(sim), ...options.activation } });
+      activation: { ground: () => playerGrounds(sim), steer: (rider, yaw) => riderStick(sim, rider ?? options.owner ?? 'actor.player', yaw), ...options.activation } });
     this.runtime = runtime; runtime.bindNativeCarry(sim, options.owner);
     for (const row of this.data) publishScriptBody(sim, row.id, () => runtime.pose(row.id));
     // `joined`: a save from before these movers had their step holds none of it, so its world has no bodies to reconnect: build them

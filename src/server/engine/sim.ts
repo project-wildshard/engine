@@ -639,6 +639,11 @@ export class SimHost {
     try { return this.events.ask('player.traversal', FIXED_STEP); }
     finally { this.traversing = null; }
   }
+  /** The command `player` gave this tick, as the host read it (SS-MS2a1b: a steer vehicle's rider's stick); undefined between
+   *  ticks or when that player sent none. */
+  tickCommand(player: string): ReturnType<typeof simCommandOf> | undefined {
+    const input = this.tickCommands?.get(player); return input === undefined ? undefined : simCommandOf(input);
+  }
   /** One simulation tick, with at most one command per player. No wall clock, renderer, active app or device input is
    *  consulted. Every player's input lands, then the world steps, then every player moves, in join order. */
   step(commands?: ReadonlyMap<string, SimTickCommand>): void {

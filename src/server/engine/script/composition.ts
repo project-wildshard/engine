@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { MoverMechanic, type NativeMoverMotion } from '../../../shared/engine/sim/moverMotion';
+import { MoverMechanic, steerFrame, type NativeMoverMotion } from '../../../shared/engine/sim/moverMotion';
 import { ScriptWorld, SCRIPT_OP, type ScriptEntity, type ScriptEffect, type EffectTransaction } from '../../../shared/engine/script/effects';
 import { ScriptHost, type ScriptHostOptions, type ScriptCall } from '../../../shared/engine/script/host';
 import type { ScriptModule } from './lane';
@@ -155,7 +155,7 @@ export class ScriptComposition {
       if (mechanic === undefined) call = this.host.call(binding.module, binding.entity, input, events);
       else {
         const entity = this.world.entity(binding.entity); if (entity === undefined) throw new Error('Missing native mover entity');
-        const next = mechanic.step(entity, { tick, dt: input[1] ?? 0, action: input[2] ?? 0, permission: input[4] ?? 0 });
+        const next = mechanic.step(entity, { tick, dt: input[1] ?? 0, action: input[2] ?? 0, permission: input[4] ?? 0, ...steerFrame(input) });
         this.world.prepare(next.effects, binding.entity, 0, 0).commit();
         call = { ok: true, effects: next.effects, events: [], fuel: 0, reason: undefined, disabled: false };
       }
