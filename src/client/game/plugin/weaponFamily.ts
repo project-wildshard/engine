@@ -16,6 +16,7 @@ import type { EquipmentRow, EquipContext } from "@wildshard/engine/combat/Equipm
 import type { ItemFamily, ItemFamilyPorts } from "@wildshard/engine/combat/itemFamilies";
 import type { ItemSpec } from "@wildshard/engine/combat/items";
 import { buildSword } from "../systems/items/declaredSword";
+import { REST } from "../../../shared/game/weapons/starterMoves";
 import type { LevelContext } from "@wildshard/engine/level/context";
 
 type App = LevelContext['app'];
@@ -29,6 +30,8 @@ type App = LevelContext['app'];
  * declared colour and the shade side a step darker.
  */
 export const ITEM_VIEW_LIFT = 0.5;
+/** SB43: the painted sword's lift; its own vertex colours carry the look, so the row's colour only lifts the shade side a little. */
+const SWORD_VIEW_LIFT = 0.25;
 /** A lit lantern shows a warm glowing core in its glass (a band round a GLB body), so the toggle shows by day (playtest round 3: LANTERN showed nothing). */
 const LANTERN_LIT = 0xffc46a;
 /** On a portrait screen a held item's view sits at most this share of the half-frame from the centre (its depth's). */
@@ -52,7 +55,8 @@ function keepInFrame(model: Group, at: readonly [number, number, number], shift 
 }
 
 function isGroup(value: unknown): value is Group { return value instanceof Group; }
-function itemMesh(ports: ItemFamilyPorts): Group {
+/** A declared item's held view from its row (`view`): an admitted asset, or a kit recipe's own build. Exported for its test. */
+export function itemMesh(ports: Pick<ItemFamilyPorts, 'view' | 'model' | 'scope'>): Group {
   if (ports.view.asset !== undefined) {
     if (!isGroup(ports.model)) throw new Error('Admitted equipment asset needs its loaded model');
     const model = ports.model.clone(true);
@@ -65,10 +69,16 @@ function itemMesh(ports: ItemFamilyPorts): Group {
   if (recipe === 'kit.lantern') return lanternMesh(ports);
   if (!['kit.whip', 'kit.sword'].includes(recipe)) throw new Error(`Unresolved item view ${recipe}`);
   const model = new Group();
-  const material = new MeshStandardMaterial({ color: ports.view.colour, flatShading: true, emissive: ports.view.colour, emissiveIntensity: ITEM_VIEW_LIFT });
   const sword = recipe === 'kit.sword' ? buildSword('iron') : null;
+  // SB43: the sword is painted per part (iron blade, dark guard, leather grip, the fists on it) and held in the starter sword's
+  // REST, its tip leaning away from the eye; the row's rotation turns it from there. Built upright in one flat colour, it stood
+  // as a grey slab over the right third of a phone's view. The row's colour still lifts its shade side (ITEM_VIEW_LIFT).
+  const material = sword === null
+    ? new MeshStandardMaterial({ color: ports.view.colour, flatShading: true, emissive: ports.view.colour, emissiveIntensity: ITEM_VIEW_LIFT })
+    : new MeshStandardMaterial({ vertexColors: true, flatShading: true, emissive: ports.view.colour, emissiveIntensity: SWORD_VIEW_LIFT });
   const geometry = sword?.sword ?? new CylinderGeometry(0.025, 0.04, 0.8, 6);
-  sword?.arms.dispose(); model.add(new Mesh(geometry, material));
+  sword?.arms.dispose();
+  const mesh = new Mesh(geometry, material); if (sword !== null) mesh.quaternion.copy(REST.q); model.add(mesh);
   model.position.set(...ports.view.position); model.rotation.set(...ports.view.rotation);
   ports.scope.onDispose(() => { model.removeFromParent(); geometry.dispose(); material.dispose(); });
   return model;
@@ -80,7 +90,7 @@ const LANTERN_GLASS = 0xf1dcaa;
  * placeholder cube at the view's lower left in every first-person frame. Now a lantern: a base, four corner posts, a top
  * plate, a pyramid roof and a carry ring in the row's colour (one merged draw), round a glass core (one draw).
  */
-function lanternMesh(ports: ItemFamilyPorts): Group {
+function lanternMesh(ports: Pick<ItemFamilyPorts, 'view' | 'model' | 'scope'>): Group {
   const model = new Group();
   const part = (geometry: BufferGeometry, x: number, y: number, z: number): BufferGeometry => geometry.translate(x, y, z);
   const pieces = [part(new BoxGeometry(0.12, 0.022, 0.12), 0, -0.075, 0), part(new BoxGeometry(0.11, 0.02, 0.11), 0, 0.07, 0),
@@ -96,7 +106,7 @@ function lanternMesh(ports: ItemFamilyPorts): Group {
   return model;
 }
 /** TE-ENG2: a lever's stand-in when its row names no GLB: a barrel and a stock in the row's colour, the muzzle at the barrel's end. */
-function rifleMesh(ports: ItemFamilyPorts): Group {
+function rifleMesh(ports: Pick<ItemFamilyPorts, 'view' | 'model' | 'scope'>): Group {
   const model = new Group(), material = new MeshStandardMaterial({ color: ports.view.colour, flatShading: true, emissive: ports.view.colour, emissiveIntensity: ITEM_VIEW_LIFT });
   const barrel = new BoxGeometry(0.035, 0.045, 0.75), stock = new BoxGeometry(0.055, 0.11, 0.3);
   const front = new Mesh(barrel, material), back = new Mesh(stock, material);
