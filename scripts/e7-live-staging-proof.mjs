@@ -4,7 +4,7 @@ import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from 'playwright';
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {saveFixture} from './debug-settings.mjs';
-import {chatLinePattern,guardStagingSockets,playerNameSource,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
+import {PRIVATE_HEALTH_SKIPPED,chatLinePattern,guardStagingSockets,playerNameSource,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
 
 const [base,build,key,engine]=process.argv.slice(2);
 assert.equal(new URL(base).origin,'https://staging.wildshard.io','J205 requires the isolated staging page');
@@ -15,7 +15,8 @@ const releaseURL='https://packs.wildshard.io/releases/staging.json',sockets=['ws
 const response=await fetch(releaseURL,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});assert.equal(response.status,200);
 const signed=await response.json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
 const release=JSON.parse(signed.body);assert.equal(release.channel,'staging');assert.equal(release.engineBuild,build);assert.equal(release.saveEpoch,1);const socket=release.socket.replace(/\/$/u,'');assert.ok(sockets.includes(socket),socket);
-const health=await(await fetch('https://wildshard.tailb41b20.ts.net:8443/health',{signal:AbortSignal.timeout(15000)})).json();assert.equal(health.build,build);assert.equal(health.serial,release.serial);
+const healthURL=privateHealthURL();
+if(healthURL===undefined)console.log(PRIVATE_HEALTH_SKIPPED);else{const health=await(await fetch(healthURL,{signal:AbortSignal.timeout(15000)})).json();assert.equal(health.build,build);assert.equal(health.serial,release.serial);}
 const version=await(await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(30000)})).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,1);
 const html=await(await fetch(base,{signal:AbortSignal.timeout(30000)})).text();assert.ok(html.includes(releaseURL));assert.ok(!html.includes('/releases/production.json'));
 const browser=await(engine==='chromium'?chromium:webkit).launch({headless:true,args:engine==='chromium'?[...KEYCHAIN_ARGS,'--mute-audio',...(process.platform==='darwin'?['--use-angle=metal']:[])]:[]});

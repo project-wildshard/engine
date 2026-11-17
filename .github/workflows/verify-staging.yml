@@ -1,0 +1,59 @@
+# Meta MINI-AUTONOMY MA4 (F5): the staging proofs the releasing lane ran by hand on the MacBook, as one dispatchable,
+# read-only run: J386's tapped journey, Doctor and the live two-player proof against https://staging.wildshard.io,
+# Chromium on Linux and WebKit on macOS, one pass/fail row per proof in the run summary. It holds no secret (J205: staging
+# only, GETs and the staging socket), so the Mac mini dispatches it and a plan's last row cites its run id:
+#   gh workflow run verify-staging.yml -R project-wildshard/engine [-f build=<sha>] [-f cards=driftwood-isle,pine-hollow]
+# Hosted runners are off the tailnet, so the box's own build and serial (private /health, MS7 D7) are read by
+# `node scripts/live-status.mjs` on the mini instead; each job prints its own live-status into the summary.
+name: verify-staging
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'The engine build staging should serve (40-hex SHA); empty = whatever staging serves now'
+        required: false
+        default: ''
+      cards:
+        description: 'Journey cards, comma separated'
+        required: false
+        default: 'driftwood-isle'
+permissions:
+  contents: read
+concurrency:
+  group: verify-staging
+  cancel-in-progress: false
+env:
+  WS_LANE_NAME: verify-staging
+  WS_PRIVATE_HEALTH: skip
+jobs:
+  proofs:
+    if: github.repository == 'project-wildshard/engine'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser: chromium
+            runner: ubuntu-24.04
+          - browser: webkit
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: bash scripts/ci-playwright-install.sh ${{ matrix.browser }}
+      - name: Staging proofs (${{ matrix.browser }})
+        env:
+          BUILD: ${{ inputs.build }}
+          CARDS: ${{ inputs.cards }}
+        run: bash scripts/verify-staging.sh "${{ matrix.browser }}" "$BUILD" "$CARDS"
+      - name: Keep the logs and frames
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: verify-staging-${{ matrix.browser }}
+          path: tmp/verify-staging/**
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,6 +1,16 @@
 // What the manual staging proofs (e7-doctor-proof, e7-live-staging-proof, e7-voice-staging-proof) accept from a real page. J205:
 // staging only. Every other console line, page error or failed request stays a failure; these are exactly the known ones.
 
+/** The staging box's own `/health`, on the tailnet only (MS7 D7). A hosted runner (engine verify-staging.yml, meta
+ *  MINI-AUTONOMY MA4) is not on the tailnet: `WS_PRIVATE_HEALTH=skip` leaves out the build and serial reads there, and
+ *  says so; `scripts/live-status.mjs` reads them from a tailnet machine. @param {NodeJS.ProcessEnv} [env] */
+export function privateHealthURL(env = process.env) {
+  return env.WS_PRIVATE_HEALTH === 'skip' ? undefined : 'https://wildshard.tailb41b20.ts.net:8443/health';
+}
+
+/** The line a proof prints when it leaves the private health out. */
+export const PRIVATE_HEALTH_SKIPPED = 'SKIP private box health (WS_PRIVATE_HEALTH=skip: not on the tailnet); the box build and serial are unchecked here';
+
 /** The rooms hosts whose `/health` is private (MS7 D7): a page's fetch of it is a 404 with no CORS header. */
 const ROOMS_HOSTS = new Set(['rooms-staging.wildshard.io', 'rooms.wildshard.io']);
 

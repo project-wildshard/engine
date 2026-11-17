@@ -11,3 +11,8 @@
   First real run, 20:13 Cancún: staging's release is serial 96 on `12886742` while the box still runs serial 95
   `5e0fb5ef`, so it says "behind the release".
 - MA3 lint: the gate's typed lint refused shadowed names, async with no await and String() of unknown values; fixed.
+- MA4: `.github/workflows/verify-staging.yml` (dispatch only, no secret) runs `scripts/verify-staging.sh <browser>`:
+  journey-proof per card, Doctor and the live two-player proof against staging, Chromium on ubuntu-24.04 and WebKit
+  on macos-15, one row per proof in the run summary plus live-status. Hosted runners are off the tailnet, so the two
+  e7 proofs take `WS_PRIVATE_HEALTH=skip` (staging-proof-lines.mjs `privateHealthURL`) and say they skipped the box's
+  private /health; Doctor takes `--engine=` to run one browser per runner.

@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from 'playwright';
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
-import {roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
+import {PRIVATE_HEALTH_SKIPPED,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
 import {SOCKET_READY,SOCKET_RELIABLE,SOCKET_PING} from '../src/shared/engine/net/socketFrames.ts';
 
 const [base,build,key]=process.argv.slice(2),human=process.argv.includes('--human-static'),origin=new URL(base).origin;
+// --engine=chromium|webkit runs one browser (verify-staging.yml runs each on its own runner); both by default.
+const only=process.argv.find(arg=>arg.startsWith('--engine='))?.slice('--engine='.length);assert.ok(only===undefined||only==='chromium'||only==='webkit',only);
 assert.equal(origin,human?'https://play.wildshard.io':'https://staging.wildshard.io');assert.match(build,/^[a-f0-9]{40}$/u);
 const channel=human?'production':'staging',releaseURL=`https://packs.wildshard.io/releases/${channel}.json`;
 /** @param {string|URL} url */
@@ -25,10 +27,13 @@ const release=JSON.parse(signed.body);assert.equal(release.channel,channel);asse
 if(human){console.log('PASS human Doctor static publication',JSON.stringify({build,epoch:1,doctorEntry:true,signedProduction:true,productionSockets:0}));}else{
  // MS7.3: the socket is rooms-staging; D7 health stays private on the tailnet.
  const socket=release.socket.replace(/\/$/u,'');assert.ok(['wss://rooms-staging.wildshard.io'].includes(socket),socket);
- const healthURL='https://wildshard.tailb41b20.ts.net:8443/health';
- const response=await fetch(healthURL,{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});assert.equal(response.status,200);assert.ok([origin,'*'].includes(response.headers.get('access-control-allow-origin')??''));
- const before=await response.json();assert.equal(before.build,build);assert.equal(before.serial,release.serial);assert.equal(typeof before.now,'number');
- for(const engine of ['chromium','webkit']){
+ const healthURL=privateHealthURL();
+ /** @type {{players?:number}|undefined} */ let before;
+ if(healthURL===undefined)console.log(PRIVATE_HEALTH_SKIPPED);else{
+  const response=await fetch(healthURL,{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});assert.equal(response.status,200);assert.ok([origin,'*'].includes(response.headers.get('access-control-allow-origin')??''));
+  const health=await response.json();assert.equal(health.build,build);assert.equal(health.serial,release.serial);assert.equal(typeof health.now,'number');before=health;
+ }
+ for(const engine of only===undefined?['chromium','webkit']:[only]){
   const browser=await(engine==='chromium'?chromium:webkit).launch({headless:true,args:engine==='chromium'?[...KEYCHAIN_ARGS,'--mute-audio',...(process.platform==='darwin'?['--use-angle=metal']:[])]:[]});
   const context=await browser.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
   /** @type {{text:string,url?:string}[]} */ const errors=[];
@@ -54,7 +59,7 @@ if(human){console.log('PASS human Doctor static publication',JSON.stringify({bui
    // D7: the page's own fetch of the private rooms /health is a 404 with no CORS header; exactly those lines are listed, not failed.
    const lines=splitRoomsHealthLines(errors,roomsHealthURL(socket));console.log('D7 rooms health lines (listed)',JSON.stringify(lines.health));
    assert.deepEqual(lines.other,[],'No other native exception or console error is filtered');
-   const after=await(await read(healthURL)).json();assert.equal(after.build,build);console.log('Doctor player-count diagnostic (shared staging)',JSON.stringify({before:before.players,after:after.players}));
+   if(healthURL!==undefined){const after=await(await read(healthURL)).json();assert.equal(after.build,build);console.log('Doctor player-count diagnostic (shared staging)',JSON.stringify({before:before?.players,after:after.players}));}
    console.log('PASS live staging Doctor',JSON.stringify({engine,build,epoch:1,rows,prefixes,clipboard:true,noReadyFrame:true,productionSockets:0}));
   }finally{await context.close();await browser.close();}
  }
