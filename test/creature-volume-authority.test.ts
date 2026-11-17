@@ -82,3 +82,21 @@ test('rewound actual volumes carry part and multiplier to the present without mo
     expect(hit?.seen.x).toBeCloseTo(0); expect(hit?.point.x).toBeCloseTo(10); expect(actor.position.x).toBe(10);
   } finally { sim.dispose(); }
 });
+
+test.each(['procedural', 'own-rig'] as const)('%s body without hit overrides retains dims and the original save bytes', async kind => {
+  const { source, assets } = await creatureVolumeFixture(), species = source.rows.species[0], look = source.rows.looks[0];
+  if (species?.body === undefined || look === undefined) throw new Error('Missing fallback source');
+  delete species.body.volumes;
+  if (kind === 'own-rig') delete species.body.skeleton;
+  else look.recipe = 'engine.sphere';
+  const before = structuredClone(source), older = before.rows.species[0];
+  if (older === undefined) throw new Error('Missing original species');
+  delete older.body;
+  const sim = createShardfileSim(source, assets, { rapier: await rapier }), native = createShardfileSim(before, assets, { rapier: await rapier });
+  try {
+    expect(sim.host.entities.get('fixture.actor')?.hitVolumes).toBeUndefined();
+    expect(snapshotSimHost(sim.host)).toEqual(snapshotSimHost(native.host));
+    for (let tick = 0; tick < 30; tick++) { sim.host.step(); native.host.step(); }
+    expect(snapshotSimHost(sim.host)).toEqual(snapshotSimHost(native.host));
+  } finally { sim.dispose(); native.dispose(); }
+});

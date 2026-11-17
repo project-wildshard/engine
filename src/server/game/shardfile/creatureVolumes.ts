@@ -16,7 +16,14 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     if (species?.body === undefined) return [];
     const body = parse(CreatureBodySchema, species.body), actor = host.entities.get(spawn.id);
     const look = shard.rows.looks.find(row => row.id === body.look);
-    if (actor === undefined || look?.recipe !== SKIN_LOOK_RECIPE) throw new Error(`species ${spawn.species}: hit volumes need an admitted skin`);
+    if (actor === undefined || look === undefined) throw new Error(`species ${spawn.species}: hit volumes need an admitted look`);
+    // Existing procedural bodies and own-rig skins still use their explicit
+    // dims/fore until an author requests new volume or socket mechanics.
+    if (look.recipe !== SKIN_LOOK_RECIPE) {
+      if (body.volumes !== undefined || body.lock !== undefined || body.hits === 'clip') throw new Error(`species ${spawn.species}: authored hit volumes need an admitted skin`);
+      return [];
+    }
+    if (body.skeleton === undefined && body.volumes === undefined && body.lock === undefined && body.hits !== 'clip') return [];
     const resolved = resolveSkinLookFiles(shard, look, assets), skin = resolved.variants?.get(spawn.variant) ?? resolved.skin;
     const bytes = assets.get(skin.row.file);
     if (bytes === undefined) throw new Error(`species ${spawn.species}: missing admitted skin GLB`);

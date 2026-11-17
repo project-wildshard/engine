@@ -23,3 +23,10 @@ pass. Registry format 0.19.0 is pinned, with 17 cases in six files,
 including the original rifle/projectile/sweep/javelin/polearm controls.
 The rest assertion compares canonical saved coordinates (JSON treats
 negative zero as zero); native bit/fore checks remain separate and exact.
+
+Fallback correction: existing procedural looks and own-rig skins with
+no authored hit/socket overrides keep dims/fore and install no adapter.
+Two real-sim controls compare their complete saves to the same rows
+without a body layer, before and after 30 ticks. The combined real
+physics/rifle/local sword/projectile/native combat matrix passes
+35 cases in four files, with full types.
