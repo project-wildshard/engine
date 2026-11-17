@@ -249,8 +249,9 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     whenIdle: () => nameIdle,
     // the HUD's arrow keys move the deck; on the main menu they wait for ZONE SELECT
     select: (i, smooth) => { deck.select(i, smooth); },
-    // the HUD's confirm / any key: the main menu's first button, ENTER THE MMO, enters the world; the deck enters its card
-    activate: () => { if (viewScreen === 'main') enterMmo(); else deck.activate(); },
+    // the HUD's confirm / any key (inputContexts `confirm: ['*']`): the main menu opens ZONE SELECT, which loads nothing (a stray
+    // key never starts the MMO's download); the deck enters its card. A focused ENTER THE MMO takes Enter / Space as its own click
+    activate: () => { if (viewScreen === 'main') play(); else deck.activate(); },
     start: () => { deck.start(); startPrefetch(); if (viewScreen === 'main') mmoCard.focus({ preventScroll: true }); },
     dispose: () => { owner.dispose(); deck.dispose(); },
   };

@@ -152,3 +152,17 @@ for (const developer of [false, true]) {
     expect(view.screen).toBe('select');
   });
 }
+
+/** MAIN-SCREEN MS1 review: the title's confirm is every key (inputContexts `confirm: ['*']`), so on the main screen it opens ZONE
+ *  SELECT, which loads nothing; only a click on ENTER THE MMO (Enter / Space on it focused) starts the MMO's download. */
+test('MS1: any key on the main screen opens ZONE SELECT and never enters the MMO', async () => {
+  const onGrid = vi.fn<() => void>();
+  const view = buildTitleMenu({ cards: CARDS, active: null, onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined,
+    onGrid, screen: 'main', mode: () => ({ developer: false, devserver: false }) });
+  document.body.append(view.root); views.push(view);
+  expect(view.screen).toBe('main');
+  view.activate();
+  await frames();
+  expect(onGrid).not.toHaveBeenCalled();
+  expect(view.screen).toBe('select');
+});

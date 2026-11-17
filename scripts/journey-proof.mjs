@@ -95,10 +95,13 @@ export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
     const what = label(s), later = s !== null && s.doc !== tapDoc;
     if (s !== null && s.hud && (s.title || s.select || s.shell)) say(t, 'the in-game HUD is drawn over a menu');
     if (what === 'shell') say(t, 'the bare launch shell (lone SHARD SELECT, LOADING) shows on the world page');
-    if (what === 'title' && (left || later)) say(t, 'the main menu came back after Enter World');
-    if (what !== 'title' && what !== 'navigating') left = true;
+    // ENTER THE MMO's card paints over the main menu, which stays laid out under it until the page leaves: a card on screen is
+    // not the menu coming back, and from it on the menu alone is
+    const card = s?.loading === true || s?.bar === true;
+    if (what === 'title' && !card && (left || later)) say(t, 'the main menu came back after Enter World');
+    if ((what !== 'title' && what !== 'navigating') || card) left = true;
     if (what === 'select' && later) say(t, 'Shard Select came back after Enter World');
-    if (what === 'bar') say(t, 'the loading card is shrunk to a bar');
+    if (s?.bar === true) say(t, 'the loading card is shrunk to a bar');
     // any full-screen card on screen, whatever sits under it (the deck stays laid out beneath the card until the page leaves)
     if (s?.loading === true && s.detailed === false) say(t, 'the loading card is not the detailed one (J399)');
     if (what === 'modal') say(t, 'an error or drop modal opened');
@@ -237,6 +240,7 @@ async function cli() {
   const browsers = (args.get('browsers') ?? 'chromium,webkit').split(','), runs = (args.get('runs') ?? 'cold,warm').split(',');
   const paths = /** @type {JourneyPath[]} */ ((args.get('paths') ?? 'select,mmo,deeplink').split(','));
   if (paths.some((p) => !['select', 'mmo', 'deeplink'].includes(p))) throw new Error('--paths takes select, mmo and deeplink');
+  if (paths.includes('deeplink') && !/^[a-z0-9_-]+$/u.test(card)) throw new Error(`--card ${card}: the deep link needs a slug, not a name`);
   const throttle = Number(args.get('throttle') ?? '0');
   // SB3: --prime <dir> starts each browser from a saved profile (<dir>/<browser>), an old shell as Jake's phone holds one
   const prime = args.get('prime');
@@ -249,9 +253,10 @@ async function cli() {
   let failed = false;
   /** @type {unknown[]} */
   const report = [];
-  for (const name of browsers) {
+  for (const name of browsers) for (const way of paths) {
     const engine = name === 'webkit' ? pw.webkit : pw.chromium;
-    const profile = join(out, `profile-${name}`);
+    // one profile per browser and way: each way's cold run is a first visit, its warm run the same profile again
+    const profile = join(out, `profile-${name}-${way}`);
     if (prime !== undefined) {
       if (!existsSync(join(prime, name))) throw new Error(`--prime ${prime} has no ${name} profile`);
       cpSync(join(prime, name), profile, { recursive: true });
@@ -265,7 +270,7 @@ async function cli() {
     // --developer: Settings ▸ Developer on, for a local build whose only cards are Developer ones (T1's ring 1, `_template`)
     if (args.has('developer')) await (await import('./debug-settings.mjs')).saveFixture(context, { scope: 'device', key: 'devMode', data: true });
     try {
-      for (const way of paths) for (const run of runs) {
+      for (const run of runs) {
         const page = context.pages()[0] ?? await context.newPage();
         if (throttle > 1 && name !== 'webkit') await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
         /** @type {string[]} */

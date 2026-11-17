@@ -19,4 +19,8 @@ test('MS5: a plain loading card fails, and the main menu is allowed only before 
   expect(judge(path([{ title: true }, { loading: true, detailed: true }, { hud: true }]))).toEqual([]);
   expect(judge(path([{ title: true }, { loading: true, detailed: false }, { hud: true }])).map((p) => p.text)).toEqual(['the loading card is not the detailed one (J399)']);
   expect(judge(path([{ title: true }, { loading: true, detailed: true }, { title: true }, { hud: true }])).map((p) => p.text)).toEqual(['the main menu came back after Enter World']);
+  // ENTER THE MMO's card paints over the main menu, still laid out beneath it: a bar there is a bar, and the menu alone after it
+  // has come back
+  expect(judge(path([{ title: true }, { title: true, bar: true }, { hud: true }])).map((p) => p.text)).toEqual(['the loading card is shrunk to a bar']);
+  expect(judge(path([{ title: true }, { title: true, loading: true, detailed: true }, { title: true }, { hud: true }])).map((p) => p.text)).toEqual(['the main menu came back after Enter World']);
 });

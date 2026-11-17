@@ -21,3 +21,10 @@
   (`journey-proof.mjs --paths`, the T1 spec). Every full-screen loading card on the way must be the detailed one (its START,
   DOWNLOAD and LOAD tracks; J399), and the main menu may show only before the tap. Local build: 12 of 12 PASS (Chromium and
   WebKit, cold and warm), every loading sample detailed; T1 journey spec green. `--developer` serves ring 1's Developer cards.
+
+- Land review fixes (claude -p, one MUST and five SHOULDs). MUST: the title's confirm is every key, so on the main screen it
+  now opens ZONE SELECT again (loads nothing) instead of starting the MMO; ENTER THE MMO takes Enter / Space only when
+  focused. The journey judge reads a bar whatever sits under it and counts a card over the main menu as leaving it; each
+  way of `--paths` gets its own browser profile, so every cold run is a first visit; a deep link needs a slug. The splash
+  places its phone hero from its own box (`cqh` / `cqw`, never `vh`) and the 80 px ENTER THE MMO floor, as the menu does.
+  The doctor proof reaches the doctor through Settings ▸ System.

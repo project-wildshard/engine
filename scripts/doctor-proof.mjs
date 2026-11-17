@@ -99,16 +99,19 @@ try {
   const landed = /** @type {{url: string}} */ (results.healthy).url;
   check(/\/doctor\/\?/u.test(landed), `/?doctor redirects to the doctor page (${landed})`);
 
-  // 2. The title's Check connection on a world build opens the doctor.
+  // 2. The title's Settings ▸ System ▸ Connection doctor on a world build opens the doctor (MAIN-SCREEN MS2: Check connection
+  //    left the main screen for Settings).
   {
     const { opened, page } = await context();
     await page.goto(`${base}/`, { waitUntil: 'load' });
-    await page.locator('.ws-main-doctor').waitFor({ timeout: 60_000 });
+    await page.locator('.ws-main-settings').waitFor({ timeout: 60_000 });
     await page.screenshot({ path: join(shots, 'title.png') });
-    await page.locator('.ws-main-doctor').click();
-    await page.waitForURL(/\/doctor\/\?.*from=title/u, { timeout: 30_000 });
+    await page.locator('.ws-main-settings').click();
+    await page.locator('.ws-gmenu-svtab[data-sv-tab="system"]').click();
+    await page.locator('.ws-gmenu-doctor').click();
+    await page.waitForURL(/\/doctor\/\?.*from=settings/u, { timeout: 30_000 });
     const rows = await rowsOf(page);
-    check(rows.join?.state === 'pass', 'title → doctor runs and joins');
+    check(rows.join?.state === 'pass', 'title settings → doctor runs and joins');
     await page.locator('[data-doctor=back]').click();
     await page.waitForURL(`${base}/`, { timeout: 30_000 });
     check(true, 'doctor → back to game returns to the title');

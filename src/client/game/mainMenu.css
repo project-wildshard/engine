@@ -90,7 +90,8 @@
   .ws-main .ws-whatsnew { margin-top: clamp(12px, 1.8cqh, 22px); }
   /* a short portrait screen (402 × 654: Safari's toolbars) gives up gaps and button height before it gives up hero */
   .ws-main .ws-main-foot { gap: clamp(12px, 2cqh, 18px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(20px, 4.6cqh, 40px)); }
-  .ws-main .ws-main-mmo { min-height: clamp(76px, 10.5cqh, 92px); }
+  /* 80 px holds the 28 px name and its line at phone width; index.html's splash places its hero from the same clamps */
+  .ws-main .ws-main-mmo { min-height: clamp(80px, 10.5cqh, 92px); }
 }
 @media (max-width: 420px) {
   .ws-main .ws-main-logo { font-size: 36px; }
