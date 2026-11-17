@@ -120,6 +120,8 @@ export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
  * after the build has no row in `#ws-title-rows` (its card comes from the catalogue, SA46), so the name tried is the title row's
  * (by slug or name), else `card` itself, else `card` with dashes as spaces (`mirror-salt` → `Mirror Salt`), compared lower-case.
  * @param {unknown} rows the page's `#ws-title-rows` @param {readonly string[]} names @param {string} card a slug or a name */
+/** How long the select waits for an uploaded shard's card: the placement file's 3 s deadline, carding and slack. */
+const CARD_WAIT_MS = 10_000;
 export function titleCardIndex(rows, names, card) {
   const row = Array.isArray(rows) ? rows.find((r) => typeof r === 'object' && r !== null && (r.slug === card || r.name === card)) : undefined;
   const lower = names.map((n) => n.trim().toLowerCase());
@@ -174,11 +176,19 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
   await skipName();
   await clear();
   await page.locator('.ws-title-stack[data-screen="select"]').waitFor({ timeout: 15_000 });
-  /** @type {unknown} */
-  const rows = JSON.parse((await page.locator('#ws-title-rows').textContent()) ?? '[]');
-  const names = await page.locator('.ws-menu-card b').allTextContents();
-  const index = titleCardIndex(rows, names, card);
-  if (index === -1) throw new Error(`No Shard Select card for ${card} (cards: ${names.join(', ')})`);
+  // an upload's card (Glowfen, Mirror Salt) joins the open select once the placement file answers (3 s deadline) and its catalogue
+  // card is read: wait for it as a player would, rather than reading the build's cards alone (SHARD-SOURCE SS14e)
+  let index = -1, names = /** @type {string[]} */ ([]);
+  const until = Date.now() + CARD_WAIT_MS;
+  for (;;) {
+    /** @type {unknown} */
+    const rows = JSON.parse((await page.locator('#ws-title-rows').textContent()) ?? '[]');
+    names = await page.locator('.ws-menu-card b').allTextContents();
+    index = titleCardIndex(rows, names, card);
+    if (index !== -1 || Date.now() >= until) break;
+    await page.waitForTimeout(250);
+  }
+  if (index === -1) throw new Error(`No Shard Select card for ${card} after ${String(CARD_WAIT_MS / 1000)} s (cards: ${names.join(', ')})`);
   await clear();
   await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).tap();
   await page.locator(`.ws-menu-card.selected[data-i="${String(index)}"]`).waitFor({ timeout: 10_000 });
