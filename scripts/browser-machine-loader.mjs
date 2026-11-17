@@ -1,6 +1,6 @@
 // Portable tools discover one owned machine provider. Missing policy is
 // portable; an unsafe or broken present policy refuses admission.
-import {constants} from 'node:fs';
+import {constants,existsSync} from 'node:fs';
 import {lstat,open} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import path from 'node:path';
@@ -62,7 +62,13 @@ async function machineProvider(options){
  const record=await optionalPolicy(options);
  if(record===undefined){return undefined;}
  if(!privatePolicy(record,options.uid??process.getuid?.())){throw new Error('Browser admission policy must be a private owned regular file');}
- const provider=await(options.load??importProvider)(pathToFileURL(providerPath(record.bytes)).href);
+ const configured=providerPath(record.bytes);
+ // Engine worktrees and clean gate copies carry their own implementation.
+ // Vite cannot import the canonical checkout's module outside its root.
+ // Portable consumers have no sibling provider and retain the machine path.
+ const local=path.join(import.meta.dirname,'browser-machine-policy.mjs');
+ const module=path.basename(configured)==='browser-machine-policy.mjs'&&existsSync(local)?local:configured;
+ const provider=await(options.load??importProvider)(pathToFileURL(module).href);
  if(!validProvider(provider)){throw new Error('Browser admission provider has no installer');}
  return provider;
 }
