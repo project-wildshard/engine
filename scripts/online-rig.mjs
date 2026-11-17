@@ -6,6 +6,7 @@ import { createWriteStream, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve as absolute } from 'node:path';
 import { Client } from 'pg';
+import { childListener, listenLoopback, rigFront } from './rig-listeners.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { rigOptions } from './online-rig-options.mjs';
@@ -52,12 +53,15 @@ export async function intoWorld(page) {
  * J353 removed the continuous-crossing switch. `workers` sets `WORLD_WORKERS` (the rig's release is production's,
  * 4 by default; staging runs 2). FM3: `origins` are loopback page origins the server also lets in, and `channel`
  * is the release file's channel (`production`).
- * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean }} options */
-export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false }) {
+ * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean, port?: 0, gridRoot?: string }} options */
+export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
   const { memory } = rigOptions({ saves, pgBin, pgData, socket });
-  const key = isolated ? fixtureKey(keyFile) : JSON.parse(readFileSync(keyFile, 'utf8'));
-  if (isolated) { await freeFixturePorts([PG_PORT, WORLD_PORT, PAGE_PORT, RELEASE_PORT]); claimFixture(work); }
+  if (port !== undefined && port !== 0) throw new Error('A rig port option must be zero; use WS_RIG_PORTS for legacy named ports');
+  if (port === 0 && !memory) throw new Error('Ephemeral native database rigs are not implemented');
+  const ephemeral = port === 0;
+  const key = isolated || ephemeral ? fixtureKey(keyFile) : JSON.parse(readFileSync(keyFile, 'utf8'));
+  if (isolated || ephemeral) { if (!ephemeral) await freeFixturePorts([PG_PORT, WORLD_PORT, PAGE_PORT, RELEASE_PORT]); claimFixture(work); }
   /** @type {(()=>unknown)[]} */
   const resources = [];
   const close = async () => {
@@ -66,6 +70,12 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     if (errors.length > 0) throw new AggregateError(errors, 'Online rig cleanup failed');
   };
   try {
+  const worldFront = ephemeral ? await rigFront() : undefined;
+  if (worldFront !== undefined) resources.push(worldFront.close);
+  const pageFront = ephemeral ? await rigFront() : undefined;
+  if (pageFront !== undefined) resources.push(pageFront.close);
+  const worldPort = worldFront?.port ?? WORLD_PORT, pagePort = pageFront?.port ?? PAGE_PORT;
+  let signedSocket = ephemeral && socket === `ws://127.0.0.1:${String(WORLD_PORT)}/` ? `ws://127.0.0.1:${String(worldPort)}/` : socket;
   const build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
   mkdirSync(work, { recursive: true });
   const slugs = [shard, ...more];
@@ -73,19 +83,20 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   const books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
   const origin = join(work, 'origin'), server = join(work, 'server');
   rmSync(join(work, 'packs'), { recursive: true, force: true });
-  run(['scripts/server-origin.mjs', origin, build, ...books], 'the server book');
-  if (nextBuild !== '') run(['scripts/server-origin.mjs', origin, nextBuild, ...books], 'the next server book');
+  run(['scripts/server-origin.mjs', origin, build, `--grid=${absolute(gridRoot)}`, ...books], 'the server book');
+  if (nextBuild !== '') run(['scripts/server-origin.mjs', origin, nextBuild, `--grid=${absolute(gridRoot)}`, ...books], 'the next server book');
   run(['scripts/build-server.mjs', '--build', build, '--out', server], 'the server build');
 
   let signed = '';
-  /** @param {number} serial @param {string} engineBuild @param {string} [signedChannel] */
-  const publish = (serial, engineBuild, signedChannel = channel) => {
-    const body = JSON.stringify({ channel: signedChannel, serial, engineBuild, saveEpoch: 1, shards: slugs.map(slug => ({ slug, revision: 1 })), socket });
+  /** @param {number} serial @param {string} engineBuild @param {string} [signedChannel] @param {string} [publicSocket] */
+  const publish = (serial, engineBuild, signedChannel = channel, publicSocket = signedSocket) => {
+    rigOptions({ saves: 'memory', socket: publicSocket }); signedSocket = publicSocket;
+    const body = JSON.stringify({ channel: signedChannel, serial, engineBuild, saveEpoch: 1, shards: slugs.map(slug => ({ slug, revision: 1 })), socket: signedSocket });
     signed = JSON.stringify({ body, signature: sign(null, Buffer.from(body), key.private).toString('hex') });
   };
   publish(1, build);
   const release = createServer((_request, response) => { response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(signed); });
-  await new Promise((resolve, reject) => { release.once('error', reject); release.listen(RELEASE_PORT, '127.0.0.1', () => { resolve(null); }); });
+  const releasePort = await listenLoopback(release, ephemeral ? 0 : RELEASE_PORT);
   resources.push(async () => { release.closeAllConnections(); await release[Symbol.asyncDispose](); });
 
   const pgCtl = join(pgBin, 'pg_ctl'), log = createWriteStream(join(work, 'server.log'));
@@ -106,9 +117,10 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   }
 
   const world = (running = build) => {
-    const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(WORLD_PORT), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(PAGE_PORT)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
-    room.stdout.pipe(log, { end: false }); room.stderr.pipe(log, { end: false });
+    const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', ephemeral ? 'ipc' : 'ignore'],
+      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(releasePort)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(ephemeral ? 0 : worldPort), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(pagePort)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
+    room.once('exit', () => { worldFront?.clear(); });
+    room.stdout?.pipe(log, { end: false }); room.stderr?.pipe(log, { end: false });
     return room;
   };
   /** @param {import('node:child_process').ChildProcess} room */
@@ -128,12 +140,14 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   });
   /** The page host's half of a deploy: the page's origin serves this build from now on. @param {string} built */
   const serve = async built => {
-    const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(PAGE_PORT), '--telemetry-dir', join(work, 'telemetry')], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
+    const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(ephemeral ? 0 : pagePort), '--telemetry-dir', join(work, 'telemetry')], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit', ephemeral ? 'ipc' : 'ignore'] });
     resources.push(() => stopped(pageServer));
+    pageServer.once('exit', () => { pageFront?.clear(); });
+    if (pageFront !== undefined) pageFront.point(await childListener(pageServer, 'preview-ready'));
     let last = 'no response';
     for (let tries = 0; tries < 300; tries++) {
       if (pageServer.exitCode !== null || pageServer.signalCode !== null) throw new Error('The owned page server exited before readiness');
-      const ready = await fetch(`http://127.0.0.1:${String(PAGE_PORT)}/version.json`, { signal: AbortSignal.timeout(2000) }).then(async found => {
+      const ready = await fetch(`http://127.0.0.1:${String(pagePort)}/version.json`, { signal: AbortSignal.timeout(2000) }).then(async found => {
         const version = await found.json(); last = `status ${String(found.status)}, build ${String(version.build)}`;
         return found.ok && version.build === buildOf(built);
       }).catch((/** @type {unknown} */ error) => { last = error instanceof Error ? error.name : 'read failed'; return false; });
@@ -142,18 +156,27 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     }
     throw new Error(`The owned page server did not serve its build (${last})`);
   };
+  // The page origin is bound before the world admits browser origins.
+  let pages = await serve(dist);
   let main = world();
   resources.push(() => stopped(main));
-  let pages = await serve(dist);
-  return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(PAGE_PORT)}`, Client,
+  if (worldFront !== undefined) worldFront.point(await childListener(main, 'world-ready'));
+  /** @param {string} [running] */
+  const start = async running => {
+    if (main.exitCode === null && main.signalCode === null) throw new Error('Stop the current rig world before starting another');
+    main = world(running);
+    try { if (worldFront !== undefined) worldFront.point(await childListener(main, 'world-ready')); }
+    catch (error) { await stopped(main); throw error; }
+  };
+  return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(pagePort)}`, worldOrigin: `http://127.0.0.1:${String(worldPort)}`, releaseOrigin: `http://127.0.0.1:${String(releasePort)}`, socket: signedSocket, ports: { page: pagePort, world: worldPort, release: releasePort }, Client,
     /** The server goes down, for a test of its coming back. */
-    stop: () => stopped(main),
+    stop: () => { worldFront?.clear(); return stopped(main); },
     /** The server up on this build. @param {string} [running] */
-    start: running => { if (main.exitCode === null && main.signalCode === null) throw new Error('Stop the current rig world before starting another'); main = world(running); },
+    start,
     /** A draining server's own exit. */
     drained: () => exited(main),
     /** The page's origin moves to this build. @param {string} built */
-    pagesServe: async built => { await stopped(pages); pages = await serve(built); },
+    pagesServe: async built => { pageFront?.clear(); await stopped(pages); pages = await serve(built); },
     close };
   } catch (error) {
     try { await close(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Online rig setup and cleanup failed', { cause: cleanup }); }

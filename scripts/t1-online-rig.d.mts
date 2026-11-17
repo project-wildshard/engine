@@ -17,4 +17,5 @@ export interface T1OnlineRig {
 export function openT1OnlineRig(
   dist: string,
   scratch: string,
+  options?: { readonly gridRoot?: string },
 ): Promise<T1OnlineRig>

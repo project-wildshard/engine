@@ -273,7 +273,7 @@ try {
     await countdown(2, nextBuild);
     await rig.pagesServe(nextDist);
     await rig.drained();
-    rig.start(nextBuild);
+    await rig.start(nextBuild);
     let stuck = null;
     await landed(nextBuild).catch(async (/** @type {unknown} */ error) => { stuck = await said(phone); note('the stale tab did not reload itself', false, { error: String(error).slice(0, 160), stuck, errors: phone.errors.slice(-6) }); await phone.shot('stuck'); });
     if (stuck === null) {
@@ -289,7 +289,7 @@ try {
     const late = (/** @type {number} */ serial) => `the panel, deploy ${String(serial)}`, PANEL = "document.querySelector('#ws-new-build button') !== null";
     await countdown(3, target);
     await rig.drained();
-    rig.start(target);
+    await rig.start(target);
     await until(phone, PANEL, 40_000, late(3));
     note('with the origin late, the page says a new build is out, and no modal', await phone.evaluate("document.querySelector('#wserr') === null"), await said(phone));
     await phone.shot('5-the-new-build-panel');
@@ -303,7 +303,7 @@ try {
     await phone.shot('6-landed-by-itself');
     await countdown(4, before);
     await rig.drained();
-    rig.start(before);
+    await rig.start(before);
     await until(phone, PANEL, 40_000, late(4));
     await rig.pagesServe(stuck === null ? nextDist : dist);
     // A tab session outlives the reload, so this shows the button did it, and not the panel's own retry beating the tap.

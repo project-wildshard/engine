@@ -121,7 +121,8 @@ const server = createServer((request, response) => {
   response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ ...world.health(), serial: release.serial, ...(placements === null ? {} : { placements: placements.serial }), uptime: Math.round((Date.now() - started) / 1000), now: Date.now() }));
 });
 server.on('upgrade', (request, socket, head) => { world.upgrade(request, socket, head); });
-stop = (code): void => { void (async (): Promise<void> => {
+let draining = false;
+stop = (code): void => { if (draining) return; draining = true; void (async (): Promise<void> => {
   const written = await world.drain().catch(() => false);
   log({ at: 'server.drained', written, saves: saves.stats?.() });
   server.close();
@@ -130,10 +131,13 @@ stop = (code): void => { void (async (): Promise<void> => {
   process.exit(written ? code : 1);
 })(); };
 await new Promise<void>(resolve => { server.listen(port, host, resolve); });
+const address = server.address();
+if (address === null || typeof address === 'string') throw new Error('Dedicated server has no bound TCP address');
+if (process.connected && process.send !== undefined) process.send({ kind: 'world-ready', pid: process.pid, port: address.port });
 metrics?.watch(world);
 // A metrics port already taken never stops the game: the line says so, and the alarms see no scrape (SC3).
 const metricsListening = metrics === undefined || metricsAt === undefined ? undefined : await metrics.listen(metricsAt).catch((error: unknown) => { log({ at: 'metrics.refused', port: metricsAt, error: String(error) }); return undefined; });
-log({ at: 'server.listening', ...(metricsListening === undefined ? {} : { metrics: metricsListening }), host, port, build, cells, crossing, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });
+log({ at: 'server.listening', ...(metricsListening === undefined ? {} : { metrics: metricsListening }), host, port: address.port, build, cells, crossing, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });
 // The door keeps Rapier only to read a new build's packs, so this costs no worker a tick.
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 }, wasm = new URL('rapier.wasm', import.meta.url), rapier = async (): Promise<Awaited<ReturnType<typeof loadRapier>>> => loadRapier(await readFile(wasm));
 // The bundle and its packs reach disk before anyone hears a countdown, so the move costs a restart and no download. A bad hash stops here, with
@@ -177,3 +181,9 @@ if (activationToken !== undefined) {
 }
 void placements?.look();
 process.once('SIGTERM', () => { watch.dispose(); placements?.dispose(); stop(0); });
+
+// An IPC-launched proof owns this process; a vanished parent must still drain saves.
+if (process.channel !== undefined) {
+  process.once('disconnect', () => { watch.dispose(); placements?.dispose(); stop(0); });
+  if (!process.connected) { watch.dispose(); placements?.dispose(); stop(0); }
+}

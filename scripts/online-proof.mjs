@@ -86,7 +86,7 @@ try {
   await jake.page.locator('#ws-reconnect-strip').waitFor({ state: 'visible', timeout: 8000 });
   await jake.page.screenshot({ path: join(shots, '5-the-strip.png') });
   note('the banner says the link is down', true, { said: await jake.page.locator('#ws-reconnect-strip').textContent() });
-  rig.start();
+  await rig.start();
   await jake.page.locator('#ws-reconnect-strip').waitFor({ state: 'hidden', timeout: 30_000 });
   await seeing(jake.page, rows => rows.some(row => row.name === 'Matt' && row.modelled), 'the strip clears, and Jake sees Matt again');
   const after = await matt.page.evaluate(() => ({ x: (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().serverX, z: (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().serverZ }));
@@ -99,7 +99,7 @@ try {
     note('the countdown shows, and play goes on', await jake.page.evaluate(() => (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().closed === null));
     await rig.pagesServe(nextDist);
     await rig.drained();
-    rig.start(nextBuild);
+    await rig.start(nextBuild);
     /** @param {import('playwright').Page} page */
     const landed = async page => { await page.waitForFunction(wanted => (/** @type {typeof globalThis & { __WS_BUILD_ID__?: string }} */ (globalThis)).__WS_BUILD_ID__ === wanted && typeof window.__workerClient === 'function' && window.__wildshard?.world?.player !== undefined, nextBuild, { timeout: 120_000 }); await page.evaluate(FLOOR_GRID_ENTER); await page.waitForFunction(() => (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().own !== null && (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().frames > 30, undefined, { timeout: 60_000 }); };
     await Promise.all([landed(jake.page), landed(matt.page)]);
