@@ -108,6 +108,8 @@ export interface LinkScreenHooks {
   readonly reload: () => void;
   /** FM8m: leave for the title screen (a removed player has no world to rejoin). Absent: the card offers Details only. */
   readonly title?: () => void;
+  /** FM7b2/FM4 mode 25: leave a full world's line for the title: the page's clean quit drops its ticket at the door. Absent: no button. */
+  readonly leaveLine?: () => void;
   /** FM4b modes 21 and 22: the link's measured pong RTT and the server's reported frame skips (`NetClient.stats`) */
   readonly stats?: () => TransportStats | undefined;
   /** S13: where a failed link's stop card reports (the browser error tracker; a test observes its own) */
@@ -388,8 +390,15 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       stop('lost', 'bad', 'Connection lost', 'Couldn\'t reconnect', 'We tried for 2 minutes and the world didn\'t answer. Anything the world hadn\'t saved yet may need doing again.',
         [{ label: 'Try again', primary: true, busy: 'Reconnecting…', act: () => { hooks.retry(); } }, ...doctor('lost')], `${String(hooks.progress().dials)} dials · last close: ${hooks.why()}`);
     } else if (state === 'full') {
-      stop('full', 'warn', 'World is full', 'The world is full', 'Every place is taken. We\'ll ask every 30 seconds and let you in as soon as someone leaves.', doctor('full'),
-        'close "full" (4002)', status => { const ms = hooks.progress().nextDialMs; status.textContent = ms === null ? 'Asking now' : `Next try in ${String(Math.ceil(ms / 1000))} s`; });
+      // FM4 mode 25: the door's own place in line (FM7b2) and its estimate only when it measured one; never a count of tries, never a countdown
+      const leave = hooks.leaveLine === undefined ? [] : [{ label: 'Title screen', busy: 'Leaving…', act: () => { hooks.leaveLine?.(); } }];
+      stop('full', 'warn', 'World is full', 'The world is full', 'Every place is taken. We\'ll ask every 30 seconds and let you in as soon as someone leaves.', [...doctor('full'), ...leave],
+        'close "full" (4002)', status => {
+          const { nextDialMs: ms, queue } = hooks.progress();
+          const place = queue?.position === undefined ? [] : [`Place ${String(queue.position)} in line`];
+          const wait = queue === undefined ? [] : [queue.etaMs === undefined ? 'estimating the wait' : queue.etaMs < 60_000 ? 'under a minute (estimate)' : `about ${String(Math.ceil(queue.etaMs / 60_000))} min (estimate)`];
+          status.textContent = [...place, ...wait, ms === null ? 'Asking now' : `Next try in ${String(Math.ceil(ms / 1000))} s`].join(' · ');
+        });
     } else if (state === 'ended' && reason === 'replaced') {
       stop('replaced', 'info', 'Another tab', 'Playing somewhere else', 'This world is open in another tab or on another device. Only one can play at a time.',
         [{ label: 'Play here', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }], 'close "replaced" (4003)');

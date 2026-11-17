@@ -1395,6 +1395,7 @@
     "src/server/host/dedicated/serverReports.ts": "server",
     "src/server/host/dedicated/serverSentry.ts": "server",
     "src/server/host/dedicated/shopGate.ts": "server",
+    "src/server/host/dedicated/seatQueue.ts": "server",
     "src/server/host/dedicated/socketPump.ts": "server",
     "src/server/host/dedicated/socketTransport.ts": "server",
     "src/server/host/dedicated/workerTable.ts": "server",

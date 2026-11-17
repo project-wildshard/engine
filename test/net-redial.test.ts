@@ -115,6 +115,21 @@ test('a full world says so and asks again every 30 s, for as long as it takes', 
   redial.dispose();
 });
 
+test('FM7b2/FM4 mode 25: a full world\'s close facts ride the progress, as the door last said them, until a seat', () => {
+  const { heard, run, links, redial } = harness();
+  heard(); links[0]?.fail('full', { code: 'queue', position: 3, etaMs: 120_000 });
+  expect(redial.progress.queue).toEqual({ position: 3, etaMs: 120_000 });
+  run(10_000);
+  expect(redial.progress.queue, 'an estimate is never counted down').toEqual({ position: 3, etaMs: 120_000 });
+  run(21_000); links[1]?.fail('full', { code: 'queue', position: 1 });
+  expect(redial.progress.queue, 'the next reply replaces it; an estimate it lacks is unknown').toEqual({ position: 1 });
+  run(31_000); links[2]?.fail('full');
+  expect(redial.progress.queue, 'an old door sends no facts: none are kept').toBeUndefined();
+  run(31_000); heard();
+  expect(redial.progress.queue).toBeUndefined();
+  redial.dispose();
+});
+
 test('a restart is redialled, and a page back in view redials at once', () => {
   const { heard, run, states, links, redial } = harness();
   heard(); links[0]?.fail('restart'); run(400);

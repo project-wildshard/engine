@@ -64,6 +64,26 @@ test('a full world closes `full`, a freed seat lets the next in, and a second so
   expect(await bot('device:9').arrived(), 'the retry gets the freed seat').toBe(true);
 });
 
+test('FM7b2: a full world queues in order, holds a freed seat for the head, and Title\'s quit cancels the ticket', { timeout: 60_000 }, async () => {
+  bench = await roomBench({ seats: 2, socketsPerIp: 32, connectsPerMinute: 64, holdMs: 50 });
+  const seats = [bot('device:0'), bot('device:1')];
+  await Promise.all(seats.map(row => row.arrived()));
+  const queued = async (device: string): Promise<unknown> => { const row = bot(device); expect(await row.ended()).toBe('full'); return row.closedWith; };
+  expect(await queued('device:a')).toEqual({ code: 'queue', position: 1 });
+  expect(await queued('device:b')).toEqual({ code: 'queue', position: 2 });
+  expect(await queued('device:a'), 'a retry keeps its place').toEqual({ code: 'queue', position: 1 });
+  seats[1]?.drop();
+  await vi.waitFor(() => { expect(roomOf().taken).toBe(1); }, { timeout: 5000 });
+  expect(await queued('device:b'), 'the freed seat is held for the head').toEqual({ code: 'queue', position: 2 });
+  expect(await queued('device:new'), 'a newcomer joins the back').toEqual({ code: 'queue', position: 3 });
+  expect(await bot('device:a').arrived(), 'the head walks in').toBe(true);
+  // Title: the page says its clean quit on a fresh link; the door drops its ticket, and the line closes up
+  const leaving = bot('device:b'); leaving.quit();
+  expect(await leaving.ended()).not.toBe('full');
+  expect(await queued('device:new')).toEqual({ code: 'queue', position: 1 });
+  expect(refusals()).toEqual({ full: 6 });
+});
+
 test('`climate` changes nothing, and a buy needs the seller', { timeout: 60_000 }, async () => {
   bench = await roomBench({ developerBoost: false });
   const phone = bot('device:shopper');

@@ -14,7 +14,11 @@ export type LinkCause = 'silent' | 'closed' | 'restart' | 'hidden' | 'updating' 
 /** Where the dial is, for a screen that shows it: dials so far, the wait to the next (null while one is out), and how long it's been down. */
 export interface LinkProgress { readonly dials: number; readonly nextDialMs: number | null; readonly downMs: number; readonly away?: LinkAway;
   /** FM8m: the server's coded fact on a final close (FM7b1's close reason, e.g. `banned` with an optional end time); absent is no fact */
-  readonly ended?: SocketCloseInfo }
+  readonly ended?: SocketCloseInfo;
+  /** FM7b2/FM4 mode 25: a full world's place in line and estimated wait, as the door last said them (never counted down); absent: no facts */
+  readonly queue?: LinkQueue }
+/** The door's waiting line (FM7b2, `queue` close facts): its position, and an estimate only when the door measured one. */
+export interface LinkQueue { readonly position?: number; readonly etaMs?: number }
 /** FM4b modes 4 and 45: the page was away for `ms` and came back to a quiet or closed link. `hidden` is time out of view the page
  *  measured (visibilitychange); `asleep` is a gap in the page's own clock ticks while it wasn't known hidden (a sleep, a frozen tab).
  *  It says nothing about the world's hold on the seat (J114): only what this page measured. */
@@ -94,6 +98,7 @@ export class Redial {
   private tickAt: number;
   private awayFor: LinkAway | null = null;
   private endedWith: SocketCloseInfo | null = null;
+  private queued: LinkQueue | null = null;
   /** STAGING-BUGBASH SB31: when the page last came back from a freeze of its own (a long task, no tick for a second or more). */
   private thawedAt = -Infinity;
   /** A link lost to the page's own freeze is dialled before the player is told: the strip waits until then. */
@@ -116,8 +121,8 @@ export class Redial {
   /** The dial's progress now. */
   get progress(): LinkProgress {
     const now = this.now(), down = this.phase !== 'up';
-    const away = this.awayFor === null ? {} : { away: this.awayFor }, ended = this.endedWith === null ? {} : { ended: this.endedWith };
-    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0, ...away, ...ended };
+    const away = this.awayFor === null ? {} : { away: this.awayFor }, ended = this.endedWith === null ? {} : { ended: this.endedWith }, queue = this.queued === null ? {} : { queue: this.queued };
+    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0, ...away, ...ended, ...queue };
   }
   /** The page came back into view (an iPhone returning to Safari): a link that went quiet while hidden redials at once.
    *  `hiddenMs` is how long the page measured itself out of view (FM4b mode 4). */
@@ -141,7 +146,7 @@ export class Redial {
   private heard(): void {
     const now = this.now(), wasDown = this.phase === 'down';
     this.heardAt = now;
-    if (wasDown) { this.phase = 'up'; this.dialled = null; this.dials = 0; this.waitingForSeat = false; this.offlineAt = null; this.awayFor = null; }
+    if (wasDown) { this.phase = 'up'; this.dialled = null; this.dials = 0; this.waitingForSeat = false; this.queued = null; this.offlineAt = null; this.awayFor = null; }
     this.show('live');
   }
   private watch(): void {
@@ -207,7 +212,11 @@ export class Redial {
     if (FINAL.has(reason) && !cut) { this.endedWith = info; this.stop(); this.show('ended', reason); return; }
     if (reason === 'retry' || cut) this.because('updating');
     if (cut) this.options.onCut?.(reason);
-    if (reason === 'full') { this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return; }
+    if (reason === 'full') {
+      // FM7b2: each reply's own facts replace the last; a door that sent none leaves none
+      this.queued = info?.code === 'queue' ? { ...(info.position === undefined ? {} : { position: info.position }), ...(info.etaMs === undefined ? {} : { etaMs: info.etaMs }) } : null;
+      this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return;
+    }
     if (this.phase === 'up') { if (this.cause !== 'updating') this.because(reason === 'restart' ? 'restart' : this.online() ? 'closed' : 'offline'); this.lose(now, false); }
     else if (this.phase === 'down') { if (reason === 'restart') this.because('restart'); this.failedDial(now); }
   }

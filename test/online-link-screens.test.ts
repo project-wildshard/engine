@@ -10,7 +10,7 @@ import { linkScreens } from '../src/client/host/online/linkScreens';
 function harness(): { scope: Scope; screens: ReturnType<typeof linkScreens>; calls: string[]; set: (next: Partial<LinkProgress> & { why?: LinkCause }) => void } {
   const scope = new Scope('test.link'), calls: string[] = [];
   let progress: LinkProgress = { dials: 1, nextDialMs: 1800, downMs: 4000 }, why: LinkCause = 'closed';
-  const screens = linkScreens(scope, { retry: () => { calls.push('retry'); }, dialNow: () => { calls.push('dialNow'); }, reload: () => { calls.push('reload'); }, title: () => { calls.push('title'); },
+  const screens = linkScreens(scope, { retry: () => { calls.push('retry'); }, dialNow: () => { calls.push('dialNow'); }, reload: () => { calls.push('reload'); }, title: () => { calls.push('title'); }, leaveLine: () => { calls.push('leaveLine'); },
     doctor: from => { calls.push(`doctor:${from}`); }, progress: () => progress, why: () => why });
   return { scope, screens, calls, set: next => { progress = { ...progress, ...next }; if (next.why !== undefined) why = next.why; } };
 }
@@ -91,6 +91,26 @@ test('the banner names the cause: a restart, a silent link, a return to the tab,
   screens.allow('Talk');
   expect(shown('resuming-blocked')?.textContent).toContain('we\'ll keep trying for 79 s more');
   scope.dispose();
+});
+
+test('FM4 mode 25: the full card says the door\'s place in line, an estimate only when one came, and Title leaves the line', () => {
+  const { scope, screens, calls, set } = harness();
+  set({ queue: { position: 4, etaMs: 150_000 } }); screens.link('full');
+  expect(shown('full')?.textContent).toContain('Place 4 in line');
+  expect(shown('full')?.textContent).toContain('about 3 min (estimate)');
+  expect(shown('full')?.textContent).toContain('Next try in 2 s');
+  screens.link('live');
+  set({ queue: { position: 2 } }); screens.link('full');
+  expect(shown('full')?.textContent).toContain('Place 2 in line');
+  expect(shown('full')?.textContent, 'unknown turnover is no countdown').toContain('estimating the wait');
+  expect(shown('full')?.textContent).not.toMatch(/\d+ min/u);
+  click(shown('full'), 'Title screen');
+  expect(calls).toEqual(['leaveLine']);
+  scope.dispose();
+  const old = harness();
+  old.screens.link('full');
+  expect(shown('full')?.textContent, 'an old door sends no facts: no invented place or wait').not.toMatch(/Place|estimat/u);
+  old.scope.dispose();
 });
 
 test('the cards: gave up, world full, another tab, turned away; a stale build is left to its reload', () => {

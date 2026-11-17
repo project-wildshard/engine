@@ -1,6 +1,7 @@
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../../../src/client/engine/net/client';
 import { WebSocketTransport } from '../../../src/client/engine/net/webSocketTransport';
+import type { SocketCloseInfo } from '../../../src/shared/engine/net/socketClose';
 
 /** Where a bot means to go, or swing: what its thumb says each command. */
 export type BotThumb = (tick: number) => Omit<NetCommand, 'seq'>;
@@ -13,12 +14,14 @@ export class RoomBot {
   /** What the gateway said to load, and why the link ended. */
   resume: string | null = null;
   closed: string | null = null;
+  /** FM7b1's close facts, when the door sent any (FM7b2: a full world's place in line). */
+  closedWith: SocketCloseInfo | null = null;
   thumb: BotThumb = stillThumb;
   private timer: ReturnType<typeof setInterval> | undefined;
   private tick = 0;
   constructor(url: string, build: string, device: string, name = 'Bot', ledger = 0, loadMs = 0) {
     this.transport = new WebSocketTransport(url); this.client = new NetClient(this.transport);
-    this.transport.onClose(reason => { this.closed = reason; this.stop(); });
+    this.transport.onClose((reason, info) => { this.closed = reason; this.closedWith = info ?? null; this.stop(); });
     this.transport.onControl((control, bytes) => {
       if (control !== 'resume') return;
       this.resume = new TextDecoder().decode(bytes);
@@ -43,6 +46,8 @@ export class RoomBot {
     return this.closed;
   }
   stop(): void { clearInterval(this.timer); }
+  /** The page's clean quit (`ready` with LEAVE_FLAG, shell.ts `leave`): Leave the world, or Title from a full world's line. */
+  quit(): void { this.transport.control('ready', new Uint8Array([1]).buffer); }
   drop(): void { this.stop(); this.transport.close(); this.client.dispose(); }
   /** Coins the server says it holds. */
   coins(line: string): number { return this.client.owned.get(line) ?? 0; }

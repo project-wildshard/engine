@@ -37,6 +37,7 @@ import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, trustedAdd
 import {checkpointWord,type CheckpointCertificate} from './checkpointWitness';
 import type { PersistenceStatus } from './saves/persistenceStatus';
 import { persistenceEnvelope } from '@wildshard/engine/net/persistenceWord';
+import { SeatQueue } from './seatQueue';
 
 /** J174: what a deploy gives everyone before they move together. */
 export const GRACE_MS = 60_000;
@@ -179,6 +180,8 @@ export class World {
   private readonly ends = new Set<SocketTransport>();
   /** Links whose player quit (`ready` with `LEAVE_FLAG`) before a body was theirs. */
   private readonly quits = new WeakSet<SocketTransport>();
+  /** FM7b2: a full world's waiting line (seatQueue.ts). */
+  private readonly queue = new SeatQueue();
   /** DEVICE-TELEMETRY DT4: each socket's device word and the player its hello named, until the one `client.device` line is written. */
   private readonly devices = new WeakMap<SocketTransport, { said?: DeviceSnapshot; who?: DeviceWho; done: boolean }>();
   /** Clients loading: each holds a seat, and has no body yet. */
@@ -608,9 +611,17 @@ export class World {
       if (found.held && moving) this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes.slice(0));
       else if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
     }
+    // FM7b2: Title from a full world's line is the page's clean quit; its ticket goes at once
+    if (this.quits.has(end)) { this.queue.leave(device); return; }
     if (!end.isOpen || this.draining) return;
     this.pending.get(device)?.end.close('replaced');
-    if (this.taken >= this.options.seats) { this.refuse('full'); end.close('full'); return; }
+    // FM7b2: a full world's line, in the door's order; a freed seat is held for its head. The place rides FM7b1's close facts.
+    const turn = this.queue.turn(device, this.options.seats - this.taken, Date.now());
+    if (!turn.admit) {
+      this.refuse('full');
+      end.close('full', { code: 'queue', ...(turn.position === undefined ? {} : { position: turn.position }), ...(turn.etaMs === undefined ? {} : { etaMs: turn.etaMs }) });
+      return;
+    }
     this.pending.set(device, { end });
     end.onClose(() => { if (this.pending.get(device)?.end === end) this.pending.delete(device); });
     // MP2.4: the Name everyone reads is the claimed one, never the hello's, so a refused or duplicate Name reaches no client.

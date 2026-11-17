@@ -427,6 +427,8 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     retry: () => { shellNow?.retry(); }, dialNow: () => { shellNow?.dialNow(); }, doctor,
     // Play here / Play again reload into the world: the tap that brought the player here comes along (QA row 16)
     reload: () => { entering(loadedNow); void leaving.reloadByHand(); }, title: () => { toTitle('removed (banned)'); },
+    // FM7b2: Title from a full world's line says the clean quit first (the door drops the ticket), for at most 3 s
+    leaveLine: () => { void Promise.race([shellNow?.leave() ?? Promise.resolve(), new Promise<void>(resolve => { scope.timeout(3000, resolve); })]).then(() => { toTitle('left a full world\'s line'); return undefined; }); },
     progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',
     // FM4b modes 21 and 22: the Slow and Unstable chips read the link's own measurements
     stats: () => shellNow?.client.stats,

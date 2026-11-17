@@ -7,3 +7,10 @@
   answers 404, which the page reads as a legacy page. Now the preview server does too.
 - `reloadPastWorker` (too-old's Update, the new-build panel, Play here) never raised the RELOADING cover, so a player's tap left
   the old page standing for up to the worker drop's 3 s. It now puts the cover up first (R3/RL3), as the stale-build reload does.
+- FM7b2 (mode 25): the door keeps a waiting line (`seatQueue.ts`): ordered tickets per seat, a freed seat held for the head,
+  the position (and an estimate only from the line's measured turnover) in FM7b1's `queue` close facts. No new wire: the page
+  retries on its 30 s cadence (each retry renews the ticket, 50 s life) and Title says the clean quit it already says on Leave
+  (`ready` + LEAVE_FLAG on a fresh link), which the door now reads as cancelling the ticket. That was the "cancellation
+  transport" the row waited on: the client-to-server word already existed.
+- FM4 queue numbers: redial keeps the door's last facts (never counted down), the full card says "Place N in line", the
+  estimate or "estimating the wait", and has a Title screen button that leaves the line.
