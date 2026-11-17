@@ -61,6 +61,19 @@ test('the clock mark pins profile samples to the page clock, whatever the stop r
   expect(() => profileAnchor({ ...profile, samples: [1, 2, 1, 2, 2] }, 0)).toThrow('no clock mark');
 });
 
+test('a sampled clock-mark child anchors the stack without borrowing an unrelated native clock read', () => {
+  const profile = { nodes: [
+    { id: 1, callFrame: { functionName: '(root)' }, children: [2, 3] },
+    { id: 2, callFrame: { functionName: 'work' }, children: [4] },
+    { id: 3, callFrame: { functionName: CLOCK_MARK }, children: [5] },
+    { id: 4, callFrame: { functionName: 'now' } },
+    { id: 5, callFrame: { functionName: 'nestedClock' }, children: [6] },
+    { id: 6, callFrame: { functionName: 'now' } },
+  ], samples: [4, 4, 6, 6], timeDeltas: [0, 10_000, 10_000, 10_000], startTime: 0, endTime: 40_000 };
+  expect(profileAnchor(profile, 5020)).toEqual({ pageMs: 5020, profileUs: 20_000 });
+  expect(() => profileAnchor({ ...profile, nodes: profile.nodes.filter(node => node.id !== 3) }, 5020)).toThrow('no clock mark');
+});
+
 // NB6, widened to play: the boot smoke's ten gameplay frames refuse a stretch of unbroken main-thread work
 test('a 2 s busy sleep in a frame is a play stall; frames waiting on the GPU or idle are not', () => {
   const sleep = playStall([{ start: 3000, end: 5000 }], 1000, 9000);

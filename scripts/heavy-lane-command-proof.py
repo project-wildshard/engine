@@ -12,7 +12,7 @@ import time
 
 
 HARNESS = r'''
-import importlib.util,json,pathlib,subprocess,sys
+import importlib.util,json,pathlib,subprocess,sys,time
 wrapper=pathlib.Path(sys.argv[1]);sys.path.insert(0,str(wrapper.parent))
 spec=importlib.util.spec_from_file_location('owned_heavy_lane',wrapper)
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
@@ -27,7 +27,15 @@ def removed(*args,**kwargs):
  return remove(*args,**kwargs)
 module.record_full_test=observed;module.remove_ticket=removed
 if sys.argv[5]=='no-counters': module.child_cpu=lambda: None
-sys.argv=[str(wrapper),'full-test','--admission-wait-seconds','.08','--max',sys.argv[4],'--',*json.loads(sys.argv[3])]
+if sys.argv[5]=='admission-jitter':
+ acquire=module.acquire;delayed=False
+ def delayed_acquire(*args,**kwargs):
+  global delayed
+  if not delayed:
+   delayed=True;time.sleep(.12);return None
+  return acquire(*args,**kwargs)
+ module.acquire=delayed_acquire
+sys.argv=[str(wrapper),'full-test','--admission-wait-seconds',sys.argv[6],'--max',sys.argv[4],'--',*json.loads(sys.argv[3])]
 sys.exit(module.main())
 '''
 
@@ -72,9 +80,12 @@ def run_case(wrapper, parent, mode):
             'token': 'held-fixture', 'resources': ['full-test'], 'command': ['fixture-holder'],
             'startedAt': time.time(), 'queuedAt': time.time(), 'lane': 'owned-fixture'}))
     try:
+        # Only the deliberately held lane uses the short admission deadline.
+        # The owned-timeout case must first admit and launch its real actor.
         result = subprocess.run([sys.executable, '-c', HARNESS, str(wrapper), str(leases),
                                  json.dumps(command), '.003' if mode == 'timeout' else '.2',
-                                 'no-counters' if mode == 'no-counters' else 'normal'],
+                                 'no-counters' if mode == 'no-counters' else 'admission-jitter' if mode == 'timeout' else 'normal',
+                                 '.08' if mode == 'refused' else '5'],
                                 env=env, capture_output=True, text=True, timeout=15)
     finally:
         if lock:
@@ -88,6 +99,7 @@ def run_case(wrapper, parent, mode):
         assert usage is None, (mode, usage)
         assert not (root / 'actor-pid').exists()
         return {'mode': mode, 'exitCode': result.returncode, 'noInventedCommand': True}
+    assert usage is not None, (mode, end, result.stderr[-1500:])
     assert usage['pid'] == int((root / 'actor-pid').read_text())
     assert usage['reaped'] is True and usage['wallSeconds'] > 0
     assert usage['identity'] and usage['scope'] == 'owned-child-and-descendants-reaped-by-it'

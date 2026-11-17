@@ -93,17 +93,21 @@ export function stallFaults(entries, idle) {
     .map(row => `Load stall: ${row.stage} sat ${(row.idleMs / 1000).toFixed(2)} s of ${(STALL_WINDOW_MS / 1000).toFixed(1)} s idle with no named wait (from +${(row.from / 1000).toFixed(1)} s of its ${(row.stageMs / 1000).toFixed(1)} s; NINE-DRAGON-BENCHMAX NB6)`);
 }
 
-/** @typedef {{ nodes: readonly { id: number, callFrame: { functionName: string } }[], samples?: readonly number[], timeDeltas?: readonly number[], startTime: number, endTime: number }} CpuProfile */
+/** @typedef {{ nodes: readonly { id: number, callFrame: { functionName: string }, children?: readonly number[] }[], samples?: readonly number[], timeDeltas?: readonly number[], startTime: number, endTime: number }} CpuProfile */
 
 /** Where the profile's clock meets the page's: the first sample of the clock mark (CLOCK_MARK) against the page time the
  * mark started at. That sample lands within one sampling interval after the mark's start, which bounds the error.
  * @param {CpuProfile} profile @param {number} markPageMs @returns {{ pageMs: number, profileUs: number }} */
 export function profileAnchor(profile, markPageMs) {
   const marks = new Set(profile.nodes.filter(node => node.callFrame.functionName === CLOCK_MARK).map(node => node.id));
+  // Profiles sample leaves. A native clock read beneath the named mark is
+  // still inside its stack; an equally named read elsewhere is not.
+  const nodes = new Map(profile.nodes.map(node => [node.id, node]));
+  for (const id of marks) for (const child of nodes.get(id)?.children ?? []) if (nodes.has(child)) marks.add(child);
   const samples = profile.samples ?? [];
   let at = profile.startTime;
   for (const [i, delta] of (profile.timeDeltas ?? []).entries()) { at += delta; if (marks.has(samples[i] ?? -1)) return { pageMs: markPageMs, profileUs: at }; }
-  throw new Error('Stall profile has no clock mark sample');
+  throw new Error(`Stall profile has no clock mark sample (${marks.size} mark-stack nodes; ${samples.length} samples)`);
 }
 
 /** A Chromium CPU profile's idle stretches on the page clock: sample i is idle over [its time, the next sample's).
