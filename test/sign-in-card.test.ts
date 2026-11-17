@@ -3,6 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import type { LoginPorts } from '../src/client/engine/net/playerLogin';
 import { openSignIn, SIGN_IN_SWITCHES, takeLink, type LinkHold } from '../src/client/engine/ui/signInCard';
+import { listenTap } from '../src/client/engine/input/dom';
 
 const noHold: LinkHold = { take: () => undefined };
 
@@ -28,6 +29,23 @@ function ports(): LoginPorts & { readonly asked: string[] } {
 }
 const card = (): HTMLElement => { const box = document.querySelector<HTMLElement>('#ws-signin'); if (box === null) throw new Error('no card'); return box; };
 const settle = async (): Promise<void> => { for (let i = 0; i < 5; i++) await Promise.resolve(); await new Promise(resolve => { setTimeout(resolve, 0); }); };
+
+test('a sign-in opening tap cannot close its new card through the retargeted mobile click', () => {
+  const scope = new Scope('sign-in-touch'), opener = document.createElement('button');
+  document.body.append(opener);
+  listenTap(scope, opener, () => { void openSignIn(scope, { parent: document.body, ports: ports() }); });
+  opener.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 20, clientY: 800 }));
+  opener.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, clientX: 20, clientY: 800 }));
+  const box = card();
+  box.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1, clientX: 20, clientY: 800 }));
+  expect(document.querySelector('#ws-signin'), 'the same touch now hit-tests the backdrop').toBe(box);
+  box.querySelector('.ws-signin-close')?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1, clientX: 20, clientY: 800 }));
+  expect(document.querySelector('#ws-signin'), 'a retarget to the new close button is not a second press either').toBe(box);
+  box.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 20, clientY: 800 }));
+  box.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 20, clientY: 800 }));
+  expect(document.querySelector('#ws-signin'), 'a new outside press still closes it').toBeNull();
+  scope.dispose();
+});
 
 test('signed out, the card mails a link and says so; Google and X stay off', async () => {
   const scope = new Scope('sign-in'), api = ports();
