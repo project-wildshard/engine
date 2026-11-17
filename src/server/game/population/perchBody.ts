@@ -29,9 +29,10 @@ export interface PerchBodyPorts<A extends AnimalSim> extends Omit<PerchHunterPor
 }
 /** Native perch policy adapter: admitted memory gates select built-in strike and
  * physical launch effects. The guest selects habitat sites and projected heights. */
-export function bindPerchBody<A extends AnimalSim, C extends PerchBodyPorts<A>>(actor: A, first: C, decision: SpeciesDecision<A>, bite: StrikeSpec,
-  guest: ReturnProgram, row: MixedPopulationRows['perch'], attackRandom: Pick<Rng, 'range'> = first.rng): ReturnType<typeof createMemoryActionBrain<A, C>> {
-  if (decision.archetype !== 'perch-hunter') throw new Error('Perch body requires its declared policy');
+function perchBodyAdapter<A extends AnimalSim, C extends PerchBodyPorts<A>>(actor: A, first: C, bite: StrikeSpec,
+  guest: ReturnProgram, row: MixedPopulationRows['perch'], attackRandom: Pick<Rng, 'range'>, decide: (ports: PerchHunterPorts<A>) => void): {
+    observe: (context: C) => PerchHunterPorts<A>; brain: ReturnType<typeof createMemoryActionBrain<A, C>>;
+  } {
   const contact = new StrikeRunner(), from = new Vector3(), to = new Vector3();
   let current = first;
   const ports = { ...first, attackRandom,
@@ -50,8 +51,9 @@ export function bindPerchBody<A extends AnimalSim, C extends PerchBodyPorts<A>>(
       Object.assign(a.mem, { perch: index, [root.x]: p.x, [root.z]: p.z, [root.baseX]: base.x, [root.baseZ]: base.z, [root.height]: height });
     },
   };
-  return createMemoryActionBrain<A, C>(actor, row.actions, { decide: (_a, context) => {
-    current = context; Object.assign(ports, context); decision.policy.think(ports);
+  const observe = (context: C): PerchHunterPorts<A> => { current = context; Object.assign(ports, context); return ports; };
+  const brain = createMemoryActionBrain<A, C>(actor, row.actions, { decide: (_a, context) => {
+    decide(observe(context));
   }, effects: new Map([
     ['bite', (a: A, c: C): void => {
       if (contact.contains(bite, { actor: { position: a.position, scale: a.scale, yaw: a.yaw }, target: c.player }) && (bite.tags.includes('cover.exempt') || c.reach(a))) {
@@ -63,6 +65,23 @@ export function bindPerchBody<A extends AnimalSim, C extends PerchBodyPorts<A>>(
       to.set(c.player.x, c.player.y + row.targetHeight, c.player.z); c.world.throwCoconut?.(from, to, a);
     }],
   ]) });
+  return { observe, brain };
+}
+
+/** Lend original observation/body authority to an independently owned controller.
+ * Its action brain owns cadence and once flags; it constructs no policy or clock. */
+export function preparePerchBody<A extends AnimalSim, C extends PerchBodyPorts<A>>(actor: A, first: C, bite: StrikeSpec,
+  guest: ReturnProgram, row: MixedPopulationRows['perch'], attackRandom: Pick<Rng, 'range'> = first.rng): {
+    observe: (context: C) => PerchHunterPorts<A>; brain: ReturnType<typeof createMemoryActionBrain<A, C>>;
+  } {
+  return perchBodyAdapter(actor, first, bite, guest, row, attackRandom, () => undefined);
+}
+
+/** Existing native/page callers retain their controller and original return surface. */
+export function bindPerchBody<A extends AnimalSim, C extends PerchBodyPorts<A>>(actor: A, first: C, decision: SpeciesDecision<A>, bite: StrikeSpec,
+  guest: ReturnProgram, row: MixedPopulationRows['perch'], attackRandom: Pick<Rng, 'range'> = first.rng): ReturnType<typeof createMemoryActionBrain<A, C>> {
+  if (decision.archetype !== 'perch-hunter') throw new Error('Perch body requires its declared policy');
+  return perchBodyAdapter(actor, first, bite, guest, row, attackRandom, ports => { decision.policy.think(ports); }).brain;
 }
 
 /** Bind the projection to the installed host's admitted terrain. */

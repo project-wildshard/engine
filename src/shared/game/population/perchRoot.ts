@@ -1,9 +1,9 @@
 import type { AnimalRigContext } from '@wildshard/engine/entities/animalRig';
 import type { MixedPopulationRows } from '@wildshard/format/mixedPopulation';
 
-/** A declared climb or drop as a root pose. Both sides pose a perch by it, before its numeric joints, on the body's own clock. */
-export function stepPerchRoot(c: AnimalRigContext, row: MixedPopulationRows['perch']['root']): void {
-  const a = c.animal, m = a.mem, dt = c.dt, height = m[row.height] ?? 0;
+/** Native root integration accepts the actual body and its owned frame delta. */
+export function stepPerchBodyRoot(a: AnimalRigContext['animal'], dt: number, row: MixedPopulationRows['perch']['root']): void {
+  const m = a.mem, height = m[row.height] ?? 0;
   if (m[row.drop]) {
     m[row.velocity] = (m[row.velocity] ?? 0) - row.gravity * dt; a.yOffset += (m[row.velocity] ?? 0) * dt;
     if (a.yOffset <= 0) { a.yOffset = 0; m[row.drop] = 0; m[row.velocity] = 0; m[row.land] = row.landing; }
@@ -14,4 +14,9 @@ export function stepPerchRoot(c: AnimalRigContext, row: MixedPopulationRows['per
     if (a.yOffset >= height - 1e-3) { m[row.climb] = 0; a.position.x = x; a.position.z = z; }
   }
   m[row.land] = Math.max(0, (m[row.land] ?? 0) - dt);
+}
+
+/** Native/page posing keeps its original callback and body-clock delta. */
+export function stepPerchRoot(c: AnimalRigContext, row: MixedPopulationRows['perch']['root']): void {
+  stepPerchBodyRoot(c.animal, c.dt, row);
 }
