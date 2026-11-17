@@ -6,12 +6,12 @@
 Ring 1 only installed Nine's server slice. Its old props stall check
 therefore no longer covered full Nine, and its play stall was report-only.
 NB6 now builds full pinned Nine in a separate blocking CI job and runs
-the stock standalone bootCase, followed by NB1's 60-second street route.
+the standalone load profiler and NB1's 60-second street route.
 The same benchmark holds geometry on software renderers and also holds
 frame/load timing on hardware. Each browser takes a CPU broker slot.
 
 Tonight's phone-tier route measured about 0.90 M triangles and 113-119
-draws p95. The regression ceilings are 1.02 M and 132. Hardware timing
+draws p95. The regression ceilings are 0.95 M and 126. Hardware timing
 allows 25 fps, 65 ms frame p95, 30 ms gpu~ p95, 40 s control, 6.5 s
 shaders and 8 s firstFrame. These permit shared-machine noise; NB8 and
 NB23 retain their separate improvement targets. Missing minutes,
@@ -40,3 +40,26 @@ leaving too little of the five-minute job for both real boots and the
 60-second street route. Split producer and observation jobs, carrying
 the exact client as an artifact. Both keep the five-minute cap; the
 ratchet and workload are unchanged.
+
+Qualification 44030475424 proved the producer within five minutes;
+the combined observation spent its clock in full boot-smoke capture
+and never reached the street. Give load and street separate matrix
+legs. The load probe enters full Nine, requires real control and a
+completed props stage, and uses the same CPU-profile stall refusal.
+Its purpose is load evidence; existing stock visual smokes keep their
+screenshots. Both observations retain five-minute caps and share the
+exact client bytes. Repeat the temporary source-sleep red/green proof
+against this focused load command before publication.
+
+Tighten the first draft's 1.02 M / 132 ceilings: those would admit
+removing tonight's far slab cut (0.958-0.964 M in NB23b) or bringing
+back ten hoverboard draws (129). Both controls fail first against
+the draft and fail correctly with 0.95 M / 126; tonight's 0.904 M /
+119 and this lane's 0.911 M / 117 retain about 5-6% noise room.
+NB8/NB23's improvement targets remain separate and unchanged.
+
+Focused load proof: baseline 6.138 s, 2 s props sleep RED with
+1.48 s unexplained idle, restored source/rebuild GREEN in 6.055 s.
+All 17 focused cases and typed lint pass. Correct declaration import
+spacing from the normal gate. M11 recovery preserves the newer
+Chromium installer fix (03d9ee6f), including its headless shell.

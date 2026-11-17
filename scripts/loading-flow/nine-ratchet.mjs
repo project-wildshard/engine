@@ -2,7 +2,7 @@
 // (0b9fe2d8), phone 402x874 @2, CPU x4, Nine rev 2 + 21413ff0.
 // These hold today's 0.904 M / 119 draws with noise room. NB8/NB23's
 // improvement targets remain in the plan. Never record a new baseline on red.
-export const NINE_LIMITS = Object.freeze({triangles95: 1_020_000, draws95: 132,
+export const NINE_LIMITS = Object.freeze({triangles95: 950_000, draws95: 126,
   fps: 25, frame95: 65, gpu95: 30, controlMs: 40_000, shadersMs: 6500, firstFrameMs: 8000});
 
 /** @typedef {{fps:number,p95:number,gpu95:number,draws95:number,tris95:number}} FrameSummary */

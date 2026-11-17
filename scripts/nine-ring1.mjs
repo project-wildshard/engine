@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // NB6: full pinned Nine (not its Ring 1 server slice), stock standalone
-// load-stall smoke, then NB1's phone street walk. No pin/baseline writes.
+// load-profile gate and NB1's phone street walk. No pin/baseline writes.
 import {spawn} from 'node:child_process';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {resolve as resolvePath} from 'node:path';
 import {serve} from './parity/serve.mjs';
-import {bootCase} from './parity/boot-smoke.mjs';
+import {assertNineLoad} from './loading-flow/nine-load.mjs';
 import {browserPool} from './parity/pool.mjs';
 import {holdCpu} from './cpu-admission.mjs';
 
@@ -39,8 +39,7 @@ if (phase !== 'build') {
       const cpu = await holdCpu(1,{inherit:true});
       const pool = browserPool(process.cwd(),1,process.platform === 'darwin' ? 'metal' : 'swiftshader');
       try {
-        const result = await bootCase(await pool.browser(0),preview.url,'standalone',folder,'nine-dragon-stack',true);
-        if (result.faults.length > 0 || result.fatal.length > 0) throw new Error(`Nine boot RED: ${[...result.faults,...result.fatal].join('; ')}`);
+        await assertNineLoad(await pool.browser(0),preview.url,folder);
       } finally {try {await pool.close();} finally {await cpu.release();}}
     }
     if (phase === 'bench' || phase === 'all') {

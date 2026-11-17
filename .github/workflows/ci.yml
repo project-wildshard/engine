@@ -360,12 +360,15 @@ jobs:
           if-no-files-found: error
 
   nine-ring1:
-    # Fresh hosted build + two real boots cannot share a five-minute clock.
-    # Consume the exact producer bytes; each leg keeps that original cap.
+    # Each real boot consumes the exact producer bytes under its own cap.
     needs: [products, nine-ring1-build]
     if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [load, street]
     env:
       WS_LANE_NAME: nine-ring1
     steps:
@@ -385,13 +388,13 @@ jobs:
           tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
           rm tmp/nine-ring1/client.tar
           bash scripts/ci-playwright-install.sh chromium
-      - name: Refuse load stalls and street workload regressions
-        run: node scripts/nine-ring1.mjs boot && node scripts/nine-ring1.mjs bench
+      - name: Refuse this load or street regression
+        run: node scripts/nine-ring1.mjs ${{ matrix.kind == 'load' && 'boot' || 'bench' }}
       - name: Keep Nine measurements and stock boot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: nine-ring1
+          name: nine-ring1-${{ matrix.kind }}
           path: |
             tmp/nine-ring1/street.json
             tmp/nine-ring1/boot

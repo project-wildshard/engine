@@ -25,6 +25,16 @@ test('missing, wedged, short or wrong-tier evidence cannot turn the gate green',
   ]){const r=reading();mutate(r);expect(nineFaults(r).length).toBeGreaterThan(0);}
 });
 
+test('removing tonight\'s far slab cut trips the measured street ratchet',()=>{
+  const r=reading();r.play.all.tris95=963_000;
+  expect(nineFaults(r).join('; ')).toContain('triangles p95');
+});
+
+test('bringing back ten merged hoverboard draws trips the street ratchet',()=>{
+  const r=reading();r.play.all.draws95=129;
+  expect(nineFaults(r).join('; ')).toContain('draws p95');
+});
+
 test('hardware holds frame and load numbers, software still holds submitted work',()=>{
   const r=reading();r.play.all.fps=12;r.play.all.p95=90;r.load.phases.control=60_000;
   expect(nineFaults(r).join('; ')).toMatch(/fps.*frame p95.*control ms/u);
