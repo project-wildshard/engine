@@ -134,9 +134,16 @@ export class NetClient {
   }
   /** ZONE-ENTRY ZE10d2: what this client holds named the cell it is leaving by a gate, and the next frames do too (the road's,
    *  while the page loads the cell): it drops them until the cell's welcome. */
-  hold(): void { this.left(); this.holding = true; }
+  hold(cell?: number): void { this.left(); this.holding = true; this.heldFor = cell; }
+  /** ZE10d2: the entry was called off: frames decode again (the next welcome, or the road's own, places them). */
+  unhold(): void { this.holding = false; this.heldFor = undefined; }
   private holding = false;
+  /** the frame number of the cell a hold waits for (undefined: any welcome ends it) */
+  private heldFor: number | undefined;
   private readonly heldFrames = new Set<() => void>();
+  private readonly heldElsewhere = new Set<(cell: number) => void>();
+  /** ZE10d2: a hold ended on a welcome from another cell than the one it waited for (a redial the door thawed back onto the road). */
+  onHeldElsewhere(listener: (cell: number) => void): () => void { this.heldElsewhere.add(listener); return () => { this.heldElsewhere.delete(listener); }; }
   /** ZE10d2: a frame arrived while held: the link is alive though nothing is decoded (the redial's watch hears it); returns the unsubscribe. */
   onHeldFrame(listener: () => void): () => void { this.heldFrames.add(listener); return () => { this.heldFrames.delete(listener); }; }
   /** Call when a new link replaces the old one, before its `hello`; returns the unsubscribe. */
@@ -221,7 +228,7 @@ export class NetClient {
   /** May a tap named `what` go out now? Asking may show the player why not; an empty `what` asks without showing anything. */
   allows(what: string): boolean { return this.gate === null || this.gate(what); }
   /** Stop listening; the transport stays with its owner. */
-  dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.presented.clear(); this.corrected.clear(); this.fights.clear(); this.deaths.clear(); this.travels.clear(); this.rejoins.clear(); }
+  dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.presented.clear(); this.corrected.clear(); this.fights.clear(); this.deaths.clear(); this.travels.clear(); this.rejoins.clear(); this.heldFrames.clear(); this.heldElsewhere.clear(); this.unhold(); }
 
   private listen(transport: Transport): (() => void)[] {
     return [transport.onMessage((_channel, bytes) => { this.receive(new Uint8Array(bytes)); }), transport.onClose(reason => { this.closed = reason; })];
@@ -233,7 +240,7 @@ export class NetClient {
     try { records = readMessage(bytes).records; } catch { this.dropped++; return; }
     for (const record of records) {
       const span = { bytes, start: record.start, end: record.end };
-      if (record.tag === TAG_WELCOME) { bootMark('server:welcome-receive'); this.holding = false; this.welcomed(span); }
+      if (record.tag === TAG_WELCOME) { bootMark('server:welcome-receive'); this.welcomed(span); }
       else if (this.holding) { this.dropped++; if (record.tag === TAG_FRAME) for (const listener of this.heldFrames) listener(); }
       else if (record.tag === TAG_EVENTS) this.events(span);
       else if (record.tag === TAG_FRAME) this.decoded(this.server?.read(span) ?? null, arrived);
@@ -258,8 +265,11 @@ export class NetClient {
       }
       this.server = built.server; this.serverEvents = built.events; this.tableHash = said.tableHash;
     } else if (said.tableHash !== this.tableHash) { this.dropped++; this.transport.close('reload'); return; }
+    const elsewhere = this.holding && this.heldFor !== undefined && said.cell !== this.heldFor;
+    this.holding = false; this.heldFor = undefined;
     this.welcome = { handle: said.handle, player: said.player, tick: said.tick, cell: said.cell, schemaHash: said.tableHash, simHz: said.simHz, frameHz: said.frameHz };
     this.interpolator.own = said.handle;
+    if (elsewhere) for (const listener of this.heldElsewhere) listener(said.cell);
   }
   private events(span: Span): void {
     let decoded: { readonly events: readonly NetEvent[] } | null = null;

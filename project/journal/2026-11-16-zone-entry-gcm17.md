@@ -16,3 +16,10 @@
   catch-up fix parked the body, and parked players are never visited for the wire (J109's
   practice rooms). A gate freeze is now parked and `shown` (`SimHost.shown`), so B on the
   road keeps seeing A stand at the gate until it goes; C in the cell sees A arrive.
+- Rig proof passes desktop and phone (build 86447e7df). The one `claude -p` review then found two
+  MUSTs, both fixed with tests: a refusal after `arrive` (no `ready` in the door's wait)
+  left the client held for good, so the shell now hears it, lets the hold go and regrids
+  to the cell left; and the page's cell moved only at `adopt`, so a redial in between
+  regridded the old session mid-entry. The cell, `loaded` and the dial's goto now move at
+  `arrive`. A hold waits for its cell's welcome (another cell's ends it and regrids), a
+  handed-over link no session takes goes after 130 s, and `removePlayer` clears parked/shown.

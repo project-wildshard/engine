@@ -136,3 +136,34 @@ test('two others see the entry: B on the road sees A frozen then go, C in Nalati
   expect(bench.room(EAST)?.holds(IDENTITY.player)).toBe(true);
   expect(page.closes(), 'A kept one socket').toBe(0);
 });
+
+test('an entry the door calls off after arrive (no ready in time) lets the hold go and sends the page back to the cell it left', { timeout: 120_000 }, async () => {
+  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true, readyMs: 2500 });
+  const page = await seated(), road = bench.road(roadName(HOME));
+  await toGate(-1, page.steer);
+  expect(await page.shell.enter?.(WEST)).not.toBeNull();
+  expect(page.shell.client.latest, 'held').toBeNull();
+  // the next session never says ready: the door refuses on its own wait and the body plays on at the gate
+  await vi.waitFor(() => { expect(page.regrids, 'back to Driftwood, where the body stands').toEqual([HOME]); }, { timeout: 15_000, interval: 50 });
+  expect(road?.entering(IDENTITY.player)).toBeNull();
+  await vi.waitFor(() => { expect(page.shell.client.latest, 'frames decode again').not.toBeNull(); }, { timeout: 5000, interval: 50 });
+  expect(bench.room(WEST)?.holds(IDENTITY.player), 'never moved into Sunscar').toBe(false);
+});
+
+test('a redial between arrive and the next session\'s ready still arrives past the gate, with no re-entry', { timeout: 180_000 }, async () => {
+  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
+  const page = await seated();
+  await toGate(1, page.steer);
+  expect(await page.shell.enter?.(EAST)).not.toBeNull();
+  // the link drops while the page loads the cell: the redial's `resume` names Nalati (ZE9c), the page's cell already
+  const transport = (page.shell.client as unknown as { transport: { close: (reason?: string) => void } }).transport;
+  transport.close('stalled');
+  await new Promise(resolve => { setTimeout(resolve, 3000); });
+  expect(page.regrids, 'the redial names the cell the page is entering').toEqual([]);
+  expect(bench.room(EAST)?.holds(IDENTITY.player), 'not seated before the next session says ready').toBe(false);
+  page.shell.rehome?.(EAST);
+  page.shell.ready();
+  await vi.waitFor(() => { expect(bench?.room(EAST)?.holds(IDENTITY.player), 'seated in Nalati').toBe(true); }, { timeout: 20_000, interval: 50 });
+  await vi.waitFor(() => { expect(page.shell.client.latest?.cell).toBe(cellFrame(EAST)); }, { timeout: 10_000, interval: 50 });
+  expect(page.regrids).toEqual([]);
+});

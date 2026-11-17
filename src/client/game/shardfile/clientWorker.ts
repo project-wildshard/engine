@@ -1,6 +1,6 @@
 // P1-E5.3 I6 (J126), E6: every page runs the real Game and Player against the real server in its worker: the Player predicts and
 // reconciles, and every creature is an interpolated row drawn by the real views.
-import type { Scope } from '@wildshard/engine/app/scope';
+import { Scope } from '@wildshard/engine/app/scope';
 import type { DevBox } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
 import { chosenArrival, chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
@@ -149,6 +149,8 @@ interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: 
 interface OnlineGrid { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean }
 /** ZE10d2: the online shell a gate's `enter` handed over (its seat frozen at the gate of `cell`), for the next session on this page. */
 let handedOver: { readonly shell: Shell; readonly cell: string } | null = null;
+/** ZE10d2: past the door's `READY_MS` (120 s) a handed-over link no session took is let go. */
+const HANDOVER_MS = 130_000;
 
 const SAVE_EVERY_MS = 30_000;
 /** How long the card waits for the server's first rows, and how often it looks. A server that has booted says them in a tick. */
@@ -426,6 +428,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     console.info(`[grid] zone entry: the door ${at === null ? 'refused' : 'answered'} ${cell}${ended || scope.disposed ? ' (session gone)' : ''}`);
     if (at === null || ended || scope.disposed) return null;
     ended = true; leaves(); handedOver = { shell, cell };
+    // no session took it (the entry's boot failed, the player left for the title): it goes once the door's own wait is over
+    const kept = handedOver, expiry = new Scope('zone.handover');
+    expiry.timeout(HANDOVER_MS, () => { expiry.dispose(); if (handedOver === kept) { handedOver = null; kept.shell.dispose(); } });
     return at;
   }));
   scope.onDispose(serverStopsForImport(stop));

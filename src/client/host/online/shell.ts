@@ -118,8 +118,12 @@ function sendDevice(transport: WebSocketTransport, build: string): void {
 /** The link alone, with no page around it. `startOnline` is this with the strips. */
 export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShell {
   let playtest=false;
-  // ZE10d2: the grid cell this link's page is in, moved by a gate's `rehome`
-  let gridCell = config.gridCell;
+  // ZE10d2: the grid cell this link's page is in, moved when the door takes a gate's entry (`arrive`), and the entry until its cell's
+  // welcome: a refusal after `arrive` (no `ready` in time, the seat moved) sends the page back to the cell it left
+  let gridCell = config.gridCell, entering: { readonly from: string | undefined; readonly to: string } | null = null;
+  // set once the client exists (below): the door called a taken entry off
+  let callOff: (back: string | undefined) => void = () => undefined;
+  const frameOf = (cell: string): number | undefined => { const at = config.gridCells?.indexOf(cell) ?? -1; return at < 0 ? undefined : at + 1; };
   let loaded = false, link: WebSocketTransport | null = null, down = false, unseated: WebSocketTransport | null = null, arrive: (value: { tick: number; restored: boolean }) => void = () => undefined;
   const booted = new Promise<{ tick: number; restored: boolean }>(resolve => { arrive = resolve; });
   const voices = new Set<(word: VoiceHeard) => void>(), encoder = new TextEncoder(), decoder = new TextDecoder();
@@ -141,6 +145,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
         return;
       }
       if (control === 'countdown') { const said = decodeCountdown(bytes); if (said !== null) view.countdown(said); return; }
+      if (control === 'enter') { const said = decodeEnter(bytes); if (said?.refused !== undefined && said.cell === entering?.to) callOff(undefined); return; }
       if (control !== 'resume') return;
       const resume = v.parse(ResumeSchema, JSON.parse(new TextDecoder().decode(bytes))), seat = resume.shard;
       if (gridCell !== undefined) {
@@ -155,6 +160,15 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     return transport;
   };
   const first = hear(new WebSocketTransport(config.socket)), client = new NetClient(first);
+  // ZE10d2: the door called a taken entry off: the body plays on at the gate, so the page goes back (to `back`, else the cell it left)
+  callOff = (back: string | undefined): void => {
+    const from = entering?.from;
+    entering = null; client.unhold(); gridCell = back ?? from; loaded = true;
+    const cell = back ?? from;
+    if (cell !== undefined) (view.regrid ?? view.elsewhere)(cell);
+  };
+  // ZE10d2: a hold that ended in another cell's welcome (a redial thawed back onto the road): back to the cell the body stands in
+  client.onHeldElsewhere(frame => { if (entering !== null) callOff(frame === 0 ? undefined : config.gridCells?.[frame - 1]); });
   const records=config.record===undefined?undefined:new NetRecords(client,{...config.record,build:config.build,level:config.loaded,
     correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
   const address = config.address ?? ((): string => config.socket);
@@ -201,8 +215,10 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
         if (control !== 'arrive') return;
         const said = decodeArrive(bytes);
         if (said === null || said.cell !== cell) return;
-        // from here the road's frames name the cell being left: the next session hears nothing until the cell's welcome
-        client.hold(); done(said.at);
+        // from here the seat is the cell's: the road's frames name the cell being left, so the next session hears nothing until the
+        // cell's welcome, and a redial meanwhile (ZE9c's arrival) asks for the cell and waits for that session's `ready`
+        entering = { from: gridCell, to: cell }; gridCell = cell; loaded = false; unseated = null;
+        client.hold(frameOf(cell)); done(said.at);
       }));
       on.control('enter', encodeEnter({ cell }));
     }),
@@ -424,5 +440,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     hiddenAt = null; shell.visible(hiddenMs); screens.visible();
   });
   return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); },
+    // ZE10d2: from the door's `arrive` every dial asks for the cell entered (ZE9c seats a redial in the hold there)
+    enter: async cell => { const pose = await shell.enter?.(cell) ?? null; if (pose !== null) goto = cell; return pose; },
     adopt: next => { loadedNow = next.loaded; gridNow = next.grid; goto = next.grid.cell; shell.rehome?.(next.grid.cell); } };
 }

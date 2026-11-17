@@ -340,7 +340,7 @@ export class SimHost {
     if (player === undefined || player === this.lead) return false;
     if (this.focused === player) this.focused = this.lead;
     player.disposeMotor(); this.playerScopes.get(id)?.dispose(); this.playerScopes.delete(id);
-    this.players.delete(id); this.strikes.delete(id); this.weapons.delete(id); this.strikeSeqs.delete(id); this.damage.leave(id);
+    this.players.delete(id); this.parked.delete(id); this.shown.delete(id); this.strikes.delete(id); this.weapons.delete(id); this.strikeSeqs.delete(id); this.damage.leave(id);
     for (const [source, target] of this.targetIds) if (source === id || target === id) {
       this.strikes.get(source)?.cancel(); this.entities.get(source)?.cancelAttack(); this.targetIds.delete(source);
     }
