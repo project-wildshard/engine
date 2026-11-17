@@ -23,7 +23,7 @@ import { modalKind } from './checks.mjs';
  *   id: ScenarioId, title: string, browser: BrowserName, status: 'ran' | 'skip' | 'crashed', reason?: string,
  *   seconds: number, legs: Leg[], errors: string[], events: ProbeEvent[], log: string[], frames: Record<string, string>,
  *   video?: string, settings?: { opened: boolean, closed: boolean }, quietTitle?: { drop: boolean, left: boolean }, drops?: number,
- *   oldCache?: { before: StorageState, after: StorageState, minClient?: string }, profile?: string,
+ *   oldCache?: { before: StorageState, after: StorageState, minClient?: string }, profile?: string, endState?: StorageState,
  * }} ScenarioResult
  */
 
@@ -190,10 +190,11 @@ export async function clearDrop(page) {
  * One scenario, start to finish, in its own persistent profile.
  * @param {{ id: ScenarioId, title: string, browser: BrowserName }} scenario
  * @param {{ url: string, out: string, card: string, deepLink: string, oldProfile?: string, oldState?: StorageState, minClient?: string,
- *   watchMs?: number, budgetMs?: number, pw: typeof import('playwright') }} options
+ *   watchMs?: number, budgetMs?: number, candidateBuild?: string, pw: typeof import('playwright') }} options
+ * K1 and K2 with no saved profile seed one (a fresh profile played into Driftwood) and report SKIP: there is no old cache yet.
  * @returns {Promise<ScenarioResult>}
  */
-export async function runScenario(scenario, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs = 90_000, pw }) {
+export async function runScenario(scenario, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs = 90_000, candidateBuild, pw }) {
   const dir = join(out, scenario.id);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, 'frames'), { recursive: true });
@@ -201,9 +202,6 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
   const result = { ...scenario, status: 'ran', seconds: 0, legs: [], errors: [], events: [], log: [], frames: {}, drops: 0 };
   const onDrop = () => { result.drops = (result.drops ?? 0) + 1; };
   const old = scenario.id === 'K1' || scenario.id === 'K2';
-  if (old && oldProfile === undefined) {
-    return { ...result, status: 'skip', reason: `no saved ${scenario.browser} profile for ${url} yet (SM4 saves one at the end of this run)` };
-  }
   const started = Date.now();
   const say = (/** @type {string} */ line) => { result.log.push(`${((Date.now() - started) / 1000).toFixed(1)}s ${line}`); };
   const profile = join(dir, 'profile');
@@ -250,15 +248,24 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
     };
     if (old) {
       await open('/');
+      // an old shell may reload itself (J383's wipe, or the worker's update): wait for the candidate, then the title
+      if (candidateBuild !== undefined) {
+        await page.waitForFunction((b) => Reflect.get(globalThis, '__WS_BUILD_ID__') === b, candidateBuild, { timeout: 60_000 }).catch(() => undefined);
+      }
       await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 90_000 });
       const after = await page.evaluate(storageState);
-      result.oldCache = { before: oldState ?? { caches: [], databases: [] }, after, ...(minClient === undefined ? {} : { minClient }) };
-      say(`old cache: page ${after.build?.slice(0, 8) ?? '?'}, ${String(after.caches.length)} caches, ${String(after.databases.length)} databases`);
+      if (oldProfile !== undefined) {
+        result.oldCache = { before: oldState ?? { caches: [], databases: [] }, after, ...(minClient === undefined ? {} : { minClient }) };
+        say(`old cache: page ${after.build?.slice(0, 8) ?? '?'}, caches ${after.caches.join(' ')}, databases ${after.databases.join(' ')}`);
+      } else say('no saved profile: seeding one for the next release');
       await shoot('title');
       const leg = await watchLeg(page, { name: 'journey', tap: await toShardSelect(page, card, onDrop), shoot, budgetMs });
       leg.stick = leg.playAt !== null && leg.problems.length === 0 ? await stickMoves(page) : undefined;
       result.legs.push(leg);
       await hold(leg, watchMs ?? 10_000);
+      // SM4: left in Driftwood, as Jake's phone is left; what it holds is the next release's "before"
+      result.endState = await page.evaluate(storageState);
+      if (oldProfile === undefined) { result.status = 'skip'; result.reason = `no saved ${scenario.browser} profile for ${url} yet: seeded one for the next release`; }
     } else if (scenario.id === 'K3') {
       await open('/');
       await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 });

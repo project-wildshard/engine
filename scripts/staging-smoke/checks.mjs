@@ -64,8 +64,12 @@ export function checkScenario(s, ctx) {
     add('old-cache-save', 'P0', lost.length === 0, `the save was lost (${lost.join(', ')})`);
     const forced = minClient !== undefined && before.clientVersion !== undefined && olderVersion(before.clientVersion, minClient);
     if (forced) {
-      const kept = [...before.caches.filter((name) => after.caches.includes(name) && !name.startsWith('ws-force-update')), ...after.databases.filter((name) => name === 'ws-built-home-v1')];
-      add('old-cache-wipe', 'P0', kept.length === 0, `a forced update (${before.clientVersion ?? ''} below minClient ${minClient ?? ''}) kept ${kept.join(', ')}`);
+      // read once play has held: the new worker drops the old shell on activation, a few seconds after the title shows, and the
+      // new build writes its own ws-built-home-v1, so only caches named for the old build count. P2: the build and save checks
+      // above hold what a player meets; a stale cache left behind is disk (SM4, opus-smoke 2026-11-17)
+      const end = s.endState ?? after, stamp = before.build?.slice(0, 7);
+      const kept = stamp === undefined ? [] : end.caches.filter((name) => before.caches.includes(name) && name.includes(stamp));
+      add('old-cache-wipe', 'P2', kept.length === 0, `a forced update (${before.clientVersion ?? ''} below minClient ${minClient ?? ''}) left ${kept.join(', ')} after play`);
     }
     add('forced-drop', 'P2', (s.drops ?? 0) === 0 && dropped.length === 0, 'a drop modal after the forced update (SB30)');
   }

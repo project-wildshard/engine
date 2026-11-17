@@ -17,11 +17,11 @@
 //   (c) the T1 suite (src/e2e/t1) or the J386 gate (verify-staging.sh) cannot hold it, and
 //   (d) it adds at most 45 s, keeping the whole run under 10 minutes.
 // Otherwise it becomes a hard check in an existing scenario, or an engine T1 test.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { SCENARIOS, runScenario } from './staging-smoke/scenarios.mjs';
 import { holds, verdictOf, worstFirst } from './staging-smoke/checks.mjs';
-import { keepRun, lastRelease, STORE } from './staging-smoke/store.mjs';
+import { keepRun, lastRelease, newestProfiles, saveProfiles, STORE } from './staging-smoke/store.mjs';
 import { changelogBullets, visionFindings, visionPass } from './staging-smoke/vision.mjs';
 
 /** The whole run's budget (SM8 (d)): over this the runner warns. */
@@ -59,14 +59,26 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
   const started = Date.now();
   const version = await served(url);
   mkdirSync(out, { recursive: true });
+  const origin = new URL(url).origin;
+  // SM4: K1 and K2 start from the newest saved profile pair for this origin
+  const saved = store === undefined ? undefined : newestProfiles(store, origin);
+  if (saved !== undefined) log(`old cache: ${saved.note.release} profiles (${saved.note.build?.slice(0, 8) ?? '?'}, client ${saved.note.clientVersion ?? '?'})`);
+  /** @param {'chromium' | 'webkit'} browser */
+  const oldFor = (browser) => {
+    const given = oldProfiles[browser];
+    if (given !== undefined) return { oldProfile: given, ...(oldState === undefined ? {} : { oldState }) };
+    const state = saved?.note.states[browser];
+    if (saved === undefined || !existsSync(join(saved.dir, browser))) return {};
+    return { oldProfile: join(saved.dir, browser), ...(state === undefined ? {} : { oldState: { ...state, ...(saved.note.clientVersion === undefined ? {} : { clientVersion: saved.note.clientVersion }) } }) };
+  };
   /** @type {import('./staging-smoke/scenarios.mjs').ScenarioResult[]} */
   const scenarios = [];
   for (const scenario of SCENARIOS) {
     if (only !== undefined && !only.includes(scenario.id)) continue;
-    const oldProfile = oldProfiles[scenario.browser];
     const result = await runScenario(scenario, {
       url, out, card, deepLink, pw, ...(watchMs === undefined ? {} : { watchMs }), ...(budgetMs === undefined ? {} : { budgetMs }),
-      ...(oldProfile === undefined ? {} : { oldProfile, ...(oldState === undefined ? {} : { oldState }) }), ...(version.minClient === undefined ? {} : { minClient: version.minClient }),
+      ...(scenario.id === 'K1' || scenario.id === 'K2' ? oldFor(scenario.browser) : {}),
+      ...(version.minClient === undefined ? {} : { minClient: version.minClient }), ...(version.build === undefined ? {} : { candidateBuild: version.build }),
     });
     scenarios.push(result);
     const problems = result.legs.flatMap((leg) => leg.problems.map((p) => `${leg.name}: ${p.text}`));
@@ -89,6 +101,18 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
     ...(last === undefined ? {} : { last: last.release }), vision: looks, findings, hold: holds(findings),
   };
   writeFileSync(join(out, 'verdict.json'), `${JSON.stringify(verdict, null, 1)}\n`);
+  // SM4: this run's K1 and K2 profiles are the next release's old cache (only the latest pair is kept)
+  const k1 = scenarios.find((s) => s.id === 'K1'), k2 = scenarios.find((s) => s.id === 'K2');
+  if (store !== undefined && (k1?.profile !== undefined || k2?.profile !== undefined)) {
+    /** @type {import('./staging-smoke/store.mjs').ProfileNote['states']} */
+    const states = {};
+    if (k1?.endState !== undefined) states.chromium = k1.endState;
+    if (k2?.endState !== undefined) states.webkit = k2.endState;
+    const dir = saveProfiles(store, { release, origin, states, ...(version.build === undefined ? {} : { build: version.build }), ...(version.clientVersion === undefined ? {} : { clientVersion: version.clientVersion }) },
+      { ...(k1?.endState === undefined ? {} : { chromium: k1.profile }), ...(k2?.endState === undefined ? {} : { webkit: k2.profile }) });
+    log(`old cache for the next release: ${dir}`);
+  }
+  for (const s of scenarios) if (s.profile !== undefined) rmSync(s.profile, { recursive: true, force: true });
   if (store !== undefined) log(`kept in ${keepRun(store, release, out, verdict)}`);
   log(`staging-smoke ${release}: ${verdict.hold ? 'HOLD' : 'no hold'}, ${String(findings.length)} findings, ${String(scenarios.length)} scenarios in ${seconds.toFixed(0)} s${seconds > RUN_BUDGET_S ? ` WARNING: over the ${String(RUN_BUDGET_S / 60)}-minute budget (SM8)` : ''}`);
   return verdict;

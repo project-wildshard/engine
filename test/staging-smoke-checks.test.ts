@@ -49,17 +49,19 @@ test('/version.json must name the candidate build and release (SB7)', () => {
 });
 
 const old = (over: Record<string, unknown>) => clean({ id: 'K1', browser: 'chromium', settings: undefined, quietTitle: undefined, legs: [leg({ name: 'journey' })], ...over } as Partial<ScenarioResult>);
-const before = { build: 'a'.repeat(40), clientVersion: '0.1.31', caches: ['ws-shell-a'], databases: ['ws-built-home-v1', 'wildshard-saves@1'] };
+const before = { build: 'a'.repeat(40), clientVersion: '0.1.31', caches: ['ws-shell-aaaaaaa-1'], databases: ['ws-built-home-v1', 'wildshard-saves@1'] };
 
-test('old cache: the candidate on the first page and the save kept, else P0; a forced update wipes, else P0; its drop modal is P2', () => {
+test('old cache: the candidate on the first page and the save kept, else P0; a forced update leaves no old shell, else P2; its drop modal is P2', () => {
   const after = { build: BUILD, caches: [], databases: ['wildshard-saves@1'] };
   expect(failed(old({ oldCache: { before, after, minClient: '0.1.31' } }))).toEqual([]);
   expect(failed(old({ oldCache: { before, after: { ...after, build: before.build }, minClient: '0.1.31' } }))).toEqual(['P0 old-cache-build']);
   expect(failed(old({ oldCache: { before, after: { ...after, databases: [] }, minClient: '0.1.31' } }))).toEqual(['P0 old-cache-save']);
   // not forced (0.1.31 is not below minClient 0.1.31): the shell cache may stay
-  expect(failed(old({ oldCache: { before, after: { ...after, caches: ['ws-shell-a'], databases: ['ws-built-home-v1', 'wildshard-saves@1'] }, minClient: '0.1.31' } }))).toEqual([]);
-  // forced (minClient 0.1.34): the old shell cache and ws-built-home-v1 must be gone
-  expect(failed(old({ oldCache: { before, after: { ...after, caches: ['ws-shell-a'], databases: ['ws-built-home-v1', 'wildshard-saves@1'] }, minClient: '0.1.34' } }))).toEqual(['P0 old-cache-wipe']);
+  expect(failed(old({ oldCache: { before, after: { ...after, caches: ['ws-shell-aaaaaaa-1'], databases: ['ws-built-home-v1', 'wildshard-saves@1'] }, minClient: '0.1.31' } }))).toEqual([]);
+  // forced (minClient 0.1.34): once play holds, no cache named for the old build is left (the new build's own ws-built-home-v1 may be)
+  const stale = { ...after, caches: ['ws-shell-aaaaaaa-1', 'ws-shell-bbbbbbb-2'], databases: ['ws-built-home-v1', 'wildshard-saves@1'] };
+  expect(failed(old({ endState: stale, oldCache: { before, after: stale, minClient: '0.1.34' } }))).toEqual(['P2 old-cache-wipe']);
+  expect(failed(old({ endState: { ...stale, caches: ['ws-shell-bbbbbbb-2'] }, oldCache: { before, after: stale, minClient: '0.1.34' } }))).toEqual([]);
   expect(failed(old({ drops: 1, oldCache: { before, after, minClient: '0.1.34' } }))).toEqual(['P2 forced-drop']);
 });
 
