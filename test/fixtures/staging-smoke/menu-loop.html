@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- STAGING-SMOKE SM1: a stub of the title, Shard Select and Enter World that serves the main menu again after the tap
+     (SB1's loop). The runner must fail K3 on it. Only the selectors the scenarios tap. -->
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body { margin: 0; background: #123; color: #fff; font: 16px sans-serif; }
+  .hide { display: none !important; }
+  .ws-title-stack { position: fixed; inset: 0; pointer-events: none; } .ws-title-stack > * { pointer-events: auto; }
+  .ws-main, .ws-menu { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; }
+  button, .ws-menu-dots i { display: block; min-width: 120px; min-height: 40px; }
+  .ws-gmenu { position: fixed; inset: 0; background: #000; display: none; } .ws-gmenu.show { display: block; }
+</style></head>
+<body>
+  <div class="ws-main"><button class="ws-main-select">SHARD SELECT</button><button class="ws-main-settings">SETTINGS</button></div>
+  <div class="ws-title-stack" data-screen="title">
+    <div class="ws-menu hide"><div class="ws-menu-card selected" data-i="0"><b>Driftwood Isle</b></div>
+      <div class="ws-menu-dots"><i data-i="0">1</i></div><button class="ws-menu-play">ENTER WORLD</button></div>
+  </div>
+  <div class="ws-gmenu"><button class="ws-gmenu-close">CLOSE</button></div>
+  <script type="application/json" id="ws-title-rows">[{"slug":"driftwood-isle","name":"Driftwood Isle"}]</script>
+  <script>
+    const $ = (s) => document.querySelector(s);
+    $('.ws-main-settings').addEventListener('click', () => $('.ws-gmenu').classList.add('show'));
+    $('.ws-gmenu-close').addEventListener('click', () => $('.ws-gmenu').classList.remove('show'));
+    $('.ws-main-select').addEventListener('click', () => { $('.ws-main').classList.add('hide'); $('.ws-menu').classList.remove('hide'); $('.ws-title-stack').dataset.screen = 'select'; });
+    // the bug: Enter World puts the main menu back
+    $('.ws-menu-play').addEventListener('click', () => { $('.ws-menu').classList.add('hide'); $('.ws-main').classList.remove('hide'); $('.ws-title-stack').dataset.screen = 'title'; });
+  </script>
+</body></html>
