@@ -1313,6 +1313,7 @@
     "./scripts/parity/pool.mjs": "./scripts/parity/pool.mjs",
     "./scripts/parity/value.mjs": "./scripts/parity/value.mjs",
     "./scripts/grid-runtime-evidence.mjs": "./scripts/grid-runtime-evidence.mjs",
+    "./scripts/proof-state.mjs": "./scripts/proof-state.mjs",
     "./scripts/model-spin-recording.mjs": "./scripts/model-spin-recording.mjs",
     "./scripts/progress-recording.mjs": "./scripts/progress-recording.mjs",
     "./scripts/sim-node-loader.mjs": "./scripts/sim-node-loader.mjs",

@@ -9,6 +9,7 @@ import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {saveFixture} from './debug-settings.mjs';
 import {guardStagingSockets,playerNameSource} from './staging-proof-lines.mjs';
 import {FLOOR_GRID_ENTER} from './frame-floor-navigation.mjs';
+import {readProofState} from './proof-state.mjs';
 
 /** Synthetic PCM only: headless proofs never open a real microphone. */
 function proofMicrophone(){
@@ -29,7 +30,7 @@ assert.equal(release.channel,'staging');assert.equal(release.socket,'wss://rooms
 const version=await(await fetch('https://staging.wildshard.io/version.json')).json();assert.equal(version.build,release.engineBuild);
 const browser=await(engine==='webkit'?webkit:chromium).launch({headless:true,args:engine==='webkit'?[]:[...KEYCHAIN_ARGS,'--use-angle=metal']});
 /** @type {string[]} */ const faults=[];
-/** @type {{engine:string,build:string,serial:number,coldTitle?:boolean,visibleAfterPlay?:boolean,leaveMs?:number,errors?:string[],locations?:{select:{inside:string|null,level:string|undefined},infinite:{inside:string|null,level:string|undefined}},chat?:boolean,voiceBothWays?:boolean}} */
+/** @type {{engine:string,build:string,serial:number,coldTitle?:boolean,visibleAfterPlay?:boolean,leaveMs?:number,errors?:string[],locations?:{select:{inside:string|null,level:string|undefined,quest?:NonNullable<ReturnType<typeof readProofState>>['quest']},infinite:{inside:string|null,level:string|undefined,quest?:NonNullable<ReturnType<typeof readProofState>>['quest']}},chat?:boolean,voiceBothWays?:boolean}} */
 const report={engine,build:version.build,serial:release.serial};
 try {
  const page=async()=>{const c=await browser.newContext({viewport:{width:960,height:600}});await c.grantPermissions(['microphone'],{origin:'https://staging.wildshard.io'});await saveFixture(c,{scope:'device',key:'devMode',data:true});await c.addInitScript(guardStagingSockets,release.socket);await c.addInitScript(proofMicrophone);await c.addInitScript(()=>{window.requestAnimationFrame=callback=>window.setTimeout(()=>callback(performance.now()),1000/30);window.cancelAnimationFrame=id=>window.clearTimeout(id);});const p=await c.newPage();p.on('pageerror',e=>faults.push(e.message));return p;};
@@ -49,7 +50,7 @@ try {
  await b.waitForFunction(source=>window.__onlinePlayers?.().some(r=>new RegExp(source,'u').test(r.name)),playerNameSource(nameA),{timeout:15000});
  report.visibleAfterPlay=true;
  /** @param {import('playwright').Page} p */
- const where=async p=>{const value=await p.evaluate(()=>({inside:(/** @type {{state:()=>{inside:string|null}}} */(window.__wildshard.shard.grid)).state().inside,level:window.__wildshard.world?.game.level.id}));return value;};
+ const where=async p=>{const state=await p.evaluate(readProofState, {});return {inside:state?.seat?.inside??null,level:state?.seat?.slug??undefined,quest:state?.quest};};
  report.locations={select:await where(a),infinite:await where(b)};assert.equal(report.locations.select.inside,'driftwood-isle');assert.equal(report.locations.infinite.inside,'driftwood-isle');
  await a.waitForFunction(source=>window.__onlinePlayers?.().some(r=>new RegExp(source,'u').test(r.name)&&r.modelled),playerNameSource(nameB),{timeout:15000});
  /** @param {import('playwright').Page} p @param {string} line */

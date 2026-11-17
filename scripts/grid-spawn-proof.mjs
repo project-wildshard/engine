@@ -18,6 +18,7 @@ import sharp from 'sharp';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
+import { readProofState } from './proof-state.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -163,9 +164,8 @@ async function runOne(browser, cell, layout, path) {
     await (phone ? press('.ws-touch .jump') : page.keyboard.press('Space'));
     run.jumpM = Number(Number(await peak).toFixed(2));
     await page.waitForTimeout(800);
-    const seat = await page.evaluate(() => { const W = /** @type {any} */ (window); return { seat: W.__workerClient?.().cell ?? null, inside: W.__wildshard?.shard?.grid?.state?.().inside ?? null }; });
-    // the snapshot's cell is 1-based into the grid catalogue (clientWorker.ts siteOf); 0 is no grid
-    run.seat = typeof seat.seat === 'number' ? catalogue.grid.cells[seat.seat - 1]?.instance ?? `#${String(seat.seat)}` : null; run.inside = seat.inside;
+    const state = await page.evaluate(readProofState, {});
+    run.seat = state?.seat?.instance ?? null; run.inside = state?.seat?.inside ?? null;
     await shot('after');
     const inCell = run.mode === 'grid' && run.inside === cell.instance && run.seat === cell.instance;
     const reasons = [];
