@@ -72,6 +72,18 @@ test('SB12: an upload whose catalogue name is only its slug is a test placement:
   ]);
 });
 
+test('SS14e: a one-word name that is its slug capitalised (Glowfen) is a real name, not a test placement', async () => {
+  const names: Record<string, string> = { glowfen: 'Glowfen', 'mu9-auto-20261116': 'mu9-auto-20261116', 'MU9-loud': 'MU9-loud' };
+  const fetch: typeof globalThis.fetch = (input) => {
+    const slug = decodeURIComponent(String(input instanceof Request ? input.url : input).split('/').pop() ?? '');
+    return Promise.resolve(new Response(JSON.stringify({ slug, name: names[slug] })));
+  };
+  const rows = await catalogueCards(Object.keys(names), { fetch, api: 'https://api.test', signal: new AbortController().signal, order: 1 });
+  expect(rows.map(({ slug, status }) => ({ slug, status }))).toEqual([
+    { slug: 'glowfen', status: 'live' }, { slug: 'mu9-auto-20261116', status: 'hidden' }, { slug: 'MU9-loud', status: 'hidden' },
+  ]);
+});
+
 test('SB12: a grid cell whose shard this page has no data for keeps road-level edges without asking for a terrain bake', async () => {
   installShards([]);
   const fetch = vi.fn(() => Promise.resolve(new Response('', { status: 404 })));

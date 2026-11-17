@@ -29,7 +29,8 @@ export interface CardPorts {
   readonly deadlineMs?: number;
 }
 
-const unnamed = (slug: string, name: string): boolean => name.trim().toLowerCase() === slug.toLowerCase();
+// the name is the slug itself, byte for byte: a one-word name that is its slug capitalised is a real name (SHARD-SOURCE SS14e)
+const unnamed = (slug: string, name: string): boolean => new Set([slug]).has(name.trim());
 /** `mu9-auto-20261116` → `Mu9 Auto 20261116` */
 const slugName = (slug: string): string => slug.split(/[-_]+/u).filter(word => word !== '').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
