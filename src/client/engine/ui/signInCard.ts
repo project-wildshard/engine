@@ -3,7 +3,7 @@ import { saveEnvironment } from '../../../shared/engine/saves/environment';
 import { engineString } from '../../../shared/engine/strings';
 import { addPasskey, deleteMine, exportMine, linkIn, pageLogin, passkeySignIn, passkeysHere, redeemLink, sendLink, signedIn, signOut, type Deleted, type LinkSent, type LoginPorts } from '../net/playerLogin';
 import { installViewport } from '../core/viewport';
-import { listenPage } from '../input/dom';
+import { followsTap, listenPage } from '../input/dom';
 import './styles/signInCard.css';
 
 /**
@@ -180,7 +180,11 @@ export function openSignIn(scope: Scope, options: SignInOptions): Promise<void> 
   return new Promise(resolve => {
     own.onDispose(() => { box.remove(); resolve(); });
     own.listen(close, 'click', () => { own.dispose(); });
-    own.listen(box, 'click', event => { if (event.target === box) own.dispose(); });
+    // The opening pointerup can put this backdrop (or a button) under the finger before iOS retargets its click.
+    own.listen(box, 'click', event => {
+      if (followsTap(event)) { event.preventDefault(); event.stopPropagation(); return; }
+      if (event.target === box) own.dispose();
+    }, { capture: true });
     listenPage(own, 'keydown', event => { if (event.key === 'Escape') own.dispose(); });
   });
 }
