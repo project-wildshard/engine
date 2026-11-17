@@ -627,3 +627,46 @@ test('an unpublished installed decision owner restores without rebinding or reru
     expect(snapshotSimHost(target.host)).toEqual(snapshotSimHost(first.host));
   }finally{invoke.mockRestore();target.host.dispose();first.dispose();}
 });
+
+// OF26d2: a decision borrows the body's existing owner; it cannot join another brain.
+test("the plain decision roster refuses native and duplicate decision controllers before guest work", async () => {
+  const f = fixture(),
+    R = await rapier,
+    spawn = f.source.creatures.spawns[0];
+  if (spawn === undefined) throw new Error("Missing decision roster actor");
+  f.source.creatures.brains = [
+    {
+      id: "roster.pursue",
+      kind: "pursue",
+      awareRadius: 18,
+      leashRadius: 45,
+      speed: 3,
+      returnSpeed: 2,
+      stopDistance: 1,
+      turnRate: 6,
+      thinkDivisor: 3,
+      attackCooldownTicks: 60,
+      wanderRadius: 0,
+      wanderEveryTicks: 420,
+    },
+  ];
+  spawn.brain = "roster.pursue";
+  const invoke = vi.spyOn(DecisionModule.prototype, "invoke");
+  try {
+    expect(() => createShardfileSim(f.source, f.assets, { ...f.options, rapier: R })).toThrow(
+      "Decision actor has two controllers",
+    );
+    expect(invoke).not.toHaveBeenCalled();
+    spawn.brain = null;
+    f.source.creatures.brains = [];
+    const row = f.scripts[0];
+    if (row === undefined) throw new Error("Missing actual decision row");
+    f.sections.set("sim/scripts", [row, { ...row, id: "second.controller" }]);
+    expect(() => createShardfileSim(f.source, f.assets, { ...f.options, rapier: R })).toThrow(
+      "Decision actor has two controllers",
+    );
+    expect(invoke).not.toHaveBeenCalled();
+  } finally {
+    invoke.mockRestore();
+  }
+});

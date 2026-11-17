@@ -40,3 +40,29 @@ correctly refused both. A body already beside its player may attack
 without walking; the proof checks changed complete body state, not an
 invented minimum displacement. Existing full skirmisher, guardian and
 perch lifecycle/native parity controls remain alongside this matrix.
+
+OF26d2 adds type-exhaustive maps for all eleven original union entries
+and all eighteen current declared names/patterns. Decision is not a
+`creatures.brains` kind: it uses admitted `sim/scripts`, native actor
+bindings and ShardDecisions' existing body/strike owner. The existing
+real decision suite proves fixed-step movement, strike, memory and
+restore; two added ownership controls refuse native-plus-decision and
+duplicate decision controllers before any guest invoke. The original
+borrowed-owner and spawn-group tests remain enabled.
+
+A custom `script` declaration still requires the trusted observation and
+strike port. A plain JSON fixture refuses exactly `Missing custom brain
+port`; no synthetic callback in JSON bypasses it. The trusted control
+runs the actual composed ScriptBrainDriver and a frozen, metered ABI0
+guest against real Rapier. Ten decisions in thirty ticks request the
+existing host catalogue/runner, deal one declared7hp contact, respect
+attack permission and restore the complete host snapshot without any
+observation call. No `brain.<actor>` callback accompanies the script
+lane. This boundary stays explicit for OF10's harm/budget ledger.
+
+The new guest's source, compiler identity and hash are retained beside
+its immutable WASM. It was compiled once with the landed SDK M1 source;
+ordinary tests only load its bytes. The initial trusted test forgot to
+register its strike catalogue and correctly produced no harm; the test
+now lends the actual authored rows through registerStrikeCatalogue.
+No runtime code or gate was changed for this audit.

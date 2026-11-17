@@ -1,0 +1,8 @@
+{
+  "source": "let calls:i32=0;\nexport function abi_version():i32{return 0;}\nexport function init(lo:i32,hi:i32):void{calls=0;}\nexport function in_ptr():i32{return 16384;}export function in_cap():i32{return 4096;}\nexport function out_ptr():i32{return 24576;}export function out_cap():i32{return 32;}\nexport function out_count():i32{return 4;}\nexport function on_tick():void{\n calls++;store<i32>(32768,calls);\n store<f64>(24576,1);store<f64>(24584,1);store<f64>(24592,0);\n store<f64>(24616,1);store<f64>(24624,2);store<f64>(24632,1);\n store<f64>(24656,1);store<f64>(24664,4);store<f64>(24672,6);\n store<f64>(24696,3);store<f64>(24704,9);store<f64>(24712,load<f64>(16408));store<f64>(24720,0);\n}",
+  "options": {
+    "maximumPages": 1
+  },
+  "compiler": "sharddev0b06c263/src/sharddev/bake/compileScript.ts",
+  "sha256": "dfcfd9f2e3f8ccc1272750395f3e24c00d059a197292b5531f974f6dc200317f"
+}
