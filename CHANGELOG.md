@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.33 (2026-11-16)
+
+- Fix Pine Hollow loading and world entry.
+- Correct ammo prompts and serve packs from the CDN.
+- Keep release checks inside their assigned CPU budget.
+
 ## v0.1.32 (2026-11-16)
 
 - Settings opens from the title screen on phones and desktop.
