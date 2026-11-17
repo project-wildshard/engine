@@ -8,3 +8,8 @@
 - Leave the world is held through a cancelable `ws:leave-world` event that HUD.exitToMenu
   dispatches: online.js is its own bundle, so a module-level gate in lastEnd would be a second
   copy. Reloads are not held (R3/R4 keep their bounds).
+- FM8s proof: the rig had no breakable database (no Postgres binary here). `pglite:` saves run
+  PGlite in the proof's process on a Unix socket behind `databaseFront` (rig-listeners.mjs) on
+  the rig's database port. `hold` lets a connection start (through its first ReadyForQuery) and
+  then keeps every query, so a write is late and never fails (pg's 3 s connect timeout would
+  otherwise turn a held new connection into a failure); `refuse` drops every connection.

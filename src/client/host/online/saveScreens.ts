@@ -37,6 +37,8 @@ export interface SaveScreens {
 type Trouble = 'late' | 'retrying' | 'failed' | null;
 
 const clock = (wall: number): string => new Date(wall).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+/** How long without a confirmed save, in the card's words. */
+const quiet = (ms: number): string => ms < 90_000 ? `${String(Math.floor(ms / 1000))} s` : `${String(Math.floor(ms / 60_000))} min`;
 const exactClock = (wall: number): string => new Date(wall).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
 
 /**
@@ -115,7 +117,7 @@ export function saveScreens(scope: Scope, parent: HTMLElement = document.body): 
       const now = diagnosticNow(), count = failures();
       body.textContent = `${count > 0 ? 'The server couldn\'t save your latest progress and is trying again.' : 'The server hasn\'t confirmed a save for a while.'} Leave now and ${lost()} may be lost; wait and you leave once it saves.`;
       last.textContent = confirmedWall === null ? 'No save confirmed yet' : `Last saved ${exactClock(confirmedWall)}`;
-      state.replaceChildren(ring(), count > 0 ? `Save failed ${String(count)} ${count === 1 ? 'time' : 'times'}` : `No save for ${String(Math.floor((now - since) / 1000))} s`);
+      state.replaceChildren(ring(), count > 0 ? `Save failed ${String(count)} ${count === 1 ? 'time' : 'times'}` : `No save for ${quiet(now - since)}`);
     };
     paint();
     box.prepend(want);

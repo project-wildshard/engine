@@ -18,7 +18,8 @@
 //
 //   node scripts/failmode-proof.mjs --prepare <work>    a fixture key (<work>/key.json, 0600) and a Driftwood build stamped with the
 //                                                       proxy's release address (<work>/dist); prints both paths
-//   scripts/browser-lane.sh node scripts/failmode-proof.mjs <dist> <work> <key.json> <pg bin|memory:> <pg data>
+//   scripts/browser-lane.sh node scripts/failmode-proof.mjs <dist> <work> <key.json> <pg bin|memory:|pglite:> <pg data>
+//       (pglite: PGlite in this process behind the rig's database front, which FM8s's save cases hold and refuse)
 //       [--engine=chromium|webkit] [--scenario=<id,...>|all] [--baseline] [--cooldown=<s>]
 //   ... --gallery     FM1b: no faults; in Driftwood, real taps open Settings ▸ Debug ▸ Failure screens, then every entry of the
 //                     gallery (its 46 modes and nine hold cards) one by one, shot at 402x874 and 1440x900, each closed by its ✕.
@@ -78,7 +79,7 @@ if (args[0] === '--prepare') {
 }
 
 const [dist = '', work = '', keyFile = '', pgBin = '', pgData = ''] = positional;
-if (pgData === '' && pgBin !== 'memory:') throw new Error('failmode-proof <dist> <work> <key.json> <pg bin|memory:> <pg data>');
+if (pgData === '' && pgBin !== 'memory:' && pgBin !== 'pglite:') throw new Error('failmode-proof <dist> <work> <key.json> <pg bin|memory:|pglite:> <pg data>');
 const galleryWalk = args.includes('--gallery');
 const engine = flag('engine', 'chromium'), baseline = args.includes('--baseline'), cooldownMs = Number(flag('cooldown', '60')) * 1000;
 if (engine !== 'chromium' && engine !== 'webkit') throw new Error('--engine=chromium|webkit');
@@ -449,6 +450,82 @@ try {
         return { ...result, shot, injection: { closes: settled, untilMs, redials: 0 }, noEnd: { seen: open, shot: openShot }, recovery: 'none: no redial; Title screen leaves for the title' };
       } finally { await heal(); await entered.context.close(); }
     },
+    // FM8s modes 30, 30b and 31: the rig's own database (pglite:) breaks on purpose through its front (online-rig.mjs `database`):
+    // `hold` keeps every query waiting (a save is late, never failed), `refuse` drops every connection (each save fails, the server
+    // retries). Each case first waits for a save to land after the page is seated, so the page has heard a confirmed save.
+    saveFault: async item => {
+      const db = rig.database;
+      if (db === undefined) return { outcome: 'blocked-dependency', reason: 'the save cases need a breakable rig database: run with pglite:' };
+      const entered = await fresh(); const { page } = entered;
+      const writes = async () => {
+        const client = new rig.Client({ connectionString: rig.DATABASE });
+        try { await client.connect(); return Number((await client.query('select coalesce(sum(revision), 0)::int as n from player_save')).rows[0]?.n ?? 0); }
+        finally { await client.end().catch(() => undefined); }
+      };
+      // the pause menu's EXIT TO MAIN, as a player leaves: Escape opens the menu when it isn't up
+      const exit = async () => {
+        if (!await page.locator('.ws-gmenu.show').isVisible().catch(() => false)) await page.keyboard.press('Escape');
+        await page.locator('.ws-gmenu.show .ws-gmenu-exit').first().click({ timeout: 10_000 });
+      };
+      const gone = (/** @type {string} */ id, /** @type {number} */ timeout) => page.locator(`[data-failmode~="${id}"]`).first().waitFor({ state: 'detached', timeout }).then(() => true, () => false);
+      try {
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        const base = await writes(), until = Date.now() + 90_000;
+        while (await writes() === base) { if (Date.now() > until) return { outcome: 'harness-fail', reason: 'no save landed in 90 s after the seat' }; await sleep(1000); }
+        await sleep(500);
+        const started = Date.now();
+        if (item.id === 'save-failed') {
+          db.fault('refuse');
+          const seen = await screen(page, item.screen, 100_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
+          const injection = { database: 'refuse', refusedConnections: db.stats.refused, cardMs: seen?.ms ?? null };
+          if (db.stats.refused === 0 && seen === null) return { outcome: 'harness-fail', reason: 'the refused database saw no connection', injection };
+          const result = await judged(seen, item, page);
+          if (result.outcome !== 'pass') return { ...result, injection, shot };
+          if (/\d\d:\d\d/u.test(seen?.copy ?? '') && !/anything after \d\d:\d\d/u.test(seen?.copy ?? '')) return { outcome: 'ui-fail', reason: 'a time that is not the last confirmed save', seen, shot };
+          await press(page, item.screen, 'Keep playing');
+          const warned = await page.locator('[data-failmode~="save-failed"][role="status"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+          const warnShot = await shoot(page, item.id, 'warning');
+          if (!warned) return { outcome: 'ui-fail', reason: 'Keep playing left no lasting warning', seen, shot: warnShot };
+          const playing = await recovered(page, 10_000).catch(() => false);
+          db.fault('pass');
+          const cleared = await gone('save-failed', 30_000), back = cleared && await recovered(page, 20_000);
+          return back && playing ? { ...result, injection: { ...injection, refusedConnections: db.stats.refused }, shot, warning: warnShot, recovery: 'Keep playing: a lasting warning, play on; pass: the retried save lands and it clears' }
+            : { outcome: 'ui-fail', reason: !playing ? 'play stopped under the warning' : cleared ? 'no frames after the save landed' : 'the warning stayed after the save landed', seen, shot: warnShot };
+        }
+        db.fault('hold');
+        const chip = await screen(page, 'save-slow', 110_000, started), chipShot = await shoot(page, item.id.replace('/', '-'), chip === null ? 'missing' : 'chip');
+        if (item.id === 'save-slow') {
+          const injection = { database: 'hold', heldBytes: db.stats.heldBytes, chipMs: chip?.ms ?? null };
+          const result = await judged(chip, item, page);
+          if (result.outcome !== 'pass') return { ...result, injection, shot: chipShot };
+          if (!/last saved \d\d:\d\d/u.test(chip?.copy ?? '')) return { outcome: 'ui-fail', reason: 'the late chip does not say the last confirmed save', seen: chip, shot: chipShot };
+          if (db.stats.heldBytes === 0) return { outcome: 'harness-fail', reason: 'the held database held no query', injection };
+          db.fault('pass');
+          const cleared = await gone('save-slow', 30_000), back = cleared && await recovered(page, 20_000);
+          return back ? { ...result, injection: { ...injection, heldBytes: db.stats.heldBytes }, shot: chipShot, recovery: 'release: the held save landed, the chip cleared' }
+            : { outcome: 'ui-fail', reason: cleared ? 'no frames after the save landed' : 'the chip stayed after the save landed', seen: chip, shot: chipShot };
+        }
+        if (chip === null) return { outcome: 'ui-fail', reason: 'no save-slow chip to leave under', notes: await onScreen(page) };
+        await exit();
+        const card = await screen(page, item.screen, 5000), shot = await shoot(page, item.id.replace('/', '-'), card === null ? 'missing' : 'card');
+        const result = await judged(card, item, page);
+        if (result.outcome !== 'pass') return { ...result, shot };
+        // Keep playing: the card goes and the player stays in the world; the cancelled wait leaves nothing behind
+        await press(page, item.screen, 'Keep playing');
+        const kept = await gone(item.screen, 5000) && new URL(page.url()).searchParams.get('chunk') === SHARD;
+        if (!kept) return { outcome: 'ui-fail', reason: 'Keep playing did not keep the player in the world', seen: card, shot };
+        await exit();
+        if (await screen(page, item.screen, 5000) === null) return { outcome: 'ui-fail', reason: 'a second Leave was not held while the save is late', seen: card, shot };
+        await press(page, item.screen, 'Leave when saved');
+        await sleep(2000);
+        const stayed = new URL(page.url()).pathname !== '/' || new URL(page.url()).searchParams.has('chunk');
+        const titled = page.waitForURL(url => new URL(url).pathname === '/' && !new URL(url).searchParams.has('chunk'), { timeout: 30_000 }).then(() => true, () => false);
+        db.fault('pass');
+        const left = await titled;
+        return stayed && left ? { ...result, shot, injection: { database: 'hold', heldBytes: db.stats.heldBytes, taps: 'EXIT TO MAIN, Keep playing, EXIT TO MAIN, Leave when saved' }, recovery: 'release: left for the title on the confirmed save' }
+          : { outcome: 'ui-fail', reason: stayed ? 'Leave when saved did not leave on the confirmed save' : 'Leave when saved left before the save landed', seen: card, shot };
+      } finally { db.fault('pass'); await entered.context.close(); }
+    },
     // --refusal=injection: a fault on a route this page never reads matches nothing, and that is a harness failure, never a pass
     unmatched: async () => {
       const entered = await fresh(); const { page } = entered;
@@ -796,6 +873,6 @@ const code = harnessFault !== null ? 2 : verdict(rows);
 const counts = {};
 for (const row of rows) counts[row.outcome] = (counts[row.outcome] ?? 0) + 1;
 writeFileSync(join(out, 'receipt.json'), JSON.stringify({ schema: 'failmode-proof/1', sha, engine, browser: browserVersion, baseline, build: fixture.build, channel: 'loopback-fixture', at: new Date().toISOString(), pages: PAGE_ORIGIN, socket: SOCKET,
-  saves: pgBin === 'memory:' ? 'memory (no persistence case selected reads them)' : 'owned Postgres', harnessFault, counts, exit: code, cases: rows }, null, 1));
+  saves: pgBin === 'memory:' ? 'memory (no persistence case selected reads them)' : pgBin === 'pglite:' ? 'owned PGlite behind the rig database front' : 'owned Postgres', harnessFault, counts, exit: code, cases: rows }, null, 1));
 console.log(`${JSON.stringify(counts)} -> ${join(out, 'receipt.json')}`);
 process.exit(code);

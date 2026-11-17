@@ -55,3 +55,59 @@ export function childListener(child, kind) {
     child.on('message', message); child.once('exit', exit); child.once('error', error);
   });
 }
+
+/** FM8s: the rig database's own front door, on a fixed loopback port, before an owned database (`path`, a Unix socket). It can break the
+ *  database on purpose: `hold` lets connections open (startup through its first ReadyForQuery) but sends no query on until `pass`, as a
+ *  stalled database does, so a write waits rather than fails; `refuse` drops every connection and every new one, as a database that is
+ *  down does. `stats` counts what it held and refused.
+ * @param {number} port @param {string} path */
+export async function databaseFront(port, path) {
+  /** @type {'pass' | 'hold' | 'refuse'} */
+  let mode = 'pass';
+  const stats = { connections: 0, refused: 0, heldBytes: 0 };
+  /** @type {Set<{ client: import('node:net').Socket, upstream: import('node:net').Socket, ready: boolean, held: Buffer[] }>} */
+  const pairs = new Set();
+  const server = createServer(client => {
+    stats.connections++;
+    client.on('error', () => { client.destroy(); });
+    if (mode === 'refuse') { stats.refused++; client.destroy(); return; }
+    const upstream = connect({ path }), pair = { client, upstream, ready: false, held: /** @type {Buffer[]} */ ([]) };
+    pairs.add(pair);
+    upstream.on('error', () => { upstream.destroy(); });
+    const end = () => { pairs.delete(pair); client.destroy(); upstream.destroy(); };
+    client.once('close', end); upstream.once('close', end);
+    // the server's side is read whole for its first ReadyForQuery ('Z'): until then the startup goes through whatever the mode
+    let pending = Buffer.alloc(0);
+    upstream.on('data', chunk => {
+      if (!pair.ready) {
+        pending = Buffer.concat([pending, chunk]);
+        while (!pair.ready && pending.length >= 5) {
+          const length = pending.readInt32BE(1);
+          if (pending.length < 1 + length) break;
+          if (pending[0] === 0x5a) pair.ready = true;
+          pending = pending.subarray(1 + length);
+        }
+      }
+      client.write(chunk);
+    });
+    client.on('data', chunk => {
+      if (mode === 'hold' && pair.ready) { pair.held.push(chunk); stats.heldBytes += chunk.length; return; }
+      upstream.write(chunk);
+    });
+  });
+  await listenLoopback(server, port);
+  let closed = false;
+  return { port, stats,
+    /** @param {'pass' | 'hold' | 'refuse'} next */
+    fault: next => {
+      mode = next;
+      if (next === 'refuse') for (const pair of pairs) { pair.client.destroy(); pair.upstream.destroy(); }
+      if (next === 'pass') for (const pair of pairs) for (const chunk of pair.held.splice(0)) pair.upstream.write(chunk);
+    },
+    mode: () => mode,
+    close: async () => {
+      if (closed) return; closed = true;
+      for (const pair of pairs) { pair.client.destroy(); pair.upstream.destroy(); }
+      await new Promise((resolve, reject) => { server.close(error => { if (error) reject(error); else resolve(undefined); }); });
+    } };
+}

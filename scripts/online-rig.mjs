@@ -6,7 +6,7 @@ import { createWriteStream, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve as absolute } from 'node:path';
 import { Client } from 'pg';
-import { childListener, listenLoopback, rigFront } from './rig-listeners.mjs';
+import { childListener, databaseFront, listenLoopback, rigFront } from './rig-listeners.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { rigOptions } from './online-rig-options.mjs';
@@ -53,6 +53,7 @@ export async function intoWorld(page) {
  * J353 removed the continuous-crossing switch. `workers` sets `WORLD_WORKERS` (the rig's release is production's,
  * 4 by default; staging runs 2). FM3: `origins` are loopback page origins the server also lets in, and `channel`
  * is the release file's channel (`production`).
+ * FM8s: `pgBin` 'pglite:' runs the saves on PGlite in this process, behind a front the proof can hold or refuse (`rig.database`).
  * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean, port?: 0, gridRoot?: string }} options */
 export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
@@ -101,8 +102,24 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
 
   const pgCtl = join(pgBin, 'pg_ctl'), log = createWriteStream(join(work, 'server.log'));
   resources.push(() => { log.end(); });
+  // FM8s: PGlite in this process on a Unix socket in the work folder, behind `databaseFront` on the rig's database port
+  const pglite = pgBin === 'pglite:';
+  /** @type {Awaited<ReturnType<typeof databaseFront>> | undefined} */
+  let dbFront;
+  if (pglite) {
+    if (ephemeral) throw new Error('A pglite: rig uses the named ports');
+    const { PGlite } = await import('@electric-sql/pglite'), { PGLiteSocketServer } = await import('@electric-sql/pglite-socket');
+    const path = join(absolute(work), 'pg.sock');
+    rmSync(path, { force: true });
+    const db = new PGlite(), pgSocket = new PGLiteSocketServer({ db, path, maxConnections: 16 });
+    await pgSocket.start();
+    resources.push(async () => { await pgSocket.stop(); await db.close(); rmSync(path, { force: true }); });
+    const front = await databaseFront(PG_PORT, path);
+    dbFront = front; resources.push(() => front.close());
+  }
   if (!memory) {
-    if (ephemeral) { const pg = await ownedEphemeralPostgres({ bin: pgBin, data: pgData }); pgPort = pg.port; resources.push(pg.close); }
+    if (pglite) { /* started above */ }
+    else if (ephemeral) { const pg = await ownedEphemeralPostgres({ bin: pgBin, data: pgData }); pgPort = pg.port; resources.push(pg.close); }
     else if (isolated) { const pg = ownedPostgres({ bin: pgBin, data: pgData, port: PG_PORT }); resources.push(pg.close); }
     else {
       const result = spawnSync(pgCtl, ['-D', pgData, '-o', `-p ${String(PG_PORT)} -k /tmp -c listen_addresses=127.0.0.1`, '-w', '-l', join(work, 'pg.log'), 'start'], { stdio: 'inherit' });
@@ -112,7 +129,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     const admin = new Client({ connectionString: database('postgres', pgPort) });
     try {
       await admin.connect();
-      if (isolated || ephemeral) await confirmPostgres(admin, pgData);
+      if ((isolated || ephemeral) && !pglite) await confirmPostgres(admin, pgData);
       await admin.query('drop database if exists saves_online'); await admin.query('create database saves_online');
     } finally { await admin.end(); }
   }
@@ -171,6 +188,8 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     catch (error) { await stopped(main); throw error; }
   };
   return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(pagePort)}`, worldOrigin: `http://127.0.0.1:${String(worldPort)}`, releaseOrigin: `http://127.0.0.1:${String(releasePort)}`, socket: signedSocket, ports: { page: pagePort, world: worldPort, release: releasePort, ...(memory ? {} : { database: pgPort }) }, Client,
+    /** FM8s: a `pglite:` rig's database, broken on purpose: `hold` (queries wait), `refuse` (connections drop), `pass`. */
+    ...dbFront === undefined ? {} : { database: { fault: dbFront.fault, mode: dbFront.mode, stats: dbFront.stats } },
     /** The server goes down, for a test of its coming back. */
     stop: () => stopped(main),
     /** The server up on this build. @param {string} [running] */

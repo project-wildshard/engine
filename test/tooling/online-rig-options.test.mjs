@@ -7,6 +7,7 @@ test('explicit memory saves need no Postgres paths; existing callers retain thei
   expect(rigOptions({ saves: 'memory', socket })).toEqual({ memory: true, pgBin: '', pgData: '' });
   expect(rigOptions({ pgBin: 'memory:', socket }).memory).toBe(true);
   expect(rigOptions({ pgBin: 'postgres/bin', pgData: 'proof/pg', socket })).toEqual({ memory: false, pgBin: 'postgres/bin', pgData: 'proof/pg' });
+  expect(rigOptions({ pgBin: 'pglite:', socket })).toEqual({ memory: false, pgBin: 'pglite:', pgData: '' });
   expect(() => rigOptions({ socket })).toThrow('requires Postgres');
 });
 
