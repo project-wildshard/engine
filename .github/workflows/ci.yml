@@ -69,9 +69,13 @@ jobs:
     steps: &packed-steps
       - name: Start the job clock (each shard's five-minute budget includes the set-up every job shares, J193)
         run: echo "WS_CI_SHARD_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      # Keep ancestry and incoming-history checks, but fetch historical blobs
+      # on demand. Run 44137015477 spent 460 s fetching every branch/tag's
+      # file bodies before any test, exhausting each shard's shared setup.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:

@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer';
 // oxlint-disable-next-line import/no-nodejs-modules -- Commits into owned throwaway Git repositories.
 import { execFileSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Every write is confined to an owned fixture under ./tmp.
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { dirname, join, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixtures run Git without the caller's index or hooks.
@@ -212,6 +212,35 @@ it('symlinks may not leave the tree or point into generated storage', () => {
     f.git('rm', '-q', '--cached', 'shortcut');
     rmSync(join(f.cwd, 'shortcut'));
   }
+});
+
+it('CI checkout retains full history, defers old blobs and still refuses a hidden bad intermediate commit', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const tests = workflow.split('\n  tests:\n')[1]?.split(/\n {2}[a-z][a-z0-9_-]*:\n/u)[0] ?? '';
+  const checkout = /- uses: actions\/checkout@[^\n]+\n\s+with:\n((?: {10}[^\n]+\n)+)/u.exec(tests)?.[1] ?? '';
+  const depth = Number(/fetch-depth: (\d+)/u.exec(checkout)?.[1] ?? 1);
+  const filter = /filter: (\S+)/u.exec(checkout)?.[1];
+  const f = fixture();
+  f.git('config', 'uploadpack.allowFilter', 'true');
+  f.git('config', 'uploadpack.allowAnySHA1InWant', 'true');
+  f.stage('src/current.ts', 'export const current = true;\n');
+  const base = f.commit();
+  const oldBlob = f.stage('art/hidden.zip', binary(2000));
+  const bad = f.commit();
+  f.git('rm', '-q', 'art/hidden.zip');
+  const tip = f.commit();
+  const clone = `${f.cwd}-ci-clone`;
+  owned.push(clone);
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: clone, env: f.env, encoding: 'utf8', stdio: 'pipe' }).trim();
+  execFileSync('git', ['clone', '-q', '--no-local', '--no-checkout', ...(depth > 0 ? [`--depth=${depth}`] : []),
+    ...(filter === undefined ? [] : [`--filter=${filter}`]), `file://${f.cwd}`, clone], { env: f.env, stdio: 'pipe' });
+  git('checkout', '-q', 'main');
+  expect(git('show', 'HEAD:src/current.ts')).toBe('export const current = true;');
+  expect(git('merge-base', base, tip)).toBe(base);
+  expect(git('rev-list', '--objects', '--all', '--missing=print').split('\n')).toContain(`?${oldBlob}`);
+  const checker = createChecker({ cwd: clone, env: f.env });
+  expect(() => checker.checkPush(`refs/heads/main ${tip} refs/heads/main ${base}\n`, { rangeOnly: true }))
+    .toThrow(new RegExp(`${bad.slice(0, 10)} art/hidden\\.zip`, 'u'));
 });
 
 it('a blobless clone (CI) checks the pushed range with one batched blob fetch', () => {
