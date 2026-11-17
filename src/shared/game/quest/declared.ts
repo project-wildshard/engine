@@ -133,7 +133,7 @@ export class DeclaredQuests {
   private finishRace(book: QuestBook, race: Race, run: RaceRun): void {
     const seconds = (this.host.state.tick - (run.running ?? this.host.state.tick)) * FIXED_STEP;
     run.running = null; run.last = seconds; run.best = run.best === null ? seconds : Math.min(run.best, seconds); run.runs++;
-    book.flags.set(race.start, false); book.flags.set(race.stop, false);
+    lowerRun(book, race);
     this.ports.fact?.(race.fact, book.player === this.books.lead.player ? race.id : `${book.player}:${race.id}`);
   }
   /** A run past its cap lapses: nothing is filed and its start flag drops so it can begin again. */
@@ -142,7 +142,7 @@ export class DeclaredQuests {
     for (const race of this.data.races ?? []) {
       const run = runs.get(race.id);
       if (run === undefined || run.running === null || (this.host.state.tick - run.running) * FIXED_STEP <= race.cap) continue;
-      run.running = null; book.flags.set(race.start, false); book.flags.set(race.stop, false);
+      run.running = null; lowerRun(book, race);
     }
   }
   /** One player's run of a race, or null for an unknown race or player. */
@@ -227,6 +227,10 @@ const timeOrNull = (value: SimValue | undefined): number | null => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new Error('Invalid race snapshot');
   return value;
 };
+/** A run's end lowers its start, its stop and its resets (a gate line's middle gates, SS-MS1c), so the next run counts them again. */
+function lowerRun(book: QuestBook, race: Race): void {
+  for (const flag of [race.start, race.stop, ...(race.resets ?? [])]) book.flags.set(flag, false);
+}
 /** A saved book's runs; a race the save does not name starts fresh. */
 function restoreRuns(runs: Map<string, RaceRun>, races: readonly Race[], value: SimValue): void {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid race snapshot');

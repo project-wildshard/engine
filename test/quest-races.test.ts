@@ -110,3 +110,19 @@ test('a run carried to a younger room keeps its elapsed time, not the old room\'
     questBooks(young).importOf('other', questBooks(young).exportOf('other')); // the save reads back
   } finally { young.dispose(); old.dispose(); }
 });
+
+test('a finish and a lapse lower the race\'s resets, so a second run counts its middle gates again (SS-MS1c)', async () => {
+  const host = createSimHost(SIM_LEVEL, { rapier: await rapier });
+  try {
+    const gated = { ...data, flags: ['run.go', 'run.mid', 'run.end'], races: [{ id: 'arch', start: 'run.go', stop: 'run.end', fact: 'arch.time', cap: CAP, resets: ['run.mid'] }] };
+    const quests = new DeclaredQuests(host, gated, { fact: () => undefined });
+    const { flags, player } = questBooks(host).lead;
+    flags.set('run.go'); flags.set('run.mid'); steps(host, 3); flags.set('run.end');
+    expect(quests.race('arch', player)?.runs).toBe(1);
+    expect(flags.has('run.mid')).toBe(false); // the middle gate counts again on the next run
+    flags.set('run.go'); flags.set('run.mid');
+    steps(host, Math.ceil(CAP / FIXED_STEP) + 2);
+    expect(quests.race('arch', player)?.running).toBeNull();
+    expect(flags.has('run.mid')).toBe(false); // a lapse lowers it too
+  } finally { host.dispose(); }
+});
