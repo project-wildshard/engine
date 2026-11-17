@@ -40,3 +40,8 @@ correctly refuses CI before inspecting symlinks. The test now observes
 its explicitly local fixture with CI unset and drives symlink refusal
 through the real CLI child. All fifteen new cases pass with CI=true;
 production CI refusal and file isolation stay unchanged.
+
+A manual local-link workflow runs the fifteen production-boundary cases
+on a clean hosted Linux checkout and retains the raw JSON proof. It
+uses normal frozen dependencies and npr, with no local candidate input.
+The full main CI remains unchanged and independently watched.
