@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // BUGBASH-LOOP (meta STAGING-BUGBASH, J385/J386): the player's own way into a world, tapped on a phone, judged frame by frame.
-// The only screens allowed are the main menu, Shard Select, the world's full-screen loading card and play. A bounce back to a
+// The only screens allowed are the main menu, Zone select, the world's full-screen detailed loading card and play.
+// MAIN-SCREEN MS5 (J399): three ways in, each judged the same: ZONE SELECT, a card, ENTER ZONE (`select`); ENTER THE MMO
+// (`mmo`); the one-zone deep link `/slug/<card>`, ENTER ZONE (`deeplink`). "It has to always be the detailed loading card". A bounce back to a
 // menu, the bare launch shell on a world page, the HUD over a menu, a loading card shrunk to a bar or a blank wait fails.
 //
-//   node scripts/journey-proof.mjs --url https://staging.wildshard.io --card driftwood-isle [--browsers chromium,webkit]
+//   node scripts/journey-proof.mjs --url https://staging.wildshard.io --card driftwood-isle [--browsers chromium,webkit] [--paths select,mmo,deeplink] [--developer]
 //        [--runs cold,warm] [--throttle 4] [--prime <profiles dir>] [--out tmp/<lane>/journey] [--video]
 //
 // The T1 spec (src/e2e/t1/journey.spec.ts) drives the same `tapJourney` against the local build; this CLI is the release
@@ -12,7 +14,8 @@ import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 
 /** @typedef {import('playwright').Page} Page */
-/** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean, origin?: number }} Screen */
+/** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string }} Screen */
+/** @typedef {'select' | 'mmo' | 'deeplink'} JourneyPath */
 /** @typedef {{ t: number, s: Screen | null }} Sample */
 /** @typedef {{ at: number, text: string }} Problem */
 
@@ -48,6 +51,9 @@ export function screenNow() {
     doc, origin: performance.timeOrigin, path: location.pathname + location.search,
     shell: shown('[data-title-shell]'), title: shown('.ws-main:not(.hide)'), select: shown('.ws-menu:not(.hide)'),
     loading: load !== undefined && loadHeight >= innerHeight * 0.8, bar: load !== undefined && loadHeight < innerHeight * 0.8,
+    // J399: the detailed card, its START, DOWNLOAD and LOAD tracks on screen, never a plain one-bar card; and the zone it names
+    detailed: load !== undefined && ['stHead', 'dlHead', 'suHead'].every((track) => [...load.querySelectorAll(`[data-el="${track}"]`)].some(seen)),
+    zone: load?.querySelector('[data-el="slug"]')?.textContent ?? '',
     hud: shown('.ws-touch') || shown('.ws-minimap'), modal: shown('#wsdrop, .ws-err, .ws-fail'),
     // the grid's sky-down arrival (grid/reveal.ts): the world drawn under its ARRIVING caption, the HUD held back for 3 s
     reveal: shown('.ws-grid-reveal'),
@@ -81,15 +87,20 @@ export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
   /** @type {number | null} */
   let blankFrom = null;
   let played = false;
+  // ENTER THE MMO is tapped on the main menu, so the first samples may show it; once anything else shows, it never comes back
+  let left = false;
   /** @param {number} at @param {string} text */
   const say = (at, text) => { if (!problems.some((p) => p.text === text)) problems.push({ at, text }); };
   for (const { t, s } of samples) {
     const what = label(s), later = s !== null && s.doc !== tapDoc;
     if (s !== null && s.hud && (s.title || s.select || s.shell)) say(t, 'the in-game HUD is drawn over a menu');
     if (what === 'shell') say(t, 'the bare launch shell (lone SHARD SELECT, LOADING) shows on the world page');
-    if (what === 'title') say(t, 'the main menu came back after Enter World');
+    if (what === 'title' && (left || later)) say(t, 'the main menu came back after Enter World');
+    if (what !== 'title' && what !== 'navigating') left = true;
     if (what === 'select' && later) say(t, 'Shard Select came back after Enter World');
     if (what === 'bar') say(t, 'the loading card is shrunk to a bar');
+    // any full-screen card on screen, whatever sits under it (the deck stays laid out beneath the card until the page leaves)
+    if (s?.loading === true && s.detailed === false) say(t, 'the loading card is not the detailed one (J399)');
     if (what === 'modal') say(t, 'an error or drop modal opened');
     if (what === 'blank' || (what === 'navigating' && later)) {
       blankFrom ??= t;
@@ -101,23 +112,47 @@ export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
   return problems;
 }
 
-/** Tap from the title to Shard Select, pick `card` by slug or name, tap Enter World, and sample until play holds for 2 s.
- * @param {Page} page @param {{ card: string, budgetMs?: number, sampleMs?: number, frames?: (row: Sample) => Promise<void> }} options
+/** Tap one way into a world and sample until play holds for 2 s. `select` (the default): the title's ZONE SELECT, pick `card`
+ * by slug or name, ENTER ZONE. `mmo`: the title's ENTER THE MMO. `deeplink`: the page is already on `/slug/<card>`, ENTER ZONE.
+ * @param {Page} page @param {{ card: string, path?: JourneyPath, budgetMs?: number, sampleMs?: number, frames?: (row: Sample) => Promise<void> }} options
  * @returns {Promise<Sample[]>} */
-export async function tapJourney(page, { card, budgetMs = 90_000, sampleMs = 120, frames }) {
-  const selectCard = page.locator('.ws-main-select');
-  await selectCard.waitFor({ state: 'visible', timeout: 60_000 });
+export async function tapJourney(page, { card, path = 'select', budgetMs = 90_000, sampleMs = 120, frames }) {
   // A drop note from the page before (a crash, an unmarked leave) is the title's own modal: dismiss it before every tap.
   const clear = async () => {
     await page.waitForTimeout(300);
     const dismiss = page.locator('#wsdrop .dismiss');
     if (await dismiss.isVisible()) await dismiss.tap();
   };
+  /** @type {Sample[]} */
+  const samples = [];
+  const start = Date.now();
+  const sample = async () => {
+    /** @type {Screen | null} */
+    let s = null;
+    try { s = await page.evaluate(screenNow); } catch { /* the document is changing */ }
+    samples.push({ t: Date.now() - start, s });
+    return s;
+  };
+  const skipName = async () => {
+    const skip = page.locator('#ws-name-box [data-name=skip]');
+    if (await skip.isVisible()) await skip.tap();
+  };
+  if (path !== 'select') {
+    const go = page.locator(path === 'mmo' ? '.ws-main-mmo' : '.ws-slug .ws-menu-play');
+    await go.waitFor({ state: 'visible', timeout: 60_000 });
+    await clear();
+    await sample();
+    await go.tap();
+    // a first play asks the Name once (MP2.4); SKIP goes on into the world
+    await page.locator('#ws-name-box').waitFor({ timeout: 1500 }).then(skipName, () => undefined);
+    return sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample, start });
+  }
+  const selectCard = page.locator('.ws-main-select');
+  await selectCard.waitFor({ state: 'visible', timeout: 60_000 });
   await clear();
   await selectCard.tap();
   await page.locator('#ws-name-box, .ws-title-stack[data-screen="select"]').first().waitFor({ timeout: 15_000 });
-  const skip = page.locator('#ws-name-box [data-name=skip]');
-  if (await skip.isVisible()) await skip.tap();
+  await skipName();
   await clear();
   await page.locator('.ws-title-stack[data-screen="select"]').waitFor({ timeout: 15_000 });
   /** @type {unknown} */
@@ -131,19 +166,16 @@ export async function tapJourney(page, { card, budgetMs = 90_000, sampleMs = 120
   await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).tap();
   await page.locator(`.ws-menu-card.selected[data-i="${String(index)}"]`).waitFor({ timeout: 10_000 });
   await page.waitForTimeout(400);
-  /** @type {Sample[]} */
-  const samples = [];
-  const start = Date.now();
-  const sample = async () => {
-    /** @type {Screen | null} */
-    let s = null;
-    try { s = await page.evaluate(screenNow); } catch { /* the document is changing */ }
-    samples.push({ t: Date.now() - start, s });
-    return s;
-  };
   await clear();
   await sample();
   await page.locator('.ws-menu-play').tap();
+  return sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample, start });
+}
+
+/** Sample from the tap until play holds for 2 s, or the budget runs out.
+ * @param {Page} page @param {{ budgetMs: number, sampleMs: number, frames?: (row: Sample) => Promise<void>, samples: Sample[], sample: () => Promise<Screen | null>, start: number }} run
+ * @returns {Promise<Sample[]>} */
+async function sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample, start }) {
   /** @type {number | null} */
   let playSince = null;
   let shotAt = -1e9;
@@ -203,6 +235,8 @@ async function cli() {
   const url = args.get('url') ?? 'https://staging.wildshard.io', card = args.get('card') ?? 'driftwood-isle';
   const out = resolvePath(args.get('out') ?? `tmp/${process.env.WS_LANE_NAME ?? 'journey'}/journey`);
   const browsers = (args.get('browsers') ?? 'chromium,webkit').split(','), runs = (args.get('runs') ?? 'cold,warm').split(',');
+  const paths = /** @type {JourneyPath[]} */ ((args.get('paths') ?? 'select,mmo,deeplink').split(','));
+  if (paths.some((p) => !['select', 'mmo', 'deeplink'].includes(p))) throw new Error('--paths takes select, mmo and deeplink');
   const throttle = Number(args.get('throttle') ?? '0');
   // SB3: --prime <dir> starts each browser from a saved profile (<dir>/<browser>), an old shell as Jake's phone holds one
   const prime = args.get('prime');
@@ -228,18 +262,20 @@ async function cli() {
       ...(name === 'webkit' ? {} : { args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }),
     });
     await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
+    // --developer: Settings ▸ Developer on, for a local build whose only cards are Developer ones (T1's ring 1, `_template`)
+    if (args.has('developer')) await (await import('./debug-settings.mjs')).saveFixture(context, { scope: 'device', key: 'devMode', data: true });
     try {
-      for (const run of runs) {
+      for (const way of paths) for (const run of runs) {
         const page = context.pages()[0] ?? await context.newPage();
         if (throttle > 1 && name !== 'webkit') await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
         /** @type {string[]} */
         const errors = [];
         page.on('pageerror', (e) => { errors.push(e.message); });
-        await page.goto(`${url}/`, { waitUntil: 'commit' });
+        await page.goto(way === 'deeplink' ? `${url}/slug/${card}` : `${url}/`, { waitUntil: 'commit' });
         let n = 0;
-        const dir = join(out, `${name}-${run}`);
+        const dir = join(out, `${name}-${way}-${run}`);
         mkdirSync(dir, { recursive: true });
-        const samples = await tapJourney(page, { card, frames: async (row) => {
+        const samples = await tapJourney(page, { card, path: way, frames: async (row) => {
           await page.screenshot({ path: join(dir, `${String(n++).padStart(3, '0')}-${String(row.t).padStart(6, '0')}-${label(row.s)}.png`), timeout: 5000 });
         } });
         const problems = judge(samples);
@@ -248,9 +284,10 @@ async function cli() {
         const path = [];
         for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t)}:${l}`); }
         const ok = problems.length === 0;
-        report.push({ browser: name, run, ok, problems, path: path.join(' '), errors, samples });
+        const zones = [...new Set(samples.map((row) => row.s?.zone ?? '').filter((zone) => zone !== ''))];
+        report.push({ browser: name, way, run, ok, problems, path: path.join(' '), zones, errors, samples });
         if (!ok) failed = true;
-        console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${run}: ${path.join(' ')}`);
+        console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${way} ${run}: ${path.join(' ')}${zones.length > 0 ? ` (card: ${zones.join(', ')})` : ''}`);
         for (const p of problems) console.log(`  - ${String(p.at)} ms: ${p.text}`);
         await page.goto('about:blank');
       }

@@ -5,7 +5,11 @@ export interface Screen {
   readonly doc: number | string; readonly origin?: number; readonly path: string;
   readonly shell: boolean; readonly title: boolean; readonly select: boolean;
   readonly loading: boolean; readonly bar: boolean; readonly hud: boolean; readonly modal: boolean;
+  /** J399: the loading card shows its START, DOWNLOAD and LOAD tracks, and the zone it names */
+  readonly detailed?: boolean; readonly zone?: string; readonly reveal?: boolean;
 }
+/** MAIN-SCREEN MS5: ZONE SELECT and a card, ENTER THE MMO, or the one-zone deep link already open */
+export type JourneyPath = 'select' | 'mmo' | 'deeplink';
 export interface Sample { readonly t: number; readonly s: Screen | null }
 export interface Problem { readonly at: number; readonly text: string }
 /** iPhone 17 Pro portrait. */
@@ -16,5 +20,5 @@ export const PHONE: {
 export function screenNow(): Screen;
 export function label(s: Screen | null): string;
 export function judge(samples: readonly Sample[], options?: { blankMs?: number; budgetMs?: number }): Problem[];
-export function tapJourney(page: Page, options: { card: string; budgetMs?: number; sampleMs?: number; frames?: (row: Sample) => Promise<void> }): Promise<Sample[]>;
+export function tapJourney(page: Page, options: { card: string; path?: JourneyPath; budgetMs?: number; sampleMs?: number; frames?: (row: Sample) => Promise<void> }): Promise<Sample[]>;
 export function stickMoves(page: Page): Promise<boolean>;

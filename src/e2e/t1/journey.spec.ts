@@ -20,12 +20,22 @@ import {
   tapJourney,
 } from '../../../scripts/journey-proof.mjs'
 
-import type { Sample } from '../../../scripts/journey-proof.mjs'
+import type { JourneyPath, Sample } from '../../../scripts/journey-proof.mjs'
 import type { Page } from '@playwright/test'
 
-async function journey(page: Page, run: string): Promise<void> {
-  await page.goto('/?mute=1&nolock=1')
-  const samples = await tapJourney(page, { card: '_template' })
+// MAIN-SCREEN MS5 (J399): the same judge on all three ways in: ZONE SELECT and a card, ENTER THE MMO, and the one-zone deep
+// link; each must reach the zone's detailed full-screen loading card and play.
+async function journey(
+  page: Page,
+  run: string,
+  way: JourneyPath = 'select',
+): Promise<void> {
+  await page.goto(
+    way === 'deeplink'
+      ? '/slug/_template?mute=1&nolock=1'
+      : '/?mute=1&nolock=1',
+  )
+  const samples = await tapJourney(page, { card: '_template', path: way })
   const path = samples.map(
     (row: Sample): string => `${String(row.t)}:${label(row.s)}`,
   )
@@ -40,7 +50,7 @@ test('a tapped phone journey shows only menu, loading card and play, cold and wa
   browser,
   baseURL,
 }): Promise<void> => {
-  test.setTimeout(240_000)
+  test.setTimeout(480_000)
   const context = await browser.newContext({
     ...PHONE,
     isMobile: true,
@@ -57,6 +67,8 @@ test('a tapped phone journey shows only menu, loading card and play, cold and wa
     })
     await journey(page, 'cold')
     await journey(page, 'warm')
+    await journey(page, 'ENTER THE MMO', 'mmo')
+    await journey(page, 'deep link', 'deeplink')
     expect(errors).toEqual([])
   } finally {
     await context.close()

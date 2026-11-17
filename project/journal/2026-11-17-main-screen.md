@@ -17,3 +17,7 @@
   square first cut framed as mainMenu.css frames it (the screen's width, bottom 56 px under where ENTER THE MMO will stand,
   from the same clamps), the sky carried on above and a fade to navy behind the bar and LOADING. Its only button is the
   reload pill. The main screen then replaces it in place.
+- MS5: the tapped journey covers all three ways in: ZONE SELECT and a card, ENTER THE MMO, and the one-zone deep link
+  (`journey-proof.mjs --paths`, the T1 spec). Every full-screen loading card on the way must be the detailed one (its START,
+  DOWNLOAD and LOAD tracks; J399), and the main menu may show only before the tap. Local build: 12 of 12 PASS (Chromium and
+  WebKit, cold and warm), every loading sample detailed; T1 journey spec green. `--developer` serves ring 1's Developer cards.
