@@ -76,4 +76,17 @@ heap profile with collected objects from readyFrame to the end of
 the boot saw 67 MB allocated in all. The used + backing step peaks
 move 400-670 MB between runs of the same build, with GC timing.
 
+## The ratchet
+
+The blocking Nine load in ci.yml (`nine-load.mjs`) keeps both cuts
+(`scripts/loading-flow/boot-memory-ratchet.mjs`). It fails a boot
+that holds a spawn part past the download step, that releases under
+50 MB of drawn geometry, or whose live heap at control is over 340 MB
+after a full collection. On the mini the boot before the cuts failed
+all three (no held count, 0 MB released, 367 MB live). After them:
+0 held, 77.6 MB released, 289.5 MB live, the same in two runs. The
+margins are wide because the hosted runner draws on SwiftShader;
+tighten them from `load.json`'s `memory`. MEMORY-GATES MG1's peak
+probe is mini-memgates' (J408); this reads boot marks, not a peak.
+
 Lane: mini-boot99
