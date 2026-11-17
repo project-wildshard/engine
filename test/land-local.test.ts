@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Start the real land CLI and Git peers.
 import { execFileSync, spawn } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Install and inspect owned fixture hooks.
-import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve fixture and script paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -11,6 +11,12 @@ import { installProofFixture } from '../scripts/proof-fixture-install.mjs';
 import { LAND, PRE_PUSH, cleanLandFixtures, fixture, prepushLines, type Fixture } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
+
+function writeFixture(root: string, path: string, content: string): void {
+  const target = join(root, path);
+  mkdirSync(resolve(target, '..'), { recursive: true });
+  writeFileSync(target, content);
+}
 
 describe('land (J400): local gates and proof reuse', () => {
   test.each(['release', 'cancel-waiter', 'lost-waiter', 'cancel-holder', 'slow-holder', 'lost-holder', 'shared-origin', 'changed-waiter'])('FL8: independent clones queue full gates and cancel safely (%s)', async mode => {
@@ -266,6 +272,47 @@ describe('land (J400): local gates and proof reuse', () => {
     writeFileSync(join(f.root, 'hooks/pre-push'), '#!/bin/sh\ncat >/dev/null\necho "lint RED in 1 s"\necho "  - vitest (full) RED in 1200 s" >&2\nexit 1\n');
     expect(f.land(wt).status).toBe(1);
     expect(f.read(f.files.receipts)).toContain('refused: vitest (full) RED in 1200 s');
+  }, 60_000);
+
+  test.each(['red', 'green'])('FL11: real J400 hook gets a test lease without a lane override (CSS %s)', mode => {
+    const f = fixture(); f.env['WS_LAND_MODE'] = 'local';
+    for (const key of ['CI', 'GITHUB_ACTIONS', 'WS_FULL_SUITE', 'WS_HEAVY_ROOT', 'WS_HEAVY_TOKEN']) delete f.env[key];
+    f.env['WS_HEAVY_SCHEDULER_ROOT'] = join(f.root, 'full-test');
+    const wt = f.worktree(`live-j400-${mode}`);
+    const cssPath = 'src/client/engine/ui/styles/quest.css';
+    const cssChecker = readFileSync(resolve('scripts/check-css.mjs'), 'utf8');
+    const files = {
+      'package.json': '{"scripts":{"check":"fixture"}}\n',
+      'scripts/push-budget.mjs': '',
+      'scripts/heavy-lane.py': `import os, sys\nos.execv(sys.executable, [sys.executable, ${JSON.stringify(resolve('scripts/heavy-lane.py'))}, *sys.argv[1:]])\n`,
+      'scripts/land-local-gate.mjs': `import ${JSON.stringify(resolve('scripts/land-local-gate.mjs'))};\n`,
+      'scripts/check-css.mjs': cssChecker,
+      '.githooks/push-checks.mjs': `import { assertHeavyLease } from ${JSON.stringify(resolve('scripts/heavy-lane-lease.mjs'))};\nassertHeavyLease('full-test');\nconsole.error('fixture full checks ran inside lease');\n`,
+    };
+    for (const match of cssChecker.matchAll(/file: join\(ROOT, '([^']+)'\)/gu)) {
+      const path = match[1] ?? '';
+      if (path !== '') writeFixture(wt, path, path === cssPath && mode === 'red' ? '.ws-steer { opacity: 1; }\n' : '');
+    }
+    for (const [path, content] of Object.entries(files)) writeFixture(wt, path, content);
+    f.git(wt, ['add', '.']);
+    f.git(wt, ['commit', '-m', 'test: exercise live local hook']);
+    const tip = f.git(wt, ['rev-parse', 'HEAD']), before = f.remoteMain();
+    writeFileSync(join(f.root, 'hooks/pre-push'),
+      `#!/bin/sh\nWS_PUSH_REFS=$(cat)\nexport WS_PUSH_REFS\nexec "${process.execPath}" "${resolve('.githooks/run-checks.mjs')}" push\n`);
+
+    const result = f.land(wt);
+    expect(result.stderr).toContain('heavy-lane: acquired full-test');
+    if (mode === 'green') {
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(result.stderr).toContain('fixture full checks ran inside lease');
+      expect(f.remoteMain()).toBe(tip);
+    } else {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(`error: ${cssPath}:1: unknown class .ws-steer`);
+      expect(result.stderr).not.toContain('fixture full checks ran inside lease');
+      expect(f.read(f.files.receipts)).toContain('refused: check-css: RED (2 error(s)');
+      expect(f.remoteMain()).toBe(before);
+    }
   }, 60_000);
 
   test('FL9: a restarted real land discovers its completed pre-rebase gate', () => {

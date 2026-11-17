@@ -121,9 +121,14 @@ const ownWsClasses = (compound) => wsClasses(compound.replaceAll(/:[\w-]+\([^)]*
 let errors = 0, warnings = 0;
 const definedIn = new Map(); // class → Set(file)
 const report = (strict, file, line, msg) => {
-  const tag = strict ? 'error' : 'warn';
-  if (strict) errors++; else warnings++;
-  console.log(`${tag}: ${relative(ROOT, file)}:${line}: ${msg}`);
+  const diagnostic = `${relative(ROOT, file)}:${line}: ${msg}`;
+  if (strict) {
+    errors++;
+    console.error(`error: ${diagnostic}`);
+  } else {
+    warnings++;
+    console.log(`warn: ${diagnostic}`);
+  }
 };
 
 for (const { file, prefix, strict } of FILES) {
@@ -231,5 +236,9 @@ for (const file of cssFiles) {
 }
 
 const n = definedIn.size;
-if (errors) { console.log(`\ncheck-css: ${errors} error(s), ${warnings} warning(s) — ${n} classes checked`); process.exit(1); }
+// Git's porcelain push logs stderr live and keeps its RED line for the refusal receipt.
+if (errors) {
+  console.error(`check-css: RED (${errors} error(s), ${warnings} warning(s)) — ${n} classes checked`);
+  process.exit(1);
+}
 console.log(`check-css: ok — ${n} classes across ${FILES.length} stylesheets${warnings ? `, ${warnings} warning(s) (non-blocking)` : ''}`);
