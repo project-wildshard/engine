@@ -25,7 +25,36 @@ export interface SlabRanges {
   /** NB8 (mini-nb8h): per node, the cone its triangles' wound normals lie in (axis xyz, cosine of its half angle); a cosine
    *  of -1 (an inner node, or a leaf of triangles with no area) never leaves a leaf out */
   readonly cones: Float32Array;
+  /** NB23 (b): the phone's far levels, when the tree was built with them (`slabFarLevels`) */
+  readonly far?: SlabFar;
 }
+
+/**
+ * NINE-DRAGON-BENCHMAX NB23 (b), far slab decimation (Jake, 2026-11-16 ~23:20 Cancún: "probably b) yeah"): each leaf of a
+ * phone slab chunk also has coarser copies of its triangles, one per level, laid after the chunk's own triangles in its
+ * index (`slabLibrary.ts` reserves the room before the first upload). A level clusters the chunk's vertices on a grid of
+ * `cells[k]` metres, apart by the way their face looks (`SLAB_FACINGS`, so a wall's corner keeps both its faces), and
+ * moves each vertex to the one of its cluster nearest the cluster's middle; a triangle two of whose corners meet, or that
+ * turns over, is dropped. The coarse triangles name the chunk's own vertices (an index, no new vertex), and one grid holds
+ * for the whole chunk, so two leaves at one level share their seams. A leaf at least `cells[k] / farAngle` away draws
+ * level k (`visibleSlabDraws`): every corner moves at most the cell's diagonal, under ~`farAngle` × 1.7 of the view.
+ */
+export interface SlabFar {
+  /** each level's cell (m), finest first; Infinity for a level left out (no room) */
+  readonly cells: Float64Array;
+  /** per node and level (node × levels + level): its coarse triangles' first and end triangle in the index (after the
+   *  chunk's own), or -1 where the leaf keeps its own triangles at that level (an inner node, or no saving) */
+  readonly starts: Int32Array;
+  readonly ends: Int32Array;
+}
+/** NB23 (b): a vertex channel two vertices must share to join one cluster (its colour, its surface kind), so a far level
+ *  never paints one face's colour or kind across another's */
+export interface SlabFarKind { readonly array: ArrayLike<number>; readonly itemSize: number }
+/** NB23 (b): the far levels' cells (m): on Nine's plain slab key (0.52 M triangles) ~49 % and ~12 % of its triangles; a
+ *  first cell of 0.15 m drew at the phone spawn's mid towers (~40-80 m), whose window frames it merged (3.7 k px) */
+export const SLAB_FAR_CELLS: readonly number[] = [0.3, 0.8];
+/** a leaf keeps its own triangles at a level that keeps more than this share of them (the index room is better spent) */
+export const SLAB_FAR_KEEP = 0.8;
 
 /** the facing cells a slab is split by first: each cube face in 3 × 3 (its middle cell holds the walls, floors and
  *  ceilings square to that axis), and one more for triangles with no area or of a cell too small for its own leaf */
@@ -62,9 +91,12 @@ const SLAB_JOB_STEP = 32_768;
 export function* slabRangesJob(geometry: BufferGeometry, leaf: number = SLAB_LEAF_TRIANGLES, faced = false, facingNode: number = SLAB_FACING_NODE, facingGrid = 3): Generator<void, SlabRanges | null, void> {
   const index = geometry.index, position = geometry.getAttribute('position');
   if (index === null || position === undefined || index.count % 3 !== 0) return null;
-  const triangles = index.count / 3;
+  // NB23 (b): a chunk with far room (`slabLibrary.ts`): the room after its own triangles is not its triangles
+  const own = slabTriangles(geometry);
+  if (own === null) return null;
+  const triangles = own;
   if (triangles <= leaf) return null;
-  const corners = new Uint32Array(index.array);
+  const corners = new Uint32Array(index.array.subarray(0, triangles * 3));
   // the bake's positions are plain float32 xyz; any other layout is read through the attribute
   const plain = position instanceof BufferAttribute && position.itemSize === 3 && !position.normalized && position.array instanceof Float32Array;
   const xyz = plain ? position.array : new Float32Array(position.count * 3);
@@ -169,6 +201,96 @@ export function* slabRangesJob(geometry: BufferGeometry, leaf: number = SLAB_LEA
   }
   index.needsUpdate = true;
   return { boxes, nodes, triangles, size, cones };
+}
+
+/** NB23 (b): the chunks whose index has far room after their own triangles (`slabLibrary.ts`), and how many are their own */
+const ROOMED = new WeakMap<BufferGeometry, number>();
+/** NB23 (b): mark `geometry`'s index as holding `own` triangles of its own, the rest far room */
+export function slabRoom(geometry: BufferGeometry, own: number): void { ROOMED.set(geometry, own); }
+/** NB23 (b): the triangles a chunk's index holds of its own: all of it, or those before its far room; null when the index
+ *  is not whole triangles */
+export function slabTriangles(geometry: BufferGeometry): number | null {
+  const index = geometry.index; if (index === null) return null;
+  const own = ROOMED.get(geometry);
+  if (own !== undefined) return own * 3 <= index.count ? own : null;
+  return index.count % 3 === 0 ? index.count / 3 : null;
+}
+
+/**
+ * NB23 (b): the far levels of a chunk whose index (`corners`, the tree's order) and tree `ranges` are built: per level
+ * (`cells`, finest first), each leaf's coarse triangles, laid level after level and leaf after leaf (so a run of far leaves
+ * at one level is one range), from triangle `ranges.triangles` on. Stops adding levels past `room` triangles (a level that
+ * does not fit is left out, its cell Infinity). Returns the coarse corners to write after the chunk's own and the levels.
+ */
+export function slabFarLevels(corners: ArrayLike<number>, xyz: ArrayLike<number>, ranges: Omit<SlabRanges, 'far'>, cells: readonly number[] = SLAB_FAR_CELLS, room?: number, kinds: readonly SlabFarKind[] = []): { corners: Uint32Array; far: SlabFar } {
+  const triangles = ranges.triangles, vertices = Math.floor(xyz.length / 3), count = ranges.nodes.length / 4, levels = cells.length;
+  // each vertex's look: the facing cell of the first triangle that names it (a faceted kit's vertex is one face's)
+  const looks = new Int16Array(vertices).fill(-1), scratch = new Int8Array(3), wound = new Float32Array(triangles * 3);
+  for (let t = 0; t < triangles; t++) {
+    const a = corners[t * 3] ?? 0, b = corners[t * 3 + 1] ?? 0, c = corners[t * 3 + 2] ?? 0;
+    const cell = facingOf(xyz, a, b, c, scratch, 0), { x, y, z } = normalOf(xyz, a, b, c);
+    wound[t * 3] = x; wound[t * 3 + 1] = y; wound[t * 3 + 2] = z;
+    for (const v of [a, b, c]) if ((looks[v] ?? 0) < 0) looks[v] = cell;
+  }
+  // and its kinds: the look becomes one id per facing cell and kind values (FNV-1a over the values' float32 bits)
+  const look = new Int32Array(vertices);
+  if (kinds.length === 0) for (let v = 0; v < vertices; v++) look[v] = (looks[v] ?? -1) + 1;
+  else {
+    const seen = new Map<number, number>(), word = new Float32Array(1), bits = new Uint32Array(word.buffer);
+    for (let v = 0; v < vertices; v++) {
+      let hash = 0x811c9dc5;
+      for (const { array, itemSize } of kinds) for (let k = 0; k < itemSize; k++) { word[0] = array[v * itemSize + k] ?? 0; hash = Math.imul(hash ^ (bits[0] ?? 0), 0x01000193) >>> 0; }
+      const key = ((looks[v] ?? -1) + 1) * 4294967296 + hash;
+      let id = seen.get(key); if (id === undefined) { id = seen.size; seen.set(key, id); }
+      look[v] = id;
+    }
+  }
+  const starts = new Int32Array(count * levels).fill(-1), ends = new Int32Array(count * levels).fill(-1), kept = Float64Array.from(cells);
+  const out: number[] = [];
+  const moved = new Int32Array(vertices);
+  for (let level = 0; level < levels; level++) {
+    const size = cells[level] ?? Infinity, before = out.length;
+    if (!(size > 0 && Number.isFinite(size))) { kept[level] = Infinity; continue; }
+    // the clusters: grid cell (15 bits an axis, ±1.6 km at 0.1 m), then grid cell and look
+    const grid = new Map<number, number>(), ids = new Map<number, number>(), cluster = new Int32Array(vertices);
+    for (let v = 0; v < vertices; v++) {
+      const x = Math.floor((xyz[v * 3] ?? 0) / size) + 16384, y = Math.floor((xyz[v * 3 + 1] ?? 0) / size) + 16384, z = Math.floor((xyz[v * 3 + 2] ?? 0) / size) + 16384;
+      const place = (x * 32768 + y) * 32768 + z;
+      let at = grid.get(place); if (at === undefined) { at = grid.size; grid.set(place, at); }
+      const key = at * 2097152 + (look[v] ?? 0);
+      let id = ids.get(key); if (id === undefined) { id = ids.size; ids.set(key, id); }
+      cluster[v] = id;
+    }
+    const n = ids.size, sum = new Float64Array(n * 3), members = new Int32Array(n), best = new Int32Array(n).fill(-1), near = new Float64Array(n).fill(Infinity);
+    for (let v = 0; v < vertices; v++) { const id = cluster[v] ?? 0; sum[id * 3] = (sum[id * 3] ?? 0) + (xyz[v * 3] ?? 0); sum[id * 3 + 1] = (sum[id * 3 + 1] ?? 0) + (xyz[v * 3 + 1] ?? 0); sum[id * 3 + 2] = (sum[id * 3 + 2] ?? 0) + (xyz[v * 3 + 2] ?? 0); members[id] = (members[id] ?? 0) + 1; }
+    for (let v = 0; v < vertices; v++) {
+      const id = cluster[v] ?? 0, m = members[id] ?? 1;
+      const dx = (xyz[v * 3] ?? 0) - (sum[id * 3] ?? 0) / m, dy = (xyz[v * 3 + 1] ?? 0) - (sum[id * 3 + 1] ?? 0) / m, dz = (xyz[v * 3 + 2] ?? 0) - (sum[id * 3 + 2] ?? 0) / m;
+      const d = dx * dx + dy * dy + dz * dz; if (d < (near[id] ?? Infinity)) { near[id] = d; best[id] = v; }
+    }
+    for (let v = 0; v < vertices; v++) moved[v] = best[cluster[v] ?? 0] ?? v;
+    for (let node = 0; node < count; node++) {
+      if ((ranges.nodes[node * 4] ?? -1) >= 0) continue;
+      const from = ranges.nodes[node * 4 + 2] ?? 0, to = ranges.nodes[node * 4 + 3] ?? 0, at = out.length;
+      for (let t = from; t < to; t++) {
+        const a = moved[corners[t * 3] ?? 0] ?? 0, b = moved[corners[t * 3 + 1] ?? 0] ?? 0, c = moved[corners[t * 3 + 2] ?? 0] ?? 0;
+        if (a === b || b === c || a === c) continue;
+        // turned over (or flat): its wound normal against the triangle it was
+        const { x, y, z } = normalOf(xyz, a, b, c);
+        if (x * (wound[t * 3] ?? 0) + y * (wound[t * 3 + 1] ?? 0) + z * (wound[t * 3 + 2] ?? 0) <= 0) continue;
+        out.push(a, b, c);
+      }
+      const coarse = (out.length - at) / 3;
+      if (coarse > SLAB_FAR_KEEP * (to - from)) { out.length = at; continue; }
+      starts[node * levels + level] = triangles + at / 3; ends[node * levels + level] = triangles + out.length / 3;
+    }
+    if (out.length / 3 > (room ?? Infinity)) {
+      // no room for this level: leave it out (a finer level that fit keeps its leaves)
+      out.length = before; kept[level] = Infinity;
+      for (let node = 0; node < count; node++) { starts[node * levels + level] = -1; ends[node * levels + level] = -1; }
+    }
+  }
+  return { corners: Uint32Array.from(out), far: { cells: kept, starts, ends } };
 }
 
 /** a triangle's wound normal (not normalised; zero with no area), into `normal` */
@@ -311,17 +433,32 @@ function backs(ranges: SlabRanges, node: number): boolean {
   // a margin of 1e-4 of the reach for float32 positions
   return cos * reach > Math.sqrt(Math.max(0, 1 - cos * cos)) * Math.sqrt(fx * fx + fy * fy + fz * fz) + 1e-4 * reach;
 }
-function collect(ranges: SlabRanges, node: number, angle: number, facing: boolean, out: SlabDraws): void {
+/** NB23 (b): each far level's ranges while a view is collected, appended after the leaves' own (`visibleSlabDraws`) */
+const farDraws: SlabDraws[] = [];
+function collect(ranges: SlabRanges, node: number, angle: number, facing: boolean, out: SlabDraws, farAngle: number): void {
   if (!visible(ranges.boxes, node)) return;
   const { nodes, boxes, size } = ranges, left = nodes[node * 4] ?? -1;
-  if (left >= 0) { collect(ranges, left, angle, facing, out); collect(ranges, nodes[node * 4 + 1] ?? 0, angle, facing, out); return; }
+  if (left >= 0) { collect(ranges, left, angle, facing, out, farAngle); collect(ranges, nodes[node * 4 + 1] ?? 0, angle, facing, out, farAngle); return; }
   if (facing && backs(ranges, node)) return;
   const from = nodes[node * 4 + 2] ?? 0, to = nodes[node * 4 + 3] ?? 0, at = node * 6;
   // the camera's distance to the leaf's box (0 inside it), in the chunk's own frame
   const dx = Math.max((boxes[at] ?? 0) - local.x, 0, local.x - (boxes[at + 3] ?? 0));
   const dy = Math.max((boxes[at + 1] ?? 0) - local.y, 0, local.y - (boxes[at + 4] ?? 0));
   const dz = Math.max((boxes[at + 2] ?? 0) - local.z, 0, local.z - (boxes[at + 5] ?? 0));
-  const floor = angle * Math.sqrt(dx * dx + dy * dy + dz * dz);
+  const distance = Math.sqrt(dx * dx + dy * dy + dz * dz), far = ranges.far;
+  if (far !== undefined && farAngle > 0) {
+    // NB23 (b): the coarsest level whose cell is under farAngle × the leaf's distance, if the leaf has it
+    const levels = far.cells.length, reach = farAngle * distance;
+    for (let level = levels - 1; level >= 0; level--) {
+      if (!((far.cells[level] ?? Infinity) <= reach)) continue;
+      const start = far.starts[node * levels + level] ?? -1;
+      if (start < 0) continue;
+      const draws = farDraws[level] ??= { starts: new Int32Array(64), counts: new Int32Array(64), n: 0, total: 0 };
+      push(draws, start, far.ends[node * levels + level] ?? start);
+      return;
+    }
+  }
+  const floor = angle * distance;
   // the first triangle smaller than the floor (the leaf runs largest first)
   let lo = from, hi = to;
   while (lo < hi) { const mid = (lo + hi) >> 1; if ((size[mid] ?? 0) >= floor) lo = mid + 1; else hi = mid; }
@@ -332,12 +469,20 @@ function collect(ranges: SlabRanges, node: number, angle: number, facing: boolea
  *  distance left out and, with `facing` (the caller's word that the GPU culls back faces: a front-sided material, a
  *  perspective camera, an unmirrored `world`), every leaf that shows the camera only its backs, into `out`; when nothing
  *  is left, the first leaf alone, so a parked warm still issues a real draw. */
-export function visibleSlabDraws(ranges: SlabRanges, world: Matrix4, camera: Camera, angle: number, out: SlabDraws, facing = false): SlabDraws {
+export function visibleSlabDraws(ranges: SlabRanges, world: Matrix4, camera: Camera, angle: number, out: SlabDraws, facing = false, farAngle = 0): SlabDraws {
   clip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(world);
   frustum.setFromProjectionMatrix(clip, WebGLCoordinateSystem, camera.reversedDepth);
   local.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inverse.copy(world).invert());
   out.n = 0; out.total = 0;
-  collect(ranges, 0, angle, facing, out);
+  for (const draws of farDraws) { draws.n = 0; draws.total = 0; }
+  collect(ranges, 0, angle, facing, out, farAngle);
+  // NB23 (b): the far levels' ranges after the leaves' own (each level's run is in index order, so it joins as the leaves'
+  // own do; two levels never join)
+  for (const draws of farDraws) for (let i = 0; i < draws.n; i++) {
+    const n = out.n;
+    if (n === out.starts.length) { const starts = new Int32Array(n * 2), counts = new Int32Array(n * 2); starts.set(out.starts); counts.set(out.counts); out.starts = starts; out.counts = counts; }
+    out.starts[n] = draws.starts[i] ?? 0; out.counts[n] = draws.counts[i] ?? 0; out.n = n + 1; out.total += draws.counts[i] ?? 0;
+  }
   nothingInView = out.n === 0;
   if (out.n === 0) { let node = 0; while ((ranges.nodes[node * 4] ?? -1) >= 0) node = ranges.nodes[node * 4] ?? 0; push(out, ranges.nodes[node * 4 + 2] ?? 0, ranges.nodes[node * 4 + 3] ?? 0); }
   return out;
@@ -419,6 +564,9 @@ export interface SlabCullOptions {
   /** another owner sets the draw range between draws (a tile driver, `tiledMesh`): each draw reads it, culls only while it
    *  is the whole index, and puts back the range it found */
   readonly liveRange?: boolean;
+  /** NB23 (b): the phone's `slabFarAngle`: a leaf draws its far level (`SlabRanges.far`) at least cell / farAngle away,
+   *  in a perspective camera's view only (a shadow camera's distance is no measure of size on screen) */
+  readonly farAngle?: number;
 }
 
 /** Draw `part` (whose geometry `ranges` was built on) as its visible run for each camera that renders it; the full
@@ -464,7 +612,8 @@ export function cullSlabRanges(part: Object3D & { geometry: BufferGeometry }, ra
     // override's included) front-sided, a perspective camera (its eye a point) and an unmirrored world (three keeps the
     // winding)
     const facing = material.side === FrontSide && (camera as Camera & { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true && part.matrixWorld.determinant() > 0;
-    const out = visibleSlabDraws(ranges, part.matrixWorld, camera, angle, draws, facing);
+    const perspective = (camera as Camera & { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true;
+    const out = visibleSlabDraws(ranges, part.matrixWorld, camera, angle, draws, facing, perspective ? options.farAngle ?? 0 : 0);
     if (skip()) return;
     if (out.n === 1) { geometry.setDrawRange((out.starts[0] ?? 0) * 3, (out.counts[0] ?? 0) * 3); return; }
     geometry.setDrawRange(0, out.total * 3);

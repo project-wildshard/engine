@@ -14,7 +14,7 @@ import { SharedTileBuilds, type TileContent } from './tileContent';
 import type { ControlRefinement } from './controlRefinement';
 import { tilesSettling } from './tileDriver';
 import { TIER_CONFIG } from '@wildshard/engine/core/tier';
-import { cullSlabRanges, slabRangesJob, spatialSlabRanges, type SlabRanges } from './slabRanges';
+import { cullSlabRanges, SLAB_FAR_CELLS, slabRangesJob, slabRoom, slabTriangles, spatialSlabRanges, type SlabFar, type SlabRanges } from './slabRanges';
 import { mergedSlabBounds, mergeSlabChunks } from './slabMerge';
 
 type WholeLibrary = Extract<WorldScenesSection['libraries'][number], { kind: 'whole' }>;
@@ -74,8 +74,17 @@ async function drainLate(): Promise<void> {
  */
 const FACED = new WeakSet<SlabRanges>();
 const DRAWERS = new WeakMap<BufferGeometry, Map<InstancedMesh, Scope>>();
+/** NB23 (b): the room a phone chunk's index keeps after its own triangles for its far levels, as a share of them (the
+ *  levels fill it finest first; one that does not fit is left out). Nine's keys' two levels take 61-74 % */
+export const SLAB_FAR_ROOM = 0.75;
+/** NB23 (b): the channels a far level's clusters keep apart: a vertex's colour (without it, a cluster of a lit window and
+ *  its frame painted one across the other: an orange triangle over Nine's gate at 0.005, 1.8 k px to 0.8 k with it) */
+export const SLAB_FAR_KINDS: readonly string[] = ['color'];
+const FAR = { farAngle: 0 };
+/** the cull options: the far angle read when a part attaches */
+function cullOptions(): { readonly farAngle: number } { FAR.farAngle = TIER_CONFIG.slabFarAngle; return FAR; }
 function attach(part: InstancedMesh, geometry: BufferGeometry, ranges: SlabRanges, scope: Scope): void {
-  cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle);
+  cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle, cullOptions());
   let drawers = DRAWERS.get(geometry);
   if (drawers === undefined) { drawers = new Map(); DRAWERS.set(geometry, drawers); }
   drawers.set(part, scope);
@@ -95,9 +104,23 @@ function facedTree(geometry: BufferGeometry): void {
       treeWorker = worker;
     } catch { treeWorker = null; return; }
   }
-  const id = asks++, corners = Uint32Array.from(index.array), xyz = position.array.slice();
+  // NB23 (b): the far levels' room after the chunk's own triangles, made now, before the chunk's first upload (a GPU
+  // buffer never grows); the draw range keeps every other draw (shadows, warms, raycasts) to the chunk's own
+  const own = slabTriangles(geometry);
+  if (own === null) return;
+  let room = 0;
+  if (TIER_CONFIG.slabFarAngle > 0 && geometry.drawRange.count >= index.count && index.count === own * 3) {
+    room = Math.ceil(own * SLAB_FAR_ROOM);
+    const Storage = index.array.constructor as new (length: number) => Uint16Array | Uint32Array, padded = new Storage((own + room) * 3);
+    padded.set(index.array);
+    geometry.setIndex(new BufferAttribute(padded, 1)); geometry.setDrawRange(0, own * 3); slabRoom(geometry, own);
+  }
+  const id = asks++, corners = Uint32Array.from(geometry.index?.array.subarray(0, own * 3) ?? []), xyz = position.array.slice();
+  // the channels a far level keeps apart (`SLAB_FAR_KINDS`), copied
+  const kinds = room > 0 ? SLAB_FAR_KINDS.flatMap(name => { const channel = geometry.getAttribute(name);
+    return channel instanceof BufferAttribute && channel.array.length === channel.count * channel.itemSize ? [{ array: channel.array.slice(), itemSize: channel.itemSize }] : []; }) : [];
   asked.set(id, geometry);
-  treeWorker.postMessage({ id, index: corners, xyz }, { transfer: [corners.buffer, xyz.buffer] });
+  treeWorker.postMessage({ id, index: corners, xyz, ...(room > 0 ? { far: SLAB_FAR_CELLS, room, kinds } : {}) }, { transfer: [corners.buffer, xyz.buffer, ...kinds.map(kind => kind.array.buffer)] });
 }
 function landed(event: MessageEvent<unknown>): void {
   const reply = event.data;
@@ -109,16 +132,26 @@ function landed(event: MessageEvent<unknown>): void {
   if (geometry === undefined || typeof tree !== 'object' || tree === null) return;
   const order: unknown = Reflect.get(tree, 'index'), boxes: unknown = Reflect.get(tree, 'boxes'), nodes: unknown = Reflect.get(tree, 'nodes');
   const size: unknown = Reflect.get(tree, 'size'), cones: unknown = Reflect.get(tree, 'cones'), triangles: unknown = Reflect.get(tree, 'triangles');
-  const index = geometry.index;
-  if (index === null || !(order instanceof Uint32Array) || !(boxes instanceof Float32Array) || !(nodes instanceof Int32Array) || !(size instanceof Float32Array)
-    || !(cones instanceof Float32Array) || typeof triangles !== 'number' || order.length !== index.count || triangles * 3 !== index.count) return;
+  const index = geometry.index, own = slabTriangles(geometry);
+  if (index === null || own === null || !(order instanceof Uint32Array) || !(boxes instanceof Float32Array) || !(nodes instanceof Int32Array) || !(size instanceof Float32Array)
+    || !(cones instanceof Float32Array) || typeof triangles !== 'number' || order.length !== own * 3 || triangles !== own) return;
   // the same triangles in the tree's order: whatever order the chunk drew in, every range from here reads this one
-  (index.array as Uint32Array | Uint16Array).set(order); index.needsUpdate = true;
-  const ranges: SlabRanges = { boxes, nodes, triangles, size, cones };
+  (index.array as Uint32Array | Uint16Array).set(order);
+  // NB23 (b): and the far levels in the room after them (`facedTree`)
+  const farCorners: unknown = Reflect.get(tree, 'farCorners'), farCells: unknown = Reflect.get(tree, 'farCells');
+  const farStarts: unknown = Reflect.get(tree, 'farStarts'), farEnds: unknown = Reflect.get(tree, 'farEnds');
+  let far: SlabFar | undefined;
+  if (farCorners instanceof Uint32Array && farCells instanceof Float64Array && farStarts instanceof Int32Array && farEnds instanceof Int32Array
+    && own * 3 + farCorners.length <= index.count && farStarts.length === farCells.length * nodes.length / 4 && farEnds.length === farStarts.length) {
+    (index.array as Uint32Array | Uint16Array).set(farCorners, own * 3);
+    far = { cells: farCells, starts: farStarts, ends: farEnds };
+  }
+  index.needsUpdate = true;
+  const ranges: SlabRanges = { boxes, nodes, triangles, size, cones, ...(far === undefined ? {} : { far }) };
   FACED.add(ranges); RANGES.set(geometry, ranges); LATE.delete(geometry);
   for (const [part, scope] of DRAWERS.get(geometry) ?? []) {
     if (scope.disposed || scope.disposing) DRAWERS.get(geometry)?.delete(part);
-    else cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle);
+    else cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle, cullOptions());
   }
 }
 

@@ -69,6 +69,11 @@ export const TIER_TABLE = {
     // NB8 (mini-nb8i): each slab chunk's tree also splits by facing, built in a worker as the chunk is read
     // (`slabLibrary.ts`), so a leaf showing the camera only its backs is left out: Nine's spawn 0.81 to 0.78 M
     slabFacing: true,
+    // NINE-DRAGON-BENCHMAX NB23 (b), far slab decimation (Jake 2026-11-16): a slab leaf at least a far level's cell / this
+    // away draws that level's coarse copy (`slabRanges.ts` `slabFarLevels`, built with the faced tree): a corner moves
+    // at most ~1.7 × this of the view. Nine's street-route walk p95 0.96 to 0.90 M, same-instant 41-388 px at the look
+    // poses, all on far towers; 0.005 drew 0.88 M but moved Nine's gate at ~90 m (776 px). 0 = off
+    slabFarAngle: 0.004,
   },
   desktop: {
     maxTexture: 4096, layerSize: 1024, dpr: 1.5, ao: true,
@@ -100,6 +105,7 @@ export const TIER_TABLE = {
     slabMerge: false,
     cullViewPad: 7,
     slabFacing: false,
+    slabFarAngle: 0,
   },
 };
 

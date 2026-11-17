@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { BackSide, Box3, BufferAttribute, BufferGeometry, type Camera, DoubleSide, Frustum, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, OrthographicCamera, PerspectiveCamera, Scene, Vector3, WebGLCoordinateSystem } from 'three';
-import { cullSlabRanges, spatialSlabRanges, visibleSlabDraws, visibleSlabRun, SLAB_LEAF_TRIANGLES, type SlabDraws } from './slabRanges';
+import { cullSlabRanges, slabFarLevels, slabRoom, slabTriangles, spatialSlabRanges, visibleSlabDraws, visibleSlabRun, SLAB_LEAF_TRIANGLES, type SlabDraws, type SlabRanges } from './slabRanges';
 
 // NINE-DRAGON-BENCHMAX NB8: a made-up resident slab chunk, a 400 m street of small wall quads whose index is in a
 // scrambled source order (as a resident cell's packing leaves it), drawn from a camera that sees one end of it.
@@ -385,4 +385,120 @@ test('the slab draw leaves backs out only for a front-sided material, a perspect
   expect(drawnBy(new MeshBasicMaterial(), mirror)).toBe(drawnBy(new MeshBasicMaterial({ side: DoubleSide }), mirror));
   const flat = new OrthographicCamera(-50, 50, 50, -50, 0.1, 2000); flat.position.copy(view.position); flat.rotation.copy(view.rotation); flat.updateMatrixWorld(true);
   expect(drawnBy(new MeshBasicMaterial(), new Matrix4(), flat)).toBe(drawnBy(new MeshBasicMaterial({ side: DoubleSide }), new Matrix4(), flat));
+});
+
+// NINE-DRAGON-BENCHMAX NB23 (b): a made-up faceted wall, a 40 m run of 0.1 m tiles (each tile its own four vertices, as a
+// faceted kit has them) along x at z 0 facing +z, with a 0.1 m deep window ledge (a face looking +y) every 2 m
+function tiledWall(): BufferGeometry {
+  const positions: number[] = [], corners: number[] = [];
+  const quad = (a: number[], b: number[], c: number[], d: number[]): void => { const at = positions.length / 3; positions.push(...a, ...b, ...c, ...d); corners.push(at, at + 1, at + 2, at, at + 2, at + 3); };
+  for (let i = 0; i < 400; i++) for (let j = 0; j < 30; j++) { const x = i * 0.1 - 20, y = j * 0.1; quad([x, y, 0], [x + 0.1, y, 0], [x + 0.1, y + 0.1, 0], [x, y + 0.1, 0]); }
+  for (let i = 0; i < 20; i++) quad([i * 2 - 20, 1.5, 0.1], [i * 2 - 19, 1.5, 0.1], [i * 2 - 19, 1.5, 0], [i * 2 - 20, 1.5, 0]);
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(Float32Array.from(positions), 3));
+  geometry.setIndex(new BufferAttribute(Uint32Array.from(corners), 1));
+  return geometry;
+}
+function farWall(cells: readonly number[], room = Infinity): { geometry: BufferGeometry; ranges: SlabRanges } {
+  const geometry = tiledWall(), tree = spatialSlabRanges(geometry, SLAB_LEAF_TRIANGLES, true); if (tree === null) throw new Error('expected ranges');
+  const index = geometry.index, xyz = geometry.getAttribute('position').array; if (index === null) throw new Error('no index');
+  const { corners, far } = slabFarLevels(index.array, xyz, tree, cells, room);
+  // the room after the chunk's own triangles, as slabLibrary.ts lays it
+  const padded = new Uint32Array(index.count + corners.length); padded.set(index.array); padded.set(corners, index.count);
+  const own = index.count; geometry.setIndex(new BufferAttribute(padded, 1)); geometry.setDrawRange(0, own); slabRoom(geometry, own / 3);
+  return { geometry, ranges: { ...tree, far } };
+}
+const wound = (xyz: ArrayLike<number>, a: number, b: number, c: number): Vector3 => {
+  const p = (v: number): Vector3 => new Vector3(xyz[v * 3], xyz[v * 3 + 1], xyz[v * 3 + 2]);
+  return p(b).sub(p(a)).cross(p(c).sub(p(a)));
+};
+
+test('a far level clusters the chunk\'s own vertices: fewer triangles, none turned over, each leaf\'s laid in its run', () => {
+  const { geometry, ranges } = farWall([0.3, 0.8]), far = ranges.far, index = geometry.index;
+  if (far === undefined || index === null) throw new Error('expected far levels');
+  const xyz = geometry.getAttribute('position').array, levels = far.cells.length, own = ranges.triangles;
+  expect(slabTriangles(geometry)).toBe(own);
+  expect(Array.from(far.cells)).toEqual([0.3, 0.8]);
+  const kept = [0, 0];
+  for (let node = 0; node < ranges.nodes.length / 4; node++) {
+    const leaf = (ranges.nodes[node * 4] ?? -1) < 0, from = ranges.nodes[node * 4 + 2] ?? 0, to = ranges.nodes[node * 4 + 3] ?? 0;
+    for (let level = 0; level < levels; level++) {
+      const start = far.starts[node * levels + level] ?? -1, end = far.ends[node * levels + level] ?? -1;
+      if (!leaf) { expect(start).toBe(-1); continue; }
+      if (start < 0) continue;
+      expect(start).toBeGreaterThanOrEqual(own); expect(end * 3).toBeLessThanOrEqual(index.count);
+      expect(end - start).toBeLessThanOrEqual(0.8 * (to - from));
+      kept[level] = (kept[level] ?? 0) + end - start;
+      for (let t = start; t < end; t++) {
+        const a = index.getX(t * 3), b = index.getX(t * 3 + 1), c = index.getX(t * 3 + 2);
+        expect(new Set([a, b, c]).size).toBe(3);
+        // the wall faces +z, the ledges +y: a coarse triangle faces one of them, never back
+        const n = wound(xyz, a, b, c).normalize();
+        expect(n.z > 0.99 || n.y > 0.99).toBe(true);
+      }
+    }
+  }
+  const [first = 0, second = 0] = kept;
+  expect(first).toBeGreaterThan(0); expect(first).toBeLessThan(own * 0.4);
+  expect(second).toBeLessThan(first);
+});
+
+test('a far level that does not fit the room is left out; a finer one that fits keeps its leaves', () => {
+  const whole = farWall([0.3, 0.8]).ranges.far; if (whole === undefined) throw new Error('expected far levels');
+  const levels = whole.cells.length, firstLevel = Array.from({ length: whole.starts.length / levels }, (_, node) => Math.max(0, (whole.ends[node * levels] ?? 0) - (whole.starts[node * levels] ?? 0))).reduce((a, b) => a + b, 0);
+  const { ranges } = farWall([0.3, 0.8], firstLevel), far = ranges.far; if (far === undefined) throw new Error('expected far levels');
+  expect(Array.from(far.cells)).toEqual([0.3, Infinity]);
+  expect(Array.from(far.starts).filter((start, at) => at % levels === 1 && start >= 0)).toEqual([]);
+  expect(Array.from(far.starts).some((start, at) => at % levels === 0 && start >= 0)).toBe(true);
+});
+
+test('a leaf at least cell / farAngle away draws its far level, a nearer one its own triangles, and angle 0 draws none', () => {
+  const { ranges } = farWall([0.3, 0.8]), world = new Matrix4();
+  const out: SlabDraws = { starts: new Int32Array(8), counts: new Int32Array(8), n: 0, total: 0 };
+  // looking along the wall from 10 m in front of its near end: it runs 0 to ~40 m away
+  const view = new PerspectiveCamera(70, 402 / 874, 0.1, 2000); view.position.set(-24, 1.5, 10); view.lookAt(-4, 1.5, 0); view.updateMatrixWorld(true);
+  const plain = visibleSlabDraws(ranges, world, view, 0.001, out, true, 0), own = { total: plain.total, coarse: 0 };
+  for (let i = 0; i < plain.n; i++) expect((plain.starts[i] ?? 0) + (plain.counts[i] ?? 0)).toBeLessThanOrEqual(ranges.triangles);
+  // 0.3 m from 15 m, 0.8 m from 40 m
+  const far = visibleSlabDraws(ranges, world, view, 0.001, out, true, 0.02);
+  let coarse = 0, fine = 0;
+  for (let i = 0; i < far.n; i++) { if ((far.starts[i] ?? 0) >= ranges.triangles) coarse += far.counts[i] ?? 0; else fine += far.counts[i] ?? 0; }
+  expect(coarse).toBeGreaterThan(0); expect(fine).toBeGreaterThan(0);
+  expect(far.total).toBeLessThan(own.total);
+  expect(far.total).toBe(coarse + fine);
+});
+
+test('a chunk with far room keeps every other reader to its own triangles, and only a perspective view takes its far level', () => {
+  const { geometry, ranges } = farWall([0.3, 0.8]), own = ranges.triangles;
+  const part = new InstancedMesh(geometry, new MeshBasicMaterial(), 1);
+  cullSlabRanges(part, ranges, 0, { farAngle: 0.02 });
+  const shadow = new OrthographicCamera(-50, 50, 50, -50, 0.1, 500); shadow.position.set(-24, 1.5, 10); shadow.lookAt(-4, 1.5, 0); shadow.updateMatrixWorld(true);
+  part.onBeforeRender(undefined as never, new Scene(), shadow, geometry, part.material, undefined as never);
+  expect(geometry.drawRange.start + geometry.drawRange.count).toBeLessThanOrEqual(own * 3);
+  part.onAfterRender(undefined as never, new Scene(), shadow, geometry, part.material, undefined as never);
+  expect([geometry.drawRange.start, geometry.drawRange.count]).toEqual([0, own * 3]);
+  const view = new PerspectiveCamera(70, 402 / 874, 0.1, 2000); view.position.set(-24, 1.5, 10); view.lookAt(-4, 1.5, 0); view.updateMatrixWorld(true);
+  part.onBeforeRender(undefined as never, new Scene(), view, geometry, part.material, undefined as never);
+  // no multi-draw here: the run, still within the chunk's own triangles
+  expect(geometry.drawRange.start + geometry.drawRange.count).toBeLessThanOrEqual(own * 3);
+  part.onAfterRender(undefined as never, new Scene(), view, geometry, part.material, undefined as never);
+  expect([geometry.drawRange.start, geometry.drawRange.count]).toEqual([0, own * 3]);
+});
+
+test('a far level keeps a kind channel apart: no coarse triangle joins two colours', () => {
+  const geometry = tiledWall(), tree = spatialSlabRanges(geometry, SLAB_LEAF_TRIANGLES, true); if (tree === null) throw new Error('expected ranges');
+  const index = geometry.index, xyz = geometry.getAttribute('position').array; if (index === null) throw new Error('no index');
+  // every other tile column dark, the rest lit (a facade's windows in their frame)
+  const colours = new Uint8Array(xyz.length);
+  // (each tile's four vertices one colour: tile k is column floor(k / 30) of the wall, the ledges after them dark)
+  for (let v = 0; v < xyz.length / 3; v++) { const tile = Math.floor(v / 4), lit = tile < 12000 && Math.floor(tile / 30) % 2 === 0; colours.set(lit ? [250, 160, 60] : [20, 20, 24], v * 3); }
+  const mixed = (corners: Uint32Array): number => {
+    let n = 0;
+    for (let t = 0; t < corners.length / 3; t++) { const [a = 0, b = 0, c = 0] = [corners[t * 3], corners[t * 3 + 1], corners[t * 3 + 2]]; if (colours[a * 3] !== colours[b * 3] || colours[a * 3] !== colours[c * 3]) n++; }
+    return n;
+  };
+  const plain = slabFarLevels(index.array, xyz, tree, [0.3]), kept = slabFarLevels(index.array, xyz, tree, [0.3], Infinity, [{ array: colours, itemSize: 3 }]);
+  expect(mixed(plain.corners)).toBeGreaterThan(0);
+  expect(mixed(kept.corners)).toBe(0);
+  expect(kept.corners.length).toBeGreaterThan(0);
 });
