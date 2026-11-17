@@ -4,6 +4,8 @@ import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import type { ScriptLane } from '@wildshard/engine/script/lane';
 import { parseQuestData, type QuestData } from '@wildshard/format/quests';
 import { questBooks, type QuestBook, type QuestBooks } from '@wildshard/engine/quest/players';
+import { FIXED_STEP } from '@wildshard/engine/core/fixedStep';
+import { publishOwned } from '@wildshard/engine/sim/shardRows';
 
 /** Hooks read atomically published script fields or queue declared events for the next script tick. */
 export interface QuestScriptPorts {
@@ -41,6 +43,10 @@ export interface QuestDataPorts {
 }
 /** A live dialogue tree view; selection resolves declared flags and scenes without executing author closures. */
 export interface DialogueView { id: string; lines: readonly string[]; choices: readonly { id: string; label: string }[] }
+/** One player's timed run (SHARD-SOURCE SS-MS1a2): the tick its start flag rose while running, and its last and best times in seconds. */
+export interface RaceRun { running: number | null; last: number | null; best: number | null; runs: number }
+type Race = NonNullable<QuestData['races']>[number];
+const freshRun = (): RaceRun => ({ running: null, last: null, best: null, runs: 0 });
 /** Bind validated quest graphs to the existing engine journal/marker state and the host's snapshot boundary. */
 export class DeclaredQuests {
   readonly quests: readonly QuestState[];
@@ -50,12 +56,13 @@ export class DeclaredQuests {
   private readonly dialogue = new Map<string, string | null>();
   private readonly dialogues = new Map<string, Map<string, string | null>>();
   private readonly books: QuestBooks;
+  private readonly races = new Map<string, Map<string, RaceRun>>();
   constructor(host: SimHost, input: QuestData, ports: QuestDataPorts = {}) {
     const data = parseQuestData(input), books = questBooks(host), lead = books.lead;
     if (data.quests.some((q) => host.quests.some((existing) => existing.def.id === q.id))) throw new Error('Quest already installed');
     const needsScript = data.triggers.some((t) => t.kind === 'script') || data.quests.some((q) => q.onComplete?.scene !== undefined) || data.dialogue.some((d) => d.nodes.some((n) => n.choices.some((c) => c.scene !== undefined)));
     if (needsScript && ports.script === undefined) throw new Error('Missing admitted quest script ports');
-    if (data.quests.some((q) => q.onComplete?.fact !== undefined) && ports.fact === undefined) throw new Error('Missing quest fact port');
+    if ((data.quests.some((q) => q.onComplete?.fact !== undefined) || (data.races ?? []).length > 0) && ports.fact === undefined) throw new Error('Missing quest fact port');
     if (data.quests.some((q) => (q.onComplete?.coins ?? 0) > 0) && ports.coins === undefined) throw new Error('Missing local coin port');
     this.host = host; this.data = data; this.ports = ports; this.books = books;
     books.claim(declaredFlags(data));
@@ -79,14 +86,61 @@ export class DeclaredQuests {
       this.dialogues.set(book.player, nodes);
       book.part(`dialogue:${data.quests[0]?.id ?? ''}`, { read: () => JSON.stringify(Object.fromEntries(nodes)), write: saved => { this.restoreNodes(nodes, JSON.parse(saved) as SimValue); } });
     });
+    this.installRaces(data.races ?? [], lead);
     books.lead.part(`dialogue:${data.quests[0]?.id ?? ''}`, { read: () => JSON.stringify(Object.fromEntries(this.dialogue)), write: saved => { this.restoreNodes(this.dialogue, JSON.parse(saved) as SimValue); } });
     host.events.on('actor.died', ({ actor }) => {
       // A selector names an exact spawn or one of its actor tags; credit stays per player and condition.
       for (const book of books.each()) for (const t of data.triggers) if (t.kind === 'death' && (actor.id === t.tag || actor.tags.some((tag) => tag === t.tag)) && test(book.flags, t.when)) book.flags.set(t.flag);
     }, host.scope);
     host.onStep('quest.declared', () => {
-      for (const book of books.each()) this.watch(book);
+      for (const book of books.each()) { this.watch(book); this.lapseRaces(book); }
     }, { snapshot: () => this.snapshot(), restore: (state) => { this.restore(state); } });
+  }
+  /** SS-MS1a2: per player, the start flag rising starts the clock and the stop flag rising files the fact with the time, keeping the
+   *  best; a finish or a lapse past the cap lowers both flags, so the run can be run again. The running start tick and the best (ms)
+   *  are that player's owned lines `race:<id>`, with `.last` and `.best` (ms) and `.runs` (finishes); the runs ride the book's save. */
+  private installRaces(races: readonly Race[], lead: QuestBook): void {
+    if (races.length === 0) return;
+    const bind = (book: QuestBook): void => {
+      const runs = new Map(races.map(race => [race.id, freshRun()])); this.races.set(book.player, runs);
+      book.flags.onChange((flag, on) => {
+        if (!on || this.books.restoring) return;
+        for (const race of races) {
+          const run = runs.get(race.id); if (run === undefined) continue;
+          if (flag === race.start) { run.running = this.host.state.tick; book.flags.set(race.stop, false); }
+          else if (flag === race.stop && run.running !== null) this.finishRace(book, race, run);
+        }
+      });
+      book.part(`races:${races[0]?.id ?? ''}`, { read: () => JSON.stringify(Object.fromEntries(runs)), write: saved => { restoreRuns(runs, races, JSON.parse(saved) as SimValue); } });
+    };
+    bind(lead); this.books.install(bind);
+    publishOwned(this.host, 'quest.races', (player, out) => {
+      for (const [id, run] of this.races.get(player) ?? []) {
+        if (run.running !== null) out.set(`race:${id}`, run.running);
+        if (run.last !== null) out.set(`race:${id}.last`, Math.round(run.last * 1000));
+        if (run.best !== null) out.set(`race:${id}.best`, Math.round(run.best * 1000));
+        if (run.runs > 0) out.set(`race:${id}.runs`, run.runs);
+      }
+    });
+  }
+  private finishRace(book: QuestBook, race: Race, run: RaceRun): void {
+    const seconds = (this.host.state.tick - (run.running ?? this.host.state.tick)) * FIXED_STEP;
+    run.running = null; run.last = seconds; run.best = run.best === null ? seconds : Math.min(run.best, seconds); run.runs++;
+    book.flags.set(race.start, false); book.flags.set(race.stop, false);
+    this.ports.fact?.(race.fact, book.player === this.books.lead.player ? race.id : `${book.player}:${race.id}`);
+  }
+  /** A run past its cap lapses: nothing is filed and its start flag drops so it can begin again. */
+  private lapseRaces(book: QuestBook): void {
+    const runs = this.races.get(book.player); if (runs === undefined) return;
+    for (const race of this.data.races ?? []) {
+      const run = runs.get(race.id);
+      if (run === undefined || run.running === null || (this.host.state.tick - run.running) * FIXED_STEP <= race.cap) continue;
+      run.running = null; book.flags.set(race.start, false); book.flags.set(race.stop, false);
+    }
+  }
+  /** One player's run of a race, or null for an unknown race or player. */
+  race(id: string, player: string = this.books.lead.player): RaceRun | null {
+    const run = this.races.get(player)?.get(id); return run === undefined ? null : { ...run };
   }
   /** One player's region and script triggers, for this tick. */
   private watch(book: QuestBook): void {
@@ -151,8 +205,26 @@ export class DeclaredQuests {
   }
 }
 
+const timeOrNull = (value: SimValue | undefined): number | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new Error('Invalid race snapshot');
+  return value;
+};
+/** A saved book's runs; a race the save does not name starts fresh. */
+function restoreRuns(runs: Map<string, RaceRun>, races: readonly Race[], value: SimValue): void {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid race snapshot');
+  for (const race of races) {
+    const row = value[race.id];
+    if (row === undefined) { runs.set(race.id, freshRun()); continue; }
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) throw new Error('Invalid race snapshot');
+    const finished = row['runs'] ?? 0;
+    if (typeof finished !== 'number' || !Number.isSafeInteger(finished) || finished < 0) throw new Error('Invalid race snapshot');
+    runs.set(race.id, { running: timeOrNull(row['running']), last: timeOrNull(row['last']), best: timeOrNull(row['best']), runs: finished });
+  }
+}
+
 /** Every flag a quest row raises on the player it runs for: each keeps its own. */
 function declaredFlags(data: QuestData): string[] {
-  return [...data.quests.map(q => q.completeFlag), ...data.triggers.map(t => t.flag),
+  return [...data.quests.map(q => q.completeFlag), ...data.triggers.map(t => t.flag), ...(data.races ?? []).flatMap(race => [race.start, race.stop]),
     ...data.dialogue.flatMap(d => d.nodes.flatMap(n => [...n.sets ?? [], ...n.choices.flatMap(c => c.sets ?? [])]))];
 }
