@@ -93,6 +93,24 @@ export class GuardianPolicy<A extends AnimalSim> {
   restore(saved: SimValue): void {
     if (saved !== this.contract) throw new Error(`Incompatible ${this.profile.pattern === 'perch' ? 'perch hunter' : 'guardian'} continuation`);
   }
+  /** Wake the native rise recipe without touching the real hit timestamp or RNG. */
+  provokeInterior(): boolean {
+    if (this.profile.pattern !== 'interior') throw new Error('Incompatible guardian provocation');
+    const a = this.actor, m = a.mem as GuardianMemory;
+    if (!m.init) return false;
+    a.cancelAttack();
+    if (m.st === INTERIOR_HIDE || m.st === INTERIOR_SINK) { m.st = INTERIOR_RISE; m.rising = 1; m.sinking = 0; }
+    else if (m.st !== INTERIOR_RISE) m.st = INTERIOR_GUARD;
+    a.state = m.st === INTERIOR_RISE ? 'rise' : 'stalk';
+    return true;
+  }
+  /** Reset owned floor/phase memory while leaving other body recipes' fields intact. */
+  resetInterior(): void {
+    if (this.profile.pattern !== 'interior') throw new Error('Incompatible guardian reset');
+    const a = this.actor; a.cancelAttack();
+    for (const key of ['init', 'hx', 'hz', 'cd', 'hitT', 'away', 'rise', 'rising', 'sinking', 'floor', 'floorS', 'st', 'hit', 'sd', 'sdT']) delete a.mem[key];
+    a.mem['guardian.rearmHitT'] = Math.max(0, a.lastHitT); a.state = 'hide';
+  }
   /** Run the selected pattern with its original floor, token, perch and vertical-completion observations. */
   think(c: GuardianObservation<A>): void {
     if (c.pattern !== this.profile.pattern) {this.rejectFrame('Incompatible guardian observation'); return;}
@@ -108,7 +126,7 @@ export class GuardianPolicy<A extends AnimalSim> {
     const a = this.actor;
   const m = a.mem as GuardianMemory, H = c.world.hold;
   if (!m.init) {
-    m.init = 1; m.hx = a.position.x; m.hz = a.position.z; m.cd = 0; m.hitT = 0; m.away = 0;
+    m.init = 1; m.hx = a.position.x; m.hz = a.position.z; m.cd = 0; m.hitT = m['guardian.rearmHitT'] ?? 0; delete m['guardian.rearmHitT']; m.away = 0;
     m.rise = 0; m.rising = 0; m.sinking = 0; m.floor = 0;
     m.st = INTERIOR_HIDE; a.state = 'hide';
     a.yOffset = spec.hideOffset;

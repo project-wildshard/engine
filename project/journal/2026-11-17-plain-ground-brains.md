@@ -1,7 +1,7 @@
 # Plain grounded creature recipes
 
 > Written by: Codex
-> State: OF26a/OF26b source built, 2026-11-17; landing qualification pending.
+> State: OF26a/OF26b and CC5b5a source built, 2026-11-17; landing qualification pending.
 
 ## OF26a: skirmisher
 
@@ -53,3 +53,24 @@ sink, and exact body/health/controller/RNG restoration during rise, attack
 and sink. The inline declaration and original interior alias also run.
 The combined23case grounded/lift/native observation controls and full
 lint/types pass. Normal landing and main-CI qualification remain held.
+
+## CC5b5a: native owner and selected-player authority
+
+Four controller controls fail before the native reset/provocation methods
+exist. Home resets remove only owned policy fields and acknowledge the
+real last hit in a finite rearm field. An old hit cannot wake the reset
+policy; foreign body memory and immutable native contracts survive. The
+next ordinary initialization retains the original native RNG order.
+
+Stock perception and contact share a bound actual player. Missing, dead
+or parked selections suppress contact without transferring to a closer
+player. Selection and pending wake continuation live in a separate server
+adapter; restore validates bytes without invoking decisions, bodies or
+RNG. Decisions and body/contact phases stay distinct. The same native
+wrapper serves both ground families, with no new decision algorithm.
+Flat/native callers keep their existing registration and save bytes.
+The layer wiring and complete behavior matrices remain CC5b5b/c.
+
+Nine authority controls and the combined29case native/default-loader/
+restore controls pass; full typecheck and lint pass. Initial lint found
+a shadowed local in contact and was corrected. No engine main push or full land runs during the hold.

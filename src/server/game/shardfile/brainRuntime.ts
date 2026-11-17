@@ -21,7 +21,11 @@ import { parseDiver, diverPreset, type ShardDiver, parseOrbitDiver, parsePatrolD
 /** Native decision families and the existing pursuit family; custom scripts require a composed host. */
 export type DeclaredNativeBrain = ShardStalker | ShardGuardianPattern | ShardDiver | ShardGrazer | PlatformBrainSpec | ShardSkirmisher | ShardGuardian | ShardPerchHunter | ShardRamGrazer | ShardChallengeGrazer | ShardOrbitDiver | ShardPatrolDiver | ShardBurstFlyer;
 /** One trusted actor's observations and body recipe; construction must not execute gameplay or consume RNG. */
-export interface DeclaredBrainRecipe<P> { observe: (dt: number) => P; body: (dt: number) => void }
+export interface DeclaredBrainRecipe<P> {
+  observe: (dt: number) => P; body: (dt: number) => void;
+  /** Observation and contact must share this actual-player selection; undefined suppresses contact. */
+  bindTarget?: (read: () => ReturnType<SimHost['nearestPlayer']> | undefined) => void;
+}
 /** Loader-injected native recipes retain navigation, vertical movement, attack tokens and strike ownership. */
 export interface DeclaredBrainPorts {
   navigation?: BrainNavigation;

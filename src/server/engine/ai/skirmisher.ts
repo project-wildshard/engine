@@ -15,6 +15,10 @@ export class SkirmisherBrain<A extends AnimalSim> {
   snapshot(): SimValue { return this.policy.snapshot(); }
   /** Restore without running any decision or native body callback. */
   restore(saved: SimValue): void { this.policy.restore(saved); }
+  /** Wake the initialized policy without inventing a damage event. */
+  provoke(): boolean { return this.policy.provokeSkirmisher(this.actor); }
+  /** Rearm only this policy's actor memory after a home return. */
+  reset(): void { this.policy.resetSkirmisher(this.actor); }
   /** Preserve the host-owned actor, cadence and perception API. */
   think(c: SkirmisherPorts<A>): void { this.policy.decideSkirmisher(this.actor, c); }
 }

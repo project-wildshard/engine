@@ -391,6 +391,20 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
   }
   /** Allocation-free native skirmish perception on the existing manager cadence. */
   decideSkirmisher(a: A, c: SkirmisherPorts<A>): void { if (this.profile.pattern !== 'skirmish') throw new Error('Incompatible stalker observation'); this.skirmishThink(a, c); }
+  /** A layer may wake the native owner, but cannot override its herd flight. */
+  provokeSkirmisher(a: A): boolean {
+    const spec = this.skirmishSpec, m = a.mem as SkirmisherMemory;
+    if (!m.init || m.st === ST_FLEE) return false;
+    a.cancelAttack(); m.st = ST_ENGAGE; m.cd = Math.max(m.cd, spec.alertCooldown); a.state = 'sidestep';
+    return true;
+  }
+  /** Retain foreign memory and acknowledge real damage before the next initialization. */
+  resetSkirmisher(a: A): void {
+    if (this.profile.pattern !== 'skirmish') throw new Error('Incompatible stalker reset');
+    a.cancelAttack();
+    for (const key of ['init', 'hx', 'hz', 'st', 'tm', 'sd', 'cd', 'hitT', 'shy', 'scat', 'wander', 'tx', 'tz', 'hit']) delete a.mem[key];
+    a.mem['skirmisher.rearmHitT'] = Math.max(0, a.lastHitT); a.state = 'idle';
+  }
   /** Allocation-free native howl perception on the existing manager cadence. */
   decideHowler(a: A, c: PouncerContext<A>): void { if (this.profile.pattern !== 'howler') throw new Error('Incompatible stalker observation'); this.howlerThink(a, c); }
   /** Allocation-free native pounce perception on the existing manager cadence. */
@@ -674,7 +688,7 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
       return;
     }
     const m = a.mem as SkirmisherMemory, rng = c.rng;
-    if (!m.init) { m.init = 1; m.hx = a.position.x; m.hz = a.position.z; m.st = ST_IDLE; m.tm = rng.range(1, 3); m.sd = rng.next() < 0.5 ? -1 : 1; m.cd = 0; m.hitT = 0; m.shy = 0; m.scat = 0; }
+    if (!m.init) { m.init = 1; m.hx = a.position.x; m.hz = a.position.z; m.st = ST_IDLE; m.tm = rng.range(1, 3); m.sd = rng.next() < 0.5 ? -1 : 1; m.cd = 0; m.hitT = m['skirmisher.rearmHitT'] ?? 0; delete m['skirmisher.rearmHitT']; m.shy = 0; m.scat = 0; }
     const dx = c.player.x - a.position.x, dz = c.player.z - a.position.z, d = Math.hypot(dx, dz);
     const toPlayer = Math.atan2(dx, dz);
     m.cd = Math.max(0, m.cd - c.dt);

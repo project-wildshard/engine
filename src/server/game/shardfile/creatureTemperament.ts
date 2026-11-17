@@ -5,7 +5,7 @@ import type { Actor } from '@wildshard/engine/combat/pipeline';
 
 interface Position { readonly x: number; readonly y: number; readonly z: number }
 /** An existing controller retains its own decisions and continuation. */
-export interface TemperamentBrain { readonly run: (dt: number, acquire?: boolean) => void; readonly adapter: SimStateAdapter; readonly provoke?: (target: string) => void; readonly notice?: number; readonly escapeSpeed?: number; readonly crowd?: number; readonly install?: () => () => void }
+export interface TemperamentBrain { readonly run: (dt: number, acquire?: boolean) => void; readonly adapter: SimStateAdapter; readonly provoke?: (target: string) => void; readonly reset?: () => void; readonly notice?: number; readonly escapeSpeed?: number; readonly crowd?: number; readonly install?: () => () => void }
 /** Social membership shares identities, never a second decision controller. */
 export interface CreatureSocialGroup { readonly id: string; readonly members: ReadonlySet<Actor> }
 
@@ -70,7 +70,8 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
     if (returning) {
       host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack();
       if (distance <= stop) {
-        source.adapter.restore(initial); actor.hp = actor.maxHp; returning = false; frightened = false; ambushing = temperament.ambush === true; actor.state = ambushing ? 'hide' : 'idle';
+        if (source.reset === undefined) source.adapter.restore(initial); else source.reset();
+        actor.hp = actor.maxHp; returning = false; frightened = false; ambushing = temperament.ambush === true; actor.state = ambushing ? 'hide' : 'idle';
         actor.setMotion(actor.yaw, 0, 3); return;
       }
       // Leave the native motor room to brake and turn into the authored home stop.

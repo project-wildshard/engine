@@ -15,6 +15,10 @@ export class GuardianBrain<A extends AnimalSim> {
   snapshot(): SimValue { return this.policy.snapshot(); }
   /** Validate without invoking a body recipe or consuming RNG. */
   restore(saved: SimValue): void { this.policy.restore(saved); }
+  /** Wake the initialized policy without inventing a damage event. */
+  provoke(): boolean { return this.policy.provokeInterior(); }
+  /** Rearm only this policy's actor memory after a home return. */
+  reset(): void { this.policy.resetInterior(); }
   /** Preserve the trusted observation API and the host's vertical/contact recipe. */
   think(c: GuardianPorts<A>): void { this.policy.think({ ...c, pattern: 'interior' }); }
 }
