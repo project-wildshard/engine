@@ -1,0 +1,40 @@
+// Fresh-installed-package QA41 proof. Imports and encoder bytes come from node_modules, never the engine checkout.
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
+import {readFileSync,existsSync} from 'node:fs';
+import {join,dirname} from 'node:path';
+import {emptyShardfile} from '@wildshard/engine/host/author';
+import {cookShard} from '@wildshard/engine/game/shardCook';
+import {outputSectionPayloads} from '@wildshard/format/outputFields';
+import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
+import {writeTar} from '@wildshard/format/tar';
+import {validationSourceBytes} from '@wildshard/format/validationReceipt';
+
+const require=createRequire(import.meta.url),engine=dirname(require.resolve('@wildshard/engine/package.json'));
+const basis=await require(join(engine,'scripts/vendor/basisu/basis_encoder.cjs'))({wasmBinary:new Uint8Array(readFileSync(join(engine,'scripts/vendor/basisu/basis_encoder.wasm'))),print:()=>{},printErr:()=>{}});
+basis.initializeBasis();
+const encoder=new basis.BasisEncoder(),rgba=new Uint8Array(64*64*4);
+for(let i=0;i<rgba.length;i++)rgba[i]=i%256;
+encoder.setCreateKTX2File(true);encoder.setKTX2UASTCSupercompression(true);encoder.setUASTC(true);encoder.setMipGen(true);
+encoder.setSliceSourceImage(0,rgba,64,64,basis.ldr_image_type.cRGBA32.value);
+const encoded=new Uint8Array(65536),length=encoder.encode(encoded);encoder.delete();assert.ok(length>0);
+const master=encoded.slice(0,length),json=validationSourceBytes,hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+const files=new Map(),source=emptyShardfile({slug:'installed-cook',name:'Installed cook',author:'Test',revision:1,seed:1});
+const measured=(path,bytes)=>({path,hash:hash(bytes),bytes:bytes.length});
+const sections=[...outputSectionPayloads(source)].map(([name,value])=>{const path=`sections/${name}.json`,bytes=json(value);files.set(path,bytes);return {name,schema:`wildshard:${name}@1`,...measured(path,bytes)};});
+const index={format:'wildshard.shardfile',formatVersion:2,sdk:'0.3',version:source.version,identity:source.identity,build:{sourceHash:'0'.repeat(64),validator:'fixture'},requires:source.requires,admission:{budgets:source.budgets,serverBudget:source.serverBudget,authorCaps:source.authorCaps,critical:source.critical,library:source.library},sections,schemas:[],files:[],runtime:null};
+const texture='/assets/gpu/installed-master.ktx2',discovery=json({native:{ktx2:{phone:{'/assets/rock.png':texture},desktop:{'/assets/rock.png':texture}}}});
+const mount=(url,path,bytes)=>{files.set(path,bytes);return {url,...measured(path,bytes)};};
+const programs={version:2,build:'fixture',lines:['void main() {}'],shaders:[[0]],programs:[[0,0]]};
+const mounts=[mount(`/programs/${source.identity.slug}.json`,'mounts/programs.json',json(programs)),mount(`/shardfiles/${source.identity.slug}/discovery.json`,'mounts/discovery.json',discovery),mount(texture,'mounts/master.ktx2',master)];
+const renderer='f'.repeat(64),cook={version:3,renderer,mounts,packs:'fence',fence:[hash(master)],programs,inputHash:hash(cookPreparationBytes(index,mounts,renderer))};
+const cookBytes=json(cook);files.set('cook.json',cookBytes);files.set('shard.json',json({...index,cook:measured('cook.json',cookBytes)}));
+// No tier override: full cook takes defaultCookTiers -> record -> flush on an installed worker.
+const report=await cookShard(writeTar(files),'cooked',{wireBytes:(_url,bytes)=>bytes.length,now:()=>performance.now(),renderer});
+assert.equal(report.preparation,'current');assert.equal(report.manifests.length,4);assert.ok(existsSync(`cooked${report.server.index}`));
+const manifest=tier=>JSON.parse(readFileSync(`cooked${report.manifests.find(row=>row.tier===tier&&row.set==='whole').url}`,'utf8'));
+const phone=manifest('phone').files,desktop=manifest('desktop').files;
+assert.ok(phone.some(row=>/installed-master\.t512-[a-f0-9]{8}\.ktx2/u.test(row.url)),'phone must use the encoded ASTC file');
+assert.ok(desktop.some(row=>row.url.split('?')[0]===texture),'desktop must keep its original master');
+console.log(JSON.stringify({slug:report.slug,manifests:report.manifests.length,phoneEncoded:true,serverFiles:report.server.files}));
