@@ -165,7 +165,7 @@ apt_source() {
   elif [ "$CHECK" = 1 ]; then say would "add apt source $name"
   else say doing "add apt source $name"; make_source "$name" "$key" "$line"; fi
 }
-BASE_PACKAGES=(ca-certificates curl gnupg git iproute2 openssl procps util-linux sudo)
+BASE_PACKAGES=(ca-certificates curl gnupg git iproute2 openssl openssh-server procps util-linux sudo)
 missing() { local name; for name in "$@"; do installed "$name" || printf '%s ' "$name"; done; }
 have_base() { [ -z "$(missing "${BASE_PACKAGES[@]}")" ]; }
 # shellcheck disable=SC2046 # One word a package.

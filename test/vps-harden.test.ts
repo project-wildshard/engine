@@ -219,3 +219,10 @@ test('VH15: the apply skips a key this kernel lacks (Yama in a container), and -
   expect(apply).toContain('\nkernel.yama.ptrace_scope = 1\n');
   expect(harden).toContain('\nkernel.yama.ptrace_scope >= 1\n');
 });
+
+test('VH16: auditd is skipped only inside a container, where the proofs run (MS3.1)', () => {
+  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const loop = apply.slice(apply.indexOf('for service in auditd acct sysstat; do'), apply.indexOf('done', apply.indexOf('for service in auditd acct sysstat; do')));
+  expect(loop).toContain('[ "$service" = auditd ] && systemd-detect-virt --container --quiet');
+  expect(loop.indexOf('systemd-detect-virt')).toBeLessThan(loop.indexOf('systemctl enable --now'));
+});

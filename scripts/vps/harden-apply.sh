@@ -106,6 +106,8 @@ if [ "$(sed -n 's/^ENABLED="\(.*\)"$/\1/p' /etc/default/sysstat 2>/dev/null)" !=
   sed -i 's/^ENABLED=.*/ENABLED="true"/' /etc/default/sysstat; say doing VH16 'sysstat collects'
 fi
 for service in auditd acct sysstat; do
+  # auditd needs the kernel's audit subsystem, which a container (the rebuild proof's) never has; the box is a VM.
+  if [ "$service" = auditd ] && systemd-detect-virt --container --quiet 2>/dev/null; then say ok VH16 'auditd skipped: a container has no kernel audit'; continue; fi
   if ! systemctl is-enabled --quiet "$service" 2>/dev/null || ! systemctl is-active --quiet "$service"; then systemctl enable --now --quiet "$service"; say doing VH16 "$service on"; fi
 done
 if put /etc/audit/rules.d/90-wildshard.rules 640 root:root VH16 <<'EOF'
@@ -213,7 +215,9 @@ for rule in $drift; do
 done
 
 # What sshd will really do for each account, checked before any reload: the agent's Match reaches it alone, and raynos
-# keeps his own keys.
+# keeps his own keys. sshd -t and -T need its privilege-separation folder, which ssh.service makes when it starts; a fresh
+# install that never started it (the rebuild proof's container) has none.
+install -d -m 755 -o root -g root /run/sshd
 sshd_keys() { sshd -T -C "user=$1,host=wildshard,addr=100.64.0.1" | awk 'tolower($1)=="authorizedkeysfile" {$1=""; sub(/^ /,""); print}'; }
 sshd_verify() {
   local agent raynos
