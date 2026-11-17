@@ -3,7 +3,7 @@ import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {nativeTamingOf} from '../../../src/server/game/riding/nativeTaming';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
-/** The pilot observes only the living horse position, live prompt and balance gauge. No trust/position grants or forceBreak. */
+/** The pilot observes only the living horse position, live prompt and published trust/balance gauges. No trust/position grants or forceBreak. */
 export function nalatiTamingPilot(host: SimHost, stallionId: string, previousBalance: number): { balance: number; commands: HeadlessCommand[] } {
   const taming = nativeTamingOf(host), original = host.entities.get(stallionId);
   if(taming===undefined)throw new Error('Missing native taming owner');
@@ -11,8 +11,12 @@ export function nalatiTamingPilot(host: SimHost, stallionId: string, previousBal
   let x = 0, z = 0, sneak = true;
   if (taming.phase !== 'breaking') {
     const dx = original.position.x - leadPlayer(host).position.x, dz = original.position.z - leadPlayer(host).position.z, length = Math.hypot(dx, dz);
-    if (length > 2.2) { x = dx / length; z = dz / length; }
-    sneak = length < 8; // at the page's 4.3 m/s the walk still catches a grazing horse; the crouch is for the last steps
+    // Offer inside the real 12 m reach, outside the herd's 10 m fear distance until trust reaches 60.
+    // Back away when needed: chasing a shy stallion at arm's length repeatedly starts its flight again.
+    const distance = (taming.view.trust ?? 0) < 60 ? 10.5 : 2.2;
+    const direction = length > distance + .2 ? 1 : length < distance - .2 ? -1 : 0;
+    if (length > 0) { x = direction * dx / length; z = direction * dz / length; }
+    sneak = length < 25; // Keep the native slow-approach trust while within its 25 m range.
   }
   const balance = taming.view.balance, lean = Math.max(-1, Math.min(1, balance * 12 + (balance - previousBalance) * 60 * 3));
   return { balance, commands: [{ kind: 'player', moveX: x, moveZ: z, yaw: 0, commandVersion: 1, crouch: sneak,
