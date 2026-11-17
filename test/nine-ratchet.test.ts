@@ -41,3 +41,23 @@ test('hardware holds frame and load numbers, software still holds submitted work
   r.renderer='ANGLE (SwiftShader Device)';expect(nineFaults(r)).toEqual([]);
   r.play.all.draws95=0;expect(nineFaults(r).join('; ')).toContain('draws p95');
 });
+
+// Run 44040033228, street artifact 14309234027: hosted macOS uses
+// Apple's virtual GPU, not the physical MacBook that set NB6's limits.
+test('hosted Paravirtual GPU observes timing while holding route and geometry',()=>{
+  const r=reading();
+  r.renderer='ANGLE (Apple, ANGLE Metal Renderer: Apple Paravirtual device, Unspecified Version)';
+  r.play.all={fps:4.21861439449197,p95:100,gpu95:55.39999961853027,draws95:101,tris95:843_148};
+  r.play.minutes=[{...r.play.all,fps:4.366666666666666,draws95:101,tris95:843148}];
+  r.load.phases.control=75_138.4;
+  r.load.stage=[{op:'stage:shaders',ms:1200},{op:'stage:firstFrame',ms:9288.2}];
+  expect(nineFaults(r)).toEqual([]);
+  const hardware={...r,renderer:'ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)'};
+  expect(nineFaults(hardware).join('; ')).toMatch(/fps.*frame p95.*gpu~ p95.*control ms.*firstFrame ms/u);
+  r.play.all.draws95=NINE_LIMITS.draws95+1;
+  expect(nineFaults(r).join('; ')).toContain('draws p95');
+  r.play.all.tris95=NINE_LIMITS.triangles95+1;
+  expect(nineFaults(r).join('; ')).toContain('triangles p95');
+  r.play.route.path=[];
+  expect(nineFaults(r).join('; ')).toContain('street route incomplete');
+});
