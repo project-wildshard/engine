@@ -574,6 +574,7 @@
     "./saves/forwardedStorage": "./src/server/engine/saves/forwardedStorage.ts",
     "./net/client": "./src/client/engine/net/client.ts",
     "./net/netRecord": "./src/client/engine/net/netRecord.ts",
+    "./net/playerLogin": "./src/client/engine/net/playerLogin.ts",
     "./net/measurements": "./src/shared/engine/net/measurements.ts",
     "./net/messages": "./src/shared/engine/net/messages.ts",
     "./net/wireMessages": "./src/shared/engine/net/wireMessages.ts",

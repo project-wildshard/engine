@@ -139,6 +139,7 @@
     "src/client/engine/combat/view/slashTrail.ts": "client",
     "src/client/engine/combat/view/SweptMelee.ts": "client",
     "src/client/engine/core/apiOrigin.ts": "client",
+    "src/client/engine/net/playerLogin.ts": "client",
     "src/client/engine/core/assets.ts": "client",
     "src/client/engine/core/bootstrap.ts": "client",
     "src/client/engine/core/crashFlag.ts": "client",

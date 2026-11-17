@@ -62,6 +62,7 @@ import { declaredKitSlots } from '../../../shared/game/shardfile/items';
 import { earlyStandalone, serverRoute } from './serverRoute';
 import { worldHosted } from '../grid/oneWayIn';
 import { setLampFollow } from '@wildshard/engine/render/lookLight';
+import { pageLogin, refreshTicket, ticketBeforeJoin, ticketed, TICKET_REFRESH_MS } from '@wildshard/engine/net/playerLogin';
 
 type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
@@ -413,7 +414,12 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     // a page that left while it asked never joins (Codex review): a cancelled load must not take the device's seat
     if (!answered || scope.disposed) throw new Error('The page left before it joined the world');
     const first = booted === undefined ? undefined : gridOf(booted, pageGoto() === booted);
-    return startOnline({ ...world, keep: releaseKeep(), leaving: onlineLeaving, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
+    // MP2.2e1: a signed-in page joins with its join ticket, so the door seats its account; a guest, or a page the API can't answer,
+    // joins as its device. The ticket is read at each hello, so a redial after a refresh sends the new one.
+    const login = pageLogin(storage), device = deviceIdentity(storage, savePrefix).player;
+    await ticketBeforeJoin(login, device);
+    scope.interval(TICKET_REFRESH_MS, () => { void refreshTicket(login, device); });
+    return startOnline({ ...world, keep: releaseKeep(), leaving: onlineLeaving, loaded: slug, build, identity: name => ticketed(login, deviceIdentity(storage, savePrefix, name)),
       ...(first === undefined ? {} : { grid: first }) });
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
