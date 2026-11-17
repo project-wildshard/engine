@@ -35,3 +35,8 @@ phone 402x874 at DPR2, CPU x4, Nine route, full 60 seconds: exit zero,
 112 draws p95, one complete minute and zero ratchet faults. No
 threshold, renderer, pin, bypass, Xcode or licence change. NB6's
 physical-GPU CI qualification stays open.
+
+The first normal push gate caught types previously hidden by the
+string summary: explicit frame tuples, percentile/window parameters
+and a narrowed exception value now pass the full layered compiler.
+This correction changes no runtime measurement or threshold.

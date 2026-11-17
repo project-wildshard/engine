@@ -218,10 +218,13 @@ try {
   try {
   await sleep(seconds * 1000 + 1500);
   play = await sample.evaluate(captured => {
-    const {world:w,rows,route:nav}=captured, cap = 1000 / 30;
+    const {world:w,route:nav}=captured, cap = 1000 / 30;
+    /** @type {[number,number,number,number,number][]} */const rows=captured.rows;
     if(window.__wildshard?.world!==w) throw new Error('benchmark world changed during play; sample invalid');
     if(rows.length===0) throw new Error('benchmark produced no drawn frames; sample invalid');
+    /** @param {number[]} list @param {number} q */
     const pct = (list, q) => { const s = [...list].sort((a, b) => a - b); return s.length === 0 ? 0 : s[Math.min(s.length - 1, Math.floor(s.length * q))]; };
+    /** @param {[number,number,number,number,number][]} list @param {number} from @param {number} to */
     const sum = (list, from, to) => { const rs = list.filter(r => r[0] >= from && r[0] < to), gpu = rs.map(r => Math.max(0, r[1] - Math.max(r[2], cap)));
       return { fps: rs.length / ((to - from) / 1000), p50: pct(rs.map(r => r[1]), 0.5), p95: pct(rs.map(r => r[1]), 0.95), gpu50: pct(gpu, 0.5), gpu95: pct(gpu, 0.95), draws95: pct(rs.map(r => r[3]), 0.95), tris95: pct(rs.map(r => r[4]), 0.95) }; };
     const span = rows.at(-1)?.[0] ?? 0, tens = [], minutes = [];
@@ -326,6 +329,7 @@ try {
 } catch(error) {
   // A lost document/world is missing evidence, never an empty green sample.
   // Keep the completed load and failure identity in the advisory artifact.
-  if(reportPath!==undefined)writeFileSync(reportPath,`${JSON.stringify({...diagnostic,error:String(error?.stack??error),faults:[String(error?.message??error)]},null,1)}\n`);
+  const fault=error instanceof Error?error.message:String(error),detail=error instanceof Error?error.stack??error.message:String(error);
+  if(reportPath!==undefined)writeFileSync(reportPath,`${JSON.stringify({...diagnostic,error:detail,faults:[fault]},null,1)}\n`);
   throw error;
 } finally { try { await browser?.close(); } finally { await cpu.release(); } }
