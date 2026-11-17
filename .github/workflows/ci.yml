@@ -97,10 +97,15 @@ jobs:
         if: matrix.job == 1
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
-        # A plan branch is new or rebased, so its `before` is zero or off-history: scan from main.
+        # Plan pushes can be new or rebased. New release branches also have
+        # a zero before SHA. Their commits inherited from main were scanned
+        # there, so only the commits outside main need scanning here.
         run: |
           base="$BASE_SHA"
-          case "$GITHUB_REF" in refs/heads/plan/*) base="$(git merge-base origin/main "$GITHUB_SHA")" ;; esac
+          case "$GITHUB_REF:$base" in
+            refs/heads/plan/*|refs/heads/release/*:0000000000000000000000000000000000000000)
+              base="$(git merge-base origin/main "$GITHUB_SHA")" ;;
+          esac
           printf 'refs/heads/main %s refs/heads/main %s\n' "$GITHUB_SHA" "$base" | node .githooks/check-push.mjs
       - name: Require this version's changelog section (Jake, 2026-11-10)
         if: matrix.job == 1
