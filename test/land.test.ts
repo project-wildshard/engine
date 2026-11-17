@@ -780,8 +780,10 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
       .toBe('!\trefs/heads/plan/x:refs/heads/plan/x\t[remote rejected] (hook declined)');
     // A passing check's logged Error never outranks the check that went RED.
     expect(prePushCause('  - tests green in 9 s\nError: expected in a passing test\n  - lint RED in 3.0 s\n')).toBe('lint RED in 3.0 s');
-    expect(prePushCause('Error: Inherited CPU grant is unavailable or is not an actual ancestor grant\nTo /remote.git\n!\tHEAD:refs/heads/main\t[remote rejected] (failed to update ref)\nDone\n'))
+    expect(prePushCause('Error: Inherited CPU grant is unavailable or is not an actual ancestor grant\n', 'To /remote.git\n!\tHEAD:refs/heads/main\t[remote rejected] (failed to update ref)\nDone\n'))
       .toContain('[remote rejected] (failed to update ref)');
+    expect(prePushCause('lint RED in 1 s\nTo /sample.git\n!\tHEAD:refs/heads/main\t[remote rejected] (sample)\nDone\n'))
+      .toBe('lint RED in 1 s');
     expect(prePushCause('')).toBe('no output');
   });
 

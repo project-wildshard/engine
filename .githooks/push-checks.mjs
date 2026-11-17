@@ -216,7 +216,10 @@ async function main(){
       }catch(error){console.error(`  !! known-red: could not read origin/main's reds (${error instanceof Error?error.message:String(error)}); the red stands`);}
     }
   }
-  if(report!==undefined&&process.env.WS_LOCAL_LAND_HEAD)printGateReport(report,process.cwd());
+  if(report!==undefined&&process.env.WS_LOCAL_LAND_HEAD){
+    if(result.ok)console.error(`  - Vitest report retained: ${report}`);
+    else printGateReport(report,process.cwd());
+  }
   if(report!==undefined&&localReport===undefined)rmSync(report,{force:true});
   const seconds=(Date.now()-began)/1000;
   if(seconds>PUSH_BUDGET.warnSeconds)console.error(`  !! full pre-push ${seconds.toFixed(1)} s exceeds ${PUSH_BUDGET.warnSeconds} s target (warning; all proofs retained)`);

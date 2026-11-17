@@ -7,7 +7,7 @@ import {failingIds} from './push-known-red.mjs';
 /** @param {NodeJS.ProcessEnv} env @param {string} [root] @returns {string|undefined} */
 export function gateReport(env,root=process.cwd()){
  if(!env.WS_LOCAL_LAND_HEAD)return env.WS_PUSH_TIMINGS;
- const lane=env.WS_LANE_NAME??'local-land';
+ const lane=(env.WS_LANE_NAME===''?undefined:env.WS_LANE_NAME)??'local-land';
  if(refuseTask(lane)!==null)throw new Error('Local gate requires a plain lane name');
  const dir=resolve(root,'tmp',lane);
  // Existing lane scratch may belong to an earlier session. Keep its owner and

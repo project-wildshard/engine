@@ -50,15 +50,15 @@ function dirtFix(code,path,branch){
 
 /** Git's own lines in a refused push's output, never the hook's cause. */
 const GIT_OWN=/^error: failed to push some refs|^To \S+$|^hint: |^Done$|^!\s/u;
-/** The pre-push's own reason for refusing a push, from git's output (under --porcelain a hook's stdout is git's
- * stdout): a check's `RED` line, else the last thrown error's message, else a remote's rejection, else the hook's
- * last line.
- * @param {string} output @returns {string} */
-export function prePushCause(output){
+/** Prefer an actual remote rejection, otherwise the hook's first RED or last
+ * thrown error. Git forwards hook output on stderr even under --porcelain.
+ * Keep Git's stdout separate from hook stderr, which can print sample trailers.
+ * @param {string} output @param {string} [porcelain] @returns {string} */
+export function prePushCause(output,porcelain=''){
  // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
  const lines=output.split('\n').map(line=>line.replaceAll(/\u001B\[[0-9;]*m/gu,'').trim()).filter(line=>line!=='');
  const hook=lines.filter(line=>!GIT_OWN.test(line));
- const pick=remoteRejection(output)
+ const pick=remoteRejection(porcelain)
   ??hook.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
   ??hook.findLast(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
   ??lines.find(line=>/^!\s.*\[(?:remote )?rejected\]/u.test(line))
@@ -606,7 +606,7 @@ class Landing{
   const result=await gitTee(this.root,args,this.env);
   if(result.status!==0){
    const leased=/\[rejected\].*\((?:stale info|fetch first)\)/u.test(result.stdout);
-   this.receipt(`STOP plan push ${short(sha)} ${leased?'refused (origin moved during the push)':`refused by the pre-push: ${prePushCause(`${result.stderr}\n${result.stdout}`)}`}`);
+    this.receipt(`STOP plan push ${short(sha)} ${leased?'refused (origin moved during the push)':`refused by the pre-push: ${prePushCause(result.stderr,result.stdout)}`}`);
    throw new StopError(leased
     ?`origin ${this.branch} moved while land pushed, so git refused the lease: someone else pushed it. Fetch and integrate their commits, then run land again. Never force over it.`
     :`push of ${this.branch} ${short(sha)} failed: ${result.stdout.trim()}\nA red pre-push names its failing check above; fix forward and run land again.`);
@@ -795,7 +795,7 @@ class Landing{
   if(isAncestor(this.root,head,now))return 'landed';
   const rejected=remoteRejection(result.stdout)!==undefined;
   if(!result.interrupted&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
-  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(`${result.stdout}\n${result.stderr}`);
+  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(result.stderr,result.stdout);
   this.receipt(`STOP main push of ${short(head)} refused: ${cause}`);
   throw new StopError(`main push of ${short(head)} refused: ${cause}\nFix forward and run land again.`);
  }

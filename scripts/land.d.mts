@@ -17,6 +17,6 @@ export function flakyFiles(directory: string, jobNames: readonly string[]): stri
 export function strikePlans(book: string, file: string, now: number): string[];
 export function quarantineFile(path: string, file: string, owner: string, reason: string, now: number): boolean;
 export const STAMPS: readonly string[];
-export function prePushCause(output: string): string;
+export function prePushCause(output: string, porcelain?: string): string;
 export const REF_LOCK: RegExp;
 export function tryGitLocked(cwd: string, args: string[], env: NodeJS.ProcessEnv, onRetry?: (why: string) => void): SpawnSyncReturns<string>;

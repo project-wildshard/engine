@@ -19,3 +19,9 @@ a unique JSON report under tmp/<lane>/, retains it, and prints assertion
 and setup failure files to stderr where land shows them live. Missing or
 unreadable reports explicitly name the expected path. JSON output remains
 available for unhandled errors even when it names no failed test file.
+
+Review follow-up: keep Git stdout and hook stderr separate when choosing
+the stop message as well as when deciding whether main moved. An expected
+sample porcelain trailer from a passing test cannot outrank a genuine red
+hook. Its regression failed first. Green gates print the retained report
+path without suggesting that successful tests need failure inspection.

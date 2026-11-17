@@ -10,6 +10,7 @@ import { prePushCause } from '../scripts/land.mjs';
 import { gateReport, printGateReport } from '../scripts/gate-report.mjs';
 
 test('local gate keeps a JSON report and names assertion and setup failures', () => {
+  mkdirSync('tmp', { recursive: true });
   const work = mkdtempSync(resolve('tmp/gate-report-'));
   try {
     const path = gateReport({ WS_LOCAL_LAND_HEAD: 'a'.repeat(40), WS_LANE_NAME: 'fixture' }, work);
