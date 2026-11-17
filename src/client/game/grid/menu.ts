@@ -28,7 +28,7 @@ export const PREPARATION_ONLY: boolean = typeof __PREPARATION_ONLY__ === 'boolea
 export interface MenuMode { readonly developer: boolean; readonly devserver: boolean }
 export function menuMode(): MenuMode { return { developer: isDev(), devserver: DEVSERVER }; }
 
-/** Infinite Wildshard is on the title only with Settings ▸ Developer on, until SF22's gates pass (G61 E1). J300 (amends GO7's DG4): a
+/** MAIN-SCREEN MS1 (J399): the main screen no longer asks this; ENTER THE MMO shows to every player. Was: Infinite Wildshard on the title only with Developer on, until SF22's gates passed (G61 E1). J300 (amends GO7's DG4): a
  *  world that hosts the grid doesn't show it either; the non-Developer title keeps Shard select, which enters that grid at the
  *  shard's cell, until Jake's main-menu redesign. */
 export function gridEntryShown(mode: MenuMode = menuMode(), gatesPassed: boolean = GRID_GATES_PASSED): boolean {

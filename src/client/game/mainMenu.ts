@@ -1,9 +1,9 @@
 /**
- * The Wildshard main menu (SHARD-PLATFORM SF21a; Jake's picks G79 / G88, board `art/menu/round-7-new-main-menu/B-*`):
- * a first-person crossroads hero, the WILDSHARD logo, two big side-by-side cards SHARD SELECT and INFINITE WILDSHARD,
- * and SETTINGS. With Developer off INFINITE WILDSHARD is hidden until SF22's gates pass (G63), and SHARD SELECT is one
- * wide card. SHARD SELECT opens today's shard deck (src/client/game/titleDeck.ts), unchanged (G58 / G64): the deck sits under the
- * menu, laid out (so its carousel centres), and a MAIN MENU button beside its SETTINGS comes back.
+ * The Wildshard main menu (MAIN-SCREEN, J387 / J399 board B, full-bleed; was SHARD-PLATFORM SF21a's G79 / G88 two cards): the
+ * crossroads hero over the whole screen, framed wide enough on a phone that every zone of the grid shows, the WILDSHARD logo,
+ * one loud ENTER THE MMO (the grid's entry, `onGrid`, for every player: Developer no longer gates it) and a quieter ZONE SELECT
+ * that opens the deck (src/client/game/titleDeck.ts), then SETTINGS and the DEV switch. The deck sits under the menu, laid out
+ * (so its carousel centres), and its BACK comes back.
  *
  *   const view = buildTitleMenu({ ...deck options, onGrid })   // a TitleDeckView: the cold title and pause ▸ EXIT TO MAIN
  *
@@ -20,7 +20,7 @@ import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
 import { lastEnd, type LastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type TitleDeck, type TitleDeckOptions } from './titleDeck';
-import { gridEntryShown, menuMode, gridMode } from './grid/menu';
+import { menuMode, gridMode } from './grid/menu';
 import { dropGridIntent, enterGrid, gridRecoveryLoop } from './grid/pageEntry';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { saves } from '@wildshard/engine/saves/runtime';
@@ -46,9 +46,6 @@ const FIRST_HERO: string = titleAssetURL('/assets/title/main-crossroads-landscap
 const FIRST_SQUARE_HERO: string = titleAssetURL('/assets/title/main-crossroads-square-first.jpg');
 
 const CARDS_ICON = '<svg viewBox="0 0 64 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="11" width="18" height="27" rx="2" transform="rotate(-16 15 24)"/><rect x="40" y="11" width="18" height="27" rx="2" transform="rotate(16 49 24)"/><rect x="22" y="4" width="20" height="31" rx="2" fill="rgba(6,10,18,0.85)"/></g></svg>';
-const GRID_CELLS = [0, 1, 2].flatMap((r) => [0, 1, 2].map((c) => `<rect x="${17 + c * 11}" y="${6 + r * 13}" width="8" height="9" rx="1"/>`)).join('');
-const GRID_DOTS = [10, 24, 38].flatMap((y) => [`<circle cx="9" cy="${y + 1}" r="1.4"/>`, `<circle cx="55" cy="${y + 1}" r="1.4"/>`]).join('');
-const GRID_ICON = `<svg viewBox="0 0 64 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2">${GRID_CELLS}</g><g fill="currentColor">${GRID_DOTS}</g></svg>`;
 
 /** The two title-menu destinations. */
 export type MainMenuScreen = 'main' | 'select';
@@ -59,7 +56,7 @@ let screen: MainMenuScreen = 'main';
 export interface TitleMenuOptions extends Omit<TitleDeckOptions, 'cards'> {
   /** the deck's cards (default: `titleCards()`, Developer read live) */
   readonly cards?: TitleDeckOptions['cards'];
-  /** INFINITE WILDSHARD's tap: boots the grid from its one-shot intent (src/client/game/plugin/context.ts `enterGrid`) */
+  /** ENTER THE MMO's tap: boots the grid from its one-shot intent (src/client/game/grid/pageEntry.ts `enterGrid`) */
   readonly onGrid: () => void;
   /** which screen to open on (default: the one this page was last on, the main menu at first) */
   readonly screen?: MainMenuScreen;
@@ -111,7 +108,6 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     // session save, so it survives the hand-over); any other entry drops a first play armed and never reached
     onEnter: (card) => { if (!(phone && !firstPlayDone() && startFirstPlay(card.slug))) dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
     onExplore: (card) => { dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onExplore(card); } });
-  const grid = gridEntryShown(mode());
   const s = GAME_STRINGS.mainMenu;
   const dev = mode().developer;
   // E7.5 prep: a build stamped with a world (`__WS_WORLD__`, as clientWorker.ts reads it) offers the Connection doctor on its title
@@ -125,9 +121,9 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     <div class="ws-main-hero"></div>
     <div class="ws-main-head"><div class="ws-main-logo">${s.logo}</div></div>
     <div class="ws-main-foot">
-      <div class="ws-main-cards${grid ? '' : ' one'}" role="group" aria-label="${s.label}">
-        <button class="ws-main-card ws-main-select" type="button"><span class="ws-main-icon">${CARDS_ICON}</span><b>${s.shardSelect}</b></button>
-        ${grid ? `<button class="ws-main-card ws-main-grid" type="button"><span class="ws-main-icon">${GRID_ICON}</span><b>${s.infinite}</b> <i class="ws-main-card-exp">${s.experimental}</i></button>` : ''}
+      <div class="ws-main-cards" role="group" aria-label="${s.label}">
+        <button class="ws-main-card ws-main-mmo ws-main-grid" type="button"><b>${s.enterMmo}</b><small><i class="ws-main-live" aria-hidden="true"></i>${s.enterMmoLine}</small></button>
+        <button class="ws-main-card ws-main-select" type="button"><span class="ws-main-icon">${CARDS_ICON}</span><b>${s.zoneSelect}</b></button>
       </div>
       <div class="ws-main-row">
         <button class="ws-main-settings" type="button">${s.settings}</button>
@@ -158,7 +154,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const banner = buildWhatsNewBanner({ news: whatsNew, developer: mode().developer, onTap: deck.onTap,
     ...(whatsNewStore === undefined ? {} : { store: whatsNewStore }) });
   if (banner !== null) required(main, '.ws-main-logo', HTMLElement).after(banner.root);
-  // G106 (Jake: "A Carousel restyled"): SHARD SELECT is today's deck, same path and behaviour (G64), restyled to the menu:
+  // G106 (Jake: "A Carousel restyled"): ZONE SELECT (J387, was SHARD SELECT) is today's deck, same path and behaviour (G64), restyled to the menu:
   // BACK and the SHARD SELECT title on top, the crossroads hero dimmed behind, one big card, a thumbnail strip for the dots
   // (DEVELOPER tags, a COMING SOON lock) and a wide ENTER WORLD (src/client/game/mainMenu.css `.ws-menu-carousel`)
   deck.root.classList.add('ws-menu-carousel');
@@ -170,12 +166,12 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   back.textContent = s.back;
   const title = document.createElement('div');
   title.className = 'ws-menu-title';
-  title.textContent = s.shardSelect;
+  title.textContent = s.zoneSelect;
   bar.append(back, title);
   deck.root.querySelector('.ws-menu-head')?.prepend(bar);
   root.append(deck.root, main);
 
-  const selectCard = required(main, '.ws-main-select', HTMLButtonElement);
+  const selectCard = required(main, '.ws-main-select', HTMLButtonElement), mmoCard = required(main, '.ws-main-mmo', HTMLButtonElement);
   const show = (next: MainMenuScreen): void => {
     screen = next; viewScreen = next;
     root.dataset['screen'] = next;
@@ -183,7 +179,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     deck.root.classList.toggle('hide', next !== 'select');
     main.inert = next !== 'main';
     deck.root.inert = next !== 'select';
-    if (next === 'main') selectCard.focus({ preventScroll: true });
+    if (next === 'main') mmoCard.focus({ preventScroll: true });
   };
   // SHARD SELECT always opens the deck, and nothing loads until a card is picked (Jake, 2026-11-12: "That shard select insta
   // loads driftwood bug is still here"). MOBILE-GRAPHICS MG5 used to skip the deck on a phone's first PLAY for card 0
@@ -191,7 +187,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // player who backed out or never noticed the card) skipped it on every tap. A phone with no mark now opens the deck on card 0, and the
   // first-play card is armed for whichever card the player enters (onEnter above)
   // MMO-PLAN MP2.4 (Jake, 2026-11-11: "Ask the user for their name… after they hit play but before we pop them into the world"):
-  // a device's first PLAY (or INFINITE WILDSHARD) asks for the Name once, then goes on; every later one goes straight through
+  // a device's first PLAY (or ENTER THE MMO) asks for the Name once, then goes on; every later one goes straight through
   let naming = false;
   let nameIdle = Promise.resolve();
   const named = async (next: () => void): Promise<void> => {
@@ -210,8 +206,8 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   };
   const play = (): void => { void named(enterPlay); };
   deck.onTap(selectCard, play);
-  const gridCard = main.querySelector('.ws-main-grid');
-  if (gridCard instanceof HTMLButtonElement) deck.onTap(gridCard, () => { if (gridEntryShown(mode())) void named(() => { dropFirstPlay(); onGrid(); leaveTitle(); }); });
+  const enterMmo = (): void => { void named(() => { dropFirstPlay(); onGrid(); leaveTitle(); }); };
+  deck.onTap(mmoCard, enterMmo);
   // S2: only the player's last product, after the title paints; a first visit reads nothing. This is verified
   // disk prefetch, never world construction or a hidden offline-size scan. It shows nothing (QB2).
   let started = false;
@@ -246,7 +242,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   if (doctor instanceof HTMLButtonElement) deck.onTap(doctor, () => { leaveTitle(); location.assign('/doctor/?sw=0&from=title'); });
   // E483 (Jake: "a better dev toggle … without having to go to the settings page"; E140's ask): the same live switch as
   // Settings ▸ Developer. Both title paths rebuild on the change (StartTitle / HUD `onDev`) on this screen, so the menu, the
-  // INFINITE WILDSHARD card and SHARD SELECT's locked cards follow it at once.
+  // ZONE SELECT's locked cards follow it at once.
   deck.onTap(required(main, '.ws-main-dev', HTMLButtonElement), () => { setDev(!dev); });
   deck.onTap(back, () => { show('main'); });
   show(viewScreen);
@@ -257,17 +253,17 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     get screen() { return viewScreen; },
     show,
     whenIdle: () => nameIdle,
-    // the HUD's arrow keys move the deck; on the main menu they wait for SHARD SELECT
+    // the HUD's arrow keys move the deck; on the main menu they wait for ZONE SELECT
     select: (i, smooth) => { deck.select(i, smooth); },
-    // the HUD's confirm / any key: the main menu's first card opens the deck, the deck enters its card
-    activate: () => { if (viewScreen === 'main') play(); else deck.activate(); },
-    start: () => { deck.start(); startPrefetch(); if (viewScreen === 'main') selectCard.focus({ preventScroll: true }); },
+    // the HUD's confirm / any key: the main menu's first button, ENTER THE MMO, enters the world; the deck enters its card
+    activate: () => { if (viewScreen === 'main') enterMmo(); else deck.activate(); },
+    start: () => { deck.start(); startPrefetch(); if (viewScreen === 'main') mmoCard.focus({ preventScroll: true }); },
     dispose: () => { owner.dispose(); deck.dispose(); },
   };
 }
 
 /**
- * The cold title's Infinite Wildshard wiring (SF21a), one call for the composition root (src/client/app/entry.ts):
+ * The cold title's ENTER THE MMO wiring (SF21a's grid entry), one call for the composition root (src/client/app/entry.ts):
  *   - a stale one-shot intent is consumed here, so nothing but a new tap boots the grid (R3-C5);
  *   - when the previous page (the grid, or any standalone world by name, QB6) ended unexpectedly (iOS's memory kill),
  *     the title only adds one line.

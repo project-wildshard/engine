@@ -126,3 +126,29 @@ test('a fresh phone that picks another card gets its first-play card there, and 
   expect(onEnter.mock.calls.map(([c]) => c.slug)).toEqual(['nalati']);
   expect(firstPlayPending('nalati')).toBe(true); expect(firstPlayPending('driftwood-isle')).toBe(false);
 });
+
+/** MAIN-SCREEN MS1 (J387, J399: "a call to action that's like enter the MMO. And below it is just like a select a zone"): every
+ *  player gets one ENTER THE MMO, the grid's entry (Developer no longer gates it), and one ZONE SELECT that opens the deck. The
+ *  Infinite Wildshard card and its EXPERIMENTAL tag are gone; `.ws-main-grid` stays ENTER THE MMO's hook for the proof scripts. */
+for (const developer of [false, true]) {
+  test(`MS1: Developer ${developer ? 'on' : 'off'}: one ENTER THE MMO enters the grid, one ZONE SELECT opens the deck`, async () => {
+    const onGrid = vi.fn<() => void>(), onEnter = vi.fn<(c: TitleCard) => void>();
+    const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onExplore: () => undefined, onSettings: () => undefined, onGrid,
+      mode: () => ({ developer, devserver: false }) });
+    document.body.append(view.root); views.push(view);
+    const mmo = view.root.querySelectorAll('.ws-main-mmo'), zone = view.root.querySelectorAll('.ws-main-select');
+    expect([mmo.length, zone.length]).toEqual([1, 1]);
+    expect(mmo[0]?.classList.contains('ws-main-grid')).toBe(true);
+    expect(mmo[0]?.querySelector('b')?.textContent).toBe('ENTER THE MMO');
+    expect(zone[0]?.querySelector('b')?.textContent).toBe('ZONE SELECT');
+    expect(view.root.querySelector('.ws-menu-title')?.textContent).toBe('ZONE SELECT');
+    expect(view.root.textContent).not.toMatch(/infinite wildshard|experimental|shard select/iu);
+    mmo[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await frames();
+    expect(onGrid).toHaveBeenCalledTimes(1);
+    expect(onEnter).not.toHaveBeenCalled();
+    tap(zone[0] ?? null);
+    await frames();
+    expect(view.screen).toBe('select');
+  });
+}

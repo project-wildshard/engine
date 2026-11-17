@@ -12,14 +12,15 @@ export const GAME_STRINGS = {
     followBuild: 'Follow the build',
     draftMode: 'Draft mode',
   },
-  /** the Wildshard main menu (SF21a, G79 / G88: Jake's board B; the grid entry is "Infinite Wildshard" everywhere players see it) */
+  /** the Wildshard main menu (MAIN-SCREEN, J387 / J399: ENTER THE MMO for every player, then ZONE SELECT, the deck) */
   mainMenu: {
     logo: 'WILDSHARD',
     label: 'Main menu',
-    shardSelect: 'SHARD SELECT',
-    infinite: 'INFINITE WILDSHARD',
-    /** G61 E1: the amber tag on the Infinite Wildshard card's corner */
-    experimental: 'EXPERIMENTAL',
+    /** J387: "a call to action that's like enter the MMO": the one online world, entered at its home cell or the last place */
+    enterMmo: 'ENTER THE MMO',
+    enterMmoLine: 'ONE WORLD · EVERY ZONE · LIVE',
+    /** J387: "Not shard select, zone select" */
+    zoneSelect: 'ZONE SELECT',
     settings: 'SETTINGS',
     back: 'BACK',
     /** E483 (E140 again): the compact Developer switch beside SETTINGS, the same switch as Settings ▸ Developer */
