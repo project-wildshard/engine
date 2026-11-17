@@ -983,6 +983,8 @@ export interface NativeMeleePorts {
 export interface NativeMeleeOwner { readonly family: ContactFamily<NativeMeleeTarget>; readonly cracked: (player: string) => number | null }
 const NativeHoldState = v.strictObject({version:v.literal(1),held:v.pipe(v.number(),v.finite(),v.minValue(0)),wasHeld:v.boolean(),
   target:v.nullable(v.pipe(v.string(),v.minLength(1),v.maxLength(128)))});
+/** A non-lead seat's melee continuation: its melee state and the hold that rides with it (the lead's hold has its own adapter). */
+const SeatMeleeState = v.strictObject({ melee: v.unknown(), hold: v.string() });
 /** Install immediate and delayed item contacts on one renderer-free owner, retaining ordered commands and wire bindings. */
 export function installNativeMelee(host: SimHost, weapon: { readonly id: string; readonly contacts?: readonly NativeMeleeContact[] },
   input: unknown, given: NativeMeleePorts): NativeMeleeOwner {
@@ -1179,7 +1181,14 @@ export function installNativeMelee(host: SimHost, weapon: { readonly id: string;
   return { family, cracked: () => cracked, sampleHeld, holdSnapshot, restoreHold, step,
     // the first player's hold keeps its own adapter; another's rides with its seat
     snapshot: ():SimValue => first||!holdStepped?snapshot():{melee:snapshot(),hold:holdSnapshot()},
-    restore: (value:unknown):void => { if(first||!holdStepped){restore(value);return;} const saved=v.parse(v.strictObject({melee:v.unknown(),hold:v.string()}),value); restore(saved.melee); restoreHold(saved.hold); } };
+    // MP1.6 churn: a seat's role is only its arrival order, so a save made in either role reads back in the other. The lead's shape
+    // in another seat starts that seat's hold over; another seat's shape in the lead restores the hold it carried.
+    restore: (value:unknown):void => {
+      const carried=holdStepped?v.safeParse(SeatMeleeState,value):undefined;
+      if(carried?.success===true){restore(carried.output.melee);restoreHold(carried.output.hold);return;}
+      restore(value);
+      if(!first&&holdStepped)restoreHold(undefined);
+    } };
   });
   const {lead}=seats;
   if(row.held?.continuation.kind==='step')host.onStep(row.held.continuation.id,lead.sampleHeld,{snapshot:lead.holdSnapshot,restore:lead.restoreHold});
