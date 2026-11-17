@@ -7,6 +7,7 @@ export interface BootStepPeak { step: string; peakBytes: number; renderer: numbe
 export interface BootMemoryVerdict {
   peakBytes: number;
   peak: { renderer: number; gpu: number; browser: number; heapBytes: number; step: string; atMs: number };
+  rendererPeak: { bytes: number; step: string; atMs: number };
   heapPeakBytes: number; steps: BootStepPeak[]; samples: number; factor: number; phoneBytes: number; budgetBytes: number; pass: boolean;
 }
 export function processDumps(events: readonly unknown[]): Map<string, BootProcessTotals>;

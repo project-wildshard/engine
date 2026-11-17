@@ -7,7 +7,8 @@
 // light memory-infra dump names the renderer, GPU and browser processes' private footprint (the number Chromium's task
 // manager shows, Linux and macOS alike), and CDP Runtime.getHeapUsage reads the JS heap; each sample is named by the loading
 // step that was running (`.ws-load[data-step]`). The peak is the largest renderer + GPU sum in one dump. The page boots
-// with Developer mode on, so an over-budget shard still loads and is measured (MG3's phone refusal spares developers).
+// with Developer mode on, so an over-budget shard still loads and is measured (MG3's phone refusal spares developers), on Low
+// graphics. The phone estimate is the renderer's peak under the loading card x CHROMIUM_TO_PHONE (see there for why).
 //
 //   node scripts/boot-memory-peak.mjs --url=<served client> --chunk=<slug> [--out=<file.json>] [--every=250]
 //        [--settle=5] [--timeout=240] [--factor=<chromium to phone>] [--budget-bytes=1500000000] [--entry=url|select]
@@ -15,7 +16,7 @@
 // --entry=select walks in as a player does (title, SHARD SELECT, the shard's card, ENTER WORLD) instead of `?chunk=`:
 // a released page (staging) takes that way in.
 //
-// --budget-bytes exits 1 when the phone estimate (peak x --factor) passes it. The line is engine's MEMORY_AMBER (1.5 GB,
+// --budget-bytes exits 1 when the phone estimate (loading renderer peak x --factor) passes it. The line is engine's MEMORY_AMBER (1.5 GB,
 // src/client/game/grid/budgetOverlay.ts); --factor defaults to MG2's calibration for this platform (CHROMIUM_TO_PHONE). A shard repo runs it
 // through `wildshard memory`; engine CI runs it on the Nine preview (`scripts/nine-ring1.mjs memory`).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -26,13 +27,21 @@ import * as v from 'valibot';
 /** Engine's MEMORY_AMBER (src/client/game/grid/budgetOverlay.ts): red over it in CI (J408). Decimal bytes. */
 export const MEMORY_LINE_BYTES = 1.5e9;
 /**
- * Chromium's headless phone-tier peak (renderer + GPU) to the iPhone's, by the host's platform (MEMORY-GATES MG2). The
- * phone: mini-boot99's iOS Simulator Web Inspector peak for staging v0.1.36 Nine Low cold, 1.318 GB, x1.4 (E271) = 1.845 GB.
- * darwin: this probe on the mini (Metal), engine preview v0.1.33-57 with the same pinned Nine rev 2, peaks 2085 and
- * 2162 MB (2026-11-17), so 1845 / 2124 = 0.87. linux: SwiftShader's GPU process is not Metal's; 1 (the reading as is)
- * until a hosted Linux reading of the same build calibrates it. One build pair each: re-calibrate when a phone reading moves.
+ * The phone estimate's factor: the iPhone's WebContent footprint over Chromium's RENDERER peak while the loading card is up
+ * (MEMORY-GATES MG2, recalibrated by mini-memcal 2026-11-17 on one build pair; meta mini QA 19).
+ * Why the renderer alone: Chromium's GPU process on Mac Metal is not the phone's meter. Its ANGLE Metal allocation read
+ * 1.3-4.5 GB on runs of the same build, about 7-20x the ~0.25 GB of buffers and textures the page asked WebGL for.
+ * ANGLE on GL read 0.6 GB for that build, and WebKit's own ANGLE Metal (the Simulator's SimMetalHost) read 0.5-0.6 GB.
+ * Chromium-only overhead in it is a further ~0.3 GB (skia, dawn, shared images, transfer memory).
+ * The renderer read 1.01-1.08 GB on every run of both builds.
+ * The anchor: staging v0.1.36 (`6f53e748`, Nine rev 2, Low) killed Jake's iPhone 17 Pro at "boot plan complete ... at
+ * compile:after", so the phone was over its ~2.05 GB WebContent line there. On that build and boot point this probe's
+ * renderer read 1.03-1.06 GB, so the phone is at least ~1.95x the renderer; 2.0 rounds that up. It is a floor from one crash,
+ * not a fit: re-calibrate when a phone boots a shard or reads its footprint. The renderer is CPU memory and does not
+ * depend on the GPU backend, so Linux takes the same factor. Was 0.87 x (renderer + GPU), from a 1.845 GB "phone" that was
+ * the Simulator Inspector x1.4, a figure under the line the phone actually crossed.
  */
-export const CHROMIUM_TO_PHONE = Object.freeze({ darwin: 0.87, linux: 1 });
+export const CHROMIUM_TO_PHONE = Object.freeze({ darwin: 2, linux: 2 });
 /** The factor for this host. @param {string} [platform] */
 export function chromiumToPhone(platform = process.platform) { return platform === 'darwin' ? CHROMIUM_TO_PHONE.darwin : CHROMIUM_TO_PHONE.linux; }
 
@@ -97,8 +106,13 @@ export function bootMemoryVerdict(samples, dumps, { factor = chromiumToPhone(), 
     if (known === undefined || sum(row) > known.peakBytes) steps.set(row.step, { step: row.step, peakBytes: sum(row), renderer: row.renderer, gpu: row.gpu, heapBytes: Math.max(row.heapBytes, known?.heapBytes ?? 0) });
     else known.heapBytes = Math.max(known.heapBytes, row.heapBytes);
   }
-  const peakBytes = sum(peak), phoneBytes = Math.round(peakBytes * factor);
+  // The phone's meter: the renderer under the loading card (the step the phone died in), x the factor. After the card the
+  // renderer keeps growing with GC timing; that window has no phone reading to calibrate against.
+  const loading = readings.filter(row => row.step !== 'ready');
+  const rendererPeak = (loading.length > 0 ? loading : readings).reduce((best, row) => row.renderer > best.renderer ? row : best);
+  const peakBytes = sum(peak), phoneBytes = Math.round(rendererPeak.renderer * factor);
   return { peakBytes, peak: { renderer: peak.renderer, gpu: peak.gpu, browser: peak.browser, heapBytes: peak.heapBytes, step: peak.step, atMs: peak.atMs },
+    rendererPeak: { bytes: rendererPeak.renderer, step: rendererPeak.step, atMs: rendererPeak.atMs },
     heapPeakBytes: heapPeak, steps: [...steps.values()], samples: readings.length, factor, phoneBytes, budgetBytes, pass: phoneBytes <= budgetBytes };
 }
 
@@ -106,7 +120,8 @@ export function bootMemoryVerdict(samples, dumps, { factor = chromiumToPhone(), 
 export function bootMemoryLine(slug, verdict) {
   const mb = (/** @type {number} */ bytes) => `${(bytes / 1e6).toFixed(0)} MB`;
   return `BOOT MEMORY ${slug}: ${verdict.pass ? 'PASS' : 'RED'} phone ${mb(verdict.phoneBytes)} / ${mb(verdict.budgetBytes)}`
-    + ` (Chromium peak ${mb(verdict.peakBytes)} = renderer ${mb(verdict.peak.renderer)} + GPU ${mb(verdict.peak.gpu)} at ${verdict.peak.step}, x${verdict.factor});`
+    + ` (loading renderer ${mb(verdict.rendererPeak.bytes)} at ${verdict.rendererPeak.step} x${verdict.factor});`
+    + ` Chromium peak ${mb(verdict.peakBytes)} = renderer ${mb(verdict.peak.renderer)} + GPU ${mb(verdict.peak.gpu)} at ${verdict.peak.step};`
     + ` JS heap peak ${mb(verdict.heapPeakBytes)}; ${verdict.samples} dumps`;
 }
 
@@ -149,6 +164,8 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
     const context = await browser.newContext({ viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
     await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+    // Low graphics (1x, no sun shadows): the preset Jake's phone ran when it crashed, so the calibration's preset
+    await saveFixture(context, { scope: 'device', key: 'graphics', data: 'low' });
     await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0 } });
     await context.addInitScript(STEP_PROBE);
     await context.route('**/api/errors', route => route.fulfill({ status: 204, body: '' }));
