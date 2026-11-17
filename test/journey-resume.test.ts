@@ -23,9 +23,9 @@ function resumingPage(menuAfter = Infinity) {
 }
 
 test('an old shell that resumes into its world is followed to play, its Name skipped, with no menu tapped', { timeout: 15_000 }, async () => {
-  for (const path of ['select', 'mmo']) {
+  for (const path of ['select', 'mmo'] as const) {
     const { page, taps } = resumingPage();
-    const samples = await tapJourney(page, { card: 'driftwood-isle', path, budgetMs: 10_000, sampleMs: 10 }) as unknown as { resumed?: boolean; at: (i: number) => unknown };
+    const samples = await tapJourney(page as never, { card: 'driftwood-isle', path, budgetMs: 10_000, sampleMs: 10 }) as unknown as { resumed?: boolean; at: (i: number) => unknown };
     expect(samples.resumed).toBe(true);
     expect(judge(samples as never)).toEqual([]);
     expect(taps).toEqual(['#ws-name-box [data-name=skip]']);
@@ -34,7 +34,7 @@ test('an old shell that resumes into its world is followed to play, its Name ski
 
 test('an old shell that updates into this build\'s main screen after its resume is tapped through as ever', { timeout: 15_000 }, async () => {
   const { page, taps } = resumingPage(3);
-  const samples = await tapJourney(page, { card: 'driftwood-isle', path: 'mmo', budgetMs: 10_000, sampleMs: 10 }) as unknown as { resumed?: boolean };
+  const samples = await tapJourney(page as never, { card: 'driftwood-isle', path: 'mmo', budgetMs: 10_000, sampleMs: 10 }) as unknown as { resumed?: boolean };
   expect(samples.resumed).toBeUndefined();
   expect(taps).toContain('.ws-main-mmo');
 });
