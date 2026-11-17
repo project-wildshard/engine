@@ -10,10 +10,13 @@
 // with Developer mode on, so an over-budget shard still loads and is measured (MG3's phone refusal spares developers).
 //
 //   node scripts/boot-memory-peak.mjs --url=<served client> --chunk=<slug> [--out=<file.json>] [--every=250]
-//        [--settle=5] [--timeout=240] [--factor=<chromium to phone>] [--budget-bytes=1500000000]
+//        [--settle=5] [--timeout=240] [--factor=<chromium to phone>] [--budget-bytes=1500000000] [--entry=url|select]
+//
+// --entry=select walks in as a player does (title, SHARD SELECT, the shard's card, ENTER WORLD) instead of `?chunk=`:
+// a released page (staging) takes that way in.
 //
 // --budget-bytes exits 1 when the phone estimate (peak x --factor) passes it. The line is engine's MEMORY_AMBER (1.5 GB,
-// src/client/game/grid/budgetOverlay.ts); --factor is MG2's calibration (CHROMIUM_TO_PHONE below). A shard repo runs it
+// src/client/game/grid/budgetOverlay.ts); --factor defaults to MG2's calibration for this platform (CHROMIUM_TO_PHONE). A shard repo runs it
 // through `wildshard memory`; engine CI runs it on the Nine preview (`scripts/nine-ring1.mjs memory`).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
@@ -22,8 +25,16 @@ import * as v from 'valibot';
 
 /** Engine's MEMORY_AMBER (src/client/game/grid/budgetOverlay.ts): red over it in CI (J408). Decimal bytes. */
 export const MEMORY_LINE_BYTES = 1.5e9;
-/** Chromium's headless phone-tier peak to the iPhone's: MG2 calibrates it (1 until then: the Chromium reading as is). */
-export const CHROMIUM_TO_PHONE = 1;
+/**
+ * Chromium's headless phone-tier peak (renderer + GPU) to the iPhone's, by the host's platform (MEMORY-GATES MG2). The
+ * phone: mini-boot99's iOS Simulator Web Inspector peak for staging v0.1.36 Nine Low cold, 1.318 GB, x1.4 (E271) = 1.845 GB.
+ * darwin: this probe on the mini (Metal), engine preview v0.1.33-57 with the same pinned Nine rev 2, peaks 2085 and
+ * 2162 MB (2026-11-17), so 1845 / 2124 = 0.87. linux: SwiftShader's GPU process is not Metal's; 1 (the reading as is)
+ * until a hosted Linux reading of the same build calibrates it. One build pair each: re-calibrate when a phone reading moves.
+ */
+export const CHROMIUM_TO_PHONE = Object.freeze({ darwin: 0.87, linux: 1 });
+/** The factor for this host. @param {string} [platform] */
+export function chromiumToPhone(platform = process.platform) { return platform === 'darwin' ? CHROMIUM_TO_PHONE.darwin : CHROMIUM_TO_PHONE.linux; }
 
 const hex = v.pipe(v.string(), v.regex(/^[a-f0-9]+$/iu));
 const named = v.looseObject({ pid: v.number(), name: v.literal('process_name'), args: v.looseObject({ name: v.string() }) });
@@ -66,7 +77,7 @@ export function processDumps(events) {
  * loading step, and the phone estimate against the line. Refuses a run with no dump that saw a renderer.
  * @param {readonly BootSample[]} samples @param {Map<string,{browser:number,renderer:number,gpu:number}>} dumps
  * @param {{factor?:number, budgetBytes?:number}} [options] */
-export function bootMemoryVerdict(samples, dumps, { factor = CHROMIUM_TO_PHONE, budgetBytes = MEMORY_LINE_BYTES } = {}) {
+export function bootMemoryVerdict(samples, dumps, { factor = chromiumToPhone(), budgetBytes = MEMORY_LINE_BYTES } = {}) {
   if (!(Number.isFinite(factor) && factor > 0) || !(Number.isFinite(budgetBytes) && budgetBytes > 0)) throw new RangeError('Invalid memory verdict factor or budget');
   /** @type {BootReading[]} */
   const readings = [];
@@ -116,11 +127,10 @@ const STEP_PROBE = String.raw`(() => {
 
 /**
  * Boot `chunk` on the phone tier in headless Chromium and sample its processes until the world is drawn plus `settleMs`.
- * @param {{url:string, chunk:string, everyMs?:number, settleMs?:number, timeoutMs?:number}} options
+ * @param {{url:string, chunk:string, everyMs?:number, settleMs?:number, timeoutMs?:number, entry?:'url'|'select'}} options
  */
-export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 5000, timeoutMs = 240_000 }) {
+export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 5000, timeoutMs = 240_000, entry = 'url' }) {
   const { launchMemoryBrowser } = await import('./chromium-memory-browser.mjs');
-  const { devices } = await import('./browser-playwright.mjs');
   const { saveFixture } = await import('./debug-settings.mjs');
   const gpu = process.platform === 'darwin' ? ['--use-angle=metal'] : [];
   const memoryBrowser = await launchMemoryBrowser(['--mute-audio', ...gpu, '--ignore-gpu-blocklist', '--enable-precise-memory-info']);
@@ -133,9 +143,10 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
   const errors = [];
   let ready = false, failure = /** @type {string|null} */ (null);
   try {
-    const phone = devices['iPhone 15 Pro'];
-    // The iPhone 17 Pro's portrait viewport (402x874 @3), as memory-proof.mjs boots it.
-    const context = await browser.newContext({ ...phone, viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 }, deviceScaleFactor: 3 });
+    // The iPhone 17 Pro's portrait viewport (402x874 @3, touch), as memory-proof.mjs boots it; Chromium's own user agent, so
+    // the page takes no Safari-only path Chromium can't run.
+    const context = await browser.newContext({ viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
     await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0 } });
     await context.addInitScript(STEP_PROBE);
@@ -163,8 +174,22 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
       }
     })();
     try {
-      await page.goto(bootPageURL(url, chunk), { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)));
+      if (entry === 'select') {
+        const { loadingCardIndex } = await import('./loading-benchmark/catalogue.mjs');
+        const title = new URL(url); for (const [key, value] of Object.entries({ mute: '1', nolock: '1', sw: '0' })) title.searchParams.set(key, value);
+        await page.goto(title.href, { waitUntil: 'domcontentloaded' });
+        await page.locator('.ws-main-select').click();
+        if (await page.locator('#ws-name-box input').waitFor({ timeout: 15_000 }).then(() => true, () => false)) {
+          await page.locator('#ws-name-box input').fill('memgates'); await page.locator('#ws-name-box button[type=submit]').click();
+        }
+        await page.locator('.ws-menu-card').first().waitFor({ state: 'visible' });
+        await page.locator('.ws-menu-dots i').nth(loadingCardIndex(await page.locator('.ws-menu-card b').allTextContents(), chunk)).click();
+        await page.locator('.ws-menu-play').click();
+        await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || window.__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { polling: 250 });
+      } else {
+        await page.goto(bootPageURL(url, chunk), { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)));
+      }
       failure = await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null);
       ready = failure === null;
       if (ready) await page.waitForTimeout(settleMs);
@@ -173,7 +198,7 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
       const ended = new Promise(resolve => { tracing.once('Tracing.tracingComplete', resolve); });
       await tracing.send('Tracing.end'); await ended;
     }
-    return { chunk, url, protocol: 'chromium-phone-boot/1', ready, failure, errors, everyMs, settleMs, elapsedMs: Date.now() - started, samples, dumps: processDumps(events) };
+    return { chunk, url, entry, protocol: 'chromium-phone-boot/1', ready, failure, errors, everyMs, settleMs, elapsedMs: Date.now() - started, samples, dumps: processDumps(events) };
   } finally { await memoryBrowser.close(); }
 }
 
@@ -183,9 +208,9 @@ async function main(argv) {
   const args = Object.fromEntries(argv.map(arg => /^--([^=]+)(?:=(.*))?$/u.exec(arg)).filter(match => match !== null).map(match => [match[1], match.at(2) ?? '1']));
   if (args.url === undefined || args.chunk === undefined) throw new Error('Usage: boot-memory-peak.mjs --url=<served client> --chunk=<slug> [--out=<file.json>] [--factor=<n>] [--budget-bytes=<n>]');
   const number = (/** @type {string|undefined} */ text, /** @type {number} */ fallback) => text === undefined ? fallback : Number(text);
-  const run = await measureBootMemory({ url: args.url, chunk: args.chunk, everyMs: number(args.every, 250), settleMs: number(args.settle, 5) * 1000, timeoutMs: number(args.timeout, 240) * 1000 });
+  const run = await measureBootMemory({ url: args.url, chunk: args.chunk, everyMs: number(args.every, 250), settleMs: number(args.settle, 5) * 1000, timeoutMs: number(args.timeout, 240) * 1000, entry: args.entry === 'select' ? 'select' : 'url' });
   if (!run.ready) throw new Error(`${args.chunk} did not reach its world: ${run.failure ?? 'no error card'}${run.errors.length === 0 ? '' : `; page errors: ${run.errors.slice(0, 3).join(' | ')}`}`);
-  const verdict = bootMemoryVerdict(run.samples, run.dumps, { factor: number(args.factor, CHROMIUM_TO_PHONE), budgetBytes: number(args['budget-bytes'], MEMORY_LINE_BYTES) });
+  const verdict = bootMemoryVerdict(run.samples, run.dumps, { factor: number(args.factor, chromiumToPhone()), budgetBytes: number(args['budget-bytes'], MEMORY_LINE_BYTES) });
   const line = bootMemoryLine(args.chunk, verdict);
   if (args.out !== undefined) {
     const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true });

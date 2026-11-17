@@ -16,3 +16,11 @@ First local reading on the mini (Metal, preview v0.1.33-57, pinned
 Nine): Chromium peak 2917 MB, renderer 1044 + GPU 1873, still climbing
 through worldPrograms and finish. Desktop GPU memory is not the phone's;
 MG2 calibrates the factor against the iOS Simulator reading.
+
+MG2's calibration: two more preview runs without the iOS user agent
+(Chromium on an iPhone UA took a Safari path) read 2085 and 2162 MB.
+mini-boot99's Simulator Inspector peak for the same Nine rev 2 on staging
+v0.1.36 is 1.318 GB, x1.4 for the phone = 1.845 GB, so Metal's factor
+is 0.87. Linux (SwiftShader) stays 1 until a hosted reading. `--entry=
+select` walks in through SHARD SELECT for released pages; staging's
+direct `?chunk=` load stopped with "build stopped: its scope has closed".
