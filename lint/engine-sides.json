@@ -1787,6 +1787,7 @@
     "src/shared/game/quest/contractBoard.ts": "shared",
     "src/shared/game/quest/contracts.ts": "shared",
     "src/shared/game/quest/declared.ts": "shared",
+    "src/shared/game/quest/raceWire.ts": "shared",
     "src/shared/game/quest/effectPresentation.ts": "shared",
     "src/shared/game/quest/effects.ts": "shared",
     "src/shared/game/quest/eliteDecisions.ts": "shared",

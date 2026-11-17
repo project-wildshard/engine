@@ -9,6 +9,7 @@ import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { DeclaredQuests } from '../src/shared/game/quest/declared';
+import { raceStartLine } from '../src/shared/game/quest/raceWire';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 const rapier = loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
@@ -26,7 +27,7 @@ test('a race files its fact with the time between its flags, keeps the best and 
     const quests = new DeclaredQuests(host, data, { fact: (name, entity) => { filed.push([name, entity]); } });
     const { flags, player: lead } = questBooks(host).lead;
     flags.set('run.go'); const started = host.state.tick;
-    expect(owned(host, lead).get('race:arch')).toBe(started); // the wire carries the running start tick
+    expect(owned(host, lead).get('race:arch')).toBe(raceStartLine(started)); // the wire carries the running start tick
     steps(host, 30); flags.set('run.end');
     expect(filed).toEqual([['arch.time', 'arch']]);
     expect(quests.race('arch', lead)).toEqual({ running: null, last: 30 * FIXED_STEP, best: 30 * FIXED_STEP, runs: 1 });
@@ -92,4 +93,20 @@ test('the lead\'s running race rides a region save and finishes after the restor
     expect(again?.race('arch', player)).toEqual({ running: null, last: 10 * FIXED_STEP, best: 10 * FIXED_STEP, runs: 1 });
     expect(flags.has('run.go')).toBe(false);
   } finally { restored?.dispose(); host.dispose(); }
+});
+
+test('a run carried to a younger room keeps its elapsed time, not the old room\'s tick', async () => {
+  const loaded = await rapier, old = createSimHost(SIM_LEVEL, { rapier: loaded }), young = createSimHost(SIM_LEVEL, { rapier: loaded });
+  try {
+    for (const host of [old, young]) host.addPlayer('other', { x: 0, y: 0, z: 0 });
+    new DeclaredQuests(old, data, { fact: () => undefined });
+    const filed: [string, string][] = [], quests = new DeclaredQuests(young, data, { fact: (name, entity) => { filed.push([name, entity]); } });
+    steps(old, 500); questBooks(old).of('other').flags.set('run.go'); steps(old, 20);
+    const saved = questBooks(old).exportOf('other');
+    questBooks(young).importOf('other', saved);
+    steps(young, 10); questBooks(young).of('other').flags.set('run.end');
+    expect(quests.race('arch', 'other')).toEqual({ running: null, last: 30 * FIXED_STEP, best: 30 * FIXED_STEP, runs: 1 });
+    expect(filed).toEqual([['arch.time', 'other:arch']]);
+    questBooks(young).importOf('other', questBooks(young).exportOf('other')); // the save reads back
+  } finally { young.dispose(); old.dispose(); }
 });

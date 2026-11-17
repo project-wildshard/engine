@@ -1041,6 +1041,7 @@
     "./game/shard/runtime": "./src/shared/game/shard/runtime.ts",
     "./game/travel/travel": "./src/client/game/travel/travel.ts",
     "./game/quest/declared": "./src/shared/game/quest/declared.ts",
+    "./game/quest/raceWire": "./src/shared/game/quest/raceWire.ts",
     "./game/shardfile/hybridRows": "./src/client/game/plugin/headless.ts",
     "./game/shardfile/bossRow": "./src/server/game/shardfile/bossRow.ts",
     "./game/shardfile/bakedKinds": "./src/client/game/shardfile/bakedKinds.ts",

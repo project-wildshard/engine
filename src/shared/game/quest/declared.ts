@@ -6,6 +6,7 @@ import { parseQuestData, type QuestData } from '@wildshard/format/quests';
 import { questBooks, type QuestBook, type QuestBooks } from '@wildshard/engine/quest/players';
 import { FIXED_STEP } from '@wildshard/engine/core/fixedStep';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
+import { raceStartLine } from './raceWire';
 
 /** Hooks read atomically published script fields or queue declared events for the next script tick. */
 export interface QuestScriptPorts {
@@ -113,12 +114,16 @@ export class DeclaredQuests {
           else if (flag === race.stop && run.running !== null) this.finishRace(book, race, run);
         }
       });
-      book.part(`races:${races[0]?.id ?? ''}`, { read: () => JSON.stringify(Object.fromEntries(runs)), write: saved => { restoreRuns(runs, races, JSON.parse(saved) as SimValue); } });
+      // the part carries a running run's elapsed ticks, not this room's tick: an imported book lands in a room with its own count
+      book.part(`races:${races[0]?.id ?? ''}`, {
+        read: () => JSON.stringify(Object.fromEntries([...runs].map(([id, run]) => [id, { ...run, running: run.running === null ? null : this.host.state.tick - run.running }]))),
+        write: saved => { restoreRuns(runs, races, JSON.parse(saved) as SimValue); for (const run of runs.values()) if (run.running !== null) run.running = this.host.state.tick - run.running; },
+      });
     };
     bind(lead); this.books.install(bind);
     publishOwned(this.host, 'quest.races', (player, out) => {
       for (const [id, run] of this.races.get(player) ?? []) {
-        if (run.running !== null) out.set(`race:${id}`, run.running);
+        if (run.running !== null) out.set(`race:${id}`, raceStartLine(run.running));
         if (run.last !== null) out.set(`race:${id}.last`, Math.round(run.last * 1000));
         if (run.best !== null) out.set(`race:${id}.best`, Math.round(run.best * 1000));
         if (run.runs > 0) out.set(`race:${id}.runs`, run.runs);

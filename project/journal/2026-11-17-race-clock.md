@@ -42,3 +42,16 @@ author proof read every filed fact as some quest's `onComplete`. A race
 files its fact under its own id, so the proof now takes a race row too
 (`test/author-proof-race.test.ts`, failed first). The live filing path
 never asked.
+
+## Review fixes before the land
+
+One `claude -p` review found two MUSTs and a SHOULD, each now a test
+that failed first. A book carried to another room (`exportOf` and
+`importOf`) saved the run's start as the old room's tick, so a younger
+room read a negative time and the next import refused the save: the
+part now saves the elapsed ticks, as the player doc does for health.
+The page clock ran before the wire was bound, saw a run count of 0 and
+then showed an old finish on join: it now waits for a tick. And the
+start tick rode an f32 owned line, inexact past 2^24 ticks and absent at
+tick 0: `raceWire.ts` sends it within a 2^20 window plus one, and the
+page reads the elapsed ticks across the wrap.

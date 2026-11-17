@@ -1,6 +1,7 @@
 import { FIXED_STEP } from '@wildshard/engine/core/fixedStep';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import { engineString } from '@wildshard/engine/strings';
+import { raceElapsedTicks } from '@wildshard/engine/game/quest/raceWire';
 
 /** What the page shows a race in: one line of text, or nothing. */
 export interface RaceClockView { show: (text: string | null) => void }
@@ -16,7 +17,7 @@ export function raceTime(seconds: number): string {
 }
 
 /**
- * SHARD-SOURCE SS-MS1a3: the race clock. The server's owned lines (SS-MS1a2) say when this player's run started (`race:<id>`, a tick) and,
+ * SHARD-SOURCE SS-MS1a3: the race clock. The server's owned lines (SS-MS1a2) say when this player's run started (`race:<id>`, the tick as `raceStartLine` writes it) and,
  * once it finishes, its time and best (`.last`, `.best`, ms) and how many runs finished (`.runs`). While one runs the clock counts from its
  * start tick to the wire's latest; a finish shows the time and the best for a few seconds. A line at zero is absent.
  */
@@ -28,6 +29,8 @@ export function installRaceClock(races: readonly RaceRow[], page: {
   let finish: { text: string; left: number } | null = null, shown: string | null = null;
   const show = (text: string | null): void => { if (text !== shown) { shown = text; page.view.show(text); } };
   page.system({ id: 'game.shardfile.race-clock', phase: 'update', run: (dt: number) => {
+    // no wire yet (or unbound): every line reads 0, so a run count seen now would read as a finish when the wire binds
+    const now = page.tick(); if (now === null) { seen.clear(); return; }
     let running: string | null = null;
     for (const race of races) {
       const runs = page.line(`race:${race.id}.runs`), before = seen.get(race.id);
@@ -35,8 +38,8 @@ export function installRaceClock(races: readonly RaceRow[], page: {
       if (before !== undefined && runs > before) {
         finish = { text: engineString('s_race_finish', [raceTime(page.line(`race:${race.id}.last`) / 1000), raceTime(page.line(`race:${race.id}.best`) / 1000)]), left: RACE_FINISH_SHOWN };
       }
-      const start = page.line(`race:${race.id}`), now = page.tick();
-      if (running === null && start > 0 && now !== null) running = raceTime((now - start) * FIXED_STEP);
+      const start = page.line(`race:${race.id}`);
+      if (running === null && start > 0) running = raceTime(raceElapsedTicks(start, now) * FIXED_STEP);
     }
     if (running !== null) finish = null;
     else if (finish !== null) { finish.left -= dt; if (finish.left <= 0) finish = null; }

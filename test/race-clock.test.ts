@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import type { SystemSpec } from '../src/client/engine/app/systems';
 import { installRaceClock, RACE_FINISH_SHOWN, raceTime } from '../src/client/game/shardfile/raceClock';
 import { FIXED_STEP } from '../src/shared/engine/core/fixedStep';
+import { RACE_TICK_WINDOW, raceStartLine } from '../src/shared/game/quest/raceWire';
 
 // SHARD-SOURCE SS-MS1a3, the page's half: the clock runs from the wire's start tick between the flags, then shows the finish
 // time and the best for a few seconds, off the lines the server's race clock (SS-MS1a2) sends this player.
@@ -25,7 +26,7 @@ test('the clock runs between the flags and shows the finish time and the best af
   const { lines, shown, frame, at } = page();
   at(100); frame();
   expect(shown).toEqual([]); // no run, nothing shown
-  lines.set('race:arch', 100); at(100 + Math.round(3 / FIXED_STEP)); frame();
+  lines.set('race:arch', raceStartLine(100)); at(100 + Math.round(3 / FIXED_STEP)); frame();
   expect(shown.at(-1)).toBe('0:03.0');
   at(100 + Math.round(12.5 / FIXED_STEP)); frame();
   expect(shown.at(-1)).toBe('0:12.5');
@@ -40,4 +41,20 @@ test('a page that joins after a finish shows no stale finish line', () => {
   const { lines, shown, frame, at } = page();
   lines.set('race:arch.runs', 3); lines.set('race:arch.last', 9000); lines.set('race:arch.best', 8000); at(5); frame();
   expect(shown).toEqual([]);
+});
+
+test('a page bound late, or rebound, shows no finish it did not see happen', () => {
+  const { lines, shown, frame, at } = page();
+  frame(); frame(); // no wire yet: every line reads 0
+  lines.set('race:arch.runs', 3); lines.set('race:arch.last', 9000); lines.set('race:arch.best', 8000); at(5); frame();
+  expect(shown).toEqual([]);
+});
+
+test('the start line is the tick within a window, never 0, and the clock reads across the wrap', () => {
+  expect(raceStartLine(0)).toBeGreaterThan(0);
+  expect(raceStartLine(RACE_TICK_WINDOW + 7)).toBe(raceStartLine(7));
+  expect(raceStartLine(2 ** 40)).toBeLessThanOrEqual(2 ** 24); // exact as an f32 owned line
+  const { lines, shown, frame, at } = page();
+  lines.set('race:arch', raceStartLine(3 * RACE_TICK_WINDOW - 30)); at(3 * RACE_TICK_WINDOW + 30); frame();
+  expect(shown.at(-1)).toBe(raceTime(60 * FIXED_STEP));
 });
