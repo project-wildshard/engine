@@ -63,7 +63,8 @@ function serverRows(rows: Readonly<Record<string, string>>) {
   };
   const database = { objectStoreNames: { contains: (name: string) => name === 'saves' }, close: () => undefined,
     transaction: () => ({ objectStore: () => ({ get: (name: string) => answer(rows[name]) }) }) };
-  vi.stubGlobal('indexedDB', { databases: () => Promise.resolve([{ name: 'wildshard-saves@1' }]), open: () => answer(database) });
+  // WR8b: the checkpoint reader opens the current epoch's database by name, never an earlier one.
+  vi.stubGlobal('indexedDB', { databases: () => Promise.resolve([{ name: 'wildshard-saves@2' }]), open: (name: string) => { if (name !== 'wildshard-saves@2') throw new Error(`opened ${name}`); return answer(database); } });
 }
 
 test("a page's location document never hides the server's checkpoint", async () => {

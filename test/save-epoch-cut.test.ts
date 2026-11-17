@@ -88,9 +88,11 @@ function files(dir: string, extensions: readonly string[]): string[] {
     return statSync(path).isDirectory() ? files(path, extensions) : extensions.some(ext => name.endsWith(ext)) ? [path] : [];
   });
 }
-test('page code and the page shell name only the current epoch prefix', () => {
-  const stale = [...files('src', ['.ts', '.js', '.mjs']), 'index.html']
+test('page code, the page shell and the proof scripts name only the current epoch', () => {
+  const stale = [...files('src', ['.ts', '.js', '.mjs']), ...files('scripts', ['.ts', '.js', '.mjs']), 'index.html']
     .filter(path => path !== join('src', 'client', 'game', 'identity.ts'))
-    .flatMap(path => [...readFileSync(path, 'utf8').matchAll(/save\.v2@(\d+)\./gu)].filter(match => Number(match[1]) !== EPOCH).map(match => `${path}: ${match[0]}`));
+    .flatMap(path => [...readFileSync(path, 'utf8').matchAll(/save\.v2@(\d+)\.|wildshard-saves@(\d+)/gu)]
+      // force-update-proof.mjs plants a database from far in the future on purpose.
+      .filter(match => Number(match[1] ?? match[2]) !== EPOCH && Number(match[2]) !== 12345).map(match => `${path}: ${match[0]}`));
   expect(stale).toEqual([]);
 });

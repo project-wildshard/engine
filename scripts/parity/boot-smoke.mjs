@@ -249,8 +249,8 @@ export function bootTemplateCheckpoint(instance, raw = localStorage.getItem(`wil
  * @param {string} instance @returns {Promise<string | null>} */
 export async function bootStoredSave(instance) {
   const prefix = 'wildshard.save.v2@2.', page = localStorage.getItem(`${prefix}${instance}`);
-  if (!(await indexedDB.databases()).some(row => row.name === 'wildshard-saves@1')) return page;
-  const opening = indexedDB.open('wildshard-saves@1');
+  if (!(await indexedDB.databases()).some(row => row.name === 'wildshard-saves@2')) return page;
+  const opening = indexedDB.open('wildshard-saves@2');
   /** @type {IDBDatabase} */ const database = await new Promise((resolve, reject) => { opening.onsuccess = () => { resolve(opening.result); }; opening.onerror = () => { reject(opening.error ?? new Error('Save storage refused')); }; });
   try {
     if (!database.objectStoreNames.contains('saves')) return page;

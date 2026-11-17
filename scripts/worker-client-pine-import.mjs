@@ -35,7 +35,7 @@ const settings = async page => {
 };
 /** @param {import('playwright').Page} page @returns {Promise<string>} */
 const identity = page => page.evaluate(async () => {
-  const db = await /** @type {Promise<IDBDatabase>} */ (new Promise((resolve, reject) => { const open = indexedDB.open('wildshard-saves@1'); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(new Error('Cannot read identity')); }));
+  const db = await /** @type {Promise<IDBDatabase>} */ (new Promise((resolve, reject) => { const open = indexedDB.open('wildshard-saves@2'); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(new Error('Cannot read identity')); }));
   try { return await new Promise((resolve, reject) => {
     const read = db.transaction('saves').objectStore('saves').get('device:wildshard.save.v2.identity');
     read.onsuccess = () => resolve(JSON.parse(read.result).player); read.onerror = () => reject(new Error('Cannot read identity'));

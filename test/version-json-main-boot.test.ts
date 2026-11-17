@@ -25,3 +25,29 @@ test.each([mainVersion, '0.1.30', '0.1.31', '0.1.32', '0.2.0'])('a %s build ente
     expect(reload).not.toHaveBeenCalled();
   } finally { scope.dispose(); vi.unstubAllGlobals(); }
 });
+
+// WR8b: the epoch-2 cut. A 0.1.35 page (epoch 1) that reads the 0.1.36 version.json is forced over exactly once; the
+// 0.1.36 page it reloads into meets its own floor and stays. J383 drops caches and the compiled-home cache only.
+test('a 0.1.35 page is forced over once by the epoch-2 release, and the 0.1.36 page stays', async () => {
+  const document = { clientVersion: '0.1.36', minClient: clientFloor('0.1.36') };
+  const dropped: string[] = [];
+  const boot = async (version: string): Promise<number> => {
+    const scope = new Scope('test.epoch-cut-floor');
+    const reload = vi.fn();
+    try {
+      vi.stubGlobal('location', { reload });
+      vi.stubGlobal('caches', { has: () => Promise.resolve(false), keys: () => Promise.resolve([]), delete: () => Promise.resolve(true),
+        open: () => Promise.resolve({ put: () => Promise.resolve(), match: () => Promise.resolve(undefined) }) });
+      vi.stubGlobal('indexedDB', { deleteDatabase: (name: string) => { dropped.push(name); const request = { onsuccess: null as (() => void) | null }; queueMicrotask(() => { request.onsuccess?.(); }); return request; } });
+      vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url === '/version.json' ? Response.json(document) : new Response('{}'))));
+      sessionStorage.clear();
+      await new ClientUpdater(sessionStorage).install(version, scope);
+      await vi.waitFor(() => { expect(fetch).toHaveBeenCalled(); });
+      await new Promise(resolve => { setTimeout(resolve, 50); });
+      return reload.mock.calls.length;
+    } finally { scope.dispose(); vi.unstubAllGlobals(); }
+  };
+  expect(await boot('0.1.35')).toBe(1);
+  expect(dropped).not.toContain('wildshard-saves@1');
+  expect(await boot('0.1.36')).toBe(0);
+});

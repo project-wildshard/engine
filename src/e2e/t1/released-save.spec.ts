@@ -34,6 +34,13 @@ const snapshotSchema = looseObject({
 // The released snapshot has no flags. Like released-save-play.test.ts,
 // add one probe to a decoded copy to make progress carry observable.
 const CARRIED_FLAG = 'released-save.probe'
+// WR8b: the v0.1.1 pin is epoch 1, a codec pin since the epoch-2 cut. Its
+// snapshot is epoch-free, so the file carries it under the current epoch;
+// the save menu refuses any other epoch on purpose.
+const EPOCH = parse(
+  looseObject({ saveEpoch: number() }),
+  JSON.parse(readFileSync('save-epoch.json', 'utf8')),
+).saveEpoch
 function releasedFile(instance: string): string {
   const pin = parse(
     pinSchema,
@@ -58,11 +65,12 @@ function releasedFile(instance: string): string {
   const { snapshot } = wire
   expect(snapshot.levelId).toBe(pin.slug)
   expect(snapshot.state.tick).toBe(pin.tick)
+  expect(pin.saveEpoch).toBeLessThanOrEqual(EPOCH)
   snapshot.flags.push(CARRIED_FLAG)
   return JSON.stringify({
     format: 'wildshard.save',
     version: 2,
-    saveEpoch: pin.saveEpoch,
+    saveEpoch: EPOCH,
     server: true,
     docs: {
       [`standalone-${instance}`]: {
@@ -117,7 +125,7 @@ test('released Template world is refused while its progress carries', async ({
   // Read the real server store: only restore refusal creates this copy.
   const copies: unknown = await page.evaluate(`(async () => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('wildshard-saves@1', 1);
+      const request = indexedDB.open('wildshard-saves@${String(EPOCH)}', 1);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

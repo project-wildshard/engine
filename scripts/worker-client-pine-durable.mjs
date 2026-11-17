@@ -32,7 +32,7 @@ async function scenario(claim) {
   };
   const stores = () => page.evaluate(async () => {
     const database = await /** @type {Promise<IDBDatabase>} */ (new Promise((resolve, reject) => {
-      const open = indexedDB.open('wildshard-saves@1'); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(new Error(open.error?.message ?? 'IndexedDB open failed'));
+      const open = indexedDB.open('wildshard-saves@2'); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(new Error(open.error?.message ?? 'IndexedDB open failed'));
     }));
     /** @param {string} key @returns {Promise<import('./types/worker-page').WorkerSaveDocument>} */
     const get = key => new Promise((resolve, reject) => {

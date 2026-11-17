@@ -29,7 +29,8 @@ test('version.json is written from the build root', () => {
   expect(versionJson('x', process.cwd()).clientVersion).toBe((JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { version: string }).version);
 });
 
-test.each([['0.1.29', '0.1.29'], ['0.1.30', '0.1.30'], ['0.1.31', '0.1.31'], ['0.1.32', '0.1.31'], ['0.2.0', '0.1.31']])('version.json for %s emits a floor it can boot under', (version, floor) => {
+// WR8b: the epoch-2 cut raised the floor to 0.1.36.
+test.each([['0.1.29', '0.1.29'], ['0.1.31', '0.1.31'], ['0.1.35', '0.1.35'], ['0.1.36', '0.1.36'], ['0.1.40', '0.1.36'], ['0.2.0', '0.1.36']])('version.json for %s emits a floor it can boot under', (version, floor) => {
   const repo = createTempRepo();
   try {
     repo.commit({ 'package.json': JSON.stringify({ version }), 'save-epoch.json': readFileSync('save-epoch.json', 'utf8') }, `chore(release): v${version}`);
