@@ -15,7 +15,7 @@ import { cleanName } from '@wildshard/engine/net/chatFilter';
 import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { decodeFirstMessage } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
-import { encodeArrive, encodeCountdown, encodeEnter, type WorldWord } from '@wildshard/engine/net/socketFrames';
+import { decodeEnter, encodeArrive, encodeCountdown, encodeEnter, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
@@ -667,6 +667,16 @@ export class World {
     }
     const admission=++this.admission;
     this.seatSockets.set(entry.device, { end, hello: hello.slice(0),admission });
+    // Only a road can admit an enter. A cell must answer instead of leaving
+    // the page waiting for its ten-second silent-peer fallback.
+    const refusedEnter = end.onControl((control, bytes) => {
+      if (control !== 'enter' || this.seatSockets.get(entry.device)?.end !== end) return;
+      const from = this.seated.get(entry.device);
+      if (from === undefined || roadHome(from) !== null) return;
+      const word = decodeEnter(bytes);
+      if (word !== null && word.refused === undefined) end.control('enter', encodeEnter({ cell: word.cell, refused: 'not-at-gate' }));
+    });
+    end.onClose(refusedEnter);
     end.onClose(() => {
       if (this.seatSockets.get(entry.device)?.end !== end) return;
       this.seatSockets.delete(entry.device);

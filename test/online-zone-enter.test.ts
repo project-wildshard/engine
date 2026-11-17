@@ -101,7 +101,9 @@ test('an enter the road refuses answers null, and the page plays on', { timeout:
   const enter = page.shell.enter;
   if (enter === undefined) throw new Error('a world page\'s shell says enter');
   // Standing in Driftwood, never at a gate
+  const asked = performance.now();
   expect(await enter(WEST)).toBeNull();
+  expect(performance.now() - asked, 'the room refuses before the shell\'s 10 s fallback').toBeLessThan(5000);
   await new Promise(resolve => { setTimeout(resolve, 300); });
   expect(page.shell.client.latest, 'frames still flow').not.toBeNull();
   expect(bench.room(HOME)?.holds(IDENTITY.player)).toBe(true);
