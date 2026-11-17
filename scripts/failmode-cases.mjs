@@ -24,8 +24,8 @@ export const CASES = Object.freeze([
   { mode: '8', id: 'upgrade-refused', owner: 'FM4b', phase: 'play', screen: 'unreachable', inject: 'refuse-upgrade 502', recover: 'as 5', blocked: 'shares mode 5\'s screen (design call)' },
   { mode: '9', id: 'restart', owner: 'FM4', phase: 'play', screen: 'restart', inject: 'socket close 4005 on every connection for 4 s', recover: 'heal: reconnected', run: 'socketDown' },
   { mode: '9b', id: 'restart/blocked', parent: 'restart', owner: 'FM4', phase: 'title', screen: 'restart-blocked', inject: 'Play on the title while 9 shows', recover: 'joins by itself', run: 'titleHold' },
-  { mode: '10', id: 'deploy', owner: 'FM4', phase: 'play', screen: 'deploy', inject: 'a newer signed release (needs a second build)', recover: 'the move lands', blocked: 'needs a second build of the same stamp; online-proof.mjs --next proves the countdown' },
-  { mode: '10b', id: 'deploy/blocked', parent: 'deploy', owner: 'FM4', phase: 'title', screen: 'deploy-blocked', inject: 'Enter world in the last 15 s', recover: 'joins after the move', blocked: 'built (titleHold.ts, the world word\'s moving.inS); the rig needs a grace, i.e. a second build, as mode 10' },
+  { mode: '10', id: 'deploy', owner: 'FM4', phase: 'play', screen: 'deploy', inject: 'the rig moves to its second build (--next): a newer signed release', recover: 'the page reloads into it and plays', run: 'deploy' },
+  { mode: '10b', id: 'deploy/blocked', parent: 'deploy', owner: 'FM4', phase: 'title', screen: 'deploy-blocked', inject: 'Enter world in the move\'s grace (--next)', recover: 'joins the second build by itself', run: 'deployHold' },
   { mode: '11', id: 'release-5xx', owner: 'FM5', phase: 'boot', screen: 'release-5xx', inject: 'release status 503 before navigation', recover: 'heal: the world loads by itself', run: 'releaseFault' },
   { mode: '12', id: 'release-429', owner: 'FM5', phase: 'boot', screen: 'release-429', inject: 'release status 429, Retry-After 3', recover: 'heal: the world loads after Retry-After', run: 'releaseFault' },
   { mode: '13', id: 'version-http', owner: 'FM5', phase: 'play', screen: 'version-http', inject: 'version.json status 503 (Developer on); Settings ▸ Build ▸ Check runs the poll\'s read', recover: 'heal: the next read clears it', run: 'versionHttp' },
@@ -43,8 +43,8 @@ export const CASES = Object.freeze([
   { mode: '21', id: 'slow', owner: 'FM4b', phase: 'play', screen: 'slow', inject: 'delay-frames 160 ms both ways (RTT over 250 ms)', recover: 'heal: clears after 10 good seconds', run: 'linkQuality' },
   { mode: '22', id: 'lossy', owner: 'FM4b', phase: 'play', screen: 'lossy', inject: 'downstream delay-frames swinging 20 ms / 420 ms every 2.5 s (RTT span over 250 ms)', recover: 'heal: clears after 10 good seconds', run: 'linkQuality' },
   { mode: '23', id: 'version-skew', owner: 'FM5', phase: 'play', screen: 'version-skew', inject: 'socket close 4000 (reload) on every connection', recover: 'one reload, then the page', run: 'socketDown' },
-  { mode: '24', id: 'too-old', owner: 'FM5b', phase: 'play', screen: 'too-old-warning', inject: 'verified retention metadata excluding this build', recover: 'next load: too-old page', blocked: 'FM7 retention metadata not built' },
-  { mode: '25', id: 'full', owner: 'FM4', phase: 'play', screen: 'full', inject: 'socket close 4002 on every connection for 3 s (FM7b queue numbers not built)', recover: 'heal: seated on the next 30 s retry', run: 'socketDown' },
+  { mode: '24', id: 'too-old', owner: 'FM5b', phase: 'play', screen: 'too-old-warning', inject: 'a signed retention file keeping only the second build (--next), the page\'s release view on it', recover: 'next load: too-old page; Update plays on the second build', run: 'tooOld' },
+  { mode: '25', id: 'full', owner: 'FM4', phase: 'play', screen: 'full', inject: '--seats=2: the door full with two pages, two more in its line (else socket close 4002 for 3 s)', recover: 'Title cancels the ticket ahead; a freed seat lets the head in', run: 'queue' },
   { mode: '26', id: 'replaced', owner: 'FM4', phase: 'play', screen: 'replaced', inject: 'a second tab of the same device takes the seat', recover: 'Play here: seated', run: 'replaced' },
   { mode: '27', id: 'auth-expired', owner: 'FM8b', phase: 'play', screen: 'auth-expired', inject: 'local provider expiry', recover: 'sign in: rejoins', blocked: 'FM8b / MP2.2 login contract not built' },
   { mode: '28', id: 'auth-failed', owner: 'FM8b', phase: 'title', screen: 'auth-failed', inject: 'provider callback error', recover: 'other ways to sign in', blocked: 'FM8b / MP2.2 login contract not built' },
@@ -68,7 +68,7 @@ export const CASES = Object.freeze([
   { mode: '44', id: 'pack-broken', owner: 'FM6', phase: 'load', screen: 'packs-5xx', inject: 'packs truncate 64 bytes, healed after 6 s', recover: 'the world loads with verified bytes', run: 'packsFault' },
   { mode: '45', id: 'sleep-wake', owner: 'FM4b', phase: 'play', screen: 'background-long', inject: 'CDP freeze 35 s with no visibility change', recover: 'seated again: no card', run: 'freeze', chromiumOnly: true },
   { mode: '46', id: 'staging', owner: 'FM5', phase: 'boot', screen: 'staging', inject: 'the fixture release signed with channel staging (loopback only)', recover: 'stays for the session', run: 'staging' },
-].map(item => Object.freeze({ ...item, deadlineMs: item.id === 'lost' ? 360_000 : 300_000 })));
+].map(item => Object.freeze({ ...item, deadlineMs: item.id === 'too-old' ? 600_000 : item.id === 'lost' ? 360_000 : 300_000 })));
 
 /** The cases a `--scenario=` asks for: `all`, or a comma list of ids (a parent id brings its `b` case too). Unknown ids throw. @param {string} asked */
 export function selectCases(asked) {

@@ -18,12 +18,12 @@ class FakeLink implements Transport {
   fail(reason: string, info?: SocketCloseInfo): void { for (const listener of [...this.closes]) listener(reason, info ?? null); this.closes.clear(); }
 }
 const frame = { tick: 1 } as DecodedFrame;
-function harness(random = 0.5, online: () => boolean = () => true): { client: NetClient; redial: Redial; links: FakeLink[]; states: LinkState[]; causes: LinkCause[]; dialTimes: number[]; now: () => number; heard: () => void; run: (ms: number) => void; failDials: (reason: string) => void; away: (ms: number) => void } {
+function harness(random = 0.5, online: () => boolean = () => true, mayDial?: () => boolean): { client: NetClient; redial: Redial; links: FakeLink[]; states: LinkState[]; causes: LinkCause[]; dialTimes: number[]; now: () => number; heard: () => void; run: (ms: number) => void; failDials: (reason: string) => void; away: (ms: number) => void } {
   let clock = 0, failing: string | null = null;
   const first = new FakeLink(), links = [first], states: LinkState[] = [], causes: LinkCause[] = [], dialTimes: number[] = [];
   const client = new NetClient(first, () => clock), frames: ((value: DecodedFrame) => void)[] = [], onFrame = client.onFrame.bind(client);
   vi.spyOn(client, 'onFrame').mockImplementation(fn => { frames.push(fn); return onFrame(fn); });
-  const redial = new Redial({ client, transport: first, now: () => clock, random: () => random, online, onState: state => { states.push(state); }, onCause: cause => { causes.push(cause); },
+  const redial = new Redial({ client, transport: first, now: () => clock, random: () => random, online, ...mayDial === undefined ? {} : { mayDial }, onState: state => { states.push(state); }, onCause: cause => { causes.push(cause); },
     dial: () => { const link = new FakeLink(); links.push(link); dialTimes.push(clock); return link; } });
   return { client, redial, links, states, causes, dialTimes, now: () => clock, heard: () => { for (const fn of frames) fn(frame); }, failDials: reason => { failing = reason; },
     // the page suspended: the clock moves on and no timer runs (an iPhone in the background, a laptop asleep)
@@ -127,6 +127,19 @@ test('FM7b2/FM4 mode 25: a full world\'s close facts ride the progress, as the d
   expect(redial.progress.queue, 'an old door sends no facts: none are kept').toBeUndefined();
   run(31_000); heard();
   expect(redial.progress.queue).toBeUndefined();
+  redial.dispose();
+});
+
+test('FM5b3: a page that may not dial again (a retired build) never redials, even a quick drop that shows no banner', () => {
+  let retired = false;
+  const { heard, run, links, states, redial } = harness(0.5, () => true, () => !retired);
+  heard(); links[0]?.fail('closed'); run(400);
+  expect(links, 'a kept build redials at once, quietly').toHaveLength(2);
+  heard();
+  retired = true;
+  links[1]?.fail('closed'); run(5000);
+  expect(links, 'no dial goes out').toHaveLength(2);
+  expect(states.at(-1)).toBe('ended');
   redial.dispose();
 });
 

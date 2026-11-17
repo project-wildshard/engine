@@ -52,6 +52,9 @@ export interface RedialOptions {
   readonly transport: Transport;
   /** Open a new link. */
   readonly dial: () => Transport;
+  /** FM5b3: asked before every redial; false ends the link (`ended`, reason `retired`): a retired build's page refuses its own
+   *  reconnect, however quick, before any dial goes out. Absent: always. */
+  readonly mayDial?: () => boolean;
   /** The link changed state. */
   readonly onState: (state: LinkState, reason?: string) => void;
   /** FM4: the cause changed while the link stayed down (a restart close mid-dial, a return to the tab after a silent spell). */
@@ -185,6 +188,7 @@ export class Redial {
     return false;
   }
   private dial(now: number): void {
+    if (this.options.mayDial?.() === false) { this.stop(); this.show('ended', 'retired'); return; }
     const transport = this.options.dial();
     this.offClose(); this.transport = transport; this.dialled = now; this.dials++;
     this.offClose = this.watchClose(transport);

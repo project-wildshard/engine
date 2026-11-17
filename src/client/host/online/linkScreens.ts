@@ -411,7 +411,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
         `${when === null ? 'You can\'t rejoin for now: no end time was given.' : `You can't rejoin until ${when}.`} You can still look around the title and your settings.`,
         hooks.title === undefined ? [] : [{ label: 'Title screen', primary: true, busy: 'Leaving…', act: () => { hooks.title?.(); } }],
         `close "banned"${untilMs === undefined ? ' · no end time' : ` · until ${new Date(untilMs).toISOString()}`}`);
-    } else if (state === 'ended' && reason !== 'reload') {
+    } else if (state === 'ended' && reason !== 'reload' && reason !== 'retired') {
+      // `retired` (FM5b3): this page refused its own reconnect, and the too-old page says why
       reportStop('link-refused', `close "${String(reason)}"`, report);
       stop('refused', 'bad', 'Turned away', 'The world turned this connection away', 'The server ended this link and won\'t take it back by itself.',
         [{ label: 'Play again', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }, ...doctor('lost')], `close "${String(reason)}"`);

@@ -67,6 +67,8 @@ export interface OnlineView {
   readonly persistence?: (fact: PersistenceWord) => void;
   /** WR5 (5.5, the cut): a refusal before any frame; the page reloads only if version.json names another build. */
   readonly cut?: (reason: string) => void;
+  /** FM5b3: asked before every redial (Redial `mayDial`); false: this page refuses its own reconnect. */
+  readonly mayRedial?: () => boolean;
   /** J174: a deploy is due, and play goes on. */
   readonly countdown: (countdown: Countdown) => void;
   /** The seat is in a cell this page hasn't loaded. */
@@ -187,7 +189,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const records=config.record===undefined?undefined:new NetRecords(client,{...config.record,build:config.build,level:config.loaded,
     correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
   const address = config.address ?? ((): string => config.socket);
-  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(address()));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); } });
+  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(address()));}, ...view.mayRedial === undefined ? {} : { mayDial: view.mayRedial }, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); } });
   // A held seat comes straight back with no `resume`: a tab reloaded inside J114's 30 s.
   // GO4: on a grid page, a held seat in another cell than the page booted re-enters the grid there, as a `resume` would say.
   const offFirst = client.onFrame(() => {
@@ -437,7 +439,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const saves = saveScreens(scope);
   // FM5b: is this page's own code still carried (signed /code-retention.json against a fresh release, at boot and on each update
   // poll)? Retired: a banner in play, and the too-old page at the next zone entry, reconnect or before the first seat
-  let seated = false, wasLive = false;
+  let seated = false;
   const tooOld = tooOldScreens(scope, { update: () => { entering(loadedNow); void leaving.reloadByHand(); } });
   const retention = retentionWatch(scope, { build: link.build, release: () => fetchSignedRelease(at, key), retention: expected => fetchCodeRetention(key, expected),
     changed: view => { tooOld.retention(view); if (!seated && tooOld.refuse('boot')) void shellNow?.leave(); } });
@@ -451,14 +453,15 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => {
       waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); tooOld.link(state === 'live');
-      // FM5b3: a refused reconnect or boot ends the link too (no redial, the body leaves), so nobody stands in the world behind the page
-      if (state === 'reconnecting' && wasLive && tooOld.refuse('reconnect')) void shellNow?.leave();
+      // FM5b3: a refused reconnect (mayRedial, before its dial: a quick one shows no banner) ends the link; the body leaves, so nobody
+      // stands in the world behind the page
+      if (state === 'ended' && reason === 'retired') void shellNow?.leave();
       // FM4 9b: a restart this tab heard explains a quiet world to the title's Enter world; a live link ends it
       if (state === 'live') clearRestart(); else if (shellNow?.why() === 'restart') noteRestart();
-      wasLive = state === 'live';
       if (state === 'ended' && reason === 'reload') void ended();
     },
     persistence: fact => { saves.fact(fact); },
+    mayRedial: () => !(seated && tooOld.refuse('reconnect')),
     // The cut (5.5): an old server refused a v1 hello. Reload only into another build; on this one, the server is updating.
     cut: () => { void leaving.reloadStale(); },
     countdown: said => { screens.countdown(said); preload(); },

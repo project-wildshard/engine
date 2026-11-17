@@ -77,7 +77,8 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   try {
   const worldFront = ephemeral ? await rigFront() : undefined;
   if (worldFront !== undefined) resources.push(worldFront.close);
-  const pageFront = ephemeral ? await rigFront() : undefined;
+  // a rig with a second build fronts its page port too, so a move swaps the page host with no downtime
+  const pageFront = ephemeral ? await rigFront() : nextDist === '' ? undefined : await rigFront(PAGE_PORT);
   if (pageFront !== undefined) resources.push(pageFront.close);
   const worldPort = worldFront?.port ?? WORLD_PORT, pagePort = pageFront?.port ?? PAGE_PORT;
   let signedSocket = ephemeral && socket === `ws://127.0.0.1:${String(WORLD_PORT)}/` ? `ws://127.0.0.1:${String(worldPort)}/` : socket;
@@ -173,26 +174,36 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     const timer = setTimeout(() => { reject(new Error('The owned world did not drain')); }, 15_000);
     room.once('exit', () => { clearTimeout(timer); resolve(undefined); });
   });
-  /** The page host's half of a deploy: the page's origin serves this build from now on. @param {string} built */
-  const serve = async built => {
-    const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(ephemeral ? 0 : pagePort), '--telemetry-dir', join(work, 'telemetry')], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit', ephemeral ? 'ipc' : 'ignore'] });
+  /** @type {import('node:child_process').ChildProcess | undefined} */
+  let pages;
+  /** A page host serving `built`: on the page port, or behind `pageFront` on its own. Ready when it answers its build directly.
+   * @param {string} built */
+  const launch = async built => {
+    const fronted = pageFront !== undefined;
+    const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(fronted ? 0 : pagePort), '--telemetry-dir', join(work, 'telemetry')], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit', fronted ? 'ipc' : 'ignore'] });
     resources.push(() => stopped(pageServer));
-    pageServer.once('exit', () => { pageFront?.clear(); });
-    if (pageFront !== undefined) pageFront.point(await childListener(pageServer, 'preview-ready'));
+    const hostPort = fronted ? await childListener(pageServer, 'preview-ready') : pagePort;
     let last = 'no response';
     for (let tries = 0; tries < 300; tries++) {
       if (pageServer.exitCode !== null || pageServer.signalCode !== null) throw new Error('The owned page server exited before readiness');
-      const ready = await fetch(`http://127.0.0.1:${String(pagePort)}/version.json`, { signal: AbortSignal.timeout(2000) }).then(async found => {
+      const ready = await fetch(`http://127.0.0.1:${String(hostPort)}/version.json`, { signal: AbortSignal.timeout(2000) }).then(async found => {
         const version = await found.json(); last = `status ${String(found.status)}, build ${String(version.build)}`;
         return found.ok && version.build === buildOf(built);
       }).catch((/** @type {unknown} */ error) => { last = error instanceof Error ? error.name : 'read failed'; return false; });
-      if (ready) return pageServer;
+      if (ready) return { pageServer, hostPort };
       await sleep(100);
     }
     throw new Error(`The owned page server did not serve its build (${last})`);
   };
+  /** The page host's half of a deploy: the page's origin serves this build from now on. @param {string} built */
+  const serve = async built => {
+    const { pageServer, hostPort } = await launch(built);
+    pageServer.once('exit', () => { if (pages === pageServer) pageFront?.clear(); });
+    pageFront?.point(hostPort);
+    return pageServer;
+  };
   // The page origin is bound before the world admits browser origins.
-  let pages = await serve(dist);
+  pages = await serve(dist);
   let main = world();
   resources.push(() => stopped(main));
   if (worldFront !== undefined) worldFront.point(await childListener(main, 'world-ready'));
@@ -219,15 +230,24 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     if (!retaining) { retaining = true; resources.push(unretain); }
     for (const folder of folders) writeFileSync(join(folder, 'code-retention.json'), text);
   };
-  /** A deploy, as online-proof.mjs --next makes it: both views name the build, `published` runs (the countdown is under way), the page
-   *  origin serves the build, the old world drains and the world starts on it. @param {string} built @param {{ published?: () => unknown }} [how] */
+  /** A deploy: the page origin serves the build, both views of the release name it, `published` runs (the countdown is under way),
+   *  the old world drains and the world starts on it. @param {string} built @param {{ published?: () => unknown }} [how] */
   const move = async (built, { published } = {}) => {
     if (nextBuild === '') throw new Error('A move needs a rig with a second build (nextDist)');
     const target = buildOf(built);
     if (target !== build && target !== nextBuild) throw new Error(`A rig moves only between its two builds, not ${target}`);
+    // as a real deploy: the page host serves the build before the release names it, so a tab the world sends home lands on it
+    if (pageFront === undefined) { if (pages !== undefined) await stopped(pages); pages = await serve(built); }
+    else {
+      // new connections reach the new host at once; the old one finishes what it holds, then stops
+      const old = pages, next = await launch(built);
+      pages = next.pageServer;
+      next.pageServer.once('exit', () => { if (pages === next.pageServer) pageFront.clear(); });
+      pageFront.retarget(next.hostPort);
+      if (old !== undefined) void sleep(8000).then(() => stopped(old)).catch(() => undefined);
+    }
     publish(current.serial + 1, target, current.channel);
     await published?.();
-    pageFront?.clear(); await stopped(pages); pages = await serve(built);
     await exited(main);
     await start(target);
   };
@@ -241,7 +261,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     /** A draining server's own exit. */
     drained: () => exited(main),
     /** The page's origin moves to this build. @param {string} built */
-    pagesServe: async built => { pageFront?.clear(); await stopped(pages); pages = await serve(built); },
+    pagesServe: async built => { pageFront?.clear(); if (pages !== undefined) await stopped(pages); pages = await serve(built); },
     close };
   } catch (error) {
     try { await close(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Online rig setup and cleanup failed', { cause: cleanup }); }

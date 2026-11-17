@@ -113,6 +113,14 @@ test('FM4 mode 25: the full card says the door\'s place in line, an estimate onl
   old.scope.dispose();
 });
 
+test('FM5b3: a retired build\'s own refused reconnect is the too-old page\'s, not a Turned away card', () => {
+  const { scope, screens } = harness();
+  screens.link('ended', 'retired');
+  expect(shown('refused')).toBeNull();
+  expect(document.querySelector('[data-failmode]:not([hidden])')).toBeNull();
+  scope.dispose();
+});
+
 test('the cards: gave up, world full, another tab, turned away; a stale build is left to its reload', () => {
   const { scope, screens, calls } = harness();
   screens.link('lost');

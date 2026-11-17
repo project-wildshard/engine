@@ -14,3 +14,10 @@
   transport" the row waited on: the client-to-server word already existed.
 - FM4 queue numbers: redial keeps the door's last facts (never counted down), the full card says "Place N in line", the
   estimate or "estimating the wait", and has a Title screen button that leaves the line.
+- The first real deploy on the rig found three gaps. A rig `move` stopped the page host before it started the next one, so
+  every tab the world sent home met 502s; a rig with a second build now fronts its page port and swaps hosts with no downtime,
+  the new host up before the release names the build, as a real deploy orders it. The second build carried none of the first
+  one's files, so a tab still on A asked B's host for its own chunks and got the SPA page (`admission.modules`, "Unexpected
+  token '<'"); the proof's `--prepare --next` now runs the release's carry step (MF2). And a retired build's quick reconnect
+  (under the banner's 2 s) never reached `tooOld.refuse('reconnect')`, which only ran once the banner showed: redial now asks
+  `mayDial` before every dial, and the shell's answer is the too-old check, so the refusal comes before any dial.

@@ -11,7 +11,8 @@ export async function listenLoopback(server, port = 0) {
 }
 
 /** The listener itself owns its port throughout child replacement; no port is probed then released. */
-export async function rigFront() {
+/** @param {number} [listen] a fixed loopback port (0: the OS's) */
+export async function rigFront(listen = 0) {
   /** @type {{path: string}|{host: string, port: number}|undefined} */
   let target;
   /** @type {Set<import('node:net').Socket>} */
@@ -26,12 +27,17 @@ export async function rigFront() {
     client.once('close', () => { upstream.destroy(); }); upstream.once('close', () => { client.destroy(); });
     client.pipe(upstream).pipe(client);
   });
-  const port = await listenLoopback(server);
+  const port = await listenLoopback(server, listen);
   let closed = false;
   const clear = () => { target = undefined; for (const socket of sockets) socket.destroy(); };
   return { port, point: (/** @type {number} */ next) => {
     if (!Number.isInteger(next) || next < 1 || next > 65535 || next === port) throw new Error('A rig front needs a distinct bound backend port');
     clear(); target = { host: '127.0.0.1', port: next };
+  },
+  /** New connections go to `next`; open ones stay on the old backend and drain (a page host's swap, with no downtime). */
+  retarget: (/** @type {number} */ next) => {
+    if (!Number.isInteger(next) || next < 1 || next > 65535 || next === port) throw new Error('A rig front needs a distinct bound backend port');
+    target = { host: '127.0.0.1', port: next };
   }, pointSocket: (/** @type {string} */ path) => {
     if (Buffer.byteLength(path) >= 104 || !lstatSync(path).isSocket()) throw new Error('A rig front needs a short owned Unix socket path');
     clear(); target = { path };

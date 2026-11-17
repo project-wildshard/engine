@@ -16,16 +16,22 @@
 // The server lets 10 connects a minute in per address and every page here is 127.0.0.1, so play cases wait out the minute between
 // them (`--cooldown=<s>`, 60) rather than lifting the cap; a long outage is held by refused upgrades that never reach the server.
 //
-//   node scripts/failmode-proof.mjs --prepare <work>    a fixture key (<work>/key.json, 0600) and a Driftwood build stamped with the
-//                                                       proxy's release address (<work>/dist); prints both paths
+//   node scripts/failmode-proof.mjs --prepare <work> [--next]
+//                                                       a fixture key (<work>/key.json, 0600) and a Driftwood build stamped with the
+//                                                       proxy's release address (<work>/dist); `--next` also a second build of the same
+//                                                       stamp (<work>/next); prints the paths
 //   scripts/browser-lane.sh node scripts/failmode-proof.mjs <dist> <work> <key.json> <pg bin|memory:|pglite:> <pg data>
 //       (pglite: PGlite in this process behind the rig's database front, which FM8s's save cases hold and refuse)
-//       [--engine=chromium|webkit] [--scenario=<id,...>|all] [--baseline] [--cooldown=<s>]
+//       [--engine=chromium|webkit] [--scenario=<id,...>|all] [--baseline] [--cooldown=<s>] [--next=<work>/next]
+//       [--seats=2]   (mode 25 on the door's own line: two pages take both seats, two more wait in line)
+//       (`--next`: the second build, for a deploy under play (10), under a title tap (10b) and a retired build (24, FM5b4); the rig's
+//        `move`, `pageView` and `retain` carry the release, the world and the page origin between the two builds)
 //   ... --gallery     FM1b: no faults; in Driftwood, real taps open Settings ▸ Debug ▸ Failure screens, then every entry of the
 //                     gallery (its 46 modes and nine hold cards) one by one, shot at 402x874 and 1440x900, each closed by its ✕.
 //                     Writes <work>/failmodes/gallery.json; exit 0 only when every entry opened and closed.
 // Ports: the rig from WS_RIG_PORTS (18856 here: Postgres 18856, world 18857, pages 18858, release 18859), the proxy's pages on 18851 and
 // its world door on 18852. The fixture release is signed by the owned key only, channel production on loopback (staging for mode 46).
+import { carryPreviousDeploy } from './app-build/previousDeploy.mjs';
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -61,20 +67,28 @@ if (args[0] === '--prepare') {
     writeFileSync(keyFile, JSON.stringify({ public: pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex'), private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }) }), { mode: 0o600, flag: 'wx' });
   }
   const key = JSON.parse(readFileSync(keyFile, 'utf8')), owner = `failmode-${String(process.pid)}`;
-  const built = spawnSync('bash', ['scripts/serve-build.sh', '--shard', SHARD, '--name', 'failmode', '--hours', '1'], { cwd: ROOT, encoding: 'utf8',
-    env: { ...process.env, SERVE_OWNER: owner, WILDSHARD_RELEASE_URL: RELEASE_URL, WILDSHARD_RELEASE_KEY: key.public, VITE_API_ORIGIN: PAGE_ORIGIN }, stdio: ['ignore', 'pipe', 'pipe'] });
-  const out = /→ (\S+)/u.exec(built.stderr)?.[1], port = /127\.0\.0\.1:(\d+)/u.exec(built.stdout)?.[1];
-  try {
-    if (built.status !== 0 || out === undefined) throw new Error(`the build failed: ${built.stderr.slice(-2000)}`);
-    const dist = join(work, 'dist');
-    rmSync(dist, { recursive: true, force: true });
-    if (spawnSync('cp', ['-cR', out, dist], { stdio: 'inherit' }).status !== 0) throw new Error('copying the build failed');
-    if (!readFileSync(join(dist, 'index.html'), 'utf8').includes(RELEASE_URL)) throw new Error('the build is not stamped with the proxy release address');
-    writeFileSync(join(work, 'fixture.json'), JSON.stringify({ schema: 'failmode-fixture/1', release: RELEASE_URL, api: PAGE_ORIGIN, publicKey: key.public, build: JSON.parse(readFileSync(join(dist, 'version.json'), 'utf8')).build }));
-    console.log(JSON.stringify({ dist, keyFile }));
-  } finally {
-    if (port !== undefined) spawnSync('bash', ['scripts/serve-build.sh', 'stop', port], { cwd: ROOT, env: { ...process.env, SERVE_OWNER: owner }, stdio: 'ignore' });
-  }
+  /** One build of the same stamp into `<work>/<name>`; each gets its own build id (sha + build time). @param {string} name */
+  const buildInto = name => {
+    const built = spawnSync('bash', ['scripts/serve-build.sh', '--shard', SHARD, '--name', 'failmode', '--hours', '1'], { cwd: ROOT, encoding: 'utf8',
+      env: { ...process.env, SERVE_OWNER: owner, WILDSHARD_RELEASE_URL: RELEASE_URL, WILDSHARD_RELEASE_KEY: key.public, VITE_API_ORIGIN: PAGE_ORIGIN }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = /→ (\S+)/u.exec(built.stderr)?.[1], port = /127\.0\.0\.1:(\d+)/u.exec(built.stdout)?.[1];
+    try {
+      if (built.status !== 0 || out === undefined) throw new Error(`the build failed: ${built.stderr.slice(-2000)}`);
+      const folder = join(work, name);
+      rmSync(folder, { recursive: true, force: true });
+      if (spawnSync('cp', ['-cR', out, folder], { stdio: 'inherit' }).status !== 0) throw new Error('copying the build failed');
+      if (!readFileSync(join(folder, 'index.html'), 'utf8').includes(RELEASE_URL)) throw new Error('the build is not stamped with the proxy release address');
+      return { folder, build: /** @type {string} */ (JSON.parse(readFileSync(join(folder, 'version.json'), 'utf8')).build) };
+    } finally {
+      if (port !== undefined) spawnSync('bash', ['scripts/serve-build.sh', 'stop', port], { cwd: ROOT, env: { ...process.env, SERVE_OWNER: owner }, stdio: 'ignore' });
+    }
+  };
+  const first = buildInto('dist'), second = args.includes('--next') ? buildInto('next') : null;
+  if (second !== null && second.build === first.build) throw new Error('the second build has the first one\'s id');
+  // as a release does (app-build-pipeline, MF2): the second build carries the first one's files, so a tab still on the first finds them
+  if (second !== null) await carryPreviousDeploy(second.folder, { previousDirectory: first.folder });
+  writeFileSync(join(work, 'fixture.json'), JSON.stringify({ schema: 'failmode-fixture/1', release: RELEASE_URL, api: PAGE_ORIGIN, publicKey: key.public, build: first.build, ...second === null ? {} : { next: second.build } }));
+  console.log(JSON.stringify({ dist: first.folder, keyFile, ...second === null ? {} : { next: second.folder } }));
   process.exit(0);
 }
 
@@ -82,6 +96,10 @@ const [dist = '', work = '', keyFile = '', pgBin = '', pgData = ''] = positional
 if (pgData === '' && pgBin !== 'memory:' && pgBin !== 'pglite:') throw new Error('failmode-proof <dist> <work> <key.json> <pg bin|memory:|pglite:> <pg data>');
 const galleryWalk = args.includes('--gallery');
 const engine = flag('engine', 'chromium'), baseline = args.includes('--baseline'), cooldownMs = Number(flag('cooldown', '60')) * 1000;
+// FM7b2/FM4 mode 25: `--seats=2` makes the door itself full (two seated pages), for the real waiting line; without it `full` is the
+// proxy's injected close, which carries no place in line
+const seats = flag('seats', '');
+if (seats !== '' && !/^[1-9]$/u.test(seats)) throw new Error('--seats=<1-9>');
 if (engine !== 'chromium' && engine !== 'webkit') throw new Error('--engine=chromium|webkit');
 // `--refusal=screen|injection` proves strict mode refuses: a drop that must show a screen no build has (exit 1), and a fault armed on
 // a route the page never reads, so it matches nothing (exit 2). Neither is a catalogue case.
@@ -93,6 +111,10 @@ if (!readFileSync(join(dist, 'index.html'), 'utf8').includes(RELEASE_URL)) throw
 fixtureKey(keyFile);
 const fixture = JSON.parse(readFileSync(join(absolute(dist, '..'), 'fixture.json'), 'utf8'));
 if (fixture.schema !== 'failmode-fixture/1' || fixture.release !== RELEASE_URL || fixture.api !== PAGE_ORIGIN || fixture.publicKey !== fixtureKey(keyFile).public || fixture.build !== JSON.parse(readFileSync(join(dist, 'version.json'), 'utf8')).build) throw new Error('The owned fixture stamp, key and build must agree');
+// the second build: stamped alike, prepared beside the first (fixture.json names it)
+const nextDist = flag('next', '');
+if (nextDist !== '' && (!readFileSync(join(nextDist, 'index.html'), 'utf8').includes(RELEASE_URL) || fixture.next !== JSON.parse(readFileSync(join(nextDist, 'version.json'), 'utf8')).build)) throw new Error(`${nextDist} is not the prepared second build: --prepare <work> --next`);
+const NEEDS_NEXT = 'needs the second build: --prepare <work> --next, then --next=<work>/next';
 claimFixture(work); mkdirSync(shots, { recursive: true });
 const sha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim();
 
@@ -104,7 +126,7 @@ const sha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8
 
 const { openRig } = await import('./online-rig.mjs');
 let rig;
-try { rig = await openRig({ dist, work: join(absolute(work), 'rig'), keyFile, pgBin, pgData, shard: SHARD, socket: SOCKET, origins: [PAGE_ORIGIN], isolated: true }); } catch (error) {
+try { rig = await openRig({ dist, nextDist, work: join(absolute(work), 'rig'), keyFile, pgBin, pgData, shard: SHARD, socket: SOCKET, origins: [PAGE_ORIGIN], isolated: true, ...seats === '' ? {} : { seats: Number(seats) } }); } catch (error) {
   writeFileSync(join(out, 'receipt.json'), JSON.stringify({ schema: 'failmode-proof/1', sha, engine, baseline, phase: 'setup', harnessFault: String(error).slice(0, 600), exit: 2, cases: [] }));
   process.exit(2);
 }
@@ -240,6 +262,34 @@ try {
   };
   /** Clicks a button on the case's screen. @param {import('playwright').Page} page @param {string} id @param {string} label */
   const press = (page, id, label) => page.locator(`[data-failmode~="${id}"] button`, { hasText: label }).first().click({ timeout: 5000 });
+  /** The build this page runs, polled across its own reloads (null while it navigates). @param {import('playwright').Page} page @param {string} build @param {number} timeout */
+  const onBuild = async (page, build, timeout) => {
+    const until = Date.now() + timeout;
+    while (Date.now() < until) {
+      if (await page.evaluate(() => /** @type {{ __WS_BUILD_ID__?: string }} */ (/** @type {unknown} */ (globalThis)).__WS_BUILD_ID__).catch(() => null) === build) return true;
+      await sleep(250);
+    }
+    return false;
+  };
+  /** Mode 10's recovery (J174: countdown, preload, reconnect): the link is live on the moved world and frames flow again. The page may
+   *  stay on its build (the same wire plays on) or reload into the new one; the receipt names which. @param {import('playwright').Page} page */
+  const backInPlay = async (/** @type {import('playwright').Page} */ page, timeout = 120_000) => {
+    const until = Date.now() + timeout;
+    while (Date.now() < until) {
+      const live = await page.evaluate(() => typeof window.__workerClient === 'function' && window.__workerClient().own !== null && window.__workerClient().closed === null).catch(() => false);
+      if (live) { const before = await frames(page); await sleep(1000); if (await frames(page) > before + 10) return true; }
+      await sleep(500);
+    }
+    return false;
+  };
+  /** Whether this page holds a seat. @param {import('playwright').Page} page */
+  const seated = page => page.evaluate(() => typeof window.__workerClient === 'function' && window.__workerClient().own !== null).catch(() => false);
+  // FM5b4/mode 10: the rig back on the first build, with no page view or retention file, for the next case
+  let onNext = false;
+  const home = async () => {
+    rig.pageView(null); rig.retain(null);
+    if (onNext) { onNext = false; await rig.move(dist); }
+  };
   /** The pause menu's Settings at one of its tabs, as a player gets there: Escape (the pause key), else the HUD's Settings button.
    *  @param {import('playwright').Page} page @param {'system' | 'dev'} tab */
   const settingsTab = async (page, tab) => {
@@ -248,6 +298,14 @@ try {
     if (!await menu.isVisible().catch(() => false)) await page.locator('button', { hasText: /^Settings$/u }).first().click({ timeout: 5000 }).catch(() => undefined);
     await menu.waitFor({ state: 'visible', timeout: 10_000 });
     await page.locator(`.ws-gmenu.show [data-sv-tab="${tab}"]`).first().click({ timeout: 10_000 });
+  };
+  /** The player's own update check, Settings ▸ System ▸ Check (the manual twin of the foreground and 5 min reads), then back to play.
+   *  @param {import('playwright').Page} page */
+  const checkForUpdate = async page => {
+    await settingsTab(page, 'system');
+    await page.locator('.ws-gmenu.show .ws-gmenu-buildcheck').first().click({ timeout: 10_000 });
+    await sleep(1000);
+    for (let tries = 0; tries < 3 && await page.locator('.ws-gmenu.show').isVisible().catch(() => false); tries++) { await page.keyboard.press('Escape'); await sleep(300); }
   };
   /** WebKit's setOffline (Playwright) leaves loopback sockets up, so a WebKit page "offline" kept playing on the rig (opus-fm1's mode 1).
    *  There the proxy cuts the world door too while the browser is offline: a live link drops and new upgrades are refused. Labelled in
@@ -312,6 +370,47 @@ try {
         const back = await recovered(page, item.id === 'full' ? 45_000 : 30_000);
         return back ? { ...result, injection, shot, recovery: 'a real frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen: seenWhileDown, injection, shot, after: await shoot(page, item.id, 'after'), url: page.url(), notes: await onScreen(page) };
       } finally { await heal(); await entered.context.close(); }
+    },
+    // FM7b2/FM4 mode 25 on the door's own line (`--seats=2`): two pages take both seats; a third and a fourth are refused with their
+    // place (1, then 2) and no invented wait; the third's Title screen says the clean quit, so the fourth's next retry is first in line;
+    // a seated page leaves and the fourth comes in by itself. Without --seats it is the proxy's injected close (socketDown).
+    queue: async item => {
+      if (seats === '') return runners.socketDown?.(item) ?? { outcome: 'harness-fail', reason: 'no socketDown runner' };
+      if (seats !== '2') return { outcome: 'harness-fail', reason: 'the line case needs --seats=2' };
+      const opened = /** @type {Entered[]} */ ([]);
+      try {
+        const sit = async () => { const entered = await fresh(); opened.push(entered); await entered.page.goto(URL_PLAY); await intoWorld(entered); return entered; };
+        const first = await sit(); await sit();
+        // a page that waits in line: its Name, then the full card
+        const wait = async () => {
+          const entered = await fresh(); opened.push(entered); const { page } = entered, started = Date.now();
+          await page.goto(URL_PLAY);
+          const named = await page.locator('#ws-name-box input').waitFor({ state: 'visible', timeout: 60_000 }).then(() => true, () => false);
+          if (named) { await page.locator('#ws-name-box input').fill(`fm${String(Date.now() % 100_000)}`); await page.locator('#ws-name-box button[type=submit]').click(); }
+          return { entered, seen: await screen(page, item.screen, 60_000, started) };
+        };
+        const { entered: third, seen: thirdSeen } = await wait();
+        const result = await judged(thirdSeen, item, third.page), shot = await shoot(third.page, item.id, 'place-1');
+        if (result.outcome !== 'pass') return { ...result, shot };
+        if (!/Place 1 in line/u.test(thirdSeen?.copy ?? '') || !/estimating the wait/u.test(thirdSeen?.copy ?? '')) return { outcome: 'ui-fail', reason: 'the first in line was not told its place, or was given a wait nobody measured', seen: thirdSeen, shot };
+        const { entered: fourth, seen: fourthSeen } = await wait(), secondShot = await shoot(fourth.page, item.id, 'place-2');
+        if (!/Place 2 in line/u.test(fourthSeen?.copy ?? '')) return { outcome: 'ui-fail', reason: 'the second in line was not told place 2', seen: fourthSeen, shot: secondShot };
+        // Title cancels: the third's quit, then it is on the title
+        await press(third.page, item.screen, 'Title screen');
+        await third.page.waitForURL(url => url.searchParams.get('chunk') === null, { timeout: 15_000 });
+        const moved = await fourth.page.locator(`[data-failmode~="${item.screen}"]`, { hasText: 'Place 1 in line' }).first().waitFor({ timeout: 45_000 }).then(() => true, () => false);
+        const firstShot = await shoot(fourth.page, item.id, 'moved-up');
+        if (!moved) return { outcome: 'ui-fail', reason: 'Title did not cancel the ticket ahead: the fourth never moved up', seen: fourthSeen, shot: firstShot, notes: await onScreen(fourth.page) };
+        // a seat frees: the head of the line comes in by itself on its next retry
+        const leaving = Date.now();
+        await first.context.close();
+        const admitted = await fourth.page.locator(`[data-failmode~="${item.screen}"]`).first().waitFor({ state: 'detached', timeout: 75_000 }).then(() => true, () => false)
+          && await intoWorld(fourth, 90_000).then(() => true, () => false);
+        if (!admitted) return { outcome: 'ui-fail', reason: 'the head of the line never came in after a seat freed', seen: fourthSeen, notes: await onScreen(fourth.page) };
+        return { ...result, shot, notes: { second: { seen: fourthSeen, shot: secondShot }, movedUp: firstShot },
+          injection: { seats: 2, seated: 2, waiting: 2, door: 'the world\'s own full refusal with FM7b2 queue facts' },
+          recovery: `Title cancelled the ticket ahead; a seat freed and the head came in after ${String(Math.round((Date.now() - leaving) / 1000))} s` };
+      } finally { for (const row of opened) await row.context.close().catch(() => undefined); }
     },
     // FM4: Send while the link is down holds one visible line, sent once on the way back
     heldChat: async item => {
@@ -795,6 +894,159 @@ try {
         const cleared = await page.locator(`[data-failmode~="${item.screen}"]`).waitFor({ state: 'detached', timeout: 45_000 }).then(() => true, () => false);
         return cleared ? { ...result, injection, shot, recovery: 'Run again with the clock right: no warning' } : { outcome: 'ui-fail', reason: 'the warning stayed after Run again with the clock right', seen, injection, shot };
       } finally { await entered.context.close(); }
+    },
+    // FM4 mode 10 (J174): a deploy under play, on the second build. Both views of the release name it; the world counts down while
+    // play goes on, the page origin moves, the world drains and comes back on it, and the page reloads into it by itself.
+    deploy: async item => {
+      if (rig.nextBuild === '') return { outcome: 'blocked-dependency', reason: NEEDS_NEXT };
+      const entered = await fresh(); const { page } = entered;
+      try {
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        let seen = /** @type {Seen | null} */ (null), shot = '', playing = false;
+        const started = Date.now();
+        onNext = true;
+        await rig.move(nextDist, { published: async () => {
+          seen = await screen(page, item.screen, 15_000, started); shot = await shoot(page, item.id, seen === null ? 'missing' : 'countdown');
+          const before = await frames(page); await sleep(1500);
+          playing = await frames(page) > before + 10 && await page.evaluate(() => typeof window.__workerClient === 'function' && window.__workerClient().closed === null).catch(() => false);
+        } });
+        const result = await judged(seen, item, page);
+        if (result.outcome !== 'pass') return { ...result, shot };
+        if (!playing) return { outcome: 'ui-fail', reason: 'play stopped under the countdown', seen, shot };
+        const landed = await backInPlay(page);
+        const runs = await page.evaluate(() => /** @type {typeof globalThis & { __WS_BUILD_ID__?: string }} */ (globalThis).__WS_BUILD_ID__ ?? '').catch(() => '');
+        return landed ? { ...result, shot, injection: { from: rig.build, to: rig.nextBuild, views: 'world and page' }, recovery: `the link came back on the moved world and play goes on (page build ${runs === rig.nextBuild ? 'reloaded into the new one' : 'kept, same wire'})` }
+          : { outcome: 'ui-fail', reason: 'play never came back after the move', seen, shot, notes: await onScreen(page) };
+      } finally { await entered.context.close(); await home(); }
+    },
+    // FM4 mode 10b: ENTER THE MMO on the title in a deploy's last seconds (the world's first word says it is moving inside 15 s).
+    // The tap holds on `deploy-blocked`; once the world is back on the second build the page joins it by itself.
+    deployHold: async item => {
+      if (rig.nextBuild === '') return { outcome: 'blocked-dependency', reason: NEEDS_NEXT };
+      const entered = await fresh(); const { page } = entered;
+      try {
+        // as 9b: a device that has played goes back to the title (a fresh one's ENTER opens Zone select instead)
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        await page.goto(`${PAGE_ORIGIN}/?mute=1&nolock=1`);
+        const enter = page.locator('.ws-main-mmo').first();
+        await enter.waitFor({ state: 'visible', timeout: 60_000 });
+        let seen = /** @type {Seen | null} */ (null), shot = '', tapped = 0;
+        onNext = true;
+        await rig.move(nextDist, { published: async () => {
+          // the world reads its release every 500 ms; from then on its first word says it is moving
+          await sleep(1500);
+          tapped = Date.now(); await enter.click({ timeout: 10_000 });
+          seen = await screen(page, item.screen, 10_000, tapped); shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
+        } });
+        const result = await judged(seen, item, page);
+        if (result.outcome !== 'pass') return { ...result, shot };
+        const landed = await intoWorld(entered, 120_000).then(() => true, () => false) && await backInPlay(page);
+        return landed ? { ...result, shot, injection: { from: rig.build, to: rig.nextBuild, tapMsAfterPublish: 1500, heldMs: Date.now() - tapped }, recovery: 'the held tap joined the moved world by itself' }
+          : { outcome: 'ui-fail', reason: 'the held tap never joined the moved world', seen, shot, notes: await onScreen(page) };
+      } finally { await entered.context.close(); await home(); }
+    },
+    // FM5b4 mode 24 (J219, J229): the second build retires this one. A legacy page (no file, a 404) shows nothing; a boot on the retired
+    // build gets the too-old page before any seat; in play the player's Check reads the signed file and the banner counts down to its
+    // signed deadline while a held Attack fights on, and zero navigates nowhere; the next load (a dropped link's reconnect) is refused
+    // with the page and nothing redials; once the deploy is done, one Update tap paints the RELOADING cover at once and lands in play on
+    // the second build, with no second reload. The page's view of the release runs ahead of the world's (the rig's two signed views).
+    tooOld: async item => {
+      if (rig.nextBuild === '') return { outcome: 'blocked-dependency', reason: NEEDS_NEXT };
+      const next = rig.nextBuild, steps = /** @type {Record<string, unknown>} */ ({});
+      try {
+        // 1. legacy: no file
+        {
+          const reads = /** @type {number[]} */ ([]), entered = await fresh(); const { page } = entered;
+          page.on('response', response => { if (new URL(response.url()).pathname === '/code-retention.json') reads.push(response.status()); });
+          try {
+            await page.goto(URL_PLAY); await intoWorld(entered); await checkForUpdate(page); await sleep(3000);
+            const up = (await visibleIds(page)).filter(ids => /\btoo-old/u.test(ids));
+            if (up.length > 0) return { outcome: 'ui-fail', reason: 'a legacy page (no retention file) showed too-old', notes: await onScreen(page) };
+            if (!reads.includes(404)) return { outcome: 'harness-fail', reason: `the page never read the missing retention file (${reads.join(',')})` };
+            steps.legacy = { reads, screens: 'none' };
+          } finally { await entered.context.close(); }
+        }
+        // 2. boot exclusion
+        rig.pageView(next); rig.retain({ keptBuilds: [next] });
+        {
+          const entered = await fresh(); const { page } = entered;
+          try {
+            const started = Date.now(); await page.goto(URL_PLAY);
+            // a fresh device is asked its Name first (MP2.4, before the online start); the page comes after it
+            const named = await page.locator('#ws-name-box input').waitFor({ state: 'visible', timeout: 60_000 }).then(() => true, () => false);
+            if (named) { await page.locator('#ws-name-box input').fill(`fm${String(Date.now() % 100_000)}`); await page.locator('#ws-name-box button[type=submit]').click(); }
+            const seen = await screen(page, 'too-old', 60_000, started), shot = await shoot(page, item.id, seen === null ? 'boot-missing' : 'boot-page');
+            const boot = await judged(seen, { ...item, screen: 'too-old' }, page);
+            if (boot.outcome !== 'pass') return { ...boot, reason: `boot: ${boot.reason ?? ''}`, shot, notes: steps };
+            await sleep(3000);
+            if (await seated(page)) return { outcome: 'ui-fail', reason: 'the retired build took a seat at boot', seen, shot };
+            steps.boot = { seen, shot, seated: false };
+          } finally { await entered.context.close(); }
+        }
+        await sleep(cooldownMs / 2);
+        // 3. in play, 4. the next load, 5. Update
+        rig.pageView(null); rig.retain(null);
+        const entered = await fresh(() => {
+          // the cover's time from the tap, kept in the tab across the reload it starts
+          let tapAt = -1;
+          addEventListener('pointerdown', () => { tapAt = performance.now(); }, true);
+          new MutationObserver(() => {
+            if (tapAt < 0 || document.getElementById('ws-reloading') === null || sessionStorage.getItem('fm.cover') !== null) return;
+            sessionStorage.setItem('fm.cover', String(Math.round(performance.now() - tapAt)));
+          }).observe(document, { childList: true, subtree: true });
+        });
+        const { page } = entered;
+        let navigations = 0;
+        page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
+        try {
+          await page.goto(URL_PLAY); await intoWorld(entered);
+          const retireAt = Date.now() + 25_000, settled = navigations;
+          rig.pageView(next); rig.retain({ keptBuilds: [next], retireAt });
+          const started = Date.now();
+          await checkForUpdate(page);
+          const seen = await screen(page, item.screen, 15_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'countdown');
+          const result = await judged(seen, item, page);
+          if (result.outcome !== 'pass') return { ...result, shot, notes: steps };
+          if (!/retires in/u.test(seen?.copy ?? '')) return { outcome: 'ui-fail', reason: 'the signed deadline was not counted down', seen, shot };
+          // Attack held: a fight, through the deadline
+          await page.keyboard.down('KeyF');
+          const before = await frames(page);
+          await sleep(Math.max(0, retireAt - Date.now()) + 3000);
+          const expired = await screen(page, item.screen, 5000), expiredShot = await shoot(page, item.id, 'expired');
+          await page.keyboard.up('KeyF');
+          const moved = await frames(page) - before;
+          if (navigations !== settled) return { outcome: 'ui-fail', reason: 'the page navigated in play', seen, shot: expiredShot };
+          if (expired === null || !/next load/u.test(expired.copy)) return { outcome: 'ui-fail', reason: 'at zero the banner did not say the next load', seen: expired, shot: expiredShot };
+          if (moved < 30 || !await seated(page)) return { outcome: 'ui-fail', reason: `play stopped under the warning (${String(moved)} frames)`, seen: expired, shot: expiredShot };
+          steps.play = { seen, shot, expired, expiredShot, framesThroughDeadline: moved, navigations: 0 };
+          // 4. the next load: the link drops once; its reconnect is refused with the page, and nothing redials
+          const dropped = await control();
+          await arm('too-old-reconnect', [{ route: 'socket', kind: 'drop-after', afterMs: 0 }]);
+          for (let tries = 0; tries < 40 && await matchedSince(dropped, 'socket') === 0; tries++) await sleep(100);
+          await heal();
+          if (await matchedSince(dropped, 'socket') === 0) return { outcome: 'harness-fail', reason: 'the drop matched nothing' };
+          const refused = await screen(page, 'too-old', 20_000), refusedShot = await shoot(page, item.id, refused === null ? 'next-load-missing' : 'next-load');
+          if (refused === null) return { outcome: 'ui-fail', reason: 'the reconnect of a retired build showed no too-old page', notes: await onScreen(page), shot: refusedShot };
+          const upgrades = (await control()).counters.upgrades; await sleep(6000);
+          const redials = (await control()).counters.upgrades - upgrades;
+          if (redials > 0) return { outcome: 'ui-fail', reason: `the refused page dialled ${String(redials)} times`, seen: refused, shot: refusedShot };
+          steps.nextLoad = { seen: refused, shot: refusedShot, redials };
+          // 5. the deploy finishes (both views, the world and the page origin on the second build); one Update tap
+          onNext = true; await rig.move(nextDist);
+          const tapNavigations = navigations;
+          await page.locator('[data-failmode~="too-old"] button', { hasText: 'Update now' }).first().click({ timeout: 5000 });
+          const landed = await onBuild(page, next, 120_000) && await intoWorld(entered, 120_000).then(() => true, () => false);
+          if (!landed) return { outcome: 'ui-fail', reason: 'Update never played on the new build', seen: refused, notes: await onScreen(page) };
+          const coverMs = Number(await page.evaluate(() => sessionStorage.getItem('fm.cover')).catch(() => null) ?? Number.NaN);
+          await sleep(8000);
+          const reloads = navigations - tapNavigations, backShot = await shoot(page, item.id, 'updated');
+          if (!Number.isFinite(coverMs) || coverMs > 250) return { outcome: 'ui-fail', reason: `the RELOADING cover was not up at once (${String(coverMs)} ms)`, seen: refused, shot: backShot };
+          if (reloads !== 1 || !await seated(page)) return { outcome: 'ui-fail', reason: `Update took ${String(reloads)} navigations`, seen: refused, shot: backShot };
+          steps.update = { coverMs, reloads, build: next, shot: backShot };
+          return { ...result, shot, injection: { retentionFile: 'signed, keeps only the second build', pageView: next, worldView: rig.build, retireInMs: 25_000, drop: 'socket drop-after 0' }, notes: steps,
+            recovery: `next load refused with the page; Update: cover in ${String(coverMs)} ms, one reload, playing on ${next}` };
+        } finally { await page.keyboard.up('KeyF').catch(() => undefined); await entered.context.close(); }
+      } finally { await home(); }
     },
     // FM5 mode 46: a release signed for staging (loopback fixture only)
     staging: async item => {
