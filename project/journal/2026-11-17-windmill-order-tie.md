@@ -9,7 +9,14 @@
 - The first difference is nearly always vertical, on a flat wall face: a grounded capsule leaning on a wall meets the
   floor and the wall both at time 0, inside the controller's 2 cm skin, and Rapier keeps whichever hit its query tree
   visits first. The page's tree and the room's are never built alike.
-- Starting grounded moves 0.5 mm above the skin (`restOnFlatFloor`) removes every difference in the probes, but the
-  floor then comes from a shape cast with a small time of impact: feet wander 3 to 6 mm vertically, a tick can hop
-  2 cm, and `road-rebind-speed` drops one tick to 89 % speed. Not shipped; NL13b5 owns a motor fix.
-- `test/net-predict-collider-order.test.ts` gains the glancing walk, marked `test.fails` until that fix lands.
+- First try, not kept: start grounded moves 0.5 mm above the skin with the fall still in them. Order-free, but the floor
+  then comes from a shape cast with a small time of impact: feet wander 3 to 6 mm vertically, a tick hops 2 cm, and
+  `road-rebind-speed` drops one tick to 89 % speed.
+- Kept: a grounded sideways move on flat static support (`restOnFlatFloor`'s case) starts `REST_LIFT` 0.5 mm above the
+  skin with no fall in it, so the floor is never hit and only a wall can be; when the move kept that height the feet go
+  back onto the skin. Every probe parts by 0 (64 walks x 15 orders on Far Reach; box, hull and prism floors under box,
+  drum and windmill walls), `road-rebind-speed` stays at 4.30 m/s, and the 31 motor test files pass. The allocating
+  control fixture takes the same change, as it took NL13's.
+- Ring 1's step digests move for Blender template, Far Reach, Driftwood, Pine and Nine (Template, Dunes and Nalati step
+  the same): re-recorded with this change. Shard repos' own walk checkpoints are keyed per engine version and move at
+  their next engine bump.

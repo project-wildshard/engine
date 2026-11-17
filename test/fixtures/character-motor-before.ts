@@ -1,5 +1,5 @@
 // Allocating motor control from 024864488d, with NL13's partial-floor
-// and flat-rest behavior fixes applied too. Allocation differences remain the control.
+// and flat-rest behavior fixes and NL13b4's lifted sideways rest applied too. Allocation differences remain the control.
 /**
  * A character's body in the physics world (PHYSICS.md P2, ENGINE-FIT E3): a capsule and Rapier's kinematic character
  * controller. The player uses it now; near creatures (P6) and the Nalati horse (P10) use the same one.
@@ -60,6 +60,7 @@ interface Vec3 { x: number; y: number; z: number }
 const GROUND_PROBE_UP = 0.1, GROUND_PROBE_DOWN = 0.25;
 /** how near a kinematic body must be for Rapier's platform friction to act on a move (its skin plus its prediction) */
 const DECK_REACH = 0.1;
+const REST_LIFT = 0.0005;
 
 export interface MoveResult {
   grounded: boolean;
@@ -213,17 +214,19 @@ export class CharacterMotor {
 
   /** A grounded capsule meets a flat static floor at the same float32 skin plane on both sides of the wire.
    * Tiny height differences otherwise choose different coplanar contacts and change a later wall slide. */
-  private restOnFlatFloor(feet: Vec3): void {
-    if (!this.result.grounded || this.result.groundNormalY < 0.999999) return;
+  private restOnFlatFloor(feet: Vec3): boolean {
+    if (!this.result.grounded || this.result.groundNormalY < 0.999999) return false;
     this.ray.origin.x = feet.x; this.ray.origin.y = feet.y + GROUND_PROBE_UP; this.ray.origin.z = feet.z;
     const hit = this.physics.world.castRayAndGetNormal(this.ray, GROUND_PROBE_UP + GROUND_PROBE_DOWN, true,
       this.physics.R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, this.collider);
-    if (hit === null) return;
+    if (hit === null) return false;
     const parent = hit.collider.parent(), flat = hit.normal.y >= 0.999999 && !isTerrainCollider(hit.collider)
       && ((hit.collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0 && (parent === null || parent.isFixed());
     const plane = Math.fround(this.ray.origin.y - hit.timeOfImpact), skin = this.kcc.offset(), y = plane + skin;
-    if (flat && Math.abs(y - feet.y) <= skin) feet.y = y;
+    if (flat && Math.abs(y - feet.y) <= skin) { feet.y = y; this.restPlane = plane; return true; }
+    return false;
   }
+  private restPlane = 0;
 
 
   /**
@@ -287,10 +290,13 @@ export class CharacterMotor {
    * Move `feet` by as much of `want` as the world allows; `feet` is updated in place. `result` says whether the
    * character ended on ground and what that ground is like. `ignoreGround`: the terrain doesn't stop this move.
    */
-  move(feet: Vec3, want: Vec3, ignoreGround = false): MoveResult {
+  move(feet: Vec3, asked: Vec3, ignoreGround = false): MoveResult {
     const r = this.result;
-    if (!this.enabled) { feet.x += want.x; feet.y += want.y; feet.z += want.z; r.grounded = false; r.groundNormalY = 1; r.horizontalFreedom = 1; r.groundCollider = null; this.anchorBody = null; return r; }
-    if (!ignoreGround && want.y <= 0) this.restOnFlatFloor(feet);
+    if (!this.enabled) { feet.x += asked.x; feet.y += asked.y; feet.z += asked.z; r.grounded = false; r.groundNormalY = 1; r.horizontalFreedom = 1; r.groundCollider = null; this.anchorBody = null; return r; }
+    const rested = !ignoreGround && asked.y <= 0 && this.restOnFlatFloor(feet);
+    const sideways = rested && Math.hypot(asked.x, asked.z) > 1e-6;
+    if (sideways) feet.y += REST_LIFT;
+    const want = sideways ? { x: asked.x, y: 0, z: asked.z } : asked;
     const { R } = this.physics;
     this.collider.setTranslation({ x: feet.x, y: feet.y + this.lift, z: feet.z });
     const wantH = Math.hypot(want.x, want.z);
@@ -312,6 +318,7 @@ export class CharacterMotor {
       m = this.kcc.computedMovement();
     }
     feet.x += m.x; feet.y += m.y + lifted; feet.z += m.z;
+    if (sideways && Math.abs(feet.y - (this.restPlane + this.kcc.offset() + REST_LIFT)) < 1e-6) feet.y = this.restPlane + this.kcc.offset();
     this.collider.setTranslation({ x: feet.x, y: feet.y + this.lift, z: feet.z });
     r.grounded = this.kcc.computedGrounded();
     r.horizontalFreedom = wantH > 1e-6 ? Math.min(1, Math.hypot(m.x, m.z) / wantH) : 1;

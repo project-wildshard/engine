@@ -59,14 +59,13 @@ test.each(['far-reach'])('%s: every deck walks the same in any collider order', 
 });
 
 /**
- * NL13b4 (open): rev 4's prism decks fixed the open deck; staging still corrected Chromium 8.5 to 18.4 a minute at the windmill.
- * The cause is not the windmill's shape. A grounded capsule leaning on any wall meets the floor and the wall at time 0 (both
- * within the controller's skin) and Rapier keeps whichever its query tree visits first, so the order the world was built in
- * picks the slide. A plain box wall on a box floor off its centre parts too; one convex windmill hull, or a drum that holds
- * the tower's corners, parts as often (opus-netlag2 probes, plan row). `fails` until the motor breaks that tie (NL13b5): then
- * this goes red, and the marker comes off.
+ * NL13b4: rev 4's prism decks fixed the open deck; staging still corrected Chromium 8.5 to 18.4 a minute at the windmill.
+ * The cause was not the windmill's shape. A grounded capsule leaning on any wall met the floor and the wall at time 0 (both
+ * within the controller's skin) and Rapier kept whichever its query tree visited first, so the order the world was built in
+ * picked the slide: before the motor's lifted sideways rest this walk parted by up to 20 cm. A plain box wall on a box floor
+ * off its centre parted too, and one convex windmill hull, or a drum that held the tower's corners, parted as often.
  */
-test.fails('far-reach: a walk glancing off the windmill is the same in any collider order', () => {
+test('far-reach: a walk glancing off the windmill is the same in any collider order', () => {
   const all = pieces('far-reach'), decks = all.filter(piece => piece.category === 'ground'), mill = all.filter(piece => piece.id === 'far.windmill');
   expect(mill).toHaveLength(1);
   const at = { x: mill[0]?.colliders[0]?.x ?? 0, z: mill[0]?.colliders[0]?.z ?? 0 };

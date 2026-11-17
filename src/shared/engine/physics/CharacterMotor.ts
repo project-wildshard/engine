@@ -64,6 +64,14 @@ interface Vec3 { x: number; y: number; z: number }
 const GROUND_PROBE_UP = 0.1, GROUND_PROBE_DOWN = 0.25;
 /** how near a kinematic body must be for Rapier's platform friction to act on a move (its skin plus its prediction) */
 const DECK_REACH = 0.1;
+/**
+ * NET-LAG NL13b4: a grounded sideways move on flat static support starts this far above the controller's skin, with no fall
+ * in it, and ends back on the skin. Resting on the skin, the capsule met the floor and any wall it leaned on both at time 0,
+ * and Rapier kept whichever hit its query tree visited first. The page's world and the room's never build that tree alike
+ * (other colliders, another insertion order), so the same step from the same state slid along a wall differently and
+ * corrected the owner (Far Reach's windmill: 8.5 to 18.4 a minute on staging). Clear of the floor, only the wall is hit.
+ */
+const REST_LIFT = 0.0005;
 
 export interface MoveResult {
   grounded: boolean;
@@ -262,19 +270,21 @@ export class CharacterMotor {
   /** Begin grounded downward moves on a ray-measured float32 skin plane above nearly flat static support.
    * Tiny height differences otherwise choose different coplanar contacts and change a later wall slide.
    * A terrain ray describes one triangle, not the capsule's heightfield contact; leave that contact to the controller. */
-  private restOnFlatFloor(feet: Vec3): void {
-    if (!this.result.grounded || this.result.groundNormalY < 0.999999) return;
+  private restOnFlatFloor(feet: Vec3): boolean {
+    if (!this.result.grounded || this.result.groundNormalY < 0.999999) return false;
     this.ray.origin.x = feet.x; this.ray.origin.y = feet.y + GROUND_PROBE_UP; this.ray.origin.z = feet.z;
     const hit = this.physics.castRayAndGetNormal(this.ray, GROUND_PROBE_UP + GROUND_PROBE_DOWN, true,
       this.physics.R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, this.collider, undefined,
       this.phased.size > 0 ? this.notPhased : undefined, this.groundHit);
-    if (hit === null) return;
+    if (hit === null) return false;
     const parent = hit.collider.parent(), flat = hit.normal.y >= 0.999999 && !isTerrainCollider(hit.collider)
       && ((hit.collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0 && (parent === null || parent.isFixed());
     const plane = Math.fround(this.ray.origin.y - hit.timeOfImpact), skin = this.kcc.offset(), y = plane + skin;
     hit.collider = this.collider; this.groundHit = hit;
-    if (flat && Math.abs(y - feet.y) <= skin) feet.y = y;
+    if (flat && Math.abs(y - feet.y) <= skin) { feet.y = y; this.restPlane = plane; return true; }
+    return false;
   }
+  private restPlane = 0;
 
   /**
    * The capsule at `feet` is within reach of a kinematic body (SF49 / SF51). Rapier's controller runs a
@@ -337,10 +347,13 @@ export class CharacterMotor {
    * Move `feet` by as much of `want` as the world allows; `feet` is updated in place. `result` says whether the
    * character ended on ground and what that ground is like. `ignoreGround`: the terrain doesn't stop this move.
    */
-  move(feet: Vec3, want: Vec3, ignoreGround = false): MoveResult {
+  move(feet: Vec3, asked: Vec3, ignoreGround = false): MoveResult {
     const r = this.result;
-    if (!this.enabled) { feet.x += want.x; feet.y += want.y; feet.z += want.z; r.grounded = false; r.groundNormalY = 1; r.horizontalFreedom = 1; r.groundCollider = null; this.anchorBody = null; return r; }
-    if (!ignoreGround && want.y <= 0) this.restOnFlatFloor(feet);
+    if (!this.enabled) { feet.x += asked.x; feet.y += asked.y; feet.z += asked.z; r.grounded = false; r.groundNormalY = 1; r.horizontalFreedom = 1; r.groundCollider = null; this.anchorBody = null; return r; }
+    const rested = !ignoreGround && asked.y <= 0 && this.restOnFlatFloor(feet);
+    const sideways = rested && Math.hypot(asked.x, asked.z) > 1e-6;
+    if (sideways) feet.y += REST_LIFT;
+    const want = sideways ? this.flatWant(asked) : asked;
     const { R } = this.physics, translation = this.translation;
     translation.x = feet.x; translation.y = feet.y + this.lift; translation.z = feet.z;
     this.collider.setTranslation(translation);
@@ -369,6 +382,7 @@ export class CharacterMotor {
       m = this.kcc.computedMovement(this.movement);
     }
     feet.x += m.x; feet.y += m.y + lifted; feet.z += m.z;
+    if (sideways && Math.abs(feet.y - (this.restPlane + this.kcc.offset() + REST_LIFT)) < 1e-6) feet.y = this.restPlane + this.kcc.offset();
     translation.x = feet.x; translation.y = feet.y + this.lift; translation.z = feet.z;
     this.collider.setTranslation(translation);
     r.grounded = this.kcc.computedGrounded();
@@ -414,6 +428,9 @@ export class CharacterMotor {
     feet.x = x; feet.y = y; feet.z = z;
     return true;
   }
+
+  private readonly flatScratch: Vec3 = { x: 0, y: 0, z: 0 };
+  private flatWant(want: Vec3): Vec3 { this.flatScratch.x = want.x; this.flatScratch.y = 0; this.flatScratch.z = want.z; return this.flatScratch; }
 
   /** let go of whatever the feet ride (a teleport) */
   release(): void { this.anchorBody = null; }
