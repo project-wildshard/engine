@@ -67,7 +67,7 @@ export class DeclaredQuests {
       if ((q.onComplete?.coins ?? 0) > 0) ports.coins?.(q.onComplete?.coins ?? 0, player);
     };
     this.quests = data.quests.map((q) => {
-      const state = new QuestState(q, host.flags, host.events, host.scope);
+      const state = new QuestState(q, lead.flags, host.events, host.scope); // SB34b: the lead's view, whose kills are its own
       host.scope.onDispose(state.observe({ complete: () => { complete(q, lead.player); } }));
       return state;
     });

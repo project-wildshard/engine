@@ -37,7 +37,7 @@ test('a player who walks into a region raises its own flag, and no one else\'s',
   expect(walk(books.of(bot.id).quests)?.current?.id).toBe('kill');
   expect(host.flags.has('been:there')).toBe(false);
   expect(walk(host.quests)?.current?.id).toBe('there');
-  expect(books.lead.flags).toBe(host.flags);
+  expect(books.lead.flags).toBe(host.questFlags); // SB34b: the host's flags, but its kill credit is its own
 });
 
 test('kill credit finishes a player\'s quest, and finishing pays the player who finished', () => {
@@ -117,7 +117,9 @@ test('only the player who killed moves its camp step and bounty; one who stood b
   expect(host.flags.has('dead:boar:1'), 'the world keeps its record').toBe(true);
   expect(camp(books.of(bot.id).quests)?.isComplete).toBe(true);
   expect(books.of(bot.id).flags.has('dead:boar:1')).toBe(true);
-  expect(paid.filter(([entity]) => entity !== lead)).toEqual([[bot.id, 5]]);
+  expect(paid, 'the lead stood by too (SB34b)').toEqual([[bot.id, 5]]);
+  expect(books.lead.flags.has('dead:boar:1')).toBe(false);
+  expect(camp(host.quests)?.current?.id).toBe('boar');
   // a second seat that stood by is told nothing of it
   const idle = host.addPlayer('bot:2', { x: 0, y: 1, z: 0 }); host.step();
   expect(books.of(idle.id).flags.has('dead:boar:1')).toBe(false);
@@ -133,7 +135,7 @@ test('every player with a meaningful share of the damage is credited, and a seco
   const one = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 }), two = host.addPlayer('bot:2', { x: 0, y: 1, z: 0 }), books = questBooks(host);
   strike(host, one.id, 30); strike(host, two.id, 200);
   expect([one.id, two.id].map(id => books.of(id).flags.has('dead:boar:1'))).toEqual([true, true]);
-  expect(paid.map(([entity]) => entity).filter(entity => entity !== books.lead.player).sort()).toEqual([one.id, two.id]);
+  expect(paid.map(([entity]) => entity).sort()).toEqual([one.id, two.id]);
   const saved = snapshotSimHost(host);
   expect(saved.books?.every(book => book.credited === true)).toBe(true);
   // a save from before SB34a: its books read the world's deaths, so they keep reading them
@@ -141,4 +143,31 @@ test('every player with a meaningful share of the damage is credited, and a seco
   const restored = restoreSimHost(SIM_LEVEL, { rapier }, legacy, fresh => { new DeclaredQuests(fresh, CAMP, { coins: () => undefined }); });
   expect(questBooks(restored).of(one.id).flags.has('dead:boar:1')).toBe(true);
   expect(camp(questBooks(restored).of(one.id).quests)?.isComplete).toBe(true);
+});
+
+test('the lead\'s kills are its own credit, and a one-player room saves exactly what it did', () => {
+  const host = createSimHost(SIM_LEVEL, { rapier }), paid: [string, number][] = [];
+  new DeclaredQuests(host, CAMP, { coins: (amount, entity) => { paid.push([entity, amount]); } });
+  strike(host, leadPlayer(host).id, 1000);
+  expect(paid).toEqual([[leadPlayer(host).id, 5]]);
+  expect(questBooks(host).lead.flags.has('dead:boar:1')).toBe(true);
+  // alone, the lead's credit is the world's record, so the save has no field of its own
+  const saved = snapshotSimHost(host);
+  expect('credit' in saved).toBe(false);
+  const restored = restoreSimHost(SIM_LEVEL, { rapier }, saved, fresh => { new DeclaredQuests(fresh, CAMP, { coins: () => undefined }); });
+  expect(restored.questFlags.credit).toEqual(['dead:boar:1']);
+  expect(camp(restored.quests)?.isComplete).toBe(true);
+});
+
+test('a lead who stood by has no credit, through a save', () => {
+  const host = createSimHost(SIM_LEVEL, { rapier });
+  new DeclaredQuests(host, CAMP, { coins: () => undefined });
+  const bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 });
+  strike(host, bot.id, 1000);
+  const saved = snapshotSimHost(host);
+  expect(saved.credit).toEqual([]);
+  const restored = restoreSimHost(SIM_LEVEL, { rapier }, saved, fresh => { new DeclaredQuests(fresh, CAMP, { coins: () => undefined }); });
+  expect(restored.flags.has('dead:boar:1')).toBe(true);
+  expect(questBooks(restored).lead.flags.has('dead:boar:1')).toBe(false);
+  expect(camp(restored.quests)?.current?.id).toBe('boar');
 });

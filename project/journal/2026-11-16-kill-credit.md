@@ -12,3 +12,10 @@ keeps its record for world rules, second seats stop reading it, and it
 is no longer replicated as a world flag. Books saved before this read
 the world's deaths once on restore (`credited` marker), so old saves
 keep progress.
+
+SB34b: the lead's book reads `SimHost.questFlags` (`LeadFlags`): the
+host's flags, but kill credit is the lead's own. Credit is personal,
+so it leaves with the lead's doc and a fresh device on the lead seat
+starts with none; the world's death record stays for world rules. A
+save writes `credit` only where it parts from the world's deaths, so
+a one-player save keeps its bytes.

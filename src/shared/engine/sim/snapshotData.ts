@@ -109,7 +109,7 @@ const entries = {
     frameCount: v.pipe(integer, v.maxValue(1000)), frameBound: v.boolean() }),
   colliderTags: v.array(v.strictObject({ handle: nonnegative,
     material: v.picklist(['sand', 'wetSand', 'grass', 'rock', 'planks', 'stone', 'water', 'wood', 'metal', 'flesh', 'shell', 'ground', 'edge', 'felt', 'earth']), owner: eventValue })),
-  flags: v.array(id), quests: v.array(quest),
+  flags: v.array(id), quests: v.array(quest), credit: v.optional(v.array(id)),
   books: v.exactOptional(v.array(v.strictObject({ player: id, flags: v.array(id), quests: v.array(quest), parts: v.record(v.string(), v.string()), credited: v.exactOptional(v.literal(true)) }))),
   slots: v.strictObject({ scriptMemory: v.record(v.string(), simValue), scriptGlobals: v.record(v.string(), simValue),
     questState: v.record(v.string(), simValue), ledgerDedupe: v.array(v.string()) }),

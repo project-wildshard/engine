@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import { createSnapshotDataSerializer, serializeSnapshotData, serializeSnapshotDataSteps, decodeSnapshotData, decodeSnapshotDataBytes, admitSnapshotDataBytes, finishSteps, checkSnapshotDataWire } from './snapshotData';
 import { byteArray } from './snapshotPhysics';
-import type { QuestBookSaved } from '../quest/players';
+import { isCredit, type QuestBookSaved } from '../quest/players';
 import type { SimHost, SimLevel, SimSlots, SimValue } from '../../../server/engine/sim';
 import { SIM_API_VERSION } from './apiVersion';
 import type { PlayerSim } from '../../../server/engine/sim/playerSim';
@@ -98,6 +98,9 @@ export interface SimSnapshot {
   flags: string[]; quests: ReturnType<QuestState['snapshot']>[];
   /** P1-E3.3: every player's quest book but the lead's, whose are `flags` and `quests`. A one-player save holds none. */
   books?: QuestBookSaved[];
+  /** SB34b: the lead's kill credit, when it is not the world's record of every death (`flags`); absent, it is, so a one-player
+   *  save keeps its bytes until a body respawns. */
+  credit?: string[] | undefined;
   slots: SimSlots; adapters: { id: string; state: SimValue }[];
   /** SF72 body band clocks (SimHost.useBodyBands); absent for a host without bands, so its bytes are unchanged. */
   bands?: BandsState | undefined;
@@ -236,7 +239,7 @@ export function regionalContinuation(host: SimHost): string {
   return JSON.stringify({ level: host.level, state: host.state, clock: host.clock.snapshot(), rng: host.rng.snapshot(),
     entities: [...host.entities].sort(([a], [b]) => a.localeCompare(b)).map(([id, entity]) => [id, entity.snapshot(), motorState(entityMotor(entity))]),
     strikes: [...host.strikes].filter(([id]) => !host.players.has(id)).sort(([a], [b]) => a.localeCompare(b)).map(([id, runner]) => [id, runner.snapshot()]),
-    targets: host.attackTargets().filter(([id]) => !host.players.has(id)), flags: host.flags.all.sort((a, b) => a.localeCompare(b)), quests: host.quests.map((quest) => quest.snapshot()), ...savedBooks(host), slots: cloneSlots(host.slots),
+    targets: host.attackTargets().filter(([id]) => !host.players.has(id)), flags: host.flags.all.sort((a, b) => a.localeCompare(b)), quests: host.quests.map((quest) => quest.snapshot()), ...savedBooks(host), ...creditField(host), slots: cloneSlots(host.slots),
     events: host.events.snapshot((value) => encode(value, host)),
     adapters: [...host.adapters].sort(([a], [b]) => a.localeCompare(b)).map(([id, adapter]) => [id, cloneValue(adapter.snapshot())]),
     ...bandsField(host), ...dayField(host), ...damageField(host), ...respawnField(host), ...focusField(host) });
@@ -281,7 +284,7 @@ function captureSimHost<Bytes extends number[] | Uint8Array>(host: SimHost, phys
     players: [...host.players.values()].map(player => playerSnapshot(host, player)),
     strikes: [...host.strikes].map(([id, runner]) => ({ id, state: runner.snapshot() })), targets: host.attackTargets(),
     events: host.events.snapshot((value) => encode(value, host)), physics: physics(host.physics.snapshot()), colliderTags,
-    flags: host.flags.all, quests: host.quests.map((quest) => quest.snapshot()), ...savedBooks(host), slots: cloneSlots(host.slots),
+    flags: host.flags.all, quests: host.quests.map((quest) => quest.snapshot()), ...savedBooks(host), ...creditField(host), slots: cloneSlots(host.slots),
     adapters: [...host.adapters].map(([id, adapter]) => ({ id, state: cloneValue(adapter.snapshot()) })), ...bandsField(host),
     ...(host.boardColliderHandles().length > 0 ? { boardColliders: [...host.boardColliderHandles()] } : {}), ...dayField(host), ...damageField(host), ...respawnField(host), ...focusField(host) };
 }
@@ -385,6 +388,11 @@ export function onSimHostRestored(host: SimHost, check: () => void): void {
 const restoringHosts = new WeakSet<SimHost>();
 /** True only during the unpublished native replacement transaction. */
 export function isSimHostRestoring(host: SimHost): boolean { return restoringHosts.has(host); }
+/** The lead's kill credit, only where it parts from the world's deaths. */
+function creditField(host: SimHost): { credit?: string[] } {
+  const credit = host.questFlags.credit.sort((a, b) => a.localeCompare(b)), world = host.flags.all.filter(isCredit).sort((a, b) => a.localeCompare(b));
+  return credit.length === world.length && credit.every((flag, i) => flag === world[i]) ? {} : { credit };
+}
 function savedBooks(host: SimHost): { books?: QuestBookSaved[] } {
   const books = host.questStore?.save();
   return books === undefined ? {} : { books };
@@ -423,6 +431,7 @@ export function restoreInstalledHost(host: SimHost, ports: { rapier: Rapier }, s
     for (const entry of saved.players) restorePlayer(host, entry);
     for (const entry of saved.strikes) host.strikes.get(entry.id)?.restore(entry.state, host.strikeSpecifications(entry.id));
     host.flags.restore(saved.flags);
+    host.questFlags.restoreCredit(saved.credit ?? saved.flags.filter(isCredit));
     for (const quest of host.quests) { const state = saved.quests.find((entry) => entry.id === quest.def.id); if (state !== undefined) quest.restore(state); }
     host.questStore?.restore(saved.books);
     host.rng.restore(saved.rng); host.clock.restore(saved.clock);

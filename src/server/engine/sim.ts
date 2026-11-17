@@ -27,7 +27,7 @@ import type { Rapier } from '../../shared/engine/physics/rapier';
 import { groups } from '../../shared/engine/physics/groups';
 import { tagCollider } from '../../shared/engine/physics/surface';
 import { Flags } from '../../shared/engine/world/interact/flags';
-import { CREDIT_PREFIX, questBooks, type QuestBookSaved } from '../../shared/engine/quest/players';
+import { CREDIT_PREFIX, LeadFlags, questBooks, type QuestBookSaved } from '../../shared/engine/quest/players';
 import { QuestState, type QuestDef } from '../../shared/engine/quest/core';
 import type { DayCycle, DayCycleClock, DayCycleSpec } from '../../shared/engine/world/dayCycle';
 import { clockDayPhase, clockPeriod, wrapClock, type DayClockState } from '../../shared/engine/sim/dayClock';
@@ -189,6 +189,8 @@ export class SimHost {
   readonly clock: GameClock;
   readonly rng: RngService;
   readonly flags: Flags;
+  /** SB34b: the lead's quest view: the host's flags, but kill credit is the lead's own, not the world's record of a death. */
+  readonly questFlags: LeadFlags;
   readonly quests: QuestState[];
   /** P1-E3.3: other players' quest books, which the save carries; engine/quest/players sets it. */
   questStore: { save: () => QuestBookSaved[] | undefined; restore: (saved: readonly QuestBookSaved[] | undefined) => void } | undefined = undefined;
@@ -284,7 +286,8 @@ export class SimHost {
     this.players.set(this.lead.id, this.lead);
     this.focused = this.lead; this.playerFocus = liveVector(() => this.focused.position);
     this.flags = new Flags(level.id, false);
-    this.quests = level.quests.map((def) => new QuestState(def, this.flags, this.events, this.scope));
+    this.questFlags = new LeadFlags(this.flags);
+    this.quests = level.quests.map((def) => new QuestState(def, this.questFlags, this.events, this.scope));
     this.strikes.set(this.lead.id, this.lead.strike);
     this.weapons.set(this.lead.id, { ...level.weapon, weight: () => 1 });
     for (const spawn of level.entities) this.createActor(spawn);
@@ -350,7 +353,7 @@ export class SimHost {
   /**
    * SB34a (J106, J105, Q-CC36): who a death counts for. Each player with a meaningful share of its damage, as loot reads it; for
    * a body no page is kept on (a target post), the player whose blow felled it; for a death no player had a hand in (the world, an
-   * NPC), everyone present, as the world's flag reached them before. The lead's book is the host's, which the world's record is.
+   * NPC), everyone present, as the world's flag reached them before.
    */
   private credit(id: string, req: DamageRequest | undefined): void { // a scripted death may carry no blow
     if (this.players.size === 0) return;

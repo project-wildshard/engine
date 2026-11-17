@@ -30,6 +30,33 @@ export class PlayerFlags extends Flags {
   }
 }
 
+/**
+ * SB34b: the lead's book. Every flag is the host's, as P1-E3.3 had it, but a death: that reads the lead's own credit, not the
+ * world's record of the body, so a player who takes the lead seat inherits nobody's kills and a respawn walks no quest back.
+ * Alone in a room the lead helped every death, so a one-player page reads what it always did.
+ */
+export class LeadFlags extends Flags {
+  private readonly world: Flags;
+  constructor(world: Flags) { super(world.level, false); this.world = world; }
+  /** The lead's own kill credit. */
+  get credit(): string[] { return super.all; }
+  override has(flag: string): boolean { return isCredit(flag) ? super.has(flag) : this.world.has(flag); }
+  override set(flag: string, on = true): void { if (isCredit(flag)) super.set(flag, on); else this.world.set(flag, on); }
+  override get all(): string[] { return [...this.world.all.filter(flag => !isCredit(flag)), ...super.all]; }
+  override count(prefix: string): number { let n = 0; for (const flag of this.all) if (flag.startsWith(prefix)) n++; return n; }
+  /** The lead's flags and credit; the world's own record of its deaths stays. */
+  override restore(flags: readonly string[]): void {
+    this.world.restore([...new Set([...this.world.all.filter(isCredit), ...flags.filter(flag => !isCredit(flag))])]);
+    super.restore([...new Set(flags.filter(isCredit))]);
+  }
+  /** Only the credit: a host restore puts the world's flags back itself. */
+  restoreCredit(flags: readonly string[]): void { super.restore(flags); }
+  override onChange(fn: FlagListener): () => void {
+    const own = super.onChange(fn), world = this.world.onChange((flag, on) => { if (!isCredit(flag)) fn(flag, on); });
+    return () => { own(); world(); };
+  }
+}
+
 /** One player's continuation beside its flags; `read` and `write` carry detached JSON text. */
 export interface QuestBookPart { readonly read: () => string; readonly write: (saved: string) => void }
 /** What a saved book holds. */
@@ -76,11 +103,13 @@ export class QuestBook {
 
 /** What a player's client reads: its quests, and which of its own flags are up: a personal flag reaches nobody else. */
 export interface QuestProgressRead { readonly version: number; readonly rows: readonly QuestProgress[]; readonly flags: readonly string[] }
+/** What a host lends its books: the lead's quest view (SB34b) is the host's `questFlags`. */
+type QuestHost = Pick<SimHost, 'flags' | 'quests' | 'players' | 'level'> & { readonly questFlags?: Flags };
 /** Every player's book on one host, made as a player is first read. */
 export class QuestBooks {
   /** The first player's book is the host's flags and quests. */
   readonly lead: QuestBook;
-  private readonly host: Pick<SimHost, 'flags' | 'quests' | 'players' | 'level'>;
+  private readonly host: QuestHost;
   private readonly claimed = new Set<string>();
   private readonly shown = new Set<string>();
   /** A book made now is being read back from a save. */
@@ -88,10 +117,10 @@ export class QuestBooks {
   private readonly books = new Map<string, QuestBook>();
   private readonly owners: ((book: QuestBook) => void)[] = [];
   private readonly list: QuestBook[] = [];
-  constructor(host: Pick<SimHost, 'flags' | 'quests' | 'players' | 'level'>) {
+  constructor(host: QuestHost) {
     const [first] = host.players.keys();
     if (first === undefined) throw new Error('Quest books require a player');
-    this.host = host; this.lead = new QuestBook(first, host.flags, host.quests);
+    this.host = host; this.lead = new QuestBook(first, host.questFlags ?? host.flags, host.quests);
     this.books.set(this.lead.player, this.lead);
     this.claim(host.level.quests.flatMap(questFlags));
     // A marker hides on a flag, and a client draws markers: it is told those flags as it is told a gate's.
@@ -101,8 +130,8 @@ export class QuestBooks {
   show(flags: Iterable<string>): void { for (const flag of flags) this.shown.add(flag); }
   /** Name flags that quest rows write: each player keeps its own copy of them. */
   claim(flags: Iterable<string>): void { for (const flag of flags) this.claimed.add(flag); }
-  /** Whether a flag is a player's own, not the world's. */
-  personal(flag: string): boolean { return this.claimed.has(flag); }
+  /** Whether a flag is a player's own, not the world's: a quest row's, or kill credit (SB34). */
+  personal(flag: string): boolean { return this.claimed.has(flag) || isCredit(flag); }
   /** Run for every other player's book, now and as they join: an owner's state for that player. */
   install(owner: (book: QuestBook) => void): void {
     this.owners.push(owner);
