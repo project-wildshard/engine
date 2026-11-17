@@ -110,7 +110,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
     if (!actor.alive) return [];
     const target = host.combat.targetPort(actor.combatActor(), actor, velocity => { actor.impulse(velocity); });
     return [{ actor: target.actor, position: target.position, target: target.target, hittable: target.hittable, hurt: target.hurt,
-      aimPoint: new Vector3(actor.position.x, actor.position.y + actor.dims.bodyY * actor.scale, actor.position.z) }];
+      aimPoint: new Vector3(actor.position.x, actor.position.y + actor.dims.bodyY * actor.scale, actor.position.z), reach: actor.dims.bodyRadius * actor.scale }];
   });
   // The command a blow answers: the page confirms its own hits by it, as it does a native swing's (`attackSeq`).
   const pressed = new Map<string, number>();

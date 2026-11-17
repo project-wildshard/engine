@@ -43,7 +43,7 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   const actor: Actor = { id: 'actor.player', get tags() { return health().tags; }, get state() { return health().state; }, get attributes() { return health().attributes; }, get alive() { return health().alive; }, applyDamage: (request) => health().applyDamage(request) };
   const aimTarget = (target: CombatTarget): ItemTarget => {
     const { dims, scale = 1 } = target.target;
-    return { ...target, aimPoint: target.position.clone().add(new Vector3(0, dims === undefined ? 0.9 : dims.bodyY * scale, 0)) };
+    return { ...target, aimPoint: target.position.clone().add(new Vector3(0, dims === undefined ? 0.9 : dims.bodyY * scale, 0)), reach: (dims?.bodyRadius ?? 0) * scale };
   };
   const items = installDeclaredItems(source.items, { scope: entry, actorId: actor.id, input: app.input, bindings: app.input.bindings,
     observation: { get mode() { return playerModes(player).current(); }, get item() { return app.equipment?.current.row.id ?? null; }, get flags() { return wirePage.client === null ? [] : [...wirePage.client.flags()]; } },

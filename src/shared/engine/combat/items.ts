@@ -15,7 +15,10 @@ export type ItemSpec = { id: string; kind: 'weapon'; light: ItemAttack; heavy: I
 /** Script hooks return only a bounded action selection. The host owns tick admission and aggregate allowances. */
 export type ItemHook = (input: { tick: number; dt: number; action: ItemAction; fuel: number; cooldown: number }) => ItemAction | null;
 /** Host-supplied body contact position, shared by headless targets and posed client rigs. */
-export interface ItemTarget extends CombatTarget { readonly aimPoint: Vector3 }
+/** `reach`: how far round its aim point the body stands (its horizontal radius), so a blow meets its surface, not only its
+ *  middle (a scale-3 Barrow Warden is 2.25 m round: a player who runs into it stands farther from its middle than a sword's
+ *  2.2 m, TEMPLATE-E2E TC-SHIP-e2). */
+export interface ItemTarget extends CombatTarget { readonly aimPoint: Vector3; readonly reach?: number }
 /** Existing actor/contact/effect ports; no renderer or active app participates in item simulation. */
 export interface ItemPorts {
   active?: () => boolean;
@@ -125,8 +128,10 @@ export class ItemRuntime {
       if (!entry.hittable || entry.actor === this.ports.actor) return false;
       this.point.copy(entry.aimPoint).sub(this.origin);
       const along = this.point.dot(this.direction), lateral = this.lateral.copy(this.point).addScaledVector(this.direction, -along).length();
-      // Contact uses the creature's body position; aim rays can pass within an authored lane radius.
-      return along >= 0 && along <= attack.range && lateral <= attack.width / 2;
+      // Contact uses the creature's body: a blow reaches its surface (its middle less its radius), and an aim ray can pass
+      // within an authored lane radius of that surface.
+      const reach = entry.reach ?? 0;
+      return along >= 0 && along <= attack.range + reach && lateral <= attack.width / 2 + reach;
     }).sort((a, b) => a.aimPoint.distanceToSquared(this.origin) - b.aimPoint.distanceToSquared(this.origin))[0];
     if (target === undefined) return;
     const hit = this.ports.combat.hit({ source: this.ports.actor, sourceTags: attack.tags, target: target.actor,

@@ -451,7 +451,7 @@ export class ShardfileClient {
     const actor: Actor = { id: 'actor.player', get tags() { return player().tags; }, get state() { return player().state; }, get attributes() { return player().attributes; }, get alive() { return player().alive; }, applyDamage: (request) => player().applyDamage(request) };
     const aimTarget = (target: CombatTarget): ItemTarget => {
       const { dims, scale = 1 } = target.target; // a row's body knows its own measures
-      return { ...target, aimPoint: target.position.clone().add(new Vector3(0, dims === undefined ? 0.9 : dims.bodyY * scale, 0)) };
+      return { ...target, aimPoint: target.position.clone().add(new Vector3(0, dims === undefined ? 0.9 : dims.bodyY * scale, 0)), reach: (dims?.bodyRadius ?? 0) * scale };
     };
     runtime.buildEquipment = () => {
       // a retained (grid) runtime's item input contexts are entered-only (installPageItemContexts), so copies never collide
