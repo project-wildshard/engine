@@ -103,6 +103,7 @@ import { exteriorLightingState, setParkedMatricesFrozen, setWarmUpHeld } from '@
 import { setBuildHeldTimed } from '@wildshard/engine/core/heldTiming';
 import { setBuildUrgent } from '@wildshard/engine/core/framePacing';
 import { NeighbourLife, type NeighbourLifeCell } from './neighbourLife';
+import { CellSceneLife, type CellSceneLifeCell, type CellScenePresentation } from './cellSceneLife';
 import { NeighbourPanels } from './neighbourPanels';
 import { talkStandIns } from '../shardfile/declaredTalks';
 import { copyMarks } from './copyIdentity';
@@ -241,6 +242,8 @@ export interface GridSessionState {
   readonly live: LiveGridSessionState | null;
   /** SF25 / G66: each shardfile neighbour's client-script life (frozen cells breathe and graze) */
   readonly life: readonly NeighbourLifeCell[];
+  /** SS-SHIPb: each data cell's detail layers, swings and splash */
+  readonly sceneLife?: readonly CellSceneLifeCell[];
   /** G342 / G385: the near-placeholder tier's cells and resident bytes */
   readonly near: NearPlaceholderState;
 }
@@ -385,6 +388,8 @@ export class GridSession {
   private roadTiles: RoadTileBacking | null = null;
   private readonly roadBudget: { readonly view: () => RoadViewCost | null; readonly resident: () => RoadResident };
   private readonly life: NeighbourLife;
+  /** SS-SHIPb: the data cells' detail layers, swings and splash (a standalone page's `ShardfileClient.world()` has them) */
+  private readonly sceneLife: CellSceneLife;
   /** Late frames the page loop has run; `stepRingsUntil` steps the rings only while it has not. */
   private lateFrames = 0;
   /** A ring prelink asked before the page drew its first frame: the page's warm-up skips it then (`warmSceneRoots`), so it
@@ -848,6 +853,7 @@ export class GridSession {
     } };
     // SF25 / G66: frozen neighbours look alive (presentation-only client scripts; their sims never step here)
     this.life = new NeighbourLife({ scope: host.scope, simulation: (id) => this.live?.lifeRegion(id), active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id });
+    this.sceneLife = new CellSceneLife({ scope: host.scope, phone: TIER === 'phone', feet: host.feet, active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id });
     // one late system for the grid (the page's onLate takes one label): the alive neighbours, then the one frame's weights
     const prepareView = host.prepareView;
     this.panels = new NeighbourPanels({ scope: host.scope, region: (id) => this.live?.panelRegion(id), ...(prepareView === undefined ? {} : { prepare: prepareView }) });
@@ -864,7 +870,7 @@ export class GridSession {
     };
     // the one late system (play.ts binds every onLate to game.grid.frame): the ring tiles' static-matrix checks run in it too
     let ringStep: (() => void) | undefined;
-    host.frame?.onLate((dt) => { this.lateFrames++; if (this.prelinkOwed && this.lateFrames > 2) { this.prelinkOwed = false; this.prelinkViews(); } this.viewStep(); this.life.late(dt); this.panels.late(); bands(); frame?.frame(); ringStep?.(); });
+    host.frame?.onLate((dt) => { this.lateFrames++; if (this.prelinkOwed && this.lateFrames > 2) { this.prelinkOwed = false; this.prelinkViews(); } this.viewStep(); this.life.late(dt); this.sceneLife.late(dt); this.panels.late(); bands(); frame?.frame(); ringStep?.(); });
     const tiles = neighbourTiles(host.scope, async (tile) => { await host.prepareTile?.(tile); },
       (tile, retiredRoots) => { this.tileGhosts.retired(tile.key, retiredRoots); }, host.frame === undefined ? undefined : step => { ringStep = step; }),
       tileCost = clientRingCatalogue(tiles.instances);
@@ -940,7 +946,7 @@ export class GridSession {
     complete: (cell: GridCell, required?: boolean) => Promise<void>; render: (cell: GridCell) => Promise<boolean>;
   } {
     const scope = this.host.scope, skins = new Map<string, Promise<ReadonlyMap<string, ClientSkin>>>();
-    const shared = new Map<string, Promise<{ source: ClientRingInstance['source']; assets: ClientAssets; views: ClientTileViews; compile: (entry: unknown) => Material }>>();
+    const shared = new Map<string, Promise<{ source: ClientRingInstance['source']; assets: ClientAssets; views: ClientTileViews; compile: (entry: unknown) => Material; scene: CellScenePresentation }>>();
     const optional = new AbortController(); scope.onDispose(() => { optional.abort(); });
     const admit = async (cell: GridCell, required: boolean, offered: () => void): Promise<void> => {
       const root = roots.get(cell.instance); if (root === undefined) return;
@@ -959,18 +965,21 @@ export class GridSession {
                 if (scope.disposed) throw new Error('Grid product view disposed during admission');
                 // A neighbour's tiles hold the authority its entered page holds, or Nine's look graphs are refused by whichever walk reaches it first.
                 const presentation = await clientMaterials(source, admitted.assets, renderer, scope, { trustedGraphs: admittedGraphAuthority(source) });
-                return { source, assets: retained.reader, views: clientTileViews({ terrain: source.terrain, terrainShadow: source.terrain?.shadow, terrainOrder: source.terrain?.order, ...presentation }), compile: presentation.compile };
+                return { source, assets: retained.reader, views: clientTileViews({ terrain: source.terrain, terrainShadow: source.terrain?.shadow, terrainOrder: source.terrain?.order, ...presentation }), compile: presentation.compile,
+                  scene: { materials: presentation.materials, swings: presentation.swings } };
               } catch (error) { retained.release(); throw error; }
             })();
             shared.set(cell.slug, loading);
           }
-          const { source, assets, views, compile } = await loading;
+          const { source, assets, views, compile, scene } = await loading;
           if (scope.disposed) return;
           this.clientTiles.offer(cell.instance, { source, assets, root, views });
           offered(); // Render-only pins need no life-script or panel construction.
           const bytes = retained.admitted.assets;
           try { await this.life.admit(cell, root, source, bytes, compile, skins); } catch (error) { console.warn(`[grid] ${cell.instance} stays still (client scripts):`, error); }
           try { await this.panels.admit(cell, root, source, bytes, views); } catch (error) { console.warn(`[grid] ${cell.instance} draws no doors (declared panels):`, error); }
+          // SS-SHIPb: a data cell's detail layers, hung lanterns and splash, which only `ShardfileClient.world()` installed
+          try { await this.sceneLife.admit(cell, root, source, assets, scene); } catch (error) { console.warn(`[grid] ${cell.instance} draws no scene life (details, swings, splash):`, error); }
           talkStandIns(source, root, scope); // TC-E8: its figure-less quest-givers stand in the cell
         } finally {
           try { await retained.releaseInputs(); } finally { if (!pageOwned) retained.release(); }
@@ -1297,6 +1306,7 @@ export class GridSession {
       frame: this.frame?.state() ?? null,
       live: this.live?.state() ?? null,
       life: this.life.state(),
+      sceneLife: this.sceneLife.state(),
       near: this.near.state(),
     };
   }
