@@ -26,6 +26,13 @@ export function toShardSelect(page: Page, card: string, onDrop?: () => void): Pr
 /** A drop note from the page before is the title's own modal (journey-proof): dismiss it, and say whether one was there.
  * @param {Page} page @returns {Promise<boolean>} */
 export function clearDrop(page: Page): Promise<boolean>;
+/** An old profile can recover its previous world (SR4) instead of opening the title. Acknowledge its notice and use the
+ * player's pause/exit controls; keep the drop in the result and leave all old-cache checks intact.
+ * @param {Page} page @param {{onDrop?: () => void, onRecovery?: () => Promise<void>}} [options] */
+export declare function oldProfileTitle(page: Page, { onDrop, onRecovery }?: {
+    onDrop?: () => void;
+    onRecovery?: () => Promise<void>;
+}): Promise<void>;
 /**
  * One scenario, start to finish, in its own persistent profile.
  * @param {{ id: ScenarioId, title: string, browser: BrowserName }} scenario
@@ -99,7 +106,7 @@ export const KEYFRAMES: readonly string[];
 /** Selectors the scenarios tap. The main screen is changing (J387, J399): keep them here, in one place. */
 export const SEL: Readonly<{
     titleSelect: ".ws-main-select";
-    settings: ".ws-main-settings";
+    settings: ".ws-main-settings:not(.ws-main-signin)";
     menuOpen: ".ws-gmenu.show";
     menuClose: ".ws-gmenu.show .ws-gmenu-close";
     pause: ".ws-touch-pause";

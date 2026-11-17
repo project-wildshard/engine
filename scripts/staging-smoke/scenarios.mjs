@@ -95,7 +95,7 @@ export async function storageState() {
 
 /** Selectors the scenarios tap. The main screen is changing (J387, J399): keep them here, in one place. */
 export const SEL = Object.freeze({
-  titleSelect: '.ws-main-select', settings: '.ws-main-settings', menuOpen: '.ws-gmenu.show', menuClose: '.ws-gmenu.show .ws-gmenu-close',
+  titleSelect: '.ws-main-select', settings: '.ws-main-settings:not(.ws-main-signin)', menuOpen: '.ws-gmenu.show', menuClose: '.ws-gmenu.show .ws-gmenu-close',
   pause: '.ws-touch-pause', exit: '.ws-gmenu.show .ws-gmenu-exit', dev: '.ws-main-dev', grid: '.ws-main-grid',
   play: '.ws-menu-play', skip: '#ws-name-box [data-name=skip]', drop: '#wsdrop', dropDismiss: '#wsdrop .dismiss',
 });
@@ -192,6 +192,27 @@ export async function clearDrop(page) {
   return true;
 }
 
+/** An old profile can recover its previous world (SR4) instead of opening the title. Acknowledge its notice and use the
+ * player's pause/exit controls; keep the drop in the result and leave all old-cache checks intact.
+ * @param {Page} page @param {{onDrop?: () => void, onRecovery?: () => Promise<void>}} [options] */
+export async function oldProfileTitle(page, { onDrop = () => undefined, onRecovery = () => Promise.resolve() } = {}) {
+  const back = '.ws-title-stack[data-screen="select"] .ws-menu-back';
+  await page.waitForFunction((selectors) => selectors.some((selector) => [...document.querySelectorAll(selector)].some((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 && getComputedStyle(element).visibility !== 'hidden';
+  })), [SEL.titleSelect, SEL.dropDismiss, SEL.pause, SEL.exit, back], { timeout: 90_000 });
+  const resumed = await page.locator(SEL.pause).isVisible() || await page.locator(SEL.exit).isVisible();
+  if (resumed || await page.locator(SEL.dropDismiss).isVisible()) await onRecovery();
+  if (await clearDrop(page)) onDrop();
+  if (await page.locator(SEL.titleSelect).isVisible()) return;
+  if (await page.locator(back).isVisible()) await page.locator(back).tap();
+  else {
+    if (!(await page.locator(SEL.exit).isVisible())) await page.locator(SEL.pause).tap();
+    await page.locator(SEL.exit).tap();
+  }
+  await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 });
+}
+
 /**
  * One scenario, start to finish, in its own persistent profile.
  * @param {{ id: ScenarioId, title: string, browser: BrowserName }} scenario
@@ -258,7 +279,7 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
       if (candidateBuild !== undefined) {
         await page.waitForFunction((b) => Reflect.get(globalThis, '__WS_BUILD_ID__') === b, candidateBuild, { timeout: 20_000 }).catch(() => undefined);
       }
-      await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 90_000 });
+      await oldProfileTitle(page, { onDrop, onRecovery: async () => { say('old cache recovery notice or resumed world; use real controls to title'); await shoot('recovery'); } });
       const after = await page.evaluate(storageState);
       if (oldProfile !== undefined) {
         result.oldCache = { before: oldState ?? { caches: [], databases: [] }, after, ...(minClient === undefined ? {} : { minClient }) };
