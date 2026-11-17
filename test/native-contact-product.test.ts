@@ -10,6 +10,7 @@ import { validationSourceBytes } from '@wildshard/format/validationReceipt';
 import { emptyShardfile } from '../src/shared/host/author';
 import { createNativeProofWorker } from '../src/test/game/headlessWorker';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { HeadlessSimulation } from '../src/server/host/headless';
 import { headlessSections, productHeadlessSections } from '../src/shared/host/headlessSections';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { readProductInput } from '../src/client/game/shardfile/product';
@@ -81,4 +82,13 @@ test('descriptor context lookup never reads an authored files getter', () => {
   expect(reads).toBe(0);
   expect(outputDescriptor(null)).toBeUndefined();
   expect(outputDescriptor({files: []})).toBeUndefined();
+});
+
+test('the public headless session carries native contact context through parent admission', {timeout: 30000}, async () => {
+  const fixture = product();
+  await onDisk(fixture.files, async directory => {
+    const admitted = await loadHeadlessProduct(directory);
+    const session = await HeadlessSimulation.create(admitted.shardfile, new Map(), undefined, {deadline: 'advisory', sections: productHeadlessSections(admitted)});
+    try { expect(session.checkpoint).toBeDefined(); } finally { await session.dispose(); }
+  });
 });

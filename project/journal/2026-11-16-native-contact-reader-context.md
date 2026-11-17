@@ -23,3 +23,9 @@ and must be replaced by actual registry format0.13.0 before landing.
 Do not push this branch with the current committed format0.12.0 pin.
 Required review, final released pin/frozen install, full local preflight
 and exact hosted CI remain open. All SDK integration remains b1/b3.
+
+Review follow-up: the public HeadlessSimulation parent also reparses asset
+admission. A real session control failed at that admission before the fix;
+passing the same context restores all six product/worker/session controls.
+The review found no other required reader correction. Format main CI
+43987122625 is green; release 0.13 is running on its exact release head.

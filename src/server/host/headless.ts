@@ -32,7 +32,7 @@ export class HeadlessSimulation {
     const sections = headlessSections(options.sections ?? outputDescriptor(shard)?.sections);
     const memory = offlineMemoryAdmission('refuse');
     await prepareAssetDecoders();
-    validateShardfileAssets(shard, assets, bytes => createHash('sha256').update(bytes).digest('hex'), memory, undefined, scriptAdmissionRows(sections));
+    validateShardfileAssets(shard, assets, bytes => createHash('sha256').update(bytes).digest('hex'), memory, undefined, scriptAdmissionRows(sections), sections);
     for (const report of memory?.reports() ?? []) console.warn(`Headless memory report-only (G433): ${report.id}: ${report.playingBytes} playing bytes`);
     // A source checkout's root. The CLI bundle is stamped src/sdk (scripts/wildshard.mjs), two levels down; this file moves deeper.
     const checkout = [dirname(createRequire(resolve(import.meta.dirname, 'package.json')).resolve('@wildshard/engine/package.json')), resolve(import.meta.dirname, '../../..'), resolve(import.meta.dirname, '../../../..')].find(root => existsSync(resolve(root, 'scripts/sim-node-loader.mjs')));
