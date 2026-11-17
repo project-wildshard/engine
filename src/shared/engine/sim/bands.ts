@@ -16,7 +16,7 @@ import { fnv1a32 } from '../core/rng';
  */
 
 /** One subject's clock on one tick rate: the page scheduler's per-subject brain or body clock, plain JSON values. */
-export interface TickClock { elapsed: number; credit: number; frame: number; dt: number; last: number; due: boolean; tickFrame: number }
+export interface TickClock { elapsed: number; credit: number; frame: number; dt: number; last: number; due: boolean; tickFrame: number; damage?: number }
 
 /** The scheduler's 'ai' rate (also 'npc'): decisions 20 Hz / 10 Hz / paused, the body every frame / 'half' / paused. */
 export const AI_TICK_RATE: TickRate = { bands: [
@@ -26,6 +26,7 @@ export const AI_TICK_RATE: TickRate = { bands: [
 ] };
 /** A pinned, driven or fight-scripted subject: it decides and moves every frame at any distance. */
 export const ALWAYS_TICK_RATE: TickRate = { bands: [{ upTo: Infinity, brainHz: Infinity, body: 'frame' }] };
+const activeBodyBand: TickBand = { upTo: Infinity, brainHz: Infinity, body: 'frame' };
 /** The scheduler's built-in rates by id; a level's tier `ticks` add to or replace them. */
 export const DEFAULT_TICK_RATES: readonly (readonly [string, TickRate])[] = [
   ['always', ALWAYS_TICK_RATE], ['ai', AI_TICK_RATE], ['npc', AI_TICK_RATE],
@@ -148,17 +149,37 @@ export class BodyBandClocks {
     return { row, band: (distance) => { const band = bandAt(table, distance); if (band === undefined) throw new Error(`Uncovered tick distance: ${rate}`); return band; } };
   }
   /** This frame's body step for `id` at `distance` (m) on `rate`; 0 = paused or the off frame of 'half'. */
-  bodyDt(id: string, rate: string, distance: number): number {
+  bodyDt(id: string, rate: string, distance: number, active = false): number {
     const { row, band } = this.row(id, rate);
-    return tickClock(row.body, band(distance), true, this.time, this.frame, false, id);
+    const dt = tickClock(row.body, active ? activeBodyBand : band(distance), true, this.time, this.frame,
+      active && row.body.frame === this.frame && row.body.dt === 0, id);
+    // A newly started attack/impulse never consumes time owed by a previous dormant body phase.
+    return active ? Math.min(dt, this.frameDt) : dt;
   }
   /** This frame's decision step for `id`; `urgent` (a hit, a lost sight line) wakes it now. The step is taken (consumed). */
-  takeBrainDt(id: string, rate: string, distance: number, urgent: boolean, maximumHz?: number): number {
+  takeBrainDt(id: string, rate: string, distance: number, urgent: boolean, maximumHz?: number, damage?: number): number {
     if (maximumHz !== undefined && !(maximumHz > 0)) throw new RangeError('Invalid authored decision frequency');
+    if (damage !== undefined && !Number.isFinite(damage)) throw new RangeError('Invalid decision damage wake');
     const { row, band } = this.row(id, rate);
-    const dt = tickClock(row.brain, band(distance), false, this.time, this.frame, urgent, undefined, maximumHz);
+    const hit = damage !== undefined && (row.brain.damage === undefined || damage > row.brain.damage);
+    if (hit) row.brain.damage = damage;
+    const dt = tickClock(row.brain, band(distance), false, this.time, this.frame, urgent || hit, undefined, maximumHz);
     row.brain.dt = 0; row.brain.due = false;
-    return dt;
+    return hit && dt === 0 ? this.frameDt : dt;
+  }
+  /** Upgrade an unbanded fixed-step save from its actual last tick; no controller, body or RNG work runs. */
+  adoptFixedTick(tick: number, subjects: readonly { id: string; rate: string; divisor: number; damage?: number | undefined }[]): void {
+    if (!Number.isSafeInteger(tick) || tick < 0 || new Set(subjects.map(row => row.id)).size !== subjects.length
+      || subjects.some(row => !this.has(row.rate) || !Number.isInteger(row.divisor) || row.divisor < 1 || 60 % row.divisor !== 0
+        || (row.damage !== undefined && !Number.isFinite(row.damage)))) throw new RangeError('Invalid unbanded cadence continuation');
+    this.time = tick / 60; this.frame = tick; this.frameDt = 1 / 60; this.rows.clear();
+    for (const subject of subjects) {
+      const { row } = this.row(subject.id, subject.rate), remainder = tick % subject.divisor;
+      row.brain.last = this.time; row.brain.frame = tick; row.brain.tickFrame = tick - remainder;
+      row.brain.credit = remainder / 60; row.brain.elapsed = remainder / 60;
+      if (subject.damage !== undefined) row.brain.damage = subject.damage;
+      row.body.last = this.time; row.body.frame = tick; row.body.tickFrame = tick;
+    }
   }
   forget(id: string): void { this.rows.delete(id); }
   snapshot(): BandsState {
@@ -168,6 +189,7 @@ export class BodyBandClocks {
   /** Exact restore; `ids` are the bodies the host holds. A different rate table, an unknown body or rate refuses. */
   restore(saved: BandsState, ids: ReadonlySet<string>): void {
     if (saved.rates !== this.contract || !Number.isSafeInteger(saved.frame) || saved.frame < 0 || saved.rows.some((row) => !ids.has(row.id) || !this.rates.has(row.rate)
+      || row.body.damage !== undefined || (row.brain.damage !== undefined && (!Number.isFinite(row.brain.damage) || row.brain.damage > saved.time * 1000 + 1e-6))
       || [row.brain, row.body].some((clock) => clock.frame > saved.frame || clock.tickFrame > saved.frame || clock.last > saved.time))
       || new Set(saved.rows.map((row) => row.id)).size !== saved.rows.length) throw new RangeError('Incompatible body band continuation');
     this.time = saved.time; this.frame = saved.frame; this.frameDt = saved.frameDt;

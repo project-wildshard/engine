@@ -64,6 +64,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     const cadence = hunt.bindRoster({ limit: 1, order: 'combined', at: () => actor, actor: body => body, id: body => body.entityId,
       player, noise, sight, reach: (body, target) => canReach(body, target, host.physics), brainDt: (body, urgent) => host.brainDt(body, urgent) });
     host.onStep(id, dt => {
+      if (!host.bodyPresent(actor.entityId)) return;
       player.copy(host.nearestPlayer(actor.position).position);
       hunt.beginTick(dt); clock += dt; cadence.observe(dt); cadence.decide();
       const bodyDt = host.bodyDt(actor.entityId);

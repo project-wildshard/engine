@@ -50,11 +50,11 @@ interface Registration { id: string; run: (dt: number) => void; adapter: SimStat
 function nativeRegistration<P>(id: string, actor: AnimalSim, divisor: number, brain: SimStateAdapter & { think: (ports: P) => void }, recipe: DeclaredBrainRecipe<P>, host: SimHost): Registration {
   if (typeof recipe.observe !== 'function' || typeof recipe.body !== 'function') throw new Error('Missing native brain recipe');
   const contract = JSON.stringify({ divisor, policy: brain.snapshot() });
-  return { id, run: dt => {
+  return { id, run: () => {
     if (!actor.alive) return;
     const decisionDt = host.brainDt(actor.entityId, false, divisor);
     if (decisionDt > 0) brain.think(recipe.observe(decisionDt));
-    recipe.body(dt);
+    const bodyDt = host.bodyDt(actor.entityId); if (bodyDt > 0) recipe.body(bodyDt);
   }, adapter: { snapshot: () => contract, restore: saved => {
     if (saved !== contract) throw new Error('Incompatible native brain continuation');
   } } };
@@ -62,11 +62,12 @@ function nativeRegistration<P>(id: string, actor: AnimalSim, divisor: number, br
 function mutableRegistration<P>(id: string, actor: AnimalSim, divisor: number,
   brain: SimStateAdapter & { think: (ports: P) => void; act: (ports: P) => void }, recipe: DeclaredBrainRecipe<P>, host: SimHost, home?: ShardCreatureHome, phaseOffset?: number): Registration {
   const contract = JSON.stringify({ version: 1, divisor, ...(home === undefined ? {} : { home }), ...(phaseOffset === undefined ? {} : { phaseOffset }) });
-  return { id, run: dt => {
+  return { id, run: () => {
     if (!actor.alive) return;
     const decisionDt = host.brainDt(actor.entityId, false, divisor);
     if (decisionDt > 0) brain.think(recipe.observe(decisionDt));
-    brain.act(recipe.observe(dt)); recipe.body(dt);
+    const bodyDt = host.bodyDt(actor.entityId);
+    if (bodyDt > 0) { brain.act(recipe.observe(bodyDt)); recipe.body(bodyDt); }
   }, adapter: { snapshot: () => [contract, brain.snapshot()], restore: saved => {
     if (!Array.isArray(saved) || saved.length !== 2 || saved[0] !== contract || saved[1] === undefined) throw new Error('Incompatible native policy cadence continuation');
     brain.restore(saved[1]);
@@ -146,7 +147,7 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
           const policy = bindCreatureTemperament(host, actor, row.at, layer.temperament,
             { ...native, notice: layer.senses?.notice ?? spec.awareRadius, escapeSpeed: spec.fleeSpeed },
             () => native.target()?.position, row.group === undefined ? undefined : social.get(row.group));
-          registrations.push({ id, ...policy, run: dt => { policy.run(dt); if (actor.alive) recipe.body(dt); } });
+          registrations.push({ id, ...policy, run: dt => { policy.run(dt); const bodyDt = host.bodyDt(actor.entityId); if (actor.alive && bodyDt > 0) recipe.body(bodyDt); } });
         }
         break;
       }
@@ -164,7 +165,7 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
           registrations.push({ id, ...policy, run: dt => {
             // Even a layer's first-frame flight needs the native owner to initialize its root memory.
             if (actor.alive && !actor.mem['init']) brain.think({ ...recipe.observe(0), calm: true });
-            policy.run(dt); if (actor.alive) recipe.body(dt);
+            policy.run(dt); const bodyDt = host.bodyDt(actor.entityId); if (actor.alive && bodyDt > 0) recipe.body(bodyDt);
           } });
         }
         break;
@@ -211,7 +212,8 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
   try {
     for (const registration of registrations) {
       const dispose = registration.install?.(); if (dispose !== undefined) remove.push(dispose);
-      remove.push(host.onStep(registration.id, registration.run, registration.adapter)); result.set(registration.id.slice(6), registration.adapter);
+      const actorId = registration.id.slice(6);
+      remove.push(host.onStep(registration.id, dt => { if (host.bodyPresent(actorId)) registration.run(dt); }, registration.adapter)); result.set(actorId, registration.adapter);
     }
   } catch (error) { for (const undo of remove) undo(); throw error; }
   return result;

@@ -63,3 +63,42 @@ test("invalid caps refuse atomically and body cadence retains its original ident
     b.beginTick(1 / 60);
   }
 });
+
+test("a real damage timestamp wakes exactly once and is part of the same saved decision clock", () => {
+  const a = new BodyBandClocks(rates),
+    b = new BodyBandClocks(rates);
+  a.beginTick(1 / 60);
+  expect(a.takeBrainDt("actual.actor", "ai", 80, false, 20)).toBe(0);
+  a.beginTick(1 / 60);
+  expect(a.takeBrainDt("actual.actor", "ai", 80, false, 20, 1000 / 60)).toBeCloseTo(2 / 60);
+  const saved = a.snapshot();
+  b.restore(saved, new Set(["actual.actor"]));
+  for (let tick = 0; tick < 3; tick++) {
+    a.beginTick(1 / 60);
+    b.beginTick(1 / 60);
+    expect(a.takeBrainDt("actual.actor", "ai", 80, false, 20, 1000 / 60)).toBe(0);
+    expect(b.takeBrainDt("actual.actor", "ai", 80, false, 20, 1000 / 60)).toBe(0);
+  }
+  expect(a.snapshot()).toEqual(b.snapshot());
+  const invalid = structuredClone(saved),
+    row = invalid.rows[0];
+  if (row === undefined) throw new Error("Missing real clock");
+  row.brain.damage = 1e9;
+  expect(() => b.restore(invalid, new Set(["actual.actor"]))).toThrow(
+    "Incompatible body band continuation",
+  );
+  expect(b.snapshot()).toEqual(a.snapshot());
+});
+
+test("an active body keeps fixed attack/impulse steps without resetting its decision credit", () => {
+  const clock = new BodyBandClocks(rates);
+  let decisions = 0;
+  for (let tick = 1; tick <= 12; tick++) {
+    clock.beginTick(1 / 60);
+    if (clock.takeBrainDt("actual.actor", "ai", 80, false, 20) > 0) decisions++;
+    if (tick >= 2 && tick <= 10)
+      expect(clock.bodyDt("actual.actor", "ai", 80, true)).toBeCloseTo(1 / 60);
+    else clock.bodyDt("actual.actor", "ai", 80);
+  }
+  expect(decisions).toBe(3);
+});

@@ -52,7 +52,7 @@ for (const layer of [false, true])
       }
       source.spawn.z = 87;
       const sim = createShardfileSim(source, new Map(), { rapier: await rapier });
-      sim.host.useBodyBands(bands);
+      if (sim.host.bodyBands === undefined) sim.host.useBodyBands(bands);
       const originalThink = SkirmisherBrain.prototype.think,
         steps: number[] = [];
       const think = vi.spyOn(SkirmisherBrain.prototype, "think").mockImplementation(function (
@@ -93,7 +93,7 @@ test("a mutable ram consumes the same authored/band clock and restores its exact
   source.spawn.z = 87;
   const sim = createShardfileSim(source, new Map(), { rapier: await rapier }),
     resumed = prepareShardfileSimRestore(source, new Map(), { rapier: await rapier });
-  sim.host.useBodyBands(bands);
+  if (sim.host.bodyBands === undefined) sim.host.useBodyBands(bands);
   resumed.host.useBodyBands(bands);
   const think = vi.spyOn(RamGrazerBrain.prototype, "think");
   try {
@@ -157,7 +157,7 @@ test("the actual pursuit path decision uses the far clock while keeping its fixe
       },
     },
   });
-  sim.host.useBodyBands(bands);
+  if (sim.host.bodyBands === undefined) sim.host.useBodyBands(bands);
   try {
     for (let tick = 1; tick <= 24; tick++) {
       sim.host.step();

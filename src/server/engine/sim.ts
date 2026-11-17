@@ -133,6 +133,8 @@ export type SimStateAdapter = StateAdapter;
 export interface SimBodyBands {
   /** Data recipes formerly stepped on exact fixed multiples; keep their native floating-point continuation. */
   fixedSteps?: boolean;
+  /** Only a data owner with an exact previous fixed policy may upgrade a save that has no band clocks. */
+  legacyDivisor?: (body: AnimalSim) => number;
   /** Tick rates by id over the page scheduler's defaults ('always', 'ai', 'npc', 'fx', 'weather') and the manager's
    *  'legacy' (decisions 10 Hz, the body every tick at any distance): the level's tier `ticks`. */
   rates?: Readonly<Record<string, TickRate>>;
@@ -252,7 +254,7 @@ export class SimHost {
   readonly floors: MotionPlatform[] = [];
   /** SF34: the level's water (useWater), if any. */
   water: SimWater | undefined;
-  private bands: { clocks: BodyBandClocks; rate: (body: AnimalSim) => string; present: ((body: AnimalSim) => boolean) | undefined; physics: boolean; fixedSteps: boolean } | undefined;
+  private bands: { clocks: BodyBandClocks; rate: (body: AnimalSim) => string; present: ((body: AnimalSim) => boolean) | undefined; physics: boolean; fixedSteps: boolean; legacyDivisor: ((body: AnimalSim) => number) | undefined } | undefined;
   private bodyStep: SimBodyStep | undefined;
   // Reused visitor state keeps this turn's captured hooks/band decision even
   // when a callback enters another fixed step. No iterator tuples per body.
@@ -403,6 +405,11 @@ export class SimHost {
   }
   /** The player `playerFocus` follows. */
   get focusedPlayer(): PlayerSim { return this.focused; }
+  /** A parked or detached seat is not a player in this world. Dead players still own their respawn tick. */
+  get hasPlayerInterest(): boolean {
+    for (const player of this.players.values()) if (!this.parked.has(player.id) && player.hasMotor) return true;
+    return false;
+  }
   /** Put a saved focus back; a player who has left leaves it on the lead. */
   restoreFocus(id: string | undefined): void { this.focused = (id === undefined ? undefined : this.players.get(id)) ?? this.lead; }
   /** Make `playerFocus` the player nearest `point`: each body before it decides and moves, an encounter before its step. */
@@ -472,7 +479,7 @@ export class SimHost {
     if (this.disposed || this.embedded || this.bands !== undefined) throw new Error('Body bands belong to an owned host, once');
     const clocks = new BodyBandClocks(options.rates);
     this.bands = { clocks, fixedSteps: options.fixedSteps === true, rate: options.rate ?? ((body) => body.driven || body.state === 'sidestep' ? 'always' : 'ai'),
-      present: options.present, physics: options.physics ?? true };
+      present: options.present, physics: options.physics ?? true, legacyDivisor: options.legacyDivisor };
     if (this.bands.physics) for (const entity of this.entities.values()) { entity.motor?.dispose(); entity.motor = null; }
   }
   /** Wrap every body's step (SimBodyStep), once, by the installer that owns the bodies' brains (restoring too: hooks hold
@@ -483,6 +490,11 @@ export class SimHost {
   }
   /** Whether the host runs on body bands, and with the physics body LOD. */
   get bodyBands(): { physics: boolean } | undefined { return this.bands === undefined ? undefined : { physics: this.bands.physics }; }
+  /** Presence is the roster owner's authority; a missing band owner retains the original always-present body. */
+  bodyPresent(id: string): boolean {
+    const entity = this.entities.get(id);
+    return entity !== undefined && this.bands?.present?.(entity) !== false;
+  }
   /** This tick's update step for body `id` (s): the fixed step without bands; with them 0 while paused or on the off
    * tick of 'half' (the next takes both ticks). Asked first in a tick it fixes the tick's value, as the page's clock. */
   bodyDt(id: string): number {
@@ -490,8 +502,10 @@ export class SimHost {
     if (entity === undefined) throw new RangeError(`Unknown simulation body ${id}`);
     const bands = this.bands;
     if (bands === undefined) return FIXED_STEP;
+    if (bands.present?.(entity) === false) { bands.clocks.forget(id); return 0; }
     if (entity.harnessHold || bands.present?.(entity) === false) { bands.clocks.forget(id); return 0; }
-    const dt = bands.clocks.bodyDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position));
+    const active = bands.fixedSteps && (entity.attackPhase >= 0 || entity.hasImpulse || entity.driven || this.strikes.get(id)?.busy === true);
+    const dt = bands.clocks.bodyDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position), active);
     return bands.fixedSteps ? Math.round(dt * 60) / 60 : dt;
   }
   /** Take this tick's decision step for body `id` on its band (the page scheduler's takeBrainDt): 0 until its rate's
@@ -505,7 +519,8 @@ export class SimHost {
     const bands = this.bands;
     if (bands === undefined) return this.state.tick % divisor === 0 ? divisor / 60 : urgent ? FIXED_STEP : 0;
     if (bands.present?.(entity) === false) { bands.clocks.forget(id); return 0; }
-    const dt = bands.clocks.takeBrainDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position), urgent, 60 / divisor);
+    const damage = bands.fixedSteps && Number.isFinite(entity.lastHitT) ? entity.lastHitT : undefined;
+    const dt = bands.clocks.takeBrainDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position), urgent, 60 / divisor, damage);
     // Authored native recipes historically receive exact fixed-step multiples, not accumulated float drift.
     return divisor === 1 && !bands.fixedSteps ? dt : Math.round(dt * 60) / 60;
   }
@@ -517,6 +532,12 @@ export class SimHost {
   bodyBandState(): BandsState | undefined { return this.bands?.clocks.snapshot(); }
   /** Exact band restore: saved state is refused unless this host runs on the same bands, and the reverse. */
   restoreBodyBands(saved: BandsState | undefined): void {
+    const bands = this.bands;
+    if (saved === undefined && bands?.legacyDivisor !== undefined) {
+      bands.clocks.adoptFixedTick(this.state.tick, [...this.entities].map(([id, body]) => ({ id, rate: bands.rate(body),
+        divisor: bands.legacyDivisor?.(body) ?? 1, damage: Number.isFinite(body.lastHitT) ? body.lastHitT : undefined })));
+      return;
+    }
     if ((saved === undefined) !== (this.bands === undefined)) throw new RangeError('Snapshot body bands do not match');
     if (saved !== undefined) this.bands?.clocks.restore(saved, new Set(this.entities.keys()));
   }
@@ -694,7 +715,10 @@ export class SimHost {
     this.afterCallbacks.forEach(this.visitStepCallback);
   }
   private readonly visitStepCallback = (run: (dt: number, host: SimHost) => void): void => { run(FIXED_STEP, this); };
-  private readonly visitStrike = (runner: StrikeRunner, id: string): void => { this.updateStrike(id, runner); };
+  private readonly visitStrike = (runner: StrikeRunner, id: string): void => {
+    if (this.parked.has(id) || (this.entities.has(id) && !this.bodyPresent(id))) return;
+    this.updateStrike(id, runner);
+  };
   private readonly visitBody = (entity: AnimalSim, id: string): void => {
     if (entity.harnessHold) return;
     this.focusOn(entity.position);

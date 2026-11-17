@@ -71,7 +71,7 @@ const strike = v.strictObject({ version, phase: v.picklist(['idle', 'windup', 'a
   x0: finite, z0: finite, x1: finite, z1: finite, yaw: finite, length: finite });
 const rng = v.strictObject({ version, state: uint32, initial: uint32, scrambledFork: v.boolean() });
 const frameIndex = v.pipe(v.number(), v.integer(), v.minValue(-1));
-const bandClock = v.strictObject({ elapsed: nonnegative, credit: nonnegative, frame: frameIndex, dt: nonnegative, last: finite, due: v.boolean(), tickFrame: frameIndex });
+const bandClock = v.strictObject({ elapsed: nonnegative, credit: nonnegative, frame: frameIndex, dt: nonnegative, last: finite, due: v.boolean(), tickFrame: frameIndex, damage: v.exactOptional(finite) });
 /** A version 1 or 2 save's player: a velocity for each mode. */
 const playerStateV2 = v.strictObject({ id, position: vector, yaw: finite, health: eventValue, motor, impulse: v.optional(vector),
   traversals: v.optional(v.pipe(v.array(v.picklist(['ride', 'grapple', 'glide', 'climb', 'drive'])), v.minLength(1), v.maxLength(5))),
