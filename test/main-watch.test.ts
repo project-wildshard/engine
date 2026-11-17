@@ -67,6 +67,29 @@ test('advisories never hide failed, unknown, incomplete or cancelled blocking wo
   expect(blockingRun(pending, [{ name: 'tests (1)', conclusion: 'success' }, { name: 'timings', conclusion: null }])).toBe(pending);
 });
 
+test('44139343442: an unassigned advisory street runner preserves the twelve passed blocking jobs', () => {
+  const red = run(44139343442, '9b016e2c', 'failure', 50);
+  const blocking = [...Array.from({ length: 9 }, (_, index) => `tests (${index + 1})`),
+    'boundaries', 'nine-ring1-build', 'nine-ring1 (load, ubuntu-latest)'];
+  const jobs = blocking.map(name => ({ name, conclusion: 'success' as string | null }));
+  const street = { name: 'nine-ring1 (street, macos-15)', conclusion: 'cancelled' };
+  for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
+    const normalized = blockingRun(red, [...jobs, { ...street, conclusion }]);
+    expect(normalized.conclusion).toBe('success');
+    const w = world([...replay, normalized]), io = fake(`street-${conclusion}`, w);
+    // An already-started watcher must not prompt the fixer for an advisory.
+    w.runs = replay; sweep(io); w.runs = [...replay, normalized]; w.tip = red.head_sha;
+    expect(sweep(io).map(row => row.kind)).toEqual(['green']);
+    expect(w.sent).toEqual([]);
+  }
+  for (const name of blocking) for (const conclusion of ['failure', 'timed_out', 'cancelled', null]) {
+    expect(blockingRun(red, [...jobs.map(row => row.name === name ? { ...row, conclusion } : row), street]).conclusion).toBe('failure');
+  }
+  expect(blockingRun(red, [street]).conclusion).toBe('failure');
+  expect(blockingRun({ ...red, conclusion: 'cancelled' }, [...jobs, street]).conclusion).toBe('cancelled');
+  expect(blockingRun(red, [...jobs, { ...street, name: 'nine-ring1 (unknown, macos-15)' }]).conclusion).toBe('failure');
+});
+
 test('replaying runs 42965336189 and 42966114949: cancelled by newer pushes is superseded, never MAIN RED', () => {
   const verdicts = judge(replay, { judged: [42965108264], dispatched: [] }, sha('652afa6c'));
   expect(verdicts.map(row => [row.kind, row.run.id])).toEqual([

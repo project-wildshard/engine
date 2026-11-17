@@ -1,4 +1,4 @@
-export interface Run {id:number;head_sha:string;status:string;conclusion:string|null;created_at:string;event:string;run_attempt?:number;blockingChecked?:boolean}
+export interface Run {id:number;head_sha:string;status:string;conclusion:string|null;created_at:string;event:string;run_attempt?:number;blockingChecked?:boolean;advisoryVersion?:number}
 export interface State {judged:number[];dispatched:string[]}
 export interface Verdict {kind:'green'|'red'|'superseded'|'dispatch';run:Run;from?:string|null;by?:string}
 export interface Pane {pane_id:string;label?:string;cwd?:string;foreground_cwd?:string}

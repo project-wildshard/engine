@@ -27,8 +27,15 @@ import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
+// NB6's hosted street job is explicitly report-only in ci.yml. Its runner
+// can also be cancelled before starting; neither outcome fails the tests.
+const ADVISORY_VERSION=2;
+/** @param {{name:string}} job */
+const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)';
+/** @param {{conclusion:string|null}} job */
+const unsuccessful=job=>['failure','timed_out','cancelled'].includes(job.conclusion??'');
 
-/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,started?:boolean}} Run */
+/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean}} Run */
 /** @typedef {{judged:number[],dispatched:string[]}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
@@ -42,11 +49,10 @@ const byCreated=(/** @type {Run} */a,/** @type {Run} */b)=>Date.parse(a.created_
  * @param {Run} run @param {readonly {name:string,conclusion:string|null}[]} jobs @returns {Run} */
 export function blockingRun(run,jobs){
   if(!finished(run)||(run.conclusion!=='failure'&&run.conclusion!=='timed_out'))return run;
-  const advisory=(/** @type {{name:string}} */job)=>job.name==='timings'||job.name==='quarantine';
   const required=jobs.filter(job=>!advisory(job));
   const clear=required.length>0&&required.every(job=>['success','skipped','neutral'].includes(job.conclusion??''));
-  const advisoryFailure=jobs.some(job=>advisory(job)&&(job.conclusion==='failure'||job.conclusion==='timed_out'));
-  return {...run,conclusion:clear&&advisoryFailure?'success':run.conclusion,blockingChecked:true};
+  const advisoryFailure=jobs.some(job=>advisory(job)&&unsuccessful(job));
+  return {...run,conclusion:clear&&advisoryFailure?'success':run.conclusion,blockingChecked:true,advisoryVersion:ADVISORY_VERSION};
 }
 
 /** What each newly finished run means, oldest first. Pure: `runs` is main's ci runs, newest or oldest first.
@@ -181,14 +187,14 @@ export function liveIo(env=process.env){
             row.started=jobs.some(job=>job.started_at!==null);
             return row;
           }
-          const kept=prior.find(old=>old.id===row.id&&old.blockingChecked===true&&(old.run_attempt??1)===(row.run_attempt??1));
+          const kept=prior.find(old=>old.id===row.id&&old.blockingChecked===true&&old.advisoryVersion===ADVISORY_VERSION&&(old.run_attempt??1)===(row.run_attempt??1));
           if(kept!==undefined)return kept;
           const jobs=/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
           return blockingRun(row,jobs);
         });
     }),
     failed:(/** @type {number} */id)=>/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
-      .filter(job=>job.name!=='timings'&&job.name!=='quarantine'&&(job.conclusion==='failure'||job.conclusion==='timed_out')).map(job=>job.name),
+      .filter(job=>!advisory(job)&&unsuccessful(job)).map(job=>job.name),
     // Blocking tests own AMBER evidence. The advisory timings collector only repeats it;
     // its annotations cannot change main's verdict. Quarantine reports separately (J193).
     annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
