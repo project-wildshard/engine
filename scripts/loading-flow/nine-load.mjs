@@ -2,7 +2,12 @@ import {writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {devices} from 'playwright';
 import {developerSettings,saveFixture,NAME_ASKED} from '../debug-settings.mjs';
-import {startStallProfile,finishStallProfile} from './stalls.mjs';
+import {startStallProfile,finishStallProfile,bootTimelineEntries} from './stalls.mjs';
+
+// Hosted green total loads: 98.239-166.456 s (six runs). Reserve one
+// observed spread: ceil(166456 + (166456 - 98239)) = 235 s.
+// This is readiness headroom; the 1.2 s props-idle gate is unchanged.
+export const NINE_READY_TIMEOUT_MS=235_000;
 
 /** NB6's actual standalone props boot, independent of screenshot and street
  * work. A fresh phone, real readiness, and the stock CPU-profile stall gate.
@@ -26,7 +31,7 @@ export async function assertNineLoad(browser,base,out) {
       await page.waitForFunction(()=>{
         const world=window.__wildshard?.world;
         return world?.game.level.id==='nine-dragon-stack'&&world.game.frameCount>0&&world.hud.entered&&!world.hud.paused&&world.game.frameGate()&&!document.querySelector('.ws-load');
-      },null,{timeout:180_000});
+      },null,{timeout:NINE_READY_TIMEOUT_MS});
       const read=await finishStallProfile(page,profile);
       faults.push(...read.faults);
       if(!read.stalls.some(row=>row.stage==='props'))faults.push('Nine load has no completed props stage');
@@ -35,6 +40,16 @@ export async function assertNineLoad(browser,base,out) {
       writeFileSync(join(out,'load.json'),`${JSON.stringify(receipt,null,2)}\n`);
       console.log(JSON.stringify(receipt));
       if(faults.length>0)throw new Error(faults.join('; '));
+    } catch(error) {
+      // Timeout used to discard all evidence before the props profile ran.
+      // Preserve the original failure even if the unresponsive page cannot
+      // supply a timeline. Context closure still drains the browser work.
+      const timeline=await Promise.race([
+        page.evaluate(bootTimelineEntries).catch(()=>null),
+        new Promise(resolve=>{setTimeout(()=>{resolve(null);},5000);}),
+      ]);
+      writeFileSync(join(out,'load-error.json'),`${JSON.stringify({elapsedMs:Date.now()-started,readinessTimeoutMs:NINE_READY_TIMEOUT_MS,error:error instanceof Error?error.message:String(error),faults,timeline},null,2)}\n`);
+      throw error;
     } finally {await profile.detach().catch(()=>undefined);}
   } finally {await context.close();}
 }
