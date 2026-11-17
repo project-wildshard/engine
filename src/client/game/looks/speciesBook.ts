@@ -155,9 +155,7 @@ export class HullLookBook {
         if (parts === null) void read().catch(() => undefined);
         else if (!wearing.has(animal)) {
           for (const part of parts) {
-            const paint = new MeshBasicMaterial({ color: new Color(...part.colour), toneMapped: false }); paint.name = part.name;
-            const mesh = new SkinnedMesh(part.geometry, paint); mesh.name = part.name; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false;
-            animal.mesh.add(mesh); mesh.bind(animal.mesh.skeleton, animal.mesh.bindMatrix);
+            wearAttachment(animal.mesh, part);
           }
           wearing.add(animal);
         }
@@ -167,6 +165,17 @@ export class HullLookBook {
     });
     return { all, pose, get: kind => { const look = all.find(row => row.kind === kind); if (look === undefined) throw new Error('Unknown packed creature look'); return look; } };
   }
+}
+
+/** One packed attachment on an animal's rig: a self-lit skinned mesh bound to the rig's skeleton *before* it joins the
+ *  rig. A rig already in a cell fires the cell clip's childadded watch at once, and an unbound SkinnedMesh threw there
+ *  ("reading 'bones'") and in the renderer ("reading 'update'"): staging v0.1.34, every Nalati entry (ZONE-ENTRY ZE22). */
+export function wearAttachment(rig: SkinnedMesh, part: { readonly name: string; readonly colour: readonly [number, number, number]; readonly geometry: BufferGeometry }): SkinnedMesh {
+  const paint = new MeshBasicMaterial({ color: new Color(...part.colour), toneMapped: false }); paint.name = part.name;
+  const mesh = new SkinnedMesh(part.geometry, paint); mesh.name = part.name; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false;
+  mesh.bind(rig.skeleton, rig.bindMatrix);
+  rig.add(mesh);
+  return mesh;
 }
 
 /** A registered species' look fields: its rig contract, fur, build, pose, gait, post-pose, rig, animation, eye glow and
