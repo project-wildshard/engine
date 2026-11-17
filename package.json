@@ -1355,7 +1355,15 @@
     "./core/byteCodec": "./src/shared/engine/core/byteCodec.ts",
     "./game/shardfile/customSchema": "./src/shared/game/shardfile/customSchema.ts",
     "./sim/stateAdapter": "./src/server/engine/sim/stateAdapter.ts",
-    "./game/types": "./types/public-game.d.ts"
+    "./game/types": "./types/public-game.d.ts",
+    "./game/loot/CoinMotion": "./src/client/game/loot/CoinMotion.ts",
+    "./game/loot/coinModel": "./src/client/game/loot/coinModel.ts",
+    "./game/models/pickupRows": "./src/client/game/models/pickupRows.ts",
+    "./game/loot/Bounty": "./src/shared/game/loot/Bounty.ts",
+    "./game/loot/Purse": "./src/shared/game/loot/Purse.ts",
+    "./game/loot/coinAmounts": "./src/shared/game/loot/coinAmounts.ts",
+    "./game/loot/coinBurstState": "./src/shared/game/loot/coinBurstState.ts",
+    "./game/loot/tableRows": "./src/shared/game/loot/tableRows.ts"
   },
   "sideEffects": [
     "./src/client/**/*",
