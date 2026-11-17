@@ -25,3 +25,13 @@ ownership. Forged-child readiness is refused. All 13 focused controls pass;
 lint/type/CSS and exact hosted CI qualification follow before the row tick.
 The transport fixture supplies a small cooked road; full T1 CI uses its actual
 app-baked grid. No rendering acceptance is inferred from the transport test.
+
+The T1 CLI itself also had a remaining probe-close allocator for its preview.
+It now starts preview-server with `--port 0`, awaits its owned child's actual
+IPC address, keeps it alive through Playwright and stops it afterward. The
+Playwright config uses that already-owned listener; manual named-port runs
+retain their own webServer path. A native CLI control runs two launchers with
+an HTTP client as their browser command: both old launchers failed to serve
+the allocated address; both repaired launchers serve distinct actual ports
+and those listeners refuse connections after exit. Actual game/browser
+acceptance remains the hosted T1 groups, not this native lifecycle control.
