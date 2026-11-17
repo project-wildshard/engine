@@ -60,3 +60,10 @@ release fixtures now seal their installs. The ref race accepts either
 exact-target refusal or an actually failing immutable-copy check; neither
 may publish. Historical batch CLI observations use their policy dates,
 so the fixture cannot expire as the real calendar advances.
+
+A final native counterexample tightened that filter: CommonJS can load
+hidden generated packages such as `.prisma`. With blanket dot skipping,
+an actual `.generated/client.cjs` returned 1 then 2 while the dependency
+identity stayed unchanged. Only known manager/cache output is now omitted;
+hidden generated package source remains bound. Scope-folder metadata uses
+the same explicit output list.

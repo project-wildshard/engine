@@ -6,7 +6,7 @@ import {join} from 'node:path';
 const CACHES=new Set(['.cache','.vite','.vite-temp','.vitest-cache']);
 /** @param {string} name */
 export const moduleCacheOutput=name=>CACHES.has(name);
-const INTERNAL=new Set(['.bin','.pnpm','.modules.yaml','.pnpm-workspace-state-v1.json','.ws-installed-lock','.package-lock.json','.cache','.vite','.vite-temp','.vitest-cache']);
+const INTERNAL=new Set(['.bin','.pnpm','.modules.yaml','.pnpm-workspace-state-v1.json','.ws-installed-lock','.package-lock.json','.cache','.vite','.vite-temp','.vitest-cache','.DS_Store','.ignored','.yarn-integrity']);
 /** The actual CJS fallback chain, including the process's global locations.
  * @param {string} origin */
 export function moduleLookupDirectories(origin){
@@ -20,8 +20,9 @@ export function moduleEntries(modules){
  const entries=[];
  for(const name of readdirSync(modules).sort()){
   if(INTERNAL.has(name))continue;
-  if(name.startsWith('.'))continue;
-  if(name.startsWith('@'))for(const child of readdirSync(join(modules,name)).sort())entries.push({name:`${name}/${child}`,file:join(modules,name,child)});
+  // Hidden generated packages (for example .prisma) are valid CJS
+  // specifiers. Only the explicit manager/cache output list is omitted.
+  if(name.startsWith('@'))for(const child of readdirSync(join(modules,name)).sort().filter(entry=>!INTERNAL.has(entry)))entries.push({name:`${name}/${child}`,file:join(modules,name,child)});
   else entries.push({name,file:join(modules,name)});
  }
  return entries;

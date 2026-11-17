@@ -125,3 +125,15 @@ test('reachable npm package bytes bind while node_modules compiler cache output 
  expect(pushDependencyIdentity(consumer,f.env)).toBe(before);
  f.put(source,'module.exports=2;');expect(pushDependencyIdentity(consumer,f.env)).not.toBe(before);
 },30000);
+
+test('hidden generated packages remain bound even beside disposable module metadata',()=>{
+ const f=fixture(false),consumer=join(f.root,'hidden-consumer');
+ f.put(join(consumer,'package.json'),'{"name":"hidden-consumer"}');
+ f.put(join(f.root,'node_modules/.package-lock.json'),'{"lockfileVersion":3}');
+ const source=join(f.root,'node_modules/.generated/client.cjs');
+ f.put(source,'module.exports=1;');
+ const load=()=>execFileSync(process.execPath,['-e',"console.log(require('.generated/client.cjs'))"],{cwd:consumer,env:f.env,encoding:'utf8'}).trim();
+ expect(load()).toBe('1');const before=pushDependencyIdentity(consumer,f.env);expect(before).not.toBeNull();
+ f.put(source,'module.exports=2;');expect(load()).toBe('2');
+ expect(pushDependencyIdentity(consumer,f.env)).not.toBe(before);
+},30000);
