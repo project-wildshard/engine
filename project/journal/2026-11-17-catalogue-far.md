@@ -14,3 +14,14 @@ Two regression cases (empty and real geometry) fail on the original lookup.
 All25 real grid index/far/near cases pass on the candidate. This release34
 patch is prepared while main lands are in flight; the same fix will land
 in mode1 in today's renamed folders.ts after their queue clears.
+
+
+The native repaired page also exposed a second boundary: those sections
+are packed, and the existing fallback first probed their absent loose
+copies. The prefix itself is correct. A real member-layer regression
+reproduces the unwanted404 while still receiving valid part bytes.
+
+For placed uploads, try the existing verified part inventory before the
+loose request. Published loose headers still work, missing files still
+return404, and unrelated built-world routing stays unchanged. This
+transport repair is included with the catalogue lookup on main and34.
