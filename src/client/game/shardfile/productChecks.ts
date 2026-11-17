@@ -5,9 +5,9 @@ import type { preflightDeclaredCosts } from '@wildshard/format/assetAdmission';
 import { isBuildValidatedOutput } from '../../../shared/game/shardfile/outputDescriptor';
 
 /** Node/CI parses unproved models; browser authority comes only from the exact build proof. */
-export async function parseCheckedProduct(input: unknown): Promise<Shardfile> {
+export async function parseCheckedProduct(input: unknown, sections?: ReadonlyMap<string, unknown>): Promise<Shardfile> {
   if (!(import.meta.env?.SSR ?? true)) throw new Error('Shardfile needs server validation before client admission');
-  return (await import('@wildshard/format/shardSchema')).parseShardfile(input);
+  return (await import('@wildshard/format/shardSchema')).parseShardfile(input, sections);
 }
 
 /** Exposed browser roots must still pass the caller's complete source rehash
@@ -36,5 +36,5 @@ export async function validateCheckedProductAssets(source: Shardfile, assets: Re
   if (!decodersReady) await (await import('@wildshard/format/shardfileAssets')).prepareAssetDecoders();
   const { validateShardfileAssets } = await import('@wildshard/format/assetAdmission');
   const { scriptAdmissionRows } = await import('@wildshard/format/scriptContract');
-  validateShardfileAssets(source, assets, hash, memory, textures, scriptAdmissionRows(sections));
+  validateShardfileAssets(source, assets, hash, memory, textures, scriptAdmissionRows(sections), sections);
 }

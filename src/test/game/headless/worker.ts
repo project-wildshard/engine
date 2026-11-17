@@ -21,9 +21,9 @@ await runTickWorker(async raw => {
     sections: v.map(v.string(), v.unknown()), snapshot: v.exactOptional(v.string()) }), raw);
   const module = new URL(payload.prepare);
   if (module.protocol !== 'file:') throw new Error('Native proof prepare module must be a file URL');
-  const shard = parseShardfile(payload.shard), rapier = await loadRapier(readFileSync(payload.binary));
+  const shard = parseShardfile(payload.shard, payload.sections), rapier = await loadRapier(readFileSync(payload.binary));
   await prepareAssetDecoders();
-  validateShardfileAssets(shard, payload.assets, hashImmutableBytes, offlineMemoryAdmission('refuse'), undefined, scriptAdmissionRows(payload.sections));
+  validateShardfileAssets(shard, payload.assets, hashImmutableBytes, offlineMemoryAdmission('refuse'), undefined, scriptAdmissionRows(payload.sections), payload.sections);
   const loaded: {prepareHeadlessRuntime?: PrepareHeadlessRuntime} = await import(module.href);
   if (typeof loaded.prepareHeadlessRuntime !== 'function') throw new Error('Native proof module needs prepareHeadlessRuntime');
   const product = payload.directory === undefined

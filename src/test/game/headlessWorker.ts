@@ -30,7 +30,7 @@ export async function createNativeProofWorker(shard: Shardfile, assets: Readonly
   const worker = new TickWorkerHost(new URL('./headless/worker.ts', import.meta.url), undefined,
     shard.serverBudget, ['--experimental-transform-types', '--import', new URL('../../../scripts/sim-node-loader.mjs', import.meta.url).href], 'advisory', async () => {
       await prepareAssetDecoders();
-      validateShardfileAssets(shard, assets, hashImmutableBytes, offlineMemoryAdmission('refuse'), undefined, scriptAdmissionRows(sections));
+      validateShardfileAssets(shard, assets, hashImmutableBytes, offlineMemoryAdmission('refuse'), undefined, scriptAdmissionRows(sections), sections);
       const admitted = new Map<string, Uint8Array>();
       for (const hash of [...shard.files.map(file => file.hash), ...shard.requires.commons.map(identity => `commons:${identity}`)]) {
         const bytes = assets.get(hash); if (bytes === undefined) throw new Error('Missing admitted worker bytes'); admitted.set(hash, bytes);

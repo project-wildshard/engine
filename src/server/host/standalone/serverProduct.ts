@@ -161,7 +161,7 @@ export async function readServerProduct(root: string, build: () => string, sourc
   // on bytes its build has already checked and the page has just read without checking. As on the page, only a build's own verdict
   // for exactly these bytes spares the checks. A product with none, an outside one, keeps them.
   const assembled = await bootTask('server:descriptor-read-and-verification', () => resolveOutputDescriptor(input, { offline: false, firstParty: true, hash: contentHash, read, checks: nodeOutputDescriptorChecks }));
-  const built = isBuildValidatedOutput(assembled), parsed = built ? assembled : parseShardfile(assembled);
+  const built = isBuildValidatedOutput(assembled), parsed = built ? assembled : parseShardfile(assembled, outputDescriptor(assembled)?.sections);
   if (!built) carryOutputDescriptor(assembled, parsed);
   const shard = patch === undefined ? parsed : patch(parsed);
   const descriptor = outputDescriptor(shard);

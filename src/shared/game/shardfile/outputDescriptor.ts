@@ -97,12 +97,15 @@ export function isBuildValidatedOutput(value: unknown): value is Shardfile {
 }
 
 /** The admitted v2 index and parsed sections, if this source came from a split output. */
-export function outputDescriptor(source: { readonly files: object }): OutputDescriptor | undefined { return descriptors.get(source.files); }
+export function outputDescriptor(source: unknown): OutputDescriptor | undefined {
+  if (typeof source !== 'object' || source === null) return undefined;
+  const files: unknown = Object.getOwnPropertyDescriptor(source, 'files')?.value;
+  return typeof files === 'object' && files !== null ? descriptors.get(files) : undefined;
+}
 
 /** Carry verified transport metadata across the existing parser's owned copy. */
 export function carryOutputDescriptor(from: unknown, to: Shardfile): void {
-  if (typeof from !== 'object' || from === null || !('files' in from) || !Array.isArray(from.files)) return;
-  const descriptor = descriptors.get(from.files);
+  const descriptor = outputDescriptor(from);
   if (descriptor !== undefined) descriptors.set(to.files, descriptor);
 }
 

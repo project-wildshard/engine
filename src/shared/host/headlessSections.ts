@@ -2,7 +2,7 @@ import { parsePlatformDataSection } from '@wildshard/format/platformDataSections
 import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
 
 /** One defining context catalogue for author-build intake and worker transport. */
-export const HEADLESS_CONTEXT_SECTIONS = ['view/modules', 'sim/scripts', 'actors/spawn-scripts', 'actors/return-scripts', 'actors/moves', 'actors/strikes', 'world/targets', 'sim/runtime-plan', 'sim/bodies'] as const;
+export const HEADLESS_CONTEXT_SECTIONS = ['actors/species-programs', 'view/modules', 'sim/scripts', 'actors/spawn-scripts', 'actors/return-scripts', 'actors/moves', 'actors/strikes', 'world/targets', 'sim/runtime-plan', 'sim/bodies'] as const;
 
 /** Explicit admitted decision/move context crossing the worker boundary; no ABI is inferred from bytes. */
 export function headlessSections(input?: ReadonlyMap<string, unknown>): Map<string, unknown> {

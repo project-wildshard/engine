@@ -1,5 +1,5 @@
 import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
-import { carryOutputDescriptor } from '@wildshard/engine/game/shardfile/outputDescriptor';
+import { carryOutputDescriptor, outputDescriptor } from '@wildshard/engine/game/shardfile/outputDescriptor';
 
 /**
  * SHARD-SOURCE AP19 (J347): `wildshard watch`'s soft restart. A watched shard's quests, encounters, spawns or scripts
@@ -35,7 +35,7 @@ export function withDevGameplay(shard: Shardfile, gameplay: DevGameplay): Shardf
   const merged: Record<string, unknown> = { ...shard };
   for (const section of DEV_GAMEPLAY_SECTIONS) if (gameplay[section] !== undefined) merged[section] = gameplay[section];
   // oxlint-disable-next-line unicorn/prefer-structured-clone -- JSON wire normalization, as the product reader parses it
-  const next = parseShardfile(JSON.parse(JSON.stringify(merged)));
+  const next = parseShardfile(JSON.parse(JSON.stringify(merged)), outputDescriptor(shard)?.sections);
   carryOutputDescriptor(shard, next);
   return next;
 }

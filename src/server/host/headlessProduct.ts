@@ -38,7 +38,7 @@ export async function loadHeadlessProduct(outDir: string): Promise<ShardProduct>
   const input: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read('shard.json', SHARDFILE_ADMISSION_LIMITS.sourceBytes)));
   if (!isOutputIndex(input)) throw new Error('Native product requires a format-2 output');
   const assembled = await resolveOutputDescriptor(input, { offline: false, hash, read, checks: nodeOutputDescriptorChecks });
-  const source = parseShardfile(assembled);
+  const source = parseShardfile(assembled, outputDescriptor(assembled)?.sections);
   carryOutputDescriptor(assembled, source);
   const descriptor = outputDescriptor(source);
   if (descriptor === undefined) throw new Error('Native product has no verified index');

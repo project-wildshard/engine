@@ -367,7 +367,7 @@ export async function readProductInput(input: unknown, options: ProductOptions):
   if (isBuildValidatedOutput(assembled)) return assembled;
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned reader');
   await preflightProduct(assembled, options.pause);
-  const source = await parseCheckedProduct(assembled);
+  const source = await parseCheckedProduct(assembled, outputDescriptor(assembled)?.sections);
   carryOutputDescriptor(assembled, source);
   return source;
 }
@@ -475,7 +475,7 @@ async function admitProductWork(input: unknown, options: ProductOptions, trace?:
   await options.pause?.();
   if (!isBuildValidatedOutput(raw)) await preflightProduct(raw, options.pause);
   if (!compatibleShardfileVersion(version(raw))) throw new Error('Shardfile needs the current or previous additive format');
-  const source = options.firstParty && isBuildValidatedOutput(raw) ? raw : await parseCheckedProduct(raw), assets = new Map<string, Uint8Array>(), hashes = new Map<Uint8Array, string>();
+  const source = options.firstParty && isBuildValidatedOutput(raw) ? raw : await parseCheckedProduct(raw, outputDescriptor(raw)?.sections), assets = new Map<string, Uint8Array>(), hashes = new Map<Uint8Array, string>();
   carryOutputDescriptor(raw, source);
   if (!options.firstParty) assertExternalShardSlug(source.identity.slug);
   // A newly reconstructed private root already proved its exact declaration.
