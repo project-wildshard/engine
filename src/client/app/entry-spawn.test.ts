@@ -55,7 +55,7 @@ test.each([{grid: false, packs: false}, {grid: true, packs: false}, {grid: false
         setSpawnPacks: (enabled: boolean) => {transport.push(enabled);},
         startSpawnDownload: (...args: unknown[]) => {transport.push('start'); calls.push(args); started.finish(); return job;},
         paintSpawnDownload: () => {calls.push('paint'); return () => {calls.push('stop');};},
-        observeSpawnHolds: () => undefined,
+        observeSpawnHolds: () => undefined, adoptSpawnReruns: () => undefined,
       });
       throw new Error(`Unexpected early import: ${name}`);
     },
@@ -77,7 +77,7 @@ test('an early transport refusal rejects its gate wait without hiding the origin
       if (name.endsWith('/core/tier')) return Promise.resolve({TIER: 'phone', initializeTier: () => Promise.resolve()});
       if (name.endsWith('/grid/menu')) return Promise.resolve({DEVSERVER: false, gridMode: () => ({})});
       if (name.endsWith('/boot/spawnDownload')) return Promise.resolve({setSpawnPacks: () => {throw reason;},
-        startSpawnDownload: () => {started.finish(); return null;}, observeSpawnHolds: () => undefined});
+        startSpawnDownload: () => {started.finish(); return null;}, observeSpawnHolds: () => undefined, adoptSpawnReruns: () => undefined});
       throw new Error(`Unexpected early import: ${name}`);
     }, pageGridRecovery: () => null, pendingGridEntry: () => false});
   await expect(beforeCompletion(started.ready, run)).rejects.toBe(reason);
@@ -128,7 +128,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/game/grid/pageEntry': grid,
     '@wildshard/engine/game/grid/menu': {DEVSERVER: devserver, gridMode: () => ({})},
     '@wildshard/engine/game/boot/spawnDownload': {setSpawnPacks: (enabled: boolean) => {transport.push(enabled);},
-      startSpawnDownload: () => {transport.push('start'); return null;}, observeSpawnHolds: () => undefined},
+      startSpawnDownload: () => {transport.push('start'); return null;}, observeSpawnHolds: () => undefined, adoptSpawnReruns: () => undefined},
     '@wildshard/engine/game/shardfile/clientSource': {configuredShardfile: () => Promise.resolve(null), preparePageResidency: () => page,
       installManifestShardfile: async () => {
         events.push('admission:start'); admissionStarted.finish(); await admission.ready;
@@ -148,6 +148,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     './assetTables': {prepareAssetPackRead: () => ({ready: resolved})},
     '@wildshard/engine/game/shardfile/folder': {},
     '@wildshard/engine/boot/tables': {publicBytes: () => ({})},
+    '@wildshard/engine/boot/contentRead': {readContent: () => Promise.reject(new Error('no pickup reads here'))},
   };
   for (const name of ['@wildshard/engine/game/systems/species/install', '@wildshard/engine/game/icons',
     '@wildshard/engine/game/models/specimenCatalogue', '@wildshard/engine/game/data/pickupCatalogue', '@wildshard/engine/game/models/interact',
