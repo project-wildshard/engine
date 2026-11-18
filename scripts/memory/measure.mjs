@@ -210,7 +210,8 @@ const WORKER_LOG = `(() => { const W = window.Worker; if (!W) return; const made
 function answerName(page) {
   let stopped = false;
   const loop = (async () => {
-    while (!stopped) {
+    for (;;) {
+      if (stopped) return;
       try {
         const skip = page.locator('#ws-name-box [data-name=skip]');
         if (await skip.count() > 0) await skip.click({ timeout: 2000 });
