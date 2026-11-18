@@ -811,7 +811,16 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     const kit = kitOf?.(sim) ?? null;
     if (kit === null) return;
     const scene = sim.interact, lead = (): string | undefined => sim.host.players.keys().next().value;
-    sim.interact = (id, player = lead()) => (player !== undefined && kit.scene(player, id)) || scene(id, player);
+    // TEMPLATE-E2E TC-NE5: a tape names a prompt by its id; on an item action's prompt (Mossgate's chest refills the
+    // lantern) the page sends the prompt's scene (`clientScene`), so the kit is handed that scene, as the page's press is
+    const items = new Set((source.targets.itemActions ?? []).map(row => row.scene));
+    // only while that prompt is the one the player's E would pick, as the page offers it
+    const named = (id: string, player: string): string | undefined => {
+      const row = source.targets.interactions.find(target => target.id === id);
+      return row !== undefined && items.has(row.scene) && sim.selectedInteraction(player) === id ? row.scene : undefined;
+    };
+    const item = (player: string, id: string): boolean => { const own = named(id, player); return own !== undefined && kit.scene(player, own); };
+    sim.interact = (id, player = lead()) => (player !== undefined && (kit.scene(player, id) || item(player, id))) || scene(id, player);
   };
   const make = (record: Fact[], paid: Record<string, number>, saved?: SimSnapshot): ShardfileSimulation => {
     let current: ShardfileSimulation | undefined;
