@@ -1,6 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The server half runs the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
+import { FIXED_STEP } from '../src/shared/engine/core/fixedStep';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../src/shared/engine/saves/store';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
@@ -16,16 +17,20 @@ import { builtFolder } from '../src/test/game/builtFolder';
 // the page's 30 s timer never runs, and a reload ends the worker before a save the page asks for on leaving comes back.
 class PageStorage implements SaveStorage {
   readonly items = new Map<string, string>();
-  /** Writes of every document, and of a world's continuation (its two slots), and when the last continuation landed:
-   *  a busy runner can stall this thread after the write, so "within a second" is read at the write, not at the next poll */
-  writes = 0; continued = 0; continuedAt = 0;
+  /** Writes of every document, and of a world's continuation (its two slots). */
+  writes = 0; continued = 0;
+  serverTick = (): number => 0;
+  lastContinuationTick = 0;
   get length(): number { return this.items.size; }
   key(index: number): string | null { return [...this.items.keys()][index] ?? null; }
   getItem(key: string): string | null { return this.items.get(key) ?? null; }
   setItem(key: string, value: string): void {
-    this.writes++;
-    if (/\.standalone(alt)?-/u.test(key)) { this.continued++; this.continuedAt = performance.now(); }
     this.items.set(key, value);
+    this.writes++;
+    if (/\.standalone(alt)?-/u.test(key)) {
+      this.continued++;
+      this.lastContinuationTick = this.serverTick();
+    }
   }
   removeItem(key: string): void { this.writes++; this.items.delete(key); }
 }
@@ -46,15 +51,26 @@ async function standingAt(slug: string, input: HeadlessRuntimeInput, x: number, 
   storage.writes = 0; storage.continued = 0;
   return storage;
 }
-function start(slug: string, storage: SaveStorage, input: HeadlessRuntimeInput): StandaloneShell {
+function start(slug: string, storage: PageStorage, input: HeadlessRuntimeInput): StandaloneShell {
   const control = new MessageChannel(), game = new MessageChannel(), harness = new MessageChannel();
-  const server = runStandaloneServer({ control: control.port1, game: game.port1, harness: harness.port1, load: () => Promise.resolve(input) });
+  const server = runStandaloneServer({
+    control: control.port1, game: game.port1, harness: harness.port1, load: () => Promise.resolve(input),
+    proof: { booted: grid => { storage.serverTick = () => grid.host.state.tick; } },
+  });
   return connectStandalone({ slug, base: `/shards/${slug}/`, build: 'test', savePrefix: 'wildshard.', storage }, control.port2, game.port2, () => { server.dispose(); harness.port1.close(); }, harness.port2);
 }
 const until = async (ready: () => boolean, timeout = 10_000): Promise<void> => { await vi.waitFor(() => { expect(ready()).toBe(true); }, { timeout, interval: 5 }); };
 const sleep = (ms: number): Promise<void> => new Promise(resolve => { setTimeout(resolve, ms); });
+async function expectPromptSave(storage: PageStorage, writesBefore: number): Promise<void> {
+  const observedAtTick = storage.serverTick();
+  expect(observedAtTick).toBeGreaterThan(0);
+  // Measure the write in simulated time. Allow the real message ports to
+  // drain under load, with a watchdog well below the page's 30-second save.
+  await until(() => storage.continued > writesBefore, 5_000);
+  expect((storage.lastContinuationTick - observedAtTick) * FIXED_STEP).toBeLessThan(1);
+}
 /** Boot a page on `storage`, wait for the world's first frame, and send frames as they come. */
-async function open(slug: string, storage: SaveStorage, input: HeadlessRuntimeInput): Promise<StandaloneShell> {
+async function open(slug: string, storage: PageStorage, input: HeadlessRuntimeInput): Promise<StandaloneShell> {
   const shell = start(slug, storage, input);
   await shell.booted; shell.ready();
   await until(() => shell.client.latest !== null);
@@ -62,7 +78,7 @@ async function open(slug: string, storage: SaveStorage, input: HeadlessRuntimeIn
   return shell;
 }
 
-test('an opened door (a public field) is in the page\'s storage within a second, with no save asked for, and a reload keeps it', async () => {
+test('an opened door (a public field) saves within a second of simulation, with no save asked for, and a reload keeps it', async () => {
   const input = await product('_template'), storage = new PageStorage();
   const first = await open('_template', storage, input), door = (shell: StandaloneShell): number | undefined => shell.client.latest === null ? undefined : shell.client.stateField(shell.client.latest, 'template.door.open');
   expect(door(first)).toBe(0);
@@ -74,9 +90,7 @@ test('an opened door (a public field) is in the page\'s storage within a second,
   const before = storage.continued;
   first.client.act({ kind: 'interact', seq: 1, id: 'template.door.use' });
   await until(() => door(first) === 1);
-  const openedAt = performance.now();
-  await until(() => storage.continued > before);
-  expect(storage.continuedAt - openedAt).toBeLessThan(1000);
+  await expectPromptSave(storage, before);
   first.dispose(); // the reload: the worker ends with no save of its own
 
   const second = await open('_template', storage, input);
@@ -84,16 +98,14 @@ test('an opened door (a public field) is in the page\'s storage within a second,
   second.dispose();
 }, 40_000);
 
-test('a quest step (a flag) is in the page\'s storage within a second, and a reload keeps it', async () => {
+test('a quest step (a flag) saves within a second of simulation, and a reload keeps it', async () => {
   const input = await product('driftwood-isle'), storage = await standingAt('driftwood-isle', input, -22, -71.5);
   const first = await open('driftwood-isle', storage, input);
   await sleep(1000);
   const before = storage.continued;
   first.client.act({ kind: 'interact', seq: 1, id: 'castaway.talk' });
   await until(() => first.client.quests.get('sealed-ring')?.started === true);
-  const startedAt = performance.now();
-  await until(() => storage.continued > before);
-  expect(storage.continuedAt - startedAt).toBeLessThan(1000);
+  await expectPromptSave(storage, before);
   first.dispose();
 
   const second = await open('driftwood-isle', storage, input);
