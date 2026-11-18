@@ -158,3 +158,37 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
   whole boot) were the largest engine-owned sites. Cut: a plain-JSON fast check for those slots' writes, and a one-row
   read of the server step. 239 -> 164 MB late, 1,003 -> 910 MB whole boot. WebKit [K], 5 alternating cold runs: peak
   median 1,267 -> 1,051 MB, settled 765 -> 733.
+
+## mini-ninemem9, 2026-11-18: what sets the WebKit loading peak, and two cuts held
+
+All on engine `bdba72b5`, cold WebKit [K], instrument minimal, `nine-dragon-stack` (the chunk slug; `nine-dragon` lands on
+zone select and times out).
+
+- **Why the peak swings ~80-170 MB between identical runs.** A cold boot's WebContent is WebKit Malloc (the JS heap and
+  its malloc, 750-860 MB at the peak) plus ArrayBuffer contents (VM tag "WebAssembly Memory", 170-330 MB). Sampling
+  `footprint -j` back to back beside a full-GC detector (a sentinel object every 100 ms, held 1.5 s so it is old, then
+  dropped; its `FinalizationRegistry` callback marks a full collection) shows, over 6 boots: full GCs at ~2.0 and
+  ~2.4-2.8 s (`props`), then none until `readyFrame` (~5.6-6.2 s); in one run none until after control. Between them
+  Malloc grows ~480 -> ~860 MB and ArrayBuffers ~30 -> ~300 MB, nearly all garbage. The GC at `readyFrame` comes when the
+  ArrayBuffer burst there crosses JSC's threshold; Malloc pages stay dirty after it (bmalloc returns them over seconds),
+  so the peak is the heap's high-water at that trigger. Runs with no `readyFrame` GC peaked lowest (1,142 at control vs
+  1,148-1,209). The swing is where the full GCs land; a cut that moves them can raise the peak while it lowers
+  allocation, the likely reason mini-ninemem3/5/8's placement text path lost. Judge a cut with 10+ pairs, or stratify runs by GC timing.
+- **ArrayBuffer allocation by step** (every buffer of 64 KB+, constructors, `slice`, `from`, `arrayBuffer`, worker
+  replies; source-mapped): `props` 277 MB, `readyFrame` 222 MB. `readyFrame`: meshopt decode outputs 77 MB (161, main
+  thread, `meshopt_decoder.module.js:188`), the store-hit double read 30 + 30 (`spawnDownload.ts:323` `exactCopy` ->
+  `new Response` -> `contentRead.ts:91`), the faced trees' copies 33 (`slabGrid.ts:103` Float32 xyz 13.8 widened from
+  Int16, `slabLibrary.ts:210` corners 8.4, padded index 6.9, kinds 3.5), `gridSlabPositions` Int16 9.1. `props`: the same
+  double read 34 + 59, `rigParser.ts:79` slices 25, three's Int16 `slice` 16. These bursts are the levers: less
+  ArrayBuffer churn after the `props` GCs delays or removes the `readyFrame` trigger.
+- **Held: the server worker in chunks.** The standalone worker bundle's single 3.5 MB `serverRuntime` module costs
+  JavaScriptCore +162 MB at import, +87 MB held (V8 11 MB). Strict execution order (each module body in an init function,
+  as the page bundle has) plus `entriesAware` 1 MB parts: worker prewarm on a blank page 267 -> 199 MB peak, 113 -> 93
+  held. In Nine's boot the `sky`-to-`shaders` steps fell 60-100 MB in all 10 pairs, but the worker's transient is gone
+  before `readyFrame` either way: peak 1,187 / 1,187 -> 1,191 / 1,216, settled 760 / 760 -> 783 / 783 (two batches of
+  5). Not shipped. Also measured: an ASCII-only bundle -15 MB peak, -7 held (the 3.5 MB file is UTF-16 in JSC).
+- **Held: admitted transport released at the first drawn world frame.** A Chromium heap snapshot at `readyFrame`: 253
+  MB reachable; the largest owner is `ClientAssets.wire`, 176 admitted files, 33 MB (GLB 22, JSON 8), held until control
+  (`releaseAll`). Dropping it after `worldFrame` caused no reread through control + 15 s. Peak 1,198 -> 1,134, then
+  1,083 -> 1,211 with the order flipped (combined medians 1,118 -> 1,160), settled 750 -> 758: noise, not shipped. As
+  above, freeing live bytes early only helps if a GC runs before the peak.
