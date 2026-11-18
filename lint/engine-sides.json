@@ -1583,6 +1583,7 @@
     "src/shared/engine/physics/query.ts": "shared",
     "src/shared/engine/physics/queryBatchV2.ts": "shared",
     "src/shared/engine/physics/rapier.ts": "shared",
+    "src/shared/engine/physics/rapierModule.ts": "shared",
     "src/shared/engine/physics/rapierWarm.ts": "shared",
     "src/shared/engine/physics/readinessWalls.ts": "shared",
     "src/shared/engine/physics/ropeChain.ts": "shared",

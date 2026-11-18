@@ -40,3 +40,19 @@ test('an early worker that failed to load is dropped for a new one', () => {
   const adopted = adoptSpare();
   expect(early?.terminated).toBe(true); expect(adopted).not.toBe(early); expect(FakeWorker.made).toHaveLength(2);
 });
+
+// ENGINE-MEMORY EM21: once the page has compiled Rapier, the early worker gets that module and compiles none of its own
+test('an early worker gets the page\'s compiled Rapier once the page has one', async () => {
+  useFakeWorker();
+  const empty = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
+  const { compileRapier, compiledRapier } = await import('@wildshard/engine/physics/rapierModule');
+  vi.stubGlobal('fetch', () => Promise.resolve(new Response(empty, { headers: { 'content-type': 'application/wasm' } })));
+  try {
+    const module = await compileRapier();
+    expect(compiledRapier()).toBe(module);
+    prespawnStandalone();
+    const [early] = FakeWorker.made;
+    expect(early?.posted[0]?.data).toEqual({ prewarm: true, rapier: module });
+    expect(adoptSpare()).toBe(early);
+  } finally { vi.unstubAllGlobals(); }
+});

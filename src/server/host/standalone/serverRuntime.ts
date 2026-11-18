@@ -3,6 +3,7 @@ import '@wildshard/engine/core/portableMathFirst';
 import { loadRapier, type Rapier } from '@wildshard/engine/physics/rapier';
 import { installCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { RAPIER_WASM_URL } from '@wildshard/engine/physics/wasmUrl';
+import { isWasmModule } from '@wildshard/engine/physics/rapierModule';
 import { askHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import { runStandaloneServer } from './serverHost';
 import { fetchGridCollision, fetchServerFolder } from './serverFolder';
@@ -12,6 +13,8 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 
 /** What a page hands its server's worker: what its document holds and a worker's realm has no way to read. */
 export interface ServerWorkerStart {
+  /** EM21: the page's compiled Rapier, or null: the worker then compiles its own from the bytes the page holds */
+  readonly rapier?: WebAssembly.Module | null;
   readonly catalogue: unknown; readonly validator: unknown; readonly verdicts: unknown;
   /** J311: the grid cell (instance) a no-world build's Shard select chose, or null. */
   readonly goto: string | null;
@@ -21,10 +24,16 @@ export interface ServerWorkerStart {
   readonly ownServer?: string | null;
 }
 
-/** Physics, once, from the page's own copy where it holds one (DL25). */
+/** Physics, once: from the page's compiled module where it posted one (EM21), else from the page's own copy of the bytes
+ *  where it holds one (DL25). */
 let physics: Promise<Rapier> | undefined;
-const rapierOf = (held: HeldRead | undefined): Promise<Rapier> => {
+const compiledOf = (data: unknown): WebAssembly.Module | undefined => {
+  const rapier: unknown = typeof data === 'object' && data !== null ? Reflect.get(data, 'rapier') : undefined;
+  return isWasmModule(rapier) ? rapier : undefined;
+};
+const rapierOf = (held: HeldRead | undefined, compiled?: WebAssembly.Module): Promise<Rapier> => {
   physics ??= (async () => {
+    if (compiled !== undefined) return bootTask('server:rapier-instantiate-shared', () => loadRapier(compiled));
     const bytes = await bootTask('server:rapier-held-bytes', async () => await held?.(new URL(RAPIER_WASM_URL, globalThis.location.href).href) ?? undefined);
     return bootTask('server:rapier-initialize', () => loadRapier(bytes));
   })();
@@ -41,7 +50,7 @@ export function prewarmServerWorker(event: MessageEvent<unknown>): void {
   const reads = event.ports[0];
   void (async () => {
     try {
-      const R = await rapierOf(reads === undefined ? undefined : askHeldReads(reads));
+      const R = await rapierOf(reads === undefined ? undefined : askHeldReads(reads), compiledOf(event.data));
       warmRapier(R, diagnosticNow); bootMark('server:rapier-warmed');
     } catch { physics = undefined; /* the start message's boot loads physics again and reports there */ }
   })();
@@ -62,7 +71,7 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   const [control, game, harness, reads] = event.ports;
   if (control === undefined || game === undefined) return;
   const held = reads === undefined ? undefined : askHeldReads(reads);
-  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerFolder(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held, patch, ownsServer(start, slug)),
+  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerFolder(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held, compiledOf(start)), held, patch, ownsServer(start, slug)),
     strips: boot => fetchGridCollision(boot.base),
     onSaveRefused: error => { console.warn('Standalone save refused, falling back', error); } });
 }

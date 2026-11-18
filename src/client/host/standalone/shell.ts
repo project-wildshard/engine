@@ -11,6 +11,7 @@ import { saveDocuments } from '@wildshard/engine/saves/indexed';
 import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { ServerMessageSchema, ShellMessageSchema, type ProbedRow, type ServerMessage, type ShellMessage } from '@wildshard/format/standaloneControl';
 import { answerHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
+import { compiledRapier } from '@wildshard/engine/physics/rapierModule';
 import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace, HarnessStill } from '../../../shared/host/standalone/harnessPlace';
 import type { DevBox, DevCollidersMessage, DevGround, DevGroundMessage } from '@wildshard/engine/game/devColliders';
 import { isDevRestart, type DevGameplay, type DevPlace, type DevRestarted, type DevRestartMessage } from '@wildshard/engine/game/devGameplay';
@@ -206,7 +207,9 @@ export function prespawnStandalone(held?: HeldRead): void {
   const worker = serverWorker(), owner = new Scope('standalone.prespawn'), started = { worker, owner, failed: false }, reads = new MessageChannel();
   owner.listen(worker, 'error', () => { started.failed = true; });
   if (held !== undefined) answerHeldReads(reads.port1, held);
-  worker.postMessage({ prewarm: true }, [reads.port2]);
+  // EM21: the page's compiled Rapier, when it has one, so the worker instantiates it instead of compiling its own copy
+  const rapier = compiledRapier();
+  worker.postMessage(rapier === null ? { prewarm: true } : { prewarm: true, rapier }, [reads.port2]);
   spare = started;
 }
 /** The early worker if one is waiting and loaded, else a new one (exported for its test). */
@@ -236,7 +239,7 @@ export function startStandalone(config: StandaloneConfig): StandaloneShell {
   // C3: the page's catalogue, read at boot, is the worker's too; it has no document to read it from. So are its build's
   // verdicts, which a worker's reads ask for as the page's do (they are stamped into the document, and into nothing else).
   bootMark('worker:configuration-send');
-  worker.postMessage({ catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null, goto: config.goto ?? null, enter: config.enter ?? null, ownServer: config.ownServer === true ? config.slug : null } satisfies ServerWorkerStart,
+  worker.postMessage({ rapier: compiledRapier(), catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null, goto: config.goto ?? null, enter: config.enter ?? null, ownServer: config.ownServer === true ? config.slug : null } satisfies ServerWorkerStart,
     [control.port2, game.port2, harness.port2, ...reads === undefined ? [] : [reads.port2]]);
   if (reads !== undefined && config.held !== undefined) answerHeldReads(reads.port1, config.held);
   // The worker sits beside this module, so an emitted module's `/b/<build>/` folder is the server's real build (J57).
