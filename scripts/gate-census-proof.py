@@ -103,6 +103,14 @@ def unreaped_root(parent, deadline=False):
         actor.wait(timeout=2)
 
 
+def parsed(path):
+    """The JSON a fixture wrote, or None while it is missing or only partly written."""
+    try:
+        return json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
 def wait_for(predicate, processes, seconds=10):
     until = time.monotonic() + seconds
     while not predicate():
@@ -181,8 +189,9 @@ if(mode==='failed')process.exitCode=7;
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     recorder = None
     try:
-        wait_for(lambda: (root / 'ready.json').exists(), [wrapper])
-        ready = json.loads((root / 'ready.json').read_text())
+        # the fixture's writeFileSync creates the file before it fills it: a busy runner read it empty (run 44291731549)
+        wait_for(lambda: parsed(root / 'ready.json') is not None, [wrapper])
+        ready = parsed(root / 'ready.json')
         owner = json.loads(subprocess.check_output([sys.executable, str(ENGINE / 'scripts/cpu-census.py'),
                                                    '--pid', str(ready['pid']), '--owner-only'], env=env, text=True))
         raw = root / 'raw.jsonl'
