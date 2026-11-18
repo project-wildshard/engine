@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { CRASH_LINE } from '../src/client/game/grid/budgetOverlay';
-import { anchorBounds, ledgerSplit, loadPhoneModel, phoneFromChromium, phoneFromLedger, phoneFromWebKit, phonePeakFromWebKit, rangeText } from '../scripts/memory/phoneModel.mjs';
+import { anchorBounds, ledgerSplit, loadPhoneModel, phoneFromChromium, phoneFromLedger, phoneFromWebKit, phonePeakFromWebKit, rangeText, t90, upperOverRuns, zoneOverRuns } from '../scripts/memory/phoneModel.mjs';
 import { ANCHOR_RENDERER_MB, fitPhoneModel, lineFit } from '../scripts/memory/phone-fit.mjs';
 import { traceToControl } from '../scripts/memory/measure.mjs';
 
@@ -129,4 +129,40 @@ test('Template, Dunes, Pine and Nine each carry a prediction with its error bar'
   expect(model.zones['nine-dragon-stack']!.phoneLoadingMB.high).toBeLessThan(model.limitMB);
   expect(model.zones['nine-dragon-stack']!.phoneLoadingMB.high).toBeGreaterThan(1500);
   expect(model.chromium.loadingPerRenderer.low).toBeLessThan(model.chromium.loadingPerRenderer.high);
+});
+
+test('EM11c: a zone\'s upper bound is the 90% prediction bound on one more cold boot, and more runs narrow it', () => {
+  expect(t90(1)).toBe(3.078);
+  expect(t90(5)).toBe(1.476);
+  expect(t90(30)).toBe(1.31);
+  expect(t90(31)).toBeCloseTo(1.309, 3);
+  expect(t90(10_000)).toBeCloseTo(1.2817, 4);
+  expect(upperOverRuns([1200 * MB])).toBe(1200 * MB);
+  // mean 1,500, sd 100: 1,500 + 1.638 x 100 x sqrt(1.25)
+  expect(upperOverRuns([1400, 1500, 1500, 1600].map((x) => x * MB)) / MB).toBeCloseTo(1500 + 1.638 * Math.sqrt(20_000 / 3) * Math.sqrt(1.25), 6);
+  // the same spread read with more runs: the highest run never moves, the bound comes down towards mean + 1.28 sd
+  const round = [1400, 1550, 1700].map((x) => x * MB);
+  const bounds = [1, 2, 4, 8].map((k) => upperOverRuns(Array.from({ length: k }, () => round).flat()));
+  for (let i = 1; i < bounds.length; i++) expect(bounds[i]!).toBeLessThan(bounds[i - 1]!);
+  expect(bounds[3]! / MB).toBeGreaterThan(1550 + 1.28 * 130);
+  // a run that reads far out still moves it: an honest bound is not a trimmed one
+  expect(upperOverRuns([...round, 2000 * MB])).toBeGreaterThan(upperOverRuns(round));
+});
+
+test('EM11c: the bound stays conservative against the v0.1.36 anchor: over the anchor\'s death-window runs it reads the boot the phone died in over the line', () => {
+  const died = anchor.runs.map((windows) => phoneFromWebKit(windows[windows.map((w) => w.step).lastIndexOf('compile:after')]!.peak, model));
+  expect(upperOverRuns(died.map((p) => p.high))).toBeGreaterThanOrEqual(model.limitMB * MB);
+  // even the runs' central figures, bounded the same way, put that boot over the line
+  expect(upperOverRuns(died.map((p) => p.central))).toBeGreaterThanOrEqual(model.limitMB * MB);
+});
+
+test('EM11c: zoneOverRuns reads the median run\'s central figure and the bound over every run\'s high', () => {
+  const m = { gpuFloorMB: 0, alpha: { low: 0.5, high: 0.5 }, scale: { low: 0.5, high: 0.5 } };
+  const run = (wc: number) => ({ settled: { webcontent: wc * MB, gpu: 0 }, checkpoints: [{ peak: { webcontent: (wc + 100) * MB, gpu: 0 } }] });
+  const z = zoneOverRuns([run(700), run(800), run(900)], m);
+  expect(z.runs).toBe(3);
+  expect(z.playing.central / MB).toBeCloseTo(800);
+  expect(z.loading.central / MB).toBeCloseTo(900);
+  expect(z.playing.upper / MB).toBeCloseTo(800 + 1.886 * 100 * Math.sqrt(4 / 3), 6);
+  expect(z.loading.upper - z.playing.upper).toBeCloseTo(100 * MB, 0);
 });

@@ -48,7 +48,7 @@ import { cpus, loadavg } from 'node:os';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { listProcesses, readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
-import { ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText } from './phoneModel.mjs';
+import { ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText, zoneOverRuns } from './phoneModel.mjs';
 
 export const PROTOCOL = 'memory-run/1';
 /** The inspector modes (see the header). @type {readonly ['minimal', 'full']} */
@@ -642,6 +642,11 @@ async function main(argv) {
     instrument,
   };
   if (summary && runs > 1) for (const [name, s] of Object.entries(summary)) if (typeof s === 'object') console.log(`${name.padEnd(18)} median ${mb(s.median)} MB  min ${mb(s.min)}  max ${mb(s.max)}  spread ${s.spreadPct}%  (n ${s.n}) [K]`);
+  if (summary && runs > 1 && !args.url2 && good.every((r) => r.checkpoints.length > 0)) {
+    // EM11c: the zone's EM11 figure over its runs, the median run's central and the 90% bound on one more cold boot
+    const z = zoneOverRuns(/** @type {any} */ (good), loadPhoneModel()), gb = (/** @type {number} */ b) => (b / 1e9).toFixed(2);
+    console.log(`phone over ${z.runs} runs [EM11, iPhone 17 Pro]: playing ${gb(z.playing.central)} GB (upper ${gb(z.playing.upper)}), loading ${gb(z.loading.central)} GB (upper ${gb(z.loading.upper)}); upper = 90% prediction bound on one more cold boot`);
+  }
   const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({ url: args.url, chunk: args.chunk, timeoutMs, plantRetainedBuffer: Boolean(args['plant-retained-buffer']) }) : null;
   if (microscope && !args['ledger-only']) for (const line of microscopeLines(microscope)) console.log(line);
   const ledger = microscope?.ready ? ledgerPeak(microscope.checkpoints) : null;

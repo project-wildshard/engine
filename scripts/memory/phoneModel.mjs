@@ -72,6 +72,48 @@ export function phoneFromChromium(rendererBytes, model) {
   return { low: rendererBytes * r.low, central: rendererBytes * r.central, high: rendererBytes * r.high };
 }
 
+/** One-sided 90% Student-t quantiles for 1 to 30 degrees of freedom. */
+const T90 = Object.freeze([3.078, 1.886, 1.638, 1.533, 1.476, 1.440, 1.415, 1.397, 1.383, 1.372, 1.363, 1.356, 1.350, 1.345, 1.341,
+  1.337, 1.333, 1.330, 1.328, 1.325, 1.323, 1.321, 1.319, 1.318, 1.316, 1.315, 1.314, 1.313, 1.311, 1.310]);
+
+/** The one-sided 90% Student-t quantile; past 30 degrees of freedom, Cornish-Fisher from z = 1.2816. @param {number} df */
+export function t90(df) {
+  if (!(df >= 1)) throw new Error(`t90 needs at least one degree of freedom, got ${df}`);
+  if (df <= T90.length) return T90[Math.floor(df) - 1];
+  const z = 1.2816;
+  return z + (z ** 3 + z) / (4 * df);
+}
+
+/**
+ * EM11c (mini-em11c, 2026-11-18): a zone's upper bound over N cold runs, the one-sided 90% prediction bound on one more
+ * cold boot's EM11 high: mean + t90(N-1) x sd x sqrt(1 + 1/N) of the runs' highs. Each run's high is already the model's
+ * upper end (both families at the ends the v0.1.36 anchor allows), so the bound is the model's error bar on a boot the
+ * phone might see, not on the runs we happened to take. It replaced "the highest run's high" (mini-sweep, epoch 6):
+ * that maximum is a distribution-free prediction bound whose coverage rises with N (75% at 3 runs, 86% at 6), so it
+ * widened as runs were added. This one holds coverage at 90%: its t and sqrt(1 + 1/N) shrink with N, so more runs
+ * narrow it towards mean + 1.28 sd. One run has no spread to read; its high stands alone. Bytes in, bytes out.
+ * @param {readonly number[]} highs
+ */
+export function upperOverRuns(highs) {
+  const n = highs.length;
+  if (n === 0) throw new Error('upperOverRuns needs at least one run');
+  if (n === 1) return highs[0];
+  const mean = highs.reduce((a, b) => a + b, 0) / n;
+  const sd = Math.sqrt(highs.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
+  return mean + t90(n - 1) * sd * Math.sqrt(1 + 1 / n);
+}
+
+/** One zone over N cold WebKit runs (measure.mjs rows): per phase the median run's central figure and the 90% upper
+ *  bound on one more boot (`upperOverRuns`). @param {readonly {settled:{webcontent:number, gpu:number}, checkpoints:readonly {peak:{webcontent:number, gpu:number}}[]}[]} runs @param {any} model */
+export function zoneOverRuns(runs, model) {
+  if (runs.length === 0) throw new Error('zoneOverRuns needs at least one run');
+  const median = (/** @type {number[]} */ xs) => { const s = [...xs].sort((a, b) => a - b), m = Math.floor(s.length / 2); return s.length % 2 === 1 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const playing = runs.map((r) => phoneFromWebKit(r.settled, model)), loading = runs.map((r) => phonePeakFromWebKit(r.checkpoints, model));
+  return { runs: runs.length,
+    playing: { central: median(playing.map((r) => r.central)), upper: upperOverRuns(playing.map((r) => r.high)) },
+    loading: { central: median(loading.map((r) => r.central)), upper: upperOverRuns(loading.map((r) => r.high)) } };
+}
+
 /** "1.84 GB (1.52-2.31)" @param {Range} range */
 export function rangeText(range) {
   const gb = (/** @type {number} */ b) => (b / 1e9).toFixed(2);

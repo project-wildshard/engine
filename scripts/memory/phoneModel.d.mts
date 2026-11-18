@@ -15,3 +15,7 @@ export function ledgerSplit(counters:Record<string,Record<string,number>>|null|u
 export function phoneFromLedger(counters:Record<string,Record<string,number>>|null|undefined,model:ChainModel&{ledger:LedgerFit;peakOverSettled:Range},phase?:'playing'|'loading'):Range;
 export function phoneFromChromium(rendererBytes:number,model:{chromium:{loadingPerRenderer:Range}}):Range;
 export function rangeText(range:Range):string;
+export function t90(df:number):number;
+export function upperOverRuns(highs:readonly number[]):number;
+export function zoneOverRuns(runs:readonly {settled:{webcontent:number;gpu:number};checkpoints:readonly {peak:{webcontent:number;gpu:number}}[]}[],model:ChainModel):{
+  runs:number;playing:{central:number;upper:number};loading:{central:number;upper:number}};
