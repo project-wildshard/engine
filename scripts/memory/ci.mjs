@@ -28,6 +28,13 @@ const get = file => JSON.parse(readFileSync(file, 'utf8'));
 const stored = mode === 'ledger' && baseline ? get(baseline).zones : null;
 // The native Template footprint gets the same rule: a batch whose median is over the line is measured once more.
 const anchor = mode === 'footprint' && baseline ? get(baseline).anchor : null;
+// J424: only an armed zone (its baseline says "armed": true) can block, so only an armed zone gets the second boot. Any
+// other zone boots once, and a boot that fails is printed and blocks nothing (memory/ratchet.mjs guardZones).
+const armed = (/** @type {string} */ chunk) => {
+  if (!baseline) return true;
+  const doc = get(baseline);
+  return (mode === 'footprint' ? doc.anchor : doc.zones?.[chunk])?.armed === true;
+};
 
 const preview = await serve(absolute(root), '', true, { telemetryDir: join(directory, 'telemetry') });
 const files = [];
@@ -59,6 +66,12 @@ try {
         ...(mode === 'ledger' ? ['--ledger-only'] : [mode === 'footprint' ? '--runs=5' : '--runs=3'])]);
       return file;
     };
+    if (!armed(chunk)) {
+      try { files.push(await boot(1)); } catch (error) {
+        console.log(`REPORT, not armed, blocks nothing (J424):\n${chunk}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      continue;
+    }
     if (stored !== null) {
       files.push(...await confirmZone({ zone: chunk, baseline: stored[chunk], boot, read: get, log: line => { console.log(line); } }));
       continue;
@@ -73,7 +86,8 @@ try {
     }
   }
   const next = join(directory, `${mode}-ratchet.json`);
-  ratchet([`--mode=${mode}`, `--out=${next}`, ...(baseline ? [`--baseline=${baseline}`] : []), ...files]);
+  if (files.length === 0) console.log(`No ${mode} reading to compare; nothing here is armed, so this blocks nothing (J424)`);
+  else ratchet([`--mode=${mode}`, `--out=${next}`, ...(baseline ? [`--baseline=${baseline}`] : []), ...files]);
   if (mode === 'ledger' && !baseline) {
     const control = get(next).zones._template;
     const clean = join(directory, 'template-clean.json'), planted = join(directory, 'template-planted.json');

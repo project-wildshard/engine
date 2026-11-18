@@ -455,6 +455,7 @@ jobs:
           retention-days: 7
 
   memory-ledger-guard:
+    # J424: report-only except for zones whose baseline says "armed": true (scripts/memory/ratchet.mjs guardZones).
     # EM35 uses a full production client. Nine stalled on hosted SwiftShader
     # at 180 s and 480 s (44239650390, 44246104563). Its ledger uses the
     # native WebKit job below.
@@ -594,6 +595,7 @@ jobs:
           if-no-files-found: ignore
 
   memory-footprint-guard:
+    # J424: report-only until the Template anchor or Nine's zone says "armed": true (scripts/memory/ratchet.mjs).
     # EM36 reads native processes on the same hosted macOS runner as EM12.
     needs: nine-ring1-build
     if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' && (inputs.pins_channel == '' || inputs.pins_channel == 'production') }}

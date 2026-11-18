@@ -1,6 +1,6 @@
 // EM35–EM36. Byte budgets for ledger capacity and native WebContent footprint have separate baselines.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { isDeepStrictEqual, parseArgs } from 'node:util';
+import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { memorySubsystems, PHONE_MEMORY_BUDGETS } from '../../src/shared/engine/core/memoryBudget.ts';
 
@@ -109,6 +109,54 @@ export async function confirmZone({ zone, baseline, boot, read, log }) {
   return [first, await boot(2)];
 }
 
+/** @param {unknown} error */
+const message = error => error instanceof Error ? error.message : String(error);
+
+/**
+ * J424 (Jake 2026-11-18): "the gates should only block once an agent has done the work to get it under the gate". A zone
+ * blocks only when its baseline says `"armed": true`, which the agent who got it under its line writes; every other zone
+ * prints its reading and blocks nothing. A zone that passes and is not armed yet is listed as ready to arm.
+ * @param {Record<string, LedgerBudget & {armed?: boolean}>} stored @param {Map<string, LedgerBudget[]>} readings
+ * @param {(baseline: LedgerBudget, runs: readonly LedgerBudget[], zone: string) => LedgerBudget} judge
+ */
+export function guardZones(stored, readings, judge) {
+  /** @type {Record<string, LedgerBudget & {armed?: boolean}>} */
+  const zones = {};
+  /** @type {string[]} */ const reports = [], failures = [], eligible = [];
+  for (const zone of [...new Set([...Object.keys(stored), ...readings.keys()])].sort((a, b) => a.localeCompare(b))) {
+    const baseline = stored[zone], runs = readings.get(zone) ?? [];
+    if (baseline === undefined) { reports.push(`${zone}: no baseline yet; record it with ci.yml memory_record`); continue; }
+    const armed = baseline.armed === true, flag = armed ? { armed } : {};
+    let failure;
+    if (runs.length === 0) failure = `${zone}: no boot reached control`;
+    else try {
+      zones[zone] = { ...judge(baseline, runs, zone), ...flag };
+      if (!armed) eligible.push(zone);
+      continue;
+    } catch (error) { failure = message(error); }
+    zones[zone] = baseline;
+    (armed ? failures : reports).push(failure);
+  }
+  return { zones, reports, failures, eligible };
+}
+
+/**
+ * J424 for the native Template footprint: its anchor blocks only when armed.
+ * @param {FootprintBudget & {armed?: boolean}} anchor @param {() => readonly (readonly number[])[]} batches
+ * @returns {{anchor: FootprintBudget & {armed?: boolean}, report: string | null}}
+ */
+export function guardFootprint(anchor, batches) {
+  if (anchor.armed === true) return { anchor: { ...confirmFootprint(anchor, batches()), armed: true }, report: null };
+  try { return { anchor: confirmFootprint(anchor, batches()), report: null }; }
+  catch (error) { return { anchor, report: message(error) }; }
+}
+
+/** @param {readonly string[]} reports @param {readonly string[]} eligible @param {string} file */
+function announce(reports, eligible, file) {
+  for (const report of reports) console.log(`REPORT, not armed, blocks nothing (J424):\n${report}`);
+  if (eligible.length > 0) console.log(`Under the line and ready to arm (set "armed": true for it in ${file}): ${eligible.join(', ')}`);
+}
+
 /** Hottest run sets the extent of measured spread around the median. The
  * positive spread is kept in bytes so subsequent measurements cannot widen
  * the allowance.
@@ -200,27 +248,31 @@ export function main(argv) {
     for (const doc of measurements) {
       const rows = readings.get(doc.chunk) ?? [];
       if (mode === 'ledger') {
-        if (doc.microscope?.ready !== true) throw new Error(`${doc.chunk}: Chromium did not reach control`);
-        rows.push(ledgerBudget(doc.microscope.checkpoints));
+        if (doc.microscope?.ready === true) rows.push(ledgerBudget(doc.microscope.checkpoints));
+        else if (baseline === null) throw new Error(`${doc.chunk}: Chromium did not reach control`);
       } else {
-        if (doc.chunk !== 'nine-dragon-stack' || !Array.isArray(doc.webkit) || doc.webkit.length === 0) throw new Error('Expected native WebKit Nine runs');
+        if (doc.chunk !== 'nine-dragon-stack' || !Array.isArray(doc.webkit)) throw new Error('Expected native WebKit Nine runs');
         for (const run of doc.webkit) {
-          if (run.host !== 'webkit' || run.refused !== null || run.ready !== true) throw new Error('Nine did not reach control in native WebKit');
-          rows.push(ledgerBudget(run.checkpoints));
+          if (run.host === 'webkit' && run.refused === null && run.ready === true) rows.push(ledgerBudget(run.checkpoints));
+          else if (baseline === null) throw new Error('Nine did not reach control in native WebKit');
         }
       }
       readings.set(doc.chunk, rows);
     }
-    if (baseline !== null && !isDeepStrictEqual([...readings.keys()].sort(), Object.keys(baseline.zones).sort())) {
-      throw new Error('Measured zone coverage differs from the committed ledger baseline');
+    if (baseline === null) {
+      const zones = Object.fromEntries([...readings.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([zone, runs]) => [zone, highWater(runs)]));
+      if (values.out) write(values.out, { version: 1, mode, instrument, zones });
+      console.log(`Ledger recorded for ${readings.size} zones`);
+      return;
     }
-    const zones = Object.fromEntries([...readings.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([zone, runs]) =>
-      [zone, baseline === null ? highWater(runs)
-        : (mode === 'ledger' ? confirmLedger : compareLedger)(baseline.zones[zone], runs, zone)]));
-    if (values.out) write(values.out, { version: 1, mode, instrument, zones });
-    console.log(`Ledger ${baseline === null ? 'recorded' : 'passed'} for ${readings.size} zones`);
+    const verdict = guardZones(baseline.zones, readings, mode === 'ledger' ? confirmLedger : compareLedger);
+    if (values.out) write(values.out, { version: 1, mode, instrument, zones: verdict.zones });
+    announce(verdict.reports, verdict.eligible, values.baseline ?? 'the baseline');
+    const armed = Object.keys(baseline.zones).filter(zone => baseline.zones[zone].armed === true);
+    console.log(`Ledger read for ${readings.size} zones; armed: ${armed.length === 0 ? 'none' : armed.join(', ')}`);
+    if (verdict.failures.length > 0) throw new Error(verdict.failures.join('\n'));
   } else {
-    const batches = measurements.map(doc => {
+    const batches = () => measurements.map(doc => {
       if (doc.chunk !== '_template' || !Array.isArray(doc.webkit) || doc.webkit.length === 0) throw new Error('Expected native WebKit Template runs');
       return doc.webkit.map((/** @type {any} */ run) => {
         if (run.host !== 'webkit' || run.refused !== null || run.ready !== true) throw new Error('Template did not reach control in native WebKit');
@@ -228,10 +280,14 @@ export function main(argv) {
       });
     });
     const instrument = footprintInstrument(measurements, baseline);
-    const anchor = baseline === null ? footprintBudget(batches.flat()) : confirmFootprint(baseline.anchor, batches);
+    const verdict = baseline === null ? { anchor: footprintBudget(batches().flat()), report: null } : guardFootprint(baseline.anchor, batches);
+    const anchor = verdict.anchor;
     if (values.out) write(values.out, { version: 1, mode, instrument, anchor });
-    const medians = batches.map(readings => footprintBudget(readings).settled).join(' B, ');
-    console.log(`Template native WebContent: median ${medians} B, baseline ${anchor.settled} B + ${anchor.spread} B`);
+    if (verdict.report !== null) announce([verdict.report], [], '');
+    else if (baseline !== null && anchor.armed !== true) announce([], ['anchor'], values.baseline ?? 'the baseline');
+    let medians = 'unread';
+    try { medians = batches().map(readings => footprintBudget(readings).settled).join(' B, '); } catch { /* reported above */ }
+    console.log(`Template native WebContent: median ${medians} B, baseline ${anchor.settled} B + ${anchor.spread} B${anchor.armed === true ? ', armed' : ''}`);
   }
 }
 

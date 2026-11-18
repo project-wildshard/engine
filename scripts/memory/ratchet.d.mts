@@ -14,4 +14,9 @@ export function footprintInstrument(measurements: readonly unknown[], baseline: 
 export function compareFootprint(baseline: FootprintBudget, readings: readonly number[]): FootprintBudget;
 export function footprintOverLine(baseline: FootprintBudget, readings: readonly number[]): string | null;
 export function confirmFootprint(baseline: FootprintBudget, batches: readonly (readonly number[])[]): FootprintBudget;
+export function guardZones(stored: Record<string, LedgerBudget & { armed?: boolean }>, readings: Map<string, LedgerBudget[]>,
+  judge: (baseline: LedgerBudget, runs: readonly LedgerBudget[], zone: string) => LedgerBudget):
+  { zones: Record<string, LedgerBudget & { armed?: boolean }>; reports: string[]; failures: string[]; eligible: string[] };
+export function guardFootprint(anchor: FootprintBudget & { armed?: boolean }, batches: () => readonly (readonly number[])[]):
+  { anchor: FootprintBudget & { armed?: boolean }; report: string | null };
 export function main(argv: string[]): void;
