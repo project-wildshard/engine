@@ -30,3 +30,14 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
   (`warmRapier`, ~120 ms): the tier-up spike lands at `world`, when the page holds ~250 MB, not on `firstFrame`. Sky Reach's
   loading renderer peak 558 -> 520 MB (4 alternating runs each, 541-573 vs 518-523); the peak is now the main thread's world
   loading (`loadout`), where malloc carries a ~100 MB transient.
+
+## mini-ninemem3 (relay), 2026-11-17 night
+
+- Allocation sampling (HeapProfiler sampling with collected objects, source-mapped; `tmp/mini-ninemem3/alloc.mjs`): Nine
+  allocates ~1.15 GB on the main thread before ready, ~630 MB of it in `props`. shard-format's share ~300 MB: placement
+  pages ~110 (valibot rebuild + `json.ts` visit descriptors), material graph validation ~100 (`validateGraph`/`typeNode`/
+  `toNodes` per compile), post graph ~26, colliders ~24. Also: GLSL emission ~140, save writes still ~85 (store.write +
+  slots v.lazy), `dequantizeIntoSpace` ~32.
+- Placement pages now go through `placementPageText.ts`: plain exact pages are used as `JSON.parse` made them, the rest
+  through format's schema. Placement parsing 110 -> 47 MB of allocation (the rest is the parse itself). It is a copy of
+  shard-format `b960e0e1` `placement-page-text.ts` because MG8 holds this engine on format 0.21.0.
