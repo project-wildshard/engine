@@ -48,12 +48,14 @@ export interface Deps {
   waitMs?: number;
   pollMs?: number;
   qa?: QaVerdict;
+  localQa?: QaVerdict;
+  localQaSource?: string;
   releaseKey?: string;
   catalogue?: string;
 }
 export const SMOKE_SCENARIOS: readonly string[];
 /** STAGING-QA SQ15: one staging-qa.mjs verdict, the candidate's or live staging's. */
-export interface QaVerdict { qa?: boolean; kind?: string; full?: boolean; build?: string; url?: string; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }
+export interface QaVerdict { qa?: boolean; kind?: string; full?: boolean; build?: string; release?: string; url?: string; deploymentId?: string; roomsSerial?: number; proofs?: readonly { id?: string; pass?: boolean }[]; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }
 export const QA_LEGS: Readonly<{ candidate: readonly string[]; staging: readonly string[] }>;
 export function qaGap(qa: QaVerdict | undefined, build: string): string | undefined;
 export const PACKS_ORIGIN: string;

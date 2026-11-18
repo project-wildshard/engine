@@ -15,6 +15,7 @@
 // page is packaged, uploaded, read back and aliased. Every dependency comes in through `deps`, so the tests drive a fake host.
 // J205: the flow opens no socket. Nothing here ever joins a channel; production proofs are static.
 import {createHash, createPublicKey, verify} from 'node:crypto';
+import {LEGS} from '../staging-qa-budget.mjs';
 
 export const PACKS_ORIGIN = 'https://packs.wildshard.io';
 /** Where every channel's page sends `/api/{errors,telemetry,inbox}` (API-CLOUDFLARE AC11). */
@@ -116,6 +117,8 @@ export function pinnedReleaseKey(configured) {
  * @property {QaVerdict} [qa]  Production go-live (meta STAGING-QA SQ15, J426-J428): one `staging-qa.mjs` verdict.json for this build,
  *   the candidate's or live staging's (`page-release.mjs --qa=<file>`; `{problem}` when it could not be read). It replaces
  *   --after-staging-proofs, verify-staging.sh's journeys and sweeps, and --smoke.
+ * @property {QaVerdict} [localQa]  Staging go-live requires the full local QA verdict from the source before the cut.
+ * @property {string} [localQaSource]  The release commit's parent, which the local QA rig built.
  * @property {string} [releaseKey]  Defaults to RELEASE_PUBLIC_KEY; tests sign with their own.
  * @property {string} [catalogue]  Preview only (SA35): the catalogue the page bakes, staging's borrowed grid (scripts/preview-grid.ts);
  *   default the pinned `test/pins/catalogue.json`.
@@ -258,6 +261,11 @@ export async function runPhase(phase, deps) {
   const checked = deps.state.read('check');
   if (checked?.build !== deps.build || checked?.channel !== channel.channel || checked?.deployment?.id !== deployment.id) refuse(`no ${channel.channel} check of ${deployment.id}: run the check phase first`);
   if (channel.channel === 'staging') {
+    const tag = `v${deps.manifest.version}`;
+    const local = localQaGap(deps.localQa, deps.localQaSource, tag);
+    if (local !== undefined) refuse(`staging go-live needs --local-qa=<verdict.json>: ${local}`);
+    const candidate = candidateQaGap(deps.qa, deps.build, tag, deployment.id, checked?.serial);
+    if (candidate !== undefined) refuse(`staging go-live needs --qa=<candidate verdict.json>: ${candidate}`);
     plan('recheck signed extra placements before the alias move');
     if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/release-placed-ready.mjs', 'staging'], {WS_BUILD_ID: deps.build});
   }
@@ -272,6 +280,7 @@ export async function runPhase(phase, deps) {
     else if (checked !== undefined && gate.serial !== checked.serial) deps.log(`note: serial moved ${checked.serial} -> ${gate.serial} since check, still ${deps.build}`);
   }
   if (channel.channel === 'staging') {
+    if (gate.serial !== deps.qa?.roomsSerial) refuse('staging rooms serial changed since candidate QA; run the candidate leg again');
     plan('move the cook to this signed staging build before moving the page alias');
     if (!dry) deps.run('node', ['scripts/release-cook.mjs', '--staging', `--build=${deps.build}`]);
   }
@@ -369,7 +378,8 @@ async function productionGates(phase, deps, refuse) {
 }
 
 /**
- * @typedef {{ qa?: boolean, kind?: string, full?: boolean, build?: string, url?: string, hold?: boolean,
+ * @typedef {{ qa?: boolean, kind?: string, full?: boolean, build?: string, release?: string, url?: string, hold?: boolean,
+ *   roomsSerial?: number, deploymentId?: string, proofs?: readonly { id?: string, pass?: boolean }[],
  *   scenarios?: readonly { id?: string, status?: string }[],
  *   findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string }} QaVerdict
  */
@@ -378,7 +388,33 @@ async function productionGates(phase, deps, refuse) {
 export const SMOKE_SCENARIOS = Object.freeze(['K1', 'K2', 'K3', 'K4', 'K5']);
 
 /** STAGING-QA SQ15: the legs production reads, and the scenarios each must have run (staging-qa-budget.mjs LEGS). */
-export const QA_LEGS = Object.freeze({candidate: ['K1', 'K2', 'K5', 'K6'], staging: ['K3', 'K5']});
+export const QA_LEGS = Object.freeze({candidate: LEGS.candidate, staging: LEGS.staging});
+
+/** @param {QaVerdict | undefined} qa @param {string | undefined} source @param {string} release */
+function localQaGap(qa, source, release) {
+  if (qa === undefined) return 'no local verdict';
+  if (qa.problem !== undefined) return qa.problem;
+  if (qa.qa !== true || qa.kind !== 'local' || qa.full !== true) return 'a full local staging-qa.mjs verdict is required';
+  if (typeof source !== 'string' || !/^[a-f0-9]{40}$/u.test(source) || qa.build !== source || qa.release !== release) {
+    return 'the local verdict must name the exact release source and version';
+  }
+  if (qa.hold !== false) return 'local QA holds the release';
+  if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/u.test(qa.url ?? '')) return 'local QA must use the loopback rig';
+  const ran = new Set([...(qa.scenarios ?? []).filter(row => row.status === 'ran').map(row => row.id),
+    ...(qa.proofs ?? []).filter(row => row.pass === true).map(row => row.id)]);
+  const missing = LEGS.local.filter(id => id !== 'build' && !ran.has(id));
+  return missing.length === 0 ? undefined : `local QA is missing ${missing.join(', ')}`;
+}
+
+/** @param {QaVerdict | undefined} qa @param {string} build @param {string} release @param {string} deploymentId @param {number | undefined} serial */
+function candidateQaGap(qa, build, release, deploymentId, serial) {
+  const gap = qaGap(qa, build);
+  if (gap !== undefined) return gap;
+  if (qa?.kind !== 'candidate' || qa.release !== release) return 'the candidate verdict must name the release being deployed';
+  if (qa.deploymentId !== deploymentId) return 'the candidate verdict names a different Worker deployment';
+  if (serial === undefined || qa.roomsSerial !== serial) return 'the candidate verdict names a different signed rooms serial';
+  return undefined;
+}
 
 /**
  * SQ15 (J398's hold, J426): why a staging-qa verdict does not let `build` go live, or undefined. It must be the full default

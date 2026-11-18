@@ -18,6 +18,11 @@ const build = 'a'.repeat(40);
 const qaOn = (on: string = build, hold = false) => ({qa: true, kind: 'candidate', full: true, build: on, url: CHANNELS.staging.origin,
   scenarios: QA_LEGS.candidate.map(id => ({id, status: id === 'K1' ? 'skip' : 'ran'})), hold,
   findings: hold ? [{scenario: 'K6', key: 'black-world', severity: 'P0', text: 'the world is black or empty'}] : []});
+const source = 'b'.repeat(40);
+const localQa = {qa: true, kind: 'local', full: true, build: source, release: 'v0.1.10', url: 'http://127.0.0.1:4400', hold: false,
+  scenarios: ['K3', 'K4', 'K5'].map(id => ({id, status: 'ran'})),
+  proofs: [{id: 'gate-chromium', pass: true}, {id: 'ios-safari', pass: true}]};
+const candidateQa = (deploymentId = 'dpl_1') => ({...qaOn(), release: 'v0.1.10', deploymentId, roomsSerial: 7});
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
 const key = publicKey.export({format: 'der', type: 'spki'}).toString('hex');
 const token = ['host', 'credential', 'marker'].join('-');
@@ -67,6 +72,7 @@ function rig(channel: Channel = 'staging') {
   };
   const deps: Deps = {
     root: '/root', channel, build, host,
+    ...(channel === 'staging' ? {localQa, localQaSource: source, qa: candidateQa()} : {}),
     packs: {
       publish: ({dryRun}) => { if (!dryRun) calls.push('packs.publish'); return Promise.resolve({parts: 3, uploaded: 1, held: 2, book: 'b', cors: CHANNELS[channel].origin}); },
       verify: () => { calls.push('packs.verify'); return Promise.resolve({parts: 3, uploaded: 0, held: 3, book: 'b', cors: CHANNELS[channel].origin}); },
@@ -113,6 +119,37 @@ test('the four phases run in order and move the alias last', async () => {
     'deployedDigests', 'run node scripts/release-cook.mjs --staging --build=' + build, 'goLive', 'state go-live',
   ]);
   expect(lines.some(line => line.includes('alias last'))).toBe(true);
+});
+
+test('staging go-live binds both complete QA verdicts to the source, deployment and signed serial', async () => {
+  const {deps, calls, live} = rig();
+  await through(deps, 'check');
+  delete deps.localQa;
+  delete deps.qa;
+  const dry = await runPhase('go-live', {...deps, dryRun: true});
+  expect(dry.refusals.join(' ')).toMatch(/--local-qa.*--qa=/u);
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/--local-qa/u);
+  deps.localQa = {...localQa, build};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/exact release source/u);
+  deps.localQa = {...localQa, proofs: []};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/ios-safari/u);
+  deps.localQa = localQa;
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/--qa=/u);
+  deps.qa = {...candidateQa(), build: source};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/verdict is for/u);
+  deps.qa = {...candidateQa(), hold: true};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/it holds/u);
+  deps.qa = candidateQa('old-deployment');
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/different Worker deployment/u);
+  deps.qa = candidateQa();
+  live.release = signed('staging', 8);
+  live.health = {build, serial: 8};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/serial changed since candidate QA/u);
+  expect(calls).not.toContain('goLive');
+  live.release = signed('staging', 7);
+  live.health = {build, serial: 7};
+  await runPhase('go-live', deps);
+  expect(calls).toContain('goLive');
 });
 
 test('--content publishes the content set before the packs and the page (PAGE-SIZE PZ2)', async () => {
@@ -473,6 +510,7 @@ function workersRig(channel: Channel = 'staging') {
   const host = workersHost({token: () => token, exec, fetch: get as typeof fetch, log: () => {}});
   deps.root = root;
   deps.host = host;
+  if (channel === 'staging') deps.qa = candidateQa(versionId);
   deps.readFile = path => readFileSync(path);
   return {deps, live, root, served, wrangler, url, uploadedMaps, setTag: (value: string) => { tag = value; }};
 }
