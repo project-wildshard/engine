@@ -1,5 +1,6 @@
 import { cueFamilyNames, cueFile, cueFiles, cueManifest, cueShotFiles, cueSprite, type CueSprite } from '../../../shared/engine/audio/bootAudio';
-import { compactSampleLoop } from './preload';
+import { compactSampleLoop, decodeSampleLoop, sampleClip } from './preload';
+import { TIER } from '../core/tier';
 import type { SampleLoop } from './Audio';
 import type { AudioMixer } from './levelAudio';
 import type { AudioRead, AudioDecode } from './SetScore';
@@ -33,7 +34,7 @@ export function cutCueSprite(manifest:Record<string,unknown>|undefined,sprite:Cu
 }
 
 /** Decoded loop metadata; the native emitter decides whether its declared zone is live. */
-export interface CatalogueLoop extends SampleLoop {zone:string|undefined;live:boolean}
+export type CatalogueLoop = SampleLoop & {zone:string|undefined;live:boolean};
 /** One catalogue's decoding/cache policies, retaining eager bank and lazy family semantics. */
 export interface CueCataloguePolicy {
   tolerance:number;arrayFamilies:boolean;familyGain:boolean;loopGain:number;
@@ -92,7 +93,10 @@ export class CueCatalogue {
       if(!this.available)return undefined;
       const rows=this.manifest?.['beds'],row=obj(rows)?rows[name]:undefined;if(!obj(row))return undefined;
       const url=cueFile(this.key,row['file']);if(url===undefined)return undefined;
-      try{const buffer=await this.decode(await this.read(url),'bed');return this.live()?this.loop(buffer,row,url):undefined;}
+      try{
+        const sample = await decodeSampleLoop(await this.read(url), row, url, num(row['gain'], this.policy.loopGain), this.decode, 'bed', true);
+        return this.live() ? { ...sample, zone: typeof row['zone'] === 'string' ? row['zone'] : undefined, live: row['live'] === true } : undefined;
+      }
       catch(error){console.info(`[sfx] ${url}: ${error instanceof Error?error.message:String(error)} — that bed stays silent`);return undefined;}
     })();this.beds.set(name,pending);return pending;
   }
@@ -131,33 +135,59 @@ export class CueCatalogue {
   async decodeAll(onFile?:()=>void):Promise<CueBank> {
     const raw=this.manifest,bank={loops:this.loops,shots:this.shots};if(raw===undefined||!this.live())return bank;
     const buffers=new Map<string,AudioBuffer>(),effects=new Set(this.shotFiles());
-    const files = (section: unknown): Set<string> => new Set(obj(section) ? Object.values(section).flatMap(row => {
-      const url = obj(row) ? cueFile(this.key, row['file']) : undefined;
-      return url === undefined ? [] : [url];
-    }) : []);
-    const beds = files(raw['beds']), hums = files(raw['hums']);
+    const bedRows = rowsByRecording(raw['beds'], this.key);
+    const humRows = rowsByRecording(raw['hums'], this.key);
+    const beds = new Map<string, SampleLoop>();
     await Promise.all(cueFiles(this.key).map(async url=>{try{
-      const purpose = effects.has(url) ? 'effect' : beds.has(url) && !hums.has(url) ? 'bed' : undefined;
-      buffers.set(url,await this.decode(await this.read(url),purpose));}
+      const rows = bedRows.get(url), row = rows?.[0];
+      const effect = effects.has(url), bed = row !== undefined && !humRows.has(url);
+      const bytes = await this.read(url);
+      if (bed && !effect && rows?.length === 1) {
+        beds.set(url, await decodeSampleLoop(bytes, row, url, num(row['gain'], this.policy.loopGain), this.decode, 'bed', true));
+      } else {
+        buffers.set(url, await this.decode(bytes, effect ? 'effect' : bed ? 'bed' : undefined));
+      }}
       catch(error){console.info(`[sfx] ${url}: ${error instanceof Error?error.message:String(error)} — synth kept`);}finally{onFile?.();}}));
     if(!this.live())return bank;
     for(const section of ['beds','hums']){
       const rows=raw[section];if(!obj(rows))continue;
       for(const [name,row] of Object.entries(rows)){
-        if(!obj(row))continue;const url=cueFile(this.key,row['file']),buffer=url===undefined?undefined:buffers.get(url);if(buffer===undefined||url===undefined)continue;
-        const loop=this.loop(buffer,row,url);if(loop.loopEnd>loop.loopStart)this.loops.set(`${section==='beds'?'bed':'hum'}.${name}`,{buffer:loop.buffer,loopStart:loop.loopStart,loopEnd:loop.loopEnd,gain:loop.gain});
+        if(!obj(row))continue;const url=cueFile(this.key,row['file']);if(url===undefined)continue;
+        const buffer = buffers.get(url), loop = beds.get(url) ?? (buffer === undefined ? undefined : this.loop(buffer, row, url));
+        if(loop !== undefined && loop.loopEnd>loop.loopStart)this.loops.set(`${section==='beds'?'bed':'hum'}.${name}`,loop);
       }
     }
     const sprite=raw['sprite'],rows=raw['oneshots'];if(!obj(rows))return bank;
     if(!obj(sprite)){
       for(const [family,row] of Object.entries(rows)){const clips:SampleClip[]=[];
-        for(const name of cueFamilyNames(raw,family)){const url=cueFile(this.key,name),buffer=url===undefined?undefined:buffers.get(url);if(buffer!==undefined)clips.push(this.whole(buffer,obj(row)?num(row['gain'],1):1));}
+        for(const name of cueFamilyNames(raw,family)){const url=cueFile(this.key,name),buffer=url===undefined?undefined:buffers.get(url);if(buffer!==undefined && url!==undefined)clips.push(await sampleClip(buffer,obj(row)?num(row['gain'],1):1,url));}
         if(clips.length>0)this.shots.set(family,clips);
       }return bank;
     }
-    const parsed=cueSprite(this.key,raw),buffer=parsed===undefined?undefined:buffers.get(parsed.url);if(parsed!==undefined&&buffer!==undefined)cutCueSprite(this.manifest,parsed,buffer,this.shots,this.policy);
+    const parsed=cueSprite(this.key,raw),buffer=parsed===undefined?undefined:buffers.get(parsed.url);
+    if(parsed!==undefined&&buffer!==undefined) {
+      if (TIER === 'phone' && buffer.sampleRate === 24000 && buffer.numberOfChannels === 1) {
+        const { packCueClips } = await import('./packedCues');
+        const clips = new Map<string, SampleClip[]>();
+        cutCueSprite(this.manifest, parsed, buffer, clips, this.policy);
+        packCueClips(clips, this.shots, parsed.url);
+      } else cutCueSprite(this.manifest,parsed,buffer,this.shots,this.policy);
+    }
     return bank;
   }
+}
+
+function rowsByRecording(section: unknown, catalogue: string): Map<string, Record<string, unknown>[]> {
+  const files = new Map<string, Record<string, unknown>[]>();
+  if (!obj(section)) return files;
+  for (const row of Object.values(section)) {
+    if (!obj(row)) continue;
+    const url = cueFile(catalogue, row['file']);
+    if (url === undefined) continue;
+    const rows = files.get(url);
+    if (rows === undefined) files.set(url, [row]); else rows.push(row);
+  }
+  return files;
 }
 /** The loading bar lends its counted read/decode; the catalogue owns the admitted bank. */
 export function decodeCueSet(key:string,read:AudioRead,decode:AudioDecode,onFile?:()=>void):Promise<CueBank> {

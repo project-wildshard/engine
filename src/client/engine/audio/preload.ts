@@ -97,7 +97,7 @@ export const decodeBytes: AudioDecode = async (bytes, purpose) => {
   } finally { if (decoding.get(key) === work) decoding.delete(key); }
 };
 
-async function sampleClip(buffer: AudioBuffer, gain: number, url: string): Promise<SampleClip> {
+export async function sampleClip(buffer: AudioBuffer, gain: number, url: string): Promise<SampleClip> {
   const clip = { buffer, offset: 0, duration: buffer.duration, gain };
   if (TIER !== 'phone' || buffer.sampleRate !== PHONE_SAMPLE_RATE || buffer.numberOfChannels !== 1) return clip;
   const { packMonoCue, cueGain } = await import('./packedCues');
@@ -177,28 +177,6 @@ const LOOP_GAIN: Record<LoopName, number> = {
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
-interface Job { url: string; effect?: true; apply: (buf: AudioBuffer, bank: SfxBank) => void | Promise<void> }
-/** AUDIO AU1: the files and their order are the shared selection's (`sfxEntries`, which the cook also reads). */
-function sfxJobs(set: string, bed: AmbientBed, policy: SfxDecodePolicy): Job[] {
-  return sfxEntries(set, bed, policy).map((entry): Job => {
-    const u = entry.url;
-    if ('loop' in entry) {
-      const name = entry.loop, v = entry.row;
-      const apply = (buffer: AudioBuffer, bank: SfxBank): void => {
-        const loopEnd = Math.min(buffer.duration, num(v['loopEnd'], buffer.duration)), loopStart = Math.max(0, Math.min(loopEnd - 0.05, num(v['loopStart'], 0)));
-        const packed = compactSampleLoop(buffer, { loopStart, loopEnd }, u);
-        bank.loops.set(name, { ...packed, gain: (policy.loopGains?.[name] ?? LOOP_GAIN[name] ?? 1) * num(v['gain'], 1) });
-      };
-      return { url: u, apply };
-    }
-    const family = entry.family, gain = entry.gain;
-    return { url: u, effect: true, apply: async (buffer, bank) => {
-      const clip = await sampleClip(buffer, gain, u), familyClips = bank.shots.get(family);
-      if (familyClips) familyClips.push(clip); else bank.shots.set(family, [clip]);
-    } };
-  });
-}
-
 /**
  * Decode `set` — every file its sfx.json lists that this shard can play — from `read` (the boot's counted fetch at the bar;
  * `cachedBytes` for a switch in the menu). A file that fails keeps its synth version; the set as a whole never rejects.
@@ -206,10 +184,38 @@ function sfxJobs(set: string, bed: AmbientBed, policy: SfxDecodePolicy): Job[] {
 export async function decodeSfxSet(set: string, bed: AmbientBed, read: (url: string) => Promise<ArrayBuffer>, onFile?: () => void, decode: AudioDecode = decodeBytes, policy: SfxDecodePolicy = {}): Promise<SfxBank> {
   const j = sfxManifests()[set];
   const bank: SfxBank = { set, credit: isObj(j) && typeof j['credit'] === 'string' ? j['credit'] : undefined, loops: new Map(), shots: new Map() };
-  await Promise.all(sfxJobs(set, bed, policy).map(async (job) => {
-    try { await job.apply(await decode(await read(job.url), job.effect ? 'effect' : undefined), bank); }
-    catch (e) { console.info(`[sfx] ${job.url}: ${e instanceof Error ? e.message : String(e)} — synth kept`); }
+  await Promise.all(sfxEntries(set, bed, policy).map(async entry => {
+    const { url } = entry;
+    try {
+      const bytes = await read(url);
+      if ('loop' in entry) {
+        const { loop: name, row } = entry;
+        const gain = (policy.loopGains?.[name] ?? LOOP_GAIN[name] ?? 1) * num(row['gain'], 1);
+        bank.loops.set(name, await decodeSampleLoop(bytes, row, url, gain, decode, undefined, entry.bed === true || name === 'underwater'));
+      } else {
+        const clip = await sampleClip(await decode(bytes, 'effect'), entry.gain, url);
+        const familyClips = bank.shots.get(entry.family);
+        if (familyClips) familyClips.push(clip); else bank.shots.set(entry.family, [clip]);
+      }
+    }
+    catch (e) { console.info(`[sfx] ${url}: ${e instanceof Error ? e.message : String(e)} — synth kept`); }
     onFile?.();
   }));
   return bank;
+}
+
+/** Keep authored bed cuts as compressed recordings whenever the phone can
+ * play them on its native sample clock. Hums retain short synchronous PCM. */
+export async function decodeSampleLoop(bytes: ArrayBuffer, row: Record<string, unknown>, url: string, gain: number,
+  decode: AudioDecode, purpose: 'bed' | undefined, stream: boolean): Promise<SampleLoop> {
+  if (stream && TIER === 'phone') {
+    const { streamedBed } = await import('./streamedBed');
+    const sampled = await streamedBed({ bytes, url, start: num(row['loopStart'], 0), end: num(row['loopEnd'], 0), gain,
+      halfRate: purpose === 'bed', decode: data => decodeBytes(data, purpose) });
+    if (sampled !== undefined) return sampled;
+  }
+  const buffer = await decode(bytes, purpose);
+  const loopEnd = Math.min(buffer.duration, num(row['loopEnd'], buffer.duration));
+  const loopStart = Math.max(0, Math.min(loopEnd - 0.05, num(row['loopStart'], 0)));
+  return { ...compactSampleLoop(buffer, { loopStart, loopEnd }, url), gain };
 }

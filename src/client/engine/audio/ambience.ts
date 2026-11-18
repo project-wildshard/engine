@@ -6,12 +6,12 @@ import type { AudioLoopEmitterRecipe, AudioLoopGraph, AudioAmbienceRouting, Audi
 import { requireAudioProfile, requireAudioLevel, audioMixValue, evaluateAudioMix, type AudioZoneProfile } from '../../../shared/engine/audio/audioProfiles';
 import type { Audio, SampleLoop } from './Audio';
 import type { AudioMixer } from './levelAudio';
-import { ownAudioSource } from './ownership';
-import { loopAt, audioRandom } from './util';
+import { audioRandom } from './util';
+import { loopOffset, playSampleLoop, sampleIdentity, type LoopVoice, type StreamLoop } from './sampleLoop';
 
 interface ZoneVoice {
-  gain: GainNode; pan: StereoPannerNode | undefined; src: AudioBufferSourceNode | undefined;
-  buf: AudioBuffer | undefined; level: number; quiet: number;
+  gain: GainNode; pan: StereoPannerNode | undefined; src: LoopVoice | undefined;
+  buf: AudioBuffer | StreamLoop | undefined; level: number; quiet: number;
 }
 export interface ZoneBed {
   id: string; panned?: boolean; out?: () => AudioNode; started: () => void;
@@ -21,9 +21,11 @@ export class AmbienceZones {
   readonly beds: Map<string, ZoneVoice> = new Map<string, ZoneVoice>();
   private readonly audio: AudioMixer;
   private readonly scope: Scope | undefined;
+  private readonly playbackOwner: Scope;
   private readonly random: () => number;
   constructor(audio: AudioMixer, random: () => number, scope?: Scope) {
     this.audio = audio; this.random = random; this.scope = scope;
+    this.playbackOwner = scope ?? new Scope('ambience.loops');
     scope?.onDispose(() => { this.dispose(); });
   }
   ensure(def: ZoneBed): ZoneVoice {
@@ -37,36 +39,22 @@ export class AmbienceZones {
   }
   start(def: ZoneBed, sample: SampleLoop, time: number = this.audio.ctx.currentTime, scale = 1): ZoneVoice {
     const bed = this.ensure(def), c = this.audio.ctx;
-    const source = this.scope ? c.createBufferSource() : ownAudioSource(c.createBufferSource());
     let scaled: GainNode | undefined;
-    if (scale !== 1) { scaled = c.createGain(); scaled.gain.value = scale; source.connect(scaled).connect(bed.gain); }
-    else source.connect(bed.gain);
-    let started = false, ended = false;
-    const endedSignal = new AbortController();
-    let forget = (): void => { /* Installed before playback. */ };
-    const cleanup = (): void => {
-      source.disconnect(); scaled?.disconnect(); forget(); endedSignal.abort();
-      if (bed.src === source) { bed.src = undefined; bed.buf = undefined; }
-    };
-    const stop = (): void => {
-      if (ended) return;
-      ended = true;
-      try { if (started) source.stop(); } finally { cleanup(); }
-    };
-    if (this.scope) {
-      forget = this.scope.capture('sounds', stop);
-      this.scope.listen(source, 'ended', () => { ended = true; cleanup(); }, { once: true, signal: endedSignal.signal });
-    }
-    try { loopAt(source, sample.buffer, sample, this.random, time); started = true; }
-    catch (error) { stop(); throw error; }
-    bed.src = source; bed.buf = sample.buffer; bed.quiet = 0; def.started(); return bed;
+    if (scale !== 1) { scaled = c.createGain(); scaled.gain.value = scale; scaled.connect(bed.gain); }
+    let published = false;
+    const source = playSampleLoop(sample, { context: c, output: scaled ?? bed.gain, owner: this.playbackOwner,
+      time, offset: loopOffset(sample, this.random), ended: () => {
+      scaled?.disconnect();
+      if (published && bed.src === source) { bed.src = undefined; bed.buf = undefined; }
+    } });
+    published = true; bed.src = source; bed.buf = sampleIdentity(sample); bed.quiet = 0; def.started(); return bed;
   }
   mix(def: ZoneBed, sample: SampleLoop | undefined, level: number, tau: number, threshold = 0.002): void {
     if (!this.audio.ready || this.scope?.disposed) return;
     let bed = this.beds.get(def.id);
     if (!bed) { if (!sample || level < threshold) return; bed = this.ensure(def); }
     const t = this.audio.ctx.currentTime;
-    if (bed.src && (!sample || sample.buffer !== bed.buf)) {
+    if (bed.src && sampleIdentity(sample) !== bed.buf) {
       bed.src.stop(t + 1.2); bed.src = undefined; bed.buf = undefined; bed.gain.gain.setTargetAtTime(0, t, 0.3);
     }
     if (sample && !bed.src && level >= threshold) this.start(def, sample);
@@ -484,7 +472,7 @@ function boundsOf(o: object | null | undefined, key: string): Record<(typeof BOU
 
 /** A live loop retains its original gain and source teardown, whether sampled or synthesized. */
 export interface LoopEmitterVoice {
-  startedAt:number;out:GainNode;level:number;sample:boolean;buf:AudioBuffer|undefined;panner:PannerNode|undefined;srcs:AudioScheduledSourceNode[];
+  startedAt:number;out:GainNode;level:number;sample:boolean;buf:AudioBuffer|StreamLoop|undefined;panner:PannerNode|undefined;srcs:AudioScheduledSourceNode[];
   stop:()=>void;fadeIn:(time:number)=>void;fadeOut:(time:number)=>void;
 }
 export interface LoopEmitterPorts {position?:{x:number;y:number;z:number};duck?:(gain:number)=>void;scope?:Scope}
@@ -510,23 +498,29 @@ export class LoopEmitter {
     const sink=recipe.out==='ambient'?this.audio.ambient:this.audio.sfx;
     if(recipe.connect==='always'){if(panner===undefined)out.connect(sink);else out.connect(panner).connect(sink);}
     const srcs:AudioScheduledSourceNode[]=[],sample=this.audio.loop(recipe.sample);let level=recipe.level;
+    let recorded: LoopVoice | undefined;
     if(sample!==undefined){
-      const source=ownAudioSource(c.createBufferSource());
-      if(recipe.offset==='random'){loopAt(source,sample.buffer,sample,audioRandom,c.currentTime);source.connect(out);}
-      else{source.buffer=sample.buffer;source.loop=true;source.loopStart=sample.loopStart;source.loopEnd=sample.loopEnd;source.connect(out);source.start(t,sample.loopStart);}
-      if(recipe.connect==='sample')out.connect(sink);srcs.push(source);level=sample.gain;
+      if(recipe.connect==='sample')out.connect(sink);
+      const random = recipe.offset === 'random';
+      recorded = playSampleLoop(sample, { context: c, output: out, owner: this.scope,
+        offset: random ? loopOffset(sample, audioRandom) : sample.loopStart, time: random ? c.currentTime : t,
+        ended: () => { /* The emitter owns the gain until its fade ends. */ } });
+      level=sample.gain;
     }else{srcs.push(...this.audio.loopGraph(this.graph,out,t));}
     const stop=():void=>{
       if(sample===undefined&&recipe.stop.order.length>0){for(const index of recipe.stop.order)srcs[index]?.stop();}else for(const source of srcs)source.stop();
-      out.disconnect();
+      recorded?.stop(); out.disconnect();
     };
-    const voice:LoopEmitterVoice={startedAt:t,out,level,sample:sample!==undefined,buf:sample?.buffer,panner,srcs,stop,
+    const voice:LoopEmitterVoice={startedAt:t,out,level,sample:sample!==undefined,buf:sampleIdentity(sample),panner,srcs,stop,
       fadeIn:at=>{if(recipe.fadeIn.mode==='target'){out.gain.cancelScheduledValues(at);out.gain.setTargetAtTime(level,at,recipe.fadeIn.seconds);}else out.gain.linearRampToValueAtTime(level,at+recipe.fadeIn.seconds);},
       fadeOut:at=>{
         if(this.nodes===voice)this.nodes=undefined;
         out.gain.cancelScheduledValues(at);
         if(recipe.fadeOut.mode==='linear'){out.gain.setValueAtTime(out.gain.value,at);out.gain.linearRampToValueAtTime(0,at+recipe.fadeOut.seconds);}else out.gain.setTargetAtTime(0,at,recipe.fadeOut.seconds);
-        if(recipe.stop.mode==='timer')this.scope.timeout(recipe.stop.after*1000,stop);else for(const source of srcs)source.stop(at+recipe.stop.after);
+        if(recipe.stop.mode==='timer')this.scope.timeout(recipe.stop.after*1000,stop);else {
+          recorded?.stop(at+recipe.stop.after);
+          for(const source of srcs)source.stop(at+recipe.stop.after);
+        }
         if(recipe.disconnect.node==='panner')this.scope.timeout(recipe.disconnect.after*1000,()=>{try{panner?.disconnect();}catch{/* Already disconnected. */}});
       }};
     this.nodes=voice;return voice;
@@ -538,12 +532,12 @@ export class LoopEmitter {
     this.ports.duck?.(distance<=range.duckNear?range.duckGain:distance>=range.duckFar?1:1+(range.duckGain-1)*((range.duckFar-distance)/(range.duckFar-range.duckNear)));
     if(distance>range.drop){this.nodes?.fadeOut(this.audio.ctx.currentTime);return;}
     if(this.nodes===undefined){if(distance>range.build)return;const voice=this.start();voice.fadeIn(voice.startedAt);}
-    else if(this.audio.loop(this.recipe.sample)?.buffer!==this.nodes.buf){this.nodes.fadeOut(this.audio.ctx.currentTime);const voice=this.start();voice.fadeIn(voice.startedAt);}
+    else if(sampleIdentity(this.audio.loop(this.recipe.sample))!==this.nodes.buf){this.nodes.fadeOut(this.audio.ctx.currentTime);const voice=this.start();voice.fadeIn(voice.startedAt);}
     const listener=this.audio.ctx.listener;listener.positionX.value=px;listener.positionY.value=py;listener.positionZ.value=pz;listener.forwardX.value=-m[8];listener.forwardY.value=-m[9];listener.forwardZ.value=-m[10];listener.upX.value=m[4];listener.upY.value=m[5];listener.upZ.value=m[6];
   }
   dispose():void {
     const voice=this.nodes;this.nodes=undefined;
-    if(voice!==undefined){for(const source of voice.srcs){try{source.stop();}catch{/* Already stopped. */}source.disconnect();}voice.out.disconnect();voice.panner?.disconnect();}
+    if(voice!==undefined){try{voice.stop();}catch{/* Already stopped. */}for(const source of voice.srcs)source.disconnect();voice.panner?.disconnect();}
     if(this.ownsScope)this.scope.dispose();this.ports.duck?.(1);
   }
 }

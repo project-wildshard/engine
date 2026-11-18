@@ -3,7 +3,8 @@ import { SynthBeds } from './synth';
 import { LoopEmitter, type LoopEmitterPorts, type LoopEmitterVoice, AmbienceZones } from './ambience';
 import { resourceScope } from '../../../shared/engine/app/resources';
 import { observeAudioMemory } from '../../../shared/engine/core/memoryResources';
-import { loopAt, audioRandom, spatialAudio, WindGustBed } from './util';
+import { audioRandom, spatialAudio, WindGustBed } from './util';
+import { loopOffset, playSampleLoop, type StreamLoop, type LoopBounds, type LoopVoice } from './sampleLoop';
 import { PlayerVoices } from './playerVoices';
 import { AudioSurfaceMap, type AudioSurfacePorts } from './surface';
 import { ownAudioSource } from './ownership';
@@ -92,8 +93,8 @@ export interface CallVoice {
 /** a level's synth bed (`installSynthBed`): started when its id is the bed and no sampled bed of that id decoded */
 export interface SynthBed { start: () => void; stop: () => void }
 export type LoopName = string;
-/** a decoded loop (a bed or a hum): the buffer, its loop points in the file, and a gain from sfx.json (default per kind) */
-export interface SampleLoop { buffer: AudioBuffer; loopStart: number; loopEnd: number; gain: number }
+/** A bed or hum keeps its authored loop points and gain in either storage format. */
+export type SampleLoop = LoopBounds & ({ buffer: AudioBuffer } | { stream: StreamLoop });
 
 const rnd = (a: number, b: number) => a + audioRandom() * (b - a);
 
@@ -176,11 +177,13 @@ export class Audio extends PlayerVoices {
   private _worldMuted = false;
   private bed: AmbientBed;
   private bedNodes: AudioNode[] = [];
+  private bedPlayback: LoopVoice | undefined;
   private hum:LoopEmitterVoice|undefined;
   private humOn = false;
   private underwater = false; private underGain?: GainNode; private bubbleTimer: ReturnType<Scope['timeout']> = 0;
   /** the synth hum's sources under water (swapped for the underwater bed when one decodes) */
   private underFeed: AudioScheduledSourceNode[] = []; private underSample = false;
+  private underPlayback: LoopVoice | undefined;
   // ── samples (sfx.json) ──
   private sfxSet: SfxSet = getSfxSet();
   private loops = new Map<LoopName, SampleLoop>();
@@ -194,6 +197,7 @@ export class Audio extends PlayerVoices {
     this.started = false;
     this.stopBed();
     this.hum?.stop(); this.hum = undefined; this.humOn = false;
+    this.underPlayback?.stop(); this.underPlayback = undefined;
     for (const source of this.underFeed) { try { source.stop(); } catch { /* May have already ended. */ } source.disconnect(); }
     this.underFeed.length = 0;
     this.worldMuted = true;
@@ -303,12 +307,6 @@ export class Audio extends PlayerVoices {
   }
   /** a sampled one-shot of this set exists (a zoned ambience scatters calls only when they are sampled) */
   hasShot(family: string): boolean { return this.shots.has(family); }
-  /** a looping source of `l` (loopStart → loopEnd) started now, from a random point inside the loop so two plays never phase */
-  private loopSource(l: SampleLoop): AudioBufferSourceNode {
-    const c = this.ctx, s = ownAudioSource(c.createBufferSource());
-    loopAt(s, l.buffer, l, audioRandom, c.currentTime);
-    return s;
-  }
   /** the master lowpass: wide open on land, shut down to ~500 Hz under water (setUnderwater) */
   private get muffle(): BiquadFilterNode { return this.graph().muffle; }
   /** the 2 s white-noise buffer every noise voice loops */
@@ -390,11 +388,14 @@ export class Audio extends PlayerVoices {
     const g = this.underGain;
     if (!g) return;
     const c = this.ctx, l = this.loops.get('underwater');
+    this.underPlayback?.stop(); this.underPlayback = undefined;
     for (const n of this.underFeed) { try { n.stop(); } catch { /* not started */ } }
     if (l) {
       const lvl = c.createGain(); lvl.gain.value = l.gain / 1.4; // the synth hum's envelope peaks at 1.4
-      const s = this.loopSource(l); s.connect(lvl).connect(g);
-      this.underFeed = [s]; this.underSample = true;
+      lvl.connect(g);
+      this.underPlayback = playSampleLoop(l, { context: c, output: lvl, owner: this.scope, time: c.currentTime,
+        offset: loopOffset(l, audioRandom), ended: () => { lvl.disconnect(); } });
+      this.underFeed = []; this.underSample = true;
       return;
     }
     const src = ownAudioSource(c.createBufferSource()); src.buffer = this.noise; src.loop = true; src.start(0, audioRandom());
@@ -606,6 +607,7 @@ export class Audio extends PlayerVoices {
     this.synthBeds.get(this.bed)?.stop();
     if (this.bedNodes.length === 0) return; // nothing sounding (and before the first gesture, no context to ask the time)
     const t = this.ctx.currentTime;
+    this.bedPlayback?.stop(t + 3); this.bedPlayback = undefined;
     for (const n of this.bedNodes) {
       if (n instanceof GainNode) { n.gain.cancelScheduledValues(t); n.gain.setTargetAtTime(0, t, 0.6); }
       if (n instanceof AudioScheduledSourceNode) n.stop(t + 3);
@@ -626,8 +628,10 @@ export class Audio extends PlayerVoices {
     tap.sound?.('audio.startSampleBed');
     const c = this.ctx, t = c.currentTime, g = c.createGain();
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(l.gain, t + 2);
-    const s = this.loopSource(l); s.connect(g).connect(this.ambient);
-    this.bedNodes.push(g, s);
+    g.connect(this.ambient);
+    this.bedPlayback = playSampleLoop(l, { context: c, output: g, owner: this.scope, time: t,
+      offset: loopOffset(l, audioRandom), ended: () => { g.disconnect(); } });
+    this.bedNodes.push(g);
   }
 
   /** a looping noise band: bandpass + lowpass, slow amplitude and filter LFOs, panned into the ambient bus */

@@ -1,4 +1,4 @@
-import { AAC_PREFILL_FRAMES, type AacTrack } from './aacTrack';
+import type { AacTrack } from './aacTrack';
 import { AacWindows, trimAacWindow, type AacWindow } from './aacWindows';
 import { AacPull } from './aacPull';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -15,7 +15,7 @@ export interface AacSourcePorts {
   readonly failed: (error: unknown) => void;
   readonly ended: () => void;
 }
-const RATE = 48000, LOOKAHEAD = AAC_PREFILL_FRAMES / RATE, MAX_WINDOWS = 48;
+const RATE = 48000, MAX_WINDOWS = 48;
 /** Schedules short native sources ahead on the existing context clock; never opens an audio device.
  * The first prepared window starts synchronously. Further work is serialized and scoped; each ended
  * window drops its AudioBuffer and listeners. Suspension cannot grow the source set. A missed deadline
@@ -37,7 +37,7 @@ export class AacSource {
   constructor(track: AacTrack, ports: AacSourcePorts, t0: number, join?: { readonly initial: number; readonly at: number }) {
     const at = join?.at ?? t0;
     if (ports.scope.disposed || ports.scope.disposing || ports.context.sampleRate !== RATE || !Number.isFinite(t0) || t0 < 0
-      || !Number.isFinite(at) || at < ports.context.currentTime || at < t0 || at - t0 >= LOOKAHEAD) {
+      || !Number.isFinite(at) || at < ports.context.currentTime || at < t0 || at - t0 >= track.lookahead) {
       throw new Error('AAC source requires a live owner, 48 kHz context and future start');
     }
     this.track = track; this.ports = ports; this.t0 = t0; this.scope = ports.scope.child('AAC.source');
@@ -104,13 +104,13 @@ export class AacSource {
     try {
       while (this.active() && this.windows.size < MAX_WINDOWS) {
         const plan = this.next, start = this.t0 + plan.timeline / RATE;
-        if (start >= this.stopAt || start >= this.ports.context.currentTime + LOOKAHEAD) return;
+        if (start >= this.stopAt || start >= this.ports.context.currentTime + this.track.lookahead) return;
         if (start < this.ports.context.currentTime) throw new Error('AAC source missed its exact scheduling deadline');
         const buffer = this.track.buffer(plan.frames);
         for (const part of plan.parts) {
           const pcm = await this.pull.read(part.start, part.frames);
           if (!this.active()) return;
-          pcm.forEach((channel, i) => { buffer.getChannelData(i).set(channel, part.destination); });
+          this.track.copyPcm(buffer, pcm, part.destination, part.start);
         }
         if (start < this.ports.context.currentTime) throw new Error('AAC source missed its exact scheduling deadline');
         this.next = this.plans.next(); this.schedule(plan, buffer);

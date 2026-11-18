@@ -10,6 +10,10 @@ import { currentOwner } from '../../../shared/engine/app/ownership';
 export const AAC_PREFILL_FRAMES = 480000;
 export interface AacPreparedWindow { readonly plan: AacWindow; readonly buffer: AudioBuffer }
 export type AacBufferFactory = (frames: number, channels: 1 | 2) => AudioBuffer;
+type CopyPcm = (buffer: AudioBuffer, pcm: readonly Float32Array[], destination: number, start: number) => void;
+const copyPcm: CopyPcm = (buffer, pcm, destination) => {
+  pcm.forEach((channel, index) => { buffer.getChannelData(index).set(channel, destination); });
+};
 /** Encoded track plus a transferable bounded prebuffer; never a whole decoded recording. */
 export class AacTrack {
   readonly duration: number;
@@ -17,6 +21,8 @@ export class AacTrack {
   readonly loopStart: number;
   readonly loopEnd: number;
   readonly frames: number;
+  readonly lookahead: number;
+  readonly copyPcm: CopyPcm;
   readonly bytes: Uint8Array;
   readonly index: RecordingAacIndex;
   readonly factory: AacCodecFactory;
@@ -28,10 +34,12 @@ export class AacTrack {
   private readonly decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>;
   private readonly makeBuffer: AacBufferFactory;
   private constructor(bytes: Uint8Array, index: RecordingAacIndex, factory: AacCodecFactory, loopStart: number, loopEnd: number,
-    decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>, makeBuffer: AacBufferFactory) {
+    decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>, makeBuffer: AacBufferFactory, prefillFrames: number, copy: CopyPcm) {
     this.bytes = bytes; this.index = index; this.factory = factory; this.loopStart = loopStart; this.loopEnd = loopEnd;
     this.frames = index.sizes.length * 1024 - index.primingFrames; this.duration = this.frames / 48000;
     this.decode = decode; this.makeBuffer = makeBuffer;
+    this.lookahead = prefillFrames / 48000;
+    this.copyPcm = copy;
   }
   get ready(): boolean { return this.prepared !== undefined && this.preparedInitial === 0; }
   /** Move prebuffer ownership to the playing source, so the bank cannot retain already-ended PCM. */
@@ -68,12 +76,12 @@ export class AacTrack {
     try {
       for (;;) {
         const plan = plans.next();
-        if (plan.timeline >= AAC_PREFILL_FRAMES) break;
+        if (plan.timeline >= this.lookahead * 48000) break;
         const buffer = this.buffer(plan.frames);
         for (const part of plan.parts) {
           const pcm = await pull.read(part.start, part.frames);
           if (scope.disposed || scope.disposing) throw new Error('AAC preparation owner retired');
-          pcm.forEach((channel, i) => { buffer.getChannelData(i).set(channel, part.destination); });
+          this.copyPcm(buffer, pcm, part.destination, part.start);
         }
         windows.push({ plan, buffer });
       }
@@ -96,6 +104,15 @@ export class AacTrack {
   static async prepare(bytes: Uint8Array, loopStartSeconds: number, loopEndSeconds: number,
     decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>, factory?: AacCodecFactory, owner?: Scope,
     makeBuffer?: AacBufferFactory): Promise<AacTrack | undefined> {
+    const track = await AacTrack.open(bytes, loopStartSeconds, loopEndSeconds, decode, factory, owner, makeBuffer);
+    if (track === undefined) return undefined;
+    try { await track.prime(owner); return track; } catch { return undefined; }
+  }
+  /** Admit the compressed recording without allocating PCM. Each playback
+   * can fork its own cursor over the same validated bytes. */
+  static async open(bytes: Uint8Array, loopStartSeconds: number, loopEndSeconds: number,
+    decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>, factory?: AacCodecFactory, owner?: Scope,
+    makeBuffer?: AacBufferFactory, prefillFrames: number = AAC_PREFILL_FRAMES, copy: CopyPcm = copyPcm): Promise<AacTrack | undefined> {
     if (owner?.disposed) return undefined;
     const label = { owner: currentOwner()?.name ?? 'engine/audio', asset: 'audio/aac-windows' };
     const buffers = makeBuffer ?? (typeof AudioBuffer === 'function'
@@ -109,7 +126,9 @@ export class AacTrack {
     if (!aacWindowEligible(48000, loopStart, loopEnd, frames)) return undefined;
     const native = factory ?? await nativeAacFactory(index);
     if (!native || owner?.disposed) return undefined;
-    const track = new AacTrack(bytes, index, native, loopStart, loopEnd, decode, buffers);
-    try { await track.prime(owner); return track; } catch { return undefined; }
+    return new AacTrack(bytes, index, native, loopStart, loopEnd, decode, buffers, prefillFrames, copy);
+  }
+  fork(): AacTrack {
+    return new AacTrack(this.bytes, this.index, this.factory, this.loopStart, this.loopEnd, this.decode, this.makeBuffer, this.lookahead * 48000, this.copyPcm);
   }
 }

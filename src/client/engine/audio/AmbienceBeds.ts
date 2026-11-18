@@ -1,5 +1,6 @@
 import { AmbienceZones } from './ambience';
-import { loopAt, panFromYaw } from './util';
+import { panFromYaw } from './util';
+import { loopOffset, playSampleLoop } from './sampleLoop';
 import type { Audio, SampleLoop } from './Audio';
 import type { AudioMixer } from './levelAudio';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -13,21 +14,12 @@ import { tap, ambientTick } from '../../../shared/engine/core/harnessTap';
 
 interface LoopVoice { gain: GainNode; pan: StereoPannerNode; stop: () => void }
 function loopVoice(audio: AudioMixer, sample: SampleLoop, scope: Scope, random: () => number): LoopVoice {
-  const ctx = audio.ctx, source = ctx.createBufferSource(), gain = ctx.createGain(), pan = ctx.createStereoPanner();
+  const ctx = audio.ctx, gain = ctx.createGain(), pan = ctx.createStereoPanner();
   gain.gain.value = 0;
-  source.connect(gain).connect(pan).connect(audio.bus('ambience'));
-  let started = false, stopped = false;
-  let forget = (): void => { /* Installed below before playback. */ };
-  const stop = (): void => {
-    if (stopped) return;
-    stopped = true;
-    try { if (started) source.stop(); }
-    finally { source.disconnect(); gain.disconnect(); pan.disconnect(); forget(); }
-  };
-  forget = scope.capture('sounds', stop);
-  try { loopAt(source, sample.buffer, sample, random, ctx.currentTime); started = true; }
-  catch (error) { stop(); throw error; }
-  return { gain, pan, stop };
+  gain.connect(pan).connect(audio.bus('ambience'));
+  const voice = playSampleLoop(sample, { context: ctx, output: gain, owner: scope,
+    time: ctx.currentTime, offset: loopOffset(sample, random), ended: () => { gain.disconnect(); pan.disconnect(); } });
+  return { gain, pan, stop: () => { voice.stop(); } };
 }
 interface BedDef { id: string; zone: string; sample: () => SampleLoop | undefined; started: () => void }
 type ZoneWeights = Readonly<Record<string, number>>;

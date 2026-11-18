@@ -50,6 +50,14 @@ it('bounds paired stereo/mono preparation on the same rounded loop without whole
     const bytes = [...left, ...right].reduce((sum, window) => sum + window.buffer.length * window.buffer.numberOfChannels * 4, 0);
     expect(bytes).toBeLessThan(6000000); expect(closed).toBeGreaterThan(0);
     expect(calm.ready).toBe(false); expect(tension.ready).toBe(false);
+    const firstBed = calm.fork(), secondBed = calm.fork();
+    expect(firstBed.bytes).toBe(secondBed.bytes);
+    expect(firstBed.index).toBe(secondBed.index);
+    expect(firstBed.ready).toBe(false);
+    const otherPhase = calm.loopStart + 12000;
+    await Promise.all([firstBed.primeAt(calm.loopStart), secondBed.primeAt(otherPhase)]);
+    expect(firstBed.take(calm.loopStart)[0]?.plan.parts[0]?.start).toBe(calm.loopStart - 32);
+    expect(secondBed.take(otherPhase)[0]?.plan.parts[0]?.start).toBe(otherPhase - 32);
     const phase = tension.loopEnd - 2000;
     await tension.primeAt(phase);
     expect(tension.ready).toBe(false);
