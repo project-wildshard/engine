@@ -65,6 +65,7 @@ export const SMOKE_SCENARIOS: readonly string[];
 export interface SmokeVerdict { build?: string; url?: string; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }
 export function smokeGap(smoke: SmokeVerdict | undefined, build: string): string | undefined;
 export const PACKS_ORIGIN: string;
+export const API_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;
 export function pinnedReleaseKey(configured?: string): string;
 export const PHASES: readonly Phase[];

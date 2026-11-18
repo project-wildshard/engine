@@ -20,6 +20,7 @@ import { openQaCandidate } from './staging-qa-candidate.mjs';
 /** @typedef {{ id: string, browser: string, pass: boolean, seconds: number, playedMs: number, reason?: string, log: string }} Proof */
 /** @typedef {{build?: string, findings: readonly Finding[], scenarios: readonly { id: string, status: string, legs: readonly {playedMs?: number}[] }[] }} SmokeEvidence */
 const JOURNEYS = Object.freeze(['gate-chromium', 'journey-webkit']);
+const DEPLOY_SCENARIOS = Object.freeze([...SMOKE_SCENARIOS, 'K6']);
 const STAGING = CHANNELS.staging.origin;
 
 /** @param {string} scenario @param {string} key @param {Finding['severity']} severity @param {string} text @returns {Finding} */
@@ -109,9 +110,9 @@ async function cli() {
   const url = new URL(args.get('url') ?? STAGING).origin;
   if (url !== STAGING && !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/u.test(url)) throw new Error('Staging QA requires staging or a loopback server');
   const requested = args.get('only')?.split(',');
-  const known = new Set(/** @type {string[]} */ ([...SMOKE_SCENARIOS, ...JOURNEYS]));
+  const known = new Set(/** @type {string[]} */ ([...DEPLOY_SCENARIOS, ...JOURNEYS]));
   if (requested?.some(id => !known.has(id))) throw new Error('Unknown staging QA step');
-  const selected = SMOKE_SCENARIOS.filter(id => (requested ?? (local ? ['K3', 'K4', 'K5'] : SMOKE_SCENARIOS)).includes(id));
+  const selected = DEPLOY_SCENARIOS.filter(id => (requested ?? (local ? ['K3', 'K4', 'K5'] : DEPLOY_SCENARIOS)).includes(id));
   const expected = JOURNEYS.filter(id => (requested ?? (local ? [] : JOURNEYS)).includes(id));
   if (args.has('dry-run')) {
     const target = local ? 'local source' : candidateUrl === undefined ? url : 'staging candidate';

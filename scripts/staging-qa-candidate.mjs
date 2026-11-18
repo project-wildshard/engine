@@ -75,9 +75,9 @@ async function closeServer(server) {
 async function candidateTransport(root, out, dist) {
   const keys = mkdtempSync(join(out, 'candidate-cert-'));
   const config = join(keys, 'cert.conf'), key = join(keys, 'site.key'), pem = join(keys, 'site.pem');
-  /** @type {Set<import('node:net').Socket>} */
+  /** @type {Set<import('node:stream').Duplex>} */
   const sockets = new Set();
-  /** @param {import('node:net').Socket} stream */
+  /** @param {import('node:stream').Duplex} stream */
   function track(stream) {
     sockets.add(stream);
     stream.once('close', () => { sockets.delete(stream); });
