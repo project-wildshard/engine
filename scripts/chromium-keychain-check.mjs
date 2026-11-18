@@ -133,7 +133,16 @@ export function keychainProblems(/** @type {string} */ text) {
       if (!safe(text.slice(start, expression(text, start)))) problems.push(`bare Playwright launch at offset ${match.index}`);
       else ownsSafeChromium = true;
     }
-    if (/\.\s*(?:connect|connectOverCDP)\s*\(/u.test(code) && !ownsSafeChromium
+    const importsPgClient = /\bimport\s*\{\s*Client\s*\}\s*from\s*['"]pg['"]/u.test(text);
+    const attaches = [...code.matchAll(/\.\s*(connect|connectOverCDP)\s*\(/gu)].some(match => {
+      if (match[1] !== 'connect' || !importsPgClient) return true;
+      const before = code.slice(Math.max(0, match.index - 80), match.index);
+      const receiver = /\b(\w+)\s*$/u.exec(before);
+      // A Postgres Client opens the database socket, even in a Chromium test.
+      return receiver === null || before.slice(0, receiver.index).trimEnd().endsWith('.')
+        || !/^\s*new\s+Client\s*\(/u.test(bindings.get(receiver[1]) ?? '');
+    });
+    if (attaches && !ownsSafeChromium
       && (!text.includes('Browser.getBrowserCommandLine') || !text.includes('KEYCHAIN_ARGS.every'))) problems.push('Chromium attachment must verify the connected process command line');
     if (/\bdefineConfig\s*\(/u.test(code) && /Desktop Chrome/u.test(text)
       && !/launchOptions\s*:\s*\{\s*args\s*:\s*\[\s*\.\.\.KEYCHAIN_ARGS/u.test(text)) problems.push('Desktop Chrome project lacks safe launchOptions');

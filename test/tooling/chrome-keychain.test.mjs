@@ -55,6 +55,10 @@ test('raw executable aliases and every child-process API are checked', () => {
   }
   assert.ok(keychainProblems("import { chromium } from 'playwright'; chromium.launch({args: [...KEYCHAIN_ARGS]}); chromium.launch({});").length > 0);
   assert.ok(keychainProblems("import { chromium } from 'playwright'; chromium.connect(endpoint);").length > 0);
+  const postgres = "import { Client } from 'pg'; import { chromium } from 'playwright'; const client = new Client(options); await client.connect();";
+  assert.deepEqual(keychainProblems(postgres), []);
+  assert.ok(keychainProblems(`${postgres} chromium.connect(endpoint);`).length > 0);
+  assert.ok(keychainProblems(`${postgres} driver.client.connect(endpoint);`).length > 0);
   assert.ok(keychainProblems("import { chromium as c } from 'playwright'; c.connectOverCDP(endpoint);").length > 0);
   assert.ok(keychainProblems("import { chromium } from 'playwright'; const pattern = /['\"]/u; chromium.launch({});").length > 0);
   const shell = '#!/bin/bash\nBROWSER="/cache/chromium-1254/chrome"\nexec "$BROWSER"';
