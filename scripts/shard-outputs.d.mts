@@ -2,6 +2,10 @@
 export interface ShardOutputRow { readonly slug: string; readonly manifest?: Readonly<Record<string, unknown>>; readonly [field: string]: unknown }
 /** A product of the shard folders: an output of a folder, or the folder itself (`output` null). */
 export interface ShardFolder { readonly slug: string; readonly folder: string; readonly output: ShardOutputRow | null }
+/** ONE-FORMAT OF6a: where a source's card lives, in reading order (`manifest.json`, then `data/card.json`). */
+export const CARD_FILES: readonly string[];
+/** OF6a: a source folder's card file, or null for a folder with no card. */
+export function shardCardFile(source: string): string | null;
 export function mergeManifest(base: unknown, over: unknown): unknown;
 /** SA42: a single-shard repo's folder name (its source at `src/`), or null. */
 export function singleShardFolder(root: string): string | null;

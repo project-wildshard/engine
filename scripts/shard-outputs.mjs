@@ -11,6 +11,14 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const plain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 /** @param {string} file @returns {unknown} */
 const readJson = (file) => { try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return undefined; } };
+/** ONE-FORMAT OF6a: where a source's card lives, in reading order: a legacy `manifest.json` while one is left, else
+ * `data/card.json`, the card's one home. Every reader that names a product reads it through `shardCardFile`. */
+export const CARD_FILES = ['manifest.json', 'data/card.json'];
+/** OF6a: a source folder's card file, or null for a folder with no card (a source proof, a scene shard).
+ * @param {string} source @returns {string | null} */
+export function shardCardFile(source) {
+  return CARD_FILES.map((name) => resolve(source, name)).find((file) => existsSync(file)) ?? null;
+}
 
 /**
  * SA42 (J317, sharddev SA16 `shardSource.ts`): a single-shard repo keeps its shard source at `src/` (its `src/shard.config.ts`, or a
@@ -26,7 +34,7 @@ export function singleShardFolder(root) {
     const index = readJson(resolve(src, 'shard.json'));
     if (plain(index) && plain(index.identity) && typeof index.identity.slug === 'string') return index.identity.slug;
   }
-  const manifest = readJson(resolve(src, 'manifest.json'));
+  const card = shardCardFile(src), manifest = card === null ? undefined : readJson(card);
   return plain(manifest) && typeof manifest.slug === 'string' ? manifest.slug : basename(resolve(root));
 }
 /** SA42: a shard folder's source directory: `src/` for the single-shard repo's own folder, else `src/shards/<folder>`. @param {string} root @param {string} folder */
@@ -79,12 +87,14 @@ export function builtShardFolders(root, folders) {
 /** An output's authored manifest: the folder base with its overrides, its slug, canonical shardfile path and data map.
  * @param {string} root @param {string} folder @param {{ slug: string, manifest?: object }} output */
 export function outputManifest(root, folder, output) {
-  const base = JSON.parse(readFileSync(resolve(shardSourceDir(root, folder), 'manifest.json'), 'utf8'));
+  const card = shardCardFile(shardSourceDir(root, folder));
+  if (card === null) throw new Error(`${folder}: its outputs need a card (data/card.json) to compose over`);
+  const base = JSON.parse(readFileSync(card, 'utf8'));
   return mergeManifest(base, { ...output.manifest, slug: output.slug, shardfile: `/shardfiles/${output.slug}/shard.json`, minimap: { image: `/assets/${output.slug}/map/top.webp` } });
 }
-/** The shard folders with a manifest: under src/shards, or a single-shard repo's src/ (SA42). P3: a tree with no shard source has none. @param {string} root */
+/** The shard folders with a manifest or a card (OF6a): under src/shards, or a single-shard repo's src/ (SA42). P3: a tree with no shard source has none. @param {string} root */
 export function manifestFolders(root) {
-  return shardSourceFolders(root, ['manifest.ts', 'manifest.json']);
+  return shardSourceFolders(root, ['manifest.ts', ...CARD_FILES]);
 }
 /** The source folder of a product slug (itself for a one-product folder). @param {string} root @param {string} slug */
 export function outputFolderOf(root, slug) {
