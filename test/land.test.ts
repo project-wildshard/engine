@@ -6,14 +6,11 @@
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute the workflow shell against owned fixture paths.
 import { spawnSync } from 'node:child_process';
-// oxlint-disable-next-line import/no-nodejs-modules -- A local Actions API double for the main-run reuse check.
-import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Evaluate ci.yml's real concurrency-key expressions.
 import { runInNewContext } from 'node:vm';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
 import { shaVerdict } from '../scripts/land.mjs';
 import { cleanLandFixtures, trackLandFixtureRoot } from './fixtures/land-git';
@@ -45,13 +42,10 @@ test('boundaries stays blocking and independent; J400 moves quarantine to report
     const block = ciJob(name);
     expect(block, name).toContain("    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}");
     expect(block).not.toMatch(/^ {4}continue-on-error:/mu);
-    // a main push that reused the plan run would skip it for every landed SHA: no reuse step here
-    expect(block, name).not.toContain('ci-exact-reuse.mjs');
-    expect(block, name).not.toContain('steps.reuse');
   }
   expect(readFileSync('.github/workflows/ci-reports.yml', 'utf8')).toContain('node scripts/test-quarantine.mjs --shard=1/1');
-  // The hosted fallback still accepts an exact plan proof.
-  expect(ciJob('tests')).toContain('node scripts/ci-exact-reuse.mjs ci.yml');
+  // FLOW-SIMPLE FS5: main never reuses a plan-branch run; there are none (J422).
+  expect(readFileSync('.github/workflows/ci.yml', 'utf8')).not.toMatch(/ci-exact-reuse|steps\.reuse/u);
   expect(ciJob('tests')).not.toMatch(/^ {4}if: /mu);
 });
 
@@ -130,51 +124,7 @@ test('the ledger cache preserves browser and server packs and records both diges
   ]);
 });
 
-describe('main reuses the exact SHA\'s green plan-branch run (no double run)', () => {
-  const sha = 'b'.repeat(40);
-  const ciJobs = ['changes', 'static', 'plan', 'e2e', 'tests (1)', 'tests (2)'].map(name => ({ name, status: 'completed', conclusion: 'success' }));
-  const packedStep = (conclusion = 'success') => [{ name: "Run this job's packed share", status: 'completed', conclusion }];
-  const withApi = async (runs: unknown[], jobs: unknown[], check: (api: string) => Promise<void>) => {
-    const server = createServer((request, response) => {
-      response.setHeader('content-type', 'application/json');
-      const url = request.url ?? '';
-      response.end(JSON.stringify(url.includes('/jobs') ? { jobs } : url.includes(`head_sha=${sha}`) ? { workflow_runs: runs } : { workflow_runs: [] }));
-    });
-    await new Promise<void>(done => { server.listen(0, '127.0.0.1', () => { done(); }); });
-    const address = server.address();
-    try { if (address !== null && typeof address !== 'string') await check(`http://127.0.0.1:${address.port}`); } finally { server.close(); }
-  };
-  const env = (api: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({ GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: sha, GITHUB_REPOSITORY: 'project-wildshard/engine', GH_TOKEN: 'fixture', GITHUB_RUN_ID: '9', GITHUB_API_URL: api, ...extra });
-  const run = (extra: Record<string, unknown> = {}) => ({ id: 5, head_sha: sha, event: 'push', status: 'completed', conclusion: 'success', head_branch: 'plan/foo', head_repository: { full_name: 'project-wildshard/engine' }, run_started_at: '2026-11-10T20:00:00Z', ...extra });
-  const steady: { scope: (at: number) => string; now: number } = { scope: () => 'same', now: Date.parse('2026-11-10T20:30:00Z') };
-  const reused = async (runs: unknown[], jobs: unknown[], extra: NodeJS.ProcessEnv = {}, options = steady) => {
-    let result = { reused: false, run: null as number | null, reason: '' };
-    await withApi(runs, jobs, async api => { result = await exactBranchProof('ci.yml', env(api, extra), options); });
-    return result;
-  };
-  test('a complete green plan/<slug> push run of this exact SHA is reused on main', async () => {
-    expect(await reused([run()], ciJobs)).toMatchObject({ reused: true, run: 5 });
-    // CI-JOB-PACKING: a packed run is its `tests (N)` shares; static, plan, e2e and Ring 1's products run inside them.
-    const packed = ['tests (1)', 'tests (2)', 'tests (3)'].map(name => ({ name, status: 'completed', conclusion: 'success', steps: packedStep() }));
-    expect(await reused([run()], packed)).toMatchObject({ reused: true, run: 5 });
-    // A share that reused or skipped its packed step proves nothing, even when the job is green.
-    expect((await reused([run()], packed.map(job => (job.name === 'tests (2)' ? { ...job, steps: packedStep('skipped') } : job)))).reused).toBe(false);
-    expect((await reused([run()], packed.map(job => (job.name === 'tests (2)' ? { ...job, conclusion: 'skipped' } : job)))).reused).toBe(false);
-    expect((await reused([run()], [{ name: 'quarantine', status: 'completed', conclusion: 'success' }])).reused).toBe(false);
-    // A legacy job in the list makes it the older shape, which needs all of them.
-    expect((await reused([run()], [...packed, { name: 'static', status: 'completed', conclusion: 'success' }])).reused).toBe(false);
-  });
-  test('anything less runs main in full', async () => {
-    for (const extra of [{ head_branch: 'main' }, { head_branch: 'feature/x' }, { conclusion: 'failure' }, { head_sha: 'c'.repeat(40) }, { head_repository: { full_name: 'fork/engine' } }, { id: 9 }, { run_started_at: 'never' }]) expect((await reused([run(extra)], ciJobs)).reused, JSON.stringify(extra)).toBe(false);
-    expect((await reused([run()], ciJobs, { GITHUB_REF: 'refs/heads/plan/foo' })).reused).toBe(false);
-    // A docs-only or skip-propagated green run: the blocking jobs did not all run.
-    expect((await reused([run()], ciJobs.map(job => (job.name.startsWith('tests') ? { ...job, conclusion: 'skipped' } : job)))).reused).toBe(false);
-    expect((await reused([run()], ciJobs.filter(job => !job.name.startsWith('tests')))).reused).toBe(false);
-    expect((await reused([run()], ciJobs.filter(job => job.name !== 'e2e'))).reused).toBe(false);
-    // The suite's exclusions changed since the branch run started (a quarantine deadline passed).
-    expect((await reused([run()], ciJobs, {}, { scope: (at: number) => String(at > Date.parse('2026-11-10T20:10:00Z')), now: steady.now })).reason).toMatch(/predates a quarantine change/u);
-    expect((await exactBranchProof('ci.yml', env('http://127.0.0.1:9'), steady)).reused).toBe(false);
-  });
+describe('ci.yml on main', () => {
   test('main pushes coalesce while release branches run independently (RB1)', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
     const top = text.split('\njobs:\n')[0] ?? '';
@@ -276,7 +226,6 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(street).toContain('name: nine-ring1-street');
     expect(street).toContain('if: always()');
     expect(build).not.toMatch(/^ {4}needs:/mu);
-    expect(build).toContain('node scripts/ci-exact-reuse.mjs ci.yml');
     expect(build).toContain('node scripts/ci-selection.mjs');
     expect(build).toContain("steps.paths.outputs.docs != 'true'");
     expect(build).toContain('code-run: ${{ steps.code.outputs.run }}');

@@ -189,9 +189,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import {appendFileSync} from 'node:fs';
-          import {exactBranchProof} from './scripts/ci-exact-reuse.mjs';
-          const proof=await exactBranchProof('ci.yml',{...process.env,GITHUB_EVENT_NAME:'push',GITHUB_REF:'refs/heads/main',GITHUB_SHA:process.env.SOURCE_SHA,GITHUB_RUN_ID:process.env.SOURCE_RUN});
-          appendFileSync(process.env.GITHUB_OUTPUT,`run=${proof.run??process.env.SOURCE_RUN}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT,`run=${process.env.SOURCE_RUN}\n`);
           NODE
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         continue-on-error: true

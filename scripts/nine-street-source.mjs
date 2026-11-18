@@ -1,9 +1,9 @@
-// NB6's advisory must observe its source run's exact client. Only a main
-// run that reused an exact green plan may borrow that plan's artifact.
+// NB6's advisory must observe its source run's exact client. Main runs
+// never reuse a plan run now (J422, meta FLOW-SIMPLE FS5): the source run's
+// own artifact or none.
 import {appendFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {exactBranchProof} from './ci-exact-reuse.mjs';
 
 /** @param {NodeJS.ProcessEnv} [env] */
 export async function nineStreetSource(env=process.env){
@@ -19,10 +19,7 @@ export async function nineStreetSource(env=process.env){
   if(data===null||typeof data!=='object'||!('artifacts'in data)||!Array.isArray(data.artifacts))throw new Error('Malformed Nine source artifacts');
   return data.artifacts.some(row=>row!==null&&typeof row==='object'&&row.name==='nine-ring1-client'&&row.expired===false);
  };
- if(await artifact(run))return{run,sha,artifact:true};
- const proof=await exactBranchProof('ci.yml',{...env,GITHUB_EVENT_NAME:'push',GITHUB_REF:'refs/heads/main',GITHUB_SHA:sha,GITHUB_RUN_ID:String(run)});
- if(proof.run!==null&&await artifact(proof.run))return{run:proof.run,sha,artifact:true};
- return{run,sha,artifact:false}; // docs-only and skipped producers have no observation
+ return{run,sha,artifact:await artifact(run)}; // docs-only and skipped producers have no observation
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

@@ -1,8 +1,9 @@
 // EV4: prove the exact release tree before acquiring a second test lease.
 import {execFileSync} from 'node:child_process';
+import {resolve} from 'node:path';
 import {isDeepStrictEqual} from 'node:util';
-import {exclusionScope} from './ci-exact-reuse.mjs';
 import {provesCode} from './ci-proof-jobs.mjs';
+import {activeQuarantineFiles} from './test-quarantine.mjs';
 
 const REPO='project-wildshard/engine';
 const ORIGIN=/^(?:git@github\.com:|ssh:\/\/git@github\.com\/|https:\/\/github\.com\/)project-wildshard\/engine(?:\.git)?$/u;
@@ -13,6 +14,12 @@ const branchRef=new RegExp(`^refs/heads/release/(${VERSION})$`,'u');
 const tagRef=new RegExp(`^refs/tags/(${VERSION})$`,'u');
 /** @param {unknown} value @returns {value is Record<string,unknown>} */
 const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+
+/** The blocking suite's active J200 quarantine at the observation time: a hosted proof counts only when it is the same
+ * set as when that run started. @param {number} at @param {string} cwd */
+export function exclusionScope(at,cwd){
+ return JSON.stringify(activeQuarantineFiles(at,resolve(cwd,'test/quarantine.json')).sort());
+}
 
 /** @param {string} cwd @param {string[]} args */
 function git(cwd,args){

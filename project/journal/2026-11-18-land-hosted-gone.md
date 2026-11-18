@@ -19,3 +19,11 @@ moved main, rebase conflict, force refusal, pins and DS22 stamps, the clean-tree
 install, two lands at once, ref-lock retries); a peer moves main before land, or a write lands from inside the pre-push,
 where the hosted tests used the fake Actions CLI. The hosted-only tests went: quota waits, red branch CI, plan-branch
 ownership, carried provenance, verifyReplay and the preflight. The fixture defaults to `WS_LAND_MODE=push`.
+
+## Slice 3: main never reuses a plan run
+
+`scripts/ci-exact-reuse.mjs` let a main push skip its suite when the same SHA's plan-branch run was green (J240). No
+plan branch runs ci now (FS6), so it could only ever answer "run in full". Deleted with its `.d.mts`, the two `reuse`
+steps in `ci.yml` and every `steps.reuse` condition, the `reused-run` output, ci-reports' borrowed-run lookup and
+`nine-street-source.mjs`'s plan-run fallback. `release-gate.mjs` keeps `exclusionScope`, now its own. `ci-proof-jobs.mjs`
+stays: `ci-selection.mjs` and `release-gate.mjs` read `provesCode`.

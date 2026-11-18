@@ -54,16 +54,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/plan/') }}
 
 jobs:
-  # Every packed job gates itself, so its shares start independently: a main push of a SHA its plan
-  # branch already proved green reuses that run (J240), and a docs-only push runs only job 1's docs checks.
+  # Every packed job gates itself, so its shares start independently: a docs-only push runs only job 1's docs
+  # checks.
   # A job that runs its packed share says so in its step "Run this job's packed share"; scripts/ci-proof-jobs.mjs
   # counts a run as a code proof only when every share ran that step green. T1 consumes its producer's build in that same job.
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # The plan-branch run a main push reused (J240): its reports are this SHA's measurements (LS2's timings job).
     outputs: &packed-outputs
-      reused-run: ${{ steps.reuse.outputs.run }}
       code-run: ${{ steps.code.outputs.run }}
       t1-blocking: ${{ steps.t1-policy.outputs.blocking }}
     strategy:
@@ -90,11 +88,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: package.json
-      - name: Reuse this exact SHA's green plan-branch run (J240)
-        id: reuse
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-exact-reuse.mjs ci.yml
       # EV3c: the checks below run only in job 1 (the history scan alone is ~100 s), so its shards are not charged them;
       # ci-pack.mjs takes WS_CI_JOB_OWN_MS off the job clock. They took tests (1)'s shards to 300 s on 132-142 s of tests.
       - name: Start job 1's own-checks clock (not charged to its shards)
@@ -138,7 +131,6 @@ jobs:
         if: matrix.job == 1
         run: echo "WS_CI_JOB_OWN_MS=$(( $(date +%s%3N) - WS_CI_JOB_OWN_FROM_MS ))" >> "$GITHUB_ENV"
       - name: Classify from an actually green code-proving ancestor
-        if: steps.reuse.outputs.reused != 'true'
         id: paths
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
@@ -146,16 +138,16 @@ jobs:
         run: node scripts/ci-selection.mjs
       # A docs-only push still runs lint, format, the committed asks, agent parity and any test that reads a changed
       # doc (EV9), once.
-      - if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs == 'true' && matrix.job == 1
+      - if: steps.paths.outputs.docs == 'true' && matrix.job == 1
         uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs == 'true' && matrix.job == 1
+      - if: steps.paths.outputs.docs == 'true' && matrix.job == 1
         env:
           DOCS_TESTS: ${{ steps.paths.outputs.docs_tests }}
         run: bash scripts/ci-static.sh docs
       - id: code
-        if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
+        if: steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
       - if: steps.code.outputs.run == 'true'
         uses: ./.github/actions/ring-setup
@@ -372,21 +364,16 @@ jobs:
           persist-credentials: false
       # J400: classify here, beside products, rather than wait for its full
       # packed share. Its failure still gates the workflow independently.
-      # Retain exact branch reuse and docs-only proof policy.
+      # Retain the docs-only proof policy.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: package.json
-      - id: reuse
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-exact-reuse.mjs ci.yml
       - id: paths
-        if: steps.reuse.outputs.reused != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-selection.mjs
       - id: code
-        if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
+        if: steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
       - if: steps.code.outputs.run == 'true'
         uses: ./.github/actions/ring-setup
