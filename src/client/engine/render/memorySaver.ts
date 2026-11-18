@@ -26,7 +26,8 @@ import { drawHooks, indexRotated, keepRotated, propertyHooks, turnTriangles, web
 import { onceTextureUploaded } from './textureUploadEvents';
 import { renderCount } from './frameCounter';
 import { presenting } from '../../../shared/engine/core/framePacing';
-import { hintCollection } from '../../../shared/engine/core/ownedBuffer';
+import { COLLECTION_HINT_BYTES, hintCollection } from '../../../shared/engine/core/ownedBuffer';
+import { jsonSlot } from '../saves/slots';
 
 const LABEL = 'engine/memorySaver';
 const isTarget = (value: unknown): value is THREE.WebGLRenderTarget => value instanceof THREE.WebGLRenderTarget;
@@ -233,11 +234,25 @@ const releasesNow = new WeakMap<object, () => number>();
  */
 export function releaseDrawnGeometry(renderer: object): number { return releasesNow.get(renderer)?.() ?? 0; }
 
+/** the device Debug slot that overrides the collection hint: its size in MB (a number or a numeric string), 0 for off */
+export const COLLECTION_HINT_SLOT = 'debug.collectionHint';
+
+/** The hint's size: `debug.collectionHint` MB when it holds a count (0 is off), else `COLLECTION_HINT_BYTES`. */
+export function collectionHintBytes(): number {
+  const value = jsonSlot(COLLECTION_HINT_SLOT, 'device').read();
+  const n = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN;
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) * 1024 * 1024 : COLLECTION_HINT_BYTES;
+}
+
 /** MG10 (mini-ninemem10): on WebKit, a full collection as the shaders step starts (`hintCollection`): the boot's garbage
- *  goes before the first frames and `readyFrame` add to the heap, instead of at its high-water. Returns the bytes hinted
- *  (0 on Blink, whose collector the hint does not steer this way, and with no navigator). */
+ *  goes before the first frames and `readyFrame` add to the heap, instead of at its high-water. Off with
+ *  `debug.collectionHint` 0 (`--device-save=debug.collectionHint=0` in the Simulator harness, or the Debug panel on a
+ *  phone). Returns the bytes hinted (0 on Blink, whose collector the hint does not steer this way, with no navigator,
+ *  when switched off, and when the host refuses the reservation). */
 export function collectBeforeShaders(userAgent: string = typeof navigator === 'undefined' ? '' : navigator.userAgent): number {
-  return webKitEngine(userAgent) ? hintCollection() : 0;
+  if (!webKitEngine(userAgent)) return 0;
+  const bytes = collectionHintBytes();
+  return bytes > 0 ? hintCollection(bytes) : 0;
 }
 
 /** remember which GL buffer each attribute array went into (three's WebGLAttributes.createBuffer / a full re-upload) */

@@ -228,3 +228,9 @@ flip order. Buffer census (`tmp/` tool, not kept: typed-array and ArrayBuffer co
 - Next, largest first: the other side of the same lever (a second hint after `readyFrame` for the control-step peak);
   the bake writing Int16 grid positions (26 MB of decode garbage); reducing JS-heap garbage before `shaders`, which sets
   the heap the hinted collection starts from. Any cut that removes ArrayBuffer churn should be judged with the hint in.
+- **Hint risk check (coordinator, 07:00 Cancún).** The 256 MB `ArrayBuffer` is made in try/catch (a refused or failed
+  reservation hints nothing and the load goes on; unit-tested with 2^60 bytes), and only its `byteLength` is read: no
+  page is written. Simulator, Nine, the game tab's WebContent footprint every 50 ms with the kernel's interval high reset
+  each sample, 1.2 s before to 0.6 s after the shaders step: biggest one-sample rise 36 and 35 MB in two runs, no
+  interval high above its neighbours: the reservation is never charged. Kill switch: device Debug slot
+  `debug.collectionHint` (MB; 0 off), `--device-save=debug.collectionHint=0` in the Simulator harness.
