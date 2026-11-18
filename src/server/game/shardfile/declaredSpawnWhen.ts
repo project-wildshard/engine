@@ -10,6 +10,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { SimHost } from '@wildshard/engine/sim';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { hostDay } from './declaredClimate';
+import { countStanding, type CountSlot } from './declaredSpawnCount';
 
 type SpawnRow = Shardfile['creatures']['spawns'][number];
 type When = NonNullable<SpawnRow['when']>;
@@ -26,13 +27,13 @@ export function spawnAbsent(body: object): boolean { return 'hidden' in body && 
 const waveKey = (set: string, index: number): string => `${set}#${String(index)}`;
 
 /** Install the `when` gate for the rows that declare one; nothing when none does (no adapter, so older saves restore). */
-export function installDeclaredSpawnWhen(host: SimHost, rows: readonly SpawnRow[], restoring = false): { readonly absent: () => ReadonlySet<string> } | null {
-  const gated = rows.filter((row): row is SpawnRow & { when: When } => row.when !== undefined);
+export function installDeclaredSpawnWhen(host: SimHost, rows: readonly SpawnRow[], restoring = false, counted: ReadonlyMap<string, CountSlot> = new Map()): { readonly absent: () => ReadonlySet<string> } | null {
+  const gated = rows.filter(row => row.when !== undefined || counted.has(row.id));
   if (gated.length === 0) return null;
   for (const row of gated) if (!host.entities.has(row.id)) throw new Error(`Spawn row ${row.id} names no body`);
   const absent = new Set<string>(), opened = new Set<string>();
   const waves = new Map<string, string[]>();
-  for (const row of gated) if (row.when.wave !== undefined) {
+  for (const row of gated) if (row.when?.wave !== undefined) {
     const key = waveKey(row.when.wave.set, row.when.wave.index), members = waves.get(key) ?? [];
     members.push(row.id); waves.set(key, members);
   }
@@ -45,9 +46,11 @@ export function installDeclaredSpawnWhen(host: SimHost, rows: readonly SpawnRow[
     return false;
   };
   const night = (): boolean => { const phase = hostDay(host)?.dayPhase; return phase === 'dusk' || phase === 'night'; };
-  const holds = (when: When): boolean => quest(when.quest)
+  const met = (when: When): boolean => quest(when.quest)
     && (when.time === undefined || (when.time === 'night') === night())
     && (when.wave === undefined || when.wave.index === 1 || opened.has(waveKey(when.wave.set, when.wave.index)));
+  // OF29b: a counted row's copy `slot` stands once the cell's players call for that many bodies
+  const holds = (row: SpawnRow): boolean => { const slot = counted.get(row.id); return (slot === undefined || countStanding(host.players.size, slot.per) >= slot.slot) && (row.when === undefined || met(row.when)); };
   const leave = (row: SpawnRow, b: Body): void => {
     Object.assign(b, { hidden: true }); b.alive = false; b.position.y = ABSENT_Y; b.motor?.resetAt?.(b.position);
     host.flags.clear(`dead:${row.id}`); absent.add(row.id);
@@ -65,7 +68,7 @@ export function installDeclaredSpawnWhen(host: SimHost, rows: readonly SpawnRow[
     }
     for (const row of gated) {
       const b = body(row.id); if (b === undefined) continue;
-      const on = holds(row.when);
+      const on = holds(row);
       if (!on && b.alive) leave(row, b);
       else if (on && absent.has(row.id)) enter(row, b);
     }

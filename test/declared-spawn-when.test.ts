@@ -101,3 +101,22 @@ test('OF29a: a save keeps who is absent and which waves opened; a shard with no 
   const plain = createShardfileSim(shard([{}]), new Map(), { rapier });
   try { expect(plain.host.adapters.has(SPAWN_WHEN_STEP)).toBe(false); } finally { plain.dispose(); }
 });
+
+// ONE-FORMAT OF29b (OF28b): a row's `count: { per, max }` stands one body per `per` players in the cell, to `max`.
+test('OF29b: ten players raise a counted wolf row to its ceiling, and it falls back as they leave', () => {
+  const sim = createShardfileSim(shard([{ count: { per: 2, max: 5 } }, {}]), new Map(), { rapier });
+  const pack = ['wolf:1', 'wolf:1.2', 'wolf:1.3', 'wolf:1.4', 'wolf:1.5'];
+  try {
+    expect(sim.host.entities.size, 'the row keeps its ceiling of bodies beside the uncounted row').toBe(6);
+    expect(pack.map(id => present(sim, id))).toEqual([true, false, false, false, false]);
+    const guests = Array.from({ length: 9 }, (_unused, index) => `p${String(index + 2)}`);
+    for (const id of guests) sim.host.addPlayer(id, { x: 0, y: 0, z: 0 });
+    sim.host.step();
+    expect(pack.map(id => present(sim, id))).toEqual([true, true, true, true, true]);
+    expect(body(sim, 'wolf:1.3').position.x).toBeCloseTo(7);
+    for (const id of guests.slice(2)) sim.host.removePlayer(id);
+    sim.host.step();
+    expect(pack.map(id => present(sim, id)), 'three players stand two').toEqual([true, true, false, false, false]);
+    expect(present(sim, 'wolf:2'), 'an uncounted row is untouched').toBe(true);
+  } finally { sim.dispose(); }
+});

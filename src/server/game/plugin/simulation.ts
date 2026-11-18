@@ -105,6 +105,7 @@ import { registerInstalled } from '../shardfile/installedSides';
 import { installDeclaredRiding, type DeclaredRiding } from '../shardfile/declaredRiding';
 import { installDeclaredHostPortalRide } from '../shardfile/declaredPortalRide';
 import { installDeclaredSpawnWhen } from '../shardfile/declaredSpawnWhen';
+import { countedShard, countSlots } from '../shardfile/declaredSpawnCount';
 import type { PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
 
@@ -416,7 +417,8 @@ export interface ShardfileSimulation {
   riding: DeclaredRiding | null;
 }
 /** One declared simulation core, used by the normal browser loader and the headless author validator. */
-function shardfileSimInput(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): {level: SimLevel; ports: SimHostPorts} {
+function shardfileSimInput(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): {level: SimLevel; ports: SimHostPorts} {
+  const shard = countedShard(source); // OF29b: a counted row runs as its row and its copies
   if (shard.nativeGround !== null) throw new Error('Native ground retains its native runtime simulation; a flat declared proxy is forbidden');
   preflightPlainPerches(shard, assets, ports);
   const portals = portalLinkEntries(shard.entryways), portalErrors = portalLinkRules(portals, shard);
@@ -455,7 +457,8 @@ function sceneFields(lane: ScriptLanePort | undefined): DecisionRuntime['scene']
 function observationValue(entry: [string, unknown], value: boolean): asserts entry is [string, boolean] { entry[1] = value; }
 
 /** Reinstall matching adapters into a fresh standalone restore host; restoring skips collider allocation and stepping. */
-export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): ShardfileSimulation {
+export function bindShardfileSim(host: SimHost, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): ShardfileSimulation {
+  const shard = countedShard(source); // OF29b: the same expanded rows the level was built from
   const seats = scriptSeats(host), { first } = seats;
   // TE-ENG7: each declared body names its species on the wire. Set here, on create and on restore alike, and never in
   // the level's spec, so a save keeps its level fingerprint.
@@ -726,7 +729,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       } });
     }
     installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataBrains, resolveCreatureLayers(shard.rows, creatures.brains));
-    installDeclaredSpawnWhen(host, creatures.spawns, ports.restoring === true); // OF29a: a `when` row stands only while it holds
+    installDeclaredSpawnWhen(host, creatures.spawns, ports.restoring === true, countSlots(shard)); // OF29a: a `when` row stands only while it holds
     installDataRespawns(host, creatures.spawns);
     installLayerHunts(host, shard.rows, creatures);
     dataPorts?.install();
