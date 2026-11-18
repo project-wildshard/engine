@@ -29,7 +29,6 @@ import { Bodies, BODY_CAP } from '../../../shared/engine/physics/bodies';
 import { addLevelTerrain } from '../../../shared/engine/physics/terrain';
 import { addPiece } from '../../../shared/engine/physics/pieces';
 import type { WorldRegistry } from '../world/registry';
-import { installPhysicsDebug } from '../physics/debug';
 import { installCrashFlag } from './crashFlag';
 import { enteredOwner, withOwner } from '../../../shared/engine/app/ownership';
 
@@ -112,7 +111,8 @@ export async function bootstrap(step: StepRunner, level: LevelSpec, inputContext
   });
   setActivePhysics(physics); // weapons, aim assist, interact query it (src/client/engine/physics/active.ts)
   setRagdollClock(() => game.alpha); // ragdoll poses interpolate between fixed steps like everything else
-  installPhysicsDebug(physics, game.scene, params);
+  // dev only (`?physics=debug`, `?navmesh=debug`): its own chunk, so the session closure stays under its ceiling
+  if (params.get('physics') === 'debug' || params.get('navmesh') === 'debug') void import('../physics/debug').then(({ installPhysicsDebug }) => installPhysicsDebug(physics, game.scene, params));
 
   const player = new Player(game.camera, physics, canvas);
   // Later frame owners return the traveller first (LIFO); retire its latest controller, rather than the boot capsule.

@@ -11,7 +11,7 @@ import {CI_SERIAL_TESTS,CPU_EXCLUSIVE_TESTS} from './vitest-ci-files.ts';
 /** Q54: a related file over this many seconds alone runs on hosted CI only. */
 export const LOCAL_FILE_SECONDS=20;
 /** Vitest files that drive a real browser. Playwright e2e is already hosted-only. */
-export const BROWSER_TESTS=Object.freeze(/** @type {string[]} */(['test/chromium-memory-browser.test.ts','test/headless-combat.test.ts','test/javelin-flight.test.ts',
+export const BROWSER_TESTS=Object.freeze(/** @type {string[]} */(['test/chromium-memory-browser.test.ts','test/headless-combat.test.ts','test/memory-calibration-page.test.ts','test/javelin-flight.test.ts',
  'test/net-strip-browser.test.ts','test/projectile-law.test.ts','test/staging-smoke-recovery.test.ts','test/tooling/chrome-keychain.test.mjs','test/tooling/parity/browser-escape.test.mjs']));
 /** Wall-clock proofs that hold the whole CPU budget (vitest-ci-files.ts). */
 export const TIMING_TESTS=Object.freeze(/** @type {string[]} */([...CPU_EXCLUSIVE_TESTS]));
