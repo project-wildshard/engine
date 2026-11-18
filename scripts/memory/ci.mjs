@@ -51,20 +51,19 @@ try {
   }
   for (const chunk of readings) {
     const rounds = mode === 'ledger' && !baseline ? (chunk === '_template' ? 5 : 3) : 1;
+    const file = (/** @type {number} */ round) => join(directory, `measure-${chunk}-${round}.json`);
     for (let i = 0; i < rounds; i++) {
-      const file = join(directory, `measure-${chunk}-${i + 1}.json`);
-      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file}`,
+      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file(i + 1)}`,
         ...(mode === 'ledger' ? ['--ledger-only'] : [mode === 'footprint' ? '--runs=5' : '--runs=3'])]);
-      files.push(file);
+      files.push(file(i + 1));
     }
-    const first = stored?.[chunk] === undefined ? null : get(files.at(-1));
+    const first = stored?.[chunk] === undefined ? null : get(file(1));
     const failure = first?.microscope?.ready === true
       ? ledgerOverLine(stored[chunk], ledgerBudget(first.microscope.checkpoints), chunk) : null;
     if (failure !== null) {
       console.log(`${failure}\nMeasuring ${chunk} once more: it fails only if this reading is over the line too.`);
-      const file = join(directory, `measure-${chunk}-2.json`);
-      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file}`, '--ledger-only']);
-      files.push(file);
+      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file(2)}`, '--ledger-only']);
+      files.push(file(2));
     }
   }
   const next = join(directory, `${mode}-ratchet.json`);
