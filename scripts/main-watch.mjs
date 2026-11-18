@@ -33,23 +33,24 @@ const ADVISORY_VERSION=7;
 const NATIVE_FOOTPRINT='memory-footprint-guard';
 const NATIVE_CHECKS=new Set(['Check armed native footprints and report Template', "Check or report Nine's online native WebKit ledger"]);
 /** @typedef {{name:string,conclusion:string|null,started_at?:string|null,runner_id?:number|null,steps?:readonly {name:string,conclusion:string|null}[]}} Job */
+/** @param {{conclusion:string|null}} job */
+const unsuccessful=job=>['failure','timed_out','cancelled','startup_failure'].includes(job.conclusion??'');
 
 /** J426: keep a completed failed check even if the runner is later canceled.
  * @param {Job} job @returns {string|undefined} */
 function nativeInfrastructure(job){
-  if(job.name!==NATIVE_FOOTPRINT||job.steps?.some(step=>NATIVE_CHECKS.has(step.name)&&step.conclusion==='failure'))return;
+  if(job.name!==NATIVE_FOOTPRINT||job.steps?.some(step=>NATIVE_CHECKS.has(step.name)&&step.conclusion==='failure'))return undefined;
   if(job.conclusion==='startup_failure')return 'runner failed to start';
-  if(!unsuccessful(job))return;
+  if(!unsuccessful(job))return undefined;
   if((job.runner_id===null||job.runner_id===0)&&job.steps?.length===0)return 'no xcode-27 runner assigned';
   if(job.conclusion==='timed_out')return 'runner timed out';
   if(job.conclusion==='cancelled')return 'runner was canceled';
+  return undefined;
 }
 
 /** @param {Job} job */
 const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic'
   ||nativeInfrastructure(job)!==undefined;
-/** @param {{conclusion:string|null}} job */
-const unsuccessful=job=>['failure','timed_out','cancelled','startup_failure'].includes(job.conclusion??'');
 
 /** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
 /** @typedef {{judged:number[],dispatched:string[]}} State */
@@ -207,7 +208,7 @@ export function liveIo(env=process.env){
           if(cancelled(row)){
             // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
             // the jobs, rather than that workflow timestamp, say whether any work actually started.
-            row.started=jobs.some(job=>job.started_at!=null);
+            row.started=jobs.some(job=>typeof job.started_at==='string');
             row.blockingFailed=jobs.some(job=>!advisory(job)&&unsuccessful(job))&&row.started;
             row.blockingChecked=true;
             row.advisoryVersion=ADVISORY_VERSION;
