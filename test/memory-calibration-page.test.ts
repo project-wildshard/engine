@@ -38,7 +38,8 @@ beforeAll(async () => {
   browser = useWebkit
     ? await webkit.launch({ headless: true })
     : await chromium.launch({ executablePath: chromiumExecutable, headless: true, args: [...KEYCHAIN_ARGS] });
-});
+  // A browser launch under a loaded land gate takes more than vitest's 10 s default (full Chromium ~7 s idle).
+}, 60_000);
 afterAll(async () => {
   try {
     await browser?.close();
