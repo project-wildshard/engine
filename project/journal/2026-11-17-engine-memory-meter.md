@@ -38,3 +38,13 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   member arrays (13.4 MB) were the largest holder the ledger did not see. A typed view over a wasm memory names the
   memory's own buffer, so the census leaves those out. Workers post their ledgers on a BroadcastChannel from
   `installWorkerBootTiming`, so every engine worker reports without touching its message protocol.
+- EM8 (mini-em1b), the closure. `measure.mjs --closure` predicts WebContent and GPU-process [K] at control from the
+  ledger times EM1's weights and splits each process by `footprint -j` category. The first thing it found was that the
+  category names are the VM tags', not what holds them: in Playwright WebKit a 200 MB ArrayBuffer lands in "WebAssembly
+  Memory" (JSC's primitive Gigacage) and a 200 MB `WebAssembly.Memory` in "WebKit Malloc". With that mapping the
+  ArrayBuffer category closes: Template 44 MB measured against 41 MB of ledger, Nine 114 against 104. The whole
+  process does not: the ledger predicts 13% of Template's WebContent and 27% of its GPU process. The gap sits in WebKit
+  Malloc (the JS object heap and WebCore, 428 MB on Template, 810 on Nine) and in Metal's IOAccelerator memory in the
+  GPU process (about 100 MB on Template, 1.1 GB on Nine). A probe on a blank page says ANGLE Metal costs 1.0x for
+  textures and aligned buffers, 1.33x with mips, 3.2x for an int16x3 attribute, and about 0.1 MB a program, and Nine
+  has 65 programs and 0.6 MB of unaligned attributes, so neither explains Nine's GPU gigabyte.

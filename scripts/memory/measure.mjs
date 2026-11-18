@@ -4,7 +4,7 @@
 // engine ledger, [R] Chromium's renderer.
 //
 //   scripts/browser-lane.sh node scripts/memory/measure.mjs --url=<served client> --chunk=<slug> [--runs=5]
-//        [--microscope] [--out=<file.json>] [--settle=2000] [--timeout=240]
+//        [--microscope] [--closure] [--out=<file.json>] [--settle=2000] [--timeout=240]
 //
 // (a) Native WebKit (Playwright WebKit, headless): the shard boots as a phone (402x874 @3, touch, phone tier, Low
 //     graphics, muted, Developer on so an over-budget shard still loads, a fresh profile per run: cold). The kernel
@@ -19,6 +19,11 @@
 //     the phone. Dumps are joined to requests by order: Tracing.requestMemoryDump returns a guid one higher than the dump
 //     event's id (26 of 26 probe runs), so a guid join reads the next dump.
 //
+// (d) --closure (EM8): at control, the ledger's counters times EM1's native-WebKit weights (scripts/memory/calibration.json)
+//     predict WebContent and GPU-process [K] beside the measured ones, and `footprint -j` splits each process by VM
+//     category (WebKit Malloc, WebAssembly Memory, JS JIT Generated Code, IOSurface, Metal-owned graphics ...) into what the
+//     ledger explains and what it does not.
+//
 // A run whose WebContent peak falls before the loading card is refused, not reported. The JSON is `memory-run/1`.
 //
 // The protocol (EM4):
@@ -31,7 +36,8 @@
 //     the median of its per-round differences, and floor + engine + zone must close on the whole within 2%.
 //   - A busy machine is waited out (up to --wait minutes, 10), then refused: the 1-minute load average over --max-load
 //     (the CPU count) or more than --max-lanes other scripts/browser-lane.sh runs (2). Both are written with each round.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -190,8 +196,8 @@ export async function settledReading(page, procs, { settleMs = 2000, gcs = 2, re
 }
 
 /** One cold phone boot in native WebKit, read by the kernel.
- * @param {{url:string, chunk:string, settleMs?:number, timeoutMs?:number, everyMs?:number, gcs?:number, reads?:number}} options */
-export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5 }) {
+ * @param {{url:string, chunk:string, settleMs?:number, timeoutMs?:number, everyMs?:number, gcs?:number, reads?:number, closure?:boolean}} options */
+export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false }) {
   const { webkit } = await import('../browser-playwright.mjs');
   const browser = await webkit.launch({ headless: true });
   const load = loadavg()[0];
@@ -210,7 +216,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     const sampler = startSampler([...procs.keys()], { everyMs });
     const discover = () => { for (const p of webkitProcesses()) if (!procs.has(p.pid)) { procs.set(p.pid, p); sampler.add(p.pid); } };
     const watch = setInterval(discover, 500);
-    let failure = null, settled = null, ledger = null;
+    let failure = null, settled = null, ledger = null, counters = null, categories = null;
     /** @type {StepRow[]} */ let steps = [];
     const started = Date.now();
     try {
@@ -221,6 +227,8 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
         sampler.mark('settling');
         settled = await settledReading(page, [...procs.values()], { settleMs, gcs, reads });
         ledger = await page.evaluate(() => { const s = Reflect.get(window, '__wildshard')?.memory?.(); return s ? { totals: s.totals, unattributed: s.unattributed, allocations: s.allocations.map((/** @type {any} */ a) => ({ domain: a.domain, kind: a.kind, bytes: a.bytes })) } : null; });
+        counters = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.counters?.() ?? null; } catch { return null; } });
+        if (closure) categories = footprintCategories([...procs.values()]);
       }
       steps = await page.evaluate(() => Reflect.get(window, '__memoryRun')?.steps ?? []);
       clearInterval(watch);
@@ -230,10 +238,97 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
       const lifetime = readFootprints(all.map((p) => p.pid));
       return { host: 'webkit', chunk, url, build, ready: failure === null, failure, errors: errors.slice(0, 5), readyMs, loadAverage: Math.round(load * 100) / 100,
         processes: all.map((p) => ({ pid: p.pid, role: p.role, name: p.name, path: p.path, lifetimeMaxBytes: /** @type {any} */ (lifetime[String(p.pid)])?.lifetimeMaxPhysicalFootprintBytes ?? null })),
-        checkpoints, settled, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, refused: failure ?? refusal(checkpoints), samples: stream.samples.length };
+        checkpoints, settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, refused: failure ?? refusal(checkpoints), samples: stream.samples.length };
     } finally { clearInterval(watch); await sampler.stop().catch(() => undefined); }
   } finally { await browser.close(); }
 }
+
+const mb = (/** @type {number} */ b) => (b / MB).toFixed(0).padStart(5);
+
+/** `footprint -j` of each WebContent and GPU process: MB-exact bytes (dirty + swapped) by VM category, summed per role.
+ * @param {readonly BrowserProcess[]} procs @returns {Record<'webcontent'|'gpu', Record<string, number>>} */
+export function footprintCategories(procs) {
+  /** @type {Record<'webcontent'|'gpu', Record<string, number>>} */ const out = { webcontent: {}, gpu: {} };
+  const dir = resolvePath(import.meta.dirname, '../../tmp/measure-footprint'); mkdirSync(dir, { recursive: true });
+  for (const p of procs) {
+    if (p.role !== 'webcontent' && p.role !== 'gpu') continue;
+    const file = resolvePath(dir, `${process.pid}-${p.pid}.json`);
+    try {
+      execFileSync('footprint', ['-j', file, '-p', String(p.pid)], { stdio: 'ignore', timeout: 60_000 });
+      for (const row of JSON.parse(readFileSync(file, 'utf8')).processes ?? []) addCategories(out[p.role], row.categories ?? {});
+    } catch { /* a process that exited has no categories */ } finally { rmSync(file, { force: true }); }
+  }
+  return out;
+}
+/** @param {Record<string, number>} into @param {Record<string, {dirty?:number, swapped?:number}>} categories */
+export function addCategories(into, categories) {
+  for (const [name, c] of Object.entries(categories)) { const bytes = (c.dirty ?? 0) + (c.swapped ?? 0); if (bytes > 0) into[name] = (into[name] ?? 0) + bytes; }
+}
+
+/** Which calibration kind (EM1, native WebKit) weighs each ledger kind, and where its bytes land (`footprint` category).
+ * RAM kinds not listed here are ArrayBuffers. Measured in Playwright WebKit (EM8, 2026-11-17): ArrayBuffer contents (JSC's
+ * primitive Gigacage) land in the category `footprint` names "WebAssembly Memory", and a `WebAssembly.Memory` lands in
+ * "WebKit Malloc" with the JS object heap and strings; the names are the VM tags', not what holds them. */
+export const LEDGER_WEIGHTS = Object.freeze({
+  ram: { wasm: ['wasm', 'WebKit Malloc'], 'audio-buffer': ['audio', 'WebAssembly Memory'], canvas: ['canvas2d', 'IOSurface'], image: ['imagebitmap', 'IOSurface'], 'image-bitmap': ['imagebitmap', 'IOSurface'] },
+  arrayBuffer: ['arraybuffer', 'WebAssembly Memory'], worker: ['worker', 'WebAssembly Memory'],
+  gpu: { texture: ['texrgba', 'graphics'], buffer: ['glbuffer', 'graphics'], renderbuffer: ['msaa', 'graphics'], 'drawing-buffer': ['imagebitmap', 'IOSurface'] },
+});
+
+/** EM8's prediction from the ledger: per process, the blank page's floor plus each ledger kind times its EM1 slope, plus
+ * each worker isolate's own cost (the worker fit's intercept over the floor) and the one-time cost of the first texture upload (the texture fit's intercept over the floor). Each term names the
+ * `footprint` category its bytes land in, so the remainder can be split by category.
+ * @param {{gpu?:Record<string, number>, ram?:Record<string, number>, workers?:Record<string, number>} | null} counters
+ * @param {{baselineMB:{webcontent:number, gpu:number}, kinds:Record<string, {slope:number, interceptMB:number, lands:string, roles?:Record<string, {slope:number, interceptMB:number}>}>}} host EM1's `hosts.webkit` */
+export function predictFootprint(counters, host) {
+  /** @type {{process:'webcontent'|'gpu', term:string, category:string, bytes:number}[]} */ const terms = [];
+  const add = (/** @type {'webcontent'|'gpu'} */ role, term, calibKind, category, bytes) => {
+    if (bytes <= 0) return;
+    const fit = host.kinds[calibKind], slope = fit?.roles?.[fit.lands]?.slope ?? fit?.slope ?? 1;
+    terms.push({ process: fit?.lands === 'gpu' ? 'gpu' : role, term, category, bytes: bytes * slope });
+  };
+  for (const [kind, bytes] of Object.entries(counters?.ram ?? {})) { const w = LEDGER_WEIGHTS.ram[kind] ?? LEDGER_WEIGHTS.arrayBuffer; add('webcontent', `ram ${kind}`, w[0], w[1], bytes); }
+  for (const [key, bytes] of Object.entries(counters?.workers ?? {})) { const kind = key.slice(key.lastIndexOf('/') + 1); const w = kind === 'wasm' ? LEDGER_WEIGHTS.ram.wasm : LEDGER_WEIGHTS.worker; add('webcontent', `worker ${key}`, w[0], w[1], bytes); }
+  for (const [kind, bytes] of Object.entries(counters?.gpu ?? {})) { const w = LEDGER_WEIGHTS.gpu[kind] ?? LEDGER_WEIGHTS.gpu.texture; add('gpu', `gpu ${kind}`, w[0], w[1], bytes); }
+  const isolates = new Set(Object.keys(counters?.workers ?? {}).map((key) => key.slice(0, key.lastIndexOf('/'))));
+  const isolateMB = Math.max(0, (host.kinds.worker?.interceptMB ?? 0) - host.baselineMB.webcontent);
+  for (const name of isolates) terms.push({ process: 'webcontent', term: `worker ${name} isolate`, category: 'WebKit Malloc', bytes: isolateMB * MB });
+  if ((counters?.gpu?.texture ?? 0) > 0) terms.push({ process: 'gpu', term: 'first texture upload', category: 'graphics', bytes: Math.max(0, (host.kinds.texrgba?.interceptMB ?? 0) - host.baselineMB.gpu) * MB });
+  const floor = { webcontent: host.baselineMB.webcontent * MB, gpu: host.baselineMB.gpu * MB };
+  const sum = (/** @type {'webcontent'|'gpu'} */ role) => floor[role] + terms.filter((t) => t.process === role).reduce((a, t) => a + t.bytes, 0);
+  return { floor, terms, webcontent: sum('webcontent'), gpu: sum('gpu') };
+}
+
+/** The remainder by `footprint` category: measured bytes in each category against the ledger terms that land there
+ * (`graphics` is the two Metal-owned categories together). @param {Record<string, number>} measured
+ * @param {ReturnType<typeof predictFootprint>['terms']} terms @param {'webcontent'|'gpu'} role */
+export function categoryRemainder(measured, terms, role) {
+  const group = (/** @type {string} */ name) => (name.endsWith('(graphics)') ? 'graphics' : name);
+  /** @type {Record<string, {measured:number, ledger:number}>} */ const rows = {};
+  for (const [name, bytes] of Object.entries(measured)) { const g = group(name); (rows[g] ??= { measured: 0, ledger: 0 }).measured += bytes; }
+  for (const t of terms) if (t.process === role) (rows[t.category] ??= { measured: 0, ledger: 0 }).ledger += t.bytes;
+  return Object.entries(rows).map(([category, r]) => ({ category, measured: r.measured, ledger: r.ledger, unexplained: r.measured - r.ledger })).sort((a, b) => b.measured - a.measured);
+}
+
+/** EM8's closure lines for one run at control. @param {any} run @param {any} host */
+export function closureLines(run, host) {
+  if (!run.settled || !run.counters) return [];
+  const p = predictFootprint(run.counters, host);
+  const pct = (/** @type {number} */ a, /** @type {number} */ b) => `${((a / b) * 100).toFixed(0)}%`;
+  const lines = [`  closure at control: predicted from the ledger [L] x EM1 weights vs measured [K]`,
+    `    WebContent predicted ${mb(p.webcontent)} MB vs ${mb(run.settled.webcontent)} MB measured (${pct(p.webcontent, run.settled.webcontent)})`,
+    `    GPU process predicted ${mb(p.gpu)} MB vs ${mb(run.settled.gpu)} MB measured (${pct(p.gpu, run.settled.gpu)})`,
+    `    Mac stand-in for the phone (both) predicted ${mb(p.webcontent + p.gpu)} MB vs ${mb(run.settled.webcontent + run.settled.gpu)} MB (${pct(p.webcontent + p.gpu, run.settled.webcontent + run.settled.gpu)})`];
+  for (const role of /** @type {const} */ (['webcontent', 'gpu'])) {
+    if (!run.categories?.[role]) continue;
+    lines.push(`    ${role} by footprint category [K]: measured / ledger-explained / unexplained MB`);
+    for (const r of categoryRemainder(run.categories[role], p.terms, role)) if (r.measured >= 0.5 * MB || r.ledger >= 0.5 * MB) lines.push(`      ${r.category.slice(0, 44).padEnd(44)} ${mb(r.measured)} ${mb(r.ledger)} ${mb(r.unexplained)}`);
+  }
+  return lines;
+}
+
+/** EM1's native-WebKit calibration. */
+export function webkitCalibration() { return JSON.parse(readFileSync(new URL('calibration.json', import.meta.url), 'utf8')).hosts.webkit; }
 
 /** The microscope: the same boot in Chromium, a detailed memory-infra dump at each checkpoint.
  * @param {{url:string, chunk:string, timeoutMs?:number, depth?:number}} options */
@@ -281,12 +376,10 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
   } finally { await owned.close(); }
 }
 
-const mb = (/** @type {number} */ b) => (b / MB).toFixed(0).padStart(5);
 
 /** Serve the calibration page (scripts/memory/calib/index.html) on a free local port: the ladder's blank and WebGL rungs. */
 export async function serveCalibrationPage() {
   const { createServer } = await import('node:http');
-  const { readFileSync } = await import('node:fs');
   const page = readFileSync(new URL('calib/index.html', import.meta.url));
   const server = createServer((req, res) => {
     if (req.method === 'POST') { req.resume(); res.end('ok'); return; }
@@ -331,7 +424,6 @@ export function ledgerTotal(ledger) {
  * runs (scripts/browser-lane.sh status; this run's own slot is not counted). Waits up to `waitMs`, then refuses.
  * @param {{maxLoad:number, maxLanes:number, waitMs:number}} limits */
 export async function quietMachine({ maxLoad, maxLanes, waitMs }) {
-  const { execFileSync } = await import('node:child_process');
   const lanes = () => {
     try {
       const text = execFileSync(new URL('../browser-lane.sh', import.meta.url).pathname, ['status'], { encoding: 'utf8', timeout: 20_000 });
@@ -417,7 +509,7 @@ export function microscopeLines(run) {
 async function main(argv) {
   /** @type {Record<string, string>} */
   const args = Object.fromEntries(argv.map((a) => /^--([^=]+)(?:=(.*))?$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2] ?? '1']));
-  if (!args.url || (args.chunk === undefined && !args.ladder)) { console.error('usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--out=<file>] | --ladder [--zones=a,b]'); return 64; }
+  if (!args.url || (args.chunk === undefined && !args.ladder)) { console.error('usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--out=<file>] | --ladder [--zones=a,b]'); return 64; }
   const settleMs = Number(args.settle ?? 2000), timeoutMs = Number(args.timeout ?? 240) * 1000;
   const gcs = Number(args.gcs ?? 2), reads = Number(args.reads ?? 5);
   const limits = { maxLoad: Number(args['max-load'] ?? cpus().length), maxLanes: Number(args['max-lanes'] ?? 2), waitMs: Number(args.wait ?? 10) * 60_000 };
@@ -429,9 +521,10 @@ async function main(argv) {
   for (let i = 0; i < runs; i++) {
     // two builds alternate inside each round, and the order flips each round, so drift lands on both
     for (const url of i % 2 === 0 ? urls : [...urls].reverse()) {
-      const run = await webkitBoot({ url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads });
+      const run = await webkitBoot({ url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure) });
       webkit.push(run);
       for (const line of webkitLines(run)) console.log(line);
+      if (args.closure) for (const line of closureLines(run, webkitCalibration())) console.log(line);
     }
   }
   if (args.url2) {

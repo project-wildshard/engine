@@ -18,8 +18,9 @@ export interface WebkitRun {
   host:'webkit';chunk:string;url:string;build:string|null;ready:boolean;failure:string|null;errors:string[];readyMs:number;loadAverage:number;
   processes:(BrowserProcess&{lifetimeMaxBytes:number|null})[];checkpoints:Checkpoint[];settled:(Pair&{reads:Pair[]})|null;
   ledger:{totals:Record<string,number>;unattributed:Record<string,number>;byKind:Ledger|null}|null;refused:string|null;samples:number;
+  counters:Counters|null;categories:Record<'webcontent'|'gpu',Record<string,number>>|null;
 }
-export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number}):Promise<WebkitRun>;
+export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean}):Promise<WebkitRun>;
 export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;gpuDetail:{kinds:Record<string,number>;formats:Record<string,number>;owners:Record<string,number>}|null;checkpoints:{step:string;ledger:Record<string,Record<string,number>>|null;processes:DumpProcess[]}[]}
 export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number}):Promise<MicroscopeRun>;
 export function webkitLines(run:WebkitRun):string[];
@@ -39,3 +40,13 @@ export function ladderLines(result:LadderParts&{rungs:Record<string,{k:Stats;wc:
 export function ledgerParity(checkpoint:{ledger?:Record<string,Record<string,number>>|null;processes:{role:string;alloc:Record<string,number>}[]}):{ledgerGpu:number;ledgerBuffers:number;angleMetal:number;webglBuffers:number}|null;
 export function phoneContext(context:unknown):Promise<void>;
 export function untilControl(page:unknown,timeoutMs:number):Promise<string|null>;
+export interface Counters {gpu?:Record<string,number>;ram?:Record<string,number>;workers?:Record<string,number>}
+export interface CalibrationHost {baselineMB:{webcontent:number;gpu:number};kinds:Record<string,{slope:number;interceptMB:number;lands:string;roles?:Record<string,{slope:number;interceptMB:number}>}>}
+export interface ClosureTerm {process:'webcontent'|'gpu';term:string;category:string;bytes:number}
+export function footprintCategories(procs:readonly BrowserProcess[]):Record<'webcontent'|'gpu',Record<string,number>>;
+export function addCategories(into:Record<string,number>,categories:Record<string,{dirty?:number;swapped?:number}>):void;
+export const LEDGER_WEIGHTS:Readonly<{ram:Record<string,[string,string]>;arrayBuffer:[string,string];worker:[string,string];gpu:Record<string,[string,string]>}>;
+export function predictFootprint(counters:Counters|null,host:CalibrationHost):{floor:{webcontent:number;gpu:number};terms:ClosureTerm[];webcontent:number;gpu:number};
+export function categoryRemainder(measured:Record<string,number>,terms:readonly ClosureTerm[],role:'webcontent'|'gpu'):{category:string;measured:number;ledger:number;unexplained:number}[];
+export function closureLines(run:unknown,host:CalibrationHost):string[];
+export function webkitCalibration():CalibrationHost;

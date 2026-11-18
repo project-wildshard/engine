@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity} from '../scripts/memory/measure.mjs';
+import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories} from '../scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -74,4 +74,30 @@ test('EM5 parity sets the ledger WebGL bytes beside ANGLE Metal and the renderer
   {role:'gpu',alloc:{'gpu/angle/metal':20*MiB,'gpu/angle':20*MiB}},{role:'renderer',alloc:{'webgl/context_*/buffers':5e6,'webgl/context_*':9e6}}]};
  expect(ledgerParity(checkpoint)).toEqual({ledgerGpu:15,ledgerBuffers:5,angleMetal:20*MiB/1e6,webglBuffers:5});
  expect(ledgerParity({processes:[]})).toBeNull();
+});
+
+const MB=1e6;
+const HOST={baselineMB:{webcontent:16,gpu:18},kinds:{
+  arraybuffer:{slope:1,interceptMB:16,lands:'webcontent'},wasm:{slope:1,interceptMB:16,lands:'webcontent'},worker:{slope:1,interceptMB:19,lands:'webcontent'},
+  texrgba:{slope:1.5,interceptMB:58,lands:'gpu'},glbuffer:{slope:1,interceptMB:20,lands:'gpu'},msaa:{slope:1,interceptMB:25,lands:'gpu'},imagebitmap:{slope:1,interceptMB:19,lands:'gpu'},
+}};
+
+test('the closure prediction is the floor plus each ledger kind times its weight, in the process its kind lands in',()=>{
+  const p=predictFootprint({ram:{'array-buffer':10*MB,'geometry-cpu':4*MB,wasm:2*MB},workers:{'server/wasm':3*MB,'server/wire':1*MB,'decode/isolate':0},gpu:{texture:8*MB,buffer:5*MB}},HOST);
+  expect(p.webcontent/MB).toBeCloseTo(16+10+4+2+3+1+2*(19-16));
+  expect(p.gpu/MB).toBeCloseTo(18+8*1.5+5+(58-18));
+  expect(p.terms.find(t=>t.term==='worker server/wasm')).toMatchObject({process:'webcontent',category:'WebKit Malloc'});
+  expect(p.terms.find(t=>t.term==='ram array-buffer')).toMatchObject({process:'webcontent',category:'WebAssembly Memory'});
+  expect(p.terms.filter(t=>t.term.endsWith(' isolate')).map(t=>t.term)).toEqual(['worker server isolate','worker decode isolate']);
+  expect(p.terms.find(t=>t.term==='gpu texture')).toMatchObject({process:'gpu',category:'graphics'});
+  expect(predictFootprint({gpu:{buffer:MB}},HOST).terms.map(t=>t.term)).toEqual(['gpu buffer']);
+});
+
+test('the remainder is split by footprint category, Metal-owned categories together as graphics',()=>{
+  const measured:Record<string,number>={};
+  addCategories(measured,{'WebKit Malloc':{dirty:30*MB,swapped:2*MB},'IOAccelerator (graphics)':{dirty:5*MB},'Owned physical footprint (unmapped) (graphics)':{dirty:20*MB},Stack:{dirty:0}});
+  expect(measured).toEqual({'WebKit Malloc':32*MB,'IOAccelerator (graphics)':5*MB,'Owned physical footprint (unmapped) (graphics)':20*MB});
+  const terms=[{process:'gpu' as const,term:'gpu texture',category:'graphics',bytes:15*MB},{process:'webcontent' as const,term:'ram array-buffer',category:'WebKit Malloc',bytes:12*MB}];
+  expect(categoryRemainder(measured,terms,'gpu')).toEqual([{category:'WebKit Malloc',measured:32*MB,ledger:0,unexplained:32*MB},{category:'graphics',measured:25*MB,ledger:15*MB,unexplained:10*MB}]);
+  expect(categoryRemainder(measured,terms,'webcontent')[0]).toMatchObject({category:'WebKit Malloc',ledger:12*MB,unexplained:20*MB});
 });
