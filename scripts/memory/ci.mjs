@@ -34,6 +34,14 @@ try {
     // Nine timed out on hosted SwiftShader at 180 and 480 seconds (EM35).
     // The macOS job reads its native WebKit ledger from the pinned Nine build.
     readings = built.filter(chunk => chunk !== 'nine-dragon-stack');
+    const selection = process.env.WS_LEDGER_RECORD_ZONES?.trim();
+    if (selection) {
+      const requested = [...new Set(selection.split(',').map(chunk => chunk.trim()))];
+      if (baseline || !requested.includes('_template') || requested.some(chunk => !readings.includes(chunk))) {
+        throw new Error('Partial ledger recording requires _template and known Ubuntu zones');
+      }
+      readings = readings.filter(chunk => requested.includes(chunk));
+    }
   }
   for (const chunk of readings) {
     const rounds = mode === 'ledger' && !baseline ? (chunk === '_template' ? 5 : 3) : 1;

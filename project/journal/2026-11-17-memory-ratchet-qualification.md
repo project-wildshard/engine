@@ -49,3 +49,11 @@ a checkpoint. Regular measurements still fail on that timeout. The
 26-zone qualification also retries a failed install once and reuses the
 full production pin cache after a socket closed during the first attempt.
 [Split qualification](https://github.com/project-wildshard/engine/actions/runs/44255220814).
+
+The Ubuntu-only replay reached control on all 80 boots. The serialized
+CDP dump queue missed the control ledger on three Open Plot runs.
+The microscope now keeps a real page-recorded control checkpoint
+when its process dump is absent. It leaves that checkpoint's process
+list empty. A qualification can rerecord selected known Ubuntu zones
+with Template and both controls. Ordinary comparison still requires
+the entire committed coverage.

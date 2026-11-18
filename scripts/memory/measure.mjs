@@ -448,6 +448,7 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
       }
     })();
     let failure = null, gpuDetail = null;
+    /** @type {StepRow | undefined} */ let liveControl;
     try {
       await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
       failure = await untilControl(page, timeoutMs);
@@ -460,6 +461,8 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
         if (!dumped()) failure = `memory dumps never reached control (last dumped checkpoint: ${lastStep})`;
       }
       gpuDetail = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.gpu?.() ?? null; } catch { return null; } });
+      if (failure === null) liveControl = await page.evaluate(() =>
+        Reflect.get(window, '__memoryRun')?.steps.findLast((/** @type {StepRow} */ row) => row[1] === 'control'));
     } catch (error) {
       if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
       failure = `${error.message} Last observed checkpoint: ${lastStep}`;
@@ -470,7 +473,12 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
       await tracing.send('Tracing.end'); await ended;
     }
     const dumps = dumpsInOrder(events, depth);
-    return { host: 'chromium', ready: failure === null, failure, gpuDetail, checkpoints: requested.map(({ step, ledger }, i) => ({ step, ledger, processes: dumps[i]?.processes.filter((p) => p.role === 'renderer' || p.role === 'gpu') ?? [] })) };
+    const checkpoints = requested.map(({ step, ledger }, i) => ({ step, ledger, processes: dumps[i]?.processes.filter((p) => p.role === 'renderer' || p.role === 'gpu') ?? [] }));
+    // A queued or refused process dump must not discard the page's already recorded control ledger.
+    if (liveControl?.[2] && !checkpoints.some(row => row.step === 'control' && row.ledger)) {
+      checkpoints.push({ step: 'control', ledger: liveControl[2], processes: [] });
+    }
+    return { host: 'chromium', ready: failure === null, failure, gpuDetail, checkpoints };
   } finally { await owned.close(); }
 }
 

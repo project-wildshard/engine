@@ -21,6 +21,11 @@ on:
         type: boolean
         required: false
         default: false
+      memory_record_zones:
+        description: Optional comma-separated Ubuntu recording zones including _template
+        type: string
+        required: false
+        default: ''
       record:
         description: Record Ring 1's platform digest baseline and upload it, instead of comparing
         type: boolean
@@ -492,6 +497,7 @@ jobs:
         name: Read or block on subsystem ledger bytes
         env:
           MEMORY_RECORD: ${{ inputs.memory_record }}
+          WS_LEDGER_RECORD_ZONES: ${{ inputs.memory_record_zones }}
         run: |
           baseline=()
           if [[ "$MEMORY_RECORD" != true ]]; then baseline+=(scripts/memory/ledger-ratchet.json); fi
