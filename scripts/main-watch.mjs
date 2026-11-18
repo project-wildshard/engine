@@ -28,10 +28,13 @@ import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
-// NB6's street and EM35's Chromium diagnostic jobs are advisory.
-const ADVISORY_VERSION=5;
+// NB6's street and EM35's Chromium diagnostic jobs are advisory. So is the native footprint job (J424, Coordinator
+// 2026-11-18): an armed zone over its phone line (run 44375696856) or a macOS runner never assigned (44358473370) is
+// reported there and never turns main red.
+const ADVISORY_VERSION=6;
 /** @param {{name:string}} job */
-const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic';
+const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic'
+  ||job.name==='memory-footprint-guard';
 /** @param {{conclusion:string|null}} job */
 const unsuccessful=job=>['failure','timed_out','cancelled'].includes(job.conclusion??'');
 

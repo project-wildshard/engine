@@ -94,12 +94,12 @@ test('44139343442: an unassigned advisory street runner preserves the twelve pas
   expect(blockingRun(red, [...jobs, { ...street, name: 'nine-ring1 (unknown, macos-15)' }]).conclusion).toBe('failure');
 });
 
-test('J426 preserves a failed or canceled required footprint verdict', () => {
-  const red = run(42970000008, 'abcd1234', 'failure', 50);
+test('44375696856: an armed footprint over its line is reported and never turns main red (J424)', () => {
+  const red = run(44375696856, '4026d299', 'failure', 50);
   const jobs = ['tests (1)', 'boundaries', 'nine-ring1-build', 'memory-ledger-guard']
     .map(name => ({ name, conclusion: 'success' as string | null }));
   for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
-    expect(blockingRun(red, [...jobs, { name: 'memory-footprint-guard', conclusion }]).conclusion).toBe('failure');
+    expect(blockingRun(red, [...jobs, { name: 'memory-footprint-guard', conclusion }]).conclusion).toBe('success');
   }
   const ledgerRed = [{ name: 'tests (1)', conclusion: 'success' }, { name: 'memory-ledger-guard', conclusion: 'failure' }];
   expect(blockingRun(red, [...ledgerRed, { name: 'memory-footprint-guard', conclusion: 'success' }]).conclusion).toBe('failure');

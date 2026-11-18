@@ -68,7 +68,9 @@ test('an armed zone must finish a comparable native boot and stay within both li
   }
 });
 
-test('CI keeps both armed jobs blocking during normal comparisons and recordings', () => {
+// J424 + Coordinator 2026-11-18 (run 44375696856): the Ubuntu ledger blocks an armed zone; the native footprint job
+// reports one and never fails main's run.
+test('CI keeps the armed ledger blocking and the native footprint job advisory', () => {
   const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
   const section = (job: string): string => {
     const body = workflow.split(`\n  ${job}:\n`)[1]?.split(/\n {2}[a-z-]+:\n/u)[0];
@@ -84,7 +86,7 @@ test('CI keeps both armed jobs blocking during normal comparisons and recordings
   expect(ledger).toMatch(/\n {4}runs-on:/u);
   expect(native).toContain('runs-on: xcode-27');
   expect(ledger).not.toMatch(/\n {4}continue-on-error:/u);
-  expect(native).not.toContain('continue-on-error');
+  expect(native).toMatch(/\n {4}continue-on-error: true\n/u);
 });
 
 test('both native baselines require an online boot', () => {
