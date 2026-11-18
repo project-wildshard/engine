@@ -137,7 +137,7 @@
       "peak": {
         "browser": 2810784,
         "engine": 14032048,
-        "workers": 14179926,
+        "workers": 14478732,
         "geometry": 44126019,
         "textures": 52530214,
         "scene": 10534008,
@@ -596,7 +596,7 @@
         "workers": 10412040,
         "geometry": 60073161,
         "textures": 127285900,
-        "scene": 345648,
+        "scene": 430296,
         "audio": 46651101,
         "loading": 192918739,
         "margin": 0
