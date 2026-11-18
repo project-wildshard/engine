@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { deployFrameProblem } from '../scripts/journey-proof.mjs';
 import { holdLine, mergeVerdict } from '../scripts/staging-qa.mjs';
+import { chromiumCandidateArgs } from '../scripts/staging-qa-browser.mjs';
 
 const build = 'a'.repeat(40);
 const selected = ['K3'];
@@ -9,6 +10,15 @@ const expected = ['journey-webkit'];
 const proof = { id: 'journey-webkit', browser: 'webkit', pass: true, seconds: 3, playedMs: 2000, log: 'run.log' };
 const smoke = { build, scenarios: [{ id: 'K3', status: 'ran', legs: [{ playedMs: 4000 }] }], findings: [] };
 const clean = { build, smoke, proofs: [proof], expected, selected, after: build, full: false };
+
+it('pins only the staging preview key in Chromium while preserving its launch flags', () => {
+  const pin = Buffer.alloc(32, 6).toString('base64');
+  const audio = ['--mute-audio', '--use-mock-keychain', '--password-store=basic'];
+  expect(chromiumCandidateArgs(audio, pin)).toEqual([...audio, `--ignore-certificate-errors-spki-list=${pin}`]);
+  expect(() => chromiumCandidateArgs(audio, undefined)).toThrow('requires the staging preview certificate pin');
+  expect(() => chromiumCandidateArgs(audio, 'invalid')).toThrow('requires the staging preview certificate pin');
+  expect(() => chromiumCandidateArgs([...audio, '--ignore-certificate-errors'], pin)).toThrow('requires scoped certificate trust');
+});
 
 describe('staging QA deploy verdict', () => {
   it('holds on several SB48 black frames and accepts a lit frame', async () => {

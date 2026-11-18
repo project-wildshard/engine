@@ -30,3 +30,13 @@ SQ5 builds a clean copy of the requested source and runs K3, K4 and K5
 against a signed loopback rooms service. The rig uses a one-run signing key
 and cleans up the room process, preview and copied tree. The first MacBook
 run reached play in all three scenarios in two minutes after the build.
+
+SQ18 fixes the Chromium saved-cache false hold in SB50. The candidate
+test had trusted the preview in the page context, and its existing
+service worker refused the preview certificate. The browser process now
+trusts only the preview's ephemeral public key. Live staging still uses
+its own certificate. Packs, API, and rooms keep their regular TLS checks.
+
+Three untouched v0.1.42 Chromium profiles reached lit play on the exact
+v0.1.44 candidate with the scoped pin. Each trial verified the updated
+build and stick movement. Unit tests refuse missing and blanket trust.
