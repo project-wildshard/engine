@@ -557,9 +557,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   };
   scope.onDispose(() => { clawed?.useClaw(null); clawed = null; });
   wirePage.bind(client, id => { net.wire.interact(id); }, stop, (handle, to) => headOf(bodies.get(handle)?.body, to), act => { client.act(act); });
-  wirePage.led = () => net.predictor.leading; wirePage.rowBody = handle => bodies.get(handle)?.body ?? null;
+  wirePage.led = () => net.predictor.leading; wirePage.pending = () => net.predictor.pending; wirePage.rowBody = handle => bodies.get(handle)?.body ?? null;
   wirePage.namedBody = id => { for (const [handle, { body }] of bodies) if (client.entities.get(handle)?.id === id) return body; return null; };
-  scope.onDispose(() => { wirePage.unbind(); wirePage.led = () => false; wirePage.rowBody = () => null; wirePage.namedBody = () => null; });
+  scope.onDispose(() => { wirePage.unbind(); wirePage.led = () => false; wirePage.pending = () => 0; wirePage.rowBody = () => null; wirePage.namedBody = () => null; });
   // SHARD-SOURCE AP24b: a look lamp that follows an actor rides its body, or one of its bones, by the server's name for it
   scope.onDispose(setLampFollow(ports.scene, (actor, bone) => { const body = wirePage.namedBody(actor); return body === null ? null : bone === undefined ? body.mesh : body.mesh.skeleton.getBoneByName(bone) ?? null; }));
   // J116: the lock's body by the server's name for it

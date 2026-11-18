@@ -50,7 +50,7 @@ import { installDeclaredPlumbing } from '../shard/declaredPlumbing';
 import { declaredFolderCompendium, declaredDay, declaredWeather } from '../../../shared/game/shard/declaredRows';
 import { installDeclaredTargets, spentUses } from '../shard/declaredTargets';
 import { ownedLineFields } from './ownedLines';
-import { hasTalks, installPlay, playWire } from './playInstalls';
+import { hasTalks, heldMove, installPlay, playWire } from './playInstalls';
 import type { ClientScriptViewTarget } from "../plugin/ui";
 import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
 import type { LedgerCatalogueItem } from '../../../shared/game/ledger';
@@ -711,7 +711,7 @@ export class ShardfileClient {
     // SS-GP7: the one install list (races, talks, rides, a held tool's lines), on this page's wire; a grid stay walks the same list
     if (hasTalks(source) && presentation === null) throw new Error('Missing talk presentation module');
     installPlay(source, { ...playWire(), scope: ctx.scope, system: ctx.system, flags, prompts: runtime.interactables, root: ctx.root,
-      feet: () => world.player.position, rider: world.player, boost: () => (world.player.sampleHeldCommand().buttons & NET_BUTTONS.sprint) !== 0,
+      feet: () => world.player.position, rider: world.player, boost: () => (world.player.sampleHeldCommand().buttons & NET_BUTTONS.sprint) !== 0, move: heldMove(world.player),
       movers: pageMovers, items: () => items.runtimes, expose: (name, value) => { ctx.debug.expose(name, value); },
       views: { raceClock: () => new RaceClockChip(ctx.scope), steer: () => new SteerChip(ctx.scope),
         talkBox: () => { if (presentation === null) throw new Error('Missing talk presentation module'); return presentation.talkBox(ctx.scope.child('talks')); } } });

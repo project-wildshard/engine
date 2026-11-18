@@ -11,6 +11,9 @@ import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { FollowedMovers } from '../plugin/followedMovers';
 import { installSteerRide, type SteerRider, type SteerRideView } from '../plugin/steerRide';
+import type { SteerRow } from '../plugin/steerPrediction';
+import type { PlayerWireInput } from '@wildshard/engine/player/Player';
+import { localWalkingMove } from '@wildshard/engine/player/walk';
 import { installDeclaredTalks, type TalkBox } from './declaredTalks';
 import { itemLineMirror } from './itemLines';
 import { installRaceClock, type RaceClockView } from './raceClock';
@@ -28,6 +31,10 @@ export interface PlayWire {
   readonly send: (id: string) => void;
   /** Whether the wire is bound and this side's. */
   readonly live: () => boolean;
+  /** SS-MS2a3b: a mover's row in the newest frame (its sample of that tick), or null. */
+  readonly moverRow: (id: string) => SteerRow | null;
+  /** Commands this page sent that the server has not stepped yet. */
+  readonly behind: () => number;
 }
 
 /** Everything a play entry reads off its side. */
@@ -45,6 +52,8 @@ export interface PlayPort extends PlayWire {
   readonly rider: SteerRider;
   /** Whether the rider holds boost (sprint) now. */
   readonly boost: () => boolean;
+  /** The world move the player's held stick and view make now (SS-MS2a3b: a steer vehicle's stick on this page). */
+  readonly move: () => { readonly x: number; readonly z: number };
   /** The side's followed movers, or null when it built none. */
   readonly movers: FollowedMovers | null;
   /** The held kit's items, or null while there is none (a grid kit comes and goes with its own stay). */
@@ -64,7 +73,14 @@ export interface PlayInstall {
 /** The wire reads and sends of one side. `here` says whether the wire is this side's (always, on a one-shard page). */
 export function playWire(here: () => boolean = () => true): PlayWire {
   return { line: (name) => (here() ? wirePage.line(name) : 0), tick: () => (here() ? wirePage.tick() : null), led: () => here() && wirePage.led(),
-    send: (id) => { if (here()) wirePage.send(id); }, live: () => wirePage.client !== null && here() };
+    send: (id) => { if (here()) wirePage.send(id); }, live: () => wirePage.client !== null && here(),
+    moverRow: (id) => (here() ? wirePage.moverRow(id) : null), behind: () => (here() ? wirePage.pending() : 0) };
+}
+
+/** The world move a player's held controls make now, as the walk (and the server, off the command) reads them. */
+export function heldMove(player: { sampleHeldCommand: () => PlayerWireInput }): () => { readonly x: number; readonly z: number } {
+  const out = { x: 0, z: 0 };
+  return () => { const held = player.sampleHeldCommand(); localWalkingMove(held.steer, held.yaw, out); return { x: out.x, z: out.z }; };
 }
 
 /** Whether a source declares any race. */
@@ -93,7 +109,8 @@ const talks: PlayInstall = { id: 'talks', wants: hasTalks, install: (source, por
 const rides: PlayInstall = { id: 'rides', wants: hasSteerRides, install: (_source, port) => {
   const movers = port.movers;
   if (movers === null) return;
-  installSteerRide(movers, { system: port.system, led: port.led, player: port.rider, view: port.views.steer(), boost: port.boost });
+  installSteerRide(movers, { system: port.system, led: port.led, player: port.rider, view: port.views.steer(), boost: port.boost,
+    predict: { move: port.move, row: port.moverRow, behind: port.behind } });
   port.scope.onDispose(() => { movers.steered = null; }); // the next install boards afresh
 } };
 

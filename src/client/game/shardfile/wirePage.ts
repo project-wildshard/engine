@@ -25,6 +25,7 @@ import { netEncounterFeed, type EncounterRow } from '../boss/barFeed';
 import { netLootFeed, type LootFeed } from '../loot/feed';
 import { netCreatureCount } from '../population/netCounts';
 import type { MoverView } from '../../../server/game/plugin/mover';
+import type { MoverPose } from '@wildshard/engine/physics/mover';
 
 type Live = (client: NetClient) => (() => void) | undefined;
 /** A mover's look in one grid cell, as `WirePage.moverLooks` keys it. */
@@ -66,6 +67,8 @@ export class WirePage {
   readonly moverLooks: Map<string, MoverView> = new Map<string, MoverView>();
   /** Whether the server is carrying this player's body now. */
   led: () => boolean = () => false;
+  /** Commands this page sent that the server has not stepped yet (SS-MS2a3b). */
+  pending: () => number = () => 0;
   /** A row's body on this page, by its handle. */
   rowBody: (body: number) => Animal | null = () => null;
   /** A row's body on this page, by the name the server gave it. */
@@ -75,6 +78,16 @@ export class WirePage {
   private speciesKinds: ReadonlyMap<string, string> = new Map<string, string>();
   /** The head over a row's body, into `to`: what an elite's bar stands on. */
   readonly head: (body: number, to: Vector3) => boolean = (body, to) => this.heads(body, to);
+  /** SS-MS2a3b: a mover's row in the newest frame, when that frame carried a sample of it (not a held copy). */
+  moverRow(id: string): { readonly tick: number; readonly pose: MoverPose } | null {
+    const client = this.client, frame = client?.latest;
+    if (client === null || frame === null || frame === undefined) return null;
+    const handle = client.handle(`script:${id}`);
+    if (handle === undefined || !frame.fresh.has(handle)) return null;
+    const row = client.fields(frame, handle), x = row?.['x'], y = row?.['y'], z = row?.['z'], pitch = row?.['pitch'], yaw = row?.['yaw'], roll = row?.['roll'];
+    if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number' || typeof pitch !== 'number' || typeof yaw !== 'number' || typeof roll !== 'number') return null;
+    return { tick: frame.tick, pose: { position: { x, y, z }, euler: { x: pitch, y: yaw, z: roll }, enabled: row?.['enabled'] === true } };
+  }
   /** How many poses rows have set: what a proof reads. */
   posed = 0;
   /** What this page drew of what it only hears, by name: what a proof reads. */

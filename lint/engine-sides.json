@@ -874,6 +874,7 @@
     "src/client/game/plugin/placeholderGeometry.ts": "client",
     "src/client/game/plugin/scene.ts": "client",
     "src/client/game/plugin/shaderFamily.ts": "client",
+    "src/client/game/plugin/steerPrediction.ts": "client",
     "src/client/game/plugin/steerRide.ts": "client",
     "src/client/game/plugin/ui.ts": "client",
     "src/client/game/plugin/weaponFamily.ts": "client",

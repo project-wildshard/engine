@@ -18,6 +18,14 @@ export interface MoverSteer { readonly throttle: number; readonly turn: number; 
 export const STEER_FIELDS = { yaw: 2, speed: 5, ridden: 6 } as const;
 const signed = (x: number): number => Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
 const COORD = 250;
+/** How far above and below a ground-following steer vehicle its ground probe reaches (m): the server's and its rider's page. */
+export const STEER_PROBE = { up: 2, down: 4 } as const;
+/** SS-MS2a1b: a rider's world move (the walk's, off a command) as a steer vehicle's stick in its frame (heading `yaw`): forward
+ *  is throttle, right is turn. The server reads it off the rider's command and the rider's page off its own (SS-MS2a3b). */
+export function steerStick(move: { readonly x: number; readonly z: number }, yaw: number, boost: boolean): MoverSteer {
+  const sin = Math.sin(yaw), cos = Math.cos(yaw);
+  return { throttle: -sin * move.x - cos * move.z, turn: cos * move.x - sin * move.z, boost };
+}
 /** Where a steer vehicle's frame rides the mover's numeric input, after the 12 numbers every mover reads. */
 const STEER_INPUT = 12;
 /** A steer vehicle's stick and ground as numeric mover input (the composed lane's one ABI). */

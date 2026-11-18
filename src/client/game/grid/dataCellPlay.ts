@@ -10,7 +10,7 @@ import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { FollowedMovers } from '../plugin/followedMovers';
-import { PLAY_INSTALLS, installPlay, playWire, type PlayPort, type PlayViews } from '../shardfile/playInstalls';
+import { PLAY_INSTALLS, heldMove, installPlay, playWire, type PlayPort, type PlayViews } from '../shardfile/playInstalls';
 import { wirePage } from '../shardfile/wirePage';
 import type { RegionalRuntimePage } from './regionalRuntime';
 
@@ -20,7 +20,7 @@ const unset = (what: string) => (): never => { throw new Error(`grid play port: 
 export function cellPlayPort(stay: Scope, here: () => boolean,
   parts: Partial<Omit<PlayPort, 'scope' | 'line' | 'tick' | 'led' | 'send' | 'live' | 'views'>> & { readonly views?: Partial<PlayViews> }): PlayPort {
   return { ...playWire(here), scope: stay, system: unset('frame clock'), flags: wirePage.gates, prompts: [], root: new Group(),
-    feet: unset('player'), rider: { yaw: 0, position: { x: 0, y: 0, z: 0 } }, boost: () => false, movers: null, items: () => null,
+    feet: unset('player'), rider: { yaw: 0, position: { x: 0, y: 0, z: 0 } }, boost: () => false, move: () => ({ x: 0, z: 0 }), movers: null, items: () => null,
     ...parts, views: { raceClock: unset('race chip'), steer: unset('steer chip'), talkBox: unset('talk box'), ...parts.views } };
 }
 
@@ -37,7 +37,7 @@ export function cellPagePort(page: Pick<RegionalRuntimePage, 'world'>, stay: Sco
   const player = page.world.player;
   return cellPlayPort(stay, here, { ...parts, views,
     system: (spec) => { app.addSystem({ ...spec, id: `grid.${instance}.${spec.id}` }, stay); },
-    feet: () => player.position, rider: player, boost: () => (player.sampleHeldCommand().buttons & NET_BUTTONS.sprint) !== 0 });
+    feet: () => player.position, rider: player, boost: () => (player.sampleHeldCommand().buttons & NET_BUTTONS.sprint) !== 0, move: heldMove(player) });
 }
 
 /** The page's install: every entry the copy wants on `cellPagePort`, its chips and box loaded with the quest presentation;

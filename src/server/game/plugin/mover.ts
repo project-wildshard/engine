@@ -20,7 +20,7 @@ import { KinematicMover, type MoverBox, type MoverPose } from "@wildshard/engine
 import { RopeChain } from "@wildshard/engine/physics/ropeChain";
 import { MOVER_FIELDS, MOVER_FIELD_RANGES, moverScriptEntities } from "../../../shared/game/shardfile/movers";
 import { MoverLifecycle, MoverLifecycleStateSchema, moverEndState, type MoverEndEvent } from '@wildshard/engine/sim/moverLifecycle';
-import { MoverMechanic, steerFrame, steerInput, type MoverSteer, type NativeMoverMotion } from '@wildshard/engine/sim/moverMotion';
+import { MoverMechanic, STEER_PROBE, steerFrame, steerInput, steerStick, type MoverSteer, type NativeMoverMotion } from '@wildshard/engine/sim/moverMotion';
 import { floorBelow } from '@wildshard/engine/physics/query';
 import { localWalkingMove } from '@wildshard/engine/player/walk';
 import { parseMovers, type MoverData } from "@wildshard/format/movers";
@@ -39,8 +39,6 @@ export interface TerrainEntryWalk {
     readonly halfWidths: Readonly<Record<TerrainEntryway['edge'], number>>; readonly stride: number; readonly look: number };
 }
 /** The player's capsule (the engine's edge walk's). */
-/** How far above and below a ground-following steer vehicle its ground probe reaches (m). */
-const STEER_PROBE_UP = 2, STEER_PROBE_DOWN = 4;
 /** A point given in a vehicle's own frame (x right, z back), where it stands in the world now. */
 function vehiclePoint(entity: { readonly position: readonly [number, number, number]; readonly fields: Readonly<Record<number, number>> }, [x, y, z]: readonly [number, number, number]): [number, number, number] {
   const yaw = entity.fields[MOVER_FIELDS.yaw] ?? 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
@@ -190,8 +188,7 @@ export function riderStick(host: Pick<SimHost, 'tickCommand'>, player: string, y
   const command = host.tickCommand(player); if (command === undefined) return undefined;
   const move = { x: command.moveX, z: command.moveZ };
   if (command.commandVersion === 1 && command.steer !== undefined) localWalkingMove(command.steer, command.yaw, move);
-  const sin = Math.sin(yaw), cos = Math.cos(yaw);
-  return { throttle: -sin * move.x - cos * move.z, turn: cos * move.x - sin * move.z, boost: command.boost === true || command.sprint === true };
+  return steerStick(move, yaw, command.boost === true || command.sprint === true);
 }
 export function* playerGrounds(host: Pick<SimHost, 'players' | 'parked'>): Generator<CharacterMotor['result']> { for (const player of host.players.values()) if (player.hasMotor && !host.parked.has(player.id)) yield player.motor.result; }
 /** Host-owned activation observes real grounded collider ownership and the admitted host shared state. */
@@ -416,7 +413,7 @@ export class MoverRuntime {
     const yaw = e.fields[MOVER_FIELDS.yaw] ?? 0, ridden = e.fields[MOVER_FIELDS.raising] === 1;
     const stick = ridden ? this.activation.steer?.(this.riders.get(m.id), yaw) : undefined;
     // SS-GP5: the probe passes through the vehicle's own hull, or it would climb onto itself
-    const ground = m.driver.ground ? floorBelow(this.physics(), e.position[0], e.position[2], e.position[1] + STEER_PROBE_UP, STEER_PROBE_UP + STEER_PROBE_DOWN, undefined, collider => tagOf(collider)?.owner !== m.id) : undefined;
+    const ground = m.driver.ground ? floorBelow(this.physics(), e.position[0], e.position[2], e.position[1] + STEER_PROBE.up, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== m.id) : undefined;
     return [...input, ...steerInput(stick, ground)];
   }
   /** Anyone's real ground: one player on a plate holds it down for the room. */

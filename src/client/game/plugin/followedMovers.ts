@@ -9,6 +9,10 @@ import type { ScriptEntity } from '@wildshard/engine/script/effects';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import { parseMovers, type MoverData } from '@wildshard/format/movers';
+import { floorBelow } from '@wildshard/engine/physics/query';
+import { tagOf } from '@wildshard/engine/physics/surface';
+import { STEER_PROBE, type MoverSteer } from '@wildshard/engine/sim/moverMotion';
+import { SteerPrediction, type SteerRow } from './steerPrediction';
 import { moverScriptEntities } from '../../../shared/game/shardfile/movers';
 import { carryPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { wirePage } from '../shardfile/wirePage';
@@ -71,10 +75,14 @@ export class FollowedMovers {
   private readonly steerPrompts = new Map<string, readonly { readonly local: readonly [number, number, number]; readonly at: Vector3 }[]>();
   /** SS-MS2a3: the steer vehicle this page's player rides now, as the page's steer ride reads it (`steerRide.ts`), or null. */
   steered: string | null = null;
+  /** SS-MS2a3b: the ridden vehicle this page steps on its rider's stick, ahead of its rows. */
+  private prediction: { readonly id: string; readonly run: SteerPrediction } | null = null;
+  private readonly physics: Physics;
   constructor(data: MoverData, ports: { readonly physics: Physics; readonly scope: Scope; readonly adopt?: (id: string) => MoverView | undefined; readonly restoreFlags?: ReadonlySet<string>;
     /** SS-GP5: each steer vehicle's hull in its own frame (`vehicleHulls`), which rides it as a platform's boxes do. */
     readonly hulls?: ReadonlyMap<string, readonly MoverBox[]> }) {
     this.data = parseMovers(data);
+    this.physics = ports.physics;
     this.lifecycle = new MoverLifecycle(this.data.map(row => ({ id: row.id, ...(row.atEnd === undefined ? {} : { atEnd: row.atEnd }), ...(row.restoreFrom === undefined ? {} : { restoreFrom: row.restoreFrom }) })));
     if (this.data.some(row => row.restoreFrom !== undefined) && ports.restoreFlags === undefined) throw new Error('Mover restore requires saved flag data');
     this.entities = new Map(moverScriptEntities(this.data).map(entity => [entity.id, entity]));
@@ -110,8 +118,30 @@ export class FollowedMovers {
   private entity(row: MoverData[number]): ScriptEntity {
     const entity = this.entities.get(row.entity); if (entity === undefined) throw new Error('Missing mover script entity'); return entity;
   }
-  /** Pose a mover off a server's row: its collider and its view. */
+  /** Pose a mover off a server's row: its collider and its view. The vehicle this page predicts takes its rows in `predict`. */
   follow(id: string, pose: MoverPose): void {
+    if (this.prediction?.id !== id) this.place(id, pose);
+  }
+  /**
+   * SS-MS2a3b: one fixed step of the vehicle this page's player rides, on the rider's `stick`, before its row arrives. `row` is
+   * its newest row, which answers the command `behind` steps back from the one just sent: the prediction settles on it.
+   */
+  predict(id: string, stick: MoverSteer, row: SteerRow | null, behind: number): MoverPose {
+    if (this.prediction?.id !== id) {
+      const data = this.data.find(entry => entry.id === id); if (data === undefined) throw new Error('Unknown mover');
+      this.prediction = { id, run: new SteerPrediction(data, this.pose(id)) };
+    }
+    const { run } = this.prediction, data = this.data.find(entry => entry.id === id), was = this.pose(id).position;
+    // the ground under a ground-following vehicle, as the server probes it: its own hull is not ground
+    const ground = data?.driver?.kind === 'steer' && data.driver.ground
+      ? floorBelow(this.physics, was.x, was.z, was.y + STEER_PROBE.up, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== id) : undefined;
+    run.step(stick, ground);
+    if (row !== null) run.settle(row, behind);
+    const pose = run.pose(); this.place(id, pose); return pose;
+  }
+  /** The ride ended: the vehicle follows its rows again. */
+  stopPredicting(): void { this.prediction = null; }
+  private place(id: string, pose: MoverPose): void {
     this.sinks.get(id)?.(pose); this.poses.set(id, pose);
     for (const prompt of this.steerPrompts.get(id) ?? []) prompt.at.set(...vehiclePoint(pose, prompt.local));
     const end = this.ends.get(id);
@@ -128,7 +158,10 @@ export class FollowedMovers {
   }
   /** A replay of a command under a predicted body: no physics steps between replayed commands, so the deck goes where this one
    * meets it at once, and the pose the next live step carries from waits behind it. */
-  replayPose(id: string, at: MoverPose, next: MoverPose): void { const body = this.bodies.get(id); body?.resetPose(at); body?.setPose(next); }
+  replayPose(id: string, at: MoverPose, next: MoverPose): void {
+    if (this.prediction?.id === id) return; // the ridden vehicle stands where this page has it (SS-MS2a3b)
+    const body = this.bodies.get(id); body?.resetPose(at); body?.setPose(next);
+  }
   /** Nothing steps here, so the only ride this page knows is one it sees move. */
   riding(id?: string): boolean {
     const rows = id === undefined ? this.data : this.data.filter(row => row.id === id);

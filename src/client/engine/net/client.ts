@@ -178,6 +178,8 @@ export class NetClient {
   onLedger(listener: (receipt: NetLedger) => void): () => void { this.receipts.add(listener); return () => { this.receipts.delete(listener); }; }
   /** A held frame by tick. */
   frame(tick: number): DecodedFrame | null { return this.frames.get(tick) ?? null; }
+  /** An entity's handle by its id, while the wire holds it. */
+  handle(id: string): number | undefined { return this.ids.get(id); }
   /** One entity's row in a frame, as field values. */
   fields(frame: DecodedFrame, handle: number): NetFields | null {
     const row = frame.rows.get(handle), cls = this.entities.get(handle)?.cls;
