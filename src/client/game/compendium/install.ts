@@ -71,7 +71,8 @@ export function installCompendium(host: CompendiumHost): { state: CompendiumStat
   disc.type = 'button'; disc.className = 'ws-cmp-disc';
   disc.innerHTML = `${GLYPH_BOOK}Journal`;
   hudSlots.pill(disc, () => { if (hud.entered) journal.open(); }, journal.scope);
-  bagMenu(menu).addFinds('compendium', () => compendiumFinds(state, (id) => { journal.open(id); })); // the BAG's FINDS tab is the journal (E314 C: JOURNAL became FINDS)
+  // the BAG's FINDS tab is the journal (E314 C: JOURNAL became FINDS); its row goes with the journal (SS-GP4d: a grid stay's does)
+  journal.scope.onDispose(bagMenu(menu).addFinds('compendium', () => compendiumFinds(state, (id) => { journal.open(id); })));
   app.input.bind('journal', () => { journal.open(); }, journal.scope, () => hud.entered && !menu.isOpen && !journal.isOpen);
 
   // ── open / close: release the lock + the weapons, then resume the way the pause menu does ──

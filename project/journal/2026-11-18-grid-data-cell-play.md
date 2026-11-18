@@ -9,3 +9,8 @@ Loot coins and the compendium (rows 12, 13) are the rest of SS-GP4.
 SS-GP4e: gear loot. A data cell whose loot row carries gear (the Template's `purse.coins`) installs its purse, coin burst,
 chip and Bag loot row per stay (`dataCellLoot.ts`); `stayContext` takes the copy's own folder so the loot presentation reads
 the copy's `economy/loot`, not the home's.
+
+SS-GP4d: compendium and journal. A data cell's compendium registers from its own folder per stay and its journal (N key,
+FINDS row, Journal pill, tracker on a cell-named system) installs and leaves with the stay. Found doing it: the plain
+`installCompendium` path never removed its Bag FINDS row (only the menu's scope did), so a second entry would throw
+"Duplicate Bag finds"; the row now goes with the journal's scope. That closes SS-GP4.

@@ -90,6 +90,7 @@ import { cellCompletionRows, enterDataCellCompletion } from './dataCellCompletio
 import { cellDeclaredAudio, enterDataCellAudio } from './dataCellAudio';
 import { enterDataCellPlumbing, hasPlumbing } from './dataCellPlumbing';
 import { cellLootRow, enterDataCellLoot } from './dataCellLoot';
+import { enterDataCellCompendium, hasCompendium } from './dataCellCompendium';
 import type { AudioData } from '@wildshard/format/audio';
 import type { CompletionRows } from '@wildshard/format/completion';
 import { hasDeclaredHud } from '../shardfile/declaredHud';
@@ -283,7 +284,9 @@ export class LiveGridSession {
     /** SS-GP4c: the copy's source when it declares input contexts (its tools' keys and touch buttons), installed on entry */
     readonly plumbing: Shardfile | null;
     /** SS-GP4e: the copy's gear loot row and its folder when it pays coins, its purse and chip installed on entry */
-    readonly loot: { readonly source: Shardfile; readonly row: string; readonly folder: ShardFolder } | null }>();
+    readonly loot: { readonly source: Shardfile; readonly row: string; readonly folder: ShardFolder } | null;
+    /** SS-GP4d: the copy's compendium source, its sketches' assets and its folder, the journal installed on entry */
+    readonly compendium: { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array>; readonly folder: ShardFolder } | null }>();
   /** AU20: the entered data cell's own audio scene (an Open Plot's score, bed and loops), live while the feet are in it. */
   private plotAudio: { readonly instance: string; readonly scope: Scope } | null = null;
   /** TC-E1b: the entered data cell's held kit, disposed when the feet leave it */
@@ -796,7 +799,8 @@ export class LiveGridSession {
           // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
           audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(folder())) : null,
           completion: completionRows === null ? null : { source: copySource, rows: completionRows }, declaredAudio: cellDeclaredAudio(copySource), plumbing: hasPlumbing(copySource) ? copySource : null,
-          loot: lootRow === null ? null : { source: copySource, row: lootRow, folder: folder() } });
+          loot: lootRow === null ? null : { source: copySource, row: lootRow, folder: folder() },
+          compendium: hasCompendium(copySource) ? { source: copySource, assets, folder: folder() } : null });
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });
         // TC-E1b: feet that entered before this admission finished get the cell's kit now
         if (gridCells.cell?.instance === cell.instance && this.dataKit === null) this.enterDataKit(cell.instance);
@@ -1011,7 +1015,7 @@ export class LiveGridSession {
   private enterDataPlay(instance: string): void {
     const region = this.regions.get(instance), page = this.page.runtimePage?.() ?? null;
     if (region === undefined || page === null) return;
-    const { quests, facts, hud, completion, declaredAudio, plumbing, loot } = region;
+    const { quests, facts, hud, completion, declaredAudio, plumbing, loot, compendium } = region;
     if (quests !== null) this.enterDataStay('quests', instance, (stay, here) => enterDataCellQuests(quests, page, stay, instance, here));
     if (facts !== null) this.enterDataStay('facts', instance, (stay, here) => { enterDataCellFacts(facts, { saves: this.page.saves, catalogue: this.page.catalogue, progress: () => page.play.progress }, stay, instance, here); });
     if (hud !== null) this.enterDataStay('hud', instance, (stay, here) => { enterDataCellHud(hud, page, stay, instance, here); });
@@ -1019,6 +1023,7 @@ export class LiveGridSession {
     if (declaredAudio !== null) this.enterDataStay('audio', instance, (stay) => { enterDataCellAudio(declaredAudio, page, stay); });
     if (plumbing !== null) this.enterDataStay('plumbing', instance, (stay, here) => { enterDataCellPlumbing(plumbing, page, stay, instance, here); });
     if (loot !== null) this.enterDataStay('loot', instance, async (stay) => { await enterDataCellLoot(loot.source, loot.row, loot.folder, page, stay, instance); });
+    if (compendium !== null) this.enterDataStay('compendium', instance, async (stay) => { await enterDataCellCompendium(compendium.source, compendium.assets, compendium.folder, page, stay, instance); });
   }
   /** One play install of the entered cell, by kind: its stay scope ends when the feet leave. `here` says whether the wire is this cell's. */
   private enterDataStay(kind: string, instance: string, install: (stay: Scope, here: () => boolean) => Promise<void> | void): void {
