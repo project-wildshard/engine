@@ -28,8 +28,12 @@ import { pageScope } from '../../../shared/engine/app/resources';
  *   version(): Promise<SwVersion|null>  what the controlling worker holds ({ build, entries, bytes, caches }),
  *                               null when nothing controls the page.
  *
+ *   activated: string|null      SB37b: the live build whose worker activated behind this page (an update takes over by itself,
+ *                               sw.js STALESHELL, yet claims no document); null until then. The title reloads into it when idle.
+ *
  *   window event `ws-sw-waiting` carries { waiting, build } for an installed newest build, or { waiting: null }
  *   when it can no longer deliver it. The UI's `ws-sw-discovered` event carries a fresh version.json build.
+ *   window event `ws-sw-activated` carries { build } once, when `activated` is set.
  *
  * Opt-outs: `?sw=0` unregisters any worker and registers none (the bench measures the network). In dev the
  * worker is only registered with `?sw=1` (a stale worker would serve yesterday's bundle over HMR).
@@ -56,6 +60,8 @@ export interface WsSw {
   /** Explicit network-only opt-outs also disable optional code transports. */
   readonly enabled?: boolean;
   waiting: ServiceWorker | null;
+  /** SB37b: the live build whose worker activated behind this page, which still runs an older one */
+  activated?: string | null;
   /** `why`: what asked for it, recorded for the next boot (src/client/engine/boot/lastEnd.ts); `within`: ms the hand-over may take (RL3) */
   adopt: (to?: string, why?: string, within?: number) => Promise<boolean>;
   version: () => Promise<SwVersion | null>;
@@ -71,7 +77,7 @@ let controlEvent = false, controlFrames = false, controlReached = false, precach
 /** OF5a: the title settled (`ws:title-settled`), and whether its update precache was asked */
 let titleSettled = false, updateAsked = false;
 // declared ahead of the functions that read it (they only run after registration; `boot()` is hoisted)
-const api: WsSw = { ready: boot(), enabled: swAllowed(), waiting: null, adopt, version };
+const api: WsSw = { ready: boot(), enabled: swAllowed(), waiting: null, activated: null, adopt, version };
 
 function swAllowed(): boolean {
   if (!sw) return false;
@@ -118,6 +124,22 @@ function announce(w: ServiceWorker): void {
       || w.state !== 'installed' || target !== newestBuild || !matchesNewest(build, target)) return;
     api.waiting = w;
     window.dispatchEvent(new CustomEvent('ws-sw-waiting', { detail: { waiting: w, build: target } }));
+  })();
+}
+
+/** SB37b: a worker that reached `activated` serves the next navigation. When it is the live build and this page runs another,
+ *  say so once: the title reloads into it while idle (src/client/game/titleHandover.ts). The worker itself never navigates a
+ *  page (a menu the player has open would be snatched) and claims none (039d). */
+function noticeActivated(w: ServiceWorker): void {
+  void (async () => {
+    // this page's own build (every ordinary boot) costs one worker message and no version.json read
+    const build = await buildOf(w);
+    if (build === null || build.startsWith(`${__BUILD_ID__}-`)) return;
+    const target = await newest();
+    if (pageScope.disposed || pageScope.disposing || api.activated !== null || w.state !== 'activated'
+      || target === null || target !== newestBuild || !matchesNewest(build, target)) return;
+    api.activated = target;
+    window.dispatchEvent(new CustomEvent('ws-sw-activated', { detail: { build: target } }));
   })();
 }
 
@@ -172,11 +194,16 @@ function watch(reg: ServiceWorkerRegistration): void {
     pageScope.listen(w, 'statechange', () => {
       if (w.state === 'installed' && sw?.controller) announce(w);
       else if (api.waiting === w && w.state !== 'installed') unavailable();
+      if (w.state === 'activated' && sw?.controller) noticeActivated(w);
     });
     if (w.state === 'installed') announce(w);
   };
   track(reg.waiting);
   track(reg.installing);
+  // SB37b: an update that activated before this registration was read (slow WebKit registration) is the live build too.
+  // Only a controlled page had a build to replace: a first install's activation is this page's own build (DL1 asks it PRECACHE only)
+  const active = reg.active;
+  if (active?.state === 'activated' && sw?.controller) noticeActivated(active);
   pageScope.listen(reg, 'updatefound', () => track(reg.installing));
 }
 

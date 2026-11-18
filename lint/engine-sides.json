@@ -817,6 +817,7 @@
     "src/client/game/loot/ui/CoinChip.ts": "client",
     "src/client/game/loot/ui/ShopPanel.ts": "client",
     "src/client/game/mainMenu.ts": "client",
+    "src/client/game/titleHandover.ts": "client",
     "src/client/game/models/binarySource.ts": "client",
     "src/client/game/models/collectionDisplay.ts": "client",
     "src/client/game/models/collectionWall.ts": "client",

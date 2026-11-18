@@ -28,6 +28,7 @@ import { pageScope } from '@wildshard/engine/app/resources';
 import { saves } from '@wildshard/engine/saves/runtime';
 import { findTitleManifest, titleManifests } from './shard/titleList';
 import { titlePrefetchChoice, titlePrefetchTarget } from './grid/titlePrefetchChoice';
+import { armTitleHandover } from './titleHandover';
 
 import { GAME_STRINGS } from '../../shared/game/strings';
 import { WHATS_NEW, type WhatsNew } from './whatsNew';
@@ -262,6 +263,8 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   deck.onTap(required(main, '.ws-main-dev', HTMLButtonElement), () => { setDev(!dev); });
   deck.onTap(back, () => { show('main'); });
   show(viewScreen);
+  // SB37b: a cold title gives way to the candidate once its worker activates, only while it sits idle on the main screen
+  if (opts.active === null) armTitleHandover(owner, () => viewScreen === 'main' && !naming && !leavingTitle);
 
   return {
     root, cards: deck.cards,
