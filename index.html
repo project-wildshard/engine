@@ -312,6 +312,12 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
 /* FC14 (G911): the phone's HUD glass is flat. A backdrop blur re-samples the live canvas under every chip, disc and panel
    each frame the world draws; a desktop keeps it */
 #hud.touch, #hud.touch * { -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* MEMORY-GATES MG10 (mini-ninesteady2): WebKit gives each composited layer a backing store the size of its box at the screen's
+   scale (402 x 874 at 3x is 12.6 MB, up to three of them while it repaints). #hud and the touch layer fill the screen but
+   paint only small controls, so on the phone each of their children draws in its own small layer and the two full-screen
+   containers paint nothing, so they get no backing store. The full-screen effects opt out where they are styled
+   (game.css, gmenu.css, touch.css). */
+:where(#hud.touch) > * { will-change: opacity; }
 
 .ws-glass {
   background: var(--ws-glass);
