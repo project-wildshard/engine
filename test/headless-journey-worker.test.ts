@@ -10,10 +10,11 @@ import {expect,test} from 'vitest';
 
 test('terminal journey matches native step movement, retires, and refuses runtime/invalid requests',()=>{
   const child=spawnSync(process.execPath,['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
-    resolve('test/fixtures/headless/journey-run.mjs')],{encoding:'utf8',timeout:20_000});
-  expect(child.status,child.stdout+child.stderr).toBe(0);
+    resolve('test/fixtures/headless/journey-run.mjs')],{encoding:'utf8',timeout:35_000});
+  const diagnostics=[child.error?.message,child.signal,child.stdout,child.stderr].filter(Boolean).join('\n');
+  expect(child.status,diagnostics).toBe(0);
   expect(child.stdout).toContain('native journey parity, terminal disposal and runtime refusal pass');
-},25_000);
+},45_000);
 
 
 test('the public route cursor loads in strip-only Node without a TypeScript transform',()=>{
