@@ -1,11 +1,11 @@
-import { parseNavigation, readNavigation, type NavigationContent } from '@wildshard/format/navigation';
+import type { NavigationContent } from '@wildshard/format/navigation';
 import { app } from '../app/runtime';
 /**
  * The app's binding of the baked navmesh (SF72 split it from the renderer-free src/shared/engine/physics/navmesh.ts, which holds
  * the format, the parse and the queries): the active level's navmesh, and its fetch in the `physics` step. Every navmesh
  * this loads reports its query cost to the perf meter (frameCost.nav).
  */
-import { buildNavmesh, parseNavmesh, type Navmesh } from '../../../shared/engine/physics/navmesh';
+import type { Navmesh } from '../../../shared/engine/physics/navmesh';
 import { workSlice } from '../../../shared/engine/core/workSlice';
 import { navmeshUrl } from '../../../shared/engine/physics/navmeshUrl';
 import { frameCost } from '../../../shared/engine/core/frameCost';
@@ -46,6 +46,18 @@ async function declaredBytes(key: string, file: string, url: string): Promise<Ui
 }
 
 
+/**
+ * ENGINE-MEMORY EM20: one copy of the zone's navmesh, the server's. Creatures steer in the standalone server's worker (or a
+ * room), which builds its own from the same bytes; the page draws and predicts the player and asks no navmesh anything.
+ * Built on the page it was a second copy: Nalati 8.69 MB of JS heap [H] in each isolate (271 kB of bytes, 32x as objects).
+ * The page builds one only for the tools that read it: `?navmesh=debug` (the overlay) or `?navmesh=page` (the Developer
+ * probe's `nav`). Its code (navcat) loads only then, off the session bundle.
+ */
+export function pageNavmeshWanted(search: string = typeof location === 'undefined' ? '' : location.search): boolean {
+  const asked = new URLSearchParams(search).get('navmesh');
+  return asked === 'debug' || asked === 'page';
+}
+
 /** Set (or clear) the active navmesh — node tests, or a shard switch. */
 export function setActiveNavmesh(levelId: string, navmesh: Navmesh | null): void { app.navmesh = navmesh; app.navmeshId = navmesh ? levelId : null; }
 
@@ -58,6 +70,8 @@ export function setActiveNavmesh(levelId: string, navmesh: Navmesh | null): void
  * admitted are not downloaded twice; either way they are checked against the row before any query mesh is built.
  */
 export async function loadNavmesh(levelId: string, bakedId: string = levelId, content?: NavigationContent): Promise<Navmesh | null> {
+  if (!pageNavmeshWanted()) return null;
+  const [{ buildNavmesh, parseNavmesh }, { parseNavigation, readNavigation }] = await Promise.all([import('../../../shared/engine/physics/navmesh'), import('@wildshard/format/navigation')]);
   if (content !== undefined) {
     const row = parseNavigation(content.row);
     const bytes = 'bytes' in content ? content.bytes : await declaredBytes(bakedId, row.file, content.url);
