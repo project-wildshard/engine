@@ -12,11 +12,9 @@ import { addBakedTerrainCollider } from '@wildshard/engine/physics/terrainTiles'
 import { retireTerrain } from '@wildshard/engine/physics/terrain';
 import { timeClientPreparation } from './preparationTiming';
 import { wirePage } from './wirePage';
-import { installRaceClock } from './raceClock';
-import { itemLineMirror } from './itemLines';
 import { RaceClockChip, SteerChip } from '@wildshard/engine/quest/view/ui';
-import { installSteerRide } from '../plugin/steerRide';
 import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
+import type { FollowedMovers } from '../plugin/followedMovers';
 import { installDataPageMovers } from './dataPageMovers';
 import { installDataPageBodies } from './touchViews';
 import { admitClientPlan, installClientPhase, type AdmittedClientPlan, type ClientPhase } from './clientPlan';
@@ -52,7 +50,7 @@ import { installDeclaredPlumbing } from '../shard/declaredPlumbing';
 import { declaredFolderCompendium, declaredDay, declaredWeather } from '../../../shared/game/shard/declaredRows';
 import { installDeclaredTargets, spentUses } from '../shard/declaredTargets';
 import { ownedLineFields } from './ownedLines';
-import { installDeclaredTalks } from './declaredTalks';
+import { hasTalks, installPlay, playWire } from './playInstalls';
 import type { ClientScriptViewTarget } from "../plugin/ui";
 import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
 import type { LedgerCatalogueItem } from '../../../shared/game/ledger';
@@ -539,9 +537,6 @@ export class ShardfileClient {
       if (journal !== null && !retainsRuntimeServices(ctx)) ctx.scope.onDispose(() => { journal.journal.scope.dispose(); });
     }
     const ledger = placementLedger(ctx.app.saves, source, identity, this.bindings.catalogue);
-    // SHARD-SOURCE SS-MS1a3: a declared race's clock, off this player's race lines
-    const races = source.quests.races ?? [];
-    if (races.length > 0) installRaceClock(races, { system: ctx.system, line: name => wirePage.line(name), tick: () => wirePage.tick(), view: new RaceClockChip(ctx.scope) });
     // SS-GP2: one function with a grid data cell's (`grid/dataCellFacts.ts`). On a grid page a fact filed while the feet stand
     // in another cell is that cell's (its copy records it), never this placement's.
     recordWireFacts(source, identity, ledger, ctx.scope, { here: () => { const entered = pageGridInstance(); return entered === null || entered === identity.instance; },
@@ -575,13 +570,12 @@ export class ShardfileClient {
     // the bodies whatever the plan's movers, so the page does too)
     installDataPageBodies(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map() });
     // TEMPLATE-E2E TC-E5c: a plain shard's lift and doors stand on its page; a client plan's movers install their own
+    let pageMovers: FollowedMovers | null = null;
     if (this.bindings.nativeRuntime !== true && !(this.plan?.features ?? []).some(row => row.kind === 'world.movers' || row.kind === 'motion.channels')) {
       const movers = installDataPageMovers(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map(), prompts: runtime.interactables });
       if (movers !== null) {
         ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });
-        // SHARD-SOURCE SS-MS2a3: a steer vehicle's rider: its leave prompt, the view behind its heading, its speed and boost
-        if (movers.data.some(row => row.driver?.kind === 'steer')) installSteerRide(movers, { system: ctx.system, led: () => wirePage.led(), player: world.player, view: new SteerChip(ctx.scope),
-          boost: () => (world.player.sampleHeldCommand().buttons & NET_BUTTONS.sprint) !== 0 });
+        pageMovers = movers; // a steer vehicle's rider is the play list's `rides` entry
         // side parity (SS1) reads the page's colliders beside a room's at tick 0: every mover's collider at its declared rest
         ctx.debug.expose('shardfileMovers', { rest: () => { for (const row of movers.data) { const at = { position: { ...row.at }, euler: { ...row.euler }, enabled: row.enabled }; movers.replayPose(row.id, at, at); } } });
       }
@@ -690,9 +684,6 @@ export class ShardfileClient {
         if (lever.taken && !play.weapons.has(lever.id)) { play.weapons.unlock(lever.id); play.weapons.select(lever.id); }
       }
     } });
-    // SR11 (C9): the server burns the lantern; its owned lines are what this page's runtime shows, since it never steps.
-    const heldLines = itemLineMirror(source, items.runtimes, name => wirePage.line(name));
-    if (heldLines !== null) ctx.system({ id: 'shardfile.item-lines', phase: 'update', run: () => { if (wirePage.client !== null) heldLines(); } });
 
     if (source.plumbing !== null && source.plumbing.input.length + source.plumbing.debug.length > 0) {
       const plumbing = installDeclaredPlumbing(source.plumbing, { handledInput: handledItemInputs(source), instance: source.identity.slug, tier: TIER, scope: ctx.scope, input: ctx.app.input,
@@ -704,16 +695,13 @@ export class ShardfileClient {
     installDeclaredTargets(source.targets, { panels: tiles.props?.panels ?? new Map(), colliders, read, scene, interactables: runtime.interactables, scope: ctx.scope, system: ctx.system,
       // TE-ENG6: a use that can no longer run drops its prompt: its `unless` condition holds, or its rack's lever is in hand.
       spent: spentUses(source, { read, taken: item => takenHere(item) }) });
-    // TE-ENG3: a quest-giver from rows. The server keeps each player's node and says it as an owned line; answers go by name.
-    if ((source.targets.talks?.length ?? 0) > 0) {
-      if (presentation === null) throw new Error('Missing talk presentation module');
-      let box: ReturnType<typeof presentation.talkBox> | null = null;
-      const talkBox = (): ReturnType<typeof presentation.talkBox> => { box ??= presentation.talkBox(ctx.scope.child('talks')); return box; };
-      const talks = installDeclaredTalks(source, { root: ctx.root, scope: ctx.scope, interactables: runtime.interactables, system: ctx.system, flags,
-        line: name => wirePage.line(name), send: id => { wirePage.send(id); }, box: talkBox,
-        player: () => world.player.position });
-      ctx.debug.expose('shardfileTalks', { talks: () => talks.map(talk => ({ id: talk.id, node: talk.node() ?? null, open: box?.isOpen ?? false })) });
-    }
+    // SS-GP7: the one install list (races, talks, rides, a held tool's lines), on this page's wire; a grid stay walks the same list
+    if (hasTalks(source) && presentation === null) throw new Error('Missing talk presentation module');
+    installPlay(source, { ...playWire(), scope: ctx.scope, system: ctx.system, flags, prompts: runtime.interactables, root: ctx.root,
+      feet: () => world.player.position, rider: world.player, boost: () => (world.player.sampleHeldCommand().buttons & NET_BUTTONS.sprint) !== 0,
+      movers: pageMovers, items: () => items.runtimes, expose: (name, value) => { ctx.debug.expose(name, value); },
+      views: { raceClock: () => new RaceClockChip(ctx.scope), steer: () => new SteerChip(ctx.scope),
+        talkBox: () => { if (presentation === null) throw new Error('Missing talk presentation module'); return presentation.talkBox(ctx.scope.child('talks')); } } });
     // SS-GP1: one install with a grid data cell's (`grid/dataCellQuests.ts`)
     const installQuests = (quests: Shardfile['quests'], at: ShardContext, ui: typeof presentation): void => {
       installDeclaredQuests(quests, flags, ctx.app.events, at.scope, (quest, options) => {

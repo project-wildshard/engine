@@ -11,7 +11,10 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { carryPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { FollowedMovers } from '../plugin/followedMovers';
 import { wirePage } from '../shardfile/wirePage';
-import { cellRidePrompts, installCellRides } from './dataCellRides';
+import type { Shardfile } from '@wildshard/format/shardSchema';
+import { PLAY_INSTALLS, hasSteerRides, installPlay } from '../shardfile/playInstalls';
+import { cellPlayPort } from './dataCellPlay';
+import { cellRidePrompts } from './dataCellRides';
 
 const steer = { kind: 'steer', speed: 8, turn: 1, boost: 1.5, accel: 40, ground: false } as const;
 const trigger = { kind: 'interact', permission: 0 } as const;
@@ -45,7 +48,10 @@ test('a copy\'s steer vehicle rides off the cell\'s wire for the stay, and only 
   const player = { yaw: 2, position: { x: 0, y: 1 + carry.seat, z: 0 } };
   let leading = false, here = true;
   wirePage.led = () => leading;
-  installCellRides(movers, stay, () => here, { system: spec => { systems.push(spec); }, player, boost: () => false, view: { show: ride => { shown.push(ride); } } });
+  const rides = PLAY_INSTALLS.filter(entry => entry.id === 'rides');
+  expect(hasSteerRides({ movers: data })).toBe(true);
+  expect(installPlay({ movers: data } as unknown as Shardfile, cellPlayPort(stay, () => here, { system: spec => { systems.push(spec); }, rider: player, movers,
+    views: { steer: () => ({ show: ride => { shown.push(ride); } }) } }), rides)).toEqual(['rides']);
   const frame = (): void => { movers.follow('land-sail', { position: { ...at }, euler: { ...euler }, enabled: true }); for (const system of systems) system.run(1 / 60, 0); };
   frame();
   expect(movers.steered).toBe(null);
@@ -66,6 +72,8 @@ test('a copy with carries but no steer vehicle installs no steer ride', () => {
   const [sail] = data; if (sail === undefined) throw new Error('Missing land-sail');
   const ferry = { data: [{ ...sail, id: 'ferry', driver: { kind: 'winch' } }] } as unknown as FollowedMovers; // a ferry rides, nobody steers it
   const systems: SystemSpec[] = [];
-  installCellRides(ferry, new Scope('grid-ferry-stay'), () => true, { system: spec => { systems.push(spec); }, player: { yaw: 0, position: { x: 0, y: 0, z: 0 } }, boost: () => false, view: { show: () => undefined } });
+  expect(hasSteerRides({ movers: ferry.data })).toBe(false);
+  for (const entry of PLAY_INSTALLS.filter(row => row.id === 'rides')) entry.install({ movers: ferry.data } as unknown as Shardfile, cellPlayPort(new Scope('grid-ferry-stay'), () => true,
+    { system: spec => { systems.push(spec); }, movers: ferry, views: { steer: () => ({ show: () => undefined }) } }));
   expect(systems).toEqual([]);
 });

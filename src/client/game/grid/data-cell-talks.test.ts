@@ -15,7 +15,8 @@ import { talkStandIns, type TalkBox } from '../shardfile/declaredTalks';
 import { wirePage } from '../shardfile/wirePage';
 import { talkChoice, talkLine } from '../../../shared/game/shardfile/talks';
 import { copyPrompts } from './copyPrompts';
-import { hasTalks, installCellTalks } from './dataCellTalks';
+import { PLAY_INSTALLS, hasTalks, installPlay } from '../shardfile/playInstalls';
+import { cellPlayPort } from './dataCellPlay';
 
 type Tree = Shardfile['quests']['dialogue'][number];
 type Talk = NonNullable<Shardfile['targets']['talks']>[number];
@@ -45,14 +46,17 @@ test('a copy with talks joins them to its prompts for the stay, on the cell serv
   const prompts: Interactable[] = copyPrompts(source), box = new Box(), systems: SystemSpec[] = [], scope = new Scope('grid.data-talks.fixture');
   let here = true;
   const feet = { x: talk.at[0], z: talk.at[2] };
-  const talks = installCellTalks(source, prompts, { world: { player: { position: feet } } }, scope, () => here, { box: () => box, system: (spec) => { systems.push(spec); } });
+  let exposed: { talks: () => { readonly node: string | null }[] } | null = null;
+  installPlay(source, cellPlayPort(scope, () => here, { prompts, feet: () => feet, system: (spec) => { systems.push(spec); }, views: { talkBox: () => box },
+    expose: (_name, value) => { exposed = value as typeof exposed; } }), PLAY_INSTALLS.filter(entry => entry.id === 'talks'));
+  const talks = (): { readonly node: string | null }[] => exposed?.talks() ?? [];
   expect(prompts.map((row) => row.label)).toEqual([door.label, talk.label, named.label]);
   const prompt = prompts[1]; if (prompt === undefined) throw new Error('The talk joins the copy\'s prompts');
   expect([prompt.position.x, prompt.position.z]).toEqual([talk.at[0], talk.at[2]]); // the copy's own frame
   expect(prompt.radius).toBe(0); // the cell's server has said no node yet
   lines.set(talkLine(dialogue.id), 1);
   expect(prompt.radius).toBe(talk.radius);
-  expect(talks[0]?.node()).toBe(dialogue.nodes[0]?.id);
+  expect(talks()[0]?.node).toBe(dialogue.nodes[0]?.id);
   here = false; // mid-crossing the wire is another cell's: no node, no prompt
   expect(prompt.radius).toBe(0);
   here = true;

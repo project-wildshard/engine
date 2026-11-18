@@ -12,7 +12,7 @@
 import { Object3D, Vector3 } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Actor, CombatTarget } from '@wildshard/engine/combat/pipeline';
-import type { ItemTarget } from '@wildshard/engine/combat/items';
+import type { ItemRuntime, ItemTarget } from '@wildshard/engine/combat/items';
 import { EquipmentService } from '@wildshard/engine/combat/EquipmentService';
 import type { Weapon } from '@wildshard/engine/combat/Weapon';
 import { playerModes } from '@wildshard/engine/player/modes';
@@ -20,7 +20,6 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { installDeclaredItems, leverLines, rackMeleeRows, rackToolRows, takenLine } from '../../../shared/game/shardfile/items';
 import { declaredItemIcon, declaredKitItemFamilies, declaredLever } from '../plugin/weaponFamily';
 import { itemScene } from '../shardfile/clientItems';
-import { itemLineMirror } from '../shardfile/itemLines';
 import { loadItemModels } from '../shardfile/itemModels';
 import { wirePage } from '../shardfile/wirePage';
 import type { RegionalRuntimePage } from './regionalRuntime';
@@ -34,7 +33,9 @@ export function holdsItems(source: Pick<Shardfile, 'items'>): boolean {
 
 /** Build the cell's declared kit under `entry` and bind it as the page's held equipment until `entry` is disposed. */
 /** `here`: whether the wire's frames are this cell's (a crossing's frames are another's, and their lines are not this kit's). */
-export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, page: RegionalRuntimePage, entry: Scope, here: () => boolean = () => true): Promise<EquipmentService | null> {
+export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, page: RegionalRuntimePage, entry: Scope, here: () => boolean = () => true,
+  /** the kit's items, for the play list's held-tool lines (`playInstalls.ts`, SS-GP7) */
+  held: (runtimes: ReadonlyMap<string, ItemRuntime>) => void = () => undefined): Promise<EquipmentService | null> {
   const controls = page.equipment;
   if (controls === undefined || !holdsItems(source)) return null;
   const models = await loadItemModels(source.items, assets, entry);
@@ -83,10 +84,9 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   // by the row's id (`weapon.sword-iron`), as the server's taken line names it, not the page's (`declared.weapon.sword-iron`)
   const onRacks = rackMeleeRows(source), racked = new Set(weapons.filter(weapon => onRacks.has(weapon.row.id)));
   const onStands = rackToolRows(source), stands = new Set(items.tools.filter(tool => onStands.has(tool.row.id)));
-  // a held tool's fuel and light are the server's, as on a one-shard page (`itemLines.ts`)
-  const heldLines = itemLineMirror(source, items.runtimes, name => wirePage.line(name));
+  // a held tool's fuel and light are the server's, as on a one-shard page: the play list's `item-lines` entry reads these items
+  held(items.runtimes);
   app.addContentSystem({ id: 'grid.data-cell-kit', phase: 'update', run: (dt, t) => {
-    if (heldLines !== null && wirePage.client !== null && here()) heldLines();
     for (const lever of levers) {
       if (wirePage.client !== null && here()) {
         const lines = leverLines(lever.row.id);

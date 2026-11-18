@@ -9,7 +9,9 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { FIXED_STEP } from '@wildshard/engine/core/fixedStep';
 import { raceStartLine } from '@wildshard/engine/game/quest/raceWire';
 import { wirePage } from '../shardfile/wirePage';
-import { hasRaces, installCellRaces } from './dataCellRaces';
+import { Scope } from '@wildshard/engine/app/scope';
+import { PLAY_INSTALLS, hasRaces, installPlay } from '../shardfile/playInstalls';
+import { cellPlayPort } from './dataCellPlay';
 
 const race = { id: 'arch', start: 'arch.0', stop: 'arch.8', fact: 'arch', cap: 600 };
 const source = { quests: { flags: [], quests: [], triggers: [], dialogue: [], races: [race] } } as unknown as Shardfile;
@@ -26,7 +28,8 @@ test('a copy with races runs its clock off the cell server\'s lines for the stay
   vi.spyOn(wirePage, 'tick').mockImplementation(() => tick);
   const systems: SystemSpec[] = [], shown: (string | null)[] = [];
   let here = true;
-  installCellRaces(source, () => here, { system: (spec) => { systems.push(spec); }, view: { show: (text) => { shown.push(text); } } });
+  installPlay(source, cellPlayPort(new Scope('grid.data-play.fixture'), () => here, { system: (spec) => { systems.push(spec); },
+    views: { raceClock: () => ({ show: (text) => { shown.push(text); } }) } }), PLAY_INSTALLS.filter(entry => entry.id === 'races'));
   const frame = (): void => { for (const system of systems) system.run(1 / 60, 0); };
   frame();
   expect(shown).toEqual([]); // no run yet

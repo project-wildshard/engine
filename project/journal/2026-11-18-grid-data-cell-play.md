@@ -14,3 +14,9 @@ SS-GP4d: compendium and journal. A data cell's compendium registers from its own
 FINDS row, Journal pill, tracker on a cell-named system) installs and leaves with the stay. Found doing it: the plain
 `installCompendium` path never removed its Bag FINDS row (only the menu's scope did), so a second entry would throw
 "Duplicate Bag finds"; the row now goes with the journal's scope. That closes SS-GP4.
+
+SS-GP7: one install list. `shardfile/playInstalls.ts` holds the races, talks, steer ride and held-tool lines as entries
+(`{ id, wants(source), install(source, port) }`); `client.ts` walks it once on its own wire and a grid stay walks it through
+`grid/dataCellPlay.ts` with the wire gated on the cell. `dataCellRaces.ts` and `dataCellTalks.ts` are gone, `dataCellRides.ts`
+keeps only the ride prompts, and the kit hands its items to the list instead of mirroring the lines itself.
+`grid/play-installs.test.ts` fails for an entry the grid port leaves idle.

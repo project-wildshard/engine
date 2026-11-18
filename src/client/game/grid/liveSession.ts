@@ -78,9 +78,10 @@ import type { LocalSaveInstance } from '../../../shared/game/instanceSaves';
 import { loadNavmesh } from '@wildshard/engine/physics/navmeshLoad';
 import { enteredRuntime, pickInFrame } from './enteredInteract';
 import { copyPrompts, copySpent, enteredCopy } from './copyPrompts';
-import { enterDataCellTalks, hasTalks } from './dataCellTalks';
-import { enterDataCellRaces, hasRaces } from './dataCellRaces';
-import { cellRidePrompts, enterDataCellRides } from './dataCellRides';
+import type { ItemRuntime } from '@wildshard/engine/combat/items';
+import { cellRidePrompts } from './dataCellRides';
+import { enterDataCellPlay } from './dataCellPlay';
+import { PLAY_INSTALLS } from '../shardfile/playInstalls';
 import { enterDataCellQuests } from './dataCellQuests';
 import { hasQuests } from '../shardfile/declaredQuests';
 import { enterDataCellFacts } from './dataCellFacts';
@@ -267,10 +268,8 @@ export class LiveGridSession {
   private readonly regions = new Map<string, { readonly spawn: LiveGridSpawn; readonly items: Shardfile['items']['rows']; readonly queries: PlayerFrameQueries; readonly colliders: PanelRegion['colliders']; readonly prompts: ReturnType<typeof copyPrompts>; readonly audio: PlotAudioScene | null;
     /** TC-E1b: the copy's admitted source and assets, its declared kit built from them on entry */
     readonly kit: { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array> } | null;
-    /** TC-E8: the copy's source when it declares talks, installed on entry */
-    readonly talks: Shardfile | null;
-    /** SS-MS1b: the copy's source when it declares races, their clock installed on entry */
-    readonly races: Shardfile | null;
+    /** SS-GP7: the copy's source when it wants an entry of the one install list (races, talks, rides, held-tool lines) */
+    readonly play: Shardfile | null;
     /** SS-GP1: the copy's source when it declares quests, their state and views installed on entry */
     readonly quests: Shardfile | null;
     /** SS-GP2: the copy's source when it maps facts to rewards, its granted facts recorded on entry */
@@ -290,13 +289,7 @@ export class LiveGridSession {
   /** AU20: the entered data cell's own audio scene (an Open Plot's score, bed and loops), live while the feet are in it. */
   private plotAudio: { readonly instance: string; readonly scope: Scope } | null = null;
   /** TC-E1b: the entered data cell's held kit, disposed when the feet leave it */
-  private dataKit: { readonly instance: string; readonly scope: Scope } | null = null;
-  /** TC-E8: the entered data cell's talks, live while the feet are in it */
-  private dataTalks: { readonly instance: string; readonly scope: Scope } | null = null;
-  /** SS-MS1b: the entered data cell's race clock, live while the feet are in it */
-  private dataRaces: { readonly instance: string; readonly scope: Scope } | null = null;
-  /** SS-MS2a3b: the entered data cell's steer ride, live while the feet are in it */
-  private dataRides: { readonly instance: string; readonly scope: Scope } | null = null;
+  private dataKit: { readonly instance: string; readonly scope: Scope; runtimes: ReadonlyMap<string, ItemRuntime> | null } | null = null;
   /** SS-GP1 on: the entered data cell's other play installs by kind (`quests`, `facts`, `hud`), each live while the feet are in it */
   private readonly dataStays = new Map<string, { readonly instance: string; readonly scope: Scope }>();
   private readonly plotBanks = new Map<string, ReturnType<PlotAudioPorts['bank']>>();
@@ -336,9 +329,9 @@ export class LiveGridSession {
     this.runtimeScope = scope.child('grid.runtime.residents');
     this.runtimePage = new RuntimePageSession(this.runtimeResidents, scope, { pause: yieldGridConstruction });
     scope.onDispose(gridCells.onLeave(() => { this.runtimePage.leave(); this.prepareDeferredEntries(); }));
-    scope.onDispose(gridCells.onLeave(() => { this.leavePlotAudio(); this.leaveDataKit(); this.leaveDataTalks(); this.leaveDataRaces(); this.leaveDataRides(); this.leaveDataStays(); }));
+    scope.onDispose(gridCells.onLeave(() => { this.leavePlotAudio(); this.leaveDataKit(); this.leaveDataStays(); }));
     scope.onDispose(gridCells.onEnter(cell => {
-      if (!this.runtimeResidents.has(cell.instance)) { this.dataMovers.get(cell.instance)?.claim(); this.dataBodies.get(cell.instance)?.claim(); this.enterPlotAudio(cell.instance); this.enterDataKit(cell.instance); this.enterDataTalks(cell.instance); this.enterDataRaces(cell.instance); this.enterDataRides(cell.instance); this.enterDataPlay(cell.instance); ports.lightingSettled?.(); return; }
+      if (!this.runtimeResidents.has(cell.instance)) { this.dataMovers.get(cell.instance)?.claim(); this.dataBodies.get(cell.instance)?.claim(); this.enterPlotAudio(cell.instance); this.enterDataKit(cell.instance); this.enterDataPlay(cell.instance); ports.lightingSettled?.(); return; }
       this.startedRuntimes.add(cell.instance);
       const activation = this.runtimePage.enter(cell);
       this.activation = activation;
@@ -795,7 +788,7 @@ export class LiveGridSession {
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);
         this.regions.set(cell.instance, { spawn: { x: start.at.x, y: undefined, z: start.at.z, yaw: start.yaw },
           // the admitted terrain inside the cell (one source of truth); its strips are road level (the terrain tile ends at the cell edge)
-          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: [...copyPrompts(copySource, copySpent(copySource)), ...cellRidePrompts(movers)], kit: holdsItems(copySource) ? { source: copySource, assets } : null, talks: hasTalks(copySource) ? copySource : null, races: hasRaces(copySource) ? copySource : null, quests: hasQuests(copySource) ? copySource : null, facts: hasLedger(copySource) ? copySource : null, hud: hasDeclaredHud(copySource) ? copySource : null,
+          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: [...copyPrompts(copySource, copySpent(copySource)), ...cellRidePrompts(movers)], kit: holdsItems(copySource) ? { source: copySource, assets } : null, play: PLAY_INSTALLS.some(entry => entry.wants(copySource)) ? copySource : null, quests: hasQuests(copySource) ? copySource : null, facts: hasLedger(copySource) ? copySource : null, hud: hasDeclaredHud(copySource) ? copySource : null,
           // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
           audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(folder())) : null,
           completion: completionRows === null ? null : { source: copySource, rows: completionRows }, declaredAudio: cellDeclaredAudio(copySource), plumbing: hasPlumbing(copySource) ? copySource : null,
@@ -804,9 +797,6 @@ export class LiveGridSession {
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });
         // TC-E1b: feet that entered before this admission finished get the cell's kit now
         if (gridCells.cell?.instance === cell.instance && this.dataKit === null) this.enterDataKit(cell.instance);
-        if (gridCells.cell?.instance === cell.instance && this.dataTalks === null) this.enterDataTalks(cell.instance);
-        if (gridCells.cell?.instance === cell.instance && this.dataRaces === null) this.enterDataRaces(cell.instance);
-        if (gridCells.cell?.instance === cell.instance && this.dataRides === null) this.enterDataRides(cell.instance);
         if (gridCells.cell?.instance === cell.instance && !this.inDataStay(cell.instance)) this.enterDataPlay(cell.instance);
         // G321: its own sky inside its cell (its data look's dome and light), laid while it is resident
         {
@@ -815,7 +805,7 @@ export class LiveGridSession {
             try { await hangCellDataSky(request); } catch (error) { console.warn(`[region sky] ${cell.instance}`, error); }
           })();
         }
-        const unlist = (): void => { if (this.plotAudio?.instance === cell.instance) this.leavePlotAudio(); if (this.dataKit?.instance === cell.instance) this.leaveDataKit(); if (this.dataTalks?.instance === cell.instance) this.leaveDataTalks(); if (this.dataRaces?.instance === cell.instance) this.leaveDataRaces(); if (this.dataRides?.instance === cell.instance) this.leaveDataRides(); this.leaveDataStays(cell.instance); this.plotBanks.delete(cell.instance); this.regions.delete(cell.instance); this.dataMovers.delete(cell.instance); this.dataBodies.delete(cell.instance); this.transferWalls.delete(cell.instance); };
+        const unlist = (): void => { if (this.plotAudio?.instance === cell.instance) this.leavePlotAudio(); if (this.dataKit?.instance === cell.instance) this.leaveDataKit(); this.leaveDataStays(cell.instance); this.plotBanks.delete(cell.instance); this.regions.delete(cell.instance); this.dataMovers.delete(cell.instance); this.dataBodies.delete(cell.instance); this.transferWalls.delete(cell.instance); };
         return { host: shell, shell, dispose: () => {
           unlist();
           try { shell.dispose(); } finally { retained.release(); }
@@ -955,58 +945,12 @@ export class LiveGridSession {
     const kit = this.regions.get(instance)?.kit ?? null, page = this.page.runtimePage?.() ?? null;
     if (kit === null || page === null) return;
     const entry = this.ports.scope.child(`grid.data-kit.${instance}`);
-    this.dataKit = { instance, scope: entry };
+    this.dataKit = { instance, scope: entry, runtimes: null };
     const enter = async (): Promise<void> => {
-      try { await enterDataCellKit(kit.source, kit.assets, page, entry, () => this.wire === null || this.wire.site() === instance); } catch (error: unknown) {
+      try { await enterDataCellKit(kit.source, kit.assets, page, entry, () => this.wire === null || this.wire.site() === instance,
+        (runtimes) => { if (this.dataKit?.scope === entry) this.dataKit.runtimes = runtimes; }); } catch (error: unknown) {
         if (this.dataKit?.scope === entry) this.leaveDataKit();
         console.error(`[grid] ${instance}'s declared kit refused`, error);
-      }
-    };
-    void enter();
-  }
-  /** TC-E8: the feet entered a data cell; its declared talks are prompts until they leave. */
-  private enterDataTalks(instance: string): void {
-    this.leaveDataTalks();
-    const region = this.regions.get(instance), page = this.page.runtimePage?.() ?? null;
-    if (region === undefined || region.talks === null || page === null) return;
-    const entry = this.ports.scope.child(`grid.data-talks.${instance}`);
-    this.dataTalks = { instance, scope: entry };
-    const talks = region.talks, prompts = region.prompts;
-    const enter = async (): Promise<void> => {
-      try { await enterDataCellTalks(talks, prompts, page, entry, instance, () => this.wire === null || this.wire.site() === instance); } catch (error: unknown) {
-        if (this.dataTalks?.scope === entry) this.leaveDataTalks();
-        console.error(`[grid] ${instance}'s declared talks refused`, error);
-      }
-    };
-    void enter();
-  }
-  /** SS-MS1b: the feet entered a data cell; its races' clock shows until they leave. */
-  private enterDataRaces(instance: string): void {
-    this.leaveDataRaces();
-    const region = this.regions.get(instance);
-    if (region === undefined || region.races === null) return;
-    const entry = this.ports.scope.child(`grid.data-races.${instance}`);
-    this.dataRaces = { instance, scope: entry };
-    const races = region.races;
-    const enter = async (): Promise<void> => {
-      try { await enterDataCellRaces(races, entry, instance, () => this.wire === null || this.wire.site() === instance); } catch (error: unknown) {
-        if (this.dataRaces?.scope === entry) this.leaveDataRaces();
-        console.error(`[grid] ${instance}'s race clock refused`, error);
-      }
-    };
-    void enter();
-  }
-  /** SS-MS2a3b: the feet entered a data cell; its steer vehicles ride until they leave. */
-  private enterDataRides(instance: string): void {
-    this.leaveDataRides();
-    const movers = this.dataMovers.get(instance)?.movers, page = this.page.runtimePage?.() ?? null;
-    if (movers === undefined || page === null) return;
-    const entry = this.ports.scope.child(`grid.data-rides.${instance}`);
-    this.dataRides = { instance, scope: entry };
-    const enter = async (): Promise<void> => {
-      try { await enterDataCellRides(movers, page, entry, instance, () => this.wire === null || this.wire.site() === instance); } catch (error: unknown) {
-        if (this.dataRides?.scope === entry) this.leaveDataRides();
-        console.error(`[grid] ${instance}'s steer ride refused`, error);
       }
     };
     void enter();
@@ -1015,7 +959,10 @@ export class LiveGridSession {
   private enterDataPlay(instance: string): void {
     const region = this.regions.get(instance), page = this.page.runtimePage?.() ?? null;
     if (region === undefined || page === null) return;
-    const { quests, facts, hud, completion, declaredAudio, plumbing, loot, compendium } = region;
+    const { quests, facts, hud, completion, declaredAudio, plumbing, loot, compendium, play } = region;
+    // SS-GP7: the one install list's entries (races, talks, rides, held-tool lines), on the cell's side of it
+    if (play !== null) this.enterDataStay('play', instance, async (stay, here) => { await enterDataCellPlay(play, page, stay, instance, here,
+      { prompts: region.prompts, movers: this.dataMovers.get(instance)?.movers ?? null, items: () => (this.dataKit?.instance === instance ? this.dataKit.runtimes : null) }); });
     if (quests !== null) this.enterDataStay('quests', instance, (stay, here) => enterDataCellQuests(quests, page, stay, instance, here));
     if (facts !== null) this.enterDataStay('facts', instance, (stay, here) => { enterDataCellFacts(facts, { saves: this.page.saves, catalogue: this.page.catalogue, progress: () => page.play.progress }, stay, instance, here); });
     if (hud !== null) this.enterDataStay('hud', instance, (stay, here) => { enterDataCellHud(hud, page, stay, instance, here); });
@@ -1046,18 +993,6 @@ export class LiveGridSession {
   /** Every play install, or only `instance`'s. */
   private leaveDataStays(instance?: string): void {
     for (const [kind, entered] of this.dataStays) if (instance === undefined || entered.instance === instance) this.leaveDataStay(kind);
-  }
-  private leaveDataRides(): void {
-    const entered = this.dataRides; this.dataRides = null;
-    entered?.scope.dispose();
-  }
-  private leaveDataRaces(): void {
-    const entered = this.dataRaces; this.dataRaces = null;
-    entered?.scope.dispose();
-  }
-  private leaveDataTalks(): void {
-    const entered = this.dataTalks; this.dataTalks = null;
-    entered?.scope.dispose();
   }
   private leaveDataKit(): void {
     const entered = this.dataKit; this.dataKit = null;
