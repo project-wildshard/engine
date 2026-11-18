@@ -7,6 +7,7 @@ import { retainCachedResources } from '@wildshard/engine/app/cachedAssets';
 import { cacheUntilDisposed } from '@wildshard/engine/app/disposalCache';
 import { ktx2File, ktx2Texture, ktx2TranscodeSupport, prepareCompressedTexture, parseKtx2Bytes } from '@wildshard/engine/core/ktx2';
 import { compressedLayerArray } from '@wildshard/engine/render/layeredMaps';
+import { releaseOnUpload } from '@wildshard/engine/render/memorySaver';
 import type { RGB } from '@wildshard/engine/entities/species/loft';
 import type { CreatureHull } from '@wildshard/engine/entities/species/look';
 import type { BoneDef } from '@wildshard/engine/entities/species/registry';
@@ -252,6 +253,11 @@ export function riggedHulls(row: RiggedHullFamilyRow, urls: RiggedHullUrls, tran
         const map = separate?.map ?? std?.map ?? null, normalMap = separate?.normalMap ?? std?.normalMap ?? null;
         if (map && separate === null) { map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4; }
         if (normalMap && separate === null) normalMap.anisotropy = 4;
+        // The embedded colour atlas belongs to this hull family. Coat setup
+        // borrows its sampler settings; live bodies and card bakes sample it.
+        const bitmap: unknown = map?.image;
+        if (TIER === 'phone' && separate === null && map !== null && map.source !== normalMap?.source
+          && typeof ImageBitmap !== 'undefined' && bitmap instanceof ImageBitmap) releaseOnUpload(map.source, () => { bitmap.close(); });
         const joints = sm.skeleton.bones.map((b) => ({ name: b.name, pos: new THREE.Vector3().setFromMatrixPosition(b.matrixWorld) }));
         const out: RiggedHullAsset = { geometry, map, normalMap, joints };
         retainCachedResources(out);
