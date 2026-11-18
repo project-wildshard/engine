@@ -8,8 +8,8 @@
 //      the manifest only if the key, recomputed after the install, still matches the one it started with. Any other
 //      install (some slugs, a ring, --from-format) deletes the manifest first, so a manifest only ever describes the
 //      exact result of the last full install. Each pin also records which product and mounts it supplied.
-//   2. The key hashes everything that decides those bytes: the pins and asset pins, the installer's own source, and
-//      the shardfile validation revision (package.json, the lockfile, so `@wildshard/format`, and the admission code).
+//   2. The key hashes the pin descriptors, asset pins and local fallback bytes, installer and lockfile, tracked
+//      public path names and the shardfile validation revision. Same-tree reuse checks the shared inputs separately.
 //   3. `reusePins` tries this tree first (a rebuild with unchanged pins verifies in place and writes nothing), then
 //      every other worktree of the repo, the canonical checkout first, whose manifest carries the same key and whose
 //      install lock is free. From a source it clones each product folder and each untracked mount; a mount this tree

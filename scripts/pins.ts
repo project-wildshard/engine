@@ -395,7 +395,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     }
     for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   } finally {
-    // Retain cleanup information for the next install even if publication stopped midway.
+    // The install lock has created out/. Keep cleanup information even if publication stopped midway.
     const kept = overlay ? before.filter(path => !replaced.has(path) && existsSync(path)) : [];
     paths = [...new Set([...kept, ...published])].sort((a, b) => a.localeCompare(b));
     writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
@@ -411,7 +411,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   if (full && failed === 0) clearLocalCandidates(root);
   const keptProducts = pins.length - toAdmit.length;
   if (keptProducts > 0) console.log(`pins: retained ${keptProducts} verified products`);
-  console.log(`${toAdmit.length - failed} of ${toAdmit.length} pins admitted, ${paths.length} mounts published`);
+  console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
   return pins;
 }
 
