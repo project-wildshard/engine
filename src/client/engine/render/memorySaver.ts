@@ -211,8 +211,7 @@ function releaseAttribute(a: unknown, label: string, gl: WebGL2RenderingContext,
 function releaseGeometry(g: THREE.BufferGeometry, label: string, uploads: Uploads, releaseShape: boolean): number {
   const shape = releaseShape && !geometryHasCpuReader(g) && !g.hasAttribute('skinIndex') && !g.hasAttribute('skinWeight') && Object.keys(g.morphAttributes).length === 0;
   const batch = fixedBatchGeometry(g);
-  // Native BatchedMesh.onBeforeRender reads index.array.BYTES_PER_ELEMENT to build multi-draw offsets.
-  let bytes = shape && !batch ? releaseAttribute(g.index, `${label}.index`, uploads.gl, uploads.index) : 0;
+  let bytes = shape ? releaseAttribute(g.index, `${label}.index`, uploads.gl, uploads.index) : 0;
   for (const [name, attribute] of Object.entries(g.attributes)) {
     if (name === 'skinIndex' || name === 'skinWeight'
       || (name === 'position' && (!shape || (g.boundingSphere === null && !batch)))) continue;
@@ -321,9 +320,6 @@ export function installMemorySaver(renderer: Renderer, releaseShape = false): vo
       if (p === undefined) continue;
       const geometry = p.geometry.deref();
       if (geometry === undefined) { queue[at] = undefined; continue; }
-      // Native BatchedMesh.clone copies its geometry during shader warm-up.
-      // Let the ordinary settling pass retire these batches in play.
-      if (fixedBatchGeometry(geometry)) continue;
       // a geometry still changing keeps its place: the ordinary settle looks at it again later
       if (!same(versions(geometry), p.versions)) continue;
       queue[at] = undefined;

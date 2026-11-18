@@ -19,6 +19,7 @@
  * SHADOW_LAYER (the shadow pass only, `castShadow` still its tile's shadow disc), so each light's cascades cull it as before.
  */
 import { Box3, BufferAttribute, BufferGeometry, InterleavedBufferAttribute, Matrix3, Matrix4, Mesh, Sphere, Vector3, type Material, type Object3D } from 'three';
+import { buildTier } from '@wildshard/engine/core/tier';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { MERGED_COPY, MERGED_VIEW, SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
 import { ownedArray, ownedCopy, type OwnedLabel } from '@wildshard/engine/core/ownedBuffer';
@@ -37,12 +38,44 @@ function plainFloats(attribute: BufferAttribute | InterleavedBufferAttribute): {
   return attribute.array instanceof Float32Array ? { array: attribute.array, stride: attribute.itemSize, offset: 0 } : null;
 }
 interface Cached<T> { readonly key: string; readonly version: number; readonly values: T }
+type GeometryAttribute = BufferAttribute | InterleavedBufferAttribute;
+
+function writeAttributes(output: Float32Array, offset: number, attribute: GeometryAttribute, name: string,
+  transform: Matrix4, rotation: Matrix3 | null): void {
+  const { itemSize: size, count } = attribute, plain = plainFloats(attribute);
+  if (name === 'position') {
+    const e = transform.elements;
+    for (let i = 0; i < count; i++) {
+      const end = offset + i * 3, at = plain === null ? 0 : i * plain.stride + plain.offset;
+      const x = plain === null ? attribute.getX(i) : plain.array[at] ?? 0, y = plain === null ? attribute.getY(i) : plain.array[at + 1] ?? 0;
+      const z = plain === null ? attribute.getZ(i) : plain.array[at + 2] ?? 0;
+      const w = 1 / ((e[3] ?? 0) * x + (e[7] ?? 0) * y + (e[11] ?? 0) * z + (e[15] ?? 1));
+      output[end] = ((e[0] ?? 1) * x + (e[4] ?? 0) * y + (e[8] ?? 0) * z + (e[12] ?? 0)) * w;
+      output[end + 1] = ((e[1] ?? 0) * x + (e[5] ?? 1) * y + (e[9] ?? 0) * z + (e[13] ?? 0)) * w;
+      output[end + 2] = ((e[2] ?? 0) * x + (e[6] ?? 0) * y + (e[10] ?? 1) * z + (e[14] ?? 0)) * w;
+    }
+  } else if (rotation !== null) {
+    const v = new Vector3();
+    for (let i = 0; i < count; i++) {
+      v.set(attribute.getComponent(i, 0), attribute.getComponent(i, 1), attribute.getComponent(i, 2)).applyMatrix3(rotation).normalize();
+      const end = offset + i * size;
+      output[end] = v.x; output[end + 1] = v.y; output[end + 2] = v.z;
+      if (size === 4) output[end + 3] = attribute.getComponent(i, 3);
+    }
+  } else if (plain === null) {
+    for (let i = 0; i < count; i++) for (let c = 0; c < size; c++) output[offset + i * size + c] = attribute.getComponent(i, c);
+  } else if (plain.stride === size && plain.offset === 0) {
+    output.set(plain.array.subarray(0, count * size), offset);
+  } else {
+    for (let i = 0; i < count; i++) for (let c = 0; c < size; c++) output[offset + i * size + c] = plain.array[i * plain.stride + plain.offset + c] ?? 0;
+  }
+}
 interface Member {
   readonly mesh: Mesh; readonly corner: { readonly x: number; readonly z: number } | null; hidden: ReadonlySet<number>;
   /** this tile's attributes in the parent's space (position under its transform `key`), and its kept triangles */
   readonly attributes: Map<string, Cached<Float32Array>>; triangles: Cached<Uint32Array> | null;
-  /** G782: the bounds of its parent-space positions, kept with the position array they were read from */
-  bounds: { readonly positions: Float32Array; readonly box: Box3 } | null;
+  /** G782: the bounds of its parent-space positions, kept with their input and transform. */
+  bounds: { readonly source: GeometryAttribute; readonly key: string; readonly version: number; readonly box: Box3 } | null;
 }
 interface Block { readonly members: Map<Mesh, Member>; merged: Mesh | null; queued: boolean }
 
@@ -52,6 +85,7 @@ export type MergeGrouping = 'quadrant' | 'cell' | 'block';
 
 export class GroundMerge {
   private readonly blocks = new Map<string, Block>();
+  private readonly cacheChannels = buildTier() !== 'phone';
   /** `onRebuild`: each new merged mesh, before it draws (its shadow flags, render order or a terrain's mesh slot) */
   constructor(private readonly parent: Object3D, private readonly material: Material, private readonly name: string, private readonly onRebuild?: (mesh: Mesh) => void, readonly grouping: MergeGrouping = 'quadrant') {
     if (grouping !== 'quadrant' && grouping !== 'cell' && grouping !== 'block') throw new Error('Unknown ground merge grouping');
@@ -136,82 +170,63 @@ export class GroundMerge {
     const first = block.members.values().next().value; if (first === undefined) return;
     const names = Object.keys(first.mesh.geometry.attributes).filter(name => [...block.members.values()].every(member => member.mesh.geometry.hasAttribute(name))), parentInverse = new Matrix4(), toParent = new Matrix4();
     this.parent.updateWorldMatrix(true, false); parentInverse.copy(this.parent.matrixWorld).invert();
-    // sized up front and filled from each member's kept arrays (G639: growing number arrays for the whole ground held a
-    // 183 ms frame, and rebuilding all of it on every tile arrival still 78 ms, on a Nalati drive at phone 4x)
-    const drawn = [...block.members.values()].filter(member => member.hidden.size < 4);
-    const parts = drawn.map(member => {
-      const geometry = member.mesh.geometry, position = geometry.getAttribute('position');
+    // Size the output first. On phone, fill its channels directly: keeping
+    // transformed member channels would retain another copy beside the draw.
+    const parts = [...block.members.values()].filter(member => member.hidden.size < 4).map(member => ({
+      member, position: member.mesh.geometry.getAttribute('position'), triangles: this.triangles(member),
+    }));
+    let vertices = 0, indices = 0;
+    for (const part of parts) { vertices += part.position.count; indices += part.triangles.length; }
+    if (indices === 0) return;
+    const channels = names.map(name => {
+      const size = first.mesh.geometry.getAttribute(name).itemSize;
+      return { name, size, values: new Float32Array(vertices * size) };
+    });
+    const index = vertices > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+    const box = new Box3();
+    let base = 0, written = 0;
+    for (const { member, position, triangles } of parts) {
+      const geometry = member.mesh.geometry;
       member.mesh.updateWorldMatrix(true, false);
       if (member.mesh.parent === null) toParent.copy(member.mesh.matrix);
       else toParent.multiplyMatrices(parentInverse, member.mesh.matrixWorld);
       const transform = toParent.elements.join(',');
-      // AP8: a prop's normals and tangents turn with it (a ground's channels copy as they are)
-      const turned = this.grouping === 'block' && !isTranslation(toParent), normalMatrix = turned ? new Matrix3().getNormalMatrix(toParent) : null;
-      const attributes = names.map(name => {
-        const attribute = geometry.getAttribute(name);
+      // AP8: a prop's normals and tangents turn with it (a ground's channels copy as they are).
+      const turned = this.grouping === 'block' && !isTranslation(toParent);
+      const normal = turned ? new Matrix3().getNormalMatrix(toParent) : null;
+      const tangent = turned ? new Matrix3().setFromMatrix4(toParent) : null;
+      for (const { name, values } of channels) {
+        const attribute = geometry.getAttribute(name), size = attribute.itemSize;
         if (attribute.count !== position.count) throw new Error(`Ground merge member lacks ${name}`);
-        const directed = turned && (name === 'normal' || name === 'tangent') && attribute.itemSize >= 3;
-        const key = name === 'position' || directed ? transform : '', known = member.attributes.get(name);
-        if (known !== undefined && known.key === key && known.version === versionOf(attribute)) return known.values;
-        const size = attribute.itemSize, out = ownedArray(Float32Array, attribute.count * size, MERGE_ARRAYS);
+        const rotation = size < 3 ? null : name === 'normal' ? normal : name === 'tangent' ? tangent : null;
+        const key = name === 'position' || rotation !== null ? transform : '';
+        const version = versionOf(attribute), offset = base * size;
+        if (this.cacheChannels) {
+          let cached = member.attributes.get(name);
+          if (cached === undefined || cached.key !== key || cached.version !== version) {
+            const data = ownedArray(Float32Array, attribute.count * size, MERGE_ARRAYS);
+            writeAttributes(data, 0, attribute, name, toParent, rotation);
+            cached = { key, version, values: data };
+            member.attributes.set(name, cached);
+          }
+          values.set(cached.values, offset);
+        } else writeAttributes(values, offset, attribute, name, toParent, rotation);
         if (name === 'position') {
-          // Vector3.applyMatrix4, inlined
-          const e = toParent.elements, plain = plainFloats(position);
-          for (let i = 0; i < attribute.count; i++) {
-            const at = plain === null ? 0 : i * plain.stride + plain.offset;
-            const x = plain === null ? position.getX(i) : plain.array[at] ?? 0, y = plain === null ? position.getY(i) : plain.array[at + 1] ?? 0;
-            const z = plain === null ? position.getZ(i) : plain.array[at + 2] ?? 0, w = 1 / ((e[3] ?? 0) * x + (e[7] ?? 0) * y + (e[11] ?? 0) * z + (e[15] ?? 1));
-            out[i * 3] = ((e[0] ?? 1) * x + (e[4] ?? 0) * y + (e[8] ?? 0) * z + (e[12] ?? 0)) * w;
-            out[i * 3 + 1] = ((e[1] ?? 0) * x + (e[5] ?? 1) * y + (e[9] ?? 0) * z + (e[13] ?? 0)) * w;
-            out[i * 3 + 2] = ((e[2] ?? 0) * x + (e[6] ?? 0) * y + (e[10] ?? 1) * z + (e[14] ?? 0)) * w;
+          const previous = member.bounds;
+          if (previous === null || previous.source !== position || previous.key !== transform || previous.version !== version) {
+            member.bounds = { source: position, key: transform, version,
+              box: new Box3().setFromArray(values.subarray(offset, offset + attribute.count * size)) };
           }
-        } else if (directed) {
-          const m = name === 'normal' ? normalMatrix : new Matrix3().setFromMatrix4(toParent), v = new Vector3();
-          if (m === null) throw new Error('Ground merge normal without its matrix');
-          for (let i = 0; i < attribute.count; i++) {
-            v.set(attribute.getComponent(i, 0), attribute.getComponent(i, 1), attribute.getComponent(i, 2)).applyMatrix3(m).normalize();
-            out[i * size] = v.x; out[i * size + 1] = v.y; out[i * size + 2] = v.z;
-            if (size === 4) out[i * size + 3] = attribute.getComponent(i, 3);
-          }
-        } else {
-          const plain = plainFloats(attribute);
-          if (plain === null) for (let i = 0; i < attribute.count; i++) for (let c = 0; c < size; c++) out[i * size + c] = attribute.getComponent(i, c);
-          else if (plain.stride === size && plain.offset === 0) out.set(plain.array.subarray(0, attribute.count * size));
-          else for (let i = 0; i < attribute.count; i++) for (let c = 0; c < size; c++) out[i * size + c] = plain.array[i * plain.stride + plain.offset + c] ?? 0;
+          if (member.bounds !== null) box.union(member.bounds.box);
         }
-        member.attributes.set(name, { key, version: versionOf(attribute), values: out });
-        return out;
-      });
-      return { member, count: position.count, attributes, triangles: this.triangles(member) };
-    });
-    let vertices = 0, indices = 0;
-    for (const part of parts) { vertices += part.count; indices += part.triangles.length; }
-    if (indices === 0) return;
-    const values = names.map(name => new Float32Array(vertices * first.mesh.geometry.getAttribute(name).itemSize)), index = vertices > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
-    let base = 0, written = 0;
-    for (const part of parts) {
-      part.attributes.forEach((source, n) => { values[n]?.set(source, base * (source.length / Math.max(1, part.count))); });
-      const triangles = part.triangles;
+      }
       for (let k = 0; k < triangles.length; k++) index[written++] = base + (triangles[k] ?? 0);
-      base += part.count;
+      base += position.count;
     }
     const geometry = new BufferGeometry();
-    names.forEach((name, n) => { const out = values[n]; if (out !== undefined) geometry.setAttribute(name, new BufferAttribute(out, first.mesh.geometry.getAttribute(name).itemSize)); });
+    for (const { name, size, values } of channels) geometry.setAttribute(name, new BufferAttribute(values, size));
     geometry.setIndex(new BufferAttribute(index, 1));
-    // G782: the block's bounds are the union of its members' kept bounds (each read once, when its positions change), not
-    // two more passes over the whole merged array per rebuild; the sphere is the box's, which a flat ground tile fills
-    const at = names.indexOf('position');
-    if (at === -1) geometry.computeBoundingSphere();
-    else {
-      const box = new Box3();
-      for (const part of parts) {
-        const positions = part.attributes[at];
-        if (positions === undefined) throw new Error('Ground merge member lacks its positions');
-        if (part.member.bounds?.positions !== positions) part.member.bounds = { positions, box: new Box3().setFromArray(positions) };
-        box.union(part.member.bounds.box);
-      }
-      geometry.boundingBox = box; geometry.boundingSphere = box.getBoundingSphere(new Sphere());
-    }
+    geometry.boundingBox = box; geometry.boundingSphere = box.getBoundingSphere(new Sphere());
     const mesh = new Mesh(geometry, this.material);
     mesh.name = this.name; mesh.castShadow = false; mesh.receiveShadow = true;
     // A merge has no per-tile scene groups. Publish only coarse members whose
@@ -224,8 +239,16 @@ export class GroundMerge {
   }
 
   /** The member's kept triangles (its own vertex numbers), kept until its index or hidden quadrants change. */
-  private triangles(member: Member): Uint32Array {
+  private triangles(member: Member): Uint16Array | Uint32Array {
     const geometry = member.mesh.geometry, position = geometry.getAttribute('position'), source = geometry.getIndex();
+    if ((member.corner === null || member.hidden.size === 0) && source !== null && !source.normalized) {
+      const array = source.array;
+      if ((array instanceof Uint16Array || array instanceof Uint32Array) && array.length >= source.count) {
+        member.triangles = null;
+        const count = source.count - source.count % 3;
+        return array.length === count ? array : array.subarray(0, count);
+      }
+    }
     const key = [...member.hidden].sort((x, y) => x - y).join(','), version = (source?.version ?? 0) * 65536 + versionOf(position);
     if (member.triangles !== null && member.triangles.key === key && member.triangles.version === version) return member.triangles.values;
     const count = source === null ? position.count : source.count, at = (k: number): number => source === null ? k : source.getX(k);

@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
+import { _buildAs } from '@wildshard/engine/core/tier';
 import { Scope } from '@wildshard/engine/app/scope';
 import { GroundMerge, propMerge } from './groundMerge';
 
@@ -243,4 +244,23 @@ test('AP8: props merge per material and receive flag; a turned prop turns its no
   expect(propMerge(parent, material, { receive: false, order: 0 })).not.toBe(propMerge(parent, material, cast));
   a.dispose(); b.dispose(); await settle();
   expect(propMerge(parent, material, cast).meshes).toHaveLength(0);
+});
+
+test('the merge owns its output and refreshes reused source positions and bounds', async () => {
+  const parent = new THREE.Group(), material = new THREE.MeshBasicMaterial(), scope = new Scope('reuse');
+  _buildAs('phone');
+  const merge = new GroundMerge(parent, material, 'ground.reuse');
+  _buildAs(null);
+  const mesh = tile(-250, -250), source = mesh.geometry.getAttribute('position');
+  merge.add(mesh, scope); await settle();
+  const first = merge.mesh?.geometry;
+  if (first === undefined || first.boundingBox === null) throw new Error('Merge did not build');
+  const original = first.getAttribute('position').getY(0);
+  source.setY(0, 25); source.needsUpdate = true;
+  expect(first.getAttribute('position').getY(0)).toBe(original);
+  merge.rebuild();
+  const next = merge.mesh?.geometry;
+  expect(next?.getAttribute('position').getY(0)).toBe(25);
+  expect(next?.boundingBox?.max.y).toBe(25);
+  scope.dispose(); await settle(); mesh.geometry.dispose(); material.dispose();
 });
