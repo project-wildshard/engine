@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import {parseGridCatalogue} from '../src/shared/game/grid/catalogue';
-import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
+import {stepCheckpoints,settleControl,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -122,4 +122,16 @@ test('STR8: an online page enters only a shard its build places, so the meter re
   expect(()=>parseGridCatalogue(placed.grid)).not.toThrow();
   expect(pinned.grid.cells.length,'the pinned catalogue is left as it was').toBe(placed.grid.cells.length-2);
   expect([ringThree().length,new Set(ringThree().map(c=>c.join(','))).size,ringThree().every(([x,y])=>Math.max(Math.abs(x),Math.abs(y))===3)]).toEqual([24,24,true]);
+});
+
+test('control is the ledger after a GC; the boot checkpoints stay the peak (v0.1.45 run 44398174924)', () => {
+  const ab = (bytes: number) => ({ram: {'array-buffer': bytes}});
+  const boot = [{step: 'server', ledger: ab(109_027_567)}, {step: 'audio', ledger: ab(109_030_715)}, {step: 'control', ledger: ab(109_030_715)}];
+  const settled = settleControl(boot, ab(86_285_895));
+  expect(settled.map(row => row.ledger)).toEqual([ab(109_027_567), ab(109_030_715), ab(86_285_895)]);
+  expect(settled[2]).toMatchObject({unsettled: ab(109_030_715)});
+  expect(boot[2]?.ledger).toEqual(ab(109_030_715));
+  // no settled read (the page published no counters) keeps the boot's own reading
+  expect(settleControl(boot, null)).toEqual(boot);
+  expect(settleControl([{step: 'audio', ledger: ab(1)}], ab(0))).toEqual([{step: 'audio', ledger: ab(1)}]);
 });

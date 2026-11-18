@@ -522,6 +522,17 @@ export function phoneLine(run, model = loadPhoneModel()) {
 /** EM1's native-WebKit calibration. */
 export function webkitCalibration() { return JSON.parse(readFileSync(new URL('calibration.json', import.meta.url), 'utf8')).hosts.webkit; }
 
+/** The ledger counts a buffer until a GC clears its weak reference (memoryAttribution.ts), so a control read taken the
+ * moment the card goes can still hold garbage. Nalati's array buffers read 86.3 MB at control in twelve main runs, after
+ * a 22.7 MB drop whose step moved between readyFrame and audio, and 109.0 MB in v0.1.45's run 44398174924 where that
+ * drop never came before control. Control is the reading after one page.requestGC(); the boot's own checkpoints stay
+ * the peak. @param {readonly {step:string, ledger:any}[]} checkpoints @param {any} settled */
+export function settleControl(checkpoints, settled) {
+  const last = checkpoints.findLastIndex(row => row.step === 'control');
+  if (last === -1 || settled === null || settled === undefined) return [...checkpoints];
+  return checkpoints.map((row, index) => index === last ? { ...row, ledger: settled, unsettled: row.ledger } : row);
+}
+
 /** Read the page's checkpoint ledger without requesting browser process dumps during boot.
  * @param {import('playwright').Page} page @param {string} url @param {number} timeoutMs */
 async function chromiumLedger(page, url, timeoutMs) {
@@ -537,9 +548,14 @@ async function chromiumLedger(page, url, timeoutMs) {
     steps: /** @type {StepRow[]} */ (Reflect.get(window, '__memoryRun')?.steps ?? []),
     gpuDetail: Reflect.get(globalThis, '__wildshardMemory')?.gpu?.() ?? null,
   }));
-  const checkpoints = steps.map(([, step, ledger]) => ({ step, ledger, processes: [] }));
+  let checkpoints = steps.map(([, step, ledger]) => ({ step, ledger, processes: [] }));
   if (failure === null && !checkpoints.some(row => row.step === 'control' && row.ledger)) {
     failure = 'Boot did not record a control ledger';
+  }
+  if (failure === null) {
+    await page.requestGC();
+    const settled = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.counters?.() ?? null; } catch { return null; } });
+    checkpoints = settleControl(checkpoints, settled);
   }
   const timeline = failure === null ? undefined : await Promise.race([
     page.evaluate(bootTimelineEntries).catch(() => null),

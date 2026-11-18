@@ -15,6 +15,7 @@ export interface Pair {webcontent:number;gpu:number}
 export interface Checkpoint {step:string;from:number;to:number;samples:number;peak:Pair;last:Pair;ledger:Ledger|null}
 export function stepCheckpoints(samples:readonly Sample[],steps:readonly StepRow[],procs:readonly BrowserProcess[]):Checkpoint[];
 export function refusal(checkpoints:readonly Checkpoint[]):string|null;
+export function settleControl<T extends {step:string;ledger:unknown}>(checkpoints:readonly T[],settled:unknown):(T|(T&{unsettled:unknown}))[];
 export function ledgerByKind(snapshot:{allocations?:readonly {domain:string;kind:string;bytes:number}[]}|null|undefined):Ledger|null;
 export function stats(values:readonly number[]):{n:number;median:number;min:number;max:number;spreadPct:number};
 export interface DumpProcess {pid:number;role:string;footprint:number;alloc:Record<string,number>}
