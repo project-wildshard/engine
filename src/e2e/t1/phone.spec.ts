@@ -88,6 +88,41 @@ test('the phone boot clones no worker buffer of 64 KB or more', async ({
   expect(census.rows).toEqual([])
 })
 
+// ENGINE-MEMORY EM19 (design rule 5, a worker is a budgeted isolate): on the phone tier the decode workers retire 2 s after
+// their last job (the far impostor decoder too), so a few seconds after control T1's page keeps at most the committed set:
+// the standalone server, the neighbours' tile decoder and live JSON parser, held from loading to the page's end so no
+// worker script is fetched in play (DL17, G872), and the region's road capture worker. A direct zone boot keeps only
+// `serverWorker` (Template, Nine, Pine, Nalati, 2026-11-17).
+const PHONE_WORKERS_AT_CONTROL: readonly string[] = [
+  'liveJsonParser.worker',
+  'roadTileCapture.worker',
+  'serverWorker',
+  'tileDecodeWorker',
+]
+const workerName = (url: string): string =>
+  url
+    .replace(/^.*\//u, '')
+    .replace(/-[\w]{6,}\.js$/u, '')
+    .replace(/^blob:.*/u, 'blob')
+test('the phone keeps only its committed workers after control', async ({
+  page,
+}): Promise<void> => {
+  await expect
+    .poll(
+      (): readonly string[] =>
+        page
+          .workers()
+          .map((worker): string => workerName(worker.url()))
+          .filter((name): boolean => !PHONE_WORKERS_AT_CONTROL.includes(name))
+          .toSorted(),
+      { timeout: 15_000 },
+    )
+    .toEqual([])
+  expect(page.workers().length).toBeLessThanOrEqual(
+    PHONE_WORKERS_AT_CONTROL.length,
+  )
+})
+
 // ENGINE-MEMORY EM26 (design rule 7): the phone tier has one texture path, KTX2. Template's phone boot uploads no shard
 // texture as decoded RGBA8 over 1 MB (scripts/memory/uploadRecorder.mjs).
 test('the phone boot uploads no shard texture as RGBA8 over 1 MB', async ({
