@@ -83,7 +83,7 @@ export function unloadedTitleRow(named: string | null, loaded: Pick<ShardManifes
   return row === undefined || new Set([loaded.slug]).has(row.slug) ? undefined : row;
 }
 /** A listed shard entering on another shard's page (C3): the page's manifest under the listed row's name and pointer. OF8: the
- *  page shard's own hybrid pointer and client plan are not the arrival's, so they stay behind; carried over beside the row's
+ *  page shard's own runtime pointer and client plan are not the arrival's, so they stay behind; carried over beside the row's
  *  `shardfile` they named two descriptors and every uploaded zone failed to boot (staging v0.1.38). */
 export function listedArrival<M extends Pick<ShardManifest, 'slug' | 'name' | 'gridShardfile' | 'clientPlanRuntime'>>(loaded: M,
   listed: Pick<TitleManifest, 'slug' | 'name'> & { readonly shardfile: string }): Omit<M, 'gridShardfile' | 'clientPlanRuntime'> & { readonly shardfile: string } {

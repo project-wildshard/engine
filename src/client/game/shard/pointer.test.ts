@@ -45,11 +45,11 @@ test('a shardfile-named runtime home is measured standalone like a gridShardfile
 });
 
 // staging v0.1.38: an API-uploaded zone (Mossgate, Mirror Salt, Glowfen) enters on another shard's page. Its row names only
-// `shardfile`; the page's own manifest is a client-plan hybrid on `gridShardfile`. The arrival must not carry both.
+// `shardfile`; the page's own manifest is a client-plan runtime shard on `gridShardfile`. The arrival must not carry both.
 const PAGE = { slug: 'driftwood-isle', name: 'Driftwood Isle', clientPlanRuntime: true as const, gridShardfile: '/shardfiles/driftwood-isle/shard.json' };
 const UPLOADED = { slug: 'mossgate', name: 'Mossgate', shardfile: '/shardfiles/mossgate/shard.json' };
 
-test('an uploaded zone arriving on a hybrid page boots as plain data on its own pointer', () => {
+test('an uploaded zone arriving on a runtime shard page boots as plain data on its own pointer', () => {
   const arrival = listedArrival(PAGE, UPLOADED);
   expect(arrival.slug).toBe('mossgate');
   expect(dataPointer(arrival)).toBe(UPLOADED.shardfile);
