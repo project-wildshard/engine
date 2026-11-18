@@ -19,27 +19,7 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 const state = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
 fs.appendFileSync(state.log, process.argv.slice(2).join(' ') + '\\n');
-// TS10: \`run download\` writes the planted flaky file's failed shard report; \`run rerun\` turns the red run green (or not).
 const args = process.argv.slice(2);
-if (args[0] === 'run' && args[1] === 'download') {
-  const dir = args[args.indexOf('-D') + 1];
-  if (state.flaky !== undefined) {
-    for (const job of state.flaky.jobs ?? [1]) {
-      fs.mkdirSync(dir + '/engine-ci-' + job + '/engine-ci', { recursive: true });
-      fs.mkdirSync(dir + '/engine-ci-' + job + '/ci-pack', { recursive: true });
-      fs.writeFileSync(dir + '/engine-ci-' + job + '/ci-pack/job-' + job + '.json', JSON.stringify({ pinsCode: 0, units: [{ name: 'shard:' + job, blocking: true, code: 1 }, { name: 'static', blocking: true, code: state.flaky.staticRed === true ? 1 : 0 }] }));
-      fs.writeFileSync(dir + '/engine-ci-' + job + '/engine-ci/shard-' + job + '-ordinary.json', JSON.stringify({ files: [{ file: state.flaky.file, state: 'failed', durationMs: 900 }, { file: 'test/fine.test.ts', state: 'passed', durationMs: 10 }] }));
-      fs.writeFileSync(dir + '/engine-ci-' + job + '/engine-ci/shard-' + job + '-wall.json', JSON.stringify({ overBudget: false }));
-    }
-  }
-  process.exit(0);
-}
-if (args[0] === 'run' && args[1] === 'rerun') {
-  state.reran = [...(state.reran ?? []), Number(args[2])];
-  if (state.flaky?.stillRed !== true) state.red = {};
-  fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(state));
-  process.exit(0);
-}
 // MF12: \`limitedUntil\` (epoch ms) makes every Actions query a quota stop until then; rate_limit says when it resets.
 if (args[0] === 'api' && args[1] === 'rate_limit') {
   process.stdout.write(JSON.stringify({ resources: { core: { limit: 5000, remaining: Date.now() < (state.limitedUntil ?? 0) ? 0 : 4999, reset: Math.ceil((state.limitedUntil ?? Date.now()) / 1000) } } }));
@@ -123,7 +103,7 @@ export function fixture() {
     GIT_AUTHOR_NAME: 'Land', GIT_AUTHOR_EMAIL: 'land@example.test', GIT_COMMITTER_NAME: 'Land', GIT_COMMITTER_EMAIL: 'land@example.test',
     PATH: `${bin}:${process.env['PATH'] ?? ''}`, FAKE_GH_STATE: files.state, PUSHED_LOG: files.pushed, PREPUSH_LOG: files.prepush,
     PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript, PREPUSH_DELTA_LOG: files.delta, ACK_SCRIPT: resolve('scripts/land-hook-ack.mjs'),
-    WS_LAND_REPO: 'project-wildshard/fixture', WS_FLAKE_STRIKES: join(root, 'strikes.jsonl'), WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
+    WS_LAND_REPO: 'project-wildshard/fixture', WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
     WS_SESSION_KEEP_ROOT: join(root, 'session-keep'),
     // MF12: never mint a real reader App token from a fixture, even on a machine that has the App's key.
     WS_GH_READER: '0', WS_LAND_MODE: 'hosted',

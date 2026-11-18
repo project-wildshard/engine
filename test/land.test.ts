@@ -15,8 +15,8 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
-import { failedJobs, flakyFiles, quarantineFile, shaVerdict, strikePlans } from '../scripts/land.mjs';
-import { cleanLandFixtures, fixture, trackLandFixtureRoot } from './fixtures/land-git';
+import { failedJobs, shaVerdict } from '../scripts/land.mjs';
+import { cleanLandFixtures, trackLandFixtureRoot } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
 
@@ -320,98 +320,4 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     const loads = bins.map(bin => bin.reduce((sum, unit) => sum + unit.seconds, 0));
     expect(Math.max(...loads)).toBeLessThanOrEqual(540);
   });
-});
-
-// TEST-SPEED TS10 (J255): a flaky hosted red re-runs once; a green re-run strikes the file; strikes from two plans in
-// 24 h quarantine it with no human; a red re-run blocks only its plan.
-describe('TS10 flaky strikes', () => {
-  test('the strike book, the shard reports and the quarantine entry', () => {
-    const now = Date.parse('2026-11-11T12:00:00Z'), row = (at: string, plan: string, file = 'test/a.test.ts') => JSON.stringify({ at, plan, file });
-    const book = [row('2026-11-11T11:00:00Z', 'plan/one'), row('2026-11-10T11:00:00Z', 'plan/old'), row('2026-11-11T10:00:00Z', 'plan/one'), row('2026-11-11T09:00:00Z', 'plan/two', 'test/b.test.ts'), 'torn{'].join('\n');
-    expect(strikePlans(book, 'test/a.test.ts', now)).toEqual(['plan/one']);
-    expect(strikePlans(`${book}\n${row('2026-11-11T11:30:00Z', 'plan/three')}`, 'test/a.test.ts', now)).toEqual(['plan/one', 'plan/three']);
-    mkdirSync('tmp', { recursive: true });
-    const root = mkdtempSync(resolve('tmp', 'land-strikes-')); trackLandFixtureRoot(root);
-    mkdirSync(join(root, 'engine-ci-2/engine-ci'), { recursive: true }); mkdirSync(join(root, 'engine-ci-2/ci-pack'), { recursive: true });
-    const job = (units: unknown[]) => writeFileSync(join(root, 'engine-ci-2/ci-pack/job-2.json'), JSON.stringify({ pinsCode: 0, units }));
-    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-native.json'), JSON.stringify({ files: [{ file: 'test/slow.test.ts', state: 'passed', durationMs: 61_000 }, { file: 'test/ok.test.ts', state: 'passed', durationMs: 5 }] }));
-    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-ordinary.json'), JSON.stringify({ files: [{ file: 'test/red.test.ts', state: 'failed', durationMs: 5 }] }));
-    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: false }));
-    job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'quarantine', blocking: false, code: 1 }]);
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts']);
-    job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'boundaries', blocking: true, code: 1 }]);
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
-    // Anything but test files keeps it red: another failed job, a red static unit, a shard over its wall, no report.
-    expect(flakyFiles(root, ['tests (2) (failure)', 'quarantine-check (failure)'])).toBeNull();
-    expect(flakyFiles(root, ['tests (5) (failure)'])).toBeNull();
-    job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'static', blocking: true, code: 1 }]);
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
-    job([{ name: 'shard:3', blocking: true, code: 1 }]);
-    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: true }));
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
-    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: false }));
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts']);
-    // J295: an amber file (61 s, passed) is green, never a flake; a file red on time is never re-run away.
-    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-native.json'), JSON.stringify({ budget: { red: ['RED file=test/hang.test.ts ms=130000 budget=60000'] }, files: [{ file: 'test/hang.test.ts', state: 'passed', durationMs: 130_000 }] }));
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
-    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-ordinary.json'), JSON.stringify({ errorCount: 1, files: [{ file: 'test/red.test.ts', state: 'failed', durationMs: 5 }] }));
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
-    const quarantine = join(root, 'quarantine.json');
-    writeFileSync(quarantine, JSON.stringify({ schema: 1, entries: [] }));
-    expect(quarantineFile(quarantine, 'test/red.test.ts', 'opus-testspeed-lane', 'why', now)).toBe(true);
-    expect(quarantineFile(quarantine, 'test/red.test.ts', 'opus-testspeed-lane', 'why', now)).toBe(false);
-    expect(JSON.parse(readFileSync(quarantine, 'utf8')).entries).toEqual([{ file: 'test/red.test.ts', owner: 'opus-testspeed-lane', addedAt: '2026-11-11T12:00:00.000Z', deadline: '2026-11-13T12:00:00.000Z', reason: 'why' }]);
-    expect(quarantineFile(quarantine, 'test/late.test.ts', 'opus-testspeed-lane', 'why', now + 999)).toBe(true);
-    expect(JSON.parse(readFileSync(quarantine, 'utf8')).entries[1].addedAt).toBe('2026-11-11T12:00:00.000Z');
-  });
-
-  test('a planted flaky file: one strike lands its plan, a second plan\'s strike quarantines it, a red re-run stops only its plan', () => {
-    const f = fixture();
-    mkdirSync(join(f.repo, 'test'), { recursive: true });
-    writeFileSync(join(f.repo, 'test/quarantine.json'), `${JSON.stringify({ schema: 1, entries: [] }, null, 2)}\n`);
-    f.git(f.repo, ['add', 'test/quarantine.json']); f.git(f.repo, ['commit', '--quiet', '-m', 'quarantine file']); f.git(f.repo, ['-c', 'core.hooksPath=/dev/null', 'push', '--quiet', 'origin', 'main']);
-    const flaky = { file: 'test/planted-flaky.test.ts' };
-    // Plan one: red, then green on its re-run: one strike, it lands, nothing is quarantined.
-    const one = f.worktree('one');
-    f.commit(one, 'src/one.ts', 'export const one = 1;\n', 'one');
-    f.state({ red: { 'plan/one': { ci: 'tests (1)' } }, flaky });
-    let result = f.land(one);
-    expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/flaky .*test\/planted-flaky\.test\.ts; re-running its failed jobs once/u);
-    expect(f.read(join(f.root, 'strikes.jsonl')).trim().split('\n')).toHaveLength(1);
-    expect(f.git(f.remote, ['show', 'main:test/quarantine.json'])).not.toContain('planted-flaky');
-    // Plan two: the same file flakes: the second plan's strike quarantines it on main, with no human.
-    const two = f.worktree('two');
-    f.commit(two, 'src/two.ts', 'export const two = 2;\n', 'two');
-    // A peer lands while plan two waits on CI, so land rebases its quarantine commit and must re-date it (J193).
-    f.state({ red: { 'plan/two': { ci: 'tests (2)' } }, flaky: { ...flaky, jobs: [2] }, once: { marker: join(f.root, 'peer-once'), command: ['sh', f.peerScript('src/peer.ts', null, 'export const peer = 1;')] } });
-    result = f.land(two);
-    expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/quarantine .*planted-flaky\.test\.ts quarantined for 48 h/u);
-    const entries = JSON.parse(f.git(f.remote, ['show', 'main:test/quarantine.json'])).entries;
-    expect(entries).toMatchObject([{ file: 'test/planted-flaky.test.ts', owner: 'opus-testspeed-lane' }]);
-    // J193's history check: addedAt is the introducing commit's own time on main, the deadline 48 h later.
-    const committedAt = Number(f.git(f.remote, ['log', '-1', '--first-parent', '--format=%ct', 'main', '--', 'test/quarantine.json'])) * 1000;
-    expect(Date.parse(entries[0].addedAt)).toBe(committedAt);
-    expect(Date.parse(entries[0].deadline) - committedAt).toBe(48 * 3600 * 1000);
-    expect(f.git(f.remote, ['show', 'main:src/two.ts'])).toBe('export const two = 2;');
-    expect(f.git(f.remote, ['show', 'main:src/peer.ts'])).toBe('export const peer = 1;');
-    // Plan three: red on its re-run too: not flaky, it stops, and main does not move.
-    const three = f.worktree('three'), before = f.remoteMain();
-    f.commit(three, 'src/three.ts', 'export const three = 3;\n', 'three');
-    f.state({ red: { 'plan/three': { ci: 'tests (3)' } }, flaky: { ...flaky, jobs: [3], stillRed: true } });
-    result = f.land(three);
-    expect(result.status).toBe(1);
-    expect(result.stdout).toMatch(/hosted CI is red/u);
-    expect(f.remoteMain()).toBe(before);
-    expect(f.read(join(f.root, 'strikes.jsonl')).trim().split('\n')).toHaveLength(2);
-    // Plan four: a test file red plus the wall check after the upload: not a flaky file, so no re-run and no strike.
-    const four = f.worktree('four');
-    f.commit(four, 'src/four.ts', 'export const four = 4;\n', 'four');
-    f.state({ red: { 'plan/four': { ci: 'tests (4)' } }, flaky: { ...flaky, jobs: [4], wallRed: true } });
-    result = f.land(four);
-    expect(result.status).toBe(1);
-    expect(result.stdout).not.toMatch(/re-running its failed jobs/u);
-    expect(f.read(join(f.root, 'strikes.jsonl')).trim().split('\n')).toHaveLength(2);
-  }, 120_000);
 });
