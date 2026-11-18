@@ -67,8 +67,10 @@ export interface CompletionContext {
   } | null } };
 }
 /** Install the admitted card on the actual play owner. Inputs are data and borrowed platform owners, never shard callbacks. */
-export function installCompletion(ctx: CompletionContext, flags: Flags, progress: CompletionProgress | undefined, objective?: HTMLElement, anchors?: ReadonlyMap<string, { readonly x: number; readonly z: number }>): Completion {
-  const rows = ctx.product.section('ui/completion'), runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play;
+export function installCompletion(ctx: CompletionContext, flags: Flags, progress: CompletionProgress | undefined, objective?: HTMLElement, anchors?: ReadonlyMap<string, { readonly x: number; readonly z: number }>,
+  // SS-GP4a: a grid data cell's card reads its own folder's rows, not the page's product
+  rows: CompletionRows = ctx.product.section('ui/completion')): Completion {
+  const runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play;
   if (world === undefined || world === null || play === undefined || play === null) throw new Error('Completion requires the normal play owner');
   const player = world.player, card = new ShardComplete(), title = (findChunk(ctx.manifest.slug)??findTitleManifest(ctx.manifest.slug))?.name ?? rows.title;
   const next = ctx.manifest.next === undefined ? undefined : findChunk(ctx.manifest.next)??findTitleManifest(ctx.manifest.next);

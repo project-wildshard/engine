@@ -3,7 +3,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { standScenes } from '../../../shared/game/shardfile/items';
 
 /** A tool's direct input callback already queues its toggle; plumbing supplies its keys/touch and only the other scenes. */
-export function handledItemInputs(source: Shardfile): ReadonlySet<string> {
+export function handledItemInputs(source: Pick<Shardfile, 'plumbing' | 'items' | 'targets'>): ReadonlySet<string> {
   const handled = new Set<string>();
   for (const context of source.plumbing?.input ?? []) for (const action of context.actions) {
     const item = source.items.rows.find((row) => row.kind === 'tool' && row.action === action.id);
