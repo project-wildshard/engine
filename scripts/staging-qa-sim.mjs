@@ -31,9 +31,9 @@ export function qaDevice(listing) {
   return Object.values(devices).flat().find(each => each.name === QA_DEVICE && each.isAvailable !== false);
 }
 
-/** Whether `idb` and `ios_webkit_debug_proxy` are on PATH: the proof needs both. @returns {string | undefined} what is missing */
+/** @returns {string | undefined} Required Simulator tools that are missing from PATH. */
 export function missingTools() {
-  const missing = ['idb', 'ios_webkit_debug_proxy', 'xcrun'].filter(tool => {
+  const missing = ['idb', 'idb_companion', 'ios_webkit_debug_proxy', 'xcrun'].filter(tool => {
     try { execFileSync('/usr/bin/which', [tool], { stdio: 'ignore' }); return false; } catch { return true; }
   });
   return missing.length === 0 ? undefined : missing.join(', ');

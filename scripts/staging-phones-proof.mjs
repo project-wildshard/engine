@@ -23,6 +23,7 @@ import * as v from 'valibot';
 import { saveFixtureCode } from './debug-settings.mjs';
 import { decodeProtocolPng } from './parity/fast-png.mjs';
 import { soakInspector } from './soak/inspector.mjs';
+import { ownSimulatorHid } from './staging-qa-idb.mjs';
 import { chatLinePattern, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from './staging-proof-lines.mjs';
 
 const STAGING = 'https://staging.wildshard.io', RELEASE = 'https://packs.wildshard.io/releases/staging.json', SHARD = 'driftwood-isle';
@@ -112,22 +113,7 @@ function safari(udid) {
     throw new Error(`No Safari page on ${BASE}`);
   };
   const page = inspector(find, 'webkit');
-  /** @param {string[]} args */
-  const idbOnce = args => new Promise((resolve, reject) => {
-    const child = spawn('idb', ['ui', ...args, '--udid', udid], { stdio: ['ignore', 'inherit', 'inherit'] });
-    child.on('error', reject); child.on('exit', code => { if (code === 0) resolve(undefined); else reject(new Error(`idb ui ${args[0] ?? ''} exited ${String(code)}`)); });
-  });
-  // The Simulator's HID channel (dtuhidd) is sometimes invalidated mid-run and the next idb call opens a fresh one
-  // (STAGING-QA SQ14: a local leg on b61b0042 held on that, with the world already drawn). Two retries, a second apart.
-  /** @param {string[]} args */
-  const idb = async args => {
-    for (let attempt = 1; ; attempt += 1) {
-      try { await idbOnce(args); return; } catch (error) {
-        if (attempt >= 3) throw error;
-        await new Promise(resolve => { setTimeout(resolve, 1000); });
-      }
-    }
-  };
+  const hid = ownSimulatorHid(udid);
   const r = (/** @type {number} */ value) => String(Math.round(value));
   return { errors: page.errors, evaluate: page.evaluate,
     open: async url => {
@@ -136,11 +122,11 @@ function safari(udid) {
       execFileSync('xcrun', ['simctl', 'openurl', udid, url]);
       await page.connect();
     },
-    swipe: async (from, to, ms) => { await idb(['swipe', r(from.x), r(from.y), r(to.x), r(to.y), '--duration', String(ms / 1000), '--delta', '3']); },
-    tap: async at => { await idb(['tap', r(at.x), r(at.y)]); },
+    swipe: async (from, to, ms) => { await hid.tapOrSwipe(['swipe', r(from.x), r(from.y), r(to.x), r(to.y), '--duration', String(ms / 1000), '--delta', '3']); },
+    tap: async at => { await hid.tapOrSwipe(['tap', r(at.x), r(at.y)]); },
     scale: () => Promise.resolve(1),
     shot: async name => { execFileSync('xcrun', ['simctl', 'io', udid, 'screenshot', join(shots, `${name}.png`)], { stdio: 'ignore', timeout: 60_000 }); await Promise.resolve(); },
-    close: async () => { page.close(); proxy.kill('SIGTERM'); await sleep(200); } };
+    close: async () => { page.close(); proxy.kill('SIGTERM'); await hid.close(); await sleep(200); } };
 }
 
 /** Chrome in a booted Android emulator, through its DevTools socket and the touchscreen of `adb shell input`. @param {string} serial @returns {Phone} */
