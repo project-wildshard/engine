@@ -3,7 +3,9 @@
 // hook), a post-receive hook records every pushed tip, and a fake `gh` on PATH
 // answers Actions queries only for SHAs that were really pushed.
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture repositories stay in the repository scratch root.
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Execute the workflow shell against owned fixture paths.
+import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- A local Actions API double for the main-run reuse check.
 import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Evaluate ci.yml's real concurrency-key expressions.
@@ -79,6 +81,8 @@ test('the blocking memory ledger restores and saves its own verified Brotli part
   expect(ledger.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br\/1/gu)).toHaveLength(2);
   expect(ledger).toContain('full-ledger-spawn-parts-br-v1-');
   expect(ledger).toContain('$codec-$CODEC_INPUTS-');
+  expect(ledger).toContain('key=%s%s-parts-and-server');
+  expect(ledger).toContain('restore-keys: ${{ steps.ledger-codec.outputs.prefix }}');
   expect(ledger).toContain('tmp/memory-ledger/spawn-parts.sha256');
   expect(ledger).toContain("steps.ledger-client.outcome == 'success'");
   expect(ledger).toContain("steps.ledger-parts-pruned.outcome == 'success'");
@@ -88,6 +92,52 @@ test('the blocking memory ledger restores and saves its own verified Brotli part
   const upload = ledger.indexOf('- if: always()', read);
   expect(upload).toBeGreaterThan(read);
   expect(ledger.slice(read, upload)).not.toContain('continue-on-error');
+});
+
+test('the ledger cache preserves browser and server packs and records both digests', () => {
+  const root = mkdtempSync(resolve('tmp', 'land-ledger-parts-'));
+  trackLandFixtureRoot(root);
+  const cache = join(root, 'cache');
+  const spawnRoot = join(root, 'tmp/memory-ledger/preview/dist/assets/spawn');
+  const browser = 'a'.repeat(64);
+  const server = 'b'.repeat(64);
+  const stale = 'c'.repeat(64);
+  mkdirSync(cache);
+  for (const hash of [browser, server, stale]) writeFileSync(join(cache, `${hash}.br`), hash);
+  for (const [folder, hash] of [['parts', browser], ['server', server]] as const) {
+    mkdirSync(join(spawnRoot, folder), {recursive: true});
+    writeFileSync(join(spawnRoot, folder, `${hash.slice(0, 16)}.pack.br`), hash);
+  }
+  const job = ciJob('memory-ledger-guard');
+  const run = (name: string) => {
+    const step = job.split(`      - name: ${name}\n`)[1]?.split(/\n {6}- /u)[0];
+    const shell = step?.split('\n        run: |\n')[1];
+    if (shell === undefined) throw new Error(`Missing shell step ${name}`);
+    const script = shell.replace('cache="$HOME/.cache/wildshard/gen/spawn-parts-br/1"', 'cache="$LEDGER_FIXTURE_CACHE"');
+    expect(script).not.toContain('$HOME');
+    return spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], {
+      cwd: root, encoding: 'utf8', env: {...process.env, GITHUB_WORKSPACE: root, LEDGER_FIXTURE_CACHE: cache},
+    });
+  };
+  const prune = 'Keep only encodings emitted by this full ledger build';
+  const serverFolder = join(spawnRoot, 'server');
+  const hiddenServer = join(root, 'missing-server');
+  renameSync(serverFolder, hiddenServer);
+  expect(run(prune).status).toBe(1);
+  expect(readdirSync(cache).sort()).toEqual([`${browser}.br`, `${server}.br`, `${stale}.br`]);
+  const digestStep = 'Record the served ledger Brotli part digests';
+  expect(run(digestStep).status).not.toBe(0);
+  expect(readdirSync(join(root, 'tmp/memory-ledger'))).not.toContain('spawn-parts.sha256');
+  renameSync(hiddenServer, serverFolder);
+  const pruned = run(prune);
+  expect(pruned.status, pruned.stderr).toBe(0);
+  expect(readdirSync(cache).sort()).toEqual([`${browser}.br`, `${server}.br`]);
+  const recorded = run(digestStep);
+  expect(recorded.status, recorded.stderr).toBe(0);
+  const manifest = readFileSync(join(root, 'tmp/memory-ledger/spawn-parts.sha256'), 'utf8');
+  expect(manifest.trim().split('\n').map(line => line.split('  ')[1])).toEqual([
+    `parts/${browser.slice(0, 16)}.pack.br`, `server/${server.slice(0, 16)}.pack.br`,
+  ]);
 });
 
 describe('main reuses the exact SHA\'s green plan-branch run (no double run)', () => {

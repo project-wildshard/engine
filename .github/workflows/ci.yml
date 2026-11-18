@@ -487,7 +487,7 @@ jobs:
           [[ "$codec" =~ ^[0-9]+(\.[0-9]+)+$ ]] || exit 1
           [[ "$CODEC_INPUTS" =~ ^[a-f0-9]{64}$ && "$PART_INPUTS" =~ ^[a-f0-9]{64}$ ]] || exit 1
           prefix="full-ledger-spawn-parts-br-v1-$RUNNER_OS-$RUNNER_ARCH-$codec-$CODEC_INPUTS-"
-          printf 'prefix=%s\nkey=%s%s\n' "$prefix" "$prefix" "$PART_INPUTS" >> "$GITHUB_OUTPUT"
+          printf 'prefix=%s\nkey=%s%s-parts-and-server\n' "$prefix" "$prefix" "$PART_INPUTS" >> "$GITHUB_OUTPUT"
       - name: Restore full-ledger Brotli parts
         id: ledger-parts
         if: steps.ledger-codec.outcome == 'success'
@@ -512,8 +512,10 @@ jobs:
         continue-on-error: true
         run: |
           export LC_ALL=C
-          cd tmp/memory-ledger/preview/dist/assets/spawn/parts
-          sha256sum -- *.pack.br > "$GITHUB_WORKSPACE/tmp/memory-ledger/spawn-parts.sha256"
+          cd tmp/memory-ledger/preview/dist/assets/spawn
+          manifest="$GITHUB_WORKSPACE/tmp/memory-ledger/spawn-parts.sha256"
+          sha256sum -- parts/*.pack.br server/*.pack.br > "$manifest.tmp"
+          mv -- "$manifest.tmp" "$manifest"
       - name: Read or block on subsystem ledger bytes
         env:
           MEMORY_RECORD: ${{ inputs.memory_record }}
@@ -536,13 +538,16 @@ jobs:
         if: ${{ !cancelled() && steps.ledger-codec.outcome == 'success' && steps.ledger-client.outcome == 'success' && steps.ledger-parts.outputs.cache-hit != 'true' }}
         continue-on-error: true
         run: |
-          parts=tmp/memory-ledger/preview/dist/assets/spawn/parts
+          spawn=tmp/memory-ledger/preview/dist/assets/spawn
           cache="$HOME/.cache/wildshard/gen/spawn-parts-br/1"
-          [[ -d "$parts" && -d "$cache" ]] || exit 1
+          [[ -d "$cache" ]] || exit 1
+          compgen -G "$spawn/parts/*.pack.br" >/dev/null || exit 1
+          compgen -G "$spawn/server/*.pack.br" >/dev/null || exit 1
           shopt -s nullglob
           for file in "$cache"/*.br; do
             name=${file##*/}
-            [[ -f "$parts/${name:0:16}.pack.br" ]] || rm -- "$file"
+            part="${name:0:16}.pack.br"
+            [[ -f "$spawn/parts/$part" || -f "$spawn/server/$part" ]] || rm -- "$file"
           done
           kept=("$cache"/*.br)
           (( ${#kept[@]} > 0 ))
