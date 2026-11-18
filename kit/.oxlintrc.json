@@ -189,7 +189,8 @@
               "__workerClient",
               "__barLog",
               "__onlinePlayers",
-              "__countLog"
+              "__countLog",
+              "__imageUploads"
             ]
           }
         ]

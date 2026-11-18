@@ -4,6 +4,7 @@ import { devices } from '../../../scripts/browser-playwright.mjs'
 import { expect, test as base } from '../../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { recordBars } from '../../../scripts/loading-card-recorder.mjs'
+import { recordImageUploads } from '../../../scripts/memory/uploadRecorder.mjs'
 import { watchClones } from './clones.ts'
 import { inPlay } from './probe.ts'
 
@@ -110,6 +111,8 @@ async function openWorld(
     await harnessPins(context, { seed: 357 })
     if (profile === 'phone') {
       await context.addInitScript(recordBars)
+      // EM26: shard textures uploaded as decoded RGBA
+      await context.addInitScript(recordImageUploads)
     }
     if (entryDelayMs > 0) {
       await context.route('**/*.js', async (route): Promise<void> => {

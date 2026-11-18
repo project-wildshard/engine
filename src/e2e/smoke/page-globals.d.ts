@@ -45,6 +45,15 @@ declare global {
     | undefined
   var __barLog: readonly BarRow[] | undefined
   var __countLog: readonly { readonly serverFiles: number }[] | undefined
+  // ENGINE-MEMORY EM26: scripts/memory/uploadRecorder.mjs, shard textures uploaded as decoded RGBA over 1 MB
+  var __imageUploads:
+    | readonly {
+        readonly width: number
+        readonly height: number
+        readonly bytes: number
+        readonly src: string
+      }[]
+    | undefined
   var __wildshard: SmokeProbe | undefined
   var __workerClientRow: ((name: string) => number | undefined) | undefined
   var __workerClient:

@@ -88,6 +88,17 @@ test('the phone boot clones no worker buffer of 64 KB or more', async ({
   expect(census.rows).toEqual([])
 })
 
+// ENGINE-MEMORY EM26 (design rule 7): the phone tier has one texture path, KTX2. Template's phone boot uploads no shard
+// texture as decoded RGBA8 over 1 MB (scripts/memory/uploadRecorder.mjs).
+test('the phone boot uploads no shard texture as RGBA8 over 1 MB', async ({
+  page,
+}): Promise<void> => {
+  const uploads = await page.evaluate(
+    (): readonly object[] | undefined => globalThis.__imageUploads,
+  )
+  expect(uploads).toEqual([])
+})
+
 async function mounted(page: Page): Promise<boolean> {
   return await page.evaluate((): boolean => {
     const world = globalThis.__wildshard?.world

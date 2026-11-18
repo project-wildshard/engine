@@ -163,6 +163,11 @@ export function texModeWhy(): { mode: TexMode; why: string } {
       else state.resolved = autoReady?.(slug) === true ? { mode: 'ktx2', why: `auto: ${slug} has a KTX2 set (its final format from the first visit)` } : { mode: 'img', why: `auto: ${slug} has no KTX2 set for this tier` };
       // OF17: a shard this device has read as KTX2 keeps that form on this page too (the grid's choice on a one-shard page)
       if (state.resolved.mode === 'img' && deviceForm?.read(slug) === true) state.resolved = { mode: 'ktx2', why: `auto: this device read ${slug} as KTX2 (OF17)` };
+      // EM26 (meta ENGINE-MEMORY, design rule 7): the phone tier has one texture path. A shard with a KTX2 set loads it
+      // there even when its tier asks for images: decoded RGBA is four to eight times the bytes, plus the decode copy (Nine
+      // at phone Low: 94.5 MB of textures and 14.7 MB of image bitmaps as images, 58.9 and 0 as KTX2 [L]). The GPU veto
+      // below still turns a GPU that cannot sample the transcoder's targets back to images.
+      if (TIER === 'phone' && state.resolved.mode === 'img' && autoReady?.(slug) === true) state.resolved = { mode: 'ktx2', why: `${state.resolved.why}; phone: ${slug} has a KTX2 set (EM26)` };
     }
     // last, whatever picked KTX2 (a harness pin included): a GPU that samples the transcoder's only compressed targets
     // wrong when mipmapped loads images (render/ktx2Probe.ts — the iOS Simulator's zeroed sRGB ASTC / ETC2 mips; a
