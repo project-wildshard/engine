@@ -238,7 +238,7 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     this.bBody = bone('body'); this.bHead = bone('head');
     const fore = model.dims.fore;
     this.bFore = fore === undefined ? null : bone(fore.bone);
-    this.jointPose=this.custom?null:new QuadrupedRigPose(rig.bones);
+    this.jointPose=this.custom?null:new QuadrupedRigPose(rig.bones,model.species.rigContract.skeleton==='kit.quadruped');
     const fur = rig.materials[0];
     if (fur !== undefined && fur !== model.hard) { this.flashMat = fur; this.flashBase.copy(fur.emissive); this.flashBaseI = fur.emissiveIntensity; }
     this.parts = new Set(rig.parts);

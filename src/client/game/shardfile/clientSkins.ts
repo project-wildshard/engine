@@ -161,14 +161,16 @@ export class SkinDriver {
     return this.skin.clips.has('idle') ? 'idle' : null;
   }
   /** Pose this instance's bones for the frame. */
-  step(c: SkinDriveState): void {
+  step(c: SkinDriveState, freshBase = false): void {
     const name = this.choose(c); if (name === null) return;
     const clip = this.skin.clips.get(name); if (clip === undefined) return;
     this.since = name === this.clip ? this.since + c.dt : 0; this.clip = name;
     // one-shots from their trigger (the export sampled each from it), the walk from the gait phase, idles on the clock
     const time = name === 'die' ? this.since : name === 'attack' ? c.attack * this.skin.attackSpan : name === 'hit' ? this.hitT : name === 'walk' ? c.phase * clip.duration : c.t;
     const looping = name === 'walk' || name.startsWith('idle'), at = looping ? time % clip.duration : Math.min(time, clip.duration);
-    this.active?.restore();
+    // A native poser already rebuilt this frame's base; restoring last frame's
+    // cached layer base here would freeze its otherwise untracked gait joints.
+    if (!freshBase) this.active?.restore();
     const tracks = clip.tracks;
     for (let index = 0; index < tracks.length; index++) {
       const track = tracks[index]; if (track === undefined) throw new Error('Missing skin track');
@@ -195,20 +197,22 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
   const select = (id: string): ClientSkin => clientVariantSkin(skin, id);
   const bones = (selected: ClientSkin): BoneDef[] => selected.bones.map((bone): BoneDef => ({ name: bone.name, parent: bone.parent, pos: [bone.pos[0], bone.pos[1], bone.pos[2]] }));
   const dims = (): AnimalSpecies['dims'] => ({ ...species.dims, feet: species.dims.feet.map(([x, z]): [number, number] => [x, z]) });
-  return { id: row.id, species: species.id, kind: species.kind, rig: 'custom', fur: NO_FUR,
-    rigContract: { skeleton: skin.skeleton, sockets: [...skin.sockets], clips: [...skin.clips.keys()] },
+  const quadruped = species.body?.skeleton === 'quadruped';
+  const animate = (c: RigAnimCtx): void => {
+    const pose = c.animal.hitVolumes;
+    if (pose?.joint !== undefined) {
+      for (const [name, bone] of Object.entries(c.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative skin joint ${name}`);
+      return;
+    }
+    let driver = drivers.get(c.bones); if (driver === undefined) { driver = new SkinDriver(select(c.animal.variant), c.bones); drivers.set(c.bones, driver); } driver.step(c, quadruped);
+  };
+  return { id: row.id, species: species.id, kind: species.kind, rig: quadruped ? 'quadruped' : 'custom', fur: NO_FUR,
+    rigContract: { skeleton: quadruped ? 'kit.quadruped' : skin.skeleton, sockets: [...skin.sockets], clips: [...skin.clips.keys()] },
     // the procedural stand-in is the hull itself (the factory swaps in `skin`'s shared geometry before any rig is made)
     build: (variant) => { const selected = select(variant.id); return { bones: bones(selected), furParts: [], hardParts: [selected.geometry.clone()], eyeParts: [], dims: dims() }; },
     material: () => skin.material(),
     ...(skin.parts.length === 0 ? {} : { partMaterials: () => skin.parts.map((part) => part()) }),
     skin: (variant) => { const selected = select(variant.id); return { geometry: selected.geometry, map: null, normalMap: null, bones: bones(selected), overgrown: false }; },
-    animate: (c) => {
-      const pose = c.animal.hitVolumes;
-      if (pose?.joint !== undefined) {
-        for (const [name, bone] of Object.entries(c.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative skin joint ${name}`);
-        return;
-      }
-      let driver = drivers.get(c.bones); if (driver === undefined) { driver = new SkinDriver(select(c.animal.variant), c.bones); drivers.set(c.bones, driver); } driver.step(c);
-    },
+    ...(quadruped ? { postPose: animate } : { animate }),
   };
 }
