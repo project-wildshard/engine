@@ -682,5 +682,11 @@
  "test/sim-transport.test.ts",
  "test/boot-fixture-install.test.ts",
  "test/grid-module-preparation.test.ts",
- "test/species-kinds.test.ts"
+ "test/species-kinds.test.ts",
+ "src/shared/engine/core/memory-budget.test.ts",
+ "test/figure-rows-feet.test.ts",
+ "test/fixed-draw-shape-copy.test.ts",
+ "test/format-json-schema-steer.test.ts",
+ "test/road-surface-assets.test.ts",
+ "test/test-lists-name-files.test.ts"
 ]
