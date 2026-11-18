@@ -84,14 +84,38 @@ jobs:
           branch="release/v$version"
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --jq .object.sha)" = "$RELEASE_BUILD"
           run=$(gh run list --workflow ci --branch "$branch" --commit "$RELEASE_BUILD" \
-            --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId')
-          test -n "$run"
-          gh run view "$run" --json headSha,jobs | node -e '
+            --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          attempt=()
+          if [[ -z "$run" ]]; then
+            read -r run queue_attempt < <(jq -er '.ciJ381 | [.run, .attempt] | @tsv' <<< "$STAGING_QUALIFICATION")
+            [[ "$run" =~ ^[1-9][0-9]*$ && "$queue_attempt" =~ ^[1-9][0-9]*$ ]]
+            attempt=(--attempt "$queue_attempt")
+          fi
+          export RELEASE_BRANCH="$branch" QUEUE_ATTEMPT="${queue_attempt:-}"
+          gh run view "$run" "${attempt[@]}" --json headSha,headBranch,event,workflowName,attempt,status,conclusion,jobs | node -e '
+            const assert = require("node:assert/strict");
             const ci = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+            assert.equal(ci.headSha, process.env.RELEASE_BUILD);
+            assert.equal(ci.headBranch, process.env.RELEASE_BRANCH);
+            assert.equal(ci.event, "push");
+            assert.equal(ci.workflowName, "ci");
+            assert.equal(ci.status, "completed");
             const required = ci.jobs.filter(job => job.name !== "nine-ledger-diagnostic" || job.conclusion !== "skipped");
-            if (ci.headSha !== process.env.RELEASE_BUILD || required.length === 0 ||
-                required.some(job => job.conclusion !== "success")) {
-              throw new Error("The exact release branch CI must pass");
+            assert.ok(required.length >= 12);
+            const failed = required.filter(job => job.conclusion !== "success");
+            assert.ok(failed.length < required.length);
+            const queueAttempt = process.env.QUEUE_ATTEMPT;
+            if (queueAttempt === "") {
+              assert.equal(ci.conclusion, "success");
+              assert.equal(failed.length, 0);
+            } else {
+              assert.equal(ci.attempt, Number(queueAttempt));
+              assert.equal(ci.conclusion, "failure");
+              assert.ok(JSON.parse(process.env.STAGING_QUALIFICATION).preAliasSmokeV1);
+              const queueGuards = new Set(["memory-ledger-guard", "memory-footprint-guard"]);
+              assert.ok(failed.length > 0 && failed.every(job => queueGuards.has(job.name) &&
+                job.conclusion === "cancelled" && job.steps.length === 0), "J381 only covers a runner queue cancellation");
+              console.log("J381 staging admission:", failed.map(job => job.name).join(", "), "cancelled before any steps");
             }
           '
           node --input-type=module <<'JS'
