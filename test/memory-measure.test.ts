@@ -1,7 +1,8 @@
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import {parseGridCatalogue} from '../src/shared/game/grid/catalogue';
-import {stepCheckpoints,settleControl,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
+import {runInNewContext} from 'node:vm';
+import {STEP_LOG,stepCheckpoints,settleControl,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -134,4 +135,27 @@ test('control is the ledger after a GC; the boot checkpoints stay the peak (v0.1
   // no settled read (the page published no counters) keeps the boot's own reading
   expect(settleControl(boot, null)).toEqual(boot);
   expect(settleControl([{step: 'audio', ledger: ab(1)}], ab(0))).toEqual([{step: 'audio', ledger: ab(1)}]);
+});
+
+test('a settling run collects garbage before each step reads the ledger; any other run reads as is',()=>{
+  // brasscap-mesa's peak loading read 37.8 to 47.1 MB on the same code (main runs 44405336243..44418154411):
+  // dead array buffers stay in the weak-ref ledger until a GC runs.
+  const boot=(settle:boolean)=>{
+    const state={step:'modules',garbage:5};const calls:string[]=[];let tick=():void=>undefined;
+    const page:Record<string,unknown>={performance:{timeOrigin:0,now:()=>1},addEventListener:()=>undefined,Storage:class{setItem(){}},
+      setInterval:(callback:()=>void)=>{tick=callback;return 0;},MutationObserver:class{observe(){}},
+      document:{documentElement:{},querySelector:()=>({getAttribute:()=>state.step})},
+      __wildshardMemory:{counters:()=>{calls.push('read');return {ram:{'array-buffer':10+state.garbage}};}},
+      gc:()=>{calls.push('gc');state.garbage=0;}};
+    page['window']=page;page['globalThis']=page;
+    runInNewContext(STEP_LOG,page);
+    const run=page['__memoryRun'] as {settle:boolean,steps:[number,string,unknown][]};
+    run.settle=settle;
+    state.step='finish';tick();
+    return {bytes:run.steps.map(([,step,ledger])=>[step,ledger]),calls};
+  };
+  const ab=(bytes:number)=>({ram:{'array-buffer':bytes}});
+  // the first read comes before the init script that sets the flag, as on a real page
+  expect(boot(true)).toEqual({bytes:[['modules',ab(15)],['finish',ab(10)]],calls:['read','gc','read']});
+  expect(boot(false)).toEqual({bytes:[['modules',ab(15)],['finish',ab(15)]],calls:['read','read']});
 });
