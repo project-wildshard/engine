@@ -1909,6 +1909,7 @@
     "src/shared/game/shardfile/props.ts": "shared",
     "src/shared/game/shardfile/resourceRole.ts": "shared",
     "src/shared/game/shardfile/runtimeState.ts": "shared",
+    "src/shared/game/shardfile/runtimeTier.ts": "shared",
     "src/shared/game/shardfile/schemaReferences.ts": "shared",
     "src/shared/game/shardfile/scriptNotice.ts": "shared",
     "src/shared/game/shardfile/serverPack.ts": "shared",

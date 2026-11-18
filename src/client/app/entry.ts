@@ -605,8 +605,8 @@ async function startSelected(): Promise<void> {
     loading.setPrefetchSource(gridPrefetchStatus);
     const inline = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI, inlineOwner))) : null;
     // NB19: an inline candidate that declares a runtime enters as the catalogue enters it, by its own discovery's
-    // client-plan entry; only a page that owns its inline candidate may (inlineRuntimeArrival), and the bare inline path refuses.
-    const runtimePage = inline === null ? null : await inlineRuntimeArrival(inline, browserShardfileOptions(document.baseURI, inlineOwner), readJson);
+    // client-plan entry on the page that owns this inline candidate. A bare inline arrival has no runtime composition.
+    const runtimePage = inline === null || !inlineOwner ? null : await inlineRuntimeArrival(inline, { base: document.baseURI }, readJson);
     const source = runtimePage === null ? inline : null, admitted = runtimePage ?? arrival;
     page = preparePageResidency(admitted, source?.identity.slug);
     // The script memory bank, sized by route: each reserve can cost JSC a full GC (e472f34069), so a grid page reserves

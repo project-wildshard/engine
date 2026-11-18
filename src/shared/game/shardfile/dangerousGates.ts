@@ -2,7 +2,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 
 /**
- * ONE-FORMAT OF10b: the four dangerous gates of the ledger (`gates.ts`, docs/GATES.md), each named for its harm. Each is
+ * ONE-FORMAT OF10b: the dangerous gates of the ledger (`gates.ts`, docs/GATES.md), each named for its harm. Each is
  * deprecated: its OF10c row replaces it with the budget tier its comment names, then deletes it. A gate site calls one of
  * these; nothing else reads the provenance option for these capabilities.
  */
@@ -12,10 +12,6 @@ export interface DangerousProvenance { readonly dangerousGrant?: boolean }
 type Provenance = DangerousProvenance;
 /** The host's grant of the dangerous capabilities (runtime, page features, ownership) until OF10c budgets them. */
 export function dangerousTrust(granted = true): DangerousProvenance { return granted ? { dangerousGrant: true } : {}; }
-
-/** @deprecated ONE-FORMAT OF10c1: a declared `runtime` binds a native engine module with no CPU, memory or bandwidth limit
- * of its own; the shard's tier CPU and memory limits, metered on that module, replace this provenance check. */
-export function dangerousUnbudgetedRuntime(reader: Provenance): boolean { return reader.dangerousGrant === true; }
 
 /** @deprecated ONE-FORMAT OF10c2: native page features run page code paths outside the cost admission charged; the
  * shard's tier CPU and memory limits, charged per page feature, replace this provenance check. */

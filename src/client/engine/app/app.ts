@@ -229,7 +229,7 @@ export class App {
   addContentSystem(spec: SystemSpec, scope: Scope): void {
     const ticket = this.cpu.ticket(scope);
     this.addSystem({ ...spec, run: (dt, t) => {
-      if (!this.cpu.enabled || ticket === null) { spec.run(dt, t); return; }
+      if (!this.cpu.shouldMeasure(ticket)) { spec.run(dt, t); return; }
       const started = diagnosticNow();
       try { spec.run(dt, t); } finally { this.cpu.record(ticket, diagnosticNow() - started); }
     } }, scope);

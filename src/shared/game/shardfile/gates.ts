@@ -41,28 +41,13 @@ export const DANGEROUS_GATES = 'src/shared/game/shardfile/dangerousGates.ts';
 
 export const GATES: readonly Gate[] = [
   {
-    id: 'runtime-admission', verdict: 'dangerous', name: 'dangerousUnbudgetedRuntime',
-    what: 'A shard that declares a `runtime` is admitted only as our own (`folder.ts`, inline arrival, and the data-only '
-      + 'source paths that refuse any runtime).',
-    harm: 'A runtime binds a native module compiled into the engine bundle (one shard\'s TypeScript), which runs with no CPU, '
-      + 'memory or bandwidth limit of its own.',
-    budget: 'OF10c: the shard\'s tier CPU and memory limits, metered on the runtime\'s module.',
-    // OF10a7: plus the option's last two spellings, `DangerousProvenance` and `dangerousTrust`, the dangerous gates' input
-    refs: { [DANGEROUS_GATES]: 3 },
-    snippets: [
-      { file: FOLDER, text: 'if (source.runtime !== null && !dangerousUnbudgetedRuntime(options)) throw' },
-      { file: CLIENT_SOURCE, text: 'if (!dangerousUnbudgetedRuntime(options)) throw' },
-      { file: CLIENT_SOURCE, text: "if (admitted.source.runtime !== null) throw new Error('Custom runtime requires" },
-      { file: CLIENT_SOURCE, text: "  if (source.runtime !== null) throw new Error('Custom runtime requires" },
-    ],
-  },
-  {
     id: 'declared-page', verdict: 'dangerous', name: 'dangerousUnbudgetedPageFeatures',
     what: 'A shard with a declared client page (native page features) is admitted only as our own.',
     harm: 'Native page features run engine page code paths the shard selects (stages, owners, plan features), outside the '
       + 'cost its admission charged.',
     budget: 'OF10c: the shard\'s tier CPU and memory limits, charged per page feature.',
-    refs: { [DANGEROUS_GATES]: 1 },
+    // Includes the grant interface and its constructor shared by the remaining gates.
+    refs: { [DANGEROUS_GATES]: 3 },
     snippets: [{ file: FOLDER, text: 'if (hasDeclaredClientPage(source) && !dangerousUnbudgetedPageFeatures(options)) throw' }],
   },
   {

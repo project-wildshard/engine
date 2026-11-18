@@ -2,7 +2,7 @@ import { prepareClientModuleGroups } from './clientModules';
 import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/shardfile/outputDescriptor';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { dangerousRuntimeOwnership, dangerousUnbudgetedRuntime, type DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
+import { dangerousRuntimeOwnership } from '../../../shared/game/shardfile/dangerousGates';
 import { cataloguePlaced } from '../../../shared/game/shardfile/identity';
 import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
@@ -154,15 +154,12 @@ export async function installShardfileFolder(input: unknown, providedOptions: Fo
  * whose entry is the data-only client-plan entry (discovery.ts `planEntry`, as `prepareClientPlanShard` admits it). The
  * caller enters the returned manifest by `installManifestShardfile`, as a catalogue arrival.
  *
- * Trust is unchanged: `installShardfileFolder` still refuses every runtime, so does every page that does not own its
- * inline candidate (a released page's inline product is never built-in), and a candidate whose discovery names no
- * client-plan entry, another identity or another descriptor. Returns null when the candidate declares no runtime.
+ * The app only calls this for its own inline candidate. The discovery must name its client plan, exact identity and
+ * same-origin descriptor. Returns null when the candidate declares no runtime.
  */
-export async function inlineRuntimeArrival(source: Shardfile, options: Pick<FolderOptions, 'base'> & DangerousProvenance,
+export async function inlineRuntimeArrival(source: Shardfile, options: Pick<FolderOptions, 'base'>,
   read: (url: string) => Promise<unknown>, discover: (document: unknown) => ShardManifest = shardFromDiscovery): Promise<ShardManifest | null> {
   if (source.runtime === null) return null;
-  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (!dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires native runtime composition');
   const { slug: folder } = source.identity;
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(folder)) throw new Error('Inline runtime identity is not a shard folder');
   const url = new URL(`/shardfiles/${folder}/discovery.json`, options.base);

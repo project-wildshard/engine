@@ -34,6 +34,7 @@ import type { LiveGridRegion } from './live';
 import type { RegionShell } from './regionShell';
 import type { GridLoadout } from '../../../shared/game/grid/wallet';
 import { runtimeAccountedBytes, type RuntimeCost } from '@wildshard/format/runtimeCost';
+import { runtimeTierLimits } from '../../../shared/game/shardfile/runtimeTier';
 import { createRegionalView, type RegionalView } from './regionalView';
 import { installEnteredRuntimeService } from "../shard/retainedHooks";
 import { Progress } from '../Progress';
@@ -220,6 +221,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
       const app = request.page.context.app, parent = request.page.context.game.runtime, pageScope = request.page.world.game.levelScope;
       if (parent === undefined) throw new Error('Regional factory requires the page runtime');
       app.cpu.bind(scope, request.cell.instance);
+      if (declaration !== null) app.cpu.setLimit(scope, runtimeTierLimits(request.admitted.source).cpuMicrosPerFrame);
       const view = createRegionalView({ cell: request.cell, home: ports.home, scene: request.page.world.game.rootScene,
         physics: host.physics, slot: app, assets: app.assets, allocator: request.allocator, claim: request.claim,
         scope, ground: foundation.ground, ownGround: request.manifest.cellGround === 'world',

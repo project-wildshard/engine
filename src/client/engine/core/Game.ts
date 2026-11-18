@@ -1872,9 +1872,11 @@ export class Game {
         // FR5 (G869): a rays-only disc is parentless and GodRaysEffect draws it with matrixAutoUpdate off: compose it here,
         // or the rays come from the world origin (E398's painted sun never reached the rays)
         sky.sunDisc.updateMatrix();
-        const lookStart = this.app.cpu.enabled ? diagnosticNow() : 0;
+        const lookTicket = this.app.cpu.active ? this.app.cpu.ticket(this.levelScope) : null;
+        const meterLook = this.app.cpu.shouldMeasure(lookTicket) && this.lookStrategy?.frame !== undefined;
+        const lookStart = meterLook ? diagnosticNow() : 0;
         try { this.lookStrategy?.frame?.(realDt, t); }
-        finally { if (this.app.cpu.enabled && this.lookStrategy?.frame !== undefined) this.app.cpu.record(this.app.cpu.ticket(this.levelScope), diagnosticNow() - lookStart); }
+        finally { if (meterLook) this.app.cpu.record(lookTicket, diagnosticNow() - lookStart); }
         cullPlaced(this.camera); // placed models' per-copy culling and LODs for this view (src/client/engine/models/place.ts; nothing when none cull)
         if (this.stepOnly) { this.app.cpu.end(); if (on) frameCost.end(realDt * 1000, renderAt - lastRun, 0, 0); return; } // stepFrame: no draw
         // D178 (G813): a held crossing view pauses the post chain: the AO pass sits this draw out, and the bloom, rays and

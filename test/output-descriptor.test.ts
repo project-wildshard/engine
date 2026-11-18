@@ -28,6 +28,7 @@ import { leaseClientLibrary } from '../src/client/game/shardfile/clientLibrary';
 import { entryReadPlan } from '../src/client/game/grid/entryReadPrefetch';
 import { parseEntryReadSet } from '@wildshard/format/entryReads';
 import { installCatalogueFixture } from './fixtures/bootSetup';
+import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
 import { setPageMode } from '../src/shared/game/grid/pageMode';
 import { PageResidency } from '../src/client/game/grid/pageResidency';
 
@@ -79,6 +80,23 @@ function cacheStore(): { cache: FolderCache; bytes: Map<string, Uint8Array>; pro
     putFolder: (_base, value) => { product = structuredClone(value); return Promise.resolve(); },
   } };
 }
+
+test.each(['large', 'small'] as const)('OF10c1c: checked admission reserves the measured runtime claim (%s tier)', async tier => {
+  const { source, wires } = fixture();
+  const runtime: NonNullable<Shardfile['runtime']> = { kind: 'client-plan', cost: FIXTURE_RUNTIME_COST, binds: ['state'] };
+  const reserve = vi.fn();
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const admitted = await admitFolder({ ...source, runtime, budgets: { ...source.budgets, tier } },
+      { ...options(wires), dangerousGrant: false, reserve });
+    expect(admitted.source.runtime).toEqual(runtime);
+    expect(admitted.source.budgets.tier).toBe(tier);
+    expect(reserve).toHaveBeenCalledOnce();
+    expect(reserve).toHaveBeenCalledWith(admitted.source);
+    if (tier === 'small') expect(warning).toHaveBeenCalledWith(expect.stringContaining('runtime claims'));
+    else expect(warning).not.toHaveBeenCalled();
+  } finally { warning.mockRestore(); }
+});
 
 test('a rejected descriptor request uses a checked revisit, never elapsed time', async () => {
   const f = fixture(), store = cacheStore(), opts = options(f.wires, store.cache);
