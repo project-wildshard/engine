@@ -21,7 +21,7 @@
   "scripts": {
     "test:t1": "node scripts/t1-e2e.mjs",
     "pnpm:devPreinstall": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
-    "dev": "node src/tools/build-web.ts --dev",
+    "dev": "node scripts/dev.mjs",
     "build": "node src/tools/build-web.ts",
     "typecheck": "pnpm typecheck:kit && pnpm gen:inputs && npr tsc -b tsconfig.layers.json --builders 8",
     "lint": "pnpm lint:kit && pnpm lint:game",

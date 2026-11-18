@@ -21,7 +21,16 @@ Run from the repo root.
   only tests reach is red: add or fix the row, never the gate.
 - `pnpm test`: `node:test` on `src/**/*.test.ts`, run as .ts by Node's type stripping.
 - `pnpm test:hooks`: the `.githooks/` suite (CI, and pre-commit when hooks change).
-- `pnpm dev`: esbuild watch + the server on http://127.0.0.1:4402.
+- `pnpm dev`: the game on http://127.0.0.1:4402 with its server as a local Node process
+  (`scripts/dev.mjs`, MEMORY-STRUCTURE STR2/STR3, J414, J419): ring 1's pins, a
+  devserver client build, and the dedicated server on loopback with saves on disk
+  in PGlite under `tmp/dev-world/`. The page port stamps each document with the
+  world, so no dev page starts the in-page server worker; only the deployed
+  preview keeps it. A `src/server/` edit rebuilds the server and restarts the
+  world (the page redials, about 2 s); a `src/client/` or `src/shared/` edit
+  rebuilds the client and the page reopens on it. `--shard <slug>` (every pin),
+  `--port`, `--saves memory`, `--dist <built folder>`, `--no-watch`. Delete
+  `tmp/dev-world/` with dev stopped for a fresh world.
 - `pnpm build`: builds the web app into `src/dist/web`.
 - `pnpm test:e2e`: the `engine serve` status page, then the Template 2
   smoke (TEMPLATE-E2E, J233): the real title, a walk, the door, the
@@ -69,7 +78,7 @@ goes in `tmp/<task>/` and is deleted when done.
 - `src/server/`: the Hono app (`GET /api/health`) and `serve.ts`.
 - `src/shared/`: zod schemas used on both sides of the wire.
 - `src/client/`: the Preact web app, with its own `tsconfig.json` (DOM lib).
-- `src/tools/build-web.ts`: esbuild into `src/dist/web` (`--dev` watches and serves).
+- `src/tools/build-web.ts`: esbuild into `src/dist/web` (the kit status page; `--dev` watches and serves it).
 - `src/e2e/`: Playwright: the status page, and `smoke/`, the Template 2 smoke.
 - `src/cook/`: shardfile to runtime packs.
 - `src/scripts/check-sides.mjs`: the side rule (`pnpm check:sides`).
