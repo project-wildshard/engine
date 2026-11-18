@@ -5,6 +5,13 @@
  * standalone server's worker is now started early in the boot (`prespawnStandalone`), when the page holds far less, and
  * warms Rapier there. The world it builds touches the server's paths: trimesh and heightfield colliders, dynamic bodies,
  * a character controller, ray and shape casts and steps. It frees everything it made.
+ *
+ * ENGINE-MEMORY EM21: the spike is one compile. V8 optimizes Rapier 0.21's 366 kB step function (#2643) on the second
+ * `world.step()`: about 190 MB of compile memory for 0.3 to 0.45 s, freed when it ends. V8 counts that memory, which sits
+ * in its process-wide wasm engine, in every isolate's malloc, so a Chromium dump shows it once per isolate (156 MB
+ * "workers" plus part of "main" is one compile). The module is shared (rapierModule.ts), so it compiles once per page.
+ * Only a smaller step function avoids it (a Rapier rebuild); JavaScriptCore shows no such spike (EM13).
+ * test/rapier-tier-up.test.ts holds every large optimization inside this warm-up.
  */
 import type { Rapier } from './rapier';
 
