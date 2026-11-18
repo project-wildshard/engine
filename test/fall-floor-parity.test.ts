@@ -69,7 +69,7 @@ async function gridPageResetTick(slug: string, drop: Drop, as: 'home' | 'region'
   if (!(live instanceof LiveGridSession)) throw new Error('Missing live session prototype');
   const region = { resident: { product, runtime: { hooks: {} } } };
   Object.assign(live, { page: as === 'home' ? page : {}, runtimeRegions: new Map(as === 'home' ? [] : [[slug, region]]),
-    hybrid: { state: () => ({ instance: slug, ready: true }) },
+    runtimePage: { state: () => ({ instance: slug, ready: true }) },
     ports: { home: { instance: as === 'home' ? slug : 'elsewhere', origin }, assembly: { at: () => cell } },
     live: { worldFeet: () => ({ x: origin.x + position.x, y: position.y, z: origin.z + position.z }) } });
   let reset = false;
