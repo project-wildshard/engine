@@ -1,5 +1,5 @@
 import { afterAll, expect, test, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Sphere, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Sphere, Sprite, SpriteMaterial, Vector3 } from 'three';
 import { textureUploadRenderer } from '../../../test/engine/textureUploadRenderer';
 import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from './changedTextureUploads';
 import { installMemorySaver, releaseDrawnGeometry } from './memorySaver';
@@ -98,6 +98,26 @@ test('phone retires draw-only shape data and an unexpected raycast reads back th
   expect(Array.from(drawOnly.geometry.index?.array ?? [])).toEqual([0, 1, 2]);
   expect(arrayReleased(drawOnly.geometry.getAttribute('position'))).toBe(false);
   drawOnly.geometry.dispose(); registered.geometry.dispose(); material.dispose();
+});
+
+test('phone keeps the sprite quad readable for the next renderer', () => {
+  vi.stubGlobal('WebGL2RenderingContext', FakeGL);
+  vi.stubGlobal('WebGLBuffer', FakeBuffer);
+  const gl = new FakeGL(), renderer = Object.assign(textureUploadRenderer(), { getContext: () => gl });
+  installMemorySaver(renderer, true);
+  const material = new SpriteMaterial(), sprite = new Sprite(material), geometry = sprite.geometry;
+  const index = geometry.index;
+  if (index === null) throw new Error('Expected an indexed sprite');
+  const expected = Array.from(index.array);
+  try {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, new FakeBuffer());
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, index.array);
+    renderer.renderBufferDirect(new PerspectiveCamera(), new Scene(), geometry, material, sprite, { start: 0, count: 6, materialIndex: 0 });
+    expect(releaseDrawnGeometry(renderer)).toBe(0);
+    geometry.dispose();
+    expect(new Sprite(material).geometry).toBe(geometry);
+    expect(Array.from(index.array)).toEqual(expected);
+  } finally { material.dispose(); }
 });
 
 test('a prepared fixed batch retires vertex arrays and keeps the multi-draw index', () => {

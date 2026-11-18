@@ -280,7 +280,8 @@ export function installMemorySaver(renderer: Renderer, releaseShape = false): vo
     // A rig's geometry stays whole: the far and shadow herds copy every attribute of it when a batch grows, and reading
     // a released array back from the GPU (restore) stalled a desktop Pine drive 1.4 s in one frame (gl.isBuffer
     // waiting on the GPU, then getBufferSubData)
-    if (seenGeometry.has(geometry) || object instanceof THREE.SkinnedMesh
+    // Three shares one quad between all sprites, including the next renderer's sprites.
+    if (seenGeometry.has(geometry) || object instanceof THREE.SkinnedMesh || object instanceof THREE.Sprite
       || (object instanceof THREE.BatchedMesh && !(releaseShape && fixedBatchGeometry(geometry)))) return;
     seenGeometry.add(geometry);
     // The scene/cache owns live geometry; this delayed optimization only borrows it.
