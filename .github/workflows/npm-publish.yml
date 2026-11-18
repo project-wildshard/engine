@@ -194,14 +194,16 @@ jobs:
         run: node scripts/build-server.mjs --dev --out dist/dev-server
       - name: Check package version, bins and exports
         run: |
+          node scripts/npm-artifact.mjs "$RUNNER_TEMP/engine-npm" > "$RUNNER_TEMP/engine-npm.json"
           # shellcheck disable=SC2016 # the quoted script is JavaScript with template literals
           node -e '
+          const { appendFileSync, readFileSync } = require("node:fs");
           const { execFileSync } = require("node:child_process");
-          const pkg = JSON.parse(require("node:fs").readFileSync("package.json", "utf8"));
+          const packed = JSON.parse(readFileSync(process.argv[2], "utf8"));
+          const pkg = JSON.parse(execFileSync("tar", ["-xOf", packed.filename, "package/package.json"], { encoding: "utf8" }));
           const version = process.argv[1].replace(/^v/, "");
           if (pkg.version !== version) throw new Error(`tag says ${version}, package.json says ${pkg.version}`);
           if (pkg.private) throw new Error(`${pkg.name} is private`);
-          const packed = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { encoding: "utf8", maxBuffer: 1 << 28 }))[0];
           const files = new Set(packed.files.map((file) => file.path));
           for (const name of ["main.mjs", "cellWorker.mjs", "rapier.wasm", "bundle.json", "migrations/0001-saves.sql"]) {
             if (!files.has(`dist/dev-server/${name}`)) throw new Error(`not in the tarball: dev server ${name}`);
@@ -213,7 +215,8 @@ jobs:
           const { posix } = require("node:path");
           for (const file of files) {
             if (!/(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(file)) continue;
-            const config = JSON.parse(require("node:fs").readFileSync(file, "utf8"));
+            if (file.startsWith("node_modules/")) continue;
+            const config = JSON.parse(execFileSync("tar", ["-xOf", packed.filename, "package/" + file], { encoding: "utf8" }));
             const parents = Array.isArray(config.extends) ? config.extends : [config.extends];
             const inputs = [...parents, ...(config.references ?? []).map(row => row.path)];
             for (const input of inputs) {
@@ -226,8 +229,9 @@ jobs:
           }
           const missing = [...new Set(targets)].filter((target) => !target.includes("*")).map((target) => target.replace(/^\.\//, "")).filter((target) => !files.has(target));
           if (missing.length > 0) throw new Error(`not in the tarball: ${missing.join(", ")}`);
+          appendFileSync(process.env.GITHUB_ENV, `ENGINE_NPM_ARCHIVE=${packed.filename}\n`);
           console.log(`${pkg.name}@${pkg.version}: ${files.size} files, ${packed.size} bytes packed, every bin and export inside`);
-          ' "$RELEASE_TAG"
+          ' "$RELEASE_TAG" "$RUNNER_TEMP/engine-npm.json"
       # Every engine version carries a changelog (Jake, 2026-11-10); changelog-tag.yml checks the same, but a
       # separate workflow cannot stop this one.
       - name: Require the release changelog section at its commit
@@ -256,7 +260,7 @@ jobs:
           fi
           args=(--provenance --access public --ignore-scripts)
           if [[ "$GITHUB_EVENT_NAME" = workflow_dispatch ]]; then args+=(--tag next); fi
-          npm publish "${args[@]}"
+          npm publish "${args[@]}" "$ENGINE_NPM_ARCHIVE"
 
   placeholder:
     # Only main's copy of this file: the trusted publisher is bound to the file name, not the branch.

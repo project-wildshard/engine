@@ -12,6 +12,9 @@ An installed tarball resolved the exact patched module; the package test
 compares the shipped skeleton module with its frozen source byte for byte.
 Meshoptimizer is an engine runtime dependency so the bundled format's
 decoder import stays resolvable under pnpm's isolated npm tarball install.
+The publisher stages regular files before packing the closure. Packing
+pnpm's global store links in place emitted archive hardlinks that tar
+refused to extract. The archive test now extracts the entire package.
 
 The authored server opens the verified build folder as one loopback cell.
 Bring in the declared rigs its spawned creatures need for native height

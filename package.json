@@ -11,9 +11,6 @@
     "access": "public"
   },
   "type": "module",
-  "bundleDependencies": [
-    "@wildshard/format"
-  ],
   "bin": {
     "engine": "./src/cli/engine.mjs"
   },
