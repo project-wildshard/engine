@@ -85,6 +85,30 @@ export function ledgerOverLine(baseline, run, zone) {
   }
 }
 
+/**
+ * Read one hosted zone for the comparison guard. A boot that is over the line,
+ * or that never reaches control (hosted SwiftShader blocks the page for many
+ * seconds at a time), is booted once more; the files returned go to
+ * confirmLedger. With no baseline for the zone the first failure stands.
+ * @param {{ zone: string, baseline: LedgerBudget | undefined, boot: (round: number) => Promise<string>,
+ *   read: (file: string) => any, log: (line: string) => void }} ports
+ * @returns {Promise<string[]>}
+ */
+export async function confirmZone({ zone, baseline, boot, read, log }) {
+  let first;
+  try { first = await boot(1); } catch (error) {
+    if (baseline === undefined) throw error;
+    log(`${zone}: ${error instanceof Error ? error.message : String(error)}\nBooting ${zone} once more: it fails only if this boot fails too.`);
+    return [await boot(2)];
+  }
+  const doc = read(first);
+  const failure = baseline === undefined || doc?.microscope?.ready !== true ? null
+    : ledgerOverLine(baseline, ledgerBudget(doc.microscope.checkpoints), zone);
+  if (failure === null) return [first];
+  log(`${failure}\nMeasuring ${zone} once more: it fails only if this reading is over the line too.`);
+  return [first, await boot(2)];
+}
+
 /** Hottest run sets the extent of measured spread around the median. The
  * positive spread is kept in bytes so subsequent measurements cannot widen
  * the allowance.

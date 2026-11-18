@@ -1,13 +1,28 @@
 import { expect, test } from 'vitest';
-import { compareFootprint, compareLedger, confirmLedger, footprintBudget, ledgerOverLine, footprintInstrument, ledgerBudget } from '../scripts/memory/ratchet.mjs';
+import { compareFootprint, compareLedger, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, ledgerBudget } from '../scripts/memory/ratchet.mjs';
 
 const MB = 1e6;
-const boot = (held: number): ReturnType<typeof ledgerBudget> => ledgerBudget([
+const points = (held: number): Parameters<typeof ledgerBudget>[0] => [
   { step: 'props', ledger: { gpu: { buffer: 8 * MB }, ram: { 'array-buffer': 70 * MB } } },
   { step: 'finish', ledger: { gpu: { buffer: 20 * MB }, ram: { 'array-buffer': (50 + held) * MB } } },
   { step: 'control', ledger: { gpu: { buffer: 18 * MB }, ram: { 'array-buffer': (30 + held) * MB } } },
   { step: 'playing', ledger: { gpu: { buffer: 30 * MB }, ram: { 'array-buffer': 90 * MB } } },
-]);
+];
+const boot = (held: number): ReturnType<typeof ledgerBudget> => ledgerBudget(points(held));
+
+/** Hosted boots in order: a number is a reading with that many held MB, an Error a boot that never reached control. */
+async function guard(boots: readonly (number | Error)[], baseline: ReturnType<typeof ledgerBudget> | null = boot(0)) {
+  const booted: number[] = [];
+  const files = await confirmZone({ zone: 'template', baseline: baseline ?? undefined, log: () => undefined,
+    read: file => ({ microscope: { ready: true, checkpoints: points(boots[Number(file) - 1] as number) } }),
+    boot: async round => {
+      booted.push(round);
+      const outcome = boots[round - 1];
+      if (outcome instanceof Error) throw outcome;
+      return String(round);
+    } });
+  return { files, booted };
+}
 
 test('each subsystem has a control reading and a separate loading high-water mark', () => {
   expect(boot(0)).toMatchObject({ control: { geometry: 18 * MB, loading: 30 * MB },
@@ -30,6 +45,18 @@ test('the guard measures a zone a second time only when its first reading is ove
   expect(ledgerOverLine(boot(0), boot(0), 'template')).toBeNull();
   expect(ledgerOverLine(boot(0), boot(0.5), 'template')).toBeNull();
   expect(ledgerOverLine(boot(0), boot(4), 'template')).toMatch(/template control loading: 34000000 B > 30600000 B/u);
+});
+
+test('a hosted zone boots once when its reading is in line, twice when it is over', async () => {
+  expect(await guard([0])).toEqual({ files: ['1'], booted: [1] });
+  expect(await guard([4, 0])).toEqual({ files: ['1', '2'], booted: [1, 2] });
+  expect(await guard([20, 20])).toEqual({ files: ['1', '2'], booted: [1, 2] });
+});
+
+test('a hosted boot that never reaches control is booted once more and fails only if that one does too', async () => {
+  expect(await guard([new Error('stopped loading at step "props"'), 0])).toEqual({ files: ['2'], booted: [1, 2] });
+  await expect(guard([new Error('first'), new Error('second')])).rejects.toThrow('second');
+  await expect(guard([new Error('record mode')], null)).rejects.toThrow('record mode');
 });
 
 test('a retained allocation that every reading shows still fails the zone', () => {

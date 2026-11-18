@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { serve } from '../parity/serve.mjs';
-import { compareLedger, ledgerBudget, ledgerOverLine, main as ratchet } from './ratchet.mjs';
+import { compareLedger, confirmZone, ledgerBudget, main as ratchet } from './ratchet.mjs';
 
 const [mode, root, output, baseline] = process.argv.slice(2);
 if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode) || !root || !output) {
@@ -23,8 +23,8 @@ async function measure(args) {
 
 /** @param {string} file */
 const get = file => JSON.parse(readFileSync(file, 'utf8'));
-// One hosted boot is one sample (memory/ratchet.mjs confirmLedger): a zone whose
-// first reading is over the line is measured once more and fails only if both are.
+// One hosted boot is one sample (memory/ratchet.mjs confirmZone): a zone whose first
+// boot is over the line or never reaches control is booted once more.
 const stored = mode === 'ledger' && baseline ? get(baseline).zones : null;
 
 const preview = await serve(absolute(root), '', true, { telemetryDir: join(directory, 'telemetry') });
@@ -51,20 +51,17 @@ try {
   }
   for (const chunk of readings) {
     const rounds = mode === 'ledger' && !baseline ? (chunk === '_template' ? 5 : 3) : 1;
-    const file = (/** @type {number} */ round) => join(directory, `measure-${chunk}-${round}.json`);
-    for (let i = 0; i < rounds; i++) {
-      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file(i + 1)}`,
+    const boot = async (/** @type {number} */ round) => {
+      const file = join(directory, `measure-${chunk}-${round}.json`);
+      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file}`,
         ...(mode === 'ledger' ? ['--ledger-only'] : [mode === 'footprint' ? '--runs=5' : '--runs=3'])]);
-      files.push(file(i + 1));
+      return file;
+    };
+    if (stored !== null) {
+      files.push(...await confirmZone({ zone: chunk, baseline: stored[chunk], boot, read: get, log: line => { console.log(line); } }));
+      continue;
     }
-    const first = stored?.[chunk] === undefined ? null : get(file(1));
-    const failure = first?.microscope?.ready === true
-      ? ledgerOverLine(stored[chunk], ledgerBudget(first.microscope.checkpoints), chunk) : null;
-    if (failure !== null) {
-      console.log(`${failure}\nMeasuring ${chunk} once more: it fails only if this reading is over the line too.`);
-      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file(2)}`, '--ledger-only']);
-      files.push(file(2));
-    }
+    for (let i = 0; i < rounds; i++) files.push(await boot(i + 1));
   }
   const next = join(directory, `${mode}-ratchet.json`);
   ratchet([`--mode=${mode}`, `--out=${next}`, ...(baseline ? [`--baseline=${baseline}`] : []), ...files]);
