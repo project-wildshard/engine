@@ -11,6 +11,7 @@ import { writeBoard } from './staging-smoke/board.mjs';
 import { holds, worstFirst } from './staging-smoke/checks.mjs';
 import { STORE } from './staging-smoke/store.mjs';
 import { CHANNELS, SMOKE_SCENARIOS } from './page-release/flow.mjs';
+import { checkLocalSource, openQaRig } from './staging-qa-local.mjs';
 
 /** @typedef {import('./staging-smoke/checks.mjs').Finding} Finding */
 /** @typedef {{ id: string, browser: string, pass: boolean, seconds: number, playedMs: number, reason?: string, log: string }} Proof */
@@ -59,7 +60,7 @@ function journey({ id, root, url, out, build }) {
   mkdirSync(dir, { recursive: true });
   const log = join(dir, 'run.log');
   const args = gate
-    ? [join(import.meta.dirname, 'zone-gate-proof.mjs'), `--base=${url}`, `--out=${dir}`, '--engine=chromium', '--viewport=1280x800@1', '--target=far-reach', '--deploy']
+    ? [join(import.meta.dirname, 'zone-gate-proof.mjs'), `--base=${url}`, `--out=${dir}`, '--engine=chromium', '--viewport=1280x800@1', '--target=far-reach', '--deploy', '--online']
     : [join(import.meta.dirname, 'journey-proof.mjs'), '--url', url, '--out', dir, '--browsers', browser, '--card', 'driftwood-isle', '--paths', 'mmo', '--runs', 'cold', '--deploy'];
   console.log(`staging-qa starting ${id}`);
   const started = Date.now();
@@ -87,38 +88,54 @@ async function cli() {
   }
   const release = args.get('release');
   if (release === undefined || !/^v\d+\.\d+\.\d+$/u.test(release)) throw new Error('Use --release vX.Y.Z');
+  const local = args.has('local');
+  if (local && args.has('url')) throw new Error('Use --local or --url');
   const url = new URL(args.get('url') ?? STAGING).origin;
   if (url !== STAGING && !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/u.test(url)) throw new Error('Staging QA requires staging or a loopback server');
   const requested = args.get('only')?.split(',');
   const known = new Set(/** @type {string[]} */ ([...SMOKE_SCENARIOS, ...JOURNEYS]));
   if (requested?.some(id => !known.has(id))) throw new Error('Unknown staging QA step');
-  const selected = SMOKE_SCENARIOS.filter(id => requested === undefined || requested.includes(id));
-  const expected = JOURNEYS.filter(id => requested === undefined || requested.includes(id));
+  const selected = SMOKE_SCENARIOS.filter(id => (requested ?? (local ? ['K3', 'K4', 'K5'] : SMOKE_SCENARIOS)).includes(id));
+  const expected = JOURNEYS.filter(id => (requested ?? (local ? [] : JOURNEYS)).includes(id));
   if (args.has('dry-run')) {
-    console.log(`staging-qa ${release} ${url}: ${[...selected, ...expected].join(', ')}; vision reports only; hold and fix forward on P0/P1`);
+    const target = local ? 'local source' : url;
+    console.log(`staging-qa ${release} ${target}: ${[...selected, ...expected].join(', ')}; vision reports only; hold and fix forward on P0/P1`);
     return;
   }
   const root = resolve(args.get('root') ?? '.');
   const out = resolve(args.get('out') ?? join(root, 'tmp', 'staging-qa', release, String(Date.now())));
   if (existsSync(join(out, 'verdict.json')) || existsSync(join(out, 'smoke')) || expected.some(id => existsSync(join(out, id)))) throw new Error('Use a fresh staging QA output directory');
   const store = resolve(args.get('store') ?? STORE);
+  const source = args.get('build');
+  if (local && (source === undefined || !/^[a-f0-9]{40}$/u.test(source))) throw new Error('Use --build <source-sha> for local QA');
+  const rig = local && source !== undefined ? await openQaRig({ root, build: source, out }) : undefined;
+  try {
+    await qualify({ url: rig?.base ?? url, release, root: rig?.source ?? root, out, store: local ? join(out, 'local-store') : store, local,
+      selected, expected, owner, full: requested === undefined,
+      ...(source === undefined ? {} : { source }), ...(args.has('bugbash') ? { bugbash: args.get('bugbash') } : {}) });
+  } finally { await rig?.close(); }
+}
+
+/** @param {{url: string, release: string, root: string, out: string, store: string, local: boolean, selected: readonly string[],
+ * expected: readonly string[], owner: string, full: boolean, source?: string, bugbash?: string | undefined}} options */
+async function qualify({ url, release, root, out, store, local, selected, expected, owner, full, source, bugbash }) {
   const started = Date.now();
   const first = await served(url);
-  const build = args.get('build') ?? first.build;
-  if (build === undefined || !/^[0-9a-f]{40}$/u.test(build) || first.build !== build || first.clientVersion !== release.slice(1)) {
+  const build = source ?? first.build;
+  if (build === undefined || !/^[0-9a-f]{40}$/u.test(build) || first.build !== build || (!local && first.clientVersion !== release.slice(1))) {
     throw new Error('Staging QA requires /version.json for the requested build and version');
   }
   mkdirSync(out, { recursive: true });
   const smoke = selected.length === 0 ?
     { build, url, release, at: new Date().toISOString(), seconds: 0, scenarios: [], findings: [], vision: [], hold: false } :
-    await runSmoke({ url, release, out: join(out, 'smoke'), only: selected, store, build, deploy: true, changelog: join(root, 'CHANGELOG.md') });
+    await runSmoke({ url, release, out: join(out, 'smoke'), only: selected, store, build, deploy: true, vision: !local, changelog: join(root, 'CHANGELOG.md') });
   const proofs = expected.map(id => journey({ id, root, url, out, build }));
+  if (local) checkLocalSource(root, build);
   const after = await served(url);
-  const merged = mergeVerdict({ build, smoke, proofs, expected, selected, ...(after.build === undefined ? {} : { after: after.build }), full: requested === undefined });
-  const verdict = { ...smoke, ...merged, build, qa: true, startedAt: new Date(started).toISOString(), at: new Date().toISOString(),
+  const merged = mergeVerdict({ build, smoke, proofs, expected, selected, ...(after.build === undefined ? {} : { after: after.build }), full });
+  const verdict = { ...smoke, ...merged, build, qa: true, kind: local ? 'local' : 'staging', startedAt: new Date(started).toISOString(), at: new Date().toISOString(),
     seconds: (Date.now() - started) / 1000, proofs };
   const hold = holdLine(verdict, owner);
-  const bugbash = args.get('bugbash');
   const rows = bugbash !== undefined && verdict.findings.length > 0
     ? bugbashRows(readFileSync(resolve(bugbash), 'utf8'), verdict.findings, { release, build }) : undefined;
   if (bugbash !== undefined && rows !== undefined) writeFileSync(resolve(bugbash), rows.text);
@@ -126,7 +143,7 @@ async function cli() {
   const file = join(out, 'verdict.json');
   writeFileSync(file, `${JSON.stringify({ ...verdict, ...(board === undefined ? {} : { board }) }, null, 2)}\n`);
   const line = hold ?? `staging-qa PASS ${release} ${build.slice(0, 8)}${verdict.full ? '' : ' partial'}: ${(verdict.seconds / 60).toFixed(1)} min, ${verdict.minutesInPlay.toFixed(1)} min in play`;
-  if (verdict.full) {
+  if (verdict.full && !local) {
     const receipts = join(homedir(), '.cache', 'wildshard', 'lane-receipts.log');
     mkdirSync(dirname(receipts), { recursive: true });
     appendFileSync(receipts, `${new Date().toISOString()} ${process.env.WS_LANE_NAME ?? 'staging-qa'} ${line}\n`);

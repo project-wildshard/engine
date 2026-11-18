@@ -25,3 +25,8 @@ evidence and two exact-build browser journeys. That lets QA 29 pin the staged
 engine after the stable J428 deploy checks. Admission still verifies the green
 release CI, live page and signed rooms release. The optional skipped ledger
 diagnostic no longer makes an otherwise green release CI look red.
+
+SQ5 builds a clean copy of the requested source and runs K3, K4 and K5
+against a signed loopback rooms service. The rig uses a one-run signing key
+and cleans up the room process, preview and copied tree. The first MacBook
+run reached play in all three scenarios in two minutes after the build.
