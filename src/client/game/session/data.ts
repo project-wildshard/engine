@@ -5,6 +5,7 @@ import type { MusicStyle } from '@wildshard/engine/audio/bootAudio';
 import type { FieldModelsContext, ShardManifest } from '../shard/manifest';
 
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import type * as WorkerClient from '../shardfile/clientWorker';
 import { checkFolderClientModules } from '../shardfile/clientModules';
 
 import { imagesFirstPlayingBytes } from '../grid/runtimeCost';
@@ -27,6 +28,9 @@ import { beginLoading, type Loading } from '@wildshard/engine/ui/Loading';
 import { gridPrefetchStatus } from '../grid/prefetch';
 import { currentPageMode } from '../../../shared/game/grid/pageMode';
 import { NO_AUDIO, type LevelAudioProfile } from '@wildshard/engine/audio/levelAudio';
+
+/** Share the lazy worker-client import at prewarm, early start and adoption. */
+export const loadWorkerClient = (): Promise<typeof WorkerClient> => import('../shardfile/clientWorker');
 
 async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audioProfile: LevelAudioProfile | undefined; files: Readonly<Record<"sky" | "baked" | "terrain" | "trees" | "physics" | "cabins" | "props" | "art" | "music" | "sfx", readonly string[]>>; plan: Plan<"audio" | "sky" | "terrain" | "physics" | "cabins" | "props" | "renderer" | "cards" | "forest" | "edge" | "grass" | "animals" | "weapon" | "assembly" | "menu" | "shaders" | "firstFrame">; step: StepRunner; menuLoad: Preload<void> | null; audioLoad: Preload<AudioBanks> | null; deferredAudio: (Preload<void> & { readonly style: MusicStyle; decode: () => Promise<AudioBanks>; }) | null; fieldModels: Promise<(ctx: FieldModelsContext) => void> | null; manifest: ShardManifest; slug: string; stage: LoadStage; boot: StagedBoot; session: SessionState; kit: KitPorts; product: ShardFolder; }> {
   const { manifest, stage, boot, session } = ctx;
@@ -94,9 +98,7 @@ async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audi
   const audioLoad = deferExtras ? null : startAudioPreload(files, manifest, audioProfile);
   const deferredAudio = deferExtras ? startDeferredAudioPreload(files, manifest, audioProfile) : null;
   // MG10 (J410): the in-page server's worker starts now and warms physics while the page holds little (clientWorker.ts)
-  void (async () => {
-    try { (await import('../shardfile/clientWorker')).prespawnWorkerServer(); } catch { /* the server step imports it again */ }
-  })();
+  void loadWorkerClient().then(worker => worker.prespawnWorkerServer()).catch(() => undefined);
   void startViewmodelTextures(manifest.boot?.viewmodelSets ?? false); // the crossbow's + rifle's textures, drawn in a worker while the world builds
   const fieldModels = manifest.fieldModels?.() ?? null;
   return { ...ctx, loading, audioProfile, files, plan, step, menuLoad, audioLoad, deferredAudio, fieldModels };

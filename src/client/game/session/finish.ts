@@ -9,6 +9,7 @@ import { initialHomeMetadataRequired } from '../grid/homeMetadata';
 import { reenterGrid, reenterGridInPage, reenterShard, showGridDestination } from '../grid/pageEntry';
 import type { playStage } from './play';
 import type { WorkerClientGrid } from '../shardfile/clientWorker';
+import { loadWorkerClient } from './data';
 import { asShell } from '@wildshard/engine/app/ownership';
 import { app } from '@wildshard/engine/app/runtime';
 import { releaseByteCounter } from '@wildshard/engine/boot/bytes';
@@ -129,7 +130,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // only once the home region has placed the player and its saves, which the server carries from the page.
   void (async () => {
     try {
-      const worker = await import('../shardfile/clientWorker');
+      const worker = await loadWorkerClient();
       if (!game.levelScope.disposed) worker.startWorkerServerEarly({ slug: ctx.grid?.home.slug ?? slug, lone: workerGrid(ctx) === null, scope: game.levelScope });
     } catch { /* the Worker boot step imports it again and reports its failure */ }
   })();
@@ -325,7 +326,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // DL17, DL21: the server boots under the card, a counted line on it, so its reads land before control and the player's first
   // press reaches a server that is up. Before the flip this moves only J130's row.
   try {
-    await loadingStage('server', () => import('../shardfile/clientWorker').then(worker => worker.launchWorkerClient({ ...(TIER === 'phone' && entersAtReveal ? { linkBodies: () => linkWorldUnderLoader(game, true) } : {}), slug: ctx.grid?.home.slug ?? slug, player, physics: world.physics, scene: game.rootScene, animals, weapons, health: playerHealth, died: ctx.serverDied, hurt: ctx.serverHurt, items: ctx.grid === null ? ctx.product.shardfile.items.rows : [], dims: kind => { const species = app.species.get(kind), variant = species?.variants[0]; return variant === undefined ? null : species?.build(variant, new Rng(1)).dims ?? null; }, tools: () => app.equipment?.tools ?? [], day: () => app.dayCycle, grid: workerGrid(ctx), scope: game.levelScope, system: spec => { app.addSystem(spec, game.levelScope); } })));
+    await loadingStage('server', () => loadWorkerClient().then(worker => worker.launchWorkerClient({ ...(TIER === 'phone' && entersAtReveal ? { linkBodies: () => linkWorldUnderLoader(game, true) } : {}), slug: ctx.grid?.home.slug ?? slug, player, physics: world.physics, scene: game.rootScene, animals, weapons, health: playerHealth, died: ctx.serverDied, hurt: ctx.serverHurt, items: ctx.grid === null ? ctx.product.shardfile.items.rows : [], dims: kind => { const species = app.species.get(kind), variant = species?.variants[0]; return variant === undefined ? null : species?.build(variant, new Rng(1)).dims ?? null; }, tools: () => app.equipment?.tools ?? [], day: () => app.dayCycle, grid: workerGrid(ctx), scope: game.levelScope, system: spec => { app.addSystem(spec, game.levelScope); } })));
   } catch (error) {
     plan.fail(error instanceof Error ? error.message : String(error));
     throw error;
