@@ -13,8 +13,8 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 
 let R: Rapier;
 beforeAll(async () => { R = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))); });
-function frame(tick: number, x: number, alive = true): DecodedFrame {
-  const values: Record<string, number> = { x, y: 0, z: -.8 };
+function frame(tick: number, x: number, alive = true, y = 0): DecodedFrame {
+  const values: Record<string, number> = { x, y, z: -.8 };
   const row = Uint32Array.from(ANIMAL_CLASS.row.map(column => column.name === 'alive' ? Number(alive)
     : column.kind === 'f32q' && Object.hasOwn(values, column.name)
       ? Math.round(((values[column.name] ?? 0) - Number(column.value(0))) / column.step) : 0));
@@ -91,6 +91,21 @@ test('dead or departed rows release their collision proxy', () => {
     f.interpolator.push(frame(104, 0)); f.world.poseFor(6, false); f.creatures.prepare();
     expect(f.world.capsuleCount).toBe(1);
     f.interpolator.clear(); f.world.poseFor(7, false); f.creatures.prepare();
+    expect(f.world.capsuleCount).toBe(0);
+  } finally { f.dispose(); }
+});
+
+// NET-LAG NL13b3 (opus-netlag4): at 180 ms a diving Far Reach drift ray, projected 11 ticks past its newest row, stopped the
+// page's capsule dead while the room walked on (two of three Far Reach corrections a run). A flyer reacts to the player and
+// cannot be guessed that far ahead, so a creature off the ground under the feet never blocks the predicted command.
+test('a creature flying above the feet does not block the predicted command', () => {
+  const f = fixture();
+  try {
+    f.interpolator.push(frame(100, 0, true, 1.2)); f.interpolator.push(frame(102, 0, true, 1.2));
+    f.world.frame(100, 1); f.world.poseFor(7, false); f.creatures.prepare(); f.physics.step();
+    f.world.poseFor(8, false);
+    f.motor.move(f.feet, { x: 0, y: -22 / 3600, z: -4.3 / 60 });
+    expect(f.feet.z).toBeLessThan(-.07);
     expect(f.world.capsuleCount).toBe(0);
   } finally { f.dispose(); }
 });
