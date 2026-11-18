@@ -53,8 +53,8 @@ export class ClientAssets {
 
     // Build-owned callers read the canonical URL through the service worker.
     // Its cache is authoritative; the read capability compares length only.
-    if (this.options.firstPartyRead !== undefined) {
-      return this.observe(ref, await this.options.firstPartyRead(outputBlobUrl(this.source, ref, base), cap, undefined, hash, priority));
+    if (this.options.buildRead !== undefined) {
+      return this.observe(ref, await this.options.buildRead(outputBlobUrl(this.source, ref, base), cap, undefined, hash, priority));
     }
 
     // a native content-cache read already checked its SHA-256 (ContentCache.get): no page re-hash (~150 ms of a

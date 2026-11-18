@@ -13,7 +13,7 @@ import { installRuntimeState, type RuntimeState, type RuntimeStateValue } from "
 
 /** The runtime binds both sides read: which sections a runtime owns, its host state, ledger, coins and spawns. */
 
-/** The sections `source` declares its runtime binds; empty for a pure-data shard. */
+/** The sections `source` declares its runtime binds; empty for a pure-shard. */
 export function runtimeBinds(source: Pick<Shardfile, 'runtime'>): ReadonlySet<RuntimeBoundSection> {
   return new Set(source.runtime?.binds);
 }
@@ -125,7 +125,7 @@ export interface RuntimeFacts {
 /**
  * Bind the declared ledger rules for a runtime that has no simulation host: each fact is stamped tick 0 and told apart by
  * its entity, so a replayed or reloaded fact is the same fact and grants nothing twice (SF14). `instance` is the
- * first-party placement id.
+ * built-in placement id.
  */
 export function bindRuntimeLedger(ctx: Pick<ShardContext, 'app'>, source: Shardfile, instance: string): RuntimeFacts {
   requireBound(source, 'ledger');

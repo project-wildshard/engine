@@ -9,7 +9,7 @@ import { HeldEquipment } from '../plugin/heldEquipment';
 import { heldBowArrow, heldBowDisplay, heldLauncherBolt, heldLauncherDisplay } from '../weapons/heldLauncher';
 import { heldToolSpecimen, heldToolRows } from '../plugin/heldTool';
 import { HeldFinishes } from '../loadout/finishes';
-import { loadFirstPartyFolder } from '../shardfile/runtimeFolder';
+import { loadCatalogueFolder } from '../shardfile/runtimeFolder';
 
 /** Client-only presentation: define held gear from pre-admission card rows; all family builders and preparation live here. */
 export function heldGear(input: unknown): readonly RosterEntry[] {
@@ -17,7 +17,7 @@ export function heldGear(input: unknown): readonly RosterEntry[] {
   const catalogue = (): HeldEquipment => HeldEquipment.current(rows.slug);
   const finishes = (): HeldFinishes => HeldFinishes.current(rows.slug);
   const prepare = async (): Promise<void> => {
-    const product = await loadFirstPartyFolder(rows.slug);
+    const product = await loadCatalogueFolder(rows.slug);
     await HeldEquipment.prepare(product);
     finishes();
   };
@@ -71,6 +71,6 @@ export function heldArmsGear(input: unknown): readonly RosterEntry[] {
   const arms = HeldView.admit({ kind: 'toon', ...rows.look });
   return rows.cards.map(row => live(defineModel<object>({ id: row.id, name: row.name, category: 'gear', pipeline: ['blender','code'], file: row.file, defaults: {},
     build: context => loadingSpecimen(row.id, row.size, async () => {
-      await arms.prepareExplorer(context, await loadFirstPartyFolder(rows.slug)); return arms.specimen({ sky: context.sky, blade: row.kind });
+      await arms.prepareExplorer(context, await loadCatalogueFolder(rows.slug)); return arms.specimen({ sky: context.sky, blade: row.kind });
     }) }), { copies: row.copies }));
 }

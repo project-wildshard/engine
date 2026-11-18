@@ -66,7 +66,7 @@ function fixture(blob = false, spawnX = 0, revision = 1, slug = 'loader-fixture'
 function options(wires: ReadonlyMap<string, Uint8Array>, cache?: FolderCache): FolderOptions {
   // Each fixture owns its transport/verifier service. Repeated reads through
   // these options still coalesce; unrelated fixtures cannot lend verified packs.
-  return { base, offline: false, firstParty: true, hash: bytes => hash(bytes), ...(cache === undefined ? {} : { cache }), fetch: url => {
+  return { base, offline: false, dangerousGrant: true, hash: bytes => hash(bytes), ...(cache === undefined ? {} : { cache }), fetch: url => {
     const bytes = wires.get(url.slice(base.length));
     return Promise.resolve(bytes === undefined ? new Response(null, { status: 404 }) : new Response(Uint8Array.from(bytes)));
   } };
@@ -1265,7 +1265,7 @@ test('native first-party loading has no visited fallback, content digest or clie
   const digest=vi.fn<(bytes:Uint8Array)=>Promise<string>>(()=>Promise.resolve('0'.repeat(64)));
   const visited=vi.spyOn(store.cache,'product').mockRejectedValue(new Error('No visited fallback'));
   const native:FolderOptions={...ordinary,cache:store.cache,hash:digest,progress:row=>{phases.push(row.phase);},
-    firstPartyRead:(url,expected,read)=>{
+    buildRead:(url,expected,read)=>{
       const path=new URL(url).pathname.slice(new URL(base).pathname.length),bytes=f.wires.get(path);requests.push(path);
       if(bytes===undefined||(expected!==undefined&&expected!==bytes.length))throw new Error('Missing build file');
       read?.(bytes.length);return Promise.resolve(bytes);
@@ -1285,7 +1285,7 @@ test('first-party admission leaves deferred files unread, warms them, and still 
   const files=f.source.files.map(file=>file.hash);expect(files.length).toBeGreaterThan(0);
   const native:FolderOptions={...ordinary,deferred:()=>Promise.resolve(files),
     backgroundFetch:url=>{warmed.push(new URL(url).pathname.slice(new URL(base).pathname.length));return Promise.resolve(new Response(new Uint8Array([1,2,3])));},
-    firstPartyRead:(url,expected,read)=>{
+    buildRead:(url,expected,read)=>{
       const path=new URL(url).pathname.slice(new URL(base).pathname.length),bytes=f.wires.get(path);requests.push(path);
       if(bytes===undefined||(expected!==undefined&&expected!==bytes.length))throw new Error('Missing build file');
       read?.(bytes.length);return Promise.resolve(bytes);
@@ -1359,7 +1359,7 @@ test('ONE-FORMAT OF10a2: an outside product with this device\'s own receipt gets
   // a validator revision lets this device keep its own receipt; the build's verdict is never read for an outside product
   const restore = installIndexReceipt(row.index), tiers = vi.spyOn(await import('../src/client/game/shardfile/folderCost'), 'tierFolderFilesPaced');
   try {
-    const online: FolderOptions = { ...options(row.wires, store.cache), firstParty: false };
+    const online: FolderOptions = { ...options(row.wires, store.cache), dangerousGrant: false };
     await admitFolder(await readFolderDescriptor(online), online);
     expect(store.product()?.validation).toBeDefined();
     expect(tiers).not.toHaveBeenCalled(); // no tier asked, and no receipt yet: every byte is validated

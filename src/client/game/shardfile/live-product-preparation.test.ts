@@ -28,7 +28,7 @@ test.each([false, true])('boot stays main and only live decoding uses bounded pa
     currentSpawnDownload: () => undefined, contentURL: (url: string) => url, // PZ3: no content base
     browserLiveJsonParser: () => { calls.push('parser'); return parser; },
     TIER_CONFIG: {}, TIER: 'phone', splatDrawTier: () => 'phone', builtIndexes: null, ktx2TranscodeSupport: () => ({}),
-    pauseDescriptor: () => pause, dangerousTrust: (granted = true) => (granted ? { firstParty: true } : {}),
+    pauseDescriptor: () => pause, dangerousTrust: (granted = true) => (granted ? { dangerousGrant: true } : {}),
   });
   if (typeof method !== 'function') throw new Error('Product options factory is not callable');
   const result: unknown = Reflect.apply(method, undefined, ['https://game.test/shardfiles/fixture/', true]);
@@ -42,9 +42,9 @@ test.each([false, true])('boot stays main and only live decoding uses bounded pa
     expect(value).toBe(parsed); expect(calls).toEqual(['parser','parse']);
   }
   expect('cache' in result).toBe(false);
-  expect('firstPartyRead' in result).toBe(true);
-  if (!('firstPartyRead' in result) || typeof result.firstPartyRead !== 'function') throw new Error('Native read capability missing');
-  expect(await Reflect.apply(result.firstPartyRead, undefined, ['data.bin', 3, undefined, undefined, 'low'])).toEqual(wire);
+  expect('buildRead' in result).toBe(true);
+  if (!('buildRead' in result) || typeof result.buildRead !== 'function') throw new Error('Native read capability missing');
+  expect(await Reflect.apply(result.buildRead, undefined, ['data.bin', 3, undefined, undefined, 'low'])).toEqual(wire);
   expect(native).toEqual([{ url: 'https://game.test/shardfiles/fixture/data.bin', init: { cache: 'reload', headers: { 'x-test': 'native' }, priority: 'low' } }]);
   expect(loanReads).toBe(0); expect(expanded).toBe(1);
 });

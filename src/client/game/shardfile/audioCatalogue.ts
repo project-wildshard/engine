@@ -1,13 +1,13 @@
 import {Scope} from '@wildshard/engine/app/scope';
 import {createCatalogueAudio,type LevelAudioProfile} from '@wildshard/engine/audio/levelAudio';
-import {loadFirstPartyFolder} from './runtimeFolder';
+import {loadCatalogueFolder} from './runtimeFolder';
 import type {ShardFolder} from '../../../shared/game/shardfile/shardFolder';
 
 /** Boot borrows admitted audio rows; the profile retains no product lease or decoded-asset copy. */
 export async function folderAudioCatalogue(slug:string,product?:ShardFolder):Promise<LevelAudioProfile>{
  if(product!==undefined)return createCatalogueAudio(product.section('audio/audio').audio);
  const scope=new Scope(`audio.catalogue:${slug}`);
- try{return await folderAudioCatalogue(slug,await loadFirstPartyFolder(slug,scope));}
+ try{return await folderAudioCatalogue(slug,await loadCatalogueFolder(slug,scope));}
  finally{scope.dispose();}
 }
 /** Full catalogue inventory preserves the music-then-SFX ordering used by counted boot. */

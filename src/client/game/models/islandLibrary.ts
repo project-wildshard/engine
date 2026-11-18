@@ -63,12 +63,12 @@ export class IslandLibrary<Groups> {
     if (this.admitted === null) throw new Error(`${this.rows.product} reads its product before its product is admitted`);
     return this.admitted;
   }
-  /** Open and admit the first-party product outside a page (renderer services stay behind this explicit load). */
+  /** Open and admit the built-in product outside a page (renderer services stay behind this explicit load). */
   async open(owner: Scope = resourceScope()): Promise<ShardFolder> {
     if (owner.disposed || owner.disposing) throw new Error('Island library owner left');
     if (this.resolved !== undefined) return this.product;
-    const { loadFirstPartyFolder } = await import('../shardfile/runtimeFolder');
-    const product = await loadFirstPartyFolder(this.rows.product, owner);
+    const { loadCatalogueFolder } = await import('../shardfile/runtimeFolder');
+    const product = await loadCatalogueFolder(this.rows.product, owner);
     this.admit(product); return product;
   }
 

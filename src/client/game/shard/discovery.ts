@@ -23,7 +23,7 @@ const looks = {
 /** The styles a client plan's entry names, as text in its document: the page adds each once, when the entry loads. */
 function addStyles(styles: readonly string[]): void {
   for (const text of styles) {
-    if (typeof document === 'undefined' || [...document.head.querySelectorAll('style[data-shard]')].some(row => row.textContent === text)) continue;
+    if (typeof document === 'undefined' || [...document.head.querySelectorAll('style[shard]')].some(row => row.textContent === text)) continue;
     const style = document.createElement('style');
     style.dataset['shard'] = ''; style.textContent = text;
     document.head.append(style);

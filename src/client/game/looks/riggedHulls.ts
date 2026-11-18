@@ -41,8 +41,8 @@ export function folderRiggedHulls(slug: string): RiggedHulls {
   let family: RiggedHulls | undefined, loading: Promise<RiggedHulls> | undefined;
   const prepare = (): Promise<RiggedHulls> => {
     loading ??= (async () => {
-      const { loadFirstPartyFolder } = await import('@wildshard/engine/game/shardfile/runtimeFolder');
-      const product = await loadFirstPartyFolder(slug), book = product.section('look/rigged-hulls');
+      const { loadCatalogueFolder } = await import('@wildshard/engine/game/shardfile/runtimeFolder');
+      const product = await loadCatalogueFolder(slug), book = product.section('look/rigged-hulls');
       const source = book.tiers[TIER];
       if (book.productFiles) {
         // Only named KTX2 coats use the byte parser. Other image codecs keep their original URL decoder.
@@ -159,7 +159,7 @@ export function hullMapName(name: string, bytes: Uint8Array, astc: boolean): str
 
 /** The cached family must not retain an admission or its transport bodies after its resident owner retires. */
 function folderHullTransport(slug: string): RiggedHullTransport {
-  const read = async () => (await import('@wildshard/engine/game/shardfile/runtimeFolder')).loadFirstPartyFolder(slug);
+  const read = async () => (await import('@wildshard/engine/game/shardfile/runtimeFolder')).loadCatalogueFolder(slug);
   return {
     rig: async name => { const product = await read(); return parseRigFile(await product.file(name), product.url(name)); },
     texture: async name => {

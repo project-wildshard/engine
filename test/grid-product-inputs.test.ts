@@ -11,7 +11,7 @@ function fixture(transportOnly = false) {
   source.files.push({ hash: ref, kind: 'binary', compressed: bytes.length, decoded: bytes.length, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false });
   let durable = true, corrupted = false, held = 0;
   const fetch = vi.fn(() => Promise.resolve(new Response(corrupted ? Uint8Array.of(3, 2, 1) : bytes)));
-  const options: FolderOptions = { base: 'https://inputs.test/', offline: false, firstParty: true, fetch, hash: value => Promise.resolve(hashImmutableBytes(value)),
+  const options: FolderOptions = { base: 'https://inputs.test/', offline: false, dangerousGrant: true, fetch, hash: value => Promise.resolve(hashImmutableBytes(value)),
     cache: { product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
       asset: async () => new Uint8Array(await (await fetch()).arrayBuffer()) } };
   const releasePreparedTransport = vi.fn((refs: Iterable<string>) => {
@@ -50,7 +50,7 @@ test('approach cancellation drains its started window of reads and starts no suf
   const bytes = Array.from({ length: APPROACH_INPUT_READS + 2 }, (_, i) => Uint8Array.of(i + 1)), hashes = bytes.map(hashImmutableBytes);
   for (const [i, hash] of hashes.entries()) source.files.push({ hash, kind: 'binary', compressed: bytes[i]?.length ?? 0, decoded: 1, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false });
   const finish: (() => void)[] = [], started: string[] = [];
-  const options: FolderOptions = { base: 'https://inputs.test/', offline: false, firstParty: true, fetch: () => Promise.reject(new Error('Unexpected network')),
+  const options: FolderOptions = { base: 'https://inputs.test/', offline: false, dangerousGrant: true, fetch: () => Promise.reject(new Error('Unexpected network')),
     hash: value => Promise.resolve(hashImmutableBytes(value)), cache: { product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
       asset: (_base, hash) => new Promise(resolve => { started.push(hash); finish.push(() => { resolve(bytes[hashes.indexOf(hash)] ?? null); }); }) } };
   let held = 0;

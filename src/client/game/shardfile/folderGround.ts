@@ -2,7 +2,7 @@ import { installRequiredGroundLoader } from '@wildshard/engine/world/bakedTerrai
 import { installBakedSamplesReader } from '@wildshard/engine/world/BakedTerrain';
 import { bilinearTerrainSamplers, decodeTerrainTile } from '@wildshard/format/terrainTileBytes';
 import { clientGround } from '../../../shared/game/shardfile/clientGround';
-import { firstPartyDescriptor, runtimeFolder, slugRuntimeFolder, type RuntimeFolder } from './runtimeFolder';
+import { catalogueDescriptor, runtimeFolder, slugRuntimeFolder, type RuntimeFolder } from './runtimeFolder';
 import { selectedLevel } from '@wildshard/engine/level/selection';
 import { findShard } from '../shard/registry';
 import { runtimePagePointer } from '../shard/pointer';
@@ -35,7 +35,7 @@ export function installFolderGround(): () => void {
 export function standaloneRuntimePage(key: string): Promise<RuntimeFolder> | null {
   const manifest = findShard(key);
   if (manifest === undefined || runtimePagePointer(manifest) === undefined || manifest.clientPlanRuntime !== true || selectedLevel()?.id !== key) return null;
-  return firstPartyDescriptor(key).then(runtimeFolder);
+  return catalogueDescriptor(key).then(runtimeFolder);
 }
 
 /**

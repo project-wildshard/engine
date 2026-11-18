@@ -32,7 +32,7 @@ export function openWorld(input: HeadlessRuntimeInput, options: OpenWorldOptions
 export type WorldAdapter = TickWorkerAdapter & { readonly host: SimHost };
 
 /** A tick adapter (a shard's CI journeys, the bake worker) on the world `openWorld` opens as a room. A data cell has no host-owned
- *  resident to tick: the bake worker runs a data shard on its own simulation. */
+ *  resident to tick: the bake worker runs a shard on its own simulation. */
 export async function openWorldAdapter(input: HeadlessRuntimeInput, snapshot?: string): Promise<WorldAdapter> {
   if (!nativeCell(input)) throw new Error('A tick adapter runs a native world');
   const world = await openWorld(input, { room: true, ...(snapshot === undefined ? {} : { snapshot }) }), { host, resident } = world;

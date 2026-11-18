@@ -54,7 +54,7 @@ function sameMeasurement(a: RuntimeCost, b: RuntimeCost): boolean {
 }
 
 /**
- * A transitional region pays for its whole opaque runtime. The first-party manifest and admitted declaration must
+ * A transitional region pays for its whole opaque runtime. The built-in manifest and admitted declaration must
  * share the reviewed measurement and its images-first provenance; an empty declarative sim is never its estimate.
  * The selected image path uses its separate images-first measurement when declared. The caller reserves these bytes
  * through the page's ordinary allocator before constructing the regional shell.

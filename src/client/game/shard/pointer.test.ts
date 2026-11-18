@@ -15,7 +15,7 @@ test('a client-plan shard names its runtime descriptor as shardfile, and the old
   expect(dataPointer({ shardfile: PATH, clientPlanRuntime: true })).toBeUndefined();
   expect(runtimePagePointer({ gridShardfile: PATH, clientPlanRuntime: true })).toBe(PATH);
   expect(runtimePagePointer({ gridShardfile: PATH })).toBe(PATH);
-  // a data shard's shardfile stays plain data admission
+  // a shard's shardfile stays plain data admission
   expect(runtimePagePointer({ shardfile: PATH })).toBeUndefined();
   expect(dataPointer({ shardfile: PATH })).toBe(PATH);
   expect(runtimePagePointer({})).toBeUndefined();
@@ -34,7 +34,7 @@ const COST: RuntimeCost = { webContentMB: 634.916944, glMB: 269.1803, engineBase
   rev: 'f3a42924f51424d2a653597c945451f69505ed14', device: 'iOS Simulator Safari compressed matched pre-entry increment, three cold runs',
   evidence: 'progress/memory/g258-accounting/summary.json' };
 
-test('a shardfile-named runtime home is measured standalone like a gridShardfile one; a data shard is not', () => {
+test('a shardfile-named runtime home is measured standalone like a gridShardfile one; a shard is not', () => {
   const slug = parseShardSlug('pine-hollow');
   for (const pointer of [{ shardfile: PATH }, { gridShardfile: PATH }]) {
     const page = preparePageResidency({ slug, clientPlanRuntime: true, runtimeCost: COST, ...pointer });

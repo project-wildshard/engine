@@ -123,7 +123,7 @@ import { ACCENTS } from '@wildshard/format/accent';
 import { installShardHoverSpeed } from '../../../shared/game/grid/rules';
 import { findShard } from '../shard/registry';
 import { accentHex, hudAccent, onHudAccent, setHudAccent } from './hudAccent';
-import { firstPartyInstance } from '../../../shared/game/grid/instances';
+import { catalogueInstance } from '../../../shared/game/grid/instances';
 import { installSavesSettings } from '../savesSettings';
 import type { LiveGridSession } from '../grid/liveSession';
 import { pickInteractable } from '@wildshard/engine/world/interact/Interactables';
@@ -280,7 +280,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   });
   hud.menu = menu; // pause → Settings tab; the menu's CLOSE → hud.onResume
   // pause ▸ Settings ▸ SAVES (SF33b, G83): a card per shard save, NEW GAME's before → after sheet; HERE is the grid cell you stand in, else this shard's copy
-  const homeInstance = ((): string => { try { return firstPartyInstance(manifest.slug); } catch { return manifest.slug; } })();
+  const homeInstance = ((): string => { try { return catalogueInstance(manifest.slug); } catch { return manifest.slug; } })();
   installSavesSettings(menu, { scope: game.levelScope, grid: grid !== null, toTitle: () => { exitSessionToTitle(); },
     ...(gridLive === null ? {} : { beforeReset: (instance) => {
       const commit = gridLive.prepareNewGameRecovery(instance);

@@ -105,11 +105,11 @@ function installDataCellLoot(host: SimHost, shard: HeadlessRuntimeInput['shard']
     item: (player, item, count) => { effects.push({ kind: 'item', item, count, actorId: player }); } }, alone);
 }
 
-/** A cell with no native plan: a data shard, which any host can run from its output. */
+/** A cell with no native plan: a shard, which any host can run from its output. */
 async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[], alone: boolean): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined; readonly kit: () => DeclaredKitItems | null }> {
   await Promise.resolve();
   const { shard, assets, rapier } = input;
-  // A data shard's decisions, moves and targets ride its product sections (TE-ENG1's boss rows): without them the
+  // A shard's decisions, moves and targets ride its product sections (TE-ENG1's boss rows): without them the
   // encounter runs no decision and the boss falls back to its native phase chase.
   const sections = input.sections ?? (input.product === undefined ? undefined : folderHeadlessSections(input.product));
   const ports: ShardfileSimPorts = { rapier, ...(sections === undefined ? {} : { sections }),
@@ -120,7 +120,7 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
     const fresh = createShardfileSim(shard, assets, ports), kit = kitOf(fresh);
     installDataCellLoot(fresh.host, shard, effects, alone);
     installCellHome(fresh.host);
-    // SS3: a data shard's simulation builds its declared prop solids; a shard with none built has no server half to claim
+    // SS3: a shard's simulation builds its declared prop solids; a shard with none built has no server half to claim
     if (fresh.colliders.size > 0) registerInstalled(fresh.host, 'collision');
     return { host: fresh.host, sim: () => fresh, kit: () => kit, dispose: () => { fresh.dispose(); } };
   }
@@ -200,7 +200,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
   const fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
   return { host, owned: ownedOf(host, input, options.owned, options.profiles, options.shard), fallFloor, fall: fallFloor(), dispose, fact, effects: () => effects, adopt: saved => { const held = sim(); return held === undefined || (saved === undefined ? importPageProgress(options.saves, placed, input.shard, held) : carryRefusedSave(input.shard, held, saved)); }, step: inputs => {
     effects.length = 0;
-    // A data shard's prompts answer whoever stands at them; an id they don't offer that player is dropped, since an input may not end the server.
+    // A shard's prompts answer whoever stands at them; an id they don't offer that player is dropped, since an input may not end the server.
     const routes = actRoutes(host);
     const items = kit();
     for (const { player, command } of inputs) if (command !== null) items?.command(player, command);

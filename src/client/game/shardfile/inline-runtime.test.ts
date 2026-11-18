@@ -7,7 +7,7 @@ import { inlineRuntimeArrival } from './clientSource';
 import type { ShardManifest } from '../shard/manifest';
 
 const BASE = 'http://127.0.0.1:4173/';
-const OWNER = { base: BASE, firstParty: true };
+const OWNER = { base: BASE, dangerousGrant: true };
 const candidate = (runtime: Shardfile['runtime'], slug = 'nine-dragon-stack'): Shardfile => ({ identity: { slug }, runtime }) as unknown as Shardfile;
 const declared = { binds: [] } as unknown as Shardfile['runtime'];
 const GRID = { gridShardfile: '/shardfiles/nine-dragon-stack/shard.json' };
@@ -27,7 +27,7 @@ test('a candidate with no runtime keeps the inline path and reads nothing', asyn
 
 test('a page that does not own its inline candidate still refuses any runtime before a read', async () => {
   const read = vi.fn();
-  await expect(inlineRuntimeArrival(candidate(declared), { base: BASE, firstParty: false }, read, discover))
+  await expect(inlineRuntimeArrival(candidate(declared), { base: BASE, dangerousGrant: false }, read, discover))
     .rejects.toThrow('Custom runtime requires native runtime composition');
   expect(read).not.toHaveBeenCalled();
 });

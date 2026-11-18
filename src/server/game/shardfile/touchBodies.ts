@@ -1,5 +1,5 @@
 /**
- * Touchable props on a data shard (meta SHARD-SOURCE SS9b, shard-format `props.bodies`). Each row is one Rapier dynamic
+ * Touchable props on a shard (meta SHARD-SOURCE SS9b, shard-format `props.bodies`). Each row is one Rapier dynamic
  * body in the host's world, in the ITEM group, so a player's capsule pushes it (the character motor applies impulses to
  * dynamic bodies) and every player sees the same crate move. Its pose is published as a script body under the row's id
  * (`script:<id>` on the wire, the channel a mover's panel already rides), and the page draws the named panel there.

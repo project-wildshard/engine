@@ -69,12 +69,12 @@ test('browser products need a build proof and bundle no checked host intake', as
   const nativeRead=async(path:string,size:number):Promise<Uint8Array>=>{
     const bytes=await read(path);if(bytes.length!==size)throw new Error('Emitted section size mismatch');return bytes;
   };
-  const reader = { offline: false, firstParty: true, read, hash,
+  const reader = { offline: false, dangerousGrant: true, read, hash,
     built:{indexHash:hashImmutableBytes(encode(index)),read:nativeRead}};
   expect(await loaded.resolveOutputDescriptor(index, reader)).toEqual(source);
   expect(read).toHaveBeenCalledTimes(index.sections.length);expect(hash).not.toHaveBeenCalled();
   read.mockClear(); hash.mockClear();
-  const unprovedReader={offline:false,firstParty:true,read,hash};
+  const unprovedReader={offline:false,dangerousGrant:true,read,hash};
   // Authored fields and a matching receipt do not grant the native build capability.
   await expect(loaded.resolveOutputDescriptor({ ...index, identity: { ...index.identity, revision: 2 } }, unprovedReader))
     .rejects.toThrow('build-owned reader');
@@ -85,8 +85,8 @@ test('browser products need a build proof and bundle no checked host intake', as
     const bytes = wires.get(url.slice('https://fixture.test/'.length));
     return Promise.resolve(bytes === undefined ? new Response(null, { status: 404 }) : new Response(Uint8Array.from(bytes)));
   });
-  const options: FolderOptions = { base: 'https://fixture.test/', offline: false, firstParty: true, hash, fetch,
-    firstPartyRead:async(url,size)=>{
+  const options: FolderOptions = { base: 'https://fixture.test/', offline: false, dangerousGrant: true, hash, fetch,
+    buildRead:async(url,size)=>{
       const response=await fetch(url);if(!response.ok)throw new Error('Missing emitted fixture file');
       const bytes=new Uint8Array(await response.arrayBuffer());
       if(size!==undefined&&bytes.length!==size)throw new Error('Emitted fixture size mismatch');return bytes;
@@ -100,7 +100,7 @@ test('browser products need a build proof and bundle no checked host intake', as
   hash.mockClear();
   fetch.mockClear();
   admitted.source.identity.name = 'Changed exposed source';
-  const unprovedOptions:FolderOptions={base:options.base,offline:false,firstParty:true,hash,fetch};
+  const unprovedOptions:FolderOptions={base:options.base,offline:false,dangerousGrant:true,hash,fetch};
   expect(()=>loaded.admitFolder(admitted.source, unprovedOptions)).toThrow('build-owned reader');
   expect(fetch).not.toHaveBeenCalled();
   expect(()=>loaded.admitFolder(structuredClone(source), unprovedOptions)).toThrow('build-owned reader');

@@ -1,7 +1,7 @@
 /**
- * TEMPLATE-E2E TC-E5b: a data cell's movers on the page that walks it. The server steps a data shard's movers
+ * TEMPLATE-E2E TC-E5b: a data cell's movers on the page that walks it. The server steps a shard's movers
  * (`createShardfileSim`), and the wire carries each pose as a `script:` row. A shard with a `client/plan` mover row installs
- * followed movers through it (`clientMoverOwners.ts`, `sceneMotion.ts`); a plain data shard has none, so before this its lift
+ * followed movers through it (`clientMoverOwners.ts`, `sceneMotion.ts`); a plain shard has none, so before this its lift
  * and doors had no collider on the page: a lift drawn rising (its props panel, `neighbourPanels.ts`) that no one could stand on.
  *
  * Each mover gets its collider in the cell's own physics, and the same row poses its drawn look where the page has one.

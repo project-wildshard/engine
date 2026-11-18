@@ -635,7 +635,7 @@ export class LiveGridSession {
     this.crossing.crossing.dispose(); this.crossing = this.installCrossing();
     this.startedRuntimes.add(cell.instance);
     gridCells.enter({ instance: cell.instance, slug: cell.slug });
-    // T7 (Tile residency): a data shard's owned home is its bodyless region, entered as a crossing enters it; no hooks run
+    // T7 (Tile residency): a shard's owned home is its bodyless region, entered as a crossing enters it; no hooks run
     const region = this.runtimeRegions.has(cell.instance) ? undefined : this.regions.get(cell.instance);
     if (region !== undefined) {
       const at = this.page.traveller.position;
@@ -802,7 +802,7 @@ export class LiveGridSession {
     const prepareEntry = async (): Promise<void> => {
       if (declaration === null) return;
       if (manifest.clientPlanRuntime !== true) throw new GridCellWaitingError('Client-plan runtime requires its built-in manifest policy');
-      if (manifest.load === undefined) throw new GridCellWaitingError('Missing compiled first-party loader');
+      if (manifest.load === undefined) throw new GridCellWaitingError('Missing compiled built-in loader');
       // The built-in loader still owns its literal CSS imports. Prepare them
       // before entered features; importing it constructs no world or plugin.
       await manifest.load();

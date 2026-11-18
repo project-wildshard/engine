@@ -42,7 +42,7 @@ export function invalidatePropertyObservation(texture?: Texture): void {
 }
 
 /** The sole engine renderBufferDirect hook. Keep the renderer's current target:
- * third-party draw adapters installed before us must still run. */
+ * external draw adapters installed before us must still run. */
 export function drawHooks(renderer: DrawTarget): DrawHooks {
   const pipeline = pipelineOf(renderer), installed = pipeline.draw;
   if (installed !== undefined) return installed;

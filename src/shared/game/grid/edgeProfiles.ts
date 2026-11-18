@@ -4,7 +4,7 @@ import type { GridCell } from './assembly';
 
 /** Physical boundary observations are admitted beside the rows; they cannot invent height at an entry. */
 export type GridEdgeObservations = NonNullable<PlatformCell['observations']>;
-/** A declared full row or the complete first-party WSTR bake, never an all-zero substitute for missing data. */
+/** A declared full row or the complete built-in WSTR bake, never an all-zero substitute for missing data. */
 export type GridEdgeSource = { readonly kind: 'declared'; readonly profiles: EdgeProfiles; readonly observations: GridEdgeObservations }
   | { readonly kind: 'baked'; readonly bytes: Uint8Array; readonly palette: readonly [EdgeColour, EdgeColour, EdgeColour, EdgeColour]; readonly observations: GridEdgeObservations };
 /** Admission/hash/transport belong to the reader. This pure ready-data seam precedes one platform mesh generation. */

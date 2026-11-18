@@ -1,4 +1,4 @@
-// TEMPLATE-E2E TC-E2 (J361, meta TEMPLATE-E2E-PLAN): a data shard's creatures respawn. A `creatures.spawns` row's optional
+// TEMPLATE-E2E TC-E2 (J361, meta TEMPLATE-E2E-PLAN): a shard's creatures respawn. A `creatures.spawns` row's optional
 // `respawn` (seconds, 1 to 3600, shard-format 0.5.8) brings its body back at its `at`, whole, that long after it dies: the
 // declared brain and group skip a dead actor and resume once it is alive again, so reviving the body restores them. The
 // waits are the host's state (one adapter), so a save keeps the clock; a cell asleep spends it (SC10, as declared homes do).

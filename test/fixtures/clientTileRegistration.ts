@@ -31,7 +31,7 @@ export function clientTileFixture(coarse = true, fail = false, holdDistant = fal
   const active = new Map<Group, { key: string; root: Group; excluded: ReadonlySet<number> }>();
   const make = (name: string): ClientRingInstance & { root: Group } => {
     const root = new Group(); root.name = name;
-    const assets = new ClientAssets(source, wire, { base: 'https://example.invalid/', firstParty: true, offline: true,
+    const assets = new ClientAssets(source, wire, { base: 'https://example.invalid/', dangerousGrant: true, offline: true,
       hash: bytes => Promise.resolve(hashImmutableBytes(bytes)), fetch: () => Promise.reject(new Error('Unexpected network')), cache: {
         product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
         asset: (_base, hash) => Promise.resolve(wire.get(hash) ?? null),

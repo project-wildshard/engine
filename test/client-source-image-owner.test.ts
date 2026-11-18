@@ -47,7 +47,7 @@ function bindings(imageOwner?: Scope): ShardfileClientBindings {
     ...(imageOwner === undefined ? {} : { imageOwner }) };
 }
 function options(wires: ReadonlyMap<string, Uint8Array>, fetch?: FolderOptions['fetch']): FolderOptions {
-  return { base: 'https://example.test/', offline: false, firstParty: true, fetch: fetch ?? (url => {
+  return { base: 'https://example.test/', offline: false, dangerousGrant: true, fetch: fetch ?? (url => {
     const bytes = wires.get(url.slice('https://example.test/'.length));
     return Promise.resolve(bytes === undefined ? new Response(null, { status: 404 }) : new Response(Uint8Array.from(bytes)));
   }),

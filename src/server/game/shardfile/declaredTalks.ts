@@ -1,4 +1,4 @@
-// TE-ENG3: a data shard's quest-givers (`targets.talks`) on the server. Each player's node lives in `DeclaredQuests`, saved in
+// TE-ENG3: a shard's quest-givers (`targets.talks`) on the server. Each player's node lives in `DeclaredQuests`, saved in
 // the quest's existing dialogue part; this owner says it as an owned line and takes the page's answers by name, judged where
 // the player stands. A choice sets its flags, so a quest's `startWhen` takes the accept; the quest pays as it always has.
 import type { Shardfile } from '@wildshard/format/shardSchema';

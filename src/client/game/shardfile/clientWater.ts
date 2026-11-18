@@ -3,7 +3,7 @@
  * its rest surface under `root`, owned by `scope`. The swim / wade port is `shardfileWater` (the motor); this is only the
  * visible surface, so a level never gets a second water from an engine pond bootstrap. A pool is its circle or polygon,
  * a stream a ribbon through its points at their levels, the sea a cell-wide plane. The surface is `materials.get('water')`
- * when the look declares one, else the default water surface (`defaultWaterMaterial`, LF1-3: a no-code shard has no client
+ * when the look declares one, else the default water surface (`defaultWaterMaterial`, LF1-3: a no-runtime shard has no client
  * plan to draw a graph surface, so this is its pond); a graph surface that declares `stages.outline` draws its hull
  * through `outline` (`clientMaterials().outline`). A pool that declares its `surface` (TEMPLATES-CLEANROOM M4.6) draws
  * that instead: a planar mirror on the desktop tier (`reflectingWater.ts`), the default surface in its tint and Fresnel

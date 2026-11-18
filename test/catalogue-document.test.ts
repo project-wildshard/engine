@@ -15,7 +15,7 @@ import {installTitleManifests, titleManifests, withCatalogueHeads, type TitleMan
 import {GridAssembly} from '../src/shared/game/grid/assembly';
 import {catalogueDocument} from '../src/shared/game/grid/catalogueDocument';
 import {installCatalogue, installInlineCatalogue, installedCatalogue} from '../src/shared/game/grid/catalogueSlot';
-import {firstPartyInstance} from '../src/shared/game/grid/instances';
+import {catalogueInstance} from '../src/shared/game/grid/instances';
 import shipped from '../src/shared/game/grid/singleplayer.json' with {type: 'json'};
 import {instanceSaveIdentity} from '../src/shared/game/instanceSaves';
 import {admittedShardInstance, assertShardSlug} from '../src/shared/game/shardfile/identity';
@@ -52,7 +52,7 @@ describe('the catalogue a page reads', () => {
   it('runs a new placement through every reader', async () => {
     installCatalogue(added);
     expect(new GridAssembly({developer: false, devserver: false}).cell('test-shard').slug).toBe('test-shard');
-    expect(firstPartyInstance('test-shard')).toBe('test-shard-solo');
+    expect(catalogueInstance('test-shard')).toBe('test-shard-solo');
     expect(instanceSaveIdentity({id: 'test-shard-solo', shard: 'test-shard'})).toEqual({id: 'test-shard-solo', legacy: 'test-shard'});
     // OF10a5: placed by the catalogue, so it saves under its placement's instance, whoever made it (the api-server
     // owns the slug); a private save namespace is refused for every shard

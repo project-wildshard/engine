@@ -60,10 +60,10 @@ test.each([
   expect(browserErrorNoise(event,where)).toBe(reason);
 });
 test.each([
-  ['a real first-party error',thrown("Cannot read properties of undefined (reading 'position')"),page],
-  ['a first-party frame among extension frames',thrown('boom',['chrome-extension://abc/content.js','https://play.example.invalid/assets/main-abc.js']),page],
+  ['a real built-in error',thrown("Cannot read properties of undefined (reading 'position')"),page],
+  ['a built-in frame among extension frames',thrown('boom',['chrome-extension://abc/content.js','https://play.example.invalid/assets/main-abc.js']),page],
   ['a QB8 capture on staging',thrown('QB8 capture: a forced uncaught error in play'),{...page,environment:'staging'}],
-  ['a Script error. with a first-party frame',thrown('Script error.'),page],
+  ['a Script error. with a built-in frame',thrown('Script error.'),page],
   ['a Script error. with an anonymous frame',thrown('Script error.',['<anonymous>']),page],
   ['an extension frame beside an anonymous frame',thrown('boom',['chrome-extension://abc/content.js','<anonymous>']),page],
   ['an extension frame beside a nameless frame',thrown('boom',['chrome-extension://abc/content.js','']),page],

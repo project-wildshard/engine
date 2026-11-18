@@ -4,7 +4,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import {join, relative, sep} from 'node:path';
 import {writeTar} from '@wildshard/format/tar';
 
-/** One built product as the tarball `wildshard pack` writes (J86: first-party shards take the same road), without its
+/** One built product as the tarball `wildshard pack` writes (J86: built-in shards take the same road), without its
  *  build key and runtime sources, which never ship, or its packs, which repeat files it holds and format rebuilds. */
 export function folderTarball(product: string): Uint8Array {
   const files = new Map<string, Uint8Array>();

@@ -15,11 +15,11 @@ import type { TreeSetRows } from '@wildshard/format/treeSetRows';
 import { createModelLibrary } from '../plugin/geometry';
 import { lookGraphMaterials } from '../plugin/shaderFamily';
 import { lendLooks, type LentLooks } from '../shardfile/lentLooks';
-import { firstPartyDescriptor, loadFirstPartyFolder } from '../shardfile/runtimeFolder';
+import { catalogueDescriptor, loadCatalogueFolder } from '../shardfile/runtimeFolder';
 
-/** A first-party product's tree set rows (its `world/trees` section). */
+/** A built-in product's tree set rows (its `world/trees` section). */
 export async function folderTreeSet(slug: string): Promise<TreeSetRows> {
-  const product = await loadFirstPartyFolder(slug);
+  const product = await loadCatalogueFolder(slug);
   return folderTreePool(product, product.section('world/trees'));
 }
 
@@ -78,7 +78,7 @@ export class TreeSetFactory extends TreeFactory {
       loadTexture(U.cardsAlbedo, true, 1, undefined, cards), loadTexture(U.cardsNormal, false, 1, undefined, cards), loadTexture(U.cardsArm, false, 1, undefined, cards),
       loadTexture(U.farAlbedo, true, 1, undefined, far), loadTexture(U.farNormal, false, 1, undefined, far),
       loadPBRArray([...BARK_LAYERS], TIER_CONFIG.layerSize),
-      firstPartyDescriptor(rows.product).then(source => lookGraphMaterials(resourceScope(), { renderer: this.renderer }, source, [graphs.bark, graphs.needles, graphs.twigs, graphs.far])),
+      catalogueDescriptor(rows.product).then(source => lookGraphMaterials(resourceScope(), { renderer: this.renderer }, source, [graphs.bark, graphs.needles, graphs.twigs, graphs.far])),
     ]);
     lendLooks(resourceScope(), looks); this.looks = looks;
     const look = (id: string, lent: Readonly<Record<string, THREE.Texture>>): TreeMaterial => {

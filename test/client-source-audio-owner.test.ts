@@ -31,7 +31,7 @@ function fixture(scene: boolean): { options: FolderOptions; index: ReturnType<ty
     admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
     sections, schemas: [], files: [], runtime: null });
   wires.set('shard.json', encode(index));
-  return { index, options: { base: 'https://example.test/', offline: false, firstParty: true,
+  return { index, options: { base: 'https://example.test/', offline: false, dangerousGrant: true,
     fetch: url => {
       const bytes = wires.get(url.slice('https://example.test/'.length));
       return Promise.resolve(bytes === undefined ? new Response(null, { status: 404 }) : new Response(Uint8Array.from(bytes)));

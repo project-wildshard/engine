@@ -136,7 +136,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
         if (admissionFailure !== undefined) throw admissionFailure;
         events.push('admission:end'); return shard;
       }},
-    '@wildshard/engine/game/shardfile/runtimeFolder': {browserShardfileOptions: (_base: string, firstParty = false) => {firstParties.push(firstParty); return {};}},
+    '@wildshard/engine/game/shardfile/runtimeFolder': {browserShardfileOptions: (_base: string, dangerousGrant = false) => {firstParties.push(dangerousGrant); return {};}},
     '@wildshard/engine/game/boot/loadingPaths': {loadingPath: noop},
     '@wildshard/engine/game/grid/prefetch': {gridPrefetchStatus: noop},
     '@wildshard/engine/script/moduleV2': {prepareScriptMemoryBank: async (_counts: unknown, yieldTurn: () => Promise<void>) => {
@@ -195,7 +195,7 @@ test.each([{reserveMs: 0.02, turns: 0}, {reserveMs: 3, turns: 15}, {reserveMs: 2
 
 // SA15: `wildshard dev`'s page (a devserver build with the author's shard inline) reads and installs that shard as the
 // build's own product, and starts no catalogue shard's spawn download.
-test('a devserver page with an inline author shard reads it first-party and starts no spawn download', async () => {
+test('a devserver page with an inline author shard reads it built-in and starts no spawn download', async () => {
   const f = selectedEntry(undefined, false, true);
   await beforeCompletion(f.memoryStarted.ready, f.run); f.acceptSession(); await Promise.resolve();
   expect(f.transport).toEqual([false]);

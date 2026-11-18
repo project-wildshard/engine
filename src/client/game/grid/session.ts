@@ -296,7 +296,7 @@ const NearRow = v.object({ near: v.object({ gpu: num, decoded: num, content: v.o
  * G342 / G348: a shard's near placeholder. Its shardfile's own `near` row first (`wildshard build` bakes one for any terrain
  * shardfile, so an unknown uploaded shard draws its own), read from its sections and near files without admitting the
  * product (G608, as O26's far proxy); else its baked folder like the far proxy
- * (`scripts/bake/near-placeholder.mjs`, the first-party shards until their shardfiles carry the row). A baked view whose
+ * (`scripts/bake/near-placeholder.mjs`, the built-in shards until their shardfiles carry the row). A baked view whose
  * world carries the shard's own props owns its cell; one built from the shard's own coarse tiles (`near.tiles`) never does,
  * as a shardfile's own near row never does: those tiles keep refining over it.
  */

@@ -9,7 +9,7 @@ import { lowPolyLookMaterial } from '@wildshard/engine/world/lowpolyKit';
 import type { OwnedGeometry } from '@wildshard/engine/models/ownedGeometry';
 import { parseCollectionCard, CollectionDisplaysSchema, type CollectionModelRow } from '@wildshard/format/collectionDisplay';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
-import { loadFirstPartyFolder } from '../shardfile/runtimeFolder';
+import { loadCatalogueFolder } from '../shardfile/runtimeFolder';
 
 /** Collection model parameters stay data, including future shards' count and trophy names. */
 export type CollectionParams = Record<string, number | boolean>;
@@ -105,7 +105,7 @@ export class CollectionCatalogue {
     const row = this.rows?.[key]; if (row === undefined) throw new Error(`Collection is not prepared: ${key}`); return row;
   }
   /** Prepare the shared handles and admitted rows. A resolved book pins its
-   * original product; only the compatible legacy path opens a first-party one. */
+   * original product; only the compatible legacy path opens a built-in one. */
   prepare(): Promise<void> {
     const owner = resourceScope(), pinned = this.pinnedFolder;
     const check = (): void => { if (pinned !== undefined && (owner.disposed || owner.disposing)) throw new Error('Collection owner left during preparation'); };
@@ -114,7 +114,7 @@ export class CollectionCatalogue {
       try {
         await Promise.all([...this.geometry.values()].map(handle => handle.load()));
         check();
-        const product = pinned ?? await loadFirstPartyFolder(this.slug, owner); check();
+        const product = pinned ?? await loadCatalogueFolder(this.slug, owner); check();
         const rows = v.parse(CollectionDisplaysSchema, product.section('collections/displays')).models;
         const entries = Object.fromEntries(Object.entries(rows).map(([key, row]) => {
           const { id, name, file, surface, defaults, variants } = row;

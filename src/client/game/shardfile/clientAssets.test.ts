@@ -29,13 +29,13 @@ function fixture() {
   observed.push(bytes.buffer);
   source.files.push({ hash: ref, kind: 'binary', compressed: bytes.length, decoded: 3, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false });
   const fetch = vi.fn(() => Promise.reject(new Error('Unexpected transport fetch')));
-  const options = { base: 'https://example.invalid/product/', offline: true, firstParty: true, fetch,
+  const options = { base: 'https://example.invalid/product/', offline: true, dangerousGrant: true, fetch,
     hash: vi.fn(() => Promise.resolve(ref)) };
   const rows = () => memoryAttribution.snapshot().allocations.filter(row => row.owner === 'product:transport-memory');
   return { source, bytes, ref, options, fetch, rows };
 }
 
-test('native first-party demand uses the canonical URL and no page cache or hash', async () => {
+test('native built-in demand uses the canonical URL and no page cache or hash', async () => {
   const f = fixture(), requests: { url: string; bytes: number | undefined; hash: string | undefined; priority: 'low' | undefined }[] = [];
   const index = parseOutputIndex({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: f.source.version,
     identity: f.source.identity, requires: f.source.requires, build: { sourceHash: '0'.repeat(64), validator: 'test' },
@@ -47,7 +47,7 @@ test('native first-party demand uses the canonical URL and no page cache or hash
   const source = await resolveOutputDescriptor(index, { offline: false, read, hash: f.options.hash,
     built: { indexHash: 'b'.repeat(64), read } });
   if (!isBuildValidatedOutput(source)) throw new Error('Missing build-owned output fixture');
-  const assets = new ClientAssets(source, new Map(), { ...f.options, firstPartyRead: (url, bytes, _read, hash, priority) => {
+  const assets = new ClientAssets(source, new Map(), { ...f.options, buildRead: (url, bytes, _read, hash, priority) => {
     requests.push({ url, bytes, hash, priority }); return Promise.resolve(f.bytes);
   } });
   expect(await assets.read(f.ref, 'low')).toBe(f.bytes);

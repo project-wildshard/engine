@@ -60,7 +60,7 @@ test('the client retirement observer watches roots weakly through repeated publi
   const gc = collectionRuntime(); if (gc === null) return;
   const source = emptyShardfile({ slug: 'tile-ghost', name: 'Tile', author: 'Test', revision: 1, seed: 1 });
   const page = new Scope('client tile page'), root = new Group(), ghosts = new GhostWorlds(), decoder = new TileDecoder();
-  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/', offline: true, firstParty: true,
+  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/', offline: true, dangerousGrant: true,
     fetch: () => Promise.reject(new Error('No fixture network')), hash: () => Promise.reject(new Error('No fixture hashing')) });
   const refs: WeakRef<object>[] = [], frameSteps: (() => void)[] = []; let retired = 0;
   const ports = clientRingPorts(new Map([['home', { source, assets, root, views: {

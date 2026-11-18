@@ -1,7 +1,7 @@
 /**
- * TEMPLATE-E2E TC-E5c: a plain data shard's movers on its one-shard page (`?chunk=<slug>`). The server steps them
+ * TEMPLATE-E2E TC-E5c: a plain shard's movers on its one-shard page (`?chunk=<slug>`). The server steps them
  * (`createShardfileSim`) and the wire poses each as a row; only a client plan (`world.movers`, `motion.channels`) installed
- * them here, so a data shard with none (Mossgate, Brasscap) had a lift drawn at rest and no collider to stand on. A grid cell
+ * them here, so a shard with none (Mossgate, Brasscap) had a lift drawn at rest and no collider to stand on. A grid cell
  * has its own (`grid/dataCellMovers.ts`, TC-E5b).
  *
  * Each mover gets its collider in the page's physics, and the same row poses its props panel where the page draws one.

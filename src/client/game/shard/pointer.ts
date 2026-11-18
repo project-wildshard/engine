@@ -14,7 +14,7 @@ export function runtimePagePointer(manifest: Pick<ShardManifest, 'shardfile' | '
   return manifest.gridShardfile ?? (manifest.clientPlanRuntime === true ? manifest.shardfile : undefined);
 }
 
-/** OF8: the pointer of a plain data shard, admitted as data; undefined for a runtime shard (`runtimePagePointer`) or a shard with none. */
+/** OF8: the pointer of a plain shard, admitted as data; undefined for a runtime shard (`runtimePagePointer`) or a shard with none. */
 export function dataPointer(manifest: Pick<ShardManifest, 'shardfile' | 'gridShardfile' | 'clientPlanRuntime'>): string | undefined {
   return runtimePagePointer(manifest) === undefined ? manifest.shardfile : undefined;
 }

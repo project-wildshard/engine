@@ -1,4 +1,4 @@
-// TE-ENG3: a data shard's quest-givers (`targets.talks`) on the page. A figure stands at the row's feet (its props model, or a
+// TE-ENG3: a shard's quest-givers (`targets.talks`) on the page. A figure stands at the row's feet (its props model, or a
 // stand-in when it names none); E opens the dialogue box on the node the server says this player is at. An answer goes to the
 // server by position and the next node opens once the server says it; a node with no choices ends the talk.
 import { CapsuleGeometry, Group, Mesh, MeshStandardMaterial, SphereGeometry, Vector3, type Object3D } from 'three';

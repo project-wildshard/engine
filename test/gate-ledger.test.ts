@@ -7,7 +7,7 @@ import { DANGEROUS_GATES, GATES, renderGates } from '../src/shared/game/shardfil
 
 const ROOT = resolve(import.meta.dirname, '..');
 /** OF1's `engine.access-gate-references` pattern (shard-format src/tools/one-way-counts.ts), over runtime src. */
-const REFERENCE = /\bfirstParty\b/gu;
+const REFERENCE = /\bdangerousGrant\b/gu;
 
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -17,7 +17,7 @@ function sources(dir: string): string[] {
   });
 }
 
-test('every firstParty reference in engine src belongs to a ledger gate, file by file', () => {
+test('every dangerousGrant reference in engine src belongs to a ledger gate, file by file', () => {
   const actual = new Map<string, number>();
   for (const file of sources(resolve(ROOT, 'src'))) {
     const count = readFileSync(file, 'utf8').match(REFERENCE)?.length ?? 0;
@@ -29,7 +29,7 @@ test('every firstParty reference in engine src belongs to a ledger gate, file by
   expect(Object.fromEntries([...actual].sort())).toEqual(Object.fromEntries([...ledger].sort()));
 });
 
-test('every gate with no firstParty reference names a line that is still there', () => {
+test('every gate with no dangerousGrant reference names a line that is still there', () => {
   for (const gate of GATES) for (const row of gate.snippets ?? []) {
     expect(readFileSync(resolve(ROOT, row.file), 'utf8'), `${gate.id}: ${row.file}`).toContain(row.text);
   }

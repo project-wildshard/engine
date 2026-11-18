@@ -19,7 +19,7 @@ import { TIER, type Tier } from '@wildshard/engine/core/tier';
 import type { GridRecoveryRecord } from '../../../shared/game/grid/recovery';
 import { bootPageMode, pageGridRecovery } from '../grid/pageEntry';
 import { currentPageMode } from '../../../shared/game/grid/pageMode';
-import { firstPartyInstance } from '../../../shared/game/grid/instances';
+import { catalogueInstance } from '../../../shared/game/grid/instances';
 import { game } from '../shard/registry';
 import { installShards, shards } from '../shard/list';
 import type { ShardManifest } from '../shard/manifest';
@@ -134,7 +134,7 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
   return result;
 }
 
-/** Select a fully admitted external product before the ordinary session starts; first-party discovery remains installed.
+/** Select a fully admitted external product before the ordinary session starts; built-in discovery remains installed.
  * A native preparation barrier may overlap admission, but precedes every live binding and publication. */
 export async function installShardfileFolder(input: unknown, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
@@ -153,7 +153,7 @@ export async function installShardfileFolder(input: unknown, providedOptions: Fo
  * caller enters the returned manifest by `installManifestShardfile`, as a catalogue arrival.
  *
  * Trust is unchanged: `installShardfileFolder` still refuses every runtime, so does every page that does not own its
- * inline candidate (a released page's inline product is never first-party), and a candidate whose discovery names no
+ * inline candidate (a released page's inline product is never built-in), and a candidate whose discovery names no
  * client-plan entry, another identity or another descriptor. Returns null when the candidate declares no runtime.
  */
 export async function inlineRuntimeArrival(source: Shardfile, options: Pick<FolderOptions, 'base'> & DangerousProvenance,
@@ -192,7 +192,7 @@ function selectSource(source: ShardManifest): ShardManifest {
   game.shard = source; _applyChunkConstants(source); configureLevel(toLevelSpec(source)); return source;
 }
 
-/** Admit a built first-party descriptor before the normal session, preserving picker identity and its canonical save instance.
+/** Admit a built built-in descriptor before the normal session, preserving picker identity and its canonical save instance.
  * A native preparation barrier may overlap admission, but precedes every live binding and publication. */
 export async function installManifestShardfile(manifest: ShardManifest, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
@@ -227,11 +227,11 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
   // declared page keeps its claim here: session.ts admits none for it.
   const { residency, ...unclaimed } = bindings, gridHome = residency !== undefined && currentPageMode() === 'grid' && !hasDeclaredClientPage(source);
   const client = clientSource(admitted, folderOptions, { ...(gridHome ? { ...unclaimed, allocator: residency.allocator } : bindings),
-    instance: residency === undefined ? firstPartyInstance(manifest.slug) : bindings.instance });
+    instance: residency === undefined ? catalogueInstance(manifest.slug) : bindings.instance });
   const plan = sections?.get('client/plan');
   const sceneAudio = plan !== undefined && parseClientPlan(plan).features.some(row => row.kind === 'audio.scene');
   const { image: _unadmittedImage, ...mapLook } = manifest.minimap ?? {};
-  // First-party declared pages keep their authored scalar level presentation and boot inventory.
+  // Built-in declared pages keep their authored scalar level presentation and boot inventory.
   // The admitted client owns ground, navigation and all executable stages; no shard loader survives.
   const page: ShardManifest = hasDeclaredClientPage(source) ? { ...manifest,
     boot: compiledPageBoot(manifest.boot, client.boot),
@@ -241,7 +241,7 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     ...(client.load === undefined ? {} : { load: client.load }),
   } : client;
   const installed = { ...page,
-    // Explicit scene features retain the counted first-party catalogue.
+    // Explicit scene features retain the counted built-in catalogue.
     ...(sceneAudio && manifest.audio?.preload !== undefined ? { audio: manifest.audio } : {}),
     ...(sceneAudio && page.boot !== undefined && manifest.boot?.audio !== undefined
       ? { boot: { ...page.boot, audio: manifest.boot.audio } } : {}),
@@ -250,7 +250,7 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     // cell stays "not a shardfile shard" and Shard select's template card never boots. A declared page keeps it by its spread.
     shardfile: manifest.shardfile,
     ...(source.presentation === undefined ? { biome: manifest.biome, blurb: manifest.blurb, card: manifest.card } : {}),
-    // The first-party viewer is authored presentation, independent of native page stages.
+    // The built-in viewer is authored presentation, independent of native page stages.
     ...(manifest.explore === undefined ? {} : { explore: manifest.explore }),
     // Keep the authored map look; image bytes come exclusively from the admitted product (SF66).
     minimap: { ...mapLook, ...client.minimap },

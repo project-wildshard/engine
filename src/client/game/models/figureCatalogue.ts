@@ -1,7 +1,7 @@
 import { GeometryPack } from '@wildshard/engine/models/geometryPack';
 import { fetchDeflatedBytes as fetchDeflated } from '@wildshard/engine/core/deflate';
 import { resourceScope } from '@wildshard/engine/app/resources';
-import { loadFirstPartyFolder } from '../shardfile/runtimeFolder';
+import { loadCatalogueFolder } from '../shardfile/runtimeFolder';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 /** Client-only product catalogue for fallback and baked figure rows. */
 import * as THREE from 'three';
@@ -159,7 +159,7 @@ export class FolderFigureCatalogue {
   }
   prepare(): Promise<void> {
     this.pending ??= (async () => {
-      try { await this.admit(await loadFirstPartyFolder(this.folderId)); }
+      try { await this.admit(await loadCatalogueFolder(this.folderId)); }
       catch (error: unknown) { this.pending = undefined; throw error; }
     })();
     return this.pending;

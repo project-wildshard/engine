@@ -11,7 +11,7 @@ const tile: RingTile = { key: 'home:l0/0/0', instance: 'home', type: 'level', le
 function fixture() {
   const source = emptyShardfile({ slug: 'scope-fixture', name: 'Scope', author: 'Test', revision: 1, seed: 1 });
   const scope = new Scope('region'), root = new Group(), decoder = new TileDecoder();
-  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/', offline: true, firstParty: true,
+  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/', offline: true, dangerousGrant: true,
     fetch: () => Promise.reject(new Error('No fixture network')), hash: () => Promise.reject(new Error('No fixture hashing')) });
   const waiting: { scope: Scope; finish: () => void }[] = [];
   let preparedReady: () => void = () => undefined;

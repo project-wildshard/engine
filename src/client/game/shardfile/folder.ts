@@ -62,10 +62,10 @@ export interface FolderProgress {
 /** Loading is explicit about connectivity, never inferred from an author field; the dangerous gates' grant is the host's
  * (`DangerousProvenance`, OF10a7) until OF10c budgets them. */
 export interface FolderOptions extends DangerousProvenance {
-  /** Native first-party build capability. Publication validates the content;
+  /** Native built-in build capability. Publication validates the content;
    * this reader fetches its canonical URL and compares the declared length.
    * Node author and external readers omit it and retain checked admission. */
-  firstPartyRead?: (url:string,expectedBytes:number|undefined,read?:(bytes:number)=>void,hash?:string,priority?:'low')=>Promise<Uint8Array>;
+  buildRead?: (url:string,expectedBytes:number|undefined,read?:(bytes:number)=>void,hash?:string,priority?:'low')=>Promise<Uint8Array>;
   /** S4: the tier whose splat layers this device draws, when it isn't `tier`. Asked only of a shard with a phone set. */
   splatTier?: () => 'phone' | 'desktop';
   /** The spawn manifest names individual files, never transport envelopes. */
@@ -109,7 +109,7 @@ export interface FolderOptions extends DangerousProvenance {
   /** Host-owned residency owner reserves parsed source and immutable transport before any asset-cache read or owned copy. */
   reserve?: (source: Shardfile) => void | Promise<void>;
   /** GC9: files the native owner releases straight after admission (a grid neighbour's runtime-only wires, read back
-   * from cache or network by its inputs). A first-party read leaves them unread instead of fetching and dropping them;
+   * from cache or network by its inputs). A built-in read leaves them unread instead of fetching and dropping them;
    * checked admission still reads every file. */
   deferred?: (source: Shardfile) => Promise<readonly string[]>;
   /** Native presentation observer; it does not participate in admission decisions. */
@@ -118,16 +118,16 @@ export interface FolderOptions extends DangerousProvenance {
   pause?: () => Promise<void>;
   /** At most four cache requests in flight (the browser loader, G580 T2/G590); durable checks and pins stay. */
   cacheBatch?: boolean;
-  /** The bundled page's own first-party index hashes, and its once-only reload when a newer deployment's index arrives. */
+  /** The bundled page's own built-in index hashes, and its once-only reload when a newer deployment's index arrives. */
   built?: { indexes: ReadonlySet<string>; stale: () => Promise<void> };
 }
-/** A first-party index this client never validated: a newer deployment that an older cached app must not parse. */
+/** A built-in index this client never validated: a newer deployment that an older cached app must not parse. */
 export class StaleClientError extends Error {
   constructor() { super('This app is older than the shard it is loading. Reload to update.'); this.name = 'StaleClientError'; }
 }
-/** Parse fetched index bytes; a first-party index outside the bundle's own catalogue reloads once before any parsing. */
+/** Parse fetched index bytes; a built-in index outside the bundle's own catalogue reloads once before any parsing. */
 export async function readIndexBytes(bytes: Uint8Array, options: FolderOptions): Promise<unknown> {
-  const built = options.firstPartyRead===undefined ? listedBuilt(options) : undefined;
+  const built = options.buildRead===undefined ? listedBuilt(options) : undefined;
   if (built !== undefined) await checkBuiltIndex(await options.hash(bytes), options);
   await options.pause?.();
   return options.parseJson === undefined ? JSON.parse(descriptorDecoder.decode(bytes)) : options.parseJson(bytes);
@@ -154,7 +154,7 @@ export interface AdmittedFolder {
   releasePreparedTransport?: (refs: Iterable<string>, reread?: 'cache-or-fetch') => Promise<readonly string[]>;
   /** Complete verified offline storage after control, without retaining the distant files on the page. */
   completeCache?: (scope: Scope) => Promise<void>;
-  /** GC9: selected files a first-party read left unread (`FolderOptions.deferred`): still this product's inputs, read back on demand. */
+  /** GC9: selected files a built-in read left unread (`FolderOptions.deferred`): still this product's inputs, read back on demand. */
   unread?: readonly string[];
 }
 
@@ -173,7 +173,7 @@ function transportRelease(source: Shardfile, assets: Map<string, Uint8Array>, op
     const released: string[] = [];
     // Online grid readers already verify cache misses fetched from the immutable product URL.
     // Do not pin the whole grid in the bounded disk cache; offline owners still require durable bytes.
-    const canFetch = options.firstPartyRead!==undefined || reread === 'cache-or-fetch' && !options.offline;
+    const canFetch = options.buildRead!==undefined || reread === 'cache-or-fetch' && !options.offline;
     if (cache === undefined && !canFetch) return released;
     const releasing = prepared ? files : await (bound ??= releasable());
     for (const ref of requested) {
@@ -231,7 +231,7 @@ async function readBoundedResponse(response: Response, maximum: number, read?: (
 }
 function resolveDescriptor(input: unknown, options: FolderOptions, lineage = false, background = false): Promise<unknown> {
   const base = new URL('.', options.base).href, cache = options.cache, backgroundStore = cache?.putAssetBackground;
-  const builtRead=options.firstPartyRead;
+  const builtRead=options.buildRead;
   if(builtRead!==undefined)return resolveOutputDescriptor(input,{
     offline:options.offline,deferAssetDeclarations:true,hash:options.hash,
     built:{read:(path,bytes,hash)=>builtRead(new URL(path,base).href,bytes,undefined,hash),
@@ -322,13 +322,13 @@ export async function readFolderDescriptor(options: FolderOptions, declaredUrl?:
   const indexHash = url.pathname.endsWith('/shard.json') ? builtIndexHash(url.pathname) : null;
   if (indexHash !== null && options.descriptorHash !== undefined && options.descriptorHash !== indexHash) throw new Error('Shardfile descriptor hash mismatch');
   if (indexHash !== null) url.searchParams.set('v', indexHash.slice(0, 8));
-  const builtRead=options.firstPartyRead;
+  const builtRead=options.buildRead;
   if(builtRead!==undefined)return timeClientPreparation(new URL('.',url).pathname,'product.source',async()=>{
     const bytes=await builtRead(url.href,undefined,undefined,options.descriptorHash??indexHash??undefined);
     await options.pause?.();
     const input:unknown=options.parseJson===undefined?JSON.parse(descriptorDecoder.decode(bytes)):await options.parseJson(bytes);
     const source=await resolveDescriptor(input,options);
-    if(!isBuildValidatedOutput(source))throw new Error('First-party reader did not assemble its build output');
+    if(!isBuildValidatedOutput(source))throw new Error('Built-in reader did not assemble its build output');
     return source;
   });
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned reader');
@@ -386,7 +386,7 @@ type AdmissionPhase = 'visited' | 'sections' | 'source' | 'files' | 'costs' | 's
  * Refill at most sixteen immutable read slots after verification. A refusal stops
  * new reads and drains started work before authored-order refusal or publication. */
 export function admitFolder(input: unknown, options: FolderOptions): Promise<AdmittedFolder> {
-  const builtRead=options.firstPartyRead;
+  const builtRead=options.buildRead;
   if(builtRead!==undefined)return timeClientPreparation(new URL('.',options.base).pathname,'product.read',()=>readBuiltFolder(input,options,builtRead));
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned reader');
   const trace = clientPreparationBatch<AdmissionPhase>(options.descriptorPath ?? options.base, 'admission-phases',
@@ -395,10 +395,10 @@ export function admitFolder(input: unknown, options: FolderOptions): Promise<Adm
   return waitFor('Admit product', trace === undefined ? pending : pending.finally(() => { trace.finish(); }), 'admission');
 }
 
-/** G887: ordinary first-party loading reads the build's selected files, not a second admission. */
-async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNullable<FolderOptions['firstPartyRead']>):Promise<AdmittedFolder>{
+/** G887: ordinary built-in loading reads the build's selected files, not a second admission. */
+async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNullable<FolderOptions['buildRead']>):Promise<AdmittedFolder>{
   const source=await resolveDescriptor(input,options);
-  if(!isBuildValidatedOutput(source))throw new Error('First-party reader did not assemble its build output');
+  if(!isBuildValidatedOutput(source))throw new Error('Built-in reader did not assemble its build output');
   const instance=await admittedShardInstance(options.base,source.identity.slug,options.hash);
   await options.reserve?.(source);
   const selected=options.tier===undefined?source.files:await tierFolderFilesPaced(source,options.tier,options.pause,options.splatTier);

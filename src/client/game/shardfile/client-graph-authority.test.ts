@@ -17,7 +17,7 @@ test('a shard with a runtime or a declared page keeps its declared graph ceiling
   expect(refusal(true).join(' ')).not.toContain('nested nodes counted');
 });
 
-test('a data shard stays under the author default', () => {
+test('a shard stays under the author default', () => {
   expect(dangerousUnbudgetedMaterialGraph({ runtime: null })).toBe(false);
   expect(refusal(false).join(' ')).toContain('budget: 268 nodes (at most 160)');
 });

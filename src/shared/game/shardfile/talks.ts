@@ -1,4 +1,4 @@
-// TE-ENG3: a data shard's quest-giver (`targets.talks`), the names both halves share. The server keeps each player's node in
+// TE-ENG3: a shard's quest-giver (`targets.talks`), the names both halves share. The server keeps each player's node in
 // the quest's dialogue part and says it as an owned line; the page shows that node and sends the player's answer by name.
 import type { Shardfile } from '@wildshard/format/shardSchema';
 

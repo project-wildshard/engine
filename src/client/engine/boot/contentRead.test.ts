@@ -103,7 +103,7 @@ test('one loading-card RETRY resumes all failed content reads, excluding retired
   expect([...loadingWaitState().pending.values()].some(wait => paths.includes(wait.resource ?? ''))).toBe(false);
 });
 
-test.each([new Uint8Array([9]), new Uint8Array([9, 9, 9, 9])])('stale first-party lengths reload the same URL once', async stale => {
+test.each([new Uint8Array([9]), new Uint8Array([9, 9, 9, 9])])('stale built-in lengths reload the same URL once', async stale => {
   const requests: { url: string; cache: RequestCache | undefined }[] = [];
   const result = await readContent(url, 3, { expectedBytes: 3, fetch: (path, init) => {
     requests.push({ url: path, cache: init.cache });

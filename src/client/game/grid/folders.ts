@@ -1,5 +1,5 @@
 /**
- * The grid page's admitted first-party shardfile products (SHARD-PLATFORM SF18a / SF18b): one admission per slug, shared by
+ * The grid page's admitted built-in shardfile products (SHARD-PLATFORM SF18a / SF18b): one admission per slug, shared by
  * the live host's regional sims (`liveSession.ts`) and the neighbours' render tiles (`session.ts`). The six template copies
  * share one product's immutable bytes; a failed admission is forgotten so a later request retries.
  */
@@ -48,10 +48,10 @@ const parsedIndexes = new Map<string, OutputIndex>();
 // The input below is parsed privately from these exact wire bytes. Only the
 // bundle's own validated index inventory proves its schema output type.
 function builtGridIndex(input: unknown, hash: string, options: FolderOptions): input is OutputIndex {
-  return typeof input === 'object' && input !== null && (options.firstPartyRead!==undefined||options.built?.indexes.has(hash) === true);
+  return typeof input === 'object' && input !== null && (options.buildRead!==undefined||options.built?.indexes.has(hash) === true);
 }
 async function readGridFolderIndex(url: string, identity: string, options: FolderOptions): Promise<GridFolderIndex> {
-  const native=options.firstPartyRead,address=new URL(url);
+  const native=options.buildRead,address=new URL(url);
   const declared=options.descriptorHash??builtIndexHash(address.pathname)??undefined;
   if(native!==undefined&&declared!==undefined)address.searchParams.set('v',declared.slice(0,8));
   const bytes = native===undefined?await boundedResponse(await options.fetch(url), limits.sourceBytes):await native(address.href,undefined,undefined,declared);
@@ -102,7 +102,7 @@ async function readGridFolderFile(at: GridFolderIndex, path: string, hash: strin
  *  neighbour's world/tiles (and both proxies its look), at once or a few hundred ms apart, and the audit saw one section URL
  *  read up to 5 times in a load. A read in flight is shared; each caller parses its own copy. */
 const sectionReads = new Map<string, Promise<Uint8Array>>();
-/** A first-party section's verified bytes, kept after the read settles so the next caller in the same load reads none. Its
+/** A built-in section's verified bytes, kept after the read settles so the next caller in the same load reads none. Its
  *  URL names its hash, so a kept copy is never stale. Least recently used leaves first past `SECTION_BYTES` (one load's
  *  neighbour sections are about 0.3-1 MB; the largest seen is 73 KB). */
 const settledSections = new Map<string, Uint8Array>();
@@ -116,17 +116,17 @@ function keepSection(key: string, bytes: Uint8Array): void {
     settledSections.delete(oldest); settledBytes -= held.length;
   }
 }
-/** A first-party section's URL carries `?v=` and the first 8 hex of the hash its index declares, as the cook names it in a
+/** A built-in section's URL carries `?v=` and the first 8 hex of the hash its index declares, as the cook names it in a
  *  spawn manifest (`shardCook.ts` folderFile), so the service worker's `immutable()` keeps it and a spawn download's copy
- *  answers it. A third-party product's file keeps its bare URL. */
+ *  answers it. A external product's file keeps its bare URL. */
 function gridSectionAddress(at: GridFolderIndex, path: string, hash: string): string {
   const address = new URL(path, at.url);
   if (nativeRead(at.options) !== undefined) address.searchParams.set('v', hash.slice(0, 8));
   return address.href;
 }
-/** The build-owned reader a first-party product reads through (undefined: the checked network and content-cache path). */
-function nativeRead(options: FolderOptions): FolderOptions['firstPartyRead'] {
-  return options.firstPartyRead;
+/** The build-owned reader a built-in product reads through (undefined: the checked network and content-cache path). */
+function nativeRead(options: FolderOptions): FolderOptions['buildRead'] {
+  return options.buildRead;
 }
 /** One hash-verified section of the index, parsed (null when the index has none). */
 async function readGridSection(at: GridFolderIndex, name: string): Promise<unknown> {
@@ -134,7 +134,7 @@ async function readGridSection(at: GridFolderIndex, name: string): Promise<unkno
   if (section === undefined) return null;
   const address = gridSectionAddress(at, section.path, section.hash), versioned = nativeRead(at.options) !== undefined;
   const decode = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-  // Only a first-party section is kept once settled: the checked path has its own content cache and revalidation.
+  // Only a built-in section is kept once settled: the checked path has its own content cache and revalidation.
   const held = versioned ? settledSections.get(`${address} ${section.hash}`) : undefined;
   if (held !== undefined) {
     const kept = `${address} ${section.hash}`;
@@ -356,10 +356,10 @@ export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode?:
   const heldCache = cache, optional = mode === 'optional-metadata' || typeof mode === 'object' && mode.signal !== undefined;
   const acquire = (): Promise<GridFolder | GridFolderMetadata> => heldCache.acquire(slug, async (reserve, releaseBytes) => {
     const url = new URL(descriptor, location.href), original = browserShardfileOptions(new URL('.', url).href, true);
-    const priority = admissionPriority(owner), content = original.cache, present = content?.verifiedPresent, verified = content?.verifiedAsset,native=original.firstPartyRead;
+    const priority = admissionPriority(owner), content = original.cache, present = content?.verifiedPresent, verified = content?.verifiedAsset,native=original.buildRead;
     const options: FolderOptions = { ...original, memory: owner.allocator.memory,
       fetch: address => priority.read(slug, () => original.fetch(address)),
-      ...(native===undefined?{}:{firstPartyRead:(address,bytes,read,hash,fetchPriority)=>priority.read(slug,()=>native(address,bytes,read,hash,fetchPriority))}),
+      ...(native===undefined?{}:{buildRead:(address,bytes,read,hash,fetchPriority)=>priority.read(slug,()=>native(address,bytes,read,hash,fetchPriority))}),
       ...(content === undefined ? {} : { cache: { ...content,
         product: base => priority.read(slug, () => content.product(base)),
         asset: (base, hash) => priority.read(slug, () => content.asset(base, hash)),
@@ -367,7 +367,7 @@ export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode?:
         ...(present === undefined ? {} : { verifiedPresent: (hash: string, bytes: number) => priority.read(slug, () => present(hash, bytes)) }),
       } }),
     };
-    const input = options.firstPartyRead===undefined
+    const input = options.buildRead===undefined
       ? await readIndexBytes(await boundedResponse(await options.fetch(url.href), limits.sourceBytes), options)
       : await readFolderDescriptor(options,url);
     // GC9: the runtime-only wires released below are never read here (Pine's read fetched and hashed ~1,500 files twice)

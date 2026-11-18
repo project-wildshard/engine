@@ -461,9 +461,9 @@ export interface ShardManifest {
   /** SF57: a reviewed per-sim resident reading for this shard's regional shardfile sims; the allocator charges it instead of the declared ceiling. */
   regionalSimCost?: RegionalSimCost;
   next?: string;
-  /** Built first-party data source, admitted before the existing session boot; picker identity stays on this manifest. */
+  /** Built built-in data source, admitted before the existing session boot; picker identity stays on this manifest. */
   shardfile?: string;
-  /** First-party grid declaration for a native runtime shard; discovery alone does not replace the standalone boot path. */
+  /** Built-in grid declaration for a native runtime shard; discovery alone does not replace the standalone boot path. */
   gridShardfile?: string;
   /** Built-in finite page owner, derived from the admitted entry policy; no source module exists. */
   clientPlanRuntime?: true;
@@ -657,7 +657,7 @@ export interface ChunkMapDef {
 /** a named place on the shard: world XZ in metres; `r` ≈ its size (how far back the fly-to camera stands) */
 export interface ChunkPoi { id: string; name: string; x: number; z: number; r?: number }
 
-/** Data for first-party discovery and boot; native module loaders stay explicit bindings. */
+/** Data for built-in discovery and boot; native module loaders stay explicit bindings. */
 export type ShardManifestRows = Omit<ShardManifest, 'scalarBlocks' | 'load' | 'render' | 'roster' | 'ktx2' | 'dev' | 'groundColor' | 'ground' | 'horizon' | 'pois' | 'spawns' | 'minimap' | 'trees' | 'audio'> & {
   /** the look as a row: a post-graph look read from a product file's row (game/looks/postGraphLook `postGraphLook`);
    *  `defineShard` binds it as `render`, so a manifest never carries it */

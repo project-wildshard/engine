@@ -49,7 +49,7 @@ test('native contact targets pass real Node and client product admission with th
   const admitted = await onDisk(fixture.files, loadHeadlessFolder);
   expect(admitted.shardfile.items).toEqual(fixture.shard.items);
   expect(folderHeadlessSections(admitted).get('actors/species-programs')).toEqual(fixture.payloads.get('actors/species-programs'));
-  const source = await readFolderInput(fixture.index, {base: 'https://fixture.test/', firstParty: false, offline: false, hash: bytes => Promise.resolve(hash(bytes)),
+  const source = await readFolderInput(fixture.index, {base: 'https://fixture.test/', dangerousGrant: false, offline: false, hash: bytes => Promise.resolve(hash(bytes)),
     fetch: url => { const bytes = fixture.files.get(new URL(url).pathname.slice(1)); return Promise.resolve(bytes === undefined ? new Response(null, {status: 404}) : new Response(Uint8Array.from(bytes))); }});
   await validateCheckedFolderAssets(source, new Map(), hash, undefined, undefined, fixture.payloads, false);
   expect(source.items).toEqual(fixture.shard.items);

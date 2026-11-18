@@ -1,9 +1,9 @@
 /** C4 (J28): the part of a cook that touches untrusted bytes. It runs in a child process of its own under time, memory,
  * file and network limits (`cookWorker.ts`), so a hostile shardfile can kill this process and nothing else. Everything
- * here is first-party code reading data; the only foreign code is a shard's wasm, under the sim's fuel limit.
+ * here is built-in code reading data; the only foreign code is a shard's wasm, under the sim's fuel limit.
  *
  * Gates, in order: `api-server` already refused what it could (F3 (a)); the cap of D31; the format's product validator
- * again, because this host trusts no other host; the simulation proof (F3 (b)); then the cook. A shard with first-party
+ * again, because this host trusts no other host; the simulation proof (F3 (b)); then the cook. A shard with built-in
  * runtime bindings can't be proved without its native recipes, so its proof says `unmeasured` and never invents one. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';

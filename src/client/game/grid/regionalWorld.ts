@@ -8,7 +8,7 @@ import { ktx2TranscodeSupport } from '@wildshard/engine/core/ktx2';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 /**
  * The concrete regional world of a native runtime cell (SHARD-PLATFORM SF47 / M3, E452): the foundation that
- * `createRegionalRuntimeFactory` composes, so an admitted first-party runtime can run as a neighbour cell instead of the
+ * `createRegionalRuntimeFactory` composes, so an admitted built-in runtime can run as a neighbour cell instead of the
  * page's home.
  *
  * The page keeps its one renderer, camera, sky, player, input and combat. The region owns, under its resident scope,

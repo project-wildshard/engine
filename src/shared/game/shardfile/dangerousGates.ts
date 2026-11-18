@@ -8,22 +8,22 @@ import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
  */
 /** ONE-FORMAT OF10a7: the provenance option survives only as these dangerous gates' input. Nothing else reads it; each
  * OF10c row deletes one reader, and the last deletes this and `dangerousTrust`. */
-export interface DangerousProvenance { readonly firstParty?: boolean }
+export interface DangerousProvenance { readonly dangerousGrant?: boolean }
 type Provenance = DangerousProvenance;
 /** The host's grant of the dangerous capabilities (runtime, page features, ownership) until OF10c budgets them. */
-export function dangerousTrust(granted = true): DangerousProvenance { return granted ? { firstParty: true } : {}; }
+export function dangerousTrust(granted = true): DangerousProvenance { return granted ? { dangerousGrant: true } : {}; }
 
 /** @deprecated ONE-FORMAT OF10c1: a declared `runtime` binds a native engine module with no CPU, memory or bandwidth limit
  * of its own; the shard's tier CPU and memory limits, metered on that module, replace this provenance check. */
-export function dangerousUnbudgetedRuntime(reader: Provenance): boolean { return reader.firstParty === true; }
+export function dangerousUnbudgetedRuntime(reader: Provenance): boolean { return reader.dangerousGrant === true; }
 
 /** @deprecated ONE-FORMAT OF10c2: native page features run page code paths outside the cost admission charged; the
  * shard's tier CPU and memory limits, charged per page feature, replace this provenance check. */
-export function dangerousUnbudgetedPageFeatures(reader: Provenance): boolean { return reader.firstParty === true; }
+export function dangerousUnbudgetedPageFeatures(reader: Provenance): boolean { return reader.dangerousGrant === true; }
 
 /** @deprecated ONE-FORMAT OF10c3: a runtime that owns the page's world, audio or stages escapes admission; the shard's
  * tier CPU and memory limits, with the owned stages metered as the runtime's, replace this provenance check. */
-export function dangerousRuntimeOwnership(reader: Provenance): boolean { return reader.firstParty === true; }
+export function dangerousRuntimeOwnership(reader: Provenance): boolean { return reader.dangerousGrant === true; }
 
 /** @deprecated ONE-FORMAT OF10c4: whether a shard's material graphs keep their declared ceilings (a runtime or a declared
  * page; admission gives those to our own products alone). Opened, any shard could compile unbounded GPU graphs; the

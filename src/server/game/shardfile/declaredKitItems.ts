@@ -1,5 +1,5 @@
-// SR11 (C8, C9): a data shard's declared kit melee and lantern on the server. Before the flip the page stepped each item's
-// runtime; the flip left that runtime queued and never stepped, so a data shard's player struck with the zero-damage
+// SR11 (C8, C9): a shard's declared kit melee and lantern on the server. Before the flip the page stepped each item's
+// runtime; the flip left that runtime queued and never stepped, so a shard's player struck with the zero-damage
 // HOST_PROBE and the lantern never lit. Each player now holds their own runtimes here, fed by their wire: a press with its
 // aim, a held heavy, an equip by slot and a lantern scene. What the lantern burns reaches its owner as owned lines. A blow's
 // status (the whip heavy's poison) goes to the room's status owner (`statusEffects.ts`, HS5).
@@ -72,7 +72,7 @@ export const RESTOCK_CAP = 999;
 const finite = (aim: AimCommand): boolean => [aim.origin.x, aim.origin.y, aim.origin.z, aim.direction.x, aim.direction.y, aim.direction.z].every(Number.isFinite);
 function isStates(value: unknown): value is Record<string, ItemState> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 
-/** Install a data shard's kit items, a seat for each player; null when the shard declares none. */
+/** Install a shard's kit items, a seat for each player; null when the shard declares none. */
 export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'items' | 'targets' | 'state'>, hooks: (player: string) => ReadonlyMap<string, ItemHook>): DeclaredKitItems | null {
   const rows = shard.items.rows.filter(row => SERVER_KIT_FAMILIES.has(row.family));
   if (rows.length === 0) return null;

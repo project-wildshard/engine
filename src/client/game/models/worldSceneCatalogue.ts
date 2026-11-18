@@ -21,7 +21,7 @@ import { hydrateWorldSceneWeld, admitWorldSceneModelGraphs, weldSceneMaterial } 
 import { sceneFileKey, type WorldSceneWeld } from '@wildshard/format/worldSceneWeld';
 import { SceneHandles } from '../shardfile/sceneHandles';
 import { hasLentLook, lendLooks, lentLook } from '../shardfile/lentLooks';
-import { loadFirstPartyFolder, runtimeLookMaterials } from '../shardfile/runtimeFolder';
+import { loadCatalogueFolder, runtimeLookMaterials } from '../shardfile/runtimeFolder';
 import { libraryModel } from './libraryModel';
 import { worldSceneSourceMaterial } from '../shardfile/worldSceneMaterials';
 import { readWholeLibrary } from '../shardfile/wholeLibrary';
@@ -133,7 +133,7 @@ async function load(ctx: ModelContext, product: string, catalogue: WorldSceneMod
   current.pending ??= (async () => {
     const owner = lifetime.child(`scene-models/${product}`);
     try {
-    const admitted = pinnedFolder ?? await loadFirstPartyFolder(product, owner), rows = admitted.section('world/scenes');
+    const admitted = pinnedFolder ?? await loadCatalogueFolder(product, owner), rows = admitted.section('world/scenes');
     requireLive(owner);
     if (!Object.is(admitted.shardfile.identity.slug, product)) throw new Error('Scene model product identity differs');
     if (rows.catalogue === undefined || !same(parseWorldSceneModels(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await admitted.file(rows.catalogue)))), catalogue)) throw new Error('Scene model boot metadata differs from its admitted catalogue');

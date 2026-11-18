@@ -85,7 +85,7 @@ export interface ShardFolderInput {
   readonly read: (hash: string) => Promise<Uint8Array>;
   /** Deep-freeze admitted values for tests and validation. */
   readonly check?: boolean;
-  /** a first-party build's named JSON: its build validated each file against its schema (nameBlob) and `read` checks the
+  /** a built-in build's named JSON: its build validated each file against its schema (nameBlob) and `read` checks the
    *  bytes against that build's hash, so a read parses it without validating it again (an external product validates) */
   readonly builtJson?: boolean;
   /** Explicit Node author capability; never supplied by authored JSON. */

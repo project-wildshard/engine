@@ -231,7 +231,7 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
     return previousLine;
   }
 
-  /** The same bounded evidence also accompanies handled errors through the working first-party inbox. */
+  /** The same bounded evidence also accompanies handled errors through the working built-in inbox. */
   function bootDiagnostic(): Record<string, unknown> {
     // S4: with no boot trace (an older page, storage refused) the report still says where the card stood
     if (current === null) {

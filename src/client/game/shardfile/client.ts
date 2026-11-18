@@ -104,7 +104,7 @@ export interface ShardfileClientBindings {
   imageOwner?: Scope;
   /** Optional grid-page owner, created before hydration. Runtime homes reuse its reviewed early claim. */
   residency?: PageResidency;
-  /** Explicit first-party transition policy: a completely empty data declaration adds no gameplay services. */
+  /** Explicit built-in transition policy: a completely empty data declaration adds no gameplay services. */
   nativeRuntime?: boolean;
   /** Transitional entry owns its stages, while client/plan still installs platform features. */
   runtimeStagesOnly?: boolean;
@@ -595,7 +595,7 @@ export class ShardfileClient {
     // SHARD-SOURCE SS9c: a touchable crate stands where the server's body is, its panel drawn there (the server installs
     // the bodies whatever the plan's movers, so the page does too)
     installDataPageBodies(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map() });
-    // TEMPLATE-E2E TC-E5c: a plain data shard's lift and doors stand on its page; a client plan's movers install their own
+    // TEMPLATE-E2E TC-E5c: a plain shard's lift and doors stand on its page; a client plan's movers install their own
     if (this.bindings.nativeRuntime !== true && !(this.plan?.features ?? []).some(row => row.kind === 'world.movers' || row.kind === 'motion.channels')) {
       const movers = installDataPageMovers(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map(), prompts: runtime.interactables });
       if (movers !== null) {

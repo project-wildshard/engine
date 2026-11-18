@@ -7,7 +7,7 @@ import { declaredDay, declaredWeather } from '../../../shared/game/shard/declare
 import { publishWeather } from '../weather/wire';
 
 /**
- * A data shard's authored day and weather on the server, which steps them and publishes them as rows. Like the page's own they
+ * A shard's authored day and weather on the server, which steps them and publishes them as rows. Like the page's own they
  * are no part of a save, so a world starts its sky where the shard authored it. A host with a director's clock keeps that one.
  * Weather draws from its own seed: the host's streams are in a save, and this may not change what one holds.
  */

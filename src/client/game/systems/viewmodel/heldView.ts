@@ -25,7 +25,7 @@ import type { SkyRig as Sky } from '@wildshard/engine/world/skyRig';
 import type { GraphLiteral } from '@wildshard/format/materialGraph';
 import { parseHeldView, type HeldViewRow } from '@wildshard/format/heldView';
 import { toonLighting } from '../../looks/toonLighting';
-import { loadFirstPartyFolder, runtimeLookMaterials } from '../../shardfile/runtimeFolder';
+import { loadCatalogueFolder, runtimeLookMaterials } from '../../shardfile/runtimeFolder';
 import type { ShardFolder } from '../../../../shared/game/shardfile/shardFolder';
 import { createClientScene } from '../../plugin/scene';
 import { worldScenePool } from '../../shardfile/scenePools';
@@ -217,7 +217,7 @@ export class HeldView {
 
   /** Admit a product's graph held view (`file`'s `view`). */
   static async fromFolder(slug: string, file: string): Promise<HeldView> {
-    const product = await loadFirstPartyFolder(slug);
+    const product = await loadCatalogueFolder(slug);
     return new HeldView({ kind: 'graph', ...(await product.json<{ readonly view: object }>(file)).view }, slug);
   }
 
@@ -344,7 +344,7 @@ export class HeldView {
     const row = this.row, render = app.render, folderSlug = this.slug ?? '';
     if (row.kind !== 'graph' || folderSlug.length === 0) throw new Error('A graph held view is read from its product (HeldView.fromFolder)');
     if (render === null) throw new Error('Held graphs require the render service');
-    const owner = resourceScope(), product = await loadFirstPartyFolder(folderSlug), tier = render.tier, R = row.rig;
+    const owner = resourceScope(), product = await loadCatalogueFolder(folderSlug), tier = render.tier, R = row.rig;
     const ids = [...new Set([...row.meshes.map(mesh => mesh.look), ...row.pendants.materials, row.trail.look])];
     const looks = await lookMaterials({ scope: owner, renderer: render.renderer }, product, ids);
     const rig = await RigArms.load(R.url, this.contract, this.bake, false,

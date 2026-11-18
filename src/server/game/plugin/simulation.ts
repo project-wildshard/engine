@@ -800,7 +800,7 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
   });
   interface Fact { name: string; actorId: string; tick: number }
   const facts: Fact[] = [], baselineFacts: Fact[] = [];
-  // MU6: what a scene or data shard pays its player, as a data cell pays it (cellWorld): quest coins and each kill's own
+  // MU6: what a scene or shard pays its player, as a data cell pays it (cellWorld): quest coins and each kill's own
   // rolls off the shard's loot tables, by item, `coins` for coins. A native pack registers itself (`nativeInventories`).
   const goods: Record<string, number> = {}, baselineGoods: Record<string, number> = {};
   // SHARD-SOURCE SS-GF1a1c: a tape's E on a pickup (an item scene that takes a tool off its stand, `world.pickup`) runs
@@ -908,7 +908,7 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     for (const fact of filed) { const receipt = owner.record(fact); insist(receipt.status !== 'pending', 'ledger write pending'); if (receipt.status === 'granted') granted++; }
     for (const name of plan.requiredFacts) insist(facts.some(fact => fact.name === name), `native fact missing: ${name}`);
     // F27: the packs as the tape left them; a required stack short of its count names what the packs hold. MU6: a scene or
-    // data shard's player holds what the tape was paid (quest coins, kill rolls) and the ledger's item rewards, as `player`.
+    // shard's player holds what the tape was paid (quest coins, kill rolls) and the ledger's item rewards, as `player`.
     const inventory = nativeInventories(resident.host), paid: Record<string, number> = { ...goods };
     for (const row of Object.values(owner.state().items)) paid[row.item] = (paid[row.item] ?? 0) + row.quantity;
     if (Object.keys(paid).length > 0 && inventory['player'] === undefined) inventory['player'] = paid;

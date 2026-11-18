@@ -167,7 +167,7 @@ async function readBuiltOutput(index:OutputIndex,reader:OutputDescriptorReader,b
   // Drain every started read and retain authored publication/error order.
   for(const value of values){if(value.status==='rejected')throw value.reason;sections.set(...value.value);}
   const source=assembleOutputTransport(index,sections);
-  if(!isBuiltClientSource(source,reader))throw new Error('Built output needs its first-party reader');
+  if(!isBuiltClientSource(source,reader))throw new Error('Built output needs its built-in reader');
   const residentBytes=builtShardfileResidency(index.build.sourceHash);
   buildValidated.add(source);descriptors.set(source.files,{index,sections,cached:false,indexHash:built.indexHash,built:true,...(residentBytes===undefined?{}:{residentBytes})});
   return source;

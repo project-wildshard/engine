@@ -537,7 +537,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   };
   // A crossing brings another shard's items, and each has its own slots.
   let items = ports.items;
-  // SR11 (C8): a data shard's kit melee goes by its order among them, the slot its server owner reads (`declaredKitSlots`).
+  // SR11 (C8): a shard's kit melee goes by its order among them, the slot its server owner reads (`declaredKitSlots`).
   const slotsOf = (rows: readonly WorkerItemRow[]): Map<string, number> => new Map([...declaredKitSlots(rows), ...rows.flatMap(item => item.ranged === undefined ? [] : [[item.id, item.ranged.slot] as const])]);
   player.link = net; net.place = shell.place; net.bindWeapons(ports.weapons, slotsOf(items));
   // A frame names its world. A grid page crosses when one says so; a one-shard page has only the world it opened in, and waits there.

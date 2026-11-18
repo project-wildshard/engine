@@ -50,7 +50,7 @@ export interface ContentReadOptions {
   read?: (bytes: number) => void;
   /** Host retry acknowledgement. The browser default uses the existing loading-card button. */
   retry?: (error: ContentReadError) => Promise<void>;
-  /** First-party immutable reads trust the server; stale lengths retry the same URL. */
+  /** Built-in immutable reads trust the server; stale lengths retry the same URL. */
   expectedBytes?: number;
   /** Header-admitted native response before reading; the caller owns any clone. */
   response?: (response: Response) => void;
@@ -209,7 +209,7 @@ async function busyWait(error: ContentReadError, ms: number, signal?: AbortSigna
 }
 
 /** Read a complete bounded file. Retry one confirmed lost/missing transport immediately,
- * then leave the same load pending on RETRY. An optional first-party manifest
+ * then leave the same load pending on RETRY. An optional built-in manifest
  * length shares this recovery; ordinary caps, parsing and hashes stay strict. */
 export async function readContent(url: string, maximum: number, options: ContentReadOptions): Promise<Uint8Array<ArrayBuffer>> {
   if (!Number.isSafeInteger(maximum) || maximum < 0 || maximum > 25_000_000) throw new Error('Invalid content wire cap');
@@ -239,7 +239,7 @@ export async function readContent(url: string, maximum: number, options: Content
       else {
         if (options.instead !== undefined && await options.instead(error)) throw error;
         // RL8 (Jake's phone, 2026-11-09: an old cached build sat at "0.00 MB of 28.4 MB"): a deploy keeps only the live
-        // build's hashed files, so a missing first-party file on a build the server no longer serves can never arrive.
+        // build's hashed files, so a missing built-in file on a build the server no longer serves can never arrive.
         // Instead of RETRY forever, the page reloads past its worker into the live build (once per build and tab).
         if (options.retry === undefined && error.missing && typeof document !== 'undefined'
           && await (await import('./browserChunkRecovery')).reloadIfStaleBuild()) await new Promise<void>(() => { /* never settles: the page is navigating */ });

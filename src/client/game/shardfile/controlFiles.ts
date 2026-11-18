@@ -1,7 +1,7 @@
 import { controlFileHashes } from '@wildshard/format/admissionControl';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 
-/** I2: only an exact first-party validation receipt may use this transport subset. Keep the full declaration;
+/** I2: only an exact built-in validation receipt may use this transport subset. Keep the full declaration;
  * tile scopes verify their own later reads. Global/critical and manifest-construction bytes stay ready. */
 export function controlFiles(source: Shardfile, selected: readonly Shardfile['files'][number][]): Shardfile['files'] {
   const needed = controlFileHashes(source);

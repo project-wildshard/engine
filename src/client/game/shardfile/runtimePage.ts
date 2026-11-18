@@ -300,7 +300,7 @@ export async function prepareRuntimePage(product: ShardFolder, options: FolderOp
     readonly residencyContext?: Pick<ShardContext, 'game' | 'scope'>;
     /** Retain an adapted borrowed home runtime across road visits; neighbours remain fenced. */
     readonly retainHomeRuntime?: boolean;
-    /** First-party transition whose runtime installs every admitted world/kit/play declaration.
+    /** Built-in transition whose runtime installs every admitted world/kit/play declaration.
      * Admission and residency still run; the data client must not install a second simulation. */
     readonly stagesOwner?: 'declared' | 'runtime';
   }): Promise<ShardPlugin> {

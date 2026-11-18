@@ -46,7 +46,7 @@ function fixture() {
     }) };
     return { entered, finish: () => { finish(); }, refuse: () => { refuse(); } };
   };
-  const assets = new ClientAssets(source, wire, { base: 'https://example.invalid/', offline: true, firstParty: true,
+  const assets = new ClientAssets(source, wire, { base: 'https://example.invalid/', offline: true, dangerousGrant: true,
     fetch: () => Promise.reject(new Error('Unexpected network')), hash: bytes => Promise.resolve(hashImmutableBytes(bytes)), cache: {
       product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
       pin: () => { leases++; return () => { leases--; }; },

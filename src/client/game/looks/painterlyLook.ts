@@ -21,7 +21,7 @@ import { SpecimenTextureSchema } from '@wildshard/format/specimenCatalogue';
 import { loadSpecimenTexture } from '../models/specimenCatalogue';
 import { createClientScene } from '../plugin/scene';
 import { lentLook, setLentParam, setLentTexture } from '../shardfile/lentLooks';
-import { loadFirstPartyFolder, runtimeFolder } from '../shardfile/runtimeFolder';
+import { loadCatalogueFolder, runtimeFolder } from '../shardfile/runtimeFolder';
 import type { StaticCaptureUniforms } from './staticCapture';
 import { GroundMerge } from '../shardfile/groundMerge';
 import { paintedGroundMerge } from './paintedGroundMerge';
@@ -48,7 +48,7 @@ export function paintedGroundPainter(slug: string, input: unknown, tiles: unknow
   return { build: async (terrain, field, scope) => {
     const [, textures, product] = await Promise.all([field.ready(), Promise.all(rows.layers.map(name => {
       const texture = materials[name]?.texture; if (texture === undefined) throw new Error(`Missing painted tile ${name}`); return loadSpecimenTexture(texture);
-    })), loadFirstPartyFolder(slug)]);
+    })), loadCatalogueFolder(slug)]);
     const material = painterlyMaterial(null, rows.material);
     const colour = product.section('look/colour-functions')[rows.colour];
     if (colour === undefined) throw new Error(`Missing ground colour graph ${rows.colour}`);

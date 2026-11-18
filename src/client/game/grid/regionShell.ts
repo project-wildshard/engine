@@ -38,7 +38,7 @@ export interface DataCellWorld {
   readonly shell: RegionShell; readonly water: WaterBodies; readonly heightAt: (x: number, z: number) => number;
   readonly colliders: ReadonlyMap<string, PropColliderPort>;
 }
-/** The world a data shard's server lays, for this page's prediction: its ground, its props and its water. Solids are world data, not law. */
+/** The world a shard's server lays, for this page's prediction: its ground, its props and its water. Solids are world data, not law. */
 export function dataCellWorld(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, rapier: Rapier, groundResolution: 256 | 257): DataCellWorld {
   const { x, y, z, yaw } = source.spawn, shell = new RegionShell({ id: source.identity.slug, player: { at: { x, y, z }, yaw } }, rapier);
   try {

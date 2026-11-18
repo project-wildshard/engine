@@ -69,7 +69,7 @@ function ownedRuntimeFolder(source: Shardfile, assets: ClientAssets, release?: A
   } };
 }
 
-/** The bundle's own first-party indexes; the dev server rebuilds products under a running page, so it never checks. */
+/** The bundle's own built-in indexes; the dev server rebuilds products under a running page, so it never checks. */
 const builtIndexes = import.meta.env.DEV ? null : builtIndexHashes();
 /** A cached app reloads once into the deployment that served a newer index; it never parses that index meanwhile. */
 async function staleRecovery(): Promise<void> {
@@ -100,7 +100,7 @@ export function browserShardfileOptions(base: string, granted = false): FolderOp
   };
   const quality = Object.fromEntries(Object.entries(TIER_CONFIG).filter((entry): entry is [string, number | boolean] => entry[0].includes('.') && (typeof entry[1] === 'number' || typeof entry[1] === 'boolean')));
   const readable = granted || builtIndexHash(new URL('shard.json', new URL('.', base)).pathname) !== null;
-  const firstPartyRead: NonNullable<FolderOptions['firstPartyRead']> = async (url, bytes, read, hash, priority) => {
+  const buildRead: NonNullable<FolderOptions['buildRead']> = async (url, bytes, read, hash, priority) => {
     const address = new URL(resolve(url), base).href;
     const storage = typeof caches === 'undefined' ? undefined : caches;
     const result = await waitFor(`Read ${folderResourceRole(address)}`, readAsset(address, bytes, {
@@ -120,7 +120,7 @@ export function browserShardfileOptions(base: string, granted = false): FolderOp
   return { ...(parseJson === undefined ? {} : { parseJson }), base, ...dangerousTrust(granted), ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
     // OF10a4: the build reader serves a product the host trusts or one the build's verdict table lists (its catalogue and the
     // placed uploads' cook rows); an unlisted product has no browser reader and fails closed, as before
-    ...(readable ? { firstPartyRead } : {}),
+    ...(readable ? { buildRead } : {}),
     backgroundFetch: (url, signal) => fetch(contentURL(resolve(url)), { priority: 'low', ...(signal === undefined ? {} : { signal }) }),
     fetch: (url, signal) => waitFor(`Read ${folderResourceRole(url, base)}`, (async () => {
       if (spawn !== undefined) return fetch(contentURL(resolve(url)), signal === undefined ? {} : {signal});
@@ -160,7 +160,7 @@ function pauseDescriptor(): () => Promise<void> {
 
 const provided = new Map<string, RuntimeFolder[]>();
 
-/** The canonical product base for a first-party shard (`/shardfiles/<slug>/`), relative to the page, on the content base
+/** The canonical product base for a built-in shard (`/shardfiles/<slug>/`), relative to the page, on the content base
  *  when the boot bank names one (PZ3). */
 export function folderBase(slug: string): string {
   return contentURL(new URL(`shardfiles/${slug}/`, typeof document === 'undefined' ? location.href : document.baseURI || location.href).href);
@@ -335,13 +335,13 @@ export function shardFolderFromAdmission(admitted: AdmittedFolder, scope: Scope,
 }
 
 /** Terrain/navigation readers share the product loaded before the first plugin hook. */
-export function loadFirstPartyFolder(slug: string, scope: Scope | null = currentOwner()): Promise<ShardFolder> {
+export function loadCatalogueFolder(slug: string, scope: Scope | null = currentOwner()): Promise<ShardFolder> {
   return loadShardFolder(slug, browserShardfileOptions(folderBase(slug), true), scope);
 }
 
 /** Terrain/navigation readers share the product loaded before the first plugin hook. */
-export function firstPartyDescriptor(slug: string): Promise<Shardfile> {
-  return loadFirstPartyFolder(slug).then(product => product.shardfile);
+export function catalogueDescriptor(slug: string): Promise<Shardfile> {
+  return loadCatalogueFolder(slug).then(product => product.shardfile);
 }
 
 /** The product reader for `slug`: its runtime's (`runtimeFolder`) once its runtime page was prepared, else a resident grid cell's, else null. */

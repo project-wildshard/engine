@@ -25,7 +25,7 @@ test('the preceding additive product admits and cooks without rewriting its orig
  expect(SHARDFILE_VERSION).toBe('0.1.0.1');
  expect(index.version).toBe('0.1');
  const originalHash=hashImmutableBytes(tar);
- const options:FolderOptions={base,offline:false,firstParty:true,
+ const options:FolderOptions={base,offline:false,dangerousGrant:true,
   hash:bytes=>Promise.resolve(hashImmutableBytes(bytes)),fetch:url=>{
    const bytes=files.get(url.slice(base.length));
    return Promise.resolve(bytes===undefined?new Response(null,{status:404}):new Response(Uint8Array.from(bytes)));
@@ -46,7 +46,7 @@ test('the preceding additive product admits and cooks without rewriting its orig
 for(const version of ['0.1.0.2','0.1.1.0'])test(`future or breaking ${version} refuses before transport`,async()=>{
  const bytes=readFileSync(join(fixture,'shard.json')),input:unknown=JSON.parse(bytes.toString('utf8')),index=parseOutputIndex(input);
  let reads=0;
- const options:FolderOptions={base,offline:false,firstParty:true,
+ const options:FolderOptions={base,offline:false,dangerousGrant:true,
   hash:value=>Promise.resolve(hashImmutableBytes(value)),fetch:()=>{reads++;return Promise.reject(new Error('Unexpected transport'));}};
  await expect(admitFolder({...index,version},options)).rejects.toThrow(version);
  expect(reads).toBe(0);
@@ -65,7 +65,7 @@ test('the canonical zero-counter alias admits through the engine reader',async()
  }
  const source=assembleOutputShardfile(index,sections);
  const descriptor={...index,build:{...index.build,sourceHash:hashImmutableBytes(validationSourceBytes(source))}};
- const options:FolderOptions={base,offline:false,firstParty:true,
+ const options:FolderOptions={base,offline:false,dangerousGrant:true,
   hash:bytes=>Promise.resolve(hashImmutableBytes(bytes)),fetch:url=>{
    const bytes=files.get(url.slice(base.length));
    return Promise.resolve(bytes===undefined?new Response(null,{status:404}):new Response(Uint8Array.from(bytes)));

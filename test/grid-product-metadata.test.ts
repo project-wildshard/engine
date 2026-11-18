@@ -43,7 +43,7 @@ function fixture(offline = false, playing?: number) {
   const read = vi.fn<(base: string, hash: string) => Promise<Uint8Array | null>>((_base, hash) => Promise.resolve(hash === ref ? Uint8Array.from(binary) : Uint8Array.from(json)));
   const hash = vi.fn((bytes: Uint8Array) => Promise.resolve(hashImmutableBytes(bytes)));
   const fetch = vi.fn(() => Promise.resolve(Response.json({})));
-  const options: product.FolderOptions = { base: 'https://metadata.test/', offline, firstParty: true, fetch, hash,
+  const options: product.FolderOptions = { base: 'https://metadata.test/', offline, dangerousGrant: true, fetch, hash,
     cache: { asset: read, product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true) } };
   vi.spyOn(runtime, 'browserShardfileOptions').mockReturnValue(options);
   // the real admission awaits its reserve (the residency walk runs in steps, f149370022) before it continues
@@ -55,10 +55,10 @@ function fixture(offline = false, playing?: number) {
 
 test('native URL reads retain actual-world priority over speculative product reads',async()=>{
   const f=fixture(),native=vi.fn(()=>Promise.resolve(Uint8Array.of(1)));
-  f.options.firstPartyRead=native;
+  f.options.buildRead=native;
   vi.spyOn(product,'readFolderDescriptor').mockImplementation(async(options,url)=>{
-    if(url===undefined||options.firstPartyRead===undefined)throw new Error('Missing native root reader');
-    await options.firstPartyRead(url.href,undefined);return f.source;
+    if(url===undefined||options.buildRead===undefined)throw new Error('Missing native root reader');
+    await options.buildRead(url.href,undefined);return f.source;
   });
   const release=prioritizeGridFolder('active-world',f.owner);
   const pending=gridShardfileFolder('driftwood-isle',f.owner,'metadata');

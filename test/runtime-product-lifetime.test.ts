@@ -8,7 +8,7 @@ import type { FolderOptions } from '../src/client/game/shardfile/folder';
 test('a live admission reader keeps its facade and transport across collection', async () => {
   await realGc('test/runtime-product-lifetime.test.ts', 'a live admission reader keeps', async collect => {
     const source = emptyShardfile({ slug: 'live-admission', name: 'Live', author: 'Test', revision: 1, seed: 1 });
-    const options: FolderOptions = { base: 'https://test.example/shardfiles/live-admission/', offline: true, firstParty: true,
+    const options: FolderOptions = { base: 'https://test.example/shardfiles/live-admission/', offline: true, dangerousGrant: true,
       hash: () => Promise.reject(new Error('Unexpected hash')), fetch: () => Promise.reject(new Error('Unexpected fetch')) };
     const scope = new Scope('live-admission');
     try {
@@ -28,7 +28,7 @@ test('a live admission reader keeps its facade and transport across collection',
 test('a live descriptor does not retain a retired admission facade or its transport', async () => {
   await realGc('test/runtime-product-lifetime.test.ts', 'a live descriptor does not retain', async collect => {
     const source = emptyShardfile({ slug: 'retired-admission', name: 'Retired', author: 'Test', revision: 1, seed: 1 });
-    const options: FolderOptions = { base: 'https://test.example/shardfiles/retired-admission/', offline: true, firstParty: true,
+    const options: FolderOptions = { base: 'https://test.example/shardfiles/retired-admission/', offline: true, dangerousGrant: true,
       hash: () => Promise.reject(new Error('Unexpected hash')), fetch: () => Promise.reject(new Error('Unexpected fetch')) };
     const retired = (() => {
       const scope = new Scope('retired-admission'), wire = new Uint8Array(1024 * 1024);
