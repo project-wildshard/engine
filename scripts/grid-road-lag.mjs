@@ -103,7 +103,7 @@ try {
       const live = new Set(now);
       for (const program of held) if (!live.has(program)) q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: ((k) => k.length > 700 ? `${k.slice(0, 300)} … ${k.slice(-300)}` : k)(String(program.cacheKey ?? '')), released: true });
       held = live;
-      q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), inside: st.inside, phase: st.live?.crossing?.phase ?? null, card: st.cellLoading ?? null, stage: st.cellStage ?? null, ready: st.live?.live?.gameplayReady, res: st.live?.live?.residents ?? null, cx: st.live?.live?.crossings ?? null, cur: st.live?.live?.current ?? null, hy: st.hybrid?.instance ?? null, hook: st.hybrid?.hook ?? null });
+      q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), inside: st.inside, phase: st.live?.crossing?.phase ?? null, card: st.cellLoading ?? null, stage: st.cellStage ?? null, ready: st.live?.live?.gameplayReady, res: st.live?.live?.residents ?? null, cx: st.live?.live?.crossings ?? null, cur: st.live?.live?.current ?? null, hy: st.runtimePage?.instance ?? null, hook: st.runtimePage?.hook ?? null });
     } catch (error) { q.samples.push({ err: String(error).slice(0, 700) }); } }, 50);
   });
   const sample = () => page.evaluate(() => { const rows = /** @type {any[]} */ (/** @type {any} */ (window).__road.samples); for (let at = rows.length - 1; at >= 0; at--) if (rows[at].err === undefined) return rows[at]; return undefined; });

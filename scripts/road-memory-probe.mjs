@@ -43,7 +43,7 @@ const PAGE_READ = `(() => {
     cost = { playingMB: m(res.cost.playing), accountedMB: m(res.cost.accounted), engineBaseMB: m(res.cost.input?.engineBase ?? 0), pageMB: m(res.cost.input?.page ?? 0), overlapMB: m(res.cost.input?.overlap ?? 0),
       byOwner: by(c => c.owner).slice(0, 20), byCategory: by(c => c.category), byOwnerCategory: by(c => c.owner + ' ' + c.category).slice(0, 30) }; } catch (e) { cost = { error: String(e).slice(0, 160) }; }
   const lv = st.live?.live;
-  const why = { home: st.home, gate: st.gate, current: lv?.current ?? null, pending: lv?.pending ?? null, crossings: lv?.crossings ?? null, transitions: (lv?.transitions ?? []).slice(-6), retirements: (lv?.retirements ?? []).slice(-6), hybrid: st.hybrid ?? null };
+  const why = { home: st.home, gate: st.gate, current: lv?.current ?? null, pending: lv?.pending ?? null, crossings: lv?.crossings ?? null, transitions: (lv?.transitions ?? []).slice(-6), retirements: (lv?.retirements ?? []).slice(-6), hybrid: st.runtimePage ?? null };
   return { why, cost, feet: st.feet, inside: st.inside, residents: st.live?.live?.residents ?? null, playingMB: st.playingMB, residentMB: st.residentMB, envelopeMB: st.envelopeMB,
     shows: Object.entries(st.cells.reduce((m, c) => { m[c.shows] = (m[c.shows] ?? 0) + 1; return m; }, {})), rings: { far: st.rings.far, l1: st.rings.l1, l0: st.rings.l0 },
     ledgerMB: mem?.totals ? { gpu: Math.round(mem.totals.gpu / 1048576), ram: Math.round(mem.totals.ram / 1048576) } : null,

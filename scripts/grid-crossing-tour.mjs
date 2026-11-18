@@ -115,7 +115,7 @@ try {
         q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside,
           phase: lv?.crossing?.phase, ready: lv?.live?.gameplayReady, loading: st.cellLoading, step: st.cellStep?.step ?? null,
           // GC6: whether the crossing's target world (colliders and sim) is resident yet, and the world built ahead (GC5)
-          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null, refused: lv?.live?.ahead?.refused ?? null, hy: st.hybrid ?? null, fc: W.__wildshard.world?.game?.frameCount ?? null, deferred: lv?.live?.ahead?.deferred ?? null, env: st.envelopeMB ?? null, pending: lv?.live?.pending ?? null,
+          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null, refused: lv?.live?.ahead?.refused ?? null, hy: st.runtimePage ?? null, fc: W.__wildshard.world?.game?.frameCount ?? null, deferred: lv?.live?.ahead?.deferred ?? null, env: st.envelopeMB ?? null, pending: lv?.live?.pending ?? null,
           // GC13: the cells whose worlds the page holds, and what playing costs
           res: lv?.live?.residents ?? null, mb: st.playingMB ?? null,
           // GC12: how many closed walls show (only the ones the walker stands at)

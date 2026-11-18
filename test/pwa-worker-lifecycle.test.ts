@@ -581,7 +581,7 @@ test('quota denial cannot destroy inert cached-visit bodies or either old produc
   const legacy = await f.open('ws-content-v0'), oldKey = url(`/__ws_content__/v0/${hash}`);
   await legacy.put(oldKey, new Response(bytes));
   for (const name of ['ws-shardfile-products-v0', 'ws-shardfile-products-v2']) {
-    await (await f.open(name)).put(url('/shardfiles/fixture/__visited_shardfile__'), Response.json({source: {identity: {slug: 'fixture'}}, dangerousGrant: true}));
+    await (await f.open(name)).put(url('/shardfiles/fixture/__visited_shardfile__'), Response.json({source: {identity: {slug: 'fixture'}}, firstParty: true}));
   }
   const worker = f.load('A', []); await worker.dispatch('install'); await worker.dispatch('activate');
   const assets = await f.open(ASSET_CACHE_NAME); vi.spyOn(assets, 'put').mockRejectedValueOnce(new DOMException('full', 'QuotaExceededError'));
