@@ -1423,6 +1423,7 @@
   "files": [
     "CHANGELOG.md",
     "dist/dev-server",
+    "patches",
     "src",
     "!src/**/*.test.*",
     "scripts",

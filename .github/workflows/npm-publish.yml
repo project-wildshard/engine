@@ -209,6 +209,9 @@ jobs:
             if (!files.has(`dist/dev-server/${name}`)) throw new Error(`not in the tarball: dev server ${name}`);
           }
           if (!files.has("node_modules/@wildshard/format/package.json")) throw new Error("not in the tarball: frozen shard format");
+          for (const patch of Object.values(pkg.pnpm?.patchedDependencies ?? {})) {
+            if (!files.has(patch)) throw new Error(`not in the tarball: ${patch}`);
+          }
           const targets = [];
           const walk = (value) => typeof value === "string" ? targets.push(value) : Object.values(value ?? {}).forEach(walk);
           walk(pkg.exports); walk(pkg.bin);

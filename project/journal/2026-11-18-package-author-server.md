@@ -15,6 +15,8 @@ decoder import stays resolvable under pnpm's isolated npm tarball install.
 The publisher stages regular files before packing the closure. Packing
 pnpm's global store links in place emitted archive hardlinks that tar
 refused to extract. The archive test now extracts the entire package.
+The source patch travels with the engine so an SDK workspace can apply
+the same bytes to its shared format dependency before typechecking.
 
 The authored server opens the verified build folder as one loopback cell.
 Bring in the declared rigs its spawned creatures need for native height
