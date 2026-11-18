@@ -1,0 +1,108 @@
+name: memory-footprint
+# J424 + Coordinator 2026-11-18: the native WebKit footprint guard lives outside ci, so ci's verdict never waits on an
+# xcode-27 runner. Main run 44392712273 had 14 of 14 jobs green and sat 45+ minutes on this job with no runner
+# assigned; job-level continue-on-error cannot help a job that never starts. It measures the exact full pinned client
+# that ci's memory-client-build archived (memory-pinned-client). main-watch judges ci runs only, so this workflow is
+# advisory there; a red run here is still the armed zone's owner's to fix.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main, 'release/**']
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: The ci run whose memory-pinned-client to measure
+        type: string
+        required: true
+      memory_record:
+        description: Record memory measurements while checking armed ceilings
+        type: boolean
+        required: false
+        default: false
+permissions:
+  contents: read
+  actions: read
+# One measurement at a time per branch. A newer source replaces a queued one and never cancels a started sweep.
+concurrency:
+  group: memory-footprint-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
+jobs:
+  memory-footprint-guard:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.head_repository.full_name == github.repository) }}
+    # J426: the armed zones must pass both phone footprint lines. EM11 was fitted on macOS 27 WebKit; macOS 15 charged
+    # significantly more of the same Nalati build to WebContent (44375696856).
+    runs-on: xcode-27
+    timeout-minutes: 90 # Full 26-zone sweep, five cold boots per zone.
+    env:
+      WS_LANE_NAME: memory-footprint
+      SOURCE_RUN: ${{ inputs.source_run || github.event.workflow_run.id }}
+    steps:
+      - name: Find the source run's pinned client
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" --jq .head_sha)
+          count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/artifacts?name=memory-pinned-client" --jq '[.artifacts[] | select(.expired == false)] | length')
+          printf 'sha=%s\nartifact=%s\n' "$sha" "$([[ "$count" -gt 0 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          if [[ "$count" -eq 0 ]]; then echo "::notice::ci run $SOURCE_RUN archived no memory-pinned-client (no code change, or its build failed); nothing to measure"; fi
+      - if: steps.source.outputs.artifact == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          persist-credentials: false
+      - if: steps.source.outputs.artifact == 'true'
+        uses: ./.github/actions/ring-setup
+      - name: Read the shared memory policy
+        id: policy
+        if: steps.source.outputs.artifact == 'true'
+        run: |
+          armed=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log(armedMemory().zones.size > 0)')
+          printf 'armed=%s\n' "$armed" >> "$GITHUB_OUTPUT"
+          # With an empty policy, ci-reports owns the advisory native readings.
+          if [[ "$armed" != true ]]; then echo "::notice::no armed zone; nothing to guard"; fi
+      - if: steps.policy.outputs.armed == 'true'
+        run: node scripts/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
+      - name: Record the native measurement host
+        if: steps.policy.outputs.armed == 'true'
+        run: sw_vers
+      - if: steps.policy.outputs.armed == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN }}
+          name: memory-pinned-client
+          path: tmp/memory-footprint
+      - name: Restore the native preview and install WebKit
+        id: native-client
+        if: steps.policy.outputs.armed == 'true'
+        run: |
+          tar -xf tmp/memory-footprint/client.tar
+          rm tmp/memory-footprint/client.tar
+          bash scripts/ci-playwright-install.sh webkit
+      - name: Check armed native footprints and report Template
+        if: steps.policy.outputs.armed == 'true'
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        run: |
+          record=()
+          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
+          node scripts/memory/ci.mjs footprint tmp/memory-ledger/preview tmp/memory-footprint/readings "${record[@]}"
+      - name: Check or report Nine's online native WebKit ledger
+        if: ${{ !cancelled() && steps.native-client.outcome == 'success' }}
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        run: |
+          record=()
+          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
+          node scripts/memory/ci.mjs webkit-ledger tmp/memory-ledger/preview tmp/memory-footprint/nine-ledger "${record[@]}"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-footprint-guard
+          path: |
+            tmp/memory-footprint/readings/*.json
+            tmp/memory-footprint/nine-ledger/*.json
+          retention-days: 7
+          if-no-files-found: ignore

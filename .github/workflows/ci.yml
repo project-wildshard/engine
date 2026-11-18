@@ -621,61 +621,8 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  memory-footprint-guard:
-    # J426: the armed zones must pass both phone footprint lines.
-    # With an empty policy, ci-reports owns the advisory native readings.
-    # EM11 was fitted on macOS 27 WebKit. macOS 15 charged significantly more
-    # of the same Nalati build to WebContent (44375696856).
-    # J426: armed measurements fail the job. Main-watch reports runner
-    # infrastructure interruptions as advisory.
-    needs: memory-client-build
-    if: ${{ !cancelled() && needs.memory-client-build.result == 'success' && needs.memory-client-build.outputs.armed != 'false' }}
-    runs-on: xcode-27
-    timeout-minutes: 90 # Full 26-zone sweep, five cold boots per zone.
-    env:
-      WS_LANE_NAME: memory-footprint
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/ring-setup
-      - run: node scripts/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
-      - name: Record the native measurement host
-        run: sw_vers
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: memory-pinned-client
-          path: tmp/memory-footprint
-      - name: Restore the native preview and install WebKit
-        id: native-client
-        run: |
-          tar -xf tmp/memory-footprint/client.tar
-          rm tmp/memory-footprint/client.tar
-          bash scripts/ci-playwright-install.sh webkit
-      - name: Check armed native footprints and report Template
-        env:
-          MEMORY_RECORD: ${{ inputs.memory_record }}
-        run: |
-          record=()
-          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          node scripts/memory/ci.mjs footprint tmp/memory-ledger/preview tmp/memory-footprint/readings "${record[@]}"
-      - name: Check or report Nine's online native WebKit ledger
-        if: ${{ !cancelled() && steps.native-client.outcome == 'success' }}
-        env:
-          MEMORY_RECORD: ${{ inputs.memory_record }}
-        run: |
-          record=()
-          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          node scripts/memory/ci.mjs webkit-ledger tmp/memory-ledger/preview tmp/memory-footprint/nine-ledger "${record[@]}"
-      - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: memory-footprint-guard
-          path: |
-            tmp/memory-footprint/readings/*.json
-            tmp/memory-footprint/nine-ledger/*.json
-          retention-days: 7
-          if-no-files-found: ignore
+  # memory-footprint-guard moved to memory-footprint.yml (workflow_run after ci): ci's verdict never waits on an
+  # xcode-27 runner (main run 44392712273 sat 45+ min with none assigned).
 
   boundaries:
     # TS15: blocking after main run 43768938893's green soak, 2026-11-15. Cook Ring 1, attach, and play the same bytes.

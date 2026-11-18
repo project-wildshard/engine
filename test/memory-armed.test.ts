@@ -82,14 +82,19 @@ test('a measured footprint must pass the armed reading and the shared line', asy
     { playingBytes: 1_010_000_000, loadingBytes: 1_300_000_000 })).toThrow(`line ${lines.playingBytes} B`);
 });
 
-test('CI runs both armed measurement jobs without a job-level bypass', () => {
-  const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
-  const section = (job: string): string => {
+test('CI runs both armed measurement jobs without a job-level bypass, the native one in its own workflow', () => {
+  const read = (file: string): string => readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8');
+  const section = (workflow: string, job: string): string => {
     const body = workflow.split(`\n  ${job}:\n`)[1]?.split(/\n {2}[a-z-]+:\n/u)[0];
     if (body === undefined) throw new Error(`Missing CI job ${job}`);
     return body;
   };
-  const ledger = section('memory-ledger-guard'), native = section('memory-footprint-guard');
+  const ci = read('ci.yml'), footprint = read('memory-footprint.yml');
+  const ledger = section(ci, 'memory-ledger-guard'), native = section(footprint, 'memory-footprint-guard');
+  // ci's verdict never waits on the xcode-27 runner (44392712273); the footprint run follows ci and reads its client.
+  expect(ci).not.toMatch(/\n {2}memory-footprint-guard:\n/u);
+  expect(footprint).toMatch(/workflow_run:\n {4}workflows: \[ci\]/u);
+  expect(native).toContain('run-id: ${{ env.SOURCE_RUN }}');
   expect(ledger).toContain('record+=(--record)');
   expect(native).toContain('record+=(--record)');
   expect(ledger).toContain('name: memory-pinned-client');

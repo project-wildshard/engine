@@ -52,7 +52,8 @@ test('boundaries stays blocking and independent; J400 moves quarantine to report
 test('the blocking memory ledger restores and saves its own verified Brotli parts', () => {
   const producer = ciJob('memory-client-build');
   const ledger = ciJob('memory-ledger-guard');
-  const native = ciJob('memory-footprint-guard');
+  // The native consumer runs after ci in memory-footprint.yml (ci's verdict never waits on its xcode-27 runner).
+  const native = readFileSync('.github/workflows/memory-footprint.yml', 'utf8');
   const restore = producer.indexOf('uses: actions/cache/restore@');
   const build = producer.indexOf('name: Build every production pin');
   const archive = producer.indexOf('name: Archive the full pinned preview');
@@ -62,8 +63,9 @@ test('the blocking memory ledger restores and saves its own verified Brotli part
   expect(build).toBeGreaterThan(restore);
   expect(archive).toBeGreaterThan(build);
   expect(save).toBeGreaterThan(archive);
+  expect(ledger).toContain('needs: memory-client-build');
+  expect(native).toContain('workflows: [ci]');
   for (const consumer of [ledger, native]) {
-    expect(consumer).toContain('needs: memory-client-build');
     expect(consumer).toContain('name: memory-pinned-client');
     expect(consumer).not.toContain('uses: actions/cache/save@');
   }
