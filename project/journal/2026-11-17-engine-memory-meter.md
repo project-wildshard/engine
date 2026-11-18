@@ -16,3 +16,11 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   2.54 GB). The microscope joins memory-infra dumps by order: the returned guid is one higher than the event's id.
   The ladder on one build: blank 46 MB, engine fixed (Template over blank) 852 MB [K] of which the ledger names 61; the
   title alone is 98 MB over blank; Nine's zone over Template 1,853 MB, most of it in the GPU process.
+- EM5, the WebGL ledger on every page (`src/client/engine/render/glCounters.ts`). The allocation journal now reports to a
+  sink; a counters-only sink (bytes by kind, format and owner, plus the drawing buffer) installs before the renderer's
+  first call on every page and publishes `globalThis.__wildshardMemory.counters()` for the harness, so a ledger number no
+  longer needs Developer mode. Developer's per-resource journal stacks on top and comes and goes without removing it.
+- EM1, the calibration table (`scripts/memory/calibration.json`, `calibrate.mjs`): 0/128/256/512 MB of eleven kinds, three
+  fresh-browser runs each, on WebKit, Chromium and the Simulator. Plain memory reads 1.00 everywhere; JS objects cost 1.9x
+  the page's 48-byte estimate in JSC and 1.2x in V8. Textures carry a one-time cost on first upload (~57 MB WebKit GPU
+  process, ~74 MB Chromium, ~190 MB SimMetalHost) and then ~1.0-1.2x; SimMetalHost holds ASTC at four times its size.
