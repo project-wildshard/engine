@@ -11,6 +11,8 @@ test('only the phone tier cuts slab chunks', () => {
   // mini-nb8e: a key's chunks merge on the phone only (and there only with multi-draw, `worldScenes.ts`)
   expect(TIER_TABLE.desktop.slabMerge).toBe(false);
   expect(TIER_TABLE.phone.slabMerge).toBe(true);
+  // ONE-FORMAT OF-EM28a: the phone merges a key only into runs a 16-bit index addresses
+  expect(TIER_TABLE.phone.slabMergeVertices).toBe(65_535);
 });
 
 /** NB8 (mini-nb8i): the phone's slab trees split by facing (built in a worker), and its placed copies chosen for a view

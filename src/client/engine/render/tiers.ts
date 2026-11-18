@@ -66,6 +66,10 @@ export const TIER_TABLE = {
     // NB8 (mini-nb8e): with WEBGL_multi_draw, a frustum-culled slab key's chunks in a bank draw as one merged geometry
     // (`slabMerge.ts`): Nine's 12 plain chunks are 1 draw; the leaf cut keeps its triangles where they were
     slabMerge: true,
+    // ONE-FORMAT OF-EM28a: a merged key's run holds at most this many vertices (`slabMergeRuns`), so every run keeps a
+    // 16-bit index; 0 = the whole key in one run, 32-bit past 65,535. Nine (headless WebKit, phone Low, 3 alternating cold
+    // boots): ledger WebGL buffers 124.3 to 117.4 MB, WebContent peak 1,837 to 1,520 MB (no merge copy), +12-19 draws
+    slabMergeVertices: 65_535,
     // NB8 (mini-nb8i): placed copies are chosen for the camera's view padded this many degrees (and re-chosen at a
     // quarter of that turn, `cull.ts`): Nine's copies at 7° drew ~0.1 M triangles outside the portrait view
     cullViewPad: 3,
@@ -108,6 +112,7 @@ export const TIER_TABLE = {
     slabRanges: false,
     slabLodAngle: 0,
     slabMerge: false,
+    slabMergeVertices: 0,
     cullViewPad: 7,
     slabFacing: false,
     slabFarAngle: 0,

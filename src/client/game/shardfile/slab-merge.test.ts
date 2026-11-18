@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { BufferAttribute, BufferGeometry, Float16BufferAttribute, Frustum, Matrix4, PerspectiveCamera, Vector3 } from 'three';
-import { mergedSlabBounds, mergeSlabChunks } from './slabMerge';
+import { mergedSlabBounds, mergeSlabChunks, slabMergeRuns } from './slabMerge';
 import { slabRangesJob, spatialSlabRanges, visibleSlabDraws } from './slabRanges';
 
 // NINE-DRAGON-BENCHMAX NB8 (mini-nb8e): a key's chunks as one geometry on the phone. Made-up chunks of a wall kit:
@@ -47,6 +47,20 @@ test('a merge past 65,535 vertices takes a 32-bit index', () => {
   const merged = mergeSlabChunks([chunk(0, 10_000), chunk(6000, 10_000)]);
   expect(merged?.index?.array).toBeInstanceOf(Uint32Array);
   expect(merged?.index?.getX(merged.index.count - 1)).toBe(79_999);
+});
+
+// ONE-FORMAT OF-EM28a: on the phone a key merges only into runs a 16-bit index can address
+test('runs of at most 65,535 vertices: first fit in chunk order, a 16-bit index each, the same triangles', () => {
+  expect(slabMergeRuns([53_702, 54_829, 17_633, 6_000], 65_535)).toEqual([[0, 3], [1], [2]]);
+  expect(slabMergeRuns([30_000, 30_000, 30_000], 65_535)).toEqual([[0, 1], [2]]);
+  expect(slabMergeRuns([80_055, 100], 65_535)).toEqual([[0], [1]]);
+  expect(slabMergeRuns([53_702, 54_829, 17_633], 0)).toEqual([[0, 1, 2]]);
+  const parts = [chunk(0, 8000), chunk(5000, 8000), chunk(9000, 8000)];
+  const runs = slabMergeRuns(parts.map(part => part.getAttribute('position').count), 65_535);
+  expect(runs).toEqual([[0, 1], [2]]);
+  const merged = mergeSlabChunks(runs[0]?.map(at => parts[at] ?? chunk(0, 1)) ?? []);
+  expect(merged?.index?.array).toBeInstanceOf(Uint16Array);
+  expect(triangles(merged ?? chunk(0, 1))).toEqual([parts[0], parts[1]].flatMap(part => triangles(part ?? chunk(0, 1))));
 });
 
 test('chunks whose channels differ, or one chunk, are not merged', () => {

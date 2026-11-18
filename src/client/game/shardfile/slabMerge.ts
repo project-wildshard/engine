@@ -54,6 +54,22 @@ export function mergeSlabChunks(chunks: readonly BufferGeometry[]): BufferGeomet
   return merged;
 }
 
+/**
+ * ONE-FORMAT OF-EM28a: a key's chunks grouped into the runs it merges, as chunk positions. `limit` caps a run's vertices
+ * (first fit in chunk order; a chunk past it is a run of its own); 0 is one run, the NB8 merge. At 65,535 every run keeps
+ * a 16-bit index: half the index bytes of one 32-bit merge, at a draw per run instead of one per key.
+ */
+export function slabMergeRuns(vertices: readonly number[], limit: number): number[][] {
+  if (limit <= 0) return [vertices.map((_, at) => at)];
+  const runs: { at: number[]; total: number }[] = [];
+  for (const [at, count] of vertices.entries()) {
+    const run = runs.find(open => open.total + count <= limit);
+    if (run === undefined) runs.push({ at: [at], total: count });
+    else { run.at.push(at); run.total += count; }
+  }
+  return runs.map(run => run.at);
+}
+
 /** The merged key's frozen bounds from its chunk rows: their boxes' union, and a sphere about its centre that holds
  *  every row's sphere. */
 export function mergedSlabBounds(rows: readonly { readonly box: readonly number[]; readonly sphere: readonly number[] }[]): { box: Box3; sphere: Sphere } {

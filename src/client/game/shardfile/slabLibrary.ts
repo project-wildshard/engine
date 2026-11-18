@@ -17,7 +17,7 @@ import { tilesSettling } from './tileDriver';
 import { TIER_CONFIG } from '@wildshard/engine/core/tier';
 import { indexTurned, writeIndexTriangles } from '@wildshard/engine/render/memorySaver';
 import { cullSlabRanges, SLAB_FAR_CELLS, slabRangesJob, slabRoom, slabTriangles, spatialSlabRanges, type SlabFar, type SlabRanges } from './slabRanges';
-import { mergedSlabBounds, mergeSlabChunks } from './slabMerge';
+import { mergedSlabBounds, mergeSlabChunks, slabMergeRuns } from './slabMerge';
 
 type WholeLibrary = Extract<WorldScenesSection['libraries'][number], { kind: 'whole' }>;
 type SlabTile = WorldSceneSlabLibrary['tiles'][number];
@@ -413,16 +413,14 @@ export class SlabLibrary {
     // soon as its last one is read, so the bank holds at most one key's copy at a time beside what it has read
     const rows = chunksOf(entry), merged = this.mergedKeys(entry), lastOf = new Map<string, number>();
     for (const [index, chunk] of rows.entries()) if (merged.has(chunk.key)) lastOf.set(chunk.key, index);
-    const mergeKey = (key: string): void => {
-      const at: number[] = [];
-      for (const [index, chunk] of rows.entries()) if (chunk.key === key) at.push(index);
+    const keepChunks = (parts: readonly BufferGeometry[]): void => {
+      for (const part of parts) { ownSceneResource(part, scope); if (TIER_CONFIG.slabRanges) { LATE.add(part); facedTree(part); } }
+    };
+    const mergeRun = (at: readonly number[]): void => {
       const parts = at.map(index => chunks[index] ?? null).filter(part => part !== null);
-      const geometry = parts.length === at.length ? mergeSlabChunks(parts) : null;
-      if (geometry === null) {
-        // channels that differ: the key keeps its chunks, each with its own leaf tree
-        for (const part of parts) { ownSceneResource(part, scope); if (TIER_CONFIG.slabRanges) { LATE.add(part); facedTree(part); } }
-        return;
-      }
+      const geometry = parts.length === at.length && parts.length > 1 ? mergeSlabChunks(parts) : null;
+      // one chunk, or channels that differ: the chunks stay as they are, each with its own leaf tree
+      if (geometry === null) { keepChunks(parts); return; }
       const { box, sphere } = mergedSlabBounds(at.map(index => rows[index] ?? { box: [], sphere: [] }));
       geometry.boundingBox = box; geometry.boundingSphere = sphere;
       gpuOnlyAttributes(geometry, SLAB_GPU_ONLY);
@@ -431,6 +429,16 @@ export class SlabLibrary {
       if (TIER_CONFIG.slabRanges) { LATE.add(geometry); facedTree(geometry); }
       for (const [order, index] of at.entries()) chunks[index] = order === 0 ? geometry : null;
       for (const part of parts) part.dispose();
+    };
+    const mergeKey = (key: string): void => {
+      const all: number[] = [];
+      for (const [index, chunk] of rows.entries()) if (chunk.key === key) all.push(index);
+      const parts = all.map(index => chunks[index] ?? null).filter(part => part !== null);
+      if (parts.length !== all.length) { keepChunks(parts); return; }
+      // ONE-FORMAT OF-EM28a: the key's runs (`slabMergeRuns`, `slabMergeVertices` per tier); a run of one chunk keeps it
+      for (const run of slabMergeRuns(parts.map(part => part.getAttribute('position').count), TIER_CONFIG.slabMergeVertices)) {
+        mergeRun(run.map(order => all[order] ?? -1));
+      }
     };
     let box = bounds.get(tile);
     if (entry.covers !== undefined) {
