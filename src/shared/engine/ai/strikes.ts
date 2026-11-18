@@ -1,5 +1,6 @@
 import type { CombatTag } from '../combat/pipeline';
 import type { StrikeDebrisPolicy } from '@wildshard/format/strikeDebris';
+import type { CreatureSkinClipName } from '@wildshard/format/skinData';
 import { Hfsm } from './hfsm';
 
 export interface BrainPoint { x: number; y: number; z: number }
@@ -36,6 +37,7 @@ export interface StrikeSpec {
   from?: string;
   knockbackDistance?: number;
   projectile?: { speed: number; gravity: number; radius: number };
+  ability?: { clip?: CreatureSkinClipName };
   range: number; damage: number; tags: readonly CombatTag[];
   weight: (ctx: StrikeContext) => number;
   units?: 'world' | 'actor';
@@ -50,6 +52,11 @@ export interface StrikeSpec {
 }
 export interface UtilityScore { id: string; score: number }
 export type StrikePhase = 'idle' | 'windup' | 'active' | 'recover' | 'cooldown';
+export interface RunningAbility {
+  readonly id: string;
+  readonly clip?: CreatureSkinClipName;
+  readonly progress: number;
+}
 interface StrikeState {
   version: number; phase: StrikePhase; currentId: string | null; hit: boolean; elapsed: number; speedMul: number; clock: number;
   deadlines: { id: string; at: number }[]; scores: UtilityScore[];
@@ -80,6 +87,12 @@ export class StrikeRunner {
     return this.state === 'windup' ? this.elapsed : this.elapsed + spec.windup + (this.state === 'recover' || this.state === 'cooldown' ? spec.active : 0) + (this.state === 'cooldown' ? spec.recover : 0);
   }
   get spec(): StrikeSpec | null { return this.current; }
+  get ability(): RunningAbility | undefined {
+    const spec = this.current;
+    if (spec?.ability === undefined || this.state === 'idle' || this.state === 'cooldown') return undefined;
+    const elapsed = this.state === 'active' ? spec.windup + Math.min(this.elapsed, spec.active) : this.through;
+    return { id: spec.id, ...spec.ability, progress: Math.min(1, elapsed / Math.max(0.05, spec.windup + spec.active + spec.recover)) };
+  }
   get busy(): boolean { return this.state !== 'idle'; }
   ready(id: string): boolean { return !this.busy && (this.deadlines.get(id) ?? 0) <= this.clock; }
   advanceIdle(dt: number): void { if (!this.busy) this.clock += dt; }

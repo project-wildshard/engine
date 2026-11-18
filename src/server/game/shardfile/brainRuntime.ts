@@ -60,13 +60,23 @@ function prepareAbilities(host: SimHost, actor: AnimalSim, abilities: ResolvedCr
       active: ability.duration ?? strike.active,
       cooldown: ability.cooldown,
       independentCooldown: true,
+      ability: ability.clip === undefined ? {} : { clip: ability.clip },
       motion: { speed: ability.speed ?? speed },
       ...(ability.from === undefined ? {} : { from: ability.from }),
     };
     return { min, max, ability, spec };
   });
   return {
-    install: () => host.bindStrikeCatalogue(actor.entityId, options.map(row => row.spec)),
+    install: () => {
+      const removePlayback = actor.bindAbilityPlayback(() => host.strikes.get(actor.entityId)?.ability);
+      try {
+        const removeCatalogue = host.bindStrikeCatalogue(actor.entityId, options.map(row => row.spec));
+        return () => { removePlayback(); removeCatalogue(); };
+      } catch (error) {
+        removePlayback();
+        throw error;
+      }
+    },
     request: (target: BrainTarget): boolean => {
       if (host.strikes.get(actor.entityId)?.busy === true) return true;
       const at = actor.position, distance = Math.hypot(target.position.x - at.x, target.position.z - at.z);

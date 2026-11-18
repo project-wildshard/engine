@@ -39,12 +39,13 @@ export class ClipCreatureVolumes implements CreatureVolumePose {
   private refresh(): void {
     const a = this.actor, sampler = this.sampler, now = this.now();
     const idle = creatureClipName('idle', this.clipMap, sampler), die = creatureClipName('die', this.clipMap, sampler);
-    const attack = creatureClipName('attack', this.clipMap, sampler), reaction = creatureClipName('hit', this.clipMap, sampler);
+    const ability = a.runningAbility, progress = ability?.progress ?? a.attackPhase;
+    const attack = creatureClipName('attack', this.clipMap, sampler, ability), reaction = creatureClipName('hit', this.clipMap, sampler);
     const walk = creatureClipName('walk', this.clipMap, sampler), graze = creatureClipName('idle.graze', this.clipMap, sampler);
     let name = idle, time = now, loop = true;
     const hit = now - a.lastHitT / 1000;
     if (!a.alive && sampler.has(die)) { name = die; time = Math.max(0, a.deathTime); loop = false; }
-    else if (a.attackPhase >= 0 && sampler.has(attack)) { name = attack; time = a.attackPhase * this.attackSpan; loop = false; }
+    else if (progress >= 0 && sampler.has(attack)) { name = attack; time = progress * this.attackSpan; loop = false; }
     else if (hit >= 0 && sampler.has(reaction) && hit < sampler.duration(reaction)) { name = reaction; time = hit; loop = false; }
     else if (Math.hypot(a.speed, a.strafe) / a.scale > .15 && sampler.has(walk)) name = walk;
     else if (a.state === 'graze' && sampler.has(graze)) name = graze;

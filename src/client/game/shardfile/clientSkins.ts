@@ -14,6 +14,7 @@ import { macrotask } from '@wildshard/engine/boot/plan';
 import { InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
 import { is } from 'valibot';
 import type { ClipName } from '@wildshard/engine/anim/rig';
+import type { RunningAbility } from '@wildshard/engine/ai/strikes';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
 import { BipedRigPose } from '@wildshard/engine/entities/animalRig';
@@ -162,33 +163,33 @@ export class SkinDriver {
     for (const [name, clip] of skin.clips) if (clip.layers !== null) this.layers.set(name, bindSkinPoseLayers(clip.layers, ordered));
   }
   /** The clip the creature's state asks for: death, then the attack, the hit reaction, the gait, idle (grazing when it grazes). */
-  private choose(c: SkinDriveState): SkinClipState | null {
+  private choose(c: SkinDriveState, ability?: RunningAbility): SkinClipState | null {
     // a new blow raises the flinch (Animal.stagger / applyDamage); the reaction plays once from its start
     if (c.alive && c.flinch > this.flinch + 0.05) this.hitT = 0; else if (this.hitT >= 0) this.hitT += c.dt;
     this.flinch = c.flinch;
     if (this.hitT >= (this.skin.clips.get(this.name('hit'))?.duration ?? 0)) this.hitT = -1;
     if (!c.alive) return this.skin.clips.has(this.name('die')) ? 'die' : null;
-    if (c.attack >= 0 && this.skin.clips.has(this.name('attack'))) return 'attack';
+    if ((ability?.progress ?? c.attack) >= 0 && this.skin.clips.has(this.name('attack', ability))) return 'attack';
     if (this.hitT >= 0 && this.skin.clips.has(this.name('hit'))) return 'hit';
     if (Math.hypot(c.speed, c.strafe) / c.scale > 0.15 && this.skin.clips.has(this.name('walk'))) return 'walk';
     if (c.state === 'graze' && this.skin.clips.has(this.name('idle.graze'))) return 'idle.graze';
     return this.skin.clips.has(this.name('idle')) ? 'idle' : null;
   }
-  private name(state: SkinClipState): CreatureSkinClipName {
-    return creatureClipName(state, this.skin.clipMap, this.skin.clips);
+  private name(state: SkinClipState, ability?: RunningAbility): CreatureSkinClipName {
+    return creatureClipName(state, this.skin.clipMap, this.skin.clips, ability);
   }
   /** Pose this instance's bones for the frame. */
-  step(c: SkinDriveState, freshBase = false): void {
+  step(c: SkinDriveState, freshBase = false, ability?: RunningAbility): void {
     this.biped?.reset();
-    const state = this.choose(c);
+    const state = this.choose(c, ability);
     if (state === null) {
       if (this.biped !== undefined && c.alive) this.biped.walk(c.phase, Math.hypot(c.speed, c.strafe) / c.scale);
       return;
     }
-    const name = this.name(state), clip = this.skin.clips.get(name); if (clip === undefined) return;
+    const name = this.name(state, ability), clip = this.skin.clips.get(name); if (clip === undefined) return;
     this.since = state === this.state ? this.since + c.dt : 0; this.state = state;
     // one-shots from their trigger (the export sampled each from it), the walk from the gait phase, idles on the clock
-    const time = state === 'die' ? this.since : state === 'attack' ? c.attack * this.skin.attackSpan : state === 'hit' ? this.hitT : state === 'walk' ? c.phase * clip.duration : c.t;
+    const time = state === 'die' ? this.since : state === 'attack' ? (ability?.progress ?? c.attack) * this.skin.attackSpan : state === 'hit' ? this.hitT : state === 'walk' ? c.phase * clip.duration : c.t;
     const looping = state === 'walk' || state.startsWith('idle'), at = looping ? time % clip.duration : Math.min(time, clip.duration);
     // A native poser already rebuilt this frame's base; restoring last frame's
     // cached layer base here would freeze its otherwise untracked gait joints.
@@ -231,7 +232,7 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
       driver = new SkinDriver(select(c.animal.variant), c.bones, species.body?.skeleton);
       drivers.set(c.bones, driver);
     }
-    driver.step(c, quadruped);
+    driver.step(c, quadruped, c.animal.runningAbility);
   };
   return { id: row.id, species: species.id, kind: species.kind, rig: quadruped ? 'quadruped' : 'custom', fur: NO_FUR,
     rigContract: { skeleton: quadruped ? 'kit.quadruped' : skin.skeleton, sockets: [...skin.sockets],

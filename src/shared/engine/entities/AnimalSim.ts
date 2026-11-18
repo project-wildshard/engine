@@ -2,6 +2,7 @@ import type { HarvestDrop } from '@wildshard/format/harvestRows';
 import { Vector3, MathUtils } from 'three';
 import type { AnimalPoseLaw } from './animalPose';
 import { FlightMotion, type SpeciesFlight } from '../ai/flight';
+import type { RunningAbility } from '../ai/strikes';
 import type { Actor, DamageRequest, DamageDealt } from '../combat/pipeline';
 import type { AnimalDims, Rarity, VariantMods } from './species/registry';
 import { tap } from '../core/harnessTap';
@@ -128,6 +129,13 @@ export class AnimalSim {
     this.authoredLockPoints = points;
   }
   private strikePoints: CreatureLockPoints | undefined;
+  private readAbility: (() => RunningAbility | undefined) | undefined;
+  get runningAbility(): RunningAbility | undefined { return this.readAbility?.(); }
+  bindAbilityPlayback(read: () => RunningAbility | undefined): () => void {
+    if (this.readAbility !== undefined) throw new Error('Creature ability playback is already bound');
+    this.readAbility = read;
+    return () => { if (this.readAbility === read) this.readAbility = undefined; };
+  }
   bindStrikePoints(points: CreatureLockPoints): void {
     if (this.strikePoints !== undefined || points.names.length === 0) throw new Error('Incompatible creature strike points');
     this.strikePoints = points;
