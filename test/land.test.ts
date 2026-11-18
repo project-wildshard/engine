@@ -50,28 +50,38 @@ test('boundaries stays blocking and independent; J400 moves quarantine to report
 });
 
 test('the blocking memory ledger restores and saves its own verified Brotli parts', () => {
+  const producer = ciJob('memory-client-build');
   const ledger = ciJob('memory-ledger-guard');
-  const restore = ledger.indexOf('uses: actions/cache/restore@');
-  const build = ledger.indexOf('name: Build every production pin');
+  const native = ciJob('memory-footprint-guard');
+  const restore = producer.indexOf('uses: actions/cache/restore@');
+  const build = producer.indexOf('name: Build every production pin');
+  const archive = producer.indexOf('name: Archive the full pinned preview');
+  const save = producer.indexOf('uses: actions/cache/save@');
   const read = ledger.indexOf('name: Read or block on subsystem ledger bytes');
-  const save = ledger.indexOf('uses: actions/cache/save@');
   expect(restore).toBeGreaterThan(0);
   expect(build).toBeGreaterThan(restore);
+  expect(archive).toBeGreaterThan(build);
+  expect(save).toBeGreaterThan(archive);
+  for (const consumer of [ledger, native]) {
+    expect(consumer).toContain('needs: memory-client-build');
+    expect(consumer).toContain('name: memory-pinned-client');
+    expect(consumer).not.toContain('uses: actions/cache/save@');
+  }
+  const unpack = ledger.indexOf('name: Restore the pinned preview and install Chromium');
   const digest = ledger.indexOf('name: Record the served ledger Brotli part digests');
-  expect(digest).toBeGreaterThan(build);
+  expect(unpack).toBeGreaterThan(0);
+  expect(digest).toBeGreaterThan(unpack);
   expect(read).toBeGreaterThan(digest);
-  expect(read).toBeGreaterThan(build);
-  expect(save).toBeGreaterThan(read);
-  expect(ledger.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br\/1/gu)).toHaveLength(2);
-  expect(ledger).toContain('full-ledger-spawn-parts-br-v1-');
-  expect(ledger).toContain('$codec-$CODEC_INPUTS-');
-  expect(ledger).toContain('key=%s%s-parts-and-server');
-  expect(ledger).toContain('restore-keys: ${{ steps.ledger-codec.outputs.prefix }}');
+  expect(producer.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br\/1/gu)).toHaveLength(2);
+  expect(producer).toContain('full-ledger-spawn-parts-br-v1-');
+  expect(producer).toContain('$codec-$CODEC_INPUTS-');
+  expect(producer).toContain('key=%s%s-parts-and-server');
+  expect(producer).toContain('restore-keys: ${{ steps.ledger-codec.outputs.prefix }}');
   expect(ledger).toContain('tmp/memory-ledger/spawn-parts.sha256');
-  expect(ledger).toContain("steps.ledger-client.outcome == 'success'");
-  expect(ledger).toContain("steps.ledger-parts-pruned.outcome == 'success'");
-  expect(ledger).toContain("steps.ledger-parts.outputs.cache-hit != 'true'");
-  expect(ledger).not.toContain('ring1-spawn-parts-br-');
+  expect(producer).toContain("steps.ledger-client.outcome == 'success'");
+  expect(producer).toContain("steps.ledger-parts-pruned.outcome == 'success'");
+  expect(producer).toContain("steps.ledger-parts.outputs.cache-hit != 'true'");
+  expect(producer).not.toContain('ring1-spawn-parts-br-');
   expect(ledger).not.toMatch(/^ {4}continue-on-error:/mu);
   const upload = ledger.indexOf('- if: always()', read);
   expect(upload).toBeGreaterThan(read);
@@ -92,9 +102,8 @@ test('the ledger cache preserves browser and server packs and records both diges
     mkdirSync(join(spawnRoot, folder), {recursive: true});
     writeFileSync(join(spawnRoot, folder, `${hash.slice(0, 16)}.pack.br`), hash);
   }
-  const job = ciJob('memory-ledger-guard');
-  const run = (name: string) => {
-    const step = job.split(`      - name: ${name}\n`)[1]?.split(/\n {6}- /u)[0];
+  const run = (job: string, name: string) => {
+    const step = ciJob(job).split(`      - name: ${name}\n`)[1]?.split(/\n {6}- /u)[0];
     const shell = step?.split('\n        run: |\n')[1];
     if (shell === undefined) throw new Error(`Missing shell step ${name}`);
     const script = shell.replace('cache="$HOME/.cache/wildshard/gen/spawn-parts-br/1"', 'cache="$LEDGER_FIXTURE_CACHE"');
@@ -107,16 +116,16 @@ test('the ledger cache preserves browser and server packs and records both diges
   const serverFolder = join(spawnRoot, 'server');
   const hiddenServer = join(root, 'missing-server');
   renameSync(serverFolder, hiddenServer);
-  expect(run(prune).status).toBe(1);
+  expect(run('memory-client-build', prune).status).toBe(1);
   expect(readdirSync(cache).sort()).toEqual([`${browser}.br`, `${server}.br`, `${stale}.br`]);
   const digestStep = 'Record the served ledger Brotli part digests';
-  expect(run(digestStep).status).not.toBe(0);
+  expect(run('memory-ledger-guard', digestStep).status).not.toBe(0);
   expect(readdirSync(join(root, 'tmp/memory-ledger'))).not.toContain('spawn-parts.sha256');
   renameSync(hiddenServer, serverFolder);
-  const pruned = run(prune);
+  const pruned = run('memory-client-build', prune);
   expect(pruned.status, pruned.stderr).toBe(0);
   expect(readdirSync(cache).sort()).toEqual([`${browser}.br`, `${server}.br`]);
-  const recorded = run(digestStep);
+  const recorded = run('memory-ledger-guard', digestStep);
   expect(recorded.status, recorded.stderr).toBe(0);
   const manifest = readFileSync(join(root, 'tmp/memory-ledger/spawn-parts.sha256'), 'utf8');
   expect(manifest.trim().split('\n').map(line => line.split('  ')[1])).toEqual([

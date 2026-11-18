@@ -56,8 +56,12 @@ hosted artifact. Its loading peaks were 120,245,465, 148,047,873 and
 SwiftShader could not reach its control checkpoint.
 
 The separate five-run Pine rig replay also passed with 972,417,596 B
-playing and 1,447,250,243 B loading. Placed zones use online JSON. Desert Ruin and Thin Ice have hidden
-placements outside the world grid, so their enforced readings use
-the supported standalone boot. The selector reads the preview's
-actual grid. The existing Ubuntu ledger keeps its standalone
-Chromium instrument.
+playing and 1,447,250,243 B loading. The full qualification passed all
+26 armed pins across 130 measured boots. Far Reach had the highest
+playing and loading readings among the 22 light zones at 769,277,797
+and 1,050,698,788 B. The preview's grid has no cell for Desert Ruin or
+Thin Ice, so their five-run standalone playing and loading readings
+were 594,716,039 and 851,164,947 B for Desert Ruin, and 578,591,866 and
+787,308,423 B for Thin Ice. The existing Ubuntu ledger uses standalone
+Chromium. The raw native readings and computed table are in the lane's
+`j426-2026-11-18/pinned-native` receipt directory.
