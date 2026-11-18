@@ -37,3 +37,26 @@ test('the worker reads the bundle as the bundler wrote it, never public copies o
   put('dist/.vite/chunk-modules.json', '{}');
   expect(Object.keys(writtenBundle(join(root, 'dist'), root, join(root, 'public'))).sort()).toEqual(Object.keys(first).sort());
 });
+
+test('a rebake excludes carried-only code while retaining chunks shared with the current deployment', () => {
+  const current = 'b/current/entry-aaaaaaaa.js', shared = 'b/c/shared-bbbbbbbb.js';
+  const old = 'b/older/entry-cccccccc.js', oldShared = 'b/c/older-dddddddd.js';
+  const font = 'assets/current-font-eeeeeeee.woff2';
+  put('rebake/.vite/manifest.json', JSON.stringify({
+    'index.html': { file: current, isEntry: true },
+    [shared]: { file: shared },
+  }));
+  put(`rebake/${font}`, 'current font');
+  for (const path of [current, shared, old, oldShared]) put(`rebake/${path}`, 'export const held = true;');
+  put('rebake/deploy-chunks.json', JSON.stringify({
+    format: 2,
+    builds: [
+      { build: 'current', content: true, files: [current, shared].map(path => ({ path, bytes: 25 })) },
+      { build: 'older', files: [old, oldShared, shared, font].map(path => ({ path, bytes: 25 })) },
+    ],
+  }));
+
+  const rebaked = writtenBundle(join(root, 'rebake'), root, join(root, 'public'));
+  expect(Object.keys(rebaked).filter(path => path.startsWith('b/')).sort()).toEqual([shared, current]);
+  expect(rebaked[font]?.type).toBe('asset');
+});

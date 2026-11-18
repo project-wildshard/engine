@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { carriedPaths } from '../page-size.mjs';
+import { CHUNK } from './previousDeploy.mjs';
 
 /** Files build-app writes into the bundle folder after the bundler: never part of the emitted bundle. */
-const LATER = new Set(['build-flags.json', '.vite/chunk-modules.json']);
+const LATER = new Set(['build-flags.json', '.vite/chunk-modules.json', 'deploy-chunks.json']);
 export interface EmittedFile {
   readonly type: 'chunk' | 'asset'; readonly code?: string; readonly source?: Uint8Array; readonly imports?: readonly string[];
   readonly isEntry?: boolean; readonly facadeModuleId?: string | null; readonly modules?: Readonly<Record<string, unknown>>;
@@ -33,11 +35,15 @@ export function writtenBundle(outDir: string, root: string, publicDir = join(roo
     }
     else originals.set(row.file, [...originals.get(row.file) ?? [], key]);
   }
+  // The staging rebake happens after retention copied older code into the output. Only current code belongs in
+  // its precache. Legacy graphs also listed art and fonts that the current code-only graph may leave implicit.
+  const carried = carriedPaths(outDir)?.paths;
   const bundle: Record<string, EmittedFile> = {};
   for (const entry of readdirSync(outDir, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const path = join(entry.parentPath, entry.name), name = relative(outDir, path).replaceAll('\\', '/');
     if (LATER.has(name) || name.startsWith('shardfiles/') || existsSync(join(publicDir, name))) continue;
+    if (CHUNK.test(name) && carried?.has(name) === true) continue;
     const bytes = readFileSync(path), chunk = chunks.get(name);
     bundle[name] = chunk === undefined ? { type: 'asset', source: new Uint8Array(bytes), originalFileNames: originals.get(name) ?? [] } : {
       type: 'chunk', code: bytes.toString('utf8'), imports: (chunk.row.imports ?? []).map(key => manifest[key]?.file ?? key),
