@@ -75,6 +75,10 @@ function readsVertexColour(nodes: Readonly<Record<string, GraphNode>>): boolean 
   return Object.values(nodes).some(node => node.op === 'vertexColour' || node.op === 'vertexColourAlpha' || (node.body !== undefined && readsVertexColour(node.body.nodes)));
 }
 
+function readsObjectOrigin(nodes: Readonly<Record<string, GraphNode>>): boolean {
+  return Object.values(nodes).some(node => node.op === 'objectOrigin' || (node.body !== undefined && readsObjectOrigin(node.body.nodes)));
+}
+
 /** the compiled materials that own their graph's shadow depth (their clones share it) */
 const depthOwners = new WeakSet<THREE.Material>();
 
@@ -84,6 +88,8 @@ export class GraphShaderMaterial extends THREE.ShaderMaterial {
   /** the tile grid codec this program decodes positions with (null: it reads no model-space position): its own step and
    *  origin follow the drawn object, re-uploaded only when they change (RM8.1e) */
   codec: ClassicCodec | null = null;
+  /** The compiled graph can draw a mesh whose local transform decodes a static position grid. */
+  positionGridCompatible = false;
   /** a vertex-moving caster's shadow depth from the graph's own vertex stage (null: the stock depth), shared by its clones;
    *  each variant casts with its own copy (`classicShadowDepth`) */
   shadowDepth: GraphShaderMaterial | null = null;
@@ -182,6 +188,7 @@ export class GraphShaderMaterial extends THREE.ShaderMaterial {
     source.uniforms = {};
     try { super.copy(source); } finally { source.uniforms = uniforms; }
     this.codec = source instanceof GraphShaderMaterial && source.codec !== null ? new ClassicCodec() : null;
+    this.positionGridCompatible = source instanceof GraphShaderMaterial && source.positionGridCompatible;
     this.shadowDepth = source instanceof GraphShaderMaterial ? source.shadowDepth : null;
     this.instanceColour = source instanceof GraphShaderMaterial && source.instanceColour;
     this.readsVertexColour = source instanceof GraphShaderMaterial && source.readsVertexColour;
@@ -296,6 +303,7 @@ function shaderMaterial(glsl: GraphGlsl, opts: GraphShaderOptions): GraphShaderM
   m.gateCascades();
   m.name = outline ? 'graph:outline' : `graph:${ir.kind}`;
   if (readsCodec(shaders.vertexShader)) m.codec = new ClassicCodec();
+  m.positionGridCompatible = m.codec === null && !readsObjectOrigin(ir.nodes);
   m.instanceColour = readsInstanceColour(ir.nodes);
   m.readsVertexColour = readsVertexColour(ir.nodes);
   m.defaultAttributeValues = attributeDefaults(glsl, m);

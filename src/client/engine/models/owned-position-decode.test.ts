@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute, Matrix4, Mesh, MeshBasicMaterial, Vector3 } from 'three';
-import { identitySpaceGeometry } from './ownedGeometry';
+import { copyOwnedDrawGeometry, copyOwnedGeometry, identitySpaceGeometry, modelSpaceDrawPosition, restoreOwnedGeometryGrid } from './ownedGeometry';
 
 /** The original two-pass result: the Float32 store between normalization and
  * matrix multiplication is part of the shipped decoder's numerical contract. */
@@ -17,6 +17,27 @@ function original(mesh: Mesh): BufferGeometry {
   }
   return geometry;
 }
+
+test('a draw grid keeps packed SNORM positions while CPU copies keep the original model-space values', () => {
+  const raw = new Int16Array([7, -32768, 2, 32767, 9, 16384, -12345, 0]);
+  const source = new BufferGeometry().setAttribute('position', new InterleavedBufferAttribute(new InterleavedBuffer(raw, 4), 3, 1, true));
+  const material = new MeshBasicMaterial(), mesh = new Mesh(source, material);
+  mesh.position.set(20, -2, 4); mesh.scale.setScalar(7); mesh.updateMatrixWorld(true);
+  restoreOwnedGeometryGrid(source, mesh.matrixWorld);
+  const draw = copyOwnedDrawGeometry(source);
+  if (draw === undefined) throw new Error('Expected packed positions');
+  expect(draw.position.normalized).toBe(true);
+  expect(draw.position.array).toEqual(new Int16Array([-32768, 2, 32767, 16384, -12345, 0]));
+  const cpu = copyOwnedGeometry(source), reference = original(mesh), reader = modelSpaceDrawPosition(draw);
+  expect(cpu.getAttribute('position').array).toEqual(reference.getAttribute('position').array);
+  for (let i = 0; i < draw.position.count; i++) {
+    const gpu = new Vector3().fromBufferAttribute(draw.position, i).applyMatrix4(draw.grid);
+    expect(new Vector3().fromBufferAttribute(reader, i)).toEqual(new Vector3().fromBufferAttribute(reference.getAttribute('position'), i));
+    expect(gpu.distanceTo(new Vector3().fromBufferAttribute(cpu.getAttribute('position'), i))).toBeLessThan(0.00001);
+  }
+  expect((source.getAttribute('position') as InterleavedBufferAttribute).data.array).toBe(raw);
+  material.dispose(); source.dispose(); cpu.dispose(); reference.dispose(); draw.geometry.dispose();
+});
 
 test.each([1, 0.00037, 3.141592653589793].flatMap(scale => [false, true].flatMap(interleaved => [false, true].flatMap(tangent => [3, 4].map(normalWidth => ({ scale, interleaved, tangent, normalWidth }))))))(
   'fused grid decode retains original channels/bounds ($scale, stride $interleaved, tangent $tangent, normal $normalWidth)', ({ scale, interleaved, tangent, normalWidth }) => {

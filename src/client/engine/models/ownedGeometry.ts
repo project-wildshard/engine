@@ -1,4 +1,5 @@
 import { Box3, BufferAttribute, BufferGeometry, Float16BufferAttribute, InterleavedBufferAttribute, type TypedArray, Material, Mesh, Matrix3, type Matrix4, Vector3, type Object3D } from 'three';
+import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
 import { halfAttribute, nativeWholeGeometry } from './nativeGeometry';
 
 function isGeometryMesh(node: Object3D): node is Mesh {
@@ -9,13 +10,15 @@ function isGeometryMesh(node: Object3D): node is Mesh {
 
 /** iPhone downloads I3: a phone-tier model whose positions are 16-bit integers on its own grid (KHR_mesh_quantization):
  *  its node carries only the grid's uniform scale and translation (compactPhoneGlb), no rotation. */
-function gridQuantized(mesh: Mesh): boolean {
-  const position = mesh.geometry.getAttribute('position'), e = mesh.matrixWorld.elements;
+function gridQuantized(geometry: BufferGeometry, matrix: Matrix4): boolean {
+  const position = geometry.getAttribute('position'), e = matrix.elements;
+  if (position === undefined || position.itemSize !== 3) return false;
   // a padded 8-byte stride reads back interleaved; either way the storage is normalized Int16
   const array: unknown = 'isInterleavedBufferAttribute' in position ? position.data.array : position.array;
   if (!(array instanceof Int16Array) || !position.normalized) return false;
   const scale = e[0];
-  return scale !== undefined && scale > 0 && e[5] === scale && e[10] === scale && e[15] === 1
+  return scale !== undefined && Number.isFinite(scale) && scale > 0 && e[5] === scale && e[10] === scale && e[15] === 1
+    && [e[12], e[13], e[14]].every(Number.isFinite)
     && [1, 2, 3, 4, 6, 7, 8, 9, 11].every(i => e[i] === 0);
 }
 /** Float positions back in the model's own space: the grid scale and translation baked in, the node left out (every
@@ -79,7 +82,7 @@ function restoreCompactNormal(normal: CompactNormal, matrix: Matrix4): void {
     array[at] = Math.round(point.x * 127); array[at + 1] = Math.round(point.y * 127); array[at + 2] = Math.round(point.z * 127);
   }
 }
-function dequantizeIntoSpace(geometry: BufferGeometry, mesh: Mesh): void {
+function dequantizeIntoSpace(geometry: BufferGeometry, matrix: Matrix4): void {
   const position = geometry.getAttribute('position'), out = new Float32Array(position.count * 3), point = new Vector3();
   const box = geometry.boundingBox, sphere = geometry.boundingSphere;
   const nativeGetters = position instanceof InterleavedBufferAttribute ? interleavedGetters : positionGetters;
@@ -107,7 +110,7 @@ function dequantizeIntoSpace(geometry: BufferGeometry, mesh: Mesh): void {
     const y = numericReads ? source[at + 1] : undefined, z = numericReads ? source[at + 2] : undefined;
     if (x === undefined || y === undefined || z === undefined) point.set(Math.fround(position.getX(i)), Math.fround(position.getY(i)), Math.fround(position.getZ(i)));
     else point.set(Math.fround(Math.max(x / 32767, -1)), Math.fround(Math.max(y / 32767, -1)), Math.fround(Math.max(z / 32767, -1)));
-    point.applyMatrix4(mesh.matrixWorld);
+    point.applyMatrix4(matrix);
     out[i * 3] = point.x; out[i * 3 + 1] = point.y; out[i * 3 + 2] = point.z;
     if (scanBounds) {
       const px = Math.fround(point.x), py = Math.fround(point.y), pz = Math.fround(point.z);
@@ -124,9 +127,9 @@ function dequantizeIntoSpace(geometry: BufferGeometry, mesh: Mesh): void {
   // of the retained geometry contract. No tangent/custom path is moved here.
   if (normal !== undefined) geometry.setAttribute('normal', new BufferAttribute(new Float32Array(0), 3));
   try {
-    geometry.applyMatrix4(mesh.matrixWorld);
+    geometry.applyMatrix4(matrix);
     if (normal !== undefined) {
-      restoreCompactNormal(normal, mesh.matrixWorld);
+      restoreCompactNormal(normal, matrix);
       geometry.setAttribute('normal', normal.attribute); normal.attribute.needsUpdate = true;
     }
   } finally {
@@ -156,9 +159,9 @@ function dequantizeIntoSpace(geometry: BufferGeometry, mesh: Mesh): void {
  *  to its own plain Float32 attribute, for readers that take only ordinary Float32 meshes (the rest geometry pools); null
  *  for any other mesh, which those readers keep as it is. */
 export function identitySpaceGeometry(mesh: Mesh): BufferGeometry | null {
-  if (!gridQuantized(mesh)) return null;
+  if (!gridQuantized(mesh.geometry, mesh.matrixWorld)) return null;
   const geometry = mesh.geometry.clone();
-  dequantizeIntoSpace(geometry, mesh);
+  dequantizeIntoSpace(geometry, mesh.matrixWorld);
   for (const [name, attribute] of Object.entries(geometry.attributes)) {
     if (name === 'position' || (attribute instanceof BufferAttribute && attribute.array instanceof Float32Array && !attribute.normalized)) continue;
     const out = new Float32Array(attribute.count * attribute.itemSize);
@@ -166,6 +169,62 @@ export function identitySpaceGeometry(mesh: Mesh): BufferGeometry | null {
     geometry.setAttribute(name, new BufferAttribute(out, attribute.itemSize));
   }
   return geometry;
+}
+
+/** Render-only copies can carry the admitted GLB grid independently of CPU model-space copies. */
+const drawGrids = new WeakMap<BufferGeometry, Matrix4>();
+export function ownedGeometryGrid(geometry: BufferGeometry): Matrix4 | undefined { return drawGrids.get(geometry)?.clone(); }
+export function restoreOwnedGeometryGrid(geometry: BufferGeometry, grid: Matrix4): void {
+  if (gridQuantized(geometry, grid)) drawGrids.set(geometry, grid.clone());
+}
+
+/** CPU consumers still receive the admitted model's original identity-space values. */
+export function copyOwnedGeometry(source: BufferGeometry): BufferGeometry {
+  const copy = source.clone(), grid = drawGrids.get(source);
+  if (grid !== undefined) dequantizeIntoSpace(copy, grid);
+  return copy;
+}
+
+export interface OwnedDrawGeometry {
+  readonly geometry: BufferGeometry;
+  readonly grid: Matrix4;
+  readonly position: BufferAttribute;
+}
+/** Clone a static draw without a Float32 position intermediate. Keep the
+ * original compact-normal transform and the independent mesh grid. */
+export function copyOwnedDrawGeometry(source: BufferGeometry): OwnedDrawGeometry | undefined {
+  const grid = drawGrids.get(source);
+  if (grid === undefined || source.hasAttribute('aSway') || source.hasAttribute('tangent')) return undefined;
+  const geometry = source.clone(), packed = geometry.getAttribute('position');
+  const interleaved = packed instanceof InterleavedBufferAttribute, array = interleaved ? packed.data.array : packed.array;
+  if (!(array instanceof Int16Array)) { geometry.dispose(); return undefined; }
+  let position: BufferAttribute;
+  if (interleaved) {
+    const words = ownedArray(Int16Array, packed.count * 3, { owner: 'engine/owned-geometry', asset: 'packed-position', kind: 'geometry-cpu' });
+    for (let i = 0, src = packed.offset; i < words.length; i += 3, src += packed.data.stride) {
+      words[i] = array[src] ?? 0; words[i + 1] = array[src + 1] ?? 0; words[i + 2] = array[src + 2] ?? 0;
+    }
+    position = new BufferAttribute(words, 3, true);
+    geometry.setAttribute('position', position);
+  } else position = packed;
+  geometry.boundingBox = null; // The scene's build reads this in its original model space.
+  const normal = geometry.getAttribute('normal');
+  normal?.applyNormalMatrix(new Matrix3().getNormalMatrix(grid));
+  return { geometry, grid: grid.clone(), position };
+}
+
+/** Tile assignment reads the pre-existing model-space Float32 values. A
+ * temporary reader preserves their rounding without allocating the array. */
+export function modelSpaceDrawPosition(draw: OwnedDrawGeometry): BufferAttribute {
+  const { position, grid } = draw, e = grid.elements, scale = e[0];
+  const offset = [e[12], e[13], e[14]] as const;
+  const read = (index: number, channel: 0 | 1 | 2): number =>
+    Math.fround(Math.fround(position.getComponent(index, channel)) * scale + offset[channel]);
+  const reader = new BufferAttribute(position.array, 3, true);
+  reader.getX = index => read(index, 0);
+  reader.getY = index => read(index, 1);
+  reader.getZ = index => read(index, 2);
+  return reader;
 }
 
 const raw = (attribute: BufferAttribute): Uint8Array => new Uint8Array(attribute.array.buffer, attribute.array.byteOffset, attribute.array.byteLength);
@@ -222,9 +281,11 @@ export interface OwnedGeometry {
   take: () => BufferGeometry;
 }
 
-/** A single identity-space, unquantized baked triangle mesh. Custom GLB channels map back to authored shader names. */
-export function createOwnedGeometry(url: string, channels: Readonly<Record<string, string>> = {}): OwnedGeometry {
+/** Identity-space baked triangles by default. A draw-grid intake retains the original normalized positions and node transform. */
+export function createOwnedGeometry(url: string, channels: Readonly<Record<string, string>> = {}, keepDrawGrid = false): OwnedGeometry {
   let template: BufferGeometry | undefined, pending: Promise<void> | undefined;
+  const transformed = new Set(['position', 'normal', 'tangent']);
+  const canKeepGrid = keepDrawGrid && Object.entries(channels).every(([from, to]) => !transformed.has(from) && !transformed.has(to));
   const load = async (bytes?: Uint8Array): Promise<void> => {
     const { prepareRigLoader } = await import('../anim/rig');
     let input = bytes;
@@ -240,13 +301,17 @@ export function createOwnedGeometry(url: string, channels: Readonly<Record<strin
       const [mesh] = meshes;
       if (mesh === undefined || meshes.length !== 1) throw new Error(`Baked model needs one mesh: ${url}`);
       gltf.scene.updateMatrixWorld(true);
-      const quantized = gridQuantized(mesh);
+      const quantized = gridQuantized(mesh.geometry, mesh.matrixWorld);
       if (!quantized && mesh.matrixWorld.elements.some((value, i) => value !== (i % 5 === 0 ? 1 : 0))) throw new Error(`Baked model needs identity space: ${url}`);
       // The parser and this intake are the only owners of this single mesh.
       // Borrowed BufferGeometry input still copies in load(); private GLB
       // attributes can pass directly into the intake instead of doubling them.
       const geometry = mesh.userData['nativeAttributes'] === undefined ? mesh.geometry : nativeWholeGeometry(mesh, 'take');
-      if (quantized) dequantizeIntoSpace(geometry, mesh);
+      if (quantized) {
+        if (canKeepGrid && mesh.userData['nativeAttributes'] === undefined && Object.keys(geometry.morphAttributes).length === 0
+          && !geometry.hasAttribute('skinIndex') && !geometry.hasAttribute('skinWeight')) restoreOwnedGeometryGrid(geometry, mesh.matrixWorld);
+        else dequantizeIntoSpace(geometry, mesh.matrixWorld);
+      }
       const index = geometry.getIndex();
       // The deterministic GLB writer emits identity indices for an authored triangle soup; restore its original draw.
       if (mesh.userData['nativeAttributes'] === undefined && index !== null && index.count === geometry.getAttribute('position').count && index.array.every((value, i) => value === i)) geometry.setIndex(null);
@@ -289,6 +354,6 @@ export function createOwnedGeometry(url: string, channels: Readonly<Record<strin
       template = geometry; pending = Promise.resolve();
     },
     take: () => { if (template === undefined) throw new Error(`Baked model was not loaded: ${url}`); const geometry = template; template = undefined; pending = undefined; return geometry; },
-    copy: () => { if (template === undefined) throw new Error(`Baked model was not loaded: ${url}`); return template.clone(); },
+    copy: () => { if (template === undefined) throw new Error(`Baked model was not loaded: ${url}`); return copyOwnedGeometry(template); },
   };
 }

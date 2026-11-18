@@ -3,7 +3,7 @@ import type { App } from '@wildshard/engine/app/app';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { forgetWhenDisposed } from '@wildshard/engine/app/cachedAssets';
-import { createOwnedGeometry } from '@wildshard/engine/models/ownedGeometry';
+import { copyOwnedDrawGeometry, copyOwnedGeometry, createOwnedGeometry, ownedGeometryGrid, restoreOwnedGeometryGrid, type OwnedDrawGeometry } from '@wildshard/engine/models/ownedGeometry';
 import { TIER } from '@wildshard/engine/core/tier';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { PreparationReads } from './preparationReads';
@@ -16,10 +16,13 @@ interface Source {
   readonly file: string;
   readonly segments?: readonly string[];
   readonly attributes?: Readonly<Record<string, string>>;
+  /** Internal: a static-scene consumer has a use for the original draw grid. */
+  readonly compactDraw?: boolean;
 }
 /** A construction lease lends only independent mutable copies; completion releases its source claim. */
 export interface WorldSceneGeometry {
   readonly copy: () => BufferGeometry;
+  readonly draw: () => OwnedDrawGeometry | undefined;
   readonly done: () => void;
 }
 const templates = new WeakMap<Assets, Map<string, BufferGeometry>>();
@@ -37,11 +40,12 @@ function lease(owner: Scope, assets: Assets, source: BufferGeometry): WorldScene
     geometry = undefined; forget(); release();
   };
   forget = owner.capture('disposers', done);
-  return { done, copy: () => {
+  const current = (): BufferGeometry => {
     requireLive(owner);
     if (geometry === undefined) throw new Error('World scene geometry construction has finished');
-    return geometry.clone();
-  } };
+    return geometry;
+  };
+  return { done, copy: () => copyOwnedGeometry(current()), draw: () => copyOwnedDrawGeometry(current()) };
 }
 
 /** Cache only completed immutable GLB geometry under its admitted addresses and decoder profile.
@@ -53,7 +57,7 @@ function templateKey(product: Pick<ShardFolder, 'url'>, row: Source, revisit: bo
   // Independent renames commute; chained or overwritten destinations keep the decoder's authored order.
   const destinations = ordered.map(([, to]) => to);
   const orderedAliases = new Set(destinations).size !== destinations.length || destinations.some(to => Object.hasOwn(row.attributes ?? {}, to));
-  return JSON.stringify([url, segments, TIER, channels, orderedAliases ? ordered : null, revisit]);
+  return JSON.stringify([url, segments, TIER, channels, orderedAliases ? ordered : null, revisit, ...(row.compactDraw === true ? ['draw-grid-v1'] : [])]);
 }
 /** Whether `row` already has a completed template under `assets` (a read would reuse it and read no bytes). */
 export function cachedWorldSceneGeometry(product: Pick<ShardFolder, 'url'>, row: Source, assets: Assets, reuse: GeometryReuse = {}): boolean { return templates.get(assets)?.has(templateKey(product, row, reuse.revisit === true)) === true; }
@@ -70,16 +74,17 @@ export async function readWorldSceneGeometry(owner: Scope, product: GeometryFold
   const ready = memo.get(key);
   if (ready !== undefined) return lease(owner, assets, ready);
   const saved = product.shardfile === undefined ? null : await readHomeBuildGeometry(product.shardfile, `owned:${key}`);
-  const restored = saved?.size === 1 ? saved.get('model')?.geometry : undefined;
+  const cached = saved?.size === 1 ? saved.get('model') : undefined, restored = cached?.geometry;
   if (restored === undefined && saved !== null) for (const view of saved.values()) view.geometry.dispose();
   if (owner.disposed || owner.disposing) restored?.dispose();
   requireLive(owner);
   let geometry: BufferGeometry;
-  if (restored !== undefined) {
-    geometry = restored;
+  if (cached !== undefined) {
+    if (row.compactDraw === true) restoreOwnedGeometryGrid(cached.geometry, cached.matrix);
+    geometry = cached.geometry;
   }
   else {
-    const intake = createOwnedGeometry(url, row.attributes);
+    const intake = createOwnedGeometry(url, row.attributes, row.compactDraw === true);
     // All segments are independently verified product files. Start them with the
     // primary instead of waiting one extra transport turn for that first file.
     // Drain started reads before a refusal can release the caller's input lease.
@@ -109,7 +114,7 @@ export async function readWorldSceneGeometry(owner: Scope, product: GeometryFold
     const held = lease(owner, assets, geometry);
     memo.set(key, geometry);
     forgetWhenDisposed(geometry, memo, key, geometry); // its listener holds no product or owner of this reader
-    if (restored === undefined && product.shardfile !== undefined) void saveHomeBuildGeometry(product.shardfile, `owned:${key}`, new Map([['model', { geometry, matrix: new Matrix4() }]]));
+    if (restored === undefined && product.shardfile !== undefined) void saveHomeBuildGeometry(product.shardfile, `owned:${key}`, new Map([['model', { geometry, matrix: ownedGeometryGrid(geometry) ?? new Matrix4() }]]));
     return held;
   } catch (error) {
     if (asset !== undefined) assets.evictCached(asset); else if (temporary) geometry.dispose();

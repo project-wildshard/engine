@@ -201,6 +201,9 @@ export function bakeAO(geo: THREE.BufferGeometry, o: AOOptions = {}): void {
 // ── material ──────────────────────────────────────────────────────────────────────────────────────
 
 const materials = new WeakMap<Sky, Map<string, THREE.MeshStandardMaterial>>();
+const classicKitMaterials = new WeakSet<THREE.Material>();
+/** The built-in kit shader can draw a static packed mesh without authored local-space effects. */
+export function isClassicLowPolyMaterial(material: THREE.Material): boolean { return classicKitMaterials.has(material); }
 const borrowedMaterials = new WeakMap<Sky, Map<string, { readonly material: THREE.Material }[]>>();
 
 /** Bind a borrowed kit material while scope lives. Newest live binding wins;
@@ -265,6 +268,7 @@ export function lowPolyMaterial(sky: Sky, variant = 'default', init?: (m: THREE.
     init?.(m);
     sky.setupMaterial(m);
     bySky.set(variant, m);
+    classicKitMaterials.add(m);
   }
   return m;
 }

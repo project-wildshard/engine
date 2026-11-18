@@ -12,10 +12,12 @@ import { prepareSceneSources, sceneModelSource, sceneBakeSource, sceneSourceDecl
 import { drawSceneRows, prepareSceneDrawRows } from './sceneDraws';
 import { admitWorldSceneStepSources, worldSceneStepSources } from './worldSceneStepSources';
 import { TIER, TIER_CONFIG } from '@wildshard/engine/core/tier';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { SceneHandles } from './sceneHandles';
 import { assertSceneProfile } from './sceneProfile';
 import { BufferAttribute, BufferGeometry, InstancedBufferAttribute, InstancedMesh, type Material, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, type Object3D, Sphere, Vector3 } from 'three';
 import { sharedModelContext } from '@wildshard/engine/models/model';
+import { modelSpaceDrawPosition, type OwnedDrawGeometry } from '@wildshard/engine/models/ownedGeometry';
 import { bindWorldSceneModelSources, defineWorldSceneCatalogue } from '../models/worldSceneCatalogue';
 import { defineSpecimenCatalogue,prepareSpecimenCatalogue } from '../models/specimenCatalogue';
 import { admitWorldSceneSurface, prepareWorldSceneSurfaces, worldSceneSurfaceMaterial } from './worldSceneSurface';
@@ -33,7 +35,7 @@ import { sceneFileKey, type WorldSceneWeld } from '@wildshard/format/worldSceneW
 import { parseWorldScenePlacement, type WorldScenePlacementRow } from '@wildshard/format/worldScenePlacement';
 import { poseOf, placeCollider, readColliderRows } from '@wildshard/engine/models/colliders';
 import { readWorldSceneGeometries, readWorldSceneGeometry, type WorldSceneGeometry } from './worldSceneGeometry';
-import { lowPolyLookMaterial } from '@wildshard/engine/world/lowpolyKit';
+import { isClassicLowPolyMaterial, lowPolyLookMaterial } from '@wildshard/engine/world/lowpolyKit';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { buildYield, workSlice } from '@wildshard/engine/core/workSlice';
 import { presenting } from '@wildshard/engine/core/framePacing';
@@ -67,7 +69,33 @@ function requireSceneOwner(owner: Scope): void {
 }
 interface Library {
   readonly geometry: (id: string) => BufferGeometry | null;
+  readonly draw?: (id: string) => OwnedDrawGeometry | undefined;
   readonly models?: Pick<ModelLibrary<string, string>, 'painted'>;
+}
+type SceneStep = WorldScenesSection['steps'][number];
+type SceneMeshNode = Extract<WorldSceneRecipe['scene']['nodes'][number], { kind: 'mesh' }>;
+/** A bounded leaf mesh has no children or authored transform to reinterpret. */
+function staticGridParts(step: SceneStep, recipe: WorldSceneRecipe): SceneMeshNode[] {
+  const bounded = new Set(step.bounds.map(row => row.part));
+  return recipe.scene.nodes.filter((node): node is SceneMeshNode => node.kind === 'mesh' && bounded.has(node.id) && node.children.length === 0
+    && node.instances === undefined && node.position === undefined && node.rotation === undefined && node.scale === undefined
+    && !step.registry.some(row => row.part === node.id) && !step.instanceAttributes.some(row => row.part === node.id)
+    && recipe.scene.nodes.every(other => other === node || other.kind !== 'mesh' || other.geometry !== node.geometry));
+}
+
+function gridMaterialSlot(step: SceneStep, recipe: WorldSceneRecipe, node: SceneMeshNode): string | undefined {
+  const material = recipe.scene.materials.find(row => row.id === node.material);
+  return material?.kind === 'port' ? step.materials[material.source] : undefined;
+}
+function bindDrawGrid(mesh: Mesh, draw: OwnedDrawGeometry): void {
+  const { geometry } = draw;
+  // Tiling and authored bounds were built with the original model-space positions.
+  const inverse = draw.grid.clone().invert();
+  geometry.boundingBox?.applyMatrix4(inverse); geometry.boundingSphere?.applyMatrix4(inverse);
+  geometry.setAttribute('position', draw.position);
+  mesh.position.setFromMatrixPosition(draw.grid);
+  mesh.scale.setScalar(draw.grid.elements[0] ?? 1);
+  mesh.updateMatrixWorld(true);
 }
 /** Material preparations ahead of their original ordered publication cursor. */
 const MODEL_READ_AHEAD = 4;
@@ -330,6 +358,17 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
   const coldOnly = (ref: { readonly library: string }): boolean => { const row = libraryRows.get(ref.library); return row?.kind === 'whole' && (row.load === 'explorer' || row.load === 'refine'); };
   const modelGeometry = residentModels === undefined ? [] : worldSceneModelResources(residentModels).geometry.filter(ref => !coldOnly(ref));
   const activeSteps = section.steps.filter(step => step.load !== 'explorer' && (step.cube === undefined || step.cube === (ctx.cube === null ? 'standalone' : 'cell')));
+  const gridSources = new Set<string>();
+  if (TIER === 'phone') for (const step of activeSteps) {
+    const file = step.variants === undefined ? step.scene : ctx.cube === null ? step.variants.standalone : step.variants.cell;
+    const recipe = file === undefined ? undefined : recipes.get(file);
+    if (recipe === undefined) continue;
+    for (const node of staticGridParts(step, recipe)) {
+      const ref = step.geometry[node.geometry];
+      const slot = section.materials.find(row => row.id === gridMaterialSlot(step, recipe, node));
+      if (ref !== undefined && (slot?.kind === 'basic' || slot?.kind === 'lowpoly' || slot?.kind === 'look')) gridSources.add(JSON.stringify([ref.library, ref.model]));
+    }
+  }
   // Collision predicates may only read an already published scalar from the
   // selected scene graph. Reject absent, wrong-kind and future refs before any
   // geometry, physics piece or active callback can be installed.
@@ -395,7 +434,8 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
   const ownedModels = section.libraries.flatMap(row => row.kind === 'owned' ? row.models
     .filter(model => residentReferences.has(JSON.stringify([row.id, model.id])))
     .map(model => {
-      const source = { file: typeof model.file === 'string' ? model.file : model.file[TIER], attributes: model.attributes };
+      const source = { file: typeof model.file === 'string' ? model.file : model.file[TIER], attributes: model.attributes,
+        compactDraw: model.segments === undefined && gridSources.has(JSON.stringify([row.id, model.id])) };
       return model.segments === undefined ? source : Object.assign(source, { segments: model.segments });
     }) : []);
   // Metadata-only scenes need no render service. Borrow the real asset owner
@@ -468,7 +508,7 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
                 const pause = constructionCheckpoint(owner); if (pause !== undefined) await pause;
               } else if (modelSlice.due()) await modelSlice.yield();
             }
-            libraries.set(row.id, { geometry: id => models.get(id)?.copy() ?? null });
+            libraries.set(row.id, { geometry: id => models.get(id)?.copy() ?? null, draw: id => models.get(id)?.draw() });
           } else {
             requireSceneOwner(owner);
             const models = worldScenePool(product, row);
@@ -682,9 +722,20 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
     for (const step of activeSteps) for (const instance of step.repeat ?? [{ id: '' }]) {
       const file = step.variants === undefined ? step.scene : ctx.cube === null ? step.variants.standalone : step.variants.cell;
       const recipe = file === undefined ? undefined : recipes.get(file); if (recipe === undefined) throw new Error('Missing admitted scene recipe');
-      const geometry = new Map<string, BufferGeometry>();
+      const geometry = new Map<string, BufferGeometry>(), packed = new Map<string, OwnedDrawGeometry>();
+      const candidates = new Map((TIER === 'phone' ? staticGridParts(step, recipe) : []).map(node => [node.geometry, node]));
       for (const [port, ref] of Object.entries(step.geometry)) {
-        const source = libraries.get(ref.library)?.geometry(ref.model); if (source === undefined || source === null) throw new Error(`Missing scene geometry: ${port}`);
+        const library = libraries.get(ref.library), node = candidates.get(port);
+        const slot = node === undefined ? undefined : gridMaterialSlot(step, recipe, node), material = slot === undefined ? undefined : materials.get(slot);
+        const compatible = material !== undefined && (material instanceof MeshBasicMaterial || isClassicLowPolyMaterial(material)
+          || Reflect.get(material, 'positionGridCompatible') === true);
+        const draw = compatible ? library?.draw?.(ref.model) : undefined;
+        const source = draw?.geometry ?? library?.geometry(ref.model);
+        if (source === undefined || source === null) throw new Error(`Missing scene geometry: ${port}`);
+        if (node !== undefined && draw !== undefined) {
+          source.setAttribute('position', modelSpaceDrawPosition(draw));
+          packed.set(node.id, draw);
+        }
         geometry.set(port, source); owner.onDispose(() => { source.dispose(); }); await copies.check();
       }
       const sources = worldSceneStepSources(product, step, geometry, new Map(Object.entries(step.materials).map(([port, slot]) => [port, materials.get(slot)])));
@@ -715,12 +766,31 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
       // NB8 (mini-nb8j): the phone's faced trees reorder their parts' indices before the tiles read them
       const users = new Map<BufferGeometry, number>();
       for (const part of made.parts.values()) if (mesh3(part)) users.set(part.geometry, (users.get(part.geometry) ?? 0) + 1);
-      await faceParts([...made.parts.values()].filter((part): part is Mesh => mesh3(part) && users.get(part.geometry) === 1 && facedPart(part, part.matrixWorld)), owner);
+      const faced = [...made.parts.values()].filter((part): part is Mesh => mesh3(part) && users.get(part.geometry) === 1 && facedPart(part, part.matrixWorld));
+      const facedSet = new Set(faced);
+      for (const [id, draw] of packed) {
+        const part = made.parts.get(id);
+        if (!mesh3(part) || !facedSet.has(part)) continue;
+        // The facing tree reads a plain position store. These meshes keep
+        // their original representation and matching index partition.
+        const reader = draw.geometry.getAttribute('position');
+        const positions = ownedArray(Float32Array, reader.count * 3, { owner: 'engine/world-scenes', asset: 'faced-position', kind: 'geometry-cpu' });
+        for (let i = 0, at = 0; i < reader.count; i++, at += 3) {
+          positions[at] = reader.getX(i); positions[at + 1] = reader.getY(i); positions[at + 2] = reader.getZ(i);
+        }
+        draw.geometry.setAttribute('position', new BufferAttribute(positions, 3));
+        packed.delete(id);
+      }
+      await faceParts(faced, owner);
       for (const [index, draw] of buffered.entries()) {
         const content = tileBufferedDraws(`${prefix}.buffered.${String(index)}`, draw.root, draw.rows);
         if (content !== null) bufferedContents.push(content);
       }
       for (const [name, part] of made.parts) if (mesh3(part)) { const content = tiledMesh(`${prefix}.${name}`, part, part.matrixWorld); if (content !== null) handles.addTiled(content); await copies.check(); }
+      for (const [id, draw] of packed) {
+        const part = made.parts.get(id);
+        if (mesh3(part)) bindDrawGrid(part, draw);
+      }
       for (const [id, values] of sources.collections) handles.publishMaterials(`${prefix}.${id}`, values);
       const registered = new Map<string, { root: Object3D; colliders: ColliderDesc[] }>();
       const position = instance.position ?? [0, 0, 0], rotation = instance.rotation ?? [0, 0, 0];

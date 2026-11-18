@@ -90,6 +90,7 @@ test('a lent texture samples the node path\'s black opaque stand-in until its ru
 
 test('a program reading a model-space position decodes the drawn tile primitive\'s grid, uploading only on a change', () => {
   const m = compileClassicGraph({ version: 1, kind: 'material', model: 'unlit', nodes: { p: { op: 'positionGeometry' }, v: { op: 'varying', in: ['p'] } }, stages: { surface: { colour: 'v' } } }).material;
+  expect(m.positionGridCompatible).toBe(false);
   const grid = new THREE.BufferGeometry(); grid.setAttribute('position', new THREE.BufferAttribute(new Int16Array([0, 0, 0, 4, 0, 0, 0, 4, 0]), 3));
   const tile = new THREE.Mesh(grid, m); tile.scale.setScalar(0.25); tile.position.set(1, 2, 3);
   const plain = new THREE.Mesh(new THREE.BoxGeometry(), m);
@@ -104,6 +105,8 @@ test('a program reading a model-space position decodes the drawn tile primitive\
 test('a lit graph takes its drawn scene\'s prefiltered environment, as a node material does', () => {
   const lit = compileClassicGraph({ version: 1, kind: 'material', model: 'standard', nodes: {}, stages: { surface: { colour: [1, 1, 1] } } }).material;
   const unlit = compileClassicGraph({ version: 1, kind: 'material', model: 'unlit', nodes: {}, stages: { surface: { colour: [1, 1, 1] } } }).material;
+  expect(lit.positionGridCompatible).toBe(true);
+  expect(unlit.clone().positionGridCompatible).toBe(true);
   const scene = new THREE.Scene(), environment = new THREE.Texture();
   environment.mapping = THREE.CubeUVReflectionMapping;
   scene.environment = environment; scene.environmentIntensity = 0.4;

@@ -9,6 +9,7 @@ test('object origins read the live placement attribute without a stale companion
     nodes: { origin: { op: 'objectOrigin' }, carried: { op: 'varying', in: ['origin'] } }, stages: { surface: { colour: 'carried' } }, effectState: { fog: false } });
   try {
     const { vertexShader, fragmentShader } = compiled.material;
+    expect(compiled.material.positionGridCompatible).toBe(false);
     const main = vertexShader.slice(vertexShader.indexOf('void main()'));
     // the origin is the instance matrix's translation, read from three's live instanceMatrix attribute, carried by a varying
     expect(main).toMatch(/modelMatrix \* wsInstanceTransform\(vec4\(0\.0, 0\.0, 0\.0, 1\.0\)\)/u);
