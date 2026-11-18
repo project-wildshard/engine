@@ -33,7 +33,7 @@ export async function assertNineLoad(browser,base,out) {
         const failure=document.querySelector('.ws-load-error');
         if(failure!==null){
           const message=failure.querySelector('p:nth-of-type(2)')?.textContent?.trim();
-          return message||'Terminal load failure screen opened';
+          return message!==undefined&&message!==''?message:'Terminal load failure screen opened';
         }
         const world=window.__wildshard?.world;
         return world?.game.level.id==='nine-dragon-stack'&&world.game.frameCount>0&&world.hud.entered&&!world.hud.paused&&world.game.frameGate()&&!document.querySelector('.ws-load');
