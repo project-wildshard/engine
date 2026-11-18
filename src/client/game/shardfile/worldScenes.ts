@@ -513,7 +513,7 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
               const geometry = models.geometry(part); if (geometry === null) throw new Error(`Missing scene pool part: ${part}`);
               owner.onDispose(() => { geometry.dispose(); }); handles.publish(`${row.publish}.${part}`, geometry);
             }
-            libraries.set(row.id, { geometry: id => models.geometry(id), models });
+            libraries.set(row.id, { geometry: id => models.geometry(id), draw: id => models.draw?.(id), models });
           }
           libraryProgress(libraryIndex + 1, row.id);
           const pause = constructionCheckpoint(owner); if (pause !== undefined) await pause;

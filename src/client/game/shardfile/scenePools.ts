@@ -28,9 +28,10 @@ export function worldScenePool(product: Pick<ShardFolder, 'file' | 'url'>, row: 
     return copy;
   });
   const painted = full ? admitted.painted : [];
+  const keepGrid = TIER === 'phone' && full && admitted.publish === undefined && painted.length === 0;
   return createModelLibrary<never, never>({ meshes: [], meshUrls: {}, hd: [], hdUrls: {}, hdLooks: {}, aoFloor: 1,
     paintedModels: painted.map(model => ({ name: model.id, url: product.url(model.file), geometry: model.geometry })),
-    geometryPools: files.map(file => ({ url: product.url(tierFile(file.file)), parts: file.parts, ...(file.channels === undefined ? {} : { channels: file.channels }) })) }, 'world scene library', {},
+    geometryPools: files.map(file => ({ url: product.url(tierFile(file.file)), parts: file.parts, keepGrid, ...(file.channels === undefined ? {} : { channels: file.channels }) })) }, 'world scene library', {},
     async url => {
       const file = [...files.map(entry => tierFile(entry.file)), ...painted.map(entry => entry.file)].find(name => product.url(name) === url);
       if (file === undefined) throw new Error('Missing scene library file');

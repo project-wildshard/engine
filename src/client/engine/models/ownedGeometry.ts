@@ -162,13 +162,16 @@ export function identitySpaceGeometry(mesh: Mesh): BufferGeometry | null {
   if (!gridQuantized(mesh.geometry, mesh.matrixWorld)) return null;
   const geometry = mesh.geometry.clone();
   dequantizeIntoSpace(geometry, mesh.matrixWorld);
+  widenRestChannels(geometry);
+  return geometry;
+}
+function widenRestChannels(geometry: BufferGeometry): void {
   for (const [name, attribute] of Object.entries(geometry.attributes)) {
     if (name === 'position' || (attribute instanceof BufferAttribute && attribute.array instanceof Float32Array && !attribute.normalized)) continue;
     const out = new Float32Array(attribute.count * attribute.itemSize);
     for (let i = 0; i < attribute.count; i++) for (let c = 0; c < attribute.itemSize; c++) out[i * attribute.itemSize + c] = attribute.getComponent(i, c);
     geometry.setAttribute(name, new BufferAttribute(out, attribute.itemSize));
   }
-  return geometry;
 }
 
 /** Render-only copies can carry the admitted GLB grid independently of CPU model-space copies. */
@@ -176,6 +179,30 @@ const drawGrids = new WeakMap<BufferGeometry, Matrix4>();
 export function ownedGeometryGrid(geometry: BufferGeometry): Matrix4 | undefined { return drawGrids.get(geometry)?.clone(); }
 export function restoreOwnedGeometryGrid(geometry: BufferGeometry, grid: Matrix4): void {
   if (gridQuantized(geometry, grid)) drawGrids.set(geometry, grid.clone());
+}
+
+/** Rest-pool positions can stay on the grid if every possible decoded word
+ * remains finite in the original Float32 mesh. */
+export function keepRestGeometryGrid(mesh: Mesh): boolean {
+  const { geometry, matrixWorld } = mesh;
+  if (!gridQuantized(geometry, matrixWorld)) return false;
+  const e = matrixWorld.elements;
+  if (![e[12], e[13], e[14]].every(offset => Number.isFinite(Math.fround(offset - e[0])) && Number.isFinite(Math.fround(offset + e[0])))) return false;
+  separateMixedChannels(geometry);
+  drawGrids.set(geometry, matrixWorld.clone());
+  return true;
+}
+
+/** A rest consumer still sees plain Float32 channels and authored bounds. */
+export function copyRestGeometry(source: BufferGeometry): BufferGeometry {
+  const copy = source.clone(), grid = drawGrids.get(source);
+  if (grid === undefined) return copy;
+  copy.boundingBox = null; copy.boundingSphere = null;
+  dequantizeIntoSpace(copy, grid);
+  widenRestChannels(copy);
+  copy.boundingBox = source.boundingBox?.clone() ?? null;
+  copy.boundingSphere = source.boundingSphere?.clone() ?? null;
+  return copy;
 }
 
 /** A plain attribute holding its own array (not a typed subclass, not one whose CPU copy went after upload). */

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { BufferAttribute, Group, Mesh, MeshStandardMaterial, PlaneGeometry } from 'three';
+import { BufferAttribute, Group, InterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshStandardMaterial, PlaneGeometry } from 'three';
 import { createModelLibrary, type ModelGeometryPool } from './geometry';
 
 afterEach(() => { vi.restoreAllMocks(); });
@@ -126,4 +126,41 @@ it.each(['detached', 'out-of-bounds'])('refuses a %s channel whose attribute cou
   await library.preload();
   expect(error).toHaveBeenCalledTimes(1); expect(library.geometry('a')).toBeNull();
   mesh.geometry.dispose();
+});
+
+it('keeps a private draw packed and returns the exact legacy CPU copy', async () => {
+  const load = async (keepGrid: boolean) => {
+    const mesh = primitive('a'), scene = new Group();
+    mesh.position.set(12, 2, -3); mesh.scale.setScalar(2);
+    mesh.geometry.setAttribute('position', new BufferAttribute(new Int16Array([
+      -32767, 32767, 0, 16384, 32767, 0, -32767, -32767, 0, 16384, -32767, 0,
+    ]), 3, true));
+    mesh.geometry.setAttribute('color', new BufferAttribute(new Uint8Array([
+      100, 45, 200, 255, 8, 15, 0, 42, 128, 16, 145, 1,
+    ]), 3, true));
+    mesh.geometry.setAttribute('uv', new InterleavedBufferAttribute(new InterleavedBuffer(new Float32Array([
+      0, 1, 99, 1, 1, 99, 0, 0, 99, 1, 0, 99,
+    ]), 3), 2, 0));
+    scene.add(mesh);
+    const library = createModelLibrary<never, never>({ ...empty, geometryPools: [
+      { url: 'pool', parts: ['a'], keepGrid },
+    ] }, 'test', {}, () => Promise.resolve({ scene }));
+    await library.preload();
+    return library;
+  };
+  const legacy = (await load(false)).geometry('a');
+  const library = await load(true), cpu = library.geometry('a'), draw = library.draw?.('a');
+  if (legacy === null || cpu === null || draw === undefined) throw new Error('Missing rest pool geometry');
+  expect(draw.position.array).toBeInstanceOf(Int16Array);
+  expect(draw.geometry.getAttribute('color').array).toBeInstanceOf(Uint8Array);
+  expect(draw.geometry.boundingBox).toEqual(legacy.boundingBox);
+  expect(draw.geometry.boundingSphere).toEqual(legacy.boundingSphere);
+  for (const name of Object.keys(legacy.attributes)) {
+    expect(cpu.getAttribute(name).array).toEqual(legacy.getAttribute(name).array);
+  }
+  expect(cpu.index?.array).toEqual(legacy.index?.array);
+  expect(cpu.boundingBox).toEqual(legacy.boundingBox);
+  expect(cpu.boundingSphere).toEqual(legacy.boundingSphere);
+  expect(library.geometry('a', { borrow: true })).toBe(library.geometry('a', { borrow: true }));
+  legacy.dispose(); cpu.dispose(); draw.geometry.dispose();
 });

@@ -16,7 +16,7 @@ import { wholeGeometryInputs } from '../../../shared/game/shardfile/wholeInputs'
 import { TIER } from '@wildshard/engine/core/tier';
 import { readHomeBuildGeometry, saveHomeBuildGeometry } from '../shardfile/homeBuildCache';
 import { defineSceneModels, type BakedModelMetadata } from '@wildshard/engine/models/model';
-import { identitySpaceGeometry } from '@wildshard/engine/models/ownedGeometry';
+import { copyOwnedDrawGeometry, copyRestGeometry, identitySpaceGeometry, keepRestGeometryGrid, ownedGeometryGrid, type OwnedDrawGeometry } from '@wildshard/engine/models/ownedGeometry';
 import * as wholeV from 'valibot';
 import type { Scope as ResourceScope } from '@wildshard/engine/app/scope';
 import { resourceScope } from '@wildshard/engine/app/resources';
@@ -114,6 +114,8 @@ export interface NativeModelPartPolicy { readonly first?: boolean; readonly requ
 export interface ModelPbrAtlas { readonly map: Texture; readonly normalMap: Texture; readonly armMap: Texture }
 export interface ModelGeometryPool {
   readonly url: string; readonly parts: readonly string[]; readonly native?: NativeModelPartPolicy;
+  /** A private phone scene pool can lend packed geometry to compatible draws. */
+  readonly keepGrid?: boolean;
   /** Explicit Float32 application channels; a part subset requires that channel on exactly those meshes. */
   readonly channels?: readonly { readonly name: string; readonly source: string; readonly width: number; readonly parts?: readonly string[] }[];
   readonly atlases?: readonly { readonly id: string; readonly part: string; readonly anisotropy: number; readonly refresh?: boolean }[];
@@ -134,6 +136,8 @@ export interface ModelLibrary<M extends string, H extends string> {
   mesh: (name: M) => BufferGeometry | null;
   /** An owned copy by default. borrow:true lends the immutable cached primitive: never transform, recolour, change attributes or dispose it. */
   geometry: (name: string, options?: { readonly borrow?: boolean }) => BufferGeometry | null;
+  /** A compatible static scene draw can take its own packed copy and grid. */
+  readonly draw?: (name: string) => OwnedDrawGeometry | undefined;
   /** Borrow immutable original PBR textures; no texture clone, retint or new upload is introduced. */
   readonly atlas: (id: string) => ModelPbrAtlas | null;
   /** A hero model fitted as `fit`, as a group sharing the loaded geometry and maps; null when it did not load. */
@@ -199,6 +203,27 @@ function hasNonfiniteFloat32(values: Float32Array): boolean {
   return false;
 }
 
+function packedRestChannel(attribute: BufferAttribute | InterleavedBufferAttribute): boolean {
+  const array = attribute instanceof InterleavedBufferAttribute ? attribute.data.array : attribute.array;
+  if (attribute.normalized) {
+    const end = attribute instanceof InterleavedBufferAttribute
+      ? (attribute.count - 1) * attribute.data.stride + attribute.offset + attribute.itemSize
+      : attribute.count * attribute.itemSize;
+    return attribute.count > 0 && end <= array.length && (array instanceof Int16Array || array instanceof Int8Array || array instanceof Uint8Array);
+  }
+  return array instanceof Float32Array;
+}
+function finiteRestFloat(attribute: BufferAttribute | InterleavedBufferAttribute, packed: boolean): boolean {
+  if (attribute.normalized) return false;
+  if (attribute instanceof BufferAttribute) return attribute.array instanceof Float32Array && !hasNonfiniteFloat32(attribute.array);
+  // For a packed GLB with mixed lanes, inspect only this attribute's words.
+  if (!packed || !(attribute.data.array instanceof Float32Array)) return false;
+  for (let i = 0; i < attribute.count; i++) for (let lane = 0; lane < attribute.itemSize; lane++) {
+    if (!Number.isFinite(attribute.getComponent(i, lane))) return false;
+  }
+  return true;
+}
+
 interface ModelLoadState { loading: Promise<void> | null }
 
 // Resource listeners outlive the library that loaded them. Build them outside
@@ -218,6 +243,7 @@ export function createModelLibrary<M extends string, H extends string>(rows: Mod
   const ready = new Map<M, BufferGeometry>(), hd = new Map<H, Object3D>();
   const painted = new Map<string, PaintedModel>(), paintedRows = rows.paintedModels ?? [];
   const rest = new Map<string, BufferGeometry>(), atlases = new Map<string, ModelPbrAtlas>();
+  const borrowedRest = new WeakMap<BufferGeometry, BufferGeometry>();
   const rigs = rows.rigs === undefined ? null : rigLibrary(rows.rigs);
   const state: ModelLoadState = { loading: null };
   const pools = rows.geometryPools ?? [], parts = pools.flatMap(pool => pool.parts), atlasRows = pools.flatMap(pool => pool.atlases ?? []);
@@ -336,21 +362,26 @@ export function createModelLibrary<M extends string, H extends string>(rows: Mod
       if (nodes.length !== pool.parts.length || new Set(nodes.map(node => node.name)).size !== nodes.length) throw new Error('Rest pool part roster differs');
       for (const name of pool.parts) {
         const node = nodes.find(candidate => candidate.name === name);
-        // I3: a grid-quantized cast (compactPhoneGlb: grid node, normalized channels) reads back as its identity-space Float32 mesh
-        const decoded = node?.type === 'Mesh' && !node.matrixWorld.equals(new Matrix4()) ? identitySpaceGeometry(node) : null;
-        if (node?.type !== 'Mesh' || (decoded === null && !node.matrixWorld.equals(new Matrix4()))) throw new Error('Rest pool requires named identity-space ordinary meshes');
+        if (node?.type !== 'Mesh') throw new Error('Rest pool requires named identity-space ordinary meshes');
+        const identity = node.matrixWorld.equals(new Matrix4());
+        // A one-mesh file owns its attribute objects and one grid. A
+        // multi-mesh GLB may share its source geometry across nodes.
+        const packed = !identity && pool.keepGrid === true && nodes.length === 1
+          && Object.values(node.geometry.attributes).every(packedRestChannel) && keepRestGeometryGrid(node);
+        const decoded = identity || packed ? null : identitySpaceGeometry(node);
+        if (!identity && !packed && decoded === null) throw new Error('Rest pool requires named identity-space ordinary meshes');
         if (decoded !== null) node.geometry.dispose();
         const geometry = decoded ?? node.geometry, position = geometry.getAttribute('position');
-        if (!(position instanceof BufferAttribute) || position.count === 0 || position.count > 400_000 || Object.keys(geometry.morphAttributes).length > 0) throw new Error('Rest pool requires bounded rigid positions');
+        if (position === undefined || !packed && !(position instanceof BufferAttribute) || position.count === 0 || position.count > 400_000 || Object.keys(geometry.morphAttributes).length > 0) throw new Error('Rest pool requires bounded rigid positions');
         const channels = (pool.channels ?? []).filter(row => row.parts === undefined || row.parts.includes(name));
         for (const [channel, attribute] of Object.entries(geometry.attributes)) {
           const width = ['uv','uv1'].includes(channel) ? 2 : channel === 'tangent' ? 4 : ['position', 'normal', 'color'].includes(channel) ? 3 : channels.find(row => row.source === channel)?.width;
-          if (width === undefined || !(attribute instanceof BufferAttribute) || !(attribute.array instanceof Float32Array)
-            || attribute.normalized || attribute.itemSize !== width || attribute.count !== position.count || hasNonfiniteFloat32(attribute.array)) throw new Error('Rest pool has incompatible Float32 channels');
+          if (width === undefined || attribute.itemSize !== width || attribute.count !== position.count
+            || !(packed && attribute.normalized || finiteRestFloat(attribute, packed))) throw new Error('Rest pool has incompatible Float32 channels');
         }
         for (const row of channels) {
           const attribute: unknown = geometry.attributes[row.source];
-          if (!(attribute instanceof BufferAttribute) || geometry.hasAttribute(row.name)) throw new Error('Missing or colliding declared rest channel');
+          if (!(attribute instanceof BufferAttribute || packed && attribute instanceof InterleavedBufferAttribute) || geometry.hasAttribute(row.name)) throw new Error('Missing or colliding declared rest channel');
           geometry.deleteAttribute(row.source); geometry.setAttribute(row.name, attribute);
         }
         const index = geometry.index;
@@ -479,7 +510,28 @@ export function createModelLibrary<M extends string, H extends string>(rows: Mod
     preloadRigs: () => rigs?.bodies.preload() ?? Promise.resolve(),
     models: specimens => modelCatalogue(specimens, { rig: name => { if (rigs === null) throw new Error('Model library has no declared rigs'); return rigs.bodies.bodyOrStandIn(name); } }),
     mesh: name => ready.get(name)?.clone() ?? null,
-    geometry: (name, options) => { const value=rest.get(name); return value===undefined?null:options?.borrow===true?value:value.clone(); },
+    geometry: (name, options) => {
+      const value = rest.get(name);
+      if (value === undefined) return null;
+      if (options?.borrow !== true) return copyRestGeometry(value);
+      if (ownedGeometryGrid(value) === undefined) return value;
+      const prior = borrowedRest.get(value);
+      if (prior !== undefined) return prior;
+      const copy = copyRestGeometry(value);
+      borrowedRest.set(value, copy);
+      return copy;
+    },
+    draw: name => {
+      const value = rest.get(name);
+      if (value === undefined) return undefined;
+      const draw = copyOwnedDrawGeometry(value);
+      if (draw === undefined) return undefined;
+      // Pool bounds were authored in model space. Tiling reads them there;
+      // the draw later transforms them back to the packed grid.
+      draw.geometry.boundingBox = value.boundingBox?.clone() ?? null;
+      draw.geometry.boundingSphere = value.boundingSphere?.clone() ?? null;
+      return draw;
+    },
     atlas: id => atlases.get(id) ?? null,
     painted: name => {
       const model = painted.get(name); if (model === undefined) return null;
