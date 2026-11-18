@@ -9,7 +9,7 @@
  * row still to run costs its fast seconds plus that share of its difference. A running row that has already overrun its
  * cost is a reading too: it raises the fit, so the estimate goes up rather than holding a number already wrong. A row's
  * own reported share is not used: rows report their cheap units first (Home region reads 97 % within its first second,
- * the first frame 30 % in a tenth of its time) or last (Worker boot sits at a sixth until its final 0.2 s), so it is
+ * the first frame 30 % in a tenth of its time) or last (the server step sits at a sixth until its final 0.2 s), so it is
  * the bar's real progress, not a clock.
  *
  * Nothing here is a timer or a guess. Until a second of the phone profile's work has finished, there is no reading, and

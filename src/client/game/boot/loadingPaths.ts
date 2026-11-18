@@ -2,6 +2,7 @@ import { BOOT_STEPS, STEP_INFO } from '@wildshard/engine/boot/steps';
 import { repeatedStep } from '@wildshard/engine/boot/timeline';
 import type { Loading } from '@wildshard/engine/ui/Loading';
 import type { GridCrossingTiming } from '../../../shared/game/grid/crossing';
+import { serverStepLabel } from '../shardfile/serverRoute';
 
 /** LS7 (J188): a Load row's bar share is its measured seconds, never a range or a floor. One calibrated profile: the
  *  data-only shardfile path, Sunscar Dunes, phone tier (iPhone 16 Pro viewport, 4x CPU, 12.8 Mbit/s), headless Chromium,
@@ -106,8 +107,9 @@ export function loadingPath(id: LoadingPathId, own?: Readonly<Record<string, { l
     step('readyFrame', 'First drawn frames and minimap'),
     // QA8: WebKit only (finish.ts linkWorldUnderLoader); it carries no bar share, so other engines' bars are unchanged
     step('spawnPrograms', 'Spawn program links'), { ...step('worldPrograms', 'World program links'), weight: 0.01 },
-    // DL21: the server's boot, on J130's row and after the flip on every page; no bar share, so a page with no server is unchanged
-    { ...step('server', 'Worker boot'), weight: 0.01 }, leaf('audio')],
+    // DL21: the server's boot, on J130's row and after the flip on every page; no bar share, so a page with no server is unchanged.
+    // SB48: named for what it is, joining the world (the in-page server only on a build with no world)
+    { ...step('server', serverStepLabel()), weight: 0.01 }, leaf('audio')],
     ignored: native ? [] : BOOT_STEPS.filter(key => !selected.has(key)) },
     id === 'grid' ? GRID_MEASURED_SECONDS : native ? NATIVE_MEASURED_SECONDS : id === 'shardfile' ? SHARDFILE_MEASURED_SECONDS : null,
     id === 'grid' ? GRID_DESKTOP_SECONDS : undefined);

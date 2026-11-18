@@ -40,7 +40,7 @@ function loadNalati(t: ReturnType<typeof tab>): { life: PageLife; notes: DropNot
   const world = t.page();
   world.life.setAliveSource(() => ({ slug: 'nalati-grasslands', resident: '', mode: 'shard' }));
   world.notes.markStep({ world: 'nalati-grasslands', name: 'Nalati Grasslands', step: 'Start' });
-  world.notes.markStep({ step: 'Worker boot' });
+  world.notes.markStep({ step: 'Joining the world' });
   return world;
 }
 const shardUrl = new URLSearchParams('chunk=nalati-grasslands');
@@ -131,7 +131,7 @@ test('an unmarked title arrival with no token still shows the drop modal', () =>
     const t = tab(); loadNalati(t);
     window.dispatchEvent(new Event('pagehide'));
     const next = t.page(nav);
-    expect(next.notes.take(next.life.lastEnd())).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', step: 'Worker boot' });
+    expect(next.notes.take(next.life.lastEnd())).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', step: 'Joining the world' });
   }
 });
 

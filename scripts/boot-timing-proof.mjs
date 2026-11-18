@@ -227,8 +227,8 @@ if(expectedBuild!==undefined) {
         assert.ok(operations.has('server:worker-bootstrap-ready'),'actual bootstrap receipt absent');
         assert.ok(timing.entries.some(row=>row.operation==='server:worker-runtime-import'&&row.result==='complete'&&row.end!==null),'actual runtime import never completed');
         const samples=/** @type {{label:string,steps:number,files:number,bytes:number}[]} */(await page.evaluate(()=>Reflect.get(window,'__workerBootProof')));
-        assert.ok(samples.some(row=>row.label.includes('Worker boot')&&row.steps>0&&row.files>0&&row.bytes>0),`Worker boot lacks real visible work/verified inputs: ${JSON.stringify(samples)}`);
-        console.log(`${name}: Worker boot real visible samples=${samples.length}, steps=${Math.max(...samples.map(row=>row.steps))}`);
+        assert.ok(samples.some(row=>/(?:Worker boot|Joining the world|Starting the in-page server)/u.test(row.label)&&row.steps>0&&row.files>0&&row.bytes>0),`The server step lacks real visible work/verified inputs: ${JSON.stringify(samples)}`);
+        console.log(`${name}: server step real visible samples=${samples.length}, steps=${Math.max(...samples.map(row=>row.steps))}`);
       }
       const ordinary=timing.entries.filter(row=>row.operation==='worker:message-receive').length;
       const received=Object.entries(timing.counters).filter(([key,row])=>key.endsWith(':messages-received')&&row.unit==='messages').reduce((sum,[,row])=>sum+row.loaded,0);

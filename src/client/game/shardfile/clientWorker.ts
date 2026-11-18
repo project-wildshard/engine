@@ -59,7 +59,7 @@ import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
-import { earlyStandalone, serverRoute } from './serverRoute';
+import { earlyStandalone, serverRoute, serverStepLabel } from './serverRoute';
 import { worldHosted } from '../grid/oneWayIn';
 import { setLampFollow } from '@wildshard/engine/render/lookLight';
 import { pageLogin, refreshTicket, ticketBeforeJoin, ticketed, TICKET_REFRESH_MS } from '@wildshard/engine/net/playerLogin';
@@ -335,7 +335,7 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...ownsInlineCandidate(slug) ? { ownServer: true as const } : {}, ...goto === null ? {} : { goto }, ...enter === null ? {} : { enter }, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
 }
 /** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of
- *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the Worker boot
+ *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the server
  *  step are counted there when that step adopts it. */
 const serverKey = (world: string, lone: boolean): string => `${world}${lone ? '|lone' : '|grid'}`;
 interface EarlyServer { readonly key: string; readonly shell: Promise<Shell>; readonly reads: { count: number; card: ReturnType<typeof countedWait> | null }; adopted: boolean }
@@ -355,7 +355,7 @@ export function prespawnWorkerServer(): void {
     try { (await loadServerModules()).prespawnStandalone?.(url => spawnHeldBytes(url)); } catch { /* the server's boot loads them again */ }
   })();
 }
-/** Start the standalone server now, for the Worker boot step to adopt. A one-shard page of a build with a world joins it at
+/** Start the standalone server now, for the server step to adopt. A one-shard page of a build with a world joins it at
  *  that step instead, as before. A level left before adoption saves and stops this server as an adopted one would. */
 export function startWorkerServerEarly(options: { readonly slug: string; readonly lone: boolean; readonly scope: Scope }): void {
   // GO4: a build with a world puts every page in it, a grid page too: no in-page server to start early.
@@ -363,8 +363,8 @@ export function startWorkerServerEarly(options: { readonly slug: string; readonl
   if (early !== null && !early.adopted) return;
   const reads: EarlyServer['reads'] = { count: 0, card: null };
   const shell = bootStandalone(options.slug, options.lone, () => { if (reads.card === null) reads.count++; else reads.card.add(); });
-  // Its failures are the Worker boot step's, which awaits the same promises; until then nothing reports them early.
-  void (async () => { try { await (await shell).booted; } catch { /* reported at the Worker boot step */ } })();
+  // Its failures are the server step's, which awaits the same promises; until then nothing reports them early.
+  void (async () => { try { await (await shell).booted; } catch { /* reported at the server step */ } })();
   const started: EarlyServer = { key: serverKey(options.slug, options.lone), shell, reads, adopted: false };
   early = started;
   // Settings' import stops an unadopted server as it stops an adopted one (no save); adoption registers its own stop.
@@ -773,7 +773,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
 }
 
 async function guarded(ports: WorkerClientPorts): Promise<void> {
-  const card = countedWait('Worker boot', 'files'); // completed worker tasks and verified inputs own its progress
+  const card = countedWait(serverStepLabel(), 'files'); // completed worker tasks and verified inputs own its progress (SB48: the step's own name)
   try { await startWorkerClient(ports, card); }
   catch (error) { console.error('[worker client]', error); throw error; }
   finally { card.end(); }

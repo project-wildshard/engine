@@ -32,13 +32,13 @@ function tab() {
   return { session, local, page };
 }
 
-/** the world page boots Blender Template and reaches LOAD step 19 (Worker boot), as on Jake's iPhone */
+/** the world page boots Blender Template and reaches LOAD step 19 (Joining the world), as on Jake's iPhone */
 function enterWorld(t: ReturnType<typeof tab>): { life: PageLife; notes: DropNotes } {
   const world = t.page();
   world.life.setAliveSource(() => ({ slug: 'blender-template', resident: '', mode: 'shard' }));
   world.notes.markStep({ world: 'blender-template', name: 'Blender Template', step: 'Start' });
   world.notes.markStep({ step: 'Application modules' });
-  world.notes.markStep({ step: 'Worker boot' });
+  world.notes.markStep({ step: 'Joining the world' });
   return world;
 }
 /** the title page that boots next: the drop it shows (once), rendered */
@@ -55,7 +55,7 @@ test('a forced load failure ends on the title with the modal and its reason', ()
   world.notes.record({ reason: 'The world failed to load.', error: failure });
   world.life.markReload('stuck boot recovery (ShardLoadError: world.bin: 404 Not Found)');
   const { drop, again } = title(t, true);
-  expect(drop).toMatchObject({ kind: 'error', what: "Couldn't enter Blender Template", reason: 'The world failed to load.', step: 'Worker boot', code: 'E_FETCH' });
+  expect(drop).toMatchObject({ kind: 'error', what: "Couldn't enter Blender Template", reason: 'The world failed to load.', step: 'Joining the world', code: 'E_FETCH' });
   expect(modal()?.querySelector('h1')?.textContent).toBe("Couldn't enter Blender Template");
   expect(modal()?.querySelector('.reason')?.textContent).toBe('The world failed to load.');
   expect(again).toBeNull(); // shown once
@@ -70,7 +70,7 @@ test('a forced server close during enter ends on the title with the close reason
   expect(drop).toMatchObject({ what: "Couldn't enter Blender Template", reason: 'The server closed the connection.', code: '1006', message: 'the server closed the connection' });
   const dev = modal()?.querySelector('.dev')?.textContent ?? '';
   expect(dev).toContain('1006');
-  expect(dev).toContain('Worker boot');
+  expect(dev).toContain('Joining the world');
 });
 
 test('a thrown error during boot ends on the title with the error, its stack and its step', () => {
@@ -82,7 +82,7 @@ test('a thrown error during boot ends on the title with the error, its stack and
   const { drop } = title(t, true);
   expect(drop?.message).toBe("TypeError: undefined is not an object (evaluating 'worker.port')");
   expect(modal()?.querySelector('.stack')?.textContent).toContain('TypeError');
-  expect(modal()?.querySelector('.dev')?.textContent).toContain('Worker boot');
+  expect(modal()?.querySelector('.dev')?.textContent).toContain('Joining the world');
 });
 
 test('a crash with no word from the game (iOS kills the page) restarts onto the modal with the last step', () => {
@@ -91,7 +91,7 @@ test('a crash with no word from the game (iOS kills the page) restarts onto the 
   // the process died: no pagehide ran; a killed WebContent process can lose sessionStorage too
   t.session.clear();
   const { drop } = title(t, true);
-  expect(drop).toMatchObject({ kind: 'restart', what: 'The game restarted unexpectedly', step: 'Worker boot', message: 'Error: WebGL context lost' });
+  expect(drop).toMatchObject({ kind: 'restart', what: 'The game restarted unexpectedly', step: 'Joining the world', message: 'Error: WebGL context lost' });
   expect(drop?.reason).toContain('Blender Template');
   expect(modal()).not.toBeNull();
 });
@@ -109,7 +109,7 @@ test('a plain unexpected title navigation, with no error anywhere, shows the mod
   window.dispatchEvent(new Event('pagehide'));
   const { drop, end } = title(t, true);
   expect(end.kind).toBe('fresh');
-  expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', step: 'Worker boot' });
+  expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', step: 'Joining the world' });
   expect(drop?.reason).toContain('without the game or you asking');
   expect(modal()).not.toBeNull();
 });
@@ -125,8 +125,8 @@ test('a server resume to another shard, then the title, lands on the modal namin
   window.dispatchEvent(new Event('pagehide')); // then the title, with no word from anyone
   const { drop } = title(t, true);
   expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', world: 'driftwood-isle',
-    trail: 'Blender Template at Worker boot → online seat elsewhere (driftwood-isle)' });
-  expect(drop?.reason).toContain('redirect: Blender Template at Worker boot → online seat elsewhere (driftwood-isle) → Driftwood Isle at Start');
+    trail: 'Blender Template at Joining the world → online seat elsewhere (driftwood-isle)' });
+  expect(drop?.reason).toContain('redirect: Blender Template at Joining the world → online seat elsewhere (driftwood-isle) → Driftwood Isle at Start');
   expect(modal()?.querySelector('.reason')?.textContent).toContain('online seat elsewhere (driftwood-isle)');
   expect(modal()?.querySelector('.dev')?.textContent).toContain('Route');
 });
@@ -167,7 +167,7 @@ test('copy details holds every fact, and dismiss closes the modal', async () => 
   modal()?.querySelector<HTMLButtonElement>('.copy')?.click();
   await vi.waitFor(() => { expect(written).toHaveLength(1); });
   expect(written[0]).toBe(dropDetails(drop as Drop));
-  expect(written[0]).toContain('Step: Worker boot');
+  expect(written[0]).toContain('Step: Joining the world');
   expect(written[0]).toContain('Code: 1006');
   modal()?.querySelector<HTMLButtonElement>('.dismiss')?.click();
   expect(modal()).toBeNull();

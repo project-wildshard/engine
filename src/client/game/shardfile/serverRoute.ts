@@ -21,6 +21,12 @@ export function hostsGrid(world: unknown): boolean {
   return typeof cells === 'number' && cells > 1;
 }
 
-/** Whether a page may start the in-page server before its Worker boot step: only on a build with no world (OF2: a world build's pages
+/** Whether a page may start the in-page server before its server step: only on a build with no world (OF2: a world build's pages
  *  all join the world). */
 export function earlyStandalone(world: unknown): boolean { return serverRoute(world) === 'standalone'; }
+
+/** STAGING-BUGBASH SB48 (Jake 2026-11-18): the Load step a player read as "Worker boot" is, on staging and prod, the page joining
+ *  the world; only the preview's in-page standalone server boots a server of its own, and only it says so. */
+export function serverStepLabel(world: unknown = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__): string {
+  return serverRoute(world) === 'online' ? 'Joining the world' : 'Starting the in-page server';
+}

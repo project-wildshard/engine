@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- The rule is read where the page applies it.
 import { readFileSync } from 'node:fs';
-import { earlyStandalone, hostsGrid, serverRoute } from '../src/client/game/shardfile/serverRoute';
+import { earlyStandalone, hostsGrid, serverRoute, serverStepLabel } from '../src/client/game/shardfile/serverRoute';
 import { shardCell } from '../src/client/game/grid/oneWayIn';
 
 // GO4 (QA row 13, "let's make it all the same"): an online build's grid page plays on the world, like a one-shard page.
@@ -49,4 +49,13 @@ test('a grid page whose world hosts one cell re-enters as that cell\'s one-shard
   expect(readFileSync('src/client/game/session/finish.ts', 'utf8')).toContain('reshard: instance => { reenterShard(instance); }');
   const entry = readFileSync('src/client/game/grid/pageEntry.ts', 'utf8'), body = entry.slice(entry.indexOf('export function reenterShard'));
   expect(body.slice(0, body.indexOf('\n}\n')), 'a one-shard page: no grid intent').not.toContain('pageGridIntents');
+});
+
+// Jake 2026-11-18 (opus-drift brief): the Load step read "Worker boot" on his iPhone. On a world build it is the page joining the
+// world; only the preview's in-page server, a build with no world, boots a server of its own and says so.
+test('the server step says what it does: joining the world, or the in-page server on a build with no world', () => {
+  expect(serverStepLabel(WORLD)).toBe('Joining the world');
+  expect(serverStepLabel(undefined)).toBe('Starting the in-page server');
+  expect(source()).toContain('countedWait(serverStepLabel(),');
+  expect(readFileSync('src/client/game/boot/loadingPaths.ts', 'utf8')).toContain("step('server', serverStepLabel())");
 });

@@ -16,3 +16,6 @@
   is a flat dark fill. Jake's frame: mean 8, sd 4.7, 99.9 % page background, flagged. New scenario K6 enters every
   Shard Select card a player can enter at phone Low on WebKit (Low Power's mode, which K1-K5 never reach) and judges each
   cell's frame 4 s into play. First run on staging v0.1.42: six cells, 129 s, all drawn (mean 65 to 133, sd 34 to 61).
+- The Load step Jake read as "Worker boot" on his iPhone is renamed for what it does: "Joining the world" on a build with a
+  world (staging, prod), "Starting the in-page server" only on a build with no world (the preview), one rule
+  (`serverRoute.ts` `serverStepLabel`) for both the step row and its counted card.

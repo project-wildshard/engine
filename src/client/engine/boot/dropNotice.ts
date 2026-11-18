@@ -51,7 +51,7 @@ export interface Drop {
   readonly stack: string;
   /** how the previous page ended, in lastEnd's words */
   readonly end: string;
-  /** the redirect chain that ended here, oldest first: "Blender Template at Worker boot → online seat elsewhere (driftwood-isle)" */
+  /** the redirect chain that ended here, oldest first: "Blender Template at Joining the world → online seat elsewhere (driftwood-isle)" */
   readonly trail: string;
   /** the call site of the last navigation the game made ('' none) */
   readonly routeStack: string;

@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { askNameToJoin, nameAskDue } from './namePrompt';
 
-// OFFLINE OF11 (J298): a fresh device entering the world offline isn't held at Worker boot by the Name prompt.
+// OFFLINE OF11 (J298): a fresh device entering the world offline isn't held at the server step by the Name prompt.
 const scopes: Scope[] = [];
 afterEach(() => { for (const scope of scopes.splice(0)) scope.dispose(); document.body.replaceChildren(); });
 const scope = (): Scope => { const made = new Scope('name-join'); scopes.push(made); return made; };

@@ -17,9 +17,9 @@ test('a thrown error during boot records the drop before the recovery reload', a
   reload.mockImplementation(() => { recordedAtReload = takeDrop(reloaded); });
   vi.stubGlobal('location', { href: 'https://play.example/?chunk=blender-template', origin: 'https://play.example', search: '?chunk=blender-template', reload });
   vi.stubGlobal('fetch', () => Promise.resolve(new Response('{}')));
-  markDropStep({ world: 'blender-template', name: 'Blender Template', step: 'Worker boot' });
+  markDropStep({ world: 'blender-template', name: 'Blender Template', step: 'Joining the world' });
   guardBoot(Promise.reject(new TypeError('boot exploded')));
   await vi.waitFor(() => { expect(reload).toHaveBeenCalled(); });
-  expect(recordedAtReload).toMatchObject({ kind: 'error', what: "Couldn't enter Blender Template", step: 'Worker boot', message: 'TypeError: boot exploded',
+  expect(recordedAtReload).toMatchObject({ kind: 'error', what: "Couldn't enter Blender Template", step: 'Joining the world', message: 'TypeError: boot exploded',
     reason: 'The game hit an error while starting, so it reloaded to recover.' });
 });
