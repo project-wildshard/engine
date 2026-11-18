@@ -105,3 +105,16 @@ Both Chromium and native WebKit still compare their subsystem budgets
 with the same 2% cap.
 [Release-merge comparison](https://github.com/project-wildshard/engine/actions/runs/44277584673).
 [Direct sampler qualification](https://github.com/project-wildshard/engine/actions/runs/44284828105).
+
+The independent regular run on 89652d01 stopped the old comparator
+at Clockwork's 26.096 MB. Its loading row was 25,459,564 B ArrayBuffers,
+370,224 B wire and 266,240 B canvas. The direct cap is 26.501 MB.
+Replaying all 26 reports revealed two further sampled loading
+highs. Pastel Plain's 18.197 MB fits the original measured 18.232 MB
+control and peak, which the new three-run batch missed. Keep that
+measured value. Pine Hollow reached 192.919 MB at firstFrame, of
+which 190.462 MB was ArrayBuffers. The new three-run batch reached
+184.867 MB at the same checkpoint. The Chromium renderer path
+and production pins in the two runs are the same. Include the
+independent Pine high. All 26 reports then pass the +2% comparator.
+[Independent artifact](https://github.com/project-wildshard/engine/actions/runs/44287631212).
