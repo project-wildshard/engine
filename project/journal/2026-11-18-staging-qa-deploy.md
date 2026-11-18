@@ -19,3 +19,9 @@ SQ2 uses SB48's world-region detector for every deploy smoke leg and
 journey. A transient dark frame can clear on the next sample. Three
 consecutive black or empty frames hold the train. The MacBook K3 probe
 on staging v0.1.42 and the dark and lit fixture checks passed.
+
+The npm `next` workflow accepts the pre-alias K1–K6 verdict with black-world
+evidence and two exact-build browser journeys. That lets QA 29 pin the staged
+engine after the stable J428 deploy checks. Admission still verifies the green
+release CI, live page and signed rooms release. The optional skipped ledger
+diagnostic no longer makes an otherwise green release CI look red.

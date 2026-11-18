@@ -88,8 +88,9 @@ jobs:
           test -n "$run"
           gh run view "$run" --json headSha,jobs | node -e '
             const ci = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
-            if (ci.headSha !== process.env.RELEASE_BUILD || ci.jobs.length === 0 ||
-                ci.jobs.some(job => job.conclusion !== "success")) {
+            const required = ci.jobs.filter(job => job.name !== "nine-ledger-diagnostic" || job.conclusion !== "skipped");
+            if (ci.headSha !== process.env.RELEASE_BUILD || required.length === 0 ||
+                required.some(job => job.conclusion !== "success")) {
               throw new Error("The exact release branch CI must pass");
             }
           '
@@ -102,7 +103,27 @@ jobs:
           assert.equal(packageInfo.name, '@wildshard/engine');
           const proof = JSON.parse(process.env.STAGING_QUALIFICATION);
           assert.equal(proof.build, process.env.RELEASE_BUILD);
-          if (proof.of8FocusedChromiumSweep !== undefined) {
+          if (proof.preAliasSmokeV1 !== undefined) {
+            const smoke = proof.preAliasSmokeV1;
+            const scenarios = ['K1', 'K2', 'K3', 'K4', 'K5', 'K6'];
+            const sha256 = /^[a-f0-9]{64}$/u;
+            assert.equal(proof.stagingQualified, true);
+            assert.equal(smoke.release, `v${packageInfo.version}`);
+            assert.equal(smoke.build, proof.build);
+            assert.equal(smoke.serial, proof.serial);
+            assert.equal(smoke.hold, false);
+            assert.deepEqual(smoke.ran, scenarios);
+            assert.ok(smoke.findings.every(row => row.severity !== 'P0' && row.severity !== 'P1'));
+            assert.ok(smoke.world.every(row => row.judged === true));
+            assert.deepEqual([...new Set(smoke.world.map(row => row.scenario))].sort(), scenarios);
+            assert.ok(smoke.world.some(row => row.scenario === 'K6' && typeof row.cell === 'string' && row.cell.length > 0));
+            assert.deepEqual(smoke.journeys.map(row => row.browser).sort(), ['chromium', 'webkit']);
+            assert.ok(smoke.journeys.every(row => row.pass === true && sha256.test(row.sha256)));
+            assert.match(smoke.smokeSHA, sha256);
+            assert.match(smoke.sourceAlias, /^[a-f0-9]{40}$/u);
+            assert.notEqual(smoke.sourceAlias, smoke.build);
+            assert.match(smoke.deploymentId, /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u);
+          } else if (proof.of8FocusedChromiumSweep !== undefined) {
             // The coordinator approved this path for 0.1.39 after the OF8 sweep.
             const sweep = proof.of8FocusedChromiumSweep;
             assert.equal(packageInfo.version, '0.1.39');
