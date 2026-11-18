@@ -1,4 +1,4 @@
-# MG8: the engine moves to shard-format 0.34.0
+# MG8: the engine moves to shard-format 0.35.0
 
 Lane mini-mg8, branch `plan/mg8-format-pin` (MEMORY-GATES MG8).
 
@@ -15,7 +15,9 @@ breaks between the two versions, and what the engine does about each:
 - `actors/moves` admits `leap` (0.28, CC17a): the runner refuses it by name until CC17b.
 - `@wildshard/wire-released` stays at `669d1fc`: `packages/wire` is unchanged.
 
-The 0.34 check gate refuses the engine's pinned Driftwood, Nalati, Nine and Pine products
+The 0.34 check gate refused the engine's pinned Driftwood, Nalati, Nine and Pine products
 (`test/cook-built-shards.test.ts`): stale memory epoch 1 measurements and estimates over the
-1.5 GB phone line. The branch lands only once those pins move to revisions that pass; the
-test is not loosened.
+1.5 GB phone line. Jake's J411 and J412 (2026-11-18) made memory gates ratchets, so the pin
+moves to format 0.35.0 instead. Its `memory-ratchet.ts` holds those four zones at their
+epoch-7 baselines and reports the lines; every other zone still refuses. All 27 pins admit and
+`cook-built-shards` passes unchanged.
