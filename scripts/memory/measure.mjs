@@ -364,14 +364,30 @@ export function phoneLine(run, model = loadPhoneModel()) {
 export function webkitCalibration() { return JSON.parse(readFileSync(new URL('calibration.json', import.meta.url), 'utf8')).hosts.webkit; }
 
 /** The microscope: the same boot in Chromium, a detailed memory-infra dump at each checkpoint.
- * @param {{url:string, chunk:string, timeoutMs?:number, depth?:number}} options */
-export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, depth = 3 }) {
+ * @param {{url:string, chunk:string, timeoutMs?:number, depth?:number, plantRetainedBuffer?:boolean}} options */
+export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, depth = 3, plantRetainedBuffer = false }) {
   const { launchMemoryBrowser } = await import('../chromium-memory-browser.mjs');
   const gpu = process.platform === 'darwin' ? ['--use-angle=metal'] : [];
   const owned = await launchMemoryBrowser([...gpu, '--ignore-gpu-blocklist', '--enable-precise-memory-info']);
   try {
     const context = await owned.browser.newContext({ ...PHONE_VIEW });
     await phoneContext(context);
+    if (plantRetainedBuffer) await context.addInitScript(() => {
+      // Only the negative-control browser holds and charges this allocation.
+      // Publishing happens before the first WebGL upload.
+      let published;
+      Object.defineProperty(globalThis, '__wildshardMemory', {
+        configurable: true,
+        get: () => published,
+        set(value) {
+          const planted = new Uint8Array(20_000_000).fill(0xa5);
+          published = { ...value, counters() {
+            const ledger = value.counters();
+            return { ...ledger, ram: { ...ledger.ram, 'array-buffer': (ledger.ram['array-buffer'] ?? 0) + planted.byteLength } };
+          } };
+        },
+      });
+    });
     const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);
     const tracing = await owned.browser.newBrowserCDPSession();
     /** @type {any[]} */ const events = [];
@@ -547,6 +563,7 @@ async function main(argv) {
   const gcs = Number(args.gcs ?? 2), reads = Number(args.reads ?? 5);
   const limits = { maxLoad: Number(args['max-load'] ?? cpus().length), maxLanes: Number(args['max-lanes'] ?? 2), waitMs: Number(args.wait ?? 10) * 60_000 };
   if (args.ladder) return ladder(args, { runs: Number(args.runs ?? 5), settleMs, timeoutMs, gcs, reads, limits });
+  if (args['plant-retained-buffer'] && !args['ledger-only']) throw new Error('The retained buffer control requires --ledger-only');
   const runs = args['ledger-only'] ? 0 : Number(args.runs ?? 1);
   const urls = args.url2 ? [args.url, args.url2] : [args.url];
   /** @type {Awaited<ReturnType<typeof webkitBoot>>[]} */
@@ -577,7 +594,7 @@ async function main(argv) {
     refused: webkit.length - good.length,
   };
   if (summary && runs > 1) for (const [name, s] of Object.entries(summary)) if (typeof s === 'object') console.log(`${name.padEnd(18)} median ${mb(s.median)} MB  min ${mb(s.min)}  max ${mb(s.max)}  spread ${s.spreadPct}%  (n ${s.n}) [K]`);
-  const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({ url: args.url, chunk: args.chunk, timeoutMs }) : null;
+  const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({ url: args.url, chunk: args.chunk, timeoutMs, plantRetainedBuffer: Boolean(args['plant-retained-buffer']) }) : null;
   if (microscope && !args['ledger-only']) for (const line of microscopeLines(microscope)) console.log(line);
   const ledger = microscope ? ledgerPeak(microscope.checkpoints) : null;
   if (ledger) for (const line of ledgerPeakLines(args.chunk, ledger)) console.log(line);

@@ -16,6 +16,11 @@ on:
         type: choice
         options: [production, staging]
         default: production
+      memory_record:
+        description: Measure candidate memory ratchet baselines
+        type: boolean
+        required: false
+        default: false
       record:
         description: Record Ring 1's platform digest baseline and upload it, instead of comparing
         type: boolean
@@ -437,6 +442,96 @@ jobs:
             tmp/nine-ring1/street.json
             tmp/nine-ring1/boot
           retention-days: 7
+
+  memory-ledger-guard:
+    # EM35 exercises the full production catalogue. Ring 1's slices omit
+    # vertex and texture storage, so this is a separate pinned client.
+    needs: nine-ring1-build
+    if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' && (inputs.pins_channel == '' || inputs.pins_channel == 'production') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WS_LANE_NAME: memory-ledger
+      WILDSHARD_CATALOGUE: test/pins/catalogue.json
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Select the committed or qualification ledger
+        id: baseline
+        if: ${{ inputs.memory_record || hashFiles('scripts/memory/ledger-ratchet.json') != '' }}
+        run: echo "selected=true" >> "$GITHUB_OUTPUT"
+      - if: steps.baseline.outputs.selected == 'true'
+        uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: memory-ledger
+      - if: steps.baseline.outputs.selected == 'true'
+        name: Build every production pin
+        run: |
+          node scripts/scratch-dir.mjs memory-ledger 'EM35 full pinned ledger'
+          node scripts/pins.ts install
+          node scripts/gen.mjs --inputs-only
+          python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs --outDir tmp/memory-ledger/preview/dist
+          bash scripts/ci-playwright-install.sh chromium
+      - if: steps.baseline.outputs.selected == 'true'
+        name: Read or block on subsystem ledger bytes
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        run: |
+          baseline=()
+          if [[ "$MEMORY_RECORD" != true ]]; then baseline+=(scripts/memory/ledger-ratchet.json); fi
+          node scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/memory-ledger/readings "${baseline[@]}"
+      - if: ${{ always() && steps.baseline.outputs.selected == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-ledger-guard
+          path: tmp/memory-ledger/readings/*.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+  memory-footprint-guard:
+    # EM36 reads native processes on the same hosted macOS runner as EM12.
+    needs: nine-ring1-build
+    if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' && (inputs.pins_channel == '' || inputs.pins_channel == 'production') }}
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      WS_LANE_NAME: memory-footprint
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Select the committed or qualification footprint
+        id: baseline
+        if: ${{ inputs.memory_record || hashFiles('scripts/memory/footprint-ratchet.json') != '' }}
+        run: echo "selected=true" >> "$GITHUB_OUTPUT"
+      - if: steps.baseline.outputs.selected == 'true'
+        uses: ./.github/actions/ring-setup
+      - if: steps.baseline.outputs.selected == 'true'
+        run: node scripts/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
+      - if: steps.baseline.outputs.selected == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: nine-ring1-client
+          path: tmp/memory-footprint
+      - if: steps.baseline.outputs.selected == 'true'
+        name: Read or block on settled Template WebContent
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        run: |
+          mkdir -p tmp/memory-footprint/preview
+          tar -xf tmp/memory-footprint/client.tar -C tmp/memory-footprint/preview
+          bash scripts/ci-playwright-install.sh webkit
+          baseline=()
+          if [[ "$MEMORY_RECORD" != true ]]; then baseline+=(scripts/memory/footprint-ratchet.json); fi
+          node scripts/memory/ci.mjs footprint tmp/memory-footprint/preview tmp/memory-footprint/readings "${baseline[@]}"
+      - if: ${{ always() && steps.baseline.outputs.selected == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-footprint-guard
+          path: tmp/memory-footprint/readings/*.json
+          retention-days: 7
+          if-no-files-found: ignore
 
   boundaries:
     # TS15: blocking after main run 43768938893's green soak, 2026-11-15. Cook Ring 1, attach, and play the same bytes.

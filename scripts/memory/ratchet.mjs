@@ -1,0 +1,142 @@
+// EM35–EM36. Byte budgets for ledger capacity and native WebContent footprint have separate baselines.
+import { readFileSync, writeFileSync } from 'node:fs';
+import { isDeepStrictEqual, parseArgs } from 'node:util';
+import { pathToFileURL } from 'node:url';
+import { memorySubsystems, PHONE_MEMORY_BUDGETS } from '../../src/shared/engine/core/memoryBudget.ts';
+
+const SUBSYSTEMS = Object.keys(PHONE_MEMORY_BUDGETS);
+const LEDGER_PHASES = ['control', 'peak'];
+
+/** @typedef {import('../../src/shared/engine/core/memoryBudget.ts').BudgetLedger} BudgetLedger */
+/** @typedef {{step:string, ledger:BudgetLedger | null}} Reading */
+/** @typedef {{control: Record<string,number>, peak: Record<string,number>}} LedgerBudget */
+/** @typedef {{settled: number, spread: number}} FootprintBudget */
+
+function byteCount(/** @type {unknown} */ value) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new Error('Expected a nonnegative byte count');
+  return value;
+}
+
+function capacity(/** @type {BudgetLedger} */ reading) {
+  const totals = memorySubsystems(reading);
+  return Object.fromEntries(Object.entries(totals).map(([kind, { gpu, ram }]) => [kind, gpu + ram]));
+}
+
+/** Latest control and the maximum observed bytes of each subsystem before that checkpoint.
+ * @param {readonly Reading[]} checkpoints @returns {LedgerBudget} */
+export function ledgerBudget(checkpoints) {
+  const last = checkpoints.findLastIndex(row => row.step === 'control');
+  const control = last === -1 ? null : checkpoints[last]?.ledger;
+  if (!control) throw new Error('Boot did not record a control ledger');
+  const peak = capacity(control);
+  for (const { ledger } of checkpoints.slice(0, last)) {
+    if (ledger === null) continue;
+    for (const [kind, bytes] of Object.entries(capacity(ledger))) peak[kind] = Math.max(peak[kind], bytes);
+  }
+  return { control: capacity(control), peak };
+}
+
+/**
+ * Check every boot and ratchet to the largest observation in the same batch,
+ * bounded by the previous baseline. A new budget requires a measured baseline.
+ * @param {LedgerBudget} baseline @param {readonly LedgerBudget[]} runs
+ * @param {string} zone @returns {LedgerBudget}
+ */
+export function compareLedger(baseline, runs, zone) {
+  if (runs.length === 0) throw new Error(`${zone}: no successful ledger boots`);
+  /** @type {LedgerBudget} */
+  const next = { control: {}, peak: {} };
+  const failures = [];
+  for (const phase of LEDGER_PHASES) for (const kind of SUBSYSTEMS) {
+    const previous = byteCount(baseline[phase]?.[kind]);
+    const observed = Math.max(...runs.map(run => byteCount(run[phase]?.[kind])));
+    const limit = previous + Math.floor(previous * 0.02);
+    if (observed > limit) failures.push(`${zone} ${phase} ${kind}: ${observed} B > ${limit} B (baseline ${previous} B)`);
+    next[phase][kind] = Math.min(previous, observed);
+  }
+  if (failures.length > 0) throw new Error(failures.join('\n'));
+  return next;
+}
+
+/** Hottest run sets the extent of measured spread around the median. The
+ * positive spread is kept in bytes so subsequent measurements cannot widen
+ * the allowance.
+ * @param {readonly number[]} readings @returns {FootprintBudget} */
+export function footprintBudget(readings) {
+  if (readings.length < 3 || readings.some(n => byteCount(n) === 0)) throw new Error('Need at least three native WebContent readings');
+  const sorted = [...readings].sort((a, b) => a - b);
+  const lower = sorted[Math.floor((sorted.length - 1) / 2)], upper = sorted[Math.ceil((sorted.length - 1) / 2)];
+  const settled = Math.round((lower + upper) / 2);
+  return { settled, spread: sorted.at(-1) - settled };
+}
+
+/** @param {FootprintBudget} baseline @param {readonly number[]} readings */
+export function compareFootprint(baseline, readings) {
+  const observed = footprintBudget(readings);
+  const previous = byteCount(baseline.settled), limit = previous + byteCount(baseline.spread);
+  if (observed.settled > limit) throw new Error(`Template settled WebContent: ${observed.settled} B > ${limit} B (baseline ${previous} B + ${baseline.spread} B spread)`);
+  return { settled: Math.min(previous, observed.settled), spread: baseline.spread };
+}
+
+/** @param {readonly LedgerBudget[]} runs @returns {LedgerBudget} */
+function highWater(runs) {
+  if (runs.length === 0) throw new Error('No ledger boots');
+  const phase = (/** @type {keyof LedgerBudget} */ name) =>
+    Object.fromEntries(SUBSYSTEMS.map(kind => [kind, Math.max(...runs.map(run => run[name][kind]))]));
+  return { control: phase('control'), peak: phase('peak') };
+}
+
+/** @param {string} file @returns {any} */
+function json(file) { return JSON.parse(readFileSync(file, 'utf8')); }
+
+/** @param {string} file @param {unknown} value */
+function write(file, value) { writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`); }
+
+/** Consume recorded measure.mjs output. Calibration and comparison never
+ * share an implicit write path. A failed comparison cannot update a file.
+ * @param {string[]} argv */
+export function main(argv) {
+  const { values, positionals } = parseArgs({ args: argv, allowPositionals: true,
+    options: { mode: { type: 'string' }, baseline: { type: 'string' }, out: { type: 'string' } } });
+  const mode = values.mode;
+  if (!['ledger', 'footprint'].includes(mode ?? '') || positionals.length === 0 || (!values.baseline && !values.out)) {
+    throw new Error('Usage: ratchet.mjs --mode=ledger|footprint [--baseline=file] [--out=file] <measure.json>...');
+  }
+  const baseline = values.baseline ? json(values.baseline) : null;
+  if (baseline !== null && (baseline.version !== 1 || baseline.mode !== mode)) throw new Error('Incompatible memory baseline');
+  const measurements = positionals.map(json);
+  for (const doc of measurements) if (doc.protocol !== 'memory-run/1' || typeof doc.chunk !== 'string') throw new Error('Expected measure.mjs output');
+  if (mode === 'ledger') {
+    /** @type {Map<string, LedgerBudget[]>} */
+    const readings = new Map();
+    for (const doc of measurements) {
+      if (doc.microscope?.ready !== true) throw new Error(`${doc.chunk}: Chromium did not reach control`);
+      const rows = readings.get(doc.chunk) ?? [];
+      rows.push(ledgerBudget(doc.microscope.checkpoints));
+      readings.set(doc.chunk, rows);
+    }
+    if (baseline !== null && !isDeepStrictEqual([...readings.keys()].sort(), Object.keys(baseline.zones).sort())) {
+      throw new Error('Measured zone coverage differs from the committed ledger baseline');
+    }
+    const zones = Object.fromEntries([...readings.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([zone, runs]) =>
+      [zone, baseline === null ? highWater(runs) : compareLedger(baseline.zones[zone], runs, zone)]));
+    if (values.out) write(values.out, { version: 1, mode, zones });
+    console.log(`Ledger ${baseline === null ? 'recorded' : 'passed'} for ${readings.size} zones`);
+  } else {
+    const readings = measurements.flatMap(doc => {
+      if (doc.chunk !== '_template' || !Array.isArray(doc.webkit) || doc.webkit.length === 0) throw new Error('Expected native WebKit Template runs');
+      return doc.webkit.map((/** @type {any} */ run) => {
+        if (run.host !== 'webkit' || run.refused !== null || run.ready !== true) throw new Error('Template did not reach control in native WebKit');
+        return byteCount(run.settled?.webcontent);
+      });
+    });
+    const anchor = baseline === null ? footprintBudget(readings) : compareFootprint(baseline.anchor, readings);
+    if (values.out) write(values.out, { version: 1, mode, anchor });
+    console.log(`Template native WebContent: median ${footprintBudget(readings).settled} B, baseline ${anchor.settled} B + ${anchor.spread} B`);
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try { main(process.argv.slice(2)); }
+  catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
+}

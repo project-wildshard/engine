@@ -23,7 +23,7 @@ export interface WebkitRun {
 }
 export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean}):Promise<WebkitRun>;
 export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;gpuDetail:{kinds:Record<string,number>;formats:Record<string,number>;owners:Record<string,number>}|null;checkpoints:{step:string;ledger:Record<string,Record<string,number>>|null;processes:DumpProcess[]}[]}
-export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number}):Promise<MicroscopeRun>;
+export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number;plantRetainedBuffer?:boolean}):Promise<MicroscopeRun>;
 export function webkitLines(run:WebkitRun):string[];
 export function microscopeLines(run:MicroscopeRun):string[];
 export function settledReading(page:unknown,procs:readonly BrowserProcess[],options?:{settleMs?:number;gcs?:number;reads?:number}):Promise<Pair&{reads:Pair[]}>;
