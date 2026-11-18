@@ -1,5 +1,7 @@
+import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
-import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories} from '../scripts/memory/measure.mjs';
+import {parseGridCatalogue} from '../src/shared/game/grid/catalogue';
+import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -109,4 +111,15 @@ test('STR1: a run names its boot and the in-page server worker by its chunk',()=
   expect(isServerWorker('http://127.0.0.1:4400/assets/serverWorker-1a2b3c.js')).toBe(true);
   expect(isServerWorker('http://127.0.0.1:4400/assets/ktx2Zstd-1a2b3c.js')).toBe(false);
   expect(isServerWorker('blob:http://127.0.0.1:4400/0b1c')).toBe(false);
+});
+
+test('STR8: an online page enters only a shard its build places, so the meter reads the built catalogue and places what the grid leaves out',()=>{
+  const pinned=JSON.parse(readFileSync('test/pins/catalogue.json','utf8'));
+  const page=(catalogue:unknown)=>`<head><script type="application/json" id="ws-catalogue">${JSON.stringify(catalogue).replaceAll('<','\\u003c')}</script></head>`;
+  expect([builtGridCell(page(pinned),'driftwood-isle'),builtGridCell(page(pinned),'open-plot-thin-ice'),builtGridCell('<head></head>','driftwood-isle')],'Thin Ice is off the pinned grid (J305)').toEqual([[0,0],null,null]);
+  const placed=placeOffGrid(pinned,['open-plot-thin-ice','open-plot-desert-ruin','driftwood-isle']);
+  expect([builtGridCell(page(placed),'open-plot-thin-ice'),builtGridCell(page(placed),'open-plot-desert-ruin'),builtGridCell(page(placed),'driftwood-isle')],'ring 3 from (0,3), as staging places Thin Ice; a placed shard keeps its cell').toEqual([[0,3],[1,3],[0,0]]);
+  expect(()=>parseGridCatalogue(placed.grid)).not.toThrow();
+  expect(pinned.grid.cells.length,'the pinned catalogue is left as it was').toBe(placed.grid.cells.length-2);
+  expect([ringThree().length,new Set(ringThree().map(c=>c.join(','))).size,ringThree().every(([x,y])=>Math.max(Math.abs(x),Math.abs(y))===3)]).toEqual([24,24,true]);
 });

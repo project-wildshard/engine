@@ -33,6 +33,10 @@
 // origin, the order flipped each round. Every run names its boot; an online run that starts the in-page server worker
 // (`standalone-server`) is refused, as is a standalone run that starts none. `--round=k` starts the round count at k, so a
 // shell loop can take one pair per command, each inside the measure lock, with the order still flipping. ratchet.mjs and phone-fit.mjs refuse runs that mix boots, as they do instruments.
+// The online page enters a `?chunk=` shard only where its build's catalogue gives the shard a grid cell (OF3): a shard off the
+// grid (Thin Ice and Desert Ruin, J305) lands on the title, so `--online` refuses it at once. `--place=<slug,...> --out=<file>`
+// writes the pinned catalogue with those shards on ring 3's first free cells (J314's order, from (0,3), where staging puts
+// Thin Ice); build the client with `WILDSHARD_CATALOGUE=<file>` and measure that build online (MEMORY-STRUCTURE STR8).
 //
 // The instrument (--instrument, EM11b): `minimal`, the default, turns off the Web Inspector's Network and Console domains on
 // the page before the boot and registers no route, so WebKit neither keeps every fetched response body (1.34 x the bytes, up
@@ -258,6 +262,42 @@ export async function openOnlineBoot({ dist, chunk, scratch }) {
     }
     throw new Error(`the ${chunk} world server did not become healthy`);
   } catch (error) { await close(); throw error; }
+}
+
+const CATALOGUE_ELEMENT = /<script type="application\/json" id="ws-catalogue">([^<]*)<\/script>/u;
+/** STR8: the grid cell a built page's inline catalogue (`ws-catalogue`) gives `slug`, or null: the online page enters only a placed
+ *  shard (`inThisWorld`, OF3). @param {string} html @param {string} slug @returns {readonly [number, number] | null} */
+export function builtGridCell(html, slug) {
+  const text = CATALOGUE_ELEMENT.exec(html)?.[1];
+  /** @type {{slug: string, cell: [number, number]}[]} */
+  const cells = text === undefined ? [] : JSON.parse(text)?.grid?.cells ?? [];
+  return cells.find((row) => row.slug === slug)?.cell ?? null;
+}
+/** Ring 3 of the 7 × 7 (J314), clockwise from (0,3), the order staging's uploads fill it. @returns {[number, number][]} */
+export function ringThree() {
+  /** @type {[number, number][]} */
+  const ring = [];
+  for (let x = 0; x <= 3; x++) ring.push([x, 3]);
+  for (let y = 2; y >= -3; y--) ring.push([3, y]);
+  for (let x = 2; x >= -3; x--) ring.push([x, -3]);
+  for (let y = -2; y <= 3; y++) ring.push([-3, y]);
+  for (let x = -2; x < 0; x++) ring.push([x, 3]);
+  return ring;
+}
+/** STR8: a measurement catalogue: `catalogue` with each shard in `slugs` the grid doesn't place on ring 3's next free cell, its
+ *  instance named after it. A placed shard keeps its cell. @template {{grid: {cells: {instance: string, slug: string, cell: number[]}[]}}} C
+ *  @param {C} catalogue @param {readonly string[]} slugs @returns {C} */
+export function placeOffGrid(catalogue, slugs) {
+  const cells = [...catalogue.grid.cells], taken = new Set(cells.map((row) => row.cell.join(',')));
+  for (const slug of slugs) {
+    if (cells.some((row) => row.slug === slug)) continue;
+    if (cells.some((row) => row.instance === slug)) throw new Error(`${slug} already names another shard's cell`);
+    const free = ringThree().find((cell) => !taken.has(cell.join(',')));
+    if (free === undefined) throw new Error(`ring 3 has no free cell for ${slug}`);
+    taken.add(free.join(','));
+    cells.push({ instance: slug, slug, cell: free });
+  }
+  return { ...catalogue, grid: { ...catalogue.grid, cells } };
 }
 
 /** The phone boot's saved state: phone tier, Low graphics, muted, Developer on, first play done. `route` false (instrument
@@ -728,8 +768,21 @@ async function main(argv) {
   /** @type {Record<string, string>} */
   const args = Object.fromEntries(argv.map((a) => /^--([^=]+)(?:=(.*))?$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2] ?? '1']));
   const online = args.online === undefined ? null : args.online === 'pair' ? 'pair' : 'online';
-  const usage = 'usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--ledger-only] [--summary=<file>] [--out=<file>] | --online[=pair] --dist=<built client folder> --chunk=<slug> [--runs=N] [--round=k] | --ladder [--zones=a,b]';
+  const usage = 'usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--ledger-only] [--summary=<file>] [--out=<file>] | --online[=pair] --dist=<built client folder> --chunk=<slug> [--runs=N] [--round=k] | --ladder [--zones=a,b] | --place=<slug,...> --out=<catalogue file>';
+  if (args.place) {
+    if (!args.out) { console.error('--place=<slug,...> takes --out=<catalogue file> (and --catalogue=<file>, default test/pins/catalogue.json)'); return 64; }
+    const placed = placeOffGrid(JSON.parse(readFileSync(args.catalogue ?? 'test/pins/catalogue.json', 'utf8')), args.place.split(','));
+    mkdirSync(dirname(resolvePath(args.out)), { recursive: true });
+    writeFileSync(args.out, `${JSON.stringify(placed, null, 2)}\n`);
+    for (const slug of args.place.split(',')) console.log(`${slug} at (${placed.grid.cells.find((row) => row.slug === slug)?.cell.join(',')}) in ${args.out}`);
+    return 0;
+  }
   if (online !== null && (!args.dist || !args.chunk || args.url2 || args.ladder || args.microscope || args['ledger-only'])) { console.error(`--online takes --dist and --chunk, and no --url2, --ladder, --microscope or --ledger-only\n${usage}`); return 64; }
+  if (online !== null && builtGridCell(readFileSync(join(args.dist, 'index.html'), 'utf8'), args.chunk) === null) {
+    console.error(`--online: ${args.chunk} has no grid cell in ${args.dist}'s catalogue (off the grid, J305), so the online page lands on the title (OF3).\n`
+      + `Place it and build a client for it: node scripts/memory/measure.mjs --place=${args.chunk} --out=tmp/<lane>/catalogue.json, then WILDSHARD_CATALOGUE=tmp/<lane>/catalogue.json node scripts/build-app.mjs --outDir <dist>`);
+    return 64;
+  }
   if ((online === null && !args.url) || (args.chunk === undefined && !args.ladder)) { console.error(usage); return 64; }
   const settleMs = Number(args.settle ?? 2000), timeoutMs = Number(args.timeout ?? 240) * 1000;
   const gcs = Number(args.gcs ?? 2), reads = Number(args.reads ?? 5);
