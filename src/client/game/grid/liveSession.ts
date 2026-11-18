@@ -274,6 +274,8 @@ export class LiveGridSession {
   /** G580 T2: the Developer choice, read at construction; the keeper is made at the first retirement */
   private keeper: ProgramKeeper | null = null;
   private checkpointsSuppressed = false;
+  /** SB41: a prepared recovery's place is final; `validSaved` holds the record to that exact save, `at` and all. */
+  private recoveryPrepared = false;
   /** The periodic autosave in flight: one stage a frame, superseded by any direct checkpoint (rt3-freeze). */
   private autosave: Generator<undefined, boolean> | null = null;
   private autosaveCaptured = false;
@@ -537,6 +539,8 @@ export class LiveGridSession {
 
   /** Where this page stands, which is the cell its next boot opens in. On a wire it's all a page saves. */
   saveLocation(): boolean {
+    // SB41: the online worker's pagehide save lands after a GPU recovery is prepared; a newer stamp would stale the record
+    if (this.recoveryPrepared) return false;
     // SB41: on a wire the server decides crossings, so the page can stand in a cell with no region entered (`current` null):
     // the cell under the feet is still where it stands, and the reload's owned-home entry admits it before the resume
     const current = this.live.current(), feet = this.worldFeet(), standing = this.ports.assembly.at(feet.x, feet.z);
@@ -552,7 +556,7 @@ export class LiveGridSession {
    *  doesn't place changes nothing. */
   serverPlace(instance: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }): boolean {
     const cell = this.ports.assembly.cells.find(row => row.instance === instance);
-    if (cell === undefined) return false;
+    if (cell === undefined || this.recoveryPrepared) return false;
     const road = { x: cell.origin.x + this.ports.assembly.pitch / 2 + 3.6, z: cell.origin.z, yaw: at.yaw }, recovery = gridRecovery(this.page.saves);
     this.page.saves.define(SERVER_PLACED).write(true);
     // A stand past the cell's interior (a rim the walls hold) still names the cell: the hint keeps the cell, with the road beside it.
@@ -577,7 +581,7 @@ export class LiveGridSession {
     if (this.wire === null ? !this.checkpoint() : !this.saveLocation()) return false;
     if (!gridRecovery(this.page.saves).write(this.ports.assembly, this.ports.home, this.recoveryRoad(), reason)) return false;
     // The intent names exactly this checkpoint; a later pagehide/timer must not replace its location or continuation.
-    this.checkpointsSuppressed = true; this.autosave?.return(false); this.autosave = null;
+    this.checkpointsSuppressed = true; this.recoveryPrepared = true; this.autosave?.return(false); this.autosave = null;
     return true;
   }
 

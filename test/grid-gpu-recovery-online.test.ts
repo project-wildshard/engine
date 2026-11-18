@@ -4,7 +4,7 @@
 // `?glreload`. Proved on staging v0.1.34 by scripts/gpu-recovery-proof.mjs: desktop Chromium on Driftwood landed on the title.
 // On a wire a recovery needs only where this page stands; offline the region checkpoint must still land first.
 import { installCatalogueFixture } from './fixtures/bootSetup';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { LiveGridSession, type LiveGridWire } from '../src/client/game/grid/liveSession';
 import { Scope } from '../src/shared/engine/app/scope';
 import { SaveStore } from '../src/shared/engine/saves/store';
@@ -73,4 +73,21 @@ test('on the road between cells the recovery still resumes on the road', () => {
   const { owner, store } = session({ wired: true, checkpoint: false });
   expect(owner.prepareRecovery('gpu')).toBe(true);
   expect(gridRecovery(store).consume(assembly)).toMatchObject({ kind: 'resume', record: { saved: { location: { kind: 'road' } } } });
+});
+
+// SB41 again (buddy-engine, staging v0.1.40 20de8e5d): the record named the pier, but the online worker's pagehide save
+// (clientWorker `save` → `grid.saveLocation()`) wrote the same place 322 ms later with a newer `at`. `validSaved` holds the
+// record to the instance's exact saved place, so the newer stamp made it stale and the reload took the safe road at (285,0).
+test('a location save after the recovery is prepared keeps the prepared place, so the reload still resumes on the pier', () => {
+  vi.useFakeTimers({ now: 1_794_981_215_528 });
+  try {
+    const { owner, store } = session({ wired: true, checkpoint: false });
+    const pier = { x: (home?.origin.x ?? 0) + 1, y: 2.02, z: (home?.origin.z ?? 0) - 194 };
+    Reflect.set(owner, 'live', { current: () => null, worldFeet: () => pier, followServer: () => undefined });
+    expect(owner.prepareRecovery('gpu')).toBe(true);
+    vi.advanceTimersByTime(322);
+    expect(owner.saveLocation()).toBe(false);
+    expect(owner.serverPlace(home?.instance ?? '', { x: 1, y: 2.02, z: -194, yaw: 0 })).toBe(false);
+    expect(gridRecovery(store).consume(assembly)).toMatchObject({ kind: 'resume', record: { saved: { location: { kind: 'cell', x: 1, z: -194 } } } });
+  } finally { vi.useRealTimers(); }
 });
