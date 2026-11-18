@@ -72,8 +72,245 @@ index af001b6115726433a64ea76058f3cb46735a2b3e..f781369919d4df927ccf3eb8c4b253de
 +  graphTierLimits,
 +}
  export type { BudgetTier, BudgetTierLimits }
+diff --git a/src/format/creature-attachments.ts b/src/format/creature-attachments.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..5825b58ce208ebd55c3bad1acd926cf92929935d
+--- /dev/null
++++ b/src/format/creature-attachments.ts
+@@ -0,0 +1,231 @@
++// ONE-FORMAT CC30a: a body's socket attachments. Each hangs up to four parts on
++// a skeleton socket the way the boss socket rig does (`bossSocketRig.ts`: an
++// `{ id, geometry, material }` part), where `geometry` is a library GLB's hash
++// and `material` a `look.materials` id. `when` shows it while a channel is at
++// `at` or above; `part` hides it once that volume breaks (the volume's
++// `channel`, set to 1 by the break, carries it to every page); `desktop`
++// drops it on the phone tier.
++import {
++  array,
++  boolean,
++  check,
++  exactOptional,
++  finite,
++  maxLength,
++  maxValue,
++  minLength,
++  minValue,
++  number,
++  pipe,
++  regex,
++  strictObject,
++  string,
++  tuple,
++} from 'valibot'
++
++import { creatureContract } from './creature-skeletons.ts'
++import { CreatureSocketNameSchema } from './creature-volumes.ts'
++import { materialExists } from './materials.ts'
++
++import type { CreatureSkeleton } from './creature-layers.ts'
++import type { CreatureTrail } from './creature-skeletons.ts'
++import type { GenericSchema } from 'valibot'
++
++const ZERO = 0
++const ONE = 1
++const MAX_ATTACHMENTS = 8
++const MAX_MESHES = 4
++const MAX_ID = 128
++const MAX_OFFSET = 500
++const id = pipe(string(), regex(/^[a-z][a-zA-Z0-9.:-]*$/u), maxLength(MAX_ID))
++const hash = pipe(string(), regex(/^[0-9a-f]{64}$/u))
++const unit = pipe(number(), finite(), minValue(ZERO), maxValue(ONE))
++const offset = pipe(
++  number(),
++  finite(),
++  minValue(-MAX_OFFSET),
++  maxValue(MAX_OFFSET),
++)
++
++/** One drawn part: a library GLB's geometry under a `look.materials` material. */
++interface CreatureAttachmentMesh {
++  id: string
++  geometry: string
++  material: string
++}
++interface CreatureAttachment {
++  id: string
++  /** A socket of the body's skeleton contract, or a bone of a GLB's own rig. */
++  socket: string
++  meshes: CreatureAttachmentMesh[]
++  /** Offset in the socket's local frame. */
++  at?: [number, number, number]
++  /** Shown while `channel` is at `at` (0.5 when omitted) or above. */
++  when?: { channel: string; at?: number }
++  /** A body volume with a break `channel`: the attachment hides once it breaks. */
++  part?: string
++  /** Dropped on the phone tier. */
++  desktop?: boolean
++}
++
++const mesh = strictObject({ id, geometry: hash, material: id })
++const shownWhen = strictObject({ channel: id, at: exactOptional(unit) })
++const meshList = pipe(array(mesh), minLength(ONE), maxLength(MAX_MESHES))
++const attachment = strictObject({
++  id,
++  socket: CreatureSocketNameSchema,
++  meshes: meshList,
++  at: exactOptional(tuple([offset, offset, offset])),
++  when: exactOptional(shownWhen),
++  part: exactOptional(CreatureSocketNameSchema),
++  desktop: exactOptional(boolean()),
++})
++const CreatureAttachmentsSchema: GenericSchema<CreatureAttachment[]> = pipe(
++  array(attachment),
++  minLength(ONE),
++  maxLength(MAX_ATTACHMENTS),
++  check<CreatureAttachment[], 'Duplicate creature attachment'>(
++    (rows: readonly AttachmentView[]): boolean => {
++      const ids = rows.flatMap((row: AttachmentView): readonly string[] => [
++        row.id,
++        ...row.meshes.map((part: MeshView): string => part.id),
++      ])
++      return new Set(ids).size === ids.length
++    },
++    'Duplicate creature attachment',
++  ),
++)
++
++/** A read-only view of an attachment, for the checks below. */
++interface AttachmentView {
++  readonly id: string
++  readonly socket: string
++  readonly meshes: readonly MeshView[]
++  readonly when?: { readonly channel: string }
++  readonly part?: string
++}
++interface MeshView {
++  readonly id: string
++  readonly geometry: string
++  readonly material: string
++}
++
++interface AttachedBody {
++  readonly skeleton?: CreatureSkeleton
++  readonly trail?: CreatureTrail
++  readonly channels?: readonly { readonly name: string }[]
++  readonly volumes?: readonly {
++    readonly part: string
++    readonly hp?: number
++    readonly channel?: string
++  }[]
++  readonly attachments?: readonly AttachmentView[]
++}
++
++/** A volume's break channel is declared and the volume has hp to break. */
++function volumeChannelsDeclared(body: AttachedBody): boolean {
++  const names = new Set(
++    (body.channels ?? []).map(
++      (row: { readonly name: string }): string => row.name,
++    ),
++  )
++  return (body.volumes ?? []).every(
++    (row: { readonly hp?: number; readonly channel?: string }): boolean =>
++      row.channel === undefined ||
++      (row.hp !== undefined && names.has(row.channel)),
++  )
++}
++
++/** The sockets a declared skeleton offers; undefined for a GLB's own rig. */
++function socketNames(body: AttachedBody): ReadonlySet<string> | undefined {
++  if (body.skeleton === undefined) {
++    return undefined
++  }
++  if (body.skeleton === 'serpent' && body.trail === undefined) {
++    return new Set()
++  }
++  return new Set(
++    Object.keys(
++      creatureContract({
++        skeleton: body.skeleton,
++        ...(body.trail === undefined ? {} : { trail: body.trail }),
++      }).sockets,
++    ),
++  )
++}
++
++/** Every attachment's socket, `when` channel and `part` volume resolve on its body. */
++function attachmentsResolve(body: AttachedBody): boolean {
++  const sockets = socketNames(body)
++  const channels = new Set(
++    (body.channels ?? []).map(
++      (row: { readonly name: string }): string => row.name,
++    ),
++  )
++  const broken = new Set(
++    (body.volumes ?? [])
++      .filter(
++        (row: { readonly channel?: string }): boolean =>
++          row.channel !== undefined,
++      )
++      .map((row: { readonly part: string }): string => row.part),
++  )
++  return (body.attachments ?? []).every(
++    (row: AttachmentView): boolean =>
++      (sockets === undefined || sockets.has(row.socket)) &&
++      (row.when === undefined || channels.has(row.when.channel)) &&
++      (row.part === undefined || broken.has(row.part)),
++  )
++}
++
++/** Shardfile reference rules: each part draws a library GLB under a declared material. */
++function attachmentFileRules(source: {
++  readonly species: readonly {
++    readonly body?: { readonly attachments?: readonly AttachmentView[] }
++  }[]
++  readonly files: readonly { readonly hash: string; readonly kind: string }[]
++  readonly library: readonly string[]
++  readonly materials: Readonly<Record<string, unknown>>
++}): string[] {
++  const glbs = new Set(
++    source.files
++      .filter((file: { readonly kind: string }): boolean => file.kind === 'glb')
++      .map((file: { readonly hash: string }): string => file.hash),
++  )
++  const library = new Set(source.library)
++  const meshes = source.species.flatMap(
++    (row: {
++      readonly body?: { readonly attachments?: readonly AttachmentView[] }
++    }): readonly MeshView[] =>
++      (row.body?.attachments ?? []).flatMap(
++        (item: AttachmentView): readonly MeshView[] => item.meshes,
++      ),
++  )
++  const errors: string[] = []
++  if (
++    meshes.some(
++      (part: MeshView): boolean =>
++        !glbs.has(part.geometry) || !library.has(part.geometry),
++    )
++  ) {
++    errors.push('creature attachment geometry')
++  }
++  if (
++    meshes.some(
++      (part: MeshView): boolean =>
++        !materialExists(source.materials, part.material),
++    )
++  ) {
++    errors.push('creature attachment material')
++  }
++  return errors
++}
++
++export {
++  CreatureAttachmentsSchema,
++  MAX_ATTACHMENTS,
++  attachmentFileRules,
++  attachmentsResolve,
++  volumeChannelsDeclared,
++}
++export type { CreatureAttachment, CreatureAttachmentMesh }
 diff --git a/src/format/creature-body.ts b/src/format/creature-body.ts
-index 2a453ad09116cf6b31dd8ee348bd847d38909ad9..8f55d75b34a8b858f093cf9ffe59c306878317dd 100644
+index 2a453ad09116cf6b31dd8ee348bd847d38909ad9..d55ce136798be9862de4e6be5ed13d99043ed138 100644
 --- a/src/format/creature-body.ts
 +++ b/src/format/creature-body.ts
 @@ -2,6 +2,7 @@ import {
@@ -84,11 +321,16 @@ index 2a453ad09116cf6b31dd8ee348bd847d38909ad9..8f55d75b34a8b858f093cf9ffe59c306
    maxLength,
    maxValue,
    minValue,
-@@ -13,36 +14,73 @@ import {
+@@ -13,36 +14,81 @@ import {
    string,
  } from 'valibot'
  
 -import { CREATURE_SKELETONS } from './creature-skeletons.ts'
++import {
++  CreatureAttachmentsSchema,
++  attachmentsResolve,
++  volumeChannelsDeclared,
++} from './creature-attachments.ts'
 +import {
 +  CreatureChannelBindSchema,
 +  CreatureChannelsSchema,
@@ -102,6 +344,7 @@ index 2a453ad09116cf6b31dd8ee348bd847d38909ad9..8f55d75b34a8b858f093cf9ffe59c306
    MAX_VOLUMES,
  } from './creature-volumes.ts'
  
++import type { CreatureAttachment } from './creature-attachments.ts'
 +import type {
 +  CreatureChannel,
 +  CreatureChannelBind,
@@ -138,6 +381,8 @@ index 2a453ad09116cf6b31dd8ee348bd847d38909ad9..8f55d75b34a8b858f093cf9ffe59c306
 +  bind?: CreatureChannelBind
 +  /** A second look drawn while a channel is high. */
 +  swap?: CreatureLookSwap
++  /** ONE-FORMAT CC30a: at most eight parts hung on sockets, shown by channel, hidden by a broken part. */
++  attachments?: CreatureAttachment[]
  }
 +const trailCount = pipe(
 +  number(),
@@ -160,17 +405,18 @@ index 2a453ad09116cf6b31dd8ee348bd847d38909ad9..8f55d75b34a8b858f093cf9ffe59c306
    size: picklist(
      ['tiny', 'small', 'medium', 'large', 'giant'],
      'Unknown creature size',
-@@ -52,6 +90,9 @@ const bodyObject = strictObject({
+@@ -52,6 +98,10 @@ const bodyObject = strictObject({
    volumes: exactOptional(CreatureVolumesSchema),
    lock: exactOptional(CreatureLockSchema),
    hits: exactOptional(picklist(['rest', 'clip'])),
 +  channels: exactOptional(CreatureChannelsSchema),
 +  bind: exactOptional(CreatureChannelBindSchema),
 +  swap: exactOptional(CreatureLookSwapSchema),
++  attachments: exactOptional(CreatureAttachmentsSchema),
  })
  const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
    bodyObject,
-@@ -65,15 +106,28 @@ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
+@@ -65,15 +115,28 @@ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
        ((body.lock?.length ?? ONE) <= ONE && body.hits !== 'clip'),
      'Only giants have multiple lock points or clip hits',
    ),
@@ -201,13 +447,21 @@ index 2a453ad09116cf6b31dd8ee348bd847d38909ad9..8f55d75b34a8b858f093cf9ffe59c306
        return (
          new Set(
            [...defaults, ...(body.volumes ?? [])].map(
-@@ -84,6 +138,10 @@ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
+@@ -84,6 +147,18 @@ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
      },
      'Too many resolved creature volumes',
    ),
 +  check<CreatureBody, 'A creature binds an undeclared channel'>(
 +    channelsDeclared,
 +    'A creature binds an undeclared channel',
++  ),
++  check<CreatureBody, 'A part breaks into an undeclared channel'>(
++    volumeChannelsDeclared,
++    'A part breaks into an undeclared channel',
++  ),
++  check<CreatureBody, 'A creature attachment does not resolve'>(
++    attachmentsResolve,
++    'A creature attachment does not resolve',
 +  ),
  )
  
@@ -518,19 +772,21 @@ index 4f52e862b668708d061d81630ee2f9bcee298a66..d68027e332da37f3bf18670a40235a04
 +  SkeletonContract,
 +}
 diff --git a/src/format/creature-volumes.ts b/src/format/creature-volumes.ts
-index f9aa9a3f474cf0d37f6baeb42936c12afe9584e7..f8eb4b1558f93c84806ccfa737ab05fb17d97d59 100644
+index f9aa9a3f474cf0d37f6baeb42936c12afe9584e7..33d9e16c16c8426393b980d7775cbe7c7b4782cf 100644
 --- a/src/format/creature-volumes.ts
 +++ b/src/format/creature-volumes.ts
-@@ -22,6 +22,8 @@ import type { GenericSchema } from 'valibot'
+@@ -22,6 +22,10 @@ import type { GenericSchema } from 'valibot'
  /** Bone-local rest offset. The runtime clamps the scaled radius, not the source. */
  interface CreatureVolume extends SkeletonVolume {
    at?: [number, number, number]
 +  /** Part hp (ONE-FORMAT CC31): the part breaks at 0, once; later hits pass to the next volume. */
 +  hp?: number
++  /** ONE-FORMAT CC30a: a body channel this part's break sets to 1, so every page sees it broken. */
++  channel?: string
  }
  const ZERO = 0
  const ONE = 1
-@@ -29,6 +31,7 @@ const MAX_VOLUMES = 16
+@@ -29,6 +33,7 @@ const MAX_VOLUMES = 16
  const MAX_NAME = 128
  const MAX_EXTENT = 500
  const MAX_MULTIPLIER = 100
@@ -538,19 +794,25 @@ index f9aa9a3f474cf0d37f6baeb42936c12afe9584e7..f8eb4b1558f93c84806ccfa737ab05fb
  const CreatureSocketNameSchema: GenericSchema<string> = pipe(
    string(),
    regex(/^[a-zA-Z][a-zA-Z0-9_.:-]*$/u),
-@@ -37,6 +40,7 @@ const CreatureSocketNameSchema: GenericSchema<string> = pipe(
+@@ -37,6 +42,12 @@ const CreatureSocketNameSchema: GenericSchema<string> = pipe(
  const scalar = pipe(number(), finite())
  const extent = pipe(scalar, minValue(ZERO), maxValue(MAX_EXTENT))
  const offset = pipe(scalar, minValue(-MAX_EXTENT), maxValue(MAX_EXTENT))
 +const partHp = pipe(scalar, minValue(Number.MIN_VALUE), maxValue(MAX_PART_HP))
++const channelName = pipe(
++  string(),
++  regex(/^[a-z][a-zA-Z0-9.:-]*$/u),
++  maxLength(MAX_NAME),
++)
  const volumeObject = strictObject({
    part: CreatureSocketNameSchema,
    bone: CreatureSocketNameSchema,
-@@ -46,6 +50,7 @@ const volumeObject = strictObject({
+@@ -46,6 +57,8 @@ const volumeObject = strictObject({
    axis: picklist(['y', 'z']),
    multiplier: pipe(scalar, minValue(ZERO), maxValue(MAX_MULTIPLIER)),
    at: exactOptional(tuple([offset, offset, offset])),
 +  hp: exactOptional(partHp),
++  channel: exactOptional(channelName),
  })
  const CreatureVolumeSchema: GenericSchema<CreatureVolume> = pipe(
    volumeObject,
@@ -893,6 +1155,27 @@ index 6d732c490aa5f97fb4c014fc4fbca488bd0bfaed..585fcbaa028ea968a960f3d5d72f5646
    'view.channel': 100, 'view.clip': 101, 'view.vfx': 102, 'view.sound': 103, 'view.visible': 104, 'view.field': 105,
  });
  export type ScriptV1EventName = keyof typeof SCRIPT_V1_EVENTS;
+diff --git a/src/format/shardSchema.ts b/src/format/shardSchema.ts
+index 57fdd48b0eef5aba318895ec85a826961fb22a35..f6dc8aa680ed8a6aac63cbd3f531589b6d9b260a 100644
+--- a/src/format/shardSchema.ts
++++ b/src/format/shardSchema.ts
+@@ -58,6 +58,7 @@ import { AccentSchema } from './accent.ts';
+ import { MapSchema, PresentationSchema } from './presentation.ts';
+ import { MigrationsSchema, migrationRules } from './migrations.ts';
+ import { skinLookRules } from './skinAssets.ts';
++import { attachmentFileRules } from './creature-attachments.ts';
+ import { MaterialsSchema, FamilyLooksSchema, MaterialCurvesSchema, TextureSamplersSchema, materialExists, materialTextureRefs, materialGraphRules, materialCurveRules, textureSamplerRules, graphBindingSources } from './materials.ts';
+ import { PostStackSchema, postStackRules } from './postStack.ts';
+ import { LookSkySchema, lookSkyRules } from './look-sky.ts';
+@@ -322,7 +323,7 @@ export function shardfileRules(s: Shardfile, sections?: ReadonlyMap<string, unkn
+   if (s.items.rows.some((row) => row.kind === 'tool' && row.action === null) && s.runtime?.binds?.includes('items') !== true) errors.push('native tools require runtime.binds items');
+   if (s.modes !== undefined && (s.modes.traverse.some(row => row.kind !== 'ladder') || (s.modes.ride?.length ?? 0) > 0 || (s.modes.grapple?.length ?? 0) > 0) && !pageOwner && s.runtime?.binds?.includes('modes') !== true) errors.push('traverse modes require their declared page or runtime player phase');
+   if (s.runtime !== null && s.modes?.traverse.some(row => row.kind === 'ladder')) errors.push('ladder traversal requires the data-only player owner');
+-  errors.push(...skinLookRules(s));
++  errors.push(...skinLookRules(s), ...attachmentFileRules({ species: s.rows.species, files: s.files, library: s.library, materials: s.look.materials }));
+   errors.push(...clientScriptRules(s));
+   if (s.props !== null) {
+     try { validatePropsReferences(s.props, s); } catch { errors.push('declared prop references'); }
 diff --git a/src/format/skin-file.ts b/src/format/skin-file.ts
 index d2c9fe2241aca364934f58b21f20dc05f7565907..3d7ac169808ddb16dcf87b8b716df2f87cca8d97 100644
 --- a/src/format/skin-file.ts
