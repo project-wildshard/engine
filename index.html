@@ -233,6 +233,20 @@
       const homeParams = new URLSearchParams(location.search);
       // The environment flags select no level (src/client/app/bootRoute.ts keeps the same list): a launch with only them is the title.
       for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw']) homeParams.delete(key);
+      // STAGING-BUGBASH SB44: a world page's address is bare (GO4), so the engine's own update reload of one (lastEnd's young
+      // `stale deployment code` / `stale build` / `new build panel`, not a `reload` that means the title) would land on the title.
+      // That page handed its tap to this document (titleArrival, session, 60 s): the address names the world again, so the page
+      // goes back in (entry.ts reads the tap as a title PLAY's) instead of the title's UNEXPECTEDLY BACK AT THE TITLE.
+      if (homeParams.size === 0 && location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
+        const saved = (store, scope, key) => { const item = JSON.parse(store.getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; };
+        const left = saved(localStorage, 'device', 'life.lastUnload'), tap = saved(sessionStorage, 'session', 'titleArrival'), now = Date.now();
+        if (left && left.reload !== true && now - left.t >= 0 && now - left.t < 10000 && /^(?:stale deployment code|stale build|new build panel)/u.test(left.reason)
+          && tap && now - tap.at >= 0 && now - tap.at < 60000 && /^[a-z0-9_-]+$/u.test(tap.slug)) {
+          const next = new URLSearchParams(location.search);
+          next.set('chunk', tap.slug); homeParams.set('chunk', tap.slug);
+          history.replaceState(history.state, '', location.pathname + '?' + next.toString() + location.hash);
+        }
+      } catch { /* storage blocked: the title, as before */ }
       if (homeParams.size === 0) document.documentElement.classList.add('title-first');
       // BUGBASH-LOOP (J385): the launch shell and live menu belong to the title only. A world page (`?chunk=`, a tap's
       // navigation) paints its own full-screen loading card from the first bytes, never the bare title over it.

@@ -304,3 +304,56 @@ test('QA 11-13: a page the entry turns into the title later (a player reload, an
   window.document.documentElement.classList.add('title-first'); frames.now = 700; await settle();
   expect(text()).toBe('Loading · 0.7 s');
 });
+
+// STAGING-BUGBASH SB44 (staging v0.1.38, a v0.1.36 WebKit shell): the online shell's fresh release read named a newer build, so the
+// page reloaded itself into it (`stale deployment code`) a second after Driftwood reached play. A world page's address is bare `/`
+// (GO4), so the reload landed on the title and the drop modal said UNEXPECTEDLY BACK AT THE TITLE, though the old page had handed its
+// tap to the next document (`setTitleArrival(…, {tab: true})`). The first bytes now take that handoff back into the world.
+function reloadedDocument(search: string, left: { reason: string; ago: number; reload?: true } | null, arrival: { slug: string; ago: number } | null): Window {
+  const window = new Window({ url: `https://launch.test/${search}`, width: 402, height: 874, settings: {
+    enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true,
+    enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true,
+  } });
+  windows.push(window);
+  const now = Date.now();
+  if (left !== null) window.localStorage.setItem(`wildshard.save.v2@${saveEpoch}.device`, JSON.stringify({keys: {'life.lastUnload': {v: 1, data: {
+    reason: left.reason, t: now - left.ago, build: 'old', slug: 'driftwood-isle', resident: '', mode: 'grid', ...left.reload === undefined ? {} : {reload: true},
+  }}}}));
+  if (arrival !== null) window.sessionStorage.setItem(`wildshard.save.v2@${saveEpoch}.session`, JSON.stringify({keys: {titleArrival: {v: 1, data: {
+    slug: arrival.slug, mode: 'enter', at: now - arrival.ago,
+  }}}}));
+  window.document.write(html);
+  return window;
+}
+const titleFirst = (window: Window): boolean => window.document.documentElement.classList.contains('title-first');
+
+test('SB44: the engine\'s own update reload of a bare world page goes back into the world its tap named', () => {
+  for (const reason of ['stale deployment code', 'stale build: its files are gone from the server', 'new build panel']) {
+    const window = reloadedDocument('', { reason, ago: 800 }, { slug: 'driftwood-isle', ago: 900 });
+    expect(window.location.search, reason).toBe('?chunk=driftwood-isle');
+    expect(titleFirst(window), reason).toBe(false);
+    expect(window.document.documentElement.classList.contains('boot-menu'), reason).toBe(false);
+  }
+  // the harness's environment flags ride along
+  expect(reloadedDocument('?tier=phone', { reason: 'stale deployment code', ago: 800 }, { slug: 'driftwood-isle', ago: 900 }).location.search)
+    .toBe('?tier=phone&chunk=driftwood-isle');
+});
+
+test('SB44: every other bare launch stays the title, with or without a handoff', () => {
+  const cases: [string, Parameters<typeof reloadedDocument>[1], Parameters<typeof reloadedDocument>[2]][] = [
+    ['a cold launch', null, null],
+    ['a tap left over with no reload behind it (DL21)', null, { slug: 'driftwood-isle', ago: 900 }],
+    ['an engine reload with no tap handed over', { reason: 'stale deployment code', ago: 800 }, null],
+    ['the player leaving for the title while loading', { reason: 'release page: title screen', ago: 800 }, { slug: 'driftwood-isle', ago: 900 }],
+    ['exit to main menu', { reason: 'exit to main menu', ago: 800 }, { slug: 'driftwood-isle', ago: 900 }],
+    ['a reload that means the title (`reload`)', { reason: 'stale deployment code', ago: 800, reload: true }, { slug: 'driftwood-isle', ago: 900 }],
+    ['an old reload (over 10 s)', { reason: 'stale deployment code', ago: 12_000 }, { slug: 'driftwood-isle', ago: 900 }],
+    ['an old tap (over 60 s)', { reason: 'stale deployment code', ago: 800 }, { slug: 'driftwood-isle', ago: 61_000 }],
+    ['a slug that is no slug', { reason: 'stale deployment code', ago: 800 }, { slug: '../x?y', ago: 900 }],
+  ];
+  for (const [name, left, arrival] of cases) {
+    const window = reloadedDocument('', left, arrival);
+    expect(window.location.search, name).toBe('');
+    expect(titleFirst(window), name).toBe(true);
+  }
+});
