@@ -661,6 +661,7 @@
     "src/client/game/grid/copyLayout.ts": "client",
     "src/client/game/grid/copyPrompts.ts": "client",
     "src/client/game/grid/dataCellKit.ts": "client",
+    "src/client/game/grid/dataCellRaces.ts": "client",
     "src/client/game/grid/dataCellTalks.ts": "client",
     "src/client/game/grid/dataCellMovers.ts": "client",
     "src/client/game/grid/edgeSources.ts": "client",
