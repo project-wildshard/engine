@@ -14,6 +14,7 @@ import { canReach } from '../../shared/engine/ai/reach';
 import { CombatPipeline, type DamageRequest } from '../../shared/engine/combat/pipeline';
 import { DamageBook, landedBy } from './combat/damageBook';
 import { RespawnBook } from './sim/respawn';
+import { StrikeProjectiles, validateStrikeProjectile } from './sim/strikeProjectiles';
 import type { PlayerHealth } from '../../shared/engine/combat/health';
 import { Physics } from '../../shared/engine/physics/Physics';
 import { CharacterMotor, PLAYER_BODY, PLAYER_CAPSULE, type MotorOptions } from '../../shared/engine/physics/CharacterMotor';
@@ -217,6 +218,8 @@ export class SimHost {
   private readonly callbacks = new Map<string, (dt: number, host: SimHost) => void>();
   private readonly afterCallbacks = new Map<string, (dt: number, host: SimHost) => void>();
   private readonly weapons = new Map<string, StrikeSpec>();
+  private strikeProjectiles: StrikeProjectiles | undefined;
+  private stopStrikeProjectiles: (() => void) | undefined;
   private readonly strikeCatalogues = new Map<string, ReadonlyMap<string, StrikeSpec>>();
   private readonly dynamicActors = new Set<string>();
   private readonly targetIds = new Map<string, string>();
@@ -439,6 +442,7 @@ export class SimHost {
     if (this.disposed) throw new Error('Simulation host is disposed');
     if (!this.dynamicActors.has(id)) return false;
     this.entities.get(id)?.motor?.dispose(); this.dynamicActors.delete(id); this.entities.delete(id); this.strikes.delete(id); this.weapons.delete(id); this.strikeCatalogues.delete(id);
+    this.strikeProjectiles?.removeSource(id);
     this.adapters.delete(`runtime.actor.${id}`); this.bands?.clocks.forget(id);
     for (const [source, target] of this.targetIds) if (source === id || target === id) {
       this.strikes.get(source)?.cancel(); this.entities.get(source)?.cancelAttack(); this.targetIds.delete(source);
@@ -459,7 +463,16 @@ export class SimHost {
   bindStrikeCatalogue(id: string, specs: readonly SimStrike[]): () => void {
     if (!this.entities.has(id) || this.strikeCatalogues.has(id) || new Set(specs.map(row => row.id)).size !== specs.length) throw new Error('Invalid strike catalogue owner');
     const rows = new Map<string, StrikeSpec>();
-    for (const spec of specs) rows.set(spec.id, { ...structuredClone(spec), weight: () => 1 });
+    let hasProjectiles = false;
+    for (const spec of specs) {
+      if (spec.projectile !== undefined) { validateStrikeProjectile(spec.projectile); hasProjectiles = true; }
+      rows.set(spec.id, { ...structuredClone(spec), weight: () => 1 });
+    }
+    if (hasProjectiles && this.strikeProjectiles === undefined) {
+      const flight = new StrikeProjectiles(this, (source, strike) => this.strikeCatalogues.get(source)?.get(strike));
+      this.stopStrikeProjectiles = this.onStep('creatures.strike-flight', dt => { flight.step(dt); }, flight, 'afterBodies');
+      this.strikeProjectiles = flight;
+    }
     this.strikeCatalogues.set(id, rows);
     const runner = specs.length > 0 && !this.strikes.has(id) ? new StrikeRunner() : undefined;
     if (runner !== undefined) this.strikes.set(id, runner);
@@ -467,6 +480,12 @@ export class SimHost {
       if (this.strikeCatalogues.get(id) !== rows) return;
       this.strikeCatalogues.delete(id);
       if (runner !== undefined && this.strikes.get(id) === runner) this.strikes.delete(id);
+      this.strikeProjectiles?.removeSource(id);
+      if (hasProjectiles && ![...this.strikeCatalogues.values()].some(catalogue => [...catalogue.values()].some(spec => spec.projectile !== undefined))) {
+        this.stopStrikeProjectiles?.();
+        this.stopStrikeProjectiles = undefined;
+        this.strikeProjectiles = undefined;
+      }
     };
   }
   /** Selection never installs another clock or contact path. Missing or busy actors retain today's refusal. */
@@ -789,6 +808,13 @@ export class SimHost {
     if (from !== undefined && origin === undefined) throw new Error(`Missing installed strike socket ${from} on ${id}`);
     if (origin !== undefined) { this.hitPoint.copy(position); this.hitPoint.y += target === undefined ? 1.2 : target.dims.bodyY * target.scale; }
     runner.update(FIXED_STEP, { actor, target: origin === undefined ? position : this.hitPoint, ...(origin === undefined ? {} : { origin }),
+      ...(runner.spec?.projectile === undefined ? {} : { launch: (spec: StrikeSpec) => {
+        const flight = this.strikeProjectiles;
+        if (flight === undefined || source === undefined) throw new Error('Missing authored creature flight owner');
+        if (origin === undefined) { this.hitOrigin.copy(actor.position); this.hitOrigin.y += source.dims.bodyY * source.scale; }
+        this.hitPoint.copy(position); this.hitPoint.y += target === undefined ? 1.2 : target.dims.bodyY * target.scale;
+        flight.launch(id, spec, this.hitOrigin, this.hitPoint);
+      } }),
       canReach: () => source === undefined ? true : canReach(source, position, this.physics, origin), hit: (spec) => {
       this.direction.subVectors(origin === undefined ? position : this.hitPoint, origin ?? actor.position).normalize();
       if (origin === undefined) {

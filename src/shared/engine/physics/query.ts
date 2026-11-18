@@ -93,7 +93,7 @@ const balls = new WeakMap<Physics, Map<number, Ball>>();
  * Sweep a ball of `radius` from `a` to `b` (a bolt's flight over one step, a thrown thing): the first world surface it
  * touches, with the ball's centre at `point` when it does. Null when the sweep is clear.
  */
-export function sweepBall(physics: Physics, a: Vec3, b: Vec3, radius: number, sees: readonly GroupName[] = WORLD, exclude?: Collider): Hit | null {
+export function sweepBall(physics: Physics, a: Vec3, b: Vec3, radius: number, sees: readonly GroupName[] = WORLD, exclude?: Collider, as: GroupName = 'PLAYER'): Hit | null {
   const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, len = Math.hypot(dx, dy, dz);
   if (len < 1e-6) return null;
   let byR = balls.get(physics);
@@ -101,7 +101,7 @@ export function sweepBall(physics: Physics, a: Vec3, b: Vec3, radius: number, se
   let ball = byR.get(radius);
   if (!ball) { ball = new physics.R.Ball(radius); byR.set(radius, ball); }
   const dir = { x: dx / len, y: dy / len, z: dz / len };
-  const hit = physics.world.castShape(a, { x: 0, y: 0, z: 0, w: 1 }, dir, ball, 0, len, true, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(sees), exclude);
+  const hit = physics.world.castShape(a, { x: 0, y: 0, z: 0, w: 1 }, dir, ball, 0, len, true, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(sees, as), exclude);
   if (!hit) return null;
   const t = hit.time_of_impact, tag = tagOf(hit.collider);
   return {

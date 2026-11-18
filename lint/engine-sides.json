@@ -1264,6 +1264,7 @@
     "src/server/engine/script/simBatchV2.ts": "server",
     "src/server/engine/sim.ts": "server",
     "src/server/engine/sim/playerSim.ts": "server",
+    "src/server/engine/sim/strikeProjectiles.ts": "server",
     "src/server/engine/sim/respawn.ts": "server",
     "src/server/engine/sim/restore.ts": "server",
     "src/server/game/animation/limbPopulation.ts": "server",

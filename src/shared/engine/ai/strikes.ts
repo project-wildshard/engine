@@ -27,6 +27,7 @@ export interface StrikeContext {
   readonly direction?: BrainPoint;
   canReach: () => boolean;
   hit: (spec: StrikeSpec) => void;
+  launch?: (spec: StrikeSpec) => void;
 }
 export interface StrikeSpec {
   debris?: StrikeDebrisPolicy;
@@ -34,6 +35,7 @@ export interface StrikeSpec {
   independentCooldown?: true;
   from?: string;
   knockbackDistance?: number;
+  projectile?: { speed: number; gravity: number; radius: number };
   range: number; damage: number; tags: readonly CombatTag[];
   weight: (ctx: StrikeContext) => number;
   units?: 'world' | 'actor';
@@ -141,7 +143,14 @@ export class StrikeRunner {
     }
     if (this.state === 'active') {
       if (laneMotion(spec)) a.setMotion(this.yaw, (spec.motion?.speed ?? 0) * this.speedMul, 0.35);
-      if (!this.hit && this.elapsed >= (spec.motion?.delay ?? 0)) this.hit = this.contact(spec, ctx);
+      if (!this.hit && this.elapsed >= (spec.motion?.delay ?? 0)) {
+        if (spec.projectile === undefined) this.hit = this.contact(spec, ctx);
+        else {
+          if (ctx.launch === undefined) throw new Error('Projectile strike needs a flight owner');
+          ctx.launch(spec);
+          this.hit = true;
+        }
+      }
       // a charge (declared `motion`) runs until the actor reaches the lane's end, or a runaway timeout; a motionless lane
       // (a wall of wind swept from a hover) keeps its full length for contact and ends at its declared `active` window
       if (laneMotion(spec) && spec.motion !== undefined) {
