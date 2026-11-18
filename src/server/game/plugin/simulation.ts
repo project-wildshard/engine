@@ -44,6 +44,7 @@ import { DirectorStageLane, bindDirectorActions, type DirectorActionBinding } fr
 import { directorDayRange, directorDataHostIssues } from '@wildshard/format/directorStages';
 import { DEFAULT_NORMALIZED_DAY, normalizedDayClock, inNormalizedDayRange, type DayCycle } from '@wildshard/engine/world/dayCycle';
 import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
+import { waveHeight } from '@wildshard/engine/world/waves';
 import { createSimHost, type SimHost, type SimCommand, type SimHostPorts, type SimLevel, type SimStrike, type SimValue } from "@wildshard/engine/sim";
 import { buildPlatformSpawns } from "@wildshard/engine/ai/platform";
 import { addBakedTerrainCollider } from "@wildshard/engine/physics/terrainTiles";
@@ -485,6 +486,10 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     if (liftEntries.length > 0 && !host.embedded && !ports.restoring && !ports.entrySocketsProvided) installEntrySockets(host.physics, host.scope, [{ x: 0, z: 0 }]);
     const water = ports.water ?? new WaterBodies();
     if (ports.water === undefined) for (const row of [...shard.water].sort((a, b) => Number(a.kind === 'sea') - Number(b.kind === 'sea'))) water.add(declaredWaterBody(row), host.scope);
+    // ONE-FORMAT OF40a: the `water.sea` primitive from a plain upload. A declared sea row gives the player its water (wade,
+    // swim, the swell), as Driftwood's native host does; a native product keeps installing its own.
+    const sea = ports.water === undefined && shard.runtime === null && !host.embedded && !host.hasWater ? water.sea : null;
+    if (sea !== null) { const waves = shard.water.some(row => row.kind === 'sea' && row.waves); host.useWater({ surfaceAt: sea.restAt, ...(waves ? { bob: (x: number, z: number) => waveHeight(x, z, host.clock.now) } : {}) }); }
     const ids = shardfileColliderIds(shard);
     if (portals.length > 0) {
       const safe = () => { if (portalTransitioning(host.physics)) throw new Error('Cannot step or snapshot during a portal transfer'); };
