@@ -81,7 +81,7 @@ export class AudioSceneDirector {
   if(ownCues!==undefined&&expected.length===0)throw new Error('Scene cue bank requires its loop inventory');
   if(ownCues!==undefined){const credit=cueManifest(requireAudioProfile(this.data.samples,'scene sample catalogue').set)?.['credit'];if(typeof credit!=='string')throw new Error('Scene cue bank requires its credit');installSfxCredit(credit,scope);}
   if(ownCues!==undefined)a.onLevelBank(bank=>{ownCues.useBank(bank.cues);},scope);
-  if(music!==undefined){const profile=requireAudioProfile(this.data.music,'scene score'),score=SetScore.declared(profile,music,undefined,{styleIndependent:ownCues!==undefined});this.score=score;scope.onDispose(()=>{score.dispose();});scope.onDispose(music.setScore(profile.id,score));a.onLevelBank(bank=>{if(ownCues===undefined||expected.every(id=>bank.cues.loops.has(id)))score.useBank(bank.score);},scope);}
+  if(music!==undefined){const profile=requireAudioProfile(this.data.music,'scene score'),score=SetScore.declared(profile,music,undefined,{styleIndependent:ownCues!==undefined,scope});this.score=score;scope.onDispose(()=>{score.dispose();});scope.onDispose(music.setScore(profile.id,score));a.onLevelBank(bank=>{if(ownCues===undefined||expected.every(id=>bank.cues.loops.has(id)))score.useBank(bank.score);},scope);}
   this.ambience=new SampledAmbience(a,requireAudioProfile(this.data.zones,'scene zones'),ownCues,scope);
   scope.onDispose(()=>{this.ambience?.dispose();this.ambience=null;if(a.hoofSurfaceAt===hoof)a.hoofSurfaceAt=previousHoof;if(a.bedId===voices.rows.bed)a.setAmbient(previousBed);if(animals?.onSound===animalSound){if(previousAnimal===undefined)delete animals.onSound;else Object.defineProperty(animals,'onSound',previousAnimal);}this.audio=null;this.voices=null;this.score=undefined;this.music=undefined;this.thrustPending=false;});
  }
@@ -206,7 +206,7 @@ async function installSampledAudioScene(ctx:ShardContext,data:AudioData):Promise
  const row=requireAudioProfile(data.sampledScene,'sample scene'),profile=requireAudioProfile(data.zones,'sample zones'),musicProfile=requireAudioProfile(data.music,'sample score');
  const audio=ctx.app.audio;if(audio?.music===null||audio===null)throw new Error('Sample scene requires audio/music');
  const music=audio.music,random=():number=>ctx.app.rng.stream('cosmetic').next(),scope=ctx.scope;
- const player=new CuePlayer(audio,scope,random),score=SetScore.declared(musicProfile,music);
+ const player=new CuePlayer(audio,scope,random),score=SetScore.declared(musicProfile,music,undefined,{scope});
  scope.onDispose(music.setScore(musicProfile.id,score));scope.onDispose(()=>{score.dispose();});
  let step=0;
  const voices=new Map<string,(opts:CombatCueOpts)=>boolean|undefined>(Object.entries(row.voices).map(([id,voice])=>[id,opts=>{

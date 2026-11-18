@@ -15,7 +15,7 @@ import { setSfxCredit } from './credits';
 import type { SfxBank } from './preload';
 import { Voices } from './Voices';
 import type { Scope } from '../../../shared/engine/app/scope';
-import type { CueMap, CueOpts } from './Cues';
+import type { CueMap, CueOpts, SampleClip } from './Cues';
 import type { Music } from './Music';
 import type { LevelAudioBank } from './levelAudio';
 import { audioUnlocked, claimPageAudioContext, releasePageAudioContext, resumePageAudioContext, whenAudioUnlocked } from './unlock';
@@ -184,7 +184,7 @@ export class Audio extends PlayerVoices {
   // ── samples (sfx.json) ──
   private sfxSet: SfxSet = getSfxSet();
   private loops = new Map<LoopName, SampleLoop>();
-  private shots = new Map<string, { bufs: AudioBuffer[]; gain: number }>();
+  private shots = new Map<string, SampleClip[]>();
   private sampleBed = false;
   census(): { activeVoices: number; beds: number; buses: number } {
     return { activeVoices: currentOwner()?.census.sounds ?? 0, beds: this.liveBeds?.() ?? (this.bedNodes.length > 0 ? 1 : 0), buses: this.g ? 8 : 0 };
@@ -286,7 +286,7 @@ export class Audio extends PlayerVoices {
     if (bank.credit !== undefined) setSfxCredit(this.sfxSet, bank.credit);
     this.applySamples(new Map(bank.loops), new Map(bank.shots));
   }
-  private applySamples(loops: Map<LoopName, SampleLoop>, shots: Map<string, { bufs: AudioBuffer[]; gain: number }>): void {
+  private applySamples(loops: Map<LoopName, SampleLoop>, shots: Map<string, SampleClip[]>): void {
     const hadBed = this.sampleBed, hadUnder = this.underSample, hadHum = this.hum?.sample === true;
     this.loops = loops; this.shots = shots;
     if (!this.g) return;
@@ -298,7 +298,7 @@ export class Audio extends PlayerVoices {
   override shot(family: string, o: { pan?: number; gain?: number; out?: AudioNode; t?: number; rate?: number } = {}): boolean {
     const set = this.shots.get(family);
     if (!set || !this.g) return false;
-    return this.voices.sample(set.bufs.map((buffer) => ({ buffer, offset: 0, duration: buffer.duration, gain: set.gain })),
+    return this.voices.sample(set,
       { ...o, time: o.t ?? 0 }, { jitter: 40, gainJitter: 0.84 }) !== undefined;
   }
   /** a sampled one-shot of this set exists (a zoned ambience scatters calls only when they are sampled) */

@@ -1,3 +1,4 @@
+import type { AudioDecode } from '@wildshard/engine/audio/SetScore';
 import type { AudioData } from '@wildshard/format/audio';
 import type { ClientPlan } from '@wildshard/format/clientPlan';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -81,10 +82,10 @@ export function enterPlotAudio(scene: PlotAudioScene, scope: Scope, ports: PlotA
 }
 
 /** One decode at a time, as the boot's decoder does (WebKit holds no pile of native PCM outputs at once). */
-function serialDecode(decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>): (bytes: ArrayBuffer) => Promise<AudioBuffer> {
+function serialDecode(decode: AudioDecode): AudioDecode {
   let tail: Promise<unknown> = Promise.resolve();
-  return (bytes) => {
-    const next = tail.then(() => decode(bytes));
+  return (bytes, purpose) => {
+    const next = tail.then(() => decode(bytes, purpose));
     tail = next.catch(() => undefined);
     return next;
   };

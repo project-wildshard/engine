@@ -48,6 +48,7 @@
     "src/client/engine/audio/loopWindow.ts": "client",
     "src/client/engine/audio/Music.ts": "client",
     "src/client/engine/audio/ownership.ts": "client",
+    "src/client/engine/audio/packedCues.ts": "client",
     "src/client/engine/audio/playerVoices.ts": "client",
     "src/client/engine/audio/preload.ts": "client",
     "src/client/engine/audio/score/score.ts": "client",

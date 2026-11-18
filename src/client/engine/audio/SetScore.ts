@@ -5,11 +5,12 @@ import type { Music, MusicState } from './Music';
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { AudioMusicProfile } from '../../../shared/engine/audio/audioProfiles';
 import { selectScoreSlots } from './scoreSelection';
+import { resourceScope } from '../../../shared/engine/app/resources';
 
 /** reads a stem file's bytes (fetch by default; a test hands its own) */
 export type AudioRead = (url: string) => Promise<ArrayBuffer>;
 /** decodes a stem's bytes into an AudioBuffer (the audio context by default; a test hands its own) */
-export type AudioDecode = (bytes: ArrayBuffer) => Promise<AudioBuffer>;
+export type AudioDecode = (bytes: ArrayBuffer, purpose?: 'effect') => Promise<AudioBuffer>;
 /** a set's decoded score: every slot's stems and the stings, ready for SetScore to play */
 export interface ScoreBank { slots: Map<string, SlotAudio>; stings: Map<StemSting, AudioBuffer> }
 export interface ScoreSource {
@@ -34,14 +35,15 @@ export interface ScoreSource {
 const STINGS: readonly StemSting[] = ['pickup', 'death', 'chunk'];
 /** Decode the requested stems only; absent or invalid files keep the next fallback or synth. */
 export async function decodeScore(set: ScoreSet, slots: readonly string[], read: AudioRead, decode: AudioDecode,
-  withStings: boolean, onFile?: () => void): Promise<ScoreBank> {
+  withStings: boolean, onFile?: () => void, owner: Scope = resourceScope()): Promise<ScoreBank> {
   const bank: ScoreBank = { slots: new Map(), stings: new Map() }, m = scoreManifest(set);
   if (!m) return bank;
-  const one = async (file: string): Promise<AudioBuffer> => {
+  const { decodeRecordingStem } = await import('./Stems');
+  const one = async <T>(file: string, convert: (bytes: ArrayBuffer) => Promise<T>): Promise<T> => {
     try {
       const url = `${set.dir}${file}`;
       if (!shipped(url)) throw new Error(`${url} is not in this build`);
-      return await decode(await read(url));
+      return await convert(await read(url));
     } finally { onFile?.(); }
   };
   await Promise.all([
@@ -49,16 +51,17 @@ export async function decodeScore(set: ScoreSet, slots: readonly string[], read:
       const spec = m.slots[slot];
       if (!spec) return;
       try {
-        const [calm, tension, ...layers] = await Promise.all([one(spec.calm), spec.tension === undefined ? Promise.resolve(undefined) : one(spec.tension), ...spec.layers.map(one)]);
+        const stem = (file: string) => one(file, bytes => decodeRecordingStem(bytes, spec, decode, owner));
+        const [calm, tension, ...layers] = await Promise.all([stem(spec.calm), spec.tension === undefined ? Promise.resolve(undefined) : stem(spec.tension), ...spec.layers.map(stem)]);
         if (spec.loopEnd > calm.duration + 0.05) throw new Error(`${slot}: loopEnd ${spec.loopEnd} past the file (${calm.duration.toFixed(2)} s)`);
-        const aligned = (b: AudioBuffer | undefined): b is AudioBuffer => b !== undefined && Math.abs(b.duration - calm.duration) < 0.05;
+        const aligned = (b: typeof calm | undefined): b is typeof calm => b !== undefined && Math.abs(b.duration - calm.duration) < 0.05;
         if (!layers.every(aligned)) throw new Error(`${slot}: a layer's length differs from the base`);
         bank.slots.set(slot, { genre: SCORE_GENRE, slot, spec, calm, tension: aligned(tension) ? tension : undefined, layers });
       } catch (error) { console.info(`[music] ${set.manifestKey}/${slot}: ${error instanceof Error ? error.message : String(error)} — the synth or another slot plays`); }
     }),
     ...(withStings ? STINGS : []).map(async (key) => {
       const file = m.stings[key];
-      if (file !== undefined) try { bank.stings.set(key, await one(file)); } catch { /* Keep the existing sting. */ }
+      if (file !== undefined) try { bank.stings.set(key, await one(file, bytes => decode(bytes, 'effect'))); } catch { /* Keep the existing sting. */ }
     }),
   ]);
   return bank;
@@ -68,6 +71,7 @@ export interface SetScoreOptions<Scene> extends ScoreSet {
   pick: (scene: Scene, state: MusicState | undefined) => readonly string[];
   read: AudioRead; decode: AudioDecode; onReady: () => void;
   waitForBank?: boolean;
+  scope?: Scope;
   /** Admitted minimum crossfade and fallback synth lead; omission keeps Music's existing defaults. */
   styleIndependent?: boolean;
   minFade?: number; synthLead?: 'pluck' | 'marimba';
@@ -75,10 +79,13 @@ export interface SetScoreOptions<Scene> extends ScoreSet {
 /** One score set; only the playing and wanted slots retain PCM across scene changes. */
 export class SetScore<Scene> implements ScoreSource {
   /** Bind admitted scene defaults and music-state selection to the existing set decoder. */
-  static declared(profile:AudioMusicProfile,music:Pick<Music,'refreshScore'>,io?:{read:AudioRead;decode:AudioDecode},policyOptions?:{styleIndependent?:boolean}):SetScore<Record<string,number|boolean|string|null>> {
+  static declared(profile:AudioMusicProfile,music:Pick<Music,'refreshScore'>,io?:{read:AudioRead;decode:AudioDecode},policyOptions?:{styleIndependent?:boolean;scope?:Scope}):SetScore<Record<string,number|boolean|string|null>> {
     const source=profile.source,policy=profile.setPlayback;
     if(source===null||policy===undefined)throw new Error('Missing declared score set');
-    const ports=io??{read:(url:string)=>import('./preload').then(({cachedBytes})=>cachedBytes(url)),decode:(bytes:ArrayBuffer)=>import('./preload').then(({decodeBytes})=>decodeBytes(bytes))};
+    const ports: { read: AudioRead; decode: AudioDecode } = io ?? {
+      read: url => import('./preload').then(({ cachedBytes }) => cachedBytes(url)),
+      decode: (bytes, purpose) => import('./preload').then(({ decodeBytes }) => decodeBytes(bytes, purpose)),
+    };
     return new SetScore({...source,...ports,...policyOptions,onReady:()=>{music.refreshScore();},minFade:profile.minFade,synthLead:profile.synthLead,scene:{...policy.scene},waitForBank:policy.waitForBank,
       pick:(scene,state)=>selectScoreSlots(profile.selection,profile.selectMode,{...scene,...(policy.stateMode?{mode:state?.mode??null}:{})})});
   }
@@ -135,7 +142,7 @@ export class SetScore<Scene> implements ScoreSource {
     if (this.decoding === undefined) {
       this.decoding = slot;
       const start = performance.now();
-      void decodeScore(this.options, [slot], this.options.read, this.options.decode, this.stings.size === 0).then((bank) => {
+      void decodeScore(this.options, [slot], this.options.read, this.options.decode, this.stings.size === 0, undefined, this.options.scope).then((bank) => {
         this.decoding = undefined;
         if (this.disposed) return undefined;
         const audio = bank.slots.get(slot);

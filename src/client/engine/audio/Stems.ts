@@ -4,6 +4,8 @@ import { ownAudioSource } from './ownership';
 import { tap } from '../../../shared/engine/core/harnessTap';
 import { AacTrack } from './aacTrack';
 import { AacSource } from './aacSource';
+import type { AudioDecode } from './SetScore';
+import type { Scope } from '../../../shared/engine/app/scope';
 // src/client/engine/audio/Stems.ts — the MiniMax-Music3 stem player behind src/client/engine/audio/Music.ts (project/archive/2026-09-23-music.md v3, row 7).
 //
 //   public/assets/music/<genre>/music.json   { genre, model, credit, slots: { <slot>: { calm, tension, bpm, beatsPerBar,
@@ -26,7 +28,7 @@ import { AacSource } from './aacSource';
 import { STINGS, musicManifest, musicSetDir, shipped, type SCORE_GENRE, type MusicStyle as MusicGenre, type BossPhase, type MusicSet, type SlotName, type SlotSpec, type StemSting } from '../../../shared/engine/audio/bootAudio';
 
 /** a decoded slot: its spec and the stems (tension absent for the title cut; layers only on the boss) */
-export interface SlotAudio { genre: MusicGenre | typeof SCORE_GENRE; slot: SlotName; spec: SlotSpec; calm: AudioBuffer | AacTrack; tension: AudioBuffer | AacTrack | undefined; layers: AudioBuffer[] }
+export interface SlotAudio { genre: MusicGenre | typeof SCORE_GENRE; slot: SlotName; spec: SlotSpec; calm: AudioBuffer | AacTrack; tension: AudioBuffer | AacTrack | undefined; layers: (AudioBuffer | AacTrack)[] }
 
 /** one genre, decoded: the slots this shard can play and the stings, plus what each file cost */
 export type StyleBank = GenreBank;
@@ -39,11 +41,19 @@ export interface GenreBank {
   log: { file: string; bytes: number; ms: number }[];
 }
 
+/** Prepare bounded native AAC windows, with the same complete recording on unsupported codecs or loops. */
+export async function decodeRecordingStem(bytes: ArrayBuffer, spec: SlotSpec, decode: AudioDecode, owner: Scope): Promise<AudioBuffer | AacTrack> {
+  if (owner.disposed) throw new Error('Music preparation owner retired');
+  const prepared = await AacTrack.prepare(new Uint8Array(bytes), spec.loopStart, spec.loopEnd, decode, undefined, owner);
+  if (owner.disposed) throw new Error('Music preparation owner retired');
+  return prepared ?? await decode(bytes);
+}
+
 /**
  * Decode `slots` + every sting of `genre`. `read` hands over a file's bytes (by URL), `decode` turns them into an AudioBuffer
  * (an OfflineAudioContext's — no live context needed). Rejects only when the build has no manifest for the genre.
  */
-export async function decodeStyle(genre: MusicGenre, slots: readonly SlotName[], read: (url: string) => Promise<ArrayBuffer>, decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>, onFile?: () => void, set: MusicSet = 'base', stings: readonly StemSting[] = STINGS, withTension = true): Promise<StyleBank> {
+export async function decodeStyle(genre: MusicGenre, slots: readonly SlotName[], read: (url: string) => Promise<ArrayBuffer>, decode: AudioDecode, onFile?: () => void, set: MusicSet = 'base', stings: readonly StemSting[] = STINGS, withTension = true): Promise<StyleBank> {
   const m = musicManifest(genre, set);
   if (!m) throw new Error(`no music.json for '${musicSetDir(genre, set)}' in this build`);
   const base = `/assets/music/${musicSetDir(genre, set)}/`;
@@ -59,19 +69,13 @@ export async function decodeStyle(genre: MusicGenre, slots: readonly SlotName[],
       return buf;
     } finally { onFile?.(); }
   };
-  const one = (file: string): Promise<AudioBuffer> => readOne(file, decode);
   await Promise.all([
     ...slots.map(async (slot) => {
       const spec = m.slots[slot];
       if (!spec) return;
       try {
-        const bounded = spec.layers.length === 0;
-        const stem = (file: string): Promise<AudioBuffer | AacTrack> => bounded ? readOne(file, async bytes => {
-          const prepared = await AacTrack.prepare(new Uint8Array(bytes), spec.loopStart, spec.loopEnd, decode, undefined, owner);
-          if (owner.disposed) throw new Error('Music preparation owner retired');
-          return prepared ?? await decode(bytes);
-        }) : one(file);
-        const [calm, tension, ...layers] = await Promise.all([stem(spec.calm), !withTension || spec.tension === undefined ? Promise.resolve(undefined) : stem(spec.tension), ...spec.layers.map(one)]);
+        const stem = (file: string): Promise<AudioBuffer | AacTrack> => readOne(file, bytes => decodeRecordingStem(bytes, spec, decode, owner));
+        const [calm, tension, ...layers] = await Promise.all([stem(spec.calm), !withTension || spec.tension === undefined ? Promise.resolve(undefined) : stem(spec.tension), ...spec.layers.map(stem)]);
         // the loop must fit the file (a bad loopEnd would loop into silence)
         if (spec.loopEnd > calm.duration + 0.05) throw new Error(`${slot}: loopEnd ${spec.loopEnd} past the file (${calm.duration.toFixed(2)} s)`);
         // stems of one recording: a stem of another length would drift off the calm one — drop it rather than play it wrong
@@ -83,7 +87,7 @@ export async function decodeStyle(genre: MusicGenre, slots: readonly SlotName[],
     ...stings.map(async (k) => {
       const f = m.stings[k];
       if (f === undefined) return;
-      try { bank.stings.set(k, await one(f)); } catch { /* that sting stays synth */ }
+      try { bank.stings.set(k, await readOne(f, bytes => decode(bytes, 'effect'))); } catch { /* that sting stays synth */ }
     }),
   ]);
   return bank;
@@ -113,8 +117,8 @@ export class Deck {
   private readonly ctx: BaseAudioContext;
   private readonly failed: ((error: unknown) => void) | undefined;
   constructor(ctx: BaseAudioContext, audio: SlotAudio, dest: AudioNode, t0: number, fadeIn: number, tension = 0, phase: BossPhase = 1, failed?: (error: unknown) => void) {
-    if ([audio.calm, audio.tension].some(stem => stem instanceof AacTrack && (ctx.sampleRate !== stem.sampleRate || audio.layers.length > 0))) {
-      this.scope.dispose(); throw new Error('Bounded AAC deck requires 48 kHz playback without boss layers');
+    if ([audio.calm, audio.tension, ...audio.layers].some(stem => stem instanceof AacTrack && ctx.sampleRate !== stem.sampleRate)) {
+      this.scope.dispose(); throw new Error('Bounded AAC deck requires 48 kHz playback');
     }
     this.ctx = ctx;
     this.failed = failed;

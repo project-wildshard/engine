@@ -21,18 +21,38 @@ import { sfxEntries, type SfxDecodePolicy } from '../../../shared/engine/audio/b
 import { currentOwner, onOwnerDispose } from '../../../shared/engine/app/ownership';
 import { observeAudioMemory } from '../../../shared/engine/core/memoryResources';
 import { compactLoopWindow } from './loopWindow';
+import { TIER } from '../core/tier';
+import type { AudioDecode } from './SetScore';
+import type { SampleClip } from './Cues';
 
 export const DECODE_RATE = 48000;
-let offline: OfflineAudioContext | undefined;
-function decodeContext(): OfflineAudioContext {
-  offline ??= new OfflineAudioContext(2, 1, DECODE_RATE); // the 3-argument form: Safari's constructor
+const PHONE_EFFECT_RATE = 24000;
+let offline: OfflineAudioContext | undefined, phoneEffects: OfflineAudioContext | undefined;
+function decodeContext(phoneEffect: boolean): OfflineAudioContext {
+  // The three-argument form is supported by Safari.
+  if (phoneEffect) {
+    phoneEffects ??= new OfflineAudioContext(1, 1, PHONE_EFFECT_RATE);
+    return phoneEffects;
+  }
+  offline ??= new OfflineAudioContext(2, 1, DECODE_RATE);
   return offline;
+}
+function monoEffect(source: AudioBuffer): AudioBuffer {
+  if (source.numberOfChannels === 1) return source;
+  const buffer = new AudioBuffer({ length: source.length, numberOfChannels: 1, sampleRate: source.sampleRate });
+  const output = buffer.getChannelData(0);
+  for (let channel = 0; channel < source.numberOfChannels; channel++) {
+    const input = source.getChannelData(channel);
+    for (let frame = 0; frame < input.length; frame++) output[frame] = (output[frame] ?? 0) + (input[frame] ?? 0) / source.numberOfChannels;
+  }
+  return buffer;
 }
 // Exact compressed content, independent of URL or boot/runtime decoder wrappers. Completed entries are weak:
 // retirement of the last bank/deck releases its PCM, and a later visit decodes again. Bound the metadata too.
 const decoded = new Map<string, WeakRef<AudioBuffer>>();
 const decoding = new Map<string, Promise<AudioBuffer>>();
 const decodedKeys = new WeakMap<AudioBuffer, string>();
+const packedEffects = new Map<string, WeakRef<SampleClip>>();
 const compactedLoops = new Map<string, { buffer: WeakRef<AudioBuffer>; loopStart: number; loopEnd: number }>();
 const DECODE_ENTRIES = 256;
 /** SF64: the file each fetched recording came from, so its decoded PCM is charged to a file instead of a hash. Weak: the
@@ -46,19 +66,22 @@ function audioLabel(owner: string, url: string | undefined): { owner: string; as
   const folder = path.slice(0, Math.max(0, path.lastIndexOf('/'))).replace(/^\//u, '');
   return { owner: GENERIC_OWNERS.has(owner) && folder.length > 0 ? `audio:${folder}` : owner, asset };
 }
-/** Decode at 48 kHz, sharing identical live recordings without retaining retired PCM (the bytes are detached on decode). */
-export async function decodeBytes(bytes: ArrayBuffer): Promise<AudioBuffer> {
+/** Share live recordings within the same output format without retaining retired PCM. */
+export const decodeBytes: AudioDecode = async (bytes, purpose) => {
+  const phoneEffect = purpose === 'effect' && TIER === 'phone';
   const label = audioLabel(currentOwner()?.name ?? 'engine/audio', sources.get(bytes));
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-  const key = Array.from(digest, value => value.toString(16).padStart(2, '0')).join('');
+  const hash = Array.from(digest, value => value.toString(16).padStart(2, '0')).join('');
+  const key = phoneEffect ? `mono24:${hash}` : hash;
   const live = decoded.get(key)?.deref();
   if (live) return live;
   const pending = decoding.get(key);
   if (pending) return pending;
-  const work = decodeContext().decodeAudioData(bytes);
+  const decodedAudio = decodeContext(phoneEffect).decodeAudioData(bytes);
+  const work = phoneEffect ? decodedAudio.then(monoEffect) : decodedAudio;
   decoding.set(key, work);
   try {
-    const buffer = observeAudioMemory(await work, { owner: label.owner, asset: label.asset ?? `audio/sha256:${key}` });
+    const buffer = observeAudioMemory(await work, { owner: label.owner, asset: label.asset ?? `audio/sha256:${hash}` });
     decodedKeys.set(buffer, key);
     decoded.delete(key); decoded.set(key, new WeakRef(buffer));
     while (decoded.size > DECODE_ENTRIES) {
@@ -68,6 +91,25 @@ export async function decodeBytes(bytes: ArrayBuffer): Promise<AudioBuffer> {
     }
     return buffer;
   } finally { if (decoding.get(key) === work) decoding.delete(key); }
+};
+
+async function sampleClip(buffer: AudioBuffer, gain: number, url: string): Promise<SampleClip> {
+  const clip = { buffer, offset: 0, duration: buffer.duration, gain };
+  if (TIER !== 'phone' || buffer.sampleRate !== PHONE_EFFECT_RATE || buffer.numberOfChannels !== 1) return clip;
+  const { packMonoCue, cueGain } = await import('./packedCues');
+  const key = decodedKeys.get(buffer), cached = key === undefined ? undefined : packedEffects.get(key)?.deref();
+  if (cached) return cueGain(cached, gain);
+  const { owner, asset } = audioLabel(currentOwner()?.name ?? 'engine/audio', url);
+  const packed = packMonoCue(clip, { owner, asset: asset ?? url });
+  if (key !== undefined) {
+    packedEffects.delete(key);
+    packedEffects.set(key, new WeakRef(packed));
+    while (packedEffects.size > DECODE_ENTRIES) {
+      const first = packedEffects.keys().next().value; if (first === undefined) break;
+      packedEffects.delete(first);
+    }
+  }
+  return packed;
 }
 
 /** Loop-only PCM keeps its authored samples and interpolation guards, not unused intro/outro.
@@ -123,7 +165,7 @@ export function trackBusy<T>(kind: AudioKind, work: Promise<T>): Promise<T> {
 
 // ─────────────── sound-effect sets (sfx.json) ───────────────
 /** a decoded sound-effect set: what Audio.ts plays in place of the synth versions */
-export interface SfxBank { set: string; credit: string | undefined; loops: Map<LoopName, SampleLoop>; shots: Map<string, { bufs: AudioBuffer[]; gain: number }> }
+export interface SfxBank { set: string; credit: string | undefined; loops: Map<LoopName, SampleLoop>; shots: Map<string, SampleClip[]> }
 /** a sample's level before sfx.json's own `gain` (beds sit under the synth bed's ~0.1 winds; hums near the synth hum's 0.11) */
 const LOOP_GAIN: Record<LoopName, number> = {
   underwater: 0.5, pickup: 0.35, shrine: 0.6,
@@ -131,7 +173,7 @@ const LOOP_GAIN: Record<LoopName, number> = {
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
-interface Job { url: string; bed?: true; apply: (buf: AudioBuffer, bank: SfxBank) => void }
+interface Job { url: string; effect?: true; apply: (buf: AudioBuffer, bank: SfxBank) => void | Promise<void> }
 /** AUDIO AU1: the files and their order are the shared selection's (`sfxEntries`, which the cook also reads). */
 function sfxJobs(set: string, bed: AmbientBed, policy: SfxDecodePolicy): Job[] {
   return sfxEntries(set, bed, policy).map((entry): Job => {
@@ -143,10 +185,13 @@ function sfxJobs(set: string, bed: AmbientBed, policy: SfxDecodePolicy): Job[] {
         const packed = compactSampleLoop(buffer, { loopStart, loopEnd }, u);
         bank.loops.set(name, { ...packed, gain: (policy.loopGains?.[name] ?? LOOP_GAIN[name] ?? 1) * num(v['gain'], 1) });
       };
-      return entry.bed ? { url: u, bed: true, apply } : { url: u, apply };
+      return { url: u, apply };
     }
     const family = entry.family, gain = entry.gain;
-    return { url: u, apply: (buf, bank) => { const s = bank.shots.get(family); if (s) s.bufs.push(buf); else bank.shots.set(family, { bufs: [buf], gain }); } };
+    return { url: u, effect: true, apply: async (buffer, bank) => {
+      const clip = await sampleClip(buffer, gain, u), familyClips = bank.shots.get(family);
+      if (familyClips) familyClips.push(clip); else bank.shots.set(family, [clip]);
+    } };
   });
 }
 
@@ -154,11 +199,11 @@ function sfxJobs(set: string, bed: AmbientBed, policy: SfxDecodePolicy): Job[] {
  * Decode `set` — every file its sfx.json lists that this shard can play — from `read` (the boot's counted fetch at the bar;
  * `cachedBytes` for a switch in the menu). A file that fails keeps its synth version; the set as a whole never rejects.
  */
-export async function decodeSfxSet(set: string, bed: AmbientBed, read: (url: string) => Promise<ArrayBuffer>, onFile?: () => void, decode: (bytes: ArrayBuffer) => Promise<AudioBuffer> = decodeBytes, policy: SfxDecodePolicy = {}): Promise<SfxBank> {
+export async function decodeSfxSet(set: string, bed: AmbientBed, read: (url: string) => Promise<ArrayBuffer>, onFile?: () => void, decode: AudioDecode = decodeBytes, policy: SfxDecodePolicy = {}): Promise<SfxBank> {
   const j = sfxManifests()[set];
   const bank: SfxBank = { set, credit: isObj(j) && typeof j['credit'] === 'string' ? j['credit'] : undefined, loops: new Map(), shots: new Map() };
   await Promise.all(sfxJobs(set, bed, policy).map(async (job) => {
-    try { job.apply(await decode(await read(job.url)), bank); }
+    try { await job.apply(await decode(await read(job.url), job.effect ? 'effect' : undefined), bank); }
     catch (e) { console.info(`[sfx] ${job.url}: ${e instanceof Error ? e.message : String(e)} — synth kept`); }
     onFile?.();
   }));

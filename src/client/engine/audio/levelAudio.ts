@@ -41,7 +41,7 @@ export const NO_AUDIO: LevelAudioProfile = {
 /** Optional native decode hook for an existing sprite catalogue; no playback or scheduling. */
 export interface AudioCatalogueExtras {
   readonly files: () => readonly string[];
-  readonly decode: (read: AudioRead, onFile?: () => void) => Promise<void>;
+  readonly decode: (read: AudioRead, onFile?: () => void, decode?: AudioDecode) => Promise<void>;
 }
 /** Declared download/decode routing over the existing music and sample catalogues.
  * Selected sets keep their original order; an overlay replaces matching samples
@@ -53,7 +53,7 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
   if(catalogueExtras===undefined&&data.bank?.catalogue!==undefined){
     const {declaredCatalogue}=await import('./declaredBank');
     const policy=data.bank.catalogue,catalogue=declaredCatalogue(policy);
-    catalogueExtras={files:()=>catalogue.shotFiles(),decode:async(read,onFile)=>{await declaredCatalogue(policy,read).decodeShots(onFile);}};
+    catalogueExtras={files:()=>catalogue.shotFiles(),decode:async(read,onFile,decode)=>{await declaredCatalogue(policy,read,decode).decodeShots(onFile);}};
   }
   const samples = data.samples, music = data.music, policy = samples?.catalogue;
   if (samples === undefined || music === undefined || policy === undefined) throw new Error('Missing declared audio catalogue');
@@ -90,7 +90,7 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
     decode: async (style, read, decode, onFile) => {
       const [title, bank] = await Promise.all([
         decodeStyle(style, music.bootSlots, read, decode, onFile).catch(() => undefined), decodeSamples(read, decode, onFile),
-        ...(getSfxSet() === 'synth' || catalogueExtras === undefined ? [] : [catalogueExtras.decode(read, onFile)]),
+        ...(getSfxSet() === 'synth' || catalogueExtras === undefined ? [] : [catalogueExtras.decode(read, onFile, decode)]),
       ]);
       return { title, samples: bank, score: { slots: new Map(), stings: new Map() }, cues: { loops: new Map(), shots: new Map() } };
     },
@@ -123,7 +123,7 @@ async function createScoreSetAudio(data:AudioData):Promise<LevelAudioProfile> {
       ]);
       if(policy.cueOverlay&&bank!==undefined){
         for(const [id,loop] of cues.loops)bank.loops.set(id.slice(id.indexOf('.')+1),loop);
-        for(const [id,clips] of cues.shots)bank.shots.set(id,{bufs:clips.map(clip=>clip.buffer),gain:clips[0]?.gain??1});
+        for(const [id,clips] of cues.shots)bank.shots.set(id,clips);
       }
       return {title,score,cues,...(bank===undefined?{}:{samples:bank})};
     },

@@ -39,6 +39,7 @@ import { audioFiles } from './audioFiles';
 import { whenPrefetched } from './prefetch';
 import { readContent } from './contentRead';
 import { decodeBytes, type SfxBank } from '../audio/preload';
+import type { AudioDecode } from '../audio/SetScore';
 import type { StyleBank } from '../audio/Stems';
 import { getSfxSet } from '../ui/Settings';
 import { TIER } from '../core/tier';
@@ -203,12 +204,12 @@ const AUDIO_FILE_CAP = 25_000_000;
 const downloaded = new Set<string>();
 /** A decoder that runs one file at a time. decodeStyle and decodeSfxSet both start every file at once; gating their
  *  decoder, not their reads, means WebKit never holds dozens of simultaneous native PCM outputs (E246 memory A/B). */
-function serialDecoder(decoded?: (bytes: ArrayBuffer) => void): (bytes: ArrayBuffer) => Promise<AudioBuffer> {
+function serialDecoder(decoded?: (bytes: ArrayBuffer) => void): AudioDecode {
   let tail: Promise<void> = Promise.resolve();
-  return (bytes) => {
+  return (bytes, purpose) => {
     const next = tail.then(async () => {
       await macrotask();
-      const buffer = await waitFor('Decode selected audio clip', decodeBytes(bytes));
+      const buffer = await waitFor('Decode selected audio clip', decodeBytes(bytes, purpose));
       decoded?.(bytes);
       return buffer;
     });

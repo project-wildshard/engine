@@ -11,7 +11,8 @@ import { spatialAudio } from './util';
 import { audioLog } from './audioLog';
 import type { Audio } from './Audio';
 import type { VoiceTable, PlayOpts } from './Voices';
-import type { AudioRead } from './SetScore';
+import type { AudioDecode, AudioRead } from './SetScore';
+import { TIER } from '../core/tier';
 
 export interface DeclaredBankAudio extends Pick<Audio,'ready'|'listenerYaw'|'ambient'|'shot'|'playPhrase'> {
  readonly voices:Pick<Audio['voices'],'register'|'prewarm'|'playback'>;
@@ -19,9 +20,9 @@ export interface DeclaredBankAudio extends Pick<Audio,'ready'|'listenerYaw'|'amb
 const shared=new Map<string,WeakRef<Map<string,SampleClip[]>>>();
 const catalogues=new WeakMap<Map<string,SampleClip[]>,Set<WeakRef<CueCatalogue>>>();
 /** Live boot/playback catalogues share sprite slices; the memo never owns retired PCM. */
-export function declaredCatalogue(row:NonNullable<AudioBank['catalogue']>,read:AudioRead=cachedBytes):CueCatalogue {
+export function declaredCatalogue(row:NonNullable<AudioBank['catalogue']>,read:AudioRead=cachedBytes,decode:AudioDecode=decodeBytes):CueCatalogue {
  let clips=shared.get(row.set)?.deref();if(clips===undefined){clips=new Map();shared.set(row.set,new WeakRef(clips));}
- const catalogue=new CueCatalogue(row.set,read,decodeBytes,{...row,available:()=>getSfxSet()!=='synth',shared:clips});
+ const catalogue=new CueCatalogue(row.set,read,decode,{...row,compactSprite:TIER==='phone',available:()=>getSfxSet()!=='synth',shared:clips});
  let users=catalogues.get(clips);if(users===undefined){users=new Set();catalogues.set(clips,users);}
  users.add(new WeakRef(catalogue));return catalogue;
 }

@@ -518,6 +518,7 @@ export class Music {
   private decoding: MusicGenre | undefined;
   private deck: Deck | undefined;
   private readonly resolvingTracks = new WeakSet<AacTrack>();
+  private readonly failedSlots = new WeakSet<SlotAudio>();
   /** the synth sequencer is scheduling (its timer runs); `synthGen` voids a pending stop when it is restarted mid-fade */
   private synthOn = false;
   private synthGen = 0;
@@ -737,6 +738,7 @@ export class Music {
       const playing = this.deck && source.slots.includes(this.deck.slot) ? this.deck.slot : undefined;
       const a = source.want(playing);
       if (a === undefined) { if (!source.pending || !this.deck) this.toSynth(now); return; }
+      if (this.failedSlots.has(a)) { this.toSynth(now); return; }
       if (this.deck?.slot === a.slot && this.deck.genre === a.genre) { this.deck.setPhase(source.phase ?? 1, now); return; }
       this.startDeck(a, playing === undefined ? 0 : source.minFade ?? 6);
       return;
@@ -780,10 +782,12 @@ export class Music {
       if (buffer) {
         if (a.calm === track) a.calm = buffer;
         if (a.tension === track) a.tension = buffer;
+        const layer = a.layers.indexOf(track); if (layer !== -1) a.layers[layer] = buffer;
       }
-      if (this.playing && this._genre === a.genre && this.wantSlot() === a.slot) this.sync();
+      if (this.playing && this.wantSlot() === a.slot) this.sync();
     } catch (error: unknown) {
       if (this.scope.disposed) return;
+      this.failedSlots.add(a);
       this.failed.add(a.genre);
       console.info(`[music] ${a.genre}/${a.slot}: ${String(error)} — the synth plays on`);
       this.sync();
@@ -794,7 +798,7 @@ export class Music {
     if (!rig) return;
     // The device context is created only by a gesture. Unsupported rates keep the original decoder;
     // the old deck continues while that fallback resolves, and stale completion cannot install a slot.
-    const waiting = [a.calm, a.tension].filter((track): track is AacTrack => track instanceof AacTrack
+    const waiting = [a.calm, a.tension, ...a.layers].filter((track): track is AacTrack => track instanceof AacTrack
       && (rig.ctx.sampleRate !== track.sampleRate || !track.ready));
     if (waiting.length > 0) {
       for (const track of waiting) {
@@ -818,7 +822,7 @@ export class Music {
     }
     const deck = withOwner(this.scope, () => new Deck(rig.ctx, a, rig.stemBus, t, fade, this.tension(), this.source?.phase ?? 1, error => {
       console.info(`[music] ${a.genre}/${a.slot}: ${String(error)} — the synth plays on`);
-      if (this.deck === deck) { this.deck = undefined; this.failed.add(a.genre); this.sync(); }
+      if (this.deck === deck) { this.deck = undefined; this.failedSlots.add(a); this.failed.add(a.genre); this.sync(); }
     }));
     this.deck = deck;
     audioLog('music', `deck:${a.slot}`, true, a.genre);
