@@ -18,7 +18,8 @@ export interface SpeciesLook extends Pick<SpeciesDef, 'rigContract' | 'fur' | 'b
   /** creature memory a specimen is stood up with in the Model Explorer (a creature that waits hidden is shown risen) */
   standMem?: Readonly<Record<string, number>>;
   variants?: Readonly<Record<string, Pick<VariantDef, 'tint' | 'fur' | 'traits'>>>;
-  material?: (sky: Sky, glow?: [number, number, number], intensity?: number) => AnimalMaterial;
+  /** `variant`: the variant drawn (a skin look's variants each wear their own coat, ONE-FORMAT OF27b) */
+  material?: (sky: Sky, glow?: [number, number, number], intensity?: number, variant?: VariantDef) => AnimalMaterial;
   /** with `material` on a low-poly level: the body stays faceted (flat facets, per-facet jitter) in one group, glowing eye
    *  faces marked by an `aGlow` attribute (1 on the eyes) for the material to read; absent, the smooth loft as before */
   faceted?: true;

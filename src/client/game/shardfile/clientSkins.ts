@@ -223,6 +223,20 @@ export class SkinDriver {
   }
 }
 
+/**
+ * ONE-FORMAT OF27b: the textures this tier's skin files name (each skin file's dependencies after its GLB): the look's
+ * skin and its variants', or on the phone tier its phone skin's where it has one, as `loadClientSkins` draws them.
+ */
+export function skinTextureRefs(source: Pick<Shardfile, 'rows' | 'files'>, tier: Tier = buildTier()): string[] {
+  const files = new Map(source.files.map((file) => [file.hash, file]));
+  return [...new Set(source.rows.looks.flatMap((look) => {
+    if (look.recipe !== SKIN_LOOK_RECIPE) return [];
+    const parameters = skinLookParameters(look), table = parameters.variants === undefined ? [] : files.get(parameters.variants)?.dependencies ?? [];
+    const skins = tier === 'phone' && parameters.phone !== undefined ? [parameters.phone] : [parameters.skin, ...table];
+    return skins.flatMap((hash) => files.get(hash)?.dependencies.slice(1) ?? []);
+  }))];
+}
+
 /** Select once for every creature view owner, including entered grid cells. */
 export function clientVariantSkin(skin: ClientSkin, id: string): ClientSkin {
   if (skin.variants === undefined) return skin;
@@ -257,7 +271,8 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
       clips: [...skin.clips.keys()].filter((name): name is ClipName => is(SkinClipNameSchema, name)) },
     // the procedural stand-in is the hull itself (the factory swaps in `skin`'s shared geometry before any rig is made)
     build: (variant) => { const selected = select(variant.id); return { bones: bones(selected), furParts: [], hardParts: [selected.geometry.clone()], eyeParts: [], dims: dims() }; },
-    material: () => skin.material(),
+    // OF27b: each variant wears its own coat (its skin file's material: maps, sheen, rim, glow)
+    material: (_sky, _glow, _intensity, variant) => (variant === undefined ? skin : select(variant.id)).material(),
     ...(skin.parts.length === 0 ? {} : { partMaterials: () => skin.parts.map((part) => part()) }),
     skin: (variant) => { const selected = select(variant.id); return { geometry: selected.geometry, map: null, normalMap: null, bones: bones(selected), overgrown: false }; },
     ...(quadruped ? { postPose: animate } : { animate }),

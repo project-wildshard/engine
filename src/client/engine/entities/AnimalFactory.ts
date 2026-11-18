@@ -6,7 +6,7 @@ import type { GraphShaderMaterial } from '../render/graph/glslMaterial';
 import { mergeAnimalGeometry } from '../models/animalGeometry';
 import { Rng } from '../../../shared/engine/core/rng';
 import type { SkyRig as Sky } from '../world/skyRig';
-import { attachFogUniforms, fogUniforms } from '../world/Atmosphere';
+import { bindFurRim } from '../render/furRim';
 import { bakedTexture } from '../boot/bakedTextures';
 import { validateCreatureBones, speciesDef, variantDef, type SpeciesDef, type VariantDef, type AnimalDims, type BoneDef, type FurStyle } from '../../../shared/engine/entities/species/registry';
 import { setLowPoly } from './species/loft';
@@ -298,6 +298,67 @@ function slotFurColours(fur: THREE.Material): void {
   }, { key: (prior) => `${prior}|fur-slots`, pureKey: true });
 }
 
+/** the fur's program: the overgrown parts, the shared backlit rim (render/furRim.ts) and a shell layer */
+function patchFur(fur: THREE.MeshPhysicalMaterial, rim: THREE.Color, shell?: ShellLayer, shellIndex = -1, overgrown = false): void {
+  patchShader(fur, 'engine.animal-fur', PATCH_ORDER.material, (shader) => {
+    if (overgrown) {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <clipping_planes_pars_vertex>', `#include <clipping_planes_pars_vertex>
+          attribute vec2 aOvergrown; varying vec2 vOvergrown;`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vOvergrown = aOvergrown;`);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <clipping_planes_pars_fragment>', `#include <clipping_planes_pars_fragment>
+          varying vec2 vOvergrown;`)
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          diffuseColor.rgb = mix( diffuseColor.rgb, diffuse, vOvergrown.x );`)
+        .replace('mapN.xy *= normalScale;', 'mapN.xy *= normalScale * ( 1.0 - vOvergrown.x );')
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+          totalEmissiveRadiance += vec3( 0.45, 0.95, 1.1 ) * 2.6 * vOvergrown.y;`);
+    }
+    bindFurRim(shader, rim);
+    if (shell !== undefined) {
+      shader.uniforms['shellLen'] = { value: shell.len };
+      shader.uniforms['shellComb'] = { value: new THREE.Vector3(0, -0.45, -0.25).multiplyScalar(shell.len * shell.layer) };
+      shader.uniforms['shellT'] = { value: shell.threshold };
+      shader.uniforms['shellDark'] = { value: shell.dark };
+      shader.uniforms['strandMap'] = { value: shell.strand };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <clipping_planes_pars_vertex>', `#include <clipping_planes_pars_vertex>
+          attribute float furLen; uniform float shellLen; uniform vec3 shellComb; varying float vFurLen; varying vec2 vStrandUv;`)
+        .replace('#include <skinning_vertex>', `#include <skinning_vertex>
+          vFurLen = furLen; vStrandUv = uv * 6.0;
+          transformed += objectNormal * ( furLen * shellLen ) + shellComb * furLen;`);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <clipping_planes_pars_fragment>', `#include <clipping_planes_pars_fragment>
+          uniform float shellT; uniform float shellDark; uniform sampler2D strandMap; varying float vFurLen; varying vec2 vStrandUv;`)
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          if ( vFurLen < 0.04 ) discard;
+          float strand = texture2D( strandMap, vStrandUv ).r;
+          if ( strand < shellT ) discard;
+          diffuseColor.rgb *= shellDark;`);
+    }
+  }, { mode: 'replace', key: `animal-fur${shell !== undefined ? `-shell${shellIndex}` : ''}${overgrown ? '-overgrown' : ''}` });
+}
+
+/**
+ * A rigged hull's fur material (Pine Hollow PH-M1, the hull book's draw): one group drawn with the procedural fur's own
+ * program over the hull's photoreal atlas (the variant's coat) and normal map, its sheen and backlit rim from `style`.
+ * `selfLight` (traits.selfLight) feeds the coat back as emissive (the Antler King's night fight).
+ */
+export function hullFurMaterial(hull: CreatureHull, style: FurStyle, selfLight: number): { fur: THREE.MeshPhysicalMaterial; rim: THREE.Color } {
+  const fur = new THREE.MeshPhysicalMaterial({
+    map: hull.map, normalMap: hull.normalMap, normalScale: new THREE.Vector2(1.0, -1.0),   // glTF's normal map, derivative tangents (as GLTFLoader); every rig ships one
+    roughness: style.roughness, metalness: 0, vertexColors: true, color: new THREE.Color(1.0, 1.0, 1.0),
+    sheen: Math.max(0.01, style.sheen), sheenRoughness: 0.7, sheenColor: col3(style.sheenColor), envMapIntensity: style.envMapIntensity,
+  });
+  if (style.emissive !== undefined) { fur.emissive = col3(style.emissive); fur.emissiveIntensity = style.emissiveIntensity ?? 1; }
+  if (selfLight > 0) { fur.emissiveMap = hull.map; fur.emissive.setRGB(1, 1, 1); fur.emissiveIntensity = selfLight; }
+  const rim = col3(style.rim);
+  patchFur(fur, rim, undefined, -1, hull.overgrown);
+  return { fur, rim };
+}
+
 export class AnimalFactory {
   private models = new Map<string, AnimalModel>();
   private tex = new Map<string, { map: THREE.Texture; normalMap: THREE.Texture }>();
@@ -429,7 +490,7 @@ export class AnimalFactory {
       if (look?.material !== undefined) {
         // Nalati: the smooth loft, vertex colours only, no fur texture / shells — and fur, hooves and eyes in ONE group so a
         // wolf / horse is a single draw call; the view supplies the material and its soft light
-        const mat = look.material(this.sky, species.eyeGlow, species.eyeGlowIntensity);
+        const mat = look.material(this.sky, species.eyeGlow, species.eyeGlowIntensity, v);
         // a generated hull skinned to this skeleton (Debug ▸ Creatures = Models, glbCreatures.ts). While it is still loading the
         // procedural mesh stands in, and every rig made from it is upgraded in place when the hull arrives (upgradeHull)
         const hull = look.skin?.(v, sp.bones, eyes) ?? null;
@@ -475,18 +536,8 @@ export class AnimalFactory {
       const hull = app.species.look(kind)?.skin?.(v, sp.bones, eyes) ?? null;
       if (hull !== null && hull.map !== null) {
         if (hull.fur !== undefined) style = { ...style, ...hull.fur };   // the coat's own sheen / rim (E322 F-M2's fixed bears)
-        const fur = new THREE.MeshPhysicalMaterial({
-          map: hull.map, normalMap: hull.normalMap, normalScale: new THREE.Vector2(1.0, -1.0),   // glTF's normal map, derivative tangents (as GLTFLoader); every rig ships one
-          roughness: style.roughness, metalness: 0, vertexColors: true, color: new THREE.Color(1.0, 1.0, 1.0),
-          sheen: Math.max(0.01, style.sheen), sheenRoughness: 0.7, sheenColor: col3(style.sheenColor), envMapIntensity: style.envMapIntensity,
-        });
-        if (style.emissive !== undefined) { fur.emissive = col3(style.emissive); fur.emissiveIntensity = style.emissiveIntensity ?? 1; }
-        // traits.selfLight: the coat fed back as emissive (the Antler King reads in his night fight, as the Drowned Captain's
-        // selfLight) — its own program, only on that variant
         const selfLight = Number(v.traits?.['selfLight'] ?? 0);
-        if (selfLight > 0) { fur.emissiveMap = hull.map; fur.emissive.setRGB(1, 1, 1); fur.emissiveIntensity = selfLight; }
-        const rim = col3(style.rim);
-        this.patchFur(fur, rim, undefined, -1, hull.overgrown);
+        const { fur, rim } = hullFurMaterial(hull, style, selfLight);
         this.sky.setupMaterial(fur);
         const coatLayer = hull.coatLayer;
         m = { kind, variant: v.id, style: 'pbr', render: DEFAULT_CREATURE_RENDER, species, variantDef: v, geometry: hull.geometry, bones: hull.bones, dims: sp.dims, fur, hard: fur, eye: new THREE.MeshPhysicalMaterial(), shells: [], rim, hull: { overgrown: hull.overgrown, ...(coatLayer === undefined ? {} : { coatLayer }) } };
@@ -506,7 +557,7 @@ export class AnimalFactory {
       });
       if (style.emissive !== undefined) { fur.emissive = col3(style.emissive); fur.emissiveIntensity = style.emissiveIntensity ?? 1; }
       const rim = col3(style.rim);
-      this.patchFur(fur, rim);
+      patchFur(fur, rim);
       const hard = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0, vertexColors: true, color: new THREE.Color(1, 1, 1), normalMap: tex.normalMap, normalScale: new THREE.Vector2(0.35, 0.35) });
       const eye = new THREE.MeshPhysicalMaterial({ roughness: 0.1, metalness: 0, vertexColors: true, color: new THREE.Color(1, 1, 1), clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.5 });
       if (species.eyeGlow !== undefined) { eye.emissive = col3(species.eyeGlow); eye.emissiveIntensity = species.eyeGlowIntensity ?? 1; }
@@ -518,7 +569,7 @@ export class AnimalFactory {
       for (let i = 0; i < SHELL_LAYERS; i++) {
         const sm = fur.clone();
         const k = (i + 1) / SHELL_LAYERS;
-        this.patchFur(sm, rim, { layer: k, len: baseLen * k, threshold: 0.1 + 0.82 * k * k, dark: 0.8 + 0.3 * k, strand }, i);
+        patchFur(sm, rim, { layer: k, len: baseLen * k, threshold: 0.1 + 0.82 * k * k, dark: 0.8 + 0.3 * k, strand }, i);
         this.sky.setupMaterial(sm);
         shells.push(sm);
       }
@@ -539,66 +590,7 @@ export class AnimalFactory {
    * `overgrown` (a generated hull's overgrown variant): the `aOvergrown` attribute's x takes the vertex colour instead of the
    * atlas and its normal map (the moss clumps), y glows cyan (the glass eyes) — one more program, only while one exists.
    */
-  private patchFur(fur: THREE.MeshPhysicalMaterial, rim: THREE.Color, shell?: ShellLayer, shellIndex = -1, overgrown = false): void {
-    patchShader(fur, 'engine.animal-fur', PATCH_ORDER.material, (shader) => {
-      if (overgrown) {
-        shader.vertexShader = shader.vertexShader
-          .replace('#include <clipping_planes_pars_vertex>', `#include <clipping_planes_pars_vertex>
-            attribute vec2 aOvergrown; varying vec2 vOvergrown;`)
-          .replace('#include <begin_vertex>', `#include <begin_vertex>
-            vOvergrown = aOvergrown;`);
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <clipping_planes_pars_fragment>', `#include <clipping_planes_pars_fragment>
-            varying vec2 vOvergrown;`)
-          .replace('#include <map_fragment>', `#include <map_fragment>
-            diffuseColor.rgb = mix( diffuseColor.rgb, diffuse, vOvergrown.x );`)
-          .replace('mapN.xy *= normalScale;', 'mapN.xy *= normalScale * ( 1.0 - vOvergrown.x );')
-          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-            totalEmissiveRadiance += vec3( 0.45, 0.95, 1.1 ) * 2.6 * vOvergrown.y;`);
-      }
-      attachFogUniforms(shader);
-      shader.uniforms['furRimColor'] = { value: rim };
-      shader.uniforms['furSunDir'] = fogUniforms.fogSunDir;
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <clipping_planes_pars_fragment>', `#include <clipping_planes_pars_fragment>
-          uniform vec3 furRimColor; uniform vec3 furSunDir;`)
-        .replace('#include <opaque_fragment>', `
-          {
-            vec3 V = normalize( vViewPosition );
-            float ndv = saturate( dot( normal, V ) );
-            vec3 sunV = normalize( ( viewMatrix * vec4( furSunDir, 0.0 ) ).xyz );
-            float back = saturate( dot( sunV, -V ) );                // looking toward the sun: the coat's tips light up
-            float fres = pow( 1.0 - ndv, 3.2 );
-            // the backlit glow is a close-up detail: past ~10 m it washes the whole silhouette into the haze and a
-            // a pale creature at 25 m becomes a pale ghost you cannot aim at, so it fades to a third by 40 m
-            float rimDist = 1.0 - 0.67 * smoothstep( 10.0, 40.0, length( vViewPosition ) );
-            float rimAmt = fres * ( 0.02 + 1.2 * back * back ) * rimDist;
-            outgoingLight += furRimColor * rimAmt * ( 0.15 + 0.85 * diffuseColor.rgb * 2.2 );
-          }
-          #include <opaque_fragment>`);
-      if (shell !== undefined) {
-        shader.uniforms['shellLen'] = { value: shell.len };
-        shader.uniforms['shellComb'] = { value: new THREE.Vector3(0, -0.45, -0.25).multiplyScalar(shell.len * shell.layer) };
-        shader.uniforms['shellT'] = { value: shell.threshold };
-        shader.uniforms['shellDark'] = { value: shell.dark };
-        shader.uniforms['strandMap'] = { value: shell.strand };
-        shader.vertexShader = shader.vertexShader
-          .replace('#include <clipping_planes_pars_vertex>', `#include <clipping_planes_pars_vertex>
-            attribute float furLen; uniform float shellLen; uniform vec3 shellComb; varying float vFurLen; varying vec2 vStrandUv;`)
-          .replace('#include <skinning_vertex>', `#include <skinning_vertex>
-            vFurLen = furLen; vStrandUv = uv * 6.0;
-            transformed += objectNormal * ( furLen * shellLen ) + shellComb * furLen;`);
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <clipping_planes_pars_fragment>', `#include <clipping_planes_pars_fragment>
-            uniform float shellT; uniform float shellDark; uniform sampler2D strandMap; varying float vFurLen; varying vec2 vStrandUv;`)
-          .replace('#include <map_fragment>', `#include <map_fragment>
-            if ( vFurLen < 0.04 ) discard;
-            float strand = texture2D( strandMap, vStrandUv ).r;
-            if ( strand < shellT ) discard;
-            diffuseColor.rgb *= shellDark;`);
-      }
-    }, { mode: 'replace', key: `animal-fur${shell !== undefined ? `-shell${shellIndex}` : ''}${overgrown ? '-overgrown' : ''}` });
-  }
+
 
   /** Fur-shell meshes for one rig: SHELL_LAYERS SkinnedMeshes sharing geometry + skeleton, parented to the body mesh, all hidden. [] in 'toon'. */
   createShells(rig: Pick<AnimalRig, 'mesh'>, model: Pick<AnimalModel, 'geometry' | 'shells'>): THREE.SkinnedMesh[] {
@@ -685,7 +677,7 @@ export class AnimalFactory {
     if (!model.render.furRim || model.rim === undefined || model.hull?.overgrown === true) return null;
     const fur = model.fur.clone();
     if (!(fur instanceof THREE.MeshPhysicalMaterial)) return null;
-    this.patchFur(fur, model.rim, undefined, -1, false);
+    patchFur(fur, model.rim, undefined, -1, false);
     fur.color.setRGB(1, 1, 1);
     this.sky.setupMaterial(fur);
     return fur;
@@ -713,11 +705,11 @@ export class AnimalFactory {
     }
     // painterly: a fresh material (a clone would drop the painterly shader patch)
     const look = app.species.look(model.kind);
-    const fur = look?.material?.(this.sky, model.species.eyeGlow, model.species.eyeGlowIntensity) ?? model.fur.clone();
+    const fur = look?.material?.(this.sky, model.species.eyeGlow, model.species.eyeGlowIntensity, model.variantDef) ?? model.fur.clone();
     if (model.map) fur.map = model.map;
     if (model.doubleSided === true) fur.side = THREE.DoubleSide;
     if (model.render.furRim && model.rim !== undefined) {
-      this.patchFur(fur as THREE.MeshPhysicalMaterial, model.rim, undefined, -1, model.hull?.overgrown ?? false);   // clone() does not carry onBeforeCompile
+      patchFur(fur as THREE.MeshPhysicalMaterial, model.rim, undefined, -1, model.hull?.overgrown ?? false);   // clone() does not carry onBeforeCompile
     }
     if (model.render.lowPoly && model.geometry.hasAttribute('aGlow') && fur instanceof THREE.MeshStandardMaterial) patchEyeGlow(fur, model.eye.emissive, model.eye.emissiveIntensity);
     const v = (tint - 0.5) * model.render.tintRange;

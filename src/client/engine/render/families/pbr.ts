@@ -14,6 +14,8 @@ import * as THREE from 'three';
 import { applyDetail } from './detail';
 import { applyGround } from './ground';
 import { applyMeasure } from './measure';
+import { bindFurRim } from '../furRim';
+import { patchShader, PATCH_ORDER } from '../shaderPatches';
 import type { PbrMaterialParams } from '@wildshard/format/materialFamilies';
 
 /** How a texture is read: `colour` is sRGB, `data` is linear (normals, ORM). */
@@ -44,7 +46,9 @@ export function compilePbr(params: PbrMaterialParams, textures: TextureResolver,
   const { white, flatNormal } = pbrFillers();
   const { colour, normal, orm } = params.maps;
   const ormMap = orm === null ? white : textures(orm, 'data');
-  const m = new THREE.MeshStandardMaterial({
+  // ONE-FORMAT OF27b: a fur (a hull book's coat drawn as a skin) is three's physical material for its velvet sheen
+  const fur = params.sheen !== undefined || params.rim !== undefined;
+  const m = new (fur ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial)({
     color: new THREE.Color().setRGB(...params.colour, THREE.SRGBColorSpace),
     map: colour === null ? white : textures(colour, 'colour'),
     normalMap: normal === null ? flatNormal : textures(normal, 'data'),
@@ -62,6 +66,14 @@ export function compilePbr(params: PbrMaterialParams, textures: TextureResolver,
     alphaTest: params.alphaCutoff,
   });
   m.name = 'family:pbr';
+  if (params.sheen !== undefined && m instanceof THREE.MeshPhysicalMaterial) {
+    m.sheen = params.sheen.amount; m.sheenRoughness = params.sheen.roughness; m.sheenColor.setRGB(...params.sheen.colour);
+  }
+  // the hull book's backlit rim (render/furRim.ts), the same source as the fur material's
+  if (params.rim !== undefined) {
+    const rim = new THREE.Color().setRGB(...params.rim);
+    patchShader(m, 'family.pbr-rim', PATCH_ORDER.material, (shader) => { bindFurRim(shader, rim); }, { key: (prior) => `${prior}|pbr-rim` });
+  }
   // M4.3: the surface's own glow, added over its lit colour (lamp glass that the sun still lights); absent = black
   if (params.emissive !== undefined) { m.emissive.setRGB(...params.emissive, THREE.SRGBColorSpace); m.emissiveIntensity = params.emissiveIntensity ?? 1; }
   if (params.ground !== null && params.measure !== null) throw new Error('material family: a PBR surface takes a ground or a measure layer, not both');

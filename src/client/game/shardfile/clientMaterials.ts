@@ -30,6 +30,7 @@ import { curvedParams, materialTextureRefs } from '@wildshard/format/materials';
 import { clientGraphs, graphOutlineHook, isGraphEntry, keptGraphFileTextureRefs, type GraphOutlineHook, type GraphReadout, type GraphSources } from './clientGraphs';
 import { parseSkinFile, skinLookParameters } from '@wildshard/format/skinAssets';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
+import { skinTextureRefs } from './clientSkins';
 import type { PropSurfaceBinding } from '@wildshard/engine/world/declaredProps';
 import { propMaterialTextureRefs, propMaterialsOf } from '@wildshard/format/propMaterials';
 import { ownedGraph, propSurfaces } from './clientPropMaterials';
@@ -153,7 +154,7 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   const groundLayers = splat === undefined ? undefined : await import('./clientSplatLayers');
   const splatTier = splatDrawTier();
   const splatRefs = new Set(splat === undefined ? [] : splatTextureRefs(splat, splatTier));
-  const refs = new Set([...materialTextureRefs(sampledMaterials), ...keptGraphFileTextureRefs(sampledMaterials, (hash) => assets.get(hash)), ...(shard.props?.textures.map((entry) => entry.colour) ?? []), ...propMaterialTextureRefs(named), ...splatRefs]);
+  const refs = new Set([...materialTextureRefs(sampledMaterials), ...keptGraphFileTextureRefs(sampledMaterials, (hash) => assets.get(hash)), ...(shard.props?.textures.map((entry) => entry.colour) ?? []), ...propMaterialTextureRefs(named), ...splatRefs, ...skinTextureRefs(shard)]);
   // LS8 (J204): a caller's loading step (a sky backdrop's looks: 1.5 s of Driftwood's sky at 4x CPU) may count each
   // texture transcoded and the graph compiler loaded, so it moves while they land
   const loadsCompiler = graphsOn && carriesGraph(shard, assets);
