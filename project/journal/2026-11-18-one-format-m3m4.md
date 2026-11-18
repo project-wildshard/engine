@@ -16,3 +16,7 @@
 - CC17b follow-up: a leap on a real ground body was pulled 20% a tick toward the ground by the ground follow (peak
   about 7 m). `AnimalSim.airborne`, set by `ShardDecisions` while a leap flies, leaves its height to the move; the
   real-body test peaks at 9 m.
+- CC23c: the serpent poser. `TrailCreatureVolumes.joint` lends the skin view every trail bone's local transform (the
+  head against the view root, each bone against the one ahead, facing along the path), so a serpent skin draws on the
+  same trail its volumes sit on (embedded hosts and neighbour cells read the bound pose). 20 serpents of 14 bones pose
+  in 0.032 ms a frame (Node, loaded MacBook). A remote MMO page still needs its own ring fed from the wire's root.

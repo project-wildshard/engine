@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { Quaternion, Vector3 } from 'three';
 import * as v from 'valibot';
 import { CreatureBodySchema, type CreatureBody } from '@wildshard/format/creatureLayers';
 import { MIN_VOLUME_RADIUS, trailBoneNames } from '@wildshard/format/creatureSkeletons';
@@ -32,6 +32,12 @@ export class TrailCreatureVolumes implements CreatureVolumePose {
   private readonly key = ownedArray(Float64Array, 5, TRAIL_STATE).fill(Number.NaN);
   private readonly centre = new Vector3();
   private readonly along = new Vector3();
+  private readonly at = new Vector3();
+  private readonly ahead = new Vector3();
+  private readonly turn = new Quaternion();
+  private readonly parentTurn = new Quaternion();
+  private static readonly FORWARD = new Vector3(0, 0, 1);
+  private static readonly UP = new Vector3(0, 1, 0);
   constructor(input: CreatureBody, private readonly root: Root, private readonly ground: (x: number, z: number) => number) {
     const body = v.parse(CreatureBodySchema, input), contract = bodyContract(body);
     if (body.skeleton !== 'serpent' || body.trail === undefined || contract === undefined) throw new Error('Trail volumes need a serpent body');
@@ -74,6 +80,34 @@ export class TrailCreatureVolumes implements CreatureVolumePose {
     const length = this.along.length();
     if (length > 1e-9) this.along.multiplyScalar(row.halfLength / length); else this.along.set(0, 0, 0);
     rear.copy(this.centre).sub(this.along); front.copy(this.centre).add(this.along);
+  }
+  /**
+   * CC23c, the serpent poser: lend the skin view each trail bone's local transform, so the drawn body lies on the same
+   * trail the hit volumes do. A bone faces along the path toward the head (rest forward +z); the head is relative to the
+   * view's root (the body's position and yaw, scaled by its scale), every other bone to the bone ahead of it.
+   */
+  joint(name: string, position: Vector3, quaternion: Quaternion, scale: Vector3): boolean {
+    const index = this.bones.indexOf(name); if (index === -1) return false;
+    const s = this.root.scale;
+    this.facing(index, this.turn);
+    if (index === 0) {
+      const yaw = this.parentTurn.setFromAxisAngle(TrailCreatureVolumes.UP, -this.root.yaw);
+      this.bone(0, position).sub(this.root.position).applyQuaternion(yaw).divideScalar(s);
+      quaternion.copy(yaw).multiply(this.turn);
+    } else {
+      this.facing(index - 1, this.parentTurn).invert();
+      this.bone(index, position).sub(this.bone(index - 1, this.at)).applyQuaternion(this.parentTurn).divideScalar(s);
+      quaternion.copy(this.parentTurn).multiply(this.turn);
+    }
+    scale.set(1, 1, 1);
+    return true;
+  }
+  /** Bone `index`'s world facing: rest forward (+z) turned onto the path toward the head. */
+  private facing(index: number, out: Quaternion): Quaternion {
+    this.bone(index, this.ahead);
+    if (index === 0) this.ahead.sub(this.bone(1, this.at)); else this.ahead.negate().add(this.bone(index - 1, this.at));
+    const length = this.ahead.length();
+    return length > 1e-9 ? out.setFromUnitVectors(TrailCreatureVolumes.FORWARD, this.ahead.divideScalar(length)) : out.identity();
   }
   /** A volume whose top is under the ground at its centre is buried: it cannot be hit and it does not collide. */
   off(index: number): boolean {
