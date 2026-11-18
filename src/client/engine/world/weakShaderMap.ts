@@ -56,3 +56,16 @@ export class WeakShaderMap<V> {
     return lifetime;
   }
 }
+
+/** A CSM shader payload: the cascades only update its uniforms (three's CSM `_updateUniforms` and `dispose`). */
+export interface CsmShader { readonly uniforms: Record<string, unknown> }
+/**
+ * MG9: CSM's map keeps only each compiled shader's uniforms, not the whole onBeforeCompile parameters: those carry the
+ * finished vertex and fragment text, which nothing reads after the program is built (Pine kept 23 fragment shaders,
+ * 4.6 MB of strings, through play). The uniforms object is the one three's program reads, so refits still land.
+ */
+export class CsmShaderMap extends WeakShaderMap<CsmShader> {
+  override set(material: object, value: CsmShader | null): this {
+    return super.set(material, value === null ? null : { uniforms: value.uniforms });
+  }
+}

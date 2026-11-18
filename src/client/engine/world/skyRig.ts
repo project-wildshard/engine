@@ -18,7 +18,7 @@ import { ShadowFade, installShadowFadeChunk, sunFadeUniform } from './shadowFade
 import { patchPointLightSkip } from './pointLightSkip';
 import { registerCascades } from './cascadeLights';
 import { patchCSMShaderChunk } from './csmLightBlock';
-import {WeakShaderMap} from './weakShaderMap';
+import {CsmShaderMap} from './weakShaderMap';
 import { compassDir, type DayCycleClock } from '../../../shared/engine/world/dayCycle';
 import { ShadowMaps } from './shadowVariants';
 import type { LookStrategy, SkyBackdrop, SkyBackdropContext, SkyBackdropFactory, SkyBackdropPost, SkyBackdropTargets, SkyDressing } from '../render/look';
@@ -129,7 +129,7 @@ export class SkyRig {
     });
     this.csm.fade = true;
     // SF57: the page's sky outlives every shard visit; its cascades hold each set-up material weakly (WeakShaderMap)
-    Reflect.set(this.csm, 'shaders', new WeakShaderMap());
+    Reflect.set(this.csm, 'shaders', new CsmShaderMap());
     installCascadeCull(this.csm, this.camera); // each cascade draws only the casters its own slice can see the shadow of (PH-P2)
     if (!TIER_CONFIG.softShadows) this.renderer.shadowMap.type = THREE.PCFShadowMap; // 16-tap PCFSoft → 9-tap PCF on the phone
     // E138: the phone's split rig may filter its shadows with a 7×7 / 5×5 tent, not three's 5 noisy taps

@@ -21,7 +21,7 @@
  */
 import * as THREE from 'three';
 import type { Scope } from '../../../shared/engine/app/scope';
-import { finishShaderText } from './shaderText';
+import { finishShaderText, forgetShaderText } from './shaderText';
 
 export type ShaderSource = THREE.WebGLProgramParametersWithUniforms;
 export type ShaderPatchFn = (shader: ShaderSource, renderer: THREE.WebGLRenderer) => void;
@@ -301,3 +301,6 @@ export function shaderPatchTextures(mat: THREE.Material): readonly THREE.Texture
   if (state === undefined || mat.onBeforeCompile !== state.runner) return [];
   return [...new Set([...state.entries.flatMap(entry => entry.textures ?? []), ...state.observedTextures])];
 }
+
+/** MG9: drop the finished shader texts once the level's programs are built (shaderText.ts `forgetShaderText`). */
+export function forgetFinishedShaders(): void { forgetShaderText(); }

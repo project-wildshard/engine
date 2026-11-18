@@ -93,3 +93,7 @@ export function finishShaderText(shader: ShaderText): void {
   if (!byCounts.has(counts)) entries++;
   byCounts.set(counts, { vertex: shader.vertexShader, fragment: shader.fragmentShader, chunks: read });
 }
+
+/** MG9: forget every finished program text and resolved chunk (once the boot's programs are built: Pine held 26 finished
+ *  fragment shaders, 4.4 MB of strings, through play). A program built later resolves its text again, as the first did. */
+export function forgetShaderText(): void { finished.clear(); entries = 0; chunks.clear(); }

@@ -24,6 +24,9 @@ export interface WorldSceneGeometry {
   readonly copy: () => BufferGeometry;
   readonly draw: () => OwnedDrawGeometry | undefined;
   readonly done: () => void;
+  /** `done`, then the decoded template leaves the cache when no other lease holds it (MG9: a consumer whose copies are
+   *  all made; an idle template is CPU-only memory a later reader decodes again from its file) */
+  readonly retire: () => void;
 }
 const templates = new WeakMap<Assets, Map<string, BufferGeometry>>();
 function requireLive(owner: Scope): void {
@@ -45,7 +48,8 @@ function lease(owner: Scope, assets: Assets, source: BufferGeometry): WorldScene
     if (geometry === undefined) throw new Error('World scene geometry construction has finished');
     return geometry;
   };
-  return { done, copy: () => copyOwnedGeometry(current()), draw: () => copyOwnedDrawGeometry(current()) };
+  const retire = (): void => { done(); assets.evictCached(`scene:${source.uuid}`); };
+  return { done, retire, copy: () => copyOwnedGeometry(current()), draw: () => copyOwnedDrawGeometry(current()) };
 }
 
 /** Cache only completed immutable GLB geometry under its admitted addresses and decoder profile.

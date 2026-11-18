@@ -2,7 +2,7 @@ import {expect, test} from 'vitest';
 import {MeshStandardMaterial, PerspectiveCamera, Scene, type Vector2} from 'three';
 import {CSM} from 'three/examples/jsm/csm/CSM.js';
 import {dispatchRebind} from '../../../shared/engine/app/scope';
-import {WeakShaderMap} from './weakShaderMap';
+import {CsmShaderMap, WeakShaderMap} from './weakShaderMap';
 
 interface Shader { uniforms: {CSM_cascades: {value: Vector2[]}; cameraNear: {value: number}; shadowFar: {value: number}} }
 const shader = (): Shader => ({uniforms: {CSM_cascades: {value: []}, cameraNear: {value: -1}, shadowFar: {value: -1}}});
@@ -58,4 +58,13 @@ test('actual CSM refits update every live shader and leave retired shader record
     expect(liveDefines['USE_CSM']).toBeUndefined(); expect(retiredDefines['USE_CSM']).toBeUndefined();
     expect(Object.hasOwn(live, 'onBeforeCompile')).toBe(false); expect(Object.hasOwn(retired, 'onBeforeCompile')).toBe(false);
   } finally { csm.dispose(); csm.remove(); map.clear(); live.dispose(); retired.dispose(); }
+});
+
+test('the CSM map keeps a compiled shader\'s uniforms, not its program text', () => {
+  const map = new CsmShaderMap(), material = new MeshStandardMaterial(), compiled = { ...shader(), vertexShader: 'v'.repeat(1000), fragmentShader: 'f'.repeat(1000) };
+  map.set(material, compiled);
+  const kept = map.get(material);
+  expect(kept?.uniforms).toBe(compiled.uniforms); expect(kept === null || kept === undefined ? null : Object.keys(kept)).toEqual(['uniforms']);
+  map.set(material, null); expect(map.get(material)).toBeNull();
+  map.clear(); material.dispose();
 });

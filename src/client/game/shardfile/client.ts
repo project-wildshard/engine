@@ -1,5 +1,6 @@
 import {readModuleGroups} from '@wildshard/engine/boot/download';
 import { whenControl } from '@wildshard/engine/boot/prefetch';
+import { forgetFinishedShaders } from '@wildshard/engine/render/shaderPatches';
 import type * as ScriptPresentation from '../plugin/ui';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
@@ -272,7 +273,8 @@ export class ShardfileClient {
     // D227 (G872, wildshard-new): once play starts the session's admitted file bytes go, as H6 does for the grid's runtime
     // product (finish.ts): a Pine page still held 33.2 MB here at 30 s of play. The cache pins above stay; a later read
     // verifies from the content cache or the network (ClientAssets.readReleased).
-    whenControl(world.game.levelScope, ctx.scope, () => { this.assets.releaseAll(); });
+    // MG9: the boot's finished shader texts go too (no program is built after control on any zone, mini-shadermem)
+    whenControl(world.game.levelScope, ctx.scope, () => { this.assets.releaseAll(); forgetFinishedShaders(); });
     const allocator = this.bindings.allocator; if (allocator === undefined) throw new Error('Shardfile requires its session residency allocator');
     // The reviewed opaque-runtime claim includes its whole home. Cache leases remain pinned above;
     // ordinary data homes account library/commons and tile parts independently in the same allocator.

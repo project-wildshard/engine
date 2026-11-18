@@ -499,7 +499,8 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
               const result = await geometryIntake.next();
               if (result.done) throw new Error(`Missing scene model read: ${model.id}`);
               const geometry = result.value;
-              finish.push(geometry.done); models.set(model.id, geometry);
+              // MG9: a phone keeps no idle revisit templates beside the live copies (Pine: 9.6 MB of CPU arrays at control)
+              finish.push(TIER === 'phone' ? geometry.retire : geometry.done); models.set(model.id, geometry);
               modelProgress(modelIndex + 1, model.id);
               requireSceneOwner(owner);
               // A completed read/decode can span drawn frames. Its old local
@@ -652,6 +653,8 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
       const from = residentTileEntry(resident) ?? product.shardfile.spawn, owned = new Map(section.libraries.flatMap(row => row.kind === 'owned' ? [[row.id, row] as const] : []));
       const away = (row: WorldSceneWeld): number => { const at = lateWelds.get(row.id) ?? [0, 0]; return Math.hypot(at[0] - from.x, at[1] - from.z); };
       const late = welds.filter(row => lateWelds.has(row.id)).sort((a, b) => away(a) - away(b));
+      // MG9: the late welds' decoded templates are idle once every late weld has made its copies (Pine: 9.8 MB of CPU arrays)
+      const retired: (() => void)[] = [];
       const pending = late.map(row => refinementQueue().add(`weld:${row.id}`, { x: lateWelds.get(row.id)?.[0] ?? 0, z: lateWelds.get(row.id)?.[1] ?? 0 }, async () => {
           const shapes = new Map<string, WorldSceneGeometry>();
           try {
@@ -670,9 +673,10 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
             await buildYield(owner);
           }
           await publishAssembly(row, (library, model) => shapes.get(JSON.stringify([library, model]))?.copy() ?? null);
-          } finally { for (const shape of shapes.values()) shape.done(); }
+          } finally { for (const shape of shapes.values()) { shape.done(); retired.push(shape.retire); } }
       }));
       void Promise.all(pending);
+      void Promise.allSettled(pending).then(() => { for (const retire of retired.splice(0)) retire(); return undefined; });
     }
     if (batches.size > 0 && sky === undefined) throw new Error('Scene batches need a world sky');
     for (const row of batches.values()) {

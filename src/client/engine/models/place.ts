@@ -717,12 +717,18 @@ function* drawInstancedSteps<P extends object>(def: ModelDef<P>, pls: readonly P
     ({ cull, cullWith } = cullersOf(c));
   } else if (culls && bounds !== null) {
     // `casters`: each choice reads the casting cascades' frusta (a cascade's getFrustum rebuilds its footprint: once a choice)
-    const casting = o.cull?.casters === undefined ? undefined : (): THREE.Frustum[] => o.ctx.sky.csm.lights.filter((l) => l.castShadow).map((l) => l.shadow.getFrustum());
+    const casting = o.cull?.casters === undefined ? undefined : castingFrusta(o.ctx);
     const c = new InstancedCull(groups, levels, of, matrices, colors, bounds, levelsOf(def), o.cull ?? {}, originsOf(pls, o), fadesOf(def), casting,
       scales.some((k) => k !== 1) ? scales : null);
     ({ cull, cullWith } = cullersOf(c));
   }
   return { object: wrap(objects, def.id), drawnAs: 'instanced', colliders, boxes, cull, cullWith };
+}
+
+/** The casting cascades' frusta, read by a culler. Made outside the generator: JavaScriptCore keeps a generator's
+ *  parameters (every copy's placement, pose and params) alive in each closure made in its body (MG9). */
+function castingFrusta(ctx: BuildOptions<object>['ctx']): () => THREE.Frustum[] {
+  return () => ctx.sky.csm.lights.filter((l) => l.castShadow).map((l) => l.shadow.getFrustum());
 }
 
 // ── instanced, culled by the shard (`PlaceOptions.culler`): per part, level 0 with every copy, each LOD its own mesh ──
@@ -1358,15 +1364,26 @@ function* placeSteps<P extends object>(def: ModelDef<P>, placements: readonly Pl
     : o.draw === 'instanced' ? (o.culler ? yield* drawHandedSteps(def, placements, poses, params, buildOptions, o.culler) : yield* drawInstancedSteps(def, placements, poses, params, buildOptions))
       : o.draw === 'batched' ? drawBatched(def, placements, poses, params, buildOptions)
         : drawSingle(def, placements, poses, params, buildOptions);
-  const { boxes } = drawn;
   const extra = o.piece?.colliders;
   if (extra !== undefined) drawn.colliders = [...drawn.colliders, ...extra];
   // where each copy stands, for `nearest` (float64: exact) — the placements themselves are not kept alive: no closure
-  // below names `placements`, `poses` or `params` (MG9: a closure that did held every copy's placement and pose for the
+  // names `placements`, `poses` or `params` (MG9: a closure that did held every copy's placement and pose for the
   // life of the record, 22,250 floor-cover copies on Pine)
-  const copies = placements.length, firstParams = params[0];
+  const copies = placements.length;
   const points = new Float64Array(copies * 3);
   placements.forEach((pl, i) => { points[i * 3] = pl.x; points[i * 3 + 1] = pl.y; points[i * 3 + 2] = pl.z; });
+  return placedOf(def, o, drawn, points, params[0]);
+}
+
+/**
+ * MG9 (WebKit): the record and its closures are made here, outside the `placeSteps` generator. JavaScriptCore keeps a
+ * generator's parameters in a scope every closure made in its body holds, so a `nearest` or `copyBox` made there kept
+ * `placements` (every copy's placement, 22,250 floor-cover copies on Pine) for the life of the record. V8 does not.
+ */
+function placedOf<P extends object>(def: ModelDef<P>, o: PlaceOptions, drawn: Drawn, points: Float64Array, firstParams: P | undefined): Placed {
+  const w = o.weld;
+  const { boxes } = drawn;
+  const copies = points.length / 3;
   let registered: Promise<void> = Promise.resolve();
   const placed: Placed = {
     get registered(): Promise<void> { return registered; },
