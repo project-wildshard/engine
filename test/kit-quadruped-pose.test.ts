@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
+import { bindFlatTerrain } from '../src/test/engine/terrain';
 import { kitView } from './fixtures/kit-view';
 
 const rapier = loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
@@ -51,6 +52,88 @@ test('an actual walk track overrides the native upper joint while untracked join
     f.actor.speed = 0; f.actor.state = 'idle'; f.view.update(1 / 60, 2, true);
     expect(f.rig.bones['FL_shoulder']?.position.x).toBeCloseTo(.23, 6);
   } finally { f.dispose(); }
+});
+
+const knees = ['FL_carpus', 'FR_carpus', 'BL_stifle', 'BR_stifle'];
+
+test.each([
+  { gait: 'walk', speed: 1.3, swingPeaks: [.56, .06, .81, .31] },
+  { gait: 'trot', speed: 4, swingPeaks: [.74, .24, .24, .74] },
+  { gait: 'gallop', speed: 6, swingPeaks: [.13, 0, .68, .56] },
+])('the actual clipless GLB reaches the $gait swing peaks at the expected phases', async ({ speed, swingPeaks }) => {
+  const f = await kitView(clipless, 'quadruped', dims, await rapier);
+  try {
+    f.actor.speed = speed;
+    f.actor.state = 'flee';
+    f.actor.levelGround = true;
+    const peaks = knees.map(() => ({ phase: 0, flex: 0 }));
+    for (let frame = 0; frame < 360; frame++) {
+      f.view.update(1 / 60, frame / 60, true);
+      if (frame < 120) continue;
+      for (const [index, joint] of knees.entries()) {
+        const peak = peaks[index];
+        const flex = f.rig.bones[joint]?.rotation.x ?? 0;
+        if (peak !== undefined && flex > peak.flex) {
+          peak.flex = flex;
+          peak.phase = f.view.gaitPhase;
+        }
+      }
+    }
+    for (const [index, peak] of peaks.entries()) {
+      expect(peak.flex).toBeGreaterThan(.3);
+      const phaseError = Math.abs(peak.phase - (swingPeaks[index] ?? NaN));
+      expect(Math.min(phaseError, 1 - phaseError)).toBeLessThan(.05);
+    }
+  } finally { f.dispose(); }
+});
+
+test('the actual clipless GLB grazes and then raises its head on return to idle', async () => {
+  const f = await kitView(clipless, 'quadruped', dims, await rapier);
+  try {
+    const head = f.rig.bones['head'];
+    if (head === undefined) throw new Error('Missing canonical head');
+    f.actor.levelGround = true;
+    f.actor.speed = 0;
+    const headHeight = (state: 'idle' | 'graze', start: number): number => {
+      f.actor.state = state;
+      for (let frame = 0; frame < 120; frame++) f.view.update(1 / 60, start + frame / 60, true);
+      return head.getWorldPosition(new Vector3()).y;
+    };
+    const idleHeight = headHeight('idle', 0);
+    const grazingHeight = headHeight('graze', 2);
+    expect(idleHeight - grazingHeight).toBeGreaterThan(.2);
+    expect(headHeight('idle', 4) - grazingHeight).toBeGreaterThan(.2);
+  } finally { f.dispose(); }
+});
+
+test('the actual clipless GLB flexes only the foot over an uneven patch', async () => {
+  const f = await kitView(clipless, 'quadruped', dims, await rapier);
+  const terrainQueries: number[] = [];
+  const releaseTerrain = bindFlatTerrain({ heightAt: (x, z) => {
+    const height = Math.hypot(x - .23, z - .47) < .1 ? .16 : 0;
+    terrainQueries.push(height);
+    return height;
+  } });
+  try {
+    f.view.place(0, 0, 0, 0);
+    f.actor.state = 'idle';
+    const kneeFlex = (levelGround: boolean): number[] => {
+      f.actor.levelGround = levelGround;
+      for (let frame = 0; frame < 120; frame++) {
+        if (frame % 6 === 0) f.view.sampleTerrain();
+        f.view.update(1 / 60, frame / 60, true);
+      }
+      return knees.map(joint => f.rig.bones[joint]?.rotation.x ?? 0);
+    };
+    const flat = kneeFlex(true);
+    expect(terrainQueries).toHaveLength(0);
+    const rough = kneeFlex(false);
+    expect(terrainQueries).toContain(.16);
+    expect((rough[0] ?? 0) - (flat[0] ?? 0)).toBeCloseTo(1.6 * .16 / dims.legLen, 3);
+    expect(rough.slice(1)).toEqual(flat.slice(1));
+    const reset = kneeFlex(true);
+    expect(reset[0]).toBeCloseTo(flat[0] ?? NaN, 3);
+  } finally { releaseTerrain(); f.dispose(); }
 });
 
 test('an admitted pose layer follows the fresh native gait without freezing or accumulating it', async () => {
