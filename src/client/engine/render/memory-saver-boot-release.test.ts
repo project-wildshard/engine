@@ -1,9 +1,11 @@
 import { afterAll, expect, test, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Sphere, Vector3 } from 'three';
 import { textureUploadRenderer } from '../../../test/engine/textureUploadRenderer';
+import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from './changedTextureUploads';
 import { installMemorySaver, releaseDrawnGeometry } from './memorySaver';
 import { arrayReleased, retainGeometryForCpuReads } from './releasedArrays';
 import { installFrameCounter } from './frameCounter';
+import { noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 
 // Mini QA 2026-11-17 row 19: the boot draws the world a handful of times, never the 240 renders a geometry waits before its
 // CPU copy goes, so Nine's phone boot held 88-147 MB of attribute arrays beside their GPU copies through its peak.
@@ -96,4 +98,48 @@ test('phone retires draw-only shape data and an unexpected raycast reads back th
   expect(Array.from(drawOnly.geometry.index?.array ?? [])).toEqual([0, 1, 2]);
   expect(arrayReleased(drawOnly.geometry.getAttribute('position'))).toBe(false);
   drawOnly.geometry.dispose(); registered.geometry.dispose(); material.dispose();
+});
+
+test('a prepared fixed batch retires vertex arrays and keeps the multi-draw index', () => {
+  vi.stubGlobal('WebGL2RenderingContext', FakeGL);
+  vi.stubGlobal('WebGLBuffer', FakeBuffer);
+  const gl = new FakeGL(), renderer = Object.assign(textureUploadRenderer(), { getContext: () => gl });
+  installFrameCounter(renderer);
+  installMemorySaver(renderer, true);
+  const material = new MeshBasicMaterial(), scene = new Scene(), camera = new PerspectiveCamera();
+  const triangle = new BufferGeometry().setIndex([0, 1, 2])
+    .setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]), 3));
+  const draw = (fixed: boolean): ChangedBatchedMesh => {
+    const batch = new ChangedBatchedMesh(1, 6, 6, material);
+    const near = batch.addGeometry(triangle), far = batch.addGeometry(triangle);
+    batch.addInstance(near);
+    if (fixed) prepareBatchGeometryRetirement(batch, [near, far]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, new FakeBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, batch.geometry.getAttribute('position').array);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, new FakeBuffer());
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, batch.geometry.index?.array ?? new Uint16Array());
+    renderer.renderBufferDirect(camera, scene, batch.geometry, material, batch, { start: 0, count: 3, materialIndex: 0 });
+    return batch;
+  };
+  const changing = draw(false), fixed = draw(true);
+  expect(releaseDrawnGeometry(renderer)).toBe(0);
+  expect(arrayReleased(fixed.geometry.getAttribute('position'))).toBe(false);
+  try {
+    for (let frame = 0; frame < 240; frame++) renderer.render(scene, camera);
+    noteFrameDrawn();
+    renderer.renderBufferDirect(camera, scene, fixed.geometry, material, fixed, { start: 0, count: 3, materialIndex: 0 });
+  } finally {
+    noteFrameDrawn(Number.NEGATIVE_INFINITY);
+  }
+  expect(arrayReleased(changing.geometry.getAttribute('position'))).toBe(false);
+  expect(arrayReleased(changing.geometry.index ?? {})).toBe(false);
+  fixed.setGeometryIdAt(0, 1);
+  fixed.computeBoundingSphere();
+  expect(fixed.getBoundingSphereAt(1, new Sphere())?.radius).toBeCloseTo(Math.sqrt(2));
+  expect(arrayReleased(fixed.geometry.getAttribute('position'))).toBe(true);
+  expect(arrayReleased(fixed.geometry.index ?? {})).toBe(false);
+  const ray = new Raycaster(new Vector3(0, 0, 1), new Vector3(0, 0, -1));
+  expect(ray.intersectObject(fixed)[0]?.distance).toBe(1);
+  expect(Array.from(fixed.geometry.index?.array ?? [])).toEqual([0, 1, 2, 3, 4, 5]);
+  changing.dispose(); fixed.dispose(); triangle.dispose(); material.dispose();
 });

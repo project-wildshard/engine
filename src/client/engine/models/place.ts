@@ -24,7 +24,7 @@ import { app } from '../app/runtime';
 import { frameBudgetSpent, paceYield, presenting } from '../../../shared/engine/core/framePacing';
 import { WORK_SLICE_MS, yieldTask } from '../../../shared/engine/core/workSlice';
 import * as THREE from 'three';
-import { ChangedBatchedMesh } from '../render/changedTextureUploads';
+import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from '../render/changedTextureUploads';
 import { setInstanceEnvelope } from '../render/instancedGeometry';
 import { cullCopiesPerCascade } from '../world/cascadeCull';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -36,7 +36,7 @@ import { FrameCamera } from '../world/frameCamera';
 import { geometryBoundsSteps } from '../world/geometryBounds';
 import { keepShadowWhole } from '../world/shadowChunks';
 import { withTier } from '../explore/tiers';
-import { TIER_CONFIG } from '../core/tier';
+import { buildTier, TIER_CONFIG } from '../core/tier';
 import { loadingSpecimen } from './gear';
 import { specimenReady, paramsOf, seedOf, type ModelBuild, type ModelBuildVisit, type ModelContext, type ModelDef, type ModelPart, type Placement } from './model';
 import { drawnHullOwn, drawnHullWorld, placeCollider, poseGeometry, poseOf, type Pose } from './colliders';
@@ -839,16 +839,25 @@ function drawBatched<P extends object>(def: ModelDef<P>, pls: readonly Placement
       if (sort !== undefined) bm.sortObjects = sort;
       bm.name = `${def.id}:batch`;
     }
-    return groups.map(({ part: member, geos }) => {
+    const retire = own && buildTier() === 'phone';
+    const batchParts: number[] = [];
+    const entries = groups.map(({ part: member, geos }) => {
       /** geometry id per (variant, level) */
       const ids = new Int32Array(keys.length * levels).fill(-1);
       /** a part's `until`, squared, per (variant, level) (∞: none) */
       const until2 = new Float64Array(keys.length * levels).fill(Number.POSITIVE_INFINITY);
-      for (const x of geos) { ids[x.v * levels + x.l] = bm.addGeometry(x.g); if (x.until !== undefined) until2[x.v * levels + x.l] = x.until * x.until; }
+      for (const x of geos) {
+        const id = bm.addGeometry(x.g);
+        ids[x.v * levels + x.l] = id;
+        if (retire) batchParts.push(id);
+        if (x.until !== undefined) until2[x.v * levels + x.l] = x.until * x.until;
+      }
       // what each variant's copies draw per level, shared by its copies' slots
       const perVariant = keys.map((_, v) => ({ geometry: ids.slice(v * levels, v * levels + levels), until2: geos.some((x) => x.v === v && x.until !== undefined) ? until2.slice(v * levels, v * levels + levels) : null }));
       return { bm, perVariant, tint: member.tint !== false, uncast: split && bm instanceof CastSplitBatchedMesh && !casts(member) ? bm : null };
     });
+    if (retire) prepareBatchGeometryRetirement(bm, batchParts);
+    return entries;
   });
   // each batch copied what it was given: the scaled copies go
   for (const bySize of scaledParts.values()) for (const g of bySize.values()) g.dispose();

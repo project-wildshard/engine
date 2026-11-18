@@ -20,11 +20,12 @@
 import * as THREE from 'three';
 import { RenderPass, type EffectComposer, type Pass } from 'postprocessing';
 import { markGpuOnly } from '../core/gpuOnly';
-import { arrayReleased, geometryHasCpuReader, markArrayReleased, markArrayRestored } from './releasedArrays';
+import { arrayReleased, fixedBatchGeometry, geometryHasCpuReader, markArrayReleased, markArrayRestored } from './releasedArrays';
 import type { Renderer } from './renderer';
 import { drawHooks, propertyHooks } from './drawHooks';
 import { onceTextureUploaded } from './textureUploadEvents';
 import { renderCount } from './frameCounter';
+import { presenting } from '../../../shared/engine/core/framePacing';
 
 const LABEL = 'engine/memorySaver';
 const isTarget = (value: unknown): value is THREE.WebGLRenderTarget => value instanceof THREE.WebGLRenderTarget;
@@ -169,9 +170,12 @@ function releaseAttribute(a: unknown, label: string, gl: WebGL2RenderingContext,
 
 function releaseGeometry(g: THREE.BufferGeometry, label: string, uploads: Uploads, releaseShape: boolean): number {
   const shape = releaseShape && !geometryHasCpuReader(g) && !g.hasAttribute('skinIndex') && !g.hasAttribute('skinWeight') && Object.keys(g.morphAttributes).length === 0;
-  let bytes = shape ? releaseAttribute(g.index, `${label}.index`, uploads.gl, uploads.index) : 0;
+  const batch = fixedBatchGeometry(g);
+  // Native BatchedMesh.onBeforeRender reads index.array.BYTES_PER_ELEMENT to build multi-draw offsets.
+  let bytes = shape && !batch ? releaseAttribute(g.index, `${label}.index`, uploads.gl, uploads.index) : 0;
   for (const [name, attribute] of Object.entries(g.attributes)) {
-    if (name === 'skinIndex' || name === 'skinWeight' || (name === 'position' && (!shape || g.boundingSphere === null))) continue;
+    if (name === 'skinIndex' || name === 'skinWeight'
+      || (name === 'position' && (!shape || (g.boundingSphere === null && !batch)))) continue;
     bytes += releaseAttribute(attribute, `${label}.${name}`, uploads.gl, uploads.vertex);
   }
   if (bytes > 0) markGpuOnly(LABEL);
@@ -238,6 +242,10 @@ export function installMemorySaver(renderer: Renderer, releaseShape = false): vo
       queue[head++] = undefined;
       const geometry = p.geometry.deref();
       if (geometry === undefined) continue;
+      if (fixedBatchGeometry(geometry) && !presenting()) {
+        queue.push({ ...p, at: frame });
+        continue;
+      }
       const now = versions(geometry);
       if (same(now, p.versions)) releaseGeometry(geometry, p.label, uploads, releaseShape);
       else queue.push({ geometry: p.geometry, at: frame, versions: now, label: p.label }); // still changing: look again later
@@ -252,6 +260,9 @@ export function installMemorySaver(renderer: Renderer, releaseShape = false): vo
       if (p === undefined) continue;
       const geometry = p.geometry.deref();
       if (geometry === undefined) { queue[at] = undefined; continue; }
+      // Native BatchedMesh.clone copies its geometry during shader warm-up.
+      // Let the ordinary settling pass retire these batches in play.
+      if (fixedBatchGeometry(geometry)) continue;
       // a geometry still changing keeps its place: the ordinary settle looks at it again later
       if (!same(versions(geometry), p.versions)) continue;
       queue[at] = undefined;
@@ -269,7 +280,8 @@ export function installMemorySaver(renderer: Renderer, releaseShape = false): vo
     // A rig's geometry stays whole: the far and shadow herds copy every attribute of it when a batch grows, and reading
     // a released array back from the GPU (restore) stalled a desktop Pine drive 1.4 s in one frame (gl.isBuffer
     // waiting on the GPU, then getBufferSubData)
-    if (seenGeometry.has(geometry) || object instanceof THREE.BatchedMesh || object instanceof THREE.SkinnedMesh) return;
+    if (seenGeometry.has(geometry) || object instanceof THREE.SkinnedMesh
+      || (object instanceof THREE.BatchedMesh && !(releaseShape && fixedBatchGeometry(geometry)))) return;
     seenGeometry.add(geometry);
     // The scene/cache owns live geometry; this delayed optimization only borrows it.
     queue.push({ geometry: new WeakRef(geometry), at: renderCount(renderer), versions: versions(geometry), label: object.name || geometry.name || object.type });

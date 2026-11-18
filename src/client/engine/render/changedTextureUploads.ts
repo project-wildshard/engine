@@ -1,5 +1,6 @@
-import { BatchedMesh, DataTexture, TextureSource, type Skeleton } from 'three';
+import { BatchedMesh, BufferAttribute, DataTexture, Sphere, TextureSource, type Skeleton } from 'three';
 import { onceTextureUploaded } from './textureUploadEvents';
+import { markFixedBatchGeometry } from './releasedArrays';
 
 interface PaletteImage { data: Float32Array | Uint32Array; width: number; height: number }
 interface UploadState {
@@ -80,6 +81,19 @@ export function trackPaletteTexture(texture: DataTexture): void {
   }
   textures.add(texture);
   state.textures.push(new WeakRef(texture));
+}
+
+/** Phone-only, after the owner inserts every part and before publishing the batch for its first draw.
+ * The view can still change instances and their LOD selections. Native culling reads cached part spheres. */
+export function prepareBatchGeometryRetirement(batch: Pick<BatchedMesh, 'geometry' | 'getBoundingSphereAt'>, parts: Iterable<number>): void {
+  const sphere = new Sphere();
+  for (const part of parts) batch.getBoundingSphereAt(part, sphere);
+  // The first upload copies the entire arrays. The ranges from construction
+  // would otherwise stay pending until a subsequent edit and upload.
+  for (const attribute of Object.values(batch.geometry.attributes)) {
+    if (attribute instanceof BufferAttribute) attribute.clearUpdateRanges();
+  }
+  markFixedBatchGeometry(batch.geometry);
 }
 
 /** Native culling/sorting still writes every pass, including shadows. Inspect

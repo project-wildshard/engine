@@ -1,5 +1,5 @@
 import { BatchedMesh, Matrix4, type BufferGeometry, type Camera, type Material } from 'three';
-import { ChangedBatchedMesh } from '@wildshard/engine/render/changedTextureUploads';
+import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from '@wildshard/engine/render/changedTextureUploads';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BatchedCull } from '@wildshard/engine/models/cull';
 import { InstancedBatch } from '@wildshard/engine/models/instancedBatch';
@@ -7,6 +7,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { WorldRegistry } from '@wildshard/engine/world/registry';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { ownSceneResource } from '@wildshard/engine/app/sceneOwnership';
+import { buildTier } from '@wildshard/engine/core/tier';
 import type { WorldSceneBatchRow } from '@wildshard/format/worldSceneBatch';
 
 /**
@@ -48,7 +49,11 @@ export class WorldSceneBatch {
       for (const row of culled) for (const slot of new Set([row.lod0, row.lod1])) uses.set(slot, (uses.get(slot) ?? 0) + 1);
       for (const [slot, count] of uses) { const id = ids[slot]; if (id !== undefined) batch.reserve(id, count); }
     }
-    if (skin !== null) batch.addInstance(batch.addGeometry(skin));
+    if (skin !== null) {
+      const id = batch.addGeometry(skin);
+      batch.addInstance(id);
+      ids.push(id);
+    }
     this.fixed = culled.map(row => {
       const near = ids[row.lod0], far = ids[row.lod1];
       if (near === undefined || far === undefined) throw new Error('Missing fixed scene batch geometry');
@@ -57,7 +62,10 @@ export class WorldSceneBatch {
       return new BatchedCull([{ mesh: batch, instance, geometry: Int32Array.of(near, far), until2: null }],
         Uint32Array.of(0, 1), Float64Array.from(row.sphere), [0, row.near], { ...this.row.cull, far: row.far });
     });
-    if (batch instanceof BatchedMesh) ownSceneResource(batch, this.owner);
+    if (batch instanceof BatchedMesh) {
+      if (buildTier() === 'phone') prepareBatchGeometryRetirement(batch, ids);
+      ownSceneResource(batch, this.owner);
+    }
     else for (const mesh of batch.children) ownSceneResource(mesh, this.owner);
     withOwner(this.owner, () => { this.registry.add({ id: this.row.id, name: this.row.name, category: 'nature', file: 'src/client/game/shardfile/worldSceneBatch.ts', object: batch }); });
     return batch;

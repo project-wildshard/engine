@@ -31,3 +31,19 @@ Pine still carries 21.67 MB in stores first found under a hidden node and
 overlap. The large remaining Pine crag and cabin buffers still have CPU arrays
 at spawn. Removing them before their first upload requires a different source
 representation or a first-use loader.
+
+## Fixed batches
+
+The crag and forest batches already had their vertex buffers on WebGL at
+control. Their owners can retire the vertex arrays after settling because
+the batches keep each LOD part's native culling sphere. The native
+multi-draw path still reads the index element size, so its CPU array stays.
+Boot warming still clones the native batches. The retirement queue waits
+for ordinary play before releasing them.
+
+At the same Pine spawn on the same pinned product, the interim root-scene
+probe [H] read 42.72 MB before the fixed-batch cut. The settled trial read
+34.07 MB after play began, with Nalati steady at 17.06 MB. Trace sampling
+identified the native index reads, so the final cut leaves those indices
+resident from the start. The immediate control reading precedes retirement.
+Pine's 30 MB target and the M1 CPU ledger proof remain open.
