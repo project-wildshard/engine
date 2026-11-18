@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines} from '../scripts/memory/measure.mjs';
+import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity} from '../scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -66,4 +66,12 @@ test('the ladder parts are medians of per-round differences, checked against the
   const lines=ladderLines({rungs:{blank:{k:stats([45e6]),wc:stats([16e6]),gpu:stats([29e6]),l:stats([0])}},parts,byZone,runs:3});
   expect(lines[2]).toBe('| blank | 16 (16-16) | 29 (29-29) | 45 (45-45) | - | 0 |');
   expect(lines.some(l=>/\| z: floor \+ engine \+ zone vs whole \| .*\(within 2%/u.test(l))).toBe(true);
+});
+
+test('EM5 parity sets the ledger WebGL bytes beside ANGLE Metal and the renderer buffer dump',()=>{
+ const MiB=1024*1024;
+ const checkpoint={ledger:{gpu:{texture:10*1e6,buffer:5*1e6,'drawing-buffer':2*1e6},ram:{}},processes:[
+  {role:'gpu',alloc:{'gpu/angle/metal':20*MiB,'gpu/angle':20*MiB}},{role:'renderer',alloc:{'webgl/context_*/buffers':5e6,'webgl/context_*':9e6}}]};
+ expect(ledgerParity(checkpoint)).toEqual({ledgerGpu:15,ledgerBuffers:5,angleMetal:20*MiB/1e6,webglBuffers:5});
+ expect(ledgerParity({processes:[]})).toBeNull();
 });

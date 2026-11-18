@@ -13,7 +13,11 @@ const BUFFER_BINDINGS: ReadonlyMap<number, number> = new Map([[0x8892, 0x8894], 
 const RENDERBUFFER_BINDING = 0x8ca7;
 interface Level { width: number; height: number; depth: number; format: number; external: number; type: number }
 interface TextureStorage { levels: Map<number, Level> }
-const installed = new WeakMap<object, () => void>();
+/** Where the journal reports: Developer's attribution ledger (one row per resource) or the always-on counters (glCounters.ts).
+ *  `format` hears a texture's or renderbuffer's internal format just before its allocation. */
+export type JournalSink = Pick<MemoryAttribution, 'allocation' | 'release' | 'label' | 'source' | 'buffer'> & { format?: (resource: object, format: number) => void };
+/** One journal per context and sink: the counters stay installed while Developer's journal comes and goes on top. */
+const installed = new WeakMap<object, Map<JournalSink, () => void>>();
 const object = (value: unknown): value is object => typeof value === 'object' && value !== null;
 const number = (value: unknown): number => typeof value === 'number' && Number.isFinite(value) ? value : 0;
 function dimensions(value: unknown): [number, number] {
@@ -25,8 +29,9 @@ function dimensions(value: unknown): [number, number] {
 /** Observe storage operations on this context only: a storage call reads the binding it targets (WebGL's client-side binding
  * state, never a GPU query); no bind is wrapped, no pixels read, no source arrays retained.
  * Uses the same native identities gpuLabels sends to the external census. Subuploads do not allocate storage. */
-export function installAllocationJournal(context: Context, ledger: MemoryAttribution = memoryAttribution): () => void {
-  const previous = installed.get(context); if (previous !== undefined) return previous;
+export function installAllocationJournal(context: Context, ledger: JournalSink = memoryAttribution): () => void {
+  const journals = installed.get(context) ?? new Map<JournalSink, () => void>(); installed.set(context, journals);
+  const previous = journals.get(ledger); if (previous !== undefined) return previous;
   const scope = pageScope.child('memory.context');
   let closed = false;
   const textures = new WeakMap<object, TextureStorage>();
@@ -45,6 +50,7 @@ export function installAllocationJournal(context: Context, ledger: MemoryAttribu
     let storage = textures.get(resource);
     if (storage === undefined) { storage = { levels: new Map() }; textures.set(resource, storage); }
     storage.levels.set((target >= 0x8515 && target <= 0x851a ? target - 0x8515 : 0) * 64 + index, level);
+    ledger.format?.(resource, level.format);
     let bytes = 0;
     for (const row of storage.levels.values()) bytes += allocationImageBytes(row.format, row.width, row.height, row.depth, row.external, row.type);
     track(resource, 'texture', bytes);
@@ -111,6 +117,7 @@ export function installAllocationJournal(context: Context, ledger: MemoryAttribu
     wrap(name, args => {
       const renderbuffer = bound(RENDERBUFFER_BINDING); if (renderbuffer === undefined) return;
       const shift = samples ? 1 : 0;
+      ledger.format?.(renderbuffer, number(args[1 + shift]));
       track(renderbuffer, 'renderbuffer', allocationImageBytes(number(args[1 + shift]), number(args[2 + shift]), number(args[3 + shift])) * Math.max(1, samples ? number(args[1]) : 1));
     });
   for (const name of ['deleteTexture', 'deleteBuffer', 'deleteRenderbuffer']) wrap(name, args => {
@@ -119,7 +126,7 @@ export function installAllocationJournal(context: Context, ledger: MemoryAttribu
   });
   const retire = (): void => { for (const weak of handles) { const resource = weak.deref(); if (resource !== undefined) ledger.release(resource, 'gpu'); } handles.clear(); };
   scope.listen(context.canvas, 'webglcontextlost', retire);
-  const dispose = (): void => { if (closed) return; closed = true; retire(); for (const restore of originals.reverse()) restore(); installed.delete(context); scope.dispose(); };
+  const dispose = (): void => { if (closed) return; closed = true; retire(); for (const restore of originals.reverse()) restore(); journals.delete(ledger); scope.dispose(); };
   scope.onDispose(dispose);
-  installed.set(context, dispose); return dispose;
+  journals.set(ledger, dispose); return dispose;
 }

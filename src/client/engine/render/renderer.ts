@@ -11,6 +11,7 @@ import { installFrameCounter } from './frameCounter';
 import { installTextureUploadEvents } from './textureUploadEvents';
 import { installCompressedTextureRetirement } from './compressedTextureRetirement';
 import { installDiagnosticJournal } from './diagnosticJournal';
+import { installMemoryCounters } from './glCounters';
 import { installDoubleElements } from './doubleElements';
 import { installUniformCacheKinds } from './uniformCaches';
 import { installCompileShadowSkip } from './compileShadows';
@@ -36,6 +37,7 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   clearCreationErrors(context);
   installDoubleElements();
   installSkinnedSortSpheres();
+  const stopCounters = installMemoryCounters(context); // EM5: on every page, before the first storage call
   const stopJournal = installDiagnosticJournal(context);
   const renderer = labelledCreation('engine/renderer', 'builtin/renderer-initialization', () => new THREE.WebGLRenderer({ canvas, context, antialias: false, stencil: false, depth: true }));
   // D176: three's link check read three driver info logs on every program's first use (~1.4 ms of sync round-trips a
@@ -49,7 +51,7 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   installCompileShadowSkip(renderer);
   const stopLabels = installDeveloperLabels(renderer);
   const dispose = renderer.dispose.bind(renderer);
-  renderer.dispose = () => { try { dispose(); } finally { stopLabels(); stopJournal(); } };
+  renderer.dispose = () => { try { dispose(); } finally { stopLabels(); stopJournal(); stopCounters(); } };
   installFrameCounter(renderer); // SF59: the engine counts its own renders (frameCounter.ts)
   installTextureUploadEvents(renderer);
   installCompressedTextureRetirement(renderer);

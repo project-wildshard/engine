@@ -20,8 +20,8 @@ export interface WebkitRun {
   ledger:{totals:Record<string,number>;unattributed:Record<string,number>;byKind:Ledger|null}|null;refused:string|null;samples:number;
 }
 export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number}):Promise<WebkitRun>;
-export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;checkpoints:{step:string;processes:DumpProcess[]}[]}
-export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number}):Promise<MicroscopeRun>;
+export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;gpuDetail:{kinds:Record<string,number>;formats:Record<string,number>;owners:Record<string,number>}|null;checkpoints:{step:string;ledger:Record<string,Record<string,number>>|null;processes:DumpProcess[]}[]}
+export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number}):Promise<MicroscopeRun>;
 export function webkitLines(run:WebkitRun):string[];
 export function microscopeLines(run:MicroscopeRun):string[];
 export function settledReading(page:unknown,procs:readonly BrowserProcess[],options?:{settleMs?:number;gcs?:number;reads?:number}):Promise<Pair&{reads:Pair[]}>;
@@ -36,3 +36,4 @@ export interface LadderParts {
 }
 export function ladderParts(rounds:readonly Record<string,{k:number;l:number;peak?:number}>[],zones:readonly string[]):LadderParts;
 export function ladderLines(result:LadderParts&{rungs:Record<string,{k:Stats;wc:Stats;gpu:Stats;l:Stats;peak?:Stats}>;runs:number}):string[];
+export function ledgerParity(checkpoint:{ledger?:Record<string,Record<string,number>>|null;processes:{role:string;alloc:Record<string,number>}[]}):{ledgerGpu:number;ledgerBuffers:number;angleMetal:number;webglBuffers:number}|null;

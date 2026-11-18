@@ -120,8 +120,8 @@ export function stats(values) {
 /** Join memory-infra dump events to the requests that made them by order: the n-th request is the n-th dump id in
  * numeric order (the returned guid is one higher than the event's id). Each dump: per process its role, private
  * footprint and allocator sizes at depth <= 3.
- * @param {readonly any[]} events @returns {{id:string, processes:{pid:number, role:string, footprint:number, alloc:Record<string, number>}[]}[]} */
-export function dumpsInOrder(events) {
+ * @param {readonly any[]} events @param {number} [depth] allocator path depth kept (3) @returns {{id:string, processes:{pid:number, role:string, footprint:number, alloc:Record<string, number>}[]}[]} */
+export function dumpsInOrder(events, depth = 3) {
   /** @type {Map<number, string>} */
   const names = new Map();
   for (const e of events) if (e?.ph === 'M' && e.name === 'process_name') names.set(e.pid, e.args?.name);
@@ -138,7 +138,7 @@ export function dumpsInOrder(events) {
     if (typeof fp === 'string') row.footprint = Number.parseInt(fp, 16);
     for (const [path, node] of Object.entries(e.args.dumps.allocators ?? {})) {
       const size = node?.attrs?.size;
-      if (size?.units !== 'bytes' || typeof size.value !== 'string' || path.split('/').length > 3) continue;
+      if (size?.units !== 'bytes' || typeof size.value !== 'string' || path.split('/').length > depth) continue;
       const key = norm(path); row.alloc[key] = (row.alloc[key] ?? 0) + Number.parseInt(size.value, 16);
     }
   }
@@ -236,8 +236,8 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
 }
 
 /** The microscope: the same boot in Chromium, a detailed memory-infra dump at each checkpoint.
- * @param {{url:string, chunk:string, timeoutMs?:number}} options */
-export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000 }) {
+ * @param {{url:string, chunk:string, timeoutMs?:number, depth?:number}} options */
+export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, depth = 3 }) {
   const { launchMemoryBrowser } = await import('../chromium-memory-browser.mjs');
   const gpu = process.platform === 'darwin' ? ['--use-angle=metal'] : [];
   const owned = await launchMemoryBrowser([...gpu, '--ignore-gpu-blocklist', '--enable-precise-memory-info']);
@@ -250,33 +250,34 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000 }) {
     tracing.on('Tracing.dataCollected', (event) => { events.push(...event.value); });
     const traceConfig = /** @type {{includedCategories:string[]}} */ ({ includedCategories: ['disabled-by-default-memory-infra'], memoryDumpConfig: { triggers: [] } });
     await tracing.send('Tracing.start', { transferMode: 'ReportEvents', traceConfig });
-    /** @type {string[]} */ const requested = [];
+    /** @type {{step:string, ledger:any}[]} */ const requested = [];
     const run = { on: true };
     const dumper = (async () => {
       let seen = 0;
       while (run.on) {
         const steps = /** @type {StepRow[]} */ (await page.evaluate(() => Reflect.get(window, '__memoryRun')?.steps ?? []).catch(() => []));
         for (; seen < steps.length; seen++) {
-          const step = steps[seen][1];
+          const [, step, ledger] = steps[seen];
           if (step === 'page') continue;
           const r = await tracing.send('Tracing.requestMemoryDump', { levelOfDetail: 'detailed', deterministic: step === 'control' }).catch(() => null);
-          if (r?.success) requested.push(step);
+          if (r?.success) requested.push({ step, ledger: ledger ?? null });
         }
         await sleep(100);
       }
     })();
-    let failure = null;
+    let failure = null, gpuDetail = null;
     try {
       await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
       failure = await untilControl(page, timeoutMs);
       await sleep(1500);
+      gpuDetail = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.gpu?.() ?? null; } catch { return null; } });
     } finally {
       run.on = false; await dumper;
       const ended = new Promise((resolve) => { tracing.once('Tracing.tracingComplete', resolve); });
       await tracing.send('Tracing.end'); await ended;
     }
-    const dumps = dumpsInOrder(events);
-    return { host: 'chromium', ready: failure === null, failure, checkpoints: requested.map((step, i) => ({ step, processes: dumps[i]?.processes.filter((p) => p.role === 'renderer' || p.role === 'gpu') ?? [] })) };
+    const dumps = dumpsInOrder(events, depth);
+    return { host: 'chromium', ready: failure === null, failure, gpuDetail, checkpoints: requested.map(({ step, ledger }, i) => ({ step, ledger, processes: dumps[i]?.processes.filter((p) => p.role === 'renderer' || p.role === 'gpu') ?? [] })) };
   } finally { await owned.close(); }
 }
 
@@ -387,12 +388,27 @@ export function webkitLines(run) {
 }
 
 /** @param {Awaited<ReturnType<typeof chromiumMicroscope>>} run */
+/** EM5's check: the ledger's WebGL bytes (the drawing buffer aside) beside ANGLE Metal's allocator dump in the GPU process,
+ * and its buffer bytes beside the renderer's WebGL buffer dump. @param {{ledger?: Record<string, Record<string, number>> | null, processes: {role:string, alloc:Record<string, number>}[]}} checkpoint */
+export function ledgerParity(checkpoint) {
+  const gpu = checkpoint.ledger?.gpu; if (!gpu) return null;
+  const sum = (/** @type {string} */ role, /** @type {RegExp} */ path) => checkpoint.processes.filter((p) => p.role === role).reduce((s, p) => s + Object.entries(p.alloc).filter(([k]) => path.test(k)).reduce((a, [, b]) => a + b, 0), 0) / MB;
+  return {
+    ledgerGpu: Object.entries(gpu).filter(([k]) => k !== 'drawing-buffer').reduce((s, [, b]) => s + b, 0) / MB,
+    ledgerBuffers: (gpu.buffer ?? 0) / MB,
+    angleMetal: sum('gpu', /^gpu\/angle\/metal$/u),
+    webglBuffers: sum('renderer', /^webgl\/context_[#*]\/buffers$/u),
+  };
+}
+
 export function microscopeLines(run) {
   const lines = ['[R] Chromium microscope (detailed memory-infra dump per checkpoint; attribution only)'];
   for (const c of run.checkpoints) {
     const r = c.processes.filter((p) => p.role === 'renderer').reduce((s, p) => s + p.footprint, 0), g = c.processes.filter((p) => p.role === 'gpu').reduce((s, p) => s + p.footprint, 0);
     const big = c.processes.filter((p) => p.role === 'renderer').flatMap((p) => Object.entries(p.alloc)).filter(([k]) => /^(v8|malloc|partition_alloc\/partitions\/array_buffer|blink_gc|webgl|canvas|gpu)$|^partition_alloc\/partitions\/array_buffer$|^v8\/main$|^webgl\/context_#\/(buffers|textures|renderbuffers)$/u.test(k));
     lines.push(`  ${c.step.slice(0, 28).padEnd(28)} renderer ${mb(r)} MB [R]  GPU process ${mb(g)} MB   ${big.map(([k, b]) => `${k} ${(b / MB).toFixed(0)}`).join(', ')}`);
+    const parity = ledgerParity(c);
+    if (parity) lines.push(`  ${''.padEnd(28)} ledger WebGL ${parity.ledgerGpu.toFixed(1)} MB [L] vs gpu/angle/metal ${parity.angleMetal.toFixed(1)}; ledger buffers ${parity.ledgerBuffers.toFixed(1)} vs webgl buffers ${parity.webglBuffers.toFixed(1)} [R]`);
   }
   return lines;
 }

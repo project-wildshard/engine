@@ -24,3 +24,7 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   fresh-browser runs each, on WebKit, Chromium and the Simulator. Plain memory reads 1.00 everywhere; JS objects cost 1.9x
   the page's 48-byte estimate in JSC and 1.2x in V8. Textures carry a one-time cost on first upload (~57 MB WebKit GPU
   process, ~74 MB Chromium, ~190 MB SimMetalHost) and then ~1.0-1.2x; SimMetalHost holds ASTC at four times its size.
+  EM5's checks on Template at control (Chromium, ANGLE Metal): the ledger's buffers equal `webgl/context_*/buffers`
+  exactly (15.30 MB). Its WebGL total (33.5 MB) does not match `gpu/angle/metal` (110 MB): ANGLE Metal holds 36 MB before
+  the engine's first allocation and ~41 MB more than the API asked for by control; that gap is EM8's to name. NB1 on Nine,
+  three alternating pairs: frame p95 42.6 ms with counters off, 41.3 ms on.

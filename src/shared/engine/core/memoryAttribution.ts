@@ -104,6 +104,17 @@ export class MemoryAttribution {
     return { version: 1, allocations, totals: summary.totals, unattributed: summary.unattributed,
       measured: summary.measured, accountedBytes: summary.accountedBytes };
   }
+  /** Live bytes by kind in one domain (ENGINE-MEMORY EM5's harness read-out), without detail rows. */
+  kinds(domain: MemoryDomain): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const entry of this.entries.values()) {
+      if (entry.domain !== domain) continue;
+      const resource = entry.resource.deref();
+      if (resource === undefined) { this.entries.delete(entry.id); continue; }
+      out[entry.kind] = (out[entry.kind] ?? 0) + validBytes(entry.readBytes(resource));
+    }
+    return out;
+  }
   /** Current totals from the same live weak identities, without allocating or sorting detail rows. */
   summary(accountedBytes: number | null = this.readAccounted?.() ?? null): MemorySummary {
     return this.read(accountedBytes);

@@ -342,6 +342,7 @@
     "src/client/engine/render/dataLook.ts": "client",
     "src/client/engine/render/desktopReference.ts": "client",
     "src/client/engine/render/diagnosticJournal.ts": "client",
+    "src/client/engine/render/glCounters.ts": "client",
     "src/client/engine/render/displayColour.ts": "client",
     "src/client/engine/render/doubleElements.ts": "client",
     "src/client/engine/render/drawGuards.ts": "client",
