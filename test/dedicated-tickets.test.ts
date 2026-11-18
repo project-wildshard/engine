@@ -9,7 +9,8 @@ import { RoomBot } from './fixtures/dedicated/roomBot';
 
 // MMO-PLAN MP2.2c (MP2.1's ticket): the api-server signs a short Ed25519 ticket (player, device, expiry); the door checks it
 // offline against the pinned key and seats the account's player. Two devices' tickets reach one player, a join never asks the
-// api-server, and a bad or expired ticket plays as the device's guest. The ticket rides in the hello's `player` text, so the wire
+// api-server, and a bad ticket plays as the device's guest. FM7b3c (meta MMO-FAILURE-MODES-PLAN mode 27): a ticket the key signed
+// that has run out is refused with the `auth-expired` close fact, so the page says so rather than playing its account as a guest. The ticket rides in the hello's `player` text, so the wire
 // does not change. Format (api-server `src/server/signing/player-ticket.ts`): `ticket:<player>.<device>.<expires>.<signature>`, at most 251 bytes.
 const SHARD = 'driftwood-isle', PLAYER = 'plr_0123456789abcdef0123456789abcdef', NOW_S = 1_800_000_000;
 const bots: RoomBot[] = [];
@@ -32,8 +33,13 @@ test('a ticket seats its account; a bad, expired or odd one seats the device it 
   const key = keys(), other = keys(), live = NOW_S + 60, now = NOW_S * 1000;
   const good = ticket(key.privateKey, { player: PLAYER, device: 'device:a', expires: live });
   expect(await admit(good, key.spkiHex, now), 'with the device whose guest progress it may claim (MP2.2d)').toEqual({ seat: `account:${PLAYER}`, from: 'device:a' });
-  expect(await seatOf(ticket(other.privateKey, { player: PLAYER, device: 'device:a', expires: live }), key.spkiHex, now), 'another key').toBe('device:a');
-  expect(await seatOf(ticket(key.privateKey, { player: PLAYER, device: 'device:a', expires: NOW_S }), key.spkiHex, now), 'expired').toBe('device:a');
+  expect(await admit(ticket(other.privateKey, { player: PLAYER, device: 'device:a', expires: live }), key.spkiHex, now), 'another key: no account is known').toEqual({ seat: 'device:a' });
+  const ranOut = ticket(key.privateKey, { player: PLAYER, device: 'device:a', expires: NOW_S });
+  expect(await admit(ranOut, key.spkiHex, now), 'FM7b3c: this key\'s ticket, run out by the door\'s clock, is the authority\'s expiry').toEqual({ seat: 'device:a', expired: true });
+  expect(await admit(ticket(other.privateKey, { player: PLAYER, device: 'device:a', expires: NOW_S }), key.spkiHex, now), 'another key\'s run-out ticket claims no expiry').toEqual({ seat: 'device:a' });
+  expect(await admit(ranOut.replace(/[0-9a-f]{4}$/u, '0000'), key.spkiHex, now), 'a broken signature claims no expiry').toEqual({ seat: 'device:a' });
+  expect(await admit(ranOut, undefined, now), 'no pinned key claims none').toEqual({ seat: 'device:a' });
+  expect(await seatOf(ranOut, key.spkiHex, now), 'expired').toBe('device:a');
   expect(await seatOf(good.replace('device:a', 'device:b'), key.spkiHex, now), 'another device in a signed ticket').toBe('device:b');
   expect(await seatOf(good.replace(PLAYER.slice(4), 'f'.repeat(32)), key.spkiHex, now), 'another player in it: never theirs').toBe('device:a');
   expect(await seatOf(ticket(key.privateKey, { player: 'plr_admin', device: 'device:a', expires: live }), key.spkiHex, now), 'a ticket that does not parse').toBeUndefined();
@@ -73,8 +79,6 @@ test('two devices\' tickets reach one player, with the api-server down; a bad ti
   expect(room?.bodyOf('device:desk'), 'not as the desktop').toBeUndefined();
   await join(ticket(keys().privateKey, { player: PLAYER, device: 'device:stranger', expires }));
   expect(room?.bodyOf('device:stranger'), 'a ticket from another key plays as its device').toBeDefined();
-  await join(ticket(key.privateKey, { player: PLAYER, device: 'device:late', expires: Math.floor(Date.now() / 1000) - 1 }));
-  expect(room?.bodyOf('device:late'), 'an expired ticket plays as its device').toBeDefined();
   // review M1: a guest still playing in another tab is never claimed from under its body (another account, so only the guest is live)
   for (const bot of bots.splice(0)) bot.drop(); // the door lets one address hold only a few sockets
   const tab = await join('device:tab');
@@ -83,6 +87,30 @@ test('two devices\' tickets reach one player, with the api-server down; a bad ti
   tab.drop();
   expect(asked, 'no join asked the api-server').toEqual([]);
   expect(claims, 'MP2.2d: a live ticket claims its device\'s guest progress, never while the account (the desktop, its body still held) or the guest (the tab) is live; a dead ticket claims nothing').toEqual([`device:phone>${account}`]);
+});
+
+test('FM7b3c: a run-out ticket is told auth-expired and seats nobody; the same device\'s fresh ticket plays as the account; an unknown key\'s plays as its device', { timeout: 60_000 }, async () => {
+  const key = keys(), now = (): number => Math.floor(Date.now() / 1000);
+  const claims: string[] = [];
+  bench = await roomBench({ ticketKey: key.spkiHex, saves: { ...memoryPlayerSaves(), claim: (device, account) => { claims.push(`${device}>${account}`); return Promise.resolve('none'); } } });
+  const room = bench.room(SHARD), account = `account:${PLAYER}`;
+  const ranOut = new RoomBot(bench.url, 'bench', ticket(key.privateKey, { player: PLAYER, device: 'device:late', expires: now() - 1 }), 'Ann'); bots.push(ranOut);
+  expect(await ranOut.ended(), 'expired: the door refuses the hello').toBe('refused');
+  expect(ranOut.closedWith, 'with the coded fact the page shows as Please sign in again').toEqual({ code: 'auth-expired' });
+  expect(room?.bodyOf('device:late'), 'never seated as the device\'s guest').toBeUndefined();
+  expect(room?.bodyOf(account), 'nor as the account').toBeUndefined();
+  expect(claims, 'and nothing is claimed for it').toEqual([]);
+  // replaced: the page's sign-in still holds and the API hands it a fresh ticket for the same device
+  const renewed = new RoomBot(bench.url, 'bench', ticket(key.privateKey, { player: PLAYER, device: 'device:late', expires: now() + 600 }), 'Ann'); bots.push(renewed);
+  expect(await renewed.arrived(), 'valid session: the fresh ticket plays').toBe(true);
+  expect(room?.bodyOf(account), 'as the account').toBeDefined();
+  renewed.drop();
+  // missing authority: a ticket no key here signed, run out or not, says nothing of any account: the device plays, no expiry claimed
+  const stranger = new RoomBot(bench.url, 'bench', ticket(keys().privateKey, { player: PLAYER, device: 'device:stranger', expires: now() - 1 }), 'Ann'); bots.push(stranger);
+  expect(await stranger.arrived(), 'unknown: plays as its device').toBe(true);
+  expect(stranger.closedWith).toBeNull();
+  expect(room?.bodyOf('device:stranger')).toBeDefined();
+  expect(bench.world.refusals['auth-expired'], 'one expiry refusal counted').toBe(1);
 });
 
 test('MP2.2g: the door stops asking to claim once the account has progress; an empty account is asked again', { timeout: 60_000 }, async () => {

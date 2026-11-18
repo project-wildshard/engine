@@ -2,7 +2,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import type { LoginPorts } from '../src/client/engine/net/playerLogin';
-import { openSignIn, SIGN_IN_SWITCHES, takeLink, type LinkHold } from '../src/client/engine/ui/signInCard';
+import { openSignIn, SIGN_IN_SWITCHES, takeLink, takeLinkOutcome, type LinkHold } from '../src/client/engine/ui/signInCard';
 import { listenTap } from '../src/client/engine/input/dom';
 
 const noHold: LinkHold = { take: () => undefined };
@@ -91,6 +91,81 @@ test('MP2.2g: a link the boot took off the address (index.html\'s login door) is
   expect(replaced, 'the address had nothing left to take').toEqual([]);
   expect(api.asked, 'the waiting token is the one spent').toEqual([`/api/login/email/redeem {"token":"${token}"}`]);
   expect(await takeLink(api, page, url => { replaced.push(url); }, hold), 'spent once').toBeUndefined();
+});
+
+// FM8b modes 28 and 29: sign-in that can't finish says why inside the card; the player stays on the login, or plays as a guest.
+function failingPorts(answers: Record<string, () => Response>): LoginPorts & { readonly asked: string[] } {
+  const held = new Map<string, string>(), asked: string[] = [];
+  return {
+    api: '', now: () => 0, asked,
+    storage: { getItem: key => held.get(key) ?? null, setItem: (key, value) => { held.set(key, value); }, removeItem: key => { held.delete(key); } },
+    fetch: input => { const route = typeof input === 'string' ? input : ''; asked.push(route); return Promise.resolve(answers[route]?.() ?? new Response('', { status: 404 })); },
+  };
+}
+const failShown = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`#ws-signin [data-failmode="${id}"]:not([hidden])`);
+const tap = (root: HTMLElement | null, label: string): void => { [...root?.querySelectorAll('button') ?? []].find(node => node.textContent === label)?.click(); };
+
+test('FM8b mode 29: a link request the API fails names its status, Try now asks again, and Play as a guest closes the card', async () => {
+  let status = 502;
+  const scope = new Scope('sign-in'), api = failingPorts({ '/api/login/email': () => new Response('', { status }) });
+  void openSignIn(scope, { parent: document.body, ports: api });
+  expect(failShown('api-5xx'), 'nothing before a request').toBeNull();
+  const email = card().querySelector<HTMLInputElement>('.ws-signin-email');
+  if (email === null) throw new Error('no email field');
+  email.value = 'ann@b.co';
+  card().querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  const box = failShown('api-5xx');
+  expect(box?.textContent).toContain('Accounts are down');
+  expect(box?.querySelector('.ws-signin-fail-body')?.textContent, 'no status in the words a player reads').not.toMatch(/\d{3}/u);
+  expect(box?.querySelector('details')?.textContent, 'the status is a Details fact').toContain('answered 502');
+  expect(card().querySelector('.ws-signin-email'), 'the login stays under it').not.toBeNull();
+  status = 202;
+  tap(box, 'Try now');
+  await settle();
+  expect(api.asked, 'the player\'s tap asked once more').toEqual(['/api/login/email', '/api/login/email']);
+  expect(failShown('api-5xx'), 'answered: the box goes').toBeNull();
+  expect(card().querySelector('.ws-signin-note')?.textContent).toContain('Check your email');
+  status = 503;
+  card().querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }));
+  await settle();
+  tap(failShown('api-5xx'), 'Play as a guest');
+  expect(document.querySelector('#ws-signin'), 'the guest way out closes the card').toBeNull();
+  scope.dispose();
+});
+
+test('FM8b mode 28: a mailed link the API refuses opens the card on Sign-in didn\'t work; a new link from the form signs in', async () => {
+  const api = failingPorts({ '/api/login/email/redeem': () => Response.json({ error: 'link not valid' }, { status: 401 }), '/api/login/email': () => new Response('', { status: 202 }) });
+  const page = { pathname: '/', search: '', hash: '#login=wsl_abcdefgh12345678' };
+  const taken = await takeLinkOutcome(api, page, () => undefined, noHold);
+  expect(taken).toEqual({ note: '', failure: { kind: 'auth-failed' } });
+  const scope = new Scope('sign-in');
+  void openSignIn(scope, { parent: document.body, ports: api, note: taken?.note ?? '', ...taken?.failure === undefined ? {} : { failure: taken.failure } });
+  const box = failShown('auth-failed');
+  expect(box?.textContent).toContain('Sign-in didn\'t work');
+  expect([...box?.querySelectorAll('button') ?? []].map(node => node.textContent)).toEqual(['Email me a new link', 'Play as a guest']);
+  tap(box, 'Email me a new link');
+  expect(failShown('auth-failed')).toBeNull();
+  expect(document.activeElement?.className, 'the email field takes the focus').toBe('ws-signin-email');
+  scope.dispose();
+  expect(await takeLink(failingPorts({ '/api/login/email/redeem': () => new Response('', { status: 401 }) }), { pathname: '/', search: '', hash: '#login=wsl_abcdefgh12345678' }, () => undefined, noHold),
+    'the note alone still says the link was used').toContain('expired or was used');
+});
+
+test('FM8b mode 29: a mailed link the API couldn\'t take keeps its token, and Try now spends it once the API is back', async () => {
+  let status = 503;
+  const api = failingPorts({ '/api/login/email/redeem': () => status === 200 ? Response.json({ session: 'wss_s', player: { id: 'plr_x', email: 'ann@b.co' } }) : new Response('', { status }) });
+  const taken = await takeLinkOutcome(api, { pathname: '/', search: '', hash: '#login=wsl_abcdefgh12345678' }, () => undefined, noHold);
+  expect(taken?.failure).toEqual({ kind: 'api-5xx', status: 503, token: 'wsl_abcdefgh12345678' });
+  const scope = new Scope('sign-in');
+  void openSignIn(scope, { parent: document.body, ports: api, ...taken?.failure === undefined ? {} : { failure: taken.failure } });
+  expect(failShown('api-5xx')?.querySelector('details')?.textContent).toContain('answered 503');
+  status = 200;
+  tap(failShown('api-5xx'), 'Try now');
+  await settle();
+  expect(failShown('api-5xx')).toBeNull();
+  expect(card().dataset['signedIn']).toBe('true');
+  scope.dispose();
 });
 
 // MMO-PLAN MP2.5c: signed in, the card offers the player's data as one file, and deletes the account in two taps.

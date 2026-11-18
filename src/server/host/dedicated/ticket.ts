@@ -1,16 +1,19 @@
 // MMO-PLAN MP2.2c (MP2.1, J69, J171): who a hello seats. A signed-in page sends the api-server's join ticket as its `player`
 // (api-server `src/server/signing/player-ticket.ts`), and the door checks it here, offline, against the pinned public key: no join
 // asks the api-server, so joins survive its outage. A live ticket seats `account:plr_<player>`, the same on every device, so a phone
-// and a desktop reach one player. A ticket this key didn't sign, or one past its expiry, plays as the device it names, as that
-// device's guest would. A plain device id is itself; nobody names an account directly, or sends a ticket that doesn't parse.
+// and a desktop reach one player. A ticket this key didn't sign plays as the device it names, as that device's guest would. FM7b3c
+// (meta MMO-FAILURE-MODES-PLAN mode 27): one this key signed that has run out by the door's clock is `expired`, which the door refuses
+// with the `auth-expired` close fact rather than playing the account's page as a guest. A plain device id is itself; nobody names an
+// account directly, or sends a ticket that doesn't parse.
 // Format: `ticket:<player>.<device>.<expires>.<signature>`, the player id's 32 hex, the device id, Unix seconds, and 128 hex of
 // Ed25519 over everything before the last dot. The wire caps hello text at 255 bytes; the longest ticket is 251.
 
 /** The api-server's ticket key (`~/.config/wildshard/player-ticket-signing-key.pub.pem`), SPKI DER in hex. */
 export const PLAYER_TICKET_PUBLIC_KEY = '302a300506032b657003210062d6fe4908c19b31d934a1293b4fb1327a531fbc19e8a6d30cebbb174a7fa70c';
 
-/** Who a hello seats, and the device a live ticket came from (whose guest progress the account may claim, MP2.2d). */
-export interface Admission { readonly seat: string; readonly from?: string }
+/** Who a hello seats, and the device a live ticket came from (whose guest progress the account may claim, MP2.2d). `expired`
+ *  (FM7b3c): the ticket was this key's but has run out, the authority's own verdict; its seat is only the device it names. */
+export interface Admission { readonly seat: string; readonly from?: string; readonly expired?: true }
 
 /** A ticket, whole; `NetIdentitySchema` takes the same shape. */
 const TICKET = /^(?<signed>ticket:(?<player>[0-9a-f]{32})\.(?<device>device:[A-Za-z0-9-]{1,64})\.(?<expires>[0-9]{1,12}))\.(?<signature>[0-9a-f]{128})$/u;
@@ -42,8 +45,9 @@ export async function admit(player: string, spkiHex: string | undefined, nowMs: 
   // a deleted or expired player's anonymous ledger (`deleted:`, MP2.5f/g) is nobody's to play as
   if (groups === undefined) return ['account:', 'ticket:', 'confirm:', 'deleted:'].some(kind => player.startsWith(kind)) ? undefined : { seat: player };
   const { signed: text = '', player: id = '', device = '', expires = '0', signature = '' } = groups;
-  const live = Number(expires) * 1000 > nowMs && await signed(text, signature, spkiHex);
-  return live ? { seat: `account:plr_${id}`, from: device } : { seat: device };
+  // a ticket no key here signed says nothing of any account, run out or not
+  if (!await signed(text, signature, spkiHex)) return { seat: device };
+  return Number(expires) * 1000 > nowMs ? { seat: `account:plr_${id}`, from: device } : { seat: device, expired: true };
 }
 
 /** Just the seat (`admit`'s). */

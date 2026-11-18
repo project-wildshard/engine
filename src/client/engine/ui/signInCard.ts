@@ -1,7 +1,8 @@
 import type { Scope } from '../../../shared/engine/app/scope';
 import { saveEnvironment } from '../../../shared/engine/saves/environment';
 import { engineString } from '../../../shared/engine/strings';
-import { addPasskey, deleteMine, exportMine, linkIn, pageLogin, passkeySignIn, passkeysHere, redeemLink, sendLink, signedIn, signOut, type Deleted, type LinkSent, type LoginPorts } from '../net/playerLogin';
+import { addPasskey, askForLink, deleteMine, exportMine, linkIn, pageLogin, passkeySignIn, passkeysHere, signedIn, signOut, spendLink, type Deleted, type LinkSent, type LoginPorts } from '../net/playerLogin';
+import { clearFailure, showFailure } from '../telemetry/runtime';
 import { installViewport } from '../core/viewport';
 import { followsTap, listenPage } from '../input/dom';
 import './styles/signInCard.css';
@@ -28,7 +29,14 @@ export interface SignInOptions {
   readonly ports?: LoginPorts;
   /** MP2.5c: where the player's saves are (the world's door); without it the card offers no data rows. */
   readonly account?: AccountPorts;
+  /** FM8b modes 28 and 29: the card opens on why a mailed link didn't sign the page in (`takeLinkOutcome`). */
+  readonly failure?: SignInFailure;
+  /** FM8b mode 27: opened from the world's signed-out card, so it sits above the link's cards (their layer, just under errors). */
+  readonly overWorld?: boolean;
 }
+/** FM8b: why sign-in didn't finish. `auth-failed` (28): the API refused the mailed link (spent, run out, unknown). `api-5xx` (29): the
+ *  API answered a server error, with its status; `token` is the link to spend again on Try now (a link request just asks again). */
+export type SignInFailure = { readonly kind: 'auth-failed' } | { readonly kind: 'api-5xx'; readonly status: number; readonly token?: string };
 
 /** MP2.5c: what Download my data and Delete account need beyond the API. */
 export interface AccountPorts {
@@ -44,7 +52,7 @@ export function saveFile(name: string, text: string): void {
   link.href = url; link.download = name; link.click(); // the URL stays until the page goes: revoking it at once can cancel the download
 }
 
-const SENT: Record<LinkSent, string> = { sent: 's_signin_sent', busy: 's_signin_busy', off: 's_signin_off', failed: 's_signin_failed' } as const;
+const SENT: Record<LinkSent, string> = { sent: 's_signin_sent', busy: 's_signin_busy', off: 's_signin_off', down: 's_signin_failed', failed: 's_signin_failed' } as const;
 const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = ''): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag); node.className = cls; if (text !== '') node.textContent = text; return node;
 };
@@ -77,12 +85,14 @@ export const sessionLinkHold: LinkHold = {
   },
 };
 
+/** What spending a mailed link came to: the card's note ('' when it signed the page in) and, when it didn't, why (FM8b). */
+export interface LinkTaken { readonly note: string; readonly failure?: SignInFailure }
 /**
  * Spend a mailed link: the token the login door kept, or a `#login=…` still in the address (a page from before the door), taken
- * off it first so a reload never spends it twice. Undefined: no link. '' when it signed the page in (the card's who line says
- * who: MP2.2g's "Signed in as" once), else the line saying the link was used or expired.
+ * off it first so a reload never spends it twice. Undefined: no link. Else the card's note ('' when it signed the page in: the card's
+ * who line says who, MP2.2g's "Signed in as" once) and, FM8b, why it didn't: the API refused the link, or answered a server error.
  */
-export async function takeLink(ports: LoginPorts, page: Pick<Location, 'hash' | 'pathname' | 'search'> = location, replace: (url: string) => void = url => { history.replaceState(history.state, '', url); }, hold: LinkHold = sessionLinkHold): Promise<string | undefined> {
+export async function takeLinkOutcome(ports: LoginPorts, page: Pick<Location, 'hash' | 'pathname' | 'search'> = location, replace: (url: string) => void = url => { history.replaceState(history.state, '', url); }, hold: LinkHold = sessionLinkHold): Promise<LinkTaken | undefined> {
   const inAddress = linkIn(page.hash);
   if (inAddress !== undefined) {
     const hash = page.hash.replace(/(?:^#|&)login=[^&]*/u, '').replace(/^&/u, '#');
@@ -90,19 +100,65 @@ export async function takeLink(ports: LoginPorts, page: Pick<Location, 'hash' | 
   }
   const token = hold.take() ?? inAddress;
   if (token === undefined) return undefined;
-  const kept = await redeemLink(ports, token);
-  return kept === undefined ? engineString('s_signin_link_used') : '';
+  const spent = await spendLink(ports, token);
+  if (spent.kind === 'in') return { note: '' };
+  if (spent.kind === 'refused') return { note: '', failure: { kind: 'auth-failed' } };
+  if (spent.kind === 'down') return { note: '', failure: { kind: 'api-5xx', status: spent.status, token } };
+  return { note: engineString('s_signin_link_used') };
+}
+/** `takeLinkOutcome`'s note alone. */
+export async function takeLink(ports: LoginPorts, page: Pick<Location, 'hash' | 'pathname' | 'search'> = location, replace: (url: string) => void = url => { history.replaceState(history.state, '', url); }, hold: LinkHold = sessionLinkHold): Promise<string | undefined> {
+  const taken = await takeLinkOutcome(ports, page, replace, hold);
+  return taken === undefined ? undefined : taken.failure?.kind === 'auth-failed' ? engineString('s_signin_link_used') : taken.note;
 }
 
-function signedOutRows(own: Scope, ports: LoginPorts, say: (line: string) => void, done: () => void): HTMLElement[] {
+/** FM8b: the card's failure box and how it is filled. */
+interface FailBox {
+  readonly show: (failure: SignInFailure, actions: readonly { readonly label: string; readonly act: () => void }[]) => void;
+  readonly hide: () => void;
+}
+function failBox(own: Scope, root: HTMLElement): FailBox {
+  const tag = make('span', 'ws-signin-fail-tag'), title = make('h3', 'ws-signin-fail-title'), body = make('p', 'ws-signin-fail-body'), actions = make('div', 'ws-signin-fail-actions');
+  // the status the page got is a fact for Details, never primary copy (a player reads words, J229)
+  const details = make('details', 'ws-signin-fail-details'), detail = make('p', 'ws-signin-fail-detail');
+  details.append(make('summary', '', engineString('s_signin_fail_details')), detail);
+  root.hidden = true; root.setAttribute('role', 'alert'); root.append(tag, title, body, actions, details);
+  let shown = false;
+  const hide = (): void => { if (shown) clearFailure(root, 'recovered'); shown = false; root.hidden = true; delete root.dataset['failmode']; };
+  return {
+    hide,
+    show: (failure, buttons) => {
+      if (shown) clearFailure(root, 'replaced');
+      root.dataset['failmode'] = failure.kind; root.dataset['tone'] = 'warn';
+      if (failure.kind === 'auth-failed') {
+        tag.textContent = engineString('s_signin_fail_auth_tag'); title.textContent = engineString('s_signin_fail_auth_title');
+        body.textContent = engineString('s_signin_fail_auth_body'); detail.textContent = engineString('s_signin_fail_auth_detail');
+      } else {
+        tag.textContent = engineString('s_signin_fail_api_tag'); title.textContent = engineString('s_signin_fail_api_title');
+        body.textContent = engineString('s_signin_fail_api_body'); detail.textContent = engineString('s_signin_fail_api_detail', [failure.status]);
+      }
+      actions.replaceChildren(...buttons.map(({ label, act }, index) => {
+        const node = button(index === 0 ? 'ws-signin-send' : 'ws-signin-alt', label, `fail-${String(index)}`);
+        own.listen(node, 'click', act);
+        return node;
+      }));
+      root.hidden = false; shown = true; showFailure(own, root, failure.kind);
+    },
+  };
+}
+
+function signedOutRows(own: Scope, ports: LoginPorts, say: (line: string) => void, done: () => void, fail: FailBox, close: () => void): HTMLElement[] {
   const form = make('form', 'ws-signin-form'), email = make('input', 'ws-signin-email'), send = make('button', 'ws-signin-send', engineString('s_signin_send'));
   form.noValidate = true; email.type = 'email'; email.required = true; email.setAttribute('autocomplete', 'email'); email.setAttribute('aria-label', engineString('s_signin_email'));
   email.placeholder = engineString('s_signin_email'); email.enterKeyHint = 'send'; send.type = 'submit'; send.dataset['signin'] = 'send';
   form.append(email, send);
   const mail = async (): Promise<void> => {
     send.disabled = true;
-    const sent = await sendLink(ports, email.value.trim(), game());
-    send.disabled = false; say(engineString(SENT[sent] as 's_signin_sent'));
+    const asked = await askForLink(ports, email.value.trim(), game());
+    send.disabled = false;
+    // FM8b mode 29: the API's own server error, named, with Try now (the player's own tap asks again) and the guest way out
+    if (asked.said === 'down') { say(''); fail.show({ kind: 'api-5xx', status: asked.status ?? 503 }, [{ label: engineString('s_signin_fail_try'), act: () => { void mail(); } }, { label: engineString('s_signin_fail_guest'), act: close }]); return; }
+    fail.hide(); say(engineString(SENT[asked.said] as 's_signin_sent'));
   };
   own.listen(form, 'submit', event => { event.preventDefault(); void mail(); });
   const rows: HTMLElement[] = [form];
@@ -164,17 +220,34 @@ export function openSignIn(scope: Scope, options: SignInOptions): Promise<void> 
   if (ports === undefined) return Promise.resolve();
   const own = scope.child('sign-in');
   const box = make('div', 'ws-signin'), card = make('div', 'ws-signin-card'), note = make('p', 'ws-signin-note'), body = make('div', 'ws-signin-body');
-  const close = button('ws-signin-close', engineString('s_signin_close'), 'close');
-  box.id = 'ws-signin'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); note.setAttribute('role', 'status');
-  card.append(make('h2', 'ws-signin-title', engineString('s_signin_title')), make('p', 'ws-signin-why', engineString('s_signin_why')), body, note, close);
+  const close = button('ws-signin-close', engineString('s_signin_close'), 'close'), failRoot = make('div', 'ws-signin-fail'), fail = failBox(own, failRoot);
+  box.id = 'ws-signin'; box.setAttribute('role', 'dialog');
+  // a literal: calc() takes z-index through a float, which at this size lands below the link cards (opus-fm2 saw 2147479950)
+  if (options.overWorld === true) box.style.zIndex = '2147482450'; box.setAttribute('aria-modal', 'true'); note.setAttribute('role', 'status');
+  card.append(make('h2', 'ws-signin-title', engineString('s_signin_title')), make('p', 'ws-signin-why', engineString('s_signin_why')), failRoot, body, note, close);
   box.append(card);
   const say = (line: string): void => { note.textContent = line; note.hidden = line === ''; };
   const draw = (): void => {
-    const rows = signedIn(ports) === undefined ? signedOutRows(own, ports, say, changed) : signedInRows(own, ports, say, changed, options.account);
+    const rows = signedIn(ports) === undefined ? signedOutRows(own, ports, say, changed, fail, () => { own.dispose(); }) : signedInRows(own, ports, say, changed, options.account);
     body.replaceChildren(...rows); box.dataset['signedIn'] = String(signedIn(ports) !== undefined);
   };
-  function changed(line = ''): void { say(line); draw(); options.changed?.(); }
+  function changed(line = ''): void { fail.hide(); say(line); draw(); options.changed?.(); }
   say(options.note ?? ''); draw();
+  // FM8b: a mailed link the API refused (28) or couldn't take (29) opens the card on why; the email form stays below it
+  const emailField = (): void => { fail.hide(); body.querySelector<HTMLInputElement>('.ws-signin-email')?.focus(); };
+  const opened = options.failure;
+  if (opened?.kind === 'auth-failed') fail.show(opened, [{ label: engineString('s_signin_fail_new_link'), act: emailField }, { label: engineString('s_signin_fail_guest'), act: () => { own.dispose(); } }]);
+  else if (opened?.kind === 'api-5xx') {
+    const token = opened.token;
+    const again = async (): Promise<void> => {
+      if (token === undefined) { emailField(); return; }
+      const spent = await spendLink(ports, token);
+      if (spent.kind === 'in') changed();
+      else if (spent.kind === 'down') fail.show({ kind: 'api-5xx', status: spent.status, token }, [{ label: engineString('s_signin_fail_try'), act: () => { void again(); } }, { label: engineString('s_signin_fail_guest'), act: () => { own.dispose(); } }]);
+      else fail.show({ kind: 'auth-failed' }, [{ label: engineString('s_signin_fail_new_link'), act: emailField }, { label: engineString('s_signin_fail_guest'), act: () => { own.dispose(); } }]);
+    };
+    fail.show(opened, [{ label: engineString('s_signin_fail_try'), act: () => { void again(); } }, { label: engineString('s_signin_fail_guest'), act: () => { own.dispose(); } }]);
+  }
   installViewport();
   own.ownNode(box); options.parent.append(box);
   return new Promise(resolve => {

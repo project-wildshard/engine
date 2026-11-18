@@ -524,3 +524,56 @@ test('FM4b mode 5 negative controls: a link that was live, a restart, an old ser
     scope.dispose();
   } finally { vi.useRealTimers(); }
 });
+
+/** FM8b mode 27: the screens with the page's sign-in hooks. */
+function authHarness(): { scope: Scope; screens: ReturnType<typeof linkScreens>; calls: string[]; set: (next: Partial<LinkProgress>) => void } {
+  const scope = new Scope('test.auth'), calls: string[] = [];
+  let progress: LinkProgress = { dials: 0, nextDialMs: null, downMs: 0 };
+  const screens = linkScreens(scope, { retry: () => { calls.push('retry'); }, dialNow: () => { calls.push('dialNow'); }, reload: () => { calls.push('reload'); },
+    title: why => { calls.push(`title:${String(why)}`); }, signIn: () => { calls.push('signIn'); }, guest: () => { calls.push('guest'); },
+    progress: () => progress, why: () => 'closed' });
+  return { scope, screens, calls, set: next => { progress = { ...progress, ...next }; } };
+}
+
+test('FM8b mode 27: the account service ending the session stops play under the signed-out card, which outlasts the link\'s own changes', () => {
+  const { scope, screens, calls } = authHarness();
+  screens.signedOut();
+  const card = shown('auth-expired');
+  expect(card?.textContent).toContain('Please sign in again');
+  expect(card?.textContent).toContain('the account service ended this session (401)');
+  expect([...card?.querySelectorAll('button') ?? []].map(button => button.textContent)).toEqual(['Sign in', 'Play as a guest', 'Title screen']);
+  expect(screens.allow('Talk'), 'a world tap under the card is held, never sent').toBe(false);
+  screens.link('reconnecting', 'closed');
+  expect(shown('drop'), 'no banner over it').toBeNull();
+  screens.link('live');
+  expect(shown('auth-expired'), 'a live link never closes it: the page is signed out').toBe(card);
+  expect(shown('reconnected'), 'and claims no reconnect').toBeNull();
+  screens.signedOut();
+  expect(document.querySelectorAll('[data-failmode~="auth-expired"]'), 'one card, however often it is heard').toHaveLength(1);
+  click(card, 'Sign in');
+  click(card, 'Play as a guest');
+  click(card, 'Title screen');
+  expect(calls).toEqual(['signIn', 'guest', 'title:signed out (auth-expired)']);
+  scope.dispose();
+});
+
+test('FM7b3c/FM8b: the door\'s auth-expired close is the signed-out card, never the generic turned-away one; a plain refused stays that', () => {
+  const { scope, screens, set } = authHarness();
+  set({ ended: { code: 'auth-expired' } });
+  screens.link('ended', 'refused');
+  expect(shown('auth-expired')?.textContent).toContain('the door\'s ticket ran out');
+  expect(shown('refused')).toBeNull();
+  scope.dispose(); document.body.replaceChildren();
+  const plain = authHarness();
+  plain.screens.link('ended', 'refused');
+  expect(shown('refused'), 'no fact: the old card').not.toBeNull();
+  expect(shown('auth-expired'), 'no expiry claimed without one').toBeNull();
+  plain.scope.dispose();
+});
+
+test('FM8b mode 27: a page without sign-in hooks offers only what it has', () => {
+  const { scope, screens } = harness();
+  screens.signedOut();
+  expect([...shown('auth-expired')?.querySelectorAll('button') ?? []].map(button => button.textContent)).toEqual(['Title screen']);
+  scope.dispose();
+});

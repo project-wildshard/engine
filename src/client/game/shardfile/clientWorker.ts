@@ -62,7 +62,7 @@ import { declaredKitSlots } from '../../../shared/game/shardfile/items';
 import { earlyStandalone, serverRoute, serverStepLabel } from './serverRoute';
 import { worldHosted } from '../grid/oneWayIn';
 import { setLampFollow } from '@wildshard/engine/render/lookLight';
-import { pageLogin, refreshTicket, ticketBeforeJoin, ticketed, TICKET_REFRESH_MS } from '@wildshard/engine/net/playerLogin';
+import { pageLogin, refreshTicket, signedIn, ticketBeforeJoin, ticketed, TICKET_REFRESH_MS } from '@wildshard/engine/net/playerLogin';
 
 type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
@@ -147,7 +147,13 @@ const onlineLeaving: OnlineLeaving = {
   reloadByHand: async () => { await (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadPastWorker(); },
   settle: () => { void (async () => { (await import('@wildshard/engine/boot/browserChunkRecovery')).settleRefusedBuild(); })(); },
 };
-interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: OnlineGrid }) => Promise<Shell> }
+/** FM8b mode 27: the page's sign-in, lent to the online shell (shell.ts `OnlineSession`). */
+interface OnlineSession {
+  readonly renew: () => Promise<'ok' | 'ended' | 'guest' | 'unknown'>;
+  readonly onEnded: (heard: () => void) => void;
+  readonly signIn: () => Promise<boolean>;
+}
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: OnlineGrid; session?: OnlineSession }) => Promise<Shell> }
 interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; devGround?: (ground: DevGround) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void;
   /** ZE10d2: an online shell's gate word and its adoption by the next session on this page (`shell.ts` `StartedOnline`) */
   enter?: (cell: string) => Promise<{ readonly x: number; readonly z: number; readonly yaw: number } | null>;
@@ -425,11 +431,28 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const first = booted === undefined ? undefined : gridOf(booted, pageGoto() === booted);
     // MP2.2e1: a signed-in page joins with its join ticket, so the door seats its account; a guest, or a page the API can't answer,
     // joins as its device. The ticket is read at each hello, so a redial after a refresh sends the new one.
-    const login = pageLogin(storage), device = deviceIdentity(storage, savePrefix).player;
+    // FM8b mode 27: the account service's 401 (a session that ended) signs the page out and is heard by the world's signed-out card,
+    // whether it came before the join, from the 20-minute refresh or from the check each drop makes
+    const endedHeard: (() => void)[] = [];
+    let ended = false;
+    const login = { ...pageLogin(storage), ended: () => { ended = true; for (const heard of endedHeard) heard(); } }, device = deviceIdentity(storage, savePrefix).player;
     await ticketBeforeJoin(login, device);
     if (scope.disposed) throw new Error('The page left before it joined the world');
     scope.interval(TICKET_REFRESH_MS, () => { void refreshTicket(login, device); });
-    return startOnline({ ...world, keep: releaseKeep(), leaving: onlineLeaving, loaded: slug, build, identity: name => ticketed(login, deviceIdentity(storage, savePrefix, name)),
+    const session: OnlineSession = {
+      renew: async () => {
+        if (signedIn(login) === undefined) return ended ? 'ended' : 'guest';
+        if (await refreshTicket(login, device, AbortSignal.timeout(5000)) !== undefined) return 'ok';
+        return signedIn(login) === undefined ? 'ended' : 'unknown';
+      },
+      onEnded: heard => { endedHeard.push(heard); if (ended) heard(); },
+      signIn: async () => {
+        const { openSignIn, titleSignedIn } = await import('@wildshard/engine/ui/signInCard');
+        await openSignIn(scope, { parent: document.body, overWorld: true });
+        return titleSignedIn();
+      },
+    };
+    return startOnline({ ...world, keep: releaseKeep(), leaving: onlineLeaving, loaded: slug, build, identity: name => ticketed(login, deviceIdentity(storage, savePrefix, name)), session,
       ...(first === undefined ? {} : { grid: first }) });
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;

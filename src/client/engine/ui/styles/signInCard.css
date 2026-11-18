@@ -22,3 +22,13 @@ html[data-ws-keyboard] .ws-signin { top: var(--ws-kb-top, 0px); height: calc(var
 .ws-signin button:disabled { opacity: 0.5; cursor: default; }
 .ws-signin .ws-signin-note { margin: 0; color: #ffe2b0; font-size: 13px; line-height: 1.4; }
 .ws-signin .ws-signin-note[hidden] { display: none; }
+/* FM8b modes 28 and 29: why sign-in didn't finish, inside the card (the player stays on the login) */
+.ws-signin .ws-signin-fail { display: grid; gap: 8px; padding: 12px; border: 1px solid rgba(255, 196, 120, 0.55); background: rgba(40, 26, 8, 0.55); }
+.ws-signin .ws-signin-fail[hidden] { display: none; }
+.ws-signin .ws-signin-fail-tag { font-family: var(--ws-mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: #ffc478; }
+.ws-signin .ws-signin-fail-title { margin: 0; font-family: var(--ws-display); font-weight: 700; font-size: 19px; color: #fff0d8; }
+.ws-signin .ws-signin-fail-body { margin: 0; color: rgba(255, 236, 210, 0.9); font-size: 14px; line-height: 1.4; }
+.ws-signin .ws-signin-fail-actions { display: grid; gap: 8px; }
+.ws-signin .ws-signin-fail-details { color: rgba(255, 236, 210, 0.7); font-size: 12px; }
+.ws-signin .ws-signin-fail-details summary { cursor: pointer; }
+.ws-signin .ws-signin-fail-detail { margin: 4px 0 0; font-family: var(--ws-mono); }

@@ -13,11 +13,19 @@ export interface LoginPorts {
   readonly fetch: typeof fetch;
   readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   readonly now: () => number;
+  /** FM8b mode 27: hears the API end this page's session (a 401 on a ticket ask, which signs the page out). */
+  readonly ended?: () => void;
 }
 /** Who is signed in on this page. */
 export interface SignedIn { readonly session: string; readonly email: string }
-/** How a link request went: sent, refused for too many asks, mail off on this API, or anything else. */
-export type LinkSent = 'sent' | 'busy' | 'off' | 'failed';
+/** How a link request went: sent, refused for too many asks, mail off on this API, the API down (FM8b mode 29: it answered 500,
+ *  502, 503 or 504, other than its own "mail is off"), or anything else (no answer, a refused address). */
+export type LinkSent = 'sent' | 'busy' | 'off' | 'down' | 'failed';
+/** FM8b modes 28 and 29: how spending a mailed link went. `refused`: the API said the link isn't valid (spent, run out, unknown);
+ *  `down`: it answered a 5xx, with that status; `failed`: no answer at all. Never a guess past the status the page got. */
+export type LinkSpent = { readonly kind: 'in'; readonly who: SignedIn } | { readonly kind: 'refused' } | { readonly kind: 'down'; readonly status: number } | { readonly kind: 'failed' };
+/** FM8b mode 29: an account request the API answered with a server error (never a network failure, which says nothing of the API). */
+export const apiDown = (status: number): boolean => status === 500 || status === 502 || status === 503 || status === 504;
 
 const SESSION_KEY = 'wildshard.player.session', TICKET_KEY = 'wildshard.player.ticket';
 /** A ticket is used while it has this long left: a join in its last minutes would outlive it. */
@@ -66,17 +74,38 @@ async function keep(ports: LoginPorts, response: Response | undefined): Promise<
   return kept;
 }
 
+/** What a link request got: how it went, and the API's status when it answered a server error (FM8b's card names it). */
+export interface LinkAsked { readonly said: LinkSent; readonly status?: number }
 /** Ask for a sign-in link mailed to `email`, coming back to `game` (the page's origin). */
-export async function sendLink(ports: LoginPorts, email: string, game: string): Promise<LinkSent> {
+export async function askForLink(ports: LoginPorts, email: string, game: string): Promise<LinkAsked> {
   const response = await post(ports, '/api/login/email', { email, game });
-  if (response === undefined) return 'failed';
-  return response.status === 202 ? 'sent' : response.status === 429 ? 'busy' : response.status === 503 ? 'off' : 'failed';
+  if (response === undefined) return { said: 'failed' };
+  if (response.status === 202) return { said: 'sent' };
+  if (response.status === 429) return { said: 'busy' };
+  // api-server's 503 for a deployment with no mailer says so in its body; any other 5xx is the API itself failing
+  if (response.status === 503) {
+    let body: unknown;
+    try { body = await response.json(); } catch { body = undefined; }
+    if (typeof body === 'object' && body !== null && (body as Record<string, unknown>)['error'] === 'sign-in mail is off') return { said: 'off' };
+  }
+  return apiDown(response.status) ? { said: 'down', status: response.status } : { said: 'failed' };
 }
+/** Ask for a sign-in link: how it went. */
+export async function sendLink(ports: LoginPorts, email: string, game: string): Promise<LinkSent> { return (await askForLink(ports, email, game)).said; }
 /** The link token in a page's hash (`#login=wsl_…`), or undefined. */
 export function linkIn(hash: string): string | undefined { return LINK.exec(hash)?.groups?.['token']; }
+/** Spend a mailed link's token: signed in, or why not (FM8b: the API's refusal, its server error, or no answer). */
+export async function spendLink(ports: LoginPorts, token: string): Promise<LinkSpent> {
+  const response = await post(ports, '/api/login/email/redeem', { token });
+  if (response === undefined) return { kind: 'failed' };
+  if (apiDown(response.status)) return { kind: 'down', status: response.status };
+  const who = await keep(ports, response);
+  return who !== undefined ? { kind: 'in', who } : response.status === 401 ? { kind: 'refused' } : { kind: 'failed' };
+}
 /** Spend a mailed link's token: the page is signed in, or undefined (used, expired, unknown). */
 export async function redeemLink(ports: LoginPorts, token: string): Promise<SignedIn | undefined> {
-  return keep(ports, await post(ports, '/api/login/email/redeem', { token }));
+  const spent = await spendLink(ports, token);
+  return spent.kind === 'in' ? spent.who : undefined;
 }
 
 /** This device's held ticket while it has more than a few minutes left, or undefined. */
@@ -92,7 +121,8 @@ export async function refreshTicket(ports: LoginPorts, device: string, signal?: 
   const response = await post(ports, '/api/players/ticket', { device }, { session, ...(signal === undefined ? {} : { signal }) });
   // an answer for a session the page no longer holds (signed out, or in as someone else meanwhile) changes nothing
   if (signedIn(ports)?.session !== session) return undefined;
-  if (response?.status === 401) { signOut(ports); return undefined; }
+  // FM8b mode 27: the API's own verdict that the session ended; whoever listens (the world's card) hears it once it signs out
+  if (response?.status === 401) { signOut(ports); ports.ended?.(); return undefined; }
   const ticket = (await json(response))?.['ticket'];
   if (typeof ticket !== 'string' || TICKET.exec(ticket)?.groups?.['device'] !== device) return undefined;
   write(ports, TICKET_KEY, ticket);

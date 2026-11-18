@@ -17,7 +17,7 @@ import { mobileDevice } from '@wildshard/engine/boot/titleArrival';
 import { dropFirstPlay, firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { lowPowerOn } from '@wildshard/engine/core/graphicsMode';
 import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
-import { openSignIn, saveFile, takeLink, titleLogin, titleSignedIn, type AccountPorts } from '@wildshard/engine/ui/signInCard';
+import { openSignIn, saveFile, takeLinkOutcome, titleLogin, titleSignedIn, type AccountPorts } from '@wildshard/engine/ui/signInCard';
 import { engineString } from '@wildshard/engine/strings';
 import { lastEnd, type LastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
@@ -270,9 +270,10 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   deck.onTap(signIn, () => { void openSignIn(owner, { parent: document.body, changed: relabel, account }); });
   const login = titleLogin();
   const landed = async (ports: NonNullable<typeof login>): Promise<void> => {
-    const note = await takeLink(ports);
-    if (note === undefined || owner.disposed) return;
-    relabel(); await openSignIn(owner, { parent: document.body, changed: relabel, note, account });
+    // FM8b modes 28 and 29: a link the API refused, or couldn't take, opens the card on why
+    const taken = await takeLinkOutcome(ports);
+    if (taken === undefined || owner.disposed) return;
+    relabel(); await openSignIn(owner, { parent: document.body, changed: relabel, note: taken.note, account, ...taken.failure === undefined ? {} : { failure: taken.failure } });
   };
   if (login !== undefined) void landed(login);
   // MS2 (J399, board B): CHECK CONNECTION left the main screen; Settings ▸ System's Connection doctor row opens the same page

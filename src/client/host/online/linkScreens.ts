@@ -110,8 +110,12 @@ export interface LinkScreenHooks {
   readonly doctor?: (from: string) => void;
   /** Reload this page into the world, taking the seat back (another tab, a turned-away link). */
   readonly reload: () => void;
-  /** FM8m: leave for the title screen (a removed player has no world to rejoin). Absent: the card offers Details only. */
-  readonly title?: () => void;
+  /** FM8m: leave for the title screen (a removed player has no world to rejoin), naming why. Absent: the card offers Details only. */
+  readonly title?: (why?: string) => void;
+  /** FM8b mode 27: the existing sign-in card; a page signed in once it closes rejoins as the account. Absent: no Sign in button. */
+  readonly signIn?: () => void;
+  /** FM8b mode 27: rejoin as this device's guest, whose progress stays its own. Absent: no Play as a guest button. */
+  readonly guest?: () => void;
   /** FM7b2/FM4 mode 25: leave a full world's line for the title: the page's clean quit drops its ticket at the door. Absent: no button. */
   readonly leaveLine?: () => void;
   /** FM4b modes 21 and 22: the link's measured pong RTT and the server's reported frame skips (`NetClient.stats`) */
@@ -137,6 +141,8 @@ export interface LinkScreens {
   readonly holdChat: (text: string, send: (text: string) => void, drop: () => void) => boolean;
   /** The page came back into view: the banner says why again. */
   readonly visible: () => void;
+  /** FM8b mode 27: the account service ended this page's session (its own 401 on a ticket ask): the signed-out card. */
+  readonly signedOut: () => void;
 }
 
 /** The banner's words and catalogue ids for a link that is down. */
@@ -194,7 +200,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   parent.append(banner, deploy);
 
   let state: LinkState = 'live', reason: string | undefined, wasDown = false, quietUntil = 0, deployLeft = 0, deployTicking = false;
-  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline' | 'away' | 'reach'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
+  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline' | 'away' | 'reach' | 'auth'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
   const held: { text: string; send: (text: string) => void; drop: () => void }[] = [];
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
   /** FM4b modes 5 to 8: down, online, and no dial on this page ever reached the world, for 10 s. A restart or an old server's cut
@@ -289,6 +295,23 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   };
   const doctor = (from: string): { label: string; busy: string; act: () => void }[] => hooks.doctor === undefined ? [] : [{ label: 'Check connection', busy: 'Opening…', act: () => { hooks.doctor?.(from); } }];
   /**
+   * FM8b mode 27 (`auth-expired`): the account's sign-in ended, as an authority said: the API's own 401 on a ticket ask (`api`: the
+   * 20-minute refresh, or the check each drop makes), or the door's `auth-expired` close for a ticket its key signed that has run out
+   * (`door`, FM7b3c). Play stops under the card and it stays through the link's own changes. Sign in opens the existing sign-in card,
+   * and a page signed in when it closes rejoins as the account; Play as a guest rejoins as this device's guest. J229: no clock on this
+   * page decides it, and no seat or save is claimed beyond what the account keeps.
+   */
+  const authCard = (from: 'api' | 'door'): void => {
+    if (open?.kind === 'auth') return;
+    const signIn = hooks.signIn === undefined ? [] : [{ label: 'Sign in', primary: true as const, act: () => { hooks.signIn?.(); } }];
+    const guest = hooks.guest === undefined ? [] : [{ label: 'Play as a guest', busy: 'Joining…', act: () => { hooks.guest?.(); } }];
+    const title = hooks.title === undefined ? [] : [{ label: 'Title screen', busy: 'Leaving…', act: () => { hooks.title?.('signed out (auth-expired)'); } }];
+    banner.hidden = true;
+    stop('auth-expired', 'info', 'Signed out', 'Please sign in again', 'Your sign-in ran out. Sign in to rejoin as your account: its character and progress are kept.',
+      [...signIn, ...guest, ...title], from === 'door' ? 'close "refused" · auth-expired: the door\'s ticket ran out' : 'the account service ended this session (401)');
+    if (open !== null) open.kind = 'auth';
+  };
+  /**
    * FM4b mode 2 (`offline-play`): the device says it has no network. Play waits under the card, the dial waits for the network
    * (Redial's `offline`), and the card closes by itself when the network is back (the banner takes over) or the link is.
    * J229: no seat-hold or save time is claimed, only what this page measured.
@@ -377,7 +400,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     paint(); askSite(); own.interval(1000, paint);
     // the address may be what's wrong (the world moved, a bad name): the signed release file is read again now and every 30 s
     hooks.recheck?.(); own.interval(RECHECK_MS, () => { hooks.recheck?.(); });
-    const title = hooks.title === undefined ? [] : [{ label: 'Title screen', busy: 'Leaving…', act: () => { hooks.title?.(); } }];
+    const title = hooks.title === undefined ? [] : [{ label: 'Title screen', busy: 'Leaving…', act: () => { hooks.title?.('left an unreachable world'); } }];
     box.append(status, make('p', 'ws-link-auto', 'This closes by itself when the world answers. If it keeps up, check this device\'s connection, and that its date and time are set automatically.'),
       buttons(own, [{ label: 'Try now', primary: true, act: () => { hooks.dialNow(); hooks.recheck?.(); askSite(); paint(); } }, ...doctor('unreachable'), ...title]));
     const details = make('details'); details.append(make('summary', '', 'Details'), detail); box.append(details);
@@ -387,7 +410,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   };
   /** The 10 s mark comes by itself, with no state change: checked each second. */
   scope.interval(1000, () => {
-    if (unreachable()) { if (open?.kind !== 'reach' && open?.kind !== 'stop') { reachCard(); paintBanner(); } }
+    if (unreachable()) { if (open?.kind !== 'reach' && open?.kind !== 'stop' && open?.kind !== 'auth') { reachCard(); paintBanner(); } }
     else if (open?.kind === 'reach') { close(state === 'live' ? 'recovered' : 'replaced'); paintBanner(); }
   });
 
@@ -429,6 +452,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const link = (next: LinkState, why?: string): void => {
     state = next; reason = why;
     if (state !== 'live') hideQuality('replaced');
+    // FM8b mode 27: the signed-out card stays up through the link's own changes; only its buttons close it
+    if (open?.kind === 'auth') { banner.hidden = true; return; }
     paintBanner();
     // down again: the notice goes, and a stop card (lost, after Try again) gives way to the banner
     if (down()) {
@@ -470,6 +495,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     } else if (state === 'ended' && reason === 'replaced') {
       stop('replaced', 'info', 'Another tab', 'Playing somewhere else', 'This world is open in another tab or on another device. Only one can play at a time.',
         [{ label: 'Play here', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }], 'close "replaced" (4003)');
+    } else if (state === 'ended' && reason === 'refused' && hooks.progress().ended?.code === 'auth-expired') {
+      authCard('door');
     } else if (state === 'ended' && reason === 'refused' && hooks.progress().ended?.code === 'banned') {
       // FM8m mode 41: the server's coded fact, not a moderator's words (J229): an end time only when it sent one; no redial, no Play again
       // an end time already past is no end time to wait for: the card claims none rather than a time gone by
@@ -498,6 +525,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     },
     live: () => state === 'live',
     allow: what => {
+      if (open?.kind === 'auth') return false;
       if (state === 'live') return true;
       if (!down() || what === '') return false;
       if (open === null && diagnosticNow() >= quietUntil) hold(what, false);
@@ -513,6 +541,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       if (down() && open?.kind !== 'stop') hold('Send', true);
       return true;
     },
-    visible: () => { paintBanner(); },
+    visible: () => { if (open?.kind !== 'auth') paintBanner(); },
+    signedOut: () => { authCard('api'); },
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { deleteMine, doorOf, exportMine, heldTicket, linkIn, redeemLink, refreshTicket, sendLink, signedIn, signOut, ticketed, type LoginPorts } from './playerLogin';
+import { askForLink, deleteMine, doorOf, exportMine, heldTicket, linkIn, redeemLink, refreshTicket, sendLink, signedIn, signOut, spendLink, ticketed, type LoginPorts } from './playerLogin';
 
 // MMO-PLAN MP2.2e1: the page's sign-in client against a stand-in for api-server's player routes.
 const DEVICE = 'device:0b6f1a52-7f4e-4d7a-9a1c-3c2b1d0e9f87', NOW = 1_800_000_000_000, API = 'https://api.test';
@@ -23,6 +23,48 @@ const ok = (body: unknown, status = 200): Response => Response.json(body, { stat
 const signedInRig = (ticket: (body: Record<string, unknown>) => Response): ReturnType<typeof rig> =>
   rig({ '/api/login/email/redeem': () => ok({ session: 'wss_s', player: { id: 'plr_x', email: 'a@b.co' } }), '/api/players/ticket': ticket });
 
+describe('FM8b: sign-in that can\'t finish says why, from the status the page got', () => {
+  test('mode 29: a server error from the API is down, with its status; mail off, a refusal or no answer is not', async () => {
+    for (const status of [500, 502, 503, 504]) {
+      expect(await askForLink(rig({ '/api/login/email': () => new Response('', { status }) }), 'a@b.co', 'g'), String(status)).toEqual({ said: 'down', status });
+    }
+    expect(await askForLink(rig({ '/api/login/email': () => ok({ error: 'sign-in mail is off' }, 503) }), 'a@b.co', 'g')).toEqual({ said: 'off' });
+    expect(await askForLink(rig({ '/api/login/email': () => new Response('', { status: 501 }) }), 'a@b.co', 'g'), 'not a status the API fails with').toEqual({ said: 'failed' });
+    const offline: LoginPorts = { ...rig({}), fetch: () => Promise.reject(new TypeError('offline')) };
+    expect(await askForLink(offline, 'a@b.co', 'g'), 'no answer says nothing of the API').toEqual({ said: 'failed' });
+  });
+
+  test('modes 28 and 29: a spent link is refused, a server error is down with its status, and neither signs the page in', async () => {
+    const refused = rig({ '/api/login/email/redeem': () => ok({ error: 'link not valid' }, 401) });
+    expect(await spendLink(refused, 'wsl_abcdefgh12345678')).toEqual({ kind: 'refused' });
+    expect(signedIn(refused)).toBeUndefined();
+    const down = rig({ '/api/login/email/redeem': () => new Response('', { status: 502 }) });
+    expect(await spendLink(down, 'wsl_abcdefgh12345678')).toEqual({ kind: 'down', status: 502 });
+    expect(signedIn(down)).toBeUndefined();
+    const offline: LoginPorts = { ...rig({}), fetch: () => Promise.reject(new TypeError('offline')) };
+    expect(await spendLink(offline, 'wsl_abcdefgh12345678')).toEqual({ kind: 'failed' });
+    expect(await spendLink(signedInRig(() => ok({})), 'wsl_abcdefgh12345678')).toEqual({ kind: 'in', who: { session: 'wss_s', email: 'a@b.co' } });
+  });
+
+  test('mode 27: only the API\'s 401 ends the session and is heard; no answer or a server error ends nothing', async () => {
+    let answer = (): Response => new Response('', { status: 503 });
+    const ended: string[] = [], ports = { ...signedInRig(() => answer()), ended: () => { ended.push('ended'); } };
+    await redeemLink(ports, 'wsl_abcdefgh12345678');
+    expect(await refreshTicket(ports, DEVICE)).toBeUndefined();
+    expect(signedIn(ports), 'a 503 keeps the session').toBeDefined();
+    answer = () => { throw new TypeError('offline'); };
+    expect(await refreshTicket(ports, DEVICE)).toBeUndefined();
+    expect(signedIn(ports), 'no answer keeps it').toBeDefined();
+    expect(ended, 'nothing heard yet').toEqual([]);
+    answer = () => new Response('', { status: 401 });
+    expect(await refreshTicket(ports, DEVICE)).toBeUndefined();
+    expect(signedIn(ports), 'the 401 signs out').toBeUndefined();
+    expect(ended, 'and is heard once').toEqual(['ended']);
+    expect(await refreshTicket(ports, DEVICE), 'signed out: nothing is asked').toBeUndefined();
+    expect(ended).toEqual(['ended']);
+  });
+});
+
 describe('player sign-in on the page', () => {
   test('a link is asked for, and a mailed link redeemed signs the page in', async () => {
     const ports = rig({ '/api/login/email': () => new Response('', { status: 202 }) });
@@ -37,9 +79,11 @@ describe('player sign-in on the page', () => {
   });
 
   test('a refused link, too many asks or mail off say so', async () => {
-    for (const [status, said] of [[429, 'busy'], [503, 'off'], [400, 'failed']] as const) {
+    for (const [status, said] of [[429, 'busy'], [400, 'failed']] as const) {
       expect(await sendLink(rig({ '/api/login/email': () => new Response('', { status }) }), 'a@b.co', 'g')).toBe(said);
     }
+    // api-server's own 503 for a deployment with no mailer (player-login.ts) says so in its body
+    expect(await sendLink(rig({ '/api/login/email': () => ok({ error: 'sign-in mail is off' }, 503) }), 'a@b.co', 'g')).toBe('off');
     const ports = rig({ '/api/login/email/redeem': () => new Response('', { status: 401 }) });
     expect(await redeemLink(ports, 'wsl_abcdefgh12345678')).toBeUndefined();
     expect(signedIn(ports)).toBeUndefined();

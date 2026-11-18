@@ -307,6 +307,18 @@ export interface StartOnline {
   readonly recordTag?:string;
   /** mode 23: how the page leaves on purpose, in its own saves (see OnlineLeaving) */
   readonly leaving?: OnlineLeaving;
+  /** FM8b mode 27: the page's sign-in (the page's bundle lends it); absent, the world never speaks of one. */
+  readonly session?: OnlineSession;
+}
+/** FM8b mode 27: the page's sign-in, as the online shell needs it. The page's bundle lends it: this one holds no saves. */
+export interface OnlineSession {
+  /** Ask the account service for a fresh join ticket: `ok`, `ended` (its 401: the page is signed out), `guest` (no session here), or
+   *  `unknown` (no answer, so nothing is claimed). */
+  readonly renew: () => Promise<'ok' | 'ended' | 'guest' | 'unknown'>;
+  /** Hear the session end, however the page found out (the 20-minute refresh, a renew); at once if it already had. */
+  readonly onEnded: (heard: () => void) => void;
+  /** The existing sign-in card over the world; true when the page is signed in once it closes. */
+  readonly signIn: () => Promise<boolean>;
 }
 /** E7.5 prep: ask the page to leave for the Connection doctor, saying which screen asked. The page's own bundle answers
  *  (src/client/engine/ui/errorScreen.ts): it holds the save hold and the loading card's report, which this module can't see. */
@@ -415,7 +427,7 @@ export interface StartedOnline extends OnlineShell {
 }
 export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   // OF4: a verified kept release file dials at once (offline too), and the fresh read follows; with none, the page waits for the read
-  const { release: at, key, keep, identity, recordTag, grid, leaving = OWN_LEAVING, ...link } = config;
+  const { release: at, key, keep, identity, recordTag, grid, leaving = OWN_LEAVING, session, ...link } = config;
   // ZE10d2: a gate's adoption moves the page's slug, grid and goto to the cell entered (a redial then asks for that cell)
   let loadedNow = link.loaded, gridNow = grid, goto = grid?.goto === true ? grid.cell : undefined;
   // FM5: with no kept copy and no file, the page says why (offline, the file's server down or busy, a portal, a bad signature) and
@@ -440,13 +452,19 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   let dialing = socket;
   // MP2.4: the page asked for the Name before it got here (namePrompt.ts, once per device); Skip keeps the device's own (Guest)
   const named = identity();
-  let shellNow: OnlineShell | null = null, waitingForSeat = false, recheck = (): void => undefined;
+  let shellNow: OnlineShell | null = null, waitingForSeat = false, recheck = (): void => undefined, wasDown = false;
   scope.interval(SEAT_WAIT_BEAT_MS, () => { if (waitingForSeat) seatWaitBeat(); });
   // FM4: the banner, the Reconnected notice, the cards and the hold cards (meta MMO-FAILURE-MODES-PLAN)
   const screens = linkScreens(scope, {
     retry: () => { shellNow?.retry(); }, dialNow: () => { shellNow?.dialNow(); }, doctor,
     // Play here / Play again reload into the world: the tap that brought the player here comes along (QA row 16)
-    reload: () => { entering(loadedNow); void leaving.reloadByHand(); }, title: () => { toTitle('removed (banned)'); },
+    reload: () => { entering(loadedNow); void leaving.reloadByHand(); }, title: (why = 'removed (banned)') => { toTitle(why); },
+    // FM8b mode 27: Sign in is the existing card, and a page signed in when it closes rejoins as the account; Play as a guest rejoins
+    // as the device (the page is already signed out). Both are this page's own reload into the world, the tap coming along.
+    ...session === undefined ? {} : {
+      signIn: () => { void session.signIn().then(yes => { if (yes) { entering(loadedNow); void leaving.reloadByHand(); } return undefined; }); },
+      guest: () => { entering(loadedNow); void leaving.reloadByHand(); },
+    },
     // FM7b2: Title from a full world's line says the clean quit first (the door drops the ticket), for at most 3 s
     leaveLine: () => { void Promise.race([shellNow?.leave() ?? Promise.resolve(), new Promise<void>(resolve => { scope.timeout(3000, resolve); })]).then(() => { toTitle('left a full world\'s line'); return undefined; }); },
     progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',
@@ -455,6 +473,8 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     // FM4b modes 5 to 8: whether the game's own site answers (any HTTP reply is an answer), and the signed release file read again
     reach: () => siteAnswers(scope), recheck: () => { recheck(); },
   });
+  // FM8b mode 27: the account service's own word that the session ended opens the signed-out card
+  session?.onEnded(() => { screens.signedOut(); });
   // FM8s: the server's own save facts (late, failing) and the hold on Leave the world while a save isn't confirmed
   const saves = saveScreens(scope);
   // FM5b: is this page's own code still carried (signed /code-retention.json against a fresh release, at boot and on each update
@@ -473,6 +493,13 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => {
       waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); tooOld.link(state === 'live');
+      // FM8b mode 27: each drop asks the account service for a fresh ticket before the redial needs it, so a session that ended is
+      // heard now (its 401 opens the card), not at the next 20-minute refresh. The door's own `auth-expired` close (FM7b3c: the ticket
+      // ran out) asks too: a session that still holds rejoins with the fresh ticket, and only an ended one keeps the card.
+      if (state === 'ended' && reason === 'refused' && shellNow?.progress().ended?.code === 'auth-expired') {
+        void session?.renew().then(said => { if (said === 'ok') { entering(loadedNow); void leaving.reloadByHand(); } return undefined; });
+      } else if (state !== 'live' && !wasDown) void session?.renew();
+      wasDown = state !== 'live';
       // FM5b3: a refused reconnect (mayRedial, before its dial: a quick one shows no banner) ends the link; the body leaves, so nobody
       // stands in the world behind the page
       if (state === 'ended' && reason === 'retired') void shellNow?.leave();

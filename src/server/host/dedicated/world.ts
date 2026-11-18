@@ -645,6 +645,9 @@ export class World {
     // MP2.2c: a live join ticket seats its account; anything else, the device it names.
     const ticketed = await admit(said.output.player, this.options.ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, Date.now());
     if (ticketed === undefined) { this.refuse('identity'); end.close('refused'); return; }
+    // FM7b3c: a ticket this key signed that has run out is told so (FM7b1's `auth-expired` fact), never seated as its device's guest,
+    // where the account's page would play on as someone else; the page asks its API for a fresh ticket, or says Please sign in again
+    if (ticketed.expired === true) { this.refuse('auth-expired'); end.close('refused', { code: 'auth-expired' }); return; }
     // review 2 M1: a live ticket for an account deleted here plays as its device's guest, so nothing writes the account back
     const admitted = ticketed.from !== undefined && (this.gone.get(ticketed.seat) ?? 0) > Date.now() ? { seat: ticketed.from } : ticketed;
     const { seat } = admitted;

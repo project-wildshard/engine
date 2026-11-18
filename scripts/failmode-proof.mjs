@@ -38,6 +38,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { openChaosProxy } from './chaos-proxy-core.mjs';
+import { openApiFixture } from './failmode-api-fixture.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
@@ -128,6 +129,10 @@ const sha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8
 /** @typedef {{ ids: string, ms: number, copy: string, leak: string | null }} Seen */
 
 const { openRig } = await import('./online-rig.mjs');
+// FM8b modes 27 to 29: the owned local API (failmode-api-fixture.mjs) behind the proxy's `api` route, whose per-run ticket key the rig
+// door checks (PLAYER_TICKET_PUBLIC_KEY in its environment). Opened only when a sign-in case runs, so every other case sees what it saw.
+const apiFixture = cases.some(item => item.owner === 'FM8b') ? await openApiFixture({ port: rigPort - 2 }) : null;
+if (apiFixture !== null) process.env.PLAYER_TICKET_PUBLIC_KEY = apiFixture.publicKey;
 let rig;
 try { rig = await openRig({ dist, nextDist, work: join(absolute(work), 'rig'), keyFile, pgBin, pgData, shard: SHARD, socket: SOCKET, origins: [PAGE_ORIGIN], isolated: true, ...seats === '' ? {} : { seats: Number(seats) } }); } catch (error) {
   writeFileSync(join(out, 'receipt.json'), JSON.stringify({ schema: 'failmode-proof/1', sha, engine, baseline, phase: 'setup', harnessFault: String(error).slice(0, 600), exit: 2, cases: [] }));
@@ -140,7 +145,7 @@ let harnessFault = /** @type {string | null} */ (null);
 try {
   // openChaosProxy claims its fresh directory; never delete pre-existing fixture files.
   proxy = await openChaosProxy({ work: join(absolute(work), 'proxy'), pageUpstream: rig.base, releaseUpstream: `http://127.0.0.1:${String(Number(process.env.WS_RIG_PORTS) + 3)}`, worldUpstream: `http://127.0.0.1:${String(Number(process.env.WS_RIG_PORTS) + 1)}`, pagePort: PROXY_PAGE, worldPort: PROXY_WORLD,
-    ...tlsCert === '' ? {} : { tlsPort: PROXY_TLS, tlsCert, tlsKey } });
+    ...tlsCert === '' ? {} : { tlsPort: PROXY_TLS, tlsCert, tlsKey }, ...apiFixture === null ? {} : { apiUpstream: apiFixture.origin } });
   const token = readFileSync(proxy.ready.tokenFile, 'utf8');
   /** The proxy's state, or its rules replaced. @param {{ scenario: string, rules: object[] }} [body] */
   const control = async body => {
@@ -330,8 +335,161 @@ try {
     return true;
   };
 
+  /** FM8b: ask the owned API for a link through the open sign-in card; the link it mailed. @param {import('playwright').Page} page @param {string} email */
+  const mailedLink = async (page, email) => {
+    const sentBefore = apiFixture?.outbox.length ?? 0;
+    await page.locator('#ws-signin .ws-signin-email').fill(email);
+    const send = page.locator('#ws-signin [data-signin="send"]');
+    try { await send.click({ timeout: 10_000 }); } catch (error) {
+      // what covers the button, so a layering fault names itself (opus-fm2: the link card sat over the in-world sign-in card)
+      const over = await send.evaluate(button => { const box = button.getBoundingClientRect(), top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return top === null ? 'nothing' : `${top.tagName}#${top.id}.${top.className.slice(0, 60)} z=${getComputedStyle(top.closest('[class]') ?? top).zIndex} send-root z=${getComputedStyle(button.closest('#ws-signin') ?? button).zIndex}`; }).catch(() => 'unknown');
+      throw new Error(`the sign-in card's send button took no click (on top: ${over}): ${String(error).split('\n')[0] ?? ''}`, { cause: error });
+    }
+    for (const until = Date.now() + 15_000; Date.now() < until; await sleep(200)) {
+      const mail = apiFixture?.outbox.slice(sentBefore).find(row => row.email === email);
+      if (mail !== undefined) return mail.link;
+    }
+    throw new Error(`the owned API mailed no link to ${email}`);
+  };
+  /** FM8b: has the rig's own save store placed a player matching `player` (SQL LIKE) since `afterMs`, within `timeout`?
+   *  @param {string} player @param {number} afterMs @param {number} timeout */
+  const placeAfter = async (player, afterMs, timeout) => {
+    const until = Date.now() + timeout;
+    for (;;) {
+      const client = new rig.Client({ connectionString: rig.DATABASE });
+      try {
+        await client.connect();
+        if ((await client.query('select 1 from player_place where player_id like $1 and updated_at > to_timestamp($2::double precision / 1000) limit 1', [player, afterMs])).rows.length > 0) return true;
+      } catch { /* the database front may be busy: ask again */ } finally { await client.end().catch(() => undefined); }
+      if (Date.now() >= until) return false;
+      await sleep(1000);
+    }
+  };
+
   /** @type {Record<string, (item: Case) => Promise<Result>>} */
   const runners = {
+    // FM8b modes 27 to 29 (meta MMO-FAILURE-MODES-PLAN): the page's real sign-in client against the owned local API
+    // (failmode-api-fixture.mjs, the proxy's `api` route), and the rig door checking that API's tickets with the real ticket check.
+    // Seats are read from the rig's own saves (pglite:), never from the page's word.
+    authExpired: async item => {
+      if (apiFixture === null) return { outcome: 'harness-fail', reason: 'the owned local API never opened' };
+      if (rig.database === undefined) return { outcome: 'blocked-dependency', reason: 'the seat checks read the rig database: run with pglite:' };
+      const account = `fm27-${String(Date.now() % 1_000_000)}@proof.test`, guestAccount = `fm27g-${String(Date.now() % 1_000_000)}@proof.test`;
+      const signedInWorld = async (/** @type {string} */ email) => {
+        const entered = await fresh(); const { page } = entered;
+        await page.goto(`${PAGE_ORIGIN}/?mute=1&nolock=1`);
+        await page.locator('.ws-main-signin').first().click({ timeout: 60_000 });
+        const link = await mailedLink(page, email);
+        await page.goto(link);
+        await page.locator('#ws-signin[data-signed-in="true"]').waitFor({ state: 'visible', timeout: 30_000 });
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        return entered;
+      };
+      /** The session ends at the API (its own 401 from now), then one drop of the world socket; the card must come. */
+      const endAndDrop = async (/** @type {import('playwright').Page} */ page, /** @type {string} */ named) => {
+        const refusedBefore = apiFixture?.counts.ticketRefused ?? 0, ended = apiFixture?.expireSessions() ?? 0, before = await control();
+        await arm(named, [{ route: 'socket', kind: 'drop-after', afterMs: 0 }]);
+        for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
+        const socketMatches = await matchedSince(before, 'socket');
+        await heal();
+        const started = Date.now(), seen = await screen(page, item.screen, 20_000, started);
+        return { seen, injection: { sessionsEnded: ended, socketMatches, ticketRefusals: (apiFixture?.counts.ticketRefused ?? 0) - refusedBefore } };
+      };
+      const first = await signedInWorld(account);
+      try {
+        const player = `account:plr_${apiFixture.playerOf(account) ?? '?'}`;
+        if (!await placeAfter(player, 0, 120_000)) return { outcome: 'harness-fail', reason: 'the signed-in page never stood in the world as its account (no saved place)' };
+        const { page } = first, { seen, injection } = await endAndDrop(page, 'auth-expired');
+        const shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
+        const result = await judged(seen, item, page);
+        if (result.outcome !== 'pass') return { ...result, injection, shot };
+        if (injection.socketMatches === 0 || injection.ticketRefusals === 0) return { outcome: 'harness-fail', reason: 'the drop or the API\'s 401 matched nothing', injection };
+        // recovery 1: Sign in, a new link opened in a second tab (a mail app's), the card closed: the page rejoins as the account
+        await press(page, item.screen, 'Sign in');
+        const link = await mailedLink(page, account), tab = await first.context.newPage();
+        await tab.goto(link);
+        await tab.locator('#ws-signin[data-signed-in="true"]').waitFor({ state: 'visible', timeout: 30_000 });
+        await tab.close();
+        const rejoinAt = Date.now(), ticketsBefore = apiFixture.counts.tickets;
+        await page.locator('#ws-signin .ws-signin-close').click({ timeout: 10_000 });
+        await intoWorld(first, 120_000);
+        const asAccount = await placeAfter(player, rejoinAt, 120_000);
+        const cardGone = !(await visibleIds(page)).some(ids => /\bauth-expired\b/u.test(ids));
+        if (!asAccount || !cardGone || apiFixture.counts.tickets <= ticketsBefore) return { outcome: 'ui-fail', reason: `after signing in again: ${!asAccount ? 'no saved place as the account' : !cardGone ? 'the card stayed' : 'no fresh ticket was asked'}`, seen, injection, shot };
+        // recovery 2 (explicit guest choice, on another device): Play as a guest rejoins as the device; the account is not written
+        const second = await signedInWorld(guestAccount);
+        try {
+          const other = `account:plr_${apiFixture.playerOf(guestAccount) ?? '?'}`;
+          if (!await placeAfter(other, 0, 120_000)) return { outcome: 'harness-fail', reason: 'the second page never stood in the world as its account', seen, injection, shot };
+          const guestSeen = (await endAndDrop(second.page, 'auth-expired-guest')).seen;
+          if (guestSeen === null) return { outcome: 'ui-fail', reason: 'the second page showed no signed-out card', seen, injection, shot };
+          const guestAt = Date.now();
+          await press(second.page, item.screen, 'Play as a guest');
+          await intoWorld(second, 120_000);
+          const asDevice = await placeAfter('device:%', guestAt, 120_000), accountQuiet = !await placeAfter(other, guestAt, 1000);
+          const signedOut = await second.page.evaluate(() => Object.keys(localStorage).every(key => !key.includes('wildshard.player.session'))).catch(() => false);
+          if (!asDevice || !accountQuiet) return { outcome: 'ui-fail', reason: `the guest choice: ${!asDevice ? 'no saved place as the device' : 'the account was written'}`, seen, injection, shot };
+          return { ...result, injection, shot, recovery: `Sign in by a fresh link: rejoined as the account (saved place after the rejoin); Play as a guest: rejoined as the device${signedOut ? '' : ' (session key still listed)'}`, recoveryMs: Date.now() - rejoinAt };
+        } finally { await second.context.close(); }
+      } finally { await heal(); await first.context.close(); }
+    },
+    authFailed: async item => {
+      if (apiFixture === null) return { outcome: 'harness-fail', reason: 'the owned local API never opened' };
+      const entered = await fresh(); const { page } = entered;
+      try {
+        const refusedBefore = apiFixture.counts.linkRefused, started = Date.now();
+        // a link the API never issued (or already spent): its redeem is the API's own 401
+        await page.goto(`${PAGE_ORIGIN}/?mute=1&nolock=1#login=wsl_${'fmnolink'.repeat(4)}`);
+        const seen = await screen(page, item.screen, 60_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
+        const result = await judged(seen, item, page);
+        const injection = { linkRefusals: apiFixture.counts.linkRefused - refusedBefore };
+        if (result.outcome !== 'pass') return { ...result, injection, shot };
+        if (injection.linkRefusals === 0) return { outcome: 'harness-fail', reason: 'the API refused no link', injection };
+        const healedAt = Date.now();
+        await press(page, item.screen, 'Email me a new link');
+        const link = await mailedLink(page, `fm28-${String(Date.now() % 1_000_000)}@proof.test`);
+        await page.goto(link);
+        const inNow = await page.locator('#ws-signin[data-signed-in="true"]').waitFor({ state: 'visible', timeout: 30_000 }).then(() => true, () => false);
+        return inNow ? { ...result, injection, shot, recovery: 'Email me a new link, its link opened: signed in', recoveryMs: Date.now() - healedAt }
+          : { outcome: 'ui-fail', reason: 'a fresh link never signed the page in', seen, injection, shot };
+      } finally { await entered.context.close(); }
+    },
+    api5xx: async item => {
+      if (apiFixture === null) return { outcome: 'harness-fail', reason: 'the owned local API never opened' };
+      const entered = await fresh(); const { page } = entered;
+      try {
+        await page.goto(`${PAGE_ORIGIN}/?mute=1&nolock=1`);
+        await page.locator('.ws-main-signin').first().click({ timeout: 60_000 });
+        const before = await control();
+        await arm('api-5xx', [{ route: 'api', kind: 'status', code: 503 }]);
+        const sentBefore = apiFixture.counts.sent, started = Date.now();
+        await page.locator('#ws-signin .ws-signin-email').fill(`fm29-${String(Date.now() % 1_000_000)}@proof.test`);
+        await page.locator('#ws-signin [data-signin="send"]').click({ timeout: 10_000 });
+        const seen = await screen(page, item.screen, 15_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
+        const result = await judged(seen, item, page);
+        const injection = { apiMatches: await matchedSince(before, 'api'), reachedApi: apiFixture.counts.sent - sentBefore };
+        if (result.outcome !== 'pass') return { ...result, injection, shot };
+        if (injection.apiMatches === 0 || injection.reachedApi !== 0) return { outcome: 'harness-fail', reason: 'the 503 never matched, or a request reached the API through it', injection };
+        const named = await page.locator('#ws-signin [data-failmode="api-5xx"] details').first().textContent().catch(() => '');
+        if (!/answered 503/u.test(named ?? '')) return { outcome: 'ui-fail', reason: 'the card\'s Details do not name the status the page got', seen, injection, shot };
+        // control: Play as a guest closes the card and the title stays (nothing signed in, nothing lost)
+        await press(page, item.screen, 'Play as a guest');
+        const closed = await page.locator('#ws-signin').waitFor({ state: 'detached', timeout: 10_000 }).then(() => true, () => false);
+        // recovery: the API answers again; Try now (the player's own tap) asks once more and the link is sent
+        await page.locator('.ws-main-signin').first().click({ timeout: 10_000 });
+        await page.locator('#ws-signin .ws-signin-email').fill(`fm29b-${String(Date.now() % 1_000_000)}@proof.test`);
+        await page.locator('#ws-signin [data-signin="send"]').click({ timeout: 10_000 });
+        const again = await screen(page, item.screen, 15_000);
+        await heal();
+        const healedAt = Date.now();
+        if (again !== null) await press(page, item.screen, 'Try now');
+        const sent = await page.locator('#ws-signin .ws-signin-note', { hasText: 'Check your email' }).waitFor({ state: 'visible', timeout: 15_000 }).then(() => true, () => false);
+        const boxGone = !(await visibleIds(page)).some(ids => /\bapi-5xx\b/u.test(ids));
+        return closed && again !== null && sent && boxGone && apiFixture.counts.sent > sentBefore
+          ? { ...result, injection, shot, recovery: 'Play as a guest closed the card; heal, Try now: the link was sent', recoveryMs: Date.now() - healedAt }
+          : { outcome: 'ui-fail', reason: !closed ? 'Play as a guest left the card up' : again === null ? 'the second ask showed no card' : !sent ? 'Try now never sent the link' : 'the card stayed after the link was sent', seen, injection, shot };
+      } finally { await heal(); await entered.context.close(); }
+    },
     // a fault on the world's socket, held, then healed
     socketDown: async item => {
       const entered = await fresh(); const { page } = entered;
@@ -822,9 +980,10 @@ try {
           await a.page.mouse.click(720, 300).catch(() => undefined);
           await a.page.keyboard.down('KeyB');
           const held = await screen(a.page, 'voice-failed-blocked', 5000), heldShot = held === null ? undefined : await shoot(a.page, item.id, 'held');
+          const pressedAt = held === null ? await a.page.evaluate(() => ({ marks: Object.fromEntries(Object.entries(document.documentElement.dataset)), focus: `${document.activeElement?.tagName ?? ''}#${document.activeElement?.id ?? ''}.${document.activeElement?.className ?? ''}`, voice: document.querySelector('#ws-voice')?.outerHTML.slice(0, 200), tip: document.querySelector('#ws-voice-tip')?.outerHTML.slice(0, 300), fine: matchMedia('(pointer: fine)').matches, hub: (() => { const hub = /** @type {any} */ (globalThis)[Symbol.for('wildshard.voiceSettings')]; return hub === undefined ? 'none' : { now: hub.now, readers: [...hub.readers].map(read => { try { return read(); } catch (error) { return `threw ${String(error).slice(0, 80)}`; } }) }; })(), saved: localStorage.getItem('wildshard.save.v2@2.device')?.slice(0, 400) })).catch(() => null) : null;
           await a.page.keyboard.up('KeyB');
           const heldResult = await judged(held, item, a.page);
-          if (heldResult.outcome !== 'pass') return { ...heldResult, injection, shot };
+          if (heldResult.outcome !== 'pass') return { ...heldResult, injection, shot, ...pressedAt === null ? {} : { pressedAt } };
           // turning voice off is 32's own recovery: the tip goes
           await a.page.locator('#ws-voice').click();
           const cleared = await a.page.locator('#ws-voice-tip[data-failmode]').waitFor({ state: 'detached', timeout: 10_000 }).then(() => true, async () => !(await tipOn(a, 'voice-failed') || await tipOn(a, 'voice-failed-blocked')));
@@ -895,24 +1054,40 @@ try {
         let healthyControl;
         if (quiet) {
           const framesBefore = await frames(page);
-          await cdp.send('Page.setWebLifecycleState', { state: 'frozen' }); await sleep(2500); await cdp.send('Page.setWebLifecycleState', { state: 'active' });
+          await cdp.send('Debugger.enable');
+          await cdp.send('Debugger.pause'); await sleep(2500); await cdp.send('Debugger.resume');
           let shown = /** @type {string[]} */ ([]);
           for (const until = Date.now() + 5000; Date.now() < until; await sleep(250)) { shown = (await visibleIds(page)).filter(ids => !/\b(?:slow|lossy|staging)\b/u.test(ids)); if (shown.length > 0) break; }
           healthyControl = { frozenMs: 2500, screens: shown, framesMoved: await frames(page) > framesBefore };
           if (shown.length > 0) return { outcome: 'ui-fail', reason: `a 2.5 s freeze with a live link showed ${shown.join(', ')}`, injection: { healthyControl } };
         }
-        const before = await control(), started = Date.now();
-        await cdp.send('Page.setWebLifecycleState', { state: 'frozen' });
-        if (quiet) await arm(item.id, [{ route: 'socket', kind: 'refuse-upgrade', code: 503 }]);
+        const started = Date.now();
+        // sleep-wake: the page's script stops (a debugger pause: no timer, no clock tick, no event runs). opus-fm2 saw the lifecycle
+        // freeze keep a headless page's timers going: it dialled 14 times while "frozen", so it never had a gap to read as asleep
+        await (quiet ? cdp.send('Debugger.pause') : cdp.send('Page.setWebLifecycleState', { state: 'frozen' }));
+        // a device asleep has no network: the live socket goes with it (opus-fm2: a 35 s renderer freeze alone keeps the socket up, as
+        // the browser's network side still reads it, so the page woke to a live link and dialled nothing), and the door stays shut
+        // until the card shows, so a healthy redial can't seat inside SB31's quiet second
+        let cut = 0;
+        if (quiet) {
+          const live = await control(); await arm(`${item.id}-cut`, [{ route: 'socket', kind: 'drop-after', afterMs: 0 }]);
+          for (let tries = 0; tries < 40 && (cut = await matchedSince(live, 'socket')) === 0; tries++) await sleep(100);
+          await arm(item.id, [{ route: 'socket', kind: 'refuse-upgrade', code: 503 }]);
+        }
+        const before = await control();
+        const dialsFrozen = quiet ? await matchedSince(before, 'socket') : 0;
         await sleep(awayMs);
-        await cdp.send('Page.setWebLifecycleState', { state: 'active' });
+        const dialsWhileAway = quiet ? await matchedSince(before, 'socket') - dialsFrozen : 0;
+        if (quiet) { await cdp.send('Debugger.resume'); await cdp.send('Debugger.disable'); } else await cdp.send('Page.setWebLifecycleState', { state: 'active' });
         const visibility = await page.evaluate(() => /** @type {string[]} */ (/** @type {any} */ (globalThis).__fmVisibility));
         if (item.id === 'background-long' && !visibility.includes('hidden')) {
           const notes = await onScreen(page); await heal();
           return { outcome: 'unsupported', reason: 'headless Chromium kept the page visible through the freeze; a real hidden/visible return (native-Safari Ring 2) is owed', injection: { frozenMs: Date.now() - started, visibility }, notes };
         }
         const seen = await screen(page, item.screen, 12_000, Date.now()), shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
-        const injection = { frozenMs: awayMs, visibility, ...quiet ? { quietLink: 'refuse-upgrade 503 from the freeze until the card', socketMatches: await matchedSince(before, 'socket'), healthyControl } : {} };
+        const injection = { frozenMs: awayMs, visibility, ...quiet ? { quietLink: 'the live socket dropped at the freeze, then refuse-upgrade 503 until the card', socketCut: cut, dialsWhileAway, socketMatches: await matchedSince(before, 'socket'), healthyControl } : {} };
+        // the card comes at the return; its first dial a beat later (the card says when): wait for it rather than count at once
+        if (quiet && seen !== null) for (const until = Date.now() + 10_000; injection.socketMatches === 0 && Date.now() < until; await sleep(250)) injection.socketMatches = await matchedSince(before, 'socket');
         await heal();
         if (seen === null && item.id === 'background-short' && !visibility.includes('hidden'))
           return { outcome: 'unsupported', reason: 'headless Chromium kept the page visible through the freeze; a real hidden/visible return (native-Safari Ring 2) is owed', injection, shot, notes: await onScreen(page) };
@@ -1338,6 +1513,7 @@ try {
   await launched?.close().catch((/** @type {unknown} */ error) => { cleanup.push(`browser: ${String(error)}`); });
   await proxy?.close().catch((/** @type {unknown} */ error) => { cleanup.push(`proxy: ${String(error)}`); });
   await rig.close().catch((/** @type {unknown} */ error) => { cleanup.push(`rig: ${String(error)}`); });
+  await apiFixture?.close().catch((/** @type {unknown} */ error) => { cleanup.push(`api fixture: ${String(error)}`); });
   if (cleanup.length > 0) harnessFault = `${harnessFault ?? ''} cleanup: ${cleanup.join('; ')}`.trim();
 }
 const code = harnessFault !== null ? 2 : verdict(rows);
