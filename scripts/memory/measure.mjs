@@ -432,14 +432,14 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
     await tracing.send('Tracing.start', { transferMode: 'ReportEvents', traceConfig });
     /** @type {{step:string, ledger:any}[]} */ const requested = [];
     const run = { on: true };
-    let lastStep = 'before page';
+    let lastStep = 'before page', dumpedControl = false;
     const dumper = (async () => {
       let seen = 0;
       while (run.on) {
         const steps = /** @type {StepRow[]} */ (await page.evaluate(() => Reflect.get(window, '__memoryRun')?.steps ?? []).catch(() => []));
         for (; seen < steps.length; seen++) {
           const [, step, ledger] = steps[seen];
-          lastStep = step;
+          lastStep = step; if (step === 'control') dumpedControl = true;
           if (step === 'page') continue;
           const r = await tracing.send('Tracing.requestMemoryDump', { levelOfDetail: 'detailed', deterministic: step === 'control' }).catch(() => null);
           if (r?.success) requested.push({ step, ledger: ledger ?? null });
@@ -452,6 +452,10 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
       await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
       failure = await untilControl(page, timeoutMs);
       await sleep(1500);
+      // One detailed dump per step runs behind a slow host's boot (hosted SwiftShader, 44255220814: ember-forge and jungle-ziggurat
+      // stopped at `data`); stopping the dumper at control dropped every step it hadn't reached, control's ledger with them.
+      for (const until = Date.now() + 120_000; failure === null && !dumpedControl && Date.now() < until;) await sleep(100);
+      if (failure === null && !dumpedControl) failure = `memory dumps never reached control (last dumped checkpoint: ${lastStep})`;
       gpuDetail = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.gpu?.() ?? null; } catch { return null; } });
     } catch (error) {
       if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
