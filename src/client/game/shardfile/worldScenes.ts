@@ -74,10 +74,13 @@ interface Library {
 }
 type SceneStep = WorldScenesSection['steps'][number];
 type SceneMeshNode = Extract<WorldSceneRecipe['scene']['nodes'][number], { kind: 'mesh' }>;
-/** A bounded leaf mesh has no children or authored transform to reinterpret. */
+/** A lone static draw can bind the source grid. Keep published unbounded
+ * objects in model space because their transform can be read by consumers. */
 function staticGridParts(step: SceneStep, recipe: WorldSceneRecipe): SceneMeshNode[] {
   const bounded = new Set(step.bounds.map(row => row.part));
-  return recipe.scene.nodes.filter((node): node is SceneMeshNode => node.kind === 'mesh' && bounded.has(node.id) && node.children.length === 0
+  const published = new Set(Object.values(step.publish).flatMap(row => 'part' in row ? [row.part] : []));
+  return recipe.scene.nodes.filter((node): node is SceneMeshNode => node.kind === 'mesh' && node.children.length === 0
+    && (bounded.has(node.id) || (node.id !== recipe.scene.root && !published.has(node.id)))
     && node.instances === undefined && node.position === undefined && node.rotation === undefined && node.scale === undefined
     && !step.registry.some(row => row.part === node.id) && !step.instanceAttributes.some(row => row.part === node.id)
     && recipe.scene.nodes.every(other => other === node || other.kind !== 'mesh' || other.geometry !== node.geometry));
@@ -358,17 +361,6 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
   const coldOnly = (ref: { readonly library: string }): boolean => { const row = libraryRows.get(ref.library); return row?.kind === 'whole' && (row.load === 'explorer' || row.load === 'refine'); };
   const modelGeometry = residentModels === undefined ? [] : worldSceneModelResources(residentModels).geometry.filter(ref => !coldOnly(ref));
   const activeSteps = section.steps.filter(step => step.load !== 'explorer' && (step.cube === undefined || step.cube === (ctx.cube === null ? 'standalone' : 'cell')));
-  const gridSources = new Set<string>();
-  if (TIER === 'phone') for (const step of activeSteps) {
-    const file = step.variants === undefined ? step.scene : ctx.cube === null ? step.variants.standalone : step.variants.cell;
-    const recipe = file === undefined ? undefined : recipes.get(file);
-    if (recipe === undefined) continue;
-    for (const node of staticGridParts(step, recipe)) {
-      const ref = step.geometry[node.geometry];
-      const slot = section.materials.find(row => row.id === gridMaterialSlot(step, recipe, node));
-      if (ref !== undefined && (slot?.kind === 'basic' || slot?.kind === 'lowpoly' || slot?.kind === 'look')) gridSources.add(JSON.stringify([ref.library, ref.model]));
-    }
-  }
   // Collision predicates may only read an already published scalar from the
   // selected scene graph. Reject absent, wrong-kind and future refs before any
   // geometry, physics piece or active callback can be installed.
@@ -434,8 +426,10 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
   const ownedModels = section.libraries.flatMap(row => row.kind === 'owned' ? row.models
     .filter(model => residentReferences.has(JSON.stringify([row.id, model.id])))
     .map(model => {
+      // Keep the phone's admitted grid in the boot template. A CPU consumer
+      // receives model-space positions when it takes its own copy.
       const source = { file: typeof model.file === 'string' ? model.file : model.file[TIER], attributes: model.attributes,
-        compactDraw: model.segments === undefined && gridSources.has(JSON.stringify([row.id, model.id])) };
+        compactDraw: TIER === 'phone' && model.segments === undefined };
       return model.segments === undefined ? source : Object.assign(source, { segments: model.segments });
     }) : []);
   // Metadata-only scenes need no render service. Borrow the real asset owner

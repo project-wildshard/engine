@@ -238,7 +238,10 @@ export function copyOwnedDrawGeometry(source: BufferGeometry): OwnedDrawGeometry
     position = new BufferAttribute(words, 3, true);
     geometry.setAttribute('position', position);
   } else position = packed;
-  geometry.boundingBox = null; // The scene's build reads this in its original model space.
+  // Tiling reads model space, and the draw later binds the grid to its mesh.
+  // A cached source bound is still in grid space at this point.
+  geometry.boundingBox = null;
+  geometry.boundingSphere = null;
   const normal = geometry.getAttribute('normal');
   normal?.applyNormalMatrix(new Matrix3().getNormalMatrix(grid));
   return { geometry, grid: grid.clone(), position };
