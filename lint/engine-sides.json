@@ -1377,6 +1377,7 @@
     "src/server/game/shardfile/decisions.ts": "server",
     "src/server/game/shardfile/declaredClimate.ts": "server",
     "src/server/game/shardfile/declaredKitItems.ts": "server",
+    "src/server/game/shardfile/declaredRiding.ts": "server",
     "src/server/game/shardfile/declaredTalks.ts": "server",
     "src/server/game/shardfile/talkPress.ts": "server",
     "src/server/game/shardfile/groupRuntime.ts": "server",

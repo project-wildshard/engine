@@ -101,6 +101,7 @@ import { addPiece, type AddedPiece } from "@wildshard/engine/physics/pieces";
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 import { scriptSeats, type ScriptSeats } from './scriptSeats';
 import { registerInstalled } from '../shardfile/installedSides';
+import { installDeclaredRiding, type DeclaredRiding } from '../shardfile/declaredRiding';
 
 type Physics = SimHost['physics'];
 type PropColliderPort = NonNullable<ReturnType<ReturnType<typeof installShardfileColliders>['get']>>;
@@ -404,6 +405,8 @@ export interface ShardfileSimulation {
   groups: ReadonlyMap<string, DeclaredGroupPolicy>;
   crowds: PreparedCrowds['policies'];
   movers: MoverRuntime | undefined;
+  /** CC40b1: the riding primitive, when a species declares a mount. */
+  riding: DeclaredRiding | null;
 }
 /** One declared simulation core, used by the normal browser loader and the headless author validator. */
 function shardfileSimInput(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): {level: SimLevel; ports: SimHostPorts} {
@@ -742,7 +745,8 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       if (lane === undefined) throw new Error('Interaction requires an admitted scene lane');
       seats.step(); createQuestScriptPorts(lane, hooks, actors).scene(row.scene, player); return true;
     };
-    return { selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
+    const riding = installDeclaredRiding(host, shard);
+    return { riding, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
   } catch (error) { host.dispose(); throw error; }
 }
 

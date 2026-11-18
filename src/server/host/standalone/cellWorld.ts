@@ -214,6 +214,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
       else if (act.kind === 'interact' && act.id === UNSTUCK_ACT && routes.unstuck !== null) routes.unstuck(player);
       else if (act.kind === 'interact' && act.id === RESPAWN_NOW_ACT && routes.respawnNow !== undefined) routes.respawnNow(player);
       else if (claim !== undefined) claim(player);
+      else if (act.kind === 'ride' && routes.ride !== null) routes.ride(player, act.action); // CC40b1: the riding primitive
       else if (act.kind === 'interact' && sim()?.selectedInteraction(player) === act.id) sim()?.interact(act.id, player);
       else if (act.kind !== 'climate' && act.kind !== 'buy' && act.kind !== 'board' && act.kind !== 'wear') routes.refused++;
     }
