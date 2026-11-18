@@ -147,7 +147,7 @@ def fixture(parent, name, observer=False):
     gate = root / 'gate.mjs'
     cache = (ENGINE / 'scripts/push-proof-cache.mjs').as_uri()
     gate.write_text('''import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {readFileSync,writeFileSync,renameSync,existsSync} from 'node:fs';
 import {setTimeout} from 'node:timers/promises';
 import {spawn} from 'node:child_process';
 import {capturePushTree,readPushProof,writePushProof} from ''' + json.dumps(cache) + ''';
@@ -161,7 +161,10 @@ if(mode==='reused'){
  const checked=capturePushTree(profile,env);assert.ok(checked);assert.equal(checked.tree,before.tree);assert.equal(checked.runtime,before.runtime);
  proof=writePushProof(before,selection,(performance.now()-began)/1000);
 }
-writeFileSync(root+'/ready.json',JSON.stringify({pid:process.pid}));
+// The parent uses the file's presence as its readiness signal.
+const ready=root+'/ready.json';
+writeFileSync(ready+'.pending',JSON.stringify({pid:process.pid}));
+renameSync(ready+'.pending',ready);
 while(!existsSync(root+'/go'))await setTimeout(5);
 if(mode==='orphan'){
  const program="const fs=require('node:fs'),root=process.argv[1];fs.writeFileSync(root+'/orphan-ready',String(process.pid));const timer=setInterval(()=>{if(fs.existsSync(root+'/orphan-release')){clearInterval(timer);fs.writeFileSync(root+'/orphan-finished','natural completion');}},10);";
