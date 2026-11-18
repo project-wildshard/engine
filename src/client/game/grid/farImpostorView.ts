@@ -9,6 +9,9 @@
  */
 import { Box3, DataTexture, LinearFilter, Mesh, PlaneGeometry, RGBAFormat, ShaderMaterial, Sphere, UnsignedShort5551Type, Vector3, type Material, type Object3D } from 'three';
 import { gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
+import { decoderIdleMs } from '@wildshard/engine/core/workerIdle';
+import { pageScope } from '@wildshard/engine/app/resources';
+import type { Scope } from '@wildshard/engine/app/scope';
 import type { FarImpostor } from '@wildshard/format/shardSections';
 import type { FarImpostorDecodeReply, FarImpostorDecodeRequest } from './farImpostorPack';
 import { GRID_HAZE } from '../../../shared/game/grid/farProxy';
@@ -24,15 +27,27 @@ export function farBandShare(distance: number): number {
   return Math.min(1, Math.max(0, t));
 }
 
-/** The one decode worker, started on first use (null where workers are missing: the cell keeps its proxy). */
-let decoder: { worker: Worker; next: number; pending: Map<number, (reply: FarImpostorDecodeReply) => void> } | null | undefined;
+/** The one decode worker, started on first use (null where workers are missing: the cell keeps its proxy). EM19: it
+ *  retires once idle (2 s on the phone tier, `workerIdle.ts`) and the next decode starts it again. */
+interface DecodePool { worker: Worker; next: number; pending: Map<number, (reply: FarImpostorDecodeReply) => void>; idle?: ReturnType<Scope['timeout']> | undefined }
+let decoder: DecodePool | null | undefined;
+function armIdle(pool: DecodePool): void {
+  if (pool.pending.size > 0) return;
+  pageScope.cancelTimer(pool.idle);
+  pool.idle = pageScope.timeout(decoderIdleMs(), () => {
+    pool.idle = undefined;
+    if (decoder !== pool || pool.pending.size > 0) return;
+    pool.worker.terminate(); decoder = undefined;
+  });
+}
 function decodeWorker(): typeof decoder {
   if (decoder !== undefined) return decoder;
   if (typeof Worker !== 'function') { decoder = null; return decoder; }
   const worker = new Worker(new URL('farImpostorDecodeWorker.ts', import.meta.url), { type: 'module', name: 'g539-impostor-decode' });
   const pending = new Map<number, (reply: FarImpostorDecodeReply) => void>();
-  worker.onmessage = (event: MessageEvent<FarImpostorDecodeReply>): void => { const done = pending.get(event.data.id); pending.delete(event.data.id); done?.(event.data); };
-  decoder = { worker, next: 0, pending };
+  const pool: DecodePool = { worker, next: 0, pending };
+  worker.onmessage = (event: MessageEvent<FarImpostorDecodeReply>): void => { const done = pending.get(event.data.id); pending.delete(event.data.id); done?.(event.data); armIdle(pool); };
+  decoder = pool;
   return decoder;
 }
 
@@ -46,6 +61,7 @@ export async function decodeFarImpostor(row: FarImpostor, bytes: Uint8Array): Pr
   const rows = Math.ceil(row.views / row.cols), width = row.cols * row.tile[0], height = rows * row.tile[1], id = pool.next++;
   const buffer = bytes.slice().buffer;
   const reply = await new Promise<FarImpostorDecodeReply>((resolve) => {
+    pageScope.cancelTimer(pool.idle); pool.idle = undefined;
     pool.pending.set(id, resolve);
     pool.worker.postMessage({ id, bytes: buffer, width, height } satisfies FarImpostorDecodeRequest, [buffer]);
   });
