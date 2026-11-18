@@ -14,3 +14,8 @@ report. The older content and presentation probes keep their separate callers.
 The first scoped checks on the v0.1.42 rollback reached play in K3, crossed a
 gate on Chromium and entered the MMO on WebKit. The v0.1.44 run uses saved
 v0.1.42 profiles for the two warm-cache legs.
+
+SQ2 uses SB48's world-region detector for every deploy smoke leg and
+journey. A transient dark frame can clear on the next sample. Three
+consecutive black or empty frames hold the train. The MacBook K3 probe
+on staging v0.1.42 and the dark and lit fixture checks passed.

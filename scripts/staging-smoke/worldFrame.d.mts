@@ -12,8 +12,8 @@ export function worldStats(data: Uint8Array | Uint8ClampedArray | Buffer, width:
  * @param {WorldStats} s @returns {string | null}
  */
 export function blackWorld(s: WorldStats): string | null;
-/** Read a saved frame (jpeg or png) and judge it. @param {string} path @returns {Promise<{ stats: WorldStats, black: string | null }>} */
-export function judgeFrame(path: string): Promise<{
+/** Judge a frame (jpeg or png). @param {string | Buffer} image @returns {Promise<{ stats: WorldStats, black: string | null }>} */
+export function judgeFrame(image: string | Buffer): Promise<{
     stats: WorldStats;
     black: string | null;
 }>;

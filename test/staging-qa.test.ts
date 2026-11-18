@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import sharp from 'sharp';
+import { deployFrameProblem } from '../scripts/journey-proof.mjs';
 import { holdLine, mergeVerdict } from '../scripts/staging-qa.mjs';
 
 const build = 'a'.repeat(40);
@@ -9,6 +11,15 @@ const smoke = { build, scenarios: [{ id: 'K3', status: 'ran', legs: [{ playedMs:
 const clean = { build, smoke, proofs: [proof], expected, selected, after: build, full: false };
 
 describe('staging QA deploy verdict', () => {
+  it('holds on several SB48 black frames and accepts a lit frame', async () => {
+    const frame = (background: string) => sharp({ create: { width: 120, height: 180, channels: 3, background } }).png().toBuffer();
+    const dark = await frame('#050810');
+    const lit = await frame('#91bfd8');
+    const waitForTimeout = () => Promise.resolve();
+    expect(await deployFrameProblem({ waitForTimeout, screenshot: () => Promise.resolve(dark) })).toContain('world is black or empty');
+    let count = 0;
+    expect(await deployFrameProblem({ waitForTimeout, screenshot: () => Promise.resolve(++count < 2 ? dark : lit) })).toBeNull();
+  });
   it('rejects smoke evidence or a final readback for another build', () => {
     expect(() => mergeVerdict({ ...clean, smoke: { ...smoke, build: 'old' } })).toThrow('build changed');
     expect(() => mergeVerdict({ ...clean, after: 'old' })).toThrow('build changed');

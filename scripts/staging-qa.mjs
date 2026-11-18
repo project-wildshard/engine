@@ -32,7 +32,8 @@ export function mergeVerdict({ build, smoke, proofs, expected, selected, after, 
     ...expected.filter(id => !proofs.some(row => row.id === id))
       .map(id => finding(id, 'missing', 'P1', 'the journey did not produce a result')),
     ...proofs.filter(row => !row.pass).map(row =>
-      finding(row.id, 'play', 'P0', row.reason ?? 'the journey did not reach play')),
+      finding(row.id, row.reason?.includes('world is black or empty') === true ? 'black-world' : 'play', 'P0',
+        row.reason ?? 'the journey did not reach play')),
   ].sort(worstFirst);
   const played = smoke.scenarios.reduce((total, scenario) =>
     total + scenario.legs.reduce((sum, leg) => sum + (leg.playedMs ?? 0), 0), 0) +

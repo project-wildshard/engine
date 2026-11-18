@@ -146,22 +146,18 @@ export function judgeDeploy(samples, budgetMs = 90_000) {
   ];
 }
 
-/** Use the existing parity detector across several cropped frames so HUD and one transient dark frame cannot decide the gate.
- * @param {Page} page */
+/** Use SB48's centre-world detector across several frames so a transient dark frame cannot decide the gate.
+ * @param {Pick<Page, 'waitForTimeout' | 'screenshot'>} page */
 export async function deployFrameProblem(page) {
-  const { screenshotPixels, frameFailure } = await import('./parity/black-frame.mjs');
-  const size = page.viewportSize();
-  if (size === null) throw new Error('Deploy frame check requires a viewport');
-  const { width, height } = size;
-  const clip = { x: Math.floor(width / 4), y: Math.floor(height / 4), width: Math.floor(width / 2), height: Math.floor(height / 2) };
+  const { judgeFrame } = await import('./staging-smoke/worldFrame.mjs');
+  let failure = null;
   for (let frame = 0; frame < 3; frame++) {
     await page.waitForTimeout(800);
-    const screenshot = await page.screenshot({ clip, scale: 'css', timeout: 5000 });
-    // Include the page background (#050810) in near-black for a canvas that drew nothing.
-    const sample = await page.evaluate(screenshotPixels, { bytes: Array.from(screenshot), darkLimit: 24 });
-    if (frameFailure(sample) === null) return null;
+    const screenshot = await page.screenshot({ type: 'png', scale: 'css', timeout: 5000 });
+    failure = (await judgeFrame(screenshot)).black;
+    if (failure === null) return null;
   }
-  return 'world is black in three play frames';
+  return `world is black or empty in three play frames: ${failure ?? 'no drawn world'}`;
 }
 
 /** The index of `card`'s Shard Select card among the cards' `<b>` names, or -1. SHARD-SOURCE SS-JP1 (F17): a shard the API placed

@@ -55,9 +55,9 @@ export function blackWorld(s) {
   return null;
 }
 
-/** Read a saved frame (jpeg or png) and judge it. @param {string} path @returns {Promise<{ stats: WorldStats, black: string | null }>} */
-export async function judgeFrame(path) {
-  const { data, info } = await sharp(path).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+/** Judge a frame (jpeg or png). @param {string | Buffer} image @returns {Promise<{ stats: WorldStats, black: string | null }>} */
+export async function judgeFrame(image) {
+  const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const stats = worldStats(data, info.width, info.height, info.channels);
   return { stats, black: blackWorld(stats) };
 }
