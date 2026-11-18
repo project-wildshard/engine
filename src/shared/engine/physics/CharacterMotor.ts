@@ -267,6 +267,23 @@ export class CharacterMotor {
     return true;
   }
 
+  /** A sloped support and an upright obstruction can both be at the skin.
+   * The native controller's first contact then depends on tree order. */
+  private hitsStaticSlopeAndWall(): boolean {
+    let slope = false, wall = false;
+    const climb = Math.cos(this.kcc.maxSlopeClimbAngle());
+    for (let i = 0; i < this.kcc.numComputedCollisions(); i++) {
+      const hit = this.kcc.computedCollision(i);
+      if (hit === null || hit.collider === null) return false;
+      const { collider, normal1, toi } = hit, parent = collider.parent();
+      if (isTerrainCollider(collider) || (parent !== null && !parent.isFixed())
+          || ((collider.collisionGroups() >>> 16) & GROUP.WORLD) === 0) return false;
+      if (toi <= this.kcc.offset() / 2 && normal1.y >= climb && normal1.y < 0.999999) slope = true;
+      if (Math.abs(normal1.y) < 0.1) wall = true;
+    }
+    return slope && wall;
+  }
+
   /** Begin grounded downward moves on a ray-measured float32 skin plane above nearly flat static support.
    * Tiny height differences otherwise choose different coplanar contacts and change a later wall slide.
    * A terrain ray describes one triangle, not the capsule's heightfield contact; leave that contact to the controller. */
@@ -360,7 +377,7 @@ export class CharacterMotor {
     const wantH = Math.hypot(want.x, want.z);
     // SF49 / SF51: a sideways move near a kinematic body (a mover's deck, at rest or ridden) starts a skin higher (see
     // `nearDeck`); a move with no sideways part isn't snapped back down by the controller, so it starts where it is.
-    const lifted = wantH > 1e-6 && want.y <= 0 && this.nearDeck(feet) ? this.kcc.offset() : 0;
+    let lifted = wantH > 1e-6 && want.y <= 0 && this.nearDeck(feet) ? this.kcc.offset() : 0;
     if (lifted > 0) {
       translation.x = feet.x; translation.y = feet.y + this.lift + lifted; translation.z = feet.z;
       this.collider.setTranslation(translation);
@@ -381,11 +398,30 @@ export class CharacterMotor {
       this.kcc.computeColliderMovement(this.collider, this.flat, R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, pred);
       m = this.kcc.computedMovement(this.movement);
     }
+    let grounded = this.kcc.computedGrounded();
+    // A skin of clearance lets the normal wall slide finish before snap
+    // puts the capsule onto the slope again. Keep the first move when the
+    // retry leaves the ground, such as at the end of a railing.
+    if (!ignoreGround && this.opts.group === 'PLAYER' && this.opts.length === undefined && lifted === 0 && r.grounded
+        && want.y < 0 && movedH < wantH * 0.99 && this.hitsStaticSlopeAndWall()) {
+      const clearance = this.kcc.offset();
+      translation.y += clearance;
+      this.collider.setTranslation(translation);
+      this.kcc.setApplyImpulsesToDynamicBodies(false);
+      try {
+        this.kcc.computeColliderMovement(this.collider, this.flatWant(want), R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, pred);
+      } finally { this.kcc.setApplyImpulsesToDynamicBodies(true); }
+      if (this.kcc.computedGrounded()) {
+        m = this.kcc.computedMovement(this.movement);
+        lifted = clearance;
+        grounded = true;
+      }
+    }
     feet.x += m.x; feet.y += m.y + lifted; feet.z += m.z;
     if (sideways && Math.abs(feet.y - (this.restPlane + this.kcc.offset() + REST_LIFT)) < 1e-6) feet.y = this.restPlane + this.kcc.offset();
     translation.x = feet.x; translation.y = feet.y + this.lift; translation.z = feet.z;
     this.collider.setTranslation(translation);
-    r.grounded = this.kcc.computedGrounded();
+    r.grounded = grounded;
     r.horizontalFreedom = wantH > 1e-6 ? Math.min(1, Math.hypot(m.x, m.z) / wantH) : 1;
     // the ground under the feet: a short ray down from just above them. (The controller's own contacts are empty while
     // resting — snapped or standing still — so they can't say what we stand on.)

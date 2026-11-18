@@ -61,14 +61,16 @@ test.each([30, 60])('live device input at %i fps stays aligned across a fixed 18
 
 
 // NL13b2: the same walk/sprint window as net-lag-proof, including side presses.
-test.each([30, 60])('static Far Reach stays within B2 at 180 ms and %i fps', fps => {
-  const baked = JSON.parse(readFileSync('out/far-reach/sections/sim/runtime-plan.json', 'utf8')) as { baked: { pieces: unknown } };
+test.each([[30, false], [60, false], [30, true], [60, true]] as const)('static Far Reach stays within B2 at 180 ms and %i fps (reverse order: %s)', (fps, reverse) => {
+  const baked = JSON.parse(readFileSync('out/far-reach/sections/sim/runtime-plan.json', 'utf8')) as { baked: { pieces: { readonly colliders: readonly unknown[] }[] } };
+  const pieces = baked.baked.pieces;
+  const room = reverse ? [...pieces].reverse().map(piece => ({ ...piece, colliders: [...piece.colliders].reverse() })) : pieces;
   let baseline = 0;
   const run = wirePlay(R, { id: 'far-static-foot', start: { x: 0, y: 30.02, z: -5.5, yaw: 0 }, ticks: 0, intent: () => ({}) }, {
     seconds: 47.4, frameMs: () => 1000 / fps, liveDevice: true,
     link: { latencyMs: 90, jitterMs: 0, lossPct: 0, reorderPct: 0, random: () => .5 },
     press: (frame, page, host) => {
-      if (frame === 0) { addBakedPieces(page.physics, baked.baked.pieces); addBakedPieces(host.host.physics, baked.baked.pieces); }
+      if (frame === 0) { addBakedPieces(page.physics, pieces); addBakedPieces(host.host.physics, room); }
       if (frame === fps * 5) {
         if (!(page.player.link instanceof NetPlayer)) throw new Error('Missing real NetPlayer');
         baseline = page.player.link.predictor.corrections; page.player.keys.add('KeyW');
