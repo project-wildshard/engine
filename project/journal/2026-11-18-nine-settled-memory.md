@@ -63,3 +63,47 @@ feeding the flat varying `wsV5_no` of the nine-architecture program) frees ~96 M
 footprint (unmapped)". This reproduced twice. Deleting `aFace` or `aPat`, hiding the coarse meshes and
 `geometry.dispose()` do not free it. A blank page replaying the same geometry and program does not reproduce it, and
 Template's owned unmapped is 26 MB. The mechanism is open: a Metal trace of the delete is the next step.
+
+**Closed (mini-ninesteady3): not a cut.** On 5a556859 the same delete (draws frozen, `coarse_1_1_0`'s aMisc, aFace, aPat
+and position buffers one at a time, 4 s apart, both orders, plus a no-delete control) moved no category: a buffer a VAO
+still binds stays alive in ANGLE, and that buffer draws only in the loading frames. The ~96 MB was the GPU process's
+"Owned physical footprint (unmapped) (graphics)" transient: +50-60 MB appears for a few seconds after the draws stop
+and goes again by itself (seen in all three runs, the control included).
+
+## Cut 3: no Metal pass bins more than 400 k vertices (mini-ninesteady3)
+
+The GPU process's other ~100 MB of "Owned physical footprint (unmapped)" (a blank WebGL page holds 8) is not a GL object:
+deleting every program, VAO, buffer, texture and framebuffer of the context left it in place (buffers freed 10 of their
+117 MB of IOAccelerator; ANGLE keeps freed Metal buffers). It appears in `firstFrame`/`readyFrame` (19 -> 68 -> 113 MB
+within 0.9 s) and never shrinks. On a blank page it grows with the vertex outputs one command buffer carries and with
+their varyings: 1.25 M points a frame +10.5 MB with no varyings, +34 with 4 vec4, +50 with 8 (mediump and flat change
+nothing); 6.25 M points in one frame +58; the same drawn one buffer a frame +0; a `finish()` between draws +0, a
+`flush()` +10. That is the TBDR parameter buffer (transformed vertices and varyings binned before shading), sized to the
+heaviest pass and kept. Nine's play frame is ~1.17 M vertex invocations (index count x instances) through programs with
+~14 live varyings (`WEBGL_debug_shaders`); its hidden loading frames reach ~1.6 M; skipping every loading draw left 99 MB.
+
+`render/passSplit.ts` wraps the context's draws (WebKit only) and calls `flush()` before the draw that would carry the
+pass past 400 k invocations; a draw framebuffer change restarts the count. A flush ends ANGLE's encoder and commits, the
+next draw loads the attachments, so the pixels are GL's. Split points: 200 k 69 MB, 400 k 68, 600 k 70, 800 k 89, none 113.
+
+Engine 5a556859 vs cut, 6 alternating cold WebKit runs each (instrument minimal): settled GPU process 507 (506-508) -> 459
+(455-460) MB, WebContent 761 -> 761; GPU peak 660 -> 607, WebContent peak 1,197 -> 1,162 (noise); EM11 playing 1.019 ->
+0.994 GB (upper 1.148 -> 1.109), loading 1.532 -> 1.467 (upper 1.700 -> 1.675). NB1's street route at boost, 4
+alternating cold runs each (kernel reads 30-40 s in): walking GPU 525-529 -> 469-471 MB, WebContent 732-818 -> 721-834
+(garbage, noise); rAF frames over the 40 s walk p50 17 / p95 18-19 / p99 19 -> 19-20 ms, worst frame 22-35 -> 22-26 ms,
+no frame over 50 ms in either. WebKit spawn shots at four headings: base vs cut differ in 16.2-18.9% of pixels, base vs
+base 17.4-18.5% (rain, crowd, weapon sway).
+
+Simulator (`nine-sim-memory.mjs`, play/fly 10 s, 3 rounds): loading native 0.783-0.788 -> 0.788-0.813 GB, play 0.809-0.815
+-> 0.796-0.801, GPU process 0.225-0.231 -> 0.207-0.216 (its Metal memory is in SimMetalHost, so the cut cannot show).
+**Watch item:** at the explorer's end point the Simulator read 30 fps with 78-84 calls / 0.83-0.95 M tris on the cut (400 k
+and 600 k) against 60 fps with 37 calls / 0.48 M on base, in all 3 pairs. The same flight in Playwright WebKit on the Mac
+(Apple GPU, ANGLE Metal, as the phone) reads 60 fps and 45 calls / 0.61 M tris on both, frames p99 19 / 19-31 ms (one cut
+run had a 101 ms frame, with WebContent unsettled at 1.33 GB). The Simulator's Metal goes through SimMetalHost, where a
+command-buffer commit is costly; a phone frame-rate read of the explorer is the check that settles it.
+
+Next, by owner: the parameter buffer still holds ~60 MB at the split floor; fewer live varyings in the graph programs
+shrink it further (the fog chunk's `vFogWorldPos` and the graph's `wsVFogWorld` carry the same `modelMatrix * transformed`
+in every fogged graph program; `regionLook.ts` rewrites `vFogWorldPos`, so check it first). IOAccelerator ~200 MB is the
+GL buffers (117 [L], led by Nine's aMisc f32x4 15 MB, positions 14, aSpill 12, aOff 7.5, f16 aPat/aFace 7.4 each),
+textures 47 and programs 26. "Owned (graphics)" 128 is mostly the browser's: a blank WebGL page holds 108.
