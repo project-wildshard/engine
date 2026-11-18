@@ -455,17 +455,25 @@ export class SimHost {
     return result;
   }
   /** A declared decision owner selects among admitted strikes on the existing runner, including after restore. */
-  registerStrikeCatalogue(id: string, specs: readonly SimStrike[]): void {
+  registerStrikeCatalogue(id: string, specs: readonly SimStrike[]): void { this.bindStrikeCatalogue(id, specs); }
+  bindStrikeCatalogue(id: string, specs: readonly SimStrike[]): () => void {
     if (!this.entities.has(id) || this.strikeCatalogues.has(id) || new Set(specs.map(row => row.id)).size !== specs.length) throw new Error('Invalid strike catalogue owner');
     const rows = new Map<string, StrikeSpec>();
     for (const spec of specs) rows.set(spec.id, { ...structuredClone(spec), weight: () => 1 });
     this.strikeCatalogues.set(id, rows);
-    if (specs.length > 0 && !this.strikes.has(id)) this.strikes.set(id, new StrikeRunner());
+    const runner = specs.length > 0 && !this.strikes.has(id) ? new StrikeRunner() : undefined;
+    if (runner !== undefined) this.strikes.set(id, runner);
+    return () => {
+      if (this.strikeCatalogues.get(id) !== rows) return;
+      this.strikeCatalogues.delete(id);
+      if (runner !== undefined && this.strikes.get(id) === runner) this.strikes.delete(id);
+    };
   }
   /** Selection never installs another clock or contact path. Missing or busy actors retain today's refusal. */
   startDeclaredStrike(sourceId: string, targetId: string, strike: string): boolean {
     const spec = this.strikeCatalogues.get(sourceId)?.get(strike);
-    return spec === undefined ? false : this.beginStrike(sourceId, targetId, spec);
+    if (spec === undefined || (spec.independentCooldown === true && this.strikes.get(sourceId)?.ready(strike) !== true)) return false;
+    return this.beginStrike(sourceId, targetId, spec);
   }
   /** The player's capsule on the page's body law (PLAYER_BODY: ITEM bodies stop it and its 80 kg pushes them), a creature's
    * on the page's creature filter. */
@@ -770,7 +778,12 @@ export class SimHost {
     const victim = targetId === undefined ? undefined : this.players.get(targetId), striker = this.players.get(id);
     const health = victim?.health ?? target?.combatActor(), position = victim?.position ?? target?.position;
     const actor = source ?? striker?.actor();
-    if (health === undefined || position === undefined || actor === undefined) return;
+    if (health === undefined || position === undefined || actor === undefined) {
+      for (const spec of this.strikeCatalogues.get(id)?.values() ?? []) {
+        if (spec.independentCooldown === true) { runner.advanceIdle(FIXED_STEP); break; }
+      }
+      return;
+    }
     runner.update(FIXED_STEP, { actor, target: position, canReach: () => source === undefined ? true : canReach(source, position, this.physics), hit: (spec) => {
       this.direction.subVectors(position, actor.position).normalize();
       this.hitOrigin.copy(actor.position); this.hitOrigin.y += source === undefined ? 1.2 : source.dims.bodyY * source.scale;

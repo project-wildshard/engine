@@ -17,6 +17,8 @@ export interface PlatformBrainPorts {
   targets: () => readonly BrainTarget[]; visible: (from: BrainTarget['position'], to: BrainTarget['position']) => boolean;
   path: (from: BrainTarget['position'], to: BrainTarget['position']) => readonly BrainTarget['position'][];
   attack: (targetId: string) => void; random: () => number;
+  /** Authored ability rows own range and cooldown when installed. */
+  requestAbility?: (target: BrainTarget) => boolean;
 }
 const mode = v.picklist(['idle', 'wander', 'pursue', 'attack', 'return', 'dead']);
 const finite = v.pipe(v.number(), v.finite());
@@ -82,7 +84,11 @@ export class PlatformBrain {
       .sort((a, b) => distance(at, a.position) - distance(at, b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
     if (target) {
       this.state.target = target.id;
-      if (distance(at, target.position) <= this.spec.stopDistance && this.ports.visible(at, target.position)) {
+      if (this.ports.requestAbility !== undefined) {
+        if (this.ports.visible(at, target.position) && this.ports.requestAbility(target)) {
+          this.state.mode = 'attack'; this.actor.setMotion(Math.atan2(target.position.x - at.x, target.position.z - at.z), 0, this.spec.turnRate);
+        } else { this.state.mode = 'pursue'; this.move(target.position, this.spec.speed); }
+      } else if (distance(at, target.position) <= this.spec.stopDistance && this.ports.visible(at, target.position)) {
         this.state.mode = 'attack'; this.actor.setMotion(Math.atan2(target.position.x - at.x, target.position.z - at.z), 0, this.spec.turnRate);
         if (this.state.cooldown === 0) { this.ports.attack(target.id); this.state.cooldown = this.spec.attackCooldownTicks; }
       } else { this.state.mode = 'pursue'; this.move(target.position, this.spec.speed); }
@@ -119,13 +125,15 @@ export function buildPlatformSpawns(rows: readonly PlatformSpawn[], species: Pla
 /** A bounded path port can be backed by the engine navmesh; direct pursuit still resolves collisions in the motor. */
 export type BrainNavigation = PlatformBrainPorts['path'];
 /** Validate and construct all pursuit policies without registering fixed-step work or consuming random state. */
-export function preparePlatformBrains(sim: SimHost, rows: readonly PlatformSpawn[], specs: readonly PlatformBrainSpec[], navigation: BrainNavigation = (_from, to) => [to], notices?: (actor: AnimalSim, player: string) => boolean): ReadonlyMap<string, PlatformBrain> {
+export function preparePlatformBrains(sim: SimHost, rows: readonly PlatformSpawn[], specs: readonly PlatformBrainSpec[], navigation: BrainNavigation = (_from, to) => [to], notices?: (actor: AnimalSim, player: string) => boolean,
+  abilities?: ReadonlyMap<string, NonNullable<PlatformBrainPorts['requestAbility']>>): ReadonlyMap<string, PlatformBrain> {
   const definitions = new Map(specs.map((spec) => [spec.id, spec])), result = new Map<string, PlatformBrain>();
   if (definitions.size !== specs.length) throw new Error('Duplicate brain archetype');
   for (const row of rows) {
     if (row.brain === null) continue; // A phase encounter owns this actor.
     const actor = sim.entities.get(row.id), spec = definitions.get(row.brain);
     if (!actor || !spec || result.has(row.id)) throw new Error('Unresolved brain/spawn');
+    const requestAbility = abilities?.get(row.id);
     const brain = new PlatformBrain(actor, spec, { x: row.at[0], y: row.at[1], z: row.at[2] }, {
       targets: () => Array.from(sim.players.values(), player => ({ id: player.id, position: player.position,
         alive: player.health.alive && !sim.parked.has(player.id), noticed: notices === undefined || notices(actor, player.id) })),
@@ -135,6 +143,7 @@ export function preparePlatformBrains(sim: SimHost, rows: readonly PlatformSpawn
         const hit = castRay(sim.physics, { x: from.x, y: from.y + 1, z: from.z }, { x: dx / length, y: dy / length, z: dz / length }, length);
         return !hit || hit.distance >= length - 0.1;
       }, path: navigation, attack: (target) => { sim.startStrike(row.id, target); }, random: () => sim.rng.stream('ai').next(),
+      ...(requestAbility === undefined ? {} : { requestAbility }),
     });
     result.set(row.id, brain);
   }

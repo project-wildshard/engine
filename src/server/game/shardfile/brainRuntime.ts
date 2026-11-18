@@ -1,4 +1,4 @@
-import { preparePlatformBrains, type PlatformBrainSpec, type PlatformSpawn, type BrainNavigation } from '@wildshard/engine/ai/platform';
+import { preparePlatformBrains, type PlatformBrainSpec, type PlatformSpawn, type BrainNavigation, type BrainTarget } from '@wildshard/engine/ai/platform';
 import { SkirmisherBrain, type SkirmisherPorts } from '@wildshard/engine/ai/skirmisher';
 import { GuardianBrain, type GuardianPorts } from '@wildshard/engine/ai/guardian';
 import { PerchHunterBrain, type PerchHunterPorts } from '@wildshard/engine/ai/perchHunter';
@@ -11,7 +11,7 @@ import * as v from 'valibot';
 import { CreatureHomeSchema, type ShardCreatureHome } from '@wildshard/format/creatures';
 import type { StrikeSpec } from '@wildshard/engine/ai/strikes';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
-import type { SimHost, SimStateAdapter } from '@wildshard/engine/sim';
+import type { SimHost, SimStateAdapter, SimStrike } from '@wildshard/engine/sim';
 import type { ResolvedCreatureLayers } from './creatureLayers';
 import { bindCreatureTemperament } from './creatureTemperament';
 import { bindGroundTemperament } from './groundTemperament';
@@ -50,6 +50,34 @@ export interface DeclaredBrainPorts {
 /** Stable spawn identity with optional explicitly authored per-body home authority. */
 export type DeclaredBrainSpawn = PlatformSpawn & { home?: ShardCreatureHome | undefined; phaseOffset?: number | undefined };
 interface Registration { id: string; run: (dt: number) => void; adapter: SimStateAdapter; install?: () => () => void }
+function prepareAbilities(host: SimHost, actor: AnimalSim, abilities: ResolvedCreatureLayers['abilities']) {
+  const options = abilities.map(({ ability, strike: { weight: _weight, speed, ...strike } }) => {
+    const [min, max] = typeof ability.range === 'number' ? [0, ability.range] : ability.range;
+    const spec: SimStrike = {
+      ...strike,
+      damage: ability.damage ?? strike.damage,
+      windup: ability.windup ?? strike.windup,
+      active: ability.duration ?? strike.active,
+      cooldown: ability.cooldown,
+      independentCooldown: true,
+      motion: { speed: ability.speed ?? speed },
+    };
+    return { min, max, ability, spec };
+  });
+  return {
+    install: () => host.bindStrikeCatalogue(actor.entityId, options.map(row => row.spec)),
+    request: (target: BrainTarget): boolean => {
+      if (host.strikes.get(actor.entityId)?.busy === true) return true;
+      const at = actor.position, distance = Math.hypot(target.position.x - at.x, target.position.z - at.z);
+      for (const { min, max, ability, spec } of options) {
+        if (ability.weight <= 0 || distance < min || distance > max) continue;
+        if (ability.hpBelow !== undefined && actor.hp >= actor.maxHp * ability.hpBelow) continue;
+        if (host.startDeclaredStrike(actor.entityId, target.id, spec.id)) return true;
+      }
+      return false;
+    },
+  };
+}
 function nativeRegistration<P>(id: string, actor: AnimalSim, divisor: number, brain: SimStateAdapter & { think: (ports: P) => void }, recipe: DeclaredBrainRecipe<P>, host: SimHost): Registration {
   if (typeof recipe.observe !== 'function' || typeof recipe.body !== 'function') throw new Error('Missing native brain recipe');
   const contract = JSON.stringify({ divisor, policy: brain.snapshot() });
@@ -127,12 +155,16 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
       || (spec.kind === 'burst-flyer' && ports.burstFlyer === undefined)) throw new Error('Missing native brain port');
   }
   const pursueRows = rows.filter(row => row.brain !== null && definitions.get(row.brain)?.kind === 'pursue');
+  const abilities = new Map<string, ReturnType<typeof prepareAbilities>>();
   const perception = new Map(pursueRows.map(row => {
     const actor = host.entities.get(row.id); if (actor === undefined) throw new Error('Missing pursuit senses body');
-    return [row.id, bindCreatureSenses(host, actor, layers?.get(row.species)?.senses)] as const;
+    const layer = layers?.get(row.species);
+    if (layer !== undefined && layer.abilities.length > 0) abilities.set(row.id, prepareAbilities(host, actor, layer.abilities));
+    return [row.id, bindCreatureSenses(host, actor, layer?.senses)] as const;
   }));
   const pursuits = preparePlatformBrains(host, pursueRows, presets.filter(row => row.kind === 'pursue'), ports.navigation,
-    (actor, id) => { const player = host.players.get(id); return player !== undefined && perception.get(actor.entityId)?.notices(player) === true; });
+    (actor, id) => { const player = host.players.get(id); return player !== undefined && perception.get(actor.entityId)?.notices(player) === true; },
+    new Map([...abilities].map(([id, binding]) => [id, binding.request])));
   const social = new Map<string, { readonly id: string; readonly members: Set<ReturnType<AnimalSim['combatActor']>> }>();
   for (const row of rows) {
     if (row.group === undefined || layers?.get(row.species)?.temperament.pack !== true) continue;
@@ -233,6 +265,7 @@ export function installDeclaredBrains(host: SimHost, rows: readonly DeclaredBrai
   const result = new Map<string, SimStateAdapter>();
   const remove: (() => void)[] = [];
   try {
+    for (const binding of abilities.values()) remove.push(binding.install());
     for (const registration of registrations) {
       const dispose = registration.install?.(); if (dispose !== undefined) remove.push(dispose);
       const actorId = registration.id.slice(6);

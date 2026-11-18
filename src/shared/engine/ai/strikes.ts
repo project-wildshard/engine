@@ -31,6 +31,7 @@ export interface StrikeContext {
 export interface StrikeSpec {
   debris?: StrikeDebrisPolicy;
   id: string; shape: StrikeShape; windup: number; active: number; recover: number; cooldown: number;
+  independentCooldown?: true;
   range: number; damage: number; tags: readonly CombatTag[];
   weight: (ctx: StrikeContext) => number;
   units?: 'world' | 'actor';
@@ -76,6 +77,8 @@ export class StrikeRunner {
   }
   get spec(): StrikeSpec | null { return this.current; }
   get busy(): boolean { return this.state !== 'idle'; }
+  ready(id: string): boolean { return !this.busy && (this.deadlines.get(id) ?? 0) <= this.clock; }
+  advanceIdle(dt: number): void { if (!this.busy) this.clock += dt; }
   get lastPick(): readonly UtilityScore[] { return this.scores; }
   snapshot(): StrikeState {
     return { version: 1, phase: this.state, currentId: this.current?.id ?? null, hit: this.hit, elapsed: this.elapsed,
@@ -149,7 +152,7 @@ export class StrikeRunner {
       if (laneMotion(spec)) a.setMotion(a.yaw, 0, 1.5);
       if (this.elapsed >= (spec.motion?.skid ?? spec.recover)) {
         this.deadlines.set(spec.id, this.clock + spec.cooldown);
-        if (spec.cooldown > 0) this.phase('cooldown'); else this.cancel();
+        if (spec.cooldown > 0 && spec.independentCooldown !== true) this.phase('cooldown'); else this.cancel();
       }
       return;
     }
