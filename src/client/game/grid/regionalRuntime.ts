@@ -1,5 +1,4 @@
 import { bindResidentTileEntry } from '../shardfile/tileEntry';
-import { dangerousTrust } from '../../../shared/game/shardfile/dangerousGates';
 import {bindEquipmentActors} from '../loadout/actors';
 import { freezeParkedMatrices } from '@wildshard/engine/render/precompile';
 import { timeClientPreparation } from '../shardfile/preparationTiming';
@@ -270,7 +269,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
         const logical = true;
         return progress && inventory && native && logical;
       };
-      const resident: RuntimePageResident = { instance: request.cell.instance, slug: request.cell.slug, declaration, trust: dangerousTrust(),
+      const resident: RuntimePageResident = { instance: request.cell.instance, slug: request.cell.slug, declaration,
         ...(foundation.renderReady === undefined ? {} : { renderReady: foundation.renderReady }),
         scope, product: shardFolderFromAdmission(request.admitted, scope), runtime: parent, retainRuntime: true, context: (owner, runtime) => {
           viewmodelSets ??= startViewmodelTextures(request.manifest.boot?.viewmodelSets ?? false);

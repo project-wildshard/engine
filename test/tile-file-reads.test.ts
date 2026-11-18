@@ -10,7 +10,7 @@ test.each([false, true])('tile transport overlaps bounded reads and drains refus
   const source = emptyShardfile({ slug: 'tile-file-reads', name: 'Reads', author: 'Fixture', seed: 1, revision: 1 });
   source.props = { version: 1, family: 'pbr', tiles: [{ lod: 0, x: 0, z: 0, file: first, additionalFiles: names.slice(1) }],
     wholeLibrary: [], models: [], panels: [], far: null, colliders: [], textures: [] };
-  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/', offline: true, dangerousGrant: true,
+  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/', offline: true,
     hash: () => Promise.reject(new Error('No verification expected from controlled read port')),
     fetch: () => Promise.reject(new Error('Unexpected network')) });
   const started: string[] = [], pending = new Map<string, { resolve: (bytes: Uint8Array) => void; reject: (error: Error) => void }>();

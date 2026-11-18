@@ -15,7 +15,7 @@ function requireOwner(owner: Scope): void {
  * Loading browsers share 50 ms slices; Node keeps the original task turn.
  * A queued yield keeps buildYield's
  * delivery-time frame check and refuses a retired or retiring owner. */
-export function constructionCheckpoint(owner: Scope): Promise<void> | undefined {
+export function constructionCheckpoint(owner: Scope, ownerBudgetMs: number = WORK_SLICE_MS): Promise<void> | undefined {
   requireOwner(owner);
   const live = presenting();
   if (!live && typeof document !== 'undefined') {
@@ -26,6 +26,6 @@ export function constructionCheckpoint(owner: Scope): Promise<void> | undefined 
     return buildYield(owner).then(() => { requireOwner(owner); loadingAt = diagnosticNow(); return undefined; });
   }
   loadingAt = undefined;
-  if (live && (buildHeld() || buildUrgent() || !frameDue()) && !frameBudgetSpent(WORK_SLICE_MS)) return undefined;
+  if (live && (buildHeld() || buildUrgent() || !frameDue()) && !frameBudgetSpent(Math.min(WORK_SLICE_MS, ownerBudgetMs))) return undefined;
   return buildYield(owner).then(() => { requireOwner(owner); return undefined; });
 }

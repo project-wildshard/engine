@@ -10,9 +10,10 @@ import { emptyShardfile } from '../src/shared/host/author';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 const binding = { kind: 'world.bind-sets', placed: ['orchard.pier'], groups: [{ id: 'shore', placed: ['orchard.pier'] }] };
-function fixture() {
+function fixture(tier?: 'small' | 'large') {
   const scope = new Scope('place-capability');
   const source = emptyShardfile({ slug: 'orchard', name: 'Orchard', author: 'Fixture', revision: 1, seed: 7 });
+  if (tier !== undefined) source.budgets = { ...source.budgets, tier };
   const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source,
     sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('No fixture reads')) });
   return { scope, product, ctx: legacyDouble<ShardContext>({ scope, product }) };
@@ -27,6 +28,19 @@ test('finite binding rows refuse paths, callbacks and duplicate group identities
     expect(() => admitClientPlan({ version: 1, features: [binding] }, f.product)).toThrow('declared sets');
     expect(() => admitClientPlan({ version: 1, features: [{ kind: 'world.sets', rows: [] }, { ...binding, quest: 'missing' }] }, f.product)).toThrow('declared quest');
   } finally { f.scope.dispose(); }
+});
+
+test('owned stages refuse oversized rows at the product tier before installing world state', () => {
+  const small = fixture('small'), large = fixture('large');
+  const rows = Array.from({ length: 128 }, (_, i) => ({
+    place: 'orchard', id: 'spot-' + i, name: 'Spot', file: 'spots.json',
+    pois: ['one', 'two', 'three'], x: 0, z: 0, r: 1,
+  }));
+  const input = { version: 1, features: [{ kind: 'world.sets', rows }] };
+  try {
+    expect(() => admitClientPlan(input, small.product)).toThrow(/world.sets.*tier limit of 1000/u);
+    expect(admitClientPlan(input, large.product).features).toHaveLength(1);
+  } finally { small.scope.dispose(); large.scope.dispose(); }
 });
 
 test('unordered declared play waits for the actual binding before continuation', async () => {

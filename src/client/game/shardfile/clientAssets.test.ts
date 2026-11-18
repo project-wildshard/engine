@@ -29,7 +29,7 @@ function fixture() {
   observed.push(bytes.buffer);
   source.files.push({ hash: ref, kind: 'binary', compressed: bytes.length, decoded: 3, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false });
   const fetch = vi.fn(() => Promise.reject(new Error('Unexpected transport fetch')));
-  const options = { base: 'https://example.invalid/product/', offline: true, dangerousGrant: true, fetch,
+  const options = { base: 'https://example.invalid/product/', offline: true, fetch,
     hash: vi.fn(() => Promise.resolve(ref)) };
   const rows = () => memoryAttribution.snapshot().allocations.filter(row => row.owner === 'product:transport-memory');
   return { source, bytes, ref, options, fetch, rows };

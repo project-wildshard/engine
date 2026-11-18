@@ -136,7 +136,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
         if (admissionFailure !== undefined) throw admissionFailure;
         events.push('admission:end'); return shard;
       }},
-    '@wildshard/engine/game/shardfile/runtimeFolder': {browserShardfileOptions: (_base: string, dangerousGrant = false) => {firstParties.push(dangerousGrant); return {};}},
+    '@wildshard/engine/game/shardfile/runtimeFolder': {browserShardfileOptions: (_base: string, buildOwned = false) => {firstParties.push(buildOwned); return {};}},
     '@wildshard/engine/game/boot/loadingPaths': {loadingPath: noop},
     '@wildshard/engine/game/grid/prefetch': {gridPrefetchStatus: noop},
     '@wildshard/engine/script/moduleV2': {prepareScriptMemoryBank: async (_counts: unknown, yieldTurn: () => Promise<void>) => {

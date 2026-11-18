@@ -19,7 +19,7 @@ test('published ABI2 declarations survive disk, browser admission and native exe
   const declarations = scriptAdmissionRows(descriptor.sections);
   expect(declarations.some(row => row.abi === 2)).toBe(true);
   const base = 'https://transport.test/';
-  const options: FolderOptions = { base, offline: false, dangerousGrant: true,
+  const options: FolderOptions = { base, offline: false,
     hash: bytes => Promise.resolve(hashImmutableBytes(bytes)),
     fetch: url => Promise.resolve(new Response(Uint8Array.from(readFileSync(resolve(directory, new URL(url).pathname.slice(1)))))) };
   const source = await readFolderDescriptor(options), browser = await admitFolder(source, options);
@@ -45,7 +45,7 @@ test('browser admission refuses a rewritten ABI2 page contract over the unchange
   const changed = new TextEncoder().encode(JSON.stringify(value));
   section.hash = hashImmutableBytes(changed); section.bytes = changed.length;
   delete index.packs;
-  const options: FolderOptions = { base: 'https://transport.test/', offline: false, dangerousGrant: true,
+  const options: FolderOptions = { base: 'https://transport.test/', offline: false,
     hash: bytes => Promise.resolve(hashImmutableBytes(bytes)),
     fetch: url => {
       const name = new URL(url).pathname.slice(1);

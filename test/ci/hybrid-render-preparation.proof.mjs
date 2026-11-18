@@ -42,7 +42,6 @@ const { installEnteredRuntimeService } =
   await import("../../src/client/game/shard/retainedHooks.ts");
 const { RuntimePageSession } = await import("../../src/client/game/shardfile/runtimePage.ts");
 const { emptyShardfile } = await import("../../src/shared/host/author.ts");
-const { dangerousTrust } = await import("../../src/shared/game/shardfile/dangerousGates.ts");
 const { createShardFolder } = await import("../../src/shared/game/shardfile/shardFolder.ts");
 
 function fixture(refusal) {
@@ -104,7 +103,6 @@ function fixture(refusal) {
     slug: manifest.slug,
     declaration: null,
     product,
-    trust: dangerousTrust(),
     retainRuntime: true,
     scope,
     runtime,

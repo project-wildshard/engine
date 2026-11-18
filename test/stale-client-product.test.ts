@@ -12,7 +12,7 @@ beforeAll(() => { Object.defineProperty(globalThis, '__SHARDFILE_VERDICTS__', { 
   value: [{ path: '/shardfiles/a/shard.json', indexHash: hashImmutableBytes(known) }] }); });
 afterAll(() => { Reflect.deleteProperty(globalThis, '__SHARDFILE_VERDICTS__'); });
 function options(listed: boolean, stale = vi.fn(() => Promise.resolve())): { options: FolderOptions; stale: typeof stale } {
-  return { stale, options: { base: `https://example.test/shardfiles/${listed ? 'a' : 'b'}/`, offline: false, dangerousGrant: true, hash,
+  return { stale, options: { base: `https://example.test/shardfiles/${listed ? 'a' : 'b'}/`, offline: false, hash,
     fetch: () => Promise.reject(new Error('unused')), built: { indexes: new Set([hashImmutableBytes(known)]), stale } } };
 }
 

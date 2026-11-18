@@ -67,7 +67,7 @@ function fixture(blob = false, spawnX = 0, revision = 1, slug = 'loader-fixture'
 function options(wires: ReadonlyMap<string, Uint8Array>, cache?: FolderCache): FolderOptions {
   // Each fixture owns its transport/verifier service. Repeated reads through
   // these options still coalesce; unrelated fixtures cannot lend verified packs.
-  return { base, offline: false, dangerousGrant: true, hash: bytes => hash(bytes), ...(cache === undefined ? {} : { cache }), fetch: url => {
+  return { base, offline: false, hash: bytes => hash(bytes), ...(cache === undefined ? {} : { cache }), fetch: url => {
     const bytes = wires.get(url.slice(base.length));
     return Promise.resolve(bytes === undefined ? new Response(null, { status: 404 }) : new Response(Uint8Array.from(bytes)));
   } };
@@ -88,7 +88,7 @@ test.each(['large', 'small'] as const)('OF10c1c: checked admission reserves the 
   const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
   try {
     const admitted = await admitFolder({ ...source, runtime, budgets: { ...source.budgets, tier } },
-      { ...options(wires), dangerousGrant: false, reserve });
+      { ...options(wires), reserve });
     expect(admitted.source.runtime).toEqual(runtime);
     expect(admitted.source.budgets.tier).toBe(tier);
     expect(reserve).toHaveBeenCalledOnce();
@@ -1377,7 +1377,7 @@ test('ONE-FORMAT OF10a2: an outside product with this device\'s own receipt gets
   // a validator revision lets this device keep its own receipt; the build's verdict is never read for an outside product
   const restore = installIndexReceipt(row.index), tiers = vi.spyOn(await import('../src/client/game/shardfile/folderCost'), 'tierFolderFilesPaced');
   try {
-    const online: FolderOptions = { ...options(row.wires, store.cache), dangerousGrant: false };
+    const online: FolderOptions = { ...options(row.wires, store.cache) };
     await admitFolder(await readFolderDescriptor(online), online);
     expect(store.product()?.validation).toBeDefined();
     expect(tiers).not.toHaveBeenCalled(); // no tier asked, and no receipt yet: every byte is validated

@@ -25,7 +25,6 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 
 import type { RuntimeDeclaration } from '@wildshard/format/runtime';
 import type { AudioData } from '@wildshard/format/audio';
-import { dangerousRuntimeOwnership, type DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
 import { runtimeTierLimits } from '../../../shared/game/shardfile/runtimeTier';
 import { pageFeatureBudget } from '../../../shared/game/shardfile/pageFeatureTier';
 
@@ -37,8 +36,8 @@ async function runtimeClientPhase(ctx: ShardContext, phase: ClientPhase, residen
 
 /** A finite data runtime has no source entry or hooks of its own. */
 class ClientPlanRuntime extends ShardPlugin {}
-function preparePageRuntime(product: ShardFolder, owned: boolean): new () => ShardPlugin {
-  if (!owned || !product.has('client/plan')) throw new Error('Data resident requires its admitted client plan');
+function preparePageRuntime(product: ShardFolder): new () => ShardPlugin {
+  if (!product.has('client/plan')) throw new Error('Data resident requires its admitted client plan');
   admittedFolderClientPlan(product);
   return ClientPlanRuntime;
 }
@@ -50,8 +49,6 @@ export interface RuntimePageResident {
   readonly declaration: RuntimeDeclaration | null;
   /** Required actual admitted product when compiled client features own every stage. */
   readonly product?: ShardFolder;
-  /** OF10a7: the host's grant of the dangerous capabilities (`dangerousTrust`) until OF10c. */
-  readonly trust: DangerousProvenance;
   readonly scope: Scope;
   readonly runtime: ShardRuntime;
   /** Scoped render preparation can overlap the private world; gates afterWorld and drains before teardown. */
@@ -304,7 +301,7 @@ export async function prepareRuntimePage(product: ShardFolder, options: FolderOp
     readonly residencyContext?: Pick<ShardContext, 'game' | 'scope'>;
     /** Retain an adapted borrowed home runtime across road visits; neighbours remain fenced. */
     readonly retainHomeRuntime?: boolean;
-    /** Built-in transition whose runtime installs every admitted world/kit/play declaration.
+    /** A compiled runtime installs every admitted world, kit and play declaration.
      * Admission and residency still run; the data client must not install a second simulation. */
     readonly stagesOwner?: 'declared' | 'runtime';
   }): Promise<ShardPlugin> {
@@ -312,9 +309,8 @@ export async function prepareRuntimePage(product: ShardFolder, options: FolderOp
   const folderOptions = 'base' in options ? options : browserShardfileOptions(folderBase(product.slug), options.granted);
   const source = product.shardfile;
   if (source.runtime === null) throw new Error('Runtime page requires a compiled client-plan runtime declaration');
+  const Runtime = preparePageRuntime(product);
   provideRuntimeDeclaration(source);
-  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(folderOptions)) throw new Error('Runtime stage ownership requires a native shard');
   const { residencyContext, retainHomeRuntime, stagesOwner, ...providedBindings } = bindings;
   const residency = residencyContext?.game.residency;
   if (residency !== undefined && providedBindings.residency !== undefined && residency !== providedBindings.residency) {
@@ -337,8 +333,6 @@ export async function prepareRuntimePage(product: ShardFolder, options: FolderOp
   const { load, mapImage } = await shardfileSource(source, folderOptions, { ...clientBindings, instance, nativeRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime', onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
     .then(data => ({ load: data.load, mapImage: data.minimap?.image }));
   if (load === undefined) throw new Error('Missing admitted runtime data plugin');
-  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  const Runtime = preparePageRuntime(product, dangerousRuntimeOwnership(folderOptions));
   const installed = await load().then(({ default: Data }) => new Data());
   const mapped: ShardPlugin = source.map === undefined ? installed : {
     async world(ctx) {
@@ -381,10 +375,8 @@ export class RuntimePageSession {
     if (resident === undefined) return Promise.reject(new Error('Missing runtime resident'));
     const prior = this.prepared.get(instance); if (prior !== undefined) return prior;
     const product = resident.product;
-    // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-    if (!dangerousRuntimeOwnership(resident.trust) || product === undefined || !product.has('client/plan')) return Promise.reject(new Error('Data resident requires its admitted client plan'));
-    admittedFolderClientPlan(product);
-    const prepared = Promise.resolve(ClientPlanRuntime);
+    if (product === undefined) return Promise.reject(new Error('Data resident requires its admitted client plan'));
+    const prepared = Promise.resolve().then(() => preparePageRuntime(product));
     this.prepared.set(instance, prepared);
     void prepared.catch(() => { if (this.prepared.get(instance) === prepared) this.prepared.delete(instance); });
     return prepared;

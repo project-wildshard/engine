@@ -32,31 +32,10 @@ export interface Gate {
   readonly snippets?: readonly { readonly file: string; readonly text: string }[];
 }
 
-const CLIENT_SOURCE = 'src/client/game/shardfile/clientSource.ts';
-// OF15 renames this file; until then its path is the one place the ledger names the retired word.
-const PLAN_PAGE = 'src/client/game/shardfile/runtimePage.ts';
 /** OF10b: each dangerous gate is one deprecated function here; its sites call it by name. */
 export const DANGEROUS_GATES = 'src/shared/game/shardfile/dangerousGates.ts';
 
 export const GATES: readonly Gate[] = [
-  {
-    id: 'runtime-ownership', verdict: 'dangerous', name: 'dangerousRuntimeOwnership',
-    what: 'Only our own runtime may own the page\'s world, audio or stages, run an empty client-plan policy, or keep a '
-      + 'data resident (`clientSource.ts` bindings and the client-plan page module).',
-    harm: 'An owning runtime replaces the engine\'s admitted world, audio or stage owners, so its frame and memory cost '
-      + 'escape admission entirely.',
-    budget: 'OF10c: the shard\'s tier CPU and memory limits, with the owned stages metered as the runtime\'s.',
-    // Includes the grant interface and its constructor until the last reader goes.
-    refs: { [DANGEROUS_GATES]: 3 },
-    snippets: [
-      { file: CLIENT_SOURCE, text: "=== true && (!dangerousRuntimeOwnership(options)" },
-      { file: CLIENT_SOURCE, text: "if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options)" },
-      { file: CLIENT_SOURCE, text: "if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options)" },
-      { file: PLAN_PAGE, text: "if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(folderOptions)) throw" },
-      { file: PLAN_PAGE, text: 'preparePageRuntime(product, dangerousRuntimeOwnership(folderOptions))' },
-      { file: PLAN_PAGE, text: 'if (!dangerousRuntimeOwnership(resident.trust) ||' },
-    ],
-  },
   {
     id: 'graph-authority', verdict: 'dangerous', name: 'dangerousUnbudgetedMaterialGraph',
     what: 'Material graphs keep their declared ceilings only for a shard with a runtime or a declared page; any other '

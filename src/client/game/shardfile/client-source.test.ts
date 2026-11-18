@@ -8,7 +8,7 @@ import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { SHARDFILE_ADMISSION_LIMITS } from '@wildshard/format/admissionLimits';
 
 function options(): FolderOptions {
-  return { base: 'https://fixture.invalid/', dangerousGrant: true, offline: false,
+  return { base: 'https://fixture.invalid/', offline: false,
     fetch: vi.fn(() => Promise.reject(new Error('Unexpected network read'))),
     hash: vi.fn(() => Promise.reject(new Error('Unexpected hash read'))) };
 }

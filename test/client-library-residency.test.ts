@@ -12,7 +12,7 @@ function fixture() {
   source.files.push({ hash: ref, kind: 'binary', compressed: wire.length, decoded: 20, gpu: 4, triangles: 0, draws: 0, dependencies: [], critical: false });
   source.library.push(ref);
   const cache = new Map([[ref, wire]]), fetch = vi.fn(() => Promise.reject(new Error('Offline fetch refused')));
-  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/output/', offline: true, dangerousGrant: true, fetch,
+  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/output/', offline: true, fetch,
     hash: bytes => Promise.resolve(hashImmutableBytes(bytes)), cache: {
       product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
       asset: (_base, hash) => Promise.resolve(cache.get(hash) ?? null), putAsset: () => Promise.resolve(true),

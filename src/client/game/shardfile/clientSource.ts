@@ -2,7 +2,6 @@ import { prepareClientModuleGroups } from './clientModules';
 import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/shardfile/outputDescriptor';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { dangerousRuntimeOwnership } from '../../../shared/game/shardfile/dangerousGates';
 import { cataloguePlaced } from '../../../shared/game/shardfile/identity';
 import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
@@ -103,12 +102,9 @@ function withPageMemory(options: FolderOptions, bindings: ShardfileClientBinding
 
 function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings: ShardfileClientBindings): ShardManifest {
   const source = admitted.source;
-  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.nativeRuntime === true && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Empty runtime policy requires a native runtime declaration');
-  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime audio ownership requires a native runtime declaration');
-  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime world ownership requires a native runtime declaration');
+  if (bindings.nativeRuntime === true && source.runtime === null) throw new Error('Empty runtime policy requires a native runtime declaration');
+  if (bindings.audioOwner === 'runtime' && source.runtime === null) throw new Error('Runtime audio ownership requires a native runtime declaration');
+  if (bindings.worldOwner === 'runtime' && source.runtime === null) throw new Error('Runtime world ownership requires a native runtime declaration');
   if (!cataloguePlaced(source.identity.slug) && admitted.instance === undefined) throw new Error('Outside shardfile is missing its admitted save identity');
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);

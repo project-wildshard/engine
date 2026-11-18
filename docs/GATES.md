@@ -7,11 +7,10 @@ A gate is engine code that treats one shard differently from another by where it
 **delete** gates are not dangerous and go with the provenance option (OF10a). **dangerous** gates are renamed
 `dangerousX` (OF10b) and replaced by a budget tier (OF10c).
 
-2 gates: 0 delete (0 provenance references), 2 dangerous (3).
+1 gates: 0 delete (0 provenance references), 1 dangerous (0).
 
 | Gate | Verdict | What it does | Harm | Replaced by | Where |
 |---|---|---|---|---|---|
-| runtime-ownership (`dangerousRuntimeOwnership`) | dangerous | Only our own runtime may own the page's world, audio or stages, run an empty client-plan policy, or keep a data resident (`clientSource.ts` bindings and the client-plan page module). | An owning runtime replaces the engine's admitted world, audio or stage owners, so its frame and memory cost escape admission entirely. | OF10c: the shard's tier CPU and memory limits, with the owned stages metered as the runtime's. | 3 references in 1 files, 6 named lines |
 | graph-authority (`dangerousUnbudgetedMaterialGraph`) | dangerous | Material graphs keep their declared ceilings only for a shard with a runtime or a declared page; any other shard's graphs are clamped. | Opened, any shard could compile unbounded GPU shader graphs (nodes, samplers, passes) on every player's device. | OF10c: the shard's tier GPU limits (graph nodes, textures, passes). | 2 named lines |
 
 ## Not gates

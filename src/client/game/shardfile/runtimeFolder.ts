@@ -30,7 +30,6 @@ import { keptGraphFileTextureRefs } from './clientGraphs';
 import type { ShardContext } from '../plugin/context';
 import { readAsset } from './readAsset';
 import { legacyAsset } from './legacyAsset';
-import { dangerousTrust } from '../../../shared/game/shardfile/dangerousGates';
 
 import { folderResourceRole } from '../../../shared/game/shardfile/resourceRole';
 import { entryTransport } from './entryTransport';
@@ -117,7 +116,7 @@ export function browserShardfileOptions(base: string, granted = false): FolderOp
     }, navigator.serviceWorker?.controller === null || navigator.serviceWorker?.controller === undefined ? storage : undefined), 'file', address);
     entryTransport()?.expand(); return result;
   };
-  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...dangerousTrust(granted), ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
+  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
     // OF10a4: the build reader serves a product the host trusts or one the build's verdict table lists (its catalogue and the
     // placed uploads' cook rows); an unlisted product has no browser reader and fails closed, as before
     ...(readable ? { buildRead } : {}),

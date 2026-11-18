@@ -26,13 +26,13 @@ function fixture(slug = 'edge-fixture') {
     const bytes = wires.get(path); if (bytes === undefined) return Promise.reject(new Error(`Full admission attempted: ${path}`));
     return Promise.resolve(new Response(Uint8Array.from(bytes)));
   });
-  return { source, url, edgeUrl, sectionBytes, wires, fetch, options: { base: new URL('.', url).href, offline: false, dangerousGrant: false, fetch, hash: (bytes: Uint8Array) => Promise.resolve(hashImmutableBytes(bytes)) } };
+  return { source, url, edgeUrl, sectionBytes, wires, fetch, options: { base: new URL('.', url).href, offline: false, fetch, hash: (bytes: Uint8Array) => Promise.resolve(hashImmutableBytes(bytes)) } };
 }
 
 test('a build-owned grid index skips grammar but keeps identity and section hashes', async () => {
   const f = fixture('built-edge-fixture'), wire = f.wires.get(f.url);
   if (wire === undefined) throw new Error('Missing index fixture');
-  const stale = vi.fn(() => Promise.resolve()), options = { ...f.options, dangerousGrant: true, built: { indexes: new Set([hashImmutableBytes(wire)]), stale } };
+  const stale = vi.fn(() => Promise.resolve()), options = { ...f.options, built: { indexes: new Set([hashImmutableBytes(wire)]), stale } };
   const grammar = vi.spyOn(await import('@wildshard/format/outputIndex'), 'parseOutputIndex');
   try {
     expect(await readGridFolderEdges(f.url, f.source.identity.slug, options)).toEqual({ edge: f.source.edge, entryways: f.source.entryways });
@@ -46,7 +46,7 @@ test('a build-owned grid index skips grammar but keeps identity and section hash
 test('native first-party grid metadata reads canonical URLs with declared hashes, without rehashing',async()=>{
   const f=fixture('native-edge-fixture'),digest=vi.fn<(bytes:Uint8Array)=>Promise<string>>(()=>{throw new Error('No client digest');});
   const identities:({path:string;hash:string|undefined})[]=[],rootHash='a'.repeat(64);
-  const options={...f.options,dangerousGrant:true,descriptorHash:rootHash,hash:digest,
+  const options={...f.options,descriptorHash:rootHash,hash:digest,
     buildRead:(url:string,size:number|undefined,_read?:((bytes:number)=>void),hash?:string)=>{
       const address=new URL(url);identities.push({path:address.pathname,hash});address.search='';
       const bytes=f.wires.get(address.href);if(bytes===undefined||(size!==undefined&&size!==bytes.length))throw new Error('Missing emitted file');
@@ -64,7 +64,7 @@ test.each(['unlisted', 'unbundled'] as const)('%s grid metadata still loads chec
   const options = mode === 'unlisted'
     // OF10a3: an index the build's verdict table does not list (any maker's) takes the checked grammar
     ? { ...f.options, built: { indexes: new Set(['0'.repeat(64)]), stale: () => Promise.resolve() } }
-    : { ...f.options, dangerousGrant: true };
+    : { ...f.options };
   const grammar = vi.spyOn(await import('@wildshard/format/outputIndex'), 'parseOutputIndex');
   try {
     expect(await readGridFolderEdges(f.url, f.source.identity.slug, options)).toEqual({ edge: f.source.edge, entryways: f.source.entryways });
@@ -125,7 +125,7 @@ test.each(['pending', 'rejected', 'throws'] as const)('verified grid render byte
     putAssetBackground: () => { writing(); if (kind === 'throws') throw new Error('Disk unavailable'); return kind === 'pending' ? stored : Promise.reject(new Error('Disk unavailable')); } };
   const wire = f.wires.get(f.url); if (wire === undefined) throw new Error('Missing index');
   let complete = false;
-  const reading = readGridFolderEdges(f.url, f.source.identity.slug, { ...f.options, cache, dangerousGrant: true,
+  const reading = readGridFolderEdges(f.url, f.source.identity.slug, { ...f.options, cache,
     built: { indexes: new Set([hashImmutableBytes(wire)]), stale: () => Promise.resolve() } }).then(value => { complete = true; return value; });
   try {
     await started;
@@ -223,7 +223,7 @@ test('G608: a near view reads its index, tiles and look sections and only its de
     const bytes = wires.get(path); if (bytes === undefined) return Promise.reject(new Error(`Unexpected read: ${path}`));
     return Promise.resolve(new Response(Uint8Array.from(bytes)));
   });
-  const near = await readGridFolderNear(url, 'near-fixture', { base: new URL('.', url).href, offline: false, dangerousGrant: false, fetch, hash: (bytes: Uint8Array) => Promise.resolve(hashImmutableBytes(bytes)) });
+  const near = await readGridFolderNear(url, 'near-fixture', { base: new URL('.', url).href, offline: false, fetch, hash: (bytes: Uint8Array) => Promise.resolve(hashImmutableBytes(bytes)) });
   if (near === null) throw new Error('Missing near view');
   expect(near.rows.near.content).toEqual([hash]); expect(near.rows.inventory.files.map(row => row.kind)).toEqual(['glb']);
   expect(await near.read(hash)).toEqual(glb);
@@ -303,7 +303,7 @@ test('OF8: a first-party section URL carries ?v= from the hash its index declare
   let open = (): void => { throw new Error('Missing gate'); };
   const gate = new Promise<void>(resolve => { open = resolve; });
   const reads: string[] = [];
-  const options = { ...f.options, dangerousGrant: true, descriptorHash: 'a'.repeat(64), buildRead: async (url: string, size: number | undefined, _read?: (bytes: number) => void, hash?: string) => {
+  const options = { ...f.options, descriptorHash: 'a'.repeat(64), buildRead: async (url: string, size: number | undefined, _read?: (bytes: number) => void, hash?: string) => {
     reads.push(url);
     const address = new URL(url); address.search = '';
     if (address.href === f.edgeUrl) { expect(hash).toBe(edgeHash); await gate; }

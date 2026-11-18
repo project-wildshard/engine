@@ -1,4 +1,7 @@
 import * as v from 'valibot';
+import { budgetTierLimits } from '@wildshard/format/budget-tiers';
+import { jsonDataNodes } from '@wildshard/format/json';
+import { runtimeTierLimits } from '../../../shared/game/shardfile/runtimeTier';
 import { QuestRuntimeFileSchema } from '@wildshard/format/questRuntime';
 import { checkClientPlanModules } from './clientModules';
 import { entryOwner as declaredOwner } from '../../../shared/game/shardfile/entryOwners';
@@ -369,10 +372,20 @@ export const CLIENT_FEATURES: Readonly<Record<ClientFeatureKind, ClientFeature>>
   } },
 };
 export interface AdmittedClientPlan { readonly features: readonly ClientFeatureRow[] }
+function stageCpuMicros(product: ShardFolder): number {
+  const source = product.shardfile;
+  return (source.runtime === null ? budgetTierLimits(source.budgets) : runtimeTierLimits(source)).cpuMicrosPerFrame;
+}
 /** Validate the whole plan and all required sections before the first feature can mutate the page. */
 export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedClientPlan {
   try {
     const plan = parseClientPlan(input);
+    const limit = stageCpuMicros(product);
+    // A row is the smallest host installer we can pace between drawn frames.
+    for (const row of plan.features) {
+      const nodes = jsonDataNodes(row);
+      if (nodes === undefined || nodes > limit) throw new Error(`Owned stage ${row.kind} exceeds its tier limit of ${limit} operations`);
+    }
     if(plan.features.some(row=>row.kind==='held.claims.install')&&plan.features.some(row=>row.kind==='held.melee'||row.kind==='held.ranged-page'))throw new Error('Held claims require their sole native equipment builder');
     for (const row of plan.features) if (row.kind === 'world.assembly') preflightIslandBook(product, row);
     for (const row of plan.features) {
@@ -517,12 +530,14 @@ export async function installClientPhase(ctx: ShardContext, plan: AdmittedClient
       lendLooks(ctx.scope, await runtimeLookMaterials(ctx, ctx.product.shardfile, true, missing));
     });
   }
+  if (rows.length === 0) return;
+  const stageBudgetMs = stageCpuMicros(ctx.product) / 1_000;
   for (const { row, install } of rows) {
     live();
     await timeClientPreparation(ctx.product.slug, `${phase}.${row.kind}`, () => install(ctx, row, resident));
     // A completed install may already have yielded through reads/decodes.
-    // Keep the shared frame budget, not a mandatory turn per tiny feature.
-    const pause = constructionCheckpoint(ctx.scope);
+    // Pause at the owner’s tier within the shared frame budget.
+    const pause = constructionCheckpoint(ctx.scope, stageBudgetMs);
     if (pause !== undefined) await pause;
     live();
   }

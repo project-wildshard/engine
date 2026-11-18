@@ -26,7 +26,7 @@ function fixture(limit = 10000, transform = new Matrix4(), part = 'draw', readCo
   source.files.push({ hash, kind: 'glb', compressed: bytes.length, decoded: bytes.length, gpu: 72, triangles: 1, draws: 1, dependencies: [], critical: false });
   source.library.push(hash);
   provideRuntimeFolder({ source, assets: readCold === undefined ? new Map([[hash, bytes]]) : new Map(), cached: false }, owner, {
-    base: 'https://test.example/shardfiles/whole-cache/', offline: false, dangerousGrant: true,
+    base: 'https://test.example/shardfiles/whole-cache/', offline: false,
     fetch: () => Promise.reject(new Error('Use admitted bytes')), hash: wire => Promise.resolve(hashImmutableBytes(wire)),
     ...(readCold === undefined ? {} : { cache: { product: () => Promise.resolve(null), asset: () => Promise.reject(new Error('Use verified cold source')),
       putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true), verifiedAsset: readCold } }),
@@ -142,7 +142,7 @@ test('ordered content hashes identify reconstructions and partial registration u
   const source = emptyShardfile({ slug: 'whole-pair', name: 'Pair', author: 'Fixture', revision: 1, seed: 1 });
   source.files.push(...f.product.shardfile.files, ...other.product.shardfile.files); source.library.push(f.hash, other.hash);
   provideRuntimeFolder({ source, assets: new Map([[f.hash, f.bytes], [other.hash, other.bytes]]), cached: false }, f.owner, {
-    base: 'https://test.example/shardfiles/whole-pair/', offline: false, dangerousGrant: true,
+    base: 'https://test.example/shardfiles/whole-pair/', offline: false,
     fetch: () => Promise.reject(new Error('Use admitted bytes')), hash: wire => Promise.resolve(hashImmutableBytes(wire)),
   });
   const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('Use runtime reader')) });
@@ -219,7 +219,7 @@ test('cold whole transport refills six shared slots before the first ordered dec
   for (const piece of pieces) { source.files.push(...piece.product.shardfile.files); source.library.push(piece.hash); }
   const started: string[] = [], deliver = new Map<string, () => void>();
   provideRuntimeFolder({ source, assets: new Map(), cached: false }, owner, {
-    base: 'https://test.example/shardfiles/whole-phase/', offline: false, dangerousGrant: true,
+    base: 'https://test.example/shardfiles/whole-phase/', offline: false,
     fetch: () => Promise.reject(new Error('Use verified source')), hash: wire => Promise.resolve(hashImmutableBytes(wire)),
     cache: { product: () => Promise.resolve(null), asset: () => Promise.reject(new Error('Use verified source')),
       putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true), verifiedAsset: hash => {

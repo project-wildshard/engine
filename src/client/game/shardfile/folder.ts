@@ -1,4 +1,3 @@
-import type { DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
 import { reportPageFeatures } from '../../../shared/game/shardfile/pageFeatureTier';
 import { reportRuntimeTier } from '../../../shared/game/shardfile/runtimeTier';
 
@@ -60,9 +59,8 @@ export interface FolderProgress {
   /** Canonical descriptor/member URI, separate from the player-facing role. */
   resource?: string;
 }
-/** Loading is explicit about connectivity, never inferred from an author field; the dangerous gates' grant is the host's
- * (`DangerousProvenance`, OF10a7) until OF10c budgets them. */
-export interface FolderOptions extends DangerousProvenance {
+/** Connectivity and capabilities are supplied by the host. */
+export interface FolderOptions {
   /** Native built-in build capability. Publication validates the content;
    * this reader fetches its canonical URL and compares the declared length.
    * Node author and external readers omit it and retain checked admission. */

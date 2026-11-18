@@ -24,7 +24,7 @@ function fixture(mode: 'entered' | 'neighbour', pending = false) {
   const reads: string[] = [], pinned = new Map<string, number>(), installed: string[] = [];
   let started: () => void = () => undefined, finish: () => void = () => undefined;
   const waiting = new Promise<void>(resolve => { started = resolve; });
-  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/', dangerousGrant: true, offline: true,
+  const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/', offline: true,
     fetch: () => Promise.reject(new Error('Unexpected network')), hash: value => Promise.resolve(hashImmutableBytes(value)), cache: {
       product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
       pin: refs => {
