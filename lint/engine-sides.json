@@ -1079,6 +1079,7 @@
     "src/client/game/shardfile/wholeLibrary.ts": "client",
     "src/client/game/shardfile/wholeRefinementCover.ts": "client",
     "src/client/game/shardfile/wirePage.ts": "client",
+    "src/client/game/shardfile/ownedLines.ts": "client",
     "src/client/game/shardfile/worldAssembly.ts": "client",
     "src/client/game/shardfile/worldBuildYield.ts": "client",
     "src/client/game/shardfile/worldEntry.ts": "client",

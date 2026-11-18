@@ -1117,10 +1117,11 @@ export class LiveGridSession {
   /** The active frame's identity (the home instance, a region, or null for the highway). */
   frame(): string | null { return this.live.current(); }
 
-  /** What a cell's panels read: its solids here, and a field's row while the wire stands in it. */
+  /** What a cell's panels read: its solids here, and a field's row (a player field's owned line) while the wire stands in it. */
   panelRegion(instance: string): PanelRegion | undefined {
     const region = this.regions.get(instance);
-    return region === undefined ? undefined : { colliders: region.colliders, field: name => this.wire?.site() === instance ? wirePage.row(name) : undefined };
+    return region === undefined ? undefined : { colliders: region.colliders, field: name => this.wire?.site() === instance ? wirePage.row(name) : undefined,
+      line: name => this.wire?.site() === instance ? wirePage.line(name) : undefined };
   }
   /** A cell's quest flags, as the server holds them: only where the wire stands. */
   areaFlags(instance: string): readonly string[] { return this.wire?.site() === instance ? this.wire.flags?.() ?? [] : []; }

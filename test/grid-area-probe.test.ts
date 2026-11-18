@@ -14,7 +14,7 @@ const SOURCE = {
   props: { panels: [{ id: 'blender.door', visible: true }] },
   targets: { panels: [{ panel: 'blender.door', scope: 'shared', fieldId: 101, equals: 1, visibleWhenMatched: false, colliders: ['blender.door.collider'], activeWhenMatched: false }] },
   state: { shared: [{ id: 101, name: 'blender.door.open', default: false }], player: [] },
-  movers: [],
+  sim: { scripts: [] }, movers: [],
 } as unknown as Shardfile;
 
 function doorCell(): { panels: NeighbourPanels; region: { open: number }; admit: () => Promise<void> } {
@@ -36,6 +36,27 @@ test('a grid cell reports its door panel standing until its row opens it', async
   panels.late();
   expect(panels.targets('pine-hollow')).toEqual([{ panel: 'blender.door', visible: false, solid: false }]);
   expect(panels.targets('ink-cel-valley')).toEqual([]);
+});
+
+// SHARD-SOURCE SS-GF1a2 (staging, opus-ss10l): Glowfen's socket glow is a panel shown by a player field a script writes. On a
+// grid page that field is this player's owned line, not a shared row, so the cell reads the line: the socket lights for its
+// owner. Before, a grid cell read only rows, and the glow stayed at its default on staging.
+test("a grid cell's player-field panel follows this player's owned line", async () => {
+  const source = {
+    props: { panels: [{ id: 'glowfen.socket.1.glow', visible: false }] },
+    targets: { panels: [{ panel: 'glowfen.socket.1.glow', scope: 'player', fieldId: 6001, equals: 1, visibleWhenMatched: true, colliders: [], activeWhenMatched: true }] },
+    state: { shared: [], player: [{ id: 6001, name: 'glowfen.socket.1', default: false, type: 'bool', privacy: 'owner' }] },
+    sim: { scripts: [{ id: 'scene' }] }, movers: [],
+  } as unknown as Shardfile;
+  const scope = new Scope('grid-socket'), lines = new Map<string, number>();
+  const port: PanelRegion = { colliders: new Map(), field: () => undefined, line: name => lines.get(name) ?? 0 };
+  const panels = new NeighbourPanels({ scope: scope as Parameters<ClientTileViews['panels']>[3], region: id => id === 'glowfen' ? port : undefined });
+  const views = { panels: () => Promise.resolve(new Map([['glowfen.socket.1.glow', new Group()]])) } as unknown as ClientTileViews;
+  await panels.admit({ instance: 'glowfen', slug: 'glowfen' } as unknown as GridCell, new Group(), source, new Map(), views);
+  expect(panels.targets('glowfen')).toEqual([{ panel: 'glowfen.socket.1.glow', visible: false, solid: true }]);
+  lines.set('glowfen.socket.1', 1);
+  panels.late();
+  expect(panels.targets('glowfen')).toEqual([{ panel: 'glowfen.socket.1.glow', visible: true, solid: true }]);
 });
 
 test("the grid area is the current cell's shard, panels and flags, not the page shell", async () => {

@@ -15,9 +15,15 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { ProbeAreaTarget } from '@wildshard/engine/debug/probe';
 import { moverLookKey, wirePage } from '../shardfile/wirePage';
+import { ownedLineFields } from '../shardfile/ownedLines';
 
 /** What the panels read of a cell the live host has admitted: the solids of its world, and a field's row where this page has one. */
-export interface PanelRegion { readonly colliders: ReadonlyMap<string, { readonly active: () => boolean; readonly setActive: (active: boolean) => void }>; readonly field: (name: string) => number | undefined }
+export interface PanelRegion {
+  readonly colliders: ReadonlyMap<string, { readonly active: () => boolean; readonly setActive: (active: boolean) => void }>;
+  readonly field: (name: string) => number | undefined;
+  /** this player's owned line where the wire stands in the cell (SS-GF1a2: a socket this player lit), else undefined */
+  readonly line?: (name: string) => number | undefined;
+}
 /** The page scope the panels live and die with (the views' own scope type). */
 type PageScope = Parameters<ClientTileViews['panels']>[3];
 export interface NeighbourPanelPorts {
@@ -27,7 +33,7 @@ export interface NeighbourPanelPorts {
 }
 type TargetRow = Shardfile['targets']['panels'][number];
 interface Binding { readonly row: TargetRow; readonly panel: Object3D; readonly fallback: number }
-interface CellPanels { readonly instance: string; readonly source: Shardfile; readonly bindings: readonly Binding[] }
+interface CellPanels { readonly instance: string; readonly source: Shardfile; readonly bindings: readonly Binding[]; readonly lines: ReadonlySet<string> }
 
 /** A declared field default as the script world holds it (a bool is 0 / 1; text never matches a number). */
 function numeric(value: boolean | number | string | undefined): number {
@@ -35,9 +41,10 @@ function numeric(value: boolean | number | string | undefined): number {
 }
 
 /** Whether a target row's condition holds now: through the field's row where the page has one, else its default. */
-export function targetMatched(row: TargetRow, fallback: number, region: PanelRegion | undefined, source: Shardfile): boolean {
+export function targetMatched(row: TargetRow, fallback: number, region: PanelRegion | undefined, source: Shardfile, lines: ReadonlySet<string> = ownedLineFields(source)): boolean {
   const field = source.state[row.scope].find((f) => f.id === row.fieldId);
-  return ((field === undefined ? undefined : region?.field(field.name)) ?? fallback) === row.equals;
+  const value = field === undefined ? undefined : row.scope === 'player' && lines.has(field.name) ? region?.line?.(field.name) : region?.field(field.name);
+  return (value ?? fallback) === row.equals;
 }
 
 /** TEMPLATE-E2E TC-E5b: pose a mover's panel. The panel was baked where the mover rests (its `at` and `euler`), so each
@@ -80,7 +87,7 @@ export class NeighbourPanels {
       const field = source.state[row.scope].find((f) => f.id === row.fieldId);
       return { row, panel, fallback: numeric(field?.default) };
     });
-    const cellPanels: CellPanels = { instance: cell.instance, source, bindings };
+    const cellPanels: CellPanels = { instance: cell.instance, source, bindings, lines: ownedLineFields(source) };
     this.cells.set(cell.instance, cellPanels);
     // TEMPLATE-E2E TC-E5b: a mover's look is the props panel with its id; the wire's pose for it moves that panel. The cell the
     // feet stand in claims the id for its collider view (`dataCellMovers.ts`), which poses this cell's look too.
@@ -128,7 +135,7 @@ export class NeighbourPanels {
   private sync(cell: CellPanels): void {
     const region = this.ports.region(cell.instance);
     for (const { row, panel, fallback } of cell.bindings) {
-      const matched = targetMatched(row, fallback, region, cell.source);
+      const matched = targetMatched(row, fallback, region, cell.source, cell.lines);
       panel.visible = matched === row.visibleWhenMatched;
       for (const id of row.colliders) region?.colliders.get(id)?.setActive(matched === row.activeWhenMatched);
     }
