@@ -9,7 +9,8 @@
 //
 // The verdict for a SHA is the newest completed main `ci` run that isn't cancelled and whose SHA is that SHA or a
 // descendant of it. A cancelled run is superseded when a later main run exists, never red; with no later run,
-// the watcher dispatches `ci` on main once. Each red run gives one `MAIN RED <range>` receipt naming the landers
+// the watcher dispatches `ci` on main once. A started run cancelled with a blocking job failed, timed out or
+// cancelled is red, not superseded: main never cancels a started run, so that cancel was a timeout (J422). Each red run gives one `MAIN RED <range>` receipt naming the landers
 // of the commits in its range (from their `landed` receipts) and a message to each lander's herdr pane. State
 // (~/.cache/wildshard/main-watch.json) keeps the judged run ids, so a run is reported once however often this runs.
 // A green run that carries AMBER files (J295: a test file over its time budget, scripts/test-amber.mjs) also gives
@@ -37,13 +38,16 @@ const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='n
 /** @param {{conclusion:string|null}} job */
 const unsuccessful=job=>['failure','timed_out','cancelled'].includes(job.conclusion??'');
 
-/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean}} Run */
+/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean}} Run */
 /** @typedef {{judged:number[],dispatched:string[]}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
 const finished=(/** @type {Run} */run)=>run.status==='completed';
-const cancelled=(/** @type {Run} */run)=>run.conclusion==='cancelled'||run.conclusion==='skipped';
+/** Superseded, never red: a cancel that hid no blocking failure. Main pushes never cancel a started run (ci.yml's
+ * cancel-in-progress is false for main), so a started run whose blocking job failed, timed out or was cancelled
+ * (a job over its timeout-minutes concludes `cancelled`: nine-ring1-build in run 44361972035) is red (J422). */
+const cancelled=(/** @type {Run} */run)=>(run.conclusion==='cancelled'||run.conclusion==='skipped')&&run.blockingFailed!==true;
 const byCreated=(/** @type {Run} */a,/** @type {Run} */b)=>Date.parse(a.created_at)-Date.parse(b.created_at)||a.id-b.id;
 
 /** Completed advisory failures cannot turn green blocking jobs red. Unknown,
@@ -181,12 +185,13 @@ export function liveIo(env=process.env){
           if(!finished(row)||row.conclusion==='success')return row;
           if(cancelled(row)){
             if(judged.has(row.id))return row;
-            const kept=prior.find(old=>old.id===row.id&&typeof old.started==='boolean'&&(old.run_attempt??1)===(row.run_attempt??1));
+            const kept=prior.find(old=>old.id===row.id&&typeof old.started==='boolean'&&typeof old.blockingFailed==='boolean'&&(old.run_attempt??1)===(row.run_attempt??1));
             if(kept!==undefined)return kept;
             // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
             // the jobs, rather than that workflow timestamp, say whether any work actually started.
-            const jobs=/** @type {{started_at:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
+            const jobs=/** @type {{name:string,conclusion:string|null,started_at:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
             row.started=jobs.some(job=>job.started_at!==null);
+            row.blockingFailed=row.started&&jobs.some(job=>!advisory(job)&&unsuccessful(job));
             return row;
           }
           const kept=prior.find(old=>old.id===row.id&&old.blockingChecked===true&&old.advisoryVersion===ADVISORY_VERSION&&(old.run_attempt??1)===(row.run_attempt??1));

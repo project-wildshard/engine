@@ -177,6 +177,18 @@ test('a cancelled run with nothing newer dispatches ci on main once', () => {
   expect(w.receipts.some(line => line.includes('MAIN RED'))).toBe(false);
 });
 
+test('J422: a started run cancelled with a blocking job red (a timeout) is MAIN RED, never superseded', () => {
+  // Run 44361972035: tests (2) failed and nine-ring1-build hit its 5 min timeout, so GitHub called the run cancelled.
+  const hidden = { ...run(42970000006, 'aaaa1111', 'cancelled', 50), started: true, blockingFailed: true };
+  const newer = run(42970000007, 'bbbb2222', 'success', 70);
+  const verdicts = judge([...replay, hidden, newer], { judged: replay.map(row => row.id), dispatched: [] }, sha('bbbb2222'));
+  expect(verdicts.map(row => [row.kind, row.run.id])).toEqual([['red', 42970000006], ['green', 42970000007]]);
+  expect(verdictFor([...replay, hidden], sha('aaaa1111'), contains)?.state).toBe('red');
+  // A started cancel with every blocking job green stays superseded.
+  const clean = { ...hidden, blockingFailed: false };
+  expect(judge([...replay, clean, newer], { judged: replay.map(row => row.id), dispatched: [] }, sha('bbbb2222')).map(row => row.kind)).toEqual(['superseded', 'green']);
+});
+
 test('landers come from landed receipts; a pane is found by its worktree label or directory', () => {
   const map = landers('06:08 UTC opus-rescue land plan/rescue landed c51572839e on main (ad016fbd17..c51572839e); carried\n'
     + '05:00 UTC x land plan/y STOP plan push 1234567890 refused\n06:09 UTC opus-z land plan/z landed, MAIN RED 1234567890 on main (a..b)');
