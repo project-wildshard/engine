@@ -516,6 +516,26 @@ test('a fence that makes no progress rejects after its bound instead of passing 
   } finally { scope.dispose(); }
 });
 
+// Hosted Nine (run 44272554796): a ~23 s main-thread block under SwiftShader left the page with no timeline rows at all, then the
+// fence's first look afterwards counted the whole block as "no progress" and refused entry. Only time the fence could watch counts.
+test('a page freeze longer than the stall bound is not a stall when tiles progress once the page runs again', async () => {
+  const scope = new Scope('tiles'), made = content();
+  const frozen: TileContent = { ...made, attach: async (tile, owner) => {
+    if (tile === 28) {
+      // after the fence has looked and seen the other tiles land, the page blocks: no timer, no message, no fence look
+      await new Promise<void>(resolve => { setTimeout(() => { const until = Date.now() + 1500; while (Date.now() < until) { /* blocked */ } resolve(); }, 100); });
+      await new Promise<void>(resolve => { setTimeout(resolve, 50); });
+    }
+    await made.attach(tile, owner);
+  } };
+  const driver = new TileDriver(scope, [frozen], () => 1, () => Promise.resolve());
+  try {
+    driver.step(-40, -40);
+    await settleTileDrivers(undefined, 600);
+    expect(driver.resident('render').size).toBeGreaterThan(0);
+  } finally { scope.dispose(); }
+});
+
 // DL21: the spawn view's card counts the settle's tiles ('tiles n of m'); outside the settle there is nothing to count
 test('settlingTiles counts the fence tiles while the loader settles, and nothing outside it', async () => {
   const scope = new Scope('tiles'), made = content(), seen: { done: number; total: number }[] = [];

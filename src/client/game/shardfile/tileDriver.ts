@@ -113,7 +113,9 @@ export class TileDriver {
    *  once more, then its error rejects the fence; a fence that makes no progress (no tile or content stage finished) for
    *  `stallMs` rejects, naming the tiles it waits on (the loading card's fatal modal shows either). */
   async settle(stallMs: number): Promise<void> {
-    let progress = -1, since = diagnosticNow();
+    // Only time the fence could watch counts toward a stall: a gap between looks past two polls is the page itself blocked
+    // (hosted Nine under SwiftShader, run 44272554796: no timeline row for ~23 s), not tiles that stopped moving.
+    let progress = -1, stalled = 0, looked = diagnosticNow();
     while (this.last !== null && !this.scope.disposed && !this.scope.disposing) {
       const view = spawnViewUsesCamera() ? this.streamingView?.() ?? null : null;
       for (const key of this.plan?.nearest.render ?? []) {
@@ -127,9 +129,10 @@ export class TileDriver {
       if (this.inflight.size === 0 && open.length === 0) return;
       let finished = 0;
       for (const tile of this.attached.render.values()) finished += tile.done.size;
-      const now = diagnosticNow();
-      if (finished !== progress) { progress = finished; since = now; }
-      else if (now - since > stallMs) throw new Error(`Tile fence stalled: ${String(open.length)} tiles inside it made no progress for ${String(Math.round(stallMs / 1000))} s (first: ${open.slice(0, 4).join(', ')})`);
+      const now = diagnosticNow(), watched = Math.min(now - looked, SETTLE_POLL_MS * 2);
+      looked = now;
+      if (finished !== progress) { progress = finished; stalled = 0; }
+      else if ((stalled += watched) > stallMs) throw new Error(`Tile fence stalled: ${String(open.length)} tiles inside it made no progress for ${String(Math.round(stallMs / 1000))} s (first: ${open.slice(0, 4).join(', ')})`);
       // DL21: wait on the attaches in flight (re-checking the stall at least every SETTLE_POLL_MS), then one fresh task, so
       // the next tile starts as one lands. Polling on timer hops spent the browser's 4 ms nested-timer clamp per turn: the
       // whole cell's 64 tiles attach here with packs on (Nine's step 27, 3.0-3.5 s on the phone link, ~17 % of it idle)
