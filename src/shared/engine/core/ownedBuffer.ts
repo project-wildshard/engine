@@ -48,3 +48,20 @@ export function adoptBuffer<T extends ArrayBufferView | ArrayBufferLike>(value: 
 export function releaseOwned(value: ArrayBufferView | ArrayBufferLike): void {
   memoryAttribution.release(ArrayBuffer.isView(value) ? value.buffer : value, 'ram');
 }
+
+/**
+ * MEMORY-GATES MG10 (J410, mini-ninemem10): a hint that makes JavaScriptCore start a full collection now. JSC counts an
+ * ArrayBuffer's length toward its next collection when the buffer is made, while the kernel charges a page only once it
+ * is written; this buffer is never written, never counted in the ledger and dropped at once. Nine's WebKit loading peak
+ * is the heap's high-water when its first full collection after the `props` step runs: left alone that waits for the
+ * `readyFrame` burst or control, when hundreds of MB of boot garbage sit beside a grown world (mini-ninemem9). Hinted as
+ * the shaders step starts, the collection lands earlier: Nine, 10 alternating cold WebKit pairs, peak 1,192 -> 1,119 MB [K],
+ * settled 752 -> 741; Simulator loading 0.85 -> 0.77 GB native. 96 MB triggers nothing: the length is the trigger. A host
+ * that refuses the reservation gets no hint. Returns the bytes asked.
+ */
+export const COLLECTION_HINT_BYTES: number = 256 * 1024 * 1024;
+let hinted = 0;
+export function hintCollection(bytes: number = COLLECTION_HINT_BYTES): number {
+  try { hinted = new ArrayBuffer(bytes).byteLength; } catch { hinted = 0; }
+  return hinted;
+}

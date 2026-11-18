@@ -192,3 +192,39 @@ zone select and times out).
   (`releaseAll`). Dropping it after `worldFrame` caused no reread through control + 15 s. Peak 1,198 -> 1,134, then
   1,083 -> 1,211 with the order flipped (combined medians 1,118 -> 1,160), settled 750 -> 758: noise, not shipped. As
   above, freeing live bytes early only helps if a GC runs before the peak.
+
+## mini-ninemem10, 2026-11-18: the readyFrame burst is not the lever; a collection hint is
+
+All on engine `151dd605`, cold WebKit [K], instrument minimal, `nine-dragon-stack`, phone Low; pairs alternate builds and
+flip order. Buffer census (`tmp/` tool, not kept: typed-array and ArrayBuffer constructors, `slice` and
+`Response.arrayBuffer` of 64 KB+, by card step): `readyFrame` 184 MB, `props` 260 MB.
+
+- **Held: the store-hit double read.** A fetch layer answering from bytes it holds (`exactCopy`'s verified store copy,
+  part members) made a `Response` that `readContent` streamed into a second buffer. A held-bytes response (a lazy
+  stream; `readContent` and `readContentResponse` take the bytes as they are) removed it: census `readyFrame` Uint8Array
+  106.6 -> 80.8 MB, `props` 101 -> 66. But the peak rose: 20 pairs, 1,133 -> 1,193 and 1,165 -> 1,257 MB (base lower in
+  15 of 20), settled -12. With less ArrayBuffer churn the first full collection after `props` waits longer, and the
+  peak moves to control (1,250-1,280). Patch kept in the lane notes only.
+- **Not tried on the peak: packed 16-bit tree positions** (`slabXyz` Int16 xyz, worker and far levels read them as they
+  are; same tree, order and far levels in a unit test): ~7 MB less at `readyFrame` and held to the far pass. Same
+  mechanism as the double read, so not measured; patch in the lane notes.
+- **Meshopt decode outputs (77.8 MB, 8 slab files, 24 chunks)** are the chunk channels themselves: at
+  `slabMergeVertices` 65,535 none of Nine's chunks merge (each is 17-80 k vertices), so there is no merge copy to decode
+  into. Only the Float32 positions (26 MB) are garbage (`gridSlabPositions` makes Int16x4); avoiding them needs a slab
+  reader that decodes past three's GLTFLoader, or the bake writing Int16 grid positions (OF-EM28b4 reads them already).
+- **The lever is when JavaScriptCore collects.** JSC counts an ArrayBuffer's length toward its next full collection when
+  the buffer is made; the kernel charges only written pages. A 256 MB buffer, never written, dropped at once, made as the
+  shaders step starts: the full collection lands before the first frames and `readyFrame` add to the heap. 96 MB does
+  nothing (6 pairs, 1,154 -> 1,201): the effect is dose-bound, a trigger, not noise. Harness-injected 256 MB: 16 pairs,
+  1,200 -> 1,109 and 1,176 -> 1,113 (lower in 14). Shipped code (`hintCollection`, `collectBeforeShaders`, WebKit
+  only): 10 pairs 1,171 -> 1,120 (8 of 10); 10 pairs under the shared measure lock 1,192 -> 1,119 MB (7 of 10), EM11
+  loading 1.48 -> 1.43 GB (upper 1.66 -> 1.59), settled 752 -> 741, playing 1.00 -> 0.99 (upper 1.13 -> 1.11). Boot
+  time unchanged (ready 6.6-6.9 s both).
+- **Simulator (iOS JSC, `nine-sim-memory.mjs`, play/fly 10 s, 2 rounds each order, the second under the measure lock):**
+  loading native 0.833 / 0.886 / 0.851 / 0.846 -> 0.785 / 0.769 / 0.774 / 0.775 GB (no spike from the hint: the
+  untouched buffer is not charged); play 0.773 / 0.888 / 1.086 / 0.848 -> 0.776 / 0.795 / 0.763 / 0.804. Explorer
+  follows run order (hint second: 0.60 -> 0.77; hint first: 0.65 -> 0.56), as mini-ninemem6/7 found. Inspector's
+  `javascript` category reads higher in play after the hint (~800 vs ~580 MB) with `page` lower; its total is unchanged.
+- Next, largest first: the other side of the same lever (a second hint after `readyFrame` for the control-step peak);
+  the bake writing Int16 grid positions (26 MB of decode garbage); reducing JS-heap garbage before `shaders`, which sets
+  the heap the hinted collection starts from. Any cut that removes ArrayBuffer churn should be judged with the hint in.

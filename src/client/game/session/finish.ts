@@ -28,7 +28,7 @@ import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
 import { textureBytes } from '@wildshard/engine/render/textureBytes';
-import { releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
+import { collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { gridPrefetchOrder, startGridPrefetch } from '../grid/prefetch';
@@ -166,6 +166,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     const shadersAt = diagnosticNow(), programsBefore = game.renderer.info.programs?.length ?? 0;
     // SB32b: the step's texture uploads, which say nothing of how the GPU builds programs (slowGpu.ts)
     let uploadMs = 0;
+    // MG10 (mini-ninemem10): WebKit's full collection now, before the shaders, first frames and readyFrame pile onto the
+    // boot's garbage (the loading peak is the heap's high-water at that collection)
+    bootMark('memory:collection-hint', { bytes: collectBeforeShaders() });
     await step('shaders', async (p) => {
       // Until the first systems step the camera stands at the origin (Nine: 127 m below the spawn's eye, at 72° not the
       // held 93°) and placed copies hold none until their first cull: one step without its draw poses the spawn view,

@@ -22,10 +22,11 @@ import { RenderPass, type EffectComposer, type Pass } from 'postprocessing';
 import { markGpuOnly } from '../core/gpuOnly';
 import { arrayReleased, fixedBatchGeometry, geometryHasCpuReader, markArrayReleased, markArrayRestored, releasedArrayType } from './releasedArrays';
 import type { Renderer } from './renderer';
-import { drawHooks, indexRotated, keepRotated, propertyHooks, turnTriangles } from './drawHooks';
+import { drawHooks, indexRotated, keepRotated, propertyHooks, turnTriangles, webKitEngine } from './drawHooks';
 import { onceTextureUploaded } from './textureUploadEvents';
 import { renderCount } from './frameCounter';
 import { presenting } from '../../../shared/engine/core/framePacing';
+import { hintCollection } from '../../../shared/engine/core/ownedBuffer';
 
 const LABEL = 'engine/memorySaver';
 const isTarget = (value: unknown): value is THREE.WebGLRenderTarget => value instanceof THREE.WebGLRenderTarget;
@@ -231,6 +232,13 @@ const releasesNow = new WeakMap<object, () => number>();
  * that changed waits for the ordinary settle. Returns the bytes let go.
  */
 export function releaseDrawnGeometry(renderer: object): number { return releasesNow.get(renderer)?.() ?? 0; }
+
+/** MG10 (mini-ninemem10): on WebKit, a full collection as the shaders step starts (`hintCollection`): the boot's garbage
+ *  goes before the first frames and `readyFrame` add to the heap, instead of at its high-water. Returns the bytes hinted
+ *  (0 on Blink, whose collector the hint does not steer this way, and with no navigator). */
+export function collectBeforeShaders(userAgent: string = typeof navigator === 'undefined' ? '' : navigator.userAgent): number {
+  return webKitEngine(userAgent) ? hintCollection() : 0;
+}
 
 /** remember which GL buffer each attribute array went into (three's WebGLAttributes.createBuffer / a full re-upload) */
 function watchUploads(context: WebGL2RenderingContext, releaseShape: boolean): Uploads {
