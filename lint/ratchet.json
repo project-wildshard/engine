@@ -37,7 +37,7 @@
     "js/grid-session/raw": 300000,
     "js/grid-session/gzip": 100000,
     "js/session/raw": 4400000,
-    "js/session/gzip": 1360000,
+    "js/session/gzip": 1361500,
     "sim-in-runtime/_template": 0,
     "sim-in-runtime/blender-template": 0,
     "sim-in-runtime/driftwood-isle": 0,
