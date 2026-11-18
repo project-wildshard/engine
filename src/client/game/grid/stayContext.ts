@@ -5,11 +5,12 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import { createLevelInstallation } from '@wildshard/engine/level/installation';
 import { shardContext, type ShardContext } from '../plugin/context';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
-/** The page's context, bound to `stay`. */
-export function stayContext(page: ShardContext, stay: Scope, instance: string): ShardContext {
+/** The page's context, bound to `stay`. `product` is the copy's own folder where an install reads its sections (SS-GP4d, SS-GP4e). */
+export function stayContext(page: ShardContext, stay: Scope, instance: string, product: ShardFolder = page.product): ShardContext {
   const level = createLevelInstallation(page.app, stay, page.app.levelAdapters, () => page.progress).context;
   const scoped: typeof level = { ...level, get progress() { return level.progress; },
     system: (spec) => { level.system({ ...spec, id: `grid.${instance}.${spec.id}` }); } };
-  return shardContext(scoped, page.manifest, page.game, page.product);
+  return shardContext(scoped, page.manifest, page.game, product);
 }

@@ -5,3 +5,7 @@ SA17) declares a quest-triggered completion card, sword and swap cues with a for
 `new` shard placed on the grid is a data cell, so all three were missing there. Each is now one more per-stay install in
 `liveSession.enterDataPlay` (`dataCellCompletion.ts`, `dataCellAudio.ts`, `dataCellPlumbing.ts`), each with a grid test.
 Loot coins and the compendium (rows 12, 13) are the rest of SS-GP4.
+
+SS-GP4e: gear loot. A data cell whose loot row carries gear (the Template's `purse.coins`) installs its purse, coin burst,
+chip and Bag loot row per stay (`dataCellLoot.ts`); `stayContext` takes the copy's own folder so the loot presentation reads
+the copy's `economy/loot`, not the home's.
