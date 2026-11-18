@@ -81,6 +81,10 @@ export const TIER_TABLE = {
     // at most ~1.7 × this of the view. Nine's street-route walk p95 0.96 to 0.90 M, same-instant 41-388 px at the look
     // poses, all on far towers; 0.005 drew 0.88 M but moved Nine's gate at ~90 m (776 px). 0 = off
     slabFarAngle: 0.004,
+    // STAGING-BUGBASH SB47 (Jake's iPhone, Driftwood 67 s): no warm turns in the first frame. The parked draws (DL23) draw
+    // every drawable in or out of view with its shadow-depth pipelines, so the four turned world draws (E153) only
+    // re-rasterized the world and its shadow map on a GPU-bound phone: 246 of Driftwood's 954 first-frame draws
+    warmTurns: 0,
   },
   desktop: {
     maxTexture: 4096, layerSize: 1024, dpr: 1.5, ao: true,
@@ -116,6 +120,7 @@ export const TIER_TABLE = {
     cullViewPad: 7,
     slabFacing: false,
     slabFarAngle: 0,
+    warmTurns: 4,
   },
 };
 

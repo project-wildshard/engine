@@ -723,7 +723,7 @@ export class Game {
   private renderKnobs(): TierKnobs {
     const kit: TierKnobs = {};
     for (const schema of this.app.levelRegistrations.knobSchemas()) Object.assign(kit, schema.defaults);
-    return resolveTierKnobs({ ao: TIER_CONFIG.ao, slices: false, warmTurns: WARM_TURNS }, kit, this.level.tiers, TIER);
+    return resolveTierKnobs({ ao: TIER_CONFIG.ao, slices: false, warmTurns: TIER_CONFIG.warmTurns }, kit, this.level.tiers, TIER);
   }
 
   /**

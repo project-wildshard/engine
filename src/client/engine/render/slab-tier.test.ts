@@ -23,3 +23,11 @@ test('only the phone splits slab trees by facing and pads its placed copies\' vi
   expect(TIER_TABLE.desktop.cullViewPad).toBe(7);
   expect(TIER_TABLE.phone.cullViewPad).toBe(3);
 });
+
+/** STAGING-BUGBASH SB47: the phone's first frame draws no warm turns. Its parked draws (DL23) already draw every drawable,
+ *  in or out of view, with its shadow-depth pipelines; the four turned world draws only re-rasterized the world and its
+ *  shadow map four times on a GPU-bound phone (Driftwood: 246 of the step's 954 draws). A level's own row still wins. */
+test('only the desktop warms its first frame by four turns', () => {
+  expect(TIER_TABLE.desktop.warmTurns).toBe(4);
+  expect(TIER_TABLE.phone.warmTurns).toBe(0);
+});
