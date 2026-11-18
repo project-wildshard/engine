@@ -191,6 +191,7 @@
     "src/client/engine/entities/animalShadow.ts": "client",
     "src/client/engine/entities/animalShells.ts": "client",
     "src/client/engine/entities/AnimalView.ts": "client",
+    "src/client/engine/entities/channelLook.ts": "client",
     "src/client/engine/entities/bakedHerd.ts": "client",
     "src/client/engine/entities/creatureLods.ts": "client",
     "src/client/engine/entities/farHerd.ts": "client",

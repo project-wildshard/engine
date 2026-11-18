@@ -1,6 +1,7 @@
 import { SphereGeometry, Float32BufferAttribute, Uint16BufferAttribute, MeshStandardMaterial, MeshLambertMaterial, type Material } from 'three';
 import { NO_FUR } from '@wildshard/engine/entities/species/rigs';
 import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
+import { channelLookOf } from '@wildshard/engine/entities/channelLook';
 import type { ShardRows } from '@wildshard/format/rows';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import { skinSpeciesLook, type ClientSkin } from './clientSkins';
@@ -43,12 +44,14 @@ function sphere(row: ShardRows['looks'][number], species: ShardRows['species'][n
 export function clientSpeciesLooks(rows: ShardRows, recipes: ReadonlyMap<string, ShardViewRecipe>, materials: ReadonlyMap<string, Material>, skins: ReadonlyMap<string, ClientSkin> = new Map()): readonly SpeciesLook[] {
   return rows.looks.map((row) => {
     const species = rows.species.find((entry) => entry.id === row.species); if (species === undefined) throw new Error('Missing view species');
-    if (row.recipe === SKIN_LOOK_RECIPE) { const skin = skins.get(row.id); if (skin === undefined) throw new Error(`Unloaded skin look ${row.id}`); if (row.material !== null) throw new Error('A skin look draws with its binding material'); return skinSpeciesLook(row, species, skin); }
+    // CC28b: the body's channel-bound material terms ride the look
+    const channelLook = channelLookOf(species.body), bound = channelLook === undefined ? {} : { channelLook };
+    if (row.recipe === SKIN_LOOK_RECIPE) { const skin = skins.get(row.id); if (skin === undefined) throw new Error(`Unloaded skin look ${row.id}`); if (row.material !== null) throw new Error('A skin look draws with its binding material'); return { ...skinSpeciesLook(row, species, skin), ...bound }; }
     const recipe = row.recipe === 'engine.sphere' ? sphere : recipes.get(row.recipe); if (recipe === undefined) throw new Error(`Unknown creature view recipe ${row.recipe}`);
     const look = recipe(row, species);
-    if (row.material === null) return { ...look, id: row.id, species: species.id, kind: species.kind };
+    if (row.material === null) return { ...look, ...bound, id: row.id, species: species.id, kind: species.kind };
     const material = materials.get(row.material); if (!(material instanceof MeshStandardMaterial) && !(material instanceof MeshLambertMaterial)) throw new Error('Creature surface requires a lit platform material');
-    return { ...look, id: row.id, species: species.id, kind: species.kind, material: () => material };
+    return { ...look, ...bound, id: row.id, species: species.id, kind: species.kind, material: () => material };
   });
 }
 

@@ -239,8 +239,17 @@ export interface FurStyle {
   emissiveIntensity?: number;
 }
 
+/** ONE-FORMAT CC28b: a body's material terms bound to its actor channels, each by its index in the wire's order
+ *  (client `channelLook.ts` writes them). */
+export interface ChannelLook {
+  readonly tint?: { readonly index: number; readonly colour: readonly [number, number, number] };
+  readonly emissive?: { readonly index: number; readonly colour: readonly [number, number, number] };
+  readonly opacity?: number;
+}
 export interface SpeciesDef {
   harvest?: readonly HarvestDrop[];
+  /** ONE-FORMAT CC28b: the look's tint, glow and opacity follow these channels on every page. */
+  channelLook?: ChannelLook;
   capExempt?: boolean;
   flight?: SpeciesFlight;
   /** LOCK / target taps; defaults to false on ground species and true on flight species. */
