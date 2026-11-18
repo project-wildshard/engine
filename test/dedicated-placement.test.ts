@@ -17,6 +17,9 @@ import { cookIndexPath, serverPackBookPath, type ServerPack } from '../src/share
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { GridAssembly } from '../src/shared/game/grid/assembly';
+import { catalogueDocument } from '../src/shared/game/grid/catalogueDocument';
+import { addPlacedCells } from '../src/client/game/grid/placedCells';
 import { roomBench, serverInput, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 
@@ -61,6 +64,32 @@ test('a placed cell takes an empty spot of the 7 × 7 and the next frame number;
   expect(placeCell({ instance: 'sa33-next', slug: 'sa33-next', cell: [1, 3] })).toBe(true);
   expect(cellFrame('sa33-next')).toBe(27);
   expect(cellFrame('driftwood-isle'), 'the catalogue\'s frames do not move').toBe(cellFrame(cellName('driftwood-isle')));
+});
+
+// MA10k (meta MINI-AUTONOMY-MACBOOK): a placed pack that is late on the box opened its cell after the ones the file lists after it, so
+// the door numbered it last while the page, which reads the file in order, numbered it in its place: both clients read wrong neighbours
+// until a restart. A row's frame is its place in the signed file now, whatever order the packs arrive in.
+test('MA10k: a late middle placement keeps the frame a page gives it; the door, a worker and the page agree on every frame', () => {
+  const rows: readonly PlacedCell[] = [
+    { instance: 'ma10k-west', slug: 'ma10k-west', cell: [-1, 3] },
+    { instance: 'ma10k-late', slug: 'ma10k-late', cell: [0, 3] },
+    { instance: 'ma10k-east', slug: 'ma10k-east', cell: [1, 3] },
+  ];
+  const frames = (): Record<string, number> => Object.fromEntries(rows.map(row => [row.instance, cellFrame(row.instance)]));
+  // The page: the build's catalogue and then the file's cells, in the file's order, numbered as a grid page numbers them.
+  const { document } = addPlacedCells(catalogueDocument(), file(1, rows));
+  const page = Object.fromEntries(new GridAssembly({ developer: false, devserver: false }, document.grid).cells.map((cell, index) => [cell.instance, index + 1]));
+  // The door: the middle row's pack is late, so its cell opens a look after the one listed after it, with no restart.
+  const [west, late, east] = rows as [PlacedCell, PlacedCell, PlacedCell];
+  placeCell(west, rows); placeCell(east, rows);
+  placeCell(late, rows);
+  const door = frames();
+  // A worker: booted from what the door hands it, in the door's order.
+  const handed = placedCells();
+  forgetPlacedCells();
+  for (const row of handed) placeCell(row);
+  expect(door, 'the door').toEqual(Object.fromEntries(rows.map(row => [row.instance, page[row.instance]])));
+  expect(frames(), 'a worker').toEqual(door);
 });
 
 test('a watch opens only cells it has not opened, asks again for one that did not open, and never believes an older serial', async () => {

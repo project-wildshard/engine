@@ -16,7 +16,8 @@ export interface UploadActivationPorts {
   /** Must select the cook index for this exact raw hash even if the release book holds an older slug. It hands back the
    * product's `client/plan` section, if it has one, for the production debug refusal (OF18c). */
   readonly preload: (slug: string, hash: string) => Promise<{ readonly clientPlan?: unknown } | undefined>;
-  readonly place: (row: PlacedCell) => void;
+  /** `file`: every cell the signed file names, so the row keeps its place in it (MA10k). */
+  readonly place: (row: PlacedCell, file: readonly PlacedCell[]) => void;
   readonly open: (instances: readonly string[]) => Promise<readonly string[]>;
   readonly opened: (instance: string) => boolean;
 }
@@ -32,7 +33,7 @@ export function uploadActivator(ports: UploadActivationPorts): (notice: UploadAc
     if ((rows.length === 0 && notice.place !== false) || rows.some(row => row.hash !== notice.hash)) throw new Error('Placement does not publish the upload hash');
     const loaded = await ports.preload(notice.slug, notice.hash);
     if (ports.channel === 'production') refuseProductionDebug(loaded?.clientPlan);
-    for (const row of rows) ports.place(row);
+    for (const row of rows) ports.place(row, placement.cells);
     const instances = rows.map(row => row.instance);
     await ports.open(instances);
     if (instances.some(instance => !ports.opened(instance))) throw new Error('Upload placement has not opened');

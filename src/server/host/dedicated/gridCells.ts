@@ -18,30 +18,59 @@ interface GridNames { readonly instances: readonly string[]; readonly frames: Re
  *  `hash` is its shardfile, for a pack the build's book lacks. */
 export interface PlacedCell { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number]; readonly hash?: string;
   /** The grid row's speed class, so the board's cap in a placed road-class cell matches the page's (QA 11-15 row 8). */
-  readonly speedClass?: 'road' }
+  readonly speedClass?: 'road';
+  /** MA10k: the row's place among the file's cells a page adds after the catalogue (`addPlacedCells`), so its frame is the page's
+   *  whatever order the packs arrive in. A row placed without its file takes the next place after the ones already placed. */
+  readonly slot?: number }
 /** SA33: the cells placed on this running server, in the placement file's order, after the catalogue's. A restart forgets them; the
  *  placement watch's first look places them again. */
 const placed: PlacedCell[] = [];
 /** SA47: each placed slug's shardfile hash, when its placement named one. */
 const hashes = new Map<string, string>();
 let read: { readonly from: unknown; readonly placed: number; readonly names: GridNames } | null = null;
-/** Parsed once per installed catalogue, the way a grid page assembles it, then the placed cells: frame `catalogue count + n`. */
+/** The installed catalogue's cells, assembled the way a grid page assembles them. */
+function catalogueCells(): readonly PlacedCell[] {
+  const { grid } = catalogueDocument();
+  return new GridAssembly({ developer: false, devserver: false }, grid).cells.map(({ instance, slug, cell }) => ({ instance, slug, cell }));
+}
+/** Parsed once per installed catalogue, the way a grid page assembles it, then the placed cells: frame `catalogue count + 1 + slot`. */
 function gridNames(): GridNames {
   const { grid } = catalogueDocument();
   if (read?.from === grid && read.placed === placed.length) return read.names;
-  const { cells } = new GridAssembly({ developer: false, devserver: false }, grid), rows = [...cells.map(({ instance, slug, cell }) => ({ instance, slug, cell })), ...placed];
-  const names: GridNames = { instances: rows.map(cell => cell.instance), frames: new Map(rows.map((cell, index) => [cell.instance, index + 1])),
+  const cells = catalogueCells(), rows = [...cells, ...placed];
+  // MA10k: a placed cell's frame is its slot, its place in the file, never the order its pack arrived in.
+  const frame = (cell: PlacedCell, index: number): number => index < cells.length ? index + 1 : cells.length + 1 + (cell.slot ?? index - cells.length);
+  const names: GridNames = { instances: rows.map(cell => cell.instance), frames: new Map(rows.map((cell, index) => [cell.instance, frame(cell, index)])),
     shards: new Map(rows.map(cell => [cell.instance, cell.slug])), cells: new Map(rows.map(cell => [cell.slug, cell.instance])),
     home: cells.find(cell => cell.cell[0] === 0 && cell.cell[1] === 0)?.instance, spots: new Map(rows.map(cell => [cell.cell.join(','), cell.instance])) };
   read = { from: grid, placed: placed.length, names };
   return names;
 }
 /**
+ * MA10k: each row's slot, as a page numbers the file's cells after the catalogue's (`addPlacedCells`, `placedCells.ts`): in the file's
+ * order, past a row the catalogue already places the same way and a row the page leaves out (an instance placed elsewhere, off the 7 × 7,
+ * a slug with a cell, a placed shard's name, a taken spot).
+ */
+export function placementSlots(file: readonly PlacedCell[]): ReadonlyMap<string, number> {
+  const shards = new Map<string, string>(), cells = new Map<string, string>(), spots = new Map<string, string>(), slots = new Map<string, number>();
+  for (const row of catalogueCells()) { shards.set(row.instance, row.slug); cells.set(row.slug, row.instance); spots.set(row.cell.join(','), row.instance); }
+  for (const row of file) {
+    const [x, z] = row.cell, spot = `${String(x)},${String(z)}`;
+    if (shards.has(row.instance) || Math.abs(x) > GRID_RADIUS || Math.abs(z) > GRID_RADIUS || cells.has(row.slug) || shards.has(row.slug) || cells.has(row.instance) || spots.has(spot)) continue;
+    shards.set(row.instance, row.slug); cells.set(row.slug, row.instance); spots.set(spot, row.instance);
+    slots.set(row.instance, slots.size);
+  }
+  return slots;
+}
+/**
  * SA33: place a cell the API placed (a new slug, J314) on this running server. True when it is new here, false when this server already
  * places it the same way. A slug keeps one cell for life and a spot holds one cell, so a row that disagrees with the catalogue or an earlier
  * placement throws and changes nothing. The server draws nothing, so any spot inside the format's grid (the 7 × 7, SA29) is admitted.
+ * MA10k: `file`, the signed file's cells the row came from, gives the row its slot, so a pack that arrives late keeps its place.
  */
-export function placeCell(row: PlacedCell): boolean {
+export function placeCell(given: PlacedCell, file?: readonly PlacedCell[]): boolean {
+  const slot = file === undefined ? given.slot : placementSlots(file).get(given.instance);
+  const { slot: _given, ...plain } = given, row: PlacedCell = slot === undefined ? plain : { ...plain, slot };
   const { shards, cells, spots } = gridNames(), [x, z] = row.cell, spot = `${String(x)},${String(z)}`;
   if (shards.has(row.instance)) {
     // SA47: a new upload moves the cell's hash; F48: its open room starts over on it once no live player is in it (`cellHost.ts`).
@@ -53,7 +82,7 @@ export function placeCell(row: PlacedCell): boolean {
   if (cells.has(row.instance)) throw new Error(`${row.instance} is a placed shard's name`);
   const taken = spots.get(spot);
   if (taken !== undefined) throw new Error(`${spot} is ${taken}'s`);
-  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z], ...(row.hash === undefined ? {} : { hash: row.hash }), ...(row.speedClass === undefined ? {} : { speedClass: row.speedClass }) });
+  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z], ...(row.hash === undefined ? {} : { hash: row.hash }), ...(row.speedClass === undefined ? {} : { speedClass: row.speedClass }), ...(row.slot === undefined ? {} : { slot: row.slot }) });
   if (row.hash !== undefined) hashes.set(row.slug, row.hash);
   return true;
 }

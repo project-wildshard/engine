@@ -21,8 +21,9 @@ export interface PlacementWatchOptions {
   readonly read: () => Promise<PlacementFile>;
   /** The channel this server plays. */
   readonly channel: string;
-  /** Open these cells, the ones this server hasn't opened yet; answer the instances that opened. A cell left out is asked for again next look. */
-  readonly open: (cells: readonly PlacedCell[]) => Promise<readonly string[]>;
+  /** Open these cells, the ones this server hasn't opened yet; answer the instances that opened. A cell left out is asked for again next look.
+   *  `file` is every cell the file names, in its order, so a late cell keeps its place (MA10k). */
+  readonly open: (cells: readonly PlacedCell[], file: readonly PlacedCell[]) => Promise<readonly string[]>;
   /** A look that failed. The server plays on with the cells it has. */
   readonly failed: (error: unknown) => void;
   readonly everyMs?: number;
@@ -50,7 +51,7 @@ export class PlacementWatch {
       if (file.serial < this.seen) throw new Error(`Placement serial ${String(file.serial)} is older than ${String(this.seen)}`);
       this.seen = file.serial;
       const fresh = file.cells.filter(cell => !this.opened.has(cell.instance));
-      if (fresh.length > 0) for (const instance of await this.options.open(fresh)) this.opened.add(instance);
+      if (fresh.length > 0) for (const instance of await this.options.open(fresh, file.cells)) this.opened.add(instance);
     } catch (error) { this.options.failed(error); } finally { this.looking = false; }
   }
   dispose(): void { this.scope.dispose(); }

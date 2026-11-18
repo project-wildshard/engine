@@ -181,11 +181,12 @@ const watch = new ReleaseWatch({ read: readRelease, serving: release, cells: sha
 placements = placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID ? null : new PlacementWatch({
   read: () => fetchPlacementFile(placementAt, placementKey), channel: release.channel, ...(poll === undefined ? {} : { everyMs: Number(poll) }),
   failed: error => { log({ at: 'placement.failed', error: String(error) }); },
-  open: async rows => {
+  open: async (rows, file) => {
     const ready: string[] = [];
     for (const row of rows) {
-      // SA34a: the pack first, so the door's placed list (and so every worker's frame numbers) holds only cells it opens.
-      try { await readPackFolder(row.slug, build, await rapier(), { origin, cache }, reads, row.hash, catalogue); placeCell(row); ready.push(row.instance); }
+      // SA34a: the pack first, so the door's placed list holds only cells it opens; MA10k: its frame is its place in the file, so a late
+      // pack never swaps two cells' numbers between the door, the workers and the page.
+      try { await readPackFolder(row.slug, build, await rapier(), { origin, cache }, reads, row.hash, catalogue); placeCell(row, file); ready.push(row.instance); }
       catch (error) { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); }
     }
     return ready.length === 0 ? [] : world.openCells(ready);
@@ -199,7 +200,7 @@ if (activationToken !== undefined) {
       const input = await readPackFolder(slug, build, await rapier(), {origin, cache}, reads, hash, catalogue, true);
       return {clientPlan: input.sections?.get('client/plan') ?? (input.product?.has('client/plan') === true ? input.product.section('client/plan') : undefined)};
     },
-    place: row => {placeCell(row);}, open: instances => world.activateCells(instances),
+    place: (row, file) => {placeCell(row, file);}, open: instances => world.activateCells(instances),
     opened: instance => Object.hasOwn(world.health().table, instance),
   }));
 }
