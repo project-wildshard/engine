@@ -18,7 +18,7 @@ test('shipped graphs emit the recorded GLSL byte for byte',async()=>{
  for(const folder of folders)for(const row of await shippedGraphCosts(builtFolder(folder))){
   now[row.graphHash]=[row.codeHash,row.fragmentShaderHashes.main,row.fragmentShaderHashes.outline,row.postFragmentShaderHash].join(' ');
  }
- if(process.env.GLSL_IDENTITY==='write'){writeFileSync(FILE,`${JSON.stringify(Object.fromEntries(Object.entries(now).sort(([a],[b])=>a.localeCompare(b))),null,1)}\n`);return;}
+ if(process.env['GLSL_IDENTITY']==='write'){writeFileSync(FILE,`${JSON.stringify(Object.fromEntries(Object.entries(now).sort(([a],[b])=>a.localeCompare(b))),null,1)}\n`);return;}
  const both=Object.keys(now).filter(key=>key in recorded);
  expect(both.length).toBeGreaterThan(0);
  expect(Object.fromEntries(both.map(key=>[key,now[key]]))).toEqual(Object.fromEntries(both.map(key=>[key,recorded[key]])));
