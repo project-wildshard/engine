@@ -165,8 +165,9 @@ export class StrikeRunner {
         }
       }
       // a charge (declared `motion`) runs until the actor reaches the lane's end, or a runaway timeout; a motionless lane
-      // (a wall of wind swept from a hover) keeps its full length for contact and ends at its declared `active` window
-      if (laneMotion(spec) && spec.motion !== undefined) {
+      // (a wall of wind swept from a hover, a beam: no `motion` or no speed) keeps its full length for contact and ends at its
+      // declared `active` window
+      if (laneMotion(spec) && spec.motion !== undefined && (spec.motion.speed ?? 0) > 0) {
         const along = ((a.position.x - this.x0) * (this.x1 - this.x0) + (a.position.z - this.z0) * (this.z1 - this.z0)) / (this.length * this.length);
         if (along >= 1 || this.elapsed > this.length / Math.max(1, (spec.motion.speed ?? 0) * this.speedMul) + 1.2) this.phase('recover');
       } else if (this.elapsed >= spec.active) this.phase('recover');
