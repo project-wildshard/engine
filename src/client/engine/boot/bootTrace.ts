@@ -5,6 +5,7 @@ import { deliverBrowserError, flushScreenReports, screenReportsEnabled } from '.
 import { reportSelfReload, reportStaleBuild, selfReloadClaim } from '../telemetry/staleBuildReport';
 import type { ProgressView } from './plan';
 import { markDropStep } from './dropNotice';
+import { memoryCounters } from '../render/glCounters';
 
 declare const __BUILD_ID__: string;
 
@@ -16,7 +17,9 @@ const REPORT_LIMIT = 4;
 const REPORT_MAX_AGE = 7 * 24 * 60 * 60_000;
 type Status = 'in_progress' | 'ready' | 'planned' | 'handled_error' | 'context_lost' | 'pagehide';
 type Facts = Record<string, string | number | boolean | null>;
-interface Checkpoint { atMs: number; operation: string; facts: Facts }
+/** `ledger`: the memory ledger's totals by kind at the checkpoint, decimal MB to 0.1 (ENGINE-MEMORY EM9), so a report of a
+ * page the phone killed says what the engine held when it died */
+interface Checkpoint { atMs: number; operation: string; facts: Facts; ledger?: Record<string, number> }
 
 interface BootRecord {
   levelId: string;
@@ -38,10 +41,25 @@ interface BootRecord {
 export interface BootTraceTransports {
   inbox: (error: Error, build: string, diagnostic: string, system: string, level: string) => Promise<string>;
   deliver: typeof deliverBrowserError;
+  /** the ledger by domain and kind (glCounters' memoryCounters); a test passes its own */
+  ledger?: () => Record<string, Record<string, number>>;
+}
+
+/** The ledger flattened to `<domain>/<kind>` in decimal MB to 0.1, kinds under 0.05 MB left out; every worker summed into
+ * `workers`. Small enough for 8 checkpoints in the inbox's 16 KiB. */
+export function ledgerTotals(counters: Record<string, Record<string, number>>): Record<string, number> {
+  const out: Record<string, number> = {};
+  const put = (key: string, bytes: number): void => { const mb = Math.round(bytes / 1e5) / 10; if (mb >= 0.1) out[key] = mb; };
+  for (const [domain, kinds] of Object.entries(counters)) {
+    if (domain === 'workers') { put('workers', Object.values(kinds).reduce((sum, bytes) => sum + bytes, 0)); continue; }
+    for (const [kind, bytes] of Object.entries(kinds)) put(`${domain}/${kind}`, bytes);
+  }
+  return out;
 }
 const PAGE_TRANSPORTS: BootTraceTransports = {
   inbox: async (error, build, diagnostic, system, level) => (await import('../telemetry/bootInbox')).reportBootInterruption(error, build, diagnostic, system, level),
   deliver: deliverBrowserError,
+  ledger: memoryCounters,
 };
 
 /** one page's boot trace (createBootTrace) */
@@ -172,9 +190,15 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
     if (typeof value !== 'object' || value === null) return false;
     const c = value as Partial<Checkpoint>;
     const facts: unknown = c.facts;
+    const ledger: unknown = c.ledger;
     return typeof c.atMs === 'number' && Number.isFinite(c.atMs) && typeof c.operation === 'string' &&
+      (ledger === undefined || (typeof ledger === 'object' && ledger !== null && !Array.isArray(ledger) &&
+        Object.values(ledger).every((v: unknown) => typeof v === 'number' && Number.isFinite(v)))) &&
       typeof facts === 'object' && facts !== null && !Array.isArray(facts) &&
       Object.values(facts).every((v: unknown) => v === null || typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)));
+  }
+  function ledgerNow(): { ledger?: Record<string, number> } {
+    try { const counters = transports.ledger?.(); return counters ? { ledger: ledgerTotals(counters) } : {}; } catch { return {}; }
   }
   function write(key: string, value: BootRecord): void { try { storage()?.setItem(key, JSON.stringify(value)); } catch { /* storage may be unavailable */ } }
   function update(status: Status): void {
@@ -265,7 +289,7 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
   function recordBootCheckpoint(operation: string, facts: Facts = {}): void {
     if (current?.status !== 'in_progress') return;
     const now = Date.now();
-    const checkpoint: Checkpoint = { atMs: now - current.startedAt, operation, facts };
+    const checkpoint: Checkpoint = { atMs: now - current.startedAt, operation, facts, ...ledgerNow() };
     current = { ...current, updatedAt: now, checkpoints: [...(current.checkpoints ?? []), checkpoint].slice(-HISTORY_LIMIT) };
     write(KEY, current);
   }

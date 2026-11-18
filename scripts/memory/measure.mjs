@@ -377,10 +377,10 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
 }
 
 
-/** Serve the calibration page (scripts/memory/calib/index.html) on a free local port: the ladder's blank and WebGL rungs. */
+/** Serve the calibration page (public/memory-calibration.html) on a free local port: the ladder's blank and WebGL rungs. */
 export async function serveCalibrationPage() {
   const { createServer } = await import('node:http');
-  const page = readFileSync(new URL('calib/index.html', import.meta.url));
+  const page = readFileSync(new URL('../../public/memory-calibration.html', import.meta.url));
   const server = createServer((req, res) => {
     if (req.method === 'POST') { req.resume(); res.end('ok'); return; }
     res.setHeader('content-type', 'text/html'); res.setHeader('cache-control', 'no-store'); res.end(page);

@@ -4,7 +4,7 @@
 //   scripts/browser-lane.sh node scripts/memory/calibrate.mjs --host=webkit|chromium [options]
 //   scripts/sim-lane.sh run wildshard-iphone node scripts/memory/calibrate.mjs --host=simulator [options]
 //
-// For each kind of scripts/memory/calib/index.html and each size (default 0, 128, 256 and 512 MB), a fresh browser
+// For each kind of public/memory-calibration.html and each size (default 0, 128, 256 and 512 MB), a fresh browser
 // opens the page, which allocates the bytes, touches them and holds them. After a forced GC (WebKit, Chromium) and a
 // settle, the kernel footprint [K] of every browser process is read (scripts/memory/footprint.mjs). calibration.mjs fits
 // MB of footprint per MB held per process; the host's entry in scripts/memory/calibration.json is rewritten, the
@@ -52,7 +52,7 @@ if (argv.includes('--from-raw')) {
   mkdirSync(dirname(raw), { recursive: true });
   writeFileSync(raw, '');
   // the page, and the report a Simulator's Safari posts when it holds its bytes
-  const PAGE = readFileSync(fileURLToPath(new URL('calib/index.html', import.meta.url)));
+  const PAGE = readFileSync(fileURLToPath(new URL('../../public/memory-calibration.html', import.meta.url)));
   /** @type {Map<string, (state: any) => void>} */
   const waiting = new Map();
   const server = createServer((req, res) => {

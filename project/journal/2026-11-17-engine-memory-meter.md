@@ -48,3 +48,9 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   GPU process (about 100 MB on Template, 1.1 GB on Nine). A probe on a blank page says ANGLE Metal costs 1.0x for
   textures and aligned buffers, 1.33x with mips, 3.2x for an int16x3 attribute, and about 0.1 MB a program, and Nine
   has 65 programs and 0.6 MB of unaligned attributes, so neither explains Nine's GPU gigabyte.
+- EM9 (mini-em1b), anchors that need no cable. The calibration page moved to `public/memory-calibration.html`, so the
+  client build serves it at `/memory-calibration.html`, and gained a tour: `?tour=1` runs each kind's staircase in turn,
+  and every reload records the kind before it at its last step and starts the next. A phone that kills the page leaves
+  the kill line in `localStorage`; one that does not reaches `max` and reloads by itself. And each boot checkpoint now
+  carries the ledger's totals by kind in MB, so the "Abrupt previous page" report of a killed boot says what the engine
+  held at its last step, not only which step it was.

@@ -3,7 +3,8 @@
 <body style="font:14px monospace;background:#111;color:#ddd;margin:16px">
 <canvas id="c" width="64" height="64"></canvas><pre id="log"></pre>
 <script>
-// Known-allocation calibration page (ENGINE-MEMORY EM1; from meta docs/plans/engine-memory/calib-prototype.html).
+// Known-allocation calibration page (ENGINE-MEMORY EM1; from meta docs/plans/engine-memory/calib-prototype.html). It ships in
+// the client build at /memory-calibration.html (EM9), outside the game: nothing links to it.
 // It allocates a stated number of decimal MB of one kind, writes to every page of it (an untouched buffer is not
 // footprint) and holds it, so a meter outside the page can be checked against a known size.
 //
@@ -12,6 +13,11 @@
 //   ?kind=<kind>&stair=1&stepmb=64&every=1500&max=6000
 //                              staircase: add stepmb every `every` ms until the page dies; the last step survives in
 //                              localStorage (and a beacon to ?beacon=<url>) so a reload reads the kill line
+//   ?tour=1[&stepmb=64&every=1500&max=6000]
+//                              the phone anchor (EM9): a staircase of each kind in turn. Each reload records the kind
+//                              before it at its last step (where the page died) and starts the next; a kind that reaches
+//                              max without dying reloads by itself. When every kind is done the page shows the table.
+//                              &reset=1 starts again. window.__calib.tour holds {at, kind, got, results}.
 //
 // kinds and their true size (window.__calib.got is the bytes really held, in the kind's unit):
 //   none         nothing (a WebGL context only for the GL kinds below)
@@ -28,7 +34,19 @@
 //   canvas2d     2048x2048 2D canvases in the document, 16.8 MB each
 //   imagebitmap  2048x2048 ImageBitmaps from noise ImageData, 16.8 MB each
 //   audio        stereo 48 kHz AudioBuffers of 40 s, 15.4 MB each
-const q = new URLSearchParams(location.search), kind = q.get('kind') || 'none';
+const q = new URLSearchParams(location.search);
+const TOUR = ['arraybuffer', 'jsheap', 'wasm', 'worker', 'texrgba', 'texcomp', 'glbuffer', 'msaa', 'canvas2d', 'imagebitmap', 'audio'];
+const TOUR_KEY = 'calib:tour';
+function readTour() { try { const t = JSON.parse(localStorage.getItem(TOUR_KEY) || 'null'); return t && typeof t.at === 'number' && t.results ? t : null; } catch { return null; } }
+function saveTour(t) { try { localStorage.setItem(TOUR_KEY, JSON.stringify(t)); } catch {} }
+let tour = null;
+if (q.get('tour')) {
+  if (q.get('reset')) { try { localStorage.removeItem(TOUR_KEY); } catch {} q.delete('reset'); history.replaceState(null, '', '?' + q.toString()); }
+  tour = readTour() || { at: -1, kind: null, got: 0, results: {} };
+  if (tour.kind) tour.results[tour.kind] = { got: tour.got, ended: tour.ended || 'page went away' };
+  tour.at += 1; tour.kind = TOUR[tour.at] || null; tour.got = 0; tour.ended = null; saveTour(tour);
+}
+const kind = tour ? tour.kind || 'none' : q.get('kind') || 'none';
 const MB = 1e6, CH = 16 * 1024 * 1024, keep = [], log = document.getElementById('log');
 const say = (s) => { log.textContent += s + '\n'; };
 const canvas = document.getElementById('c');
@@ -75,17 +93,31 @@ const alloc = {
 const UNIT = { jsheap: 'objects x 48 B (assumed)' };
 const state = { kind, unit: UNIT[kind] ?? 'bytes', asked: 0, got: 0, objects: 0, done: false, error: null, comp: '', ua: navigator.userAgent, dpr: devicePixelRatio, last: null };
 try { state.last = localStorage.getItem('calib:' + kind); } catch {}
+state.tour = tour;
 window.__calib = state;
-function record() { try { localStorage.setItem('calib:' + kind, String(state.got)); } catch {} const b = q.get('beacon'); if (b) navigator.sendBeacon(b, JSON.stringify({ kind, got: state.got, t: Date.now() })); }
+function record() {
+  try { localStorage.setItem('calib:' + kind, String(state.got)); } catch {}
+  if (tour) { tour.got = state.got; saveTour(tour); }
+  const b = q.get('beacon'); if (b) navigator.sendBeacon(b, JSON.stringify({ kind, got: state.got, t: Date.now(), tour: tour ? tour.at : null }));
+}
+function showTour() {
+  for (const k of TOUR) { const r = tour.results[k]; if (r) say(k.padEnd(12) + ' ' + (r.got / MB).toFixed(0).padStart(6) + ' MB  ' + r.ended); }
+}
 (async () => {
   try {
     if (!(kind in alloc)) throw new Error('unknown kind ' + kind);
-    if (state.last) say('previous run of ' + kind + ' reached ' + (state.last / MB).toFixed(0) + ' MB before the page went away');
-    if (q.get('stair')) {
+    if (tour) {
+      const before = TOUR[tour.at - 1];
+      if (before) say('previous kind ' + before + ' reached ' + (tour.results[before].got / MB).toFixed(0) + ' MB before the page went away');
+      if (!tour.kind) { say('tour done'); showTour(); state.done = true; return; }
+      say('tour ' + (tour.at + 1) + ' of ' + TOUR.length + ': ' + kind);
+    } else if (state.last) say('previous run of ' + kind + ' reached ' + (state.last / MB).toFixed(0) + ' MB before the page went away');
+    if (q.get('stair') || tour) {
       const step = Number(q.get('stepmb') || 64) * MB, every = Number(q.get('every') || 1500), max = Number(q.get('max') || 6000) * MB;
       while (state.got < max) { state.asked += step; state.got += await alloc[kind](step); state.comp = compName; record(); say(kind + ' ' + (state.got / MB).toFixed(0) + ' MB'); await new Promise((r) => setTimeout(r, every)); }
+      if (tour) { tour.ended = 'reached max'; saveTour(tour); location.reload(); return; }
     } else { const b = Number(q.get('mb') || 0) * MB; state.asked = b; state.got = await alloc[kind](b); state.comp = compName; say(kind + ' holds ' + (state.got / MB).toFixed(1) + ' MB ' + compName); }
-  } catch (e) { state.error = String(e); say('ERROR ' + e); }
+  } catch (e) { state.error = String(e); say('ERROR ' + e); if (tour) { tour.ended = 'error: ' + String(e).slice(0, 80); saveTour(tour); location.reload(); return; } }
   state.done = true;
   if (q.get('report')) fetch('/__calib/report', { method: 'POST', body: JSON.stringify({ ...state, href: location.href }), keepalive: true }).catch(() => {});
   // keep GL resources referenced by drawing a frame now and then
