@@ -40,16 +40,17 @@ describe('shaVerdict', () => {
   });
 });
 
-test('boundaries stays blocking and independent; J400 moves quarantine to reports', () => {
+function ciJob(name: string): string {
   const text = readFileSync('.github/workflows/ci.yml', 'utf8');
-  const job = (name: string): string => {
-    const start = text.indexOf(`\n  ${name}:\n`);
-    if (start === -1) throw new Error(`ci.yml has no ${name} job`);
-    const next = text.slice(start + 1).search(/\n {2}[a-z][a-z0-9_-]*:\n/u);
-    return next === -1 ? text.slice(start) : text.slice(start, start + 1 + next);
-  };
+  const start = text.indexOf(`\n  ${name}:\n`);
+  if (start === -1) throw new Error(`ci.yml has no ${name} job`);
+  const next = text.slice(start + 1).search(/\n {2}[a-z][a-z0-9_-]*:\n/u);
+  return next === -1 ? text.slice(start) : text.slice(start, start + 1 + next);
+}
+
+test('boundaries stays blocking and independent; J400 moves quarantine to reports', () => {
   for (const name of ['boundaries']) {
-    const block = job(name);
+    const block = ciJob(name);
     expect(block, name).toContain("    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}");
     expect(block).not.toMatch(/^ {4}continue-on-error:/mu);
     // a main push that reused the plan run would skip it for every landed SHA: no reuse step here
@@ -58,8 +59,31 @@ test('boundaries stays blocking and independent; J400 moves quarantine to report
   }
   expect(readFileSync('.github/workflows/ci-reports.yml', 'utf8')).toContain('node scripts/test-quarantine.mjs --shard=1/1');
   // The hosted fallback still accepts an exact plan proof.
-  expect(job('tests')).toContain('node scripts/ci-exact-reuse.mjs ci.yml');
-  expect(job('tests')).not.toMatch(/^ {4}if: /mu);
+  expect(ciJob('tests')).toContain('node scripts/ci-exact-reuse.mjs ci.yml');
+  expect(ciJob('tests')).not.toMatch(/^ {4}if: /mu);
+});
+
+test('the blocking memory ledger restores and saves its own verified Brotli parts', () => {
+  const ledger = ciJob('memory-ledger-guard');
+  const restore = ledger.indexOf('uses: actions/cache/restore@');
+  const build = ledger.indexOf('name: Build every production pin');
+  const read = ledger.indexOf('name: Read or block on subsystem ledger bytes');
+  const save = ledger.indexOf('uses: actions/cache/save@');
+  expect(restore).toBeGreaterThan(0);
+  expect(build).toBeGreaterThan(restore);
+  expect(read).toBeGreaterThan(build);
+  expect(save).toBeGreaterThan(read);
+  expect(ledger.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br\/1/gu)).toHaveLength(2);
+  expect(ledger).toContain('full-ledger-spawn-parts-br-v1-');
+  expect(ledger).toContain('$codec-$CODEC_INPUTS-');
+  expect(ledger).toContain("steps.ledger-client.outcome == 'success'");
+  expect(ledger).toContain("steps.ledger-parts-pruned.outcome == 'success'");
+  expect(ledger).toContain("steps.ledger-parts.outputs.cache-hit != 'true'");
+  expect(ledger).not.toContain('ring1-spawn-parts-br-');
+  expect(ledger).not.toMatch(/^ {4}continue-on-error:/mu);
+  const upload = ledger.indexOf('- if: always()', read);
+  expect(upload).toBeGreaterThan(read);
+  expect(ledger.slice(read, upload)).not.toContain('continue-on-error');
 });
 
 describe('main reuses the exact SHA\'s green plan-branch run (no double run)', () => {
