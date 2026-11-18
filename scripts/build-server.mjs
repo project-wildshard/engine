@@ -13,7 +13,10 @@ import { build } from 'rolldown';
 const ROOT = resolve(import.meta.dirname, '..'), require = createRequire(join(ROOT, 'package.json'));
 // SENTRY-TRIAGE S8: the server's Sentry release is `wildshard@<version>`, as the client's (S5).
 const VERSION = /** @type {{ version: string }} */ (JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))).version;
-const { values } = parseArgs({ options: { build: { type: 'string', default: 'dev' }, out: { type: 'string', default: 'dist/server' }, entry: { type: 'string', multiple: true, default: [] }, tar: { type: 'string' } } });
+const { values } = parseArgs({ options: { build: { type: 'string', default: 'dev' }, out: { type: 'string', default: 'dist/server' }, entry: { type: 'string', multiple: true, default: [] }, tar: { type: 'string' }, dev: { type: 'boolean', default: false } } });
+// MEMORY-STRUCTURE STR4: `--dev` is the local dev server (scripts/dev-world.mjs): it keeps the dev control channel, which the
+// box's bundle (no `--dev`) folds away (test/dev-control-bundle.test.ts).
+if (values.dev && values.tar !== undefined) throw new Error('A dev server bundle is never packed for a box');
 const OUT = resolve(ROOT, values.out), DEDICATED = join(ROOT, 'src/server/host/dedicated');
 
 // As vite/rapier.ts: the package's wasm import is the game's to load.
@@ -27,7 +30,7 @@ const rapier = { name: 'rapier', resolveId: source => {
 const extra = Object.fromEntries(values.entry.map(row => { const [name, path] = row.split('='); return [name, resolve(ROOT, path)]; }));
 // Separate self-contained entries preserve the dedicated archive contract.
 for (const [name,input] of Object.entries({main:join(DEDICATED,'main.ts'),cellWorker:join(DEDICATED,'cellWorker.ts'),...extra})) {
-  await build({input,platform:'node',transform:{target:'node24',define:{__BUILD_ID__:JSON.stringify(values.build),__ENGINE_VERSION__:JSON.stringify(VERSION)}},
+  await build({input,platform:'node',transform:{target:'node24',define:{__BUILD_ID__:JSON.stringify(values.build),__ENGINE_VERSION__:JSON.stringify(VERSION),__DEVSERVER__:JSON.stringify(values.dev)}},
     plugins:[rapier],external:['pg-native'],output:{file:join(OUT,`${name}.mjs`),format:'esm',codeSplitting:false}});
 }
 mkdirSync(OUT, { recursive: true });

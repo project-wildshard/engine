@@ -126,3 +126,105 @@ test('the dev page plays on the local Node server, a restart keeps its save and 
     await context.close()
   }
 })
+
+/** STR4: a control on the dev server's channel, as a loopback tool sends it. */
+async function control(
+  world: DevWorld,
+  body?: object,
+): Promise<{ readonly status: number; readonly answer: unknown }> {
+  const url = `${world.socket.replace('ws:', 'http:')}__dev/control`
+  const response = await fetch(
+    url,
+    body === undefined
+      ? {}
+      : {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+  )
+  return {
+    status: response.status,
+    answer: await response.json().catch((): undefined => undefined),
+  }
+}
+
+/** The devices the dev server seats now. */
+async function seatsOf(world: DevWorld): Promise<readonly string[]> {
+  const { answer } = await control(world)
+  return typeof answer === 'object' &&
+    answer !== null &&
+    'seats' in answer &&
+    Array.isArray(answer.seats)
+    ? answer.seats.map(String)
+    : []
+}
+
+test('the harness verbs reach the dev server for a seated page', async ({
+  browser,
+  dev,
+}): Promise<void> => {
+  const context = await browser.newContext({ ...devices['Desktop Chrome'] })
+  try {
+    await saveFixture(context, { scope: 'device', key: 'devMode', data: true })
+    await saveFixture(context, {
+      scope: 'device',
+      key: 'firstPlayDone',
+      data: true,
+    })
+    await harnessPins(context, { seed: 357 })
+    const page = await context.newPage()
+    const before = await seatsOf(dev)
+    await page.goto(`${dev.url}?mute=1&nolock=1&fps=30`)
+    await enterTemplate(page, 'Dev Bob')
+    // The page's own device: the seat that is new (an earlier test's body may still be held)
+    const after = await seatsOf(dev)
+    const seats = after.filter((seat): boolean => !before.includes(seat))
+    expect(seats).toHaveLength(1)
+    const device = seats[0] ?? ''
+    const refused = await control(dev, { device: 'nobody', flag: 'x' })
+    expect(refused.status).toBe(409)
+    const verbs: readonly Readonly<Record<string, unknown>>[] = [
+      { flag: 'dev-proof' },
+      { hits: 2 },
+      { god: true },
+      { still: true },
+      { probe: true },
+    ]
+    const answers = await Promise.all(
+      verbs.map(
+        async (verb: Readonly<Record<string, unknown>>): Promise<unknown> => {
+          const { answer } = await control(dev, { device, ...verb })
+          return answer
+        },
+      ),
+    )
+    for (const answer of answers) {
+      expect(answer).toMatchObject({ ok: true })
+    }
+    // A place moves the body on the server, and the page's player snaps to it
+    const at = await page.evaluate((): { x: number; y: number; z: number } => {
+      const pos = globalThis.__wildshard?.state().player.pos
+      return { x: pos?.x ?? 0, y: pos?.y ?? 0, z: pos?.z ?? 0 }
+    })
+    const placed = await control(dev, {
+      device,
+      x: at.x + 6,
+      y: at.y + 1,
+      z: at.z,
+      yaw: 0,
+    })
+    expect(placed.answer).toMatchObject({ ok: true })
+    await expect
+      .poll(
+        async (): Promise<number> =>
+          await page.evaluate(
+            (): number => globalThis.__wildshard?.state().player.pos.x ?? 0,
+          ),
+        { timeout: 5000 },
+      )
+      .toBeGreaterThan(at.x + 4)
+  } finally {
+    await context.close()
+  }
+})

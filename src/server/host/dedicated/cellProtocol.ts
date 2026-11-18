@@ -1,4 +1,5 @@
 import type { ChatReport, WorldLine } from '@wildshard/engine/net/chat';
+import type { DevAnswer } from './devControl';
 import type { PlayerDoc } from './playerDoc';
 import type { SaveReceipt, SaveWrite } from './saves/saveStore';
 import type {PlaytestHit} from './playtest';
@@ -59,7 +60,9 @@ export type CellOrder =
   | { readonly kind: 'open'; readonly cells: readonly string[] }
   /** ZE9b: the zone entry of a seat frozen at a gate on road `from` is off (no `ready` in time, or the move refused): its body plays on. */
   | { readonly kind: 'thaw'; readonly from: string; readonly device: string }
-  | { readonly kind: 'close' };
+  | { readonly kind: 'close' }
+  /** MEMORY-STRUCTURE STR4: a dev control for this device's seat (DEVSERVER builds only, `devControl.ts`). */
+  | { readonly kind: 'dev'; readonly id: number; readonly device: string; readonly message: unknown };
 /** One 10 s reading of a worker (E7.8). */
 export interface WorkerReading {
   readonly cells: number; readonly awake: number;
@@ -98,6 +101,7 @@ export type WorkerNews =
   | { readonly kind: 'report'; readonly slug: string; readonly report: ChatReport }
   | { readonly kind: 'reading'; readonly reading: WorkerReading }
   | { readonly kind: 'cell'; readonly slug: string; readonly ms: number }
+  | { readonly kind: 'devAnswer'; readonly id: number; readonly answer: DevAnswer }
   | { readonly kind: 'drained' }
   /** SA34a: a `place` order's end: the cells this worker opened, or why it opened none. Its other cells and its road play on either way. */
   | { readonly kind: 'placed'; readonly id: number; readonly opened: readonly string[]; readonly error?: string; readonly resident?: WorkerResident }

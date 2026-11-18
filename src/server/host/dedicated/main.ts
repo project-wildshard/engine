@@ -34,8 +34,11 @@ import { doorTrust } from './doorTrust';
 import { WHOLE_GRID, cellShard, placeCell, placedCells, worldCells } from './gridCells';
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
 import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
+import { DEV_CONTROL_PATH, devRoute } from './devControl';
 
 declare const __BUILD_ID__: string;
+/** scripts/build-server.mjs: true only for `--dev`, the local dev server (MEMORY-STRUCTURE STR4). */
+declare const __DEVSERVER__: boolean;
 /** scripts/build-server.mjs: package.json's version, the Sentry release (S8). */
 declare const __ENGINE_VERSION__: string | undefined;
 const need = (name: string): string => { const value = process.env[name]; if (value === undefined || value === '') throw new Error(`The server needs ${name}`); return value; };
@@ -128,6 +131,8 @@ const accounts = exporting === undefined || deleting === undefined ? undefined :
 const server = createServer((request, response) => {
   if (activationReceiver?.(request, response)) return;
   if (accounts?.(request, response) === true) return;
+  // MEMORY-STRUCTURE STR4: a dev server's control channel (`build-server.mjs --dev`); the box's bundle folds this away
+  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && request.url === DEV_CONTROL_PATH) { devRoute(request, response, (device, message) => world.dev(device, message), trust.allowedOrigins, () => world.devSeats()); return; }
   if (request.url !== '/health') { response.writeHead(404).end(); return; }
   // E7.5 prep: any page may read it (no player data), so the Connection doctor sees the build; `now` lets it read a phone's clock.
   response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ ...world.health(), serial: release.serial, ...(placements === null ? {} : { placements: placements.serial }), uptime: Math.round((Date.now() - started) / 1000), now: Date.now() }));

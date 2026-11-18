@@ -1,6 +1,7 @@
 // J182: one worker's life: its cells, one 60 Hz clock over the awake ones, and the port it talks to the door on. `cellWorker.ts` is one line
 // around this, so a Node test runs the same code over a real MessageChannel.
 import { installAppIdentity } from '@wildshard/engine/app/identity';
+import { applyDev, devCellState, holdStill, type DevCellState } from './devControl';
 import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
@@ -90,6 +91,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   // `WORLD_BOOST=off` on a box turns it back off. The server can't tell a Developer page from another, so this trusts the bit.
   allowDeveloperBoost(options.developerBoost !== false);
   const scope = new Scope('dedicated.worker'), started = diagnosticNow(), cells = new Map<string, Cell>();
+  /** MEMORY-STRUCTURE STR4: each room's dev state (DEVSERVER builds only). */
+  const devStates = new Map<DedicatedRoom, DevCellState>();
   let clock: ServerClock | undefined, disposed = false, ready = false, ticks: number[] = [], ticked = 0, readAt = started, dropsAt = 0;
   /** SC8: each awake cell's own tick time since the last reading (ms summed, ticks counted), so a bench can weigh cells by awake cost. */
   let spent = new Map<string, { ms: number; ticks: number }>();
@@ -170,6 +173,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
       for (const { slug, room } of cells.values()) {
         if (room.taken === 0) continue;
         const at = diagnosticNow();
+        if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) { const held = devStates.get(room); if (held !== undefined) holdStill(room.host, held); }
         room.tick();
         const own = spent.get(slug) ?? { ms: 0, ticks: 0 };
         own.ms += diagnosticNow() - at; own.ticks++; spent.set(slug, own);
@@ -256,6 +260,18 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
    * thrown: the other cells and the road play on.
    */
   let placing: Promise<void> = Promise.resolve();
+  /** A dev control for the room that seats `order.device`: answered whether or not one does. */
+  const dev = (order: Extract<CellOrder, { kind: 'dev' }>): void => {
+    for (const { room } of cells.values()) {
+      const body = room.bodyOf(order.device);
+      if (body === undefined) continue;
+      let state = devStates.get(room);
+      if (state === undefined) { state = devCellState(); devStates.set(room, state); }
+      post({ kind: 'devAnswer', id: order.id, answer: applyDev(room.host, body.id, order.message, state, device => room.bodyOf(device)?.id) });
+      return;
+    }
+    post({ kind: 'devAnswer', id: order.id, answer: { ok: false, reason: 'that device has no seat on this worker' } });
+  };
   /** RR2: what this worker holds, for the door's `/health`: a road counts its strips only once it is open */
   const resident = (): WorkerResident => ({ cells: cells.size, road: road !== undefined, strips: road === undefined ? 0 : crossing?.strips.length ?? 0 });
   const place = async (order: Extract<CellOrder, { kind: 'place' }>): Promise<void> => {
@@ -317,6 +333,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   };
   const handle = (order: CellOrder): void => {
     if (order.kind === 'close') { dispose(); return; }
+    if (order.kind === 'dev') { if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) dev(order); else post({ kind: 'devAnswer', id: order.id, answer: { ok: false, reason: 'not a dev server' } }); return; }
     // MP4.1: a line from the world reaches each awake cell here but the one that said it. A cell asleep or starting over hears nothing.
     if (order.kind === 'chat') {
       const source = cells.get(order.from);

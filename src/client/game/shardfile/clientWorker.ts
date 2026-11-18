@@ -1,7 +1,7 @@
 // P1-E5.3 I6 (J126), E6: every page runs the real Game and Player against the real server in its worker: the Player predicts and
 // reconciles, and every creature is an interpolated row drawn by the real views.
 import { Scope } from '@wildshard/engine/app/scope';
-import type { DevBox } from '@wildshard/engine/game/devColliders';
+import type { DevBox, DevGround } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
 import { chosenArrival, chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
@@ -148,7 +148,7 @@ const onlineLeaving: OnlineLeaving = {
   settle: () => { void (async () => { (await import('@wildshard/engine/boot/browserChunkRecovery')).settleRefusedBuild(); })(); },
 };
 interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: OnlineGrid }) => Promise<Shell> }
-interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void;
+interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; devGround?: (ground: DevGround) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void;
   /** ZE10d2: an online shell's gate word and its adoption by the next session on this page (`shell.ts` `StartedOnline`) */
   enter?: (cell: string) => Promise<{ readonly x: number; readonly z: number; readonly yaw: number } | null>;
   adopt?: (next: { readonly loaded: string; readonly grid: OnlineGrid }) => void }
@@ -705,6 +705,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   window.__workerClientFlag = flag => { shell.raise(flag); };
   // SHARD-SOURCE AP5: the dev hook's `swapColliders` reaches the in-page server here (DEVSERVER only: the define folds it away)
   if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) window.__workerClientDevColliders = (name, boxes) => { shell.devColliders?.(name, boxes); };
+  // MEMORY-STRUCTURE STR4: on a dev server the ground goes over its control channel (the in-page server's shell exposes its own)
+  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && shell.devGround !== undefined) { const ground = shell.devGround; window.__workerClientDevGround = next => { ground(next); }; }
   window.__workerClientTravel = to => { travel({ to, mode: 'enter' }); };
   window.__workerClientSky = name => { wirePage.climate({ op: 'force', name, at: 0.1 }); };
   window.__workerClientTime = pick => { saveSetting('time', pick); };

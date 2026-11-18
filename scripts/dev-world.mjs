@@ -95,7 +95,7 @@ export async function openDevWorld({ dist, work, shard = '_template', port = DEV
     /** The server book and bundle for a client build. @param {string} id */
     const serverFor = id => {
       run(['scripts/server-origin.mjs', origin, id, `--grid=${absolute(gridRoot)}`, `${shard}=${book}`], 'the server book');
-      run(['scripts/build-server.mjs', '--build', id, '--out', server], 'the server build');
+      run(['scripts/build-server.mjs', '--build', id, '--out', server, '--dev'], 'the server build');
     };
     /** @param {string} id */
     const publish = id => {

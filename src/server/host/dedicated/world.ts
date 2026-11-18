@@ -3,6 +3,7 @@
 // and systemd starts it again (Q77). `NetRoom` does not change: it hears the same `hello` the door read, once the client has loaded.
 // oxlint-disable-next-line import/no-nodejs-modules -- The server's own door.
 import type { IncomingMessage } from 'node:http';
+import type { DevAnswer } from './devControl';
 // oxlint-disable-next-line import/no-nodejs-modules -- The server's own door.
 import type { Duplex } from 'node:stream';
 // oxlint-disable-next-line import/no-nodejs-modules -- Canonical network identity at the proxy boundary.
@@ -218,6 +219,8 @@ export class World {
   /** Each seated device's voice seat, renamed to the body its cell seated it in (`seated`). */
   private readonly voiceBodies = new Map<string, (body: string) => void>();
   private readonly finds = new Map<number, (found: { held: boolean; spawn: ResumeAt }) => void>();
+  /** MEMORY-STRUCTURE STR4: dev controls waiting on their worker's answer (DEVSERVER builds only). */
+  private readonly devs = new Map<number, (answer: DevAnswer) => void>();
   private readonly drains = new Map<number, () => void>();
   /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered, and when it began (SC1). */
   private readonly crossings = new Map<string, number>();
@@ -372,6 +375,7 @@ export class World {
     return opened;
   }
   private heard(index: number, news: WorkerNews): void {
+    if (news.kind === 'devAnswer') { this.devs.get(news.id)?.(news.answer); this.devs.delete(news.id); return; }
     // ZE9c review: the road let a held body go: no redial can arrive for it now
     if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from !== undefined && this.redials.get(news.device)?.from === from) this.redials.delete(news.device); }
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
@@ -559,6 +563,19 @@ export class World {
       if (cells.length > 0) link.send({ kind: 'open', cells });
     }
   }
+  /** MEMORY-STRUCTURE STR4: one dev control for a seated device, applied by the worker that holds its cell (`devControl.ts`). */
+  dev(device: string, message: unknown): Promise<DevAnswer> {
+    const cell = this.seated.get(device), link = cell === undefined ? undefined : this.linkOf(cell);
+    if (link === undefined) return Promise.resolve({ ok: false, reason: 'that device is not seated' });
+    const id = ++this.asked;
+    return new Promise(resolve => {
+      const timer = this.scope.timeout(5000, () => { this.devs.delete(id); resolve({ ok: false, reason: 'the worker did not answer' }); });
+      this.devs.set(id, answer => { this.scope.cancelTimer(timer); resolve(answer); });
+      link.send({ kind: 'dev', id, device, message });
+    });
+  }
+  /** MEMORY-STRUCTURE STR4: the devices seated now, for a dev tool. */
+  devSeats(): readonly string[] { return [...this.seated.keys()]; }
   private linkOf(slug: string): WorkerLink | undefined { return this.links.get(roadHome(slug) ?? slug); }
   private link(slug: string): WorkerLink {
     const link = this.linkOf(slug);
