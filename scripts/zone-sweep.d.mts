@@ -6,3 +6,7 @@ export function zoneVerdict(row: { readonly enterMs: number | null; readonly err
 export function wrongZone(row: { readonly name?: string; readonly zones?: readonly string[] }): string | undefined;
 export function cardsNow(): SweepCard[];
 export function slugsByName(): Record<string, string>;
+/** The cold `?chunk=<slug>&skipintro=1` link (--chunk). */
+export function chunkLink(url: string, slug: string): string;
+/** The cards to open and the --only slugs that have no card. */
+export function sweepTargets(cards: readonly { readonly name: string }[], slugs: Readonly<Record<string, string>>, only: readonly string[] | undefined): { targets: { slug: string; name: string }[]; missing: string[] };

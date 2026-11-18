@@ -6,6 +6,9 @@
 //
 //   node scripts/zone-sweep.mjs --url https://staging.wildshard.io [--browser chromium|webkit] [--out <dir>] [--only a,b] [--budget 60000]
 //   node scripts/zone-sweep.mjs --url https://play.wildshard.io --block-ws   (production: loads only, the world's socket is refused)
+//   --chunk  open each zone by its cold link, `/?chunk=<slug>&skipintro=1` (a PLAY or shared link, a reload in the zone), not by its
+//            card: a tap enters the in-page grid and never runs a cold boot's merge, so ONE-FORMAT OF8 (an upload refused on a cold
+//            boot) passed a card sweep (OF8b). --only slugs with no card are listed in results.json `missing` (SA48), not swept.
 //
 // A zone passes when the player is in the world (journey-proof's `play` label: the HUD drawn) within the budget, with no error
 // card, glitch chip, faulted system or uncaught page error (proof-faults.mjs). Only GETs leave the page. Output:
@@ -32,6 +35,21 @@ export function zoneVerdict(row, budgetMs) {
 export function wrongZone(row) {
   const want = (row.name ?? '').trim().toLowerCase();
   return want === '' ? undefined : (row.zones ?? []).find((zone) => zone.trim() !== '' && zone.trim().toLowerCase() !== want);
+}
+
+/** The cold link a PLAY or shared link opens; `skipintro` passes the title an online build shows a bare link (QA row 16).
+ * @param {string} url @param {string} slug @returns {string} */
+export function chunkLink(url, slug) {
+  return `${url.replace(/\/+$/u, '')}/?chunk=${encodeURIComponent(slug)}&skipintro=1`;
+}
+
+/** The cards to open (all, or those `--only` names by slug) and the `--only` slugs that have no card.
+ * @param {readonly { name: string }[]} cards @param {Record<string, string>} slugs @param {readonly string[] | undefined} only
+ * @returns {{ targets: { slug: string, name: string }[], missing: string[] }} */
+export function sweepTargets(cards, slugs, only) {
+  const all = cards.map((card) => ({ slug: slugs[card.name] ?? card.name, name: card.name }));
+  if (only === undefined) return { targets: all, missing: [] };
+  return { targets: all.filter((t) => only.includes(t.slug)), missing: only.filter((slug) => !all.some((t) => t.slug === slug)) };
 }
 
 /** Runs in the page with Zone select open: the cards as the player sees them. @returns {SweepCard[]} */
@@ -79,7 +97,7 @@ async function cli() {
   }
   const url = args.get('url') ?? 'https://staging.wildshard.io', browserName = args.get('browser') ?? 'chromium';
   const out = resolve(args.get('out') ?? `tmp/${process.env.WS_LANE_NAME ?? 'zone-sweep'}/zone-sweep`);
-  const budgetMs = Number(args.get('budget') ?? '60000'), blockWs = args.has('block-ws'), only = args.get('only')?.split(',');
+  const budgetMs = Number(args.get('budget') ?? '60000'), blockWs = args.has('block-ws'), only = args.get('only')?.split(','), cold = args.has('chunk');
   if (browserName !== 'chromium' && browserName !== 'webkit') throw new Error('--browser takes chromium or webkit');
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url) && !blockWs) throw new Error('Production: pass --block-ws, loads only (lane rules: never join a world there)');
   mkdirSync(out, { recursive: true });
@@ -103,6 +121,8 @@ async function cli() {
   let cards = [];
   /** @type {Record<string, string>} */
   let slugs = {};
+  /** @type {string[]} */
+  let missing = [];
   try {
     const listing = await fresh();
     const page = await listing.newPage();
@@ -114,9 +134,11 @@ async function cli() {
     slugs = await page.evaluate(slugsByName);
     await listing.close();
     console.log(`cards: ${cards.map((c) => c.name).join(', ')}`);
-    for (const card of cards) {
-      const slug = slugs[card.name] ?? card.name;
-      if (only !== undefined && !only.includes(slug)) continue;
+    const picked = sweepTargets(cards, slugs, only);
+    missing = picked.missing;
+    for (const slug of missing) console.log(`NO CARD ${slug}: Zone select shows no card for it`);
+    for (const { slug, name } of picked.targets) {
+      const card = { name };
       const context = await fresh(), zone = await context.newPage();
       /** @type {string[]} */
       const errors = [];
@@ -125,16 +147,19 @@ async function cli() {
       watchNet(zone, net);
       /** @type {import('./journey-proof.d.mts').Sample[]} */
       let samples = [];
-      let thrown = '';
+      let thrown = '', lead = 0;
       try {
-        await zone.goto(`${url}/`, { waitUntil: 'commit' });
-        samples = await tapJourney(zone, { card: card.name, budgetMs });
+        const opened = Date.now();
+        await zone.goto(cold ? chunkLink(url, slug) : `${url}/`, { waitUntil: 'commit' });
+        // a cold link boots straight into its world (or shows the zone's ENTER ZONE): time it from the load, not a tap
+        lead = Date.now() - opened;
+        samples = await tapJourney(zone, cold ? { card: card.name, path: 'deeplink', budgetMs } : { card: card.name, budgetMs });
       } catch (error) { thrown = (error instanceof Error ? error.message : String(error)).slice(0, 300); }
       await faults.settle();
       const shot = join(out, `${slug}.jpg`);
       await zone.screenshot({ path: shot, type: 'jpeg', quality: 60, timeout: 10_000 }).catch(() => undefined);
       await context.close();
-      const tap = samples[0]?.t ?? 0, played = samples.find((row) => label(row.s) === 'play');
+      const tap = cold ? -lead : samples[0]?.t ?? 0, played = samples.find((row) => label(row.s) === 'play');
       /** @type {string[]} */
       const path = [];
       for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t - tap)}:${l}`); }
@@ -150,9 +175,9 @@ async function cli() {
     }
   } finally { await browser.close(); }
   const after = await served(), build = before !== undefined && before === after ? before : undefined;
-  writeFileSync(join(out, 'results.json'), `${JSON.stringify({ url, ...(build === undefined ? {} : { build }), browser: browserName, blockWs, at: new Date().toISOString(), cards, results }, null, 1)}\n`);
+  writeFileSync(join(out, 'results.json'), `${JSON.stringify({ url, ...(build === undefined ? {} : { build }), browser: browserName, blockWs, entry: cold ? 'chunk' : 'card', missing, at: new Date().toISOString(), cards, results }, null, 1)}\n`);
   const passed = results.filter((r) => r.pass).length;
-  console.log(`${passed === results.length && results.length > 0 ? 'PASS' : 'FAIL'} zone sweep ${browserName}: ${String(passed)} of ${String(results.length)} zones open${build === undefined ? ' (the build moved during the run)' : ''}`);
+  console.log(`${passed === results.length && results.length > 0 ? 'PASS' : 'FAIL'} zone sweep ${browserName}${cold ? ' (?chunk= cold links)' : ''}: ${String(passed)} of ${String(results.length)} zones open${build === undefined ? ' (the build moved during the run)' : ''}`);
   process.exitCode = passed === results.length && results.length > 0 ? 0 : 1;
 }
 

@@ -16,8 +16,8 @@
 // one `main AMBER <sha> <file> <ms>/<budget>` receipt per file: the coordinator hands each out as a queue-skipping
 // fix row the same day (meta HOW-WE-BUILD-PLAN.md). AUDIO AU6 (J303): a shard whose audio is over 6 MB gives the same
 // kind of receipt, `main AMBER <sha> audio <shard> <tier> <MB>/6.00 MB`, from the cook report's test; never a red main.
-import {execFileSync} from 'node:child_process';
-import {appendFileSync,existsSync,mkdirSync,readFileSync,renameSync,rmSync,writeFileSync} from 'node:fs';
+import {execFileSync,spawn} from 'node:child_process';
+import {appendFileSync,existsSync,mkdirSync,openSync,readFileSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {setTimeout} from 'node:timers/promises';
@@ -348,4 +348,14 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
   const lost=sha!==undefined&&afterPush>0&&!await reached(io,sha,afterPush*1000);
   const verdicts=lost?[]:sha===undefined?sweep(io):await follow(io,{sha,lane:arg('lane'),pane:arg('pane')});
   for(const verdict of verdicts)process.stdout.write(`main-watch ${verdict.kind} ${short(verdict.run.head_sha)} run ${verdict.run.id}\n`);
+  // Meta STAGING-BUGBASH SB45: each pass also checks staging's placement serial and sweeps an upload's new card (a no-op fetch
+  // when nothing moved), detached from the canonical checkout so it outlives a land's worktree.
+  const {sweepOptedIn}=await import('./placement-sweep.mjs');
+  if(sweepOptedIn(process.env,existsSync,homedir())){
+    const here=resolve(import.meta.dirname,'..');
+    const root=dirname(resolve(here,execFileSync('git',['rev-parse','--git-common-dir'],{cwd:here,encoding:'utf8'}).trim()));
+    mkdirSync(join(root,'tmp/placement-sweep'),{recursive:true});
+    const log=openSync(join(root,'tmp/placement-sweep/sweep.log'),'a');
+    spawn(process.execPath,[join(root,'scripts/placement-sweep.mjs')],{cwd:root,detached:true,stdio:['ignore',log,log]}).unref();
+  }
 }

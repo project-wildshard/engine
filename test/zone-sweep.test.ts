@@ -1,6 +1,6 @@
 // Meta QA-FEEDBACK-2026-11-17 row 21: the zone sweep's pass rule (scripts/zone-sweep.mjs).
 import {expect, test} from 'vitest';
-import {wrongZone, zoneVerdict} from '../scripts/zone-sweep.mjs';
+import {chunkLink, sweepTargets, wrongZone, zoneVerdict} from '../scripts/zone-sweep.mjs';
 
 test('a zone passes only in the world within the budget, with no fault, error card or driver throw', () => {
   const ok = {enterMs: 12_000, errors: [], modal: false, thrown: ''};
@@ -18,4 +18,18 @@ test('a card whose loading card names another zone fails (Sky Reach loading Sign
   expect(zoneVerdict(row, 60_000)).toBe(false);
   expect(wrongZone({...row, zones: ['SKY REACH', '']})).toBeUndefined();
   expect(zoneVerdict({...row, zones: ['Sky Reach']}, 60_000)).toBe(true);
+});
+
+// STAGING-BUGBASH SB45 / ONE-FORMAT OF8b: the upload-boot bug passed the sweep because it only tapped cards in the loaded page.
+test('--chunk opens a zone by its cold ?chunk= link, past the title (QA row 16)', () => {
+  expect(chunkLink('https://staging.wildshard.io', 'mirror-salt')).toBe('https://staging.wildshard.io/?chunk=mirror-salt&skipintro=1');
+  expect(chunkLink('https://staging.wildshard.io/', 'a b')).toBe('https://staging.wildshard.io/?chunk=a%20b&skipintro=1');
+});
+
+test('--only keeps the cards it names, and names a slug with no card as missing rather than a failure (SA48)', () => {
+  const cards = [{ name: 'Driftwood Isle' }, { name: 'Mossgate' }, { name: 'Glowfen' }];
+  const slugs = { 'Driftwood Isle': 'driftwood-isle', Mossgate: 'mossgate' };
+  expect(sweepTargets(cards, slugs, undefined)).toEqual({
+    targets: [{ slug: 'driftwood-isle', name: 'Driftwood Isle' }, { slug: 'mossgate', name: 'Mossgate' }, { slug: 'Glowfen', name: 'Glowfen' }], missing: [] });
+  expect(sweepTargets(cards, slugs, ['mossgate', 'no-cook-upload'])).toEqual({ targets: [{ slug: 'mossgate', name: 'Mossgate' }], missing: ['no-cook-upload'] });
 });
