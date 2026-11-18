@@ -87,6 +87,9 @@ export class Physics {
     };
     this.world.createCollider = (desc, parent) => {
       const collider = createCollider(desc, parent), scope = this.creationOwner();
+      // The native mesh already owns its vertices and indices. Keep only
+      // Rapier's native copy unless a caller explicitly reads the JS shape.
+      if (desc.shape.type === R.ShapeType.TriMesh) collider.clearShapeCache();
       if (scope) {
         this.colliderOwners.set(collider.handle, scope);
         colliders.set(collider.handle, scope.capture('colliders', () => { if (!this.freed && collider.isValid()) this.world.removeCollider(collider, true); }));

@@ -40,6 +40,9 @@ for (const restored of [false, true]) for (const hover of [false, true]) test(`$
     expect(feet.x).toBeLessThan(-.5);
     expect(feet.x).toBeGreaterThan(-1);
     expect(colliders.get('house-wall')?.active()).toBe(true);
+    const mesh = physics.world.getCollider(colliders.get('house-wall')?.snapshot().handles[0] ?? -1);
+    expect(Reflect.get(mesh, '_shape')).toBe(restored ? undefined : null);
+    expect(mesh.indices()?.length).toBe(index.count);
     expect(physics.world.colliders.len()).toBe(2);
   } finally { motor.dispose(); scope.dispose(); physics.dispose(); geometry.dispose(); }
 });
