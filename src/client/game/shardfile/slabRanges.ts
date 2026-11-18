@@ -1,5 +1,6 @@
 import { BufferAttribute, type BufferGeometry, type Camera, FrontSide, Frustum, type Material, Matrix4, type Object3D, Vector3, WebGLCoordinateSystem } from 'three';
 import { drawNeutral } from '@wildshard/engine/render/drawNeutral';
+import { ownedArray, type OwnedLabel } from '@wildshard/engine/core/ownedBuffer';
 
 /**
  * NINE-DRAGON-BENCHMAX NB8: a slab chunk draws only the run of its triangles the camera can see. A resident cell's slab
@@ -216,6 +217,43 @@ export function slabTriangles(geometry: BufferGeometry): number | null {
   return index.count % 3 === 0 ? index.count / 3 : null;
 }
 
+/** MG10: the far levels' working tables (built in the slab tree worker) */
+const FAR_SCRATCH: OwnedLabel = { owner: 'engine/slab-far', asset: 'far-levels', kind: 'scratch' };
+/** MG10: ids for integer keys (below 2^53), handed out 0, 1, 2 ... in the order keys are first seen: an open-addressing
+ *  table in two typed arrays, sized for at most `most` keys */
+class IdTable {
+  private readonly keys: Float64Array;
+  private readonly ids: Int32Array;
+  private readonly mask: number;
+  size = 0;
+  constructor(most: number) {
+    let capacity = 16; while (capacity < most * 2) capacity *= 2;
+    this.keys = ownedArray(Float64Array, capacity, FAR_SCRATCH); this.ids = ownedArray(Int32Array, capacity, FAR_SCRATCH).fill(-1); this.mask = capacity - 1;
+  }
+  clear(): void { if (this.size > 0) { this.ids.fill(-1); this.size = 0; } }
+  id(key: number): number {
+    const low = key >>> 0, high = Math.floor(key / 4294967296) >>> 0;
+    let at = (Math.imul(low ^ Math.imul(high, 0x9e3779b1), 0x85ebca6b) ^ (low >>> 15)) & this.mask;
+    for (;;) {
+      const id = this.ids[at] ?? -1;
+      if (id < 0) { this.keys[at] = key; this.ids[at] = this.size; return this.size++; }
+      if (this.keys[at] === key) return id;
+      at = (at + 1) & this.mask;
+    }
+  }
+}
+
+/** MG10: a growing run of triangle corners in a typed array (a number[] of them cost 8 bytes a corner and its growth) */
+class Corners {
+  private array = new Uint32Array(1024);
+  length = 0;
+  push(a: number, b: number, c: number): void {
+    if (this.length + 3 > this.array.length) { const grown = ownedArray(Uint32Array, this.array.length * 2, FAR_SCRATCH); grown.set(this.array); this.array = grown; }
+    this.array[this.length] = a; this.array[this.length + 1] = b; this.array[this.length + 2] = c; this.length += 3;
+  }
+  done(): Uint32Array { return this.array.slice(0, this.length); }
+}
+
 /**
  * NB23 (b): the far levels of a chunk whose index (`corners`, the tree's order) and tree `ranges` are built: per level
  * (`cells`, finest first), each leaf's coarse triangles, laid level after level and leaf after leaf (so a run of far leaves
@@ -230,38 +268,40 @@ export function slabFarLevels(corners: ArrayLike<number>, xyz: ArrayLike<number>
     const a = corners[t * 3] ?? 0, b = corners[t * 3 + 1] ?? 0, c = corners[t * 3 + 2] ?? 0;
     const cell = facingOf(xyz, a, b, c, scratch, 0), { x, y, z } = normalOf(xyz, a, b, c);
     wound[t * 3] = x; wound[t * 3 + 1] = y; wound[t * 3 + 2] = z;
-    for (const v of [a, b, c]) if ((looks[v] ?? 0) < 0) looks[v] = cell;
+    if ((looks[a] ?? 0) < 0) looks[a] = cell;
+    if ((looks[b] ?? 0) < 0) looks[b] = cell;
+    if ((looks[c] ?? 0) < 0) looks[c] = cell;
   }
+  // MG10 (mini-ninemem7): the ids below come from typed hash tables, not Maps: a Map entry cost a worker ~60 bytes, and
+  // Nine's largest chunk (~0.5 M vertices, five tables of them) took ~180 MB of WebKit for 0.3 s. Ids are handed out in
+  // the order keys are first seen, as the Maps did, so the levels are the same bytes.
+  const table = new IdTable(vertices);
   // and its kinds: the look becomes one id per facing cell and kind values (FNV-1a over the values' float32 bits)
   const look = new Int32Array(vertices);
   if (kinds.length === 0) for (let v = 0; v < vertices; v++) look[v] = (looks[v] ?? -1) + 1;
   else {
-    const seen = new Map<number, number>(), word = new Float32Array(1), bits = new Uint32Array(word.buffer);
+    const word = new Float32Array(1), bits = new Uint32Array(word.buffer);
     for (let v = 0; v < vertices; v++) {
       let hash = 0x811c9dc5;
       for (const { array, itemSize } of kinds) for (let k = 0; k < itemSize; k++) { word[0] = array[v * itemSize + k] ?? 0; hash = Math.imul(hash ^ (bits[0] ?? 0), 0x01000193) >>> 0; }
-      const key = ((looks[v] ?? -1) + 1) * 4294967296 + hash;
-      let id = seen.get(key); if (id === undefined) { id = seen.size; seen.set(key, id); }
-      look[v] = id;
+      look[v] = table.id(((looks[v] ?? -1) + 1) * 4294967296 + hash);
     }
   }
   const starts = new Int32Array(count * levels).fill(-1), ends = new Int32Array(count * levels).fill(-1), kept = Float64Array.from(cells);
-  const out: number[] = [];
-  const moved = new Int32Array(vertices);
+  const out = new Corners(), grid = new IdTable(vertices);
+  const moved = new Int32Array(vertices), place = ownedArray(Int32Array, vertices, FAR_SCRATCH), cluster = new Int32Array(vertices);
   for (let level = 0; level < levels; level++) {
     const size = cells[level] ?? Infinity, before = out.length;
     if (!(size > 0 && Number.isFinite(size))) { kept[level] = Infinity; continue; }
     // the clusters: grid cell (15 bits an axis, ±1.6 km at 0.1 m), then grid cell and look
-    const grid = new Map<number, number>(), ids = new Map<number, number>(), cluster = new Int32Array(vertices);
+    grid.clear();
     for (let v = 0; v < vertices; v++) {
       const x = Math.floor((xyz[v * 3] ?? 0) / size) + 16384, y = Math.floor((xyz[v * 3 + 1] ?? 0) / size) + 16384, z = Math.floor((xyz[v * 3 + 2] ?? 0) / size) + 16384;
-      const place = (x * 32768 + y) * 32768 + z;
-      let at = grid.get(place); if (at === undefined) { at = grid.size; grid.set(place, at); }
-      const key = at * 2097152 + (look[v] ?? 0);
-      let id = ids.get(key); if (id === undefined) { id = ids.size; ids.set(key, id); }
-      cluster[v] = id;
+      place[v] = grid.id((x * 32768 + y) * 32768 + z);
     }
-    const n = ids.size, sum = new Float64Array(n * 3), members = new Int32Array(n), best = new Int32Array(n).fill(-1), near = new Float64Array(n).fill(Infinity);
+    table.clear();
+    for (let v = 0; v < vertices; v++) cluster[v] = table.id((place[v] ?? 0) * 2097152 + (look[v] ?? 0));
+    const n = table.size, sum = new Float64Array(n * 3), members = new Int32Array(n), best = new Int32Array(n).fill(-1), near = new Float64Array(n).fill(Infinity);
     for (let v = 0; v < vertices; v++) { const id = cluster[v] ?? 0; sum[id * 3] = (sum[id * 3] ?? 0) + (xyz[v * 3] ?? 0); sum[id * 3 + 1] = (sum[id * 3 + 1] ?? 0) + (xyz[v * 3 + 1] ?? 0); sum[id * 3 + 2] = (sum[id * 3 + 2] ?? 0) + (xyz[v * 3 + 2] ?? 0); members[id] = (members[id] ?? 0) + 1; }
     for (let v = 0; v < vertices; v++) {
       const id = cluster[v] ?? 0, m = members[id] ?? 1;
@@ -290,7 +330,7 @@ export function slabFarLevels(corners: ArrayLike<number>, xyz: ArrayLike<number>
       for (let node = 0; node < count; node++) { starts[node * levels + level] = -1; ends[node * levels + level] = -1; }
     }
   }
-  return { corners: Uint32Array.from(out), far: { cells: kept, starts, ends } };
+  return { corners: out.done(), far: { cells: kept, starts, ends } };
 }
 
 /** a triangle's wound normal (not normalised; zero with no area), into `normal` */

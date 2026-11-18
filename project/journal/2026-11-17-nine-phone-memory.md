@@ -129,3 +129,19 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
   median 1,681 -> 1,649 MB, settled 939 -> 931, GPU process settled 681-687 (one run 1,542) -> 578-579. EM11 phone
   loading 1.95 -> 1.90 GB, playing 1.17 -> 1.12 GB. Spawn shots match within the rain (base-vs-base 17.9%, base-vs-cut
   12.3-17.1% of pixels over 8 levels).
+
+## mini-ninemem7, 2026-11-18: far levels after the loader, in a fresh worker
+
+- mini-ninemem6's cut 3 (far levels 4 s after the loader's last tree) cut the loading peak but kept the tree worker and
+  its heap alive for the levels: settled +160 MB. Now a loader tree comes back alone with the positions it was sent; the
+  main thread holds the tree-ordered corners, positions and colour kinds (~26 MB on Nine), the loader's worker goes as
+  soon as its trees are in, and 8 s after the last tree a fresh worker builds the levels one chunk at a time.
+- Two traps on the way: reading a released `position.array` at far time read it back from the GPU and kept it on the
+  CPU (memorySaver `restore`, +14 MB settled), so the worker hands the positions back with the tree; and at 4 s the
+  pass (~1 s: WebContent +100 MB, GPU process +70 MB while ANGLE retires the index's old storage) fell exactly on
+  EM4's settled reading (control + 3-4 s), so it waits 8 s.
+- `slabFarLevels`' Maps (~60 B an entry, five tables of ~0.5 M on Nine's biggest chunk) and `number[]` corners are typed
+  tables: that chunk's pass fell from ~+180 to ~+100 MB. Same bytes as the Map version over 4 meshes x 18 settings.
+- WebKit [K], 5 alternating cold runs, instrument minimal, base `7addc873`: WebContent peak 1,473 -> 1,245 MB, settled
+  756 -> 762 (noise), GPU 519 -> 527; with a 10 s settle (after the pass) 745 -> 732 and 508 -> 522. Simulator n1:
+  loading 0.870 -> 0.807 GB native, play high-water 0.753 -> 0.803 (the pass now lands in play).

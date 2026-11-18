@@ -111,22 +111,87 @@ function attach(part: InstancedMesh, geometry: BufferGeometry, ranges: SlabRange
 let treeWorker: Worker | null | undefined;
 const asked = new Map<number, BufferGeometry>();
 let asks = 0;
+/**
+ * MG10 (mini-ninemem6, mini-ninemem7): the far levels wait for the boot's garbage to go. Built with the trees under the
+ * loader they cost Nine ~110-160 MB of WebKit's loading peak (the worker's cluster tables on top of the slab stage's
+ * uncollected garbage). A tree asked for while the loader settles (`tilesSettling`) comes back alone, with the positions it
+ * was sent; the main thread keeps what the chunk's far levels need (those positions, its corners in the tree's order, its
+ * kinds) and the loader's worker goes as soon as its trees are in, its heap with it (kept alive for the levels it cost
+ * ~160 MB of WebKit's settled memory). `FAR_AFTER_LAST_MS` after the last such tree (no loader signal: the Simulator's
+ * explorer showed a wait on one can outlast the boot) a fresh worker builds the levels from those copies, one chunk at a
+ * time, they land in the room the index kept for them and the worker goes too. That pass is a ~1 s transient in play
+ * (Nine: ~+100 MB WebContent, ~+70 MB GPU process while ANGLE retires the written index's old storage); at 4 s it fell on
+ * control + 3 s, the window WebKit's own boot collection and EM4's settled reading share, so it waits 8 s. Until then a far
+ * leaf draws its own triangles (the full detail the far levels stand in for). A tree asked for in play builds its levels
+ * with it, as before.
+ */
+export const FAR_AFTER_LAST_MS = 8000;
+let farQuiet = true;
+let farRound = 0;
+interface FarChunk {
+  readonly geometry: BufferGeometry; readonly room: number; readonly kinds: readonly { readonly array: ArrayLike<number> & { readonly buffer: ArrayBufferLike }; readonly itemSize: number }[];
+  /** set when its tree landed: its corners in the tree's order, turned as `turned` says (the index's way when written),
+   *  and its positions as sent (the worker gives them back: the geometry's own may be on the GPU only by then) */
+  order?: Uint32Array; xyz?: Float32Array; turned?: boolean; sentTurned?: boolean;
+}
+/** chunks whose tree came (or comes) back alone, their far levels still to build */
+const farHeld = new Map<number, FarChunk>();
+/** far levels a worker is building, by tree id: the chunk and whether the corners it was sent were turned */
+const farAsked = new Map<number, { readonly geometry: BufferGeometry; readonly sentTurned: boolean }>();
+function farWait(): boolean {
+  if (!tilesSettling()) return false;
+  farQuiet = false;
+  const round = ++farRound;
+  pageScope.timeout(FAR_AFTER_LAST_MS, () => { if (round === farRound) { farQuiet = true; askFar(); } });
+  return true;
+}
+function treeWorkerIdle(): void { if (asked.size === 0 && farAsked.size === 0) { treeWorker?.terminate(); treeWorker = undefined; } }
+/** the slab tree worker, started when none runs; null: no workers here (or one failed), so no faced trees */
+function slabTreeWorker(): Worker | null {
+  if (treeWorker !== undefined) return treeWorker;
+  try {
+    const worker = new Worker(new URL('slabTree.worker.ts', import.meta.url), { type: 'module', name: 'nb8-slab-tree' });
+    worker.onmessage = landed;
+    worker.onerror = (event: ErrorEvent): void => {
+      event.preventDefault(); worker.terminate(); treeWorker = null;
+      for (const sent of asked.values()) PENDING.delete(sent);
+      asked.clear(); farAsked.clear(); farHeld.clear(); unpark();
+    };
+    treeWorker = worker;
+  } catch { treeWorker = null; }
+  return treeWorker;
+}
+/** the held chunks whose trees are in, to a fresh worker for their far levels, once the trees under the loader went quiet:
+ *  one chunk at a time, so the worker holds one chunk's cluster tables, not every chunk's at once */
+function askFar(): void {
+  if (!farQuiet || treeWorker === null || farAsked.size > 0) return;
+  for (const [id, chunk] of farHeld) {
+    const { geometry, order, xyz, turned, sentTurned } = chunk;
+    if (order === undefined || xyz === undefined || turned === undefined || sentTurned === undefined) continue;
+    farHeld.delete(id);
+    const ranges = RANGES.get(geometry);
+    if (ranges === undefined) continue;
+    const worker = slabTreeWorker();
+    if (worker === null) return;
+    // the corners as the worker built the tree: the landing turned them in place to the index's way (`a b c` -> `c a b`,
+    // memorySaver `writeIndexTriangles`), so turn them back
+    if (turned !== sentTurned) for (let at = 0; at + 2 < order.length; at += 3) {
+      const a = order[at] ?? 0, b = order[at + 1] ?? 0, c = order[at + 2] ?? 0;
+      if (turned) { order[at] = b; order[at + 1] = c; order[at + 2] = a; } else { order[at] = c; order[at + 1] = a; order[at + 2] = b; }
+    }
+    const nodes = ranges.nodes.slice();
+    farAsked.set(id, { geometry, sentTurned });
+    worker.postMessage({ farOf: id, corners: order, xyz, nodes, triangles: ranges.triangles, far: SLAB_FAR_CELLS, room: chunk.room, kinds: chunk.kinds },
+      { transfer: [order.buffer, xyz.buffer, nodes.buffer, ...chunk.kinds.map(kind => kind.array.buffer)] });
+    return;
+  }
+}
 function facedTree(geometry: BufferGeometry): void {
   if (!TIER_CONFIG.slabFacing || typeof Worker !== 'function' || treeWorker === null) return;
   const index = geometry.index, position = geometry.getAttribute('position');
   if (index === null || !(position instanceof BufferAttribute) || position.itemSize !== 3 || position.normalized || !(position.array instanceof Float32Array)) return;
-  if (treeWorker === undefined) {
-    try {
-      const worker = new Worker(new URL('slabTree.worker.ts', import.meta.url), { type: 'module', name: 'nb8-slab-tree' });
-      worker.onmessage = landed;
-      worker.onerror = (event: ErrorEvent): void => {
-        event.preventDefault(); worker.terminate(); treeWorker = null;
-        for (const sent of asked.values()) PENDING.delete(sent);
-        asked.clear(); unpark();
-      };
-      treeWorker = worker;
-    } catch { treeWorker = null; return; }
-  }
+  const worker = slabTreeWorker();
+  if (worker === null) return;
   // NB23 (b): the far levels' room after the chunk's own triangles, made now, before the chunk's first upload (a GPU
   // buffer never grows); the draw range keeps every other draw (shadows, warms, raycasts) to the chunk's own
   const own = slabTriangles(geometry);
@@ -143,29 +208,67 @@ function facedTree(geometry: BufferGeometry): void {
   const kinds = room > 0 ? SLAB_FAR_KINDS.flatMap(name => { const channel = geometry.getAttribute(name);
     return channel instanceof BufferAttribute && channel.array.length === channel.count * channel.itemSize ? [{ array: channel.array.slice(), itemSize: channel.itemSize }] : []; }) : [];
   asked.set(id, geometry); PENDING.set(geometry, geometry.index !== null && indexTurned(geometry.index));
-  treeWorker.postMessage({ id, index: corners, xyz, ...(room > 0 ? { far: SLAB_FAR_CELLS, room, kinds } : {}) }, { transfer: [corners.buffer, xyz.buffer, ...kinds.map(kind => kind.array.buffer)] });
+  if (room > 0 && farWait()) {
+    // MG10: the tree alone now; the far levels from the main thread's copies later (`askFar`)
+    farHeld.set(id, { geometry, room, kinds });
+    worker.postMessage({ id, index: corners, xyz, keep: true }, { transfer: [corners.buffer, xyz.buffer] });
+    return;
+  }
+  worker.postMessage({ id, index: corners, xyz, ...(room > 0 ? { far: SLAB_FAR_CELLS, room, kinds } : {}) }, { transfer: [corners.buffer, xyz.buffer, ...kinds.map(kind => kind.array.buffer)] });
 }
 function landed(event: MessageEvent<unknown>): void {
   const reply = event.data;
   if (typeof reply !== 'object' || reply === null) return;
   const id: unknown = Reflect.get(reply, 'id'), tree: unknown = Reflect.get(reply, 'tree');
-  const geometry = typeof id === 'number' ? asked.get(id) : undefined;
-  if (typeof id === 'number') asked.delete(id);
-  if (asked.size === 0) { treeWorker?.terminate(); treeWorker = undefined; }
-  if (geometry === undefined) return;
+  if (typeof id !== 'number') return;
+  const farOf = farAsked.get(id);
+  if (farOf !== undefined && Reflect.has(reply, 'far')) {
+    farAsked.delete(id);
+    const far: unknown = Reflect.get(reply, 'far');
+    try { if (typeof far === 'object' && far !== null) landFar(farOf.geometry, far, farOf.sentTurned); }
+    finally { askFar(); treeWorkerIdle(); }
+    return;
+  }
+  const geometry = asked.get(id);
+  asked.delete(id);
+  treeWorkerIdle();
+  if (geometry === undefined) { farHeld.delete(id); return; }
   const sentTurned = PENDING.get(geometry) ?? false;
   PENDING.delete(geometry);
-  try { if (typeof tree === 'object' && tree !== null) land(geometry, tree, sentTurned); }
-  finally { unpark(); }
+  const held = farHeld.get(id);
+  try {
+    const order: unknown = typeof tree === 'object' && tree !== null ? Reflect.get(tree, 'index') : undefined, xyz: unknown = Reflect.get(reply, 'xyz');
+    if (typeof tree === 'object' && tree !== null && land(geometry, tree, sentTurned) && held !== undefined && order instanceof Uint32Array && xyz instanceof Float32Array && geometry.index !== null) {
+      // the far levels' corners: the landing wrote them, turned in place to the index's way
+      held.order = order; held.xyz = xyz; held.turned = indexTurned(geometry.index); held.sentTurned = sentTurned;
+      askFar();
+    } else farHeld.delete(id);
+  } finally { unpark(); }
+}
+/** a chunk's far levels, built after its tree (`farWait`): into its index's room, and every part drawing it culled again */
+function landFar(geometry: BufferGeometry, far: object, sentTurned: boolean): void {
+  const ranges = RANGES.get(geometry), index = geometry.index, own = slabTriangles(geometry);
+  const farCorners: unknown = Reflect.get(far, 'farCorners'), farCells: unknown = Reflect.get(far, 'farCells');
+  const farStarts: unknown = Reflect.get(far, 'farStarts'), farEnds: unknown = Reflect.get(far, 'farEnds');
+  if (ranges === undefined || index === null || own === null || !(farCorners instanceof Uint32Array) || !(farCells instanceof Float64Array)
+    || !(farStarts instanceof Int32Array) || !(farEnds instanceof Int32Array) || own * 3 + farCorners.length > index.count
+    || farStarts.length !== farCells.length * ranges.nodes.length / 4 || farEnds.length !== farStarts.length) return;
+  if (!writeIndexTriangles(index, [{ at: own * 3, triangles: farCorners }], sentTurned)) return;
+  const next: SlabRanges = { ...ranges, far: { cells: farCells, starts: farStarts, ends: farEnds } };
+  FACED.add(next); RANGES.set(geometry, next);
+  for (const [part, scope] of DRAWERS.get(geometry) ?? []) {
+    if (scope.disposed || scope.disposing) DRAWERS.get(geometry)?.delete(part);
+    else cullSlabRanges(part, next, TIER_CONFIG.slabLodAngle, cullOptions());
+  }
 }
 /** the faced tree `tree` of `geometry` (sent with its triangles turned or not, `sentTurned`): its index rewritten in the
  *  tree's order, its far levels after, and every part drawing it culled by the tree */
-function land(geometry: BufferGeometry, tree: object, sentTurned: boolean): void {
+function land(geometry: BufferGeometry, tree: object, sentTurned: boolean): boolean {
   const order: unknown = Reflect.get(tree, 'index'), boxes: unknown = Reflect.get(tree, 'boxes'), nodes: unknown = Reflect.get(tree, 'nodes');
   const size: unknown = Reflect.get(tree, 'size'), cones: unknown = Reflect.get(tree, 'cones'), triangles: unknown = Reflect.get(tree, 'triangles');
   const index = geometry.index, own = slabTriangles(geometry);
   if (index === null || own === null || !(order instanceof Uint32Array) || !(boxes instanceof Float32Array) || !(nodes instanceof Int32Array) || !(size instanceof Float32Array)
-    || !(cones instanceof Float32Array) || typeof triangles !== 'number' || order.length !== own * 3 || triangles !== own) return;
+    || !(cones instanceof Float32Array) || typeof triangles !== 'number' || order.length !== own * 3 || triangles !== own) return false;
   // NB23 (b): and the far levels in the room after them (`facedTree`)
   const farCorners: unknown = Reflect.get(tree, 'farCorners'), farCells: unknown = Reflect.get(tree, 'farCells');
   const farStarts: unknown = Reflect.get(tree, 'farStarts'), farEnds: unknown = Reflect.get(tree, 'farEnds');
@@ -174,7 +277,7 @@ function land(geometry: BufferGeometry, tree: object, sentTurned: boolean): void
   // the same triangles in the tree's order (whatever order the chunk drew in, every range from here reads this one), and
   // the far levels in the room after them, turned as the index draws now (WebKit's first-vertex convention); a released
   // index (the Memory saver's) is written on the GPU, never read back
-  if (!writeIndexTriangles(index, [{ at: 0, triangles: order }, ...(farOk ? [{ at: own * 3, triangles: farCorners }] : [])], sentTurned)) return;
+  if (!writeIndexTriangles(index, [{ at: 0, triangles: order }, ...(farOk ? [{ at: own * 3, triangles: farCorners }] : [])], sentTurned)) return false;
   const far: SlabFar | undefined = farOk ? { cells: farCells, starts: farStarts, ends: farEnds } : undefined;
   const ranges: SlabRanges = { boxes, nodes, triangles, size, cones, ...(far === undefined ? {} : { far }) };
   FACED.add(ranges); RANGES.set(geometry, ranges); LATE.delete(geometry);
@@ -182,6 +285,7 @@ function land(geometry: BufferGeometry, tree: object, sentTurned: boolean): void
     if (scope.disposed || scope.disposing) DRAWERS.get(geometry)?.delete(part);
     else cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle, cullOptions());
   }
+  return true;
 }
 
 function slabMesh(node: Object3D): node is Mesh { return node instanceof Mesh; }
