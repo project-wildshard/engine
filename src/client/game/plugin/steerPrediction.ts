@@ -34,8 +34,8 @@ export class SteerPrediction {
       fields: { 1: 0, [STEER_FIELDS.yaw]: euler.y, 3: 0, 4: 1, [STEER_FIELDS.speed]: 0, [STEER_FIELDS.ridden]: 1 } };
   }
   /** One step on the rider's stick, over `ground` when the page found ground under a ground-following vehicle. */
-  step(stick: MoverSteer, ground: number | undefined): void {
-    this.entity = this.mechanic.step(this.entity, { tick: this.tick++, dt: STEP, action: 0, permission: 0, steer: stick, ...(ground === undefined ? {} : { ground }) }).entity;
+  step(stick: MoverSteer, ground: number | undefined, blocked = false): void {
+    this.entity = this.mechanic.step(this.entity, { tick: this.tick++, dt: STEP, action: 0, permission: 0, steer: stick, ...(ground === undefined ? {} : { ground }), ...(blocked ? { blocked } : {}) }).entity;
     const [x, y, z] = this.entity.position;
     this.steps.push({ x, y, z, yaw: this.entity.fields[STEER_FIELDS.yaw] ?? 0 });
     if (this.steps.length > KEPT) this.steps.shift();
@@ -56,6 +56,8 @@ export class SteerPrediction {
     const [x, y, z] = this.entity.position;
     this.entity = { ...this.entity, position: [x + dx, y + dy, z + dz], fields: { ...this.entity.fields, [STEER_FIELDS.yaw]: wrap((this.entity.fields[STEER_FIELDS.yaw] ?? 0) + turn) } };
   }
+  /** Its heading now (SS-GP5c: the ground probe looks past its bow). */
+  yaw(): number { return this.entity.fields[STEER_FIELDS.yaw] ?? 0; }
   /** Where the page has it now. */
   pose(): MoverPose {
     const [x, y, z] = this.entity.position, f = this.entity.fields;

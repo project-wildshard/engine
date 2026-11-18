@@ -20,7 +20,7 @@ import { KinematicMover, type MoverBox, type MoverPose } from "@wildshard/engine
 import { RopeChain } from "@wildshard/engine/physics/ropeChain";
 import { MOVER_FIELDS, MOVER_FIELD_RANGES, moverScriptEntities } from "../../../shared/game/shardfile/movers";
 import { MoverLifecycle, MoverLifecycleStateSchema, moverEndState, type MoverEndEvent } from '@wildshard/engine/sim/moverLifecycle';
-import { MoverMechanic, STEER_PROBE, steerFrame, steerInput, steerStick, type MoverSteer, type NativeMoverMotion } from '@wildshard/engine/sim/moverMotion';
+import { MoverMechanic, STEER_PROBE, steerFrame, steerGround, steerInput, steerReach, steerStick, type MoverSteer, type NativeMoverMotion } from '@wildshard/engine/sim/moverMotion';
 import { floorBelow } from '@wildshard/engine/physics/query';
 import { localWalkingMove } from '@wildshard/engine/player/walk';
 import { parseMovers, type MoverData } from "@wildshard/format/movers";
@@ -414,8 +414,10 @@ export class MoverRuntime {
     const yaw = e.fields[MOVER_FIELDS.yaw] ?? 0, ridden = e.fields[MOVER_FIELDS.raising] === 1;
     const stick = ridden ? this.activation.steer?.(this.riders.get(m.id), yaw) : undefined;
     // SS-GP5: the probe passes through the vehicle's own hull, or it would climb onto itself
-    const ground = m.driver.ground ? floorBelow(this.physics(), e.position[0], e.position[2], e.position[1] + STEER_PROBE.up, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== m.id) : undefined;
-    return [...input, ...steerInput(stick, ground)];
+    // SS-GP5c: and it climbs no wall: one at its bow stops it
+    const probe = m.driver.ground ? steerGround((x, z, fromY) => floorBelow(this.physics(), x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== m.id),
+      { x: e.position[0], y: e.position[1], z: e.position[2] }, yaw, steerReach(this.hulls.get(m.id))) : undefined;
+    return [...input, ...steerInput(stick, probe?.ground, probe?.blocked)];
   }
   /** Anyone's real ground: one player on a plate holds it down for the room. */
   private stoodOn(id: string): boolean {

@@ -10,7 +10,9 @@ export interface MoverFrame { readonly tick: number; readonly dt: number; readon
   /** SS-MS2a1b: a steer vehicle's rider's stick this tick, in the vehicle's frame (throttle forward, turn right, each -1 to 1). */
   readonly steer?: MoverSteer;
   /** The ground height under a steer vehicle that follows the ground, when the caller found one. */
-  readonly ground?: number }
+  readonly ground?: number;
+  /** SS-GP5c: a wall stands at the steer vehicle's bow (`steerGround`): it does not move on, though it still turns. */
+  readonly blocked?: boolean }
 /** A rider's stick for a steer vehicle. */
 export interface MoverSteer { readonly throttle: number; readonly turn: number; readonly boost: boolean }
 /** Fields a steer vehicle publishes: heading (as every mover), speed as a share of its boosted top speed (fields are 0 to 1),
@@ -20,6 +22,25 @@ const signed = (x: number): number => Number.isFinite(x) ? Math.max(-1, Math.min
 const COORD = 250;
 /** How far above and below a ground-following steer vehicle its ground probe reaches (m): the server's and its rider's page. */
 export const STEER_PROBE = { up: 2, down: 4 } as const;
+/** SS-GP5c: the most a ground-following steer vehicle climbs at once (m), as a walker's step: a rise past it just ahead of
+ *  its bow is a wall it stops at, and a floor that far above it underneath is never stood on. */
+export const STEER_STEP = 0.5;
+/** How far before and past a steer vehicle's bow `steerGround` compares the floor (m): a slope rises less than a step there. */
+const BOW_SPAN = 0.25;
+/** SS-GP5c: a ground-following steer vehicle's ground and whether its bow meets a wall, the server's and its rider's page
+ *  alike. `floor` probes down from `fromY` and passes through the vehicle's own hull; `reach` is how far its bow stands
+ *  ahead of its centre (`steerReach`). A land-sail driven into Mirror Salt's race cube (2.5 m) stood on its top. */
+export function steerGround(floor: (x: number, z: number, fromY: number) => number | undefined, at: { readonly x: number; readonly y: number; readonly z: number }, yaw: number, reach: number): { readonly ground: number | undefined; readonly blocked: boolean } {
+  const top = at.y + STEER_PROBE.up, under = floor(at.x, at.z, top), forwardX = -Math.sin(yaw), forwardZ = -Math.cos(yaw);
+  const before = floor(at.x + forwardX * (reach - BOW_SPAN), at.z + forwardZ * (reach - BOW_SPAN), top);
+  const past = floor(at.x + forwardX * (reach + BOW_SPAN), at.z + forwardZ * (reach + BOW_SPAN), top);
+  return { ground: under !== undefined && under > at.y + STEER_STEP ? undefined : under,
+    blocked: past !== undefined && past > Math.max(at.y, before ?? at.y) + STEER_STEP };
+}
+/** SS-GP5c: how far a steer vehicle's bow stands ahead of its centre: its hull's farthest point forward (its frame's -z). */
+export function steerReach(hull: readonly { readonly z: number; readonly hz: number }[] | undefined): number {
+  return (hull ?? []).reduce((reach, box) => Math.max(reach, box.hz - box.z), 0);
+}
 /** SS-MS2a1b: a rider's world move (the walk's, off a command) as a steer vehicle's stick in its frame (heading `yaw`): forward
  *  is throttle, right is turn. The server reads it off the rider's command and the rider's page off its own (SS-MS2a3b). */
 export function steerStick(move: { readonly x: number; readonly z: number }, yaw: number, boost: boolean): MoverSteer {
@@ -29,14 +50,14 @@ export function steerStick(move: { readonly x: number; readonly z: number }, yaw
 /** Where a steer vehicle's frame rides the mover's numeric input, after the 12 numbers every mover reads. */
 const STEER_INPUT = 12;
 /** A steer vehicle's stick and ground as numeric mover input (the composed lane's one ABI). */
-export function steerInput(stick: MoverSteer | undefined, ground: number | undefined): number[] {
-  return [signed(stick?.throttle ?? 0), signed(stick?.turn ?? 0), Number(stick?.boost === true), Number(ground !== undefined), ground ?? 0];
+export function steerInput(stick: MoverSteer | undefined, ground: number | undefined, blocked = false): number[] {
+  return [signed(stick?.throttle ?? 0), signed(stick?.turn ?? 0), Number(stick?.boost === true), Number(ground !== undefined), ground ?? 0, Number(blocked)];
 }
 /** The frame fields `steerInput` wrote, or none for any other mover's input. */
-export function steerFrame(input: readonly number[]): Pick<MoverFrame, 'steer' | 'ground'> {
+export function steerFrame(input: readonly number[]): Pick<MoverFrame, 'steer' | 'ground' | 'blocked'> {
   if (input.length < STEER_INPUT + 5) return {};
-  const [throttle = 0, turn = 0, boost = 0, grounded = 0, ground = 0] = input.slice(STEER_INPUT);
-  return { steer: { throttle, turn, boost: boost === 1 }, ...(grounded === 1 ? { ground } : {}) };
+  const [throttle = 0, turn = 0, boost = 0, grounded = 0, ground = 0, blocked = 0] = input.slice(STEER_INPUT);
+  return { steer: { throttle, turn, boost: boost === 1 }, ...(grounded === 1 ? { ground } : {}), ...(blocked === 1 ? { blocked: true } : {}) };
 }
 /** A detached next state; the existing world validates and commits it before publishing collision or views. */
 export interface MoverAdvance { readonly entity: ScriptEntity; readonly effects: readonly ScriptEffect[] }
@@ -88,13 +109,14 @@ export class MoverMechanic {
       if (frame.action === 1) ridden = 1; else if (frame.action === 2) ridden = 0;
       const stick = ridden === 1 ? frame.steer : undefined, throttle = Math.max(0, signed(stick?.throttle ?? 0)), turn = signed(stick?.turn ?? 0);
       const target = throttle * driver.speed * (stick?.boost === true ? driver.boost : 1), change = driver.accel * frame.dt;
-      speed = speed < target ? Math.min(target, speed + change) : Math.max(target, speed - change);
+      // SS-GP5c: a wall at the bow stops it dead; it can still turn away
+      speed = frame.blocked === true ? 0 : speed < target ? Math.min(target, speed + change) : Math.max(target, speed - change);
       yaw = wrap(yaw - turn * driver.turn * frame.dt);
       // SS-MS2a2: a sail's wind push adds along the heading as far as the stick opens it (a let-go sail is furled):
       // straight downwind the full push, across none, upwind it holds the vehicle back, never past a stand
       const forwardX = -Math.sin(yaw), forwardZ = -Math.cos(yaw), wind = driver.wind;
       const along = wind === undefined ? 0 : throttle * wind.push * (wind.toward[0] * forwardX + wind.toward[1] * forwardZ) / Math.hypot(...wind.toward);
-      const [x0, y0, z0] = before.position, step = Math.max(0, speed + along) * frame.dt;
+      const [x0, y0, z0] = before.position, step = frame.blocked === true ? 0 : Math.max(0, speed + along) * frame.dt;
       const x = Math.max(-COORD, Math.min(COORD, x0 + forwardX * step)), z = Math.max(-COORD, Math.min(COORD, z0 + forwardZ * step));
       // a ground follower keeps its last height over a gap; a level vehicle keeps its rest height
       const y = !driver.ground ? motion.at.y : frame.ground !== undefined && Number.isFinite(frame.ground) ? Math.max(-COORD, Math.min(COORD, frame.ground)) : y0;

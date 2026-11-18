@@ -11,7 +11,7 @@ import type { Interactable } from '@wildshard/engine/world/interact/types';
 import { parseMovers, type MoverData } from '@wildshard/format/movers';
 import { floorBelow } from '@wildshard/engine/physics/query';
 import { tagOf } from '@wildshard/engine/physics/surface';
-import { STEER_PROBE, type MoverSteer } from '@wildshard/engine/sim/moverMotion';
+import { STEER_PROBE, steerGround, steerReach, type MoverSteer } from '@wildshard/engine/sim/moverMotion';
 import { SteerPrediction, type SteerRow } from './steerPrediction';
 import { moverScriptEntities } from '../../../shared/game/shardfile/movers';
 import { carryPrompt } from '../../../shared/game/shardfile/wirePrompts';
@@ -78,11 +78,13 @@ export class FollowedMovers {
   /** SS-MS2a3b: the ridden vehicle this page steps on its rider's stick, ahead of its rows. */
   private prediction: { readonly id: string; readonly run: SteerPrediction } | null = null;
   private readonly physics: Physics;
+  /** SS-GP5c: each steer vehicle's hull, whose bow its ground probe looks past for a wall (`steerReach`). */
+  private readonly hulls: ReadonlyMap<string, readonly MoverBox[]>;
   constructor(data: MoverData, ports: { readonly physics: Physics; readonly scope: Scope; readonly adopt?: (id: string) => MoverView | undefined; readonly restoreFlags?: ReadonlySet<string>;
     /** SS-GP5: each steer vehicle's hull in its own frame (`vehicleHulls`), which rides it as a platform's boxes do. */
     readonly hulls?: ReadonlyMap<string, readonly MoverBox[]> }) {
     this.data = parseMovers(data);
-    this.physics = ports.physics;
+    this.physics = ports.physics; this.hulls = ports.hulls ?? new Map();
     this.lifecycle = new MoverLifecycle(this.data.map(row => ({ id: row.id, ...(row.atEnd === undefined ? {} : { atEnd: row.atEnd }), ...(row.restoreFrom === undefined ? {} : { restoreFrom: row.restoreFrom }) })));
     if (this.data.some(row => row.restoreFrom !== undefined) && ports.restoreFlags === undefined) throw new Error('Mover restore requires saved flag data');
     this.entities = new Map(moverScriptEntities(this.data).map(entity => [entity.id, entity]));
@@ -133,9 +135,10 @@ export class FollowedMovers {
     }
     const { run } = this.prediction, data = this.data.find(entry => entry.id === id), was = this.pose(id).position;
     // the ground under a ground-following vehicle, as the server probes it: its own hull is not ground
-    const ground = data?.driver?.kind === 'steer' && data.driver.ground
-      ? floorBelow(this.physics, was.x, was.z, was.y + STEER_PROBE.up, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== id) : undefined;
-    run.step(stick, ground);
+    const probe = data?.driver?.kind === 'steer' && data.driver.ground
+      ? steerGround((x, z, fromY) => floorBelow(this.physics, x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== id),
+        was, run.yaw(), steerReach(this.hulls.get(id))) : undefined;
+    run.step(stick, probe?.ground, probe?.blocked);
     if (row !== null) run.settle(row, behind);
     const pose = run.pose(); this.place(id, pose); return pose;
   }
