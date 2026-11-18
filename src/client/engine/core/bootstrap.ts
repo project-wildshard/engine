@@ -5,7 +5,6 @@ import { app } from '../app/runtime';
 import type * as THREE from 'three';
 import { Game } from './Game';
 import { applyLevelTier, TIER } from './tier';
-import { noteDeviceGpu } from '../telemetry/deviceSnapshot';
 import { readyWebGLContext } from './webglStartup';
 import { recordBootCheckpoint } from '../boot/bootTrace';
 import { issueBakedPrograms } from '../boot/earlyPrograms';
@@ -75,7 +74,9 @@ export async function bootstrap(step: StepRunner, level: LevelSpec, inputContext
       recordBootCheckpoint('renderer:waiting', { ...state });
     });
     const made = new Game(canvas, context, level);
-    noteDeviceGpu(context); // DEVICE-TELEMETRY DT1: the game's own context names its GPU for the device snapshot
+    // DEVICE-TELEMETRY DT1: the game's own context names its GPU for the device snapshot. Imported here, not at the top: the
+    // snapshot module is its own chunk (the online shell and Sentry import it lazily), off the session closure's raw budget
+    void import('../telemetry/deviceSnapshot').then(({ noteDeviceGpu }) => { noteDeviceGpu(context); return undefined; }).catch(() => { /* telemetry never disrupts the boot */ });
     return made;
   });
   game.app.clock.setCapture(harnessPins()?.capture ?? null);
