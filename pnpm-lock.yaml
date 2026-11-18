@@ -126,6 +126,9 @@ importers:
       '@wildshard/engine':
         specifier: link:.
         version: 'link:'
+      '@wildshard/memory-policy':
+        specifier: npm:@wildshard/shard-format@0.38.1
+        version: '@wildshard/shard-format@0.38.1(typescript@6.0.3)'
       '@wildshard/wire-released':
         specifier: github:project-wildshard/shard-format#669d1fca695a110e6a8cb059b43a0a5caee60226&path:/packages/wire
         version: '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire(typescript@6.0.3)'
@@ -791,6 +794,11 @@ packages:
 
   '@wildshard/shard-format@0.37.1':
     resolution: {integrity: sha512-BxLC77HHt+NYqhUxYoF9x72yA50SLL98tesP6CMbvQaat+ttFHVWrukTP+iZOkFOnFK1UA6Q6Xp7M/1WYBzwyw==}
+    engines: {node: '>=24.18.0'}
+    hasBin: true
+
+  '@wildshard/shard-format@0.38.1':
+    resolution: {integrity: sha512-eTWHu4gn4B0iV3NoOltbHILOnfsJvUrlKpNLgNkBaHzffW+sdjYK9ZU9RG6TwlkgAiw6ybEno9Cp7FVIkNjDZQ==}
     engines: {node: '>=24.18.0'}
     hasBin: true
 
@@ -2042,6 +2050,13 @@ snapshots:
   '@vitest/spy@5.0.1': {}
 
   '@wildshard/shard-format@0.37.1(typescript@6.0.3)':
+    dependencies:
+      meshoptimizer: 1.2.0
+      valibot: 1.5.0(typescript@6.0.3)
+    transitivePeerDependencies:
+      - typescript
+
+  '@wildshard/shard-format@0.38.1(typescript@6.0.3)':
     dependencies:
       meshoptimizer: 1.2.0
       valibot: 1.5.0(typescript@6.0.3)

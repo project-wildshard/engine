@@ -119,6 +119,7 @@
     "@types/ws": "8.18.2",
     "@typescript/typescript6": "6.0.2",
     "@wildshard/engine": "link:.",
+    "@wildshard/memory-policy": "npm:@wildshard/shard-format@0.38.1",
     "@wildshard/wire-released": "github:project-wildshard/shard-format#669d1fca695a110e6a8cb059b43a0a5caee60226&path:/packages/wire",
     "assemblyscript": "0.28.20",
     "happy-dom": "20.14.5",

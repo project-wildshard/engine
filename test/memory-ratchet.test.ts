@@ -1,8 +1,5 @@
-// oxlint-disable-next-line import/no-nodejs-modules -- the test reads the committed baselines and ci.yml.
-import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { blockingRun } from '../scripts/main-watch.mjs';
-import { compareFootprint, compareLedger, confirmFootprint, footprintOverLine, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, footprintBoot, ledgerBudget, guardZones, guardFootprint } from '../scripts/memory/ratchet.mjs';
+import { compareFootprint, compareLedger, confirmFootprint, footprintOverLine, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, footprintBoot, ledgerBudget } from '../scripts/memory/ratchet.mjs';
 
 const MB = 1e6;
 const points = (held: number): Parameters<typeof ledgerBudget>[0] => [
@@ -103,50 +100,4 @@ test('a footprint baseline and its runs share one boot (STR1)', () => {
   expect(() => footprintBoot([{ boot: 'online' }], {})).toThrow(/standalone boot, these runs on the online boot/u);
   expect(() => footprintBoot([{ boot: 'online' }, {}], null)).toThrow('mix boots');
   expect(() => footprintBoot([{ boot: 'online+standalone' }], null)).toThrow('mix boots');
-});
-
-// J424 (Jake 2026-11-18): a memory gate blocks only where an agent armed it, after getting that zone under its line.
-test('an unarmed zone over its line is a report; an armed one fails; a zone in line is ready to arm', () => {
-  const stored = { a: boot(0), b: boot(0), c: { ...boot(0), armed: true }, d: { ...boot(0), armed: true } };
-  const readings = new Map([['a', [boot(0)]], ['b', [boot(20)]], ['c', [boot(0)]], ['d', [boot(20)]]]);
-  const verdict = guardZones(stored, readings, confirmLedger);
-  expect(verdict.eligible).toEqual(['a']);
-  expect(verdict.reports).toEqual([expect.stringMatching(/^b: 1 of 1 readings over the line\nb control loading/u)]);
-  expect(verdict.failures).toEqual([expect.stringMatching(/^d: 1 of 1 readings over the line/u)]);
-  expect(verdict.zones).toEqual({ a: boot(0), b: boot(0), c: { ...boot(0), armed: true }, d: { ...boot(0), armed: true } });
-});
-
-test('a zone with no reading or no baseline is a report unless it is armed', () => {
-  const stored = { a: boot(0), b: { ...boot(0), armed: true } };
-  const verdict = guardZones(stored, new Map([['a', []], ['b', []], ['new', [boot(0)]]]), confirmLedger);
-  expect(verdict.reports).toEqual(['a: no boot reached control', 'new: no baseline yet; record it with ci.yml memory_record']);
-  expect(verdict.failures).toEqual(['b: no boot reached control']);
-  expect(verdict.zones).toEqual(stored);
-});
-
-test('the Template footprint blocks only when its anchor is armed', () => {
-  const anchor = { settled: 539, spread: 51 }, over = [[592, 596, 610]], inside = [[550, 567, 587]];
-  expect(guardFootprint(anchor, () => over)).toEqual({ anchor, report: expect.stringMatching(/1 of 1 batches over the line/u) });
-  expect(guardFootprint(anchor, () => { throw new Error('Template did not reach control in native WebKit'); }))
-    .toEqual({ anchor, report: 'Template did not reach control in native WebKit' });
-  expect(guardFootprint(anchor, () => inside)).toEqual({ anchor, report: null });
-  expect(guardFootprint({ ...anchor, armed: true }, () => inside)).toEqual({ anchor: { ...anchor, armed: true }, report: null });
-  expect(() => guardFootprint({ ...anchor, armed: true }, () => over)).toThrow(/1 of 1 batches over the line/u);
-});
-
-interface Armed { armed?: boolean }
-
-// J424: the native footprint job is advisory only while nothing it reads is armed. Arming the Template anchor or Nine's
-// WebKit zone must also make the job blocking again: drop its continue-on-error and its main-watch advisory entry.
-test('the footprint job stops being advisory the day anything it reads is armed', () => {
-  const footprint = JSON.parse(readFileSync('scripts/memory/footprint-ratchet.json', 'utf8')) as { anchor: Armed };
-  const webkit = JSON.parse(readFileSync('scripts/memory/webkit-ledger-ratchet.json', 'utf8')) as { zones: Record<string, Armed> };
-  const armed = footprint.anchor.armed === true || Object.values(webkit.zones).some(zone => zone.armed === true);
-  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-  const job = ci.slice(ci.indexOf('\n  memory-footprint-guard:'), ci.indexOf('\n    steps:', ci.indexOf('\n  memory-footprint-guard:')));
-  expect(job).toContain('runs-on: macos-15');
-  expect(job.includes('continue-on-error: true')).toBe(!armed);
-  const red = { id: 1, head_sha: 'a', status: 'completed', conclusion: 'failure', created_at: '2026-11-18T00:00:00Z', event: 'push' };
-  const verdict = blockingRun(red, [{ name: 'tests (1)', conclusion: 'success' }, { name: 'memory-footprint-guard', conclusion: 'cancelled' }]);
-  expect(verdict.conclusion).toBe(armed ? 'failure' : 'success');
 });

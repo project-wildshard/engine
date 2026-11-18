@@ -28,13 +28,10 @@ import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
-// NB6's street job and EM35's Chromium checkpoint are report-only. J424: so is the native footprint job while nothing it
-// reads is armed; hosted macOS often never assigns it a runner (run 44358473370). memory-ratchet.test.ts ties this to
-// the baselines: arming the Template anchor or Nine's WebKit zone means taking it off this list.
-const ADVISORY_VERSION=4;
+// NB6's street and EM35's Chromium diagnostic jobs are advisory.
+const ADVISORY_VERSION=5;
 /** @param {{name:string}} job */
-const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic'
-  ||job.name==='memory-footprint-guard';
+const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic';
 /** @param {{conclusion:string|null}} job */
 const unsuccessful=job=>['failure','timed_out','cancelled'].includes(job.conclusion??'');
 

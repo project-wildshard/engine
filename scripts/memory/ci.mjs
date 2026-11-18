@@ -3,12 +3,17 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { serve } from '../parity/serve.mjs';
-import { compareLedger, confirmZone, footprintOverLine, ledgerBudget, main as ratchet } from './ratchet.mjs';
+import { armedMemory, comparePhoneFootprint, footprintBootFor, guardZone, ledgerZones, phoneFootprint } from './armed.mjs';
+import { loadPhoneModel } from './phoneModel.mjs';
+import { compareLedger, compareFootprint, footprintBoot, footprintInstrument, ledgerBudget, main as ratchet } from './ratchet.mjs';
 
-const [mode, root, output, baseline] = process.argv.slice(2);
-if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode) || !root || !output) {
-  throw new Error('Usage: memory/ci.mjs ledger|webkit-ledger|footprint <preview root> <output> [baseline]');
+const [mode, root, output, recordFlag, ...extra] = process.argv.slice(2);
+if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode) || !root || !output || extra.length > 0
+    || (recordFlag !== undefined && recordFlag !== '--record')) {
+  throw new Error('Usage: memory/ci.mjs ledger|webkit-ledger|footprint <preview root> <output> [--record]');
 }
+const record = recordFlag === '--record';
+const policy = armedMemory();
 const directory = absolute(output);
 mkdirSync(directory, { recursive: true });
 
@@ -21,88 +26,99 @@ async function measure(args) {
   if (code !== 0) throw new Error(`Measurement exited ${String(code)}: ${args.join(' ')}`);
 }
 
-/** @param {string} file */
+/** @param {string | URL} file */
 const get = file => JSON.parse(readFileSync(file, 'utf8'));
-// One hosted boot is one sample (memory/ratchet.mjs confirmZone): a zone whose first
-// boot is over the line or never reaches control is booted once more.
-const stored = mode === 'ledger' && baseline ? get(baseline).zones : null;
-// The native Template footprint gets the same rule: a batch whose median is over the line is measured once more.
-const anchor = mode === 'footprint' && baseline ? get(baseline).anchor : null;
-// J424: only an armed zone (its baseline says "armed": true) can block, so only an armed zone gets the second boot. Any
-// other zone boots once, and a boot that fails is printed and blocks nothing (memory/ratchet.mjs guardZones).
-const armed = (/** @type {string} */ chunk) => {
-  if (!baseline) return true;
-  const doc = get(baseline);
-  return (mode === 'footprint' ? doc.anchor : doc.zones?.[chunk])?.armed === true;
-};
-
+const baseline = get(new URL(`${mode}-ratchet.json`, import.meta.url));
+if (baseline.version !== 1 || baseline.mode !== mode) throw new Error('Incompatible memory baseline');
 const preview = await serve(absolute(root), '', true, { telemetryDir: join(directory, 'telemetry') });
+/** @type {string[]} */
 const files = [];
 try {
-  let readings = mode === 'footprint' ? ['_template'] : ['nine-dragon-stack'];
+  const built = readdirSync(join(root, 'dist', 'shardfiles'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
+  /** @type {Set<string>} */
+  const placed = mode === 'footprint'
+    ? new Set(get(join(root, 'dist', 'catalogue.json')).grid.cells.map((/** @type {{slug:string}} */ cell) => cell.slug))
+    : new Set();
+  let readings = mode === 'footprint'
+    ? [...new Set(['_template', ...policy.zones])]
+    : ['nine-dragon-stack'];
   if (mode === 'ledger') {
-    const built = readdirSync(join(root, 'dist', 'shardfiles'), { withFileTypes: true })
-      .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
-    const catalogue = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8'));
+    const catalogue = get('test/pins/catalogue.json');
     const expected = catalogue.shards.map((/** @type {{slug:string}} */ { slug }) => slug === 'template' ? '_template' : slug).sort();
     if (JSON.stringify(built) !== JSON.stringify(expected)) throw new Error('Prepared preview must contain every catalogue pin');
-    // Nine timed out on hosted SwiftShader at 180 and 480 seconds (EM35).
-    // The macOS job reads its native WebKit ledger from the pinned Nine build.
-    readings = built.filter(chunk => chunk !== 'nine-dragon-stack');
+    // Nine never reached control on hosted SwiftShader. Its ledger stays in
+    // native WebKit, with the same arming switch as the Ubuntu job.
+    const available = built.filter(zone => zone !== 'nine-dragon-stack');
     const selection = process.env.WS_LEDGER_RECORD_ZONES?.trim();
-    if (selection) {
-      const requested = [...new Set(selection.split(',').map(chunk => chunk.trim()))];
-      if (baseline || !requested.includes('_template') || requested.some(chunk => !readings.includes(chunk))) {
-        throw new Error('Partial ledger recording requires _template and known Ubuntu zones');
-      }
-      readings = readings.filter(chunk => requested.includes(chunk));
-    }
+    const requested = selection ? [...new Set(selection.split(',').map(zone => zone.trim()))] : available;
+    if (selection && (!record || !requested.includes('_template'))) throw new Error('Partial ledger recording requires _template');
+    readings = ledgerZones(available, policy.zones, requested);
   }
+  const model = mode === 'ledger' ? null : loadPhoneModel();
   for (const chunk of readings) {
-    const rounds = mode === 'ledger' && !baseline ? (chunk === '_template' ? 5 : 3) : 1;
-    const boot = async (/** @type {number} */ round) => {
+    const rounds = mode === 'ledger' && record ? (chunk === '_template' ? 5 : 3) : 1;
+    for (let round = 1; round <= rounds; round++) await guardZone(chunk, policy.zones, async () => {
+      if (!built.includes(chunk)) throw new Error('Prepared preview does not contain the zone');
       const file = join(directory, `measure-${chunk}-${round}.json`);
-      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file}`,
-        ...(mode === 'ledger' ? ['--ledger-only'] : [mode === 'footprint' ? '--runs=5' : '--runs=3'])]);
-      return file;
-    };
-    if (!armed(chunk)) {
-      try { files.push(await boot(1)); } catch (error) {
-        console.log(`REPORT, not armed, blocks nothing (J424):\n${chunk}: ${error instanceof Error ? error.message : String(error)}`);
+      const boot = footprintBootFor(chunk, policy.zones, placed);
+      const host = boot === 'online'
+        ? ['--online', `--dist=${absolute(root, 'dist')}`, `--scratch=${join(directory, 'online')}`]
+        : [`--url=${preview.url}`];
+      await measure([...host, `--chunk=${chunk}`, '--timeout=180', `--out=${file}`,
+        ...(mode === 'ledger' ? ['--ledger-only'] : [mode === 'footprint' ? '--runs=5' : '--runs=3', '--instrument=minimal'])]);
+      const data = get(file);
+      if (data.protocol !== 'memory-run/1' || data.chunk !== chunk) throw new Error('Reading belongs to another run or zone');
+      if (mode === 'ledger') {
+        if (data.microscope?.ready !== true) throw new Error('Chromium did not reach control');
+        const reading = ledgerBudget(data.microscope.checkpoints);
+        files.push(file);
+        if (!baseline.zones?.[chunk]) throw new Error('Missing committed subsystem ceilings');
+        compareLedger(baseline.zones[chunk], [reading], chunk);
+      } else {
+        const runs = data.webkit;
+        if (!Array.isArray(runs) || runs.length !== (mode === 'footprint' ? 5 : 3)) throw new Error('Incomplete native boot batch');
+        const footprint = phoneFootprint(chunk, runs, model, boot);
+        console.log(`${chunk}: EM11 (${boot}) upper playing ${footprint.playing} B, loading ${footprint.loading} B`);
+        if (mode === 'webkit-ledger') {
+          const nativeLedger = runs.map(run => ledgerBudget(run.checkpoints));
+          footprintInstrument([data], baseline);
+          footprintBoot([data], baseline);
+          files.push(file);
+          if (!baseline.zones?.[chunk]) throw new Error('Missing committed native WebKit subsystem ceilings');
+          compareLedger(baseline.zones[chunk], nativeLedger, chunk);
+        } else {
+          comparePhoneFootprint(footprint, policy.lines);
+          if (chunk === '_template' && boot === 'standalone') {
+            footprintInstrument([data], baseline);
+            footprintBoot([data], baseline);
+            files.push(file);
+            compareFootprint(baseline.anchor, runs.map(run => run.settled.webcontent));
+          }
+        }
       }
-      continue;
-    }
-    if (stored !== null) {
-      files.push(...await confirmZone({ zone: chunk, baseline: stored[chunk], boot, read: get, log: line => { console.log(line); } }));
-      continue;
-    }
-    for (let i = 0; i < rounds; i++) files.push(await boot(i + 1));
-    if (anchor === null) continue;
-    const settled = get(files.at(-1) ?? '').webkit?.map((/** @type {any} */ run) => run.settled?.webcontent);
-    const failure = Array.isArray(settled) && settled.every(n => typeof n === 'number') ? footprintOverLine(anchor, settled) : null;
-    if (failure !== null) {
-      console.log(`${failure}\nMeasuring ${chunk} once more: it fails only if this batch is over the line too.`);
-      files.push(await boot(2));
-    }
+    }, console.log);
   }
-  const next = join(directory, `${mode}-ratchet.json`);
-  if (files.length === 0) console.log(`No ${mode} reading to compare; nothing here is armed, so this blocks nothing (J424)`);
-  else ratchet([`--mode=${mode}`, `--out=${next}`, ...(baseline ? [`--baseline=${baseline}`] : []), ...files]);
-  if (mode === 'ledger' && !baseline) {
-    const control = get(next).zones._template;
-    const clean = join(directory, 'template-clean.json'), planted = join(directory, 'template-planted.json');
-    const args = [`--url=${preview.url}`, '--chunk=_template', '--timeout=180', '--ledger-only'];
-    await measure([...args, `--out=${clean}`]);
-    await measure([...args, '--plant-retained-buffer', `--out=${planted}`]);
-    try {
-      compareLedger(control, [ledgerBudget(get(planted).microscope.checkpoints)], '_template');
-      throw new Error('Expected the held 20 MB buffer to exceed the loading budget');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes('_template control loading:')) throw error;
-      console.log(message);
-    }
-    compareLedger(control, [ledgerBudget(get(clean).microscope.checkpoints)], '_template');
-    console.log('Unchanged Template passes the budget comparison');
+  if (files.length > 0) {
+    const next = join(directory, `${mode}-ratchet.json`);
+    // Keep each measured high as evidence. Recording cannot replace or skip
+    // the committed ceilings compared above.
+    ratchet([`--mode=${mode}`, `--out=${next}`, ...files]);
+    if (mode === 'ledger' && record) await guardZone('_template', policy.zones, async () => {
+      const anchor = get(next).zones._template;
+      if (!anchor) throw new Error('No Template ledger for the negative control');
+      const clean = join(directory, 'template-clean.json'), planted = join(directory, 'template-planted.json');
+      const args = [`--url=${preview.url}`, '--chunk=_template', '--timeout=180', '--ledger-only'];
+      await measure([...args, `--out=${clean}`]);
+      await measure([...args, '--plant-retained-buffer', `--out=${planted}`]);
+      try {
+        compareLedger(anchor, [ledgerBudget(get(planted).microscope.checkpoints)], '_template');
+        throw new Error('Expected the retained 20 MB buffer to exceed the loading budget');
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('_template control loading:')) throw error;
+        console.log(error.message);
+      }
+      compareLedger(anchor, [ledgerBudget(get(clean).microscope.checkpoints)], '_template');
+    }, console.log);
   }
 } finally { preview.close(); await preview.closed; }

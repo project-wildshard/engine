@@ -17,12 +17,12 @@ on:
         options: [production, staging]
         default: production
       memory_record:
-        description: Measure candidate memory ratchet baselines
+        description: Record memory measurements while checking armed ceilings
         type: boolean
         required: false
         default: false
       memory_record_zones:
-        description: Optional comma-separated Ubuntu recording zones including _template
+        description: Optional Ubuntu recording zones including _template (armed zones always run)
         type: string
         required: false
         default: ''
@@ -441,19 +441,16 @@ jobs:
             tmp/nine-ring1/boot
           retention-days: 7
 
-  memory-ledger-guard:
-    # J424: report-only except for zones whose baseline says "armed": true (scripts/memory/ratchet.mjs guardZones).
-    # EM35 uses a full production client. Nine stalled on hosted SwiftShader
-    # at 180 s and 480 s (44239650390, 44246104563). Its ledger uses the
-    # native WebKit job below.
+  memory-client-build:
+    # Both instruments observe this exact full pinned app and grid.
     needs: nine-ring1-build
-    if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' && (inputs.pins_channel == '' || inputs.pins_channel == 'production') }}
+    if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' }}
     runs-on: ubuntu-latest
-    # The full build took about 21 minutes and the first 20 boots about 18.
-    # Regular comparisons boot each included zone once, inside 60 minutes.
-    timeout-minutes: ${{ inputs.memory_record && 120 || 60 }}
+    timeout-minutes: 30
+    outputs:
+      armed: ${{ steps.memory-policy.outputs.armed }}
     env:
-      WS_LANE_NAME: memory-ledger
+      WS_LANE_NAME: memory-ledger-build
       WILDSHARD_CATALOGUE: test/pins/catalogue.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -462,6 +459,11 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
+      - name: Read the shared memory policy
+        id: memory-policy
+        run: |
+          armed=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log(armedMemory().zones.size > 0)')
+          printf 'armed=%s\n' "$armed" >> "$GITHUB_OUTPUT"
       # The full ledger's q11 parts are already decoded and hash-checked by
       # the app build. Keep its cache separate from the smaller Ring 1 build.
       - name: Key the full ledger Brotli cache
@@ -495,32 +497,21 @@ jobs:
           fi
           node scripts/gen.mjs --inputs-only
           python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs --outDir tmp/memory-ledger/preview/dist
-          bash scripts/ci-playwright-install.sh chromium
-      - name: Record the served ledger Brotli part digests
-        continue-on-error: true
+      - name: Archive the full pinned preview
         run: |
-          export LC_ALL=C
-          cd tmp/memory-ledger/preview/dist/assets/spawn
-          manifest="$GITHUB_WORKSPACE/tmp/memory-ledger/spawn-parts.sha256"
-          sha256sum -- parts/*.pack.br server/*.pack.br > "$manifest.tmp"
-          mv -- "$manifest.tmp" "$manifest"
-      - name: Read or block on subsystem ledger bytes
-        env:
-          MEMORY_RECORD: ${{ inputs.memory_record }}
-          WS_LEDGER_RECORD_ZONES: ${{ inputs.memory_record_zones }}
-        run: |
-          baseline=()
-          if [[ "$MEMORY_RECORD" != true ]]; then baseline+=(scripts/memory/ledger-ratchet.json); fi
-          node scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/memory-ledger/readings "${baseline[@]}"
-      - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+          products=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log([...armedMemory().zones].join("\n"))')
+          server_inputs=(out/.app/grid-collision)
+          while IFS= read -r zone; do
+            if [[ -n "$zone" ]]; then server_inputs+=("out/$zone"); fi
+          done <<< "$products"
+          tar -cf tmp/memory-ledger/client.tar tmp/memory-ledger/preview "${server_inputs[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: memory-ledger-guard
-          path: |
-            tmp/memory-ledger/readings/*.json
-            tmp/memory-ledger/spawn-parts.sha256
-          retention-days: 7
-          if-no-files-found: ignore
+          name: memory-pinned-client
+          path: tmp/memory-ledger/client.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
       - name: Keep only encodings emitted by this full ledger build
         id: ledger-parts-pruned
         if: ${{ !cancelled() && steps.ledger-codec.outcome == 'success' && steps.ledger-client.outcome == 'success' && steps.ledger-parts.outputs.cache-hit != 'true' }}
@@ -546,6 +537,55 @@ jobs:
         with:
           path: ~/.cache/wildshard/gen/spawn-parts-br/1
           key: ${{ steps.ledger-codec.outputs.key }}
+
+  memory-ledger-guard:
+    # J426: shard-format memory-armed.json controls which per-zone ceilings block.
+    # Nine stalled on hosted SwiftShader, so its ledger uses native WebKit.
+    needs: memory-client-build
+    if: ${{ !cancelled() && needs.memory-client-build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.memory_record && 120 || 60 }}
+    env:
+      WS_LANE_NAME: memory-ledger
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: memory-pinned-client
+          path: tmp/memory-ledger
+      - name: Restore the pinned preview and install Chromium
+        run: |
+          tar -xf tmp/memory-ledger/client.tar
+          rm tmp/memory-ledger/client.tar
+          bash scripts/ci-playwright-install.sh chromium
+      - name: Record the served ledger Brotli part digests
+        continue-on-error: true
+        run: |
+          export LC_ALL=C
+          cd tmp/memory-ledger/preview/dist/assets/spawn
+          manifest="$GITHUB_WORKSPACE/tmp/memory-ledger/spawn-parts.sha256"
+          sha256sum -- parts/*.pack.br server/*.pack.br > "$manifest.tmp"
+          mv -- "$manifest.tmp" "$manifest"
+      - name: Read or block on subsystem ledger bytes
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+          WS_LEDGER_RECORD_ZONES: ${{ inputs.memory_record_zones }}
+        run: |
+          record=()
+          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
+          node scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/memory-ledger/readings "${record[@]}"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-ledger-guard
+          path: |
+            tmp/memory-ledger/readings/*.json
+            tmp/memory-ledger/spawn-parts.sha256
+          retention-days: 7
+          if-no-files-found: ignore
 
   nine-ledger-diagnostic:
     # This bounded experiment runs only on an explicit memory qualification.
@@ -582,15 +622,12 @@ jobs:
           if-no-files-found: ignore
 
   memory-footprint-guard:
-    # J424: report-only until the Template anchor or Nine's zone says "armed": true (scripts/memory/ratchet.mjs).
-    # Hosted macOS sometimes never assigns this job a runner (run 44358473370), so while nothing here is armed the job
-    # itself cannot fail the run either; memory-ratchet.test.ts drops this line the day a zone here is armed.
-    # EM36 reads native processes on the same hosted macOS runner as EM12.
-    needs: nine-ring1-build
-    if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' && (inputs.pins_channel == '' || inputs.pins_channel == 'production') }}
+    # J426: the armed zones must pass both phone footprint lines.
+    # With an empty policy, ci-reports owns the advisory native readings.
+    needs: memory-client-build
+    if: ${{ !cancelled() && needs.memory-client-build.result == 'success' && needs.memory-client-build.outputs.armed != 'false' }}
     runs-on: macos-15
-    timeout-minutes: 20
-    continue-on-error: true
+    timeout-minutes: 60
     env:
       WS_LANE_NAME: memory-footprint
     steps:
@@ -601,32 +638,38 @@ jobs:
       - run: node scripts/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: nine-ring1-client
+          name: memory-pinned-client
           path: tmp/memory-footprint
-      - name: Read or block on settled Template WebContent
+      - name: Check armed native footprints and report Template
         env:
           MEMORY_RECORD: ${{ inputs.memory_record }}
         run: |
-          mkdir -p tmp/memory-footprint/preview
-          tar -xf tmp/memory-footprint/client.tar -C tmp/memory-footprint/preview
+          tar -xf tmp/memory-footprint/client.tar
+          rm tmp/memory-footprint/client.tar
           bash scripts/ci-playwright-install.sh webkit
-          baseline=()
-          if [[ "$MEMORY_RECORD" != true ]]; then baseline+=(scripts/memory/footprint-ratchet.json); fi
-          node scripts/memory/ci.mjs footprint tmp/memory-footprint/preview tmp/memory-footprint/readings "${baseline[@]}"
-      - name: Read or block on Nine's native WebKit ledger
+          record=()
+          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
+          node scripts/memory/ci.mjs footprint tmp/memory-ledger/preview tmp/memory-footprint/readings "${record[@]}"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: nine-ring1-client
+          path: tmp/memory-footprint/nine
+      - name: Check or report Nine's native WebKit ledger
         env:
           MEMORY_RECORD: ${{ inputs.memory_record }}
         run: |
-          baseline=()
-          if [[ "$MEMORY_RECORD" != true ]]; then
-            baseline+=(scripts/memory/webkit-ledger-ratchet.json)
-          fi
-          node scripts/memory/ci.mjs webkit-ledger tmp/memory-footprint/preview tmp/memory-footprint/readings "${baseline[@]}"
+          record=()
+          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
+          tar -xf tmp/memory-footprint/nine/client.tar -C tmp/memory-footprint/nine
+          rm tmp/memory-footprint/nine/client.tar
+          node scripts/memory/ci.mjs webkit-ledger tmp/memory-footprint/nine tmp/memory-footprint/nine-ledger "${record[@]}"
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: memory-footprint-guard
-          path: tmp/memory-footprint/readings/*.json
+          path: |
+            tmp/memory-footprint/readings/*.json
+            tmp/memory-footprint/nine-ledger/*.json
           retention-days: 7
           if-no-files-found: ignore
 

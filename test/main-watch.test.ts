@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { blockingRun, follow, judge, landers, liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { blockingRun, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 
 mkdirSync(resolve('tmp'), { recursive: true });
@@ -94,12 +94,12 @@ test('44139343442: an unassigned advisory street runner preserves the twelve pas
   expect(blockingRun(red, [...jobs, { ...street, name: 'nine-ring1 (unknown, macos-15)' }]).conclusion).toBe('failure');
 });
 
-test('44358473370: a footprint guard hosted macOS never ran is advisory while nothing it reads is armed (J424)', () => {
-  const red = run(44358473370, '3701945a', 'failure', 50);
+test('J426 preserves a failed or canceled required footprint verdict', () => {
+  const red = run(42970000008, 'abcd1234', 'failure', 50);
   const jobs = ['tests (1)', 'boundaries', 'nine-ring1-build', 'memory-ledger-guard']
     .map(name => ({ name, conclusion: 'success' as string | null }));
   for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
-    expect(blockingRun(red, [...jobs, { name: 'memory-footprint-guard', conclusion }]).conclusion).toBe('success');
+    expect(blockingRun(red, [...jobs, { name: 'memory-footprint-guard', conclusion }]).conclusion).toBe('failure');
   }
   const ledgerRed = [{ name: 'tests (1)', conclusion: 'success' }, { name: 'memory-ledger-guard', conclusion: 'failure' }];
   expect(blockingRun(red, [...ledgerRed, { name: 'memory-footprint-guard', conclusion: 'success' }]).conclusion).toBe('failure');
@@ -130,7 +130,7 @@ test('a first run only records what is finished; later sweeps report each new ru
 test('CIQ1 names replaced pending runs as skipped while started cancellations stay superseded', () => {
   const w = world(replay.slice(0, 1)), io = fake('pending-replaced', w);
   sweep(io);
-  w.runs = replay.map(row => ({ ...row, started: row.id === 42965336189 ? false : true }));
+  w.runs = replay.map(row => ({ ...row, started: row.id !== 42965336189 }));
   w.tip = sha('652afa6c');
   sweep(io); sweep(io);
   expect(w.receipts.filter(line => line.includes('never red'))).toEqual([
