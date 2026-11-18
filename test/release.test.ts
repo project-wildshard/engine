@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- It signs as the promoter does.
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { expect, test } from 'vitest';
-import { KEPT_RELEASE_MS, RELEASE_DEADLINE_MS, ReleaseReadError, keptRelease, releaseRetryMs, releaseScreen, releaseToDial, retryAfterMs, type KeptRelease, type ReleaseFault, type ReleaseKeep, type ReleaseWait } from '../src/client/host/online/release';
+import { FRESH_WAIT_MS, KEPT_RELEASE_MS, RELEASE_DEADLINE_MS, ReleaseReadError, freshAfterDial, keptRelease, releaseRetryMs, releaseScreen, releaseToDial, retryAfterMs, type KeptRelease, type ReleaseFault, type ReleaseKeep, type ReleaseWait } from '../src/client/host/online/release';
 
 // OFFLINE OF4: the page dials from a verified last-known release file, kept 7 days, and a read never holds it past 8 s.
 const URL_AT = 'https://cdn.example/releases/staging.json', DAY = 24 * 60 * 60 * 1000, NOW = Date.UTC(2026, 10, 13, 12);
@@ -170,4 +170,47 @@ test('a kept copy never shows a wait, and the player leaving stops the reads', a
   const leaving: ReleaseWait = { after: () => Promise.reject(new Error('left for the title')), done: () => undefined };
   await expect(releaseToDial(URL_AT, publicKey, { keep: memoryKeep(), fetch: () => { reads++; return Promise.reject(new TypeError('Failed to fetch')); }, now: () => NOW, wait: leaving })).rejects.toThrow('left for the title');
   expect(reads).toBe(1);
+});
+
+// STAGING-BUGBASH SB44 (staging v0.1.38, a v0.1.36 shell): the kept copy dialed at once, the world reached play, and the fresh read
+// behind it (another engine build) reloaded the page out of play a second later. A page that can read now waits a short while for
+// the fresh read, so the world's build is known before the world is entered; only a read slower than that follows the kept copy.
+const never = (): Promise<void> => new Promise<void>(() => undefined);
+const at = (ms: number) => (wait: number): Promise<void> => new Promise<void>((resolve) => { if (wait >= ms) setTimeout(resolve, 0); });
+test('SB44: a fresh read inside the wait is the file the page dials, before the world is entered', async () => {
+  const keep = memoryKeep({ of: URL_AT, at: NOW - DAY, text: signed(4, 'wss://old.example/', 'b1') });
+  const dial = await releaseToDial(URL_AT, publicKey, { keep, fetch: answering(signed(5, 'wss://new.example/', 'b2')), now: () => NOW, freshWaitMs: FRESH_WAIT_MS, timer: never });
+  expect(dial.file).toMatchObject({ serial: 5, engineBuild: 'b2', socket: 'wss://new.example/' });
+  expect(dial.fresh, 'a decided read: the shell compares its build before it dials').toBeNull();
+  expect(keep.kept?.text).toBe(signed(5, 'wss://new.example/', 'b2'));
+});
+
+test('SB44: a fresh read slower than the wait leaves the kept copy dialing, the read following', async () => {
+  const keep = memoryKeep({ of: URL_AT, at: NOW - DAY, text: signed(4, 'wss://old.example/', 'b1') });
+  let answer: (r: Response) => void = () => undefined;
+  const slow: typeof fetch = () => new Promise<Response>((resolve) => { answer = resolve; });
+  const dial = await releaseToDial(URL_AT, publicKey, { keep, fetch: slow, now: () => NOW, freshWaitMs: FRESH_WAIT_MS, timer: at(FRESH_WAIT_MS) });
+  expect(dial.file.serial).toBe(4);
+  answer(new Response(signed(5, 'wss://new.example/', 'b2'), { status: 200 }));
+  await expect(dial.fresh).resolves.toMatchObject({ serial: 5, engineBuild: 'b2' });
+});
+
+test('SB44: a fresh read that fails inside the wait never lets the kept copy\'s build decide', async () => {
+  const keep = memoryKeep({ of: URL_AT, at: NOW - DAY, text: signed(4, 'wss://old.example/', 'b1') });
+  const dial = await releaseToDial(URL_AT, publicKey, { keep, fetch: offline, now: () => NOW, freshWaitMs: FRESH_WAIT_MS, timer: never });
+  expect(dial.file.serial).toBe(4);
+  expect(dial.fresh).not.toBeNull();
+  await expect(dial.fresh).resolves.toBeNull();
+});
+
+test('SB44: the wait is short (a phone on a slow line keeps OF4\'s dial-at-once in spirit)', () => {
+  expect(FRESH_WAIT_MS).toBeGreaterThanOrEqual(1000);
+  expect(FRESH_WAIT_MS).toBeLessThanOrEqual(3000);
+});
+
+test('SB44: a newer build heard after the world seated this page waits for the next visit; before, it reloads', () => {
+  expect(freshAfterDial({ engineBuild: 'b2' }, 'b1', false)).toBe('reload');
+  expect(freshAfterDial({ engineBuild: 'b2' }, 'b1', true)).toBe('stay');
+  expect(freshAfterDial({ engineBuild: 'b1' }, 'b1', false)).toBe('stay');
+  expect(freshAfterDial(null, 'b1', false)).toBe('stay');
 });

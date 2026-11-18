@@ -137,7 +137,19 @@ export interface ReleaseWait {
 /** OF4: the release file a page dials from. A verified kept copy answers at once, so a load never waits on the read; the fresh read
  *  replaces it once its own signature holds. With no copy the page waits for the read (8 s at most each), and a failed read throws, or,
  *  given `wait` (FM5), shows why and reads again by its policy until a verified file answers or the player leaves. */
-export async function releaseToDial(url: string, publicKey: string, ports: { readonly keep: ReleaseKeep; readonly fetch?: typeof fetch; readonly now?: () => number; readonly deadlineMs?: number; readonly wait?: ReleaseWait; readonly online?: () => boolean }): Promise<ReleaseToDial> {
+/** STAGING-BUGBASH SB44: how long a page with a kept release file waits for the fresh read before it dials. A v0.1.36 shell dialed
+ *  its kept copy at once, reached play, and the fresh read (another engine build) reloaded it out of play a second later. Inside this
+ *  wait the fresh file is the one dialed, so the world's build is known before the world is entered; a slower line follows OF4. */
+export const FRESH_WAIT_MS = 2000;
+/** SB44: what a fresh read heard after the dial does. Another build reloads the page into it while it is still entering; once the
+ *  world has seated this page (its hello taken, so the server still takes this build), the page plays on and the newer build waits
+ *  for the next visit: no reload out of play. A retired build is still caught in play by FM5b's retention watch. */
+export function freshAfterDial(read: { readonly engineBuild: string } | null, build: string, seated: boolean): 'reload' | 'stay' {
+  return read !== null && read.engineBuild !== build && !seated ? 'reload' : 'stay';
+}
+export async function releaseToDial(url: string, publicKey: string, ports: { readonly keep: ReleaseKeep; readonly fetch?: typeof fetch; readonly now?: () => number; readonly deadlineMs?: number; readonly wait?: ReleaseWait; readonly online?: () => boolean;
+  /** SB44: with a kept copy, wait this long (on `timer`) for the fresh read before dialing (FRESH_WAIT_MS); omitted, the kept copy dials at once */
+  readonly freshWaitMs?: number; readonly timer?: (ms: number) => Promise<void> }): Promise<ReleaseToDial> {
   const now = ports.now ?? Date.now, kept = await keptRelease(url, publicKey, ports.keep, now(), ports.deadlineMs);
   const reading = async (): Promise<ReleaseFile> => {
     const { text, file } = await verifiedRead(url, publicKey, ports.deadlineMs ?? RELEASE_DEADLINE_MS, ports.fetch ?? fetch, ports.online);
@@ -146,7 +158,13 @@ export async function releaseToDial(url: string, publicKey: string, ports: { rea
     try { ports.keep.write({ of: url, at: now(), text }); } catch { /* a page that can keep nothing reads again next time */ }
     return file;
   };
-  if (kept !== null) return { file: kept, fresh: reading().catch(() => null) };
+  if (kept !== null) {
+    const fresh = reading().catch(() => null), { freshWaitMs } = ports;
+    if (freshWaitMs === undefined || freshWaitMs <= 0) return { file: kept, fresh };
+    const early = ports.timer === undefined ? undefined : await Promise.race([fresh, ports.timer(freshWaitMs).then(() => undefined)]);
+    // a read that failed in time leaves the kept copy dialing, and its build never decides (a kept copy's build is the past)
+    return early === undefined || early === null ? { file: kept, fresh } : { file: early, fresh: null };
+  }
   const { wait } = ports;
   if (wait === undefined) return { file: await reading(), fresh: null };
   for (let attempt = 0; ; attempt++) {

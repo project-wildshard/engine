@@ -18,7 +18,7 @@ import { dropTabArrival, setTitleArrival } from '@wildshard/engine/boot/titleArr
 import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
-import { fetchSignedRelease, releaseToDial, type ReleaseKeep } from './release';
+import { FRESH_WAIT_MS, fetchSignedRelease, freshAfterDial, releaseToDial, type ReleaseKeep } from './release';
 import { releaseScreens, stagingMark } from './releaseScreens';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
@@ -408,13 +408,16 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const waiting = new Scope('online.release-wait');
   const toTitle = (from = 'release page'): void => { leaving.unload(`${from}: title screen`); location.replace(new URL('/', location.origin).toString()); };
   let dial: Awaited<ReturnType<typeof releaseToDial>>;
-  try { dial = await releaseToDial(at, key, { keep: keep ?? NO_KEEP, wait: releaseScreens(waiting, { doctor, title: () => { toTitle(); } }) }); } finally { waiting.dispose(); }
+  // SB44: a page that can read waits FRESH_WAIT_MS for the fresh file behind a kept copy, so another build reloads it before play
+  const freshWait = typeof navigator === 'undefined' || navigator.onLine ? { freshWaitMs: FRESH_WAIT_MS, timer: (ms: number) => new Promise<void>(resolve => { waiting.timeout(ms, resolve); }) } : {};
+  try { dial = await releaseToDial(at, key, { keep: keep ?? NO_KEEP, wait: releaseScreens(waiting, { doctor, title: () => { toTitle(); } }), ...freshWait }); } finally { waiting.dispose(); }
   const { file: release, fresh } = dial, { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
   const entering = (slug: string): void => { leaving.arrive(slug); };
   const stale = async (): Promise<boolean> => { entering(loadedNow); const going = await leaving.reloadStale(); if (!going) leaving.unarrive(); return going; };
   // only a fresh read says the world moved on: a kept copy's build is the past, and an offline page can't reload anyway
-  if (fresh === null && release.engineBuild !== link.build) await stale();
+  // SB44: a page reloading into the world's build is going: it never dials, so its world never reaches play on the build it leaves
+  if (fresh === null && release.engineBuild !== link.build && await stale()) await new Promise<never>(() => { /* settles never: the page reloads */ });
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
   // FM5 mode 46: the staging world says so for the session (the release file's own verified channel)
@@ -476,7 +479,8 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   // under way, or the player's Retry once the link has given up
   void fresh?.then(read => {
     if (read === null || scope.disposed) return undefined;
-    if (read.engineBuild !== link.build) return stale();
+    // SB44: a world that already seated this page keeps it; the newer build waits for the next visit (no reload out of play)
+    if (read.engineBuild !== link.build) return freshAfterDial(read, link.build, seated) === 'reload' ? stale() : undefined;
     if (read.socket !== undefined && read.socket !== dialing) { dialing = read.socket; shell.dialNow(); }
     return undefined;
   });
