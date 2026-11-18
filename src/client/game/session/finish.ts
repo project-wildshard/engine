@@ -214,24 +214,30 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     throw error;
   }
   loading.setTextureBytes(textureBytes(game.rootScene));
-  // Nine Dragon phone counts and caches the same files, then decodes selected audio after the loader's peak.
-  if (deferredAudio) {
-    await step('audio', (p) => deferredAudio.wait(p));
-    // The synth bridges the short delay. This empty bank prevents Music.prepare() from decoding the
-    // same selected style again if the player taps before the deferred decode finishes.
-    music.useBank({ genre: deferredAudio.style, set: 'base', slots: new Map(), stings: new Map(), log: [] });
-  }
-  // I7: a phone profile's boot audio past its first seconds downloads and decodes after control
-  const audioPreload = deferredAudio ? null : audioLoad ?? startAudioPreload(files, chunk, audioProfile);
-  if (audioPreload) {
-    const banks = await step('audio', (p) => audioPreload.wait(p));
-    if (banks.music) music.useBank(banks.music); // the title theme's first gesture plays the stems at once
-    if (banks.profile) audio.useLevelBank(banks.profile); else audio.useSamples(banks.sfx);
-  }
-  const finishPlan: unknown = Reflect.get(plan, 'done');
-  if (typeof finishPlan !== 'function') throw new Error('Boot plan cannot finish');
-  Reflect.apply(finishPlan, plan, []); // throws unless both tracks are exactly 1
-  releaseByteCounter();
+  // Phone staged worlds finish their product and server work before decoding
+  // the downloaded bank. The loader still waits for it before control.
+  const audioAfterWorld = TIER === 'phone' && manifest.boot?.stagedWorld === true && deferredAudio === null;
+  const prepareBootAudio = async (): Promise<void> => {
+    // Nine Dragon phone counts and caches the same files, then decodes selected audio after the loader's peak.
+    if (deferredAudio) {
+      await step('audio', (p) => deferredAudio.wait(p));
+      // The synth bridges the short delay. This empty bank prevents Music.prepare() from decoding the
+      // same selected style again if the player taps before the deferred decode finishes.
+      music.useBank({ genre: deferredAudio.style, set: 'base', slots: new Map(), stings: new Map(), log: [] });
+    }
+    // I7: a phone profile's boot audio past its first seconds downloads and decodes after control
+    const audioPreload = deferredAudio ? null : audioLoad ?? startAudioPreload(files, chunk, audioProfile);
+    if (audioPreload) {
+      const banks = await step('audio', (p) => audioPreload.wait(p));
+      if (banks.music) music.useBank(banks.music); // the title theme's first gesture plays the stems at once
+      if (banks.profile) audio.useLevelBank(banks.profile); else audio.useSamples(banks.sfx);
+    }
+    const finishPlan: unknown = Reflect.get(plan, 'done');
+    if (typeof finishPlan !== 'function') throw new Error('Boot plan cannot finish');
+    Reflect.apply(finishPlan, plan, []); // throws unless both tracks are exactly 1
+    releaseByteCounter();
+  };
+  if (!audioAfterWorld) await prepareBootAudio();
   if (resuming) performance.mark('wildshard.grid.entry-policy', { detail: {
     reason: ctx.session.recovery?.reason ?? 'url', saved: ctx.session.recovery?.saved !== undefined,
     continuing: ctx.continuingGridEntry, grid: ctx.grid !== null, arrival: arrival?.mode ?? 'none',
@@ -334,6 +340,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // QA row 29: the canvas still held readyFrame's view from the authored spawn; draw it again from the place the server's
   // first owner block put the player (clientWorker.ts), so the first revealed frame is already there
   game.hiddenFrame();
+  if (audioAfterWorld) await prepareBootAudio();
   // Let first-row activation finish before the recovery menu parks the page.
   // Its captured resume state is play, after the loader's app transition above.
   if (resuming && !ctx.continuingGridEntry) hud.setPaused(true); // Graphics recovery needs RESUME; a planned update retains the original tap.
