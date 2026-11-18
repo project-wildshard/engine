@@ -33,6 +33,7 @@ export interface StrikeSpec {
   id: string; shape: StrikeShape; windup: number; active: number; recover: number; cooldown: number;
   independentCooldown?: true;
   from?: string;
+  knockbackDistance?: number;
   range: number; damage: number; tags: readonly CombatTag[];
   weight: (ctx: StrikeContext) => number;
   units?: 'world' | 'actor';

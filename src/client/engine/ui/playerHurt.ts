@@ -4,7 +4,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import type { Actor, CombatPipeline, CombatTag, DeathCause } from '../../../shared/engine/combat/pipeline';
 import type { PlayerHealth } from '../../../shared/engine/combat/health';
 import { hardFallHit } from '../../../shared/engine/player/fall';
-import { hitShoveSpeed } from '../../../shared/engine/player/shove';
+import { distanceShoveSpeed, hitShoveSpeed } from '../../../shared/engine/player/shove';
 
 export interface HurtPlayer {
   position: Vector3; yaw: number;
@@ -30,7 +30,9 @@ export class PlayerHurt {
     events.on('damage.dealt', ({ req, dealt }) => {
       if (req.target !== health) return;
       ports.flash();
-      if (req.sourceTags.includes('feel.blow')) {
+      if (req.shoveDistance !== undefined) {
+        this.blow(dealt, req.from ?? req.point, distanceShoveSpeed(req.shoveDistance));
+      } else if (req.sourceTags.includes('feel.blow')) {
         this.blow(dealt, req.point);
       } else if (req.sourceTags.includes('feel.jolt')) {
         if (req.toast !== undefined && req.toast !== '') ports.toast(req.toast);
@@ -43,14 +45,14 @@ export class PlayerHurt {
     this.ports.flash();
     if (blow) this.blow(amount, at);
   }
-  private blow(dealt: number, at: Vector3): void {
+  private blow(dealt: number, at: Vector3, speed = hitShoveSpeed(dealt)): void {
     const p = this.ports.player;
     this.ports.combat(0.9);
     if (this.ports.directional()) {
       this.ports.arc(at.x, at.z, p.position, p.yaw, dealt);
       this.ports.trauma(Math.min(0.85, 0.3 + dealt / 40));
     }
-    p.shove(at.x, at.z, hitShoveSpeed(dealt));
+    if (speed > 0) p.shove(at.x, at.z, speed);
     const dx = at.x - p.position.x, dz = at.z - p.position.z, d = Math.hypot(dx, dz);
     this.ports.hurt(dealt / 20, d > 0.3 ? ((dx * Math.cos(p.yaw) - dz * Math.sin(p.yaw)) / d) * 0.7 : 0);
   }

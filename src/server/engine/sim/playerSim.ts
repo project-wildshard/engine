@@ -7,7 +7,7 @@ import type { CharacterMotor, MotorOptions } from '../../../shared/engine/physic
 import { floorBelow } from '../../../shared/engine/physics/query';
 import { applyImpulse } from '../../../shared/engine/player/impulse';
 import { hardFallHit } from '../../../shared/engine/player/fall';
-import { hitShoveSpeed, shoveHop, startShove, type ShoveState } from '../../../shared/engine/player/shove';
+import { distanceShoveSpeed, hitShoveSpeed, shoveHop, startShove, type ShoveState } from '../../../shared/engine/player/shove';
 import { HOVER_HARD_LANDING, type BoardState } from '../../../shared/engine/player/board';
 import { hoverSpeed } from '../../../shared/engine/player/hoverSpeed';
 import { COYOTE_MS, type JumpState } from '../../../shared/engine/player/jump';
@@ -156,7 +156,11 @@ export class PlayerSim implements PlayerMotionState {
       host.combat.playerRules(scope, { target: health });
       // a creature's blow knocks this player back, as the client's PlayerHurt shoves its Player on `feel.blow`
       host.events.on('damage.dealt', ({ req, dealt }) => {
-        if (req.target === this.health && this.external === undefined && this.hasMotor && req.sourceTags.includes('feel.blow')) this.knockBack(req.point.x, req.point.z, hitShoveSpeed(dealt));
+        if (req.target !== this.health || this.external !== undefined || !this.hasMotor) return;
+        if (req.shoveDistance !== undefined) {
+          const at = req.from ?? req.point;
+          if (req.shoveDistance > 0) this.knockBack(at.x, at.z, distanceShoveSpeed(req.shoveDistance));
+        } else if (req.sourceTags.includes('feel.blow')) this.knockBack(req.point.x, req.point.z, hitShoveSpeed(dealt));
       }, scope);
     }
   }

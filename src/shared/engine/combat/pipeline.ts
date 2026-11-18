@@ -33,6 +33,8 @@ export interface DamageRequest {
   source: Actor | 'env'; sourceTags: readonly CombatTag[]; target: Actor; amount: number;
   point: Vector3; dir: Vector3; surface?: string; weaponId?: string; moveId?: string;
   headshot?: boolean; stagger?: number; knockback?: number; throughWalls?: boolean;
+  /** A player shove's travel in metres on clear ground. */
+  shoveDistance?: number;
   /** Authored collision part. Its multiplier replaces a weapon's legacy head bonus. */
   part?: string; partMultiplier?: number;
   from?: Vector3; distance?: number; scale?: number; cause?: DeathCause; toast?: StringKey;

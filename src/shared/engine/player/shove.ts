@@ -1,3 +1,5 @@
+import { FIXED_STEP } from '../core/fixedStep';
+
 /** Seconds a creature hit's knockback lasts; its speed fades linearly to 0 over it. */
 export const SHOVE_TIME = 0.18;
 /** Upward speed (m/s) a knockback gives a grounded player, so it reads as a knock, not a slide. */
@@ -12,6 +14,11 @@ export interface ShoveState { t: number; vx: number; vz: number }
  * straight away from where it landed, overriding the walk input and fading out over SHOVE_TIME through the motor.
  */
 export function hitShoveSpeed(dealt: number): number { return 5 + Math.min(4, dealt * 0.15); }
+
+// stepShove fades before the motor moves, so integrate the nonzero fixed steps.
+const shoveSteps = Math.ceil(SHOVE_TIME / FIXED_STEP) - 1;
+const shoveTravel = FIXED_STEP * shoveSteps * (1 - (shoveSteps + 1) * FIXED_STEP / (2 * SHOVE_TIME));
+export function distanceShoveSpeed(distance: number): number { return distance / shoveTravel; }
 /** Start a knockback away from (fromX, fromZ); a blow from right on top of the player knocks it straight back along `yaw`. */
 export function startShove(shove: ShoveState, x: number, z: number, fromX: number, fromZ: number, yaw: number, speed: number): void {
   const dx = x - fromX, dz = z - fromZ, d = Math.hypot(dx, dz);
