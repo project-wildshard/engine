@@ -21,3 +21,9 @@ job emits its proposed ratchet and raw readings. The CI input
 `memory_record` records both files from the current production pins.
 The jobs compare against the files when they are committed. This keeps
 measurement host and browser settings tied to the CI workload.
+
+Hosted macOS 15 qualification read 618.04–666.05 MB after control
+across five native WebKit boots. The settled median was 646.96 MB.
+The committed positive spread is 19.09 MB. A regular production CI
+run loads this file and fails above its 666.05 MB ceiling.
+[Qualification job](https://github.com/project-wildshard/engine/actions/runs/44233634711/job/134565599126).

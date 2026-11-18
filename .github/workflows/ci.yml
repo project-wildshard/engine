@@ -504,23 +504,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Select the committed or qualification footprint
-        id: baseline
-        env:
-          MEMORY_RECORD: ${{ inputs.memory_record }}
-        # a file test, not hashFiles, as the ledger guard above: the ratchet is absent until its qualification run
-        run: if [[ "$MEMORY_RECORD" == true || -f scripts/memory/footprint-ratchet.json ]]; then echo "selected=true" >> "$GITHUB_OUTPUT"; fi
-      - if: steps.baseline.outputs.selected == 'true'
-        uses: ./.github/actions/ring-setup
-      - if: steps.baseline.outputs.selected == 'true'
-        run: node scripts/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
-      - if: steps.baseline.outputs.selected == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: ./.github/actions/ring-setup
+      - run: node scripts/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: nine-ring1-client
           path: tmp/memory-footprint
-      - if: steps.baseline.outputs.selected == 'true'
-        name: Read or block on settled Template WebContent
+      - name: Read or block on settled Template WebContent
         env:
           MEMORY_RECORD: ${{ inputs.memory_record }}
         run: |
@@ -530,7 +520,7 @@ jobs:
           baseline=()
           if [[ "$MEMORY_RECORD" != true ]]; then baseline+=(scripts/memory/footprint-ratchet.json); fi
           node scripts/memory/ci.mjs footprint tmp/memory-footprint/preview tmp/memory-footprint/readings "${baseline[@]}"
-      - if: ${{ always() && steps.baseline.outputs.selected == 'true' }}
+      - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: memory-footprint-guard
