@@ -14,6 +14,7 @@ import type { DamageRequest } from '../../../shared/engine/combat/pipeline';
 import { AnimalSim, damageFor as simDamageFor, type AnimalPoseSample, type AnimalVolumePort } from '../../../shared/engine/entities/AnimalSim';
 import { floorBelow } from '../../../shared/engine/physics/query';
 import { ChannelMaterial } from './channelLook';
+import { AttachmentRig } from './creatureAttachments';
 
 /**
  * Animal — one animal instance (any registered species): procedural skeletal animation + health.
@@ -91,6 +92,8 @@ export class Animal extends AnimalSim {
   private flashMat: AnimalMaterial | null = null;
   /** CC28b: the body material under its channel look (tint, glow, opacity), when its species binds one. */
   private channelMat: ChannelMaterial | null = null;
+  /** CC30c: the body's socket attachments, shown by its channels. */
+  private attachments: AttachmentRig | null = null;
   private flashBase = new THREE.Color();
   private flashBaseI = 1;
   /** TE-ENG10: the rig's part materials, each flashed with the body and returned to its own base (an unlit glow by colour) */
@@ -246,6 +249,8 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     if (fur !== undefined && fur !== model.hard) { this.flashMat = fur; this.flashBase.copy(fur.emissive); this.flashBaseI = fur.emissiveIntensity; }
     const channelLook = model.species.channelLook;
     if (channelLook !== undefined && this.flashMat !== null) this.channelMat = new ChannelMaterial(channelLook, this.flashMat);
+    const attachments = model.species.attachments;
+    if (attachments !== undefined && attachments.length > 0) this.attachments = new AttachmentRig(attachments, name => rig.bones[name] ?? rig.mesh.getObjectByName(name));
     this.parts = new Set(rig.parts);
     for (const part of rig.parts ?? []) {
       const emissive: unknown = Reflect.get(part, 'emissive'), colour: unknown = Reflect.get(part, 'color'), lit = emissive instanceof THREE.Color;
@@ -457,6 +462,7 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
   update(dt: number, t: number, near: boolean): void {
     this.poseFrozen = false; this.poseVersion++;
     if (this.channelMat !== null) { this.channelMat.apply(this.channels, this.flashBase); this.applyFlash(); }
+    this.attachments?.update(this.channels);
     if (this.flash > 0) { this.flash = Math.max(0, this.flash - dt / FLASH_T); this.applyFlash(); }
     if (this.ragdoll !== null) { this.updateRagdoll(this.ragdoll, dt, t, near); return; }
     if (this.rowDriven) { /* posed from its row */ } else if (this.externalSimulation === null) this.stepMotion(dt); else this.readSimulationPose();

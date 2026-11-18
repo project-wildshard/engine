@@ -13,7 +13,7 @@ export interface CreatureHull {
    *  batch (PF7b); absent when the coats are not one compressed format */
   coatLayer?: { readonly array: THREE.CompressedArrayTexture; readonly layer: number };
 }
-export interface SpeciesLook extends Pick<SpeciesDef, 'rigContract' | 'fur' | 'build' | 'pose' | 'gait' | 'postPose' | 'rig' | 'animate' | 'damageMul' | 'eyeGlow' | 'eyeGlowIntensity' | 'channelLook'> {
+export interface SpeciesLook extends Pick<SpeciesDef, 'rigContract' | 'fur' | 'build' | 'pose' | 'gait' | 'postPose' | 'rig' | 'animate' | 'damageMul' | 'eyeGlow' | 'eyeGlowIntensity' | 'channelLook' | 'attachments'> {
   id: string; species: string; kind: string;
   /** creature memory a specimen is stood up with in the Model Explorer (a creature that waits hidden is shown risen) */
   standMem?: Readonly<Record<string, number>>;

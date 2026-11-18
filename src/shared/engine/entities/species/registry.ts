@@ -7,6 +7,7 @@ import type { Rng } from '../../core/rng';
 import type { DamageRequest } from '../../combat/pipeline';
 import type { HuntTuning } from '../../../../server/engine/ai/hunt';
 import type { Animal } from '../../../../client/engine/entities/AnimalView';
+import type { SpeciesAttachment } from '../../../../client/engine/entities/creatureAttachments';
 import type { AnimalSim, AnimalState } from '../AnimalSim';
 import type { SpeciesFlight } from '../../ai/flight';
 
@@ -250,6 +251,9 @@ export interface SpeciesDef {
   harvest?: readonly HarvestDrop[];
   /** ONE-FORMAT CC28b: the look's tint, glow and opacity follow these channels on every page. */
   channelLook?: ChannelLook;
+  /** ONE-FORMAT CC30c: parts hung on the body's bones, shown and hidden by its channels (the phone tier's already
+   *  without `desktop` ones). */
+  attachments?: readonly SpeciesAttachment[];
   capExempt?: boolean;
   flight?: SpeciesFlight;
   /** LOCK / target taps; defaults to false on ground species and true on flight species. */

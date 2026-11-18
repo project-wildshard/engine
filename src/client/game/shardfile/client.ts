@@ -67,7 +67,8 @@ import { clientPostStack, type ClientPost } from './clientPost';
 import { loadScenePostGraphCompiler } from '@wildshard/engine/render/graphBackend';
 import { frameLookOf } from '../grid/frameLook';
 import { clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ShardViewRecipe } from './clientRecipes';
-import { loadItemModels } from './itemModels';
+import { loadItemModels, loadStaticModels } from './itemModels';
+import { attachmentRefs, withAttachments } from './clientAttachments';
 import { loadClientSkins, type ClientSkin } from './clientSkins';
 import { clientViews } from './clientViews';
 import { createShardfileClientScripts, captureClientScriptPosition } from './clientScripts';
@@ -215,6 +216,8 @@ export class ShardfileClient {
   private worldTiles: Awaited<ReturnType<typeof standaloneClientTiles>> | undefined;
   private items: DeclaredItems | undefined;
   private itemModels: Awaited<ReturnType<typeof loadItemModels>> = new Map();
+  /** CC30c: the GLBs creature attachments draw, by hash */
+  private attachmentModels: Awaited<ReturnType<typeof loadStaticModels>> = new Map();
   private readonly mode: DataMode;
   private readonly nativeFeatures: boolean;
   /** The declared state as authored: a runtime-bound host field keeps its default for the look's curves. */
@@ -297,6 +300,7 @@ export class ShardfileClient {
     }
     worldStep(ctx, 'looks');
     this.itemModels = await loadItemModels(this.source.items, this.assets.retained, ctx.scope);
+    this.attachmentModels = await loadStaticModels(attachmentRefs(this.source.rows), this.assets.retained, ctx.scope);
     worldStep(ctx, 'item models');
     this.skins = await loadClientSkins(this.source, this.assets.retained, presentation.compile, ctx.scope);
     worldStep(ctx, 'skins');
@@ -445,7 +449,7 @@ export class ShardfileClient {
     const pageRows = source.rows.species.map((row) => ({ ...row, harvest: row.harvest ?? [], variants: row.variants.map((variant) => ({ ...variant, scale: [variant.scale[0], variant.scale[1]] as [number, number] })) }));
     ctx.rows.species(pageSpecies(pageRows, kinds));
     // CC28c: a body's swap look registers under its own page kind, with a copy of its species row, never its species' kind
-    const swaps = speciesSwaps(source.rows), swapped = new Map(swaps.map((swap) => [swap.look, swap])), looks = clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins);
+    const swaps = speciesSwaps(source.rows), swapped = new Map(swaps.map((swap) => [swap.look, swap])), looks = withAttachments(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins), source.rows, this.attachmentModels, presentation.materials, TIER === 'phone');
     ctx.rows.speciesLook(pageSpecies(looks.filter((look) => !swapped.has(look.id)), kinds));
     for (const swap of swaps) {
       const row = pageRows.find((entry) => entry.id === swap.species), look = looks.find((entry) => entry.id === swap.look);

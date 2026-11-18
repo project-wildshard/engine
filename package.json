@@ -456,6 +456,7 @@
     "./entities/lowpoly": "./src/client/engine/entities/lowpoly.ts",
     "./entities/species/loft": "./src/client/engine/entities/species/loft.ts",
     "./entities/channelLook": "./src/client/engine/entities/channelLook.ts",
+    "./entities/creatureAttachments": "./src/client/engine/entities/creatureAttachments.ts",
     "./entities/species/look": "./src/client/engine/entities/species/look.ts",
     "./entities/species/registry": "./src/shared/engine/entities/species/registry.ts",
     "./entities/species/rigs": "./src/shared/engine/entities/species/rigs.ts",

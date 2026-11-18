@@ -42,10 +42,15 @@ async function parseModel(bytes: Uint8Array): Promise<Group> {
 /** Lease static, untextured equipment GLBs by admitted hash. Independent transforms share immutable geometry/materials
  * across live shards; the last scope release disposes them. A late owner reparses after retirement, never a dead model.
  * Hashes cover only each supplied byte span, including Uint8Array subclasses backed by a larger allocation. */
-export async function loadItemModels(items: ShardItems, assets: ReadonlyMap<string, Uint8Array>, scope: Scope): Promise<ReadonlyMap<string, Group>> {
+export function loadItemModels(items: ShardItems, assets: ReadonlyMap<string, Uint8Array>, scope: Scope): Promise<ReadonlyMap<string, Group>> {
+  return loadStaticModels(items.rows.flatMap(row => row.view.asset === undefined ? [] : [row.view.asset]), assets, scope);
+}
+
+/** Lease static, untextured GLBs by admitted hash: equipment models, and a creature's attachments (ONE-FORMAT CC30c). */
+export async function loadStaticModels(hashes: Iterable<string>, assets: ReadonlyMap<string, Uint8Array>, scope: Scope): Promise<ReadonlyMap<string, Group>> {
   const result = new Map<string, Group>();
   const assertOwner = (): void => { if (scope.disposed) throw new Error('Equipment model owner retired'); };
-  const refs = new Set(items.rows.flatMap(row => row.view.asset === undefined ? [] : [row.view.asset]));
+  const refs = new Set(hashes);
   for (const ref of refs) {
     assertOwner();
     const bytes = assets.get(ref);
