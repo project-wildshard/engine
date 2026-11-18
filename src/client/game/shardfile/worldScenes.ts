@@ -839,7 +839,9 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
       ctx.system({ id: 'client.world.buffered-tiles', phase: 'update', run: () => { driver.step(world.player.position.x, world.player.position.z); } });
     }
     // Every live/deferred consumer now owns a copy; retire decoder templates.
-    libraries.clear(); packets.clear(); for (const done of finish) done();
+    // The list goes with its leases: this scope stays live through play (its systems and drivers), and a kept lease
+    // closure kept its template's arrays (MG9).
+    libraries.clear(); packets.clear(); for (const done of finish.splice(0)) done();
     return handles;
   } catch (error) { await geometryIntake?.return(); owner.dispose(); throw error; }
   finally { await geometryIntake?.return(); }

@@ -23,3 +23,33 @@ Main went red on the ledger guard (Coral Drift loading 34.0 MB > 30.7). codex-me
 garbage once parsed, that the weak ledger kept counting until the collector ran. `ClientAssets` now counts loans
 (`read` / `returned`); a buffer no reader, wire entry or cache write holds leaves the ledger at once. Coral reads 24.99 MB in
 every boot, Clockwork 19.03.
+
+## Owners at control, Nalati and Pine against Template (mini-webcontent2)
+
+Heap snapshots of an unminified build (headless Chromium, ANGLE Metal, phone Low, two GCs at control) were walked as a
+dominator tree with each ArrayBuffer store charged to its retaining chain. Nalati holds 160.7 MB of ArrayBuffers and
+Template 20 MB; the JS cells differ by only 26 MB and no single owner of cells passes 1.6 MB.
+
+- **Retired scene templates stayed live.** `worldScenes` ran its `finish` list of lease `done`/`retire` closures but kept
+  the list, and the scope it lives in stays live through play. `retire` captured `source`, and every closure of a lease
+  shares one scope, so each retired template kept its arrays (Pine ~8 MB of position, normal, uv and colour). The list is
+  emptied as it runs and a lease names its asset by id, dropping its release hook once done.
+- **Nalati's boss chamber copied its static shell.** The arena deep-copied each fixed-draw template it uses, and the
+  shell's 333k-vertex copy (12 MB of float position, normal and colour) waited beside its template until the player
+  entered. Every shape but the sand now draws a view over the template's arrays (`shareOwnedGeometry`); the view's own
+  attribute objects take the GPU buffers and the release after upload.
+
+Chromium [H] at control: Nalati ArrayBuffers 160.7 -> 147.0 MB, Pine 119.5 -> 109.8.
+
+WebKit, engine `0601e1ac` against the cut, alternating cold pairs under the shared measure lock, settled WebContent
+median [K] and EM11 upper (playing / loading):
+
+| Zone | Pairs | WebContent | Playing upper | Loading upper |
+| --- | ---: | --- | --- | --- |
+| Nalati | 10 | 781 -> 759 MB (paired -14.5) | 1.09 -> 1.07 | 1.44 -> 1.43 |
+| Pine Hollow | 20 | 746 -> 735 MB (paired -8) | 1.10 -> 1.09 | 1.52 -> 1.52 |
+| Driftwood | 10 | 719 -> 693 MB (paired -25.5, 10 of 10 lower) | 1.07 -> 1.00 | 1.37 -> 1.36 |
+
+Look at phone Low unchanged: WebKit spawn shots 4 s after control differ in 0.12% (Nalati), 0.14% (Pine) and 0.06%
+(Driftwood) of pixels, the animated grass and water. Nothing drawn reads a retired template; the chamber's views keep
+their CPU positions for picking and collision until the sand's own copy is written.

@@ -465,13 +465,14 @@ export function buildArenaRoomEncounter(Encounter:typeof ArenaRoomEncounter,ctx:
   if('kind' in ctx)return buildOpenArenaEncounter(Encounter,ctx.ports,ctx.rows);
   const world = ctx.game.runtime?.world; if (world === undefined || world === null) throw new Error('Arena build requires its entered world');
   if (draws===undefined||!draws.ready) throw new Error('Arena build requires its loaded fixed draws');
-  const handles = arenaRoomGeometryIds(room).map(id => [id, draws.handle(id)] as const);
-  const geometry = new Map(handles.map(([id, handle]) => [id, handle.copy()]));
-  const dungeon = new BossArenaRoom(room,geometry);
-  const sand = parsePrivateScene(dungeon.rows.view.scene).nodes.find(node => node.id === dungeon.rows.sand);
+  const rows = v.parse(ArenaRoomSchema, room);
+  const sand = parsePrivateScene(rows.view.scene).nodes.find(node => node.id === rows.sand);
   if (sand?.kind !== 'mesh') throw new Error('Missing chamber sand geometry');
-  // These are private draw copies, never the rebuild templates. Sand rewrites
-  // positions/colours; the other shapes only move or change material uniforms.
+  // Sand rewrites its positions/colours: a private copy. The other shapes only move or change material uniforms, so
+  // they draw views over the templates' arrays (MG11: Nalati's static shell, held until entry, was a 12 MB copy).
+  const handles = arenaRoomGeometryIds(room).map(id => [id, draws.handle(id)] as const);
+  const geometry = new Map(handles.map(([id, handle]) => [id, id === sand.geometry ? handle.copy() : handle.share?.() ?? handle.copy()]));
+  const dungeon = new BossArenaRoom(room,geometry);
   for (const [id, shape] of geometry) if (id !== sand.geometry) gpuOnlyAttributes(shape, 'arena.room');
   return sliceArenaRoom(new Encounter(dungeon,encounter,entrance,ARENA_ROOM_PAGE),dungeon,{ scene: world.game.scene,registry: ctx.app.registry });
 }

@@ -32,15 +32,20 @@ const templates = new WeakMap<Assets, Map<string, BufferGeometry>>();
 function requireLive(owner: Scope): void {
   if (owner.disposed || owner.disposing) throw new Error('World scene geometry owner is disposed or retiring');
 }
+/** MG9/MG11 (mini-webcontent2): a finished lease keeps no path to its template. Every closure here shares one scope, so
+ *  `retire` names the asset by id rather than capturing `source`, and `done` drops the release and disposer hooks; a
+ *  caller that keeps the lease (worldScenes' finish list did) then holds no template arrays (Pine: ~8 MB at control). */
 function lease(owner: Scope, assets: Assets, source: BufferGeometry): WorldSceneGeometry {
   requireLive(owner);
-  const release = assets.acquireResource(source);
+  let release: (() => void) | null = assets.acquireResource(source);
   if (release === null) throw new Error('World scene geometry has retired');
+  const id = `scene:${source.uuid}`;
   let geometry: BufferGeometry | undefined = source;
   let forget = (): void => undefined;
   const done = (): void => {
     if (geometry === undefined) return;
-    geometry = undefined; forget(); release();
+    const free = release;
+    geometry = undefined; release = null; forget(); forget = (): void => undefined; free?.();
   };
   forget = owner.capture('disposers', done);
   const current = (): BufferGeometry => {
@@ -48,7 +53,7 @@ function lease(owner: Scope, assets: Assets, source: BufferGeometry): WorldScene
     if (geometry === undefined) throw new Error('World scene geometry construction has finished');
     return geometry;
   };
-  const retire = (): void => { done(); assets.evictCached(`scene:${source.uuid}`); };
+  const retire = (): void => { done(); assets.evictCached(id); };
   return { done, retire, copy: () => copyOwnedGeometry(current()), draw: () => copyOwnedDrawGeometry(current()) };
 }
 

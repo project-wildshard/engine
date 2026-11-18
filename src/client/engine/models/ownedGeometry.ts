@@ -178,6 +178,37 @@ export function restoreOwnedGeometryGrid(geometry: BufferGeometry, grid: Matrix4
   if (gridQuantized(geometry, grid)) drawGrids.set(geometry, grid.clone());
 }
 
+/** A plain attribute holding its own array (not a typed subclass, not one whose CPU copy went after upload). */
+function plainAttribute(attribute: unknown): attribute is BufferAttribute {
+  return attribute instanceof BufferAttribute && Object.getPrototypeOf(attribute) === BufferAttribute.prototype
+    && Object.getOwnPropertyDescriptor(attribute, 'array')?.writable === true;
+}
+function attributeView(attribute: BufferAttribute): BufferAttribute {
+  const view = new BufferAttribute(attribute.array, attribute.itemSize, attribute.normalized);
+  view.name = attribute.name; view.usage = attribute.usage; view.gpuType = attribute.gpuType;
+  return view;
+}
+/**
+ * MG11 (mini-webcontent2): a draw geometry over a template's own arrays. Its attribute objects are new, so a release of
+ * the CPU copy after upload, a usage change or a GPU buffer stays with the view, but no byte is copied (Nalati's boss
+ * chamber copied a 12 MB static shell beside its template and held both until entry). The caller never writes the arrays.
+ * Undefined when the template is not plain storage (a draw grid, morphs, interleaved or typed-subclass channels): copy it.
+ */
+export function shareOwnedGeometry(source: BufferGeometry): BufferGeometry | undefined {
+  const index = source.getIndex(), attributes = Object.entries(source.attributes);
+  if (drawGrids.has(source) || Object.keys(source.morphAttributes).length > 0 || (index !== null && !plainAttribute(index))
+    || !attributes.every(([, attribute]) => plainAttribute(attribute))) return undefined;
+  const view = new BufferGeometry();
+  view.name = source.name;
+  for (const [name, attribute] of attributes) if (plainAttribute(attribute)) view.setAttribute(name, attributeView(attribute));
+  if (index !== null) view.setIndex(attributeView(index));
+  for (const group of source.groups) view.addGroup(group.start, group.count, group.materialIndex);
+  view.setDrawRange(source.drawRange.start, source.drawRange.count);
+  view.boundingBox = source.boundingBox?.clone() ?? null; view.boundingSphere = source.boundingSphere?.clone() ?? null;
+  view.userData = source.userData;
+  return view;
+}
+
 /** CPU consumers still receive the admitted model's original identity-space values. */
 export function copyOwnedGeometry(source: BufferGeometry): BufferGeometry {
   const copy = source.clone(), grid = drawGrids.get(source);
@@ -279,6 +310,8 @@ export interface OwnedGeometry {
   copy: () => BufferGeometry;
   /** Transfer a template into one owner; neither loader nor cache retains its attributes afterwards. */
   take: () => BufferGeometry;
+  /** A draw-only view over the template's arrays (`shareOwnedGeometry`), or undefined where only a copy will do. */
+  share?: () => BufferGeometry | undefined;
 }
 
 /** Identity-space baked triangles by default. A draw-grid intake retains the original normalized positions and node transform. */
@@ -356,5 +389,6 @@ export function createOwnedGeometry(url: string, channels: Readonly<Record<strin
     },
     take: () => { if (template === undefined) throw new Error(`Baked model was not loaded: ${url}`); const geometry = template; template = undefined; pending = undefined; return geometry; },
     copy: () => { if (template === undefined) throw new Error(`Baked model was not loaded: ${url}`); return copyOwnedGeometry(template); },
+    share: () => { if (template === undefined) throw new Error(`Baked model was not loaded: ${url}`); return shareOwnedGeometry(template); },
   };
 }
