@@ -2,7 +2,7 @@ import { decodeLaneBytes } from '@wildshard/engine/core/deflate';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 import { FixedDrawRowsSchema } from '@wildshard/format/fixedDraws';
 import * as v from 'valibot';
-import type { BufferGeometry } from 'three';
+import { BufferGeometry } from 'three';
 import { createOwnedGeometry, type OwnedGeometry } from '@wildshard/engine/models/ownedGeometry';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -53,9 +53,9 @@ function laneBlock(slot: string, baked: BakedRow, bytes: Uint8Array, offset: num
 
 /** One slot's intake: a GLB file (or an assembled geometry) through the template's own loader; a baked block (a file's
  *  bytes, a lane bake's whole bytes) decoded here and adopted without a copy. */
-function admitSlot(row: FixedDrawRow, template: OwnedGeometry, value: Uint8Array | BufferGeometry | undefined): Promise<void> {
+function admitSlot(row: FixedDrawRow, template: OwnedGeometry, value: Uint8Array | BufferGeometry | undefined, ownership: 'borrow' | 'take' = 'borrow'): Promise<void> {
   const baked = row.baked;
-  if (baked === undefined) return template.load(value);
+  if (baked === undefined) return template.load(value, undefined, ownership);
   if (!(value instanceof Uint8Array)) return Promise.reject(new Error(`Baked fixed draw needs its file bytes: ${row.slot}`));
   try {
     const block = 'lane' in row ? laneBlock(row.slot, baked, value, row.lane.offset) : value;
@@ -106,9 +106,14 @@ export function fixedDraws(product: Pick<ShardFolder, 'file' | 'slug'>, input: u
         // with the frame: together they made a ~180 ms Nalati cell-entry frame (Chromium phone 4x). GLB loads still all
         // start in row order and run together.
         const slice = workSlice(), admits: Promise<void>[] = [];
+        const counts = new Map<BufferGeometry, number>();
+        if (assembled !== undefined) for (const value of admitted.values()) {
+          if (value instanceof BufferGeometry) counts.set(value, (counts.get(value) ?? 0) + 1);
+        }
         for (const row of rows) {
           const template = templates.get(row.slot); if (template === undefined) throw new Error(`Undeclared fixed draw: ${row.slot}`);
-          const admit = admitSlot(row, template, admitted.get(row.slot)); admit.catch(() => undefined); admits.push(admit);
+          const value = admitted.get(row.slot), ownership = value instanceof BufferGeometry && counts.get(value) === 1 ? 'take' : 'borrow';
+          const admit = admitSlot(row, template, value, ownership); admit.catch(() => undefined); admits.push(admit);
           if (row.baked !== undefined) await slice.check();
         }
         await Promise.all(admits);

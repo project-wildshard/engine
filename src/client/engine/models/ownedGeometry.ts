@@ -332,8 +332,9 @@ function restoreSegments(parts: readonly BufferGeometry[]): BufferGeometry {
  * Materials, animation and colliders stay with their existing runtime owners. No services are installed on import. */
 export interface OwnedGeometry {
   /** Load immutable GLB storage. Optional ordered segments restore one native geometry;
-   * indexed segments repeat identical vertex bytes and carry consecutive original index slices. */
-  load: (bytes?: Uint8Array | BufferGeometry, segments?: readonly Uint8Array[]) => Promise<void>;
+   * indexed segments repeat identical vertex bytes and carry consecutive original index slices.
+   * An exclusive assembled geometry can transfer its arrays instead of making a second copy. */
+  load: (bytes?: Uint8Array | BufferGeometry, segments?: readonly Uint8Array[], ownership?: 'borrow' | 'take') => Promise<void>;
   /** Adopt an already owned geometry without copying; only an unloaded intake accepts it. */
   adopt: (geometry: BufferGeometry) => void;
   /** A deep attribute copy, safe to scale, merge, change collectible slots or release after GPU upload. */
@@ -403,13 +404,18 @@ export function createOwnedGeometry(url: string, channels: Readonly<Record<strin
     finally { for (const part of parts) part.dispose(); }
   };
   return {
-    load: (bytes, segments) => {
+    load: (bytes, segments, ownership = 'borrow') => {
       if (segments !== undefined) {
         if (!(bytes instanceof Uint8Array)) return Promise.reject(new Error('Geometry segments require original GLB bytes'));
         if (segments.length === 0 || segments.length > 15 || bytes.byteLength + segments.reduce((sum, part) => sum + part.byteLength, 0) > 100_000_000) return Promise.reject(new Error('Geometry storage segment cap'));
         pending ??= segmented([bytes, ...segments]); return pending;
       }
-      if (bytes instanceof BufferGeometry) { template?.dispose(); template = bytes.clone(); pending = Promise.resolve(); return pending; }
+      if (bytes instanceof BufferGeometry) {
+        if (ownership === 'take' && template === bytes && pending !== undefined) return pending;
+        template?.dispose();
+        template = ownership === 'take' ? bytes : bytes.clone();
+        pending = Promise.resolve(); return pending;
+      }
       pending ??= start(bytes);
       return pending;
     },

@@ -3,7 +3,7 @@ import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 import { fixedDrawModel as driftwoodFixedModel } from './fixtures/fixed-draw-models';
 import { expect, test, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry } from 'three';
+import { BufferAttribute, BufferGeometry, Matrix4 } from 'three';
 import { zlibSync } from 'fflate';
 import { coldFixedDraws, fixedDraws, folderFixedDraws } from '../src/client/game/models/fixedDraws';
 import { Scope } from '../src/shared/engine/app/scope';
@@ -22,6 +22,27 @@ test('every slot loads together from named sources and copies its own template',
   const gull = draws.handle('gull').copy(), fish = draws.handle('reefFish').copy();
   expect(gull.getAttribute('position').getX(0)).toBe(7); expect(fish.getAttribute('position').getX(0)).toBe(9);
   expect(gull).not.toBe(draws.handle('gull').copy());
+});
+
+test.each([false, true])('whole geometry retains one template per slot (shared: %s)', async shared => {
+  const gull = tri(7), fish = shared ? gull : tri(9), releaseGull = vi.fn(), releaseFish = vi.fn();
+  const whole = Promise.resolve(new Map([
+    ['gull', { geometry: gull, matrix: new Matrix4(), release: releaseGull }],
+    ['reef-fish', { geometry: fish, matrix: new Matrix4(), release: releaseFish }],
+  ]));
+  const draws = fixedDraws(product, rows);
+  await draws.load(undefined, undefined, whole);
+  const first = draws.handle('gull').take(), second = draws.handle('reefFish').take();
+  expect(first).not.toBe(second);
+  if (shared) {
+    expect(first).not.toBe(gull);
+    expect(second).not.toBe(gull);
+  } else {
+    expect(first).toBe(gull);
+    expect(second).toBe(fish);
+  }
+  expect(releaseGull).toHaveBeenCalledOnce();
+  expect(releaseFish).toHaveBeenCalledOnce();
 });
 
 test('an undeclared, missing or repeated slot refuses; no source reads the product', async () => {
