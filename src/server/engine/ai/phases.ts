@@ -87,7 +87,13 @@ export class PhaseEncounter {
     }, sim.scope, { order: 100 });
     sim.events.on('damage.dealt', ({ req }) => { if (req.source === actor.combatActor()) party.echo(req, actor, sim.combat); }, sim.scope);
     sim.events.on('actor.died', ({ actor: dead }) => { if (sim.players.size > 1) party.fell(dead.id, this.boss); else if (sim.players.has(dead.id)) this.boss.onPlayerDeath(); }, sim.scope);
-    sim.onStep(`encounter.${spec.id}`, (_dt) => { party.observe(this.boss); this.boss.update(1 / 60, sim.clock.now); }, { snapshot: () => this.snapshot(), restore: (value) => { this.restore(value); } });
+    // SB51: a beaten fight whose body its spawn row brought back (`respawn`) stands again with it: a body that stands is a fight
+    // a newcomer can damage and win, never a victory waiting on an empty arena. A cell's sleep spends that empty wait (SC10).
+    sim.events.on('world.slept', ({ seconds }) => { party.slept(seconds); }, sim.scope);
+    sim.onStep(`encounter.${spec.id}`, (_dt) => {
+      if (this.boss.state === 'victory' && actor.alive) { this.boss.returnBeaten(); this.boss.arm(); }
+      party.observe(this.boss); this.boss.update(1 / 60, sim.clock.now);
+    }, { snapshot: () => this.snapshot(), restore: (value) => { this.restore(value); } });
     sim.scope.onDispose(() => { this.boss.disarm(); }); this.boss.arm();
     publishEncounter(sim, spec.id, () => ({ ...NO_MOMENTS, kind: spec.kind === 'boss' ? 'boss' : 'elite', state: this.boss.state, hp: actor.hp / actor.maxHp, phase: this.boss.phase, shield: this.shield, body: actor.entityId }));
   }
