@@ -13,3 +13,6 @@ Review follow-up: the grid step caps at 2^-6 m (a vertex within 7.8 mm), so a ch
 graph whose only codec reads are its vertex position or object origin stays packable on the phone's normalized static
 grid, which reads step 1 and origin 0 there. Measured on Nine (headless WebKit, phone Low): slab positions 13.83 →
 9.22 MB, ledger GPU buffers 117.4 → 112.8 MB, EM11 loading peak median 1.73 → 1.66 GB.
+
+The GLSL identity record is rewritten on purpose: 58 of 211 shipped graphs read `objectOrigin` or write
+`vertex.position`, which now go through the codec (the same pixels off a grid).
