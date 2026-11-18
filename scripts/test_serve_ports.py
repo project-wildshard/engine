@@ -235,7 +235,12 @@ else:
         return process
 
     def finish(self, process):
-        stdout, stderr = process.communicate(timeout=20)
+        # Serve-build has a 30-second readiness window after the stubbed build.
+        # Let it report its own timeout, with room for fixture startup and exit.
+        try:
+            stdout, stderr = process.communicate(timeout=35)
+        except subprocess.TimeoutExpired as error:
+            self.fail(f'{error}\nPartial launcher stderr: {error.stderr or ""}')
         self.assertEqual(process.returncode, 0, stderr)
         match = re.search(r'http://127.0.0.1:(\d+)/', stdout)
         self.assertIsNotNone(match, stdout)
