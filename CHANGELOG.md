@@ -15,11 +15,9 @@ valid section, and a `vX.Y.Z` tag whose commit has none.
 
 ## v0.1.38 (2026-11-17)
 
-- The sail’s boost lights as soon as you press it, and the wind pushes it as intended.
-- Placed zones show their own cover art in the zone selector.
-- Your sword stays steady at rest, and prompts have more room for their text.
-- Resuming a world from an older open tab handles updates and cancellations correctly.
-- Distant herds stay visible with less work, and loading the grid uses less memory on phones.
+- Sails respond to wind and boost.
+- Grid loading uses less phone memory.
+- The Dust Wyrm works in the grid.
 
 ## v0.1.36 (2026-11-17)
 
