@@ -161,3 +161,34 @@ test('an entered cell uses the same clipless biped fallback on the published act
     expect(Math.max(...swing)).toBeGreaterThan(.25);
   } finally { scope.dispose(); f.dispose(); }
 });
+
+test.each([
+  { asset: 'kit-biped-pack-die.glb', owned: false },
+  { asset: 'kit-biped-pack-owned.glb', owned: true },
+])('the actual Kit pack $asset retains walk precedence and plays the sampled death', async ({ asset, owned }) => {
+  const glb = new Uint8Array(readFileSync(new URL(`./fixtures/${asset}`, import.meta.url)));
+  const f = await kitView(glb, 'biped', humanoidDims, await rapier);
+  try {
+    const thigh = f.rig.bones['thigh.L'], hips = f.rig.bones['hips'];
+    if (thigh === undefined || hips === undefined) throw new Error('Missing canonical walk or death joints');
+    f.actor.levelGround = true;
+    f.actor.speed = 1.5; f.actor.state = 'flee';
+    const walk: number[] = [];
+    for (let frame = 0; frame < 120; frame++) {
+      f.view.update(1 / 60, frame / 60, true);
+      walk.push(thigh.rotation.x);
+    }
+    expect(f.loaded.clips.has('walk')).toBe(owned);
+    if (owned) for (const angle of walk) expect(angle).toBeCloseTo(.42, 6);
+    else expect(Math.max(...walk) - Math.min(...walk)).toBeGreaterThan(.5);
+    f.actor.alive = false;
+    f.view.update(1 / 60, 2, true);
+    const start = hips.position.y;
+    for (let frame = 1; frame <= 60; frame++) f.view.update(1 / 60, 2 + frame / 60, true);
+    expect(start - hips.position.y).toBeGreaterThan(.6);
+    expect(hips.rotation.x).toBeGreaterThan(1.2);
+    const rested = hips.quaternion.clone();
+    f.view.update(1 / 60, 5, true);
+    expect(hips.quaternion.toArray()).toEqual(rested.toArray());
+  } finally { f.dispose(); }
+});
