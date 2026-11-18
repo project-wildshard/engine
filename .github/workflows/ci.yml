@@ -4,10 +4,10 @@ name: ci
 # Boundaries starts independently. Report-only soaks, quarantine and timings
 # are source-run follow-ups in ci-reports.yml and cannot hold this verdict.
 on:
-  # Local-gate land pushes only main. plan/** remains for --hosted fallback;
-  # its exact main SHA may reuse that green branch run (J240).
+  # J422: every row reaches main through the push gate; the full suite runs
+  # here on main, once per tip. No plan/** runs (meta FLOW-SIMPLE FS6).
   push:
-    branches: [main, 'plan/**', 'release/**']
+    branches: [main, 'release/**']
   pull_request:
   workflow_dispatch:
     inputs:

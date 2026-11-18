@@ -1,13 +1,8 @@
 # TC40: explicit report-only Ring 2. Repeated real cold cooks and publisher
 # SIGKILL/recovery exceed J186's ten seconds; never a hook or push gate.
 name: packs-contract
+# J422 (meta FLOW-SIMPLE FS6): no plan/** runs; nightly and by hand.
 on:
-  push:
-    branches: ['plan/**']
-    paths:
-      - scripts/packs-contract.mjs
-      - test/fixtures/packs-worker/**
-      - .github/workflows/packs-contract.yml
   workflow_dispatch:
   schedule:
     - cron: '29 8 * * *'
