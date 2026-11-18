@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import type { RuntimeCost } from '@wildshard/format/runtimeCost';
 import { parseShardSlug } from '../../../shared/game/shard/slug';
 import { dataPointer, hybridPointer } from './pointer';
+import { listedArrival } from './titleList';
 import { useOwnedGridHome } from '../grid/pageShell';
 import { preparePageResidency } from '../shardfile/clientSource';
 
@@ -18,9 +19,8 @@ test('a client-plan shard names its hybrid descriptor as shardfile, and the old 
   expect(hybridPointer({ shardfile: PATH })).toBeUndefined();
   expect(dataPointer({ shardfile: PATH })).toBe(PATH);
   expect(hybridPointer({})).toBeUndefined();
-  // naming both would let the page and the grid admit different descriptors
-  expect(() => hybridPointer({ shardfile: PATH, gridShardfile: PATH })).toThrow('names its shardfile once');
-  expect(() => dataPointer({ shardfile: PATH, gridShardfile: PATH, clientPlanRuntime: true })).toThrow('names its shardfile once');
+  // naming two different files would let the page and the grid admit different descriptors
+  expect(() => dataPointer({ shardfile: PATH, gridShardfile: '/shardfiles/other/shard.json', clientPlanRuntime: true })).toThrow('names its shardfile once');
 });
 
 test('a manifest with only shardfile and a runtime declaration owns its grid home, as gridShardfile did', () => {
@@ -42,4 +42,24 @@ test('a shardfile-named hybrid home is measured standalone like a gridShardfile 
     page.residency?.dispose();
   }
   expect(preparePageResidency({ slug, shardfile: PATH, runtimeCost: COST }).instance).toBeNull();
+});
+
+// staging v0.1.38: an API-uploaded zone (Mossgate, Mirror Salt, Glowfen) enters on another shard's page. Its row names only
+// `shardfile`; the page's own manifest is a client-plan hybrid on `gridShardfile`. The arrival must not carry both.
+const PAGE = { slug: 'driftwood-isle', name: 'Driftwood Isle', clientPlanRuntime: true as const, gridShardfile: '/shardfiles/driftwood-isle/shard.json' };
+const UPLOADED = { slug: 'mossgate', name: 'Mossgate', shardfile: '/shardfiles/mossgate/shard.json' };
+
+test('an uploaded zone arriving on a hybrid page boots as plain data on its own pointer', () => {
+  const arrival = listedArrival(PAGE, UPLOADED);
+  expect(arrival.slug).toBe('mossgate');
+  expect(dataPointer(arrival)).toBe(UPLOADED.shardfile);
+  expect(hybridPointer(arrival)).toBeUndefined();
+  expect('gridShardfile' in arrival || 'clientPlanRuntime' in arrival).toBe(false);
+  expect(preparePageResidency({ ...arrival, slug: parseShardSlug(arrival.slug) }).instance).toBeNull();
+});
+
+test('both pointers naming the same file are one pointer; only two different files are refused', () => {
+  expect(hybridPointer({ shardfile: PATH, gridShardfile: PATH, clientPlanRuntime: true })).toBe(PATH);
+  expect(dataPointer({ shardfile: PATH, gridShardfile: PATH })).toBeUndefined();
+  expect(() => hybridPointer({ shardfile: PATH, gridShardfile: '/shardfiles/other/shard.json' })).toThrow('names its shardfile once');
 });

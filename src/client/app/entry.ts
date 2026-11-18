@@ -3,7 +3,7 @@ import '@wildshard/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-unassigned-import -- evaluated for its effect: the app identity is installed before any other module body runs (E414)
 import './identity';
 import { dataPointer } from '@wildshard/engine/game/shard/pointer';
-import { findTitleManifest, installTitleManifests, readTitleRows, titleManifests, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
+import { findTitleManifest, installTitleManifests, listedArrival, readTitleRows, titleManifests, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
 import { bareSlug, installedCatalogue, installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
 import { startPageServices } from './pageServices';
@@ -524,7 +524,7 @@ async function startSelected(): Promise<void> {
   ]);
   // C3: a catalogue shard this build has no discovery for: the page's manifest, renamed; admission replaces the rest.
   const listed = unloadedTitleRow(search.get('chunk'), game.shard);
-  const arrival = listed?.shardfile === undefined ? game.shard : { ...game.shard, slug: listed.slug, name: listed.name, shardfile: listed.shardfile };
+  const arrival = listed?.shardfile === undefined ? game.shard : listedArrival(game.shard, { slug: listed.slug, name: listed.name, shardfile: listed.shardfile });
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
   // BUGBASH-LOOP (J385, Jake 2026-11-16): a loading world shows exactly one screen, its own full-screen card. No live menu
   // over it (PZ27b2 put the main menu, then Shard Select, over the world's mounting HUD and shrank this card to a 3 px bar),
