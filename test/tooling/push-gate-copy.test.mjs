@@ -153,6 +153,9 @@ describe('push gate copy (EV1)', () => {
     expect(copyReason(root, base, {}, false)).toBeNull();
     expect(copyReason(root, base, {CI: 'true'})).toBeNull();
     expect(copyReason(tree, null, {})).toBeNull();
+    // J422: land's push always copies, so the lane's next-row edits during the gate never stop it.
+    expect(copyReason(tree, base, {}, undefined, true)).toMatch(/land push \(J422\)/u);
+    expect(copyReason(tree, base, {CI: 'true'}, undefined, true)).toBeNull();
     writeFileSync(join(tree, 'stray.txt'), 'x\n');
     expect(copyReason(tree, base, {})).toMatch(/1 uncommitted path/u);
     rmSync(join(tree, 'stray.txt'));

@@ -108,7 +108,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   // another lane's work in progress in this checkout neither refuses the push nor leaks into the checks.
   for(const key of Object.keys(process.env))if(key.startsWith('GIT_'))Reflect.deleteProperty(process.env,key);
   const {copyReason,makeGateCopy,pushedCommit}=await import('../scripts/push-gate-copy.mjs');
-  const sha=pushedCommit(root,env.WS_PUSH_REFS),why=copyReason(root,sha,env);
+  const sha=pushedCommit(root,env.WS_PUSH_REFS),why=copyReason(root,sha,env,undefined,landMain==='push');
   // main-push gated these commits before it took the lock (scripts/main-push-gated.mjs): the push under the lock
   // skips the gate when every outgoing commit carries its mark. Read from the hook's own environment.
   const pregated=process.env.WS_MAIN_PUSH_GATED==='1'?(await import('../scripts/main-push-gated.mjs')).pregated(root,env.WS_PUSH_REFS):null;

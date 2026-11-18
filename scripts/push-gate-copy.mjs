@@ -54,10 +54,14 @@ export function pushedCommit(root,refs){
 }
 
 /** Why this push gates in a clean copy, or null to gate in place. The canonical checkout always copies: other lanes
- * may write there while the gate runs. A plan worktree copies only when it is dirty or HEAD is not the pushed tree.
- * @param {string} root @param {string|null} sha @param {NodeJS.ProcessEnv} env @param {boolean} [enabled] */
-export function copyReason(root,sha,env,enabled=CLEAN_COPY){
+ * may write there while the gate runs. A plan worktree copies when it is dirty, when HEAD is not the pushed tree, or
+ * on land's J422 push: the lane keeps writing its next row in that worktree while the gate runs, and a file it wrote
+ * mid-gate used to stop the push ("Push target requires a clean checked tree", opus-ss and opus-of-m7, 2026-11-18).
+ * @param {string} root @param {string|null} sha @param {NodeJS.ProcessEnv} env @param {boolean} [enabled]
+ * @param {boolean} [landPush] the push is land's J422 main push (landMainMode 'push') */
+export function copyReason(root,sha,env,enabled=CLEAN_COPY,landPush=false){
  if(!enabled||sha===null||env.CI||env.GITHUB_ACTIONS)return null;
+ if(landPush)return 'land push (J422): the lane may keep editing its worktree while the gate runs';
  const gitDir=resolve(root,git(root,['rev-parse','--git-dir'])),common=resolve(root,git(root,['rev-parse','--git-common-dir']));
  if(gitDir===common)return 'canonical checkout (shared by mode-1 lanes)';
  if(git(root,['rev-parse','HEAD^{tree}'])!==git(root,['rev-parse',`${sha}^{tree}`]))return 'pushed commit is not the checked-out tree';

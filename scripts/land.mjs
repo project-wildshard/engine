@@ -683,7 +683,10 @@ class Landing{
   const porcelain=local&&!result.hookGreen?'':result.stdout;
   const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(result.stderr,porcelain,local&&!result.hookGreen?result.stdout:'');
   this.receipt(`STOP main push of ${short(head)} refused: ${cause}`);
-  throw new StopError(`main push of ${short(head)} refused: ${cause}\nFix forward and run land again.`);
+  // J422: a file written in this worktree while the gate ran made the gate's after-check refuse the tree. The gate now
+  // runs in a clean copy for land's push (push-gate-copy.mjs copyReason); a worktree not yet rebased past that fix says so.
+  const fix=/requires a clean checked tree/u.test(cause)?'This worktree changed while the gate ran (your next row\'s edits). Run land again: after its rebase the gate runs in a clean copy, so edits during the gate no longer stop it.':'Fix forward and run land again.';
+  throw new StopError(`main push of ${short(head)} refused: ${cause}\n${fix}`);
  }
 
  /** lint:game, typecheck and the related Vitest files, here, before anything is pushed; the first red stops land with
