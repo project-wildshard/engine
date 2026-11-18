@@ -13,14 +13,19 @@
  * count restarts there. WebKit only (every iPhone browser): Blink's flush is a shallow IPC flush whose effect on its
  * GPU process was not measured.
  *
- * **Off by default in play** (coordinator, 2026-11-18): in the iOS Simulator the explorer's end point read 30 fps with the
- * split against 60 without, in 3 of 3 pairs, so it waits for a phone frame-time read. The device Debug slot
- * `debug.passSplit` (a vertex count; `--device-save=debug.passSplit=400000` in the Simulator harness) turns it on.
+ * **On by default; `debug.passSplit` overrides** (MG10, mini-ninesteady3 2026-11-18): the device Debug slot holds a vertex
+ * count, 0 for off (`--device-save=debug.passSplit=0` in the Simulator harness). It was briefly off (`c22afcdd`) for a
+ * Simulator "60 -> 30 fps" that turned out to be the explorer readout's last 0.5 s window, which reads 30 unsplit too. rAF
+ * frame times, iPhone Simulator, 2 runs each, unsplit / 400 k / 800 k: explorer p50 17 ms all, p99 19-38 / 19-20 / 18-19;
+ * play p50 17, p99 34 / 34-36 / 32-33, frames over 17.5 ms 8 / 10-12 / 8-9 %. Phone Low (codex-nalati, 5 cold pairs):
+ * playing upper Nalati 1116 -> 1090 MB, Driftwood 1148 -> 1027, spawn p99 19 ms both ways.
+ * On top of the loading-card split below (Nine, 6 alternating cold WebKit [K] runs each, loading-only vs this): settled
+ * GPU 489 (486-490) -> 452 (450-455) MB, EM11 playing 1.01 -> 0.99 GB (upper 1.125 -> 1.09), loading peak 1.50 both.
  *
  * **On while a loading card covers the world** (MG9/MG11, mini-shadermem 2026-11-18): the boot's shaders, warm-turn and
  * hidden frames draw heavier passes than any play frame, so without the split the buffer is sized at control for the boot,
- * not for play. Driftwood held 146-155 MB of it at the settled reading and 79 MB once the driver let the extra go, 10.5 s
- * later; with the split under the card it holds ~97 MB there (Pine 76 -> 66). Play frames keep their own passes.
+ * not for play (`loadingLimit` keeps that when `debug.passSplit` is 0). Driftwood held 146-155 MB of it at the settled reading and 79 MB once the driver let the extra go, 10.5 s
+ * later; with the split under the card it holds ~97 MB there (Pine 76 -> 66).
  */
 import { webKitEngine } from './drawHooks';
 import { jsonSlot } from '../saves/slots';
@@ -28,16 +33,16 @@ import { jsonSlot } from '../saves/slots';
 /** WebGL2's READ_FRAMEBUFFER: binding one moves no draw */
 const READ_FRAMEBUFFER = 0x8ca8;
 
-/** the vertex invocations one pass may carry before the next draw opens a new one, when the split is on */
+/** the vertex invocations one pass may carry before the next draw opens a new one */
 export const PASS_SPLIT_VERTICES = 400_000;
-/** the device Debug slot that turns the split on: its vertex count (a number or a numeric string); absent, it is off */
+/** the device Debug slot that overrides the limit: a vertex count (a number or a numeric string), 0 for off */
 export const PASS_SPLIT_SLOT = 'debug.passSplit';
 
-/** The split's vertex limit from `debug.passSplit`, or 0 (off). */
+/** The split's vertex limit: `debug.passSplit` when it holds a count (0 is off), else `PASS_SPLIT_VERTICES`. */
 export function passSplitLimit(): number {
   const value = jsonSlot(PASS_SPLIT_SLOT, 'device').read();
-  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : 0;
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  const n = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN;
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : PASS_SPLIT_VERTICES;
 }
 
 const DRAWS = ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'drawRangeElements'] as const;

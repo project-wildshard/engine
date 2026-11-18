@@ -54,7 +54,7 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   installShadowMaterialOwnership(renderer, ownership.assets, ownership.scope);
   installCompileShadowSkip(renderer);
   installProvokingVertex(renderer); // MG10: Metal's own convention, so ANGLE rewrites no index data per draw
-  // MG10: off in play unless `debug.passSplit` (passSplit.ts: a Simulator fps step); MG9: on under a loading card
+  // MG10: no Metal pass bins more than 400 k vertices (`debug.passSplit` overrides, 0 off); MG9: still on under a loading card
   installPassSplit(context, undefined, passSplitLimit(), PASS_SPLIT_VERTICES);
   const stopLabels = installDeveloperLabels(renderer);
   const dispose = renderer.dispose.bind(renderer);
