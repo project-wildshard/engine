@@ -12,9 +12,13 @@ export function assertShardSlug(slug: string): void {
  * instance, so this answers undefined; any other product's saves are keyed by its exact (origin, slug) pair, which
  * paths and revisions do not change.
  */
+/** A slug the catalogue places saves under its placement's instance. */
+export function cataloguePlaced(slug: string): boolean {
+  return catalogueDocument().placements.some(row => bareSlug(row.slug) === bareSlug(slug));
+}
 export async function admittedShardInstance(base: string, slug: string, hash: (bytes: Uint8Array) => Promise<string>): Promise<string | undefined> {
   assertShardSlug(slug);
-  if (catalogueDocument().placements.some(row => bareSlug(row.slug) === bareSlug(slug))) return undefined;
+  if (cataloguePlaced(slug)) return undefined;
   const url = new URL(base);
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Outside shardfiles require an HTTP origin');
   const identity = await hash(new TextEncoder().encode(JSON.stringify([url.origin, slug])));

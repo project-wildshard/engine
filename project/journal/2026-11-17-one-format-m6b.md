@@ -22,3 +22,15 @@
   host's grant `dangerousTrust()` in `dangerousGates.ts`, the one file that still spells it.
   `browserShardfileOptions(base, trusted)`, `prepareHybridShard(.., { trusted })`,
   `HybridResident.trust`.
+
+## Review fixes before the land (OF10a4, OF10a5)
+
+A `claude -p` review of the branch found three bugs, and the T1 Template journey failed (never reached play):
+
+- `firstPartyRead` had become unconditional, so an unlisted outside product took the build path, which casts the
+  index and checks sizes only. The browser reader is now given to a product the host trusts or one the build's
+  verdict table lists; anything else has no browser reader and fails closed, as on main.
+- Named JSON reads keyed `builtJson` on `descriptor.receipt`, which the build path never sets, so every `jsonSchema`
+  file threw in the browser. It keys on `descriptor.built` now.
+- The native read never named the save identity. It calls `admittedShardInstance` too, and `clientSource` refuses a
+  slug the catalogue does not place that arrives without one (the old backstop, keyed on placement, not provenance).

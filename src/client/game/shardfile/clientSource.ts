@@ -3,6 +3,7 @@ import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/s
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { dangerousRuntimeOwnership, dangerousUnbudgetedRuntime, type DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
+import { cataloguePlaced } from '../../../shared/game/shardfile/identity';
 import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { contentCost } from '@wildshard/format/contentCost';
@@ -106,12 +107,13 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
   if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime audio ownership requires a trusted first-party runtime declaration');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
   if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime world ownership requires a trusted first-party runtime declaration');
+  if (!cataloguePlaced(source.identity.slug) && admitted.instance === undefined) throw new Error('Outside shardfile is missing its admitted save identity');
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
   const ownedBindings = { ...bindings,
     ...(bindings.allocator === undefined && bindings.residency === undefined && options.memory !== undefined ? { allocator: new ResidencyAllocator({ memory: options.memory, playing: pagePlayingBytes() }) } : {}),
-    // OF10a5: the caller's admitted home (the page's residency) keeps its instance; admission's own names one only when it has none
-    ...(admitted.instance === undefined || bindings.instance !== undefined ? {} : { instance: admitted.instance }) };
+    // OF10a5: admission names the save instance of a product the catalogue does not place (its origin and slug)
+    ...(admitted.instance === undefined ? {} : { instance: admitted.instance }) };
   const residency = clientResidency(source, ownedBindings);
   const assets = new ClientAssets(source, admitted.assets, options);
   const manifest = sourceManifest(source, admitted.assets, bindings.imageOwner);

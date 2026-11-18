@@ -4,7 +4,7 @@ import { lateFiles } from './controlFiles';
 import { folderCacheCompletion } from './folderCacheCompletion';
 import { lendLooks } from './lentLooks';
 import { recoverStaleClient } from '@wildshard/engine/boot/stuck';
-import { builtIndexHashes } from '@wildshard/format/builtIndexes';
+import { builtIndexHash, builtIndexHashes } from '@wildshard/format/builtIndexes';
 import type { Material } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Renderer } from '@wildshard/engine/render/renderer';
@@ -99,6 +99,7 @@ export function browserShardfileOptions(base: string, trusted = false): FolderOp
     return result;
   };
   const quality = Object.fromEntries(Object.entries(TIER_CONFIG).filter((entry): entry is [string, number | boolean] => entry[0].includes('.') && (typeof entry[1] === 'number' || typeof entry[1] === 'boolean')));
+  const readable = trusted || builtIndexHash(new URL('shard.json', new URL('.', base)).pathname) !== null;
   const firstPartyRead: NonNullable<FolderOptions['firstPartyRead']> = async (url, bytes, read, hash, priority) => {
     const address = new URL(resolve(url), base).href;
     const storage = typeof caches === 'undefined' ? undefined : caches;
@@ -117,7 +118,9 @@ export function browserShardfileOptions(base: string, trusted = false): FolderOp
     entryTransport()?.expand(); return result;
   };
   return { ...(parseJson === undefined ? {} : { parseJson }), base, ...dangerousTrust(trusted), ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
-    firstPartyRead,
+    // OF10a4: the build reader serves a product the host trusts or one the build's verdict table lists (its catalogue and the
+    // placed uploads' cook rows); an unlisted product has no browser reader and fails closed, as before
+    ...(readable ? { firstPartyRead } : {}),
     backgroundFetch: (url, signal) => fetch(contentURL(resolve(url)), { priority: 'low', ...(signal === undefined ? {} : { signal }) }),
     fetch: (url, signal) => waitFor(`Read ${folderResourceRole(url, base)}`, (async () => {
       if (spawn !== undefined) return fetch(contentURL(resolve(url)), signal === undefined ? {} : {signal});
@@ -132,7 +135,7 @@ export function browserShardfileOptions(base: string, trusted = false): FolderOp
       if (folderControlsReady) void refresh();
       else pageScope.listen(document, 'ws:control-ready', () => { void refresh(); }, { once: true });
     },
-    fetchRange: (url: string, start: number, end: number, priority?: 'low') => waitFor(`Fetch pack range ${start}-${end}`, fetch(contentURL(url), { headers: { Range: `bytes=${start}-${end}` }, ...(priority === undefined ? {} : { priority }) }), 'file'),
+    ...(readable ? { fetchRange: (url: string, start: number, end: number, priority?: 'low') => waitFor(`Fetch pack range ${start}-${end}`, fetch(contentURL(url), { headers: { Range: `bytes=${start}-${end}` }, ...(priority === undefined ? {} : { priority }) }), 'file') } : {}),
     pause, cacheBatch: true,
     ...(builtIndexes !== null ? { built: { indexes: builtIndexes, stale: staleRecovery } } : {}),
   };
@@ -237,7 +240,7 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
       if (entry === undefined) {
         const assets = new ClientAssets(source, new Map(), options);
         entry = { source, assets, options, key, owners: new Set(), requests: new Set(),
-          product: shardFolderData(source, base, ref => assets.read(ref), descriptor?.receipt === undefined, descriptor?.receipt !== undefined) };
+          product: shardFolderData(source, base, ref => assets.read(ref), descriptor?.receipt === undefined, descriptor?.built === true) };
         if (options.tier === 'phone' && descriptor?.receipt !== undefined && source.late !== undefined) {
           let prepared: Promise<ReturnType<typeof folderCacheCompletion>> | undefined;
           const receipt = descriptor.receipt;
@@ -319,11 +322,11 @@ export function shardFolderFromAdmission(admitted: AdmittedFolder, scope: Scope,
   const opts = options ?? browserShardfileOptions(folderBase(admitted.source.identity.slug), true);
   let product = admittedFolders.get(admitted.source.files)?.deref();
   if (product === undefined) {
-    const reader = new ClientAssets(admitted.source, new Map(), opts), checked = outputDescriptor(admitted.source)?.receipt === undefined;
+    const reader = new ClientAssets(admitted.source, new Map(), opts), descriptor = outputDescriptor(admitted.source), checked = descriptor?.receipt === undefined;
     product = shardFolderData(admitted.source, opts.base, ref => {
       const present = admitted.assets.get(ref);
       return present === undefined ? reader.read(ref) : pacedResolve(present);
-    }, checked, !checked);
+    }, checked, descriptor?.built === true);
     admittedFolders.set(admitted.source.files, new WeakRef(product));
   }
   const release = opts.cache?.pin?.(outputDescriptor(admitted.source)?.index.sections.map(section => section.hash) ?? []);

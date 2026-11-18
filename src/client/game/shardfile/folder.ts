@@ -399,6 +399,7 @@ export function admitFolder(input: unknown, options: FolderOptions): Promise<Adm
 async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNullable<FolderOptions['firstPartyRead']>):Promise<AdmittedFolder>{
   const source=await resolveDescriptor(input,options);
   if(!isBuildValidatedOutput(source))throw new Error('First-party reader did not assemble its build output');
+  const instance=await admittedShardInstance(options.base,source.identity.slug,options.hash);
   await options.reserve?.(source);
   const selected=options.tier===undefined?source.files:await tierFolderFilesPaced(source,options.tier,options.pause,options.splatTier);
   const control=options.tier==='phone'?controlFiles(await playLibrarySourcePaced(source,options.pause),selected):selected;
@@ -432,7 +433,7 @@ async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNulla
   // that succeeded
   const warm=options.backgroundFetch;
   if(unread.length>0&&warm!==undefined)void warmTransport(unread.map(file=>outputBlobUrl(source,file.hash,base)),warm);
-  return {source,assets,cached:false,...(deferred===undefined?{}:{unread:unread.map(file=>file.hash)}),releaseTransport:transportRelease(source,assets,options),releasePreparedTransport:transportRelease(source,assets,options,true)};
+  return {source,assets,cached:false,...(deferred===undefined?{}:{unread:unread.map(file=>file.hash)}),releaseTransport:transportRelease(source,assets,options),releasePreparedTransport:transportRelease(source,assets,options,true),...(instance===undefined?{}:{instance})};
 }
 /** GC9: fetch immutable product files into the HTTP cache, eight at a time, ignoring failures (a later verified read fetches again). */
 async function warmTransport(urls:readonly string[],fetchLow:NonNullable<FolderOptions['backgroundFetch']>):Promise<void>{

@@ -1259,9 +1259,10 @@ test('an index read without the build reader takes the checked path (OF10a3)',as
   await expect(resolveOutputDescriptor(f.index,{offline:false,hash:bytes=>Promise.resolve(hash(bytes)),read:path=>Promise.resolve(path===first.path?corrupt:f.wires.get(path)??new Uint8Array())})).rejects.toThrow('section hash or size mismatch');
 });
 
-test('native first-party loading has no visited fallback, digest or client admission phases',async()=>{
+test('native first-party loading has no visited fallback, content digest or client admission phases',async()=>{
   const f=fixture(true),ordinary=options(f.wires),store=cacheStore(),phases:string[]=[],requests:string[]=[];
-  const digest=vi.fn<(bytes:Uint8Array)=>Promise<string>>(()=>{throw new Error('No first-party digest');});
+  // OF10a5 review fix: the one digest is the save identity of a slug the catalogue does not place, never content
+  const digest=vi.fn<(bytes:Uint8Array)=>Promise<string>>(()=>Promise.resolve('0'.repeat(64)));
   const visited=vi.spyOn(store.cache,'product').mockRejectedValue(new Error('No visited fallback'));
   const native:FolderOptions={...ordinary,cache:store.cache,hash:digest,progress:row=>{phases.push(row.phase);},
     firstPartyRead:(url,expected,read)=>{
@@ -1271,7 +1272,9 @@ test('native first-party loading has no visited fallback, digest or client admis
     }};
   const source=await readFolderDescriptor(native),loaded=await admitFolder(source,native);
   expect(loaded.source).toStrictEqual(f.source);expect([...loaded.assets.values()]).toStrictEqual([new Uint8Array([1,2,3])]);
-  expect(digest).not.toHaveBeenCalled();expect(visited).not.toHaveBeenCalled();expect(phases.every(phase=>phase==='assets')).toBe(true);
+  expect(digest.mock.calls.map(([bytes])=>new TextDecoder().decode(bytes))).toEqual([JSON.stringify([new URL(base).origin,f.source.identity.slug])]);
+  expect(loaded.instance).toBe(`external-${'0'.repeat(64)}`);
+  expect(visited).not.toHaveBeenCalled();expect(phases.every(phase=>phase==='assets')).toBe(true);
   expect(requests.filter(path=>path==='shard.json')).toHaveLength(1);expect(store.product()).toBeNull();
 });
 
