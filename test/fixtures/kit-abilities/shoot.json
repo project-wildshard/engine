@@ -1,0 +1,32 @@
+{
+  "ability": {
+    "use": "kit.shoot",
+    "range": 20,
+    "cooldown": 1.4,
+    "weight": 1,
+    "projectile": {
+      "speed": 24,
+      "gravity": 0,
+      "radius": 0.14
+    }
+  },
+  "strike": {
+    "id": "kit.shoot",
+    "shape": {
+      "kind": "sphere",
+      "radius": 0.14
+    },
+    "windup": 0.2,
+    "active": 0.1,
+    "recover": 0.24,
+    "cooldown": 1.4,
+    "range": 20,
+    "damage": 12,
+    "tags": [
+      "creature.shoot",
+      "cover.checked"
+    ],
+    "weight": 1,
+    "speed": 0
+  }
+}

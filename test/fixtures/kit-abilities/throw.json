@@ -1,0 +1,32 @@
+{
+  "ability": {
+    "use": "kit.throw",
+    "range": 8,
+    "cooldown": 2.1,
+    "weight": 1,
+    "projectile": {
+      "speed": 25,
+      "gravity": 9.81,
+      "radius": 0.25
+    }
+  },
+  "strike": {
+    "id": "kit.throw",
+    "shape": {
+      "kind": "sphere",
+      "radius": 0.25
+    },
+    "windup": 0.38,
+    "active": 0.1,
+    "recover": 0.24,
+    "cooldown": 2.1,
+    "range": 8,
+    "damage": 18,
+    "tags": [
+      "creature.throw",
+      "cover.checked"
+    ],
+    "weight": 1,
+    "speed": 0
+  }
+}

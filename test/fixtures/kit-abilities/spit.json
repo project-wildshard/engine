@@ -1,0 +1,32 @@
+{
+  "ability": {
+    "use": "kit.spit",
+    "range": 12,
+    "cooldown": 1.8,
+    "weight": 1,
+    "projectile": {
+      "speed": 18,
+      "gravity": 2,
+      "radius": 0.18
+    }
+  },
+  "strike": {
+    "id": "kit.spit",
+    "shape": {
+      "kind": "sphere",
+      "radius": 0.18
+    },
+    "windup": 0.28,
+    "active": 0.1,
+    "recover": 0.24,
+    "cooldown": 1.8,
+    "range": 12,
+    "damage": 10,
+    "tags": [
+      "creature.spit",
+      "cover.checked"
+    ],
+    "weight": 1,
+    "speed": 0
+  }
+}

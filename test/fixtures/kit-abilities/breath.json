@@ -1,0 +1,29 @@
+{
+  "ability": {
+    "use": "kit.breath",
+    "range": 7,
+    "cooldown": 3.2,
+    "weight": 1,
+    "from": "head"
+  },
+  "strike": {
+    "id": "kit.breath",
+    "shape": {
+      "kind": "wedge",
+      "length": 7,
+      "halfAngle": 0.52
+    },
+    "windup": 0.25,
+    "active": 1.2,
+    "recover": 0.24,
+    "cooldown": 3.2,
+    "range": 7,
+    "damage": 16,
+    "tags": [
+      "creature.breath",
+      "cover.checked"
+    ],
+    "weight": 1,
+    "speed": 0
+  }
+}
