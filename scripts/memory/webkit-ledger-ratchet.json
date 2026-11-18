@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "mode": "webkit-ledger",
+  "instrument": "minimal",
+  "zones": {
+    "nine-dragon-stack": {
+      "control": {
+        "browser": 2810784,
+        "engine": 0,
+        "workers": 6708749,
+        "geometry": 117412734,
+        "textures": 55685820,
+        "scene": 0,
+        "audio": 0,
+        "loading": 223311437,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 0,
+        "workers": 6708749,
+        "geometry": 117412734,
+        "textures": 55685820,
+        "scene": 0,
+        "audio": 0,
+        "loading": 223311437,
+        "margin": 0
+      }
+    }
+  }
+}

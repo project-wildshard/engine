@@ -57,3 +57,15 @@ when its process dump is absent. It leaves that checkpoint's process
 list empty. A qualification can rerecord selected known Ubuntu zones
 with Template and both controls. Ordinary comparison still requires
 the entire committed coverage.
+
+The committed Ubuntu baseline uses 80 cold boots over 26 current
+pins. Twenty-two zones come from the 753e3162 sweep. The 8428cd67
+refill covers Template, Brasscap revision 6, Ember Forge and Jungle
+Ziggurat. The independent clean Template passed. The planted run
+reported 51.62 MB of loading storage at control against 35.10 MB
+allowed. The Native WebKit baseline uses three inspector-free Nine
+boots on 8428cd67. The Template footprint ceiling is now 590.63 MB
+from the first hosted minimal run. The next batch passed at 581.33 MB.
+Production jobs now require the files.
+[Ubuntu sweep](https://github.com/project-wildshard/engine/actions/runs/44255220814/attempts/2).
+[Refill and controls](https://github.com/project-wildshard/engine/actions/runs/44268975659).

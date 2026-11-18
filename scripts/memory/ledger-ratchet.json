@@ -1,0 +1,630 @@
+{
+  "version": 1,
+  "mode": "ledger",
+  "zones": {
+    "_template": {
+      "control": {
+        "browser": 2810784,
+        "engine": 344064,
+        "workers": 7126652,
+        "geometry": 15301958,
+        "textures": 17885916,
+        "scene": 13892888,
+        "audio": 0,
+        "loading": 34411766,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 344064,
+        "workers": 7390848,
+        "geometry": 15301958,
+        "textures": 17885916,
+        "scene": 13892888,
+        "audio": 0,
+        "loading": 34412342,
+        "margin": 0
+      }
+    },
+    "brasscap-mesa": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1749456,
+        "workers": 6308399,
+        "geometry": 21595914,
+        "textures": 14187164,
+        "scene": 21582240,
+        "audio": 0,
+        "loading": 46478228,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1749456,
+        "workers": 6572595,
+        "geometry": 21595914,
+        "textures": 14187164,
+        "scene": 21582240,
+        "audio": 0,
+        "loading": 46478228,
+        "margin": 0
+      }
+    },
+    "driftwood-isle": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1880528,
+        "workers": 15048057,
+        "geometry": 51428942,
+        "textures": 59225894,
+        "scene": 0,
+        "audio": 41813888,
+        "loading": 76961072,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1880528,
+        "workers": 15048057,
+        "geometry": 51428942,
+        "textures": 59225894,
+        "scene": 821916,
+        "audio": 41813888,
+        "loading": 77750158,
+        "margin": 0
+      }
+    },
+    "far-reach": {
+      "control": {
+        "browser": 2810784,
+        "engine": 0,
+        "workers": 8720141,
+        "geometry": 21246196,
+        "textures": 158019576,
+        "scene": 0,
+        "audio": 0,
+        "loading": 56715748,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 0,
+        "workers": 8720141,
+        "geometry": 21246196,
+        "textures": 158019576,
+        "scene": 0,
+        "audio": 0,
+        "loading": 147634664,
+        "margin": 0
+      }
+    },
+    "ink-cel-valley": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6792221,
+        "geometry": 7367392,
+        "textures": 18599340,
+        "scene": 5101832,
+        "audio": 0,
+        "loading": 14495447,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6792221,
+        "geometry": 7367392,
+        "textures": 18599340,
+        "scene": 5101832,
+        "audio": 0,
+        "loading": 14495447,
+        "margin": 0
+      }
+    },
+    "nalati-grasslands": {
+      "control": {
+        "browser": 2810784,
+        "engine": 14032048,
+        "workers": 9790487,
+        "geometry": 44126019,
+        "textures": 64064548,
+        "scene": 10534008,
+        "audio": 52070124,
+        "loading": 89854931,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 14032048,
+        "workers": 13798741,
+        "geometry": 44126019,
+        "textures": 64064548,
+        "scene": 10534008,
+        "audio": 98325356,
+        "loading": 124110959,
+        "margin": 0
+      }
+    },
+    "open-plot-alien-plain": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 7905147,
+        "geometry": 9258390,
+        "textures": 11671904,
+        "scene": 0,
+        "audio": 23684224,
+        "loading": 15892449,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 7905147,
+        "geometry": 9258390,
+        "textures": 11671904,
+        "scene": 0,
+        "audio": 23684224,
+        "loading": 15892449,
+        "margin": 0
+      }
+    },
+    "open-plot-clockwork-canyon": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10145518,
+        "geometry": 16653208,
+        "textures": 11673304,
+        "scene": 9408,
+        "audio": 28195200,
+        "loading": 22819460,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10145518,
+        "geometry": 16653208,
+        "textures": 11673304,
+        "scene": 9408,
+        "audio": 28195200,
+        "loading": 22819460,
+        "margin": 0
+      }
+    },
+    "open-plot-coral-drift": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 8885894,
+        "geometry": 22120632,
+        "textures": 12015968,
+        "scene": 0,
+        "audio": 21331200,
+        "loading": 30649600,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 8885894,
+        "geometry": 22120632,
+        "textures": 12015968,
+        "scene": 0,
+        "audio": 21331200,
+        "loading": 30649600,
+        "margin": 0
+      }
+    },
+    "open-plot-desert-ruin": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10499964,
+        "geometry": 21104636,
+        "textures": 12347536,
+        "scene": 0,
+        "audio": 35109248,
+        "loading": 34214750,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10499964,
+        "geometry": 21104636,
+        "textures": 12347536,
+        "scene": 0,
+        "audio": 35109248,
+        "loading": 34214750,
+        "margin": 0
+      }
+    },
+    "open-plot-ember-forge": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 11826643,
+        "geometry": 14667978,
+        "textures": 12056192,
+        "scene": 0,
+        "audio": 20321152,
+        "loading": 19592641,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 11826643,
+        "geometry": 14667978,
+        "textures": 12056192,
+        "scene": 0,
+        "audio": 20321152,
+        "loading": 19592641,
+        "margin": 0
+      }
+    },
+    "open-plot-fossil-badlands": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 8754950,
+        "geometry": 13760904,
+        "textures": 11674648,
+        "scene": 672,
+        "audio": 27525248,
+        "loading": 17200625,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 8754950,
+        "geometry": 13760904,
+        "textures": 11674648,
+        "scene": 672,
+        "audio": 27525248,
+        "loading": 17200625,
+        "margin": 0
+      }
+    },
+    "open-plot-frostline-peaks": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10494859,
+        "geometry": 15641704,
+        "textures": 13740184,
+        "scene": 3216,
+        "audio": 25028224,
+        "loading": 28922100,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10494859,
+        "geometry": 15641704,
+        "textures": 13740184,
+        "scene": 3216,
+        "audio": 25028224,
+        "loading": 28922100,
+        "margin": 0
+      }
+    },
+    "open-plot-jungle-ziggurat": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10291920,
+        "geometry": 16238272,
+        "textures": 12351648,
+        "scene": 0,
+        "audio": 23275200,
+        "loading": 23245561,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10291920,
+        "geometry": 16238272,
+        "textures": 12351648,
+        "scene": 0,
+        "audio": 23275200,
+        "loading": 23245561,
+        "margin": 0
+      }
+    },
+    "open-plot-lantern-bayou": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 9339731,
+        "geometry": 21880658,
+        "textures": 11673304,
+        "scene": 12912,
+        "audio": 22556224,
+        "loading": 33391912,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 9339731,
+        "geometry": 21880658,
+        "textures": 11673304,
+        "scene": 12912,
+        "audio": 22556224,
+        "loading": 33391912,
+        "margin": 0
+      }
+    },
+    "open-plot-mosslight-ruins": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 12244499,
+        "geometry": 22341074,
+        "textures": 12466408,
+        "scene": 10272,
+        "audio": 24019200,
+        "loading": 36839899,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 12244499,
+        "geometry": 22341074,
+        "textures": 12466408,
+        "scene": 10272,
+        "audio": 24019200,
+        "loading": 36839899,
+        "margin": 0
+      }
+    },
+    "open-plot-night-market": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 13572419,
+        "geometry": 25827966,
+        "textures": 13740184,
+        "scene": 7344,
+        "audio": 28821248,
+        "loading": 39636687,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 13572419,
+        "geometry": 25827966,
+        "textures": 13740184,
+        "scene": 7344,
+        "audio": 28821248,
+        "loading": 39636687,
+        "margin": 0
+      }
+    },
+    "open-plot-patchwork-fairground": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 9175262,
+        "geometry": 12170002,
+        "textures": 11674648,
+        "scene": 1344,
+        "audio": 27621248,
+        "loading": 19696862,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 9175262,
+        "geometry": 12170002,
+        "textures": 11674648,
+        "scene": 1344,
+        "audio": 27621248,
+        "loading": 19696862,
+        "margin": 0
+      }
+    },
+    "open-plot-saltwind-lighthouse": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6925771,
+        "geometry": 4981692,
+        "textures": 11674648,
+        "scene": 1344,
+        "audio": 27328128,
+        "loading": 7135783,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6925771,
+        "geometry": 4981692,
+        "textures": 11674648,
+        "scene": 1344,
+        "audio": 27328128,
+        "loading": 7135783,
+        "margin": 0
+      }
+    },
+    "open-plot-sky-harbor": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 8475370,
+        "geometry": 15761290,
+        "textures": 11674648,
+        "scene": 4704,
+        "audio": 22483200,
+        "loading": 24737460,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 8475370,
+        "geometry": 15761290,
+        "textures": 11674648,
+        "scene": 4704,
+        "audio": 22483200,
+        "loading": 24737460,
+        "margin": 0
+      }
+    },
+    "open-plot-sky-race": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 8608374,
+        "geometry": 15392706,
+        "textures": 11674648,
+        "scene": 2688,
+        "audio": 25387200,
+        "loading": 19260677,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 8608374,
+        "geometry": 15392706,
+        "textures": 11674648,
+        "scene": 2688,
+        "audio": 25387200,
+        "loading": 19260677,
+        "margin": 0
+      }
+    },
+    "open-plot-starfall-observatory": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10280755,
+        "geometry": 15723914,
+        "textures": 11673304,
+        "scene": 7344,
+        "audio": 26732224,
+        "loading": 20673587,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 10280755,
+        "geometry": 15723914,
+        "textures": 11673304,
+        "scene": 7344,
+        "audio": 26732224,
+        "loading": 20673587,
+        "margin": 0
+      }
+    },
+    "open-plot-thin-ice": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6196082,
+        "geometry": 6886026,
+        "textures": 11673304,
+        "scene": 6720,
+        "audio": 29493248,
+        "loading": 8992106,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6196082,
+        "geometry": 6886026,
+        "textures": 11673304,
+        "scene": 6720,
+        "audio": 29493248,
+        "loading": 8992106,
+        "margin": 0
+      }
+    },
+    "pastel-plain": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6792950,
+        "geometry": 7367356,
+        "textures": 12977772,
+        "scene": 5101832,
+        "audio": 0,
+        "loading": 18231796,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6792950,
+        "geometry": 7367356,
+        "textures": 12977772,
+        "scene": 5101832,
+        "audio": 0,
+        "loading": 18231796,
+        "margin": 0
+      }
+    },
+    "pine-hollow": {
+      "control": {
+        "browser": 2810784,
+        "engine": 524288,
+        "workers": 8300285,
+        "geometry": 60068669,
+        "textures": 127285900,
+        "scene": 6841076,
+        "audio": 53067930,
+        "loading": 152711947,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 524288,
+        "workers": 10412040,
+        "geometry": 60068669,
+        "textures": 127285900,
+        "scene": 7136792,
+        "audio": 53067930,
+        "loading": 157136589,
+        "margin": 0
+      }
+    },
+    "sunscar-dunes": {
+      "control": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6414963,
+        "geometry": 12291844,
+        "textures": 81072452,
+        "scene": 5101832,
+        "audio": 0,
+        "loading": 82576270,
+        "margin": 0
+      },
+      "peak": {
+        "browser": 2810784,
+        "engine": 1405392,
+        "workers": 6414963,
+        "geometry": 12291844,
+        "textures": 81072452,
+        "scene": 5101832,
+        "audio": 0,
+        "loading": 86234553,
+        "margin": 0
+      }
+    }
+  }
+}

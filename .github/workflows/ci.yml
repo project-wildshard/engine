@@ -471,19 +471,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Select the committed or qualification ledger
-        id: baseline
-        env:
-          MEMORY_RECORD: ${{ inputs.memory_record }}
-        # a file test, not hashFiles: until the qualification run commits the ratchet there is no file to hash, and a
-        # hashFiles of a missing source is refused (test-build-tools: workflow cache keys hash only committed sources)
-        run: if [[ "$MEMORY_RECORD" == true || -f scripts/memory/ledger-ratchet.json ]]; then echo "selected=true" >> "$GITHUB_OUTPUT"; fi
-      - if: steps.baseline.outputs.selected == 'true'
-        uses: ./.github/actions/ring-setup
+      - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - if: steps.baseline.outputs.selected == 'true'
-        name: Build every production pin
+      - name: Build every production pin
         run: |
           node scripts/scratch-dir.mjs memory-ledger 'EM35 full pinned ledger'
           if ! node scripts/pins.ts install; then
@@ -493,8 +484,7 @@ jobs:
           node scripts/gen.mjs --inputs-only
           python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs --outDir tmp/memory-ledger/preview/dist
           bash scripts/ci-playwright-install.sh chromium
-      - if: steps.baseline.outputs.selected == 'true'
-        name: Read or block on subsystem ledger bytes
+      - name: Read or block on subsystem ledger bytes
         env:
           MEMORY_RECORD: ${{ inputs.memory_record }}
           WS_LEDGER_RECORD_ZONES: ${{ inputs.memory_record_zones }}
@@ -502,7 +492,7 @@ jobs:
           baseline=()
           if [[ "$MEMORY_RECORD" != true ]]; then baseline+=(scripts/memory/ledger-ratchet.json); fi
           node scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/memory-ledger/readings "${baseline[@]}"
-      - if: ${{ always() && steps.baseline.outputs.selected == 'true' }}
+      - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: memory-ledger-guard
@@ -578,7 +568,6 @@ jobs:
         run: |
           baseline=()
           if [[ "$MEMORY_RECORD" != true ]]; then
-            [[ -f scripts/memory/webkit-ledger-ratchet.json ]] || exit 0
             baseline+=(scripts/memory/webkit-ledger-ratchet.json)
           fi
           node scripts/memory/ci.mjs webkit-ledger tmp/memory-footprint/preview tmp/memory-footprint/readings "${baseline[@]}"
