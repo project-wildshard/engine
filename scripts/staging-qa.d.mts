@@ -24,6 +24,7 @@ export function mergeVerdict(input: {
   selected: readonly string[];
   after?: string;
   full: boolean;
+  runner?: readonly Finding[];
 }): { findings: Finding[]; worst: Severity | 'none'; hold: boolean; minutesInPlay: number; full: boolean };
 
 export function holdLine(verdict: { release: string; findings: readonly Finding[] }, owner: string): string | undefined;

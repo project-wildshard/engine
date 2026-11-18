@@ -3,6 +3,8 @@ import sharp from 'sharp';
 import { deployFrameProblem } from '../scripts/journey-proof.mjs';
 import { holdLine, mergeVerdict } from '../scripts/staging-qa.mjs';
 import { chromiumCandidateArgs } from '../scripts/staging-qa-browser.mjs';
+import { pickPhone } from '../scripts/staging-qa-sim.mjs';
+import { budgetFinding, LEG_CAP_S, LEG_TARGET_S, LEGS, nominalSeconds, STEPS } from '../scripts/staging-qa-budget.mjs';
 
 const build = 'a'.repeat(40);
 const selected = ['K3'];
@@ -47,5 +49,39 @@ describe('staging QA deploy verdict', () => {
     expect(broken).toMatchObject({ hold: true, worst: 'P0' });
     expect(holdLine({ ...broken, release: 'v0.1.44' }, 'opus-drift')).toContain('HOLD v0.1.44 P0 journey-webkit play. Fix forward with opus-drift');
     expect(mergeVerdict({ ...clean, proofs: [] })).toMatchObject({ hold: true, worst: 'P1' });
+  });
+});
+
+describe('staging QA budget (SQ16, J427)', () => {
+  it('fits every leg in about ten minutes, the iOS Simulator minutes inside them', () => {
+    for (const [kind, steps] of Object.entries(LEGS)) {
+      for (const id of steps) expect(STEPS[id]?.catches, `${kind} ${id}`).toBeTruthy();
+      expect(nominalSeconds(steps), kind).toBeLessThanOrEqual(LEG_TARGET_S);
+    }
+    expect(LEGS.local).toContain('ios-safari');
+    expect(STEPS['ios-safari']?.seconds).toBeGreaterThanOrEqual(60);
+    expect(nominalSeconds(LEGS.local) + nominalSeconds(LEGS.candidate) + nominalSeconds(LEGS.staging)).toBeLessThanOrEqual(2 * LEG_TARGET_S);
+  });
+
+  it('reports a leg over its cap as a P2 against the runner, which never holds', () => {
+    expect(budgetFinding('local', LEG_CAP_S)).toBeUndefined();
+    const over = budgetFinding('candidate', LEG_CAP_S + 60);
+    expect(over).toMatchObject({ scenario: 'runner', key: 'budget', severity: 'P2' });
+    expect(over?.text).toContain('13.0 min');
+    expect(mergeVerdict({ ...clean, runner: over === undefined ? [] : [over] })).toMatchObject({ hold: false, worst: 'P2' });
+  });
+});
+
+describe('the iOS Simulator step (SQ14)', () => {
+  it('picks the newest iOS iPhone 17 Pro, the size of Jake\'s phone', () => {
+    const row = (udid: string, name: string, state = 'Shutdown') => ({ udid, name, state, isAvailable: true });
+    const listing = { devices: {
+      'com.apple.CoreSimulator.SimRuntime.iOS-26-5': [row('a', 'iPhone 17 Pro')],
+      'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [row('b', 'iPhone 17 Pro Max'), row('c', 'iPhone 17 Pro', 'Booted'), row('d', 'iPhone 16 Pro')],
+      'com.apple.CoreSimulator.SimRuntime.watchOS-12-0': [row('e', 'iPhone 17 Pro')],
+    } };
+    expect(pickPhone(listing)).toMatchObject({ udid: 'c', state: 'Booted', version: [27, 0] });
+    expect(pickPhone({ devices: { 'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [row('d', 'iPhone 16 Pro')] } })?.udid).toBe('d');
+    expect(pickPhone({ devices: {} })).toBeUndefined();
   });
 });

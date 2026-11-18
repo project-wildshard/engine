@@ -5,10 +5,16 @@
 //   XR-9: the two, each on its own hosted runner, meet in one Driftwood room and each draws the other (`modelled`), and each
 //         reads the other's chat line saying so. The chat line is the only channel between the two jobs.
 // A proof against the live staging page, not a test (J186): it needs a booted device and minutes. J205: staging only, never an
-// agent socket on production. `.github/workflows/phones.yml` runs it nightly on hosted macOS and Linux; it reports, never gates.
+// agent socket on production. STAGING-QA SQ14 retired the hosted nightly (phones.yml): the MacBook runs Safari every deploy.
 //   SIM_UDID=<booted> node scripts/staging-phones-proof.mjs --device=safari --tag=<run> --out=<dir> [--peer-wait=<min>] [--solo]
 //   ANDROID_SERIAL=<booted> node scripts/staging-phones-proof.mjs --device=android --tag=<run> --out=<dir> [...]
 // Safari needs `ios_webkit_debug_proxy` and `idb` (with idb_companion) on PATH; Android needs `adb` (ANDROID_HOME). `--solo` skips XR-9.
+// Meta STAGING-QA SQ14 (J426: the Simulator runs every deploy; J428: only the obvious, stable checks): `staging-qa.mjs` runs
+// `--device=safari --solo` on the MacBook, against staging or (`--base=http://127.0.0.1:<port>`) the local rig, and
+// `--build=<sha>` names the exact build. The checks: the title, play on that build, a drawn canvas, a real touch that walks the
+// body. Page errors are listed, not failed. Why 25 of 30 hosted runs failed (2026-11-17/18): the hosted macOS and Linux
+// runners have no GPU, so the title took 16 min, `simctl io screenshot` timed out, or Safari or Chrome never opened a page
+// in 90 s; no failure was the game's.
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,12 +25,15 @@ import { decodeProtocolPng } from './parity/fast-png.mjs';
 import { soakInspector } from './soak/inspector.mjs';
 import { chatLinePattern, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from './staging-proof-lines.mjs';
 
-const BASE = 'https://staging.wildshard.io', RELEASE = 'https://packs.wildshard.io/releases/staging.json', SHARD = 'driftwood-isle';
+const STAGING = 'https://staging.wildshard.io', RELEASE = 'https://packs.wildshard.io/releases/staging.json', SHARD = 'driftwood-isle';
 const SOCKETS = new Set(['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443']);
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const device = flag('device', ''), tag = flag('tag', Date.now().toString(36).slice(-6)), out = flag('out', 'tmp/staging-phones'), solo = process.argv.includes('--solo');
 const peerWait = Number(flag('peer-wait', '15')) * 60_000;
+const BASE = flag('base', STAGING).replace(/\/$/u, ''), expectBuild = flag('build', ''), loopback = /^http:\/\/(127\.0\.0\.1|localhost):\d+$/u.test(BASE);
+if (BASE !== STAGING && !loopback) throw new Error('--base is staging or a loopback rig (J205: never production)');
+if (expectBuild !== '' && !/^[0-9a-f]{40}$/u.test(expectBuild)) throw new Error('--build is a 40-character SHA');
 if (device !== 'safari' && device !== 'android') throw new Error('usage: staging-phones-proof.mjs --device=safari|android --tag=<run> --out=<dir>');
 if (!/^[a-z0-9]{1,10}$/u.test(tag)) throw new Error('--tag is 1 to 10 lowercase letters or digits');
 const row = device === 'safari' ? 'XR-7' : 'XR-8', me = `XR ${device === 'safari' ? 'iOS' : 'Android'} ${tag}`, peer = `XR ${device === 'safari' ? 'Android' : 'iOS'} ${tag}`;
@@ -223,15 +232,21 @@ async function thumbWalk(phone, ms) {
   return { map, stick, from, to, most };
 }
 
-const faultsOf = (/** @type {Phone} */ phone, /** @type {string} */ socket) => splitRoomsHealthLines(phone.errors, roomsHealthURL(socket));
+const faultsOf = (/** @type {Phone} */ phone, /** @type {string} */ socket) => splitRoomsHealthLines(phone.errors, socket === '' ? null : roomsHealthURL(socket));
 
-const version = v.parse(v.looseObject({ build: v.string(), saveEpoch: v.number() }), await (await fetch(`${BASE}/version.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json());
-const signed = v.parse(v.object({ body: v.string(), signature: v.string() }), await (await fetch(RELEASE, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json());
-const release = v.parse(v.looseObject({ channel: v.string(), socket: v.string(), engineBuild: v.string() }), JSON.parse(signed.body));
-const socket = release.socket.replace(/\/$/u, ''), html = await (await fetch(BASE, { signal: AbortSignal.timeout(30_000) })).text();
-const isolated = release.channel === 'staging' && SOCKETS.has(socket) && html.includes(RELEASE) && !html.includes('/releases/production.json');
-note(row, 'J205: the page is staging, its release is staging, its socket is the staging door', isolated, { build: version.build, release: release.engineBuild, socket });
-if (!isolated) throw new Error('J205 refuses anything but the isolated staging page');
+const version = v.parse(v.looseObject({ build: v.string() }), await (await fetch(`${BASE}/version.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json());
+if (expectBuild !== '' && version.build !== expectBuild) throw new Error(`${BASE} serves ${version.build.slice(0, 8)}, not ${expectBuild.slice(0, 8)}`);
+let socket = '';
+if (loopback) note(row, 'the page is the local rig on loopback', true, { build: version.build });
+else {
+  const signed = v.parse(v.object({ body: v.string(), signature: v.string() }), await (await fetch(RELEASE, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json());
+  const release = v.parse(v.looseObject({ channel: v.string(), socket: v.string(), engineBuild: v.string() }), JSON.parse(signed.body));
+  socket = release.socket.replace(/\/$/u, '');
+  const html = await (await fetch(BASE, { signal: AbortSignal.timeout(30_000) })).text();
+  const isolated = release.channel === 'staging' && SOCKETS.has(socket) && html.includes(RELEASE) && !html.includes('/releases/production.json');
+  note(row, 'J205: the page is staging, its release is staging, its socket is the staging door', isolated, { build: version.build, release: release.engineBuild, socket });
+  if (!isolated) throw new Error('J205 refuses anything but the isolated staging page');
+}
 
 const phone = device === 'safari' ? safari(process.env.SIM_UDID ?? '') : android(process.env.ANDROID_SERIAL ?? 'emulator-5554');
 const url = `${BASE}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
@@ -295,7 +310,8 @@ try {
   // not failed, as in online-phone-proof.
   const lines = faultsOf(phone, socket), dial = (/** @type {{text: string}} */ line) => /^WebSocket connection to 'wss:\/\/rooms-staging\.wildshard\.io\/' failed: WebSocket is closed before the connection is established\.$/u.test(line.text);
   const load = (/** @type {{text: string}} */ line) => line.text.startsWith('Failed to load resource: '), other = lines.other.filter(line => !dial(line) && !load(line));
-  note(row, 'no page error', other.length === 0, { other: other.slice(0, 8), dials: lines.other.filter(dial).length, loads: lines.other.filter(load).slice(0, 8), health: lines.health.length });
+  // J428: listed for the reader, never failed; a message's wording changes with every feature
+  note(row, 'page errors (listed, not failed)', true, { other: other.slice(0, 8), dials: lines.other.filter(dial).length, loads: lines.other.filter(load).slice(0, 8), health: lines.health.length });
   code = steps.every(each => each.ok) ? 0 : 1;
 } catch (error) {
   note(row, 'the proof stopped', false, { error: String(error).slice(0, 500), errors: phone.errors.slice(-8) });
