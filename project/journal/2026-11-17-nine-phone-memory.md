@@ -100,3 +100,19 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
 - Cut 1: a detail-only boot trace change persists at most once a second (`PROGRESS_WRITE_MS`); stages, checkpoints and
   statuses still write at once. WebKit [K], 4 alternating cold runs each: WebContent peak median 1,906 -> 1,717 MB,
   settled 992 -> 970; EM11 phone loading peak 2.17 -> 1.99 GB.
+- Tried and dropped (WebKit [K], alternating cold runs on one session, not committed):
+  - placement pages admitted from their text (`placementPageText.ts` rewired): peak 1,684 -> 1,732 MB (noise or worse),
+    as on Chromium for mini-ninemem3;
+  - the phone's spawn-view fence one job at a time instead of four: 1,694 -> 1,654 MB, ranges overlap, not shipped;
+  - faced slab trees held until 1.5 s after `ws:ready`: the boot's own peak fell (~1,700 -> ~1,540) but the trees then
+    ran on top of the boot's uncollected garbage (JSC ran no GC in a quiet page for seconds) and peaked 1,655-1,768
+    after control, so nothing was won; `measure.mjs`'s control GC hides this, so judge deferrals without a forced GC;
+  - the far levels' Maps and number array as typed id tables (byte-identical output on 40 seeded meshes):
+    1,697 -> 1,681 MB, noise.
+- Ceilings (experiments, look changes, never to ship): phone `slabFacing` off 1,700 -> 1,504 MB; `slabFarAngle` 0 (no far
+  room, no far levels) ~1,700 -> ~1,560. So the faced trees cost ~200 MB of the peak and two thirds of it is the far
+  levels, but not their Maps: the suspects are the padded index (0.75 of each chunk's triangles more, CPU and upload), the
+  worker's reply and the landing's read-back of a released index (`memorySaver.restore`).
+- Simulator (`nine-sim-memory.mjs`, n 1, play/fly 10 s), base c636993f -> cut 1: WebContent native loading 0.825 ->
+  0.828 GB (noise), Inspector loading 1.154 -> 1.098; play 0.930 -> 0.939. Spawn shots at phone Low (WebKit, control
+  + 8 s): base-vs-base 12.7% of pixels over 8 levels, base-vs-cut 11.3-13.7% (the rain).
