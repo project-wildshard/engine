@@ -44,6 +44,6 @@ export class PartHealth {
     const index = this.index.get(part); if (index === undefined || !Number.isFinite(amount) || amount <= 0) return;
     const before = this.left[index] ?? 0; if (before === 0) return;
     const after = Math.max(0, before - amount); this.left[index] = after;
-    if (after === 0) this.events.emit('creature.part-broken', { actor: this.actor, part });
+    if (after === 0) this.events.emit('creature.part-broken', { actor: this.actor, part, index });
   }
 }

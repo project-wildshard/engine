@@ -75,10 +75,10 @@ const readNames = new Map<number, ScriptV1ReadName>(Object.entries(SCRIPT_V1_REA
 const listNames = new Map<number, ScriptV1ListName>(Object.entries(SCRIPT_V1_LISTS).map(([key, value]) => [value, key as ScriptV1ListName]));
 const commandNames = new Map<number, ScriptV1CommandName>(Object.entries(SCRIPT_V1_COMMANDS).map(([key, value]) => [value, key as ScriptV1CommandName]));
 const eventNames = new Map<number, ScriptV1EventName>(Object.entries(SCRIPT_V1_EVENTS).map(([key, value]) => [value, key as ScriptV1EventName]));
-const subjectActors = new Set([7, 8, 9, 10, 11, 15, 16, 17]);
+const subjectActors = new Set([7, 8, 9, 10, 11, 15, 16, 17, SCRIPT_V1_EVENTS['part.broken']]);
 const argumentActors = new Set([4, 5, 6, 7, 9, 14]);
 // CC32: `lockable` and `heal` act on the binding's own creature; `pull` and `root` on a player it observed.
-const ownedCommands = new Set([1, 2, 3, 4, 6, SCRIPT_V1_COMMANDS.lockable, SCRIPT_V1_COMMANDS.heal]);
+const ownedCommands = new Set([1, 2, 3, 4, 6, SCRIPT_V1_COMMANDS.lockable, SCRIPT_V1_COMMANDS.heal, SCRIPT_V1_COMMANDS.ability]);
 const playerCommands = new Set([7, 10, 11, 14, SCRIPT_V1_COMMANDS.pull, SCRIPT_V1_COMMANDS.root]);
 function check(ok: boolean, reason: string): asserts ok { if (!ok) throw new Error(`Decision ${reason}`); }
 function integer(value: number, min = 0, max = Number.MAX_SAFE_INTEGER): boolean { return Number.isSafeInteger(value) && value >= min && value <= max; }
@@ -450,6 +450,7 @@ export class DecisionHost {
     if (op === SCRIPT_V1_COMMANDS.lockable) check((a === 0 || a === 1) && b === 0 && command[4] === 0, 'lockable value');
     if (op === SCRIPT_V1_COMMANDS.heal) check(a > 0 && a <= 1_000_000 && b === 0 && command[4] === 0, 'heal amount');
     if (op === SCRIPT_V1_COMMANDS.pull) check(target !== 0 && a > 0 && a <= 30 && row.owners.has(b) && command[4] === 0, 'pull arguments');
+    if (op === SCRIPT_V1_COMMANDS.ability) { this.id(row, 'strikes', a); check(b === 0 && command[4] === 0, 'ability arguments'); }
     if (op === SCRIPT_V1_COMMANDS.root) check(target !== 0 && a > 0 && a <= 10 && b === 0 && command[4] === 0, 'root time');
   }
   private named(row: BindingState, values: Float64Array): Slots {

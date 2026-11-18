@@ -25,6 +25,7 @@ import type { ShardScriptPorts } from './scripts';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { Actor } from '@wildshard/engine/combat/pipeline';
 import { installStatusEffects } from './statusEffects';
+import { SCRIPT_LIMITS } from '@wildshard/format/scriptLimits';
 
 interface Motion { move: number; target: number; runner: ActorMoveRunner; binding: number }
 interface Strike { strike: number; target: number; binding: number; hit: boolean }
@@ -93,6 +94,8 @@ const continuation = v.strictObject({ contract: v.string(), decision: v.custom<D
   strikes: v.array(v.strictObject({ actor: natural, strike: natural, target: natural, binding: natural, hit: v.boolean() })),
   // CC32: `Do.lockable` answers; absent in a save that never set one.
   locks: v.optional(v.array(v.tuple([natural, v.boolean()])), []),
+  // CC59: a brain hook's pending `ability` (actor handle, strike handle); absent in a save without one.
+  abilities: v.optional(v.array(v.tuple([natural, natural])), []),
 });
 function requireValue<T>(value: T | undefined, reason: string): T { if (value === undefined) throw new Error(`Decision world: ${reason}`); return value; }
 function inverse(registry: ReadonlyMap<string, number> | undefined): ReadonlyMap<number, string> { return new Map([...registry ?? []].map(([name, id]) => [id, name])); }
@@ -177,6 +180,15 @@ export class ShardDecisions {
         const spawn = source.creatures.spawns.find(value => value.id === name);
         const borrowed = sim.borrowedActors?.has(name) === true;
         const runtime = source.runtime?.spawns;
+        if ('brain' in row.binding) {
+          // CC59: a brain hook rides a creature its brain still drives (a spawn brain or its species' temperament).
+          const brained = spawn !== undefined && (spawn.brain !== null || source.rows.species.find(value => value.id === spawn.species)?.temperament?.brain !== undefined);
+          if (owners.has(name) || name !== row.binding.brain || !brained) throw new Error('Decision brain hook needs its brain-owned creature');
+          const body = requireValue(sim.entities.get(name), 'absent actor');
+          if (bodies.has(body)) throw new Error('Decision body has two controllers');
+          bodies.add(body); owners.add(name); this.fieldActors.add(handle);
+          continue;
+        }
         if (owners.has(name) || (borrowed ? spawn !== undefined || !nativeActors.includes(name) && ![...runtime?.homes ?? [], ...runtime?.bosses ?? [], ...runtime?.actors ?? []].some(value => value.id === name)
           : spawn?.brain !== null)) throw new Error('Decision actor has two controllers');
         const body = requireValue(sim.entities.get(name), 'absent actor');
@@ -191,7 +203,8 @@ export class ShardDecisions {
       const encounter = 'encounter' in binding ? requireValue(source.encounters.find(value => value.id === binding.encounter), 'encounter binding') : undefined;
       if ('quest' in binding && !quest?.quests.some(value => value.def.id === binding.quest)) throw new Error('Decision quest binding missing');
       if ('zone' in binding && !this.registries.zones?.has(binding.zone)) throw new Error('Decision zone binding missing');
-      const self = encounter === undefined ? ('spawnGroup' in binding ? actorIds[0] ?? 0 : 0) : requireValue(this.names.get(encounter.entity), 'encounter actor');
+      const self = encounter === undefined ? ('spawnGroup' in binding ? actorIds[0] ?? 0 : 'brain' in binding ? requireValue(this.names.get(binding.brain), 'brain hook actor') : 0)
+        : requireValue(this.names.get(encounter.entity), 'encounter actor');
       if (self > 0 && !actorIds.includes(self)) throw new Error('Decision encounter does not own its actor');
       const bytes = requireValue(assets.get(row.module.slice('blobs/wasm/'.length, -'.wasm'.length)), 'module bytes');
       admitScriptContract(bytes, { abi: 1, pages: row.pages }); modules.set(row.module, bytes);
@@ -202,11 +215,14 @@ export class ShardDecisions {
       prepare: (commands, context) => this.prepare(commands, context), failed: (mode, context, reason) => {
         onDisabled?.({ module: context.script.module, entity: `binding:${context.binding.id}`, reason, failures: 3 });
         if (mode === 'hold') return;
-        for (const actor of context.binding.actors) this.stop(actor, true);
         const binding = this.rows.find(row => row.id === context.script.id)?.binding;
+        // A brain hook never held the body: its brain keeps driving it.
+        if (binding === undefined || !('brain' in binding)) for (const actor of context.binding.actors) this.stop(actor, true);
         if (mode === 'reset' && binding !== undefined && 'encounter' in binding) this.encounters.get(binding.encounter)?.retry();
       } };
-    this.host = new DecisionHost({ scripts, bindings, modules, seed: [source.identity.seed >>> 0, 0], world });
+    // CC59: the platform fuel ceilings; a guest past them is refused, and after three refusals stopped and reported.
+    this.host = new DecisionHost({ scripts, bindings, modules, seed: [source.identity.seed >>> 0, 0], world,
+      limits: { fuelPerCall: SCRIPT_LIMITS.fuelPerCall, fuelPerTick: SCRIPT_LIMITS.fuelPerTick } });
     for (const binding of bindings) { this.enabled.set(binding.id, false); this.host.setEnabled(binding.id, false); }
     for (const row of source.state.shared.filter(field => field.type !== 'string' && field.privacy === 'public')) for (const actor of this.fieldActors) {
       const body = requireValue(this.actor(actor), 'field actor'), borrowed = sim.borrowedActors?.has(requireValue(this.actors.get(actor), 'field actor')) === true;
@@ -219,9 +235,10 @@ export class ShardDecisions {
     sim.events.on('damage.dealt', ({ req, dealt }) => {
       const actor = this.combatHandle(req.target.id); if (actor === undefined) return;
       const by = req.source === 'env' ? 0 : this.combatHandle(req.source.id) ?? 0;
-      this.publish([7, actor, by, dealt, this.read(5, actor, 0), 0]);
+      this.publish([7, actor, by, dealt, this.read(5, actor, 0), 0], req.sourceTags);
       if (by > 0) { const strike = this.striking.get(by); if (strike !== undefined) strike.hit = true; }
     }, sim.scope);
+    sim.events.on('creature.part-broken', ({ actor, index }) => { const handle = this.combatHandle(actor.id); if (handle !== undefined) this.publish([19, handle, index, 0, 0, 0]); }, sim.scope);
     sim.events.on('actor.died', ({ actor, req }) => { const handle = this.combatHandle(actor.id); if (handle !== undefined) this.publish([9, handle, req.source === 'env' ? 0 : this.combatHandle(req.source.id) ?? 0, 0, 0, 0]); }, sim.scope);
     sim.onStep('decision.declared', () => { this.events = []; this.lifecycle(); this.host.step(sim.state.tick); this.stepMoves(); }, {
       snapshot: () => this.snapshot(), restore: value => this.restore(value),
@@ -397,6 +414,9 @@ export class ShardDecisions {
       } else if (op === SCRIPT_V1_COMMANDS.lockable) {
         const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'lockable actor');
         apply.push(() => { this.locks.set(target, a === 1); actor.lockOverride = a === 1; });
+      } else if (op === SCRIPT_V1_COMMANDS.ability) {
+        const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'ability actor'), strike = this.name('strikes', a);
+        apply.push(() => { actor.nextAbility = strike; });
       } else if (op === SCRIPT_V1_COMMANDS.heal) {
         const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'heal actor');
         apply.push(() => { if (actor.alive) actor.hp = Math.min(actor.maxHp, actor.hp + a); });
@@ -434,7 +454,7 @@ export class ShardDecisions {
       const row = requireValue(this.rows[index], 'decision row');
       const binding = row.binding;
       const control = this.sim.borrowedControls?.get(row.id);
-      const active = control === undefined ? 'shard' in binding || 'spawnGroup' in binding || ('encounter' in binding ? this.encounters.get(binding.encounter)?.boss.state === 'fight'
+      const active = control === undefined ? 'shard' in binding || 'spawnGroup' in binding || 'brain' in binding || ('encounter' in binding ? this.encounters.get(binding.encounter)?.boss.state === 'fight'
         : 'quest' in binding ? (this.quest?.quests.some(value => value.def.id === binding.quest && value.isStarted && !value.isComplete) ?? false)
         : this.inside(binding.zone, DECISION_PLAYER_HANDLE)) : control.fighting;
       const id = index + 1;
@@ -522,12 +542,17 @@ export class ShardDecisions {
     if (this.movers !== undefined) for (const event of this.movers.drainEndEvents()) { const signal = this.registries.signals?.get(event.mover); if (signal !== undefined) this.publish([13, signal, Number(event.atEnd), 0, 0, 0]); }
   }
   /** Existing combat/interactions feed this queue; events never execute Wasm synchronously. */
-  publish(event: ScriptV1Event): void {
+  publish(event: ScriptV1Event, tags?: readonly string[]): void {
     for (const [id, active] of this.enabled) {
       const row = this.rows[id - 1];
-      if (row !== undefined && 'spawnGroup' in row.binding && [7, 8, 9].includes(event[0])
+      if (row !== undefined && ('spawnGroup' in row.binding || 'brain' in row.binding) && [7, 8, 9, 19].includes(event[0])
         && !Object.values(decisionBindingMap(row, this.registries).ids.actors ?? {}).includes(event[1])) continue;
-      if (active) this.host.enqueue(id, event);
+      if (!active) continue;
+      // CC59: a hit's last slot is the mask of this row's `tags` the hit carried, bit i for the i-th alias in order.
+      if (event[0] === 7 && tags !== undefined && row?.tags !== undefined) {
+        const declared = row.tags, mask = Object.keys(declared).sort().reduce((bits, alias, bit) => tags.includes(declared[alias] ?? '') ? bits | (1 << bit) : bits, 0);
+        this.host.enqueue(id, [event[0], event[1], event[2], event[3], event[4], mask]);
+      } else this.host.enqueue(id, event);
     }
   }
   /** A home replacement starts only its own logical stream; pack mates continue unchanged. */
@@ -571,7 +596,16 @@ export class ShardDecisions {
   snapshot(): string { return JSON.stringify({ contract: this.contract, decision: this.host.snapshot(), enabled: [...this.enabled],
     fields: [...this.fields].flatMap(([actor, values]) => [...values.keys()].map(field => [actor, field, this.fieldValue(actor, field)])), channels: [...this.channels], playerFlags: [...this.playerFlags], zones: [...this.zones], phases: [...this.phases],
     moves: [...this.motions].map(([actor, motion]) => ({ actor, move: motion.move, target: motion.target, binding: motion.binding, state: motion.runner.snapshot() })),
-    strikes: this.savedStrikes(), ...(this.locks.size === 0 ? {} : { locks: [...this.locks] }) }); }
+    strikes: this.savedStrikes(), ...(this.locks.size === 0 ? {} : { locks: [...this.locks] }),
+    ...this.pendingAbilities() }); }
+  private pendingAbilities(): { abilities?: [number, number][] } {
+    const rows: [number, number][] = [];
+    for (const handle of this.fieldActors) {
+      const next = this.actor(handle)?.nextAbility;
+      if (next !== null && next !== undefined) rows.push([handle, requireValue(this.registries.strikes?.get(next), 'pending ability')]);
+    }
+    return rows.length === 0 ? {} : { abilities: rows };
+  }
   /** View-only channel programs may change without invalidating a retained body's logical save.
    * Registry identities and every mechanical declaration remain exact. Guests with channel/signal
    * capabilities, and owners with actual mover authority, retain the complete original contract. */
@@ -618,6 +652,7 @@ export class ShardDecisions {
       if (motion.target !== 0) this.position(motion.target);
       const runner = new ActorMoveRunner(row, actor); runner.restore(motion.state); motions.set(motion.actor, { ...motion, runner }); }
     if (new Set(saved.strikes.map(row => row.actor)).size !== saved.strikes.length) throw new Error('Duplicate decision strike');
+    for (const [actor, strike] of saved.abilities) { if (!this.fieldActors.has(actor)) throw new Error('Invalid decision ability'); this.name('strikes', strike); }
     if (new Set(saved.locks.map(([actor]) => actor)).size !== saved.locks.length || saved.locks.some(([actor]) => !this.fieldActors.has(actor))) throw new Error('Invalid decision lock');
     for (const strike of saved.strikes) {
       const binding = requireValue(this.rows[strike.binding - 1], 'strike binding'), ids = decisionBindingMap(binding, this.registries).ids;
@@ -636,5 +671,7 @@ export class ShardDecisions {
     this.striking.clear(); for (const { actor, ...strike } of saved.strikes) this.striking.set(actor, strike);
     for (const handle of this.locks.keys()) { const body = this.actor(handle); if (body !== undefined) body.lockOverride = null; }
     this.locks.clear(); for (const [actor, on] of saved.locks) { this.locks.set(actor, on); const body = this.actor(actor); if (body !== undefined) body.lockOverride = on; }
+    for (const handle of this.fieldActors) { const body = this.actor(handle); if (body !== undefined) body.nextAbility = null; }
+    for (const [actor, strike] of saved.abilities) { const body = this.actor(actor); if (body !== undefined) body.nextAbility = this.name('strikes', strike); }
   }
 }

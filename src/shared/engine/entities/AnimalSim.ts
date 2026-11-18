@@ -222,6 +222,8 @@ export class AnimalSim {
    *  continuation saves it, so the body snapshot is unchanged. */
   lockOverride: boolean | null = null;
   get lockable(): boolean { return this.lockOverride ?? this.simSpec.lockable ?? this.flying; }
+  /** CC59: a brain hook's `ability` answer: the strike its brain tries next, before its own pick; null for none. */
+  nextAbility: string | null = null;
   get lockRange(): number | undefined { return this.simSpec.flight?.lockRange; }
   /** TEMPLATE-E2E TC-E2: a dead body stands again, whole (a data spawn's `respawn`); `place` it first. */
   revive(): void {

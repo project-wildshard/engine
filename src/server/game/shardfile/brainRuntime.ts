@@ -82,6 +82,15 @@ function prepareAbilities(host: SimHost, actor: AnimalSim, abilities: ResolvedCr
     request: (target: BrainTarget): boolean => {
       if (host.strikes.get(actor.entityId)?.busy === true) return true;
       const at = actor.position, distance = Math.hypot(target.position.x - at.x, target.position.z - at.z);
+      // CC59: a brain hook's chosen ability replaces the next pick; it waits for its range, and a strike this creature
+      // does not have is dropped.
+      const next = actor.nextAbility === null ? undefined : options.find(row => row.spec.id === actor.nextAbility);
+      if (actor.nextAbility !== null && next === undefined) actor.nextAbility = null;
+      if (next !== undefined) {
+        if (distance < next.min || distance > next.max) return false;
+        if (!host.startDeclaredStrike(actor.entityId, target.id, next.spec.id)) return false;
+        actor.nextAbility = null; return true;
+      }
       for (const { min, max, ability, spec } of options) {
         if (ability.weight <= 0 || distance < min || distance > max) continue;
         if (ability.hpBelow !== undefined && actor.hp >= actor.maxHp * ability.hpBelow) continue;
