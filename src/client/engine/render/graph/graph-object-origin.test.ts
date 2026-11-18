@@ -12,7 +12,9 @@ test('object origins read the live placement attribute without a stale companion
     expect(compiled.material.positionGridCompatible).toBe(false);
     const main = vertexShader.slice(vertexShader.indexOf('void main()'));
     // the origin is the instance matrix's translation, read from three's live instanceMatrix attribute, carried by a varying
-    expect(main).toMatch(/modelMatrix \* wsInstanceTransform\(vec4\(0\.0, 0\.0, 0\.0, 1\.0\)\)/u);
+    // OF-EM28b3: less the grid origin on a grid-quantized mesh (step 1, origin 0 elsewhere), so it decodes with the codec
+    expect(main).toMatch(/modelMatrix \* vec4\(wsInstanceTransform\(vec4\(0\.0, 0\.0, 0\.0, 1\.0\)\)\.xyz - wsCodecOrigin \/ wsCodecStep, 1\.0\)/u);
+    expect(compiled.material.codec).not.toBeNull();
     expect(vertexShader).toMatch(/#ifdef USE_INSTANCING\n {2}v = instanceMatrix \* v;\n#endif/u);
     expect(vertexShader).toMatch(/varying vec3 wsV\d+_carried;/u);
     expect(fragmentShader).toMatch(/varying vec3 wsV\d+_carried;/u);

@@ -19,7 +19,8 @@ it('replaces the whole vertex with indexed uniform rows and keeps updates bounde
     expect(vertex).toContain('clamp(');
     // the whole position is the indexed row of the program's own uniform list
     expect(vertex).toMatch(/uniform vec3 wsA_islands\[ ?2 ?\];/u);
-    expect(vertex).toMatch(/transformed = t\d+_row;/u);
+    // (OF-EM28b3: in grid units on a grid-quantized mesh: step 1 and origin 0 elsewhere)
+    expect(vertex).toMatch(/transformed = \(\(t\d+_row - wsCodecOrigin\) \/ wsCodecStep\);/u);
     const list = compiled.material.uniforms['wsA_islands'];
     const storage: unknown = list?.value;
     if (!(storage instanceof Float32Array)) throw new Error('Placement did not read its uniform list');

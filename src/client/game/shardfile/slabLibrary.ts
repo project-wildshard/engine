@@ -18,6 +18,7 @@ import { TIER_CONFIG } from '@wildshard/engine/core/tier';
 import { indexTurned, writeIndexTriangles } from '@wildshard/engine/render/memorySaver';
 import { cullSlabRanges, SLAB_FAR_CELLS, slabRangesJob, slabRoom, slabTriangles, spatialSlabRanges, type SlabFar, type SlabRanges } from './slabRanges';
 import { mergedSlabBounds, mergeSlabChunks, slabMergeRuns } from './slabMerge';
+import { gridSlabPositions, markSlabGrid, placeSlabPart, slabFarCells, slabXyz } from './slabGrid';
 
 type WholeLibrary = Extract<WorldScenesSection['libraries'][number], { kind: 'whole' }>;
 type SlabTile = WorldSceneSlabLibrary['tiles'][number];
@@ -181,15 +182,18 @@ function askFar(): void {
     }
     const nodes = ranges.nodes.slice();
     farAsked.set(id, { geometry, sentTurned });
-    worker.postMessage({ farOf: id, corners: order, xyz, nodes, triangles: ranges.triangles, far: SLAB_FAR_CELLS, room: chunk.room, kinds: chunk.kinds },
+    // OF-EM28b3: the cells in the chunk's own frame (grid units on a slab grid), as its tree and its positions are
+    worker.postMessage({ farOf: id, corners: order, xyz, nodes, triangles: ranges.triangles, far: slabFarCells(geometry, SLAB_FAR_CELLS), room: chunk.room, kinds: chunk.kinds },
       { transfer: [order.buffer, xyz.buffer, nodes.buffer, ...chunk.kinds.map(kind => kind.array.buffer)] });
     return;
   }
 }
 function facedTree(geometry: BufferGeometry): void {
   if (!TIER_CONFIG.slabFacing || typeof Worker !== 'function' || treeWorker === null) return;
-  const index = geometry.index, position = geometry.getAttribute('position');
-  if (index === null || !(position instanceof BufferAttribute) || position.itemSize !== 3 || position.normalized || !(position.array instanceof Float32Array)) return;
+  const index = geometry.index;
+  // OF-EM28b3: float xyz, or a slab grid's Int16 words widened (the tree and far levels then in grid units)
+  const xyz = slabXyz(geometry);
+  if (index === null || xyz === null) return;
   const worker = slabTreeWorker();
   if (worker === null) return;
   // NB23 (b): the far levels' room after the chunk's own triangles, made now, before the chunk's first upload (a GPU
@@ -203,7 +207,7 @@ function facedTree(geometry: BufferGeometry): void {
     padded.set(index.array);
     geometry.setIndex(new BufferAttribute(padded, 1)); geometry.setDrawRange(0, own * 3); slabRoom(geometry, own);
   }
-  const id = asks++, corners = Uint32Array.from(geometry.index?.array.subarray(0, own * 3) ?? []), xyz = position.array.slice();
+  const id = asks++, corners = Uint32Array.from(geometry.index?.array.subarray(0, own * 3) ?? []);
   // the channels a far level keeps apart (`SLAB_FAR_KINDS`), copied
   const kinds = room > 0 ? SLAB_FAR_KINDS.flatMap(name => { const channel = geometry.getAttribute(name);
     return channel instanceof BufferAttribute && channel.array.length === channel.count * channel.itemSize ? [{ array: channel.array.slice(), itemSize: channel.itemSize }] : []; }) : [];
@@ -214,7 +218,7 @@ function facedTree(geometry: BufferGeometry): void {
     worker.postMessage({ id, index: corners, xyz, keep: true }, { transfer: [corners.buffer, xyz.buffer] });
     return;
   }
-  worker.postMessage({ id, index: corners, xyz, ...(room > 0 ? { far: SLAB_FAR_CELLS, room, kinds } : {}) }, { transfer: [corners.buffer, xyz.buffer, ...kinds.map(kind => kind.array.buffer)] });
+  worker.postMessage({ id, index: corners, xyz, ...(room > 0 ? { far: slabFarCells(geometry, SLAB_FAR_CELLS), room, kinds } : {}) }, { transfer: [corners.buffer, xyz.buffer, ...kinds.map(kind => kind.array.buffer)] });
 }
 function landed(event: MessageEvent<unknown>): void {
   const reply = event.data;
@@ -327,15 +331,25 @@ async function readSlabChunks(owner: Scope, product: ShardFolder, tile: number, 
       const row = file.chunks[index];
       if (row === undefined || tag.chunk !== index || tag.tile !== tile || tag.key !== row.key) throw new Error('Slab chunk differs from its row');
       const geometry = nativeWholeGeometry(mesh, 'take');
-      // a chunk of a key the bank merges (`SlabLibrary.read`) gets its leaf tree on the merged geometry instead
-      if (TIER_CONFIG.slabRanges && !merged.has(row.key)) {
-        if (tilesSettling()) LATE.add(geometry);
-        else { const ranges = spatialSlabRanges(geometry); if (ranges !== null) RANGES.set(geometry, ranges); }
-        facedTree(geometry);
-      }
       const [x0, y0, z0, x1, y1, z1] = row.box, [sx, sy, sz, radius] = row.sphere;
       geometry.boundingBox = new Box3(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1));
       geometry.boundingSphere = new Sphere(new Vector3(sx, sy, sz), radius);
+      // OF-EM28b4: a chunk baked on a grid (Int16 positions under its node's uniform scale and translation) keeps it
+      const stored: unknown = geometry.getAttribute('position'), turned = mesh.quaternion;
+      if (stored instanceof BufferAttribute && stored.array instanceof Int16Array && !stored.normalized && mesh.scale.x > 0
+        && mesh.scale.y === mesh.scale.x && mesh.scale.z === mesh.scale.x && Math.abs(turned.x) + Math.abs(turned.y) + Math.abs(turned.z) === 0) {
+        markSlabGrid(geometry, { origin: [mesh.position.x, mesh.position.y, mesh.position.z], step: mesh.scale.x });
+      }
+      // a chunk of a key the bank merges (`SlabLibrary.read`) is gridded and gets its leaf tree on the merged geometry
+      if (!merged.has(row.key)) {
+        // OF-EM28b3: positions on a slab grid before the trees read them (the trees are in the grid's units)
+        gridSlabPositions(geometry);
+        if (TIER_CONFIG.slabRanges) {
+          if (tilesSettling()) LATE.add(geometry);
+          else { const ranges = spatialSlabRanges(geometry); if (ranges !== null) RANGES.set(geometry, ranges); }
+          facedTree(geometry);
+        }
+      }
       // MG10 (J410): every channel but position goes once uploaded; what reads after that (leaf trees, far levels, picking)
       // reads only position and the index, and the channels it copies it copied above. A chunk merged before its upload
       // drops nothing: its merge copies the channels and the merged geometry is released below instead
@@ -417,6 +431,7 @@ export class SlabLibrary {
     const keepChunks = (parts: readonly BufferGeometry[]): void => {
       for (const part of parts) {
         ownSceneResource(part, scope);
+        gridSlabPositions(part);
         if (!TIER_CONFIG.slabRanges) continue;
         if (tilesSettling()) LATE.add(part);
         else { const ranges = spatialSlabRanges(part); if (ranges !== null) RANGES.set(part, ranges); }
@@ -430,6 +445,7 @@ export class SlabLibrary {
       if (geometry === null) { keepChunks(parts); return; }
       const { box, sphere } = mergedSlabBounds(at.map(index => rows[index] ?? { box: [], sphere: [] }));
       geometry.boundingBox = box; geometry.boundingSphere = sphere;
+      gridSlabPositions(geometry);
       gpuOnlyAttributes(geometry, SLAB_GPU_ONLY);
       ownSceneResource(geometry, scope);
       // its leaf tree is a sliced job after the loader's settle (`drainLate`), never a long task on the read
@@ -568,6 +584,8 @@ export class SlabLibrary {
         const part = new InstancedMesh(geometry, mesh.material, 1);
         part.instanceColor = new InstancedBufferAttribute(new Float32Array([1, 1, 1]), 3);
         part.name = `${mesh.name}:slab:${String(tile)}:${String(index)}`; part.matrixAutoUpdate = false;
+        // OF-EM28b3: its matrix decodes the chunk's slab grid (identity for a float chunk)
+        placeSlabPart(part, geometry);
         part.castShadow = key.castShadow; part.receiveShadow = key.receiveShadow; part.renderOrder = key.renderOrder;
         part.layers.mask = key.layers; part.frustumCulled = key.frustumCulled;
         if (key.frustumCulled) slabRuns(part, geometry, scope);

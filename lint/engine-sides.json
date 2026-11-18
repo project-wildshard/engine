@@ -1065,6 +1065,7 @@
     "src/client/game/shardfile/skinLayerPlayback.ts": "client",
     "src/client/game/shardfile/skinPlayback.ts": "client",
     "src/client/game/shardfile/slabLibrary.ts": "client",
+    "src/client/game/shardfile/slabGrid.ts": "client",
     "src/client/game/shardfile/slabMerge.ts": "client",
     "src/client/game/shardfile/slabRanges.ts": "client",
     "src/client/game/shardfile/slabTree.worker.ts": "client",

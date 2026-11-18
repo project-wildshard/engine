@@ -1,6 +1,6 @@
 // NF11: a refine library's baked slabs draw as plain chunk meshes under their key's anchor, one a frame, with no join.
 import { expect, test, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, type Object3D } from 'three';
+import { Box3, BufferAttribute, BufferGeometry, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, type Object3D, Sphere, Vector3 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
 import { emptyShardfile } from '../src/shared/host/author';
 import { staticGlb } from './fixtures/frozen/glb';
@@ -18,6 +18,13 @@ const triangle = (x: number): BufferGeometry => new BufferGeometry()
   .setAttribute('normal', new BufferAttribute(Float32Array.of(0, 1, 0, 0, 1, 0, 0, 1, 0), 3));
 
 function isGeometry(value: unknown): value is BufferGeometry { return value instanceof BufferGeometry; }
+/** OF-EM28b3: a drawn chunk's positions in its anchor's metres: its slab grid's Int16 words through the part's own matrix */
+function metres(part: unknown): number[] {
+  if (!(part instanceof Mesh)) throw new Error('Expected a chunk mesh');
+  const position = geometryOf(part).getAttribute('position'), at = new Vector3(), out: number[] = [];
+  for (let v = 0; v < position.count; v++) out.push(...at.set(position.getX(v), position.getY(v), position.getZ(v)).applyMatrix4(part.matrix).toArray());
+  return out;
+}
 /** a drawn chunk's geometry */
 function geometryOf(part: unknown): BufferGeometry {
   const geometry: unknown = part instanceof Mesh ? Reflect.get(part, 'geometry') : null;
@@ -85,10 +92,14 @@ test('a key draws its tiles\' chunks under its anchor, one instanced mesh each, 
     expect(Object.keys(f.anchor.geometry.attributes)).toEqual([]); expect(f.anchor.geometry.index).toBeNull();
     const [a, b] = f.anchor.children, ga = geometryOf(a), gb = geometryOf(b);
     if (a === undefined) throw new Error('Expected chunk meshes');
-    expect(Array.from(ga.getAttribute('position').array)).toEqual(Array.from(f.shapes[0]?.getAttribute('position').array ?? []));
-    expect(Array.from(gb.getAttribute('position').array)).toEqual(Array.from(f.shapes[1]?.getAttribute('position').array ?? []));
+    // OF-EM28b3: Int16 grid words on the GPU, the part's own matrix decoding them back to the shapes' metres
+    expect(ga.getAttribute('position').array).toBeInstanceOf(Int16Array); expect(gb.getAttribute('position').array).toBeInstanceOf(Int16Array);
+    expect(metres(a)).toEqual(Array.from(f.shapes[0]?.getAttribute('position').array ?? []));
+    expect(metres(b)).toEqual(Array.from(f.shapes[1]?.getAttribute('position').array ?? []));
     expect(Reflect.get(a, 'material')).toBe(f.material); expect(a.castShadow).toBe(true); expect(a.renderOrder).toBe(2); expect(a.matrixAutoUpdate).toBe(false);
-    expect(ga.boundingSphere?.radius).toBe(1); expect(ga.boundingBox?.max.x).toBe(1);
+    // the row's frozen bounds, in grid units under the same matrix
+    expect(new Sphere().copy(ga.boundingSphere ?? new Sphere()).applyMatrix4(a.matrix).radius).toBe(1);
+    expect(new Box3().copy(ga.boundingBox ?? new Box3()).applyMatrix4(a.matrix).max.x).toBe(1);
     // EP7: one identity instance with white colours, drawn through its material's instanced (coloured) program
     if (!(a instanceof InstancedMesh)) throw new Error('Expected an instanced chunk');
     expect(a.count).toBe(1); expect(Array.from(a.instanceMatrix.array)).toEqual(new Matrix4().toArray());
@@ -109,9 +120,11 @@ test('with merge, a key\'s chunks in a bank draw as one chunk holding every tria
     await f.content.attach(0, first);
     expect(f.anchor.children).toHaveLength(1);
     const merged = geometryOf(f.anchor.children[0]);
-    expect(Array.from(merged.getAttribute('position').array)).toEqual([...f.shapes[0]?.getAttribute('position').array ?? [], ...f.shapes[1]?.getAttribute('position').array ?? []]);
+    expect(metres(f.anchor.children[0])).toEqual([...f.shapes[0]?.getAttribute('position').array ?? [], ...f.shapes[1]?.getAttribute('position').array ?? []]);
     expect(Array.from(merged.index?.array ?? [])).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(merged.boundingBox?.max.x).toBe(1); expect(merged.boundingSphere?.radius).toBeGreaterThanOrEqual(1);
+    const placed = f.anchor.children[0]; if (placed === undefined) throw new Error('Expected a merged chunk');
+    expect(new Box3().copy(merged.boundingBox ?? new Box3()).applyMatrix4(placed.matrix).max.x).toBe(1);
+    expect(new Sphere().copy(merged.boundingSphere ?? new Sphere()).applyMatrix4(placed.matrix).radius).toBeGreaterThanOrEqual(1);
     // a bank with one chunk of the key keeps it as it is
     await f.content.attach(1, second);
     expect(f.anchor.children).toHaveLength(2);
@@ -122,7 +135,7 @@ test('with merge, a key\'s chunks in a bank draw as one chunk holding every tria
 
 test('an indexed retirement removes only its own original triangles and a reattach restores them', async () => {
   const f = fixture(true), first = f.owner.child('first'), second = f.owner.child('second');
-  const positions = (): number[][] => f.anchor.children.map(part => Array.from(geometryOf(part).getAttribute('position').array));
+  const positions = (): number[][] => f.anchor.children.map(metres);
   try {
     await f.content.attach(0, first); await f.content.attach(1, second);
     const all = positions(); expect(all).toEqual(f.shapes.map(shape => Array.from(shape.getAttribute('position').array)));

@@ -703,7 +703,9 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
         }
         case 'positionGeometry': return { t: 'vec3', e: `(position * ${host('codecStep', 'float')} + ${host('codecOrigin', 'vec3')})` };
         case 'instanceTransform': return out('vec4', `wsInstanceTransform(${widen(one(), 'vec4')})`);
-        case 'objectOrigin': return out('vec3', '(modelMatrix * wsInstanceTransform(vec4(0.0, 0.0, 0.0, 1.0))).xyz');
+        // OF-EM28b3: on a grid-quantized mesh (a slab chunk's grid is its own scale and translation) the origin its
+        // authored metres have, not the grid's; step 1 and origin 0 elsewhere leave it the model origin
+        case 'objectOrigin': return out('vec3', `(modelMatrix * vec4(wsInstanceTransform(vec4(0.0, 0.0, 0.0, 1.0)).xyz - ${host('codecOrigin', 'vec3')} / ${host('codecStep', 'float')}, 1.0)).xyz`);
         case 'positionWorld':
           if (ctx === 'fog') return { t: 'vec3', e: 'wsFogPosition' };
           return vertexOnly ? out('vec3', '(modelMatrix * vec4(wsPositionLocal, 1.0)).xyz') : fromVertex('PositionWorld', 'vec3', () => 'wsWorldPosition.xyz', 'end');
@@ -1037,7 +1039,10 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       outputs.alpha = output(st.post?.alpha, fragmentRoot, 'fragment', 'float');
     } else {
       outputs.offset = output(st['vertex.offset']?.offset, vertexRoot, 'vertex', 'vec3');
-      outputs.position = output(st['vertex.position']?.position, vertexRoot, 'vertex', 'vec3');
+      // OF-EM28b3: a graph's vertex position is in authored metres (it reads `positionLocal`); on a grid-quantized mesh
+      // it goes back into grid units, as an offset does (`glslProgram.ts`)
+      const position = output(st['vertex.position']?.position, vertexRoot, 'vertex', 'vec3');
+      outputs.position = position === null ? null : `((${position} - ${host('codecOrigin', 'vec3')}) / ${host('codecStep', 'float')})`;
       outputs.clip = output(st['vertex.clip']?.position, vertexRoot, 'vertex', 'vec4');
       outputs.normal = output(st['vertex.normal']?.normal, vertexRoot, 'vertex', 'vec3');
       outputs.pointSize = output(st.points?.size, vertexRoot, 'vertex', 'float');

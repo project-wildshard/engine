@@ -1,5 +1,6 @@
 import { Box3, BufferAttribute, BufferGeometry, Float16BufferAttribute, Sphere, Vector3 } from 'three';
 import { halfAttribute } from '@wildshard/engine/models/nativeGeometry';
+import { markSlabGrid, slabGrid } from './slabGrid';
 
 /**
  * NINE-DRAGON-BENCHMAX NB8 (mini-nb8e): a slab key's chunks in one bank as one geometry, for the phone. The bake caps a
@@ -15,6 +16,9 @@ export function mergeSlabChunks(chunks: readonly BufferGeometry[]): BufferGeomet
   const first = chunks[0];
   if (first === undefined || chunks.length < 2) return null;
   const names = Object.keys(first.attributes).sort();
+  // OF-EM28b4: chunks baked on a slab grid merge only with chunks on the same grid
+  const grid = slabGrid(first), key = JSON.stringify(grid ?? null);
+  if (chunks.some(chunk => JSON.stringify(slabGrid(chunk) ?? null) !== key)) return null;
   let vertices = 0, corners = 0;
   for (const chunk of chunks) {
     const index = chunk.index;
@@ -51,6 +55,7 @@ export function mergeSlabChunks(chunks: readonly BufferGeometry[]): BufferGeomet
   }
   merged.setIndex(new BufferAttribute(index, 1));
   merged.userData = { ...first.userData };
+  if (grid !== undefined) markSlabGrid(merged, grid);
   return merged;
 }
 
