@@ -239,21 +239,23 @@ for (const engineName of engines) {
   const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist', '--autoplay-policy=user-gesture-required'] : [] });
   try {
     for (const slug of shards) {
-      /** @type {{ base: string, close: () => Promise<void> }} */
-      let site = { base, close: () => Promise.resolve() }, socket = /^https:\/\/(staging|preview)\./u.test(base) ? arg('socket', 'wss://rooms-staging.wildshard.io') : arg('socket', '');
-      if (rigArg !== '') {
-        const [dist = '', work = '', keyFile = ''] = rigArg.split(','), { openRig, WORLD_PORT } = await import('./online-rig.mjs');
-        site = await openRig({ dist: absolute(dist), work: absolute(work, slug), keyFile, pgBin: 'memory:', pgData: '', shard: slug });
-        socket = `ws://127.0.0.1:${String(WORLD_PORT)}`;
-      }
-      try {
-        for (const layout of layouts) {
+      // NET-LAG NL13b3: on the rig each run gets a fresh world. A world an earlier run walked keeps its creatures stirred: a
+      // drift ray that hunted the first player dove on the second at the windmill, and its hit's shove read as that run's B2.
+      for (const layout of layouts) {
+        /** @type {{ base: string, close: () => Promise<void> }} */
+        let site = { base, close: () => Promise.resolve() }, socket = /^https:\/\/(staging|preview)\./u.test(base) ? arg('socket', 'wss://rooms-staging.wildshard.io') : arg('socket', '');
+        if (rigArg !== '') {
+          const [dist = '', work = '', keyFile = ''] = rigArg.split(','), { openRig, WORLD_PORT } = await import('./online-rig.mjs');
+          site = await openRig({ dist: absolute(dist), work: absolute(work, slug), keyFile, pgBin: 'memory:', pgData: '', shard: slug });
+          socket = `ws://127.0.0.1:${String(WORLD_PORT)}`;
+        }
+        try {
           const row = await runOne(browser, engineName, layout, slug, site.base, socket);
           rows.push(row);
           const { walk: _w, sprint: _s, boost: _b, bridge: _r, ...brief } = row;
           console.log(`${row.ok ? 'ok  ' : 'MISS'} ${JSON.stringify(brief)}`);
-        }
-      } finally { await site.close(); }
+        } finally { await site.close(); }
+      }
     }
   } finally { await browser.close(); }
 }
