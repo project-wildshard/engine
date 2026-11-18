@@ -11,6 +11,9 @@
     "access": "public"
   },
   "type": "module",
+  "bundleDependencies": [
+    "@wildshard/format"
+  ],
   "bin": {
     "engine": "./src/cli/engine.mjs"
   },
@@ -73,6 +76,7 @@
     "ajv": "6.15.0",
     "fflate": "0.8.3",
     "hono": "4.13.19",
+    "meshoptimizer": "1.2.0",
     "n8ao": "2.0.1",
     "navcat": "0.4.1",
     "pg": "8.23.1",

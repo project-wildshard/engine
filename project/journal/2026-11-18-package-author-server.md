@@ -6,6 +6,13 @@ exports. Build it under the frozen engine install and ship the result
 with its worker, physics wasm and migrations. Sharddev copies those
 bytes when it packs the dev package.
 
+The full SDK CLI still imports engine source to compile author commands.
+The npm package therefore bundles its own frozen format dependency too.
+An installed tarball resolved the exact patched module; the package test
+compares the shipped skeleton module with its frozen source byte for byte.
+Meshoptimizer is an engine runtime dependency so the bundled format's
+decoder import stays resolvable under pnpm's isolated npm tarball install.
+
 The authored server opens the verified build folder as one loopback cell.
 Bring in the declared rigs its spawned creatures need for native height
 and hit volumes. The authored world does not require a grid or road pack.
