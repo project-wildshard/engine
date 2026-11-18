@@ -9,4 +9,5 @@ export function latestReleaseRef(refs: string[]): string | undefined;
 export function reminderLine(result: ReleaseDue): string;
 export function receiptNeeded(result: ReleaseDue, previous: string): { marker: string; needed: boolean };
 export function reminderPlist(root: string, userHome: string): string;
-export function main(args: string[]): ReleaseDue;
+export function refreshReminderRefs(root: string, runGit?: (args: string[], root: string) => string): boolean;
+export function main(args: string[]): ReleaseDue | undefined;

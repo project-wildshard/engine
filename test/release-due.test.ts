@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { latestReleaseRef, receiptNeeded, releaseDue, reminderLine, reminderPlist } from '../scripts/release-due.mjs';
+import { latestReleaseRef, receiptNeeded, refreshReminderRefs, releaseDue, reminderLine, reminderPlist } from '../scripts/release-due.mjs';
 const cutAt = '2026-11-17T15:00:00.000Z', cut = Date.parse(cutAt), hour = 3_600_000;
 const latest = { tag: 'v0.1.36', build: '6'.repeat(40), cutAt, newCommits: 2 };
 describe('the release due window', () => {
@@ -31,6 +31,26 @@ describe('the release due window', () => {
     expect(receiptNeeded(due, previous).needed).toBe(false);
     expect(receiptNeeded(releaseDue(latest, cut + 8 * hour), previous).needed).toBe(true);
     expect(receiptNeeded(releaseDue(latest, cut), '').needed).toBe(false);
+  });
+  it('refreshes main, release branches and tags for the scheduled check', () => {
+    const calls: { args: string[]; root: string }[] = [];
+    expect(refreshReminderRefs('/engine', (args, root) => {
+      calls.push({ args, root });
+      return '';
+    })).toBe(true);
+    expect(calls).toEqual([{
+      args: [
+        'fetch', '--quiet', '--no-write-fetch-head', '--no-recurse-submodules', '--tags', 'origin',
+        'refs/heads/main:refs/remotes/origin/main',
+        '+refs/heads/release/*:refs/remotes/origin/release/*',
+      ],
+      root: '/engine',
+    }]);
+  });
+  it('reports a failed fetch as stale', () => {
+    expect(refreshReminderRefs('/engine', () => {
+      throw new Error('origin is unavailable');
+    })).toBe(false);
   });
   it('installs a report-only job using stable nvm and escaped XML paths', () => {
     const plist = reminderPlist('/Users/a&b/engine', '/Users/a&b');

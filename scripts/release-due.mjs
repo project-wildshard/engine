@@ -40,7 +40,27 @@ export function reminderPlist(root, userHome) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>io.wildshard.release-due</string>\n<key>ProgramArguments</key><array><string>${xml(join(userHome, '.nvm/nvm-exec'))}</string><string>node</string><string>${xml(join(root, 'scripts/release-due.mjs'))}</string><string>--receipt</string></array>\n<key>EnvironmentVariables</key><dict><key>NODE_VERSION</key><string>default</string></dict>\n<key>WorkingDirectory</key><string>${xml(root)}</string>\n<key>StartInterval</key><integer>1800</integer><key>RunAtLoad</key><true/>\n</dict></plist>\n`;
 }
 /** @param {string[]} args @param {string} root */
-function git(args, root) { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
+function git(args, root) {
+  return execFileSync('git', args, {
+    cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 25_000,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never' },
+  }).trim();
+}
+/** @param {string} root @param {typeof git} runGit */
+export function refreshReminderRefs(root, runGit = git) {
+  try {
+    runGit(['fetch', '--quiet', '--no-write-fetch-head', '--no-recurse-submodules', '--tags',
+      'origin', 'refs/heads/main:refs/remotes/origin/main',
+      '+refs/heads/release/*:refs/remotes/origin/release/*'], root);
+    return true;
+  } catch {
+    return false;
+  }
+}
+/** @param {string} log @param {string} message */
+function appendReminder(log, message) {
+  appendFileSync(log, `${new Date().toISOString().slice(11, 16)} UTC codex-ms NOTE ${message}\n`);
+}
 /** @param {string[]} args */
 export function main(args) {
   if (args.some(arg => !['--json', '--receipt', '--install'].includes(arg))) throw new Error('Usage: release-due.mjs [--json|--receipt|--install]');
@@ -58,6 +78,19 @@ export function main(args) {
     catch { execFileSync('launchctl', ['bootstrap', domain, file], { stdio: 'ignore' }); }
     console.log('Installed report-only release reminder, every30min');
   }
+  const log = join(home, '.cache/wildshard/lane-receipts.log');
+  if (args.includes('--receipt') && !refreshReminderRefs(root)) {
+    const lastKnown = git(['show', '-s', '--format=%h %ct', 'refs/remotes/origin/main'], root);
+    const [build, timestamp] = lastKnown.split(' ');
+    const checked = new Date(Number(timestamp) * 1000);
+    const marker = `MA10-stale-${build}`;
+    const message = `${marker} could not refresh origin; last known main commit at ${mexico(checked.toISOString())}`;
+    const previous = existsSync(log) ? readFileSync(log, 'utf8') : '';
+    if (!previous.includes(`codex-ms NOTE ${marker} `)) appendReminder(log, message);
+    console.error(message);
+    process.exitCode = 1;
+    return undefined;
+  }
   const ref = latestReleaseRef(git(['for-each-ref', '--format=%(refname)', 'refs/tags', 'refs/heads/release', 'refs/remotes/origin/release'], root).split('\n'));
   if (ref === undefined) throw new Error('No prepared or tagged release');
   const tag = ref.split('/').at(-1) ?? '', build = git(['rev-parse', `${ref}^{commit}`], root);
@@ -66,9 +99,8 @@ export function main(args) {
   const result = releaseDue({ tag, build, cutAt, newCommits }, Date.now());
   console.log(args.includes('--json') ? JSON.stringify(result) : reminderLine(result));
   if (args.includes('--receipt')) {
-    const log = join(home, '.cache/wildshard/lane-receipts.log');
     const { marker, needed } = receiptNeeded(result, existsSync(log) ? readFileSync(log, 'utf8') : '');
-    if (needed) appendFileSync(log, `${new Date().toISOString().slice(11, 16)} UTC codex-ms NOTE ${marker} ${newCommits} new commits; green main cut due; on-demand remains available\n`);
+    if (needed) appendReminder(log, `${marker} ${newCommits} new commits; green main cut due; on-demand remains available`);
   }
   return result;
 }
