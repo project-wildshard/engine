@@ -102,7 +102,9 @@ describe('push gate copy (EV1)', () => {
     const root = canonical();
     const directory = mkdtempSync(resolve('tmp/isolated-gate-'));
     roots.push(directory);
-    const env = {...ENV, npm_config_store_dir: join(directory, 'store')};
+    // pnpm disables its global layout by default in CI. Exercise the local
+    // producer layout explicitly even when these fixtures run on Actions.
+    const env = {...ENV, CI: 'false', GITHUB_ACTIONS: '', npm_config_store_dir: join(directory, 'store')};
     const pack = join(root, 'tmp/tool');
     mkdirSync(pack, {recursive: true});
     writeFileSync(join(pack, 'package.json'), JSON.stringify({name: 'fl12-test-tool', version: '1.0.0', bin: {'fl12-test-tool': 'cli.cjs'}}));
@@ -110,7 +112,7 @@ describe('push gate copy (EV1)', () => {
     writeFileSync(join(root, 'package.json'), JSON.stringify({name: 'fl12-fixture', private: true, packageManager: 'pnpm@10.34.9', dependencies: {'fl12-test-tool': 'file:fl12-test-tool-1.0.0.tgz'}}));
     writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages:\n  - .\nenableGlobalVirtualStore: true\n');
     /** @type {[string, string[]][]} */
-    const setup = [[pack, ['pack', '--pack-destination', root]], [root, ['install', '--offline']]];
+    const setup = [[pack, ['pack', '--pack-destination', root]], [root, ['install', '--offline', '--no-frozen-lockfile', '--config.enableGlobalVirtualStore=true']]];
     for (const [cwd, args] of setup) {
       const result=spawnSync('pnpm',args,{cwd,env,encoding:'utf8'});
       expect(result.status,result.stderr+result.stdout).toBe(0);
