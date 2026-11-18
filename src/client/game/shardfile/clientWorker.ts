@@ -20,6 +20,7 @@ import { dropTabArrival, setTitleArrival } from '@wildshard/engine/boot/titleArr
 import { countedWait } from '@wildshard/engine/boot/waits';
 import { contentURL } from '@wildshard/engine/boot/contentBase';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import type { NetClient } from '@wildshard/engine/net/client';
 import type { NetCombatEvent } from '@wildshard/engine/net/messages';
 import type { DeathCause } from '@wildshard/engine/combat/pipeline';
@@ -186,7 +187,7 @@ const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), ST
 const CHANNELS = [column('channel1'), column('channel2'), column('channel3'), column('channel4')], LOCKABLE = column('lockable');
 const LOCKS = ['row', 'on', 'off'] as const;
 const channelsOf = (row: Float64Array, out: number[]): number[] => { for (let i = 0; i < 4; i++) out[i] = row[CHANNELS[i] ?? -1] ?? 0; return out; };
-const ROW_CHANNELS = [0, 0, 0, 0];
+const ROW_CHANNELS = [0, 0, 0, 0], SYNC_CHANNELS = [0, 0, 0, 0], SYNC_ROW = ownedArray(Float64Array, ANIMAL_CLASS.row.length, { owner: 'game/creatures', asset: 'row-swap' });
 
 /** What the page measures, as I6 lists it. */
 export interface WorkerClientReport {
@@ -239,7 +240,7 @@ function poseActs(names: ReadonlySet<string>): readonly string[] {
   return line === '' ? acts : [...acts, line];
 }
 /** A creature on screen, and the world's manager that holds it: a crossing leaves it behind. */
-interface RowBody { readonly body: Animal; readonly manager: Creatures; windup?: number }
+interface RowBody { readonly body: Animal; readonly manager: Creatures; windup?: number; /** its page kind before a look swap (CC28c) */ readonly home: string }
 /** Every creature on this page is a row: a new one spawns through the real manager, one the server dropped retires. */
 function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map<number, RowBody>, retired: Map<string, number>, spawnMs: Map<string, number>, poses: ReadonlyMap<string, Record<string, number>>): void {
   if (animals === null) return;
@@ -247,11 +248,13 @@ function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map
     if (info.cls.cls !== ANIMAL_CLASS.cls || bodies.has(handle)) continue; // the shell's bundle has its own copy of the class
     const { x = 0, y = 0, z = 0, yaw = 0 } = client.interpolator.fields(handle, Number.MAX_SAFE_INTEGER) ?? {};
     if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number' || typeof yaw !== 'number') continue;
-    const kind = wirePage.rowKind(info.initial['species'], String(info.initial['kind'])), at = diagnosticNow(), body = animals.spawn(kind, x, z, yaw, String(info.initial['variant']), { y, body: { seed: Number(info.initial['seed']), scale: Number(info.initial['scale']) } });
+    const home = wirePage.rowKind(info.initial['species'], String(info.initial['kind'])), at = diagnosticNow();
+    const kind = wirePage.lookKind(home, channelsOf(client.interpolator.sample(handle, Number.MAX_SAFE_INTEGER, SYNC_ROW) ? SYNC_ROW : SYNC_ROW.fill(0), SYNC_CHANNELS));
+    const body = animals.spawn(kind, x, z, yaw, String(info.initial['variant']), { y, body: { seed: Number(info.initial['seed']), scale: Number(info.initial['scale']) } });
     spawnMs.set(kind, Math.max(spawnMs.get(kind) ?? 0, diagnosticNow() - at));
     body.rowDriven = true;
     wirePage.dress(animals, body);
-    bodies.set(handle, { body, manager: animals });
+    bodies.set(handle, { body, manager: animals, home });
     Object.assign(body.mem, poses.get(info.id));
   }
   for (const body of animals.animals.filter(entry => !entry.rowDriven)) { animals.retire(body); retired.set(body.kind, (retired.get(body.kind) ?? 0) + 1); } // what the page's own population made
@@ -270,13 +273,15 @@ function headOf(body: Animal | undefined, to: Vector3): boolean {
 }
 
 /** Rows onto the bodies, and the near ones into the predicted world as capsules. */
-function showRows(client: NetClient, ports: WorkerClientPorts, bodies: ReadonlyMap<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>): number {
+function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>): number {
   const { interpolator } = client, own = client.welcome?.handle ?? 0, under = client.riders.get(own);
   let shown = 0;
   near.length = 0;
   for (const [handle, entry] of bodies) {
     const { body, manager } = entry;
     if (handle === under || !interpolator.sample(handle, renderTick, row)) continue; // the body under this player is its own prediction (J48)
+    // CC28c: a channel crossed its look swap: retire the body, and the next sync spawns the row in the other look
+    if (wirePage.lookKind(entry.home, channelsOf(row, ROW_CHANNELS)) !== body.kind) { manager.retire(body); bodies.delete(handle); continue; }
     const attack = row[ATTACK] ?? 0, duration = (row[ATTACK_DUR] ?? 1000) / 1000, winding = row[WINDING] === 1;
     const stamp = row[ATTACK_STAMP] ?? 0, started = winding && row[TARGET] === own && entry.windup !== stamp;
     body.showRow({ x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, yaw: row[YAW] ?? 0, state: ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle', attack, attackDuration: duration, winding, flinch: row[FLINCH] ?? 0, strafe: row[STRAFE] ?? 0, brace: row[BRACE] ?? 0, hp: row[HP] ?? 0, alive: row[ALIVE] === 1, rise: row[RISE] ?? 0, act: row[ACT] ?? 0, channels: channelsOf(row, ROW_CHANNELS), lock: LOCKS[row[LOCKABLE] ?? 0] ?? 'row' }, dt);

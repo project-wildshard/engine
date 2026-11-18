@@ -116,6 +116,16 @@ export class WirePage {
     this.speciesKinds = kinds; scope.onDispose(() => { if (this.speciesKinds === kinds) this.speciesKinds = new Map(); });
   }
   /** The kind a row spawns as here: its declared species' page kind, else the wire's `kind` (a native body, an older server). */
+  /** CC28c: each page kind's look swap (its body's second look), by the page kind it swaps from. */
+  private swaps: ReadonlyMap<string, { readonly kind: string; readonly index: number; readonly at: number }> = new Map();
+  declareSwaps(swaps: ReadonlyMap<string, { readonly kind: string; readonly index: number; readonly at: number }>, scope: Scope): void {
+    this.swaps = swaps; scope.onDispose(() => { if (this.swaps === swaps) this.swaps = new Map(); });
+  }
+  /** The kind a row of page kind `home` draws as under these channels: its swap look's while the channel is at `at` or more. */
+  lookKind(home: string, channels: readonly number[]): string {
+    const swap = this.swaps.get(home);
+    return swap !== undefined && (channels[swap.index] ?? 0) >= swap.at ? swap.kind : home;
+  }
   rowKind(species: unknown, kind: string): string { return typeof species === 'string' && species !== '' ? this.speciesKinds.get(species) ?? kind : kind; }
   /** Count a thing drawn, or `times` of them (a frame that draws every word heard since the last). */
   drew(what: string, times = 1): void { this.drawn[what] = (this.drawn[what] ?? 0) + times; }

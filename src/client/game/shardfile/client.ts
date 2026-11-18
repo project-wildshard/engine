@@ -66,7 +66,7 @@ import type { GraphSources } from './clientGraphs';
 import { clientPostStack, type ClientPost } from './clientPost';
 import { loadScenePostGraphCompiler } from '@wildshard/engine/render/graphBackend';
 import { frameLookOf } from '../grid/frameLook';
-import { clientSpeciesLooks, pageSpecies, speciesViewKinds, type ShardViewRecipe } from './clientRecipes';
+import { clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ShardViewRecipe } from './clientRecipes';
 import { loadItemModels } from './itemModels';
 import { loadClientSkins, type ClientSkin } from './clientSkins';
 import { clientViews } from './clientViews';
@@ -442,8 +442,17 @@ export class ShardfileClient {
     // TE-ENG7: two declared species on one native kind each register under a page kind of their own; rows find it by species id
     const kinds = speciesViewKinds(source.rows), pageKind = (species: string, kind: string): string => kinds.get(species) ?? kind;
     wirePage.declareSpecies(kinds, ctx.scope);
-    ctx.rows.species(pageSpecies(source.rows.species.map((row) => ({ ...row, harvest: row.harvest ?? [], variants: row.variants.map((variant) => ({ ...variant, scale: [...variant.scale] })) })), kinds));
-    ctx.rows.speciesLook(pageSpecies(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins), kinds));
+    const pageRows = source.rows.species.map((row) => ({ ...row, harvest: row.harvest ?? [], variants: row.variants.map((variant) => ({ ...variant, scale: [variant.scale[0], variant.scale[1]] as [number, number] })) }));
+    ctx.rows.species(pageSpecies(pageRows, kinds));
+    // CC28c: a body's swap look registers under its own page kind, with a copy of its species row, never its species' kind
+    const swaps = speciesSwaps(source.rows), swapped = new Map(swaps.map((swap) => [swap.look, swap])), looks = clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins);
+    ctx.rows.speciesLook(pageSpecies(looks.filter((look) => !swapped.has(look.id)), kinds));
+    for (const swap of swaps) {
+      const row = pageRows.find((entry) => entry.id === swap.species), look = looks.find((entry) => entry.id === swap.look);
+      if (row === undefined || look === undefined) throw new Error(`Missing swap look ${swap.look}`);
+      ctx.rows.species({ ...row, id: `${row.id}~swap`, kind: swap.kind }); ctx.rows.speciesLook({ ...look, kind: swap.kind });
+    }
+    wirePage.declareSwaps(new Map(swaps.map((swap) => [pageKind(swap.species, source.rows.species.find((row) => row.id === swap.species)?.kind ?? ''), swap])), ctx.scope);
     const sketches = compendiumSketches(source.rows, this.assets.retained);
     for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredFolderCompendium(ctx.product, row.id, sketches) });
     ctx.rows.lootTable(source.rows.loot);

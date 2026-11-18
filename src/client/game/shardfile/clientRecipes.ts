@@ -77,3 +77,16 @@ export function pageSpecies<T extends { readonly id: string; readonly kind: stri
     return kind === entry.kind ? [entry] : [{ ...entry, kind }, { ...entry, id: `${entry.id}@${entry.kind}` }];
   });
 }
+
+/** CC28c: a body's second look (format `swap`), drawn as a page kind of its own while channel `index` is at or above `at`. */
+export interface SpeciesSwap { readonly species: string; readonly look: string; readonly kind: string; readonly index: number; readonly at: number }
+/** Every declared body's look swap. Its look draws under its own page kind (`<look>~swap`), never its species' kind, so a
+ *  species' two looks never contend for one kind (the species service resolves a kind to its last look). */
+export function speciesSwaps(rows: Pick<ShardRows, 'species'>): readonly SpeciesSwap[] {
+  return rows.species.flatMap((row) => {
+    const swap = row.body?.swap; if (swap === undefined) return [];
+    const index = (row.body?.channels ?? []).findIndex((channel) => channel.name === swap.channel);
+    if (index === -1) throw new Error(`Undeclared creature channel ${swap.channel}`);
+    return [{ species: row.id, look: swap.look, kind: `${swap.look}~swap`, index, at: swap.at ?? 0.5 }];
+  });
+}
