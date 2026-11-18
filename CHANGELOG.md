@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.44 (2026-11-18)
+
+- Show the board prompt and allow steering for vehicles in grid cells.
+- Keep the collision hull with a steerable vehicle as it moves.
+- Watch for a black or empty world after controls return.
+- Track quests, ledger progress, and HUD in grid cells.
+- Ship Brasscap Mesa rev 7 and ONE-FORMAT M2 abilities.
+
 ## v0.1.42 (2026-11-18)
 
 - Show the race clock in Mirror Salt when starting a race from its grid cell.
