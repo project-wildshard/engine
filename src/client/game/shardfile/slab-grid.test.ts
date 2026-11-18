@@ -129,3 +129,23 @@ test('a chunk baked on a grid (OF-EM28b4) keeps its Int16 words; chunks merge on
   expect(slabGrid(merged)).toEqual({ origin: [10, 20, 30], step: 2 ** -7 });
   expect(mergeSlabChunks([other(2 ** -7), other(2 ** -6)])).toBeNull();
 });
+
+test('the worker reads packed 16-bit grid xyz as it reads them widened to float: same tree, order and far levels (MG10)', () => {
+  const gridded = street();
+  gridSlabPositions(gridded);
+  const xyz = slabXyz(gridded);
+  if (!(xyz instanceof Int16Array)) throw new Error('expected packed grid words');
+  const index = Uint32Array.from(gridded.index?.array ?? []);
+  const tree = (positions: Float32Array | Int16Array): { ranges: ReturnType<typeof spatialSlabRanges>; order: Uint32Array } => {
+    const geometry = new BufferGeometry(), order = index.slice();
+    geometry.setAttribute('position', new BufferAttribute(positions, 3)); geometry.setIndex(new BufferAttribute(order, 1));
+    return { ranges: spatialSlabRanges(geometry, SLAB_LEAF_TRIANGLES, true), order };
+  };
+  const words = tree(xyz), floats = tree(Float32Array.from(xyz));
+  if (words.ranges === null || floats.ranges === null) throw new Error('expected trees');
+  for (const key of ['nodes', 'boxes', 'size', 'cones'] as const) expect(Array.from(words.ranges[key])).toEqual(Array.from(floats.ranges[key]));
+  expect(Array.from(words.order)).toEqual(Array.from(floats.order));
+  const farWords = slabFarLevels(words.order, xyz, words.ranges, [64, 160]), farFloats = slabFarLevels(floats.order, Float32Array.from(xyz), floats.ranges, [64, 160]);
+  expect(Array.from(farWords.corners)).toEqual(Array.from(farFloats.corners));
+  expect(Array.from(farWords.far.starts)).toEqual(Array.from(farFloats.far.starts));
+});

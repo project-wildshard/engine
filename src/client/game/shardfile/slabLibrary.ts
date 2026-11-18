@@ -133,7 +133,7 @@ interface FarChunk {
   readonly geometry: BufferGeometry; readonly room: number; readonly kinds: readonly { readonly array: ArrayLike<number> & { readonly buffer: ArrayBufferLike }; readonly itemSize: number }[];
   /** set when its tree landed: its corners in the tree's order, turned as `turned` says (the index's way when written),
    *  and its positions as sent (the worker gives them back: the geometry's own may be on the GPU only by then) */
-  order?: Uint32Array; xyz?: Float32Array; turned?: boolean; sentTurned?: boolean;
+  order?: Uint32Array; xyz?: Float32Array | Int16Array; turned?: boolean; sentTurned?: boolean;
 }
 /** chunks whose tree came (or comes) back alone, their far levels still to build */
 const farHeld = new Map<number, FarChunk>();
@@ -242,7 +242,7 @@ function landed(event: MessageEvent<unknown>): void {
   const held = farHeld.get(id);
   try {
     const order: unknown = typeof tree === 'object' && tree !== null ? Reflect.get(tree, 'index') : undefined, xyz: unknown = Reflect.get(reply, 'xyz');
-    if (typeof tree === 'object' && tree !== null && land(geometry, tree, sentTurned) && held !== undefined && order instanceof Uint32Array && xyz instanceof Float32Array && geometry.index !== null) {
+    if (typeof tree === 'object' && tree !== null && land(geometry, tree, sentTurned) && held !== undefined && order instanceof Uint32Array && (xyz instanceof Float32Array || xyz instanceof Int16Array) && geometry.index !== null) {
       // the far levels' corners: the landing wrote them, turned in place to the index's way
       held.order = order; held.xyz = xyz; held.turned = indexTurned(geometry.index); held.sentTurned = sentTurned;
       askFar();

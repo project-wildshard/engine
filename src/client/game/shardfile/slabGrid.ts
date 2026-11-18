@@ -94,14 +94,17 @@ export function placeSlabPart(part: Object3D, geometry: BufferGeometry): void {
   part.updateMatrix();
 }
 
-/** a chunk's positions as float xyz in its own frame (grid units on a grid), for the slab tree worker */
-export function slabXyz(geometry: BufferGeometry): Float32Array | null {
+/** a chunk's positions as xyz in its own frame, for the slab tree worker: float as baked, or a slab grid's Int16 words
+ *  packed three a vertex (grid units). MG10 (mini-ninemem10): no longer widened to float: the trees and far levels read the
+ *  same values from the 16-bit copy, which is half the bytes on the main thread at `readyFrame` and while held for the
+ *  far pass, and the worker no longer widens it either */
+export function slabXyz(geometry: BufferGeometry): Float32Array | Int16Array | null {
   const position: unknown = geometry.getAttribute('position');
   if (!(position instanceof BufferAttribute) || position.normalized) return null;
   if (position.itemSize === 3 && position.array instanceof Float32Array) return position.array.slice();
   if (position.itemSize < 3 || !(position.array instanceof Int16Array)) return null;
-  const xyz = ownedArray(Float32Array, position.count * 3, GRID_XYZ);
-  for (let v = 0; v < position.count; v++) { xyz[v * 3] = position.getX(v); xyz[v * 3 + 1] = position.getY(v); xyz[v * 3 + 2] = position.getZ(v); }
+  const words = position.array, stride = position.itemSize, xyz = ownedArray(Int16Array, position.count * 3, GRID_XYZ);
+  for (let v = 0; v < position.count; v++) { xyz[v * 3] = words[v * stride] ?? 0; xyz[v * 3 + 1] = words[v * stride + 1] ?? 0; xyz[v * 3 + 2] = words[v * stride + 2] ?? 0; }
   return xyz;
 }
 

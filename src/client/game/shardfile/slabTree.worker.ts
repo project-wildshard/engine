@@ -31,7 +31,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     const corners: unknown = Reflect.get(data, 'corners'), xyz: unknown = Reflect.get(data, 'xyz'), nodes: unknown = Reflect.get(data, 'nodes');
     const triangles: unknown = Reflect.get(data, 'triangles'), cells: unknown = Reflect.get(data, 'far'), room: unknown = Reflect.get(data, 'room');
     try {
-      if (!(corners instanceof Uint32Array) || !(xyz instanceof Float32Array) || !(nodes instanceof Int32Array) || typeof triangles !== 'number'
+      if (!(corners instanceof Uint32Array) || !(xyz instanceof Float32Array || xyz instanceof Int16Array) || !(nodes instanceof Int32Array) || typeof triangles !== 'number'
         || !Array.isArray(cells) || cells.length === 0 || !cells.every(cell => typeof cell === 'number') || typeof room !== 'number' || room <= 0) {
         self.postMessage({ id: farOf, far: null }, { transfer: [] }); return;
       }
@@ -45,7 +45,8 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     return;
   }
   const id: unknown = Reflect.get(data, 'id'), index: unknown = Reflect.get(data, 'index'), xyz: unknown = Reflect.get(data, 'xyz');
-  if (typeof id !== 'number' || !(index instanceof Uint32Array) || !(xyz instanceof Float32Array)) return;
+  // MG10 (mini-ninemem10): a slab grid's positions come as packed Int16 xyz and are read as they are, never widened
+  if (typeof id !== 'number' || !(index instanceof Uint32Array) || !(xyz instanceof Float32Array || xyz instanceof Int16Array)) return;
   try {
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(xyz, 3));

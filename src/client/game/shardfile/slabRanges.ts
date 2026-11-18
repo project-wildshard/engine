@@ -98,9 +98,10 @@ export function* slabRangesJob(geometry: BufferGeometry, leaf: number = SLAB_LEA
   const triangles = own;
   if (triangles <= leaf) return null;
   const corners = new Uint32Array(index.array.subarray(0, triangles * 3));
-  // the bake's positions are plain float32 xyz; any other layout is read through the attribute
-  const plain = position instanceof BufferAttribute && position.itemSize === 3 && !position.normalized && position.array instanceof Float32Array;
-  const xyz = plain ? position.array : new Float32Array(position.count * 3);
+  // the bake's positions are plain float32 xyz, or a slab grid's packed Int16 xyz (MG10: read as they are, the same values
+  // the float copy held); any other layout is read through the attribute
+  const plain = position instanceof BufferAttribute && position.itemSize === 3 && !position.normalized && (position.array instanceof Float32Array || position.array instanceof Int16Array);
+  const xyz: Float32Array | Int16Array = plain ? position.array as Float32Array | Int16Array : new Float32Array(position.count * 3);
   if (!plain) for (let v = 0; v < position.count; v++) { xyz[v * 3] = position.getX(v); xyz[v * 3 + 1] = position.getY(v); xyz[v * 3 + 2] = position.getZ(v); }
   // centroids (times three) and triangle ids, permuted together so every pass reads front to back
   const cx = new Float32Array(triangles), cy = new Float32Array(triangles), cz = new Float32Array(triangles), order = new Uint32Array(triangles);

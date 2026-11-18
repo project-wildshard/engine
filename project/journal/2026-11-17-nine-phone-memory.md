@@ -234,3 +234,19 @@ flip order. Buffer census (`tmp/` tool, not kept: typed-array and ArrayBuffer co
   each sample, 1.2 s before to 0.6 s after the shaders step: biggest one-sample rise 36 and 35 MB in two runs, no
   interval high above its neighbours: the reservation is never charged. Kill switch: device Debug slot
   `debug.collectionHint` (MB; 0 off), `--device-save=debug.collectionHint=0` in the Simulator harness.
+- **Hint off vs on, Simulator (same build, `debug.collectionHint` 0 vs default, 2 runs each, 50 ms samples):** biggest
+  one-sample rise 27 and 41 MB off, 35 and 36 on; loading native 0.80 off, 0.81 on in that unalternated pair (the
+  4-round alternated run read 0.85 -> 0.77). Phone check queued (mini QA 61).
+- **Cut 2, shipped: packed 16-bit tree positions.** `slabXyz` sends a gridded chunk's Int16 words packed three a vertex
+  (was widened to Float32), and the tree worker, the far levels and `slabRangesJob` read them as they are: the same
+  values, half the bytes (~7 MB at `readyFrame` and while held for the far pass). With the hint in, 10 alternating
+  cold pairs under the measure lock, engine `7885a419` + kill switch: peak 1,146 -> 1,123 MB (paired median -38, lower
+  in 8 of 10), settled 734 -> 724, EM11 loading 1.44 -> 1.42 GB (upper 1.60 both), playing 0.95 -> 0.94. Simulator 2
+  rounds: loading native 0.773 -> 0.779, play 0.80 -> 0.77, explorer 0.67 -> 0.51. `nine-ring1.mjs boot` green
+  (entered in 6.8 s).
+- **Held: float slab positions decoded straight onto the grid.** A slab-reader meshopt plugin decoded a non-merging
+  chunk's positions into one reused scratch and quantized them into the 4-word Int16 channel (bit for bit the same as
+  `gridSlabPositions` on all 24 Nine chunks, 1.15 M vertices), so 13.8 MB of Float32 decode outputs never existed. It
+  raised the peak: 10 locked pairs, 1,136 -> 1,154 MB (paired median +30, lower in 2 of 10), settled unchanged. Same
+  pattern as the double read: less `readyFrame` garbage moves the next full collection later. Patch with the held cuts
+  in meta `docs/plans/engine-memory/mg10-held-cuts-2026-11-18.md`.
