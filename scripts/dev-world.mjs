@@ -67,9 +67,9 @@ const stopChild = (child, graceMs = 15_000) => new Promise(resolve => {
  * `product` is the shard's built product folder (STR5: `wildshard dev` names the author's build); by default the one this
  * checkout's pins installed (`built-folder.mjs` `readBuiltShardfile`).
  * @param {{ dist: string, work: string, shard?: string, product?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string, log?: (line: string) => void }} options */
-export async function openDevWorld({ dist, work, shard = '_template', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, log = line => { console.log(line); } }) {
+export async function openDevWorld({ dist, work: requestedWork, shard = '_template', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, log = line => { console.log(line); } }) {
   if (!/^[a-z0-9_-]+$/u.test(shard)) throw new Error('A dev world shard must be a slug');
-  work = absolute(work); mkdirSync(work, { recursive: true });
+  const work = absolute(requestedWork); mkdirSync(work, { recursive: true });
   const key = devKey(work);
   /** @type {(() => unknown)[]} */
   const resources = [];
@@ -139,11 +139,11 @@ export async function openDevWorld({ dist, work, shard = '_template', product, p
       if (path === DEV_STATE) { answer('application/json', JSON.stringify({ revision, build, serial, world: world !== undefined })); return; }
       if (path === '/sw.js') { answer('text/javascript', DEV_SERVICE_WORKER); return; }
       // a document is read whole and stamped; everything else streams through untouched
-      const page = request.method === 'GET' && (/\.html$/u.test(path) || !/\.[a-z0-9]+$/iu.test(path));
+      const page = request.method === 'GET' && (path.endsWith('.html') || !/\.[a-z0-9]+$/iu.test(path));
       const headers = { ...request.headers, host: `127.0.0.1:${String(served)}` };
       if (page) delete headers['accept-encoding'];
       const upstream = httpRequest({ host: '127.0.0.1', port: served, method: request.method, path: request.url, headers }, reply => {
-        const type = String(reply.headers['content-type'] ?? '');
+        const type = reply.headers['content-type'] ?? '';
         if (!page || !type.startsWith('text/html')) { response.writeHead(reply.statusCode ?? 502, reply.headers); reply.pipe(response); return; }
         const chunks = /** @type {Buffer[]} */ ([]);
         reply.on('data', chunk => { chunks.push(chunk); });
