@@ -78,3 +78,30 @@ boot, and keeps the error card and last checkpoint on failures.
 Explicit microscopes and the Nine diagnostic keep their dumps.
 The comparison still requires real control for all 26 zones.
 [First regular run](https://github.com/project-wildshard/engine/actions/runs/44276449981).
+
+The release merge d514e2ae reached control in every Ubuntu zone, then
+Clockwork Canyon, Ember Forge, Fossil Badlands and Saltwind Lighthouse
+crossed the loading caps. Clockwork's full 2.97 MB increase was in
+ArrayBuffers. Across eight alternating local SwiftShader boots on the
+same Clockwork pin, 19e00075 and its audio-streaming child 577cf8cb both
+read 16.52 MB at control and peak. After two collections both read
+16.38 MB. Audio peak fell from 28.20 to 24.85 MB. The WebKit pass split
+landed later and does not run on the Ubuntu Chromium path.
+
+A complete direct-checkpoint recording on b786cd2b supplied 80 cold
+boots covering the same 26 exact pins. Clockwork recorded 22.620,
+25.981 and 22.618 MB of loading storage at control. Captured loading
+peaks account for 23 of the 28 differences against the old limits,
+including the retained ArrayBuffers seen in Far Reach and Pine Hollow.
+The remaining five entries are worker accounting. In Ink Cel Valley
+and Pastel Plain, the server physics row measured 792,588 B at control
+instead of 528,392 B. Nalati's highest worker reading held more wire
+bytes at firstFrame.
+
+The new file uses the recorded high-water values. The independent
+clean Template passed and the 20 MB planted buffer tripped control
+at 51.65 MB against 34.85 MB allowed, and tripped the peak as well.
+Both Chromium and native WebKit still compare their subsystem budgets
+with the same 2% cap.
+[Release-merge comparison](https://github.com/project-wildshard/engine/actions/runs/44277584673).
+[Direct sampler qualification](https://github.com/project-wildshard/engine/actions/runs/44284828105).

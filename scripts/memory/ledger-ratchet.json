@@ -6,12 +6,12 @@
       "control": {
         "browser": 2810784,
         "engine": 344064,
-        "workers": 7126652,
+        "workers": 7257724,
         "geometry": 15301958,
         "textures": 17885916,
         "scene": 13892888,
         "audio": 0,
-        "loading": 34411766,
+        "loading": 34162330,
         "margin": 0
       },
       "peak": {
@@ -22,7 +22,7 @@
         "textures": 17885916,
         "scene": 13892888,
         "audio": 0,
-        "loading": 34412342,
+        "loading": 43284354,
         "margin": 0
       }
     },
@@ -55,22 +55,22 @@
         "browser": 2810784,
         "engine": 1880528,
         "workers": 15048057,
-        "geometry": 51428942,
+        "geometry": 43155872,
         "textures": 59225894,
         "scene": 0,
-        "audio": 41813888,
-        "loading": 76961072,
+        "audio": 29864263,
+        "loading": 71422412,
         "margin": 0
       },
       "peak": {
         "browser": 2810784,
         "engine": 1880528,
         "workers": 15048057,
-        "geometry": 51428942,
+        "geometry": 43155872,
         "textures": 59225894,
-        "scene": 821916,
-        "audio": 41813888,
-        "loading": 77750158,
+        "scene": 0,
+        "audio": 29864263,
+        "loading": 88727199,
         "margin": 0
       }
     },
@@ -83,7 +83,7 @@
         "textures": 158019576,
         "scene": 0,
         "audio": 0,
-        "loading": 56715748,
+        "loading": 92378720,
         "margin": 0
       },
       "peak": {
@@ -94,7 +94,7 @@
         "textures": 158019576,
         "scene": 0,
         "audio": 0,
-        "loading": 147634664,
+        "loading": 149856856,
         "margin": 0
       }
     },
@@ -102,23 +102,23 @@
       "control": {
         "browser": 2810784,
         "engine": 1405392,
-        "workers": 6792221,
+        "workers": 7056417,
         "geometry": 7367392,
         "textures": 18599340,
         "scene": 5101832,
         "audio": 0,
-        "loading": 14495447,
+        "loading": 17992983,
         "margin": 0
       },
       "peak": {
         "browser": 2810784,
         "engine": 1405392,
-        "workers": 6792221,
+        "workers": 7056417,
         "geometry": 7367392,
         "textures": 18599340,
         "scene": 5101832,
         "audio": 0,
-        "loading": 14495447,
+        "loading": 17992983,
         "margin": 0
       }
     },
@@ -128,21 +128,21 @@
         "engine": 14032048,
         "workers": 9790487,
         "geometry": 44126019,
-        "textures": 64064548,
+        "textures": 52530214,
         "scene": 10534008,
-        "audio": 52070124,
+        "audio": 42531482,
         "loading": 89854931,
         "margin": 0
       },
       "peak": {
         "browser": 2810784,
         "engine": 14032048,
-        "workers": 13798741,
+        "workers": 14179926,
         "geometry": 44126019,
-        "textures": 64064548,
+        "textures": 52530214,
         "scene": 10534008,
-        "audio": 98325356,
-        "loading": 124110959,
+        "audio": 42531482,
+        "loading": 141036730,
         "margin": 0
       }
     },
@@ -154,8 +154,8 @@
         "geometry": 9258390,
         "textures": 11671904,
         "scene": 0,
-        "audio": 23684224,
-        "loading": 15892449,
+        "audio": 20620048,
+        "loading": 11518609,
         "margin": 0
       },
       "peak": {
@@ -165,8 +165,8 @@
         "geometry": 9258390,
         "textures": 11671904,
         "scene": 0,
-        "audio": 23684224,
-        "loading": 15892449,
+        "audio": 20620048,
+        "loading": 11518609,
         "margin": 0
       }
     },
@@ -178,8 +178,8 @@
         "geometry": 16653208,
         "textures": 11673304,
         "scene": 9408,
-        "audio": 28195200,
-        "loading": 22819460,
+        "audio": 24848663,
+        "loading": 25981020,
         "margin": 0
       },
       "peak": {
@@ -189,8 +189,8 @@
         "geometry": 16653208,
         "textures": 11673304,
         "scene": 9408,
-        "audio": 28195200,
-        "loading": 22819460,
+        "audio": 24848663,
+        "loading": 25981020,
         "margin": 0
       }
     },
@@ -202,8 +202,8 @@
         "geometry": 22120632,
         "textures": 12015968,
         "scene": 0,
-        "audio": 21331200,
-        "loading": 30649600,
+        "audio": 16953574,
+        "loading": 30119536,
         "margin": 0
       },
       "peak": {
@@ -213,8 +213,8 @@
         "geometry": 22120632,
         "textures": 12015968,
         "scene": 0,
-        "audio": 21331200,
-        "loading": 30649600,
+        "audio": 16953574,
+        "loading": 30119536,
         "margin": 0
       }
     },
@@ -226,8 +226,8 @@
         "geometry": 21104636,
         "textures": 12347536,
         "scene": 0,
-        "audio": 35109248,
-        "loading": 34214750,
+        "audio": 30585461,
+        "loading": 29317310,
         "margin": 0
       },
       "peak": {
@@ -237,8 +237,8 @@
         "geometry": 21104636,
         "textures": 12347536,
         "scene": 0,
-        "audio": 35109248,
-        "loading": 34214750,
+        "audio": 30585461,
+        "loading": 29317310,
         "margin": 0
       }
     },
@@ -250,8 +250,8 @@
         "geometry": 14667978,
         "textures": 12056192,
         "scene": 0,
-        "audio": 20321152,
-        "loading": 19592641,
+        "audio": 16223131,
+        "loading": 23216705,
         "margin": 0
       },
       "peak": {
@@ -261,8 +261,8 @@
         "geometry": 14667978,
         "textures": 12056192,
         "scene": 0,
-        "audio": 20321152,
-        "loading": 19592641,
+        "audio": 16223131,
+        "loading": 23216705,
         "margin": 0
       }
     },
@@ -274,8 +274,8 @@
         "geometry": 13760904,
         "textures": 11674648,
         "scene": 672,
-        "audio": 27525248,
-        "loading": 17200625,
+        "audio": 23665117,
+        "loading": 17712861,
         "margin": 0
       },
       "peak": {
@@ -285,8 +285,8 @@
         "geometry": 13760904,
         "textures": 11674648,
         "scene": 672,
-        "audio": 27525248,
-        "loading": 17200625,
+        "audio": 23665117,
+        "loading": 17712861,
         "margin": 0
       }
     },
@@ -298,8 +298,8 @@
         "geometry": 15641704,
         "textures": 13740184,
         "scene": 3216,
-        "audio": 25028224,
-        "loading": 28922100,
+        "audio": 21964048,
+        "loading": 29246868,
         "margin": 0
       },
       "peak": {
@@ -309,8 +309,8 @@
         "geometry": 15641704,
         "textures": 13740184,
         "scene": 3216,
-        "audio": 25028224,
-        "loading": 28922100,
+        "audio": 21964048,
+        "loading": 29246868,
         "margin": 0
       }
     },
@@ -322,8 +322,8 @@
         "geometry": 16238272,
         "textures": 12351648,
         "scene": 0,
-        "audio": 23275200,
-        "loading": 23245561,
+        "audio": 20318312,
+        "loading": 26441029,
         "margin": 0
       },
       "peak": {
@@ -333,8 +333,8 @@
         "geometry": 16238272,
         "textures": 12351648,
         "scene": 0,
-        "audio": 23275200,
-        "loading": 23245561,
+        "audio": 20318312,
+        "loading": 26441029,
         "margin": 0
       }
     },
@@ -346,8 +346,8 @@
         "geometry": 21880658,
         "textures": 11673304,
         "scene": 12912,
-        "audio": 22556224,
-        "loading": 33391912,
+        "audio": 18436180,
+        "loading": 29266460,
         "margin": 0
       },
       "peak": {
@@ -357,8 +357,8 @@
         "geometry": 21880658,
         "textures": 11673304,
         "scene": 12912,
-        "audio": 22556224,
-        "loading": 33391912,
+        "audio": 18436180,
+        "loading": 29266460,
         "margin": 0
       }
     },
@@ -370,8 +370,8 @@
         "geometry": 22341074,
         "textures": 12466408,
         "scene": 10272,
-        "audio": 24019200,
-        "loading": 36839899,
+        "audio": 16051118,
+        "loading": 35742839,
         "margin": 0
       },
       "peak": {
@@ -381,8 +381,8 @@
         "geometry": 22341074,
         "textures": 12466408,
         "scene": 10272,
-        "audio": 24019200,
-        "loading": 36839899,
+        "audio": 16051118,
+        "loading": 35742839,
         "margin": 0
       }
     },
@@ -394,8 +394,8 @@
         "geometry": 25827966,
         "textures": 13740184,
         "scene": 7344,
-        "audio": 28821248,
-        "loading": 39636687,
+        "audio": 24961117,
+        "loading": 43346891,
         "margin": 0
       },
       "peak": {
@@ -405,8 +405,8 @@
         "geometry": 25827966,
         "textures": 13740184,
         "scene": 7344,
-        "audio": 28821248,
-        "loading": 39636687,
+        "audio": 24961117,
+        "loading": 43346891,
         "margin": 0
       }
     },
@@ -418,8 +418,8 @@
         "geometry": 12170002,
         "textures": 11674648,
         "scene": 1344,
-        "audio": 27621248,
-        "loading": 19696862,
+        "audio": 21189127,
+        "loading": 18347002,
         "margin": 0
       },
       "peak": {
@@ -429,8 +429,8 @@
         "geometry": 12170002,
         "textures": 11674648,
         "scene": 1344,
-        "audio": 27621248,
-        "loading": 19696862,
+        "audio": 21189127,
+        "loading": 18347002,
         "margin": 0
       }
     },
@@ -442,7 +442,7 @@
         "geometry": 4981692,
         "textures": 11674648,
         "scene": 1344,
-        "audio": 27328128,
+        "audio": 22950502,
         "loading": 7135783,
         "margin": 0
       },
@@ -453,7 +453,7 @@
         "geometry": 4981692,
         "textures": 11674648,
         "scene": 1344,
-        "audio": 27328128,
+        "audio": 22950502,
         "loading": 7135783,
         "margin": 0
       }
@@ -466,8 +466,8 @@
         "geometry": 15761290,
         "textures": 11674648,
         "scene": 4704,
-        "audio": 22483200,
-        "loading": 24737460,
+        "audio": 18105574,
+        "loading": 20374856,
         "margin": 0
       },
       "peak": {
@@ -477,8 +477,8 @@
         "geometry": 15761290,
         "textures": 11674648,
         "scene": 4704,
-        "audio": 22483200,
-        "loading": 24737460,
+        "audio": 18105574,
+        "loading": 20374856,
         "margin": 0
       }
     },
@@ -490,8 +490,8 @@
         "geometry": 15392706,
         "textures": 11674648,
         "scene": 2688,
-        "audio": 25387200,
-        "loading": 19260677,
+        "audio": 22430068,
+        "loading": 20106637,
         "margin": 0
       },
       "peak": {
@@ -501,8 +501,8 @@
         "geometry": 15392706,
         "textures": 11674648,
         "scene": 2688,
-        "audio": 25387200,
-        "loading": 19260677,
+        "audio": 22430068,
+        "loading": 20106637,
         "margin": 0
       }
     },
@@ -514,8 +514,8 @@
         "geometry": 15723914,
         "textures": 11673304,
         "scene": 7344,
-        "audio": 26732224,
-        "loading": 20673587,
+        "audio": 22612180,
+        "loading": 24936463,
         "margin": 0
       },
       "peak": {
@@ -525,8 +525,8 @@
         "geometry": 15723914,
         "textures": 11673304,
         "scene": 7344,
-        "audio": 26732224,
-        "loading": 20673587,
+        "audio": 22612180,
+        "loading": 24936463,
         "margin": 0
       }
     },
@@ -538,8 +538,8 @@
         "geometry": 6886026,
         "textures": 11673304,
         "scene": 6720,
-        "audio": 29493248,
-        "loading": 8992106,
+        "audio": 21525166,
+        "loading": 8991262,
         "margin": 0
       },
       "peak": {
@@ -549,8 +549,8 @@
         "geometry": 6886026,
         "textures": 11673304,
         "scene": 6720,
-        "audio": 29493248,
-        "loading": 8992106,
+        "audio": 21525166,
+        "loading": 8991262,
         "margin": 0
       }
     },
@@ -558,23 +558,23 @@
       "control": {
         "browser": 2810784,
         "engine": 1405392,
-        "workers": 6792950,
+        "workers": 7057146,
         "geometry": 7367356,
         "textures": 12977772,
         "scene": 5101832,
         "audio": 0,
-        "loading": 18231796,
+        "loading": 13931064,
         "margin": 0
       },
       "peak": {
         "browser": 2810784,
         "engine": 1405392,
-        "workers": 6792950,
+        "workers": 7057146,
         "geometry": 7367356,
         "textures": 12977772,
         "scene": 5101832,
         "audio": 0,
-        "loading": 18231796,
+        "loading": 13931064,
         "margin": 0
       }
     },
@@ -583,22 +583,22 @@
         "browser": 2810784,
         "engine": 524288,
         "workers": 8300285,
-        "geometry": 60068669,
+        "geometry": 60073161,
         "textures": 127285900,
         "scene": 6841076,
-        "audio": 53067930,
-        "loading": 152711947,
+        "audio": 46651101,
+        "loading": 118432431,
         "margin": 0
       },
       "peak": {
         "browser": 2810784,
         "engine": 524288,
         "workers": 10412040,
-        "geometry": 60068669,
+        "geometry": 60073161,
         "textures": 127285900,
-        "scene": 7136792,
-        "audio": 53067930,
-        "loading": 157136589,
+        "scene": 7239548,
+        "audio": 46651101,
+        "loading": 184867470,
         "margin": 0
       }
     },
@@ -611,7 +611,7 @@
         "textures": 81072452,
         "scene": 5101832,
         "audio": 0,
-        "loading": 82576270,
+        "loading": 84722182,
         "margin": 0
       },
       "peak": {
@@ -622,7 +622,7 @@
         "textures": 81072452,
         "scene": 5101832,
         "audio": 0,
-        "loading": 86234553,
+        "loading": 93797257,
         "margin": 0
       }
     }
