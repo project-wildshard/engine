@@ -166,9 +166,9 @@ describe('land (J400): local gates and proof reuse', () => {
     expect(f.read(f.files.receipts)).not.toContain('J381 SKIP_CHECK=1');
   }, 60_000);
 
-  test('J400: local default lands without a plan push or Actions lookup', () => {
+  test('J400: local mode lands without a plan push or Actions lookup', () => {
     const f = fixture();
-    delete f.env['WS_LAND_MODE'];
+    f.env['WS_LAND_MODE'] = 'local';
     const wt = f.worktree('local');
     const tip = f.commit(wt, 'src/local.ts', 'export const local = true;', 'feat: local');
     const result = f.land(wt);

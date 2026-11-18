@@ -72,7 +72,8 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   // cheap stuff, ignoring vitest, but still run lint & typescript"). Any other main push keeps the full gate.
   // The marker is read from the hook's own environment: the gate's environment keeps only its allowlist.
   const landMain=landMainMode({...env,WS_LAND_MAIN_PUSH:process.env.WS_LAND_MAIN_PUSH},env.WS_PUSH_REFS);
-  if(landMain!==null){
+  // J422: land's `push` main push takes the ordinary split gate below, like any main push.
+  if(landMain!==null&&landMain!=='push'){
     if(landMain==='local'){
       // Land owns main-watch after this main-only push. Release/tag
       // observations cannot use this exact single-main-ref marker.
@@ -159,7 +160,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   }finally{copy?.remove();}
   // EV2: a green split main push hands main's verdict to main-watch, as land does (LS5). It waits for this SHA to
   // reach origin/main and quits quietly if the push never lands (a lost race).
-  if(code===0&&split&&sha!==null&&mainPushed(env.WS_PUSH_REFS)&&process.env.WS_MAIN_WATCH!=='0'&&existsSync(join(root,'scripts/main-watch.mjs'))){
+  if(code===0&&split&&landMain===null&&sha!==null&&mainPushed(env.WS_PUSH_REFS)&&process.env.WS_MAIN_WATCH!=='0'&&existsSync(join(root,'scripts/main-watch.mjs'))){
     const lane=process.env.WS_LANE_NAME??'',pane=process.env.HERDR_PANE_ID??'';
     try{
       const mainSha=(env.WS_PUSH_REFS??'').split('\n').map(line=>line.trim().split(/\s+/u)).find(row=>row[2]==='refs/heads/main')?.[1]??sha;

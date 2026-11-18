@@ -79,6 +79,19 @@ describe('pin provenance (J375)', () => {
     assert.equal(checkPinPush({ cwd: linked, refs: line(tip, old), ciState: never,
       env: { WS_LAND_MAIN_PUSH: `local:${old}` } }).ok, false);
   });
+  test('J422 push land: exact linked plan HEAD passes through the push gate; mode 1 cannot claim it', () => {
+    const w = world();
+    const old = w.git(w.lane, 'rev-parse', 'origin/main');
+    const linked = join(w.lane, '.worktrees/push-pins');
+    w.git(w.lane, 'worktree', 'add', '-b', 'plan/push-pins', linked, old);
+    const tip = w.commit(linked, { 'test/pins/rings.json': '{"r":3}\n' }, 'pin change');
+    const never = () => { throw new Error('push must not ask Actions'); };
+    const verdict = checkPinPush({ cwd: linked, refs: line(tip, old), ciState: never, env: { WS_LAND_MAIN_PUSH: `push:${tip}` } });
+    assert.equal(verdict.ok, true);
+    assert.match(verdict.ok ? verdict.note ?? '' : '', /J422/u);
+    assert.equal(checkPinPush({ cwd: w.lane, refs: line(tip, old), ciState: never, env: { WS_LAND_MAIN_PUSH: `push:${tip}` } }).ok, false);
+    assert.equal(checkPinPush({ cwd: linked, refs: line(tip, old), ciState: never, env: { WS_LAND_MAIN_PUSH: `push:${old}` } }).ok, false);
+  });
   test('exact land: the green plan SHA itself passes', () => {
     const w = world();
     const old = w.git(w.lane, 'rev-parse', 'origin/main');

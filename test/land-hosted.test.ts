@@ -95,7 +95,12 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     g.commit(kept, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     expect(g.land(kept, ['--keep']).stdout).not.toContain('cleaned');
     expect(existsSync(kept)).toBe(true);
-    expect(parseArgs([], {})).toEqual({ mode: 'local', pollSeconds: 60, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false, preflight: true });
+    // J422: push mode is the default and keeps the plan worktree for the next row; --done removes it.
+    expect(parseArgs([], {}, 'Jakes-Mac-Mini.local').mode).toBe('local');
+    expect(parseArgs([], { WS_LAND_MODE: 'push' }, 'Jakes-Mac-Mini.local').mode).toBe('push');
+    expect(parseArgs([], {}, 'macbook')).toEqual({ mode: 'push', pollSeconds: 60, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: true, done: false, preflight: true });
+    expect(parseArgs(['--done'], {}, 'macbook')).toMatchObject({ mode: 'push', keep: false, done: true });
+    expect(parseArgs([], { WS_LAND_MODE: 'local' })).toMatchObject({ mode: 'local', keep: false });
     expect(parseArgs(['--hosted'], {}).mode).toBe('hosted');
     expect(parseArgs(['--local'], { WS_LAND_MODE: 'hosted' }).mode).toBe('local');
     expect(parseArgs(['--no-preflight']).preflight).toBe(false);

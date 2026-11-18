@@ -125,6 +125,7 @@ it('only land\'s marked main push gets the land lane; a hand main push keeps the
   const main = `refs/heads/main ${a} refs/heads/main ${b}`;
   expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`}, main)).toBe('carried');
   expect(landMainMode({WS_LAND_MAIN_PUSH: `exact:${a}`}, main)).toBe('exact');
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `push:${a}`}, main)).toBe('push');
   // The marker binds the SHA land proved: another SHA, no SHA or an unknown kind keeps the full gate.
   expect(landMainMode({WS_LAND_MAIN_PUSH: `exact:${b}`}, main)).toBeNull();
   expect(landMainMode({WS_LAND_MAIN_PUSH: 'exact'}, main)).toBeNull();

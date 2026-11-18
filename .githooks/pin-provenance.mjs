@@ -69,9 +69,12 @@ export function checkPinPush({ cwd, refs, ciState, env = process.env }) {
     const branch = git(cwd, ['symbolic-ref', '--quiet', 'HEAD']).out;
     const gitDir = git(cwd, ['rev-parse', '--absolute-git-dir']).out;
     const common = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']).out;
-    if (localOnly && env.WS_LAND_MAIN_PUSH === `local:${pushed}` && head === pushed && /^refs\/heads\/plan\//u.test(branch)
+    // J422 (meta FLOW-SIMPLE FS2): land's push mode is the one way onto main for every row, pins included; main's
+    // hosted ci judges it and main-watch names the push on red.
+    const marker = env.WS_LAND_MAIN_PUSH === `local:${pushed}` ? 'local' : env.WS_LAND_MAIN_PUSH === `push:${pushed}` ? 'push' : '';
+    if (localOnly && marker !== '' && head === pushed && /^refs\/heads\/plan\//u.test(branch)
       && gitDir !== common && git(cwd, ['merge-base', '--is-ancestor', old, pushed]).ok) {
-      return { ok: true, note: `local plan HEAD ${pushed.slice(0, 10)}; full local pre-push gate follows (J400)` };
+      return { ok: true, note: marker === 'push' ? `plan HEAD ${pushed.slice(0, 10)} through land's push gate; main ci judges it (J422)` : `local plan HEAD ${pushed.slice(0, 10)}; full local pre-push gate follows (J400)` };
     }
     if (env.ALLOW_PIN_PUSH === '1') return { ok: true, note: `ALLOW_PIN_PUSH=1: ${changed.length} test/pins file(s) pushed to main without a green plan branch (J375); say so in your receipt` };
     const tips = matchingPlanTips(cwd, old, pushed);
