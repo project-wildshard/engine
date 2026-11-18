@@ -397,7 +397,9 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       if (known !== undefined) return known;
       const counts = new Map<string, number>();
       const count = (r: GraphRef | undefined): void => { if (typeof r === 'string') counts.set(r, (counts.get(r) ?? 0) + 1); };
-      for (const n of Object.values(scope.nodes)) for (const r of n.in ?? []) count(r);
+      // EM18: indexed and keyed loops (an array iterator's result object per input was most of this walk's garbage)
+      const nodes = scope.nodes;
+      for (const key in nodes) { if (!Object.hasOwn(nodes, key)) continue; const inputs = nodes[key]?.in; if (inputs !== undefined) for (let index = 0; index < inputs.length; index++) count(inputs[index]); }
       if (scope.nodes === ir.nodes) {
         const st = ir.stages;
         for (const r of [st['vertex.offset']?.offset, st['vertex.position']?.position, st.points?.size, st.post?.colour, st.post?.alpha, st.fog?.colour,
@@ -438,8 +440,14 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
         && callsPostFog(n.body.out, { ...scope, path: `${scope.path}.${r}.body`, nodes: n.body.nodes, parent: scope, home: null })) {
         body += postFog.cost.instructions * (n.count ?? 1);
       }
-      return (spec?.cost ?? 0) + (n.op === 'fogSample' ? postFog?.cost.instructions ?? 0 : 0) + body + (n.in ?? []).reduce<number>((sum, x) => sum + ownCost(x, scope, seen), 0);
+      return (spec?.cost ?? 0) + (n.op === 'fogSample' ? postFog?.cost.instructions ?? 0 : 0) + body + inputsCost(n.in, scope, seen);
     };
+    /** EM18: the inputs' own costs, summed in a loop (a reduce callback per node was garbage) */
+    function inputsCost(inputs: readonly GraphRef[] | undefined, scope: Scope, seen: Set<string>): number {
+      let sum = 0;
+      if (inputs !== undefined) for (let index = 0; index < inputs.length; index++) sum += ownCost(inputs[index], scope, seen);
+      return sum;
+    }
     /** whether a reference samples a texture (implicit derivatives), through its inputs and a loop's output */
     // MG10 / EM18: one answer per node, kept by the scope that declares it (it depends on nothing else). A walk with its
     // own seen-set per query re-walked each select's whole cone: ~28 MB [S] of sets and closures on Nine's boot
@@ -485,8 +493,14 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
     const backReaders = (scope: Scope): ReadonlyMap<string, readonly string[]> => {
       const known = backOf.get(scope.nodes); if (known !== undefined) return known;
       const back = new Map<string, string[]>();
-      for (const [id, node] of Object.entries(scope.nodes)) for (const r of node.in ?? []) if (typeof r === 'string') {
-        const list = back.get(r); if (list === undefined) back.set(r, [id]); else list.push(id);
+      const nodes = scope.nodes;
+      for (const id in nodes) {
+        if (!Object.hasOwn(nodes, id)) continue;
+        const inputs = nodes[id]?.in; if (inputs === undefined) continue;
+        for (let index = 0; index < inputs.length; index++) {
+          const r = inputs[index]; if (typeof r !== 'string') continue;
+          const list = back.get(r); if (list === undefined) back.set(r, [id]); else list.push(id);
+        }
       }
       backOf.set(scope.nodes, back); return back;
     };
@@ -495,7 +509,10 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       let known = selectsOf.get(scope.nodes);
       if (known === undefined) {
         const byCond = new Map<string, (readonly [string, GraphNode])[]>();
-        for (const [id, m] of Object.entries(scope.nodes)) {
+        const nodes = scope.nodes;
+        for (const id in nodes) {
+          if (!Object.hasOwn(nodes, id)) continue;
+          const m = nodes[id]; if (m === undefined) continue;
           const c = m.in?.[0]; if (m.op !== 'select' || typeof c !== 'string') continue;
           const list = byCond.get(c); if (list === undefined) byCond.set(c, [[id, m]]); else list.push([id, m]);
         }
@@ -623,6 +640,27 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       return v;
     }
 
+    /** the node `build` is lowering, read by the helpers below */
+    const lowering: { n: GraphNode; id: string; b: Block; ins: readonly V[]; vertex: boolean } = { n: { op: 'const' }, id: '', b: fragmentRoot, ins: [], vertex: false };
+    const one = (): V => { const a = lowering.ins[0]; if (a === undefined) throw new Error(`material graph: ${lowering.n.op} lacks an input`); return a; };
+    const two = (): [V, V] => { const a = lowering.ins[0], c1 = lowering.ins[1]; if (a === undefined || c1 === undefined) throw new Error(`material graph: ${lowering.n.op} lacks inputs`); return [a, c1]; };
+    const three = (): [V, V, V] => { const a = lowering.ins[0], c1 = lowering.ins[1], c2 = lowering.ins[2]; if (a === undefined || c1 === undefined || c2 === undefined) throw new Error(`material graph: ${lowering.n.op} lacks inputs`); return [a, c1, c2]; };
+    const out = (t: GraphValueType, e: string): V => bind(lowering.b, lowering.id, t, e);
+    const same = (f: (...xs: string[]) => string, vals: readonly V[]): V => { const t = widest(vals); return out(t, f(...vals.map(v => widen(v, t)))); };
+    /** a divisor kept off zero unless a non-zero literal: y + step(|y|, ε)·ε */
+    const divisor = (y: V, t: GraphValueType, raw: GraphRef | undefined): string => {
+      const nonZero = typeof raw === 'number' ? raw !== 0 : Array.isArray(raw) && raw.every(x => x !== 0);
+      const w = widen(y, t);
+      return nonZero ? w : `(${w} + step(abs(${w}), ${t === 'float' ? DIV_EPSILON : `${t}(${DIV_EPSILON})`}) * ${DIV_EPSILON})`;
+    };
+    const uvExpr = (): string => 'uv';
+    const fragmentUv = (): V => fromVertex('Uv', 'vec2', uvExpr, 'start');
+    const sample = (sampler: string, at: string): string => (lowering.vertex ? `textureLod(${sampler}, ${at}, 0.0)` : `texture(${sampler}, ${at})`);
+    const textureUniform = (param: string | undefined, type: 'sampler2D' | 'sampler2DArray' | 'sampler3D'): string => {
+      if (param === undefined) throw new Error(`material graph: ${lowering.n.op} names no texture param`);
+      return uniform({ name: paramName(type === 'sampler2D' ? 'wsT' : type === 'sampler2DArray' ? 'wsTA' : 'wsT3', param), type, from: 'texture', param });
+    };
+
     /** a node's value, its statements emitted into `b` */
     function build(n: GraphNode, id: string, scope: Scope, b: Block, ctx: Ctx): V {
       if (n.op === 'select') return select(n, id, scope, b, ctx);
@@ -637,29 +675,15 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
         return { t: v.t, e: name };
       }
       const ins = (n.in ?? []).map(r => ref(r, scope, b, ctx));
-      const [a, c1, c2] = ins;
-      const one = (): V => { if (a === undefined) throw new Error(`material graph: ${n.op} lacks an input`); return a; };
-      const two = (): [V, V] => { if (a === undefined || c1 === undefined) throw new Error(`material graph: ${n.op} lacks inputs`); return [a, c1]; };
-      const three = (): [V, V, V] => { if (a === undefined || c1 === undefined || c2 === undefined) throw new Error(`material graph: ${n.op} lacks inputs`); return [a, c1, c2]; };
-      const out = (t: GraphValueType, e: string): V => bind(b, id, t, e);
+      const a = ins[0];
+      // EM18: the lowering helpers read the node being lowered from `lowering` (no inputs are built past this point, so no
+      // nested build replaces it before this one returns) instead of ten closures per node
+      lowering.n = n; lowering.id = id; lowering.b = b; lowering.ins = ins; lowering.vertex = ctx === 'vertex';
       if (n.op === 'fogSample') {
         if (postFog === undefined || n.name !== ir.postFog?.name) throw new Error('material graph: missing named post fog');
         return out('vec4', `wsGraphFogSample(${ins.map((value, index) => index === 4 ? asFloat(value) : widen(value, 'vec3')).join(', ')})`);
       }
-      const same = (f: (...xs: string[]) => string, vals: readonly V[]): V => { const t = widest(vals); return out(t, f(...vals.map(v => widen(v, t)))); };
-      /** a divisor kept off zero unless a non-zero literal: y + step(|y|, ε)·ε */
-      const divisor = (y: V, t: GraphValueType, raw: GraphRef | undefined): string => {
-        const nonZero = typeof raw === 'number' ? raw !== 0 : Array.isArray(raw) && raw.every(x => x !== 0);
-        const w = widen(y, t);
-        return nonZero ? w : `(${w} + step(abs(${w}), ${t === 'float' ? DIV_EPSILON : `${t}(${DIV_EPSILON})`}) * ${DIV_EPSILON})`;
-      };
       const vertexOnly = ctx === 'vertex';
-      const fragmentUv = (): V => fromVertex('Uv', 'vec2', () => 'uv', 'start');
-      const sample = (sampler: string, at: string): string => (vertexOnly ? `textureLod(${sampler}, ${at}, 0.0)` : `texture(${sampler}, ${at})`);
-      const textureUniform = (param: string | undefined, type: 'sampler2D' | 'sampler2DArray' | 'sampler3D'): string => {
-        if (param === undefined) throw new Error(`material graph: ${n.op} names no texture param`);
-        return uniform({ name: paramName(type === 'sampler2D' ? 'wsT' : type === 'sampler2DArray' ? 'wsTA' : 'wsT3', param), type, from: 'texture', param });
-      };
       switch (n.op) {
         // inputs
         case 'windTime': return { t: 'float', e: host('windTime', 'float') };
