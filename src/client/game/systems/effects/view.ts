@@ -7,6 +7,8 @@ const PATHS: Readonly<Record<string, string>> = {
   'status-poison': 'M7 3h10M9 3v6l-5 9v3h16v-3l-5-9V3M7 15h10',
   'status-bleed': 'M12 2 5 13c-5 10 19 10 14 0z',
   'status-slow': 'M12 3v18M4 7l16 10M4 17 20 7M8 2l4 3 4-3M8 22l4-3 4 3',
+  // CC32: roots binding the feet to the ground.
+  'status-root': 'M4 21h16M12 21V9M12 15l-5 6M12 15l5 6M12 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
 };
 
 /** A row is mounted only while a status exists, leaving the resting HUD unchanged. */

@@ -718,3 +718,28 @@ index f9aa9a3..f8eb4b1 100644
  })
  const CreatureVolumeSchema: GenericSchema<CreatureVolume> = pipe(
    volumeObject,
+diff --git a/src/format/scriptAbiV1.ts b/src/format/scriptAbiV1.ts
+index 6d732c4..1eb1e8d 100644
+--- a/src/format/scriptAbiV1.ts
++++ b/src/format/scriptAbiV1.ts
+@@ -1,3 +1,6 @@
++/** ONE-FORMAT CC32: `lockable` [target own actor, 0|1]; `heal` [own actor, hp]; `pull` [player, metres, own actor];
++ *  `root` [player, seconds]. Additive: a guest that never names them is unchanged. */
++const CREATURE_COMMANDS = { lockable: 23, heal: 24, pull: 25, root: 26 } as const;
+ /** ABI-v1 numeric transport. These ids are shared by admission, generated bindings and the decision host. */
+ export const SCRIPT_V1_EVENTS: Readonly<{ start: 1; tick: 2; timer: 3; 'zone.enter': 4; 'zone.leave': 5; interact: 6; hit: 7; threshold: 8; death: 9; 'move.done': 10; 'strike.done': 11; flag: 12; signal: 13; 'strike.target': 14; 'player.join': 15; 'player.leave': 16; spawned: 17; stop: 18; field: 30; cue: 31; channel: 32; }> = Object.freeze({
+   start: 1, tick: 2, timer: 3, 'zone.enter': 4, 'zone.leave': 5, interact: 6, hit: 7, threshold: 8,
+@@ -14,11 +17,11 @@ export const SCRIPT_V1_READS: Readonly<{ x: 1; y: 2; z: 3; yaw: 4; hpShare: 5; a
+ /** Bounded list queries. Ground/navigation keep the existing physics query semantics. */
+ export const SCRIPT_V1_LISTS: Readonly<{ actorsInZone: 1; playersWithin: 2; groundHeight: 3; nearestWalkable: 4; path: 5; radial: 6; declaredFloor: 7; }> = Object.freeze({ actorsInZone: 1, playersWithin: 2, groundHeight: 3, nearestWalkable: 4, path: 5, radial: 6, declaredFloor: 7 });
+ /** Command ids; view commands occupy a disjoint range and may not run in a simulation binding. */
+-export const SCRIPT_V1_COMMANDS: Readonly<{ move: 1; strike: 2; stop: 3; field: 4; spawn: 5; despawn: 6; flag: 7; timer: 8; signal: 9; grant: 10; reward: 11; cue: 12; channel: 13; impulse: 14; encounter: 15; weather: 16; 'body.spawn': 17; 'body.teleport': 18; 'collider.enabled': 19; 'body.place': 20; 'body.visible': 21; 'body.retire': 22; 'view.channel': 100; 'view.clip': 101; 'view.vfx': 102; 'view.sound': 103; 'view.visible': 104; 'view.field': 105; }> = Object.freeze({
++export const SCRIPT_V1_COMMANDS: Readonly<{ move: 1; strike: 2; stop: 3; field: 4; spawn: 5; despawn: 6; flag: 7; timer: 8; signal: 9; grant: 10; reward: 11; cue: 12; channel: 13; impulse: 14; encounter: 15; weather: 16; 'body.spawn': 17; 'body.teleport': 18; 'collider.enabled': 19; 'body.place': 20; 'body.visible': 21; 'body.retire': 22; 'view.channel': 100; 'view.clip': 101; 'view.vfx': 102; 'view.sound': 103; 'view.visible': 104; 'view.field': 105; } & typeof CREATURE_COMMANDS> = Object.freeze({
+   move: 1, strike: 2, stop: 3, field: 4, spawn: 5, despawn: 6, flag: 7, timer: 8,
+   signal: 9, grant: 10, reward: 11, cue: 12, channel: 13, impulse: 14, encounter: 15, weather: 16,
+   'body.spawn': 17, 'body.teleport': 18, 'collider.enabled': 19,
+-  'body.place': 20, 'body.visible': 21, 'body.retire': 22,
++  'body.place': 20, 'body.visible': 21, 'body.retire': 22, ...CREATURE_COMMANDS,
+   'view.channel': 100, 'view.clip': 101, 'view.vfx': 102, 'view.sound': 103, 'view.visible': 104, 'view.field': 105,
+ });
+ export type ScriptV1EventName = keyof typeof SCRIPT_V1_EVENTS;

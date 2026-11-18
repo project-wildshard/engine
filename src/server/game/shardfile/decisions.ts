@@ -23,6 +23,8 @@ import type { MoverRuntime } from '../plugin/mover';
 import { simStrikes } from '../plugin/brain';
 import type { ShardScriptPorts } from './scripts';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
+import type { Actor } from '@wildshard/engine/combat/pipeline';
+import { installStatusEffects } from './statusEffects';
 
 interface Motion { move: number; target: number; runner: ActorMoveRunner; binding: number }
 interface Strike { strike: number; target: number; binding: number; hit: boolean }
@@ -48,6 +50,14 @@ export interface DecisionRuntime extends Pick<SimHost, 'scope' | 'events' | 'phy
   /** TE-ENG1: the scene lane's public shared fields. `field` on target 0 writes one, so a decision (a boss's windup,
    *  its open core) drives the panels and colliders that read it. Absent without a scene lane: the command refuses. */
   readonly scene?: { readonly write: (field: number, value: number) => void };
+  /** CC32: a decision's pull and root on a player this host moves. Absent where the page owns the player's motion
+   *  (an embedded host): there the commands refuse. */
+  readonly playerVerbs?: {
+    /** Draw `player` up to `metres` toward (x, z), never past it: a knockback aimed at the creature. */
+    readonly pull: (player: string, x: number, z: number, metres: number) => void;
+    /** Hold `player` still for `seconds`, as the `effect.root` status (its HUD icon and line). */
+    readonly root: (player: string, seconds: number, source: Actor) => void;
+  };
 }
 /** The player a host's scripts deal with: the one its body turned to. Its id stays the script's one player handle. */
 export function focusPlayer(host: SimHost): DecisionRuntime['player'] {
@@ -56,7 +66,11 @@ export function focusPlayer(host: SimHost): DecisionRuntime['player'] {
 }
 /** A host's decision runtime: its scripts deal with the player nearest the body that runs them. */
 export function decisionRuntime(host: SimHost, scene?: DecisionRuntime['scene']): DecisionRuntime {
-  return { ...(scene === undefined ? {} : { scene }), scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, groundHeightAt: (x, z) => host.groundHeightAt(x, z), player: focusPlayer(host),
+  const playerVerbs: DecisionRuntime['playerVerbs'] = host.embedded ? undefined : {
+    pull: (id, x, z, metres) => { host.players.get(id)?.pullToward(x, z, metres); },
+    root: (id, seconds, source) => { const player = host.players.get(id); if (player !== undefined) installStatusEffects(host).apply(player.health, 'effect.root', source, seconds); },
+  };
+  return { ...(scene === undefined ? {} : { scene }), ...(playerVerbs === undefined ? {} : { playerVerbs }), scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, groundHeightAt: (x, z) => host.groundHeightAt(x, z), player: focusPlayer(host),
     state: host.state, slots: host.slots, entities: host.entities, strikes: host.strikes,
     registerStrikeCatalogue: (id, specs) => { host.registerStrikeCatalogue(id, specs); }, startDeclaredStrike: (source, target, strike) => host.startDeclaredStrike(source, target, strike),
     onStep: (id, run, adapter, phase) => host.onStep(id, run, adapter, phase) };
@@ -77,6 +91,8 @@ const continuation = v.strictObject({ contract: v.string(), decision: v.custom<D
   playerFlags: v.array(natural), zones: v.array(v.string()), phases: v.array(v.tuple([v.string(), natural])),
   moves: v.array(v.strictObject({ actor: natural, move: natural, target: natural, binding: natural, state: v.unknown() })),
   strikes: v.array(v.strictObject({ actor: natural, strike: natural, target: natural, binding: natural, hit: v.boolean() })),
+  // CC32: `Do.lockable` answers; absent in a save that never set one.
+  locks: v.optional(v.array(v.tuple([natural, v.boolean()])), []),
 });
 function requireValue<T>(value: T | undefined, reason: string): T { if (value === undefined) throw new Error(`Decision world: ${reason}`); return value; }
 function inverse(registry: ReadonlyMap<string, number> | undefined): ReadonlyMap<number, string> { return new Map([...registry ?? []].map(([name, id]) => [id, name])); }
@@ -106,6 +122,8 @@ export class ShardDecisions {
   private readonly fieldActors = new Set<number>();
   private readonly fields = new Map<number, Map<number, number>>();
   private readonly channels = new Map<number, number>();
+  /** CC32: each creature's `Do.lockable` answer, by actor handle. */
+  private readonly locks = new Map<number, boolean>();
   private readonly playerFlags = new Set<number>();
   private readonly zones = new Set<string>();
   // Keys contain only private scalar handles, never a live actor or host.
@@ -376,6 +394,24 @@ export class ShardDecisions {
         apply.push(() => { this.events.push({ kind: 'cue', actor: target, id: a, target: 0 }); });
       } else if (op === 13) {
         this.name('channels', a); apply.push(() => { this.channels.set(a, b); });
+      } else if (op === SCRIPT_V1_COMMANDS.lockable) {
+        const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'lockable actor');
+        apply.push(() => { this.locks.set(target, a === 1); actor.lockOverride = a === 1; });
+      } else if (op === SCRIPT_V1_COMMANDS.heal) {
+        const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'heal actor');
+        apply.push(() => { if (actor.alive) actor.hp = Math.min(actor.maxHp, actor.hp + a); });
+      } else if (op === SCRIPT_V1_COMMANDS.pull || op === SCRIPT_V1_COMMANDS.root) {
+        const verbs = requireValue(this.sim.playerVerbs, 'player motion owner');
+        if (target !== DECISION_PLAYER_HANDLE || !context.observed.has(target)) throw new Error('Decision player verb authority');
+        const player = this.sim.player.id;
+        if (op === SCRIPT_V1_COMMANDS.pull) {
+          const actor = requireValue(this.sim.entities.get(this.owned(b, context)), 'pull actor');
+          apply.push(() => { verbs.pull(player, actor.position.x, actor.position.z, a); });
+        } else {
+          const self = context.binding.self > 0 ? this.actor(context.binding.self) : undefined;
+          const source = self?.combatActor() ?? this.sim.player.health;
+          apply.push(() => { verbs.root(player, a, source); });
+        }
       } else if (op === 15) {
         const binding = requireValue(this.rows.find(row => row.id === context.script.id), 'binding').binding;
         if (!('encounter' in binding)) throw new Error('Decision encounter ownership');
@@ -535,7 +571,7 @@ export class ShardDecisions {
   snapshot(): string { return JSON.stringify({ contract: this.contract, decision: this.host.snapshot(), enabled: [...this.enabled],
     fields: [...this.fields].flatMap(([actor, values]) => [...values.keys()].map(field => [actor, field, this.fieldValue(actor, field)])), channels: [...this.channels], playerFlags: [...this.playerFlags], zones: [...this.zones], phases: [...this.phases],
     moves: [...this.motions].map(([actor, motion]) => ({ actor, move: motion.move, target: motion.target, binding: motion.binding, state: motion.runner.snapshot() })),
-    strikes: this.savedStrikes() }); }
+    strikes: this.savedStrikes(), ...(this.locks.size === 0 ? {} : { locks: [...this.locks] }) }); }
   /** View-only channel programs may change without invalidating a retained body's logical save.
    * Registry identities and every mechanical declaration remain exact. Guests with channel/signal
    * capabilities, and owners with actual mover authority, retain the complete original contract. */
@@ -582,6 +618,7 @@ export class ShardDecisions {
       if (motion.target !== 0) this.position(motion.target);
       const runner = new ActorMoveRunner(row, actor); runner.restore(motion.state); motions.set(motion.actor, { ...motion, runner }); }
     if (new Set(saved.strikes.map(row => row.actor)).size !== saved.strikes.length) throw new Error('Duplicate decision strike');
+    if (new Set(saved.locks.map(([actor]) => actor)).size !== saved.locks.length || saved.locks.some(([actor]) => !this.fieldActors.has(actor))) throw new Error('Invalid decision lock');
     for (const strike of saved.strikes) {
       const binding = requireValue(this.rows[strike.binding - 1], 'strike binding'), ids = decisionBindingMap(binding, this.registries).ids;
       if (!Object.values(ids.actors ?? {}).includes(strike.actor) || !Object.values(ids.strikes ?? {}).includes(strike.strike)) throw new Error('Invalid decision strike ownership');
@@ -597,5 +634,7 @@ export class ShardDecisions {
     this.phases.clear(); for (const [id, phase] of saved.phases) this.phases.set(id, phase);
     this.motions.clear(); for (const [actor, motion] of motions) this.motions.set(actor, motion);
     this.striking.clear(); for (const { actor, ...strike } of saved.strikes) this.striking.set(actor, strike);
+    for (const handle of this.locks.keys()) { const body = this.actor(handle); if (body !== undefined) body.lockOverride = null; }
+    this.locks.clear(); for (const [actor, on] of saved.locks) { this.locks.set(actor, on); const body = this.actor(actor); if (body !== undefined) body.lockOverride = on; }
   }
 }

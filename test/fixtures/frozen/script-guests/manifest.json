@@ -53,7 +53,11 @@
       "capture": "WS_FREEZE_GUESTS=1 WS_SHARDDEV=<checkouts>/sharddev runs scripts/freeze-script-guest.mjs per missing guest",
       "files": [
         "8c634be4f8a33c433138332d5bb02d08173e8e1143773e7c9491ab95257bfc8d.json",
-        "4a7a06331e9cefa41ba76100f155c5b8f215f64afb61a532f25123fb158186f0.json"
+        "4a7a06331e9cefa41ba76100f155c5b8f215f64afb61a532f25123fb158186f0.json",
+        "5fd79ecf4d02419ac0f652fda9c5c0224498fb7ce39815a16a4e37b75bd0f311.json",
+        "3616d21ac6a586c7084dacf76a69875850f8572306b43ea7604efaff93b46b58.json",
+        "973c1cef48705819e9337e2c2aa11a9727cf770d0d50289903085b1e17ac1193.json",
+        "a2c14fffa80b96ce794161c6236de031aedb2da890ae119172eb447ae68c02d7.json"
       ]
     }
   ],

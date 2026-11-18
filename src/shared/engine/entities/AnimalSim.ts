@@ -218,7 +218,10 @@ export class AnimalSim {
     this.lastHitT = saved.lastHitT ?? -Infinity; this.attackTurnCap = saved.attackTurnCap ?? Infinity;
   }
   get flying(): boolean { return this.flight !== null; }
-  get lockable(): boolean { return this.simSpec.lockable ?? this.flying; }
+  /** CC32: a decision's `Do.lockable` answer, over the species row; null keeps the row's. The decision's own
+   *  continuation saves it, so the body snapshot is unchanged. */
+  lockOverride: boolean | null = null;
+  get lockable(): boolean { return this.lockOverride ?? this.simSpec.lockable ?? this.flying; }
   get lockRange(): number | undefined { return this.simSpec.flight?.lockRange; }
   /** TEMPLATE-E2E TC-E2: a dead body stands again, whole (a data spawn's `respawn`); `place` it first. */
   revive(): void {

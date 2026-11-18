@@ -261,6 +261,13 @@ export class PlayerSim implements PlayerMotionState {
     const { fall } = this;
     if (fall.grounded) { this.velocity.y = shoveHop(this.velocity.y); fall.grounded = false; }
   }
+  /** CC32: draw this player up to `metres` toward (x, z), never past it: the knockback law, aimed from the far side. */
+  pullToward(x: number, z: number, metres: number): void {
+    if (![x, z, metres].every(Number.isFinite) || metres < 0) throw new RangeError('Invalid player pull');
+    const dx = this.position.x - x, dz = this.position.z - z, distance = Math.hypot(dx, dz);
+    if (distance < 1e-3) return;
+    this.knockBack(this.position.x + dx / distance, this.position.z + dz / distance, distanceShoveSpeed(Math.min(metres, distance)));
+  }
   /** Dash this player at (vx, vz) m/s for `time` s, whatever the input says: the client Player's `dash` (a shard's
    * knock-down). The dash law's own rules hold (player/dash.ts: a wall ends it, a knockback cancels it, its last step
    * brakes). False (nothing happens) on the board or for no time. */

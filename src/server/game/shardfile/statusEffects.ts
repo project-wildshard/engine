@@ -20,7 +20,7 @@ const TENTHS = 10;
 /** The room's one status owner. */
 export interface StatusEffects {
   /** Put `id` on `target`, from `source`. False: no row declares it, and nothing happens. */
-  readonly apply: (target: Actor, id: EffectId, source: Actor) => boolean;
+  readonly apply: (target: Actor, id: EffectId, source: Actor, duration?: number) => boolean;
   readonly active: (target: Actor) => readonly ActiveEffect[];
 }
 const owners = new WeakMap<SimHost, StatusEffects>();
@@ -58,9 +58,9 @@ export function installStatusEffects(host: SimHost): StatusEffects {
       out.set(statusLine(effect.def.id), Math.max(1, Math.round(effect.remaining * TENTHS)) / TENTHS);
   });
   const owner: StatusEffects = {
-    apply: (target, id, source) => {
+    apply: (target, id, source, duration) => {
       if (!ids.has(id) || !target.alive) return false;
-      held.add(target); service.apply(target, id, source); return true;
+      held.add(target); service.apply(target, id, source, duration === undefined ? {} : { duration }); return true;
     },
     active: target => service.active(target),
   };

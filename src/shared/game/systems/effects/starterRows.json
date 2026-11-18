@@ -94,5 +94,26 @@
     "stacking": "refresh",
     "cue": "cue.status.slow",
     "icon": "status-slow"
+  },
+  {
+    "id": "effect.root",
+    "kind": "timed",
+    "duration": 2,
+    "tags": [
+      "status.root"
+    ],
+    "grants": [
+      "status.root"
+    ],
+    "modifiers": [
+      {
+        "attr": "moveLocked",
+        "op": "override",
+        "value": 1
+      }
+    ],
+    "stacking": "refresh",
+    "cue": "cue.status.root",
+    "icon": "status-root"
   }
 ]
