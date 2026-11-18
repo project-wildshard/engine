@@ -2,6 +2,7 @@
 // J426–J428: the staging deploy checks. Run under browser-lane.sh on the release Mac.
 // node scripts/staging-qa.mjs [--local | --candidate <worker-version-url> | --url <url>]
 //   --release vX.Y.Z [--build <sha>] [--only K3] [--out <dir>]
+// node scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z
 // SQ16 (J427): each leg runs the steps staging-qa-budget.mjs lists for it, about 10 minutes; over 12 is a P2 on the runner.
 import { spawn } from 'node:child_process';
 import { appendFileSync, closeSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
@@ -105,6 +106,21 @@ async function cli() {
   }
   const release = args.get('release');
   if (release === undefined || !/^v\d+\.\d+\.\d+$/u.test(release)) throw new Error('Use --release vX.Y.Z');
+  if (args.has('train')) {
+    if (!args.has('dry-run')) throw new Error('Use --train with --dry-run to print the staging order');
+    const steps = [
+      `Run local QA on the green source (${LEGS.local.join(', ')})`,
+      `Prepare ${release} from that source and start exact release CI`,
+      'Build the staging page from the release commit',
+      'Upload the unaliased Worker and its packs',
+      'Wait for exact release CI and signed staging rooms, then run staging check',
+      `Run QA on the unaliased candidate (${LEGS.candidate.join(', ')})`,
+      'Run staging go-live with the local and candidate verdicts',
+      `Run live QA within ten minutes (${LEGS.staging.join(', ')})`,
+    ];
+    steps.forEach((step, index) => { console.log(`${index + 1}. ${step}`); });
+    return;
+  }
   const local = args.has('local'), candidateUrl = args.get('candidate'), source = args.get('build');
   if ([local, candidateUrl !== undefined, args.has('url')].filter(Boolean).length > 1) {
     throw new Error('Choose one of --local, --candidate or --url');

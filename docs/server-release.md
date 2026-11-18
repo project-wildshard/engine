@@ -58,7 +58,8 @@ one clean release clone per channel at the exact SHA (never a worktree
 with untracked pins, never the canonical checkout):
 
 ```
-node scripts/page-release.mjs staging build|upload|check|go-live
+node scripts/page-release.mjs staging build,upload,check
+node scripts/page-release.mjs staging go-live --local-qa=<local-verdict> --qa=<candidate-verdict>
 node scripts/page-release.mjs production build|upload|check|go-live --qa=<verdict.json>
 node scripts/page-release.mjs preview build,upload,check,go-live
 ```
@@ -144,15 +145,24 @@ live signed file and `/health`, and lists what would refuse today. It
 builds, uploads and aliases nothing.
 
 Release from `release/vX.Y.Z` (meta RELEASE-BRANCHES, J360/J362).
-From clean main, run
-`../repo-kit/release.sh vX.Y.Z --prepare --notes <file>`. The helper
-selects the newest green main containing the previous tag and writes
-version, changelog and stamps on the release branch. Main keeps moving.
+Start with local QA on the exact green main commit chosen for the cut.
+Keep its verdict with the release. From main, run
+`../repo-kit/release.sh vX.Y.Z --prepare --from <source-sha> --notes <file>`.
+The helper writes the version, changelog and stamps on the release branch.
 
-Use clean channel clones at that exact release head. Run `staging
-build`, `staging upload` (packs before signing, J234), wait for exact
-branch CI and the signed staging serial, then `staging check`,
-`staging go-live`. Within 10 minutes of staging go-live, start:
+Use a clean staging clone at the release head. Run `staging build` and
+`staging upload` so the packs are available before signing (J234).
+When exact branch CI and the signed staging rooms are ready, run
+`staging check` and give its Worker version URL to
+`staging-qa.mjs --candidate <worker-url> --release vX.Y.Z --build <release-sha>`.
+Run `staging go-live --local-qa=<local-verdict> --qa=<candidate-verdict>`
+after both legs pass. The local verdict must name the release commit's
+parent. The candidate verdict must match the release, Worker version and
+signed rooms serial. A serial change requires another candidate run.
+Print the train order with
+`node scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z`.
+
+Within ten minutes of staging go-live, start the live leg.
 
 ```bash
 WS_LANE_NAME=codex-ms BROWSER=none bash scripts/browser-lane.sh --max 18 \
