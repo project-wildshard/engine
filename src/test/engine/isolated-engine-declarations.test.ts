@@ -36,7 +36,10 @@ test('trace aliases retain complete existing callable signatures',()=>{
 test('page aliases capture each original function once in order',()=>{
  const names=["bootTraceActive","previousBootLevel","flushBootReports","inspectPreviousBoot","previousBootLine","bootDiagnostic","bootDiagnosticJson","recordBootProgress","recordBootCheckpoint","startBoot","markBootPlanned","markBootHandledError","markBootContextLost","beginExploreEntry","endExploreEntry","exploreEntryPending","recordExploreFrame","recordGpuRecovery"];
  const path='src/client/engine/boot/bootTrace.ts',source=ts.createSourceFile(path,readFileSync(path,'utf8'),ts.ScriptTarget.Latest,true);
- const rows=source.statements.filter(ts.isVariableStatement).filter(node=>node.modifiers?.some(modifier=>modifier.kind===ts.SyntaxKind.ExportKeyword));
+ const readsPage=(node:ts.Node):boolean=>
+  (ts.isIdentifier(node)&&node.text==='page')||(ts.forEachChild(node,readsPage)??false);
+ const rows=source.statements.filter(ts.isVariableStatement).filter(node=>
+  node.modifiers?.some(modifier=>modifier.kind===ts.SyntaxKind.ExportKeyword)&&readsPage(node.declarationList));
  expect(rows.flatMap(node=>node.declarationList.declarations.map(row=>row.name.getText(source)))).toEqual(names);
  const printer=ts.createPrinter(),scripts:string[]=[];
  for(const row of rows){
