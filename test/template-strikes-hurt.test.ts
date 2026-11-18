@@ -54,20 +54,21 @@ test('with every body down, the same 20 s beside the pack hurts no one: the harm
   } finally { sim.dispose(); }
 }, 60_000);
 
-// TEMPLATE-E2E TC-B3: Brasscap's bandits fight back: the camp pursuer and the rusher pack (`creatures.groups`); the dust
-// wyrmling's ram hurts too. Every other body (but a rusher's pack mates) is down first, so the harm is that one body's strike.
+// TEMPLATE-E2E TC-B3: Brasscap's bandits fight back: the camp pursuer and the rushers; the dust wyrmling's ram hurts too.
+// Every other body (but a rusher's mates) is down first, so the harm is that one body's strike. TC-B9 (rev 7): the rushers
+// are leashed pursuers with a knife, no longer a `creatures.groups` pack, which left the arena's player no leash.
 // TC-B4c: the bandit brawler (`challenge-grazer`: a lane tackle and an arc club) is Brasscap's third brain kind.
 const brasscap = product('brasscap-mesa');
 for (const [id, gap] of [['bandit.camp-1.2', 2], ['bandit.rusher.1', 6], ['wyrmling.2', 2], ['brawler.1', 6]] as const) {
   test(`Brasscap's ${id} strikes the player ${String(gap)} m off`, async () => {
     const input = await brasscap;
-    expect(input.shard.creatures.groups.length).toBeGreaterThan(0);
+    expect(input.shard.creatures.spawns.find(row => row.id === id)?.brain).not.toBeNull();
     const sim = createShardfileSim(input.shard, input.assets, { rapier: await rapier, quest: { fact: () => undefined, coins: () => undefined } });
     try {
       const body = sim.host.entities.get(id), player = sim.host.players.get(PLAYER);
       if (body === undefined || player === undefined) throw new Error(`Missing ${id} or the player`);
       for (const other of sim.host.entities.values()) {
-        // a rusher hunts with its pack: its mates stay up
+        // a rusher's mates stay up, as they stand at the gate
         if (other === body || !other.alive || (id.startsWith('bandit.rusher.') && other.entityId.startsWith('bandit.rusher.'))) continue;
         sim.host.combat.hit({ source: 'env', sourceTags: [PLAYER, 'dmg.ranged'], target: other.combatActor(), amount: 100_000, point: other.position.clone(), dir: other.position.clone().setY(0).normalize() });
       }
