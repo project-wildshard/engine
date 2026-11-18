@@ -17,3 +17,10 @@ applies them (`dedicated/devControl.ts`). It is compiled only with `build-server
 uses; the box's bundle has none of it (a bundle test greps both), and `--dev --tar` is refused. A DEVSERVER page's online
 shell posts its verbs there. Not carried: the AP19 soft restart (a Node dev server restarts as a process instead, STR6) and
 a harness bot's second client (`join`), which stays on the preview's in-page server.
+
+## STR9: left to the armed-zone policy
+
+STR9's draft booted every native reading online. Main's J426 armed-zone enforcement (`8aca05fa`) already boots armed,
+placed zones online (`armed.mjs` `footprintBootFor`) and installs the pins the local server reads, so this branch keeps
+main's `scripts/memory/ci.mjs` and `ci.yml` as they are. STR9 stays open on that policy: the baselines re-pinned with
+`boot: online` and the preview's standalone reading printed beside them.
