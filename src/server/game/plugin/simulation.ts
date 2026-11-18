@@ -109,6 +109,7 @@ import { installEncounterAdds } from '../shardfile/encounterAdds';
 import { dataScriptBrains } from '../shardfile/dataScriptBrains';
 import { countedShard, countSlots } from '../shardfile/declaredSpawnCount';
 import type { PortalRideRows } from '../../../shared/game/shardfile/portalRide';
+import { installDeclaredAttackable } from '../shardfile/declaredAttackable';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
 
 type Physics = SimHost['physics'];
@@ -769,6 +770,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     };
     const riding = installDeclaredRiding(host, shard);
     installDeclaredHostPortalRide(host, shard, portalRide, ports.quest?.fact ?? (() => undefined)); // OF41b: the `portal` primitive
+    installDeclaredAttackable(host, shard); // OF38b: each creature's own `attackable` row, never a weapon's target list
     recordPrimitives(host, shard); // OF17b1: the list comes from the sections, never a host list
     return { riding, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
   } catch (error) { host.dispose(); throw error; }
