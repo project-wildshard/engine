@@ -23,7 +23,7 @@ import { launchMemoryBrowser } from './chromium-memory-browser.mjs';
 //                        call site. Note: V8 boxes doubles in unoptimised code, JavaScriptCore does not — a hot numeric loop
 //                        (creatureCoats.coatAtlas) tops this list without allocating anything on an iPhone
 //     --jsflags=<flags>  (chromium) V8 flags, e.g. --always-turbofan
-import { spawn, execSync } from 'node:child_process';
+import { startSampler, webkitProcesses } from './memory/footprint.mjs';
 import { mkdirSync, writeFileSync, createWriteStream } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 
@@ -47,28 +47,6 @@ mkdirSync(OUT, { recursive: true });
 /** bytes → MB with `d` decimals */
 const mb = (b, d = 0) => Math.round(b / 10 ** (6 - d)) / 10 ** d;
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
-const wkPids = (kind) => execSync('ps -axo pid=,comm=').toString().split('\n')
-  .filter((l) => l.includes('ms-playwright') && l.includes(`com.apple.WebKit.${kind}.Development`))
-  .map((l) => Number(l.trim().split(/\s+/)[0]));
-
-// the native sampler: python + libproc (the call scripts/ios-memory-watchdog.py makes), one JSON line per sample
-const PY = String.raw`
-import ctypes, json, sys, time
-class R(ctypes.Structure):
-    _fields_ = [('uuid', ctypes.c_ubyte * 16)] + [(n, ctypes.c_uint64) for n in ('user_time','system_time','pkg_idle_wkups','interrupt_wkups','pageins','wired_size','resident_size','phys_footprint','proc_start_abstime','proc_exit_abstime','child_user_time','child_system_time','child_pkg_idle_wkups','child_interrupt_wkups','child_pageins','child_elapsed_abstime','diskio_bytesread','diskio_byteswritten','cpu_time_qos_default','cpu_time_qos_maintenance','cpu_time_qos_background','cpu_time_qos_utility','cpu_time_qos_legacy','cpu_time_qos_user_initiated','cpu_time_qos_user_interactive','billed_system_time','serviced_system_time','logical_writes','lifetime_max_phys_footprint','instructions','cycles','billed_energy','serviced_energy','interval_max_phys_footprint','runnable_time')]
-lib = ctypes.CDLL('/usr/lib/libproc.dylib'); sysl = ctypes.CDLL('/usr/lib/libSystem.B.dylib')
-pids = [int(p) for p in sys.argv[2:]]; every = float(sys.argv[1])
-for p in pids: sysl.proc_rlimit_control(p, 4, ctypes.c_void_p(1))
-while True:
-    out = {'t': time.time() * 1000}
-    for p in pids:
-        u = R()
-        if lib.proc_pid_rusage(p, 4, ctypes.byref(u)) != 0: sys.exit(0)
-        out[str(p)] = [u.phys_footprint, u.interval_max_phys_footprint]
-        sysl.proc_rlimit_control(p, 4, ctypes.c_void_p(1))
-    print(json.dumps(out), flush=True)
-    time.sleep(every)
-`;
 
 // in the page before its scripts (strings: they run in the browser, not here)
 const STEP_SCRIPT = String.raw`(() => {
@@ -107,7 +85,6 @@ const ALLOC_SCRIPT = String.raw`(() => {
 const texScript = (tex) => harnessPinCode({ textures: tex });
 
 const WK = ENGINE === 'webkit';
-const wkBefore = WK ? new Set([...wkPids('WebContent'), ...wkPids('GPU')]) : new Set();
 const memoryBrowser = WK ? undefined : await launchMemoryBrowser(['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info', ...(JSFLAGS === '' ? [] : [`--js-flags=${JSFLAGS}`])]);
 const browser = memoryBrowser === undefined ? await webkit.launch() : memoryBrowser.browser;
 const heap = [];
@@ -126,8 +103,9 @@ try {
   await page.goto(`${URL_BASE}/version.json`);
   let renderers = [], gpus = [];
   if (WK) {
-    renderers = wkPids('WebContent').filter((p) => !wkBefore.has(p));
-    gpus = wkPids('GPU').filter((p) => !wkBefore.has(p));
+    const procs = webkitProcesses();
+    renderers = procs.filter((p) => p.role === 'webcontent').map((p) => p.pid);
+    gpus = procs.filter((p) => p.role === 'gpu').map((p) => p.pid);
   } else {
     const info = await (await browser.newBrowserCDPSession()).send('SystemInfo.getProcessInfo');
     renderers = info.processInfo.filter((p) => p.type === 'renderer').map((p) => p.id);
@@ -135,16 +113,9 @@ try {
   }
   console.error(`> renderers ${renderers.join(',')} gpu ${gpus.join(',')}`);
   const nlog = createWriteStream(resolvePath(OUT, `${TAG}-${CHUNK}.native.jsonl`));
-  const sampler = spawn('python3', ['-c', PY, String(EVERY / 1000), ...renderers.map(String), ...gpus.map(String)], { stdio: ['ignore', 'pipe', 'inherit'] });
-  state.stopSampler = () => { sampler.kill(); };
-  let buf = '';
-  sampler.stdout.on('data', (d) => {
-    buf += String(d);
-    for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
-      const l = buf.slice(0, i); buf = buf.slice(i + 1); nlog.write(`${l}\n`);
-      try { native.push(JSON.parse(l)); } catch { /* a partial line */ }
-    }
-  });
+  // the kernel footprint and its interval high-water, reset after every read (scripts/memory/footprint.mjs, EM2)
+  const sampler = startSampler([...renderers, ...gpus], { everyMs: EVERY });
+  state.stopSampler = () => { void sampler.stop(); };
 
   const poll = (async () => {
     if (cdp === null) return;
@@ -183,7 +154,12 @@ try {
   const steps = await page.evaluate(() => window.__b8_steps);
   const alloc = ALLOC ? await page.evaluate(() => window.__b8_alloc) : null;
   const rinfo = await page.evaluate(() => { const r = window.__wildshard?.world?.game?.renderer; return r ? { textures: r.info.memory.textures, geometries: r.info.memory.geometries, programs: r.info.programs?.length ?? null } : null; });
-  sampler.kill(); nlog.end();
+  for (const row of (await sampler.stop()).samples) {
+    const flat = { t: row.t, ...Object.fromEntries(Object.entries(row.p).filter(([, v]) => v !== null)) };
+    native.push(flat); nlog.write(`${JSON.stringify(flat)}\n`);
+  }
+  state.stopSampler = () => undefined;
+  nlog.end();
 
   // ── attribute: each sample → the step running at its time ──
   const stepAt = (t) => { let s = 'boot (before the loading screen)'; for (const [st, name] of steps) { if (st <= t) s = name.replace(/ · \d+ \/ \d+.*$/, ''); else break; } return t >= playAt ? 'playable' : s; };

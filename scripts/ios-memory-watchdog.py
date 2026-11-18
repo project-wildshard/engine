@@ -3,6 +3,7 @@
 import argparse
 import ctypes
 import datetime
+import importlib.util
 import json
 import math
 import pathlib
@@ -20,53 +21,27 @@ WORLD_BUDGET = int(MEMORY_GATES['explorerMB'] * 1_000_000)
 REPORT_ONLY = MEMORY_GATES['mode'] == 'report-only'
 
 
-class RUsageInfo(ctypes.Structure):
-    # macOS SDK sys/resource.h, rusage_info_v4. Do not substitute JS heap size.
-    _fields_ = [('uuid', ctypes.c_ubyte * 16)] + [
-        (name, ctypes.c_uint64) for name in (
-            'user_time', 'system_time', 'pkg_idle_wkups', 'interrupt_wkups',
-            'pageins', 'wired_size', 'resident_size', 'phys_footprint',
-            'proc_start_abstime', 'proc_exit_abstime', 'child_user_time',
-            'child_system_time', 'child_pkg_idle_wkups', 'child_interrupt_wkups',
-            'child_pageins', 'child_elapsed_abstime', 'diskio_bytesread',
-            'diskio_byteswritten', 'cpu_time_qos_default', 'cpu_time_qos_maintenance',
-            'cpu_time_qos_background', 'cpu_time_qos_utility', 'cpu_time_qos_legacy',
-            'cpu_time_qos_user_initiated', 'cpu_time_qos_user_interactive',
-            'billed_system_time', 'serviced_system_time', 'logical_writes',
-            'lifetime_max_phys_footprint', 'instructions', 'cycles', 'billed_energy',
-            'serviced_energy', 'interval_max_phys_footprint', 'runnable_time')]
+# The kernel reading lives in scripts/memory/footprint.py (ENGINE-MEMORY EM2): proc_pid_rusage RUSAGE_INFO_V4 physical
+# footprint with the interval high-water. These names stay for the callers (sim-mem-phases.py, shard-phone-memory.mjs).
+_FOOTPRINT_SPEC = importlib.util.spec_from_file_location('footprint', pathlib.Path(__file__).resolve().parent / 'memory' / 'footprint.py')
+footprint = importlib.util.module_from_spec(_FOOTPRINT_SPEC)
+_FOOTPRINT_SPEC.loader.exec_module(footprint)
+RUsageInfo = footprint.RUsageInfo
 
 
 class NativeMemory:
     def __init__(self):
         if sys.platform != 'darwin':
             raise RuntimeError('Native memory sampling requires macOS, not an iOS JS heap API')
-        self.lib = ctypes.CDLL('/usr/lib/libproc.dylib', use_errno=True)
-        self.lib.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
-        self.lib.proc_pid_rusage.restype = ctypes.c_int
-        self.system = ctypes.CDLL('/usr/lib/libSystem.B.dylib', use_errno=True)
-        self.system.proc_rlimit_control.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
-        self.system.proc_rlimit_control.restype = ctypes.c_int
+        self.kernel = footprint.Kernel()
 
     def reset_interval(self, pid):
-        # Apple XNU bsd/sys/resource.h + kern_resource.c: flavor 4 resets only
-        # the accounting interval (flag 1). It does not set/relax a memory limit.
-        if self.system.proc_rlimit_control(pid, 4, ctypes.c_void_p(1)) != 0:
+        # Flavor 4 resets only the accounting interval; it does not set or relax a memory limit.
+        if not self.kernel.reset_interval(pid):
             raise RuntimeError(f'Cannot reset native footprint interval for PID {pid}: errno {ctypes.get_errno()}')
 
     def sample(self, pid):
-        usage = RUsageInfo()
-        if self.lib.proc_pid_rusage(pid, 4, ctypes.byref(usage)) != 0:
-            raise RuntimeError(f'Cannot read PID {pid}: errno {ctypes.get_errno()} (exit or access failure)')
-        if not usage.proc_start_abstime or usage.proc_exit_abstime:
-            raise RuntimeError(f'PID {pid} has exited or has no valid start identity')
-        return {
-            'pid': pid, 'startAbstime': usage.proc_start_abstime,
-            'physicalFootprintBytes': usage.phys_footprint,
-            'residentBytes': usage.resident_size,
-            'lifetimeMaxPhysicalFootprintBytes': usage.lifetime_max_phys_footprint,
-            'intervalMaxPhysicalFootprintBytes': usage.interval_max_phys_footprint,
-        }
+        return self.kernel.sample(pid)
 
 
 def command(args):
@@ -74,60 +49,23 @@ def command(args):
     return result.stdout.strip()
 
 
-class ProcBsdInfo(ctypes.Structure):
-    # macOS SDK sys/proc_info.h, struct proc_bsdinfo (PROC_PIDTBSDINFO). It reads only the kernel's proc
-    # record, never the target's memory.
-    _fields_ = [(name, ctypes.c_uint32) for name in (
-        'pbi_flags', 'pbi_status', 'pbi_xstatus', 'pbi_pid', 'pbi_ppid', 'pbi_uid', 'pbi_gid', 'pbi_ruid',
-        'pbi_rgid', 'pbi_svuid', 'pbi_svgid', 'rfu_1')] + [
-        ('pbi_comm', ctypes.c_char * 16), ('pbi_name', ctypes.c_char * 32)] + [
-        (name, ctypes.c_uint32) for name in ('pbi_nfiles', 'pbi_pgid', 'pbi_pjobc', 'e_tdev', 'e_tpgid')] + [
-        ('pbi_nice', ctypes.c_int32), ('pbi_start_tvsec', ctypes.c_uint64), ('pbi_start_tvusec', ctypes.c_uint64)]
+_KERNEL = None
 
 
-_LIBPROC = None
-
-
-def _libproc():
-    global _LIBPROC
-    if _LIBPROC is None:
-        lib = ctypes.CDLL('/usr/lib/libproc.dylib', use_errno=True)
-        lib.proc_listallpids.argtypes = [ctypes.c_void_p, ctypes.c_int]
-        lib.proc_listallpids.restype = ctypes.c_int
-        lib.proc_pidinfo.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
-        lib.proc_pidinfo.restype = ctypes.c_int
-        lib.proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
-        lib.proc_pidpath.restype = ctypes.c_int
-        _LIBPROC = lib
-    return _LIBPROC
+def _kernel():
+    global _KERNEL
+    if _KERNEL is None:
+        _KERNEL = footprint.Kernel()
+    return _KERNEL
 
 
 def process_table():
-    """Every readable process as {pid: (ppid, name)}, from libproc in-process.
-
-    SF57 (2026-10-09): this replaced a `ps -axo pid=,ppid=,comm=` fork per call. `ps` reads each process's
-    arguments out of its memory (KERN_PROCARGS2), so one busy or swapping process could hold a 1 Hz sampler
-    for seconds; a 9 s native-sampler gap during boot loading failed a qualifying soak's sampling that way.
-    """
-    lib = _libproc()
-    count = lib.proc_listallpids(None, 0)
-    if count <= 0:
-        raise RuntimeError(f'proc_listallpids failed: errno {ctypes.get_errno()}')
-    pids = (ctypes.c_int * (count + 256))()
-    count = lib.proc_listallpids(pids, ctypes.sizeof(pids))
-    if count <= 0:
-        raise RuntimeError(f'proc_listallpids failed: errno {ctypes.get_errno()}')
-    info, size, rows = ProcBsdInfo(), ctypes.sizeof(ProcBsdInfo), {}
-    for pid in pids[:count]:
-        if pid > 0 and lib.proc_pidinfo(pid, 3, 0, ctypes.byref(info), size) == size:
-            rows[pid] = (info.pbi_ppid, (info.pbi_name or info.pbi_comm).decode('utf-8', 'replace'))
-    return rows
+    """Every readable process as {pid: (ppid, name)}, from libproc in-process (SF57: never a `ps` fork per call)."""
+    return {pid: (row['ppid'], row['name']) for pid, row in _kernel().processes(with_paths=False).items()}
 
 
 def process_path(pid, fallback):
-    buffer = ctypes.create_string_buffer(4096)
-    length = _libproc().proc_pidpath(pid, buffer, ctypes.sizeof(buffer))
-    return buffer.raw[:length].decode('utf-8', 'replace') if length > 0 else fallback
+    return _kernel().path(pid, fallback)
 
 
 def simulator_processes(manager_pid, executable_name='com.apple.WebKit.WebContent'):
