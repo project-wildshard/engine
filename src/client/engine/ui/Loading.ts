@@ -30,6 +30,7 @@ import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
 import { leftByPlayer } from '../boot/dropNotice';
 import { showFailure, clearFailure } from '../telemetry/runtime';
 import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
+import { holdLoadingPassSplit } from '../render/passSplit';
 import './loading.css';
 
 const savedStorage = saveStorage('session');
@@ -212,6 +213,8 @@ export class Loading {
     bootMark('app:loading-adopt', {scoped: mode.scoped === true || mode.inset === true, chunk: chunk.id});
     if (mode.inset !== true) { app.ui.bindPresentation(this.scope); app.ui.holdCovered(this.scope); }
     this.scoped = mode.scoped === true || mode.inset === true;
+    // MG9 (passSplit.ts): the card's frames draw in split Metal passes; an inset card sits over live play and leaves it
+    if (mode.inset !== true) this.scope.onDispose(holdLoadingPassSplit());
     if (!this.scoped && document.documentElement.classList.contains('boot-menu')) {
       this.scope.onDispose(() => { document.documentElement.classList.remove('boot-menu'); });
     }

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { installPassSplit, type PassSplitContext } from './passSplit';
+import { holdLoadingPassSplit, installPassSplit, type PassSplitContext } from './passSplit';
 
 const SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const CHROME = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -51,5 +51,27 @@ test('Blink keeps its draws unwrapped', () => {
   const { gl } = fakeContext();
   const before = gl.drawElements;
   expect(installPassSplit(gl, CHROME)).toBe(false);
+  expect(gl.drawElements).toBe(before);
+});
+
+test('with the play split off, passes split only while a loading hold is out', () => {
+  const { gl, calls } = fakeContext();
+  expect(installPassSplit(gl, SAFARI, 0, 100)).toBe(true);
+  gl.drawElements(4, 80, 5123, 0);
+  gl.drawElements(4, 80, 5123, 0); // no hold: play draws are never flushed
+  const release = holdLoadingPassSplit();
+  gl.drawElements(4, 80, 5123, 0);
+  gl.drawElements(4, 80, 5123, 0); // under the card: 160 > 100
+  release(); release(); // a second release changes nothing
+  gl.drawElements(4, 80, 5123, 0);
+  gl.drawElements(4, 80, 5123, 0);
+  expect(calls.filter((c) => c === 'flush')).toHaveLength(1);
+  expect(calls.indexOf('flush')).toBe(3);
+});
+
+test('Blink takes no loading split either', () => {
+  const { gl } = fakeContext();
+  const before = gl.drawElements;
+  expect(installPassSplit(gl, CHROME, 0, 100)).toBe(false);
   expect(gl.drawElements).toBe(before);
 });

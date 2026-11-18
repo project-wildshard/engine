@@ -13,9 +13,14 @@
  * count restarts there. WebKit only (every iPhone browser): Blink's flush is a shallow IPC flush whose effect on its
  * GPU process was not measured.
  *
- * **Off by default** (coordinator, 2026-11-18): in the iOS Simulator the explorer's end point read 30 fps with the split
- * against 60 without, in 3 of 3 pairs, so it waits for a phone frame-time read. The device Debug slot
+ * **Off by default in play** (coordinator, 2026-11-18): in the iOS Simulator the explorer's end point read 30 fps with the
+ * split against 60 without, in 3 of 3 pairs, so it waits for a phone frame-time read. The device Debug slot
  * `debug.passSplit` (a vertex count; `--device-save=debug.passSplit=400000` in the Simulator harness) turns it on.
+ *
+ * **On while a loading card covers the world** (MG9/MG11, mini-shadermem 2026-11-18): the boot's shaders, warm-turn and
+ * hidden frames draw heavier passes than any play frame, so without the split the buffer is sized at control for the boot,
+ * not for play. Driftwood held 146-155 MB of it at the settled reading and 79 MB once the driver let the extra go, 10.5 s
+ * later; with the split under the card it holds ~97 MB there (Pine 76 -> 66). Play frames keep their own passes.
  */
 import { webKitEngine } from './drawHooks';
 import { jsonSlot } from '../saves/slots';
@@ -57,9 +62,19 @@ export interface PassSplitContext {
   drawRangeElements: (...args: readonly number[]) => void;
 }
 
-/** Wrap `gl`'s draws so a pass flushes before the draw that would carry it past `limit`. False: not installed. */
-export function installPassSplit(gl: PassSplitContext, userAgent: string = globalThis.navigator?.userAgent ?? '', limit: number = PASS_SPLIT_VERTICES): boolean {
-  if (limit <= 0 || !webKitEngine(userAgent)) return false;
+let loadingHolds = 0;
+/** A loading card is up (`Loading`, not an inset card over live play): `loadingLimit` splits passes until every hold is
+ *  released. Returns the release (once). */
+export function holdLoadingPassSplit(): () => void {
+  loadingHolds++;
+  let held = true;
+  return () => { if (held) { held = false; loadingHolds--; } };
+}
+
+/** Wrap `gl`'s draws so a pass flushes before the draw that would carry it past `limit`, or past `loadingLimit` while a
+ *  loading hold is out (`holdLoadingPassSplit`) and `limit` is off. False: not installed. */
+export function installPassSplit(gl: PassSplitContext, userAgent: string = globalThis.navigator?.userAgent ?? '', limit: number = PASS_SPLIT_VERTICES, loadingLimit = 0): boolean {
+  if ((limit <= 0 && loadingLimit <= 0) || !webKitEngine(userAgent)) return false;
   let carried = 0, bound: WebGLFramebuffer | null | undefined;
   const flush = gl.flush.bind(gl);
   const bind = gl.bindFramebuffer.bind(gl);
@@ -70,9 +85,12 @@ export function installPassSplit(gl: PassSplitContext, userAgent: string = globa
   for (const name of DRAWS) {
     const draw: (...args: readonly number[]) => void = gl[name].bind(gl), count = INVOCATIONS[name];
     gl[name] = (...args: readonly number[]) => {
-      const n = count(args);
-      if (carried > 0 && carried + n > limit) { flush(); carried = 0; }
-      carried += n;
+      const max = limit > 0 ? limit : loadingHolds > 0 ? loadingLimit : 0;
+      if (max > 0) {
+        const n = count(args);
+        if (carried > 0 && carried + n > max) { flush(); carried = 0; }
+        carried += n;
+      } else carried = 0;
       draw(...args);
     };
   }
