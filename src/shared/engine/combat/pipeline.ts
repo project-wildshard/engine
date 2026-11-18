@@ -138,8 +138,17 @@ export class CombatPipeline {
       return { ...req, amount };
     }, scope, { order: def.order });
   }
+  private readonly partWatchers = new Map<Actor, (part: string, amount: number) => void>();
+  /** ONE-FORMAT CC31: hear every hit that lands on one of `actor`'s named parts, synchronously and before its multiplier
+   * (an armour plate at x0 still wears). One watcher an actor; no event is queued, so no saved queue changes. */
+  watchParts(actor: Actor, watch: (part: string, amount: number) => void, scope: Scope): void {
+    if (this.partWatchers.has(actor)) throw new Error('Parts already watched');
+    this.partWatchers.set(actor, watch);
+    scope.onDispose(() => { if (this.partWatchers.get(actor) === watch) this.partWatchers.delete(actor); });
+  }
   hit(input: DamageRequest): DamageDealt | null {
     if (!input.target.alive) return null;
+    if (input.part !== undefined) this.partWatchers.get(input.target)?.(input.part, input.amount);
     if (input.partMultiplier === 0) return null;
     // Raycast/weapon scratch vectors are reused; queued listeners must see this hit's contact frame.
     const req: DamageRequest = { ...input, ...(input.partMultiplier === undefined ? {} : { amount: input.amount * input.partMultiplier }), point: input.point.clone(), dir: input.dir.clone(),

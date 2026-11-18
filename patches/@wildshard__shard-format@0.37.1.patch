@@ -681,3 +681,40 @@ index 4f52e86..d68027e 100644
 +  SkeletonVolume,
 +  SkeletonContract,
 +}
+diff --git a/src/format/creature-volumes.ts b/src/format/creature-volumes.ts
+index f9aa9a3..f8eb4b1 100644
+--- a/src/format/creature-volumes.ts
++++ b/src/format/creature-volumes.ts
+@@ -22,6 +22,8 @@ import type { GenericSchema } from 'valibot'
+ /** Bone-local rest offset. The runtime clamps the scaled radius, not the source. */
+ interface CreatureVolume extends SkeletonVolume {
+   at?: [number, number, number]
++  /** Part hp (ONE-FORMAT CC31): the part breaks at 0, once; later hits pass to the next volume. */
++  hp?: number
+ }
+ const ZERO = 0
+ const ONE = 1
+@@ -29,6 +31,7 @@ const MAX_VOLUMES = 16
+ const MAX_NAME = 128
+ const MAX_EXTENT = 500
+ const MAX_MULTIPLIER = 100
++const MAX_PART_HP = 1_000_000
+ const CreatureSocketNameSchema: GenericSchema<string> = pipe(
+   string(),
+   regex(/^[a-zA-Z][a-zA-Z0-9_.:-]*$/u),
+@@ -37,6 +40,7 @@ const CreatureSocketNameSchema: GenericSchema<string> = pipe(
+ const scalar = pipe(number(), finite())
+ const extent = pipe(scalar, minValue(ZERO), maxValue(MAX_EXTENT))
+ const offset = pipe(scalar, minValue(-MAX_EXTENT), maxValue(MAX_EXTENT))
++const partHp = pipe(scalar, minValue(Number.MIN_VALUE), maxValue(MAX_PART_HP))
+ const volumeObject = strictObject({
+   part: CreatureSocketNameSchema,
+   bone: CreatureSocketNameSchema,
+@@ -46,6 +50,7 @@ const volumeObject = strictObject({
+   axis: picklist(['y', 'z']),
+   multiplier: pipe(scalar, minValue(ZERO), maxValue(MAX_MULTIPLIER)),
+   at: exactOptional(tuple([offset, offset, offset])),
++  hp: exactOptional(partHp),
+ })
+ const CreatureVolumeSchema: GenericSchema<CreatureVolume> = pipe(
+   volumeObject,

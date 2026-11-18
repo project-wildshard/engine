@@ -20,3 +20,8 @@
   head against the view root, each bone against the one ahead, facing along the path), so a serpent skin draws on the
   same trail its volumes sit on (embedded hosts and neighbour cells read the bound pose). 20 serpents of 14 bones pose
   in 0.032 ms a frame (Node, loaded MacBook). A remote MMO page still needs its own ring fed from the wire's root.
+- CC31: part hp (format `a91a1b3`, backported). `PartHealth` wraps a creature's volume pose: every hit on a part with
+  hp wears it by the hit's amount before its multiplier (`CombatPipeline.watchParts`, synchronous, so no new queued
+  event changes saved queues), and at 0 the part breaks once: `creature.part-broken` fires and the volume is `off`, so
+  later hits pass to the volume behind. Remaining hp is a `creatures.parts` host adapter. Hiding a part's attachment
+  waits on CC30 (attachments).

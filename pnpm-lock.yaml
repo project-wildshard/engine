@@ -12,7 +12,7 @@ packageExtensionsChecksum: sha256-4P1RJ7hiMsYRXNZzR/7SRp0cgnOnjqO4CXUbDAZm8KE=
 
 patchedDependencies:
   '@wildshard/shard-format@0.37.1':
-    hash: 49d719ec4bf4e5b086f9280df5c08469ad581c31b5ff6fa9129df0b4966603c2
+    hash: 49a844e6e3bb46e6018b0eae9eb78aef7632486034c021cef881643a1a730013
     path: patches/@wildshard__shard-format@0.37.1.patch
 
 importers:
@@ -39,7 +39,7 @@ importers:
         version: 1.8.0(valibot@1.5.0(typescript@6.0.3))
       '@wildshard/format':
         specifier: npm:@wildshard/shard-format@0.37.1
-        version: '@wildshard/shard-format@0.37.1(patch_hash=49d719ec4bf4e5b086f9280df5c08469ad581c31b5ff6fa9129df0b4966603c2)(typescript@6.0.3)'
+        version: '@wildshard/shard-format@0.37.1(patch_hash=49a844e6e3bb46e6018b0eae9eb78aef7632486034c021cef881643a1a730013)(typescript@6.0.3)'
       '@wildshard/wire':
         specifier: ^0.1.0
         version: 0.1.0(typescript@6.0.3)
@@ -2054,7 +2054,7 @@ snapshots:
 
   '@vitest/spy@5.0.1': {}
 
-  '@wildshard/shard-format@0.37.1(patch_hash=49d719ec4bf4e5b086f9280df5c08469ad581c31b5ff6fa9129df0b4966603c2)(typescript@6.0.3)':
+  '@wildshard/shard-format@0.37.1(patch_hash=49a844e6e3bb46e6018b0eae9eb78aef7632486034c021cef881643a1a730013)(typescript@6.0.3)':
     dependencies:
       meshoptimizer: 1.2.0
       valibot: 1.5.0(typescript@6.0.3)

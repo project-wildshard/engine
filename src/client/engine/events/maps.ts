@@ -13,6 +13,8 @@ export interface EventMap {
   'creature.signal': { name: string; x: number; z: number };
   'ai.windup': { actor: Actor; duration: number };
   'damage.dealt': DamageDealt;
+  /** ONE-FORMAT CC31: a part with hp reached 0 and broke, once; its volume is off from then on. */
+  'creature.part-broken': { actor: Actor; part: string };
   /** A status took or left its target (src/shared/engine/combat/effects/EffectService.ts). */
   'effect.applied': { target: EffectTarget; id: EffectId };
   'effect.removed': { target: EffectTarget; id: EffectId };

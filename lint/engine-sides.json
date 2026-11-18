@@ -1983,6 +1983,7 @@
     "src/shared/game/shardfile/creatureClipVolumes.ts": "shared",
     "src/shared/game/shardfile/creatureVolumes.ts": "shared",
     "src/shared/game/shardfile/creatureContract.ts": "shared",
-    "src/shared/game/shardfile/trailCreatureVolumes.ts": "shared"
+    "src/shared/game/shardfile/trailCreatureVolumes.ts": "shared",
+    "src/shared/game/shardfile/partHealth.ts": "shared"
   }
 }

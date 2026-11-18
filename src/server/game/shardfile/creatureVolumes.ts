@@ -8,6 +8,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import { RestCreatureVolumes } from '../../../shared/game/shardfile/creatureVolumes';
 import { CreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
 import { ClipCreatureVolumes } from '../../../shared/game/shardfile/creatureClipVolumes';
+import { PartHealth } from '../../../shared/game/shardfile/partHealth';
 import { TrailCreatureVolumes } from '../../../shared/game/shardfile/trailCreatureVolumes';
 import type { Vector3 } from 'three';
 import { checkCreatureHeight } from './creatureSizes';
@@ -58,7 +59,11 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
       ...(pose instanceof ClipCreatureVolumes ? { posed: pose.socket.bind(pose) }
         : pose instanceof TrailCreatureVolumes ? { posed: trailSocket(pose, joints) } : {}),
     });
-    return [{ actor, pose,
+    // CC31: authored volumes with hp break at 0 (their volume goes off and `creature.part-broken` fires once)
+    const hp = new Map((body.volumes ?? []).flatMap(row => row.hp === undefined ? [] : [[row.part, row.hp] as const]));
+    if (hp.size > 0 && pose === undefined) throw new Error(`species ${spawn.species}: part hp needs hit volumes`);
+    const parts = hp.size === 0 || pose === undefined ? undefined : new PartHealth(pose, hp, actor.combatActor(), host.combat, host.events, host.scope);
+    return [{ actor, pose: parts?.pose ?? pose, parts, trail: pose instanceof TrailCreatureVolumes ? pose : undefined,
       locks: body.skeleton === undefined && body.lock === undefined ? undefined : new CreatureSockets(body, joints, root),
       strikes, contract: { id: spawn.id, body, skin: skin.hash, joints, ...(strikes === undefined ? {} : { strikeNames }) } }];
   });
@@ -66,7 +71,8 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
   const id = 'creatures.volumes', contract = JSON.stringify(pending.map(row => row.contract));
   if (host.adapters.has(id)) throw new Error('Creature volumes already installed');
   // All source/rig checks precede binding any actual actor.
-  const trails = pending.flatMap(row => row.pose instanceof TrailCreatureVolumes ? [row.pose] : []);
+  const trails = pending.flatMap(row => row.trail === undefined ? [] : [row.trail]);
+  const parts = pending.flatMap(row => row.parts === undefined ? [] : [row.parts]);
   for (const row of pending) {
     if (row.pose !== undefined) row.actor.bindHitVolumes(row.pose);
     if (row.locks !== undefined) row.actor.bindLockPoints(row.locks);
@@ -78,6 +84,19 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
   host.adapters.set(id, adapter);
   host.scope.onDispose(() => { if (host.adapters.get(id) === adapter) host.adapters.delete(id); });
   if (trails.length > 0) installTrails(host, trails);
+  if (parts.length > 0) installParts(host, parts);
+}
+
+/** CC31: every part's remaining hp is saved state. */
+function installParts(host: SimHost, parts: readonly PartHealth[]): void {
+  const id = 'creatures.parts';
+  if (host.adapters.has(id)) throw new Error('Part hp already installed');
+  const adapter = { snapshot: () => parts.map(row => row.snapshot()), restore: (saved: unknown) => {
+    if (!Array.isArray(saved) || saved.length !== parts.length) throw new Error('Incompatible part hp continuation');
+    parts.forEach((row, index) => { row.restore(saved[index]); });
+  } };
+  host.adapters.set(id, adapter);
+  host.scope.onDispose(() => { if (host.adapters.get(id) === adapter) host.adapters.delete(id); });
 }
 
 /** CC23b: a serpent's strike sockets ride its trail bones (a sweep `from: tail` starts where the tail is now). */
