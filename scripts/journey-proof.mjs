@@ -13,15 +13,30 @@
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { watchFaults } from './proof-faults.mjs';
-// a static import: the module cycle is safe (scenarios.mjs reads these exports only inside functions), while a dynamic one
-// inside cli() deadlocks on this module's own top-level await
-import { smokeProbes } from './staging-smoke/scenarios.mjs';
 
 /** @typedef {import('playwright').Page} Page */
 /** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string }} Screen */
 /** @typedef {'select' | 'mmo' | 'deeplink'} JourneyPath */
 /** @typedef {{ t: number, s: Screen | null }} Sample */
 /** @typedef {{ at: number, text: string }} Problem */
+
+/** Runs in the page: requestAnimationFrame capped at 60 fps (the staging smoke's cap, `smokeProbes`), so a proof never drives
+ * an uncapped headless page on the laptop Jake plays on. Its own copy: an init script is serialized, and importing the smoke's
+ * module here would close an import cycle. */
+export function capFrames() {
+  const native = window.requestAnimationFrame.bind(window), cancel = window.cancelAnimationFrame.bind(window);
+  let gate = -1, next = 0, ids = 0;
+  /** @type {Map<number, number>} a deferred callback gets a new native id: keep the first id pointing at the live one */
+  const live = new Map();
+  /* oxlint-disable promise/prefer-await-to-callbacks -- requestAnimationFrame's callbacks are the API being capped */
+  /** @param {number} id @param {FrameRequestCallback} cb @returns {FrameRequestCallback} */
+  const track = (id, cb) => (t) => {
+    if (t === gate || t >= next) { live.delete(id); if (t !== gate) { gate = t; next = t + 1000 / 61; } cb(t); } else live.set(id, native(track(id, cb)));
+  };
+  window.requestAnimationFrame = (cb) => { const id = ++ids; live.set(id, native(track(id, cb))); return id; };
+  /* oxlint-enable promise/prefer-await-to-callbacks */
+  window.cancelAnimationFrame = (id) => { const n = live.get(id); if (n !== undefined) { cancel(n); live.delete(id); } };
+}
 
 /** iPhone 17 Pro portrait, as Jake holds it. */
 export const PHONE = Object.freeze({
@@ -350,7 +365,7 @@ async function cli() {
       ...(name === 'webkit' ? {} : { args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }),
     });
     // rAF capped at 60 fps, as the smoke and the zone sweep run: the GPU is Jake's (lane rules, opus-deskperf)
-    await context.addInitScript(smokeProbes);
+    await context.addInitScript(capFrames);
     await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
     // SB42: the lane's door pass, so a proof's joins never spend the address Jake's phone shares
     const pass = (await import('./door-pass.mjs')).doorPassInit(process.env.WS_LANE_NAME ?? 'journey-proof'); if (pass !== null) await context.addInitScript(pass);

@@ -17,6 +17,8 @@ export const PHONE: {
   readonly viewport: { width: number; height: number };
   readonly deviceScaleFactor: number; readonly hasTouch: boolean; readonly userAgent: string;
 };
+/** Runs in the page: requestAnimationFrame capped at 60 fps. */
+export function capFrames(): void;
 export function screenNow(): Screen;
 export function label(s: Screen | null): string;
 export function judge(samples: readonly Sample[], options?: { blankMs?: number; budgetMs?: number }): Problem[];
