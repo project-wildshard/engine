@@ -20,6 +20,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { installDeclaredItems, leverLines, rackMeleeRows, rackToolRows, takenLine } from '../../../shared/game/shardfile/items';
 import { declaredItemIcon, declaredKitItemFamilies, declaredLever } from '../plugin/weaponFamily';
 import { itemScene } from '../shardfile/clientItems';
+import { itemLineMirror } from '../shardfile/itemLines';
 import { loadItemModels } from '../shardfile/itemModels';
 import { wirePage } from '../shardfile/wirePage';
 import type { RegionalRuntimePage } from './regionalRuntime';
@@ -82,7 +83,10 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   // by the row's id (`weapon.sword-iron`), as the server's taken line names it, not the page's (`declared.weapon.sword-iron`)
   const onRacks = rackMeleeRows(source), racked = new Set(weapons.filter(weapon => onRacks.has(weapon.row.id)));
   const onStands = rackToolRows(source), stands = new Set(items.tools.filter(tool => onStands.has(tool.row.id)));
+  // a held tool's fuel and light are the server's, as on a one-shard page (`itemLines.ts`)
+  const heldLines = itemLineMirror(source, items.runtimes, name => wirePage.line(name));
   app.addContentSystem({ id: 'grid.data-cell-kit', phase: 'update', run: (dt, t) => {
+    if (heldLines !== null && wirePage.client !== null && here()) heldLines();
     for (const lever of levers) {
       if (wirePage.client !== null && here()) {
         const lines = leverLines(lever.row.id);

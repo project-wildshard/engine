@@ -967,6 +967,7 @@
     "src/client/game/shardfile/clientGraphs.ts": "client",
     "src/client/game/shardfile/clientHeldMelee.ts": "client",
     "src/client/game/shardfile/clientItems.ts": "client",
+    "src/client/game/shardfile/itemLines.ts": "client",
     "src/client/game/shardfile/clientLibrary.ts": "client",
     "src/client/game/shardfile/clientMaterials.ts": "client",
     "src/client/game/shardfile/graphFileCandidate.ts": "client",

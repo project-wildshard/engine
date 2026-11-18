@@ -13,6 +13,7 @@ import { retireTerrain } from '@wildshard/engine/physics/terrain';
 import { timeClientPreparation } from './preparationTiming';
 import { wirePage } from './wirePage';
 import { installRaceClock } from './raceClock';
+import { itemLineMirror } from './itemLines';
 import { RaceClockChip, SteerChip } from '@wildshard/engine/quest/view/ui';
 import { installSteerRide } from '../plugin/steerRide';
 import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
@@ -714,18 +715,8 @@ export class ShardfileClient {
       }
     } });
     // SR11 (C9): the server burns the lantern; its owned lines are what this page's runtime shows, since it never steps.
-    const mirrored = (source.targets.itemFields ?? []).flatMap(row => {
-      const field = source.state.player.find(entry => entry.id === row.fieldId), item = items.runtimes.get(row.item);
-      return field === undefined || item === undefined || field.privacy === 'host' || row.property === 'taken' ? [] : [{ item, name: field.name, property: row.property }];
-    });
-    if (mirrored.length > 0) ctx.system({ id: 'shardfile.item-lines', phase: 'update', run: () => {
-      if (wirePage.client === null) return;
-      for (const { item, name, property } of mirrored) {
-        const line = wirePage.line(name); // a line at zero is dropped from `owned`: its absence is the server's zero
-        const now = item.snapshot(), fuel = property === 'fuel' ? Math.min(1, Math.max(0, line)) : now.fuel, lit = property === 'lit' ? line > 0 : now.lit;
-        if (fuel !== now.fuel || lit !== now.lit) item.restore({ ...now, fuel, lit: lit && fuel > 0 });
-      }
-    } });
+    const heldLines = itemLineMirror(source, items.runtimes, name => wirePage.line(name));
+    if (heldLines !== null) ctx.system({ id: 'shardfile.item-lines', phase: 'update', run: () => { if (wirePage.client !== null) heldLines(); } });
 
     if (source.plumbing !== null && source.plumbing.input.length + source.plumbing.debug.length > 0) {
       const plumbing = installDeclaredPlumbing(source.plumbing, { handledInput: handledItemInputs(source), instance: source.identity.slug, tier: TIER, scope: ctx.scope, input: ctx.app.input,
