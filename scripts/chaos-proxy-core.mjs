@@ -197,6 +197,8 @@ export async function openChaosProxy(options) {
     droppedMessages: 0,
     /** FM3: socket upgrades the proxy carried on to the world (a refused one is a `socket` match instead) */
     upgrades: 0,
+    /** FM4b mode 7: TLS handshakes a client refused on the fixture certificate listener (the browser's own refusal, seen here) */
+    tlsRefused: 0,
     metadataOverflow: 0,
     queueOverflow: 0,
   }
@@ -971,6 +973,10 @@ export async function openChaosProxy(options) {
         void http(request, response, true)
       })
       secure.on('upgrade', upgrade)
+      secure.on('tlsClientError', (_error, socket) => {
+        counters.tlsRefused++
+        socket.destroy()
+      })
       tlsOrigin = `https://127.0.0.1:${await listen(secure, tlsPort)}`
     }
     return {

@@ -48,7 +48,7 @@ import { rawLeak, selectCases, verdict } from './failmode-cases.mjs';
 process.env.WS_RIG_PORTS ??= '18856';
 const rigPort = Number(process.env.WS_RIG_PORTS);
 if (!Number.isSafeInteger(rigPort) || rigPort < 1029 || rigPort > 65532) throw new Error('WS_RIG_PORTS must reserve explicit unprivileged fixture ports');
-const ROOT = absolute(import.meta.dirname, '..'), PROXY_PAGE = rigPort - 5, PROXY_WORLD = rigPort - 4, SHARD = 'driftwood-isle';
+const ROOT = absolute(import.meta.dirname, '..'), PROXY_PAGE = rigPort - 5, PROXY_WORLD = rigPort - 4, PROXY_TLS = rigPort - 3, SHARD = 'driftwood-isle';
 const PAGE_ORIGIN = `http://127.0.0.1:${String(PROXY_PAGE)}`, RELEASE_URL = `${PAGE_ORIGIN}/__release.json`, SOCKET = `ws://127.0.0.1:${String(PROXY_WORLD)}/`;
 const args = process.argv.slice(2), positional = args.filter(value => !value.startsWith('--'));
 /** @param {string} name @param {string} fallback */
@@ -99,6 +99,9 @@ const engine = flag('engine', 'chromium'), baseline = args.includes('--baseline'
 // FM7b2/FM4 mode 25: `--seats=2` makes the door itself full (two seated pages), for the real waiting line; without it `full` is the
 // proxy's injected close, which carries no place in line
 const seats = flag('seats', '');
+// FM4b mode 7: an owned self-signed PEM pair for the proxy's TLS fault listener (never a production certificate); absent: `tls` is blocked
+const tlsCert = flag('tls-cert', ''), tlsKey = flag('tls-key', '');
+if ((tlsCert === '') !== (tlsKey === '')) throw new Error('--tls-cert and --tls-key go together');
 if (seats !== '' && !/^[1-9]$/u.test(seats)) throw new Error('--seats=<1-9>');
 if (engine !== 'chromium' && engine !== 'webkit') throw new Error('--engine=chromium|webkit');
 // `--refusal=screen|injection` proves strict mode refuses: a drop that must show a screen no build has (exit 1), and a fault armed on
@@ -136,13 +139,14 @@ let browserVersion = '';
 let harnessFault = /** @type {string | null} */ (null);
 try {
   // openChaosProxy claims its fresh directory; never delete pre-existing fixture files.
-  proxy = await openChaosProxy({ work: join(absolute(work), 'proxy'), pageUpstream: rig.base, releaseUpstream: `http://127.0.0.1:${String(Number(process.env.WS_RIG_PORTS) + 3)}`, worldUpstream: `http://127.0.0.1:${String(Number(process.env.WS_RIG_PORTS) + 1)}`, pagePort: PROXY_PAGE, worldPort: PROXY_WORLD });
+  proxy = await openChaosProxy({ work: join(absolute(work), 'proxy'), pageUpstream: rig.base, releaseUpstream: `http://127.0.0.1:${String(Number(process.env.WS_RIG_PORTS) + 3)}`, worldUpstream: `http://127.0.0.1:${String(Number(process.env.WS_RIG_PORTS) + 1)}`, pagePort: PROXY_PAGE, worldPort: PROXY_WORLD,
+    ...tlsCert === '' ? {} : { tlsPort: PROXY_TLS, tlsCert, tlsKey } });
   const token = readFileSync(proxy.ready.tokenFile, 'utf8');
   /** The proxy's state, or its rules replaced. @param {{ scenario: string, rules: object[] }} [body] */
   const control = async body => {
     const response = await fetch(proxy?.ready.controlUrl ?? '', { method: body === undefined ? 'GET' : 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, ...body === undefined ? {} : { body: JSON.stringify(body) } });
     if (!response.ok) throw new Error(`chaos control ${String(response.status)}`);
-    return /** @type {{ counters: { upgrades: number, matches: Record<string, number> }, events: object[], activeConnections: number }} */ (await response.json());
+    return /** @type {{ counters: { upgrades: number, tlsRefused: number, matches: Record<string, number> }, events: object[], activeConnections: number }} */ (await response.json());
   };
   /** @param {string} scenario @param {object[]} rules */
   const arm = (scenario, rules) => control({ scenario, rules });
@@ -150,11 +154,15 @@ try {
   /** matches on a route since a snapshot @param {Awaited<ReturnType<typeof control>>} before @param {string} route */
   const matchedSince = async (before, route) => ((await control()).counters.matches[route] ?? 0) - (before.counters.matches[route] ?? 0);
 
-  launched = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist'] });
+  launched = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist',
+    // FM8 mode 32: a fake microphone (a tone) with no permission prompt, for the two-page voice case
+    '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   browserVersion = launched.version();
   const { defaultBrowserType: _engine, ...device } = devices['iPhone 16 Pro'];
   const phone = { ...device, viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 } };
   const allowedOrigins = fixtureRequestOrigins(PAGE_ORIGIN, SOCKET);
+  /** WebSocket dials the pages made, by origin (FM4b modes 6 and 7 count their negative target's) */
+  const socketDials = /** @type {Map<string, number>} */ (new Map());
   const guardFaults = /** @type {string[]} */ ([]);
   let pageFaults = /** @type {string[]} */ ([]);
   const URL_PLAY = `${PAGE_ORIGIN}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
@@ -163,7 +171,7 @@ try {
    *  a service worker every read as `cache: 'no-store'`, which sw.js rightly sends to the network: a warmed page could never launch
    *  offline under it (FM5 mode 1). An off-fixture request there is still a guard fault, seen rather than refused.
    *  `desktop`: a 1440×900 desktop browser instead of the phone (a phone context held landscape shows the portrait-only card).
-   *  @param {() => void} [init] @param {{ observe?: boolean, desktop?: boolean }} [how] */
+   *  @param {(() => void) | string} [init] @param {{ observe?: boolean, desktop?: boolean }} [how] */
   const fresh = async (init, how = {}) => {
     const context = await /** @type {import('playwright').Browser} */ (launched).newContext(how.desktop === true ? { viewport: { width: 1440, height: 900 } } : phone), errors = /** @type {string[]} */ ([]);
     if (how.observe === true) context.on('request', request => { if (!allowedOrigins.has(new URL(request.url()).origin)) guardFaults.push('saw an off-fixture HTTP request (observe-only guard)'); });
@@ -173,7 +181,9 @@ try {
       else { guardFaults.push('refused off-fixture HTTP request'); await route.abort('blockedbyclient'); }
     });
     await context.routeWebSocket('**/*', async socket => {
-      if (allowedOrigins.has(new URL(socket.url()).origin)) socket.connectToServer();
+      const origin = new URL(socket.url()).origin;
+      socketDials.set(origin, (socketDials.get(origin) ?? 0) + 1);
+      if (allowedOrigins.has(origin)) socket.connectToServer();
       else { guardFaults.push('refused off-fixture WebSocket'); await socket.close(); }
     });
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
@@ -685,6 +695,149 @@ try {
       } finally { await heal(); await entered.context.close(); }
     },
     // FM4b: the browser goes offline in the world
+    // FM4b modes 5 to 8: the world never answers this page from its first dial (a refused upgrade, an address with no DNS answer, a
+    // certificate the browser refuses). The card shows after 10 s down while online, says what the page measured, and goes when the
+    // world answers: by itself after a proxy heal (5, 8), or after the signed release names the world again and Try now (6, 7).
+    // Negative control in every case: the page is online and the game's own site answers, so the card says so (never a cause).
+    unreachable: async item => {
+      if (item.id === 'tls' && tlsCert === '') return { outcome: 'blocked-dependency', reason: 'needs --tls-cert/--tls-key: an owned self-signed PEM pair for the fixture TLS listener' };
+      const negative = item.id === 'dns' ? `ws://fm-world.invalid:${String(PROXY_WORLD)}/` : item.id === 'tls' ? `wss://127.0.0.1:${String(PROXY_TLS)}/` : '';
+      const negativeOrigin = negative === '' ? '' : new URL(negative).origin, before = await control();
+      const dialledBefore = socketDials.get(negativeOrigin) ?? 0, negativeDials = () => (socketDials.get(negativeOrigin) ?? 0) - dialledBefore;
+      if (negative !== '') { allowedOrigins.add(negativeOrigin); rig.pageView(rig.build, negative); }
+      else await arm(item.id, [{ route: 'socket', kind: 'refuse-upgrade', code: item.id === 'upgrade-refused' ? 502 : 503 }]);
+      const entered = await fresh(); const { page } = entered;
+      try {
+        const started = Date.now();
+        await page.goto(URL_PLAY);
+        // the Name box asks before the page dials (MP2.4): answer it as a player would, then the dial goes out
+        for (const until = Date.now() + 60_000; Date.now() < until; await sleep(250)) {
+          if (await page.locator('#ws-name-box input').isVisible().catch(() => false)) {
+            await page.locator('#ws-name-box input').fill(`fm${String(Date.now() % 100_000)}`);
+            await page.locator('#ws-name-box button[type=submit]').click();
+            break;
+          }
+          if ((await visibleIds(page)).length > 0) break;
+        }
+        const seen = await screen(page, item.screen, 90_000, started), shot = seen === null ? await shoot(page, item.id, 'missing') : await shoot(page, item.id, 'card');
+        const after = await control();
+        const injection = { ...negative === '' ? { socketMatches: (after.counters.matches.socket ?? 0) - (before.counters.matches.socket ?? 0) } : { pageReleaseSocket: negative, negativeDials: negativeDials() },
+          ...item.id === 'tls' ? { tlsRefused: after.counters.tlsRefused - before.counters.tlsRefused } : {}, upgradesReached: after.counters.upgrades - before.counters.upgrades };
+        if (negative === '' ? await matchedSince(before, 'socket') === 0 : negativeDials() === 0) return { outcome: 'harness-fail', reason: 'the injection was never dialled', injection };
+        if (item.id === 'tls' && after.counters.tlsRefused === before.counters.tlsRefused) return { outcome: 'harness-fail', reason: 'no TLS handshake was refused at the fixture listener', injection };
+        if (injection.upgradesReached !== 0) return { outcome: 'harness-fail', reason: 'a dial reached the world while it should not', injection };
+        const result = await judged(seen, item, page);
+        if (result.outcome !== 'pass') return { ...result, injection, shot };
+        // measured, never guessed: the game's own site answers; no DNS, TLS or status word in the primary copy
+        const site = await page.locator('[data-failmode~="unreachable"]').first().textContent({ timeout: 8000 }).catch(() => '');
+        if (!/The game's site answers/u.test(site ?? '')) return { outcome: 'ui-fail', reason: 'the card never said the game\'s own site answers', seen, injection, shot };
+        if (/DNS|certificate|TLS|refused|\b50\d\b/u.test(seen?.copy ?? '')) return { outcome: 'ui-fail', reason: 'the card names a cause the page cannot know', seen, injection, shot };
+        const banner = await visibleIds(page);
+        if (banner.some(ids => /\b(?:drop|half-open|resuming)\b/u.test(ids))) return { outcome: 'ui-fail', reason: 'a Reconnecting banner shows beside the card', seen, injection, shot, notes: banner };
+        if (negative !== '') { rig.pageView(null); await sleep(500); await press(page, item.screen, 'Try now'); } else await heal();
+        const healedAt = Date.now();
+        let back = false;
+        while (!back && Date.now() - healedAt < 45_000) { back = await seated(page) && !(await visibleIds(page)).some(ids => /\bunreachable\b/u.test(ids)); if (!back) await sleep(300); }
+        const recovery = negative !== '' ? 'release names the world again, Try now: seated, card gone' : 'heal: seated by itself, card gone';
+        return back ? { ...result, injection, shot, recovery, recoveryMs: Date.now() - healedAt } : { outcome: 'ui-fail', reason: 'no seat after the heal', seen, injection, shot, after: await shoot(page, item.id, 'after'), notes: await onScreen(page) };
+      } finally { rig.pageView(null); allowedOrigins.delete(negativeOrigin); await heal().catch(() => undefined); await entered.context.close(); }
+    },
+    // FM8 mode 32 and 32b (opus-fm): two real pages on voice in Driftwood, a fake microphone each, real ICE with no servers (the
+    // voice worker's TURN list is answered empty here: an empty list is no failure, and no STUN leaves this Mac). Controls first: the
+    // first page alone on voice past VOICE_GIVE_UP_MS shows nothing (no peer is no failure); both on voice link directly. Then the
+    // fault, a labelled page-boundary injection on both pages: remote ICE candidates are dropped (addIceCandidate and SDP candidate
+    // lines), so ICE has nothing to try and every re-offer runs out. The tip shows on its own clock; text chat still carries a line.
+    // 32: candidates allowed again, Try again re-asks the TURN list and re-offers: linked, the tip goes. 32b (hold mode on a desktop
+    // page): holding talk shows voice-failed-blocked; turning voice off clears it.
+    voice: async item => {
+      const blocked = item.id === 'voice-failed/blocked', iceUrl = 'https://wildshard-voice-ice.wildshard.workers.dev/', iceAsks = { count: 0 };
+      // a page script (a string, so it runs as the page's own code): the labelled ICE fault, off until the driver sets __fmIce.blocked
+      const iceBoundary = `(() => {
+        const proto = RTCPeerConnection.prototype, add = proto.addIceCandidate, setRemote = proto.setRemoteDescription;
+        const ice = globalThis.__fmIce = { blocked: false, dropped: 0 };
+        proto.addIceCandidate = function fmAddIceCandidate(...given) { if (ice.blocked) { ice.dropped++; return Promise.resolve(); } return add.apply(this, given); };
+        proto.setRemoteDescription = function fmSetRemoteDescription(description, ...rest) {
+          let said = description;
+          if (ice.blocked && said && typeof said.sdp === 'string') {
+            const lines = said.sdp.split('\\r\\n'), kept = lines.filter(line => !line.startsWith('a=candidate') && line !== 'a=end-of-candidates');
+            ice.dropped += lines.length - kept.length; said = { type: said.type, sdp: kept.join('\\r\\n') };
+          }
+          return setRemote.call(this, said, ...rest);
+        };
+      })();`;
+      const open = async (/** @type {boolean} */ desktop) => {
+        const entered = await fresh(iceBoundary, desktop ? { desktop: true } : {});
+        // the TURN list the page asks for: answered here, empty (owned fixture; the real worker is never asked)
+        await entered.context.route(iceUrl, route => { iceAsks.count++; void route.fulfill({ status: 200, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }, body: '{"iceServers":[]}' }); });
+        if (desktop) await saveFixture(entered.context, { scope: 'device', key: 'voiceSettings', data: { input: '', volume: 1, mode: 'hold' } });
+        if (engine === 'chromium') await entered.context.grantPermissions(['microphone'], { origin: PAGE_ORIGIN }).catch(() => undefined);
+        await entered.page.goto(URL_PLAY); await intoWorld(entered);
+        return entered;
+      };
+      const opened = /** @type {Entered[]} */ ([]);
+      try {
+        const a = await open(true); opened.push(a);
+        const b = await open(false); opened.push(b);
+        const voiceOn = async (/** @type {Entered} */ entered) => {
+          await entered.page.locator('#ws-voice').click({ timeout: 10_000 });
+          return entered.page.locator('#ws-voice[data-state="on"]').waitFor({ timeout: 20_000 }).then(() => true, () => false);
+        };
+        const linked = (/** @type {Entered} */ entered) => entered.page.locator('#ws-voice-peers button[data-linked="true"]').first().waitFor({ state: 'attached', timeout: 40_000 }).then(() => true, () => false);
+        const tipOn = (/** @type {Entered} */ entered, /** @type {string} */ id) => entered.page.locator(`#ws-voice-tip[data-failmode="${id}"]:not([hidden])`).count().then(count => count > 0, () => false);
+        const giveUpMs = 70_000;
+        // control 1 (32 only): one page on voice and nobody else is no failure, however long
+        /** @type {{ alone?: { waitedMs: number, tip: boolean }, direct?: { linkedA: boolean, linkedB: boolean, iceAsks: number, tip: boolean } }} */
+        const controls = {};
+        if (!await voiceOn(a)) return { outcome: engine === 'webkit' ? 'unsupported' : 'harness-fail', reason: `${engine}: voice never came on with the fake microphone`, notes: await onScreen(a.page) };
+        if (!blocked) {
+          await sleep(giveUpMs + 5000);
+          const alone = { waitedMs: giveUpMs + 5000, tip: await tipOn(a, 'voice-failed') };
+          controls.alone = alone;
+          if (alone.tip) return { outcome: 'ui-fail', reason: 'voice-failed with no peer on voice', injection: { controls } };
+        }
+        // control 2: both on voice, empty TURN list, nothing blocked: a direct link and no tip
+        if (!await voiceOn(b)) return { outcome: 'harness-fail', reason: 'the second page\'s voice never came on' };
+        const direct = { linkedA: await linked(a), linkedB: await linked(b), iceAsks: iceAsks.count, tip: false };
+        direct.tip = await tipOn(a, 'voice-failed') || await tipOn(b, 'voice-failed');
+        controls.direct = direct;
+        if (!direct.linkedA || !direct.linkedB || direct.tip) return { outcome: 'ui-fail', reason: 'two pages with no ICE servers never linked directly', injection: { controls } };
+        // the fault: candidates dropped on both pages, then the second page leaves and rejoins voice, so every link is offered afresh
+        for (const entered of [a, b]) await entered.page.evaluate(() => { /** @type {any} */ (globalThis).__fmIce.blocked = true; });
+        const faultAt = Date.now();
+        await b.page.locator('#ws-voice').click(); await b.page.locator('#ws-voice[data-state="off"]').waitFor({ timeout: 10_000 });
+        if (!await voiceOn(b)) return { outcome: 'harness-fail', reason: 'the second page did not rejoin voice' };
+        const seen = await screen(a.page, 'voice-failed', giveUpMs + 40_000, faultAt), shot = seen === null ? await shoot(a.page, item.id, 'missing') : await shoot(a.page, 'voice-failed', 'tip');
+        const dropped = await Promise.all([a, b].map(entered => entered.page.evaluate(() => /** @type {number} */ (/** @type {any} */ (globalThis).__fmIce.dropped))));
+        const injection = { boundary: 'page: remote ICE candidates dropped (addIceCandidate, SDP candidate lines), labelled injection', candidatesDropped: dropped, iceServers: 'empty fixture list', iceAsks: iceAsks.count, controls };
+        if (dropped.every(count => count === 0)) return { outcome: 'harness-fail', reason: 'no candidate was dropped', injection };
+        const result = await judged(seen, { ...item, screen: 'voice-failed' }, a.page);
+        if (result.outcome !== 'pass') return { ...result, injection, shot };
+        // text chat goes on: a line from the second page reaches the first
+        const line = `voice ${String(Date.now() % 10_000)}`;
+        await b.page.locator('#ws-chat input').fill(line); await b.page.locator('#ws-chat input').press('Enter');
+        const chat = await a.page.locator('#ws-chat', { hasText: line }).waitFor({ state: 'attached', timeout: 15_000 }).then(() => true, () => false);
+        if (!chat) return { outcome: 'ui-fail', reason: 'a chat line did not arrive while voice was failed', seen, injection, shot };
+        if (blocked) {
+          // 32b: hold talk on the desktop page (hold mode): the hold card says no one hears you; the mic still opens
+          await a.page.mouse.click(720, 300).catch(() => undefined);
+          await a.page.keyboard.down('KeyB');
+          const held = await screen(a.page, 'voice-failed-blocked', 5000), heldShot = held === null ? undefined : await shoot(a.page, item.id, 'held');
+          await a.page.keyboard.up('KeyB');
+          const heldResult = await judged(held, item, a.page);
+          if (heldResult.outcome !== 'pass') return { ...heldResult, injection, shot };
+          // turning voice off is 32's own recovery: the tip goes
+          await a.page.locator('#ws-voice').click();
+          const cleared = await a.page.locator('#ws-voice-tip[data-failmode]').waitFor({ state: 'detached', timeout: 10_000 }).then(() => true, async () => !(await tipOn(a, 'voice-failed') || await tipOn(a, 'voice-failed-blocked')));
+          return cleared ? { ...heldResult, injection: { ...injection, chat: 'a line arrived' }, ...heldShot === undefined ? {} : { shot: heldShot }, recovery: 'voice off: the tip went' } : { outcome: 'ui-fail', reason: 'the tip stayed after voice off', seen: held, injection };
+        }
+        // 32: the network lets candidates through again; Try again re-asks the TURN list and offers again: linked, the tip goes
+        for (const entered of [a, b]) await entered.page.evaluate(() => { /** @type {any} */ (globalThis).__fmIce.blocked = false; });
+        const asksBefore = iceAsks.count;
+        await a.page.locator('#ws-voice-tip button[data-action="retry"]').click({ timeout: 5000 });
+        const back = await linked(a) && await a.page.locator('#ws-voice-tip[data-failmode="voice-failed"]').waitFor({ state: 'detached', timeout: 30_000 }).then(() => true, async () => !await tipOn(a, 'voice-failed'));
+        return back ? { ...result, injection: { ...injection, chat: 'a line arrived', retryIceAsks: iceAsks.count - asksBefore }, shot, recovery: 'Try again: TURN list asked again, re-offered, linked, the tip went' } : { outcome: 'ui-fail', reason: 'no link after Try again', seen, injection, notes: await onScreen(a.page) };
+      } finally { for (const entered of opened) await entered.context.close().catch(() => undefined); }
+    },
     offlinePlay: async item => {
       const entered = await fresh(); const { page, context } = entered;
       try {
@@ -728,24 +881,47 @@ try {
       } finally { await context.setOffline(false).catch(() => undefined); await heal().catch(() => undefined); await entered.context.close(); }
     },
     // the page frozen (CDP), with or without a visibility change
+    // FM4b mode 45 (opus-fm): a sleep comes back to a quiet link only if the world doesn't answer at once: the proxy refuses the
+    // world's door from the freeze until the card is seen, then heals (on loopback a healthy redial seats inside SB31's one quiet
+    // second, so no card: that is right, and it was the census's "no screen"). Its healthy control: a 2.5 s freeze (under the server's
+    // 3 s stall) shows nothing. Mode 4 needs a real hidden page: a freeze alone never passes as it.
     freeze: async item => {
       if (engine !== 'chromium') return { outcome: 'unsupported', reason: 'WebKit has no lifecycle freeze; a native-Safari Ring 2 proof is owed' };
       const entered = await fresh(); const { page, context } = entered;
       try {
         await page.goto(URL_PLAY); await intoWorld(entered);
-        const cdp = await context.newCDPSession(page), awayMs = item.id === 'background-short' ? 4000 : 35_000, started = Date.now();
+        const cdp = await context.newCDPSession(page), quiet = item.id === 'sleep-wake', awayMs = item.id === 'background-short' ? 4000 : 35_000;
+        /** @type {Record<string, unknown> | undefined} */
+        let healthyControl;
+        if (quiet) {
+          const framesBefore = await frames(page);
+          await cdp.send('Page.setWebLifecycleState', { state: 'frozen' }); await sleep(2500); await cdp.send('Page.setWebLifecycleState', { state: 'active' });
+          let shown = /** @type {string[]} */ ([]);
+          for (const until = Date.now() + 5000; Date.now() < until; await sleep(250)) { shown = (await visibleIds(page)).filter(ids => !/\b(?:slow|lossy|staging)\b/u.test(ids)); if (shown.length > 0) break; }
+          healthyControl = { frozenMs: 2500, screens: shown, framesMoved: await frames(page) > framesBefore };
+          if (shown.length > 0) return { outcome: 'ui-fail', reason: `a 2.5 s freeze with a live link showed ${shown.join(', ')}`, injection: { healthyControl } };
+        }
+        const before = await control(), started = Date.now();
         await cdp.send('Page.setWebLifecycleState', { state: 'frozen' });
+        if (quiet) await arm(item.id, [{ route: 'socket', kind: 'refuse-upgrade', code: 503 }]);
         await sleep(awayMs);
         await cdp.send('Page.setWebLifecycleState', { state: 'active' });
         const visibility = await page.evaluate(() => /** @type {string[]} */ (/** @type {any} */ (globalThis).__fmVisibility));
-        const seen = await screen(page, item.screen, 8000, Date.now()), shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
-        const injection = { frozenMs: Date.now() - started, visibility };
-        if (seen === null && item.id !== 'sleep-wake' && !visibility.includes('hidden'))
+        if (item.id === 'background-long' && !visibility.includes('hidden')) {
+          const notes = await onScreen(page); await heal();
+          return { outcome: 'unsupported', reason: 'headless Chromium kept the page visible through the freeze; a real hidden/visible return (native-Safari Ring 2) is owed', injection: { frozenMs: Date.now() - started, visibility }, notes };
+        }
+        const seen = await screen(page, item.screen, 12_000, Date.now()), shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
+        const injection = { frozenMs: awayMs, visibility, ...quiet ? { quietLink: 'refuse-upgrade 503 from the freeze until the card', socketMatches: await matchedSince(before, 'socket'), healthyControl } : {} };
+        await heal();
+        if (seen === null && item.id === 'background-short' && !visibility.includes('hidden'))
           return { outcome: 'unsupported', reason: 'headless Chromium kept the page visible through the freeze; a real hidden/visible return (native-Safari Ring 2) is owed', injection, shot, notes: await onScreen(page) };
+        if (quiet && injection.socketMatches === 0) return { outcome: 'harness-fail', reason: 'the quiet link refused no dial', injection };
         const result = await judged(seen, item, page);
         if (result.outcome !== 'pass') return { ...result, injection, shot };
+        if (quiet && !/sleep-wake/u.test(seen?.ids ?? '')) return { outcome: 'ui-fail', reason: 'the card did not name the sleep (no page clock tick)', seen, injection, shot };
         return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: 'seated again' } : { outcome: 'ui-fail', reason: 'no recovery after the return', seen, injection, shot, notes: await onScreen(page) };
-      } finally { await entered.context.close(); }
+      } finally { await heal().catch(() => undefined); await entered.context.close(); }
     },
     // FM4b: slow and unstable links (measured RTT; the proxy holds frames)
     linkQuality: async item => {
@@ -892,7 +1068,21 @@ try {
         await page.evaluate(() => { /** @type {any} */ (globalThis).__fmSkew = 0; });
         await page.locator('button', { hasText: 'Run again' }).first().click();
         const cleared = await page.locator(`[data-failmode~="${item.screen}"]`).waitFor({ state: 'detached', timeout: 45_000 }).then(() => true, () => false);
-        return cleared ? { ...result, injection, shot, recovery: 'Run again with the clock right: no warning' } : { outcome: 'ui-fail', reason: 'the warning stayed after Run again with the clock right', seen, injection, shot };
+        if (!cleared) return { outcome: 'ui-fail', reason: 'the warning stayed after Run again with the clock right', seen, injection, shot };
+        // FM4b negative control: the clock 2 min off again, but nothing to measure it by (the page's version.json and the world's
+        // /health both stall, so no Date header and no health `now`): the doctor says clock unknown and warns of nothing
+        await page.evaluate(() => { /** @type {any} */ (globalThis).__fmSkew = 120_000; });
+        const before = await control();
+        await arm('clock-unknown', [{ route: 'version', kind: 'stall' }, { route: 'health', kind: 'stall' }]);
+        await page.locator('button', { hasText: 'Run again' }).first().click();
+        const unknown = await page.waitForFunction(() => /clock unknown/u.test(document.body.textContent ?? ''), undefined, { timeout: 60_000 }).then(() => true, () => false);
+        const warned = await page.locator(`[data-failmode~="${item.screen}"]`).count() > 0;
+        const controlShot = await shoot(page, item.id, 'unknown-control');
+        const unknownControl = { pageClockAheadMs: 120_000, versionMatches: await matchedSince(before, 'version'), healthMatches: await matchedSince(before, 'health'), saidUnknown: unknown, warned, shot: controlShot };
+        await heal();
+        if (unknownControl.versionMatches === 0 || unknownControl.healthMatches === 0) return { outcome: 'harness-fail', reason: 'the unknown-clock control matched no read', injection: { ...injection, unknownControl } };
+        if (!unknown || warned) return { outcome: 'ui-fail', reason: 'an unmeasured clock was not said as unknown, or still warned', seen, injection: { ...injection, unknownControl }, shot };
+        return { ...result, injection: { ...injection, unknownControl }, shot, recovery: 'Run again with the clock right: no warning; unmeasured clock: clock unknown, no warning' };
       } finally { await entered.context.close(); }
     },
     // FM4 mode 10 (J174): a deploy under play, on the second build. Both views of the release name it; the world counts down while

@@ -95,9 +95,9 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   run(['scripts/build-server.mjs', '--build', build, '--out', server], 'the server build');
 
   let signed = '', pageSigned = '', current = { serial: 1, engineBuild: build, channel };
-  /** @param {{ serial: number, engineBuild: string, channel: string }} row */
-  const signRelease = row => {
-    const body = JSON.stringify({ channel: row.channel, serial: row.serial, engineBuild: row.engineBuild, saveEpoch: 2, shards: slugs.map(slug => ({ slug, revision: 1 })), socket: signedSocket });
+  /** @param {{ serial: number, engineBuild: string, channel: string }} row @param {string} [named] the socket the file names */
+  const signRelease = (row, named = signedSocket) => {
+    const body = JSON.stringify({ channel: row.channel, serial: row.serial, engineBuild: row.engineBuild, saveEpoch: 2, shards: slugs.map(slug => ({ slug, revision: 1 })), socket: named });
     return JSON.stringify({ body, signature: sign(null, Buffer.from(body), key.private).toString('hex') });
   };
   /** Both views name this release; a page view set before is dropped. @param {number} serial @param {string} engineBuild @param {string} [signedChannel] @param {string} [publicSocket] */
@@ -108,8 +108,10 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   };
   publish(1, build);
   /** The page's view names another build until the next publish (null: the world's view again). The world never reads it.
-   * @param {string | null} engineBuild */
-  const pageView = engineBuild => { pageSigned = engineBuild === null ? '' : signRelease({ ...current, engineBuild }); };
+   * FM4b modes 6 and 7: `named` makes the page's view name another address (a negative target: an `.invalid` name, the proxy's
+   * fixture-certificate listener); the world's view and the server never read it.
+   * @param {string | null} engineBuild @param {string} [named] */
+  const pageView = (engineBuild, named) => { pageSigned = engineBuild === null ? '' : signRelease({ ...current, engineBuild }, named); };
   const release = createServer((request, response) => {
     const page = new URL(request.url ?? '/', 'http://127.0.0.1').pathname === '/__release.json' && pageSigned !== '';
     response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(page ? pageSigned : signed);
