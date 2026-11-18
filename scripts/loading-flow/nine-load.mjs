@@ -29,10 +29,19 @@ export async function assertNineLoad(browser,base,out) {
       const url=new URL(base);
       for(const [key,value] of Object.entries({chunk:'nine-dragon-stack',skipintro:'1',tier:'phone',touch:'1',mute:'1',nolock:'1',sw:'0'}))url.searchParams.set(key,value);
       await page.goto(url.href,{waitUntil:'domcontentloaded',timeout:30_000});
-      await page.waitForFunction(()=>{
+      const readiness=await page.waitForFunction(()=>{
+        const failure=document.querySelector('.ws-load-error');
+        if(failure!==null){
+          const message=failure.querySelector('p:nth-of-type(2)')?.textContent?.trim();
+          return message||'Terminal load failure screen opened';
+        }
         const world=window.__wildshard?.world;
         return world?.game.level.id==='nine-dragon-stack'&&world.game.frameCount>0&&world.hud.entered&&!world.hud.paused&&world.game.frameGate()&&!document.querySelector('.ws-load');
       },null,{timeout:NINE_READY_TIMEOUT_MS});
+      try {
+        const result=await readiness.jsonValue();
+        if(typeof result==='string')throw new Error(`Nine boot failed: ${result}`);
+      } finally {await readiness.dispose().catch(()=>undefined);}
       const read=await finishStallProfile(page,profile);
       faults.push(...read.faults);
       if(!read.stalls.some(row=>row.stage==='props'))faults.push('Nine load has no completed props stage');

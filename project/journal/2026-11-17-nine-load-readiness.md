@@ -28,3 +28,21 @@ remain unchanged. A missing-control boot still fails after 235 s.
 Persist load-error.json with the original error, page errors and a
 best-effort boot timeline before teardown. The original failure is
 re-thrown; a missing timeline cannot turn failure into success.
+
+## November 18 follow-up
+
+Ring 1 run 44264916209 on c5a5c3bd reached readyFrame. Its retained
+timeline shows the spawn-tile fence fail at 88.462 s, while the harness
+kept polling until 235 s. A worker first reply took 22.813 s in the
+same window. The receipt has no exception text tying the worker to the
+failure. The production pin changes in the range updated Brasscap.
+The exact hosted client passed the stock probe on local SwiftShader in
+60.772 s. Covering run 44267709417 passed all 15 jobs, including Nine in
+141.851 s with zero faults.
+
+The readiness poll now reports the terminal shard-load screen's
+message and keeps the original cause in load-error.json alongside the
+boot timeline. The same poll still requires real Nine control and
+keeps the 235 s deadline, props profile and boot memory gates. The
+regression control times out on the old harness and preserves the
+shown cause on the new one.
