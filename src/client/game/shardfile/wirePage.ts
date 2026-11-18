@@ -147,6 +147,15 @@ export class WirePage {
   following = false;
   /** Every flag book this page makes from now on follows the server's. */
   followBooks(): void { this.following = true; Flags.made = book => { this.books.add(book); book.follow(flag => { if (flag.startsWith('seen:')) { this.send(flag); return; } if (flag.startsWith(TALKED)) this.send(`${flag.slice(TALKED.length)}.talk`); this.send(`${STORY_ACT}${flag}`); }); }; }
+  /** SHARD-SOURCE SS-GP1: a flag book for `level` (a grid cell's slug) that follows the server's until `scope` ends (a grid
+   *  stay), then is dropped. `current`: the wire is that cell's now, so a settled world's flags are taken at once rather than
+   *  read as news on the next frame. */
+  book(level: string, scope: Scope, current: boolean): Flags {
+    const book = new Flags(level, false), tick = this.client?.latest?.tick;
+    if (current && this.books.has(book) && this.settled && tick !== undefined) book.mirror(this.heard, tick);
+    scope.onDispose(() => { this.books.delete(book); });
+    return book;
+  }
   /** The wire is up. `press` sends one `interact`. */
   bind(client: NetClient, press: (id: string) => void, stop: () => void, heads: (body: number, to: Vector3) => boolean, act: (act: NetRoomAct) => void = () => undefined): void {
     this.client = client; this.press = press; this.act = act; this.stop = stop; this.heads = heads; this.encounterRows = netEncounterFeed(client).rows;

@@ -35,7 +35,7 @@ import { enteredOwner, withOwner } from '@wildshard/engine/app/ownership';
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { loadingUnits } from '@wildshard/engine/boot/waits';
 import { Mesh, Object3D, Vector3 } from 'three';
-import { QuestState } from '@wildshard/engine/quest/core';
+import { installDeclaredQuests } from './declaredQuests';
 import { Flags } from '@wildshard/engine/world/interact/flags';
 import type { Actor, CombatTarget } from '@wildshard/engine/combat/pipeline';
 import { fovForAspect } from '@wildshard/engine/combat/blocks/melee';
@@ -738,14 +738,13 @@ export class ShardfileClient {
         player: () => world.player.position });
       ctx.debug.expose('shardfileTalks', { talks: () => talks.map(talk => ({ id: talk.id, node: talk.node() ?? null, open: box?.isOpen ?? false })) });
     }
+    // SS-GP1: one install with a grid data cell's (`grid/dataCellQuests.ts`)
     const installQuests = (quests: Shardfile['quests'], at: ShardContext, ui: typeof presentation): void => {
-      for (const declaration of quests.quests) {
-        const quest = new QuestState(declaration, flags, ctx.app.events, at.scope);
-        const options = declaration.track === false ? { chip: () => ({ label: '', count: '' }) } : {};
+      installDeclaredQuests(quests, flags, ctx.app.events, at.scope, (quest, options) => {
         // a retained (grid) runtime's chip, pins and card are its entered cell's only
         if (ui === null) throw new Error('Missing quest presentation module');
         if (retainsRuntimeServices(ctx)) ui.installEnteredQuestPresentation(at, quest, options); else ui.installQuestPresentation(at, quest, options);
-      }
+      });
     };
     // SHARD-SOURCE AP19 (DEVSERVER): `wildshard watch`'s soft restart rebuilds the quest views from a new quest section, so on a
     // watched (one-shard) page they live in one child scope it replaces; elsewhere they are the context's, as they always were.

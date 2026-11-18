@@ -1,0 +1,27 @@
+// SHARD-SOURCE SS-GP1: a shard's declared quests, one install for a one-shard page (`client.ts`) and a grid data cell
+// (`grid/dataCellQuests.ts`), so the grid cannot miss them again. Each quest's state follows `flags` (the page's book, which
+// follows the server's), and the page presents it: its chip, pins, card and reward.
+import type { Events } from '@wildshard/engine/events/events';
+import type { Scope } from '@wildshard/engine/app/scope';
+import { QuestState } from '@wildshard/engine/quest/core';
+import type { Flags } from '@wildshard/engine/world/interact/flags';
+import type { Shardfile } from '@wildshard/format/shardSchema';
+import type { QuestPresentationOptions } from '../plugin/ui';
+
+/** A quest the page presents: `installQuestPresentation` or its entered form, or a test's. */
+export type QuestPresenter = (quest: QuestState, options: QuestPresentationOptions) => void;
+
+/** An untracked quest's chip (`track: false`): blank. */
+export const BLANK_CHIP = (): { label: string; count: string } => ({ label: '', count: '' });
+
+/** Whether a source declares any quest. */
+export const hasQuests = (source: Pick<Shardfile, 'quests'>): boolean => source.quests.quests.length > 0;
+
+/** Build each declared quest's state over `flags` for `scope`'s life and hand it to `present`. */
+export function installDeclaredQuests(quests: Shardfile['quests'], flags: Flags, events: Events | undefined, scope: Scope, present: QuestPresenter): QuestState[] {
+  return quests.quests.map((declaration) => {
+    const quest = new QuestState(declaration, flags, events, scope);
+    present(quest, declaration.track === false ? { chip: BLANK_CHIP } : {});
+    return quest;
+  });
+}
