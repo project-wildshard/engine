@@ -585,9 +585,9 @@
         "workers": 8300285,
         "geometry": 60073161,
         "textures": 127285900,
-        "scene": 6841076,
+        "scene": 158244,
         "audio": 46651101,
-        "loading": 118432431,
+        "loading": 127151812,
         "margin": 0
       },
       "peak": {
@@ -596,7 +596,7 @@
         "workers": 10412040,
         "geometry": 60073161,
         "textures": 127285900,
-        "scene": 7239548,
+        "scene": 345648,
         "audio": 46651101,
         "loading": 192918739,
         "margin": 0
