@@ -43,6 +43,8 @@ export const CI_NATIVE_GROUPS = {
     'test/nalati-headless-population.test.ts',
     'test/nalati-headless-worker.test.ts',
   ],
+  // The camp walk and fresh native worker replay share one child deadline.
+  'nalati-ride': ['test/nalati-ride-verbs.test.ts'],
   'nalati-bot-taming': ['test/nalati-bot-taming.test.ts'],
   'nalati-taming': ['test/nalati-taming-verbs.test.ts'],
   // FAST-SLOW-TESTS FS4: the field taming's second leg (all five rounds from a saved breaking start), its own unit.
