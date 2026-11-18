@@ -1,0 +1,107 @@
+{
+  "species": {
+    "id": "kit.creature.deer",
+    "kind": "kit.deer",
+    "label": "Deer",
+    "aggressive": false,
+    "lockable": true,
+    "dims": {
+      "bodyY": 0.92,
+      "bodyHalfLen": 0.72,
+      "bodyRadius": 0.33,
+      "headRadius": 0.17,
+      "legLen": 0.92,
+      "feet": [
+        [0.155, 0.49],
+        [-0.155, 0.49],
+        [0.155, -0.59],
+        [-0.155, -0.59]
+      ],
+      "halfWidth": 0.27
+    },
+    "variants": [
+      {
+        "id": "hind",
+        "label": "Hind",
+        "rarity": "common",
+        "weight": 1,
+        "scale": [1, 1],
+        "hp": 60,
+        "mods": {
+          "speed": 1,
+          "chargeDist": 1,
+          "damageTaken": 1,
+          "chargeDamage": 0,
+          "relentless": false
+        }
+      }
+    ],
+    "type": "beast",
+    "body": {
+      "look": "kit.creature.deer.look",
+      "skeleton": "quadruped",
+      "size": "medium",
+      "scale": 1
+    },
+    "temperament": {
+      "reaction": "skittish",
+      "brain": "hunt",
+      "leash": 50,
+      "assist": 8,
+      "home": {
+        "speed": 1.3,
+        "stop": 1
+      },
+      "tuning": {
+        "hp": 60,
+        "sightRange": 30,
+        "sightRangeGraze": 14,
+        "sightCone": 0.9599310885968813,
+        "hearStill": 3,
+        "hearCrouch": 6,
+        "hearWalk": 12,
+        "hearSprint": 24,
+        "noticeRate": 0.3,
+        "forgetRate": 0.3,
+        "alertAt": 0.45,
+        "boltAt": 1,
+        "freezeMin": 4,
+        "freezeMax": 7,
+        "relaxAfter": 3.5,
+        "panicDist": 6,
+        "runSpeed": 6,
+        "trotSpeed": 3.2,
+        "fleeMinTime": 1.5,
+        "fleeUntil": 35,
+        "fleeUntilMax": 50,
+        "fleeMaxTime": 8,
+        "lookBack": 2.5,
+        "waryTime": 10,
+        "waryBoost": 1.2,
+        "herdAlertRadius": 8,
+        "herdBoltDelayMin": 0.4,
+        "herdBoltDelayMax": 1.2,
+        "impactSpook": 4,
+        "impactAlert": 10,
+        "motion": {
+          "walkSpeed": 1.3,
+          "chargeSpeed": 0,
+          "chargeWindup": 0,
+          "ringRadius": 0,
+          "trampleRadius": 0.5
+        }
+      }
+    },
+    "harvest": [
+      {
+        "item": "venison",
+        "count": 1
+      },
+      {
+        "item": "deer-hide",
+        "count": 1
+      }
+    ]
+  },
+  "strikes": []
+}

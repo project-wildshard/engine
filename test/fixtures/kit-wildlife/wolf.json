@@ -1,0 +1,101 @@
+{
+  "species": {
+    "id": "kit.creature.wolf",
+    "kind": "kit.wolf",
+    "label": "Wolf",
+    "aggressive": true,
+    "lockable": true,
+    "dims": {
+      "bodyY": 0.72,
+      "bodyHalfLen": 0.65,
+      "bodyRadius": 0.3,
+      "headRadius": 0.17,
+      "legLen": 0.63,
+      "feet": [
+        [0.14, 0.43],
+        [-0.14, 0.43],
+        [0.14, -0.42],
+        [-0.14, -0.42]
+      ],
+      "halfWidth": 0.25
+    },
+    "variants": [
+      {
+        "id": "grey",
+        "label": "Grey wolf",
+        "rarity": "common",
+        "weight": 1,
+        "scale": [1, 1],
+        "hp": 80,
+        "mods": {
+          "speed": 1,
+          "chargeDist": 1,
+          "damageTaken": 1,
+          "chargeDamage": 0,
+          "relentless": false
+        }
+      }
+    ],
+    "type": "beast",
+    "body": {
+      "look": "kit.creature.wolf.look",
+      "skeleton": "quadruped",
+      "size": "medium",
+      "scale": 1
+    },
+    "temperament": {
+      "reaction": "aggressive",
+      "brain": "pursue",
+      "leash": 45,
+      "assist": 14,
+      "pack": true,
+      "home": {
+        "speed": 2,
+        "stop": 1
+      },
+      "tuning": {
+        "speed": 5,
+        "turnRate": 8,
+        "thinkDivisor": 3,
+        "attackCooldownTicks": 45,
+        "wanderRadius": 4,
+        "wanderEveryTicks": 120
+      }
+    },
+    "senses": {
+      "notice": 22
+    },
+    "abilities": [
+      {
+        "use": "kit.creature.wolf.bite",
+        "range": 1.9,
+        "cooldown": 1.2,
+        "weight": 1
+      }
+    ],
+    "harvest": [
+      {
+        "item": "wolf-hide",
+        "count": 1
+      }
+    ]
+  },
+  "strikes": [
+    {
+      "id": "kit.creature.wolf.bite",
+      "shape": {
+        "kind": "sphere",
+        "radius": 1.9
+      },
+      "windup": 0.24,
+      "active": 0.1,
+      "recover": 0.25,
+      "cooldown": 1.2,
+      "range": 1.9,
+      "damage": 14,
+      "tags": ["creature.bite", "cover.checked"],
+      "weight": 1,
+      "speed": 0
+    }
+  ]
+}
