@@ -94,6 +94,10 @@ test('browser products need a build proof and bundle no checked host intake', as
   const admitted = await loaded.admitFolder(index, options);
   expect(admitted.source).toEqual(source);
   expect((await loaded.admitFolder(admitted.source, options)).source).toBe(admitted.source);
+  const identityBytes = new TextEncoder().encode(JSON.stringify([new URL(options.base).origin, source.identity.slug]));
+  expect(admitted.instance).toBe(`external-${hashImmutableBytes(identityBytes)}`);
+  expect(hash.mock.calls).toEqual([[identityBytes], [identityBytes]]);
+  hash.mockClear();
   fetch.mockClear();
   admitted.source.identity.name = 'Changed exposed source';
   const unprovedOptions:FolderOptions={base:options.base,offline:false,firstParty:true,hash,fetch};
