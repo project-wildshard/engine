@@ -13,3 +13,6 @@
   --after-staging-proofs, verify-staging.sh's journeys and sweeps, and --smoke. verify-staging.sh is a thin call into
   staging-qa.mjs; verify-staging.yml and zone-sweep.mjs are gone (K6 is the card sweep); placement-sweep.mjs enters the
   touched slugs through K6. The catalogue's 23 engine dead tests are deleted: none had a caller, only comments.
+- SQ14 follow-up: the first whole local leg on b61b0042 held on ios-safari with the world already drawn (idb's HID channel
+  dropped mid-walk), and a rerun found the last run's saved name on the same loopback origin. The proof now retries an idb
+  call twice and runs on its own `Wildshard QA` device, erased each run: PASS in 90 s. Local leg about 4.8 min in all.

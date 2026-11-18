@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import { deployFrameProblem } from '../scripts/journey-proof.mjs';
 import { holdLine, mergeVerdict } from '../scripts/staging-qa.mjs';
 import { chromiumCandidateArgs } from '../scripts/staging-qa-browser.mjs';
-import { pickPhone } from '../scripts/staging-qa-sim.mjs';
+import { pickPhone, qaDevice } from '../scripts/staging-qa-sim.mjs';
 import { budgetFinding, LEG_CAP_S, LEG_TARGET_S, LEGS, nominalSeconds, STEPS } from '../scripts/staging-qa-budget.mjs';
 
 const build = 'a'.repeat(40);
@@ -83,5 +83,7 @@ describe('the iOS Simulator step (SQ14)', () => {
     expect(pickPhone(listing)).toMatchObject({ udid: 'c', state: 'Booted', version: [27, 0] });
     expect(pickPhone({ devices: { 'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [row('d', 'iPhone 16 Pro')] } })?.udid).toBe('d');
     expect(pickPhone({ devices: {} })).toBeUndefined();
+    expect(qaDevice(listing)).toBeUndefined();
+    expect(qaDevice({ devices: { 'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [row('q', 'Wildshard QA')] } })?.udid).toBe('q');
   });
 });

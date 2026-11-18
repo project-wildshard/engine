@@ -113,10 +113,21 @@ function safari(udid) {
   };
   const page = inspector(find, 'webkit');
   /** @param {string[]} args */
-  const idb = args => new Promise((resolve, reject) => {
+  const idbOnce = args => new Promise((resolve, reject) => {
     const child = spawn('idb', ['ui', ...args, '--udid', udid], { stdio: ['ignore', 'inherit', 'inherit'] });
     child.on('error', reject); child.on('exit', code => { if (code === 0) resolve(undefined); else reject(new Error(`idb ui ${args[0] ?? ''} exited ${String(code)}`)); });
   });
+  // The Simulator's HID channel (dtuhidd) is sometimes invalidated mid-run and the next idb call opens a fresh one
+  // (STAGING-QA SQ14: a local leg on b61b0042 held on that, with the world already drawn). Two retries, a second apart.
+  /** @param {string[]} args */
+  const idb = async args => {
+    for (let attempt = 1; ; attempt += 1) {
+      try { await idbOnce(args); return; } catch (error) {
+        if (attempt >= 3) throw error;
+        await new Promise(resolve => { setTimeout(resolve, 1000); });
+      }
+    }
+  };
   const r = (/** @type {number} */ value) => String(Math.round(value));
   return { errors: page.errors, evaluate: page.evaluate,
     open: async url => {
