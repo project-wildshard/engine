@@ -1,11 +1,12 @@
 /* Client-only stealth presentation in the baseline HUD slots. */
-.ws-stealth { position: absolute; inset: 0; pointer-events: none; z-index: calc(var(--ws-layer-hud) + 4); }
+.ws-stealth { position: absolute; inset: 0; pointer-events: none; visibility: hidden; z-index: calc(var(--ws-layer-hud) + 4); }
 #hud.intro .ws-stealth { display: none; }
 
 /* the eye pip, just under the crosshair: icon + label */
-.ws-stealth-pip { --threat: 0; position: absolute; left: 50%; top: calc(50% + 30px); display: flex; align-items: center; gap: 6px; transform: translateX(-50%); padding: 3px 10px 3px 7px; border-radius: 11px; background: rgba(6, 10, 18, 0.42); box-shadow: 0 0 14px rgba(6, 10, 18, 0.35); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); text-shadow: 0 0 6px rgba(0, 0, 0, 0.75); opacity: 0; transition: opacity 0.25s, color 0.2s; white-space: nowrap; }
+.ws-stealth-pip { --threat: 0; position: absolute; left: 50%; top: calc(50% + 30px); display: flex; align-items: center; gap: 6px; transform: translateX(-50%); padding: 3px 10px 3px 7px; border-radius: 11px; background: rgba(6, 10, 18, 0.42); box-shadow: 0 0 14px rgba(6, 10, 18, 0.35); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); text-shadow: 0 0 6px rgba(0, 0, 0, 0.75); opacity: 0; transition: opacity 0.25s, color 0.2s, visibility 0s linear 0.25s; white-space: nowrap; }
 .ws-stealth-eye { display: block; width: 20px; height: 20px; font-style: normal; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.7)); }
 .ws-stealth-eye svg { display: block; width: 100%; height: 100%; }
+.ws-stealth:is([data-state='visible'], [data-state='hidden'], [data-state='noticed'], [data-state='detected']) .ws-stealth-pip { visibility: visible; transition-delay: 0s; }
 .ws-stealth[data-state='visible'] .ws-stealth-pip { opacity: 0.45; color: var(--ws-text); }
 .ws-stealth[data-state='hidden'] .ws-stealth-pip { opacity: 1; color: var(--ws-cyan); }
 .ws-stealth[data-state='hidden'] .ws-stealth-eye { filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.8)); }
@@ -15,17 +16,17 @@
 .ws-stealth[data-state='detected'] .ws-stealth-eye { width: 26px; height: 34px; animation: ws-stealth-throb 0.7s ease-in-out infinite; filter: drop-shadow(0 0 8px rgba(255, 90, 74, 0.9)); }
 
 /* the threat chevron, orbiting the crosshair toward the most aware creature (transform set by the module) */
-.ws-stealth-chev { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: 0; opacity: 0; transition: opacity 0.2s; }
+.ws-stealth-chev { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: 0; opacity: 0; transition: opacity 0.2s, visibility 0s linear 0.2s; }
 .ws-stealth-chev::before { content: ''; position: absolute; left: -9px; top: -7px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 12px solid var(--ws-amber); filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.6)); }
 .ws-stealth-chev.on { opacity: 0.9; }
 .ws-stealth[data-state='detected'] .ws-stealth-chev::before { border-bottom-color: var(--ws-red); }
 
 /* DETECTED: a red vignette pulse at the frame edges */
-.ws-stealth-vig { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 70, 50, 0.16) 78%, rgba(255, 60, 40, 0.42) 100%); transition: opacity 0.35s; }
-.ws-stealth[data-state='detected'] .ws-stealth-vig { opacity: 1; animation: ws-stealth-pulse 1.1s ease-in-out infinite; }
+.ws-stealth-vig { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 70, 50, 0.16) 78%, rgba(255, 60, 40, 0.42) 100%); transition: opacity 0.35s, visibility 0s linear 0.35s; }
+.ws-stealth[data-state='detected'] .ws-stealth-vig { visibility: visible; transition-delay: 0s; opacity: 1; animation: ws-stealth-pulse 1.1s ease-in-out infinite; }
 
 /* the GRASS cover meter on the left edge while crouched (fills with the cover; cyan once it hides you) */
-.ws-stealth-grass { position: absolute; left: 14px; top: 38%; display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; transition: opacity 0.3s; }
+.ws-stealth-grass { position: absolute; left: 14px; top: 38%; display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; transition: opacity 0.3s, visibility 0s linear 0.3s; }
 .ws-stealth-grass.on { opacity: 1; }
 .ws-stealth-grass span { font-size: 8px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); text-shadow: 0 0 5px rgba(0, 0, 0, 0.8); writing-mode: vertical-rl; transform: rotate(180deg); }
 .ws-stealth-grass b { position: relative; display: block; width: 7px; height: 110px; background: rgba(6, 10, 18, 0.5); border: 1px solid var(--ws-cyan-line); overflow: hidden; }
@@ -33,8 +34,9 @@
 .ws-stealth-grass.good i { background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.6); }
 
 /* the one-time TALL GRASS chip: desktop under the pip, touch just left of the CROUCH disc (the slot over JUMP) */
-.ws-stealth-hint { position: absolute; left: 50%; top: calc(50% + 58px); transform: translateX(-50%); padding: 4px 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); border-left: 3px solid var(--ws-cyan); font-size: 8.5px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ws-text); opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
+.ws-stealth-hint { position: absolute; left: 50%; top: calc(50% + 58px); transform: translateX(-50%); padding: 4px 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); border-left: 3px solid var(--ws-cyan); font-size: 8.5px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ws-text); opacity: 0; transition: opacity 0.4s, visibility 0s linear 0.4s; white-space: nowrap; }
 .ws-stealth-hint.on { opacity: 1; }
+.ws-stealth :is(.ws-stealth-chev, .ws-stealth-grass, .ws-stealth-hint).on { visibility: visible; transition-delay: 0s; }
 .ws-stealth-hint.touch { left: auto; right: calc(min(15vw, 84px) + 26px); top: auto; bottom: calc(max(15vh, 104px) + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px)) * 0.5 + 18px + min(15vw, 84px) * 1.5); transform: translateY(50%); }
 
 @keyframes ws-stealth-pulse { 0%, 100% { opacity: 0.65; } 50% { opacity: 1; } }

@@ -4,13 +4,14 @@
 .ws-elite {
   --gold: #e9b44c; --gold-hi: #fff0b5; --gold-lo: #8a5a16;
   --serif: 'Cinzel', 'Trajan Pro', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
-  position: absolute; inset: 0; pointer-events: none; z-index: calc(var(--ws-layer-hud) + 4);
+  position: absolute; inset: 0; pointer-events: none; visibility: hidden; z-index: calc(var(--ws-layer-hud) + 4);
 }
 #hud.intro .ws-elite { display: none; }
 
 /* ── the bar: over the head (translate3d set per frame, centred above the point) ── */
-.ws-elite-bar { position: absolute; left: 0; top: 0; width: 250px; margin: -64px 0 0 -125px; opacity: 0; transition: opacity 0.35s; will-change: transform; text-align: center; }
+.ws-elite-bar { position: absolute; left: 0; top: 0; width: 250px; margin: -64px 0 0 -125px; opacity: 0; transition: opacity 0.35s, visibility 0s linear 0.35s; text-align: center; }
 .ws-elite-bar.show { opacity: 1; }
+.ws-elite-bar.show:not(.occluded) { visibility: visible; transition-delay: 0s; will-change: transform; }
 .ws-elite-bar.show.dim { opacity: 0.22; } /* floating under the toast column (ToastStack's toastArea): the toasts read first */
 .ws-elite-bar.show.occluded { opacity: 0; } /* over its head, a wall between (Elite.ts host.canSee): never drawn through it */
 .ws-elite-name { font-family: var(--serif); font-weight: 700; font-size: 15px; letter-spacing: 0.24em; text-indent: 0.24em; color: #fbecc2; text-shadow: 0 1px 0 #3a2406, 0 0 8px rgba(0, 0, 0, 0.95); text-transform: uppercase; white-space: nowrap; }
@@ -45,11 +46,11 @@
 
 /* ── the banner ── */
 .ws-elite-banner {
-  position: absolute; left: 50%; top: 14px; display: flex; align-items: center; gap: 12px; padding: 7px 22px 7px 14px; transform: translate(-50%, -12px); opacity: 0; transition: opacity 0.4s, transform 0.5s;
+  position: absolute; left: 50%; top: 14px; display: flex; align-items: center; gap: 12px; padding: 7px 22px 7px 14px; transform: translate(-50%, -12px); opacity: 0; transition: opacity 0.4s, transform 0.5s, visibility 0s linear 0.4s;
   background: linear-gradient(180deg, rgba(14, 16, 22, 0.86), rgba(8, 10, 16, 0.8)); border: 1px solid var(--gold); box-shadow: 0 0 0 1px #2a1604, 0 0 22px rgba(233, 180, 76, 0.25), 0 8px 26px rgba(0, 0, 0, 0.6);
   clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
 }
-.ws-elite-banner.show { opacity: 1; transform: translate(-50%, 0); }
+.ws-elite-banner.show { visibility: visible; transition-delay: 0s; opacity: 1; transform: translate(-50%, 0); }
 .ws-elite-banner.below { top: 104px; }   /* under a pinned bar */
 .ws-elite-banner .ws-elite-skull { width: 30px; height: 30px; }
 .ws-elite-banner-text { display: flex; flex-direction: column; align-items: flex-start; }
@@ -57,8 +58,8 @@
 .ws-elite-banner-name { margin-top: 3px; font-family: var(--serif); font-weight: 700; font-size: 14px; letter-spacing: 0.16em; color: var(--gold); white-space: nowrap; text-shadow: 0 1px 0 #2a1604; }
 
 /* ── the edge chevron (a threat off screen: Qyran's stoop, a charge from behind) ── */
-.ws-elite-chevron { position: absolute; left: 0; top: 0; width: 0; height: 0; margin: -14px 0 0 -10px; opacity: 0; border-left: 26px solid #ffc24d; border-top: 14px solid transparent; border-bottom: 14px solid transparent; transform-origin: 10px 14px; filter: drop-shadow(0 0 8px rgba(255, 170, 60, 0.95)); transition: opacity 0.15s; }
-.ws-elite-chevron.show { opacity: 1; animation: ws-elite-pulse 0.4s ease-in-out infinite alternate; }
+.ws-elite-chevron { position: absolute; left: 0; top: 0; width: 0; height: 0; margin: -14px 0 0 -10px; opacity: 0; border-left: 26px solid #ffc24d; border-top: 14px solid transparent; border-bottom: 14px solid transparent; transform-origin: 10px 14px; filter: drop-shadow(0 0 8px rgba(255, 170, 60, 0.95)); transition: opacity 0.15s, visibility 0s linear 0.15s; }
+.ws-elite-chevron.show { visibility: visible; transition-delay: 0s; opacity: 1; animation: ws-elite-pulse 0.4s ease-in-out infinite alternate; }
 @keyframes ws-elite-pulse { from { filter: drop-shadow(0 0 4px rgba(255, 170, 60, 0.7)); } to { filter: drop-shadow(0 0 14px rgba(255, 200, 90, 1)); } }
 
 /* ── the minimap skulls (a layer inside .ws-minimap: gold alive, pulsing engaged, grey + countdown ring dead) ── */

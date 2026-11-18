@@ -128,7 +128,7 @@ export class BossBar {
   hideReward(): void { this.reward.classList.remove('show'); }
 
   fade(on: boolean, ms = 300): void {
-    this.black.style.transitionDuration = `${ms}ms`;
+    this.black.style.setProperty('--ws-boss-fade-time', `${ms}ms`);
     this.black.classList.toggle('show', on);
   }
 

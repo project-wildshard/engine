@@ -4,12 +4,14 @@
 .ws-boss {
   --gold: #e9b44c; --gold-hi: #fff0b5; --gold-lo: #8a5a16; --ink: rgba(12, 8, 4, 0.82);
   --serif: 'Cinzel', 'Trajan Pro', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
-  position: absolute; inset: 0; pointer-events: none; z-index: calc(var(--ws-layer-hud) + 4);
+  position: absolute; inset: 0; pointer-events: none; visibility: hidden; z-index: calc(var(--ws-layer-hud) + 4);
 }
 #hud.intro .ws-boss { display: none; }
+/* Let the visible pieces finish their fades, then release the idle composited backing. */
+.ws-boss > .show { visibility: visible; transition-delay: 0s; }
 
 /* ── the bar ── */
-.ws-boss-bar { position: absolute; left: 50%; top: 8px; width: min(58vw, 780px); transform: translateX(-50%) translateY(-8px); opacity: 0; transition: opacity 0.5s, transform 0.5s; }
+.ws-boss-bar { position: absolute; left: 50%; top: 8px; width: min(58vw, 780px); transform: translateX(-50%) translateY(-8px); opacity: 0; transition: opacity 0.5s, transform 0.5s, visibility 0s linear 0.5s; }
 .ws-boss-bar.show { opacity: 1; transform: translateX(-50%); }
 .ws-boss-bar-name { text-align: center; font-family: var(--serif); font-weight: 600; font-size: 19px; letter-spacing: 0.42em; text-indent: 0.42em; color: var(--gold); text-shadow: 0 1px 0 #3a2406, 0 0 10px rgba(0, 0, 0, 0.9), 0 0 18px rgba(233, 180, 76, 0.35); margin-bottom: 5px; }
 .ws-boss-bar-frame { position: relative; display: flex; align-items: center; height: 26px; }
@@ -36,7 +38,7 @@
 @keyframes ws-boss-flash { 0% { box-shadow: 0 0 0 1px #3a2406, 0 0 0 3px rgba(255, 230, 150, 0.9), 0 0 30px rgba(255, 210, 110, 0.9); } 100% { box-shadow: 0 0 0 1px #3a2406, 0 0 0 3px rgba(233, 180, 76, 0.35), 0 2px 10px rgba(0, 0, 0, 0.8); } }
 
 /* ── the name card: letterbox bands slide in, the engraved name fades up ── */
-.ws-boss-card { position: absolute; inset: 0; opacity: 0; transition: opacity 0.45s; }
+.ws-boss-card { position: absolute; inset: 0; opacity: 0; transition: opacity 0.45s, visibility 0s linear 0.45s; }
 .ws-boss-card.show { opacity: 1; }
 .ws-boss-card-band { position: absolute; left: 0; right: 0; height: 12vh; background: #000; transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .ws-boss-card-band.top { top: 0; transform: translateY(-100%); }
@@ -58,14 +60,14 @@
 .ws-boss-card-skip i { --p: 0deg; width: 14px; height: 14px; border-radius: 50%; background: conic-gradient(var(--gold) var(--p), rgba(243, 227, 189, 0.2) var(--p)); -webkit-mask: radial-gradient(closest-side, transparent 55%, #000 58%); mask: radial-gradient(closest-side, transparent 55%, #000 58%); }
 
 /* ── the retry card ── */
-.ws-boss-retry { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%) scale(0.96); width: min(90vw, 640px); text-align: center; opacity: 0; transition: opacity 0.5s, transform 0.8s; padding: 18px 0; background: radial-gradient(ellipse at center, rgba(20, 4, 2, 0.7) 0%, rgba(20, 4, 2, 0) 70%); }
+.ws-boss-retry { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%) scale(0.96); width: min(90vw, 640px); text-align: center; opacity: 0; transition: opacity 0.5s, transform 0.8s, visibility 0s linear 0.5s; padding: 18px 0; background: radial-gradient(ellipse at center, rgba(20, 4, 2, 0.7) 0%, rgba(20, 4, 2, 0) 70%); }
 .ws-boss-retry.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .ws-boss-retry-title { font-family: var(--serif); font-weight: 700; font-size: clamp(24px, 5vw, 46px); letter-spacing: 0.16em; text-indent: 0.16em; color: #e9a28c; text-shadow: 0 0 16px rgba(160, 20, 10, 0.8), 0 2px 0 #1a0402; margin-bottom: 8px; }
 .ws-boss-retry-attempt { font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.4em; text-indent: 0.4em; color: #f3e3bd; text-shadow: 0 0 6px #000; }
 
 /* ── the legendary reward card (boss-4-victory-reward.png) ── */
 .ws-boss-reward {
-  position: absolute; left: 50%; top: 17%; transform: translate(-50%, -10px); min-width: min(84vw, 420px); padding: 16px 34px 16px; text-align: center; opacity: 0; transition: opacity 0.6s, transform 0.8s;
+  position: absolute; left: 50%; top: 17%; transform: translate(-50%, -10px); min-width: min(84vw, 420px); padding: 16px 34px 16px; text-align: center; opacity: 0; transition: opacity 0.6s, transform 0.8s, visibility 0s linear 0.6s;
   background: linear-gradient(180deg, rgba(20, 14, 6, 0.9), rgba(10, 7, 3, 0.86)); border: 1.5px solid var(--gold);
   box-shadow: 0 0 0 1px #2a1604, 0 0 0 4px rgba(233, 180, 76, 0.18), 0 0 34px rgba(233, 180, 76, 0.35), 0 12px 40px rgba(0, 0, 0, 0.7);
   clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
@@ -78,7 +80,7 @@
 .ws-boss-reward-flavour { font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.08em; color: #f3e3bd; }
 
 /* ── the door fade ── */
-.ws-boss-fade { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 300ms ease; }
+.ws-boss-fade { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity var(--ws-boss-fade-time, 300ms) ease, visibility 0s linear var(--ws-boss-fade-time, 300ms); }
 .ws-boss-fade.show { opacity: 1; }
 
 /* phone: the bar full width under the minimap; the cards scaled down */
