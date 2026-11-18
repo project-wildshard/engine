@@ -81,3 +81,9 @@ has 90 minutes for the 130-boot sweep. The hosted Ubuntu job stays on
 the original instrument and comparator.
 [First hosted qualification](https://github.com/project-wildshard/engine/actions/runs/44375696856).
 [GitHub macOS 27 image](https://github.blog/changelog/2026-10-15-xcode-27-runner-image-generally-available/).
+
+A fresh six-boot mini check on `4026d299` read the same pinned Pine
+product at 993,357,493 B playing and 1,468,262,375 B loading. The
+STR8 sweep observed 1.010 and 1.541 GB on this pin, so its margin
+remains narrow. QA29 tracks the prepared Pine product's release and
+production re-pin.
