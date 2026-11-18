@@ -31,8 +31,11 @@ export function bindCreatureTemperament(host: SimHost, actor: AnimalSim, at: rea
       if (player?.health !== req.source || !player.health.alive) return;
       if (req.target !== actor.combatActor()) {
         const damaged = host.entities.get(req.target.id);
-        if (!pack || group?.members.has(req.target) !== true || damaged === undefined || damaged.combatActor() !== req.target
-          || damaged.position.distanceToSquared(actor.position) > assist * assist) return;
+        if (!pack || group?.members.has(req.target) !== true || damaged === undefined || damaged.combatActor() !== req.target) return;
+        // A guardian can start rising before the queued hit reaches its pack.
+        const dx = damaged.position.x - actor.position.x, dz = damaged.position.z - actor.position.z;
+        const dy = (damaged.position.y - damaged.yOffset) - (actor.position.y - actor.yOffset);
+        if (dx * dx + dy * dy + dz * dz > assist * assist) return;
       }
       ambushing = false;
       if (passive) frightened = true; else source.provoke?.(player.id);

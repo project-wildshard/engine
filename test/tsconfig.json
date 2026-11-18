@@ -240,7 +240,9 @@
     "declared-entry-targets-debug.test.ts",
     "fixtures/frozen/nalati-dressing-phone.json",
     "fixtures/frozen/nalati/nalati-poi-paint-original.json",
-    "fixtures/native-book-derived.json"
+    "fixtures/native-book-derived.json",
+    "fixtures/kit-wildlife/deer.skin.json",
+    "fixtures/kit-wildlife/wolf.skin.json"
   ],
   "files": [
     "../src/test/helpers/git.ts",

@@ -762,7 +762,7 @@ def select_owner(args, census, backend):
         time.sleep(min(args.interval, max(0, until - time.monotonic())))
 
 
-def census_summary(report, status):
+def census_summary(report, status, recorder_error):
     start, end, cpu, cpu_by_kind, samples = None, None, 0, collections.Counter(), 0
     with report.open() as reader:
         for line in reader:
@@ -778,7 +778,7 @@ def census_summary(report, status):
             elif row['type'] == 'end':
                 end = row
     if start is None or end is None:
-        raise SystemExit(f'incomplete census; raw observation retained at {report}')
+        raise SystemExit(f'incomplete census; raw observation retained at {report}\n{recorder_error.strip()}'.rstrip())
     kinds = collections.Counter(kind_of(process['name']) for process in end['observedProcesses'])
     return {'root': start['root'], 'startedAtMs': start['startedAtMs'],
             'machine': start.get('machine'), 'platform': start['platform'], 'endedAtMs': end.get('endedAtMs'),
@@ -872,7 +872,7 @@ def command_observe(args):
             raise SystemExit(f'census recorder timed out; {evidence}; target was not signalled') from error
         if not report.exists():
             raise SystemExit(result.stderr.strip() or 'census refused before observation')
-        row = census_summary(report, result.returncode)
+        row = census_summary(report, result.returncode, result.stderr)
         row['selectedRootIdentity'] = owner.identity
         requested = args.proof_root is not None or args.command_log is not None
         if requested:

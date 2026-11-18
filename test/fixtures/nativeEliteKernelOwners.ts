@@ -45,7 +45,7 @@ export function nativeKernelOwners(scope = new Scope('native-elites')): NativeKe
     knockdown: { speed: 9, min: 0, max: 1, seconds: 1 } }]);
   const combat = legacyDouble<ReturnType<AnimalSim['combatActor']>>({});
   const actor = legacyDouble<AnimalSim>({ entityId: 'body.1', kind: 'leopard', variant: rows[0]?.id ?? '', label: 'Guardian',
-    alive: true, position: new Vector3(), scale: 1, yaw: 0, mem: {}, herd: -1, attackPhase: .9,
+    alive: true, position: new Vector3(), scale: 1, aggroScale: 1, yaw: 0, mem: {}, herd: -1, attackPhase: .9,
     dims: legacyDouble<AnimalSim['dims']>({ headRadius: .2, bodyY: 1, bodyRadius: .3 }),
     headWorld: out => out.set(0, 1, 0), setMotion: vi.fn(), cancelAttack: vi.fn(), combatActor: () => combat });
   host.entities.set(actor.entityId, actor);

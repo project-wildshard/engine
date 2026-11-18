@@ -135,6 +135,8 @@ export interface SkirmisherSpec {
 /** Host-owned perception, navigation and attack-token authority; no rendering or application singleton. */
 export interface SkirmisherPorts<A extends AnimalSim> {
   dt: number; player: { x: number; y: number; z: number }; calm: boolean;
+  /** The layered target choice can arrive after the damage wake has interrupted a swing. */
+  retainAttackCooldownOnHit?: boolean;
   rng: Pick<Rng, 'next' | 'range'>;
   herd: readonly { variant: string; alive: boolean }[] | null;
   sound: (cue: string) => void;
@@ -695,7 +697,14 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
     const toPlayer = Math.atan2(dx, dz);
     m.cd = Math.max(0, m.cd - c.dt);
     // a blow interrupts whatever it was doing: it turns on you
-    if (a.lastHitT > m.hitT) { m.hitT = a.lastHitT; a.cancelAttack(); if (m.st !== ST_FLEE) { m.st = ST_ENGAGE; m.cd = Math.max(m.cd, this.skirmishSpec.alertCooldown); } }
+    if (a.lastHitT > m.hitT) {
+      m.hitT = a.lastHitT; a.cancelAttack();
+      if (m.st !== ST_FLEE) {
+        const cooldown = c.retainAttackCooldownOnHit === true && m.st === ST_ATTACK
+          ? this.skirmishSpec.attackCooldown : this.skirmishSpec.alertCooldown;
+        m.st = ST_ENGAGE; m.cd = Math.max(m.cd, cooldown);
+      }
+    }
     // A dead leader makes its subordinate variants scatter and remain shy.
     if (a.variant === this.skirmishSpec.subordinateVariant && !m.scat && c.herd?.some((h) => h.variant === this.skirmishSpec.leaderVariant && !h.alive)) { m.scat = 1; m.shy = 1; m.st = ST_FLEE; m.tm = rng.range(5, 7); a.cancelAttack(); c.sound(this.skirmishSpec.noticeCue); }
     const engageR = (m.shy ? this.skirmishSpec.shyRadius : this.skirmishSpec.awareRadius) * (a.aggroScale ?? 1);

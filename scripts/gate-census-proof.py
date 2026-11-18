@@ -169,8 +169,7 @@ while(!existsSync(root+'/go'))await setTimeout(5);
 if(mode==='orphan'){
  const program="const fs=require('node:fs'),root=process.argv[1];fs.writeFileSync(root+'/orphan-ready',String(process.pid));const timer=setInterval(()=>{if(fs.existsSync(root+'/orphan-release')){clearInterval(timer);fs.writeFileSync(root+'/orphan-finished','natural completion');}},10);";
  const writer=spawn(process.execPath,['-e',program,root],{detached:true,stdio:'ignore'});writer.unref();
- while(!existsSync(root+'/orphan-ready'))await setTimeout(5);
- await setTimeout(150);
+ while(!existsSync(root+'/orphan-detach'))await setTimeout(5);
 }
 assert.equal(JSON.parse(readFileSync('value.json','utf8')).value,1);
 const until=performance.now()+200;while(performance.now()<until){}
@@ -230,6 +229,22 @@ if(mode==='failed')process.exitCode=7;
         wait_for(lambda: any(root.glob('summary.*.jsonl')) if observer else raw.exists() and raw.stat().st_size > 0,
                  [wrapper, recorder])
         (root / 'go').touch()
+        if name == 'orphan':
+            def sampled_writer():
+                pid = parsed(root / 'orphan-ready')
+                if pid is None:
+                    return False
+                for report in root.glob('summary.*.jsonl'):
+                    for line in report.read_text().splitlines(keepends=True):
+                        if not line.endswith('\n'):
+                            continue
+                        row = json.loads(line)
+                        if row['type'] == 'sample' and any(process['pid'] == pid for process in row['processes']):
+                            return True
+                return False
+            # Prove this really is a known descendant before detaching it.
+            wait_for(sampled_writer, [wrapper, recorder], seconds=5)
+            (root / 'orphan-detach').touch()
         out, err = wrapper.communicate(timeout=15)
         assert wrapper.returncode == (7 if name == 'failed' else 0), (out, err)
         out, err = recorder.communicate(timeout=12)

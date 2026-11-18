@@ -68,6 +68,7 @@ export function dataGroundBrains(host: SimHost, rows: ShardRows, spawns: ShardCr
     const binding = bindContact(actor, spawn?.strike, declaration.attackDuration, 'Skirmisher'), target = binding.target;
     const herd = herdOf(spawn?.group);
     const observation = { dt: 0, player: actor.position, calm: false, rng: host.rng.stream('ai'), herd,
+      retainAttackCooldownOnHit: spawn !== undefined && species.get(spawn.species)?.temperament !== undefined,
       sound: (_cue: string) => undefined,
       steer: (body: AnimalSim, yaw: number, speed: number, turn: number) => { body.setMotion(yaw, speed, turn); },
       confine: (body: AnimalSim) => {
