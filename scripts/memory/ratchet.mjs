@@ -58,6 +58,33 @@ export function compareLedger(baseline, runs, zone) {
   return next;
 }
 
+/**
+ * A hosted Chromium boot is one sample: control "loading" swings by 3–4 MB
+ * with how many ring tiles happen to be resident, so a single over-line
+ * reading is retried (memory/ci.mjs) and the zone fails only when every
+ * reading is over. A retained allocation shows in every boot and still fails.
+ * @param {LedgerBudget} baseline @param {readonly LedgerBudget[]} runs
+ * @param {string} zone @returns {LedgerBudget}
+ */
+export function confirmLedger(baseline, runs, zone) {
+  if (runs.length === 0) throw new Error(`${zone}: no successful ledger boots`);
+  const failures = [];
+  for (const run of runs) {
+    const failure = ledgerOverLine(baseline, run, zone);
+    if (failure === null) return compareLedger(baseline, [run], zone);
+    failures.push(failure);
+  }
+  throw new Error(`${zone}: ${runs.length} of ${runs.length} readings over the line\n${failures.join('\n')}`);
+}
+
+/** The failure a single reading would raise, or null when it is inside the line.
+ * @param {LedgerBudget} baseline @param {LedgerBudget} run @param {string} zone @returns {string | null} */
+export function ledgerOverLine(baseline, run, zone) {
+  try { compareLedger(baseline, [run], zone); return null; } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 /** Hottest run sets the extent of measured spread around the median. The
  * positive spread is kept in bytes so subsequent measurements cannot widen
  * the allowance.
@@ -140,7 +167,8 @@ export function main(argv) {
       throw new Error('Measured zone coverage differs from the committed ledger baseline');
     }
     const zones = Object.fromEntries([...readings.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([zone, runs]) =>
-      [zone, baseline === null ? highWater(runs) : compareLedger(baseline.zones[zone], runs, zone)]));
+      [zone, baseline === null ? highWater(runs)
+        : (mode === 'ledger' ? confirmLedger : compareLedger)(baseline.zones[zone], runs, zone)]));
     if (values.out) write(values.out, { version: 1, mode, instrument, zones });
     console.log(`Ledger ${baseline === null ? 'recorded' : 'passed'} for ${readings.size} zones`);
   } else {

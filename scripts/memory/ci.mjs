@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { serve } from '../parity/serve.mjs';
-import { compareLedger, ledgerBudget, main as ratchet } from './ratchet.mjs';
+import { compareLedger, ledgerBudget, ledgerOverLine, main as ratchet } from './ratchet.mjs';
 
 const [mode, root, output, baseline] = process.argv.slice(2);
 if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode) || !root || !output) {
@@ -20,6 +20,12 @@ async function measure(args) {
   const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
   if (code !== 0) throw new Error(`Measurement exited ${String(code)}: ${args.join(' ')}`);
 }
+
+/** @param {string} file */
+const get = file => JSON.parse(readFileSync(file, 'utf8'));
+// One hosted boot is one sample (memory/ratchet.mjs confirmLedger): a zone whose
+// first reading is over the line is measured once more and fails only if both are.
+const stored = mode === 'ledger' && baseline ? get(baseline).zones : null;
 
 const preview = await serve(absolute(root), '', true, { telemetryDir: join(directory, 'telemetry') });
 const files = [];
@@ -51,11 +57,19 @@ try {
         ...(mode === 'ledger' ? ['--ledger-only'] : [mode === 'footprint' ? '--runs=5' : '--runs=3'])]);
       files.push(file);
     }
+    const first = stored?.[chunk] === undefined ? null : get(files.at(-1));
+    const failure = first?.microscope?.ready === true
+      ? ledgerOverLine(stored[chunk], ledgerBudget(first.microscope.checkpoints), chunk) : null;
+    if (failure !== null) {
+      console.log(`${failure}\nMeasuring ${chunk} once more: it fails only if this reading is over the line too.`);
+      const file = join(directory, `measure-${chunk}-2.json`);
+      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file}`, '--ledger-only']);
+      files.push(file);
+    }
   }
   const next = join(directory, `${mode}-ratchet.json`);
   ratchet([`--mode=${mode}`, `--out=${next}`, ...(baseline ? [`--baseline=${baseline}`] : []), ...files]);
   if (mode === 'ledger' && !baseline) {
-    const get = (/** @type {string} */ file) => JSON.parse(readFileSync(file, 'utf8'));
     const control = get(next).zones._template;
     const clean = join(directory, 'template-clean.json'), planted = join(directory, 'template-planted.json');
     const args = [`--url=${preview.url}`, '--chunk=_template', '--timeout=180', '--ledger-only'];
