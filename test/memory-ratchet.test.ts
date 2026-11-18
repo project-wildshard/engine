@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { compareFootprint, compareLedger, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, ledgerBudget } from '../scripts/memory/ratchet.mjs';
+import { compareFootprint, compareLedger, confirmFootprint, footprintOverLine, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, ledgerBudget } from '../scripts/memory/ratchet.mjs';
 
 const MB = 1e6;
 const points = (held: number): Parameters<typeof ledgerBudget>[0] => [
@@ -77,6 +77,15 @@ test('native footprint compares the median with the stored upper spread', () => 
   expect(compareFootprint(baseline, [516, 525, 535])).toEqual(baseline);
   expect(() => compareFootprint(baseline, [526, 530, 535])).toThrow(/530 B > 528 B/u);
   expect(() => footprintBudget([0, 524, 528])).toThrow('native WebContent');
+});
+
+test('a Template footprint batch over the line is confirmed by a second batch before it fails', () => {
+  const baseline = { settled: 539, spread: 51 };
+  expect(footprintOverLine(baseline, [565, 567, 580])).toBeNull();
+  expect(footprintOverLine(baseline, [539, 594, 600])).toMatch(/Template settled WebContent: 594 B > 590 B/u);
+  expect(confirmFootprint(baseline, [[539, 594, 600], [550, 567, 587]])).toEqual({ settled: 539, spread: 51 });
+  expect(() => confirmFootprint(baseline, [[539, 594, 600], [592, 596, 610]]))
+    .toThrow(/2 of 2 batches over the line\n[^]*594 B > 590 B[^]*596 B > 590 B/u);
 });
 
 test('a footprint baseline and its runs share one inspector mode (EM11b)', () => {

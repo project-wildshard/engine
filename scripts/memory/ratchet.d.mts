@@ -12,4 +12,6 @@ export function confirmZone(ports: { zone: string; baseline: LedgerBudget | unde
 export function footprintBudget(readings: readonly number[]): FootprintBudget;
 export function footprintInstrument(measurements: readonly unknown[], baseline: unknown): string;
 export function compareFootprint(baseline: FootprintBudget, readings: readonly number[]): FootprintBudget;
+export function footprintOverLine(baseline: FootprintBudget, readings: readonly number[]): string | null;
+export function confirmFootprint(baseline: FootprintBudget, batches: readonly (readonly number[])[]): FootprintBudget;
 export function main(argv: string[]): void;

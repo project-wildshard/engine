@@ -129,6 +129,30 @@ export function compareFootprint(baseline, readings) {
   return { settled: Math.min(previous, observed.settled), spread: baseline.spread };
 }
 
+/** The failure one batch of native boots would raise, or null when its median is inside the line.
+ * @param {FootprintBudget} baseline @param {readonly number[]} readings @returns {string | null} */
+export function footprintOverLine(baseline, readings) {
+  try { compareFootprint(baseline, readings); return null; } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+/**
+ * The hosted macOS runner's Template median moves about 24 MB from run to run (564-589 MB on unchanged code), so a batch
+ * whose median is over the line is measured once more (memory/ci.mjs) and fails only when every batch is over.
+ * @param {FootprintBudget} baseline @param {readonly (readonly number[])[]} batches @returns {FootprintBudget}
+ */
+export function confirmFootprint(baseline, batches) {
+  if (batches.length === 0) throw new Error('No native WebContent batches');
+  const failures = [];
+  for (const readings of batches) {
+    const failure = footprintOverLine(baseline, readings);
+    if (failure === null) return compareFootprint(baseline, readings);
+    failures.push(failure);
+  }
+  throw new Error(`Template: ${batches.length} of ${batches.length} batches over the line\n${failures.join('\n')}`);
+}
+
 /** EM11b: which Web Inspector mode the runs were read with (measure.mjs `instrument`; a run before EM11b is `full`). The
  * `full` mode carries up to ~200 MB of retained response bodies a phone does not have, so a baseline and runs read in
  * different modes are never compared: re-record the baseline (ci.yml `memory_record`).
@@ -196,7 +220,7 @@ export function main(argv) {
     if (values.out) write(values.out, { version: 1, mode, instrument, zones });
     console.log(`Ledger ${baseline === null ? 'recorded' : 'passed'} for ${readings.size} zones`);
   } else {
-    const readings = measurements.flatMap(doc => {
+    const batches = measurements.map(doc => {
       if (doc.chunk !== '_template' || !Array.isArray(doc.webkit) || doc.webkit.length === 0) throw new Error('Expected native WebKit Template runs');
       return doc.webkit.map((/** @type {any} */ run) => {
         if (run.host !== 'webkit' || run.refused !== null || run.ready !== true) throw new Error('Template did not reach control in native WebKit');
@@ -204,9 +228,10 @@ export function main(argv) {
       });
     });
     const instrument = footprintInstrument(measurements, baseline);
-    const anchor = baseline === null ? footprintBudget(readings) : compareFootprint(baseline.anchor, readings);
+    const anchor = baseline === null ? footprintBudget(batches.flat()) : confirmFootprint(baseline.anchor, batches);
     if (values.out) write(values.out, { version: 1, mode, instrument, anchor });
-    console.log(`Template native WebContent: median ${footprintBudget(readings).settled} B, baseline ${anchor.settled} B + ${anchor.spread} B`);
+    const medians = batches.map(readings => footprintBudget(readings).settled).join(' B, ');
+    console.log(`Template native WebContent: median ${medians} B, baseline ${anchor.settled} B + ${anchor.spread} B`);
   }
 }
 

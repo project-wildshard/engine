@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { serve } from '../parity/serve.mjs';
-import { compareLedger, confirmZone, ledgerBudget, main as ratchet } from './ratchet.mjs';
+import { compareLedger, confirmZone, footprintOverLine, ledgerBudget, main as ratchet } from './ratchet.mjs';
 
 const [mode, root, output, baseline] = process.argv.slice(2);
 if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode) || !root || !output) {
@@ -26,6 +26,8 @@ const get = file => JSON.parse(readFileSync(file, 'utf8'));
 // One hosted boot is one sample (memory/ratchet.mjs confirmZone): a zone whose first
 // boot is over the line or never reaches control is booted once more.
 const stored = mode === 'ledger' && baseline ? get(baseline).zones : null;
+// The native Template footprint gets the same rule: a batch whose median is over the line is measured once more.
+const anchor = mode === 'footprint' && baseline ? get(baseline).anchor : null;
 
 const preview = await serve(absolute(root), '', true, { telemetryDir: join(directory, 'telemetry') });
 const files = [];
@@ -62,6 +64,13 @@ try {
       continue;
     }
     for (let i = 0; i < rounds; i++) files.push(await boot(i + 1));
+    if (anchor === null) continue;
+    const settled = get(files.at(-1) ?? '').webkit?.map((/** @type {any} */ run) => run.settled?.webcontent);
+    const failure = Array.isArray(settled) && settled.every(n => typeof n === 'number') ? footprintOverLine(anchor, settled) : null;
+    if (failure !== null) {
+      console.log(`${failure}\nMeasuring ${chunk} once more: it fails only if this batch is over the line too.`);
+      files.push(await boot(2));
+    }
   }
   const next = join(directory, `${mode}-ratchet.json`);
   ratchet([`--mode=${mode}`, `--out=${next}`, ...(baseline ? [`--baseline=${baseline}`] : []), ...files]);
