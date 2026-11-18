@@ -18,6 +18,7 @@ import { readWindIntake } from '../boss/windEliteNative';
 import { withEncounters, type EncounterIntake } from '../population/encounterIntake';
 import { installNativeHarvest } from '../loot/harvest';
 import { prepareReturns } from './nativeRuntimeLoans';
+import { recordPrimitives } from './hostPrimitives';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** One prepared native world: identical to a typed runtime plan, built from data alone. */
@@ -97,6 +98,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     try { installNativeCollision(proof, bake, { ...need(plan.collision, 'A fresh entry walk needs its collision'), omit: fresh.omit } as Parameters<typeof installNativeCollision>[2]); proof.step(); return walk(proof); } finally { proof.dispose(); }
   }, install: (host, context) => {
     lendReturns(host);
+    recordPrimitives(host, shard, plan.features.map(row => row.host)); // OF17b1: native features name their families until M8
     const run: AssemblyRun<C> = { host, context, input: null, day: null };
     for (const step of steps) step(run);
     installNativeHarvest(host, harvest);

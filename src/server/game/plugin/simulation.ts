@@ -102,6 +102,7 @@ import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 import { scriptSeats, type ScriptSeats } from './scriptSeats';
 import { registerInstalled } from '../shardfile/installedSides';
 import { installDeclaredRiding, type DeclaredRiding } from '../shardfile/declaredRiding';
+import { recordPrimitives } from '../shardfile/hostPrimitives';
 
 type Physics = SimHost['physics'];
 type PropColliderPort = NonNullable<ReturnType<ReturnType<typeof installShardfileColliders>['get']>>;
@@ -746,6 +747,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       seats.step(); createQuestScriptPorts(lane, hooks, actors).scene(row.scene, player); return true;
     };
     const riding = installDeclaredRiding(host, shard);
+    recordPrimitives(host, shard); // OF17b1: the list comes from the sections, never a host list
     return { riding, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
   } catch (error) { host.dispose(); throw error; }
 }

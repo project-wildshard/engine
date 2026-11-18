@@ -1366,6 +1366,7 @@
     "src/server/game/shardfile/brainRuntime.ts": "server",
     "src/server/game/shardfile/dataGroundBrains.ts": "server",
     "src/server/game/shardfile/dataPerchBrains.ts": "server",
+    "src/server/game/shardfile/hostPrimitives.ts": "server",
     "src/server/game/shardfile/perchBodyPools.ts": "server",
     "src/server/game/shardfile/groundTemperament.ts": "server",
     "src/server/game/shardfile/creatureLayers.ts": "server",
