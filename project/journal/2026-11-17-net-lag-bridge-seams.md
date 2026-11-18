@@ -12,7 +12,8 @@ colliders changed the later slide by 21.6 cm.
 A grounded upright player's downward move can now retry a mixed
 static slope and wall contact from one skin of clearance. Rapier
 still resolves the rail and snaps down. The retry only replaces the
-original movement if it finds support. It does not apply another
-impulse. The native replay now differs by at most 1.42 cm across
-the tested orders. The fixed 180 ms cases use the windmill drum
+original movement if it stays grounded on static collision and within
+the movement's climb and snap bounds. An upward capsule cast checks
+clearance before retrying. The native replay differs by at most
+1.42 cm across the tested orders at the captured bridge start. The fixed 180 ms cases use the windmill drum
 step and both bridge windows.

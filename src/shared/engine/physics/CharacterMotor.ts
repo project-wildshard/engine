@@ -14,7 +14,7 @@
  * `passThrough` lets a kind of body through for a while (a stampede through the player on foot), `touching` lists what
  * lies within a margin of the capsule (the herd jostling a rider).
  */
-import type { Capsule, Collider, KinematicCharacterController, Ray, RayColliderIntersection, RigidBody } from '@dimforge/rapier3d-simd';
+import type { Capsule, CharacterCollision, Collider, KinematicCharacterController, Ray, RayColliderIntersection, RigidBody } from '@dimforge/rapier3d-simd';
 import type { Physics } from './Physics';
 import { GROUP, groups, queryGroups, type GroupName } from './groups';
 import { isTerrainCollider, tagCollider } from './surface';
@@ -72,6 +72,8 @@ const DECK_REACH = 0.1;
  * corrected the owner (Far Reach's windmill: 8.5 to 18.4 a minute on staging). Clear of the floor, only the wall is hit.
  */
 const REST_LIFT = 0.0005;
+const UP = { x: 0, y: 1, z: 0 } as const;
+const SLOPE_CONTACT = 1, WALL_CONTACT = 2;
 
 export interface MoveResult {
   grounded: boolean;
@@ -121,6 +123,8 @@ export class CharacterMotor {
   private readonly probe = { x: 0, y: 0, z: 0 };
   private readonly flat = { x: 0, y: 0, z: 0 };
   private readonly movement = { x: 0, y: 0, z: 0 };
+  private retryMovement: Vec3 | undefined;
+  private contact: CharacterCollision | undefined;
   /** Rapier reads a translation synchronously; retain its numeric upload row. */
   private readonly translation = { x: 0, y: 0, z: 0 };
   private touchShape: Capsule | null = null; private touchMargin = -1;
@@ -141,7 +145,7 @@ export class CharacterMotor {
     if (lying && state === undefined) { this.layAlong(0); this.collider.setRotation(this.rot); }
     tagCollider(this.collider, 'flesh', opts.owner ?? null);
     this.kcc = world.createCharacterController(0.02);
-    this.kcc.setUp({ x: 0, y: 1, z: 0 });
+    this.kcc.setUp(UP);
     this.kcc.enableAutostep(opts.step, opts.radius * 0.5, false);
     this.kcc.enableSnapToGround(opts.snap);
     this.kcc.setMaxSlopeClimbAngle(opts.maxClimbDeg * Math.PI / 180);
@@ -267,21 +271,44 @@ export class CharacterMotor {
     return true;
   }
 
-  /** A sloped support and an upright obstruction can both be at the skin.
-   * The native controller's first contact then depends on tree order. */
-  private hitsStaticSlopeAndWall(): boolean {
-    let slope = false, wall = false;
-    const climb = Math.cos(this.kcc.maxSlopeClimbAngle());
+  /** Both contacts can be at the skin, leaving the native sweep at the
+   * mercy of tree order. Only a purely static WORLD move may retry. */
+  private staticContacts(): number | null {
+    let contacts = 0;
+    const climb = Math.cos(this.kcc.maxSlopeClimbAngle()), reach = this.kcc.offset() / 2;
+    const scratch = this.contact ??= new this.physics.R.CharacterCollision();
     for (let i = 0; i < this.kcc.numComputedCollisions(); i++) {
-      const hit = this.kcc.computedCollision(i);
-      if (hit === null || hit.collider === null) return false;
+      const hit = this.kcc.computedCollision(i, scratch);
+      if (hit === null || hit.collider === null) return null;
       const { collider, normal1, toi } = hit, parent = collider.parent();
       if (isTerrainCollider(collider) || (parent !== null && !parent.isFixed())
-          || ((collider.collisionGroups() >>> 16) & GROUP.WORLD) === 0) return false;
-      if (toi <= this.kcc.offset() / 2 && normal1.y >= climb && normal1.y < 0.999999) slope = true;
-      if (Math.abs(normal1.y) < 0.1) wall = true;
+          || ((collider.collisionGroups() >>> 16) & GROUP.WORLD) === 0) return null;
+      if (toi <= reach && normal1.y >= climb && normal1.y < 0.999999) contacts |= SLOPE_CONTACT;
+      if (Math.abs(normal1.y) < 0.1) contacts |= WALL_CONTACT;
     }
-    return slope && wall;
+    return contacts;
+  }
+
+  /** Re-run a slide from one skin higher, with gravity left to the snap.
+   * Keep the original result at an edge, under a low roof, or when the
+   * retry finds a new obstruction or substantially changes floor height. */
+  private slideAboveSlope(want: Vec3, predicate: ((collider: Collider) => boolean) | undefined): Vec3 | null {
+    const { R, world } = this.physics, start = this.translation, clearance = this.kcc.offset();
+    const flags = R.QueryFilterFlags.EXCLUDE_SENSORS;
+    if (world.castShape(start, this.rot, UP, this.collider.shape, 0, clearance, false, flags,
+      this.filter, this.collider, undefined, predicate) !== null) return null;
+    start.y += clearance;
+    this.collider.setTranslation(start);
+    const impulses = this.kcc.applyImpulsesToDynamicBodies();
+    this.kcc.setApplyImpulsesToDynamicBodies(false);
+    try {
+      this.kcc.computeColliderMovement(this.collider, this.flatWant(want), flags, this.filter, predicate);
+    } finally { this.kcc.setApplyImpulsesToDynamicBodies(impulses); }
+    if (!this.kcc.computedGrounded() || this.staticContacts() === null) return null;
+    const retry = this.kcc.computedMovement(this.retryMovement ??= { x: 0, y: 0, z: 0 });
+    retry.y += clearance;
+    const rise = clearance + Math.hypot(retry.x, retry.z) * Math.tan(this.kcc.maxSlopeClimbAngle());
+    return retry.y <= Math.min(rise, this.opts.step) && retry.y >= -Math.min(rise, this.opts.snap) ? retry : null;
   }
 
   /** Begin grounded downward moves on a ray-measured float32 skin plane above nearly flat static support.
@@ -377,7 +404,7 @@ export class CharacterMotor {
     const wantH = Math.hypot(want.x, want.z);
     // SF49 / SF51: a sideways move near a kinematic body (a mover's deck, at rest or ridden) starts a skin higher (see
     // `nearDeck`); a move with no sideways part isn't snapped back down by the controller, so it starts where it is.
-    let lifted = wantH > 1e-6 && want.y <= 0 && this.nearDeck(feet) ? this.kcc.offset() : 0;
+    const lifted = wantH > 1e-6 && want.y <= 0 && this.nearDeck(feet) ? this.kcc.offset() : 0;
     if (lifted > 0) {
       translation.x = feet.x; translation.y = feet.y + this.lift + lifted; translation.z = feet.z;
       this.collider.setTranslation(translation);
@@ -391,31 +418,19 @@ export class CharacterMotor {
     // NL13: a flat-floor hit can also eat only part of the move (35% freedom
     // on Far Reach). Retry losses over 10%, only for nearly vertical contact normals;
     // slopes retain the original severe-stall threshold and walls never qualify.
-    const movedH = Math.hypot(m.x, m.z);
+    let movedH = Math.hypot(m.x, m.z);
     if (wantH > 1e-6 && want.y <= 0 && movedH < wantH * 0.9
         && this.stalledOnFloor(movedH < wantH * 0.3 ? Math.cos(this.kcc.maxSlopeClimbAngle()) : 0.9999)) {
       this.flat.x = want.x; this.flat.y = 0; this.flat.z = want.z;
       this.kcc.computeColliderMovement(this.collider, this.flat, R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, pred);
       m = this.kcc.computedMovement(this.movement);
+      movedH = Math.hypot(m.x, m.z);
     }
     let grounded = this.kcc.computedGrounded();
-    // A skin of clearance lets the normal wall slide finish before snap
-    // puts the capsule onto the slope again. Keep the first move when the
-    // retry leaves the ground, such as at the end of a railing.
     if (!ignoreGround && this.opts.group === 'PLAYER' && this.opts.length === undefined && lifted === 0 && r.grounded
-        && want.y < 0 && movedH < wantH * 0.99 && this.hitsStaticSlopeAndWall()) {
-      const clearance = this.kcc.offset();
-      translation.y += clearance;
-      this.collider.setTranslation(translation);
-      this.kcc.setApplyImpulsesToDynamicBodies(false);
-      try {
-        this.kcc.computeColliderMovement(this.collider, this.flatWant(want), R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, pred);
-      } finally { this.kcc.setApplyImpulsesToDynamicBodies(true); }
-      if (this.kcc.computedGrounded()) {
-        m = this.kcc.computedMovement(this.movement);
-        lifted = clearance;
-        grounded = true;
-      }
+        && want.y < 0 && movedH < wantH * 0.99 && this.staticContacts() === (SLOPE_CONTACT | WALL_CONTACT)) {
+      const retry = this.slideAboveSlope(want, pred);
+      if (retry !== null) { m = retry; grounded = true; }
     }
     feet.x += m.x; feet.y += m.y + lifted; feet.z += m.z;
     if (sideways && Math.abs(feet.y - (this.restPlane + this.kcc.offset() + REST_LIFT)) < 1e-6) feet.y = this.restPlane + this.kcc.offset();
