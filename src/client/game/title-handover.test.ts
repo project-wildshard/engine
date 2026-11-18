@@ -88,3 +88,19 @@ test('SB37b: a page a hand-over opened never hands over again (no loop), and a w
   await vi.advanceTimersByTimeAsync(30_000);
   expect(reload).not.toHaveBeenCalled();
 });
+
+test('SB37b: an ENTER THE MMO tap waiting on its gate holds the hand-over; a refused gate gives it back', async () => {
+  let release: () => void = () => undefined;
+  const gate = vi.fn(() => new Promise<void>(resolve => { release = resolve; }));
+  const view = buildTitleMenu({ cards: CARDS, active: null, gate, onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
+  document.body.append(view.root); views.push(view); view.start();
+  activated();
+  document.querySelector('.ws-main-mmo')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(gate).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(reload).not.toHaveBeenCalled();
+  release(); // the gate refused (never called go): the title is idle again
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(reload).toHaveBeenCalledOnce();
+});

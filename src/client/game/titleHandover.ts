@@ -29,6 +29,8 @@ export function armTitleHandover(owner: Scope, onMain: () => boolean, previous: 
   for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const) {
     owner.listen(window, type, () => { input = Date.now(); }, { capture: true, passive: true });
   }
+  // a player looking back at the tab gets the quiet window too, never a reload a second later
+  owner.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') input = Date.now(); });
   owner.listen(window, 'ws-sw-activated', event => {
     const value: unknown = event instanceof CustomEvent ? event.detail : null;
     if (typeof value === 'object' && value !== null && 'build' in value && typeof value.build === 'string') target = value.build;

@@ -208,7 +208,14 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const play = (): void => { void named(enterPlay); };
   deck.onTap(selectCard, play);
   // FM4 9b/10b: the title's gate (a world build's) may hold the MMO's entry too, until the world is back
-  const enterMmo = (): void => { void named(() => { const go = (): void => { dropFirstPlay(); onGrid(); leaveTitle(); }; if (deckOpts.gate === undefined) go(); else void deckOpts.gate(go); }); };
+  // SB37b: while the gate reads the world (seconds on a slow phone) the tap is in flight, so the idle title hand-over waits
+  let entering = false;
+  const enterMmo = (): void => { void named(() => {
+    const go = (): void => { dropFirstPlay(); onGrid(); leaveTitle(); };
+    if (deckOpts.gate === undefined) { go(); return; }
+    entering = true;
+    void Promise.resolve(deckOpts.gate(go)).catch(() => undefined).finally(() => { entering = false; });
+  }); };
   deck.onTap(mmoCard, enterMmo);
   // S2: only the player's last product, after the title paints; a first visit reads nothing. This is verified
   // disk prefetch, never world construction or a hidden offline-size scan. It shows nothing (QB2).
@@ -264,7 +271,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   deck.onTap(back, () => { show('main'); });
   show(viewScreen);
   // SB37b: a cold title gives way to the candidate once its worker activates, only while it sits idle on the main screen
-  if (opts.active === null) armTitleHandover(owner, () => viewScreen === 'main' && !naming && !leavingTitle);
+  if (opts.active === null) armTitleHandover(owner, () => viewScreen === 'main' && !naming && !entering && !leavingTitle);
 
   return {
     root, cards: deck.cards,

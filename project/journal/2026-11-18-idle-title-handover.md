@@ -19,3 +19,7 @@ serving the wrong document cannot loop the tab.
 This helps only shells built from this change on, so K2 can pass
 two releases later at the earliest. `title-handover.test.ts` and
 `sw-activated.test.ts` hold it until then; both failed first.
+
+A review found one gap: ENTER THE MMO reads the world for seconds
+before its hold card shows, so the tap now counts as busy until the
+gate settles. The quiet window also restarts when the tab comes back.

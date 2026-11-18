@@ -204,6 +204,7 @@ function watch(reg: ServiceWorkerRegistration): void {
   // Only a controlled page had a build to replace: a first install's activation is this page's own build (DL1 asks it PRECACHE only)
   const active = reg.active;
   if (active?.state === 'activated' && sw?.controller) noticeActivated(active);
+  else if (active?.state === 'activating') pageScope.listen(active, 'statechange', () => { if (active.state === 'activated' && sw?.controller) noticeActivated(active); });
   pageScope.listen(reg, 'updatefound', () => track(reg.installing));
 }
 
