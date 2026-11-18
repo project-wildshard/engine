@@ -62,6 +62,21 @@ test('the first failure is the only RED; a task it stopped names it', async () =
   expect(prePushCause(lines.join('\n'))).toMatch(/^check:saves RED in /u);
 }, 30_000);
 
+// TEMPLATE-E2E (opus-te2e6, 2026-11-17): a land's gate died `kill EPERM` after gen:inputs went green, because the drain
+// SIGKILLs a finished command's process groups and one of them was no longer ours to signal (an exited group's id taken
+// by another user's process). A group the gate may not signal holds nothing of its own; the gate carries on.
+test('a finished command whose group the gate may not signal does not end the gate', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  const kill = process.kill.bind(process);
+  vi.spyOn(process, 'kill').mockImplementation((pid: number, name?: string | number) => {
+    if (pid < 0) throw Object.assign(new Error('kill EPERM'), { code: 'EPERM', errno: -1, syscall: 'kill' });
+    return kill(pid, name);
+  });
+  const result = await parallelChecks([{ name: 'gen:inputs', commands: [[process.execPath, '-e', '0']] }], { graceMs: 200 });
+  expect(result).toMatchObject({ ok: true, results: [{ name: 'gen:inputs', code: 0 }] });
+}, 30_000);
+
 /** An owner shaped like scripts/vitest-tmp.ts: its own broker, its signal handler, its loss handler. */
 async function owner(work: string, kill: (pid: number, broker: number) => void): Promise<{ code: number | null; output: string }> {
   const file = join(work, 'owner.mjs');

@@ -61,7 +61,8 @@ export async function parallelChecks(tasks,options={}) {
   // CPU-BROKER: the first failure stops every other task. A task that ends after that was stopped, not refused on its
   // own: its line names the cause, so the first RED is the real one (a stopped vitest once read as a broker fault).
   let refused=false,cause='';
-  const signal=(group,name)=>{if(typeof group!=='number')return;try{process.kill(-group,name);}catch(error){if(error.code!=='ESRCH')throw error;}};
+  // A group gone (ESRCH) or no longer ours to signal (EPERM: its id taken by another user's process) holds nothing of the gate's.
+  const signal=(group,name)=>{if(typeof group!=='number')return;try{process.kill(-group,name);}catch(error){if(error.code!=='ESRCH'&&error.code!=='EPERM')throw error;}};
   const groups=child=>{
     if(typeof child.pid!=='number')return [];
     const rows=execFileSync('ps',['-Ao','pid=,ppid=,pgid='],{encoding:'utf8'}).trim().split('\n').map(line=>line.trim().split(/\s+/u).map(Number));
