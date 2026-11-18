@@ -21,6 +21,8 @@ test('production restart is refused before anything connects', () => {
 test('staging restart names only the staging unit and must end active', () => {
   expect(restartCommand('staging')).toContain('wildshard-server@staging');
   expect(restartCommand('staging')).not.toContain('production');
+  // Type=simple returns at fork: the state is read only after a settle, and printed even when not active.
+  expect(restartCommand('staging')).toMatch(/restart wildshard-server@staging && sleep 20 && \{ systemctl is-active wildshard-server@staging \|\| true; \}$/u);
   expect(main(['restart', 'staging'], () => 'active\n')).toEqual({channel: 'staging', restarted: true, state: 'active'});
   expect(() => main(['restart', 'staging'], () => 'failed\n')).toThrow(/'failed'/u);
 });

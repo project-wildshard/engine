@@ -61,6 +61,7 @@ jobs:
           printf 'Host wildshard-agent\n  HostName %s\n  User wildshard-agent\n  IdentityFile ~/.ssh/wildshard-agent\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$BOX_SSH_HOST" > ~/.ssh/config
           chmod 600 ~/.ssh/config
       - name: Restart the staging server and wait for active
+        shell: bash
         run: |
           node scripts/box-ops.mjs restart "$CHANNEL" | tee "$RUNNER_TEMP/restart.json"
           { echo "### staging-room-restart"; echo '```json'; cat "$RUNNER_TEMP/restart.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

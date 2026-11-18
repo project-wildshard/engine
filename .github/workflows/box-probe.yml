@@ -56,6 +56,7 @@ jobs:
           printf 'Host wildshard-agent\n  HostName %s\n  User wildshard-agent\n  IdentityFile ~/.ssh/wildshard-agent\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$BOX_SSH_HOST" > ~/.ssh/config
           chmod 600 ~/.ssh/config
       - name: Read tick p95, RSS and heap slope
+        shell: bash
         run: |
           node scripts/box-ops.mjs probe "$CHANNEL" | tee "$RUNNER_TEMP/probe.json"
           node -e '

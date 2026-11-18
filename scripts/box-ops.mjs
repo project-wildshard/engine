@@ -15,6 +15,7 @@ export const TICK_P95_BUDGET_S = 0.012;
 export const RSS_CAP_BYTES = {staging: 6 * 2 ** 30, production: 18 * 2 ** 30};
 export const RSS_SHARE = 0.6;
 const WINDOW = '10m';
+export const SETTLE_S = 20;
 
 /** @typedef {'staging' | 'production'} Channel */
 /** @typedef {{status?: string, data?: {result?: unknown}}} PromAnswer */
@@ -30,7 +31,7 @@ export function probeQueries(channel) {
   const c = known(channel);
   return {
     tick: `max by (worker) (max_over_time(wildshard_tick_seconds{channel="${c}",quantile="0.95"}[${WINDOW}]))`,
-    rss: `max(process_resident_memory_bytes{channel="${c}"})`,
+    rss: `max(max_over_time(process_resident_memory_bytes{channel="${c}"}[${WINDOW}]))`,
     heapSlope: `sum(deriv(wildshard_thread_memory_bytes{channel="${c}",kind="heap"}[${WINDOW}]))`,
   };
 }
@@ -50,7 +51,9 @@ export function restartCommand(channel) {
   if (channel !== 'staging') {
     throw new Error(`refused: only the staging server restarts from a workflow; '${channel}' is read-only (MA7a)`);
   }
-  return 'sudo -n /usr/bin/systemctl restart wildshard-server@staging && systemctl is-active wildshard-server@staging';
+  // The unit is Type=simple with Restart=always, so `restart` returns at fork: wait out a crash loop before reading the
+  // state, and print it even when not active (is-active exits non-zero) so the caller names it.
+  return `sudo -n /usr/bin/systemctl restart wildshard-server@staging && sleep ${SETTLE_S} && { systemctl is-active wildshard-server@staging || true; }`;
 }
 
 /** @param {unknown} answer a Prometheus /api/v1/query body */
