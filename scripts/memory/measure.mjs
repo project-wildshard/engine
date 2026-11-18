@@ -47,6 +47,7 @@ import { execFileSync } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { bootTimelineEntries } from '../loading-flow/stalls.mjs';
 import { listProcesses, readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
 import { ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText, zoneOverRuns } from './phoneModel.mjs';
 
@@ -422,7 +423,11 @@ async function chromiumLedger(page, url, timeoutMs) {
   if (failure === null && !checkpoints.some(row => row.step === 'control' && row.ledger)) {
     failure = 'Boot did not record a control ledger';
   }
-  return { host: 'chromium', ready: failure === null, failure, gpuDetail, checkpoints };
+  const timeline = failure === null ? undefined : await Promise.race([
+    page.evaluate(bootTimelineEntries).catch(() => null),
+    sleep(2000, null, { ref: false }),
+  ]);
+  return { host: 'chromium', ready: failure === null, failure, gpuDetail, checkpoints, timeline };
 }
 
 /** Chromium boot with detailed process dumps for diagnostics.
