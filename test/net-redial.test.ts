@@ -345,6 +345,17 @@ test('FM4b mode 45: a clock gap with no tick (asleep, not known hidden) is told 
   redial.dispose();
 });
 
+test('FM4b mode 45: a socket closed while the page slept reports before the first tick, and is still told as asleep', () => {
+  const { heard, run, away, redial, states, links } = harness();
+  heard(); run(200);
+  away(35_000); links[0]?.fail('lost'); run(100);
+  expect(states, 'a fresh link down, not 35 s of it').toEqual(['reconnecting']);
+  expect(redial.progress.away?.how).toBe('asleep');
+  run(400);
+  expect(links.length, 'it dials').toBeGreaterThan(1);
+  redial.dispose();
+});
+
 test('FM4b modes 4 and 45, healthy control: a long absence back to a link still carrying frames changes nothing', () => {
   const { heard, run, away, redial, states, links } = harness();
   heard(); run(200);

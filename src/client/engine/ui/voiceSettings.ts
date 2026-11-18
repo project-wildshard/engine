@@ -1,5 +1,6 @@
 import * as v from 'valibot';
 import { saves } from '../../../shared/engine/saves/runtime';
+import { saveEnvironment } from '../../../shared/engine/saves/environment';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { engineString } from '../../../shared/engine/strings';
 import { listenTap } from '../input/dom';
@@ -43,8 +44,11 @@ const hub = ((): Hub => {
   page[HUB] ??= { now: null, readers: new Set(), writers: new Set(), keys: new Set(), listeners: new Set() };
   return page[HUB];
 })();
-hub.readers.add(() => slot.read());
-hub.writers.add(now => { slot.write(now); });
+// FM8 32b (opus-fm2, 2026-11-18): a copy whose saves are memory only (no browser environment installed in it) answers the
+// defaults without throwing; on the online page it loaded first and its `toggle` hid the player's saved hold mode. It lends only
+// what its storage persists; a memory-only copy steps aside for the next, and stays the last resort while no other answers.
+hub.readers.add(() => { if (!saveEnvironment().persistent() && hub.readers.size > 1) throw new Error('memory-only saves'); return slot.read(); });
+hub.writers.add(now => { if (!saveEnvironment().persistent() && hub.writers.size > 1) throw new Error('memory-only saves'); slot.write(now); });
 hub.keys.add(() => {
   // An action bound here answers, even with no key: a cleared talk key opens nothing (Codex review).
   for (const { action, codes } of app.input.bindings.entries()) if (action === VOICE_TALK) return codes;

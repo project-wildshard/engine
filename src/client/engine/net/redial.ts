@@ -205,6 +205,9 @@ export class Redial {
   }
   private closed(reason: string, info: SocketCloseInfo | null = null): void {
     const now = this.now();
+    // FM4b mode 45: a socket that died while the page slept reports its close before the first clock tick after the wake; the
+    // absence is read first, so the close lands on a link already known to have been away, not as a fresh loss 35 s old
+    if (now - this.tickAt >= AWAY_MS) this.woke(now, 0);
     // SB31: the server closes a client it heard no byte from for 3 s (SILENCE_MS); a page frozen that long sent no ping. That is
     // the page, not the link: dial at once, and say nothing unless the link is still down a second later.
     if (reason === 'stalled' && this.phase === 'up' && (now - this.tickAt >= STRIP_MS || now - this.thawedAt < STRIP_MS)) {
