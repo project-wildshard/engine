@@ -20,9 +20,9 @@
 import * as THREE from 'three';
 import { RenderPass, type EffectComposer, type Pass } from 'postprocessing';
 import { markGpuOnly } from '../core/gpuOnly';
-import { arrayReleased, fixedBatchGeometry, geometryHasCpuReader, markArrayReleased, markArrayRestored } from './releasedArrays';
+import { arrayReleased, fixedBatchGeometry, geometryHasCpuReader, markArrayReleased, markArrayRestored, releasedArrayType } from './releasedArrays';
 import type { Renderer } from './renderer';
-import { drawHooks, propertyHooks } from './drawHooks';
+import { drawHooks, indexRotated, keepRotated, propertyHooks, turnTriangles } from './drawHooks';
 import { onceTextureUploaded } from './textureUploadEvents';
 import { renderCount } from './frameCounter';
 import { presenting } from '../../../shared/engine/core/framePacing';
@@ -149,12 +149,50 @@ function releasableAttribute(a: unknown): a is THREE.BufferAttribute {
     a.usage === THREE.StaticDrawUsage && a.updateRanges.length === 0;
 }
 
+/** each released attribute's GL buffer, for `writeReleasedArray` */
+const releasedBuffers = new WeakMap<object, { readonly gl: WebGL2RenderingContext; readonly buffer: WebGLBuffer }>();
+
+/** MG10: whether `index`'s triangles draw turned now (WebKit's first-vertex convention, `drawHooks.ts` `rotateTriangles`) */
+export function indexTurned(index: THREE.BufferAttribute): boolean { return indexRotated(index); }
+
+/**
+ * MG10: replace runs of `index`'s triangles (each `triangles` from element `at`), given turned or not (`sentTurned`), so they
+ * draw as the index draws now (`indexTurned`). When the Memory saver let the CPU copy go they go straight into the GPU
+ * buffer: no read-back from the GPU, no CPU copy kept, nothing uploaded again (the phone's slab trees landing,
+ * `slabLibrary.ts`). Otherwise into the array, uploaded again at the next draw. False: the buffer is gone (its geometry
+ * disposed) and nothing was written. The arrays given are turned in place.
+ */
+export function writeIndexTriangles(index: THREE.BufferAttribute, writes: readonly { readonly at: number; readonly triangles: Uint32Array }[], sentTurned: boolean): boolean {
+  const turned = indexRotated(index);
+  if (turned !== sentTurned) for (const { triangles } of writes) turnTriangles(triangles, !turned);
+  if (arrayReleased(index)) {
+    const held = releasedBuffers.get(index);
+    if (held === undefined || !held.gl.isBuffer(held.buffer)) return false;
+    const { gl, buffer } = held, wide = releasedArrayType(index) === 'Uint32Array';
+    const previous: unknown = gl.getParameter(gl.COPY_WRITE_BUFFER_BINDING);
+    gl.bindBuffer(gl.COPY_WRITE_BUFFER, buffer);
+    try {
+      for (const { at, triangles } of writes) {
+        const data = wide ? triangles : Uint16Array.from(triangles);
+        gl.bufferSubData(gl.COPY_WRITE_BUFFER, at * data.BYTES_PER_ELEMENT, data);
+      }
+    } finally { gl.bindBuffer(gl.COPY_WRITE_BUFFER, previous instanceof WebGLBuffer ? previous : null); }
+    return true;
+  }
+  const array = index.array as Uint16Array | Uint32Array;
+  for (const { at, triangles } of writes) array.set(triangles, at);
+  index.needsUpdate = true;
+  if (turned) keepRotated(index);
+  return true;
+}
+
 function releaseAttribute(a: unknown, label: string, gl: WebGL2RenderingContext, uploadedTo: Uploads['vertex']): number {
   if (!releasableAttribute(a)) return 0;
   const array = a.array, buffer = uploadedTo.get(array);
   if (array.length === 0 || buffer === undefined || buffer === null) return 0;
   const Ctor = array.constructor as ArrayCtor, length = array.length;
   markArrayReleased(a, Ctor.name);
+  releasedBuffers.set(a, { gl, buffer });
   // The draw count and GL handle stay. A later CPU read can recover the exact bytes.
   Object.defineProperty(a, 'array', {
     configurable: true, enumerable: true,

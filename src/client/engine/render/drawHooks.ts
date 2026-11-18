@@ -320,6 +320,21 @@ export function rotateTriangles(index: BufferAttribute): boolean {
   return true;
 }
 
+/** MG10: whether `index` draws rotated now (its triangles turned at its current version), so a writer that replaces its
+ *  triangles without a version change (`writeReleasedArray`) writes them turned too (`turnTriangles`) */
+export function indexRotated(index: BufferAttribute): boolean { return rotated.get(index) === index.version; }
+
+/** MG10: turn each triangle of `array` as `rotateTriangles` does (`a b c` -> `c a b`), or back with `back` */
+export function turnTriangles(array: Uint16Array | Uint32Array, back = false): void {
+  for (let i = 0; i + 2 < array.length; i += 3) {
+    const a = array[i] ?? 0, b = array[i + 1] ?? 0, c = array[i + 2] ?? 0;
+    if (back) { array[i] = b; array[i + 1] = c; array[i + 2] = a; } else { array[i] = c; array[i + 1] = a; array[i + 2] = b; }
+  }
+}
+
+/** MG10: `index`'s owner rewrote its triangles turned (`turnTriangles`) and bumped its version: it still draws rotated */
+export function keepRotated(index: BufferAttribute): void { if (rotated.has(index)) rotated.set(index, index.version); }
+
 /** Whether `userAgent` is WebKit's engine (Safari, and every iOS browser: CriOS, FxiOS), not Blink's. */
 export function webKitEngine(userAgent: string): boolean {
   return /AppleWebKit\//u.test(userAgent) && !/(?:Chrome|Chromium|Edg|OPR|SamsungBrowser)\//u.test(userAgent);

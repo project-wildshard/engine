@@ -15,6 +15,7 @@ import { SharedTileBuilds, type TileContent } from './tileContent';
 import type { ControlRefinement } from './controlRefinement';
 import { tilesSettling } from './tileDriver';
 import { TIER_CONFIG } from '@wildshard/engine/core/tier';
+import { indexTurned, writeIndexTriangles } from '@wildshard/engine/render/memorySaver';
 import { cullSlabRanges, SLAB_FAR_CELLS, slabRangesJob, slabRoom, slabTriangles, spatialSlabRanges, type SlabFar, type SlabRanges } from './slabRanges';
 import { mergedSlabBounds, mergeSlabChunks } from './slabMerge';
 
@@ -32,13 +33,27 @@ const EMPTY_KEYS: ReadonlySet<string> = new Set();
 const RANGES = new WeakMap<BufferGeometry, SlabRanges>();
 const LATE = new WeakSet<BufferGeometry>();
 const waiting: { readonly part: InstancedMesh; readonly geometry: BufferGeometry; readonly scope: Scope }[] = [];
+/** MG10: parts whose chunk's faced tree is on its way (`facedTree`): no place tree for them (its job read the released
+ *  index and positions back from the GPU, and kept them, ~23 MB on Nine, for a tree the faced one replaced ~0.3 s later) */
+const parked: typeof waiting = [];
+/** chunks whose faced tree the worker is building; with whether their index was drawn rotated when it was sent */
+const PENDING = new WeakMap<BufferGeometry, boolean>();
 let draining = false;
+function drainWaiting(): void { if (!draining && waiting.length > 0) { draining = true; void drainLate().finally(() => { draining = false; drainWaiting(); }); } }
 function slabRuns(part: InstancedMesh, geometry: BufferGeometry, scope: Scope): void {
   const ranges = RANGES.get(geometry);
   if (ranges !== undefined) { attach(part, geometry, ranges, scope); return; }
   if (!LATE.has(geometry)) return;
   waiting.push({ part, geometry, scope });
-  if (!draining) { draining = true; void drainLate().finally(() => { draining = false; }); }
+  drainWaiting();
+}
+/** MG10: parts whose faced tree landed or will not come go back to the place tree's queue (which attaches a landed tree) */
+function unpark(): void {
+  for (let at = parked.length - 1; at >= 0; at--) {
+    const entry = parked[at];
+    if (entry !== undefined && !PENDING.has(entry.geometry)) { parked.splice(at, 1); waiting.push(entry); }
+  }
+  drainWaiting();
 }
 async function drainLate(): Promise<void> {
   while (tilesSettling()) await new Promise<void>(resolve => { pageScope.timeout(250, resolve); });
@@ -47,6 +62,7 @@ async function drainLate(): Promise<void> {
     const { part, geometry, scope } = entry;
     if (scope.disposed || scope.disposing) continue;
     let ranges = RANGES.get(geometry);
+    if (ranges === undefined && PENDING.has(geometry)) { parked.push(entry); continue; }
     if (ranges === undefined && LATE.has(geometry)) {
       // a sliced job (mini-nb8e): a phone's merged key is ~0.5 M triangles, one long task in one go
       const job = slabRangesJob(geometry);
@@ -103,7 +119,11 @@ function facedTree(geometry: BufferGeometry): void {
     try {
       const worker = new Worker(new URL('slabTree.worker.ts', import.meta.url), { type: 'module', name: 'nb8-slab-tree' });
       worker.onmessage = landed;
-      worker.onerror = (event: ErrorEvent): void => { event.preventDefault(); worker.terminate(); treeWorker = null; asked.clear(); };
+      worker.onerror = (event: ErrorEvent): void => {
+        event.preventDefault(); worker.terminate(); treeWorker = null;
+        for (const sent of asked.values()) PENDING.delete(sent);
+        asked.clear(); unpark();
+      };
       treeWorker = worker;
     } catch { treeWorker = null; return; }
   }
@@ -122,7 +142,7 @@ function facedTree(geometry: BufferGeometry): void {
   // the channels a far level keeps apart (`SLAB_FAR_KINDS`), copied
   const kinds = room > 0 ? SLAB_FAR_KINDS.flatMap(name => { const channel = geometry.getAttribute(name);
     return channel instanceof BufferAttribute && channel.array.length === channel.count * channel.itemSize ? [{ array: channel.array.slice(), itemSize: channel.itemSize }] : []; }) : [];
-  asked.set(id, geometry);
+  asked.set(id, geometry); PENDING.set(geometry, geometry.index !== null && indexTurned(geometry.index));
   treeWorker.postMessage({ id, index: corners, xyz, ...(room > 0 ? { far: SLAB_FAR_CELLS, room, kinds } : {}) }, { transfer: [corners.buffer, xyz.buffer, ...kinds.map(kind => kind.array.buffer)] });
 }
 function landed(event: MessageEvent<unknown>): void {
@@ -132,24 +152,30 @@ function landed(event: MessageEvent<unknown>): void {
   const geometry = typeof id === 'number' ? asked.get(id) : undefined;
   if (typeof id === 'number') asked.delete(id);
   if (asked.size === 0) { treeWorker?.terminate(); treeWorker = undefined; }
-  if (geometry === undefined || typeof tree !== 'object' || tree === null) return;
+  if (geometry === undefined) return;
+  const sentTurned = PENDING.get(geometry) ?? false;
+  PENDING.delete(geometry);
+  try { if (typeof tree === 'object' && tree !== null) land(geometry, tree, sentTurned); }
+  finally { unpark(); }
+}
+/** the faced tree `tree` of `geometry` (sent with its triangles turned or not, `sentTurned`): its index rewritten in the
+ *  tree's order, its far levels after, and every part drawing it culled by the tree */
+function land(geometry: BufferGeometry, tree: object, sentTurned: boolean): void {
   const order: unknown = Reflect.get(tree, 'index'), boxes: unknown = Reflect.get(tree, 'boxes'), nodes: unknown = Reflect.get(tree, 'nodes');
   const size: unknown = Reflect.get(tree, 'size'), cones: unknown = Reflect.get(tree, 'cones'), triangles: unknown = Reflect.get(tree, 'triangles');
   const index = geometry.index, own = slabTriangles(geometry);
   if (index === null || own === null || !(order instanceof Uint32Array) || !(boxes instanceof Float32Array) || !(nodes instanceof Int32Array) || !(size instanceof Float32Array)
     || !(cones instanceof Float32Array) || typeof triangles !== 'number' || order.length !== own * 3 || triangles !== own) return;
-  // the same triangles in the tree's order: whatever order the chunk drew in, every range from here reads this one
-  (index.array as Uint32Array | Uint16Array).set(order);
   // NB23 (b): and the far levels in the room after them (`facedTree`)
   const farCorners: unknown = Reflect.get(tree, 'farCorners'), farCells: unknown = Reflect.get(tree, 'farCells');
   const farStarts: unknown = Reflect.get(tree, 'farStarts'), farEnds: unknown = Reflect.get(tree, 'farEnds');
-  let far: SlabFar | undefined;
-  if (farCorners instanceof Uint32Array && farCells instanceof Float64Array && farStarts instanceof Int32Array && farEnds instanceof Int32Array
-    && own * 3 + farCorners.length <= index.count && farStarts.length === farCells.length * nodes.length / 4 && farEnds.length === farStarts.length) {
-    (index.array as Uint32Array | Uint16Array).set(farCorners, own * 3);
-    far = { cells: farCells, starts: farStarts, ends: farEnds };
-  }
-  index.needsUpdate = true;
+  const farOk = farCorners instanceof Uint32Array && farCells instanceof Float64Array && farStarts instanceof Int32Array && farEnds instanceof Int32Array
+    && own * 3 + farCorners.length <= index.count && farStarts.length === farCells.length * nodes.length / 4 && farEnds.length === farStarts.length;
+  // the same triangles in the tree's order (whatever order the chunk drew in, every range from here reads this one), and
+  // the far levels in the room after them, turned as the index draws now (WebKit's first-vertex convention); a released
+  // index (the Memory saver's) is written on the GPU, never read back
+  if (!writeIndexTriangles(index, [{ at: 0, triangles: order }, ...(farOk ? [{ at: own * 3, triangles: farCorners }] : [])], sentTurned)) return;
+  const far: SlabFar | undefined = farOk ? { cells: farCells, starts: farStarts, ends: farEnds } : undefined;
   const ranges: SlabRanges = { boxes, nodes, triangles, size, cones, ...(far === undefined ? {} : { far }) };
   FACED.add(ranges); RANGES.set(geometry, ranges); LATE.delete(geometry);
   for (const [part, scope] of DRAWERS.get(geometry) ?? []) {

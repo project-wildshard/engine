@@ -116,3 +116,16 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
 - Simulator (`nine-sim-memory.mjs`, n 1, play/fly 10 s), base c636993f -> cut 1: WebContent native loading 0.825 ->
   0.828 GB (noise), Inspector loading 1.154 -> 1.098; play 0.930 -> 0.939. Spawn shots at phone Low (WebKit, control
   + 8 s): base-vs-base 12.7% of pixels over 8 levels, base-vs-cut 11.3-13.7% (the rain).
+
+## mini-ninemem6 (relay), 2026-11-18
+
+- Timeline probe (WebKit, 100 ms buckets of WebContent [K] beside in-page events): the slab trees' landing read the
+  released index and positions back from the GPU (`memorySaver.restore`, ~23 MB on Nine, kept for the session), from
+  the place-tree job (`drainLate`) that the faced tree replaced ~0.3 s later. After the landing the rewritten index
+  drew in GL's last-vertex convention again (its version moved past the rotation), so ANGLE's index rewrite came back
+  for those draws.
+- Cut 1: a part whose faced tree is on its way waits for it (no place-tree job), and the landing writes the triangles
+  into the GPU buffer (`writeIndexTriangles`), turned as the index draws. WebKit [K], 4 alternating cold runs: peak
+  median 1,681 -> 1,649 MB, settled 939 -> 931, GPU process settled 681-687 (one run 1,542) -> 578-579. EM11 phone
+  loading 1.95 -> 1.90 GB, playing 1.17 -> 1.12 GB. Spawn shots match within the rain (base-vs-base 17.9%, base-vs-cut
+  12.3-17.1% of pixels over 8 levels).
