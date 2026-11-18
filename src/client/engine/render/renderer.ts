@@ -11,7 +11,8 @@ import { installFrameCounter } from './frameCounter';
 import { installTextureUploadEvents } from './textureUploadEvents';
 import { installCompressedTextureRetirement } from './compressedTextureRetirement';
 import { installDiagnosticJournal } from './diagnosticJournal';
-import { installMemoryCounters } from './glCounters';
+import { installMemoryCounters, memoryCounters } from './glCounters';
+import { provideBootLedger } from '../boot/bootTrace';
 import { installDoubleElements } from './doubleElements';
 import { installUniformCacheKinds } from './uniformCaches';
 import { installCompileShadowSkip } from './compileShadows';
@@ -38,6 +39,7 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   installDoubleElements();
   installSkinnedSortSpheres();
   const stopCounters = installMemoryCounters(context); // EM5: on every page, before the first storage call
+  provideBootLedger(memoryCounters); // EM9: each boot checkpoint carries the ledger from here on
   const stopJournal = installDiagnosticJournal(context);
   const renderer = labelledCreation('engine/renderer', 'builtin/renderer-initialization', () => new THREE.WebGLRenderer({ canvas, context, antialias: false, stencil: false, depth: true }));
   // D176: three's link check read three driver info logs on every program's first use (~1.4 ms of sync round-trips a

@@ -5,7 +5,6 @@ import { deliverBrowserError, flushScreenReports, screenReportsEnabled } from '.
 import { reportSelfReload, reportStaleBuild, selfReloadClaim } from '../telemetry/staleBuildReport';
 import type { ProgressView } from './plan';
 import { markDropStep } from './dropNotice';
-import { memoryCounters } from '../render/glCounters';
 
 declare const __BUILD_ID__: string;
 
@@ -56,10 +55,15 @@ export function ledgerTotals(counters: Record<string, Record<string, number>>): 
   }
   return out;
 }
+/** The page's ledger, lent by the renderer when it installs its counters (`provideBootLedger`): importing glCounters here
+ *  put the render modules on the cold title's graph and over the session budget. Before a renderer there is nothing held. */
+let pageLedger: (() => Record<string, Record<string, number>>) | undefined;
+/** The renderer lends glCounters' `memoryCounters` once it has installed them. */
+export function provideBootLedger(ledger: () => Record<string, Record<string, number>>): void { pageLedger = ledger; }
 const PAGE_TRANSPORTS: BootTraceTransports = {
   inbox: async (error, build, diagnostic, system, level) => (await import('../telemetry/bootInbox')).reportBootInterruption(error, build, diagnostic, system, level),
   deliver: deliverBrowserError,
-  ledger: memoryCounters,
+  ledger: () => pageLedger?.() ?? {},
 };
 
 /** one page's boot trace (createBootTrace) */
