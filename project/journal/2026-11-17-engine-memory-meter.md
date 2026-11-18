@@ -73,3 +73,8 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   client ci built, the kernel footprints, the ledger and EM11's phone chain as a table in the step summary. A new ubuntu
   `memory-ledger` job runs `nine-ring1.mjs ledger`: Template's ledger [L] in Chromium on SwiftShader at control and at its
   peak, exact bytes for a later ratchet. `measure.mjs --ledger-only` and `--summary=<file>` are the two new switches.
+- EM12's first hosted run (ci-reports 44229410012): the ubuntu ledger job printed Template's ledger, but every native
+  WebKit footprint on macos-15 read 0 MB: the kernel reader found only the Playwright app. On a hosted runner the app is
+  not its own responsible process, so its XPC services do not name it. They now match when they share the app's
+  responsible pid, sit in the app's own bundle and started after it; a shared Mac keeps the stricter rule. When nothing
+  matches, measure.mjs lists the ms-playwright processes it saw, so a second miss explains itself.

@@ -41,7 +41,7 @@ import { execFileSync } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
+import { listProcesses, readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
 import { ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText } from './phoneModel.mjs';
 
 export const PROTOCOL = 'memory-run/1';
@@ -256,6 +256,9 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
       clearInterval(watch);
       const stream = await sampler.stop();
       const all = [...procs.values()];
+      // No WebContent found: say what the kernel listed under ms-playwright, so a host that ties WebKit's services to its
+      // app another way (EM12's hosted runner) can be read from one log
+      if (!all.some((p) => p.role === 'webcontent')) for (const row of listProcesses().filter((r) => r.path.includes('ms-playwright'))) console.error(`  no WebContent matched; ms-playwright process ${row.pid} ppid ${row.ppid} rpid ${row.rpid} ${row.name} (this node ${process.pid})`);
       const checkpoints = stepCheckpoints(stream.samples, steps, all);
       const lifetime = readFootprints(all.map((p) => p.pid));
       return { host: 'webkit', chunk, url, build, ready: failure === null, failure, errors: errors.slice(0, 5), readyMs, loadAverage: Math.round(load * 100) / 100,

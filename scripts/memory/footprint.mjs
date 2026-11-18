@@ -63,9 +63,20 @@ export function descendsFrom(byPid, pid, ancestor) {
  * @returns {BrowserProcess[]} */
 export function pickWebkitProcesses(rows, owner) {
   const byPid = new Map(rows.map((row) => [row.pid, row]));
-  const apps = new Set(rows.filter((row) => row.path.includes('ms-playwright') && row.path.endsWith('/Playwright')
-    && descendsFrom(byPid, row.pid, owner)).map((row) => row.pid));
-  return rows.filter((row) => apps.has(row.pid) || (apps.has(row.rpid) && row.path.includes('ms-playwright')))
+  const appRows = rows.filter((row) => row.path.includes('ms-playwright') && row.path.endsWith('/Playwright') && descendsFrom(byPid, row.pid, owner));
+  const apps = new Set(appRows.map((row) => row.pid));
+  // A hosted macOS runner (GitHub's macos-15) makes the runner, not the Playwright app, responsible for the app, and the
+  // app's XPC services share that responsible pid (EM12's first hosted run read only the app). There, and only when the
+  // app is not its own responsible process, a service under the app's own bundle directory started after the app
+  // belongs to it. Another lane's WebKit on a shared Mac keeps its own app as responsible, so it is never matched.
+  const borrowed = new Map(appRows.filter((app) => app.rpid !== app.pid && app.rpid > 0)
+    .map((app) => [app.rpid, { pid: app.pid, bundle: app.path.slice(0, app.path.indexOf('/Playwright.app/') + 1) }]));
+  const owned = (/** @type {ProcessRow} */ row) => {
+    if (apps.has(row.rpid)) return row.path.includes('ms-playwright');
+    const app = borrowed.get(row.rpid);
+    return app !== undefined && row.pid > app.pid && app.bundle.length > 1 && row.path.startsWith(app.bundle) && /com\.apple\.WebKit\./u.test(row.name);
+  };
+  return rows.filter((row) => apps.has(row.pid) || owned(row))
     .map((row) => ({ pid: row.pid, role: apps.has(row.pid) ? 'ui' : webkitRole(row.name), name: row.name, path: row.path }));
 }
 

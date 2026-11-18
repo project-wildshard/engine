@@ -49,6 +49,21 @@ test('WebKit processes are found by the kernel responsible pid of this process t
   expect(webkitRole('com.apple.WebKit.GPU')).toBe('gpu');
 });
 
+test('on a hosted runner the runner is responsible for the app and its services; the app\'s own bundle claims them (EM12)',()=>{
+  const hosted=[
+    {pid:50,ppid:1,rpid:50,name:'Runner.Worker',path:'/runner/Runner.Worker'},
+    {pid:100,ppid:50,rpid:50,name:'node',path:'/bin/node'},
+    {pid:102,ppid:100,rpid:50,name:'Playwright',path:`${pw}/Playwright.app/Contents/MacOS/Playwright`},
+    {pid:103,ppid:1,rpid:50,name:'com.apple.WebKit.WebContent.Development',path:`${pw}/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent.Development`},
+    {pid:104,ppid:1,rpid:50,name:'com.apple.WebKit.GPU.Development',path:`${pw}/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU.Development`},
+    // started before this app: not ours
+    {pid:90,ppid:1,rpid:50,name:'com.apple.WebKit.WebContent.Development',path:`${pw}/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent.Development`},
+  ];
+  expect(pickWebkitProcesses(hosted,100).map(p=>[p.pid,p.role])).toEqual([[102,'ui'],[103,'webcontent'],[104,'gpu']]);
+  // the shared-Mac case is unchanged: the other lane's app is its own responsible process
+  expect(pickWebkitProcesses(rows,100).map(p=>p.pid)).toEqual([102,103,104,105]);
+});
+
 test('Simulator processes are those under the device launchd, plus the host graphics helpers',()=>{
   const sim=[
     {pid:500,ppid:1,rpid:500,name:'launchd_sim',path:'/x/launchd_sim'},
