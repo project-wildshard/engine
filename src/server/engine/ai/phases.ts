@@ -12,9 +12,18 @@ export interface EncounterPhase { at: number; name: string; caption: string; spe
 /** Elite and boss fights share this data table; zero intro and one phase describes the simple elite. */
 export interface PhaseEncounterSpec {
   id: string; entity: string; kind: 'elite' | 'boss'; panel: string | null; name: string; title: string; retry: string;
-  arena: { at: readonly [number, number, number]; radius: number }; intro: number; introShort: number;
+  arena: { at: readonly [number, number, number]; radius: number; bounds?: EncounterBounds }; intro: number; introShort: number;
   respawn: { at: readonly [number, number, number]; yaw: number }; phases: readonly EncounterPhase[];
+  /** OF34b: how the fight starts (absent: `placed`), and whether the boss's blows skip the fight cap. */
+  start?: EncounterStart; capExempt?: true;
 }
+/** ONE-FORMAT OF34a/OF34b (J420 (1)): `placed` stands from load (as before); `spawned` has no body until a player enters the
+ *  arena; `resident` fights from the first player blow, wherever it stands. */
+export type EncounterStart = 'placed' | 'spawned' | 'resident';
+/** `room`: the fight resets once every contender has left the arena; `open`: once the boss is drawn past its radius. */
+export type EncounterBounds = 'room' | 'open';
+/** Where a spawned boss waits before its fight: under every floor, as an absent declared spawn does (`declaredSpawnWhen`). */
+const ABSENT_Y = -1e4;
 /** Profile/instance persistence and rewards arrive through explicit platform ports. No shard save is imported. */
 export interface PhaseEncounterPorts { saved: BossSaved; persist: (saved: BossSaved) => void; reward: () => void; presentation?: BossPresentation }
 const finite = v.pipe(v.number(), v.finite(), v.minValue(0));
@@ -47,6 +56,10 @@ export class PhaseEncounter {
   private readonly actor: AnimalSim;
   private readonly presentation: BossPresentation;
   private readonly party: BossContenders;
+  /** OF34b: a resident boss was struck while armed; a spawned boss is out of the world. */
+  private struck = false;
+  private absent = false;
+  private readonly settleSpawn: (restoring?: boolean) => void;
   constructor(sim: SimHost, spec: PhaseEncounterSpec, ports: PhaseEncounterPorts, decisionOwned = false) {
     const actor = sim.entities.get(spec.entity);
     if (![ports.saved.defeated, ports.saved.rewardTaken].every((n) => typeof n === 'boolean') || !Number.isSafeInteger(ports.saved.kills) || ports.saved.kills < 0) throw new Error('Invalid encounter persistence');
@@ -54,7 +67,12 @@ export class PhaseEncounter {
       || !Number.isFinite(spec.arena.radius) || spec.arena.radius <= 0 || spec.arena.radius > 500 || ![...spec.arena.at, ...spec.respawn.at, spec.respawn.yaw, spec.intro, spec.introShort].every(Number.isFinite) || spec.intro < 0 || spec.introShort < 0) throw new Error('Invalid phase encounter');
     this.actor = actor; this.spec = structuredClone(spec); this.contract = JSON.stringify(this.spec); this.presentation = ports.presentation ?? silentBossPresentation();
     const focus = new Vector3(...spec.arena.at), saved = { ...ports.saved };
-    const party = this.party = new BossContenders(sim.players, (point) => point.distanceTo(focus) < spec.arena.radius, (player, position, yaw) => {
+    const start = spec.start ?? 'placed', bounds = spec.arena.bounds, home = actor.position.clone(), homeYaw = actor.yaw;
+    if (spec.capExempt === true) actor.capExempt = true; // OF34b: the boss's blows skip the fight cap
+    // A resident or open-ground boss fights wherever it stands: its contenders are the players near its body.
+    const nearBody = start === 'resident' || bounds === 'open';
+    const inside = (point: Vector3): boolean => point.distanceTo(nearBody ? actor.position : focus) < spec.arena.radius;
+    const party = this.party = new BossContenders(sim.players, inside, (player, position, yaw) => {
       player.position.copy(position); player.yaw = yaw; player.health.attributes.health = player.health.attributes.maxHealth;
     }, { served: () => sim.respawn.served, rearm: true });
     // AC6: a form a script's `despawn` holds out of the world (hidden, not alive) is neither beaten nor revived by its fight
@@ -62,8 +80,9 @@ export class PhaseEncounter {
     const phase = (): EncounterPhase => { const value = this.spec.phases[this.boss.phase]; if (!value) throw new Error('Missing encounter phase'); return value; };
     this.boss = new BossBrain({ id: spec.id, name: spec.name, title: spec.title, retryTitle: spec.retry, intro: spec.intro, introShort: spec.introShort,
       phases: spec.phases.map((p) => ({ at: p.at, name: p.name, caption: p.caption })), reward: {} }, {
-      inArena: (point) => point.distanceTo(focus) < spec.arena.radius,
-      reset: (index) => { const value = spec.phases[index]; if (!value) throw new Error('Missing checkpoint'); actor.hp = actor.maxHp * value.at; actor.alive = !held(); actor.cancelAttack(); sim.strikes.get(actor.entityId)?.cancel(); actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; },
+      // OF34b: a resident boss's fight starts at the first player blow, never by standing in its arena
+      inArena: (point) => start === 'resident' ? this.struck : point.distanceTo(focus) < spec.arena.radius,
+      reset: (index) => { const value = spec.phases[index]; if (!value) throw new Error('Missing checkpoint'); this.struck = false; actor.hp = actor.maxHp * value.at; actor.alive = !held(); actor.cancelAttack(); sim.strikes.get(actor.entityId)?.cancel(); actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; },
       seal: () => undefined, intro: () => focus, begin: () => undefined, enterPhase: () => undefined,
       update: (_dt, _t, fighting) => {
         if (decisionOwned) return;
@@ -81,6 +100,7 @@ export class PhaseEncounter {
       if (request === null) return null;
       if (this.boss.state === 'intro' && request.source !== 'env' && sim.players.has(request.source.id)) return null;
       if (request.target !== actor.combatActor()) return request;
+      if (start === 'resident' && this.boss.state === 'armed' && request.source !== 'env' && sim.players.has(request.source.id)) this.struck = true;
       if (this.shield || this.boss.state !== 'fight' || !guardAdmits(this.guard, request)) return null;
       const next = this.spec.phases[this.boss.phase + 1];
       // A large hit cannot skip a checkpoint or kill through the next phase threshold.
@@ -92,11 +112,31 @@ export class PhaseEncounter {
     // SB51: a beaten fight whose body its spawn row brought back (`respawn`) stands again with it: a body that stands is a fight
     // a newcomer can damage and win, never a victory waiting on an empty arena. A cell's sleep spends that empty wait (SC10).
     sim.events.on('world.slept', ({ seconds }) => { party.slept(seconds); }, sim.scope);
+    /** OF34b: a spawned boss is out of the world while its fight waits (armed or dormant) and stands at home once it begins. */
+    this.settleSpawn = (restoring = false): void => {
+      if (start !== 'spawned') return;
+      const waiting = this.boss.state === 'armed' || this.boss.state === 'dormant';
+      if (waiting && !this.absent) {
+        this.absent = true; Object.assign(actor, { hidden: true }); actor.alive = false; actor.position.y = ABSENT_Y; actor.motor?.resetAt?.(actor.position);
+      } else if (this.boss.engaged && this.absent) {
+        this.absent = false; Object.assign(actor, { hidden: false });
+        if (!restoring) actor.place(home.x, home.z, homeYaw, home.y); // a restored body keeps its saved place
+        actor.alive = true; actor.motor?.resetAt?.(actor.position);
+      }
+    };
+    const reset = (): void => { this.boss.disarm(); this.boss.arm(); };
     sim.onStep(`encounter.${spec.id}`, (_dt) => {
       if (this.boss.state === 'victory' && actor.alive) { this.boss.returnBeaten(); this.boss.arm(); }
-      party.observe(this.boss); this.boss.update(1 / 60, sim.clock.now);
+      party.observe(this.boss);
+      // OF34b bounds: `room` once nobody is inside (a room of several already resets in `observe`), `open` once the boss is drawn out
+      if (this.boss.engaged && bounds === 'room' && ![...sim.players.values()].some(player => inside(player.position))) reset();
+      if (this.boss.engaged && bounds === 'open' && actor.position.distanceTo(focus) > spec.arena.radius) {
+        reset(); actor.place(home.x, home.z, homeYaw, home.y); actor.motor?.resetAt?.(actor.position);
+      }
+      this.boss.update(1 / 60, sim.clock.now);
+      this.settleSpawn();
     }, { snapshot: () => this.snapshot(), restore: (value) => { this.restore(value); } });
-    sim.scope.onDispose(() => { this.boss.disarm(); }); this.boss.arm();
+    sim.scope.onDispose(() => { this.boss.disarm(); }); this.boss.arm(); this.settleSpawn();
     publishEncounter(sim, spec.id, () => ({ ...NO_MOMENTS, kind: spec.kind === 'boss' ? 'boss' : 'elite', state: this.boss.state, hp: actor.hp / actor.maxHp, phase: this.boss.phase, shield: this.shield, body: actor.entityId }));
   }
   /** Damage modification and phase transitions use the existing shared combat/clock; no raw health callback is authored. */
@@ -106,7 +146,7 @@ export class PhaseEncounter {
     if (typeof value !== 'string') throw new Error('Invalid encounter snapshot');
     const input: unknown = JSON.parse(value), saved = v.parse(checkpointSchema, input);
     if (saved.contract !== this.contract) throw new Error('Incompatible encounter snapshot');
-    this.boss.restore(saved.boss); this.shield = saved.shield; this.guard = saved.guard ?? ENCOUNTER_GUARD.open; this.party.restoreEngaged(saved.engaged ?? 0);
+    this.boss.restore(saved.boss); this.settleSpawn(true); this.shield = saved.shield; this.guard = saved.guard ?? ENCOUNTER_GUARD.open; this.party.restoreEngaged(saved.engaged ?? 0);
     this.presentation.hideBar(); this.presentation.hideNameCard(); this.presentation.hideReward();
     if (this.boss.state === 'fight' || this.boss.state === 'beat') {
       const phase = this.spec.phases[this.boss.phase];
