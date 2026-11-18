@@ -213,7 +213,7 @@ async function main(){
   // Known reds (scripts/push-known-red.mjs): a split gate keeps a JSON report, so a red that origin/main has too never
   // refuses the push. WS_KNOWN_RED=0 refuses on every red again.
   const knownRed=split&&env.WS_KNOWN_RED!=='0'&&(local?.length??0)>0;
-  const localReport=gateReport(process.env);
+  const localReport=gateReport(process.env,process.env.WS_LOCAL_LAND_REPORT_ROOT);
   const report=localReport??(knownRed?resolve('tmp',`push-known-red-${process.pid}.json`):undefined);
   if(report!==undefined&&env.WS_PUSH_TIMINGS===undefined)mkdirSync(dirname(report),{recursive:true});
   const reporters=report===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${report}`];

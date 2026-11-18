@@ -46,7 +46,8 @@ if(inside(dirname(common))||inside(root)){
 }
 const source=spawnSync('git',['symbolic-ref','--quiet','HEAD'],{cwd:root,encoding:'utf8'});
 const env={...process.env,XDG_CACHE_HOME:join(directory,'tools'),npm_config_enable_global_virtual_store:'false',
- npm_config_package_import_method:'clone-or-copy',WS_LOCAL_LAND_SOURCE_REF:source.stdout?.trim()??''};
+ npm_config_package_import_method:'clone-or-copy',WS_LOCAL_LAND_SOURCE_REF:source.stdout?.trim()??'',
+ WS_LOCAL_LAND_REPORT_ROOT:root};
 if(process.platform==='linux')Reflect.set(env,'PLAYWRIGHT_BROWSERS_PATH',join(process.env.XDG_CACHE_HOME??join(homedir(),'.cache'),'ms-playwright'));
 Reflect.deleteProperty(env,'WS_PUSH_REFS');
 const copy=makeGateCopy(root,expected,{env,directory,installIsolated:true});

@@ -19,3 +19,9 @@ The offline regression installs and runs a real pinned package in the
 copy. Two independent full engine installs produced the same input hash
 and shared proof. Changing an isolated executable refused the proof. The
 copies took 7.4–10.1 seconds each, including 2.0–2.6 seconds for pnpm.
+
+The normal J400 run on `71f8e4fce6` completed Vitest in 920.9 seconds
+and saved full proof `526c492d-7035-4a7c-a1f7-3935bd27ba86`. Main
+advanced while testing and changed the pin identity before the retry.
+Vitest reports stay in the publishing worktree’s scratch directory so
+cleanup of the isolated checkout cannot remove them.
