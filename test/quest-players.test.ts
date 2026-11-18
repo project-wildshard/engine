@@ -176,7 +176,7 @@ test('a version 3 save on the wire reads up: the lead\'s credit is the world\'s 
   const bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 });
   strike(host, bot.id, 1000);
   const wire = JSON.parse(serializeSimSnapshot(snapshotSimHost(host))) as { version: number; snapshot: Record<string, unknown> & { books?: Record<string, unknown>[] } };
-  expect(wire.version).toBe(4);
+  expect(wire.version).toBe(5);
   // what a version 3 writer left: no credit field, unmarked books holding no deaths, the world's flag for every one
   const { credit: _credit, ...rest } = wire.snapshot;
   const old = { ...wire, version: 3, snapshot: { ...rest, version: 3, books: wire.snapshot.books?.map(({ credited: _, ...book }) => ({ ...book, flags: [] })) } };

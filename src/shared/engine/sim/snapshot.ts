@@ -25,7 +25,7 @@ import type { RespawnRow } from '../../../server/engine/sim/respawn';
 import type { DayClockState } from './dayClock';
 
 /** Same-engine snapshot format; live callbacks and authored content are installed by the fresh host. */
-export const SIM_SNAPSHOT_VERSION = 4;
+export const SIM_SNAPSHOT_VERSION = 5;
 /** Durable per-region ceiling in stored characters; the grid caller uses a logical checkpoint if exact encoding exceeds it. */
 export const SIM_REGION_SNAPSHOT_CHAR_BUDGET: number = 512 * 1024;
 /**

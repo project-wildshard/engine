@@ -11,7 +11,7 @@ import { SkirmisherBrain } from "../src/server/engine/ai/skirmisher";
 import { dataGroundBrains } from "../src/server/game/shardfile/dataGroundBrains";
 import { dataCreaturePorts } from "../src/shared/game/shardfile/dataCreaturePorts";
 import { loadRapier } from "../src/shared/engine/physics/rapier";
-import { snapshotSimHost } from "../src/shared/engine/sim/snapshot";
+import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from "../src/shared/engine/sim/snapshot";
 import { groundFixture } from "./fixtures/plain-ground";
 
 const rapier = loadRapier(readFileSync("public/assets/physics/rapier.wasm"));
@@ -115,6 +115,40 @@ test("real damage wakes once off cadence and exact restore retains the consumed 
   } finally {
     think.mockRestore();
     resumed.host.dispose();
+    sim.dispose();
+  }
+});
+
+test("the damage wake mark survives the save wire, and a version 4 save without it reads up", async () => {
+  const source = fixture(),
+    sim = createShardfileSim(source, new Map(), { rapier: await rapier });
+  try {
+    sim.host.step();
+    const actor = sim.host.entities.get("fixture.actor");
+    if (actor === undefined) throw new Error("Missing actual damaged body");
+    sim.host.combat.hit({
+      source: sim.host.nearestPlayer(actor.position).health,
+      sourceTags: [],
+      target: actor.combatActor(),
+      amount: 1,
+      point: actor.position.clone(),
+      dir: new Vector3(),
+    });
+    sim.host.step();
+    const saved = snapshotSimHost(sim.host);
+    expect(saved.bands?.rows.some((row) => row.brain.damage !== undefined)).toBe(true);
+    const text = serializeSimSnapshot(saved);
+    expect(decodeSimSnapshot(text).bands).toEqual(saved.bands);
+    const wire = JSON.parse(text) as { version: number; snapshot: { version: number; bands: { rows: { brain: Record<string, unknown> }[] } } };
+    expect(wire.version).toBe(5);
+    // what a version 4 writer left: the same clocks with no damage wake mark
+    const old = { ...wire, version: 4, snapshot: { ...wire.snapshot, version: 4,
+      bands: { ...wire.snapshot.bands, rows: wire.snapshot.bands.rows.map((row) => { const { damage: _, ...brain } = row.brain; return { ...row, brain }; }) } } };
+    const read = decodeSimSnapshot(JSON.stringify(old));
+    expect(read.version).toBe(5);
+    expect(read.bands?.rows.every((row) => row.brain.damage === undefined)).toBe(true);
+    expect(() => decodeSimSnapshot(JSON.stringify({ ...old, snapshot: { ...old.snapshot, bands: wire.snapshot.bands } }))).toThrow();
+  } finally {
     sim.dispose();
   }
 });

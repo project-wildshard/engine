@@ -71,7 +71,9 @@ const strike = v.strictObject({ version, phase: v.picklist(['idle', 'windup', 'a
   x0: finite, z0: finite, x1: finite, z1: finite, yaw: finite, length: finite });
 const rng = v.strictObject({ version, state: uint32, initial: uint32, scrambledFork: v.boolean() });
 const frameIndex = v.pipe(v.number(), v.integer(), v.minValue(-1));
-const bandClock = v.strictObject({ elapsed: nonnegative, credit: nonnegative, frame: frameIndex, dt: nonnegative, last: finite, due: v.boolean(), tickFrame: frameIndex, damage: v.exactOptional(finite) });
+const bandClockV4 = v.strictObject({ elapsed: nonnegative, credit: nonnegative, frame: frameIndex, dt: nonnegative, last: finite, due: v.boolean(), tickFrame: frameIndex });
+// ONE-FORMAT OF26e2: version 5 keeps a brain clock's last damage wake, so a restored body wakes once per new hit.
+const bandClock = v.strictObject({ ...bandClockV4.entries, damage: v.exactOptional(finite) });
 /** A version 1 or 2 save's player: a velocity for each mode. */
 const playerStateV2 = v.strictObject({ id, position: vector, yaw: finite, health: eventValue, motor, impulse: v.optional(vector),
   traversals: v.optional(v.pipe(v.array(v.picklist(['ride', 'grapple', 'glide', 'climb', 'drive'])), v.minLength(1), v.maxLength(5))),
@@ -119,14 +121,18 @@ const entriesV3 = {
   respawn: v.optional(v.array(v.tuple([id, v.strictObject({ inside: v.nullable(v.string()), pending: v.nullable(v.string()),
     stand: v.nullable(v.strictObject({ id: v.string(), label: v.string(), x: finite, y: finite, z: finite, yaw: finite })) }), nonnegative, nonnegative]))),
   bands: v.optional(v.strictObject({ rates: uint32, time: nonnegative, frame: integer, frameDt: nonnegative,
-    rows: v.array(v.strictObject({ id, rate: id, brain: bandClock, body: bandClock })) })),
+    rows: v.array(v.strictObject({ id, rate: id, brain: bandClockV4, body: bandClockV4 })) })),
   day: v.optional(v.strictObject({ value: finite, paused: v.boolean(), scale: finite, cycle: v.pipe(finite, v.minValue(Number.MIN_VALUE)),
     held: v.nullable(v.strictObject({ value: finite, paused: v.boolean() })), last: v.picklist(DAY_CLOCK_PHASES) })),
   boardColliders: v.optional(v.pipe(v.array(nonnegative), v.minLength(1))), // Rapier handles, as colliderTags'
 };
 // STAGING-BUGBASH SB34: version 4 adds kill credit: the lead's own (`credit`) and each other book's mark that its flags hold its own.
-const entries = { ...entriesV3, version: v.literal(4), credit: v.optional(v.array(id)),
+const entriesV4 = { ...entriesV3, version: v.literal(4), credit: v.optional(v.array(id)),
   books: v.exactOptional(v.array(v.strictObject({ player: id, flags: v.array(id), quests: v.array(quest), parts: v.record(v.string(), v.string()), credited: v.exactOptional(v.literal(true)) }))) };
+// ONE-FORMAT OF26e2: version 5 adds the brain band clock's `damage` wake mark.
+const entries = { ...entriesV4, version: v.literal(5),
+  bands: v.optional(v.strictObject({ rates: uint32, time: nonnegative, frame: integer, frameDt: nonnegative,
+    rows: v.array(v.strictObject({ id, rate: id, brain: bandClock, body: bandClock })) })) };
 const snapshot: v.GenericSchema<unknown, SimSnapshot> = v.strictObject({ ...entries,
   physics: v.pipe(v.array(v.pipe(integer, v.maxValue(255))), v.minLength(1), v.maxLength(maxPhysicsBytes)) });
 const packedPhysicsSchema = v.variant('encoding', [
@@ -137,6 +143,8 @@ const packedPhysicsSchema = v.variant('encoding', [
       chunks: v.pipe(v.array(v.pipe(v.string(), v.minLength(4), v.maxLength(Math.ceil((physicsBlockBytes + 64) / 3) * 4))), v.minLength(1), v.maxLength(Math.ceil(MAX_REFERENCE_BYTES / physicsBlockBytes))), checksum: uint32 }),
 ]);
 const packedSnapshot = v.strictObject({ ...entries, physics: packedPhysicsSchema });
+// OF26e2: a version 4 save, as the old writer left it: no band clock held a damage wake mark.
+const packedSnapshotV4 = v.strictObject({ ...entriesV4, physics: packedPhysicsSchema });
 // SB34: a version 3 save, as the old writer left it: every death was the world's, and every book read it.
 const packedSnapshotV3 = v.strictObject({ ...entriesV3, physics: packedPhysicsSchema });
 // P1-E5.3-A1: a version 2 save, as the old writer left it: a velocity for each mode.
@@ -144,12 +152,13 @@ const { players: _players, ...sharedEntries } = entriesV3;
 const packedSnapshotV2 = v.strictObject({ ...sharedEntries, version: v.literal(2), players: v.pipe(v.array(playerStateV2), v.minLength(1)), physics: packedPhysicsSchema });
 // P1-E5.2a: a version 1 save, as the old writer left it: one `player`, from an engine with a level API of 1.
 const packedSnapshotV1 = v.strictObject({ ...sharedEntries, version, apiVersion: version, player: playerStateV2, physics: packedPhysicsSchema });
-const wire = v.variant('version', [v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(4), snapshot: packedSnapshot }),
+const wire = v.variant('version', [v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(5), snapshot: packedSnapshot }),
+  v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(4), snapshot: packedSnapshotV4 }),
   v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(3), snapshot: packedSnapshotV3 }),
   v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(2), snapshot: packedSnapshotV2 }),
   v.strictObject({ format: v.literal('sim.snapshot'), version, snapshot: packedSnapshotV1 })]);
-/** WIRE-STABILITY WR7: the persisted `sim.snapshot` contract, for saves.lock.json: version 4, read up from 1, 2 and 3. */
-export const SIM_SNAPSHOT_CONTRACT: { readonly version: number; readonly schema: v.GenericSchema<unknown, unknown>; readonly migrations: readonly number[] } = { version: 4, schema: wire, migrations: [1, 2, 3] };
+/** WIRE-STABILITY WR7: the persisted `sim.snapshot` contract, for saves.lock.json: version 5, read up from 1, 2, 3 and 4. */
+export const SIM_SNAPSHOT_CONTRACT: { readonly version: number; readonly schema: v.GenericSchema<unknown, unknown>; readonly migrations: readonly number[] } = { version: 5, schema: wire, migrations: [1, 2, 3, 4] };
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 // A JSON-tree fence also rejects cycles/accessors/classes before lazy recursive schemas run.
@@ -447,7 +456,11 @@ function migratePlayerV2({ walk, fall, board, swim, ...rest }: v.InferOutput<typ
 /** A version 3 save is a version 4 save with no credit of its own: the lead's is the world's deaths, and every other book,
  *  unmarked, reads them once on restore (SB34), as it read them before. */
 function migrateV3(saved: v.InferOutput<typeof packedSnapshotV3>): v.InferOutput<typeof packedSnapshot> {
-  return { ...saved, version: 4 };
+  return migrateV4({ ...saved, version: 4 });
+}
+/** A version 4 save is a version 5 save whose band clocks hold no damage wake: the next hit wakes the brain, as before. */
+function migrateV4(saved: v.InferOutput<typeof packedSnapshotV4>): v.InferOutput<typeof packedSnapshot> {
+  return { ...saved, version: 5 };
 }
 /** A version 2 save is a version 3 save with one velocity on each player. Nothing else about the continuation moved. */
 function migrateV2({ players, ...rest }: v.InferOutput<typeof packedSnapshotV2>, apiVersion: number): v.InferOutput<typeof packedSnapshot> {
@@ -462,7 +475,7 @@ function readSnapshotData(input: unknown, apiVersion: number, physicsBasis: Uint
   jsonTree(parsed);
   const envelope = v.parse(wire, parsed);
   const saved = envelope.version === 1 ? migrateV1(envelope.snapshot, apiVersion) : envelope.version === 2 ? migrateV2(envelope.snapshot, apiVersion)
-    : envelope.version === 3 ? migrateV3(envelope.snapshot) : envelope.snapshot;
+    : envelope.version === 3 ? migrateV3(envelope.snapshot) : envelope.version === 4 ? migrateV4(envelope.snapshot) : envelope.snapshot;
   // Validate metadata/engine/identities before reporting a recoverable basis change. The placeholder is never returned:
   // the checksummed bytes replace it, as the writer does (a schema walk of Pine's 8.4M bytes was ~2 of a 2.3 s decode).
   const metadata = identities(v.parse(snapshot, { ...saved, physics: [0] }), apiVersion);
