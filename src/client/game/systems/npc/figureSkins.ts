@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { ResourceMemo } from '@wildshard/engine/app/cachedAssets';
 import * as v from 'valibot';
 import { bindRig, loadRigFile, rigRoot } from '@wildshard/engine/anim/rig';
+import { gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { painterlyMaterial } from '@wildshard/engine/world/painterly';
 import type { SkyRig } from '@wildshard/engine/world/skyRig';
@@ -122,6 +123,8 @@ export async function atlasFigureSkin(input: unknown, sky: SkyRig, owner: Scope,
     context.drawImage(material.map.image as CanvasImageSource, i % row.columns * row.cell, Math.floor(i / row.columns) * row.cell, row.cell, row.cell);
   });
   const map = owner.own(new THREE.CanvasTexture(canvas)); map.flipY = false; map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+  // MG11 (J410): nothing redraws the packed atlas, so its canvas goes once the texture is on the GPU (Nalati's camp: 1.6 MB)
+  gpuOnlyTexture(map, 'figure atlas');
   const material = owner.own(painterlyMaterial(sky, { map, rim: row.rim, bands: row.bands })); material.side = THREE.DoubleSide;
   mesh.material = material; mesh.name = row.name; mesh.frustumCulled = false; mesh.castShadow = true; mesh.receiveShadow = true;
   for (const bone of mesh.skeleton.bones) { bone.removeFromParent(); bone.matrixAutoUpdate = false; bone.matrixWorldAutoUpdate = false; }

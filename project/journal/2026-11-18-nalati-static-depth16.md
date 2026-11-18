@@ -39,3 +39,12 @@ clouds.
 
 Next Nalati levers, none landed here: the hull atlases as KTX2 (an SDK `CPU_READ` change, about −12 MB GPU), splitting
 the outcrops' one draw (the parameter buffer), the viewmodel sets at 256 on Low (about −11.7 MB, a look change).
+
+## The camp's figure atlas canvas goes after upload
+
+`atlasFigureSkin` packs the camp people's images onto one canvas and kept it after the upload (1.57 MB [L], Nalati's
+camp). Nothing redraws it, so it is now `gpuOnlyTexture` (the canvas shrinks to one pixel once uploaded; a lost context
+reloads the page). 6 more alternating locked pairs, base against both cuts: ledger RAM 77.97 → 76.40 MB, GPU 111.2 →
+107.0; the camp atlas stays on the GPU at 2.10 MB. Paired medians: WebContent −7.2, GPU −7.7, playing high −13.0,
+loading high −19.5 MB (playing lower in 4 of 6). EM11 uppers over those 6: playing 1.082 → 1.090 (one cut run read
+796 MB WebContent), loading 1.454 → 1.429. The nine views still match.
