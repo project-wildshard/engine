@@ -87,3 +87,34 @@ product at 993,357,493 B playing and 1,468,262,375 B loading. The
 STR8 sweep observed 1.010 and 1.541 GB on this pin, so its margin
 remains narrow. QA29 tracks the prepared Pine product's release and
 production re-pin.
+
+## STR9 online ratchets
+
+Five locked native WebKit minimal pairs on the full pinned client
+from `d411d7a6` read Template at 350,062,176 B settled WebContent
+online and 450,987,688 B in the standalone preview. The online
+positive spread was 14,106,576 B. The native guard prints the two
+medians together and compares the online anchor. The preview reports.
+
+Fourteen online Nine boots on the same client recorded a loading
+ledger high of 232,231,549 B at control and peak. The first five
+reached 185,506,183 B. The separate check found another 46,725,366 B
+of ArrayBuffers at control. The recorded GPU, worker and other
+subsystem counts stayed fixed in those two high boots. The previous
+standalone benchmark recorded 223,311,437 B. The two native baselines
+now name `boot: online`, and Nine's subsystem guard reads the full
+pinned preview in the same job as the footprints. Both subsystem
+comparators keep their 2% allowance.
+
+Nine's separate EM11 phone comparison read 979,346,434 B playing
+and 1,516,610,578 B loading across the first five boots. The six-boot
+repeat read 980,676,995 B playing and 1,500,140,714 B loading. The
+hard 1.5 GB comparison reports that breach independently of the
+subsystem check. QA29 tracks the prepared product and production
+re-pin.
+
+The normal native Nine ledger entry point passed a separate
+three-boot online cohort with the committed ceilings.
+
+The raw pairs and Nine cohort are in the lane's `j426-2026-11-18/str9`
+receipt directory.

@@ -500,7 +500,7 @@ jobs:
       - name: Archive the full pinned preview
         run: |
           products=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log([...armedMemory().zones].join("\n"))')
-          server_inputs=(out/.app/grid-collision)
+          server_inputs=(out/.app/grid-collision out/_template)
           while IFS= read -r zone; do
             if [[ -n "$zone" ]]; then server_inputs+=("out/$zone"); fi
           done <<< "$products"
@@ -644,29 +644,27 @@ jobs:
         with:
           name: memory-pinned-client
           path: tmp/memory-footprint
-      - name: Check armed native footprints and report Template
-        env:
-          MEMORY_RECORD: ${{ inputs.memory_record }}
+      - name: Restore the native preview and install WebKit
+        id: native-client
         run: |
           tar -xf tmp/memory-footprint/client.tar
           rm tmp/memory-footprint/client.tar
           bash scripts/ci-playwright-install.sh webkit
-          record=()
-          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          node scripts/memory/ci.mjs footprint tmp/memory-ledger/preview tmp/memory-footprint/readings "${record[@]}"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: nine-ring1-client
-          path: tmp/memory-footprint/nine
-      - name: Check or report Nine's native WebKit ledger
+      - name: Check armed native footprints and report Template
         env:
           MEMORY_RECORD: ${{ inputs.memory_record }}
         run: |
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          tar -xf tmp/memory-footprint/nine/client.tar -C tmp/memory-footprint/nine
-          rm tmp/memory-footprint/nine/client.tar
-          node scripts/memory/ci.mjs webkit-ledger tmp/memory-footprint/nine tmp/memory-footprint/nine-ledger "${record[@]}"
+          node scripts/memory/ci.mjs footprint tmp/memory-ledger/preview tmp/memory-footprint/readings "${record[@]}"
+      - name: Check or report Nine's online native WebKit ledger
+        if: ${{ !cancelled() && steps.native-client.outcome == 'success' }}
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        run: |
+          record=()
+          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
+          node scripts/memory/ci.mjs webkit-ledger tmp/memory-ledger/preview tmp/memory-footprint/nine-ledger "${record[@]}"
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

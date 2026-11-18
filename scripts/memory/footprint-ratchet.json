@@ -2,8 +2,9 @@
   "version": 1,
   "mode": "footprint",
   "instrument": "minimal",
+  "boot": "online",
   "anchor": {
-    "settled": 539398272,
-    "spread": 51233024
+    "settled": 350062176,
+    "spread": 14106576
   }
 }

@@ -80,8 +80,16 @@ test('CI keeps both armed jobs blocking during normal comparisons and recordings
   expect(native).toContain('record+=(--record)');
   expect(ledger).toContain('name: memory-pinned-client');
   expect(native).toContain('name: memory-pinned-client');
+  expect(native).toContain('webkit-ledger tmp/memory-ledger/preview');
   expect(ledger).toMatch(/\n {4}runs-on:/u);
   expect(native).toContain('runs-on: xcode-27');
   expect(ledger).not.toMatch(/\n {4}continue-on-error:/u);
   expect(native).not.toContain('continue-on-error');
+});
+
+test('both native baselines require an online boot', () => {
+  for (const mode of ['footprint', 'webkit-ledger']) {
+    const baseline = JSON.parse(readFileSync(new URL(`../scripts/memory/${mode}-ratchet.json`, import.meta.url), 'utf8'));
+    expect(baseline).toMatchObject({ mode, boot: 'online', instrument: 'minimal' });
+  }
 });

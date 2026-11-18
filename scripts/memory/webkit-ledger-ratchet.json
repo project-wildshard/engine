@@ -2,28 +2,29 @@
   "version": 1,
   "mode": "webkit-ledger",
   "instrument": "minimal",
+  "boot": "online",
   "zones": {
     "nine-dragon-stack": {
       "control": {
         "browser": 2810784,
         "engine": 0,
-        "workers": 6708749,
-        "geometry": 117412734,
-        "textures": 55685820,
+        "workers": 2359296,
+        "geometry": 115621098,
+        "textures": 46879100,
         "scene": 0,
-        "audio": 0,
-        "loading": 223311437,
+        "audio": 384000,
+        "loading": 232231549,
         "margin": 0
       },
       "peak": {
         "browser": 2810784,
         "engine": 0,
-        "workers": 6708749,
-        "geometry": 117412734,
-        "textures": 55685820,
+        "workers": 2359296,
+        "geometry": 115621098,
+        "textures": 46879100,
         "scene": 0,
-        "audio": 0,
-        "loading": 223311437,
+        "audio": 384000,
+        "loading": 232231549,
         "margin": 0
       }
     }
