@@ -58,3 +58,13 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   runs pymobiledevice3 through uvx for the WebContent and GPU processes' `physFootprint` every 500 ms, the syslog lines
   that state the limit and its crossing, and afterwards the newest JetsamEvent report as a table. The parsers are tested
   on a synthetic JetsamEvent and syslog sample; the first real phone run will say whether the field names hold.
+- EM11 (mini-em1c), the phone chain that replaces "Chromium renderer x 2.0" (`scripts/memory/phoneModel.mjs`,
+  `phone-model.json`, refit by `phone-fit.mjs`). Phone WebContent = native WebKit WebContent + alpha x the GPU process over
+  its floor, since iOS charges the page's Metal and IOSurface memory to WebContent. `measure.mjs` now stamps the boot
+  trace's checkpoints (the operations an "Abrupt previous page" report names) on the kernel samples, so v0.1.36 Nine's
+  death on the phone right after its last `compile:after` bounds alpha from both sides: over 2.05 GB in that window, under
+  2.147 GB in every window before. alpha 0.14-0.47; a single scale on both processes fits 0.58-0.82, and the bar is both.
+  The Mac's own WebContent alone read 1.79-1.84 GB in the death window, so the GPU side the phone charges is small next to
+  what Mac ANGLE Metal holds (1.7-1.8 GB). On main `c4397636`, phone loading peak / playing: Template 0.82 / 0.63 GB, Dunes
+  0.95 / 0.66, Pine 1.45 / 1.18, Nine 2.42 (2.06-2.91) / 1.50: Nine still crosses the line while loading. The probe's
+  factor is the fitted 2.25 (1.14-2.86) of its renderer peak.

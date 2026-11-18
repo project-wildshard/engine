@@ -1,0 +1,89 @@
+#!/usr/bin/env node
+// phone-fit.mjs (ENGINE-MEMORY EM11): refit scripts/memory/phone-model.json from runs on the Mac.
+//
+//   node scripts/memory/phone-fit.mjs --anchor=<measure.mjs JSON of the build the phone died on> --last=compile:after
+//        --zones=<measure.mjs JSON>,... --chromium=<boot-memory-peak.mjs JSON>,... [--out=scripts/memory/phone-model.json]
+//
+// The anchor run must carry the boot trace's windows (measure.mjs records them as `traceCheckpoints`). Each zone needs
+// three or more native WebKit runs with the ledger counters at control, and one or more Chromium probe runs of the same
+// build. What each number means: scripts/memory/phoneModel.mjs.
+import { readFileSync, writeFileSync } from 'node:fs';
+import { anchorBounds, ledgerSplit, phoneFromWebKit, phonePeakFromWebKit } from './phoneModel.mjs';
+import { stats } from './measure.mjs';
+
+const MB = 1e6;
+const median = (/** @type {number[]} */ xs) => stats(xs).median;
+
+/** Least squares y = floor + perMB x. @param {readonly [number, number][]} points MB pairs */
+export function lineFit(points) {
+  const n = points.length, mx = points.reduce((s, p) => s + p[0], 0) / n, my = points.reduce((s, p) => s + p[1], 0) / n;
+  const sxx = points.reduce((s, p) => s + (p[0] - mx) ** 2, 0), sxy = points.reduce((s, p) => s + (p[0] - mx) * (p[1] - my), 0);
+  const perMB = sxx === 0 ? 0 : sxy / sxx;
+  return { floorMB: my - perMB * mx, perMB };
+}
+
+/** One zone's medians over its WebKit runs. @param {any[]} runs measure.mjs `webkit` rows */
+export function zoneSummary(runs) {
+  const ok = runs.filter((r) => r.ready && r.settled && !r.refused);
+  if (ok.length === 0) throw new Error('no valid WebKit run');
+  const ledger = ok.map((r) => ledgerSplit(r.counters));
+  return { runs: ok.length, chunk: ok[0].chunk, build: ok[0].build,
+    settled: { webcontent: median(ok.map((r) => r.settled.webcontent)), gpu: median(ok.map((r) => r.settled.gpu)) },
+    ledger: { ram: median(ledger.map((l) => l.ram)), gpu: median(ledger.map((l) => l.gpu)) },
+    checkpoints: ok.map((r) => r.checkpoints) };
+}
+
+/** Fit the model. @param {{anchor:any[], last:string, zones:any[][], chromium:Record<string, number[]>, limitMB:number, limitHighMB:number, gpuFloorMB:number}} input */
+export function fitPhoneModel({ anchor, last, zones, chromium, limitMB, limitHighMB, gpuFloorMB }) {
+  const bounds = anchor.filter((r) => (r.traceCheckpoints ?? []).length > 0).map((r) => anchorBounds(r.traceCheckpoints, last, { limitMB, limitHighMB, gpuFloorMB }));
+  if (bounds.length === 0) throw new Error('the anchor has no run with boot trace windows');
+  const pick = (/** @type {(b: ReturnType<typeof anchorBounds>) => number} */ f) => Math.round(median(bounds.map(f)) * 1000) / 1000;
+  const model = { limitMB, limitHighMB, gpuFloorMB,
+    alpha: { low: pick((b) => b.alpha.low), high: pick((b) => b.alpha.high) }, scale: { low: pick((b) => b.scale.low), high: pick((b) => b.scale.high) } };
+  const summaries = zones.map(zoneSummary);
+  const rows = summaries.map((z) => {
+    const settled = phoneFromWebKit(z.settled, model);
+    const peaks = z.checkpoints.map((cps) => phonePeakFromWebKit(cps, model));
+    const peak = { low: median(peaks.map((p) => p.low)), central: median(peaks.map((p) => p.central)), high: median(peaks.map((p) => p.high)) };
+    const renderer = chromium[z.chunk] ?? [];
+    return Object.assign(z, { settledPhone: settled, peakPhone: peak, rendererLoadingPeak: renderer.length > 0 ? median(renderer) : null });
+  });
+  const wc = lineFit(rows.map((r) => [r.ledger.ram / MB, r.settled.webcontent / MB])), gp = lineFit(rows.map((r) => [r.ledger.gpu / MB, r.settled.gpu / MB]));
+  // leave-one-out: each zone predicted from the others' fit, as the phone's central figure
+  const misses = rows.map((r, i) => {
+    const rest = rows.filter((_, j) => j !== i), w = lineFit(rest.map((x) => [x.ledger.ram / MB, x.settled.webcontent / MB])), g = lineFit(rest.map((x) => [x.ledger.gpu / MB, x.settled.gpu / MB]));
+    const p = phoneFromWebKit({ webcontent: (w.floorMB + w.perMB * r.ledger.ram / MB) * MB, gpu: (g.floorMB + g.perMB * r.ledger.gpu / MB) * MB }, model);
+    return Math.abs(p.central - r.settledPhone.central) / r.settledPhone.central;
+  });
+  const ratios = rows.map((r) => r.peakPhone.central / r.settledPhone.central);
+  const withR = rows.filter((r) => r.rendererLoadingPeak !== null);
+  const round = (/** @type {number} */ x, d = 3) => Math.round(x * 10 ** d) / 10 ** d;
+  return { ...model,
+    ledger: { webcontent: { floorMB: round(wc.floorMB, 1), perMB: round(wc.perMB) }, gpu: { floorMB: round(gp.floorMB, 1), perMB: round(gp.perMB) }, missPct: round(Math.max(...misses) * 100, 1) },
+    peakOverSettled: { low: round(Math.min(...ratios)), central: round(median(ratios)), high: round(Math.max(...ratios)) },
+    chromium: withR.length === 0 ? null : { loadingPerRenderer: { low: round(Math.min(...withR.map((r) => r.peakPhone.low / r.rendererLoadingPeak))), central: round(median(withR.map((r) => r.peakPhone.central / r.rendererLoadingPeak))), high: round(Math.max(...withR.map((r) => r.peakPhone.high / r.rendererLoadingPeak))) } },
+    anchor: { last, runs: bounds.length, died: bounds.map((b) => b.died), lived: bounds.map((b) => b.lived), consistent: bounds.every((b) => b.consistent) },
+    zones: Object.fromEntries(rows.map((r) => [r.chunk, { build: r.build, runs: r.runs, settledMB: { webcontent: round(r.settled.webcontent / MB, 0), gpu: round(r.settled.gpu / MB, 0) },
+      ledgerMB: { ram: round(r.ledger.ram / MB, 1), gpu: round(r.ledger.gpu / MB, 1) },
+      phonePlayingMB: Object.fromEntries(Object.entries(r.settledPhone).map(([k, v]) => [k, round(v / MB, 0)])),
+      phoneLoadingMB: Object.fromEntries(Object.entries(r.peakPhone).map(([k, v]) => [k, round(v / MB, 0)])),
+      chromiumLoadingRendererMB: r.rendererLoadingPeak === null ? null : round(r.rendererLoadingPeak / MB, 0) }])) };
+}
+
+/** @param {string[]} argv */
+function main(argv) {
+  const args = Object.fromEntries(argv.map((a) => /^--([^=]+)=(.*)$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2]]));
+  const read = (/** @type {string} */ f) => JSON.parse(readFileSync(f, 'utf8'));
+  const chromium = /** @type {Record<string, number[]>} */ ({});
+  for (const f of (args.chromium ?? '').split(',').filter(Boolean)) { const run = read(f); const r = run.verdict?.rendererPeak?.bytes; if (typeof r === 'number') (chromium[run.chunk] ??= []).push(r); }
+  const calibration = read(new URL('calibration.json', import.meta.url).pathname).hosts.webkit;
+  const fitted = fitPhoneModel({ anchor: read(args.anchor).webkit, last: args.last ?? 'compile:after', zones: args.zones.split(',').map((f) => read(f).webkit), chromium,
+    limitMB: Number(args.limit ?? 2050), limitHighMB: Number(args['limit-high'] ?? 2147), gpuFloorMB: calibration.baselineMB.gpu });
+  const out = args.out ?? new URL('phone-model.json', import.meta.url).pathname;
+  const previous = (() => { try { return read(out); } catch { return {}; } })();
+  writeFileSync(out, `${JSON.stringify({ version: 1, note: previous.note ?? '', measured: args.measured ?? new Date().toISOString().slice(0, 10), host: previous.host ?? '', ...fitted }, null, 1)}\n`);
+  console.log(JSON.stringify(fitted, null, 1));
+  return 0;
+}
+
+if (process.argv[1] && import.meta.filename === (await import('node:path')).resolve(process.argv[1])) process.exitCode = main(process.argv.slice(2));

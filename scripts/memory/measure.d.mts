@@ -1,4 +1,5 @@
 import type {Sample,BrowserProcess} from './footprint.mjs';
+import type { PhoneModel } from './phoneModel.mjs';
 
 export const PROTOCOL: 'memory-run/1';
 export const PHONE_VIEW: {viewport:{width:number;height:number};screen:{width:number;height:number};deviceScaleFactor:number;isMobile:boolean;hasTouch:boolean};
@@ -16,7 +17,7 @@ export function dumpsInOrder(events:readonly unknown[]):{id:string;processes:Dum
 export function bootURL(url:string,chunk:string):string;
 export interface WebkitRun {
   host:'webkit';chunk:string;url:string;build:string|null;ready:boolean;failure:string|null;errors:string[];readyMs:number;loadAverage:number;
-  processes:(BrowserProcess&{lifetimeMaxBytes:number|null})[];checkpoints:Checkpoint[];settled:(Pair&{reads:Pair[]})|null;
+  processes:(BrowserProcess&{lifetimeMaxBytes:number|null})[];checkpoints:Checkpoint[];traceCheckpoints:Checkpoint[];settled:(Pair&{reads:Pair[]})|null;
   ledger:{totals:Record<string,number>;unattributed:Record<string,number>;byKind:Ledger|null}|null;refused:string|null;samples:number;
   counters:Counters|null;categories:Record<'webcontent'|'gpu',Record<string,number>>|null;
 }
@@ -50,3 +51,5 @@ export function predictFootprint(counters:Counters|null,host:CalibrationHost):{f
 export function categoryRemainder(measured:Record<string,number>,terms:readonly ClosureTerm[],role:'webcontent'|'gpu'):{category:string;measured:number;ledger:number;unexplained:number}[];
 export function closureLines(run:unknown,host:CalibrationHost):string[];
 export function webkitCalibration():CalibrationHost;
+export function traceToControl(trace:readonly StepRow[],steps:readonly StepRow[]):StepRow[];
+export function phoneLine(run:{checkpoints:readonly {peak:{webcontent:number;gpu:number}}[];settled:{webcontent:number;gpu:number}|null},model?:PhoneModel):string|null;

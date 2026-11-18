@@ -42,6 +42,7 @@ import { cpus, loadavg } from 'node:os';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
+import { loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText } from './phoneModel.mjs';
 
 export const PROTOCOL = 'memory-run/1';
 export const PHONE_VIEW = Object.freeze({ viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
@@ -60,6 +61,19 @@ export const STEP_LOG = String.raw`(() => {
   const on = () => { const step = read(); if (step && step !== steps.at(-1)?.[1]) steps.push([performance.timeOrigin + performance.now(), step, ledger()]); };
   const go = () => { new MutationObserver(on).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-step'] }); on(); setInterval(on, 100); };
   if (document.documentElement) go(); else document.addEventListener('DOMContentLoaded', go);
+  // EM11: the boot trace's checkpoints (the operations a phone's "Abrupt previous page" report names), stamped as written
+  const marks = []; window.__memoryRun.trace = marks;
+  const set = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (name, value) {
+    try {
+      if (String(value).includes('"boot.trace"')) { // the device save holds every device slot in one record
+        const record = JSON.parse(value), slot = (record.keys ?? record)['boot.trace'];
+        const at = slot?.data?.checkpoints?.at(-1);
+        if (at && at.atMs !== marks.at(-1)?.[3]) marks.push([performance.timeOrigin + performance.now(), String(at.operation), ledger(), at.atMs]);
+      }
+    } catch {}
+    return set.call(this, name, value);
+  };
 })();`;
 
 /** @typedef {import('./footprint.mjs').Sample} Sample @typedef {import('./footprint.mjs').BrowserProcess} BrowserProcess */
@@ -95,6 +109,13 @@ export function stepCheckpoints(samples, steps, procs) {
   const kept = out.filter((c) => c.samples > 0 || c.step !== 'page');
   for (const c of kept) { if (!Number.isFinite(c.from)) c.from = samples[0]?.t ?? 0; if (!Number.isFinite(c.to)) c.to = samples.at(-1)?.t ?? 0; }
   return kept;
+}
+
+/** The boot trace's windows end at control: a phone that died after the last checkpoint died before control.
+ * @param {readonly StepRow[]} trace @param {readonly StepRow[]} steps @returns {StepRow[]} */
+export function traceToControl(trace, steps) {
+  const control = steps.find((s) => s[1] === 'control');
+  return control ? [...trace.filter((m) => m[0] < control[0]), control] : [...trace];
 }
 
 /** Refuse a run whose WebContent peak is read before the loading card, or that never reached control.
@@ -217,7 +238,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     const discover = () => { for (const p of webkitProcesses()) if (!procs.has(p.pid)) { procs.set(p.pid, p); sampler.add(p.pid); } };
     const watch = setInterval(discover, 500);
     let failure = null, settled = null, ledger = null, counters = null, categories = null;
-    /** @type {StepRow[]} */ let steps = [];
+    /** @type {StepRow[]} */ let steps = [], trace = [];
     const started = Date.now();
     try {
       await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
@@ -231,6 +252,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
         if (closure) categories = footprintCategories([...procs.values()]);
       }
       steps = await page.evaluate(() => Reflect.get(window, '__memoryRun')?.steps ?? []);
+      trace = await page.evaluate(() => (Reflect.get(window, '__memoryRun')?.trace ?? []).map((/** @type {any[]} */ m) => [m[0], m[1], m[2]]));
       clearInterval(watch);
       const stream = await sampler.stop();
       const all = [...procs.values()];
@@ -238,7 +260,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
       const lifetime = readFootprints(all.map((p) => p.pid));
       return { host: 'webkit', chunk, url, build, ready: failure === null, failure, errors: errors.slice(0, 5), readyMs, loadAverage: Math.round(load * 100) / 100,
         processes: all.map((p) => ({ pid: p.pid, role: p.role, name: p.name, path: p.path, lifetimeMaxBytes: /** @type {any} */ (lifetime[String(p.pid)])?.lifetimeMaxPhysicalFootprintBytes ?? null })),
-        checkpoints, settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, refused: failure ?? refusal(checkpoints), samples: stream.samples.length };
+        checkpoints, traceCheckpoints: trace.length > 0 ? stepCheckpoints(stream.samples, traceToControl(trace, steps), all) : [], settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, refused: failure ?? refusal(checkpoints), samples: stream.samples.length };
     } finally { clearInterval(watch); await sampler.stop().catch(() => undefined); }
   } finally { await browser.close(); }
 }
@@ -325,6 +347,14 @@ export function closureLines(run, host) {
     for (const r of categoryRemainder(run.categories[role], p.terms, role)) if (r.measured >= 0.5 * MB || r.ledger >= 0.5 * MB) lines.push(`      ${r.category.slice(0, 44).padEnd(44)} ${mb(r.measured)} ${mb(r.ledger)} ${mb(r.unexplained)}`);
   }
   return lines;
+}
+
+/** EM11: the iPhone's WebContent [K] through the calibrated chain (scripts/memory/phoneModel.mjs), playing (settled at
+ * control) and the loading peak, against the crash line. @param {any} run @param {any} [model] */
+export function phoneLine(run, model = loadPhoneModel()) {
+  if (!run.settled || run.checkpoints.length === 0) return null;
+  const playing = phoneFromWebKit(run.settled, model), loading = phonePeakFromWebKit(run.checkpoints, model);
+  return `  phone [EM11 chain, iPhone 17 Pro]: playing ${rangeText(playing)}, loading peak ${rangeText(loading)}; crash line ${(model.limitMB / 1000).toFixed(2)} GB, envelope 1.00 GB`;
 }
 
 /** EM1's native-WebKit calibration. */
@@ -525,6 +555,7 @@ async function main(argv) {
       webkit.push(run);
       for (const line of webkitLines(run)) console.log(line);
       if (args.closure) for (const line of closureLines(run, webkitCalibration())) console.log(line);
+      const phone = phoneLine(run); if (phone) console.log(phone);
     }
   }
   if (args.url2) {

@@ -23,25 +23,22 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as v from 'valibot';
+import { loadPhoneModel } from './memory/phoneModel.mjs';
 
 /** Engine's MEMORY_AMBER (src/client/game/grid/budgetOverlay.ts): red over it in CI (J408). Decimal bytes. */
 export const MEMORY_LINE_BYTES = 1.5e9;
+/** ENGINE-MEMORY EM11's phone chain (scripts/memory/phoneModel.mjs, scripts/memory/phone-model.json): what an iPhone 17 Pro's
+ * WebContent holds at the loading peak, per byte of Chromium's renderer peak under the loading card, with its error bar. */
+export const PHONE_MODEL = loadPhoneModel();
 /**
- * The phone estimate's factor: the iPhone's WebContent footprint over Chromium's RENDERER peak while the loading card is up
- * (MEMORY-GATES MG2, recalibrated by mini-memcal 2026-11-17 on one build pair; meta mini QA 19).
- * Why the renderer alone: Chromium's GPU process on Mac Metal is not the phone's meter. Its ANGLE Metal allocation read
- * 1.3-4.5 GB on runs of the same build, about 7-20x the ~0.25 GB of buffers and textures the page asked WebGL for.
- * ANGLE on GL read 0.6 GB for that build, and WebKit's own ANGLE Metal (the Simulator's SimMetalHost) read 0.5-0.6 GB.
- * Chromium-only overhead in it is a further ~0.3 GB (skia, dawn, shared images, transfer memory).
- * The renderer read 1.01-1.08 GB on every run of both builds.
- * The anchor: staging v0.1.36 (`6f53e748`, Nine rev 2, Low) killed Jake's iPhone 17 Pro at "boot plan complete ... at
- * compile:after", so the phone was over its ~2.05 GB WebContent line there. On that build and boot point this probe's
- * renderer read 1.03-1.06 GB, so the phone is at least ~1.95x the renderer; 2.0 rounds that up. It is a floor from one crash,
- * not a fit: re-calibrate when a phone boots a shard or reads its footprint. The renderer is CPU memory and does not
- * depend on the GPU backend, so Linux takes the same factor. Was 0.87 x (renderer + GPU), from a 1.845 GB "phone" that was
- * the Simulator Inspector x1.4, a figure under the line the phone actually crossed.
+ * The phone estimate's factor: the iPhone's WebContent footprint at the loading peak over Chromium's RENDERER peak while
+ * the loading card is up. Was a flat 2.0 (mini-memcal, engine 3cd2dd87), the floor one crash put under v0.1.36 Nine. Now
+ * EM11's chain, fitted 2026-11-17 on Template, Dunes, Pine and Nine: native WebKit's WebContent plus a share of its GPU
+ * process (the share the phone charges to the page, bounded from both sides by where v0.1.36 died on the phone), over
+ * this probe's renderer peak on the same build. `PHONE_MODEL.chromium.loadingPerRenderer` holds the low and high ends.
+ * The renderer is CPU memory and does not depend on the GPU backend, so Linux takes the same factor.
  */
-export const CHROMIUM_TO_PHONE = Object.freeze({ darwin: 2, linux: 2 });
+export const CHROMIUM_TO_PHONE = Object.freeze({ darwin: PHONE_MODEL.chromium.loadingPerRenderer.central, linux: PHONE_MODEL.chromium.loadingPerRenderer.central });
 /** The factor for this host. @param {string} [platform] */
 export function chromiumToPhone(platform = process.platform) { return platform === 'darwin' ? CHROMIUM_TO_PHONE.darwin : CHROMIUM_TO_PHONE.linux; }
 
@@ -111,16 +108,18 @@ export function bootMemoryVerdict(samples, dumps, { factor = chromiumToPhone(), 
   const loading = readings.filter(row => row.step !== 'ready');
   const rendererPeak = (loading.length > 0 ? loading : readings).reduce((best, row) => row.renderer > best.renderer ? row : best);
   const peakBytes = sum(peak), phoneBytes = Math.round(rendererPeak.renderer * factor);
+  // EM11's error bar: the chain's low and high ends over the renderer, scaled to the factor in use
+  const bar = PHONE_MODEL.chromium.loadingPerRenderer, phoneLowBytes = Math.round(phoneBytes * bar.low / bar.central), phoneHighBytes = Math.round(phoneBytes * bar.high / bar.central);
   return { peakBytes, peak: { renderer: peak.renderer, gpu: peak.gpu, browser: peak.browser, heapBytes: peak.heapBytes, step: peak.step, atMs: peak.atMs },
     rendererPeak: { bytes: rendererPeak.renderer, step: rendererPeak.step, atMs: rendererPeak.atMs },
-    heapPeakBytes: heapPeak, steps: [...steps.values()], samples: readings.length, factor, phoneBytes, budgetBytes, pass: phoneBytes <= budgetBytes };
+    heapPeakBytes: heapPeak, steps: [...steps.values()], samples: readings.length, factor, phoneBytes, phoneLowBytes, phoneHighBytes, budgetBytes, pass: phoneBytes <= budgetBytes };
 }
 
 /** One line a CI log and a receipt can carry. @param {string} slug @param {ReturnType<typeof bootMemoryVerdict>} verdict */
 export function bootMemoryLine(slug, verdict) {
   const mb = (/** @type {number} */ bytes) => `${(bytes / 1e6).toFixed(0)} MB`;
-  return `BOOT MEMORY ${slug}: ${verdict.pass ? 'PASS' : 'RED'} phone ${mb(verdict.phoneBytes)} / ${mb(verdict.budgetBytes)}`
-    + ` (loading renderer ${mb(verdict.rendererPeak.bytes)} at ${verdict.rendererPeak.step} x${verdict.factor});`
+  return `BOOT MEMORY ${slug}: ${verdict.pass ? 'PASS' : 'RED'} phone ${mb(verdict.phoneBytes)} (${(verdict.phoneLowBytes / 1e6).toFixed(0)}-${mb(verdict.phoneHighBytes)}) / ${mb(verdict.budgetBytes)}`
+    + ` (loading renderer ${mb(verdict.rendererPeak.bytes)} at ${verdict.rendererPeak.step} x${verdict.factor.toFixed(2)}, EM11);`
     + ` Chromium peak ${mb(verdict.peakBytes)} = renderer ${mb(verdict.peak.renderer)} + GPU ${mb(verdict.peak.gpu)} at ${verdict.peak.step};`
     + ` JS heap peak ${mb(verdict.heapPeakBytes)}; ${verdict.samples} dumps`;
 }
@@ -181,13 +180,14 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
     const sampler = (async () => {
       while (run.sampling) {
         const tick = Date.now();
-        const [dumped, heap, step] = await Promise.all([
+        const [dumped, heap, [step, ledgerGpu]] = await Promise.all([
           tracing.send('Tracing.requestMemoryDump', { levelOfDetail: 'light', deterministic: false }).catch(() => null),
           cdp.send('Runtime.getHeapUsage').catch(() => null),
-          page.evaluate('window.__bootMemoryStep?.() ?? "page"').catch(() => 'page'),
+          // EM11: the ledger's WebGL bytes beside the step (null on a client older than EM5's counters)
+          page.evaluate(`[window.__bootMemoryStep?.() ?? "page", (() => { try { const c = globalThis.__wildshardMemory?.counters?.(); return c ? Object.values(c.gpu ?? {}).reduce((a, b) => a + b, 0) : null; } catch { return null; } })()]`).catch(() => ['page', null]),
         ]);
         const heapBytes = heap === null ? 0 : heap.usedSize + (heap.embedderHeapUsedSize ?? 0) + (heap.backingStorageSize ?? 0);
-        samples.push({ atMs: tick - started, step: String(step), dump: dumped?.success === true ? dumped.dumpGuid : null, heapBytes });
+        samples.push({ atMs: tick - started, step: String(step), dump: dumped?.success === true ? dumped.dumpGuid : null, heapBytes, ledgerGpu: typeof ledgerGpu === 'number' ? ledgerGpu : null });
         await sleep(Math.max(0, everyMs - (Date.now() - tick)));
       }
     })();

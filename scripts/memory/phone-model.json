@@ -1,0 +1,173 @@
+{
+ "version": 1,
+ "note": "ENGINE-MEMORY EM11: the iPhone 17 Pro's WebContent [K] from Mac readings (scripts/memory/phoneModel.mjs says how; scripts/memory/phone-fit.mjs refits). alpha and scale: the anchor's bounds (v0.1.36 Nine rev 2 died on the phone after its last compile:after, lived through every boot trace window before). ledger: settled WebKit [K] on the ledger [L] over the four zones, missPct the worst leave-one-out miss. chromium.loadingPerRenderer: the phone's loading peak over boot-memory-peak's renderer peak under the card. zones: the fit's data and each zone's phone prediction, MB decimal.",
+ "measured": "2026-11-17",
+ "host": "Mac mini (Apple M5 Pro, macOS 27.0), Playwright WebKit 27.2 headless, phone view 402x874 @3, phone tier, Low; engine c4397636 (zones) and 6f53e748 (anchor); Chromium probe on the same zone build",
+ "limitMB": 2050,
+ "limitHighMB": 2147,
+ "gpuFloorMB": 17.6,
+ "alpha": {
+  "low": 0.143,
+  "high": 0.474
+ },
+ "scale": {
+  "low": 0.579,
+  "high": 0.816
+ },
+ "ledger": {
+  "webcontent": {
+   "floorMB": 231.8,
+   "perMB": 5.76
+  },
+  "gpu": {
+   "floorMB": 117.4,
+   "perMB": 5.065
+  },
+  "missPct": 46.9
+ },
+ "peakOverSettled": {
+  "low": 1.231,
+  "central": 1.361,
+  "high": 1.618
+ },
+ "chromium": {
+  "loadingPerRenderer": {
+   "low": 1.143,
+   "central": 2.248,
+   "high": 2.855
+  }
+ },
+ "anchor": {
+  "last": "compile:after",
+  "runs": 3,
+  "died": [
+   {
+    "step": "compile:after",
+    "webcontentMB": 1787.005544,
+    "gpuMB": 878.659168
+   },
+   {
+    "step": "compile:after",
+    "webcontentMB": 1800.850048,
+    "gpuMB": 1758.201512
+   },
+   {
+    "step": "compile:after",
+    "webcontentMB": 1843.432088,
+    "gpuMB": 1839.1876
+   }
+  ],
+  "lived": [
+   {
+    "step": "compile:before",
+    "webcontentMB": 1686.653472,
+    "gpuMB": 826.68912
+   },
+   {
+    "step": "compile:before",
+    "webcontentMB": 1785.432704,
+    "gpuMB": 879.98632
+   },
+   {
+    "step": "compile:before",
+    "webcontentMB": 1711.704632,
+    "gpuMB": 936.232544
+   }
+  ],
+  "consistent": true
+ },
+ "zones": {
+  "_template": {
+   "build": "c439763-mwli2rll",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 529,
+    "gpu": 355
+   },
+   "ledgerMB": {
+    "ram": 47.5,
+    "gpu": 36.3
+   },
+   "phonePlayingMB": {
+    "low": 502,
+    "central": 633,
+    "high": 707
+   },
+   "phoneLoadingMB": {
+    "low": 685,
+    "central": 821,
+    "high": 965
+   },
+   "chromiumLoadingRendererMB": 347
+  },
+  "sunscar-dunes": {
+   "build": "c439763-mwli2rll",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 515,
+    "gpu": 497
+   },
+   "ledgerMB": {
+    "ram": 64.1,
+    "gpu": 97.6
+   },
+   "phonePlayingMB": {
+    "low": 576,
+    "central": 663,
+    "high": 812
+   },
+   "phoneLoadingMB": {
+    "low": 785,
+    "central": 945,
+    "high": 1106
+   },
+   "chromiumLoadingRendererMB": 444
+  },
+  "pine-hollow": {
+   "build": "c439763-mwli2rll",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 992,
+    "gpu": 617
+   },
+   "ledgerMB": {
+    "ram": 145.1,
+    "gpu": 190.6
+   },
+   "phonePlayingMB": {
+    "low": 922,
+    "central": 1177,
+    "high": 1299
+   },
+   "phoneLoadingMB": {
+    "low": 1146,
+    "central": 1449,
+    "high": 1615
+   },
+   "chromiumLoadingRendererMB": 1003
+  },
+  "nine-dragon-stack": {
+   "build": "c439763-mwli2rll",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 1011,
+    "gpu": 1586
+   },
+   "ledgerMB": {
+    "ram": 111.4,
+    "gpu": 186
+   },
+   "phonePlayingMB": {
+    "low": 1235,
+    "central": 1495,
+    "high": 2105
+   },
+   "phoneLoadingMB": {
+    "low": 2064,
+    "central": 2418,
+    "high": 2909
+   },
+   "chromiumLoadingRendererMB": 1019
+  }
+ }
+}
