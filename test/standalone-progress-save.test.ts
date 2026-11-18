@@ -16,12 +16,17 @@ import { builtFolder } from '../src/test/game/builtFolder';
 // the page's 30 s timer never runs, and a reload ends the worker before a save the page asks for on leaving comes back.
 class PageStorage implements SaveStorage {
   readonly items = new Map<string, string>();
-  /** Writes of every document, and of a world's continuation (its two slots). */
-  writes = 0; continued = 0;
+  /** Writes of every document, and of a world's continuation (its two slots), and when the last continuation landed:
+   *  a busy runner can stall this thread after the write, so "within a second" is read at the write, not at the next poll */
+  writes = 0; continued = 0; continuedAt = 0;
   get length(): number { return this.items.size; }
   key(index: number): string | null { return [...this.items.keys()][index] ?? null; }
   getItem(key: string): string | null { return this.items.get(key) ?? null; }
-  setItem(key: string, value: string): void { this.writes++; if (/\.standalone(alt)?-/u.test(key)) this.continued++; this.items.set(key, value); }
+  setItem(key: string, value: string): void {
+    this.writes++;
+    if (/\.standalone(alt)?-/u.test(key)) { this.continued++; this.continuedAt = performance.now(); }
+    this.items.set(key, value);
+  }
   removeItem(key: string): void { this.writes++; this.items.delete(key); }
 }
 async function product(slug: string): Promise<HeadlessRuntimeInput> {
@@ -70,8 +75,8 @@ test('an opened door (a public field) is in the page\'s storage within a second,
   first.client.act({ kind: 'interact', seq: 1, id: 'template.door.use' });
   await until(() => door(first) === 1);
   const openedAt = performance.now();
-  await until(() => storage.continued > before, 1000);
-  expect(performance.now() - openedAt).toBeLessThan(1000);
+  await until(() => storage.continued > before);
+  expect(storage.continuedAt - openedAt).toBeLessThan(1000);
   first.dispose(); // the reload: the worker ends with no save of its own
 
   const second = await open('_template', storage, input);
@@ -87,8 +92,8 @@ test('a quest step (a flag) is in the page\'s storage within a second, and a rel
   first.client.act({ kind: 'interact', seq: 1, id: 'castaway.talk' });
   await until(() => first.client.quests.get('sealed-ring')?.started === true);
   const startedAt = performance.now();
-  await until(() => storage.continued > before, 1000);
-  expect(performance.now() - startedAt).toBeLessThan(1000);
+  await until(() => storage.continued > before);
+  expect(storage.continuedAt - startedAt).toBeLessThan(1000);
   first.dispose();
 
   const second = await open('driftwood-isle', storage, input);
