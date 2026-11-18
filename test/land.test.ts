@@ -71,11 +71,15 @@ test('the blocking memory ledger restores and saves its own verified Brotli part
   const save = ledger.indexOf('uses: actions/cache/save@');
   expect(restore).toBeGreaterThan(0);
   expect(build).toBeGreaterThan(restore);
+  const digest = ledger.indexOf('name: Record the served ledger Brotli part digests');
+  expect(digest).toBeGreaterThan(build);
+  expect(read).toBeGreaterThan(digest);
   expect(read).toBeGreaterThan(build);
   expect(save).toBeGreaterThan(read);
   expect(ledger.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br\/1/gu)).toHaveLength(2);
   expect(ledger).toContain('full-ledger-spawn-parts-br-v1-');
   expect(ledger).toContain('$codec-$CODEC_INPUTS-');
+  expect(ledger).toContain('tmp/memory-ledger/spawn-parts.sha256');
   expect(ledger).toContain("steps.ledger-client.outcome == 'success'");
   expect(ledger).toContain("steps.ledger-parts-pruned.outcome == 'success'");
   expect(ledger).toContain("steps.ledger-parts.outputs.cache-hit != 'true'");

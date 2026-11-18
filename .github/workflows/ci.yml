@@ -508,6 +508,12 @@ jobs:
           node scripts/gen.mjs --inputs-only
           python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs --outDir tmp/memory-ledger/preview/dist
           bash scripts/ci-playwright-install.sh chromium
+      - name: Record the served ledger Brotli part digests
+        continue-on-error: true
+        run: |
+          export LC_ALL=C
+          cd tmp/memory-ledger/preview/dist/assets/spawn/parts
+          sha256sum -- *.pack.br > "$GITHUB_WORKSPACE/tmp/memory-ledger/spawn-parts.sha256"
       - name: Read or block on subsystem ledger bytes
         env:
           MEMORY_RECORD: ${{ inputs.memory_record }}
@@ -520,7 +526,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: memory-ledger-guard
-          path: tmp/memory-ledger/readings/*.json
+          path: |
+            tmp/memory-ledger/readings/*.json
+            tmp/memory-ledger/spawn-parts.sha256
           retention-days: 7
           if-no-files-found: ignore
       - name: Keep only encodings emitted by this full ledger build
