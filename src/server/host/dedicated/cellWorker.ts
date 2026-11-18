@@ -9,24 +9,28 @@ import { readFile } from 'node:fs/promises';
 import { parentPort, workerData } from 'node:worker_threads';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import { readPackGrid, readPackFolder, type PackReads } from './packReader';
+import { loadCookedFolder } from '../headlessFolder';
 import { runCells, type CellPort } from './cellHost';
 import { placeCell, placedHash, type PlacedCell } from './gridCells';
 import { loopLag } from './loopLag';
 import type { LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
+
+declare const __DEVSERVER__: boolean;
 
 /** What the door boots a worker with. */
 export interface CellWorkerData { readonly slugs: readonly string[]; readonly build: string; readonly origin: string; readonly cache: string; readonly holdMs?: number;readonly playtest?:boolean;
   readonly catalogue?: readonly LedgerCatalogueItem[];
   /** J107's start-over wait, a proof's override (`EMPTY_MS`): 5 minutes when absent. */
   readonly emptyMs?: number;
-  /** Every worker hosts its road; J353 removed the mode switch. */
+  /** Online grid cells host a road; an author's local world has one cell. */
   readonly crossing?: boolean;
+  readonly authorProduct?: string;
   /** SA33: the cells the door had placed when it booted this worker; a worker's module state is its own. */
   readonly placed?: readonly PlacedCell[];
   /** SERVER-CELLS SC1: `METRICS_PORT` is set, so this worker measures its event-loop lag for `/metrics`. */
   readonly metrics?: boolean }
 
-const { slugs, build, origin, cache, holdMs, emptyMs, playtest, crossing, placed, metrics, catalogue } = workerData as CellWorkerData, port = parentPort;
+const { slugs, build, origin, cache, holdMs, emptyMs, playtest, crossing, placed, metrics, catalogue, authorProduct } = workerData as CellWorkerData, port = parentPort;
 if (port === null) throw new Error('A cell runs in a worker');
 for (const row of placed ?? []) placeCell(row);
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
@@ -38,6 +42,9 @@ runCells(port as unknown as CellPort, { slugs, build, developerBoost: process.en
     return strips;
   } } : {}),
   load: async slug => {
+    if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && authorProduct !== undefined) {
+      return loadCookedFolder(authorProduct, rapier, slug);
+    }
     const input = await readPackFolder(slug, build, rapier, { origin, cache }, reads, placedHash(slug), catalogue, placedHash(slug) !== undefined);
     console.info(JSON.stringify({ at: 'cell.pack', slug, ...reads }));
     return input;

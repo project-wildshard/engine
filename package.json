@@ -1420,6 +1420,7 @@
   "binDependenciesDir": ".bin-deps",
   "files": [
     "CHANGELOG.md",
+    "dist/dev-server",
     "src",
     "!src/**/*.test.*",
     "scripts",

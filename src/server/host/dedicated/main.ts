@@ -80,7 +80,10 @@ const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD
 // J353: zone entry is the only implementation. Old box files may retain this row during rollout.
 const legacyWorldCrossing = setting('WORLD_CROSSING');
 if (legacyWorldCrossing !== undefined) log({ at: 'world.crossing.ignored', value: legacyWorldCrossing, reason: 'zone-entry' });
-const crossing = true;
+// An author's local build is one cell, with no grid pack or neighbouring shards.
+const authorProduct = typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ ? setting('WILDSHARD_DEV_PRODUCT') : undefined;
+if (authorProduct !== undefined && (host !== '127.0.0.1' || cells.length !== 1)) throw new Error('A dev product needs one cell on loopback');
+const crossing = authorProduct === undefined;
 // SA33: where the API's signed placement file is, and its own key's public half. Both or neither; only a whole-grid world grows.
 const placementAt = setting('PLACEMENT_URL'), placementKey = setting('PLACEMENT_PUBLIC_KEY');
 if ((placementAt === undefined) !== (placementKey === undefined)) throw new Error('PLACEMENT_URL and PLACEMENT_PUBLIC_KEY go together');
@@ -90,7 +93,8 @@ const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, catalogue, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing: true, ...(metrics === undefined ? {} : { metrics: true }),...(playtest===undefined?{}:{playtest:true}) };
+  const data: CellWorkerData = { slugs, build, origin, cache, catalogue, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing, ...(metrics === undefined ? {} : { metrics: true }),...(playtest===undefined?{}:{playtest:true}),
+    ...(authorProduct === undefined ? {} : { authorProduct }) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
   return { send: (order, transfer = []) => { worker.postMessage(order, transfer as never); },

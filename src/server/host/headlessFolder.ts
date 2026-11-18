@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url';
 import { SHARDFILE_ADMISSION_LIMITS } from '@wildshard/format/admissionLimits';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { parseShardfile } from '@wildshard/format/shardSchema';
+import { resolveSkinLookFiles } from '@wildshard/format/skinAssets';
+import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import { carryOutputDescriptor, resolveOutputDescriptor, outputDescriptor, serverReadsFile } from '@wildshard/engine/game/shardfile/outputDescriptor';
 import { nodeOutputDescriptorChecks, nodeNamedJsonCheck } from '@wildshard/engine/game/shardfile/outputChecksNode';
 import { shardFolderData } from '@wildshard/engine/game/shardfile/folderData';
@@ -55,13 +57,30 @@ export async function loadHeadlessFolder(outDir: string): Promise<ShardFolder> {
 
 /** Admit an extracted cooked server product through the production reader.
  * Only server assets are read; the caller owns physics and world lifetime. */
-export async function loadCookedFolder(directory: string, rapier: Rapier): Promise<HeadlessRuntimeInput> {
+export async function loadCookedFolder(directory: string, rapier: Rapier, authorSlug?: string): Promise<HeadlessRuntimeInput> {
   const product = await loadHeadlessFolder(directory), shard = product.shardfile;
+  // oxlint-disable-next-line wildshard/no-shard-branch -- Compare two runtime identities, with no shard-specific policy.
+  if (authorSlug !== undefined && shard.identity.slug !== authorSlug) throw new Error('Dev server product has the wrong identity');
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Cooked world requires a verified output descriptor');
   const entries = await Promise.all(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider)).map(async file => {
     const ref = file.commons === true ? `commons:${file.hash}` : file.hash;
     return [ref, await folderClosureFile(product, ref)] as const;
   }));
-  return { shard, assets: new Map(entries), product, rapier };
+  const assets = new Map(entries);
+  if (authorSlug !== undefined) {
+    // Native creature height and hit volumes need the selected skin rigs.
+    // Static GLBs, materials and textures still belong to the page.
+    const spawned = new Set(shard.creatures.spawns.map(spawn => spawn.species));
+    const looks = new Set(shard.rows.species.filter(species => spawned.has(species.id)).map(species => species.body?.look));
+    const needed = new Set<string>();
+    for (const look of shard.rows.looks) {
+      if (!looks.has(look.id) || look.recipe !== SKIN_LOOK_RECIPE) continue;
+      const { skin, variants } = resolveSkinLookFiles(shard, look, assets);
+      needed.add(skin.row.file);
+      for (const variant of variants?.values() ?? []) needed.add(variant.row.file);
+    }
+    await Promise.all([...needed].map(async ref => { assets.set(ref, await folderClosureFile(product, ref)); }));
+  }
+  return { shard, assets, product, rapier };
 }

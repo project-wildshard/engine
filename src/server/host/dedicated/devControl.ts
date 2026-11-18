@@ -67,6 +67,16 @@ export function holdStill(host: SimHost, state: DevCellState): void {
 /** The most a control body may be: a dev ground's heightfield is the largest. */
 const BODY_LIMIT = 32 * 1024 * 1024;
 
+/** The HTTP JSON heights are an array. The simulation and the worker port use a Float32Array. */
+function decodeDevGround(message: Record<string, unknown>): void {
+  const ground = message['wildshardDevGround'];
+  if (typeof ground !== 'object' || ground === null || !('heights' in ground) || !('resolution' in ground)) return;
+  const { heights, resolution } = ground;
+  if (typeof resolution !== 'number' || !Number.isInteger(resolution) || resolution < 2 || resolution > 257 ||
+      !Array.isArray(heights) || heights.length !== resolution * resolution || !heights.every(height => typeof height === 'number' && Number.isFinite(height))) return;
+  message['wildshardDevGround'] = { ...ground, heights: Float32Array.from(heights) };
+}
+
 /**
  * `POST /__dev/control` on the door: `{ device, ...control }` from a page on an allowed origin (a dev page's harness and dev hook),
  * or from a loopback tool with no origin; `GET` lists the seated devices. Only a loopback peer is heard, whatever the door is bound to.
@@ -88,6 +98,7 @@ export function devRoute(request: IncomingMessage, response: ServerResponse, con
     try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { response.writeHead(400, headers).end(); return; }
     if (typeof body !== 'object' || body === null || !('device' in body) || typeof body.device !== 'string') { response.writeHead(400, headers).end(); return; }
     const { device, ...message } = body as { readonly device: string } & Record<string, unknown>;
+    decodeDevGround(message);
     void (async (): Promise<void> => { const answer = await control(device, message); response.writeHead(answer.ok ? 200 : 409, headers).end(JSON.stringify(answer)); })();
   });
 }

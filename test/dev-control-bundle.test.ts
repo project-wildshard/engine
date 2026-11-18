@@ -1,7 +1,7 @@
 // MEMORY-STRUCTURE STR4 (J414): the dev control channel is in the local dev server's bundle (`build-server.mjs --dev`) and
 // absent from the box's (no `--dev`), which `build-server.mjs --tar` packs.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 
@@ -18,11 +18,27 @@ function built(name: string, dev: boolean): string {
 
 test('the box bundle has no dev control channel; the dev bundle has it', () => {
   const box = built('box', false), dev = built('dev', true);
-  for (const marker of ['/__dev/control', 'that device has no seat on this worker', 'not a dev control']) {
+  for (const marker of ['/__dev/control', 'that device has no seat on this worker', 'not a dev control', 'WILDSHARD_DEV_PRODUCT']) {
     expect(box.includes(marker), marker).toBe(false);
     expect(dev.includes(marker), marker).toBe(true);
   }
 }, 120_000);
+
+test('the npm artifact carries the native dev server and its runtime files', () => {
+  const staged = join(scratch, 'package');
+  mkdirSync(staged, { recursive: true });
+  cpSync('package.json', join(staged, 'package.json'));
+  const output = join(staged, 'dist/dev-server');
+  const build = spawnSync(process.execPath, ['scripts/build-server.mjs', '--dev', '--out', output], { encoding: 'utf8' });
+  expect(build.status, build.stderr).toBe(0);
+  const pack = spawnSync('npm', ['pack', '--ignore-scripts', '--json'], { cwd: staged, encoding: 'utf8' });
+  expect(pack.status, pack.stderr).toBe(0);
+  const [archive] = JSON.parse(pack.stdout) as [{ filename: string; files: { path: string }[] }];
+  const files = archive.files.map(row => row.path);
+  for (const file of ['main.mjs', 'cellWorker.mjs', 'rapier.wasm', 'bundle.json', 'migrations/0001-saves.sql']) {
+    expect(files).toContain(`dist/dev-server/${file}`);
+  }
+}, 30_000);
 
 test('a dev bundle is never packed for a box', () => {
   const run = spawnSync(process.execPath, ['scripts/build-server.mjs', '--dev', '--out', join(scratch, 'packed'), '--tar', join(scratch, 'packed.tgz')], { encoding: 'utf8' });

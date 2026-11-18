@@ -40,5 +40,6 @@ export function devControls(address: () => string, device: string): DevControls 
   return { send,
     place: (x, y, z, yaw) => { told({ x, y, z, yaw }); }, hardHits: by => { told({ hits: by }); }, bossGod: () => { told({ god: true }); },
     still: () => { told({ still: true }); }, raise: flag => { told({ flag }); }, move: (other, x, y, z) => { told({ move: other, x, y, z, yaw: 0 }); },
-    devColliders: (name, boxes) => { told({ wildshardDevColliders: name, boxes }); }, devGround: ground => { told({ wildshardDevGround: ground }); } };
+    devColliders: (name, boxes) => { told({ wildshardDevColliders: name, boxes }); },
+    devGround: ground => { told({ wildshardDevGround: { ...ground, heights: Array.from(ground.heights) } }); } };
 }

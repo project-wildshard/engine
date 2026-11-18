@@ -1,8 +1,13 @@
 // MEMORY-STRUCTURE STR2 (J414): the dev page port stamps every document with its world, and its key outlives a restart.
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { devKey, DEV_STATE, stampDevDocument } from '../scripts/dev-world.mjs';
+import { devControlUrl, devControls } from '../src/client/host/online/devControl';
+import { devRoute } from '../src/server/host/dedicated/devControl';
+import { isDevGround } from '../src/shared/game/devColliders';
 
 const made: string[] = [];
 afterEach(() => { for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true }); });
@@ -22,4 +27,35 @@ test('the dev key is made once and kept', () => {
   const first = devKey(work);
   expect(first.public).toMatch(/^[0-9a-f]+$/u);
   expect(devKey(work)).toEqual(first);
+});
+
+test('a watch heightfield crosses the real dev HTTP route', async () => {
+  const accepted: unknown[] = [];
+  let wake: () => void = () => {};
+  const arrived = new Promise<void>(resolve => { wake = resolve; });
+  const server = createServer((request, response) => {
+    devRoute(request, response, (device, message) => {
+      const ok = device === 'author' && isDevGround(message);
+      if (ok) { accepted.push(message); wake(); }
+      return Promise.resolve({ ok });
+    }, [], () => []);
+  });
+  try {
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('Dev route has no port');
+    const socket = `ws://127.0.0.1:${address.port}/`;
+    const ground = { resolution: 2, x: 0, z: 0, size: 5, heights: new Float32Array([0, 0.25, 2, -0.5]) };
+    devControls(() => socket, 'author').devGround(ground);
+    await arrived;
+    expect(accepted).toEqual([{ wildshardDevGround: ground }]);
+    const refused = await fetch(devControlUrl(socket), {
+      method: 'POST', body: JSON.stringify({ device: 'author', wildshardDevGround: { ...ground, heights: [0, 1, 2] } }),
+    });
+    expect(refused.status).toBe(409);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => { server.close(() => { resolve(); }); });
+  }
 });

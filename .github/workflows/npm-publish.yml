@@ -63,13 +63,10 @@ jobs:
         with:
           node-version-file: package.json
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        if: github.event_name == 'workflow_dispatch'
         with:
           package_json_file: package.json
       - uses: ./.github/actions/org-deps
-        if: github.event_name == 'workflow_dispatch'
-      - name: Install the staging signature verifier's dependencies
-        if: github.event_name == 'workflow_dispatch'
+      - name: Install the pinned build dependencies
         run: pnpm install --frozen-lockfile --config.ci=false
       - name: Admit the exact staging release for npm next
         if: github.event_name == 'workflow_dispatch'
@@ -193,6 +190,8 @@ jobs:
           node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$(npm --version)" ||
             npm install --global npm@11.16.0
           npm --version
+      - name: Build the versioned local author server
+        run: node scripts/build-server.mjs --dev --out dist/dev-server
       - name: Check package version, bins and exports
         run: |
           # shellcheck disable=SC2016 # the quoted script is JavaScript with template literals
@@ -204,6 +203,9 @@ jobs:
           if (pkg.private) throw new Error(`${pkg.name} is private`);
           const packed = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { encoding: "utf8", maxBuffer: 1 << 28 }))[0];
           const files = new Set(packed.files.map((file) => file.path));
+          for (const name of ["main.mjs", "cellWorker.mjs", "rapier.wasm", "bundle.json", "migrations/0001-saves.sql"]) {
+            if (!files.has(`dist/dev-server/${name}`)) throw new Error(`not in the tarball: dev server ${name}`);
+          }
           const targets = [];
           const walk = (value) => typeof value === "string" ? targets.push(value) : Object.values(value ?? {}).forEach(walk);
           walk(pkg.exports); walk(pkg.bin);
