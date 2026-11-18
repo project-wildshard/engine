@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.42 (2026-11-18)
+
+- Show the race clock in Mirror Salt when starting a race from its grid cell.
+- Update Brasscap Mesa to revision 6.
+
 ## v0.1.41 (2026-11-18)
 
 - Keep the title steady while Enter the MMO is opening.
