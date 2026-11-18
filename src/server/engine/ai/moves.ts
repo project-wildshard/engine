@@ -72,7 +72,14 @@ export function riseSteering(row: { readonly from: number; readonly to: number; 
   return { yaw: body.yaw + row.yawLead, speed: k > 0 ? row.speed : 0, altitude: row.from + (row.to - row.from) * k, turn: row.turn, ground: row.ground };
 }
 const finite = v.pipe(v.number(), v.finite());
-const saved: v.GenericSchema<ActorMoveSavedDataInput, ActorMoveSavedData> = v.strictObject({ version: v.literal(1), contract: v.string(), elapsed: v.pipe(finite, v.minValue(0)), angle: finite, complete: v.boolean(), strikeIssued: v.exactOptional(v.boolean()) });
+const triple = v.tuple([finite, finite, finite]);
+const saved: v.GenericSchema<ActorMoveSavedDataInput, ActorMoveSavedData> = v.strictObject({ version: v.literal(1), contract: v.string(), elapsed: v.pipe(finite, v.minValue(0)), angle: finite, complete: v.boolean(), strikeIssued: v.exactOptional(v.boolean()),
+  leap: v.exactOptional(v.strictObject({ from: triple, to: triple })) });
+/** CC17b leap arc: launch speed for the declared peak, and the time it meets the landing height on the way down (undefined: above the peak). */
+export function leapArc(height: number, gravity: number, rise: number): { readonly lift: number; readonly seconds: number } | undefined {
+  const lift = Math.sqrt(2 * gravity * height);
+  return rise > height ? undefined : { lift, seconds: (lift + Math.sqrt(Math.max(0, lift * lift - 2 * gravity * rise))) / gravity };
+}
 function point(value: MovePoint): void { if (![value.x, value.y, value.z].every(Number.isFinite)) throw new Error('Nonfinite move observation'); }
 
 /** One replaceable sim-side move. It emits data requests; platform flight/physics/combat applies them in fixed-step order.
@@ -84,6 +91,8 @@ export class ActorMoveRunner {
   private angle: number;
   private complete = false;
   private strikeIssued = false;
+  /** A leap fixes its start and landing on its first step; the saved continuation keeps both. */
+  private leap: { from: [number, number, number]; to: [number, number, number] } | undefined;
   private reportedFrame = false;
   constructor(input: unknown, body: MoveBody) {
     const row = parseActorMoves([input])[0]; if (row === undefined) throw new Error('Missing move declaration');
@@ -91,21 +100,23 @@ export class ActorMoveRunner {
     point(body.position); if (!Number.isFinite(body.yaw)) throw new Error('Nonfinite move heading');
     this.angle = this.row.kind === 'orbit' ? Math.atan2(body.position.z - this.row.center[1], body.position.x - this.row.center[0]) : 0;
   }
-  snapshot(): v.InferOutput<typeof saved> { return { version: 1, contract: this.contract, elapsed: this.elapsed, angle: this.angle, complete: this.complete, ...(this.row.kind === 'dive' && this.row.strike !== undefined ? { strikeIssued: this.strikeIssued } : {}) }; }
+  snapshot(): v.InferOutput<typeof saved> { return { version: 1, contract: this.contract, elapsed: this.elapsed, angle: this.angle, complete: this.complete, ...(this.row.kind === 'dive' && this.row.strike !== undefined ? { strikeIssued: this.strikeIssued } : {}),
+    ...(this.leap === undefined ? {} : { leap: { from: [...this.leap.from], to: [...this.leap.to] } }) }; }
   /** Full validation precedes mutation. Restore neither moves nor emits completion/strike requests. */
   restore(input: unknown): void {
     const value = v.parse(saved, input);
     if (value.contract !== this.contract) throw new Error('Move continuation belongs to another declaration');
     this.elapsed = value.elapsed; this.angle = value.angle; this.complete = value.complete; this.strikeIssued = value.strikeIssued ?? false;
+    this.leap = value.leap === undefined ? undefined : { from: [...value.leap.from], to: [...value.leap.to] };
   }
   /** Advance exactly once per 60 Hz simulation step. Completed moves emit no further requests.
    * A refused observation emits nothing, restores private clocks/edges and reports once. */
   step(observation: MoveObservation): MoveFrame {
     if (this.complete) return {};
-    const elapsed = this.elapsed, angle = this.angle, complete = this.complete, strikeIssued = this.strikeIssued;
+    const elapsed = this.elapsed, angle = this.angle, complete = this.complete, strikeIssued = this.strikeIssued, leap = this.leap;
     try {return this.evaluateObservation(observation);}
     catch (error) {
-      this.elapsed = elapsed; this.angle = angle; this.complete = complete; this.strikeIssued = strikeIssued;
+      this.elapsed = elapsed; this.angle = angle; this.complete = complete; this.strikeIssued = strikeIssued; this.leap = leap;
       if (!this.reportedFrame) {
         this.reportedFrame = true;
         emitFault({system: 'ai.move', error, verdict: 'retry'});
@@ -118,13 +129,14 @@ export class ActorMoveRunner {
     point(body.position); if (!Number.isFinite(body.yaw)) throw new Error('Nonfinite move heading');
     if (target !== undefined) point(target);
     if (perch !== undefined) { point(perch); if (!Number.isFinite(perch.yaw)) throw new Error('Nonfinite perch heading'); }
-    const needsTarget = row.kind === 'stalk' || row.kind === 'dive' || row.kind === 'takeoff' || row.kind === 'ring-run' || (row.kind === 'relocate' && row.facing === 'target');
+    const needsTarget = row.kind === 'stalk' || row.kind === 'dive' || row.kind === 'takeoff' || row.kind === 'ring-run' || (row.kind === 'relocate' && row.facing === 'target')
+      || (row.kind === 'leap' && row.to.kind === 'target' && this.leap === undefined);
     if (needsTarget && target === undefined) throw new Error('Move requires a resolved target');
     if ((row.kind === 'takeoff' || row.kind === 'perch') && perch === undefined) throw new Error('Move requires its resolved perch');
     if ((row.kind === 'burrow' || row.kind === 'surface') && (observation.field === undefined || !Number.isFinite(observation.field) || observation.field < 0 || observation.field > 1)) throw new Error('Move requires a normalized field');
     if (row.kind === 'stalk' && row.ready.kind === 'range' && (observation.range === undefined || !Number.isFinite(observation.range) || observation.range < 0)) throw new Error('Move requires the admitted strike range');
     const destination = observation.destination;
-    if (row.kind === 'relocate' && (destination === undefined || ![destination.x, destination.z].every(value => Number.isFinite(value) && Math.abs(value) <= 10000)
+    if ((row.kind === 'relocate' || (row.kind === 'leap' && row.to.kind === 'spot' && this.leap === undefined)) && (destination === undefined || ![destination.x, destination.z].every(value => Number.isFinite(value) && Math.abs(value) <= 10000)
       || (destination.y !== undefined && (!Number.isFinite(destination.y) || Math.abs(destination.y) > 10000)) || (destination.yaw !== undefined && !Number.isFinite(destination.yaw)))) throw new Error('Move requires its finite admitted location');
     this.elapsed += 1 / 60;
     switch (row.kind) {
@@ -183,8 +195,22 @@ export class ActorMoveRunner {
         const value = clamp(from + (row.kind === 'burrow' ? 1 : -1) * row.rate / 60, 0, 1);
         return { field: { id: row.field, value }, ...(value === (row.kind === 'burrow' ? 1 : 0) ? this.finish(true) : {}) };
       }
-      // format 0.28 admits `leap` (ONE-FORMAT CC17a); its runner is CC17b. Until then a leap refuses by name (a fault, no motion).
-      case 'leap': throw new Error('Move leap has no engine runner yet (ONE-FORMAT CC17b)');
+      // ONE-FORMAT CC17b: a ballistic arc from where the leap starts to where its target or spot stood then, peaking
+      // `height` above the start; the body is placed on the arc each step and lands exactly at `to`.
+      case 'leap': {
+        if (this.leap === undefined) {
+          const end = row.to.kind === 'target' ? target : destination;
+          if (end === undefined) throw new Error('Missing leap landing');
+          const y = end.y ?? body.position.y;
+          this.leap = { from: [body.position.x, body.position.y, body.position.z], to: [end.x, y, end.z] };
+        }
+        const [fx, fy, fz] = this.leap.from, [tx, ty, tz] = this.leap.to, arc = leapArc(row.height, row.gravity, ty - fy);
+        if (arc === undefined) return this.finish(false);
+        const yaw = tx === fx && tz === fz ? body.yaw : Math.atan2(tx - fx, tz - fz);
+        if (this.elapsed >= arc.seconds) return { placement: { x: tx, y: ty, z: tz, yaw }, ...this.finish(true) };
+        const t = this.elapsed, k = t / arc.seconds;
+        return { placement: { x: fx + (tx - fx) * k, y: fy + arc.lift * t - row.gravity * t * t / 2, z: fz + (tz - fz) * k, yaw } };
+      }
       default: { const unreachable: never = row; throw new Error(`Unknown move ${String(unreachable)}`); }
     }
   }
@@ -200,5 +226,6 @@ interface ActorMoveSavedDataFields {
     angle: number;
     complete: boolean;
     strikeIssued?: boolean;
+    leap?: { from: [number, number, number]; to: [number, number, number] };
 }
 type ActorMoveSavedData = { [Key in keyof ActorMoveSavedDataFields]: ActorMoveSavedDataFields[Key] };

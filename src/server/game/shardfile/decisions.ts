@@ -417,7 +417,8 @@ export class ShardDecisions {
       const strike = this.moveStrike(handle, motion.binding, row);
       const perch = row.kind === 'takeoff' || row.kind === 'perch' ? requireValue(this.spots.get(row.perch), 'move perch') : undefined;
       const field = row.kind === 'burrow' || row.kind === 'surface' ? this.registries.fields?.get(row.field) : undefined;
-      const destination = row.kind !== 'relocate' ? undefined : row.point.kind === 'spot'
+      const destination = row.kind === 'leap' ? (row.to.kind === 'spot' ? requireValue(this.spots.get(row.to.spot), 'leap spot') : undefined)
+        : row.kind !== 'relocate' ? undefined : row.point.kind === 'spot'
         ? requireValue(this.spots.get(row.point.spot), 'move location')
         : { x: this.fieldValue(handle, requireValue(this.registries.fields?.get(row.point.x), 'move x field')),
           z: this.fieldValue(handle, requireValue(this.registries.fields?.get(row.point.z), 'move z field')) };
