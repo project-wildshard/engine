@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { TIER } from '@wildshard/engine/core/tier';
+import type { Scope } from '@wildshard/engine/app/scope';
 import { lentToon, setLentParam } from '../shardfile/lentLooks';
 import { followToonLighting } from './toonLighting';
 import { createCoverAppearance, type CoverAppearance } from './coverAppearance';
@@ -68,11 +69,18 @@ function writePlant(A: InstanceArrays, n: number, entry: CoverCell, i: number, f
   const v = entry.values;
   const yaw = v[i + 3] ?? 0, s = v[i + 4] ?? 1, c = Math.cos(yaw) * s, sn = Math.sin(yaw) * s, m = A.matrix, o = n * 16;
   const [gnd, cov, nrm] = A.attrs, col = A.colour;
-  // a turn about +y, scaled: what Matrix4.compose writes, without the quaternion
-  m[o] = c; m[o + 1] = 0; m[o + 2] = -sn; m[o + 3] = 0;
-  m[o + 4] = 0; m[o + 5] = s; m[o + 6] = 0; m[o + 7] = 0;
-  m[o + 8] = sn; m[o + 9] = 0; m[o + 10] = c; m[o + 11] = 0;
-  m[o + 12] = v[i] ?? 0; m[o + 13] = v[i + 1] ?? 0; m[o + 14] = v[i + 2] ?? 0; m[o + 15] = 1;
+  const x = v[i] ?? 0, y = v[i + 1] ?? 0, z = v[i + 2] ?? 0;
+  if (A.yawScale !== null) {
+    const [origins, bases] = A.yawScale, at = n * 3;
+    origins[at] = x; origins[at + 1] = y; origins[at + 2] = z;
+    bases[at] = c; bases[at + 1] = s; bases[at + 2] = sn;
+  } else {
+    // A turn about +y, scaled: what Matrix4.compose writes, without the quaternion.
+    m[o] = c; m[o + 1] = 0; m[o + 2] = -sn; m[o + 3] = 0;
+    m[o + 4] = 0; m[o + 5] = s; m[o + 6] = 0; m[o + 7] = 0;
+    m[o + 8] = sn; m[o + 9] = 0; m[o + 10] = c; m[o + 11] = 0;
+    m[o + 12] = x; m[o + 13] = y; m[o + 14] = z; m[o + 15] = 1;
+  }
   if (col) { col[n * 3] = v[i + 5] ?? 1; col[n * 3 + 1] = v[i + 6] ?? 1; col[n * 3 + 2] = v[i + 7] ?? 1; }
   const colors = entry.start + i / STRIDE * PLANT + 15;
   if (gnd !== undefined) for (let k = 0; k < 3; k++) gnd[n * 3 + k] = file.getUint8(colors + k);
@@ -92,6 +100,7 @@ class StreamedCover {
   private readonly farBudgetMs: number;
   private readonly kinds: Kind[] = [];
   private readonly appearance: CoverAppearance;
+  private readonly yawScaleOwner: Scope | undefined;
   private readonly cells: CellWindow<CoverCell[]>;
   private readonly last = new THREE.Vector3(1e9, 0, 1e9);
   private readonly uniforms = { uPlayer: { value: new THREE.Vector3() }, uReachUp: { value: 1 } };
@@ -111,9 +120,10 @@ class StreamedCover {
   private farWritten = false;
 
   /** The cover's rows, geometries and baked cells. */
-  constructor(resources: SceneHandles, row: StreamedCoverRow, cells: Uint8Array) {
+  constructor(resources: SceneHandles, row: StreamedCoverRow, cells: Uint8Array, owner: Scope) {
     this.resources = resources;
     this.row = row;
+    this.yawScaleOwner = TIER === 'phone' ? owner : undefined;
     this.appearance = createCoverAppearance({ params: { viewer: row.params.viewer }, kinds: row.kinds.flatMap(kind => {
       const near = `${row.look}-${kind.name}`, far = `${near}-far`;
       return [...(kind.far === undefined ? [] : [{ id: far, graph: far }]), { id: near, graph: near }];
@@ -146,6 +156,7 @@ class StreamedCover {
       const k = row.kinds[ki];
       if (k === undefined) continue;
       const cap = Math.round(k.cap * capK), [near, far] = k.reach, hasTint = (this.file.tinted & (1 << ki)) !== 0;
+      const options = { coloured: hasTint, ...(this.yawScaleOwner === undefined ? {} : { yawScaleOwner: this.yawScaleOwner }) };
       const reach = new THREE.Vector3(near * K, far * K, (far - near) * K * row.growShare);
       this.rMax = Math.max(this.rMax, reach.y * sr.up + row.refill + row.eyeSlack); // sized for the slope reach
       let farTier: FarTier | null = null;
@@ -154,9 +165,9 @@ class StreamedCover {
         const f = k.far, [fn, ff] = f.reach, fcap = Math.round(f.cap * f.keep * capK);
         farSpan.set(fn * K, ff * K, (ff - fn) * K * row.growShare);
         this.rFar = Math.max(this.rFar, farSpan.y * sr.up + row.farSlack + row.eyeSlack);
-        farTier = { set: instanceTier(this.group, `${row.meshPrefix}${k.name}-far`, geometry(f.geometry, `${row.look}-${k.name}-far`), material(`${row.look}-${k.name}-far`, reach, farSpan, MODE_FAR), fcap, ATTRS, { coloured: hasTint }), cap: fcap, reach: farSpan, keep: f.keep };
+        farTier = { set: instanceTier(this.group, `${row.meshPrefix}${k.name}-far`, geometry(f.geometry, `${row.look}-${k.name}-far`), material(`${row.look}-${k.name}-far`, reach, farSpan, MODE_FAR), fcap, ATTRS, options), cap: fcap, reach: farSpan, keep: f.keep };
       }
-      const set = instanceTier(this.group, `${row.meshPrefix}${k.name}`, geometry(k.geometry, `${row.look}-${k.name}`), material(`${row.look}-${k.name}`, reach, farSpan, farTier ? MODE_HANDOVER : MODE_NEAR, farTier ? farTier.keep : 1), cap, ATTRS, { coloured: hasTint });
+      const set = instanceTier(this.group, `${row.meshPrefix}${k.name}`, geometry(k.geometry, `${row.look}-${k.name}`), material(`${row.look}-${k.name}`, reach, farSpan, farTier ? MODE_HANDOVER : MODE_NEAR, farTier ? farTier.keep : 1), cap, ATTRS, options);
       this.kinds.push({ set, cap, far: farTier, reach, scale: k.scale });
     }
     const span = Math.ceil((2 * Math.max(this.rMax, this.rFar)) / row.cell) + 1;
@@ -331,6 +342,6 @@ class StreamedCover {
 /** Client-only presentation handle; construction stays private so shards cannot override streaming. */
 export type StreamedCoverHandle = Pick<StreamedCover, 'group' | 'stats' | 'update'>;
 /** Build from plain rows and baked bytes using platform-owned scene resources. */
-export function createStreamedCover(resources: SceneHandles, input: unknown, cells: Uint8Array): StreamedCoverHandle {
-  return new StreamedCover(resources, parseStreamedCover(input), cells).build();
+export function createStreamedCover(resources: SceneHandles, input: unknown, cells: Uint8Array, owner: Scope): StreamedCoverHandle {
+  return new StreamedCover(resources, parseStreamedCover(input), cells, owner).build();
 }

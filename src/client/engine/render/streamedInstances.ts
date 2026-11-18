@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { drawNeutral } from './drawNeutral';
 import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
+import { GraphShaderMaterial } from './graph/glslMaterial';
+import { copyShaderPatches, PATCH_ORDER, patchShader } from './shaderPatches';
+import type { Scope } from '../../../shared/engine/app/scope';
 
 /**
  * Cell-streamed instances (SHARD-PLATFORM W2, G441): the bookkeeping a scatter streamed round a viewer shares, with
@@ -93,11 +96,41 @@ type InstanceWords = Float32Array | Uint8Array;
 /** The back mesh's per-instance arrays: matrices, colours (a coloured tier) and the declared attributes in order. */
 export interface InstanceArrays {
   readonly matrix: Float32Array;
+  readonly yawScale: readonly [Float32Array, Float32Array] | null;
   readonly colour: Float32Array | null;
   readonly attrs: readonly InstanceWords[];
 }
 
 const floats = (a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined): Float32Array => (a !== undefined && a.array instanceof Float32Array ? a.array : new Float32Array(0));
+
+const STREAM_ORIGIN = 'wsStreamOrigin', STREAM_YAW_SCALE = 'wsStreamYawScale';
+
+/** Exactly the matrix of a translation and a uniform yaw-scaled basis.
+ * Three's raycast and bounds computations use the same coefficients as GLSL. */
+class YawScaleMesh extends THREE.InstancedMesh {
+  override getMatrixAt(index: number, target: THREE.Matrix4): THREE.Matrix4 {
+    const position = this.geometry.getAttribute(STREAM_ORIGIN), basis = this.geometry.getAttribute(STREAM_YAW_SCALE);
+    const c = basis.getX(index), s = basis.getY(index), sn = basis.getZ(index);
+    return target.set(c, 0, sn, position.getX(index), 0, s, 0, position.getY(index), -sn, 0, c, position.getZ(index), 0, 0, 0, 1);
+  }
+}
+
+function yawScaleMaterial(source: GraphShaderMaterial, owner: Scope): GraphShaderMaterial {
+  const material = owner.own(source.clone());
+  copyShaderPatches(source, material);
+  patchShader(material, 'engine.streamed-yaw-scale', PATCH_ORDER.decorate, shader => {
+    shader.vertexShader = `attribute vec3 ${STREAM_ORIGIN};
+attribute vec3 ${STREAM_YAW_SCALE};
+mat4 wsStreamMatrix() {
+  vec3 q = ${STREAM_YAW_SCALE};
+  return mat4( vec4( q.x, 0.0, -q.z, 0.0 ), vec4( 0.0, q.y, 0.0, 0.0 ),
+    vec4( q.z, 0.0, q.x, 0.0 ), vec4( ${STREAM_ORIGIN}, 1.0 ) );
+}
+#define instanceMatrix wsStreamMatrix()
+${shader.vertexShader}`;
+  }, { key: key => `${key}|streamed-yaw-scale`, pureKey: true });
+  return material;
+}
 
 /**
  * One draw of streamed instances on two meshes (see the module comment). The front one is drawn; `begin` starts the next
@@ -112,6 +145,8 @@ export class InstanceTier {
   /** instances written into the back mesh */
   n = 0;
   private readonly attrs: readonly InstanceAttr[];
+  private readonly packed: boolean;
+  private readonly coloured: boolean;
   private front = 0;
   private up = 0;
   /** each mesh has been drawn once, i.e. three has created its GPU buffers (a whole-cap bufferData): until then a mesh
@@ -119,10 +154,11 @@ export class InstanceTier {
   private readonly drawn = [false, false];
 
   /** The tier's two meshes and the per-instance attributes they carry. */
-  constructor(meshes: readonly [THREE.InstancedMesh, THREE.InstancedMesh], attrs: readonly InstanceAttr[]) {
+  constructor(meshes: readonly [THREE.InstancedMesh, THREE.InstancedMesh], attrs: readonly InstanceAttr[], packed = false, coloured: boolean = meshes[0].instanceColor !== null) {
     this.meshes = meshes;
     this.attrs = attrs;
-    this.bytesPer = 4 * (16 + (meshes[0].instanceColor ? 3 : 0)) + attrs.reduce((bytes, attr) => bytes + attr.size * (attr.normalizedBytes === true ? 1 : 4), 0);
+    this.packed = packed; this.coloured = coloured;
+    this.bytesPer = 4 * ((packed ? 6 : 16) + (coloured ? 3 : 0)) + attrs.reduce((bytes, attr) => bytes + attr.size * (attr.normalizedBytes === true ? 1 : 4), 0);
     meshes.forEach((m, i) => { m.onBeforeRender = drawNeutral(() => { this.drawn[i] = true; }); });
   }
   /** The mesh drawn. */
@@ -131,12 +167,13 @@ export class InstanceTier {
   get back(): THREE.InstancedMesh { return this.meshes[1 - this.front] ?? this.meshes[1]; }
   /** The back mesh's per-instance arrays, to write the next set into. */
   arrays(): InstanceArrays {
-    const b = this.back, col = b.instanceColor;
+    const b = this.back, col = this.coloured ? b.instanceColor : null;
     const attrs = this.attrs.map(({ name }): InstanceWords => {
       const attr = b.geometry.getAttribute(name);
       return attr?.array instanceof Uint8Array ? attr.array : floats(attr);
     });
-    return { matrix: floats(b.instanceMatrix), colour: col ? floats(col) : null, attrs };
+    const yawScale = this.packed ? [floats(b.geometry.getAttribute(STREAM_ORIGIN)), floats(b.geometry.getAttribute(STREAM_YAW_SCALE))] as const : null;
+    return { matrix: floats(b.instanceMatrix), yawScale, colour: col ? floats(col) : null, attrs };
   }
   /** Start the next set in the back mesh. */
   begin(): void { this.n = 0; this.up = 0; const b = this.back; b.count = 0; b.visible = true; }
@@ -147,7 +184,8 @@ export class InstanceTier {
     const k = Math.min(this.n - this.up, Math.floor(bytes / this.bytesPer));
     if (k <= 0) return 0;
     const b = this.back;
-    for (const a of [b.instanceMatrix, b.instanceColor, ...this.attrs.map((x) => b.geometry.getAttribute(x.name))]) {
+    const pose = this.packed ? [b.geometry.getAttribute(STREAM_ORIGIN), b.geometry.getAttribute(STREAM_YAW_SCALE)] : [b.instanceMatrix];
+    for (const a of [...pose, this.coloured ? b.instanceColor : null, ...this.attrs.map((x) => b.geometry.getAttribute(x.name))]) {
       if (!(a instanceof THREE.BufferAttribute)) continue;
       a.addUpdateRange(this.up * a.itemSize, k * a.itemSize); a.needsUpdate = true;
     }
@@ -169,20 +207,31 @@ export class InstanceTier {
  * window moves with the viewer) and neither casts a shadow unless `castShadow`.
  */
 export function instanceTier(parent: THREE.Object3D, name: string, geometry: THREE.BufferGeometry, material: THREE.Material, cap: number,
-  attrs: readonly InstanceAttr[], options: { readonly coloured?: boolean; readonly castShadow?: boolean } = {}): InstanceTier {
+  attrs: readonly InstanceAttr[], options: { readonly coloured?: boolean; readonly castShadow?: boolean; readonly yawScaleOwner?: Scope } = {}): InstanceTier {
+  const packedMaterial = material instanceof GraphShaderMaterial && options.yawScaleOwner !== undefined && options.castShadow !== true
+    ? yawScaleMaterial(material, options.yawScaleOwner) : null;
+  const packed = packedMaterial !== null, coloured = options.coloured === true;
   const twin = new THREE.BufferGeometry();
   for (const [k, a] of Object.entries(geometry.attributes)) twin.setAttribute(k, a);
   twin.setIndex(geometry.getIndex());
   for (const gr of geometry.groups) twin.addGroup(gr.start, gr.count, gr.materialIndex);
   twin.setDrawRange(geometry.drawRange.start, geometry.drawRange.count);
   const make = (g: THREE.BufferGeometry): THREE.InstancedMesh => {
-    const mesh = new THREE.InstancedMesh(g, material, cap);
+    const mesh = packedMaterial === null ? new THREE.InstancedMesh(g, material, cap) : new YawScaleMesh(g, packedMaterial, 0);
     mesh.name = name;
     mesh.count = 0;
     mesh.frustumCulled = false;
     mesh.castShadow = options.castShadow ?? false; mesh.receiveShadow = true;
-    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    if (options.coloured === true) { mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); mesh.instanceColor.setUsage(THREE.DynamicDrawUsage); }
+    if (packed) for (const attribute of [STREAM_ORIGIN, STREAM_YAW_SCALE]) {
+      const words = ownedArray(Float32Array, cap * 3, { owner: 'engine/streamed-instances', asset: attribute, kind: 'array-buffer' });
+      g.setAttribute(attribute, new THREE.InstancedBufferAttribute(words, 3).setUsage(THREE.DynamicDrawUsage));
+    }
+    else mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    if (coloured) { mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); mesh.instanceColor.setUsage(THREE.DynamicDrawUsage); }
+    else if (packedMaterial?.instanceColour === true) {
+      const words = ownedArray(Float32Array, cap * 3, { owner: 'engine/streamed-instances', asset: 'white', kind: 'array-buffer' }).fill(1);
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(words, 3);
+    }
     for (const attr of attrs) {
       const label = { owner: 'engine/streamed-instances', asset: `${name}/${attr.name}`, kind: 'array-buffer' } as const;
       const array = attr.normalizedBytes === true ? ownedArray(Uint8Array, cap * attr.size, label) : ownedArray(Float32Array, cap * attr.size, label);
@@ -192,5 +241,5 @@ export function instanceTier(parent: THREE.Object3D, name: string, geometry: THR
     parent.add(mesh);
     return mesh;
   };
-  return new InstanceTier([make(geometry), make(twin)], attrs);
+  return new InstanceTier([make(geometry), make(twin)], attrs, packed, coloured);
 }

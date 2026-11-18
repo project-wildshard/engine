@@ -402,7 +402,7 @@ export class WorldAssembly {
       const placed = await scenes.place(stage.placement); unchanged();
       if (!scenes.has(composition.mesh)) throw new Error('World cover companion is missing');
       for (const { name, handle } of handles) scenes.publish(name, handle.copy());
-      const field = createStreamedCover(scenes, stage.rows, cells); field.group.name = composition.name;
+      const field = createStreamedCover(scenes, stage.rows, cells, scope); field.group.name = composition.name;
       const logs = scenes.mesh(composition.mesh); Object.assign(logs.userData, composition.userData); field.group.add(logs);
       unchanged(); root.add(field.group); updates.onUpdate(dt => { field.update(dt, viewer()); }, stage.system);
       unchanged(); publishEntryOwner(scope, 'object', stage.object, field.group); publishEntryOwner(scope, 'placed', stage.id, [placed]);
