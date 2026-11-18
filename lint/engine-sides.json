@@ -1528,6 +1528,7 @@
     "src/shared/engine/entities/poseCadence.ts": "shared",
     "src/shared/engine/entities/species/registry.ts": "shared",
     "src/shared/engine/entities/species/rigs.ts": "shared",
+    "src/shared/engine/entities/trailBones.ts": "shared",
     "src/shared/engine/events/events.ts": "shared",
     "src/shared/engine/input/commands.ts": "shared",
     "src/shared/engine/input/netButtons.ts": "shared",
