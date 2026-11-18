@@ -64,8 +64,10 @@ const stopChild = (child, graceMs = 15_000) => new Promise(resolve => {
 });
 
 /** The dev world.
- * @param {{ dist: string, work: string, shard?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string, log?: (line: string) => void }} options */
-export async function openDevWorld({ dist, work, shard = '_template', port = DEV_PORT, saves = 'disk', gridRoot = ROOT, log = line => { console.log(line); } }) {
+ * `product` is the shard's built product folder (STR5: `wildshard dev` names the author's build); by default the one this
+ * checkout's pins installed (`built-folder.mjs` `readBuiltShardfile`).
+ * @param {{ dist: string, work: string, shard?: string, product?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string, log?: (line: string) => void }} options */
+export async function openDevWorld({ dist, work, shard = '_template', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, log = line => { console.log(line); } }) {
   if (!/^[a-z0-9_-]+$/u.test(shard)) throw new Error('A dev world shard must be a slug');
   work = absolute(work); mkdirSync(work, { recursive: true });
   const key = devKey(work);
@@ -91,7 +93,7 @@ export async function openDevWorld({ dist, work, shard = '_template', port = DEV
     let pageOrigin = '', stamp = { release: '', key: key.public };
     let serial = 0, signed = '', revision = 0, build = '', served = 0;
     const origin = join(work, 'origin'), server = join(work, 'server');
-    const book = run(['--input-type=module', '-e', `console.log((await import('./scripts/built-folder.mjs')).readBuiltShardfile(process.cwd(), '${shard}'))`], 'the product read').trim();
+    const book = product === undefined ? run(['--input-type=module', '-e', `console.log((await import('./scripts/built-folder.mjs')).readBuiltShardfile(process.cwd(), '${shard}'))`], 'the product read').trim() : absolute(product);
     /** The server book and bundle for a client build. @param {string} id */
     const serverFor = id => {
       run(['scripts/server-origin.mjs', origin, id, `--grid=${absolute(gridRoot)}`, `${shard}=${book}`], 'the server book');

@@ -25,6 +25,7 @@ export function openDevWorld(options: {
   readonly dist: string
   readonly work: string
   readonly shard?: string
+  readonly product?: string
   readonly port?: number
   readonly saves?: 'disk' | 'memory'
   readonly gridRoot?: string
