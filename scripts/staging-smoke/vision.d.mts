@@ -33,7 +33,7 @@ export function changelogBullets(file: string, release: string): string[];
  * @param {{ scenarios: readonly { id: string, title: string, status: string, frames: Record<string, string> }[], release: string,
  *   last?: { release: string, dir: string }, bullets: readonly string[], out: string, claude?: string }} o @returns {Vision[]}
  */
-export function visionPass({ scenarios, release, last, bullets, out, claude }: {
+export function visionPass({ scenarios, release, last, bullets, out, claude, timeoutMs }: {
     scenarios: readonly {
         id: string;
         title: string;
@@ -48,6 +48,7 @@ export function visionPass({ scenarios, release, last, bullets, out, claude }: {
     bullets: readonly string[];
     out: string;
     claude?: string;
+    timeoutMs?: number;
 }): Vision[];
 /** Regressions as findings (severity from the model, P1 when it gave none). @param {readonly Vision[]} vision */
 export function visionFindings(vision: readonly Vision[]): (import("./checks.mjs").Finding & {

@@ -15,7 +15,7 @@ import { join, resolve as resolvePath } from 'node:path';
 import { watchFaults } from './proof-faults.mjs';
 
 /** @typedef {import('playwright').Page} Page */
-/** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string }} Screen */
+/** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, errorCard?: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string }} Screen */
 /** @typedef {'select' | 'mmo' | 'deeplink'} JourneyPath */
 /** @typedef {{ t: number, s: Screen | null }} Sample */
 /** @typedef {{ at: number, text: string }} Problem */
@@ -66,6 +66,7 @@ export function screenNow() {
   const shown = (selector) => [...document.querySelectorAll(selector)].some(seen);
   const load = [...document.querySelectorAll('.ws-load:not(.hide)')].find(seen);
   const loadHeight = load === undefined ? 0 : load.getBoundingClientRect().height;
+  const errorCard = shown('#wserr, .ws-fail');
   return {
     doc, origin: performance.timeOrigin, path: location.pathname + location.search,
     shell: shown('[data-title-shell]'), title: shown('.ws-main:not(.hide)'), select: shown('.ws-menu:not(.hide)'),
@@ -73,7 +74,7 @@ export function screenNow() {
     // J399: the detailed card, its START, DOWNLOAD and LOAD tracks on screen, never a plain one-bar card; and the zone it names
     detailed: load !== undefined && ['stHead', 'dlHead', 'suHead'].every((track) => [...load.querySelectorAll(`[data-el="${track}"]`)].some(seen)),
     zone: load?.querySelector('[data-el="slug"]')?.textContent ?? '',
-    hud: shown('.ws-touch') || shown('.ws-minimap'), modal: shown('#wsdrop, #wserr, .ws-fail'),
+    hud: shown('.ws-touch') || shown('.ws-minimap'), modal: errorCard || shown('#wsdrop'), errorCard,
     // the grid's sky-down arrival (grid/reveal.ts): the world drawn under its ARRIVING caption, the HUD held back for 3 s
     reveal: shown('.ws-grid-reveal'),
   };
@@ -132,6 +133,35 @@ export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
   }
   if (!played) say(samples.at(-1)?.t ?? 0, `never reached play within ${String(budgetMs)} ms`);
   return problems;
+}
+
+/** J428: only whether the world loaded, reached play in budget and stayed free of an error card.
+ * @param {readonly Sample[]} samples @param {number} [budgetMs] @returns {Problem[]} */
+export function judgeDeploy(samples, budgetMs = 90_000) {
+  const played = samples.find(row => label(row.s) === 'play' && row.t <= budgetMs);
+  const failure = samples.find(row => row.s?.errorCard === true);
+  return [
+    ...(played === undefined ? [{ at: samples.at(-1)?.t ?? 0, text: `never reached play within ${String(budgetMs)} ms` }] : []),
+    ...(failure === undefined ? [] : [{ at: failure.t, text: 'an error card opened' }]),
+  ];
+}
+
+/** Use the existing parity detector across several cropped frames so HUD and one transient dark frame cannot decide the gate.
+ * @param {Page} page */
+export async function deployFrameProblem(page) {
+  const { screenshotPixels, frameFailure } = await import('./parity/black-frame.mjs');
+  const size = page.viewportSize();
+  if (size === null) throw new Error('Deploy frame check requires a viewport');
+  const { width, height } = size;
+  const clip = { x: Math.floor(width / 4), y: Math.floor(height / 4), width: Math.floor(width / 2), height: Math.floor(height / 2) };
+  for (let frame = 0; frame < 3; frame++) {
+    await page.waitForTimeout(800);
+    const screenshot = await page.screenshot({ clip, scale: 'css', timeout: 5000 });
+    // Include the page background (#050810) in near-black for a canvas that drew nothing.
+    const sample = await page.evaluate(screenshotPixels, { bytes: Array.from(screenshot), darkLimit: 24 });
+    if (frameFailure(sample) === null) return null;
+  }
+  return 'world is black in three play frames';
 }
 
 /** The index of `card`'s Shard Select card among the cards' `<b>` names, or -1. SHARD-SOURCE SS-JP1 (F17): a shard the API placed
@@ -340,6 +370,7 @@ async function cli() {
   if (paths.some((p) => !['select', 'mmo', 'deeplink'].includes(p))) throw new Error('--paths takes select, mmo and deeplink');
   if (paths.includes('deeplink') && !/^[a-z0-9_-]+$/u.test(card)) throw new Error(`--card ${card}: the deep link needs a slug, not a name`);
   const throttle = Number(args.get('throttle') ?? '0');
+  const deploy = args.has('deploy');
   // SB3: --prime <dir> starts each browser from a saved profile (<dir>/<browser>), an old shell as Jake's phone holds one
   const prime = args.get('prime');
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The journey proof joins a world: staging or local only');
@@ -386,18 +417,22 @@ async function cli() {
         const samples = await tapJourney(page, { card, path: way, frames: async (row) => {
           await page.screenshot({ path: join(dir, `${String(n++).padStart(3, '0')}-${String(row.t).padStart(6, '0')}-${label(row.s)}.png`), timeout: 5000 });
         } });
-        const problems = judge(samples);
+        const problems = deploy ? judgeDeploy(samples) : judge(samples);
         const stuck = problems.length === 0 ? await stickProblem(page) : null;
         if (stuck !== null) problems.push({ at: samples.at(-1)?.t ?? 0, text: stuck });
+        const watchStarted = Date.now();
+        const dark = deploy && problems.length === 0 ? await deployFrameProblem(page) : null;
+        if (dark !== null) problems.push({ at: samples.at(-1)?.t ?? 0, text: dark });
+        const playedMs = deploy && problems.length === 0 ? Date.now() - watchStarted : 0;
         await faults.settle();
-        for (const text of errors) problems.push({ at: samples.at(-1)?.t ?? 0, text });
+        if (!deploy) for (const text of errors) problems.push({ at: samples.at(-1)?.t ?? 0, text });
         /** @type {string[]} */
         const path = [];
         for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t)}:${l}`); }
         const ok = problems.length === 0;
         const zones = [...new Set(samples.map((row) => row.s?.zone ?? '').filter((zone) => zone !== ''))];
         const resumed = /** @type {{ resumed?: boolean }} */ (samples).resumed === true;
-        report.push({ browser: name, way, run, ok, problems, path: path.join(' '), zones, errors, samples, ...(resumed ? { resumed } : {}) });
+        report.push({ browser: name, way, run, ok, problems, path: path.join(' '), zones, errors, samples, playedMs, ...(resumed ? { resumed } : {}) });
         if (!ok) failed = true;
         console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${way} ${run}${resumed ? ' (resumed into its world)' : ''}: ${path.join(' ')}${zones.length > 0 ? ` (card: ${zones.join(', ')})` : ''}`);
         for (const p of problems) console.log(`  - ${String(p.at)} ms: ${p.text}`);

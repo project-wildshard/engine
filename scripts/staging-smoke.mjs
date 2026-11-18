@@ -56,12 +56,12 @@ export async function served(url) {
  * Run the smoke and write <out>/verdict.json.
  * @param {{ url: string, release: string, out: string, only?: readonly string[], card?: string, deepLink?: string, watchMs?: number, budgetMs?: number,
  *   build?: string, lastTimeToPlay?: Record<string, number>, oldProfiles?: Partial<Record<'chromium' | 'webkit', string>>,
- *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, store?: string, vision?: boolean, changelog?: string, bugbash?: string, receipts?: string, runBudgetS?: number,
+ *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, store?: string, vision?: boolean, deploy?: boolean, changelog?: string, bugbash?: string, receipts?: string, runBudgetS?: number,
  *   log?: (line: string) => void }} options
  * `store` (the CLI's default: ~/.cache/wildshard/plan-artifacts/staging-smoke) keeps the run and gives the last release's
  * frames and times; without one the run is kept only in `out` and the vision pass has no baseline (no calls).
  */
-export async function runSmoke({ url, release, out, only, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, store, vision = true, changelog = resolve('CHANGELOG.md'), bugbash, receipts, runBudgetS = RUN_BUDGET_S, log = console.log }) {
+export async function runSmoke({ url, release, out, only, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, store, vision = true, deploy = false, changelog = resolve('CHANGELOG.md'), bugbash, receipts, runBudgetS = RUN_BUDGET_S, log = console.log }) {
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The staging smoke joins worlds: staging or local only, never production');
   const pw = await import('./browser-playwright.mjs');
   const started = Date.now();
@@ -84,7 +84,7 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
   for (const scenario of SCENARIOS) {
     if (only !== undefined && !only.includes(scenario.id)) continue;
     const result = await runScenario(scenario, {
-      url, out, card, deepLink, pw, ...(watchMs === undefined ? {} : { watchMs }), ...(budgetMs === undefined ? {} : { budgetMs }),
+      url, out, card, deepLink, pw, deploy, ...(watchMs === undefined ? {} : { watchMs }), ...(budgetMs === undefined ? {} : { budgetMs }),
       ...(scenario.id === 'K1' || scenario.id === 'K2' ? oldFor(scenario.browser) : {}),
       ...(version.minClient === undefined ? {} : { minClient: version.minClient }), ...(version.build === undefined ? {} : { candidateBuild: version.build }),
     });
@@ -96,11 +96,21 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
   const seconds = (Date.now() - started) / 1000;
   const last = store === undefined ? undefined : lastRelease(store, release);
   const times = lastTimeToPlay ?? last?.timeToPlay;
-  const judged = verdictOf(scenarios, { release, version, ...(build === undefined ? {} : { build }), ...(times === undefined ? {} : { lastTimeToPlay: times }) });
+  const judged = verdictOf(scenarios, { release, version, deploy, ...(build === undefined ? {} : { build }), ...(times === undefined ? {} : { lastTimeToPlay: times }) });
   // SM3: the Opus vision pass, against the last release's keyframes
-  const looks = vision ? visionPass({ scenarios, release, ...(last === undefined ? {} : { last }), bullets: changelogBullets(changelog, release), out }) : [];
+  /** @type {ReturnType<typeof visionPass>} */
+  let looks = [];
+  if (vision) {
+    try {
+      looks = visionPass({ scenarios, release, ...(last === undefined ? {} : { last }),
+        bullets: changelogBullets(changelog, release), out, ...(deploy ? { timeoutMs: 8000 } : {}) });
+    } catch (error) {
+      if (!deploy) throw error;
+      looks = [{ scenario: 'vision', verdict: 'error', line: 'vision evidence could not be prepared' }];
+    }
+  }
   for (const v of looks) log(`  vision ${v.scenario}: ${v.verdict}${v.severity === undefined ? '' : ` ${v.severity}`} ${v.line}`);
-  const findings = [...judged.findings, ...visionFindings(looks)].sort(worstFirst);
+  const findings = [...judged.findings, ...(deploy ? [] : visionFindings(looks))].sort(worstFirst);
   for (const f of findings) log(`  ${f.severity} ${f.scenario} ${f.key}: ${f.text}`);
   const verdict = {
     url, release, ...(version.build === undefined ? {} : { build: version.build }), ...(version.describe === undefined ? {} : { describe: version.describe }),

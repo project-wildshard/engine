@@ -5,7 +5,7 @@
 /** @typedef {{ scenario: string, key: string, severity: Severity, text: string, source: 'check' | 'vision', frame?: string, video?: string }} Finding */
 /** @typedef {import('./scenarios.mjs').ScenarioResult} ScenarioResult */
 /** @typedef {{ build?: string, describe?: string, clientVersion?: string, minClient?: string }} Version */
-/** @typedef {{ release: string, version: Version, build?: string, lastTimeToPlay?: Record<string, number>, checkVersion?: boolean }} CheckContext */
+/** @typedef {{ release: string, version: Version, build?: string, lastTimeToPlay?: Record<string, number>, checkVersion?: boolean, deploy?: boolean }} CheckContext */
 
 /** The journey judge's words that are not P1 on their own: no play is P0, a modal is named by its own check. */
 const NOT_P1 = /^never reached play|^an error or drop modal opened$/u;
@@ -29,6 +29,20 @@ export function timeToPlay(s) {
  */
 export function checkScenario(s, ctx) {
   if (s.status === 'skip') return [];
+  if (ctx.deploy === true) {
+    const stopped = s.status === 'crashed' ? s.reason ?? 'the page stopped' : undefined;
+    const missed = s.legs.filter(leg => leg.playAt === null || leg.problems.some(p => p.text.startsWith('never reached play')));
+    const error = s.legs.some(leg => leg.modals?.includes('error') === true || leg.problems.some(p => p.text === 'an error card opened'));
+    const black = s.legs.find(leg => leg.blackWorld !== undefined)?.blackWorld;
+    const stuck = s.legs.filter(leg => leg.stick === false).map(leg => leg.name);
+    return [
+      { key: 'play', severity: 'P0', ok: stopped === undefined && s.legs.length > 0 && missed.length === 0,
+        text: stopped ?? `never reached play in budget (${missed.map(leg => leg.name).join(', ') || 'no leg ran'})` },
+      { key: 'error-card', severity: 'P0', ok: !error, text: 'an error card opened' },
+      { key: 'stick', severity: 'P0', ok: stuck.length === 0, text: `the move stick did not move the player (${stuck.join(', ')})` },
+      { key: 'black-world', severity: 'P0', ok: black === undefined, text: black ?? 'the world drew' },
+    ];
+  }
   /** @type {Check[]} */
   const checks = [];
   /** @param {string} key @param {Severity} severity @param {boolean} ok @param {string} text */

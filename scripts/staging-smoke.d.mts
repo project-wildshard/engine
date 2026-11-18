@@ -14,12 +14,12 @@ export function served(url: string): Promise<{
  * Run the smoke and write <out>/verdict.json.
  * @param {{ url: string, release: string, out: string, only?: readonly string[], card?: string, deepLink?: string, watchMs?: number, budgetMs?: number,
  *   build?: string, lastTimeToPlay?: Record<string, number>, oldProfiles?: Partial<Record<'chromium' | 'webkit', string>>,
- *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, store?: string, vision?: boolean, changelog?: string, bugbash?: string, receipts?: string, runBudgetS?: number,
+ *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, store?: string, vision?: boolean, deploy?: boolean, changelog?: string, bugbash?: string, receipts?: string, runBudgetS?: number,
  *   log?: (line: string) => void }} options
  * `store` (the CLI's default: ~/.cache/wildshard/plan-artifacts/staging-smoke) keeps the run and gives the last release's
  * frames and times; without one the run is kept only in `out` and the vision pass has no baseline (no calls).
  */
-export function runSmoke({ url, release, out, only, card, deepLink, watchMs, budgetMs, build, lastTimeToPlay, oldProfiles, oldState, store, vision, changelog, bugbash, receipts, runBudgetS, log }: {
+export function runSmoke({ url, release, out, only, card, deepLink, watchMs, budgetMs, build, lastTimeToPlay, oldProfiles, oldState, store, vision, deploy, changelog, bugbash, receipts, runBudgetS, log }: {
     url: string;
     release: string;
     out: string;
@@ -34,6 +34,7 @@ export function runSmoke({ url, release, out, only, card, deepLink, watchMs, bud
     oldState?: import("./staging-smoke/scenarios.mjs").StorageState;
     store?: string;
     vision?: boolean;
+    deploy?: boolean;
     changelog?: string;
     bugbash?: string;
     receipts?: string;

@@ -6,7 +6,7 @@ export interface Screen {
   readonly shell: boolean; readonly title: boolean; readonly select: boolean;
   readonly loading: boolean; readonly bar: boolean; readonly hud: boolean; readonly modal: boolean;
   /** J399: the loading card shows its START, DOWNLOAD and LOAD tracks, and the zone it names */
-  readonly detailed?: boolean; readonly zone?: string; readonly reveal?: boolean;
+  readonly detailed?: boolean; readonly zone?: string; readonly reveal?: boolean; readonly errorCard?: boolean;
 }
 /** MAIN-SCREEN MS5: ZONE SELECT and a card, ENTER THE MMO, or the one-zone deep link already open */
 export type JourneyPath = 'select' | 'mmo' | 'deeplink';
@@ -22,6 +22,8 @@ export function capFrames(): void;
 export function screenNow(): Screen;
 export function label(s: Screen | null): string;
 export function judge(samples: readonly Sample[], options?: { blankMs?: number; budgetMs?: number }): Problem[];
+export function judgeDeploy(samples: readonly Sample[], budgetMs?: number): Problem[];
+export function deployFrameProblem(page: Page): Promise<string | null>;
 /** SS-JP1: the index of `card`'s Shard Select card among the cards' names (title row, else the slug, else its words), or -1. */
 export function titleCardIndex(rows: unknown, names: readonly string[], card: string): number;
 export function tapJourney(page: Page, options: { card: string; path?: JourneyPath; budgetMs?: number; sampleMs?: number; frames?: (row: Sample) => Promise<void> }): Promise<Sample[]>;

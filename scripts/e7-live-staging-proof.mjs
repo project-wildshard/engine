@@ -6,7 +6,9 @@ import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {saveFixture} from './debug-settings.mjs';
 import {PRIVATE_HEALTH_SKIPPED,chatLinePattern,guardStagingSockets,playerNameSource,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
 
-const [base,build,key,engine]=process.argv.slice(2);
+const [base,build,key,engine,epochArg]=process.argv.slice(2);
+const expectedEpoch=epochArg===undefined?undefined:Number(/^--save-epoch=(\d+)$/u.exec(epochArg)?.[1]);
+assert.ok(expectedEpoch===undefined||Number.isSafeInteger(expectedEpoch),'Expected --save-epoch=<integer>');
 assert.equal(new URL(base).origin,'https://staging.wildshard.io','J205 requires the isolated staging page');
 assert.match(build,/^[a-f0-9]{40}$/u);assert.match(key,/^[a-f0-9]+$/u);
 assert.ok(engine==='chromium'||engine==='webkit');
@@ -14,10 +16,11 @@ assert.ok(engine==='chromium'||engine==='webkit');
 const releaseURL='https://packs.wildshard.io/releases/staging.json',sockets=['wss://rooms-staging.wildshard.io'];
 const response=await fetch(releaseURL,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});assert.equal(response.status,200);
 const signed=await response.json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
-const release=JSON.parse(signed.body);assert.equal(release.channel,'staging');assert.equal(release.engineBuild,build);assert.equal(release.saveEpoch,2);const socket=release.socket.replace(/\/$/u,'');assert.ok(sockets.includes(socket),socket);
+const release=JSON.parse(signed.body);assert.equal(release.channel,'staging');assert.equal(release.engineBuild,build);assert.ok(Number.isSafeInteger(release.saveEpoch));if(expectedEpoch!==undefined)assert.equal(release.saveEpoch,expectedEpoch);
+const socket=release.socket.replace(/\/$/u,'');assert.ok(sockets.includes(socket),socket);
 const healthURL=privateHealthURL();
 if(healthURL===undefined)console.log(PRIVATE_HEALTH_SKIPPED);else{const health=await(await fetch(healthURL,{signal:AbortSignal.timeout(15000)})).json();assert.equal(health.build,build);assert.equal(health.serial,release.serial);}
-const version=await(await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(30000)})).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,2);
+const version=await(await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(30000)})).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,release.saveEpoch);
 const html=await(await fetch(base,{signal:AbortSignal.timeout(30000)})).text();assert.ok(html.includes(releaseURL));assert.ok(!html.includes('/releases/production.json'));
 const browser=await(engine==='chromium'?chromium:webkit).launch({headless:true,args:engine==='chromium'?[...KEYCHAIN_ARGS,'--mute-audio',...(process.platform==='darwin'?['--use-angle=metal']:[])]:[]});
 /** @type {{page:import('playwright').Page,context:import('playwright').BrowserContext,name:string}[]} */
@@ -66,7 +69,7 @@ try{
  // D7: the page's own fetch of the private rooms /health is a 404 with no CORS header; exactly those lines are listed, not failed.
  const lines=splitRoomsHealthLines(faults,roomsHealthURL(socket));console.log('D7 rooms health lines (listed)',JSON.stringify(lines.health));
  assert.deepEqual(lines.other,[],'No other page or console error may be filtered');
- console.log('PASS live staging play',JSON.stringify({engine,build,epoch:1,channel:'staging',socket,bodies:2,walk:true,chat:true,errors:0,productionConnections:0}));
+ console.log('PASS live staging play',JSON.stringify({engine,build,epoch:release.saveEpoch,channel:'staging',bodies:2,walk:true,chat:true,errors:0,productionConnections:0}));
 }catch(error){
  for(const row of opened){const state=await row.page.evaluate(()=>({build:Reflect.get(globalThis,'__WS_BUILD_ID__'),url:location.href,text:(document.body.textContent??'').slice(-2500),active:Reflect.get(globalThis,'__bootTiming')?.read().active,worker:window.__workerClient?.(),players:window.__onlinePlayers?.()})).catch((/** @type {unknown} */ reading)=>({reading:String(reading)}));console.error('LIVE STAGING REFUSAL',JSON.stringify({name:row.name,state,faults}));}
  throw error;

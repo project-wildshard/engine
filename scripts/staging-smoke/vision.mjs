@@ -88,7 +88,8 @@ export function askClaude(prompt, cwd, { claude = 'claude', timeoutMs = 240_000 
 export function changelogBullets(file, release) {
   if (!existsSync(file)) return [];
   const lines = readFileSync(file, 'utf8').split('\n');
-  const start = lines.findIndex((l) => l.startsWith(`## ${release} `) || l === `## ${release}`);
+  const heading = `## ${release}`;
+  const start = lines.findIndex((line) => line === heading ? true : line.startsWith(`${heading} `));
   if (start === -1) return [];
   /** @type {string[]} */
   const bullets = [];
@@ -99,14 +100,15 @@ export function changelogBullets(file, release) {
 /**
  * The vision pass over every scenario that ran: a sheet each against the last release's frames, then one call.
  * @param {{ scenarios: readonly { id: string, title: string, status: string, frames: Record<string, string> }[], release: string,
- *   last?: { release: string, dir: string }, bullets: readonly string[], out: string, claude?: string }} o @returns {Vision[]}
+ *   last?: { release: string, dir: string }, bullets: readonly string[], out: string, claude?: string, timeoutMs?: number }} o @returns {Vision[]}
  */
-export function visionPass({ scenarios, release, last, bullets, out, claude }) {
+export function visionPass({ scenarios, release, last, bullets, out, claude, timeoutMs }) {
   return scenarios.filter((s) => s.status !== 'skip').map((s) => {
     const before = last === undefined ? [] : KEYFRAMES.map((k) => { const p = join(last.dir, s.id, 'frames', `${k}.jpg`); return existsSync(p) ? p : undefined; });
     if (last === undefined || before.every((p) => p === undefined)) return { scenario: s.id, verdict: /** @type {const} */ ('baseline'), line: 'no frames from a previous release: these are the baseline' };
     const sheet = contactSheet(before, KEYFRAMES.map((k) => s.frames[k]), join(out, s.id, 'sheet.jpg'));
-    const answer = askClaude(visionPrompt({ sheet, scenario: s.id, title: s.title, last: last.release, release, bullets }), dirname(sheet), claude === undefined ? {} : { claude });
+    const answer = askClaude(visionPrompt({ sheet, scenario: s.id, title: s.title, last: last.release, release, bullets }), dirname(sheet),
+      { ...(claude === undefined ? {} : { claude }), ...(timeoutMs === undefined ? {} : { timeoutMs }) });
     /** @type {Vision} */
     const row = { scenario: s.id, verdict: answer.verdict, line: answer.line, sheet };
     if (answer.severity !== undefined) row.severity = answer.severity;

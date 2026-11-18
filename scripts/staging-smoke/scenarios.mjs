@@ -4,7 +4,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { judge, label, PHONE, screenNow, stickMoves } from '../journey-proof.mjs';
+import { deployFrameProblem, judge, judgeDeploy, label, PHONE, screenNow, stickMoves } from '../journey-proof.mjs';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { modalKind } from './checks.mjs';
 import { judgeFrame } from './worldFrame.mjs';
@@ -18,7 +18,7 @@ import { saveFixture } from '../debug-settings.mjs';
 /** @typedef {'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6'} ScenarioId */
 /** @typedef {import('./worldFrame.mjs').WorldStats} WorldStats */
 /** @typedef {{ kind: string, at: number, [key: string]: unknown }} ProbeEvent */
-/** @typedef {{ name: string, at: number, samples: Sample[], problems: Problem[], path: string, tapAt: number, playAt: number | null, stick?: boolean, modals?: string[] }} Leg */
+/** @typedef {{ name: string, at: number, samples: Sample[], problems: Problem[], path: string, tapAt: number, playAt: number | null, stick?: boolean, modals?: string[], blackWorld?: string, playedMs?: number }} Leg */
 /** @typedef {{ build?: string, caches: string[], databases: string[], clientVersion?: string }} StorageState */
 /**
  * What one scenario saw. `status: 'skip'` carries only `reason`.
@@ -289,11 +289,11 @@ export async function liveCells(page) {
  * One scenario, start to finish, in its own persistent profile.
  * @param {{ id: ScenarioId, title: string, browser: BrowserName }} scenario
  * @param {{ url: string, out: string, card: string, deepLink: string, oldProfile?: string, oldState?: StorageState, minClient?: string,
- *   watchMs?: number, budgetMs?: number, candidateBuild?: string, pw: typeof import('playwright') }} options
+ *   watchMs?: number, budgetMs?: number, candidateBuild?: string, deploy?: boolean, pw: typeof import('playwright') }} options
  * K1 and K2 with no saved profile seed one (a fresh profile played into Driftwood) and report SKIP: there is no old cache yet.
  * @returns {Promise<ScenarioResult>}
  */
-export async function runScenario(scenario, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs = 90_000, candidateBuild, pw }) {
+export async function runScenario(scenario, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs = 90_000, candidateBuild, deploy = false, pw }) {
   const dir = join(out, scenario.id);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, 'frames'), { recursive: true });
@@ -337,11 +337,28 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
   /** Watch play for `ms` (strip, long tasks), then the +10 s keyframe. @param {Leg} leg @param {number} ms */
   const hold = async (leg, ms) => {
     if (leg.playAt === null) return;
+    const watchStarted = Date.now();
     const until = leg.playAt + ms;
     const ten = leg.playAt + 10_000;
     if (Date.now() < ten) await page.waitForTimeout(ten - Date.now());
     await shoot('play10');
     if (Date.now() < until) await page.waitForTimeout(until - Date.now());
+    leg.playedMs = (leg.playedMs ?? 0) + Date.now() - watchStarted;
+  };
+  /** @param {Parameters<typeof watchLeg>[1]} options */
+  const observe = async options => {
+    const leg = await watchLeg(page, options);
+    if (deploy) {
+      leg.problems = judgeDeploy(leg.samples, budgetMs);
+      if (leg.playAt !== null && leg.problems.length === 0) {
+        const playStarted = Date.now();
+        leg.stick = await stickMoves(page);
+        const black = await deployFrameProblem(page);
+        if (black !== null) leg.blackWorld = black;
+        else leg.playedMs = Date.now() - playStarted;
+      }
+    }
+    return leg;
   };
   try {
     const open = async (/** @type {string} */ path) => {
@@ -360,8 +377,8 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
         say(`old cache: page ${after.build?.slice(0, 8) ?? '?'}, caches ${after.caches.join(' ')}, databases ${after.databases.join(' ')}`);
       } else say('no saved profile: seeding one for the next release');
       await shoot('title');
-      const leg = await watchLeg(page, { name: 'journey', tap: await toShardSelect(page, card, onDrop), shoot, budgetMs });
-      leg.stick = leg.playAt !== null && leg.problems.length === 0 ? await stickMoves(page) : undefined;
+      const leg = await observe({ name: 'journey', tap: await toShardSelect(page, card, onDrop), shoot, budgetMs });
+      if (!deploy && leg.playAt !== null && leg.problems.length === 0) leg.stick = await stickMoves(page);
       result.legs.push(leg);
       await hold(leg, watchMs ?? 10_000);
       // SM4: left in Driftwood, as Jake's phone is left; what it holds is the next release's "before"
@@ -372,17 +389,19 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
       await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 });
       await shoot('title');
       // title SETTINGS (SB27): opens the sheet, and its CLOSE puts the title back
-      const opened = await page.locator(SEL.settings).first().tap().then(() => page.locator(SEL.menuOpen).waitFor({ timeout: 8000 })).then(() => true, () => false);
+      const opened = !deploy && await page.locator(SEL.settings).first().tap().then(() => page.locator(SEL.menuOpen).waitFor({ timeout: 8000 })).then(() => true, () => false);
       let closed = false;
       if (opened) {
         await page.locator(SEL.menuClose).tap().catch(() => undefined);
         closed = await page.locator(SEL.menuOpen).waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false)
           || await page.locator(SEL.menuOpen).waitFor({ state: 'hidden', timeout: 1000 }).then(() => true, () => false);
       }
-      result.settings = { opened, closed };
-      say(`title SETTINGS opened ${String(opened)}, closed ${String(closed)}`);
-      const cold = await watchLeg(page, { name: 'cold', tap: await toShardSelect(page, card), shoot, budgetMs });
-      cold.stick = cold.playAt !== null && cold.problems.length === 0 ? await stickMoves(page) : undefined;
+      if (!deploy) {
+        result.settings = { opened, closed };
+        say(`title SETTINGS opened ${String(opened)}, closed ${String(closed)}`);
+      }
+      const cold = await observe({ name: 'cold', tap: await toShardSelect(page, card), shoot, budgetMs });
+      if (!deploy && cold.playAt !== null && cold.problems.length === 0) cold.stick = await stickMoves(page);
       result.legs.push(cold);
       say(`cold: ${cold.path}`);
       // pause, EXIT TO MAIN MENU, a quiet title (no drop modal, SB8), re-enter in the same tab
@@ -399,14 +418,14 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
         }
         result.quietTitle = { drop, left };
         say(`back at title: drop ${String(drop)}, left ${String(left)}`);
-        const again = await watchLeg(page, { name: 're-enter', tap: await toShardSelect(page, card), budgetMs });
+        const again = await observe({ name: 're-enter', tap: await toShardSelect(page, card), budgetMs });
         result.legs.push(again);
         say(`re-enter: ${again.path}`);
       }
       // close and reopen warm: the worker in control
       await page.goto('about:blank');
       await open('/');
-      const warm = await watchLeg(page, { name: 'warm', tap: await toShardSelect(page, card), budgetMs });
+      const warm = await observe({ name: 'warm', tap: await toShardSelect(page, card), budgetMs });
       result.legs.push(warm);
       say(`warm: ${warm.path}`);
       await hold(warm, watchMs ?? 10_000);
@@ -414,11 +433,11 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
       await open(`/slug/${deepLink}`);
       await page.locator(SEL.play).waitFor({ state: 'visible', timeout: 60_000 });
       await shoot('title');
-      const leg = await watchLeg(page, { name: 'deep link', shoot, budgetMs, tap: async () => {
+      const leg = await observe({ name: 'deep link', shoot, budgetMs, tap: async () => {
         await page.locator(SEL.play).tap();
         await page.locator(SEL.skip).waitFor({ state: 'visible', timeout: 4000 }).then(() => page.locator(SEL.skip).tap(), () => undefined);
       } });
-      leg.stick = leg.playAt !== null && leg.problems.length === 0 ? await stickMoves(page) : undefined;
+      if (!deploy && leg.playAt !== null && leg.problems.length === 0) leg.stick = await stickMoves(page);
       result.legs.push(leg);
       say(`deep link: ${leg.path}`);
       await hold(leg, watchMs ?? 30_000);
@@ -459,11 +478,11 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
         return { ...result, status: 'skip', reason: 'no Infinite Wildshard card on this build', seconds: (Date.now() - started) / 1000 };
       }
       await shoot('title');
-      const leg = await watchLeg(page, { name: 'grid', allowTitleFirst: true, shoot, budgetMs, tap: async () => {
+      const leg = await observe({ name: 'grid', allowTitleFirst: true, shoot, budgetMs, tap: async () => {
         await grid.tap();
         await page.locator(SEL.skip).waitFor({ state: 'visible', timeout: 4000 }).then(() => page.locator(SEL.skip).tap(), () => undefined);
       } });
-      leg.stick = leg.playAt !== null && leg.problems.length === 0 ? await stickMoves(page) : undefined;
+      if (!deploy && leg.playAt !== null && leg.problems.length === 0) leg.stick = await stickMoves(page);
       result.legs.push(leg);
       say(`grid: ${leg.path}`);
       await hold(leg, watchMs ?? 10_000);

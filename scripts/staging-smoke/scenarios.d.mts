@@ -37,7 +37,7 @@ export declare function oldProfileTitle(page: Page, { onDrop, onRecovery }?: {
  * One scenario, start to finish, in its own persistent profile.
  * @param {{ id: ScenarioId, title: string, browser: BrowserName }} scenario
  * @param {{ url: string, out: string, card: string, deepLink: string, oldProfile?: string, oldState?: StorageState, minClient?: string,
- *   watchMs?: number, budgetMs?: number, candidateBuild?: string, pw: typeof import('playwright') }} options
+ *   watchMs?: number, budgetMs?: number, candidateBuild?: string, deploy?: boolean, pw: typeof import('playwright') }} options
  * K1 and K2 with no saved profile seed one (a fresh profile played into Driftwood) and report SKIP: there is no old cache yet.
  * @returns {Promise<ScenarioResult>}
  */
@@ -45,7 +45,7 @@ export function runScenario(scenario: {
     id: ScenarioId;
     title: string;
     browser: BrowserName;
-}, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs, candidateBuild, pw }: {
+}, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs, candidateBuild, deploy, pw }: {
     url: string;
     out: string;
     card: string;
@@ -56,6 +56,7 @@ export function runScenario(scenario: {
     watchMs?: number;
     budgetMs?: number;
     candidateBuild?: string;
+    deploy?: boolean;
     pw: typeof import("playwright");
 }): Promise<ScenarioResult>;
 /** Judge every play frame's world (worldFrame.mjs). @param {Record<string, string>} frames
@@ -162,6 +163,8 @@ export type Leg = {
     playAt: number | null;
     stick?: boolean;
     modals?: string[];
+    blackWorld?: string;
+    playedMs?: number;
 };
 export type StorageState = {
     build?: string;

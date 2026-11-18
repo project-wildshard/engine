@@ -3,8 +3,9 @@ import { captureViewportPng } from './fast-png.mjs';
 
 /** Read a composited Playwright screenshot without requesting another game draw.
  * The detached analysis canvas never enters the document or changes the renderer.
- * @param {number[]} bytes */
-export async function screenshotPixels(bytes) {
+ * @param {number[] | { bytes: number[], darkLimit: number }} input */
+export async function screenshotPixels(input) {
+  const { bytes, darkLimit } = Array.isArray(input) ? { bytes: input, darkLimit: 16 } : input;
   const bitmap = await createImageBitmap(new Blob([Uint8Array.from(bytes)], { type: 'image/png' }));
   try {
     const canvas = document.createElement('canvas');
@@ -17,7 +18,7 @@ export async function screenshotPixels(bytes) {
     let pixels = 0, dark = 0;
     for (let at = 0; at < data.length; at += 16) {
       pixels++;
-      if (Math.max(data[at] ?? 0, data[at + 1] ?? 0, data[at + 2] ?? 0) < 16) dark++;
+      if (Math.max(data[at] ?? 0, data[at + 1] ?? 0, data[at + 2] ?? 0) < darkLimit) dark++;
     }
     return { width: bitmap.width, height: bitmap.height, pixels, darkShare: dark / pixels };
   } finally { bitmap.close(); }

@@ -157,7 +157,21 @@ version, changelog and stamps on the release branch. Main keeps moving.
 Use clean channel clones at that exact release head. Run `staging
 build`, `staging upload` (packs before signing, J234), wait for exact
 branch CI and the signed staging serial, then `staging check`,
-`staging go-live` and the strict staging proofs. `release.sh vX.Y.Z
+`staging go-live`. Within 10 minutes of staging go-live, start:
+
+```bash
+WS_LANE_NAME=codex-ms BROWSER=none bash scripts/browser-lane.sh --max 18 \
+  node scripts/staging-qa.mjs --release vX.Y.Z --build <exact-sha> --fix-owner <lane>
+```
+
+The staging deploy smoke checks entry to play, world draw, movement, the
+load budget, error cards, deep links and a gate crossing. Vision reports
+separately. On P0 or P1, keep the verdict and board, write the
+`staging-qa HOLD` receipt, and add or update the STAGING-BUGBASH row
+with the fix-forward lane. Hold unrelated cuts until the fix passes
+staging QA. The live page stays in place (J426).
+
+`release.sh vX.Y.Z
 --finish` tags the exact green head; the tag signs production and
 starts npm OIDC publishing. `--published` waits for npm's listing;
 never rerun the publish job while npm processes it. Production build
