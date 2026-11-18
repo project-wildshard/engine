@@ -600,7 +600,7 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap; // r186 removed PCFSoft: it renders PCF anyway, and the type is in every program's cache key
     setAnisotropy(this.renderer);
-    installMemorySaver(this.renderer); // SF22d
+    installMemorySaver(this.renderer, TIER === 'phone'); // SF22d, ENGINE-MEMORY EM27
     // shadow-only casters (shadowLayer.ts): the shadow pass tests layers against the view camera, so the view camera sees
     // SHADOW_LAYER while — and only while — the shadow maps draw. Before this the cabins' depth proxies (PLAY-PERF lever
     // 12, 46868b5) were never drawn: the cabins cast no wall / roof shadow at all.

@@ -6,9 +6,9 @@
  * 1. three.js's CPU copies go once they are on the GPU. A texture file's decoded image (loadTexture's ImageBitmap or
  *    <img>) is let go at its upload (`watchTexture`) and the image cache of `loadImage` lets go of it too (assets.ts);
  *    one source per file, so a file used twice uploads once. A GLB's embedded image, canvases and data textures stay
- *    (code reads or redraws them after the upload; KTX2 textures already drop their mips, ktx2.ts). A static geometry's attributes but `position`,
- *    the skin weights and the index give up their arrays once the geometry has drawn unchanged for a while
- *    (`releaseGeometry`): the full drop (positions and indices too) stalled Driftwood's re-walk, something reads them.
+ *    (code reads or redraws them after the upload; KTX2 textures already drop their mips, ktx2.ts). Static geometry gives
+ *    up its arrays after drawing unchanged. On phones that includes position and index for geometry with no registered
+ *    CPU reader, except for skinning, morphs and positions whose culling bounds have not been set.
  *    A released array is read back from the GPU the first time any code reads or writes it again (`restore`), and that
  *    attribute then keeps it: a late writer (the far herd's repaint faulted three's same-size check, SF22d) or reader
  *    sees the real bytes. Only static (StaticDrawUsage, no update ranges), plain attributes three uploaded go.
@@ -20,7 +20,7 @@
 import * as THREE from 'three';
 import { RenderPass, type EffectComposer, type Pass } from 'postprocessing';
 import { markGpuOnly } from '../core/gpuOnly';
-import { arrayReleased, markArrayReleased, markArrayRestored } from './releasedArrays';
+import { arrayReleased, geometryHasCpuReader, markArrayReleased, markArrayRestored } from './releasedArrays';
 import type { Renderer } from './renderer';
 import { drawHooks, propertyHooks } from './drawHooks';
 import { onceTextureUploaded } from './textureUploadEvents';
@@ -99,21 +99,22 @@ function watchTexture(t: THREE.Texture): void {
 
 // ── geometry ──
 
-/** kept on the CPU: picking and raycasts read positions and the index; skinned bounds read the skin weights */
-const KEEP = new Set(['position', 'skinIndex', 'skinWeight']);
 /** render calls a geometry must draw unchanged before its arrays go (a geometry still being filled keeps them) */
 const SETTLE_RENDERS = 240;
 
 interface Pending { geometry: WeakRef<THREE.BufferGeometry>; at: number; versions: number[] }
-function versions(g: THREE.BufferGeometry): number[] { return Object.values(g.attributes).map((a) => (a instanceof THREE.BufferAttribute ? a.version : -1)); }
+function versions(g: THREE.BufferGeometry): number[] { return [g.index?.version ?? -1, ...Object.values(g.attributes).map((a) => (a instanceof THREE.BufferAttribute ? a.version : -1))]; }
 const same = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((v, i) => v === b[i]);
 
 type ArrayCtor = new (length: number) => THREE.TypedArray;
-/** an attribute array three uploaded → the GL buffer it went into (installMemorySaver's bufferData hook) */
-const uploadedTo = new WeakMap<ArrayBufferView, WebGLBuffer>();
+/** Element and vertex buffers can upload the same source view but own distinct handles. */
+interface Uploads {
+  readonly gl: WebGL2RenderingContext;
+  readonly vertex: WeakMap<ArrayBufferView, WebGLBuffer | null>;
+  readonly index: WeakMap<ArrayBufferView, WebGLBuffer | null>;
+}
 /** attributes whose array something touched after their release (it came back from the GPU): never released again */
 const touched = new WeakSet();
-let gl: WebGL2RenderingContext | null = null;
 let lostWarned = false;
 
 /**
@@ -123,12 +124,14 @@ let lostWarned = false;
  * version three uploaded), so the write uploads at the same size and the read sees the real data. A buffer deleted since
  * (its geometry disposed) has nothing to read: it comes back zero-filled at its size, with a warning.
  */
-function restore(a: object, buffer: WebGLBuffer, Ctor: ArrayCtor, length: number, name: string): THREE.TypedArray {
+function restore(gl: WebGL2RenderingContext, a: object, buffer: WebGLBuffer, Ctor: ArrayCtor, length: number, name: string): THREE.TypedArray {
   const array = new Ctor(length);
-  if (gl?.isBuffer(buffer) === true) {
-    gl.bindBuffer(gl.COPY_READ_BUFFER, buffer); // a copy target three never binds: its ARRAY_BUFFER / VAO state stays
-    gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, array);
-    gl.bindBuffer(gl.COPY_READ_BUFFER, null);
+  if (gl.isBuffer(buffer)) {
+    // The copy binding accepts both index and vertex buffers and leaves the VAO untouched.
+    const previous: unknown = gl.getParameter(gl.COPY_READ_BUFFER_BINDING);
+    gl.bindBuffer(gl.COPY_READ_BUFFER, buffer);
+    try { gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, array); }
+    finally { gl.bindBuffer(gl.COPY_READ_BUFFER, previous instanceof WebGLBuffer ? previous : null); }
   } else if (!lostWarned) {
     lostWarned = true;
     console.warn('[memory saver] a released attribute was read after its geometry was disposed: it comes back zero-filled', name);
@@ -140,35 +143,36 @@ function restore(a: object, buffer: WebGLBuffer, Ctor: ArrayCtor, length: number
 }
 
 /** may `a` give up its array: a static, plain (not instanced, not interleaved) attribute three uploaded, untouched since */
-function releasableAttribute(name: string, a: unknown): a is THREE.BufferAttribute {
-  return !KEEP.has(name) && a instanceof THREE.BufferAttribute && !(a instanceof THREE.InstancedBufferAttribute) && !arrayReleased(a) && !touched.has(a) &&
-    a.usage === THREE.StaticDrawUsage && a.updateRanges.length === 0 && a.array.length > 0 && uploadedTo.has(a.array);
+function releasableAttribute(a: unknown): a is THREE.BufferAttribute {
+  return a instanceof THREE.BufferAttribute && !(a instanceof THREE.InstancedBufferAttribute) && !arrayReleased(a) && !touched.has(a) &&
+    a.usage === THREE.StaticDrawUsage && a.updateRanges.length === 0;
 }
 
-/**
- * No bounds are computed here: `position` stays, so a box or sphere is computed when something asks.
- * Computing them at release read geometries whose owner had already dropped its arrays (the far herd's view batch: its
- * attributes keep their count over an empty array, gpuOnly-style), so every vertex came back NaN (SF22d).
- */
-function releaseGeometry(g: THREE.BufferGeometry, label: string): number {
-  let bytes = 0;
-  for (const [name, a] of Object.entries(g.attributes)) {
-    if (!releasableAttribute(name, a)) continue;
-    const array = a.array, buffer = uploadedTo.get(array);
-    if (buffer === undefined) continue;
-    const Ctor = array.constructor as ArrayCtor, length = array.length, where = `${label}.${name}`;
-    bytes += array.byteLength;
-    markArrayReleased(a);
-    // uploaded at this version (it drew); the count stays. Reading or writing `array` brings it back (restore)
-    Object.defineProperty(a, 'array', {
-      configurable: true, enumerable: true,
-      get: (): THREE.TypedArray => restore(a, buffer, Ctor, length, where),
-      set: (value: THREE.TypedArray): void => {
-        Object.defineProperty(a, 'array', { value, writable: true, configurable: true, enumerable: true });
-        touched.add(a);
-        markArrayRestored(a);
-      },
-    });
+function releaseAttribute(a: unknown, label: string, gl: WebGL2RenderingContext, uploadedTo: Uploads['vertex']): number {
+  if (!releasableAttribute(a)) return 0;
+  const array = a.array, buffer = uploadedTo.get(array);
+  if (array.length === 0 || buffer === undefined || buffer === null) return 0;
+  const Ctor = array.constructor as ArrayCtor, length = array.length;
+  markArrayReleased(a, Ctor.name);
+  // The draw count and GL handle stay. A later CPU read can recover the exact bytes.
+  Object.defineProperty(a, 'array', {
+    configurable: true, enumerable: true,
+    get: (): THREE.TypedArray => restore(gl, a, buffer, Ctor, length, label),
+    set: (value: THREE.TypedArray): void => {
+      Object.defineProperty(a, 'array', { value, writable: true, configurable: true, enumerable: true });
+      touched.add(a);
+      markArrayRestored(a);
+    },
+  });
+  return array.byteLength;
+}
+
+function releaseGeometry(g: THREE.BufferGeometry, label: string, uploads: Uploads, releaseShape: boolean): number {
+  const shape = releaseShape && !geometryHasCpuReader(g) && !g.hasAttribute('skinIndex') && !g.hasAttribute('skinWeight') && Object.keys(g.morphAttributes).length === 0;
+  let bytes = shape ? releaseAttribute(g.index, `${label}.index`, uploads.gl, uploads.index) : 0;
+  for (const [name, attribute] of Object.entries(g.attributes)) {
+    if (name === 'skinIndex' || name === 'skinWeight' || (name === 'position' && (!shape || g.boundingSphere === null))) continue;
+    bytes += releaseAttribute(attribute, `${label}.${name}`, uploads.gl, uploads.vertex);
   }
   if (bytes > 0) markGpuOnly(LABEL);
   return bytes;
@@ -181,39 +185,46 @@ const releasesNow = new WeakMap<object, () => number>();
  * handful of times, never the 240 renders a geometry waits before its CPU copy goes, so every attribute array stayed beside
  * its GPU copy through the boot's peak (Nine's phone tier: 88 MB at firstFrame, 147 MB at worldPrograms). The boot calls
  * this after its first frames: every geometry drawn so far, unchanged since its first draw, lets go now, as the settle
- * would later (`position`, skins and the index stay; a later read or write brings an array back from the GPU). A geometry
+ * would later. A later read or write brings an array back from the GPU. A geometry
  * that changed waits for the ordinary settle. Returns the bytes let go.
  */
 export function releaseDrawnGeometry(renderer: object): number { return releasesNow.get(renderer)?.() ?? 0; }
 
 /** remember which GL buffer each attribute array went into (three's WebGLAttributes.createBuffer / a full re-upload) */
-function watchUploads(context: WebGL2RenderingContext): void {
-  gl = context;
-  const bufferData: unknown = Reflect.get(context, 'bufferData');
-  if (typeof bufferData !== 'function') return;
-  const watchedBufferData = function watchedBufferData(this: WebGL2RenderingContext, ...args: unknown[]): unknown {
-    const result: unknown = Reflect.apply(bufferData, this, args);
+function watchUploads(context: WebGL2RenderingContext, releaseShape: boolean): Uploads {
+  const uploads: Uploads = { gl: context, vertex: new WeakMap(), index: new WeakMap() };
+  const bufferData = context.bufferData.bind(context);
+  const remember = (map: Uploads['vertex'], data: ArrayBufferView, binding: number): void => {
+    const buffer: unknown = context.getParameter(binding);
+    if (!(buffer instanceof WebGLBuffer)) return;
+    const previous = map.get(data);
+    // A source shared by independently updated GL buffers has no unique readback.
+    map.set(data, previous === undefined || previous === buffer ? buffer : null);
+  };
+  const watchedBufferData = (...args: unknown[]): void => {
+    Reflect.apply(bufferData, context, args);
     const [target, data] = args;
-    if (target === context.ARRAY_BUFFER && ArrayBuffer.isView(data)) {
-      const bound: unknown = context.getParameter(context.ARRAY_BUFFER_BINDING);
-      if (bound instanceof WebGLBuffer) uploadedTo.set(data, bound);
+    if (ArrayBuffer.isView(data)) {
+      if (target === context.ARRAY_BUFFER) remember(uploads.vertex, data, context.ARRAY_BUFFER_BINDING);
+      else if (releaseShape && target === context.ELEMENT_ARRAY_BUFFER) remember(uploads.index, data, context.ELEMENT_ARRAY_BUFFER_BINDING);
     }
-    return result;
   };
   Object.defineProperty(context, 'bufferData', { value: watchedBufferData, writable: true, configurable: true });
+  return uploads;
 }
 
 /**
  * The renderer's hooks: every texture is looked at when three first asks for its properties (before its upload), every
  * geometry when it first draws.
  */
-export function installMemorySaver(renderer: Renderer): void {
+export function installMemorySaver(renderer: Renderer, releaseShape = false): void {
   const context = renderer.getContext();
-  if (context instanceof WebGL2RenderingContext) watchUploads(context);
+  const uploads = context instanceof WebGL2RenderingContext ? watchUploads(context, releaseShape) : null;
   const seenTextures = new WeakSet<THREE.Texture>();
   propertyHooks(renderer).texture = (object) => {
     if (!seenTextures.has(object)) { seenTextures.add(object); watchTexture(object); }
   };
+  if (uploads === null) return;
   const seenGeometry = new WeakSet<THREE.BufferGeometry>();
   const queue: ((Pending & { label: string }) | undefined)[] = [];
   let head = 0, lastFrame = -1;
@@ -228,7 +239,7 @@ export function installMemorySaver(renderer: Renderer): void {
       const geometry = p.geometry.deref();
       if (geometry === undefined) continue;
       const now = versions(geometry);
-      if (same(now, p.versions)) releaseGeometry(geometry, p.label);
+      if (same(now, p.versions)) releaseGeometry(geometry, p.label, uploads, releaseShape);
       else queue.push({ geometry: p.geometry, at: frame, versions: now, label: p.label }); // still changing: look again later
     }
     if (head > 256 && head * 2 > queue.length) { queue.splice(0, head); head = 0; }
@@ -244,7 +255,7 @@ export function installMemorySaver(renderer: Renderer): void {
       // a geometry still changing keeps its place: the ordinary settle looks at it again later
       if (!same(versions(geometry), p.versions)) continue;
       queue[at] = undefined;
-      bytes += releaseGeometry(geometry, p.label);
+      bytes += releaseGeometry(geometry, p.label, uploads, releaseShape);
     }
     return bytes;
   });

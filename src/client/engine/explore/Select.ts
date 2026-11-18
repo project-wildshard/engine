@@ -19,6 +19,7 @@ import type { ContextValue } from '../ui/review';
 import { measure, type CatalogEntry } from './catalog';
 import type { Explore } from './Explore';
 import { copyInTheWay, pickTarget, type Picked, type SelectTarget } from './pick';
+import { retainGeometryForCpuReads } from '../render/releasedArrays';
 
 
 const html = (tag: string, cls: string, inner = ''): HTMLElement => { const e = document.createElement(tag); e.className = cls; e.innerHTML = inner; return e; };
@@ -46,6 +47,10 @@ export class Select {
     this.explore = explore;
     this.world = world;
     this.targets = targets;
+    for (const { object } of targets) object.traverse(node => {
+      const geometry: unknown = node instanceof THREE.Mesh ? node.geometry : undefined;
+      if (geometry instanceof THREE.BufferGeometry) retainGeometryForCpuReads(geometry);
+    });
     this.entries = entries;
     this.helper = new THREE.Box3Helper(this.box, 0x8fe3ff);
     const m = this.helper.material as THREE.LineBasicMaterial;

@@ -8,7 +8,7 @@ import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { geometryBoundsSteps } from '../world/geometryBounds';
 import { pageScope } from '../../../shared/engine/app/resources';
 import { isDrawNeutral } from './drawNeutral';
-import { arrayReleased } from './releasedArrays';
+import { arrayReleased, releasedArrayType } from './releasedArrays';
 import type { Scope } from '../../../shared/engine/app/scope';
 
 /**
@@ -57,7 +57,7 @@ function vertexLayout(object: THREE.Object3D): string {
   const geometry: unknown = (object as THREE.Object3D & { geometry?: unknown }).geometry;
   return isBufferGeometry(geometry) ? Object.keys(geometry.attributes).sort().map(name => {
     const a = geometry.getAttribute(name); return `${name}:${String(a.itemSize)}:${a.normalized ? 1 : 0}`;
-  }).join(',') + (geometry.index === null ? '' : `|i${geometry.index.array.constructor.name}`) : '';
+  }).join(',') + (geometry.index === null ? '' : `|i${releasedArrayType(geometry.index) ?? geometry.index.array.constructor.name}`) : '';
 }
 /** What a drawable's first draw builds in the driver: its programs' inputs (materials), vertex layout and draw kind. */
 function pipelineKey(object: Drawable, camera: THREE.Camera): string {

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { BoxGeometry, InstancedMesh, Mesh, MeshBasicMaterial, type Object3D } from 'three';
-import { parkedDrawSlices, type ParkedDrawBudget } from '../render/parkedDraws';
+import { BoxGeometry, InstancedMesh, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, type Object3D } from 'three';
+import { firstFrameDrawables, parkedDrawSlices, type ParkedDrawBudget } from '../render/parkedDraws';
 import { markArrayReleased } from '../render/releasedArrays';
 
 /** The slicing rules at one native unit a slice (the WebKit live budget before G782 raised it to two, D152). */
@@ -59,11 +59,17 @@ test('an oversized first buffer goes alone and all following copies remain bound
 });
 
 // T10: an attribute the memory saver released is on the GPU already; reading its array reads it back from the GPU
-test('a released attribute is never read and uploads nothing', () => {
+test('released vertex and index arrays stay on the GPU during parked draw planning', () => {
   const geometry = new BoxGeometry(), material = new MeshBasicMaterial(), normal = geometry.getAttribute('normal');
-  markArrayReleased(normal);
-  Object.defineProperty(normal, 'array', { configurable: true, get: () => { throw new Error('read back a released array'); } });
+  const index = geometry.getIndex();
+  if (index === null) throw new Error('Expected indexed fixture');
+  for (const attribute of [normal, index]) {
+    markArrayReleased(attribute, attribute.array.constructor.name);
+    Object.defineProperty(attribute, 'array', { configurable: true, get: () => { throw new Error('read back a released array'); } });
+  }
   const objects = Array.from({ length: 3 }, () => new Mesh(geometry, material));
+  const shown = firstFrameDrawables(new Scene().add(...objects), new PerspectiveCamera());
+  expect(objects.some(shown)).toBe(true);
   expect(parkedDrawSlices(objects, ONE_UNIT).flat()).toEqual(objects);
   material.dispose();
 });
