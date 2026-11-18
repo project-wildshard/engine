@@ -18,8 +18,7 @@ const semantics: Readonly<Record<string, string>> = { POSITION: 'position', NORM
 
 /** iPhone downloads I3: a padded channel (a 16-bit grid position has an 8-byte stride) reads back interleaved; its stored
  *  values are copied out unchanged into a plain attribute of the same storage. */
-function plain(attribute: unknown): unknown {
-  if (!(attribute instanceof InterleavedBufferAttribute)) return attribute;
+function plainGeometryAttribute(attribute: InterleavedBufferAttribute): BufferAttribute {
   const data = attribute.data, source: TypedArray = data.array, out = new (source.constructor as new (length: number) => TypedArray)(attribute.count * attribute.itemSize);
   const size = attribute.itemSize, stride = data.stride;
   // Integer storage has no floating NaN conversion to preserve.
@@ -35,7 +34,30 @@ function plain(attribute: unknown): unknown {
       if (size > 3) out[target++] = source[at + 3] ?? 0;
     }
   } else for (let i = 0; i < attribute.count; i++) for (let c = 0; c < size; c++) out[i * size + c] = source[i * stride + attribute.offset + c] ?? 0;
-  return new BufferAttribute(out, attribute.itemSize, attribute.normalized);
+  const result = new BufferAttribute(out, attribute.itemSize, attribute.normalized).setUsage(data.usage);
+  result.name = attribute.name;
+  return result;
+}
+
+function plain(attribute: unknown): unknown { return attribute instanceof InterleavedBufferAttribute ? plainGeometryAttribute(attribute) : attribute; }
+
+/** Three uploads a GLB view once per scalar type if its channels use different typed views.
+ * Keep the original channel values and scalar types, with only the bytes each channel reads. */
+export function separateMixedChannels(geometry: BufferGeometry): void {
+  const groups = new Map<ArrayBufferLike, [string, InterleavedBufferAttribute][]>();
+  for (const [name, attribute] of Object.entries(geometry.attributes)) {
+    if (!(attribute instanceof InterleavedBufferAttribute)) continue;
+    const backing = attribute.data.array.buffer, group = groups.get(backing) ?? [];
+    group.push([name, attribute]); groups.set(backing, group);
+  }
+  for (const group of groups.values()) {
+    const first = group[0]?.[1].data.array;
+    if (first === undefined || new Set(group.map(([, attribute]) => attribute.data.array.constructor)).size < 2) continue;
+    if (group.some(([, { data: { array } }]) => array.byteOffset !== first.byteOffset || array.byteLength !== first.byteLength)) continue;
+    const packedBytes = group.reduce((sum, [, attribute]) => sum + attribute.count * attribute.itemSize * attribute.data.array.BYTES_PER_ELEMENT, 0);
+    if (packedBytes > first.byteLength) continue;
+    for (const [name, attribute] of group) geometry.setAttribute(name, plainGeometryAttribute(attribute));
+  }
 }
 
 /** Restore original typed GLB channels, including half-float bits and vec4 shader normals.

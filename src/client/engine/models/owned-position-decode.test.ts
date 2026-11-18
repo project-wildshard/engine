@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute, Matrix4, Mesh, MeshBasicMaterial, Vector3 } from 'three';
 import { copyOwnedDrawGeometry, copyOwnedGeometry, identitySpaceGeometry, modelSpaceDrawPosition, restoreOwnedGeometryGrid } from './ownedGeometry';
+import { separateMixedChannels } from './nativeGeometry';
 
 /** The original two-pass result: the Float32 store between normalization and
  * matrix multiplication is part of the shipped decoder's numerical contract. */
@@ -244,4 +245,31 @@ test('custom Vector3 matrix transforms retain the original complete position byt
     const a = actual.getAttribute('position').array, b = expected.getAttribute('position').array;
     expect(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).toEqual(new Uint8Array(b.buffer, b.byteOffset, b.byteLength));
   } finally { changed.mockRestore(); actual?.dispose(); expected?.dispose(); closeMesh(mesh); }
+});
+
+
+test('one mixed GLB allocation becomes tight channels without changing their exact typed values', () => {
+  const bytes = new ArrayBuffer(48), normal = new Int8Array(bytes), colour = new Uint16Array(bytes), sway = new Float32Array(bytes);
+  normal.set([-127, 0, 127], 0); normal.set([127, 24, -1], 24);
+  colour.set([123, 65535, 65534], 2); colour.set([65535, 32901, 0], 14);
+  sway.set([0.5, 3.25], 3); sway.set([1.75, -2.625], 9);
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('normal', new InterleavedBufferAttribute(new InterleavedBuffer(normal, 24), 3, 0, true));
+  geometry.setAttribute('color', new InterleavedBufferAttribute(new InterleavedBuffer(colour, 12), 3, 2, true));
+  geometry.setAttribute('aSway', new InterleavedBufferAttribute(new InterleavedBuffer(sway, 6), 2, 3));
+  const expected = [
+    ['normal', new Int8Array([-127, 0, 127, 127, 24, -1]), true],
+    ['color', new Uint16Array([123, 65535, 65534, 65535, 32901, 0]), true],
+    ['aSway', new Float32Array([0.5, 3.25, 1.75, -2.625]), false],
+  ] as const;
+  try {
+    separateMixedChannels(geometry);
+    for (const [name, values, normalized] of expected) {
+      const result = geometry.getAttribute(name);
+      expect(result).toBeInstanceOf(BufferAttribute);
+      expect(result.array).toEqual(values);
+      expect(result.normalized).toBe(normalized);
+      expect(result.count).toBe(2);
+    }
+  } finally { geometry.dispose(); }
 });

@@ -1,6 +1,6 @@
 import { Box3, BufferAttribute, BufferGeometry, Float16BufferAttribute, InterleavedBufferAttribute, type TypedArray, Material, Mesh, Matrix3, type Matrix4, Vector3, type Object3D } from 'three';
 import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
-import { halfAttribute, nativeWholeGeometry } from './nativeGeometry';
+import { halfAttribute, nativeWholeGeometry, separateMixedChannels } from './nativeGeometry';
 
 function isGeometryMesh(node: Object3D): node is Mesh {
   if (!(node instanceof Mesh)) return false;
@@ -319,6 +319,7 @@ export function createOwnedGeometry(url: string, channels: Readonly<Record<strin
         if (!geometry.hasAttribute(from)) { geometry.dispose(); throw new Error(`Baked model is missing ${from}: ${url}`); }
         geometry.setAttribute(to, geometry.getAttribute(from)); geometry.deleteAttribute(from);
       }
+      if (quantized) separateMixedChannels(geometry);
       template = geometry;
     } finally {
       for (const mesh of meshes) {
