@@ -1,6 +1,7 @@
 {
   "version": 1,
   "mode": "footprint",
+  "instrument": "minimal",
   "anchor": {
     "settled": 646959552,
     "spread": 19087168

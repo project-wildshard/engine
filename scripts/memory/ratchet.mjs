@@ -78,6 +78,18 @@ export function compareFootprint(baseline, readings) {
   return { settled: Math.min(previous, observed.settled), spread: baseline.spread };
 }
 
+/** EM11b: which Web Inspector mode the runs were read with (measure.mjs `instrument`; a run before EM11b is `full`). The
+ * `full` mode carries up to ~200 MB of retained response bodies a phone does not have, so a baseline and runs read in
+ * different modes are never compared: re-record the baseline (ci.yml `memory_record`).
+ * @param {readonly any[]} measurements @param {any} baseline @returns {string} */
+export function footprintInstrument(measurements, baseline) {
+  const modes = [...new Set(measurements.map(doc => doc.instrument ?? 'full'))];
+  if (modes.length !== 1) throw new Error(`Template runs mix inspector modes: ${modes.join(', ')}`);
+  const mode = /** @type {string} */ (modes[0]), stored = baseline?.instrument ?? 'full';
+  if (baseline !== null && stored !== mode) throw new Error(`Template baseline was read with instrument ${stored}, these runs with ${mode}: re-record it (ci.yml memory_record)`);
+  return mode;
+}
+
 /** @param {readonly LedgerBudget[]} runs @returns {LedgerBudget} */
 function highWater(runs) {
   if (runs.length === 0) throw new Error('No ledger boots');
@@ -130,8 +142,9 @@ export function main(argv) {
         return byteCount(run.settled?.webcontent);
       });
     });
+    const instrument = footprintInstrument(measurements, baseline);
     const anchor = baseline === null ? footprintBudget(readings) : compareFootprint(baseline.anchor, readings);
-    if (values.out) write(values.out, { version: 1, mode, anchor });
+    if (values.out) write(values.out, { version: 1, mode, instrument, anchor });
     console.log(`Template native WebContent: median ${footprintBudget(readings).settled} B, baseline ${anchor.settled} B + ${anchor.spread} B`);
   }
 }

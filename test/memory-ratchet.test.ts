@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { compareFootprint, compareLedger, footprintBudget, ledgerBudget } from '../scripts/memory/ratchet.mjs';
+import { compareFootprint, compareLedger, footprintBudget, footprintInstrument, ledgerBudget } from '../scripts/memory/ratchet.mjs';
 
 const MB = 1e6;
 const boot = (held: number): ReturnType<typeof ledgerBudget> => ledgerBudget([
@@ -33,4 +33,11 @@ test('native footprint compares the median with the stored upper spread', () => 
   expect(compareFootprint(baseline, [516, 525, 535])).toEqual(baseline);
   expect(() => compareFootprint(baseline, [526, 530, 535])).toThrow(/530 B > 528 B/u);
   expect(() => footprintBudget([0, 524, 528])).toThrow('native WebContent');
+});
+
+test('a footprint baseline and its runs share one inspector mode (EM11b)', () => {
+  expect(footprintInstrument([{ instrument: 'minimal' }, { instrument: 'minimal' }], { instrument: 'minimal' })).toBe('minimal');
+  expect(footprintInstrument([{}], null)).toBe('full');
+  expect(() => footprintInstrument([{ instrument: 'minimal' }], {})).toThrow(/instrument full, these runs with minimal/u);
+  expect(() => footprintInstrument([{ instrument: 'minimal' }, {}], null)).toThrow('mix inspector modes');
 });

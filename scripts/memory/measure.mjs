@@ -26,6 +26,12 @@
 //
 // A run whose WebContent peak falls before the loading card is refused, not reported. The JSON is `memory-run/1`.
 //
+// The instrument (--instrument, EM11b): `minimal`, the default, turns off the Web Inspector's Network and Console domains on
+// the page before the boot and registers no route, so WebKit neither keeps every fetched response body (1.34 x the bytes, up
+// to ~200 MB of WebContent that no collection frees; meta engine-memory/inspector-retention-2026-11-17.md) nor runs with its
+// memory cache disabled (a route turns on interception, which disables it). A phone has no inspector. `full` is Playwright's
+// default session, kept to compare with readings taken before EM11b. Every run, the JSON and the summary name the mode.
+//
 // The protocol (EM4):
 //   - Every reading is a cold boot: a fresh browser and profile. Never compare a warm reading with a cold one.
 //   - Compare two builds with --url2: the builds alternate inside each round and the order flips each round, on the
@@ -45,6 +51,8 @@ import { listProcesses, readFootprints, startSampler, webkitProcesses } from './
 import { ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText } from './phoneModel.mjs';
 
 export const PROTOCOL = 'memory-run/1';
+/** The inspector modes (see the header). @type {readonly ['minimal', 'full']} */
+export const INSTRUMENTS = Object.freeze(/** @type {const} */ (['minimal', 'full']));
 export const PHONE_VIEW = Object.freeze({ viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 const MB = 1e6;
 
@@ -61,6 +69,10 @@ export const STEP_LOG = String.raw`(() => {
   const on = () => { const step = read(); if (step && step !== steps.at(-1)?.[1]) steps.push([performance.timeOrigin + performance.now(), step, ledger()]); };
   const go = () => { new MutationObserver(on).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-step'] }); on(); setInterval(on, 100); };
   if (document.documentElement) go(); else document.addEventListener('DOMContentLoaded', go);
+  // the page's own errors: with the inspector's Console domain off (instrument minimal) Playwright sees none
+  const errors = []; window.__memoryRun.errors = errors;
+  addEventListener('error', (e) => { if (errors.length < 5) errors.push(String(e.message ?? e)); });
+  addEventListener('unhandledrejection', (e) => { if (errors.length < 5) errors.push(String(e.reason?.message ?? e.reason)); });
   // EM11: the boot trace's checkpoints (the operations a phone's "Abrupt previous page" report names), stamped as written
   const marks = []; window.__memoryRun.trace = marks;
   const set = Storage.prototype.setItem;
@@ -179,17 +191,34 @@ export function bootURL(url, chunk) {
   return page.href;
 }
 
-/** The phone boot's saved state: phone tier, Low graphics, muted, Developer on, first play done.
- * @param {{addInitScript: Function, route: Function}} context */
-export async function phoneContext(context) {
+/** The phone boot's saved state: phone tier, Low graphics, muted, Developer on, first play done. `route` false (instrument
+ * minimal) leaves the error reports unrouted: a route turns on request interception, which disables WebKit's memory cache.
+ * @param {{addInitScript: Function, route: Function}} context @param {{route?: boolean}} [options] */
+export async function phoneContext(context, { route = true } = {}) {
   const { saveFixture } = await import('../debug-settings.mjs');
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'device', key: 'graphics', data: 'low' });
   await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0 } });
   await context.addInitScript(STEP_LOG);
-  await context.route('**/api/errors', (/** @type {any} */ route) => route.fulfill({ status: 204, body: '' }));
+  if (route) await context.route('**/api/errors', (/** @type {any} */ r) => r.fulfill({ status: 204, body: '' }));
 }
+
+/** Instrument minimal: turn off the Web Inspector's Network domain (it keeps every response body for
+ * `Network.getResponseBody`, and only `Network.disable` frees them) and Console domain (it keeps logged values alive) on the
+ * page's current inspector session. Playwright's public API cannot do this, so it goes through the in-process server
+ * object (Playwright 1.65: `page._connection.toImpl(page).delegate._session`, a WKSession); if that path is gone, the run
+ * refuses rather than read inflated numbers. Returns the session, so the caller can check the page kept it (a process
+ * swap opens a new session with both domains on again). @param {any} page */
+export async function minimiseInspector(page) {
+  const session = page?._connection?.toImpl?.(page)?.delegate?._session;
+  if (typeof session?.send !== 'function') throw new Error('instrument minimal: no WebKit inspector session to turn the Network domain off (Playwright internals moved); use --instrument=full or fix minimiseInspector');
+  await session.send('Network.disable');
+  await session.send('Console.disable');
+  return session;
+}
+/** Is the page still on the session minimiseInspector turned down? @param {any} page @param {any} session */
+export function sameInspectorSession(page, session) { return page?._connection?.toImpl?.(page)?.delegate?._session === session; }
 
 /** Wait for control or the error card. @param {any} page @param {number} timeoutMs */
 export async function untilControl(page, timeoutMs) {
@@ -217,27 +246,29 @@ export async function settledReading(page, procs, { settleMs = 2000, gcs = 2, re
 }
 
 /** One cold phone boot in native WebKit, read by the kernel.
- * @param {{url:string, chunk:string, settleMs?:number, timeoutMs?:number, everyMs?:number, gcs?:number, reads?:number, closure?:boolean}} options */
-export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false }) {
+ * @param {{url:string, chunk:string, settleMs?:number, timeoutMs?:number, everyMs?:number, gcs?:number, reads?:number, closure?:boolean, instrument?:'minimal'|'full', probe?:(page:any, procs:BrowserProcess[]) => Promise<unknown>}} options
+ * `probe` runs at control after the settled reading (a probe script's own reading, kept as `probe` in the run). */
+export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false, instrument = 'minimal', probe }) {
   const { webkit } = await import('../browser-playwright.mjs');
   const browser = await webkit.launch({ headless: true });
   const load = loadavg()[0];
   try {
     const context = await browser.newContext({ ...PHONE_VIEW });
-    await phoneContext(context);
+    await phoneContext(context, { route: instrument === 'full' });
     const page = await context.newPage();
     page.setDefaultTimeout(timeoutMs);
     /** @type {string[]} */ const errors = [];
     page.on('pageerror', (error) => { errors.push(error.message); });
     // a small same-origin file first, so WebContent exists (and a cross-origin swap cannot move the page) before the boot
     await page.goto(new URL('/version.json', url).href);
+    const inspector = instrument === 'minimal' ? await minimiseInspector(page) : null;
     const build = await page.evaluate(() => { try { return JSON.parse(document.body.textContent ?? '').build ?? null; } catch { return null; } });
     /** @type {Map<number, BrowserProcess>} */
     const procs = new Map(webkitProcesses().map((p) => [p.pid, p]));
     const sampler = startSampler([...procs.keys()], { everyMs });
     const discover = () => { for (const p of webkitProcesses()) if (!procs.has(p.pid)) { procs.set(p.pid, p); sampler.add(p.pid); } };
     const watch = setInterval(discover, 500);
-    let failure = null, settled = null, ledger = null, counters = null, categories = null;
+    let failure = null, settled = null, ledger = null, counters = null, categories = null, /** @type {unknown} */ probed = null;
     /** @type {StepRow[]} */ let steps = [], trace = [];
     const started = Date.now();
     try {
@@ -250,8 +281,10 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
         ledger = await page.evaluate(() => { const s = Reflect.get(window, '__wildshard')?.memory?.(); return s ? { totals: s.totals, unattributed: s.unattributed, allocations: s.allocations.map((/** @type {any} */ a) => ({ domain: a.domain, kind: a.kind, bytes: a.bytes })) } : null; });
         counters = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.counters?.() ?? null; } catch { return null; } });
         if (closure) categories = footprintCategories([...procs.values()]);
+        if (probe) probed = await probe(page, [...procs.values()]);
       }
       steps = await page.evaluate(() => Reflect.get(window, '__memoryRun')?.steps ?? []);
+      if (inspector) errors.push(...await page.evaluate(() => Reflect.get(window, '__memoryRun')?.errors ?? []));
       trace = await page.evaluate(() => (Reflect.get(window, '__memoryRun')?.trace ?? []).map((/** @type {any[]} */ m) => [m[0], m[1], m[2]]));
       clearInterval(watch);
       const stream = await sampler.stop();
@@ -261,9 +294,10 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
       if (!all.some((p) => p.role === 'webcontent')) for (const row of listProcesses().filter((r) => r.path.includes('ms-playwright'))) console.error(`  no WebContent matched; ms-playwright process ${row.pid} ppid ${row.ppid} rpid ${row.rpid} ${row.name} (this node ${process.pid})`);
       const checkpoints = stepCheckpoints(stream.samples, steps, all);
       const lifetime = readFootprints(all.map((p) => p.pid));
-      return { host: 'webkit', chunk, url, build, ready: failure === null, failure, errors: errors.slice(0, 5), readyMs, loadAverage: Math.round(load * 100) / 100,
+      const kept = inspector === null || sameInspectorSession(page, inspector);
+      return { host: 'webkit', instrument: kept ? instrument : 'minimal-lost', chunk, url, build, ready: failure === null, failure, errors: errors.slice(0, 5), readyMs, loadAverage: Math.round(load * 100) / 100,
         processes: all.map((p) => ({ pid: p.pid, role: p.role, name: p.name, path: p.path, lifetimeMaxBytes: /** @type {any} */ (lifetime[String(p.pid)])?.lifetimeMaxPhysicalFootprintBytes ?? null })),
-        checkpoints, traceCheckpoints: trace.length > 0 ? stepCheckpoints(stream.samples, traceToControl(trace, steps), all) : [], settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, refused: failure ?? refusal(checkpoints), samples: stream.samples.length };
+        checkpoints, traceCheckpoints: trace.length > 0 ? stepCheckpoints(stream.samples, traceToControl(trace, steps), all) : [], settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, ...(probe ? { probe: probed } : {}), refused: failure ?? (kept ? refusal(checkpoints) : 'the page moved to a new inspector session mid-boot (Network domain on again)'), samples: stream.samples.length };
     } finally { clearInterval(watch); await sampler.stop().catch(() => undefined); }
   } finally { await browser.close(); }
 }
@@ -357,7 +391,9 @@ export function closureLines(run, host) {
 export function phoneLine(run, model = loadPhoneModel()) {
   if (!run.settled || run.checkpoints.length === 0) return null;
   const playing = phoneFromWebKit(run.settled, model), loading = phonePeakFromWebKit(run.checkpoints, model);
-  return `  phone [EM11 chain, iPhone 17 Pro]: playing ${rangeText(playing)}, loading peak ${rangeText(loading)}; crash line ${(model.limitMB / 1000).toFixed(2)} GB, envelope 1.00 GB`;
+  const mode = run.instrument ?? 'full', fitted = model.instrument ?? 'full';
+  const warn = mode === fitted ? '' : ` (WARNING: model fitted on instrument ${fitted}, this run read with ${mode}: not comparable)`;
+  return `  phone [EM11 chain, iPhone 17 Pro]: playing ${rangeText(playing)}, loading peak ${rangeText(loading)}; crash line ${(model.limitMB / 1000).toFixed(2)} GB, envelope 1.00 GB${warn}`;
 }
 
 /** EM1's native-WebKit calibration. */
@@ -441,26 +477,28 @@ export async function serveCalibrationPage() {
 
 /** One settled reading of a page that is not a boot, in a fresh WebKit: `blank` (the calibration page holding nothing),
  * `webgl` (one WebGL2 context, a program and a 24-byte buffer) or `title` (the game's title, phone settings).
- * @param {{rung:'blank'|'webgl'|'title', calibUrl:string, gameUrl:string, settleMs?:number, gcs?:number, reads?:number, timeoutMs?:number}} options */
-export async function webkitRung({ rung, calibUrl, gameUrl, settleMs = 2000, gcs = 2, reads = 5, timeoutMs = 120_000 }) {
+ * @param {{rung:'blank'|'webgl'|'title', calibUrl:string, gameUrl:string, settleMs?:number, gcs?:number, reads?:number, timeoutMs?:number, instrument?:'minimal'|'full'}} options */
+export async function webkitRung({ rung, calibUrl, gameUrl, settleMs = 2000, gcs = 2, reads = 5, timeoutMs = 120_000, instrument = 'minimal' }) {
   const { webkit } = await import('../browser-playwright.mjs');
   const browser = await webkit.launch({ headless: true });
   try {
     const context = await browser.newContext({ ...PHONE_VIEW });
-    if (rung === 'title') await phoneContext(context);
+    if (rung === 'title') await phoneContext(context, { route: instrument === 'full' });
     const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);
     if (rung === 'title') {
       await page.goto(new URL('/version.json', gameUrl).href);
+      if (instrument === 'minimal') await minimiseInspector(page);
       const title = new URL(gameUrl); for (const [key, value] of Object.entries({ mute: '1', nolock: '1', sw: '0' })) title.searchParams.set(key, value);
       await page.goto(title.href); // no skipintro: with it and no chunk the page boots straight into a zone
       await page.locator('.ws-main-select').waitFor({ state: 'visible' });
     } else {
-      await page.goto(`${calibUrl}?kind=${rung === 'webgl' ? 'glbuffer' : 'none'}&mb=0`);
+      await page.goto(`${calibUrl}?kind=${rung === 'webgl' ? 'glbuffer' : 'none'}&mb=0`, { waitUntil: 'commit' });
+      if (instrument === 'minimal') await minimiseInspector(page);
       await page.waitForFunction(() => Reflect.get(window, '__calib')?.done === true);
     }
     const settled = await settledReading(page, webkitProcesses(), { settleMs, gcs, reads });
     const ledger = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.counters?.() ?? null; } catch { return null; } });
-    return { rung, settled, ledger };
+    return { rung, instrument, settled, ledger };
   } finally { await browser.close(); }
 }
 
@@ -517,7 +555,7 @@ export function ladderParts(rounds, zones) {
 
 /** The per-checkpoint lines of one WebKit run. @param {Awaited<ReturnType<typeof webkitBoot>>} run */
 export function webkitLines(run) {
-  const lines = [`[K] WebKit ${run.chunk} build ${String(run.build).slice(0, 8)}: ready ${run.ready} in ${(run.readyMs / 1000).toFixed(1)} s, load ${run.loadAverage}${run.refused ? `, REFUSED: ${run.refused}` : ''}`,
+  const lines = [`[K] WebKit ${run.chunk} build ${String(run.build).slice(0, 8)}, instrument ${run.instrument ?? 'full'}: ready ${run.ready} in ${(run.readyMs / 1000).toFixed(1)} s, load ${run.loadAverage}${run.refused ? `, REFUSED: ${run.refused}` : ''}`,
     '  checkpoint                    WebContent peak / last [K]   GPU process peak / last [K]   ledger gpu / ram + workers [L]'];
   for (const c of run.checkpoints) {
     const l = c.ledger ? `${mb(Object.values(c.ledger.gpu ?? {}).reduce((a, b) => a + b, 0))} / ${mb([...Object.values(c.ledger.ram ?? {}), ...Object.values(c.ledger.workers ?? {})].reduce((a, b) => a + b, 0))}` : '    - /     -';
@@ -561,8 +599,10 @@ async function main(argv) {
   if (!args.url || (args.chunk === undefined && !args.ladder)) { console.error('usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--ledger-only] [--summary=<file>] [--out=<file>] | --ladder [--zones=a,b]'); return 64; }
   const settleMs = Number(args.settle ?? 2000), timeoutMs = Number(args.timeout ?? 240) * 1000;
   const gcs = Number(args.gcs ?? 2), reads = Number(args.reads ?? 5);
+  const instrument = /** @type {'minimal'|'full'} */ (args.instrument ?? 'minimal');
+  if (!INSTRUMENTS.includes(instrument)) { console.error(`--instrument is ${INSTRUMENTS.join(' or ')}`); return 64; }
   const limits = { maxLoad: Number(args['max-load'] ?? cpus().length), maxLanes: Number(args['max-lanes'] ?? 2), waitMs: Number(args.wait ?? 10) * 60_000 };
-  if (args.ladder) return ladder(args, { runs: Number(args.runs ?? 5), settleMs, timeoutMs, gcs, reads, limits });
+  if (args.ladder) return ladder(args, { runs: Number(args.runs ?? 5), settleMs, timeoutMs, gcs, reads, limits, instrument });
   if (args['plant-retained-buffer'] && !args['ledger-only']) throw new Error('The retained buffer control requires --ledger-only');
   const runs = args['ledger-only'] ? 0 : Number(args.runs ?? 1);
   const urls = args.url2 ? [args.url, args.url2] : [args.url];
@@ -571,7 +611,7 @@ async function main(argv) {
   for (let i = 0; i < runs; i++) {
     // two builds alternate inside each round, and the order flips each round, so drift lands on both
     for (const url of i % 2 === 0 ? urls : [...urls].reverse()) {
-      const run = await webkitBoot({ url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure) });
+      const run = await webkitBoot({ url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure), instrument });
       webkit.push(run);
       for (const line of webkitLines(run)) console.log(line);
       if (args.closure) for (const line of closureLines(run, webkitCalibration())) console.log(line);
@@ -592,6 +632,7 @@ async function main(argv) {
     peakWebContent: stats(good.map((r) => Math.max(...r.checkpoints.map((c) => c.peak.webcontent)))),
     peakGpu: stats(good.map((r) => Math.max(...r.checkpoints.map((c) => c.peak.gpu)))),
     refused: webkit.length - good.length,
+    instrument,
   };
   if (summary && runs > 1) for (const [name, s] of Object.entries(summary)) if (typeof s === 'object') console.log(`${name.padEnd(18)} median ${mb(s.median)} MB  min ${mb(s.min)}  max ${mb(s.max)}  spread ${s.spreadPct}%  (n ${s.n}) [K]`);
   const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({ url: args.url, chunk: args.chunk, timeoutMs, plantRetainedBuffer: Boolean(args['plant-retained-buffer']) }) : null;
@@ -599,9 +640,10 @@ async function main(argv) {
   const ledger = microscope ? ledgerPeak(microscope.checkpoints) : null;
   if (ledger) for (const line of ledgerPeakLines(args.chunk, ledger)) console.log(line);
   if (args.summary) appendFileSync(args.summary, summaryMarkdown(args.chunk, webkit, summary, ledger));
+  if (runs > 0) console.log(`instrument ${instrument}: ${instrument === 'minimal' ? 'Web Inspector Network and Console domains off, no routes' : 'Playwright default session (Network domain keeps response bodies)'}`);
   if (args.out) {
     const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, `${JSON.stringify({ protocol: PROTOCOL, url: args.url, chunk: args.chunk, date: new Date().toISOString(), webkit, summary, microscope }, null, 1)}\n`);
+    writeFileSync(out, `${JSON.stringify({ protocol: PROTOCOL, instrument: runs > 0 ? instrument : null, url: args.url, chunk: args.chunk, date: new Date().toISOString(), webkit, summary, microscope }, null, 1)}\n`);
   }
   return good.length === webkit.length && (!args['ledger-only'] || microscope?.ready === true) ? 0 : 1;
 }
@@ -633,7 +675,7 @@ export function summaryMarkdown(chunk, webkit, summary, ledger) {
       const playing = ok && model ? rangeText(phoneFromWebKit(r.settled, model)) : '-', loading = ok && model ? rangeText(phonePeakFromWebKit(r.checkpoints, model)) : '-';
       lines.push(`| ${i + 1} | ${String(r.build).slice(0, 8)} | ${ok ? m(r.settled.webcontent) : r.refused ?? '-'} | ${ok ? m(r.settled.gpu) : '-'} | ${m(Math.max(0, ...r.checkpoints.map((/** @type {any} */ c) => c.peak.webcontent)))} | ${m(l.ram)} / ${m(l.gpu)} | ${playing} | ${loading} |`);
     });
-    if (summary) lines.push('', `Settled WebContent median ${m(summary.settledWebContent.median)} MB, spread ${summary.settledWebContent.spreadPct}% (n ${summary.settledWebContent.n}); GPU process ${m(summary.settledGpu.median)} MB, spread ${summary.settledGpu.spreadPct}%. MB decimal; native Playwright WebKit, phone view, Low.`);
+    if (summary) lines.push('', `Settled WebContent median ${m(summary.settledWebContent.median)} MB, spread ${summary.settledWebContent.spreadPct}% (n ${summary.settledWebContent.n}); GPU process ${m(summary.settledGpu.median)} MB, spread ${summary.settledGpu.spreadPct}%. MB decimal; native Playwright WebKit, phone view, Low, instrument ${summary.instrument ?? 'full'}.`);
   }
   if (ledger) lines.push(...(webkit.length > 0 ? [''] : []), `Ledger [L] in Chromium: control ${m(ledger.control.ram)} ram + ${m(ledger.control.gpu)} gpu MB; peak ${m(ledger.peak.ram + ledger.peak.gpu)} MB at ${ledger.peak.step}.`);
   return `${lines.join('\n')}\n\n`;
@@ -642,7 +684,7 @@ export function summaryMarkdown(chunk, webkit, summary, ledger) {
 /** The differential ladder (EM4): blank, WebGL, title, Template at control and each zone at control, every rung a cold
  * WebKit, rung order flipped each round, N rounds; a busy machine is waited out, then refused.
  * @param {Record<string, string>} args
- * @param {{runs:number, settleMs:number, timeoutMs:number, gcs:number, reads:number, limits:{maxLoad:number, maxLanes:number, waitMs:number}}} o */
+ * @param {{runs:number, settleMs:number, timeoutMs:number, gcs:number, reads:number, limits:{maxLoad:number, maxLanes:number, waitMs:number}, instrument:'minimal'|'full'}} o */
 async function ladder(args, o) {
   const zones = (args.zones ?? 'sunscar-dunes,nine-dragon-stack').split(',').filter(Boolean);
   const calib = await serveCalibrationPage();
@@ -657,11 +699,11 @@ async function ladder(args, o) {
       const row = {};
       for (const rung of round % 2 === 0 ? rungs : [...rungs].reverse()) {
         if (rung === 'blank' || rung === 'webgl' || rung === 'title') {
-          const r = await webkitRung({ rung, calibUrl: calib.url, gameUrl: args.url, settleMs: o.settleMs, gcs: o.gcs, reads: o.reads });
+          const r = await webkitRung({ rung, calibUrl: calib.url, gameUrl: args.url, settleMs: o.settleMs, gcs: o.gcs, reads: o.reads, instrument: o.instrument });
           row[rung] = { k: r.settled.webcontent + r.settled.gpu, wc: r.settled.webcontent, gpu: r.settled.gpu, l: ledgerTotal(r.ledger) };
           raw.push({ round, machine, ...r });
         } else {
-          const r = await webkitBoot({ url: args.url, chunk: rung, settleMs: o.settleMs, timeoutMs: o.timeoutMs, gcs: o.gcs, reads: o.reads });
+          const r = await webkitBoot({ url: args.url, chunk: rung, settleMs: o.settleMs, timeoutMs: o.timeoutMs, gcs: o.gcs, reads: o.reads, instrument: o.instrument });
           if (!r.settled || r.refused) throw new Error(`${rung} round ${round}: ${r.refused ?? 'no settled reading'}`);
           const peak = Math.max(...r.checkpoints.map((c) => c.peak.webcontent + c.peak.gpu));
           row[rung] = { k: r.settled.webcontent + r.settled.gpu, wc: r.settled.webcontent, gpu: r.settled.gpu, l: r.ledger ? r.ledger.totals.gpu + r.ledger.totals.ram : 0, peak, peakWc: Math.max(...r.checkpoints.map((c) => c.peak.webcontent)) };
@@ -672,7 +714,7 @@ async function ladder(args, o) {
       rounds.push(row);
     }
   } finally { calib.close(); }
-  const result = { protocol: 'memory-ladder/1', url: args.url, zones, date: new Date().toISOString(), runs: o.runs, rungs: {}, ...ladderParts(rounds, zones), rounds, raw };
+  const result = { protocol: 'memory-ladder/1', instrument: o.instrument, url: args.url, zones, date: new Date().toISOString(), runs: o.runs, rungs: {}, ...ladderParts(rounds, zones), rounds, raw };
   for (const rung of ['blank', 'webgl', 'title', '_template', ...zones]) Reflect.set(result.rungs, rung, { k: stats(rounds.map((r) => r[rung].k)), wc: stats(rounds.map((r) => r[rung].wc)), gpu: stats(rounds.map((r) => r[rung].gpu)), l: stats(rounds.map((r) => r[rung].l)), ...(rounds[0][rung].peak === undefined ? {} : { peak: stats(rounds.map((r) => r[rung].peak ?? 0)) }) });
   for (const line of ladderLines(result)) console.log(line);
   if (args.out) { const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, `${JSON.stringify(result, null, 1)}\n`); }

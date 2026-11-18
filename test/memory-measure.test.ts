@@ -47,7 +47,7 @@ test('one line per checkpoint, each number tagged',()=>{
     checkpoints:[{step:'control',from:0,to:1,samples:1,peak:{webcontent:491e6,gpu:512e6},last:{webcontent:491e6,gpu:355e6},ledger:null}],
     settled:{webcontent:487e6,gpu:355e6},ledger:{totals:{gpu:34e6,ram:33e6},unattributed:{gpu:0,ram:0},byKind:{gpu:{texture:18e6}}}};
   const lines=webkitLines(run as never);
-  expect(lines[0]).toMatch(/^\[K\] WebKit _template build abcdef12: ready true in 13\.1 s/u);
+  expect(lines[0]).toMatch(/^\[K\] WebKit _template build abcdef12, instrument full: ready true in 13\.1 s/u);
   expect(lines.some(l=>/control settled .*487 MB \[K\].*\[L\]/u.test(l))).toBe(true);
   expect(lines.at(-1)).toBe('  ledger at control by kind [L]: gpu texture 18.0');
 });

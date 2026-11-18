@@ -4,7 +4,7 @@ export interface ChainModel {gpuFloorMB:number;alpha:{low:number;high:number};sc
 export interface LedgerFit {webcontent:{floorMB:number;perMB:number};gpu:{floorMB:number;perMB:number};missPct:number}
 export interface PhoneModel extends ChainModel {
   limitMB:number;limitHighMB:number;ledger:LedgerFit;peakOverSettled:Range;chromium:{loadingPerRenderer:Range};
-  anchor?:unknown;zones?:Record<string,{phonePlayingMB:Range;phoneLoadingMB:Range}>;
+  anchor?:unknown;instrument?:string;zones?:Record<string,{phonePlayingMB:Range;phoneLoadingMB:Range}>;
 }
 export function loadPhoneModel():PhoneModel;
 export function anchorBounds(windows:readonly TraceWindow[],lastOperation:string,options:{limitMB:number;limitHighMB:number;gpuFloorMB:number}):{
