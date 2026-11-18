@@ -52,7 +52,7 @@ function skinGlb(glow: boolean, mixed = false, size = 1): Uint8Array {
   return new Uint8Array(Buffer.concat([header, jh, text, bh, bin]));
 }
 
-async function loaded(glow: boolean, materials?: Record<string, string>, mixed = false, variants = false) {
+async function loaded(glow: boolean, materials?: Record<string, string>, mixed = false, variants = false, phone?: 'phone' | 'desktop') {
   await prepareGlbCost();
   const glb = skinGlb(glow, mixed), cost = parseGlbData(glb), file = sha(glb);
   const metadata = {
@@ -80,7 +80,15 @@ async function loaded(glow: boolean, materials?: Record<string, string>, mixed =
     source.files.push({ hash: sha(second), kind: 'json', dependencies: [secondFile] }, { hash: secondFile, kind: 'glb', dependencies: [] }, { hash: sha(table), kind: 'json', dependencies: [sha(skin), sha(second)] });
     assets.set(sha(second), second); assets.set(secondFile, secondGlb); assets.set(sha(table), table);
   }
-  const skins = await loadClientSkins(source as never, assets, compile, scope);
+  if (phone !== undefined) {
+    // ONE-FORMAT CC51b: the same rig, clips and material at no more triangles, scaled so the two hulls differ
+    const phoneGlb = skinGlb(glow, mixed, 2), phoneFile = sha(phoneGlb), phoneCost = parseGlbData(phoneGlb);
+    const lighter = new TextEncoder().encode(JSON.stringify({ ...metadata, row: { ...metadata.row, id: 'test.phone', file: phoneFile, cost: phoneCost }, binding: { ...metadata.binding, skin: 'test.phone' } }));
+    Object.assign(look.parameters, { phone: sha(lighter) });
+    source.files.push({ hash: sha(lighter), kind: 'json', dependencies: [phoneFile] }, { hash: phoneFile, kind: 'glb', dependencies: [] });
+    assets.set(sha(lighter), lighter); assets.set(phoneFile, phoneGlb);
+  }
+  const skins = await loadClientSkins(source as never, assets, compile, scope, phone ?? 'desktop');
   const loadedSkin = skins.get('test.glow.look'); if (loadedSkin === undefined) throw new Error('skin not loaded');
   return { skin: loadedSkin, look, compiled, scope };
 }
@@ -187,4 +195,16 @@ test('variant tables select distinct geometry and animation with shared aliases 
   wide.geometry.addEventListener('dispose', () => { disposed.push(wide.geometry); });
   scope.dispose();
   expect(disposed).toHaveLength(2); expect(new Set(disposed).size).toBe(2);
+});
+
+test('a look with a phone skin draws it on the phone tier and its full skin on desktop (ONE-FORMAT CC51b)', async () => {
+  const desktop = await loaded(false, undefined, false, false, 'desktop'), phone = await loaded(false, undefined, false, false, 'phone');
+  expect(desktop.skin.id).toBe('test.glow');
+  expect(phone.skin.id).toBe('test.phone');
+  // the same rig and clips; only the hull differs
+  expect(phone.skin.bones).toEqual(desktop.skin.bones);
+  expect([...phone.skin.clips.keys()]).toEqual([...desktop.skin.clips.keys()]);
+  phone.skin.geometry.computeBoundingBox(); desktop.skin.geometry.computeBoundingBox();
+  expect(phone.skin.geometry.boundingBox?.min.x).toBeCloseTo(-1, 6);
+  expect(desktop.skin.geometry.boundingBox?.min.x).toBeCloseTo(-0.5, 6);
 });

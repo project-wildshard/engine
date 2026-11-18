@@ -7,10 +7,11 @@
  * flinch, gait). One-shots (attack, hit, die) run from their trigger and hold their last frame; loops (idle, walk,
  * idle.graze) carry their numeric pose layers, compiled once per skin and shared by every instance.
  *
- *   const skins = await loadClientSkins(source, assets, compile, scope);   // world stage
+ *   const skins = await loadClientSkins(source, assets, compile, scope);   // world stage (the phone tier loads a look's phone skin)
  *   clientSpeciesLooks(rows, recipes, materials, skins);                   // kit stage
  */
 import { macrotask } from '@wildshard/engine/boot/plan';
+import { buildTier, type Tier } from '@wildshard/engine/core/tier';
 import { InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
 import { is } from 'valibot';
 import type { ClipName } from '@wildshard/engine/anim/rig';
@@ -87,12 +88,15 @@ function materialFactory(compile: (entry: unknown) => Material, entry: unknown):
  * Load every skin look of `source` from admitted bytes (`assets`, the library closure) with its binding's family
  * material (`compile`, the loader's material compiler). Keyed by look row id; everything is disposed with `scope`.
  */
-export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' | 'look'>, assets: ReadonlyMap<string, Uint8Array>, compile: (entry: unknown) => Material, scope: Scope): Promise<ReadonlyMap<string, ClientSkin>> {
+export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' | 'look'>, assets: ReadonlyMap<string, Uint8Array>, compile: (entry: unknown) => Material, scope: Scope, tier: Tier = buildTier()): Promise<ReadonlyMap<string, ClientSkin>> {
   const skins = new Map<string, ClientSkin>();
   for (const look of source.rows.looks) {
     if (look.recipe !== SKIN_LOOK_RECIPE) continue;
     if (skins.size > 0) await macrotask(); // SF67: a skin a task (the template's two were one 124-132 ms task at 4x CPU)
-    const parameters = skinLookParameters(look), resolved = resolveSkinLookFiles(source, look, assets);
+    const parameters = skinLookParameters(look), admitted = resolveSkinLookFiles(source, look, assets);
+    // ONE-FORMAT CC51b: the phone tier draws the look's lighter phone skin (same rig, clips, sockets and material) and
+    // never parses the full one; a variant look has no phone skin.
+    const resolved = tier === 'phone' && admitted.phone !== undefined ? { skin: admitted.phone } : admitted;
     const loaded = new Map<string, ClientSkin>();
     for (const file of [resolved.skin, ...(resolved.variants?.values() ?? [])]) {
       if (!loaded.has(file.hash)) loaded.set(file.hash, await loadClientSkin(file, {

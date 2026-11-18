@@ -248,3 +248,165 @@ index 4b476540d1bce7b16dbf1d90a814b2f11fc23fd8..6aa1a3c79971f5c28f395558d4f45a96
 +export { UNNAMED_TIER } from './budget-tiers.ts'
 +
 +export { type RuntimeTierIssue, type RuntimeTierSource, runtimeTierIssues }
+diff --git a/src/format/skin-file.ts b/src/format/skin-file.ts
+index d2c9fe2..3d7ac16 100644
+--- a/src/format/skin-file.ts
++++ b/src/format/skin-file.ts
+@@ -41,6 +41,7 @@ function skinLookParameters(
+     ...(look.output.variants === undefined
+       ? {}
+       : { variants: look.output.variants }),
++    ...(look.output.phone === undefined ? {} : { phone: look.output.phone }),
+   }
+ }
+ 
+diff --git a/src/format/skin-variants.ts b/src/format/skin-variants.ts
+index b2f8193..68f71d6 100644
+--- a/src/format/skin-variants.ts
++++ b/src/format/skin-variants.ts
+@@ -20,6 +20,8 @@ interface ResolvedSkinFile {
+ interface SkinLookFiles {
+   readonly skin: ResolvedSkinFile
+   readonly variants?: ReadonlyMap<string, ResolvedSkinFile>
++  /** The phone tier's lighter mesh (ONE-FORMAT CC51b): the same contract as `skin`, at most its triangles. */
++  readonly phone?: ResolvedSkinFile
+ }
+ type Source = Pick<Shardfile, 'rows' | 'files'>
+ type Look = ShardRows['looks'][number]
+@@ -166,6 +168,33 @@ function resolveVariants(
+   return variants
+ }
+ 
++function phoneLook(
++  skin: ResolvedSkinFile,
++  {
++    phone: hash,
++    look,
++    read,
++    variants,
++  }: {
++    phone: string
++    look: Look
++    read: (hash: string) => ResolvedSkinFile
++    variants: string | undefined
++  },
++): SkinLookFiles {
++  if (variants !== undefined) {
++    throw new Error(`skin look ${look.id}: a variant look has no phone skin`)
++  }
++  const phone = read(hash)
++  if (skinContract(phone) !== skinContract(skin)) {
++    throw new Error(`skin look ${look.id}: phone skin rig or material differs`)
++  }
++  if (phone.row.cost.triangles > skin.row.cost.triangles) {
++    throw new Error(`skin look ${look.id}: phone skin draws more triangles`)
++  }
++  return { skin, phone }
++}
++
+ /** Resolve exact variant coverage and compatible rig/material declarations once at admission/load. */
+ function resolveSkinLookFiles(
+   source: Source,
+@@ -175,6 +204,14 @@ function resolveSkinLookFiles(
+   const parameters = skinLookParameters(look)
+   const read = skinReader(source, assets)
+   const skin = read(parameters.skin)
++  if (parameters.phone !== undefined) {
++    return phoneLook(skin, {
++      phone: parameters.phone,
++      look,
++      read,
++      variants: parameters.variants,
++    })
++  }
+   if (parameters.variants === undefined) {
+     return { skin }
+   }
+@@ -186,5 +223,14 @@ function resolveSkinLookFiles(
+   return { skin, variants }
+ }
+ 
+-export { resolveSkinLookFiles }
++/** Every skin file a look draws: its skin, each variant's and the phone tier's. */
++function lookSkins(resolved: SkinLookFiles): ResolvedSkinFile[] {
++  return [
++    resolved.skin,
++    ...(resolved.variants?.values() ?? []),
++    ...(resolved.phone === undefined ? [] : [resolved.phone]),
++  ]
++}
++
++export { lookSkins, resolveSkinLookFiles }
+ export type { ResolvedSkinFile, SkinLookFiles }
+diff --git a/src/format/skinAssets.ts b/src/format/skinAssets.ts
+index ca82818..82a2a58 100644
+--- a/src/format/skinAssets.ts
++++ b/src/format/skinAssets.ts
+@@ -21,18 +21,25 @@ import { SkinGlbMaterialsSchema, SkinPrimitiveSchema, skinMaterialsFault, skinPa
+ 
+ import { SKIN_LOOK_RECIPE, SKIN_CLIPS_RECIPE } from './skins.ts';
+ import type { SkinLookParameters } from './skins.ts';
+-import { resolveSkinLookFiles } from './skin-variants.ts';
++import { lookSkins, resolveSkinLookFiles } from './skin-variants.ts';
+ import { skinLookParameters } from './skin-file.ts';
+ 
++/** An optional look reference names a library `json` file. */
++function libraryJson(library: readonly string[], kinds: ReadonlyMap<string, string>, hash: string | undefined): boolean {
++  return hash === undefined || kinds.get(hash) === 'json' && library.includes(hash);
++}
++
+ /** Shardfile reference rules for skin looks: a library `json` file whose dependencies are exactly its row's `glb`. */
+ function skinLookRules(source: Pick<Shardfile, 'rows' | 'files' | 'library'>): string[] {
+   const errors: string[] = [], files = new Map(source.files.map((file) => [file.hash, file]));
++  const kinds = new Map<string, string>(); for (const file of source.files) {kinds.set(file.hash, file.kind);}
+   for (const row of source.rows.looks) {
+     if (row.recipe !== SKIN_LOOK_RECIPE) { if (row.animation.recipe === SKIN_CLIPS_RECIPE) {errors.push('skin clips without a skin look');} continue; }
+     let parameters: SkinLookParameters; try { parameters = skinLookParameters(row); } catch { errors.push('skin look parameters'); continue; }
+-    const { skin, variants } = parameters, file = files.get(skin), glb = file?.dependencies.length === 1 ? files.get(file.dependencies[0] ?? '') : undefined;
++    const { skin, variants, phone } = parameters, file = files.get(skin), glb = file?.dependencies.length === 1 ? files.get(file.dependencies[0] ?? '') : undefined;
+     if (file?.kind !== 'json' || glb?.kind !== 'glb' || !source.library.includes(skin)) {errors.push('skin look file references');}
+-    if (variants !== undefined && (files.get(variants)?.kind !== 'json' || !source.library.includes(variants))) {errors.push('skin variant table references');}
++    if (!libraryJson(source.library, kinds, variants)) {errors.push('skin variant table references');}
++    if (!libraryJson(source.library, kinds, phone)) {errors.push('skin phone file references');}
+   }
+   return errors;
+ }
+@@ -76,7 +83,7 @@ function validateSkinAssets(source: Pick<Shardfile, 'rows' | 'files'> & { readon
+   for (const look of source.rows.looks) {
+     if (look.recipe !== SKIN_LOOK_RECIPE) {continue;}
+     const resolved = resolveSkinLookFiles(source, look, assets);
+-    const skins = new Map([resolved.skin, ...(resolved.variants?.values() ?? [])].map((skin): [string, typeof resolved.skin] => [skin.hash, skin]));
++    const skins = new Map(lookSkins(resolved).map((skin): [string, typeof resolved.skin] => [skin.hash, skin]));
+     for (const { row, binding } of skins.values()) {
+ 
+     validateCreatureBones(look.species, row.rig.sockets);
+diff --git a/src/format/skins.ts b/src/format/skins.ts
+index 0014c43..296ec0a 100644
+--- a/src/format/skins.ts
++++ b/src/format/skins.ts
+@@ -8,7 +8,7 @@ const SKIN_LOOK_RECIPE = 'platform.skin';
+ const SKIN_CLIPS_RECIPE = 'platform.clips';
+ const hash = v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/u));
+ /** The look row's parameters. */
+-const SkinLookParametersSchema: v.GenericSchema<SkinLookParametersRowsInput, SkinLookParametersRows> = v.strictObject({ skin: hash, variants: v.exactOptional(hash) });
++const SkinLookParametersSchema: v.GenericSchema<SkinLookParametersRowsInput, SkinLookParametersRows> = v.strictObject({ skin: hash, variants: v.exactOptional(hash), phone: v.exactOptional(hash) });
+ /** Complete variant-to-skin declarations in one ordinary content-addressed JSON file. */
+ const VARIANTS_VERSION = 1;
+ const MIN_VARIANTS = 1;
+@@ -43,13 +43,15 @@ const SkinClipParametersSchema: v.GenericSchema<SkinClipParametersRowsInput, Ski
+ const ShardSkinFileSchema: v.GenericSchema<ShardSkinFileRowsInput, ShardSkinFileRows> = v.strictObject({ row: v.unknown(), binding: v.unknown() });
+ 
+ /** A parsed skin look: the file it names and the attack span its clip was sampled with. */
+-interface SkinLookParameters { skin: string; variants?: string; attackSpan: number; clipMap?: SkinClipMap }
++/** `phone` (ONE-FORMAT CC51b) names a lighter skin file the phone tier draws instead: same rig, clips, sockets and material. */
++interface SkinLookParameters { skin: string; variants?: string; phone?: string; attackSpan: number; clipMap?: SkinClipMap }
+ 
+ /** Admitted data contracts, independent of validator implementation metadata. */
+ type SkinLookParametersRowsInput = SkinLookParametersRows;
+ interface SkinLookParametersRowsFields {
+     skin: string;
+     variants?: string;
++    phone?: string;
+ }
+ type SkinLookParametersRows = { [Key in keyof SkinLookParametersRowsFields]: SkinLookParametersRowsFields[Key] };
+ interface SkinClipParametersRowsInputFields {
