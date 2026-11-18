@@ -160,6 +160,11 @@ export interface TitleDeck {
   readonly dispose: () => void;
   /** a tap on `el` runs `fn` (propagation stopped), owned by the deck's scope: the main menu over it wires its buttons here */
   readonly onTap: (el: HTMLElement, fn: () => void) => void;
+  /** SB49: an ENTER WORLD the gate still holds, or an entry under way */
+  readonly busy: () => boolean;
+  /** SB49: settles once the deck is not busy; never, once an entry navigated (its shell is this deck's child: replacing the deck
+   *  would cancel it) */
+  readonly whenIdle: () => Promise<void>;
 }
 
 const SWORD = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 3.5L9 14l1 1L20.5 4.5z M6.5 12.5l5 5 M8 14l-4.5 4.5 1 1L9 15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
@@ -347,6 +352,11 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   };
   // the card is entered through its shardfile, whose download starts first
   let entering = false;
+  // SB49: a tap the gate holds, and an entry under way, keep the deck busy; the title's late catalogue refresh waits for both
+  let gating = 0;
+  const waiting: (() => void)[] = [];
+  const busy = (): boolean => entering || gating > 0;
+  const settle = (): void => { if (!busy()) for (const resolve of waiting.splice(0)) resolve(); };
   const enter = (c: DeckEntry): boolean => {
     if (entering) return false;
     if (c.shard === null || !canEnter(c, mode()) || opts.single?.closed !== undefined) return false;
@@ -354,7 +364,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     entering = true;
     startEntryDownload(c.slug); titlePrefetchChoice(saves).remember(c.slug);
     const attempt = beginNavigationShell(c.name, scope, () => { opts.onEnter(shard); }, play);
-    attempt.onDispose(() => { entering = false; });
+    attempt.onDispose(() => { entering = false; settle(); });
     return true;
   };
   /** ENTER WORLD, or a key: the shard's one entry (its shardfile, G531 / LD5). The card it started entering, if any (MG5) */
@@ -398,8 +408,8 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     if (opts.gate === undefined || entries[at]?.draft) { activate(at); return; }
     const asked = opts.gate(() => { activate(at); });
     if (!(asked instanceof Promise)) return;
-    playButton.setAttribute('aria-busy', 'true');
-    void asked.finally(() => { playButton.removeAttribute('aria-busy'); });
+    playButton.setAttribute('aria-busy', 'true'); gating++;
+    void asked.finally(() => { playButton.removeAttribute('aria-busy'); gating--; settle(); });
   });
   onTap(required(root, '.ws-menu-explore'), () => { const c = entries[index]; if (c?.shard && canExplore(c, mode())) opts.onExplore(c.shard); });
   onTap(required(root, '.ws-menu-settings'), opts.onSettings);
@@ -434,5 +444,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     start: () => { place(index, 0, false); scope.raf(() => { place(index, 0, false); }); },
     dispose: () => { scope.dispose(); },
     onTap,
+    busy,
+    whenIdle: () => busy() ? new Promise<void>((resolve) => { waiting.push(resolve); }) : Promise.resolve(),
   };
 }

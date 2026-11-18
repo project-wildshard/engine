@@ -84,7 +84,8 @@ export interface TitleMenu {
   /** the screen on show (tests, the proof script) */
   readonly screen: MainMenuScreen;
   readonly show: (next: MainMenuScreen) => void;
-  /** Let an open first-play name prompt complete before replacing this view. */
+  /** Let an open first-play name prompt, and an entry the world gate holds, complete before replacing this view; a title that
+   *  entered a world never settles (SB49) */
   readonly whenIdle: () => Promise<void>;
 }
 
@@ -210,12 +211,23 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // FM4 9b/10b: the title's gate (a world build's) may hold the MMO's entry too, until the world is back
   // SB37b: while the gate reads the world (seconds on a slow phone) the tap is in flight, so the idle title hand-over waits
   let entering = false;
+  let mmoIdle = Promise.resolve();
   const enterMmo = (): void => { void named(() => {
     const go = (): void => { dropFirstPlay(); onGrid(); leaveTitle(); };
     if (deckOpts.gate === undefined) { go(); return; }
     entering = true;
-    void Promise.resolve(deckOpts.gate(go)).catch(() => undefined).finally(() => { entering = false; });
+    mmoIdle = Promise.resolve(deckOpts.gate(go)).catch(() => undefined).finally(() => { entering = false; });
   }); };
+  // SB49 (staging, "Navigation shell requires a live owner"): the late catalogue's refresh disposed this menu while the world gate
+  // held ENTER ZONE, so the gate's go reached a dead deck. Idle is no name prompt, no held tap and no entry under way, all at once
+  // (a named tap goes on to its entry); a title leaving for a world is never replaced.
+  const whenIdle = async (): Promise<void> => {
+    for (;;) {
+      await nameIdle; await mmoIdle; await deck.whenIdle();
+      if (!naming && !entering && !deck.busy()) break;
+    }
+    if (leavingTitle) await new Promise<never>(() => { /* never settles */ });
+  };
   deck.onTap(mmoCard, enterMmo);
   // S2: only the player's last product, after the title paints; a first visit reads nothing. This is verified
   // disk prefetch, never world construction or a hidden offline-size scan. It shows nothing (QB2).
@@ -278,7 +290,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     get index() { return deck.index; },
     get screen() { return viewScreen; },
     show,
-    whenIdle: () => nameIdle,
+    whenIdle,
     // the HUD's arrow keys move the deck; on the main menu they wait for ZONE SELECT
     select: (i, smooth) => { deck.select(i, smooth); },
     // the HUD's confirm / any key (inputContexts `confirm: ['*']`): the main menu opens ZONE SELECT, which loads nothing (a stray

@@ -166,3 +166,59 @@ test('MS1: any key on the main screen opens ZONE SELECT and never enters the MMO
   expect(onGrid).not.toHaveBeenCalled();
   expect(view.screen).toBe('select');
 });
+
+/** STAGING-BUGBASH SB49 (staging, 2026-11-18 ~17:21 UTC, WebKit and Chromium): ENTER ZONE sometimes ended on "Navigation shell
+ *  requires a live owner", and a second tap worked. On a world build the tap first asks the world (the title gate, seconds on a
+ *  phone); the published cards landing meanwhile rebuilt the title (entry.ts awaits `whenIdle`, then `refresh` disposes this menu),
+ *  so the gate's `go` reached a disposed deck. A held tap, and an entry under way, keep the menu busy. */
+const gated = (onEnter: (c: TitleCard) => void) => {
+  const held: { go: () => void; settle: () => void }[] = [];
+  const errors: unknown[] = [];
+  let asking: Promise<void> | null = null;
+  const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined,
+    // one tap at a time, as entry.ts's gate: a second tap while the first is asked enters nothing
+    gate: (go) => {
+      asking ??= new Promise<void>((resolve) => { held.push({ go: () => { try { go(); } catch (error) { errors.push(error); } }, settle: resolve }); })
+        .finally(() => { asking = null; });
+      return asking;
+    } });
+  document.body.append(view.root); views.push(view);
+  // entry.ts's late catalogue owner: wait for the menu, then replace it
+  let refreshed = false;
+  const lateCatalogue = (): void => { void view.whenIdle().then(() => { refreshed = true; view.dispose(); return undefined; }); };
+  return { view, held, errors, lateCatalogue, refreshed: () => refreshed };
+};
+
+test('SB49: a late catalogue refresh waits for the ENTER ZONE the world gate holds, then never replaces the leaving title', async () => {
+  finishFirstPlay();
+  const onEnter = vi.fn<(c: TitleCard) => void>();
+  const { view, held, errors, lateCatalogue, refreshed } = gated(onEnter);
+  tap(view.root.querySelector('.ws-main-select'));
+  await frames();
+  tap(view.root.querySelector('.ws-menu-play'));
+  expect(held).toHaveLength(1);
+  lateCatalogue();
+  await frames();
+  expect(refreshed()).toBe(false);
+  held[0]?.go(); held[0]?.settle();
+  await frames();
+  expect(errors).toEqual([]);
+  expect(onEnter.mock.calls.map(([c]) => c.slug)).toEqual(['driftwood-isle']);
+  expect(refreshed()).toBe(false);
+});
+
+test('SB49: a held ENTER ZONE the player cancels lets the late catalogue refresh run', async () => {
+  finishFirstPlay();
+  const onEnter = vi.fn<(c: TitleCard) => void>();
+  const { view, held, lateCatalogue, refreshed } = gated(onEnter);
+  tap(view.root.querySelector('.ws-main-select'));
+  await frames();
+  tap(view.root.querySelector('.ws-menu-play'));
+  lateCatalogue();
+  await frames();
+  expect(refreshed()).toBe(false);
+  held[0]?.settle();
+  await frames();
+  expect(refreshed()).toBe(true);
+  expect(onEnter).not.toHaveBeenCalled();
+});
