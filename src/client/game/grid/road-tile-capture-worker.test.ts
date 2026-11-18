@@ -5,7 +5,7 @@ import type { CullPlan } from './roadCull';
 import type { RoadTileStore } from './roadTileArchive';
 import { RoadTileBacking } from './roadTileBacking';
 import { captureJobTiles } from './roadTileCaptureJob';
-import type { CaptureJob } from './roadTileCaptureWorker';
+import { jobMessage, type CaptureJob } from './roadTileCaptureWorker';
 
 function fixture(count = 6, seed = 0): { mesh: Mesh; plan: CullPlan } {
   const geometry = new BufferGeometry(), positions = new Float32Array(count * 9), index = new Uint32Array(count * 6);
@@ -94,4 +94,19 @@ test('worker captures keep the window: the 33rd source waits until a job answers
   for (const answer of held.splice(0)) answer();
   await backing.joinCapture();
   scope.dispose();
+});
+
+test('EM25: a job message transfers tight copies of its arrays; the job keeps the page arrays for a retry', () => {
+  const f = fixture(), positions = f.mesh.geometry.getAttribute('position').array;
+  const view = new Uint32Array(f.plan.source.buffer, 4, f.plan.source.length - 1);
+  const job: CaptureJob = { id: 1, origin: 'https://wildshard.test', attributes: [{ name: 'position', array: positions, itemSize: 3, normalized: false }],
+    source: view, lod: [150], bins: [], parents: [] };
+  const { message, transfer } = jobMessage(job, 'channel');
+  expect(transfer).toEqual([message.attributes[0]?.array.buffer, message.source.buffer]);
+  expect(message.source.buffer.byteLength).toBe(view.byteLength);
+  expect([...message.source]).toEqual([...view]);
+  expect(message.attributes[0]?.array).not.toBe(positions);
+  structuredClone(message, { transfer });
+  expect(positions.byteLength).toBeGreaterThan(0); expect(view.byteLength).toBeGreaterThan(0);
+  expect(message.source.byteLength).toBe(0);
 });

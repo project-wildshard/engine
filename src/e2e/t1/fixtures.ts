@@ -4,6 +4,7 @@ import { devices } from '../../../scripts/browser-playwright.mjs'
 import { expect, test as base } from '../../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { recordBars } from '../../../scripts/loading-card-recorder.mjs'
+import { watchClones } from './clones.ts'
 import { inPlay } from './probe.ts'
 
 import type { Browser, BrowserContext, Page } from '@playwright/test'
@@ -121,6 +122,10 @@ async function openWorld(
       })
     }
     const page = await context.newPage()
+    if (profile === 'phone') {
+      // EM25: worker messages that clone big buffers, page and workers
+      await watchClones(context, page)
+    }
     const errors: string[] = []
     page.on('pageerror', (error: Readonly<Error>): void => {
       errors.push(error.message)

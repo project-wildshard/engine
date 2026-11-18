@@ -7,6 +7,7 @@ import {
   barStalls,
   untracedChanges,
 } from '../../../scripts/loading-bar-rule.mjs'
+import { readClones } from './clones.ts'
 import { expect, test } from './fixtures.ts'
 import { state } from './probe.ts'
 
@@ -76,6 +77,15 @@ test('phone loading bars keep moving with original producer evidence', async ({
   expect(verdict.stalls).toEqual([])
   expect(verdict.backwards).toEqual([])
   expect(untracedChanges(capture.log)).toEqual([])
+})
+
+// ENGINE-MEMORY EM25 (design rule 4): every worker message of 64 KB or more transfers its buffers, both ways.
+test('the phone boot clones no worker buffer of 64 KB or more', async ({
+  page,
+}): Promise<void> => {
+  const census = await readClones(page)
+  expect(census.messages).toBeGreaterThan(0)
+  expect(census.rows).toEqual([])
 })
 
 async function mounted(page: Page): Promise<boolean> {

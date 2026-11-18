@@ -17,8 +17,8 @@ export interface CaptureJob {
 }
 export interface CaptureResult { readonly fine: readonly RoadTileReference[]; readonly coarse: readonly RoadTileReference[] }
 
-/** The bytes a job copies to the worker (its arrays, each its own whole buffer: `captureJob` copies views tight, so
- *  structured clone copies exactly these): the backpressure the page capture's scratch had. */
+/** The bytes a job copies to the worker (one tight copy of each array, transferred: `jobMessage`): the backpressure
+ *  the page capture's scratch had. */
 export function captureJobBytes(job: CaptureJob): number {
   return job.attributes.reduce((sum, row) => sum + row.array.byteLength, 0) + job.source.byteLength;
 }
@@ -28,16 +28,21 @@ export function captureJob(id: number, origin: string, geometry: BufferGeometry,
   for (const name of Object.keys(geometry.attributes)) {
     const attribute = geometry.getAttribute(name);
     if (!(attribute instanceof BufferAttribute)) return null;
-    attributes.push({ name, array: tight(attribute.array), itemSize: attribute.itemSize, normalized: attribute.normalized });
+    attributes.push({ name, array: attribute.array, itemSize: attribute.itemSize, normalized: attribute.normalized });
   }
   const bins = plan.bins.map(({ sphere, visibility: _visibility, ...bin }) => ({ ...bin, sphere: [sphere.center.x, sphere.center.y, sphere.center.z, sphere.radius] as const }));
-  return { id, origin, attributes, source: tight(plan.source), lod: [...plan.lod], bins, parents };
+  return { id, origin, attributes, source: plan.source, lod: [...plan.lod], bins, parents };
 }
 
-/** An array that owns its whole buffer: structured clone copies a view's entire backing buffer, so a view is copied
- *  tight first (the copy is the view's bytes, not the buffer's). */
-function tight<T extends TypedArray>(array: T): T {
-  return array.byteOffset === 0 && array.byteLength === array.buffer.byteLength ? array : array.slice() as T;
+/** ENGINE-MEMORY EM25 (design rule 4, transfer, never clone): the message for a job carries a tight copy of each of
+ *  its arrays (the view's bytes, not its whole buffer) and transfers those copies. A structured clone of the arrays
+ *  made a serialized copy beside the worker's, so a 20 MB source (the T1 phone boot) held three copies at once; now it
+ *  holds two, the page's own and the one the worker receives. The job keeps the page's arrays for a refused retry. */
+export function jobMessage(job: CaptureJob, channel: string): { message: CaptureJob & { channel: string }; transfer: ArrayBuffer[] } {
+  const transfer: ArrayBuffer[] = [];
+  const copy = <T extends TypedArray>(array: T): T => { const own = array.slice() as T; transfer.push(own.buffer as ArrayBuffer); return own; };
+  const attributes = job.attributes.map(row => ({ ...row, array: copy(row.array) }));
+  return { message: { ...job, attributes, source: copy(job.source), channel }, transfer };
 }
 
 export class RoadTileCaptureWorker {
@@ -64,13 +69,15 @@ export class RoadTileCaptureWorker {
   job(origin: string, mesh: Mesh, plan: CullPlan, parents: readonly { x: number; z: number }[]): CaptureJob | null {
     return this.usable() ? captureJob(this.next++, origin, mesh.geometry, plan, parents) : null;
   }
-  /** Structured clone copies the arrays: the page's own stay with its mesh for upload, and the job keeps referencing
-   *  them until it is answered, so a job the worker refuses (ok: false) runs again on the page (`refused`). */
+  /** The worker receives transferred copies of the arrays (`jobMessage`): the page's own stay with its mesh for upload,
+   *  and the job keeps referencing them until it is answered, so a job the worker refuses (ok: false) runs again on the
+   *  page (`refused`). */
   run(job: CaptureJob, refused: (job: CaptureJob) => Promise<CaptureResult>): Promise<CaptureResult> | null {
     const worker = this.worker; if (!this.usable() || worker === undefined) return null;
     return new Promise<CaptureResult>((resolve, reject) => {
       this.waiting.set(job.id, { job, resolve, reject, refused });
-      worker.postMessage({ ...job, channel: pageCacheChannel() }, { transfer: [] }); // OF12: the worker's cache channel
+      const { message, transfer } = jobMessage(job, pageCacheChannel()); // OF12: the worker's cache channel
+      worker.postMessage(message, { transfer });
     });
   }
   private message(reply: unknown): void {

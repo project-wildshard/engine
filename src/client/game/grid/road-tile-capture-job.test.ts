@@ -8,7 +8,7 @@ import { contentHash } from '../../../shared/game/shardfile/contentHash';
 import { encodeRoadTile, type RoadTileStore } from './roadTileArchive';
 import { RoadTileBacking } from './roadTileBacking';
 import { captureJobTiles } from './roadTileCaptureJob';
-import { captureJob, captureJobBytes } from './roadTileCaptureWorker';
+import { captureJob, captureJobBytes, jobMessage } from './roadTileCaptureWorker';
 
 // two attributes (one normalized integer), fine runs with an LOD level, two tiles a coarse parent
 function fixture(count = 12): { mesh: Mesh; plan: CullPlan; close: () => void } {
@@ -89,20 +89,22 @@ test('a stored body is not rewritten, and an interleaved source keeps the page p
   interleaved.dispose(); f.close();
 });
 
-test('a view over a large buffer is copied tight: the job charges and clones only its bytes', async () => {
+test('a view over a large buffer is copied tight: the job charges and sends only its bytes', async () => {
   const big = new ArrayBuffer(64 * 1024 * 1024), positions = new Float32Array(big, 4096, 9), index = new Uint32Array(new ArrayBuffer(1 << 20), 64, 3);
   positions.set([0, 0, 0, 1, 0, 0, 0, 0, 1]); index.set([0, 1, 2]);
   const geometry = new BufferGeometry(); geometry.setAttribute('position', new BufferAttribute(positions, 3));
   const plan: CullPlan = { source: index, lod: [], bins: [{ start: 0, count: 3, levels: [], sphere: new Sphere(new Vector3(), 1), tile: { x: 0, z: 0 } }] };
   const job = captureJob(3, 'https://wildshard.test', geometry, plan, [{ x: 0, z: 0 }]);
   if (job === null) throw new Error('Missing capture job');
-  for (const row of job.attributes) expect(row.array.buffer.byteLength).toBe(row.array.byteLength);
-  expect(job.source.buffer.byteLength).toBe(12);
   expect(captureJobBytes(job)).toBe(36 + 12);
-  // the tight copies carry the same values, and the page's own view is untouched
-  expect(Array.from(job.attributes[0]?.array ?? [])).toEqual(Array.from(positions)); expect(Array.from(job.source)).toEqual([0, 1, 2]);
-  expect(positions.buffer).toBe(big);
-  const store = memoryStore(), result = await captureJobTiles(structuredClone(job), store.store);
+  // EM25: the message carries tight copies (transferred), the job keeps the page's own views for a refused retry
+  const { message, transfer } = jobMessage(job, 'channel');
+  for (const row of message.attributes) expect(row.array.buffer.byteLength).toBe(row.array.byteLength);
+  expect(message.source.buffer.byteLength).toBe(12);
+  expect(transfer.reduce((sum, buffer) => sum + buffer.byteLength, 0)).toBe(captureJobBytes(job));
+  expect(Array.from(message.attributes[0]?.array ?? [])).toEqual(Array.from(positions)); expect(Array.from(message.source)).toEqual([0, 1, 2]);
+  expect(job.attributes[0]?.array).toBe(positions); expect(positions.buffer).toBe(big);
+  const store = memoryStore(), result = await captureJobTiles(structuredClone(message, { transfer }), store.store);
   expect(result.fine).toHaveLength(1);
   geometry.dispose();
 });
