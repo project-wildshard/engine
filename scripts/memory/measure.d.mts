@@ -1,4 +1,5 @@
 import type {Sample,BrowserProcess} from './footprint.mjs';
+
 export const PROTOCOL: 'memory-run/1';
 export const PHONE_VIEW: {viewport:{width:number;height:number};screen:{width:number;height:number};deviceScaleFactor:number;isMobile:boolean;hasTouch:boolean};
 export const STEP_LOG: string;
