@@ -24,6 +24,7 @@
 // public device logs say 2,147 MB (ActiveHard 2048 MiB), which `limitHighMB` carries until EM34 settles it.
 import { readFileSync } from 'node:fs';
 import { phoneFromWebKit } from '../../src/shared/engine/core/phoneMemoryModel.ts';
+
 export { phoneFromWebKit, ledgerSplit, phoneFromLedger } from '../../src/shared/engine/core/phoneMemoryModel.ts';
 
 const MB = 1e6;
