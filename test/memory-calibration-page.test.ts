@@ -24,29 +24,33 @@ const server = createServer((request, response) => {
   response.writeHead(200, { 'content-type': 'text/html' }).end(PAGE);
 });
 const useWebkit = process.env['WS_CALIB_CHROMIUM'] !== '1' && existsSync(webkit.executablePath());
-let browser: Awaited<ReturnType<typeof chromium.launch>>;
+// a CI job whose share has no Playwright browser installed skips; the Mac pre-push runs it (BROWSER_TESTS)
+const noBrowser = !useWebkit && !existsSync(chromium.executablePath());
+type Browser = Awaited<ReturnType<typeof chromium.launch>>;
+let browser: Browser | undefined;
 let base = '';
 
 beforeAll(async () => {
+  if (noBrowser) return;
   await new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve); });
   base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/memory-calibration.html`;
   browser = useWebkit ? await webkit.launch({ headless: true }) : await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS] });
 });
-afterAll(async () => { await browser.close(); server.close(); });
+afterAll(async () => { if (browser) { await browser.close(); server.close(); } });
 
 interface Calib { done: boolean; got: number; tour: { at: number; kind: string | null; got: number; results: Record<string, { got: number; ended: string }> } | null }
-const calib = async (page: Awaited<ReturnType<typeof browser.newPage>>): Promise<Calib | null> => {
+const calib = async (page: Awaited<ReturnType<Browser['newPage']>>): Promise<Calib | null> => {
   try { return await page.evaluate(() => (Reflect.get(globalThis, '__calib') as Calib | undefined) ?? null); } catch { return null; } // mid-reload
 };
-const until = async (page: Awaited<ReturnType<typeof browser.newPage>>, done: (c: Calib) => boolean, ms = 60_000): Promise<Calib> => {
+const until = async (page: Awaited<ReturnType<Browser['newPage']>>, done: (c: Calib) => boolean, ms = 60_000): Promise<Calib> => {
   for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => { setTimeout(r, 50); })) {
     const c = await calib(page); if (c && done(c)) return c;
   }
   throw new Error('the calibration page did not get there');
 };
 
-test(`the staircase writes every step and a reload reads the last one back (${useWebkit ? 'WebKit' : 'Chromium'})`, async () => {
-  const page = await browser.newPage();
+test.skipIf(noBrowser)(`the staircase writes every step and a reload reads the last one back (${useWebkit ? 'WebKit' : 'Chromium'})`, async () => {
+  const page = await browser!.newPage();
   await page.goto(`${base}?kind=arraybuffer&stair=1&stepmb=8&every=10&max=32&beacon=/beacon`);
   await until(page, (c) => c.done);
   await expect.poll(() => beacons.filter((b) => b.kind === 'arraybuffer').map((b) => b.got / MB)).toEqual([8, 16, 24, 32]);
@@ -57,8 +61,8 @@ test(`the staircase writes every step and a reload reads the last one back (${us
   await page.close();
 }, 120_000);
 
-test('the tour records where a kind died and moves on, and shows the table at the end', async () => {
-  const page = await browser.newPage();
+test.skipIf(noBrowser)('the tour records where a kind died and moves on, and shows the table at the end', async () => {
+  const page = await browser!.newPage();
   await page.goto(`${base}?tour=1&reset=1&stepmb=8&every=5000&max=1000`);
   await until(page, (c) => c.tour?.kind === 'arraybuffer' && c.tour.got >= 8 * MB);
   await page.reload(); // the page "dies" after its first step
