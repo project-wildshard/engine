@@ -262,13 +262,15 @@ test.each(ROOMS)('a HEAD client plays a room on the released wire $name: welcome
   expect(chat).toEqual(['hi']);
 
   const ownerColumns = headColumns(HEAD_CLASSES.find(entry => entry.id === PLAYER) ?? HEAD_CLASSES[0] ?? { id: 0, name: '', fields: [] }).owner;
+  const localAnimal = headColumns(HEAD_CLASSES.find(entry => entry.id === ANIMAL) ?? { id: 0, name: '', fields: [] }).row, sentAnimal = columns.get(ANIMAL)?.row ?? [];
   const problems: string[] = [];
   let acked: number | undefined;
   for (let tick = 2; tick <= FRAMES + 1; tick++) {
     link.server.send('unreliable', encodeFrame(snapshot(tick, acked)).slice().buffer); link.pump();
     const frame = client.latest;
     if (frame?.tick !== tick) { problems.push(`frame ${String(tick)} did not apply`); continue; }
-    const want = Array.from({ length: animalWords - skew }, (_, at) => (tick + at + skew) % 2);
+    // each local animal column by id: the room's word where it sends it, else its default 0 (CC28's channels, which the release lacks)
+    const want = localAnimal.map(column => { const at = sentAnimal.findIndex(theirs => theirs.id === column.id); return at === -1 ? 0 : (tick + at) % 2; });
     if (JSON.stringify([...frame.rows.get(1) ?? []]) !== JSON.stringify(want)) problems.push(`frame ${String(tick)}: animal row ${JSON.stringify([...frame.rows.get(1) ?? []])}`);
     if (frame.rows.has(2)) problems.push(`frame ${String(tick)}: the kite projected`);
     for (const [id, value] of EXACT) if (frame.owner[ownerColumns.findIndex(column => column.id === id)] !== value) problems.push(`frame ${String(tick)}: owner field ${String(id)} lost bits`);

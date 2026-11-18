@@ -72,6 +72,603 @@ index af001b6115726433a64ea76058f3cb46735a2b3e..f781369919d4df927ccf3eb8c4b253de
 +  graphTierLimits,
 +}
  export type { BudgetTier, BudgetTierLimits }
+diff --git a/src/format/creature-body.ts b/src/format/creature-body.ts
+index 2a453ad09116cf6b31dd8ee348bd847d38909ad9..8f55d75b34a8b858f093cf9ffe59c306878317dd 100644
+--- a/src/format/creature-body.ts
++++ b/src/format/creature-body.ts
+@@ -2,6 +2,7 @@ import {
+   check,
+   exactOptional,
+   finite,
++  integer,
+   maxLength,
+   maxValue,
+   minValue,
+@@ -13,36 +14,73 @@ import {
+   string,
+ } from 'valibot'
+ 
+-import { CREATURE_SKELETONS } from './creature-skeletons.ts'
++import {
++  CreatureChannelBindSchema,
++  CreatureChannelsSchema,
++  CreatureLookSwapSchema,
++  channelsDeclared,
++} from './creature-channels.ts'
++import { creatureContract } from './creature-skeletons.ts'
+ import {
+   CreatureVolumesSchema,
+   CreatureLockSchema,
+   MAX_VOLUMES,
+ } from './creature-volumes.ts'
+ 
++import type {
++  CreatureChannel,
++  CreatureChannelBind,
++  CreatureLookSwap,
++} from './creature-channels.ts'
+ import type { CreatureSkeleton, CreatureSize } from './creature-layers.ts'
++import type { CreatureTrail } from './creature-skeletons.ts'
+ import type { CreatureVolume } from './creature-volumes.ts'
+ import type { GenericSchema } from 'valibot'
+ 
+ const ONE = 1
+ const MAX_SCALE = 10
+ const MAX_ID = 128
++const MIN_TRAIL = 3
++/** The head ball plus one volume per segment fit `MAX_VOLUMES`. */
++const MAX_TRAIL = MAX_VOLUMES
++const MAX_SPACING = 10
+ const id = pipe(string(), regex(/^[a-z][a-zA-Z0-9.:-]*$/u), maxLength(MAX_ID))
+ const scalar = pipe(number(), finite())
+ interface CreatureBody {
+   /** Omit for a GLB with its own rig; a kit poser names its contract explicitly. */
+   skeleton?: CreatureSkeleton
++  /** A serpent's trail bones (ONE-FORMAT CC23); only a serpent has one. */
++  trail?: CreatureTrail
+   size: CreatureSize
+   scale: number
+   look: string
+   volumes?: CreatureVolume[]
+   lock?: string[]
+   hits?: 'rest' | 'clip'
++  /** ONE-FORMAT CC28: at most four actor channels, in wire order (animal fields 25 to 28). */
++  channels?: CreatureChannel[]
++  /** Material tint, emissive and opacity that follow channels. */
++  bind?: CreatureChannelBind
++  /** A second look drawn while a channel is high. */
++  swap?: CreatureLookSwap
+ }
++const trailCount = pipe(
++  number(),
++  integer(),
++  minValue(MIN_TRAIL),
++  maxValue(MAX_TRAIL),
++)
++const trailSpacing = pipe(
++  scalar,
++  minValue(Number.MIN_VALUE),
++  maxValue(MAX_SPACING),
++)
++const trailObject = strictObject({ count: trailCount, spacing: trailSpacing })
+ const bodyObject = strictObject({
+   skeleton: exactOptional(
+-    picklist(['quadruped', 'biped'], 'Unknown creature skeleton'),
++    picklist(['quadruped', 'biped', 'serpent'], 'Unknown creature skeleton'),
+   ),
++  trail: exactOptional(trailObject),
+   size: picklist(
+     ['tiny', 'small', 'medium', 'large', 'giant'],
+     'Unknown creature size',
+@@ -52,6 +90,9 @@ const bodyObject = strictObject({
+   volumes: exactOptional(CreatureVolumesSchema),
+   lock: exactOptional(CreatureLockSchema),
+   hits: exactOptional(picklist(['rest', 'clip'])),
++  channels: exactOptional(CreatureChannelsSchema),
++  bind: exactOptional(CreatureChannelBindSchema),
++  swap: exactOptional(CreatureLookSwapSchema),
+ })
+ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
+   bodyObject,
+@@ -65,15 +106,28 @@ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
+       ((body.lock?.length ?? ONE) <= ONE && body.hits !== 'clip'),
+     'Only giants have multiple lock points or clip hits',
+   ),
++  check<CreatureBody, 'A serpent has a trail row and only a serpent has one'>(
++    (body: {
++      readonly skeleton?: CreatureSkeleton
++      readonly trail?: CreatureTrail
++    }): boolean => (body.skeleton === 'serpent') === (body.trail !== undefined),
++    'A serpent has a trail row and only a serpent has one',
++  ),
+   check<CreatureBody, 'Too many resolved creature volumes'>(
+     (body: {
+       readonly skeleton?: CreatureSkeleton
++      readonly trail?: CreatureTrail
+       readonly volumes?: readonly { readonly part: string }[]
+     }): boolean => {
++      // A serpent without its trail is the check above's refusal
+       const defaults =
+-        body.skeleton === undefined
++        body.skeleton === undefined ||
++        (body.skeleton === 'serpent' && body.trail === undefined)
+           ? []
+-          : CREATURE_SKELETONS[body.skeleton].volumes
++          : creatureContract({
++              skeleton: body.skeleton,
++              ...(body.trail === undefined ? {} : { trail: body.trail }),
++            }).volumes
+       return (
+         new Set(
+           [...defaults, ...(body.volumes ?? [])].map(
+@@ -84,6 +138,10 @@ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
+     },
+     'Too many resolved creature volumes',
+   ),
++  check<CreatureBody, 'A creature binds an undeclared channel'>(
++    channelsDeclared,
++    'A creature binds an undeclared channel',
++  ),
+ )
+ 
+ export { CreatureBodySchema }
+diff --git a/src/format/creature-channels.ts b/src/format/creature-channels.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f2694e4ebb9d56af99ffdd7fcaef319fc5f35e0
+--- /dev/null
++++ b/src/format/creature-channels.ts
+@@ -0,0 +1,130 @@
++// ONE-FORMAT CC28: a body's actor channels and the looks bound to them.
++// A creature has at most four channels, each a 0..1 value the server owns
++// (a script's `actorChannel` command sets one) and the wire carries as
++// animal fields 25 to 28 in the body's `channels` order. A page binds the
++// look's material tint, emissive and opacity to channels, and may switch to
++// a second look while a channel is at or above `at` (Q-CC48).
++import {
++  array,
++  check,
++  exactOptional,
++  finite,
++  maxLength,
++  maxValue,
++  minLength,
++  minValue,
++  number,
++  pipe,
++  regex,
++  strictObject,
++  string,
++  tuple,
++} from 'valibot'
++
++import type { GenericSchema } from 'valibot'
++
++const ZERO = 0
++const ONE = 1
++const MAX_CHANNELS = 4
++const MAX_ID = 128
++const id = pipe(string(), regex(/^[a-z][a-zA-Z0-9.:-]*$/u), maxLength(MAX_ID))
++const unit = pipe(number(), finite(), minValue(ZERO), maxValue(ONE))
++const colour = tuple([unit, unit, unit])
++
++interface CreatureChannel {
++  name: string
++  /** The value a creature spawns with; 0 when omitted. */
++  initial?: number
++}
++/** A material term that follows one channel: the look's colour moves toward `colour` as the channel goes 0 to 1. */
++interface CreatureChannelColour {
++  channel: string
++  colour: [number, number, number]
++}
++interface CreatureChannelBind {
++  tint?: CreatureChannelColour
++  emissive?: CreatureChannelColour
++  /** The material's opacity is this channel's value. */
++  opacity?: string
++}
++/** While `channel` is at or above `at` (0.5 when omitted) the body draws `look` instead of its own. */
++interface CreatureLookSwap {
++  channel: string
++  look: string
++  at?: number
++}
++
++const channelRow = strictObject({ name: id, initial: exactOptional(unit) })
++const CreatureChannelsSchema: GenericSchema<CreatureChannel[]> = pipe(
++  array(channelRow),
++  minLength(ONE),
++  maxLength(MAX_CHANNELS),
++  check<CreatureChannel[], 'Duplicate creature channel'>(
++    (rows: readonly { readonly name: string }[]): boolean =>
++      new Set(rows.map((row: { readonly name: string }): string => row.name))
++        .size === rows.length,
++    'Duplicate creature channel',
++  ),
++)
++const channelColour = strictObject({ channel: id, colour })
++const CreatureChannelBindSchema: GenericSchema<CreatureChannelBind> =
++  strictObject({
++    tint: exactOptional(channelColour),
++    emissive: exactOptional(channelColour),
++    opacity: exactOptional(id),
++  })
++const CreatureLookSwapSchema: GenericSchema<CreatureLookSwap> = strictObject({
++  channel: id,
++  look: id,
++  at: exactOptional(unit),
++})
++
++/** Every channel name a body's `bind` and `swap` read. */
++function boundChannels(body: {
++  readonly bind?: {
++    readonly tint?: { readonly channel: string }
++    readonly emissive?: { readonly channel: string }
++    readonly opacity?: string
++  }
++  readonly swap?: { readonly channel: string }
++}): readonly string[] {
++  const { bind, swap } = body
++  return [
++    ...(bind?.tint === undefined ? [] : [bind.tint.channel]),
++    ...(bind?.emissive === undefined ? [] : [bind.emissive.channel]),
++    ...(bind?.opacity === undefined ? [] : [bind.opacity]),
++    ...(swap === undefined ? [] : [swap.channel]),
++  ]
++}
++
++/** A body binds only channels it declares. */
++function channelsDeclared(body: {
++  readonly channels?: readonly { readonly name: string }[]
++  readonly bind?: {
++    readonly tint?: { readonly channel: string }
++    readonly emissive?: { readonly channel: string }
++    readonly opacity?: string
++  }
++  readonly swap?: { readonly channel: string }
++}): boolean {
++  const names = new Set(
++    (body.channels ?? []).map(
++      (row: { readonly name: string }): string => row.name,
++    ),
++  )
++  return boundChannels(body).every((name: string): boolean => names.has(name))
++}
++
++export {
++  CreatureChannelBindSchema,
++  CreatureChannelsSchema,
++  CreatureLookSwapSchema,
++  channelsDeclared,
++  MAX_CHANNELS,
++}
++export type {
++  CreatureChannel,
++  CreatureChannelBind,
++  CreatureChannelColour,
++  CreatureLookSwap,
++}
+diff --git a/src/format/creature-layers.ts b/src/format/creature-layers.ts
+index 1b8650b7ba786d6b6f86ed0097b8f7b1ab0846f4..6dec28dbc74c073728b6fe09344139156b5805c8 100644
+--- a/src/format/creature-layers.ts
++++ b/src/format/creature-layers.ts
+@@ -47,7 +47,7 @@ type CreatureType =
+   | 'aquatic'
+   | 'critter'
+   | 'aberration'
+-type CreatureSkeleton = 'quadruped' | 'biped'
++type CreatureSkeleton = 'quadruped' | 'biped' | 'serpent'
+ type CreatureSize = 'tiny' | 'small' | 'medium' | 'large' | 'giant'
+ type CreatureReaction = 'passive' | 'skittish' | 'neutral' | 'aggressive'
+ type CreatureTuningScalar = number | boolean | string
+diff --git a/src/format/creature-mount.ts b/src/format/creature-mount.ts
+index d96b13dcf07c4770d53b04aa3022fb41366342bb..e854701154b5aee10ff1437c39eb68f945fd2519 100644
+--- a/src/format/creature-mount.ts
++++ b/src/format/creature-mount.ts
+@@ -10,10 +10,11 @@ import {
+   strictObject,
+ } from 'valibot'
+ 
+-import { CREATURE_SKELETONS } from './creature-skeletons.ts'
++import { creatureContract } from './creature-skeletons.ts'
+ import { CreatureSocketNameSchema } from './creature-volumes.ts'
+ 
+ import type { CreatureSkeleton } from './creature-layers.ts'
++import type { CreatureTrail } from './creature-skeletons.ts'
+ import type { GenericSchema } from 'valibot'
+ 
+ /** The seat socket both kit skeletons name. */
+@@ -78,6 +79,7 @@ interface MountedSpecies {
+   readonly flight?: unknown
+   readonly body?: {
+     readonly skeleton?: CreatureSkeleton
++    readonly trail?: CreatureTrail
+     readonly volumes?: readonly { readonly part: string }[]
+   }
+ }
+@@ -92,7 +94,13 @@ function seatKnown(seat: string, body: MountedSpecies['body']): boolean {
+   // A GLB with its own rig names its sockets in its skin; admission checks the seat there.
+   return (
+     body?.skeleton === undefined ||
+-    Object.hasOwn(CREATURE_SKELETONS[body.skeleton].sockets, seat)
++    Object.hasOwn(
++      creatureContract({
++        skeleton: body.skeleton,
++        ...(body.trail === undefined ? {} : { trail: body.trail }),
++      }).sockets,
++      seat,
++    )
+   )
+ }
+ 
+diff --git a/src/format/creature-skeletons.ts b/src/format/creature-skeletons.ts
+index 4f52e862b668708d061d81630ee2f9bcee298a66..d68027e332da37f3bf18670a40235a0476bf90a4 100644
+--- a/src/format/creature-skeletons.ts
++++ b/src/format/creature-skeletons.ts
+@@ -1,5 +1,8 @@
+ import type { CreatureSkeleton } from './creature-layers.ts'
+ 
++/** The skeletons whose bones never change with the body; a serpent's count comes from its `trail` row. */
++type FixedSkeleton = Exclude<CreatureSkeleton, 'serpent'>
++
+ interface SkeletonChain {
+   readonly parent: string
+   readonly bones: readonly string[]
+@@ -115,11 +118,76 @@ const BIPED: SkeletonContract = {
+   volumes: [bodyVolume('chest', 'y'), HEAD],
+   clips: CLIPS,
+ }
+-const CREATURE_SKELETONS: Readonly<Record<CreatureSkeleton, SkeletonContract>> =
+-  {
+-    quadruped: QUADRUPED,
+-    biped: BIPED,
++const CREATURE_SKELETONS: Readonly<Record<FixedSkeleton, SkeletonContract>> = {
++  quadruped: QUADRUPED,
++  biped: BIPED,
++}
++
++/** A serpent's trail row (ONE-FORMAT CC23): `count` bones `spacing` metres apart along the root's path. */
++interface CreatureTrail {
++  readonly count: number
++  readonly spacing: number
++}
++const SEGMENT_MULTIPLIER = 0.5
++const SEGMENT_RADIUS = 0.6
++const HALF = 2
++/** Trail bone names, head first: `head`, `seg1` … `seg<count-2>`, `tail`. */
++function trailBoneName(index: number, count: number): string {
++  if (index === ZERO) {
++    return 'head'
+   }
++  return index === count - ONE ? 'tail' : `seg${String(index)}`
++}
++function trailBoneNames(count: number): readonly string[] {
++  return Array.from(
++    { length: count },
++    (_unused: unknown, index: number): string => trailBoneName(index, count),
++  )
++}
++/**
++ * The serpent (ONE-FORMAT CC23): every bone is a trail bone following the head's path, so the chain is the whole
++ * body. Sockets `head`, `mouth`, `core` (the middle bone) and `tail`; one capsule per segment at x0.5 and the head
++ * ball at x2. Buried segments' volumes are off (the engine's poser); the lock stays on the head.
++ */
++function serpentContract(trail: CreatureTrail): SkeletonContract {
++  const bones = trailBoneNames(trail.count)
++  const core = bones[Math.floor(trail.count / HALF)] ?? 'head'
++  const segments = bones.slice(ONE).map((bone: string): SkeletonVolume => ({
++    part: bone,
++    bone,
++    shape: 'capsule',
++    radius: SEGMENT_RADIUS,
++    halfLength: trail.spacing / HALF,
++    axis: 'z',
++    multiplier: SEGMENT_MULTIPLIER,
++  }))
++  return {
++    root: 'head',
++    chains: { spine: { parent: 'head', bones: bones.slice(ONE) } },
++    sockets: {
++      head: socket('head'),
++      mouth: { bone: 'head', at: [ZERO, ZERO, MOUTH_FORWARD] },
++      core: socket(core),
++      tail: socket('tail'),
++    },
++    lock: 'head',
++    volumes: [HEAD, ...segments],
++    clips: CLIPS,
++  }
++}
++/** The one contract a body declares: a fixed skeleton's, or a serpent's built from its trail row. */
++function creatureContract(body: {
++  readonly skeleton: CreatureSkeleton
++  readonly trail?: CreatureTrail
++}): SkeletonContract {
++  if (body.skeleton !== 'serpent') {
++    return CREATURE_SKELETONS[body.skeleton]
++  }
++  if (body.trail === undefined) {
++    throw new Error('A serpent needs its trail row')
++  }
++  return serpentContract(body.trail)
++}
+ 
+ /** Importers and posers share this list, rather than inferring a creature kind. */
+ function skeletonBones(
+@@ -133,5 +201,19 @@ function skeletonBones(
+   ]
+ }
+ 
+-export { CREATURE_SKELETONS, MIN_VOLUME_RADIUS, skeletonBones }
+-export type { SkeletonChain, SkeletonSocket, SkeletonVolume, SkeletonContract }
++export {
++  CREATURE_SKELETONS,
++  MIN_VOLUME_RADIUS,
++  creatureContract,
++  serpentContract,
++  skeletonBones,
++  trailBoneNames,
++}
++export type {
++  CreatureTrail,
++  FixedSkeleton,
++  SkeletonChain,
++  SkeletonSocket,
++  SkeletonVolume,
++  SkeletonContract,
++}
+diff --git a/src/format/creature-volumes.ts b/src/format/creature-volumes.ts
+index f9aa9a3f474cf0d37f6baeb42936c12afe9584e7..f8eb4b1558f93c84806ccfa737ab05fb17d97d59 100644
+--- a/src/format/creature-volumes.ts
++++ b/src/format/creature-volumes.ts
+@@ -22,6 +22,8 @@ import type { GenericSchema } from 'valibot'
+ /** Bone-local rest offset. The runtime clamps the scaled radius, not the source. */
+ interface CreatureVolume extends SkeletonVolume {
+   at?: [number, number, number]
++  /** Part hp (ONE-FORMAT CC31): the part breaks at 0, once; later hits pass to the next volume. */
++  hp?: number
+ }
+ const ZERO = 0
+ const ONE = 1
+@@ -29,6 +31,7 @@ const MAX_VOLUMES = 16
+ const MAX_NAME = 128
+ const MAX_EXTENT = 500
+ const MAX_MULTIPLIER = 100
++const MAX_PART_HP = 1_000_000
+ const CreatureSocketNameSchema: GenericSchema<string> = pipe(
+   string(),
+   regex(/^[a-zA-Z][a-zA-Z0-9_.:-]*$/u),
+@@ -37,6 +40,7 @@ const CreatureSocketNameSchema: GenericSchema<string> = pipe(
+ const scalar = pipe(number(), finite())
+ const extent = pipe(scalar, minValue(ZERO), maxValue(MAX_EXTENT))
+ const offset = pipe(scalar, minValue(-MAX_EXTENT), maxValue(MAX_EXTENT))
++const partHp = pipe(scalar, minValue(Number.MIN_VALUE), maxValue(MAX_PART_HP))
+ const volumeObject = strictObject({
+   part: CreatureSocketNameSchema,
+   bone: CreatureSocketNameSchema,
+@@ -46,6 +50,7 @@ const volumeObject = strictObject({
+   axis: picklist(['y', 'z']),
+   multiplier: pipe(scalar, minValue(ZERO), maxValue(MAX_MULTIPLIER)),
+   at: exactOptional(tuple([offset, offset, offset])),
++  hp: exactOptional(partHp),
+ })
+ const CreatureVolumeSchema: GenericSchema<CreatureVolume> = pipe(
+   volumeObject,
+diff --git a/src/format/decisionScripts.ts b/src/format/decisionScripts.ts
+index 2740474e6201f599824573d93d9ca0768f61d1c7..8049a07ef9aa8a30d719c0b03128ee05b9f428c3 100644
+--- a/src/format/decisionScripts.ts
++++ b/src/format/decisionScripts.ts
+@@ -9,6 +9,10 @@ const id = v.pipe(v.string(), v.regex(/^[A-Za-z][A-Za-z0-9.:-]*$/u), v.maxLength
+ const local = v.pipe(v.string(), v.regex(/^[A-Za-z_][A-Za-z0-9_.-]*$/u), v.maxLength(64));
+ const finite = v.pipe(v.number(), v.finite());
+ const positive = v.pipe(finite, v.integer(), v.minValue(1), v.maxValue(0x7fffffff));
++const HIT_TAG_LENGTH = 64;
++const HIT_TAGS = 16;
++const hitTag = v.pipe(v.string(), v.regex(/^[a-z][a-z0-9_-]*(?:\.[a-z0-9_-]+)+$/u), v.maxLength(HIT_TAG_LENGTH));
++const hitTags = v.pipe(v.record(local, hitTag), v.check((value: Readonly<Record<string, string>>): boolean => Object.keys(value).length <= HIT_TAGS, 'at most 16 hit tags'));
+ const aliases = v.pipe(v.record(local, id), v.check(value => Object.keys(value).length <= 256, 'bounded script id map'));
+ const unique = (values: readonly unknown[]): boolean => new Set(values).size === values.length;
+ const readNames: ("x" | "y" | "z" | "yaw" | "hpShare" | "alive" | "field" | "distance" | "nearestPlayer" | "flag" | "timerLeft" | "random" | "actorInZone" | "playersInZone" | "moving" | "strikeState" | "playerFlag" | "spawnGroupAlive" | "bearing" | "bodyX" | "bodyY" | "bodyZ" | "bodyAlive" | "bodyYaw" | "bodyVisible" | "playerIntent" | "actorsInZone" | "playersWithin" | "groundHeight" | "nearestWalkable" | "path" | "radial" | "declaredFloor")[] = [...keys(SCRIPT_V1_READS), ...keys(SCRIPT_V1_LISTS)];
+@@ -25,7 +29,8 @@ const rowEntries = {
+   source: v.pipe(v.string(), v.maxLength(256), v.regex(/^behaviour\/(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.as$/u),
+     v.check(value => !value.split('/').includes('generated'), 'authored script source, not generated glue')),
+   sourceHash: v.exactOptional(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u))),
+-  binding: v.union([v.strictObject({ encounter: id }), v.strictObject({ quest: id }), v.strictObject({ zone: id }), v.strictObject({ shard: v.literal(true) }), v.strictObject({ spawnGroup: id })]),
++  // CC59: `brain` hooks a script onto a brain-owned creature; the brain keeps its body (no move, strike or stop).
++  binding: v.union([v.strictObject({ encounter: id }), v.strictObject({ quest: id }), v.strictObject({ zone: id }), v.strictObject({ shard: v.literal(true) }), v.strictObject({ spawnGroup: id }), v.strictObject({ brain: id })]),
+   pages: v.optional(v.pipe(positive, v.maxValue(4)), 1), onFail: v.picklist(['hold', 'reset', 'skip']),
+   on: v.pipe(v.array(v.picklist(keys(SCRIPT_V1_EVENTS))), v.minLength(1), v.maxLength(23), v.check(values => unique(values), 'unique subscribed events')),
+   tick: v.optional(v.nullable(v.picklist([1, 2, 5, 10])), null),
+@@ -36,6 +41,8 @@ const rowEntries = {
+   targets: v.optional(aliases, {}), spawns: v.optional(aliases, {}), signals: v.optional(aliases, {}), facts: v.optional(aliases, {}),
+   rewards: v.optional(aliases, {}), channels: v.optional(aliases, {}), impulses: v.optional(aliases, {}), weather: v.optional(aliases, {}),
+   bodies: v.exactOptional(aliases), colliders: v.exactOptional(aliases),
++  // CC59: combat tags a hit event reports as a mask, bit i for the i-th alias in sorted order.
++  tags: v.exactOptional(hitTags),
+   timers: v.optional(v.pipe(v.array(local), v.maxLength(64), v.check(values => unique(values), 'unique timer names')), []),
+   stateVersion: positive, state: v.pipe(v.array(state), v.maxLength(16)),
+   params: v.pipe(v.record(local, finite), v.check(value => Object.keys(value).length <= 32, 'bounded script parameters')),
+@@ -64,6 +71,11 @@ export function decisionScriptRowRules(script: DecisionScriptRow): string[] {
+   if ('spawnGroup' in script.binding && (Object.keys(script.actors).length === 0 || script.state.some(slot => slot.scope !== 'actor')))
+     errors.push('spawn groups declare members and actor-scoped simulation state');
+   if ((script.tick !== null) !== script.on.includes('tick')) errors.push('tick subscription has a declared 1/2/5/10 Hz rate');
++  if ('brain' in script.binding && (!Object.values(script.actors).includes(script.binding.brain)
++    || script.commands.some((name): boolean => name === 'move' || name === 'strike' || name === 'stop'))) {
++    errors.push('a brain hook names its creature and leaves move, strike and stop to the brain');
++  }
++  if (script.tags !== undefined && !validNames(Object.keys(script.tags))) { errors.push('unique nonreserved generated binding names'); }
+   if (script.on.some(name => SCRIPT_V1_EVENTS[name] >= 30) || script.commands.some(name => SCRIPT_V1_COMMANDS[name] >= 100)) errors.push('simulation script uses only simulation ops');
+   if (script.side === 'view' && !script.commands.every(isViewCommand)) { errors.push(VIEW_WRITES_GAMEPLAY); }
+   for (const names of [...SCRIPT_V1_REFERENCE_KINDS.map(kind => Object.keys(script[kind] ?? {})), script.timers, script.state.map(slot => slot.name), Object.keys(script.params)]) {
+@@ -207,6 +219,8 @@ interface DecisionScriptRowInputFields {
+         shard: true;
+     }) | ({
+         spawnGroup: string;
++    }) | ({
++        brain: string;
+     });
+     pages?: number | undefined;
+     onFail: 'hold' | 'reset' | 'skip';
+@@ -232,6 +246,7 @@ interface DecisionScriptRowInputFields {
+     weather?: Record<string, string> | undefined;
+     bodies?: Record<string, string>;
+     colliders?: Record<string, string>;
++    tags?: Record<string, string>;
+     timers?: (string)[] | undefined;
+     stateVersion: number;
+     state: ({
+@@ -262,6 +277,8 @@ interface DecisionScriptRowFields {
+         shard: true;
+     }) | ({
+         spawnGroup: string;
++    }) | ({
++        brain: string;
+     });
+     pages: number;
+     onFail: 'hold' | 'reset' | 'skip';
+@@ -287,6 +304,7 @@ interface DecisionScriptRowFields {
+     weather: Record<string, string>;
+     bodies?: Record<string, string>;
+     colliders?: Record<string, string>;
++    tags?: Record<string, string>;
+     timers: (string)[];
+     stateVersion: number;
+     state: ({
+diff --git a/src/format/encounters.ts b/src/format/encounters.ts
+index a799474b653b4e305ce5d51a877fff1f352ec1e3..aeebdfa41618e95124e9e5ce9836208dd0dc0f57 100644
+--- a/src/format/encounters.ts
++++ b/src/format/encounters.ts
+@@ -7,7 +7,10 @@ const coord = v.pipe(finite, v.minValue(-250), v.maxValue(250));
+ const point = v.tuple([coord, coord, coord]);
+ const positive = v.pipe(finite, v.minValue(0.001), v.maxValue(500));
+ const duration = v.pipe(finite, v.minValue(0), v.maxValue(60));
+-const phase = v.strictObject({ at: v.pipe(finite, v.minValue(0.001), v.maxValue(1)), name: label, caption: label, speed: v.pipe(finite, v.minValue(0), v.maxValue(15)), stopDistance: v.pipe(finite, v.minValue(0), v.maxValue(50)), turnRate: v.pipe(finite, v.minValue(0), v.maxValue(30)) });
++// ONE-FORMAT CC59: a phase's `adds` are spawn rows that wait out of the world until the fight reaches that phase.
++const MAX_ADDS = 8;
++const adds = v.exactOptional(v.pipe(v.array(id), v.nonEmpty(), v.maxLength(MAX_ADDS)));
++const phase = v.strictObject({ at: v.pipe(finite, v.minValue(0.001), v.maxValue(1)), name: label, caption: label, speed: v.pipe(finite, v.minValue(0), v.maxValue(15)), stopDistance: v.pipe(finite, v.minValue(0), v.maxValue(50)), turnRate: v.pipe(finite, v.minValue(0), v.maxValue(30)), adds });
+ const encounter = v.pipe(v.strictObject({ id, entity: id, kind: v.picklist(['elite', 'boss']), panel: v.nullable(id), name: label, title: label, retry: label,
+   arena: v.strictObject({ at: point, radius: positive }), intro: duration, introShort: duration,
+   respawn: v.strictObject({ at: point, yaw: finite }), phases: v.pipe(v.array(phase), v.minLength(1), v.maxLength(16)) }),
+@@ -22,6 +25,11 @@ export function encounterRules(rows: ShardEncounters, entities: readonly string[
+   for (const row of rows) {
+     if (!entities.includes(row.entity)) errors.push('declared encounter actor');
+     if (row.panel !== null && !panels.some((p) => p.id === row.panel && p.encounter === row.id)) errors.push('declared matching boss panel');
++    for (const step of row.phases) {
++      for (const add of step.adds ?? []) {
++        if (add === row.entity || !entities.includes(add)) { errors.push('phase adds name other declared spawns'); }
++      }
++    }
+   }
+   return [...new Set(errors)];
+ }
+@@ -61,5 +69,6 @@ export type ShardEncounters = ({
+         speed: number;
+         stopDistance: number;
+         turnRate: number;
++        adds?: string[];
+     })[];
+ })[];
 diff --git a/src/format/materialGraph.ts b/src/format/materialGraph.ts
 index b9a17f4a361554247e1e297145b28413f3daedc7..479dde264d2a30d857ef63f9f5e6f100c19c8188 100644
 --- a/src/format/materialGraph.ts
@@ -217,6 +814,18 @@ index 59f46569a2e05b59a8768023b3c3000eb38b1d32..908069c91c6267bb0722007dfcecf153
    const passes = source.look.post ?? [];
    if (passes.length === 0) return [];
    const errors: string[] = [];
+diff --git a/src/format/rows.ts b/src/format/rows.ts
+index 7b4aa4791636d26bc4c98e5d2fe1448a95b1f399..8f659906a0f1d045d4593052e71fade6a8c86ea1 100644
+--- a/src/format/rows.ts
++++ b/src/format/rows.ts
+@@ -98,6 +98,7 @@ function rowRules(rows: ShardRows): string[] {
+       if (!strikeIds.has(ability.use)) { errors.push(`Unknown creature ability: ${ability.use}`); }
+     }
+     if (speciesRow.body !== undefined && !lookIds.has(speciesRow.body.look)) { errors.push(`Unknown creature look: ${speciesRow.body.look}`); }
++    if (speciesRow.body?.swap !== undefined && !lookIds.has(speciesRow.body.swap.look)) { errors.push(`Unknown creature look: ${speciesRow.body.swap.look}`); }
+   }
+   for (const l of rows.looks) if (!speciesIds.has(l.species)) errors.push('look species');
+   for (const c of rows.compendiums) {
 diff --git a/src/format/runtime-tier.ts b/src/format/runtime-tier.ts
 index 4b476540d1bce7b16dbf1d90a814b2f11fc23fd8..6aa1a3c79971f5c28f395558d4f45a965d77db02 100644
 --- a/src/format/runtime-tier.ts
@@ -248,8 +857,44 @@ index 4b476540d1bce7b16dbf1d90a814b2f11fc23fd8..6aa1a3c79971f5c28f395558d4f45a96
 +export { UNNAMED_TIER } from './budget-tiers.ts'
 +
 +export { type RuntimeTierIssue, type RuntimeTierSource, runtimeTierIssues }
+diff --git a/src/format/scriptAbiV1.ts b/src/format/scriptAbiV1.ts
+index 6d732c490aa5f97fb4c014fc4fbca488bd0bfaed..585fcbaa028ea968a960f3d5d72f5646a6f0cef3 100644
+--- a/src/format/scriptAbiV1.ts
++++ b/src/format/scriptAbiV1.ts
+@@ -1,8 +1,15 @@
++/** ONE-FORMAT CC32: `lockable` [target own actor, 0|1]; `heal` [own actor, hp]; `pull` [player, metres, own actor];
++ *  `root` [player, seconds]. Additive: a guest that never names them is unchanged. */
++const CREATURE_COMMANDS = { lockable: 23, heal: 24, pull: 25, root: 26, ability: 27, actorChannel: 28 } as const;
++/** ONE-FORMAT CC28: `actorChannel` [own actor, channel index 0..3 in the body's `channels`, value 0..1]. */
++/** ONE-FORMAT CC59: a brain hook hears `part.broken` [actor, volume index]; `ability` [own actor, strike] replaces its
++ *  brain's next pick. A hit event's last slot is the mask of the row's `tags` the hit carried (bit i: i-th alias). */
++const CREATURE_EVENTS = { 'part.broken': 19 } as const;
+ /** ABI-v1 numeric transport. These ids are shared by admission, generated bindings and the decision host. */
+-export const SCRIPT_V1_EVENTS: Readonly<{ start: 1; tick: 2; timer: 3; 'zone.enter': 4; 'zone.leave': 5; interact: 6; hit: 7; threshold: 8; death: 9; 'move.done': 10; 'strike.done': 11; flag: 12; signal: 13; 'strike.target': 14; 'player.join': 15; 'player.leave': 16; spawned: 17; stop: 18; field: 30; cue: 31; channel: 32; }> = Object.freeze({
++export const SCRIPT_V1_EVENTS: Readonly<{ start: 1; tick: 2; timer: 3; 'zone.enter': 4; 'zone.leave': 5; interact: 6; hit: 7; threshold: 8; death: 9; 'move.done': 10; 'strike.done': 11; flag: 12; signal: 13; 'strike.target': 14; 'player.join': 15; 'player.leave': 16; spawned: 17; stop: 18; field: 30; cue: 31; channel: 32; } & typeof CREATURE_EVENTS> = Object.freeze({
+   start: 1, tick: 2, timer: 3, 'zone.enter': 4, 'zone.leave': 5, interact: 6, hit: 7, threshold: 8,
+   death: 9, 'move.done': 10, 'strike.done': 11, flag: 12, signal: 13, 'strike.target': 14,
+-  'player.join': 15, 'player.leave': 16, spawned: 17, stop: 18, field: 30, cue: 31, channel: 32,
++  'player.join': 15, 'player.leave': 16, spawned: 17, stop: 18, ...CREATURE_EVENTS, field: 30, cue: 31, channel: 32,
+ });
+ /** Scalar reads; timer and random are answered by the host's own binding state. */
+ export const SCRIPT_V1_READS: Readonly<{ x: 1; y: 2; z: 3; yaw: 4; hpShare: 5; alive: 6; field: 7; distance: 8; nearestPlayer: 9; flag: 10; timerLeft: 11; random: 12; actorInZone: 13; playersInZone: 14; moving: 15; strikeState: 16; playerFlag: 17; spawnGroupAlive: 18; bearing: 19; bodyX: 20; bodyY: 21; bodyZ: 22; bodyAlive: 23; bodyYaw: 24; bodyVisible: 25; playerIntent: 26; }> = Object.freeze({
+@@ -14,11 +21,11 @@ export const SCRIPT_V1_READS: Readonly<{ x: 1; y: 2; z: 3; yaw: 4; hpShare: 5; a
+ /** Bounded list queries. Ground/navigation keep the existing physics query semantics. */
+ export const SCRIPT_V1_LISTS: Readonly<{ actorsInZone: 1; playersWithin: 2; groundHeight: 3; nearestWalkable: 4; path: 5; radial: 6; declaredFloor: 7; }> = Object.freeze({ actorsInZone: 1, playersWithin: 2, groundHeight: 3, nearestWalkable: 4, path: 5, radial: 6, declaredFloor: 7 });
+ /** Command ids; view commands occupy a disjoint range and may not run in a simulation binding. */
+-export const SCRIPT_V1_COMMANDS: Readonly<{ move: 1; strike: 2; stop: 3; field: 4; spawn: 5; despawn: 6; flag: 7; timer: 8; signal: 9; grant: 10; reward: 11; cue: 12; channel: 13; impulse: 14; encounter: 15; weather: 16; 'body.spawn': 17; 'body.teleport': 18; 'collider.enabled': 19; 'body.place': 20; 'body.visible': 21; 'body.retire': 22; 'view.channel': 100; 'view.clip': 101; 'view.vfx': 102; 'view.sound': 103; 'view.visible': 104; 'view.field': 105; }> = Object.freeze({
++export const SCRIPT_V1_COMMANDS: Readonly<{ move: 1; strike: 2; stop: 3; field: 4; spawn: 5; despawn: 6; flag: 7; timer: 8; signal: 9; grant: 10; reward: 11; cue: 12; channel: 13; impulse: 14; encounter: 15; weather: 16; 'body.spawn': 17; 'body.teleport': 18; 'collider.enabled': 19; 'body.place': 20; 'body.visible': 21; 'body.retire': 22; 'view.channel': 100; 'view.clip': 101; 'view.vfx': 102; 'view.sound': 103; 'view.visible': 104; 'view.field': 105; } & typeof CREATURE_COMMANDS> = Object.freeze({
+   move: 1, strike: 2, stop: 3, field: 4, spawn: 5, despawn: 6, flag: 7, timer: 8,
+   signal: 9, grant: 10, reward: 11, cue: 12, channel: 13, impulse: 14, encounter: 15, weather: 16,
+   'body.spawn': 17, 'body.teleport': 18, 'collider.enabled': 19,
+-  'body.place': 20, 'body.visible': 21, 'body.retire': 22,
++  'body.place': 20, 'body.visible': 21, 'body.retire': 22, ...CREATURE_COMMANDS,
+   'view.channel': 100, 'view.clip': 101, 'view.vfx': 102, 'view.sound': 103, 'view.visible': 104, 'view.field': 105,
+ });
+ export type ScriptV1EventName = keyof typeof SCRIPT_V1_EVENTS;
 diff --git a/src/format/skin-file.ts b/src/format/skin-file.ts
-index d2c9fe2..3d7ac16 100644
+index d2c9fe2241aca364934f58b21f20dc05f7565907..3d7ac169808ddb16dcf87b8b716df2f87cca8d97 100644
 --- a/src/format/skin-file.ts
 +++ b/src/format/skin-file.ts
 @@ -41,6 +41,7 @@ function skinLookParameters(
@@ -261,7 +906,7 @@ index d2c9fe2..3d7ac16 100644
  }
  
 diff --git a/src/format/skin-variants.ts b/src/format/skin-variants.ts
-index b2f8193..68f71d6 100644
+index b2f819396294b7595b93a5e355dba340de6671d2..68f71d672f4b1dac73450af1328fc64eff759f8b 100644
 --- a/src/format/skin-variants.ts
 +++ b/src/format/skin-variants.ts
 @@ -20,6 +20,8 @@ interface ResolvedSkinFile {
@@ -339,7 +984,7 @@ index b2f8193..68f71d6 100644
 +export { lookSkins, resolveSkinLookFiles }
  export type { ResolvedSkinFile, SkinLookFiles }
 diff --git a/src/format/skinAssets.ts b/src/format/skinAssets.ts
-index ca82818..82a2a58 100644
+index ca828187f0ec2dadf1755d392458d802f30fa4f4..82a2a58e265ce1ba40cebbcb82cea43c73aac8c9 100644
 --- a/src/format/skinAssets.ts
 +++ b/src/format/skinAssets.ts
 @@ -21,18 +21,25 @@ import { SkinGlbMaterialsSchema, SkinPrimitiveSchema, skinMaterialsFault, skinPa
@@ -381,7 +1026,7 @@ index ca82818..82a2a58 100644
  
      validateCreatureBones(look.species, row.rig.sockets);
 diff --git a/src/format/skins.ts b/src/format/skins.ts
-index 0014c43..296ec0a 100644
+index 0014c43ed72b9626644e71461933f3a5419e2f82..296ec0a2f159a2e4d897073eb691125bea53abd8 100644
 --- a/src/format/skins.ts
 +++ b/src/format/skins.ts
 @@ -8,7 +8,7 @@ const SKIN_LOOK_RECIPE = 'platform.skin';
@@ -410,472 +1055,3 @@ index 0014c43..296ec0a 100644
  }
  type SkinLookParametersRows = { [Key in keyof SkinLookParametersRowsFields]: SkinLookParametersRowsFields[Key] };
  interface SkinClipParametersRowsInputFields {
-diff --git a/src/format/creature-body.ts b/src/format/creature-body.ts
-index 2a453ad..8c0ca3b 100644
---- a/src/format/creature-body.ts
-+++ b/src/format/creature-body.ts
-@@ -2,6 +2,7 @@ import {
-   check,
-   exactOptional,
-   finite,
-+  integer,
-   maxLength,
-   maxValue,
-   minValue,
-@@ -13,7 +14,7 @@ import {
-   string,
- } from 'valibot'
- 
--import { CREATURE_SKELETONS } from './creature-skeletons.ts'
-+import { creatureContract } from './creature-skeletons.ts'
- import {
-   CreatureVolumesSchema,
-   CreatureLockSchema,
-@@ -21,17 +22,24 @@ import {
- } from './creature-volumes.ts'
- 
- import type { CreatureSkeleton, CreatureSize } from './creature-layers.ts'
-+import type { CreatureTrail } from './creature-skeletons.ts'
- import type { CreatureVolume } from './creature-volumes.ts'
- import type { GenericSchema } from 'valibot'
- 
- const ONE = 1
- const MAX_SCALE = 10
- const MAX_ID = 128
-+const MIN_TRAIL = 3
-+/** The head ball plus one volume per segment fit `MAX_VOLUMES`. */
-+const MAX_TRAIL = MAX_VOLUMES
-+const MAX_SPACING = 10
- const id = pipe(string(), regex(/^[a-z][a-zA-Z0-9.:-]*$/u), maxLength(MAX_ID))
- const scalar = pipe(number(), finite())
- interface CreatureBody {
-   /** Omit for a GLB with its own rig; a kit poser names its contract explicitly. */
-   skeleton?: CreatureSkeleton
-+  /** A serpent's trail bones (ONE-FORMAT CC23); only a serpent has one. */
-+  trail?: CreatureTrail
-   size: CreatureSize
-   scale: number
-   look: string
-@@ -39,10 +47,23 @@ interface CreatureBody {
-   lock?: string[]
-   hits?: 'rest' | 'clip'
- }
-+const trailCount = pipe(
-+  number(),
-+  integer(),
-+  minValue(MIN_TRAIL),
-+  maxValue(MAX_TRAIL),
-+)
-+const trailSpacing = pipe(
-+  scalar,
-+  minValue(Number.MIN_VALUE),
-+  maxValue(MAX_SPACING),
-+)
-+const trailObject = strictObject({ count: trailCount, spacing: trailSpacing })
- const bodyObject = strictObject({
-   skeleton: exactOptional(
--    picklist(['quadruped', 'biped'], 'Unknown creature skeleton'),
-+    picklist(['quadruped', 'biped', 'serpent'], 'Unknown creature skeleton'),
-   ),
-+  trail: exactOptional(trailObject),
-   size: picklist(
-     ['tiny', 'small', 'medium', 'large', 'giant'],
-     'Unknown creature size',
-@@ -65,15 +86,28 @@ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
-       ((body.lock?.length ?? ONE) <= ONE && body.hits !== 'clip'),
-     'Only giants have multiple lock points or clip hits',
-   ),
-+  check<CreatureBody, 'A serpent has a trail row and only a serpent has one'>(
-+    (body: {
-+      readonly skeleton?: CreatureSkeleton
-+      readonly trail?: CreatureTrail
-+    }): boolean => (body.skeleton === 'serpent') === (body.trail !== undefined),
-+    'A serpent has a trail row and only a serpent has one',
-+  ),
-   check<CreatureBody, 'Too many resolved creature volumes'>(
-     (body: {
-       readonly skeleton?: CreatureSkeleton
-+      readonly trail?: CreatureTrail
-       readonly volumes?: readonly { readonly part: string }[]
-     }): boolean => {
-+      // A serpent without its trail is the check above's refusal
-       const defaults =
--        body.skeleton === undefined
-+        body.skeleton === undefined ||
-+        (body.skeleton === 'serpent' && body.trail === undefined)
-           ? []
--          : CREATURE_SKELETONS[body.skeleton].volumes
-+          : creatureContract({
-+              skeleton: body.skeleton,
-+              ...(body.trail === undefined ? {} : { trail: body.trail }),
-+            }).volumes
-       return (
-         new Set(
-           [...defaults, ...(body.volumes ?? [])].map(
-diff --git a/src/format/creature-layers.ts b/src/format/creature-layers.ts
-index ac5b0e7..07db3de 100644
---- a/src/format/creature-layers.ts
-+++ b/src/format/creature-layers.ts
-@@ -48,7 +48,7 @@ type CreatureType =
-   | 'aquatic'
-   | 'critter'
-   | 'aberration'
--type CreatureSkeleton = 'quadruped' | 'biped'
-+type CreatureSkeleton = 'quadruped' | 'biped' | 'serpent'
- type CreatureSize = 'tiny' | 'small' | 'medium' | 'large' | 'giant'
- type CreatureReaction = 'passive' | 'skittish' | 'neutral' | 'aggressive'
- type CreatureTuningScalar = number | boolean | string
-diff --git a/src/format/creature-mount.ts b/src/format/creature-mount.ts
-index d96b13d..e854701 100644
---- a/src/format/creature-mount.ts
-+++ b/src/format/creature-mount.ts
-@@ -10,10 +10,11 @@ import {
-   strictObject,
- } from 'valibot'
- 
--import { CREATURE_SKELETONS } from './creature-skeletons.ts'
-+import { creatureContract } from './creature-skeletons.ts'
- import { CreatureSocketNameSchema } from './creature-volumes.ts'
- 
- import type { CreatureSkeleton } from './creature-layers.ts'
-+import type { CreatureTrail } from './creature-skeletons.ts'
- import type { GenericSchema } from 'valibot'
- 
- /** The seat socket both kit skeletons name. */
-@@ -78,6 +79,7 @@ interface MountedSpecies {
-   readonly flight?: unknown
-   readonly body?: {
-     readonly skeleton?: CreatureSkeleton
-+    readonly trail?: CreatureTrail
-     readonly volumes?: readonly { readonly part: string }[]
-   }
- }
-@@ -92,7 +94,13 @@ function seatKnown(seat: string, body: MountedSpecies['body']): boolean {
-   // A GLB with its own rig names its sockets in its skin; admission checks the seat there.
-   return (
-     body?.skeleton === undefined ||
--    Object.hasOwn(CREATURE_SKELETONS[body.skeleton].sockets, seat)
-+    Object.hasOwn(
-+      creatureContract({
-+        skeleton: body.skeleton,
-+        ...(body.trail === undefined ? {} : { trail: body.trail }),
-+      }).sockets,
-+      seat,
-+    )
-   )
- }
- 
-diff --git a/src/format/creature-skeletons.ts b/src/format/creature-skeletons.ts
-index 4f52e86..d68027e 100644
---- a/src/format/creature-skeletons.ts
-+++ b/src/format/creature-skeletons.ts
-@@ -1,5 +1,8 @@
- import type { CreatureSkeleton } from './creature-layers.ts'
- 
-+/** The skeletons whose bones never change with the body; a serpent's count comes from its `trail` row. */
-+type FixedSkeleton = Exclude<CreatureSkeleton, 'serpent'>
-+
- interface SkeletonChain {
-   readonly parent: string
-   readonly bones: readonly string[]
-@@ -115,11 +118,76 @@ const BIPED: SkeletonContract = {
-   volumes: [bodyVolume('chest', 'y'), HEAD],
-   clips: CLIPS,
- }
--const CREATURE_SKELETONS: Readonly<Record<CreatureSkeleton, SkeletonContract>> =
--  {
--    quadruped: QUADRUPED,
--    biped: BIPED,
-+const CREATURE_SKELETONS: Readonly<Record<FixedSkeleton, SkeletonContract>> = {
-+  quadruped: QUADRUPED,
-+  biped: BIPED,
-+}
-+
-+/** A serpent's trail row (ONE-FORMAT CC23): `count` bones `spacing` metres apart along the root's path. */
-+interface CreatureTrail {
-+  readonly count: number
-+  readonly spacing: number
-+}
-+const SEGMENT_MULTIPLIER = 0.5
-+const SEGMENT_RADIUS = 0.6
-+const HALF = 2
-+/** Trail bone names, head first: `head`, `seg1` … `seg<count-2>`, `tail`. */
-+function trailBoneName(index: number, count: number): string {
-+  if (index === ZERO) {
-+    return 'head'
-   }
-+  return index === count - ONE ? 'tail' : `seg${String(index)}`
-+}
-+function trailBoneNames(count: number): readonly string[] {
-+  return Array.from(
-+    { length: count },
-+    (_unused: unknown, index: number): string => trailBoneName(index, count),
-+  )
-+}
-+/**
-+ * The serpent (ONE-FORMAT CC23): every bone is a trail bone following the head's path, so the chain is the whole
-+ * body. Sockets `head`, `mouth`, `core` (the middle bone) and `tail`; one capsule per segment at x0.5 and the head
-+ * ball at x2. Buried segments' volumes are off (the engine's poser); the lock stays on the head.
-+ */
-+function serpentContract(trail: CreatureTrail): SkeletonContract {
-+  const bones = trailBoneNames(trail.count)
-+  const core = bones[Math.floor(trail.count / HALF)] ?? 'head'
-+  const segments = bones.slice(ONE).map((bone: string): SkeletonVolume => ({
-+    part: bone,
-+    bone,
-+    shape: 'capsule',
-+    radius: SEGMENT_RADIUS,
-+    halfLength: trail.spacing / HALF,
-+    axis: 'z',
-+    multiplier: SEGMENT_MULTIPLIER,
-+  }))
-+  return {
-+    root: 'head',
-+    chains: { spine: { parent: 'head', bones: bones.slice(ONE) } },
-+    sockets: {
-+      head: socket('head'),
-+      mouth: { bone: 'head', at: [ZERO, ZERO, MOUTH_FORWARD] },
-+      core: socket(core),
-+      tail: socket('tail'),
-+    },
-+    lock: 'head',
-+    volumes: [HEAD, ...segments],
-+    clips: CLIPS,
-+  }
-+}
-+/** The one contract a body declares: a fixed skeleton's, or a serpent's built from its trail row. */
-+function creatureContract(body: {
-+  readonly skeleton: CreatureSkeleton
-+  readonly trail?: CreatureTrail
-+}): SkeletonContract {
-+  if (body.skeleton !== 'serpent') {
-+    return CREATURE_SKELETONS[body.skeleton]
-+  }
-+  if (body.trail === undefined) {
-+    throw new Error('A serpent needs its trail row')
-+  }
-+  return serpentContract(body.trail)
-+}
- 
- /** Importers and posers share this list, rather than inferring a creature kind. */
- function skeletonBones(
-@@ -133,5 +201,19 @@ function skeletonBones(
-   ]
- }
- 
--export { CREATURE_SKELETONS, MIN_VOLUME_RADIUS, skeletonBones }
--export type { SkeletonChain, SkeletonSocket, SkeletonVolume, SkeletonContract }
-+export {
-+  CREATURE_SKELETONS,
-+  MIN_VOLUME_RADIUS,
-+  creatureContract,
-+  serpentContract,
-+  skeletonBones,
-+  trailBoneNames,
-+}
-+export type {
-+  CreatureTrail,
-+  FixedSkeleton,
-+  SkeletonChain,
-+  SkeletonSocket,
-+  SkeletonVolume,
-+  SkeletonContract,
-+}
-diff --git a/src/format/creature-volumes.ts b/src/format/creature-volumes.ts
-index f9aa9a3..f8eb4b1 100644
---- a/src/format/creature-volumes.ts
-+++ b/src/format/creature-volumes.ts
-@@ -22,6 +22,8 @@ import type { GenericSchema } from 'valibot'
- /** Bone-local rest offset. The runtime clamps the scaled radius, not the source. */
- interface CreatureVolume extends SkeletonVolume {
-   at?: [number, number, number]
-+  /** Part hp (ONE-FORMAT CC31): the part breaks at 0, once; later hits pass to the next volume. */
-+  hp?: number
- }
- const ZERO = 0
- const ONE = 1
-@@ -29,6 +31,7 @@ const MAX_VOLUMES = 16
- const MAX_NAME = 128
- const MAX_EXTENT = 500
- const MAX_MULTIPLIER = 100
-+const MAX_PART_HP = 1_000_000
- const CreatureSocketNameSchema: GenericSchema<string> = pipe(
-   string(),
-   regex(/^[a-zA-Z][a-zA-Z0-9_.:-]*$/u),
-@@ -37,6 +40,7 @@ const CreatureSocketNameSchema: GenericSchema<string> = pipe(
- const scalar = pipe(number(), finite())
- const extent = pipe(scalar, minValue(ZERO), maxValue(MAX_EXTENT))
- const offset = pipe(scalar, minValue(-MAX_EXTENT), maxValue(MAX_EXTENT))
-+const partHp = pipe(scalar, minValue(Number.MIN_VALUE), maxValue(MAX_PART_HP))
- const volumeObject = strictObject({
-   part: CreatureSocketNameSchema,
-   bone: CreatureSocketNameSchema,
-@@ -46,6 +50,7 @@ const volumeObject = strictObject({
-   axis: picklist(['y', 'z']),
-   multiplier: pipe(scalar, minValue(ZERO), maxValue(MAX_MULTIPLIER)),
-   at: exactOptional(tuple([offset, offset, offset])),
-+  hp: exactOptional(partHp),
- })
- const CreatureVolumeSchema: GenericSchema<CreatureVolume> = pipe(
-   volumeObject,
-diff --git a/src/format/scriptAbiV1.ts b/src/format/scriptAbiV1.ts
-index 6d732c4..1eb1e8d 100644
---- a/src/format/scriptAbiV1.ts
-+++ b/src/format/scriptAbiV1.ts
-@@ -1,3 +1,6 @@
-+/** ONE-FORMAT CC32: `lockable` [target own actor, 0|1]; `heal` [own actor, hp]; `pull` [player, metres, own actor];
-+ *  `root` [player, seconds]. Additive: a guest that never names them is unchanged. */
-+const CREATURE_COMMANDS = { lockable: 23, heal: 24, pull: 25, root: 26 } as const;
- /** ABI-v1 numeric transport. These ids are shared by admission, generated bindings and the decision host. */
- export const SCRIPT_V1_EVENTS: Readonly<{ start: 1; tick: 2; timer: 3; 'zone.enter': 4; 'zone.leave': 5; interact: 6; hit: 7; threshold: 8; death: 9; 'move.done': 10; 'strike.done': 11; flag: 12; signal: 13; 'strike.target': 14; 'player.join': 15; 'player.leave': 16; spawned: 17; stop: 18; field: 30; cue: 31; channel: 32; }> = Object.freeze({
-   start: 1, tick: 2, timer: 3, 'zone.enter': 4, 'zone.leave': 5, interact: 6, hit: 7, threshold: 8,
-@@ -14,11 +17,11 @@ export const SCRIPT_V1_READS: Readonly<{ x: 1; y: 2; z: 3; yaw: 4; hpShare: 5; a
- /** Bounded list queries. Ground/navigation keep the existing physics query semantics. */
- export const SCRIPT_V1_LISTS: Readonly<{ actorsInZone: 1; playersWithin: 2; groundHeight: 3; nearestWalkable: 4; path: 5; radial: 6; declaredFloor: 7; }> = Object.freeze({ actorsInZone: 1, playersWithin: 2, groundHeight: 3, nearestWalkable: 4, path: 5, radial: 6, declaredFloor: 7 });
- /** Command ids; view commands occupy a disjoint range and may not run in a simulation binding. */
--export const SCRIPT_V1_COMMANDS: Readonly<{ move: 1; strike: 2; stop: 3; field: 4; spawn: 5; despawn: 6; flag: 7; timer: 8; signal: 9; grant: 10; reward: 11; cue: 12; channel: 13; impulse: 14; encounter: 15; weather: 16; 'body.spawn': 17; 'body.teleport': 18; 'collider.enabled': 19; 'body.place': 20; 'body.visible': 21; 'body.retire': 22; 'view.channel': 100; 'view.clip': 101; 'view.vfx': 102; 'view.sound': 103; 'view.visible': 104; 'view.field': 105; }> = Object.freeze({
-+export const SCRIPT_V1_COMMANDS: Readonly<{ move: 1; strike: 2; stop: 3; field: 4; spawn: 5; despawn: 6; flag: 7; timer: 8; signal: 9; grant: 10; reward: 11; cue: 12; channel: 13; impulse: 14; encounter: 15; weather: 16; 'body.spawn': 17; 'body.teleport': 18; 'collider.enabled': 19; 'body.place': 20; 'body.visible': 21; 'body.retire': 22; 'view.channel': 100; 'view.clip': 101; 'view.vfx': 102; 'view.sound': 103; 'view.visible': 104; 'view.field': 105; } & typeof CREATURE_COMMANDS> = Object.freeze({
-   move: 1, strike: 2, stop: 3, field: 4, spawn: 5, despawn: 6, flag: 7, timer: 8,
-   signal: 9, grant: 10, reward: 11, cue: 12, channel: 13, impulse: 14, encounter: 15, weather: 16,
-   'body.spawn': 17, 'body.teleport': 18, 'collider.enabled': 19,
--  'body.place': 20, 'body.visible': 21, 'body.retire': 22,
-+  'body.place': 20, 'body.visible': 21, 'body.retire': 22, ...CREATURE_COMMANDS,
-   'view.channel': 100, 'view.clip': 101, 'view.vfx': 102, 'view.sound': 103, 'view.visible': 104, 'view.field': 105,
- });
- export type ScriptV1EventName = keyof typeof SCRIPT_V1_EVENTS;
-diff --git a/src/format/decisionScripts.ts b/src/format/decisionScripts.ts
-index 2740474..8049a07 100644
---- a/src/format/decisionScripts.ts
-+++ b/src/format/decisionScripts.ts
-@@ -9,6 +9,10 @@ const id = v.pipe(v.string(), v.regex(/^[A-Za-z][A-Za-z0-9.:-]*$/u), v.maxLength
- const local = v.pipe(v.string(), v.regex(/^[A-Za-z_][A-Za-z0-9_.-]*$/u), v.maxLength(64));
- const finite = v.pipe(v.number(), v.finite());
- const positive = v.pipe(finite, v.integer(), v.minValue(1), v.maxValue(0x7fffffff));
-+const HIT_TAG_LENGTH = 64;
-+const HIT_TAGS = 16;
-+const hitTag = v.pipe(v.string(), v.regex(/^[a-z][a-z0-9_-]*(?:\.[a-z0-9_-]+)+$/u), v.maxLength(HIT_TAG_LENGTH));
-+const hitTags = v.pipe(v.record(local, hitTag), v.check((value: Readonly<Record<string, string>>): boolean => Object.keys(value).length <= HIT_TAGS, 'at most 16 hit tags'));
- const aliases = v.pipe(v.record(local, id), v.check(value => Object.keys(value).length <= 256, 'bounded script id map'));
- const unique = (values: readonly unknown[]): boolean => new Set(values).size === values.length;
- const readNames: ("x" | "y" | "z" | "yaw" | "hpShare" | "alive" | "field" | "distance" | "nearestPlayer" | "flag" | "timerLeft" | "random" | "actorInZone" | "playersInZone" | "moving" | "strikeState" | "playerFlag" | "spawnGroupAlive" | "bearing" | "bodyX" | "bodyY" | "bodyZ" | "bodyAlive" | "bodyYaw" | "bodyVisible" | "playerIntent" | "actorsInZone" | "playersWithin" | "groundHeight" | "nearestWalkable" | "path" | "radial" | "declaredFloor")[] = [...keys(SCRIPT_V1_READS), ...keys(SCRIPT_V1_LISTS)];
-@@ -25,7 +29,8 @@ const rowEntries = {
-   source: v.pipe(v.string(), v.maxLength(256), v.regex(/^behaviour\/(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.as$/u),
-     v.check(value => !value.split('/').includes('generated'), 'authored script source, not generated glue')),
-   sourceHash: v.exactOptional(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u))),
--  binding: v.union([v.strictObject({ encounter: id }), v.strictObject({ quest: id }), v.strictObject({ zone: id }), v.strictObject({ shard: v.literal(true) }), v.strictObject({ spawnGroup: id })]),
-+  // CC59: `brain` hooks a script onto a brain-owned creature; the brain keeps its body (no move, strike or stop).
-+  binding: v.union([v.strictObject({ encounter: id }), v.strictObject({ quest: id }), v.strictObject({ zone: id }), v.strictObject({ shard: v.literal(true) }), v.strictObject({ spawnGroup: id }), v.strictObject({ brain: id })]),
-   pages: v.optional(v.pipe(positive, v.maxValue(4)), 1), onFail: v.picklist(['hold', 'reset', 'skip']),
-   on: v.pipe(v.array(v.picklist(keys(SCRIPT_V1_EVENTS))), v.minLength(1), v.maxLength(23), v.check(values => unique(values), 'unique subscribed events')),
-   tick: v.optional(v.nullable(v.picklist([1, 2, 5, 10])), null),
-@@ -36,6 +41,8 @@ const rowEntries = {
-   targets: v.optional(aliases, {}), spawns: v.optional(aliases, {}), signals: v.optional(aliases, {}), facts: v.optional(aliases, {}),
-   rewards: v.optional(aliases, {}), channels: v.optional(aliases, {}), impulses: v.optional(aliases, {}), weather: v.optional(aliases, {}),
-   bodies: v.exactOptional(aliases), colliders: v.exactOptional(aliases),
-+  // CC59: combat tags a hit event reports as a mask, bit i for the i-th alias in sorted order.
-+  tags: v.exactOptional(hitTags),
-   timers: v.optional(v.pipe(v.array(local), v.maxLength(64), v.check(values => unique(values), 'unique timer names')), []),
-   stateVersion: positive, state: v.pipe(v.array(state), v.maxLength(16)),
-   params: v.pipe(v.record(local, finite), v.check(value => Object.keys(value).length <= 32, 'bounded script parameters')),
-@@ -64,6 +71,11 @@ export function decisionScriptRowRules(script: DecisionScriptRow): string[] {
-   if ('spawnGroup' in script.binding && (Object.keys(script.actors).length === 0 || script.state.some(slot => slot.scope !== 'actor')))
-     errors.push('spawn groups declare members and actor-scoped simulation state');
-   if ((script.tick !== null) !== script.on.includes('tick')) errors.push('tick subscription has a declared 1/2/5/10 Hz rate');
-+  if ('brain' in script.binding && (!Object.values(script.actors).includes(script.binding.brain)
-+    || script.commands.some((name): boolean => name === 'move' || name === 'strike' || name === 'stop'))) {
-+    errors.push('a brain hook names its creature and leaves move, strike and stop to the brain');
-+  }
-+  if (script.tags !== undefined && !validNames(Object.keys(script.tags))) { errors.push('unique nonreserved generated binding names'); }
-   if (script.on.some(name => SCRIPT_V1_EVENTS[name] >= 30) || script.commands.some(name => SCRIPT_V1_COMMANDS[name] >= 100)) errors.push('simulation script uses only simulation ops');
-   if (script.side === 'view' && !script.commands.every(isViewCommand)) { errors.push(VIEW_WRITES_GAMEPLAY); }
-   for (const names of [...SCRIPT_V1_REFERENCE_KINDS.map(kind => Object.keys(script[kind] ?? {})), script.timers, script.state.map(slot => slot.name), Object.keys(script.params)]) {
-@@ -207,6 +219,8 @@ interface DecisionScriptRowInputFields {
-         shard: true;
-     }) | ({
-         spawnGroup: string;
-+    }) | ({
-+        brain: string;
-     });
-     pages?: number | undefined;
-     onFail: 'hold' | 'reset' | 'skip';
-@@ -232,6 +246,7 @@ interface DecisionScriptRowInputFields {
-     weather?: Record<string, string> | undefined;
-     bodies?: Record<string, string>;
-     colliders?: Record<string, string>;
-+    tags?: Record<string, string>;
-     timers?: (string)[] | undefined;
-     stateVersion: number;
-     state: ({
-@@ -262,6 +277,8 @@ interface DecisionScriptRowFields {
-         shard: true;
-     }) | ({
-         spawnGroup: string;
-+    }) | ({
-+        brain: string;
-     });
-     pages: number;
-     onFail: 'hold' | 'reset' | 'skip';
-@@ -287,6 +304,7 @@ interface DecisionScriptRowFields {
-     weather: Record<string, string>;
-     bodies?: Record<string, string>;
-     colliders?: Record<string, string>;
-+    tags?: Record<string, string>;
-     timers: (string)[];
-     stateVersion: number;
-     state: ({
-diff --git a/src/format/scriptAbiV1.ts b/src/format/scriptAbiV1.ts
-index 1eb1e8d..9b73c8c 100644
---- a/src/format/scriptAbiV1.ts
-+++ b/src/format/scriptAbiV1.ts
-@@ -1,11 +1,14 @@
- /** ONE-FORMAT CC32: `lockable` [target own actor, 0|1]; `heal` [own actor, hp]; `pull` [player, metres, own actor];
-  *  `root` [player, seconds]. Additive: a guest that never names them is unchanged. */
--const CREATURE_COMMANDS = { lockable: 23, heal: 24, pull: 25, root: 26 } as const;
-+const CREATURE_COMMANDS = { lockable: 23, heal: 24, pull: 25, root: 26, ability: 27 } as const;
-+/** ONE-FORMAT CC59: a brain hook hears `part.broken` [actor, volume index]; `ability` [own actor, strike] replaces its
-+ *  brain's next pick. A hit event's last slot is the mask of the row's `tags` the hit carried (bit i: i-th alias). */
-+const CREATURE_EVENTS = { 'part.broken': 19 } as const;
- /** ABI-v1 numeric transport. These ids are shared by admission, generated bindings and the decision host. */
--export const SCRIPT_V1_EVENTS: Readonly<{ start: 1; tick: 2; timer: 3; 'zone.enter': 4; 'zone.leave': 5; interact: 6; hit: 7; threshold: 8; death: 9; 'move.done': 10; 'strike.done': 11; flag: 12; signal: 13; 'strike.target': 14; 'player.join': 15; 'player.leave': 16; spawned: 17; stop: 18; field: 30; cue: 31; channel: 32; }> = Object.freeze({
-+export const SCRIPT_V1_EVENTS: Readonly<{ start: 1; tick: 2; timer: 3; 'zone.enter': 4; 'zone.leave': 5; interact: 6; hit: 7; threshold: 8; death: 9; 'move.done': 10; 'strike.done': 11; flag: 12; signal: 13; 'strike.target': 14; 'player.join': 15; 'player.leave': 16; spawned: 17; stop: 18; field: 30; cue: 31; channel: 32; } & typeof CREATURE_EVENTS> = Object.freeze({
-   start: 1, tick: 2, timer: 3, 'zone.enter': 4, 'zone.leave': 5, interact: 6, hit: 7, threshold: 8,
-   death: 9, 'move.done': 10, 'strike.done': 11, flag: 12, signal: 13, 'strike.target': 14,
--  'player.join': 15, 'player.leave': 16, spawned: 17, stop: 18, field: 30, cue: 31, channel: 32,
-+  'player.join': 15, 'player.leave': 16, spawned: 17, stop: 18, ...CREATURE_EVENTS, field: 30, cue: 31, channel: 32,
- });
- /** Scalar reads; timer and random are answered by the host's own binding state. */
- export const SCRIPT_V1_READS: Readonly<{ x: 1; y: 2; z: 3; yaw: 4; hpShare: 5; alive: 6; field: 7; distance: 8; nearestPlayer: 9; flag: 10; timerLeft: 11; random: 12; actorInZone: 13; playersInZone: 14; moving: 15; strikeState: 16; playerFlag: 17; spawnGroupAlive: 18; bearing: 19; bodyX: 20; bodyY: 21; bodyZ: 22; bodyAlive: 23; bodyYaw: 24; bodyVisible: 25; playerIntent: 26; }> = Object.freeze({
-diff --git a/src/format/encounters.ts b/src/format/encounters.ts
---- a/src/format/encounters.ts
-+++ b/src/format/encounters.ts
-@@ -7,7 +7,10 @@
- const point = v.tuple([coord, coord, coord]);
- const positive = v.pipe(finite, v.minValue(0.001), v.maxValue(500));
- const duration = v.pipe(finite, v.minValue(0), v.maxValue(60));
--const phase = v.strictObject({ at: v.pipe(finite, v.minValue(0.001), v.maxValue(1)), name: label, caption: label, speed: v.pipe(finite, v.minValue(0), v.maxValue(15)), stopDistance: v.pipe(finite, v.minValue(0), v.maxValue(50)), turnRate: v.pipe(finite, v.minValue(0), v.maxValue(30)) });
-+// ONE-FORMAT CC59: a phase's `adds` are spawn rows that wait out of the world until the fight reaches that phase.
-+const MAX_ADDS = 8;
-+const adds = v.exactOptional(v.pipe(v.array(id), v.nonEmpty(), v.maxLength(MAX_ADDS)));
-+const phase = v.strictObject({ at: v.pipe(finite, v.minValue(0.001), v.maxValue(1)), name: label, caption: label, speed: v.pipe(finite, v.minValue(0), v.maxValue(15)), stopDistance: v.pipe(finite, v.minValue(0), v.maxValue(50)), turnRate: v.pipe(finite, v.minValue(0), v.maxValue(30)), adds });
- const encounter = v.pipe(v.strictObject({ id, entity: id, kind: v.picklist(['elite', 'boss']), panel: v.nullable(id), name: label, title: label, retry: label,
-   arena: v.strictObject({ at: point, radius: positive }), intro: duration, introShort: duration,
-   respawn: v.strictObject({ at: point, yaw: finite }), phases: v.pipe(v.array(phase), v.minLength(1), v.maxLength(16)) }),
-@@ -22,6 +25,11 @@
-   for (const row of rows) {
-     if (!entities.includes(row.entity)) errors.push('declared encounter actor');
-     if (row.panel !== null && !panels.some((p) => p.id === row.panel && p.encounter === row.id)) errors.push('declared matching boss panel');
-+    for (const step of row.phases) {
-+      for (const add of step.adds ?? []) {
-+        if (add === row.entity || !entities.includes(add)) { errors.push('phase adds name other declared spawns'); }
-+      }
-+    }
-   }
-   return [...new Set(errors)];
- }
-@@ -61,5 +69,6 @@
-         speed: number;
-         stopDistance: number;
-         turnRate: number;
-+        adds?: string[];
-     })[];
- })[];

@@ -182,6 +182,11 @@ const FIRST_ROWS_MS = 1500, FIRST_ROWS_POLL_MS = 20;
 const PARKED_BEAT_MS = 120;
 const column = (name: string): number => ANIMAL_CLASS.row.findIndex(entry => entry.name === name);
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), STATE = column('state'), ATTACK = column('attackT'), ATTACK_DUR = column('attackDur'), ATTACK_STAMP = column('attackStamp'), WINDING = column('winding'), TARGET = column('target'), FLINCH = column('flinch'), HP = column('hp'), ALIVE = column('alive'), RIDEABLE = column('rideable'), STRAFE = column('strafe'), BRACE = column('brace'), RISE = column('rise'), ACT = column('act');
+// CC28: the actor channels and lock answer (wire 1.1); an older room reads each at its default (0, `row`).
+const CHANNELS = [column('channel1'), column('channel2'), column('channel3'), column('channel4')], LOCKABLE = column('lockable');
+const LOCKS = ['row', 'on', 'off'] as const;
+const channelsOf = (row: Float64Array, out: number[]): number[] => { for (let i = 0; i < 4; i++) out[i] = row[CHANNELS[i] ?? -1] ?? 0; return out; };
+const ROW_CHANNELS = [0, 0, 0, 0];
 
 /** What the page measures, as I6 lists it. */
 export interface WorkerClientReport {
@@ -274,7 +279,7 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: ReadonlyM
     if (handle === under || !interpolator.sample(handle, renderTick, row)) continue; // the body under this player is its own prediction (J48)
     const attack = row[ATTACK] ?? 0, duration = (row[ATTACK_DUR] ?? 1000) / 1000, winding = row[WINDING] === 1;
     const stamp = row[ATTACK_STAMP] ?? 0, started = winding && row[TARGET] === own && entry.windup !== stamp;
-    body.showRow({ x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, yaw: row[YAW] ?? 0, state: ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle', attack, attackDuration: duration, winding, flinch: row[FLINCH] ?? 0, strafe: row[STRAFE] ?? 0, brace: row[BRACE] ?? 0, hp: row[HP] ?? 0, alive: row[ALIVE] === 1, rise: row[RISE] ?? 0, act: row[ACT] ?? 0 }, dt);
+    body.showRow({ x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, yaw: row[YAW] ?? 0, state: ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle', attack, attackDuration: duration, winding, flinch: row[FLINCH] ?? 0, strafe: row[STRAFE] ?? 0, brace: row[BRACE] ?? 0, hp: row[HP] ?? 0, alive: row[ALIVE] === 1, rise: row[RISE] ?? 0, act: row[ACT] ?? 0, channels: channelsOf(row, ROW_CHANNELS), lock: LOCKS[row[LOCKABLE] ?? 0] ?? 'row' }, dt);
     if (started) { entry.windup = stamp; if (body.alive) manager.onWindup?.(body, duration); }
     shown++;
     if (row[RIDEABLE] === 1) rideable.add(handle);

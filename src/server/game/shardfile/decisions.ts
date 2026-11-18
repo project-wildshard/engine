@@ -97,6 +97,8 @@ const continuation = v.strictObject({ contract: v.string(), decision: v.custom<D
   strikes: v.array(v.strictObject({ actor: natural, strike: natural, target: natural, binding: natural, hit: v.boolean() })),
   // CC32: `Do.lockable` answers; absent in a save that never set one.
   locks: v.optional(v.array(v.tuple([natural, v.boolean()])), []),
+  // CC28: `actorChannel` values (actor handle, channel index, value); absent in a save that never set one.
+  actorChannels: v.optional(v.array(v.tuple([natural, v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(3)), v.pipe(v.number(), v.minValue(0), v.maxValue(1))])), []),
   // CC59: a brain hook's pending `ability` (actor handle, strike handle); absent in a save without one.
   abilities: v.optional(v.array(v.tuple([natural, natural])), []),
 });
@@ -130,6 +132,8 @@ export class ShardDecisions {
   private readonly channels = new Map<number, number>();
   /** CC32: each creature's `Do.lockable` answer, by actor handle. */
   private readonly locks = new Map<number, boolean>();
+  /** CC28: each creature's `actorChannel` values, by actor handle then channel index. */
+  private readonly actorChannels = new Map<number, Map<number, number>>();
   private readonly playerFlags = new Set<number>();
   private readonly zones = new Set<string>();
   // Keys contain only private scalar handles, never a live actor or host.
@@ -417,6 +421,10 @@ export class ShardDecisions {
       } else if (op === SCRIPT_V1_COMMANDS.lockable) {
         const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'lockable actor');
         apply.push(() => { this.locks.set(target, a === 1); actor.lockOverride = a === 1; });
+      } else if (op === SCRIPT_V1_COMMANDS.actorChannel) {
+        const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'channel actor');
+        if (a >= actor.channelCount) throw new Error('Decision actor channel is not declared');
+        apply.push(() => { const values = this.actorChannels.get(target) ?? new Map<number, number>(); values.set(a, b); this.actorChannels.set(target, values); actor.channels[a] = b; });
       } else if (op === SCRIPT_V1_COMMANDS.spawn) {
         // CC59c: `spawn` calls a phase's adds (one row, or every member of a group) out before their phase
         const adds = requireValue(this.sim.adds, 'encounter adds'), name = this.name('spawns', a), members = this.spawnGroups.get(name) ?? [name];
@@ -605,6 +613,7 @@ export class ShardDecisions {
     fields: [...this.fields].flatMap(([actor, values]) => [...values.keys()].map(field => [actor, field, this.fieldValue(actor, field)])), channels: [...this.channels], playerFlags: [...this.playerFlags], zones: [...this.zones], phases: [...this.phases],
     moves: [...this.motions].map(([actor, motion]) => ({ actor, move: motion.move, target: motion.target, binding: motion.binding, state: motion.runner.snapshot() })),
     strikes: this.savedStrikes(), ...(this.locks.size === 0 ? {} : { locks: [...this.locks] }),
+    ...(this.actorChannels.size === 0 ? {} : { actorChannels: [...this.actorChannels].flatMap(([actor, values]) => [...values].map(([index, value]) => [actor, index, value])) }),
     ...this.pendingAbilities() }); }
   private pendingAbilities(): { abilities?: [number, number][] } {
     const rows: [number, number][] = [];
@@ -662,6 +671,7 @@ export class ShardDecisions {
     if (new Set(saved.strikes.map(row => row.actor)).size !== saved.strikes.length) throw new Error('Duplicate decision strike');
     for (const [actor, strike] of saved.abilities) { if (!this.fieldActors.has(actor)) throw new Error('Invalid decision ability'); this.name('strikes', strike); }
     if (new Set(saved.locks.map(([actor]) => actor)).size !== saved.locks.length || saved.locks.some(([actor]) => !this.fieldActors.has(actor))) throw new Error('Invalid decision lock');
+    if (new Set(saved.actorChannels.map(([actor, index]) => `${actor}:${index}`)).size !== saved.actorChannels.length || saved.actorChannels.some(([actor]) => !this.fieldActors.has(actor))) throw new Error('Invalid decision actor channel');
     for (const strike of saved.strikes) {
       const binding = requireValue(this.rows[strike.binding - 1], 'strike binding'), ids = decisionBindingMap(binding, this.registries).ids;
       if (!Object.values(ids.actors ?? {}).includes(strike.actor) || !Object.values(ids.strikes ?? {}).includes(strike.strike)) throw new Error('Invalid decision strike ownership');
@@ -679,6 +689,12 @@ export class ShardDecisions {
     this.striking.clear(); for (const { actor, ...strike } of saved.strikes) this.striking.set(actor, strike);
     for (const handle of this.locks.keys()) { const body = this.actor(handle); if (body !== undefined) body.lockOverride = null; }
     this.locks.clear(); for (const [actor, on] of saved.locks) { this.locks.set(actor, on); const body = this.actor(actor); if (body !== undefined) body.lockOverride = on; }
+    for (const handle of this.actorChannels.keys()) this.actor(handle)?.resetChannels();
+    this.actorChannels.clear();
+    for (const [actor, index, value] of saved.actorChannels) {
+      const values = this.actorChannels.get(actor) ?? new Map<number, number>(); values.set(index, value); this.actorChannels.set(actor, values);
+      const body = this.actor(actor); if (body !== undefined) body.channels[index] = value;
+    }
     for (const handle of this.fieldActors) { const body = this.actor(handle); if (body !== undefined) body.nextAbility = null; }
     for (const [actor, strike] of saved.abilities) { const body = this.actor(actor); if (body !== undefined) body.nextAbility = this.name('strikes', strike); }
   }

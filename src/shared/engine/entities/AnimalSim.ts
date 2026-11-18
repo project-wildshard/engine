@@ -15,6 +15,8 @@ export type AnimalState = typeof ANIMAL_STATES[number];
 export interface AnimalSimSpec {
   kind: string; label: string; variant: string; rarity: Rarity; hp: number; aggressive: boolean;
   dims: AnimalDims; mods: VariantMods; flight?: SpeciesFlight; lockable?: boolean;
+  /** ONE-FORMAT CC28: the body's declared actor channels' initial values, in wire order (at most four); absent, none. */
+  channels?: readonly number[];
   /** Resolved class policy; free model scale remains geometry only. */
   sizePolicy?: { readonly stride: number; readonly aggro: number; readonly cellWeight: number };
 }
@@ -156,6 +158,7 @@ export class AnimalSim {
     this.aggressive = spec.aggressive; this.mods = { ...spec.mods };
     this.maxHp = this.hp = spec.hp; this.seed = seed; this.scale = scale;
     this.flight = spec.flight === undefined ? null : new FlightMotion(spec.flight);
+    this.resetChannels();
   }
   get dims(): AnimalDims { return this.simSpec.dims; }
   get strideScale(): number { return this.simSpec.sizePolicy?.stride ?? 1; }
@@ -169,7 +172,7 @@ export class AnimalSim {
     out.flinchRoll = this.flinchRoll; out.flinchPitch = this.flinchPitch; out.brace = this.brace; out.deathSide = this.deathSide;
   }
   /** Stand as a wire row says (P1-E5.3 I6): a view of a body a server elsewhere runs. Nothing here decides or steps. */
-  showRow(row: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly state: AnimalState; readonly attack: number; readonly attackDuration?: number; readonly winding?: boolean; readonly flinch: number; readonly strafe: number; readonly brace: number; readonly hp: number; readonly alive: boolean; readonly rise: number; readonly act: number }, dt: number): void {
+  showRow(row: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly state: AnimalState; readonly attack: number; readonly attackDuration?: number; readonly winding?: boolean; readonly flinch: number; readonly strafe: number; readonly brace: number; readonly hp: number; readonly alive: boolean; readonly rise: number; readonly act: number; readonly channels?: readonly number[]; readonly lock?: 'row' | 'on' | 'off' }, dt: number): void {
     const moved = Math.hypot(row.x - this.position.x, row.z - this.position.z);
     if (dt > 0) this.speed += (Math.min(moved / dt, 20) - this.speed) * Math.min(1, dt * 10);
     this.position.set(row.x, row.y, row.z); this.yaw = row.yaw; this.groundY = row.y; this.hp = row.hp; this.alive = row.alive;
@@ -179,6 +182,9 @@ export class AnimalSim {
     const { mem } = this;
     if (row.rise > 0 || mem['rise'] !== undefined) { mem['rising'] = Number(row.rise > (mem['rise'] ?? 0)); mem['rise'] = row.rise; mem['init'] = 1; }
     if (row.act !== 0 || mem['st'] !== undefined) mem['st'] = row.act;
+    // CC28: the server's channels and lock answer, so a page's look and its lock and Tab agree with the room
+    if (row.channels !== undefined) for (let i = 0; i < 4; i++) this.channels[i] = row.channels[i] ?? 0;
+    if (row.lock !== undefined) this.lockOverride = row.lock === 'row' ? null : row.lock === 'on';
   }
   /** Full motor/contact continuation; authored ports and rig state remain with the fresh instance. */
   snapshot(): AnimalSnapshot {
@@ -222,6 +228,13 @@ export class AnimalSim {
    *  continuation saves it, so the body snapshot is unchanged. */
   lockOverride: boolean | null = null;
   get lockable(): boolean { return this.lockOverride ?? this.simSpec.lockable ?? this.flying; }
+  /** ONE-FORMAT CC28: the four actor channels (animal wire fields 25 to 28), each 0..1; the body declares how many
+   *  it uses. A script's `actorChannel` sets one on the server; a page shows what the row says. */
+  readonly channels: [number, number, number, number] = [0, 0, 0, 0];
+  /** How many channels this body declares. */
+  get channelCount(): number { return this.simSpec.channels?.length ?? 0; }
+  /** Each channel back to its declared initial value. */
+  resetChannels(): void { for (let i = 0; i < 4; i++) this.channels[i] = this.simSpec.channels?.[i] ?? 0; }
   /** CC59: a brain hook's `ability` answer: the strike its brain tries next, before its own pick; null for none. */
   nextAbility: string | null = null;
   get lockRange(): number | undefined { return this.simSpec.flight?.lockRange; }

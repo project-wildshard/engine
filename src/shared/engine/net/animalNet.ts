@@ -40,4 +40,10 @@ export const ANIMAL_NET: NetSchema<AnimalNetView> = bindClass<AnimalNetView, typ
   seed: view => view.sim.seed,
   // TE-ENG7: two declared species may share a kind; a remote page draws each by its own id.
   species: view => view.sim.species,
+  // ONE-FORMAT CC28: the actor channels a script sets, and its lock answer, for every page's look and lock.
+  channel1: view => view.sim.channels[0],
+  channel2: view => view.sim.channels[1],
+  channel3: view => view.sim.channels[2],
+  channel4: view => view.sim.channels[3],
+  lockable: view => view.sim.lockOverride === null ? 'row' : view.sim.lockOverride ? 'on' : 'off',
 });

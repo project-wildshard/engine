@@ -310,6 +310,7 @@ export function speciesResolver(rows: ShardRows, brains: ShardCreatures['brains'
     return { kind: row.kind, label: selected.label, variant: selected.id, rarity: selected.rarity, hp: selected.hp,
       aggressive: resolved === undefined ? row.aggressive : resolved.temperament.reaction === 'aggressive', lockable: row.lockable,
       ...(row.body === undefined || row.body.size === 'medium' ? {} : { sizePolicy: CREATURE_SIZES[row.body.size] }),
+      ...(row.body?.channels === undefined ? {} : { channels: row.body.channels.map(channel => channel.initial ?? 0) }),
       dims: { ...row.dims, feet: row.dims.feet.map(([x, z]) => [x, z]) }, mods: { ...selected.mods }, ...(row.flight === undefined ? {} : { flight: { ...row.flight } }) };
   };
 }
