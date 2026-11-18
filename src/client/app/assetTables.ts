@@ -81,3 +81,27 @@ export function prepareAssetPackRead(key?: string): { readonly ready: () => Prom
 export async function prepareAssetPacks(key?: string): Promise<void> {
   await prepareAssetPackRead(key).ready();
 }
+
+/** The cook mounts an inline candidate's descriptor names (`cook.json`'s `mounts`: URL and bytes), each once. */
+export function inlineMountBytes(cook: unknown): Record<string, number> {
+  const rows: unknown = record(cook) ? cook['mounts'] : undefined, out: Record<string, number> = {};
+  if (!Array.isArray(rows)) throw new Error('Inline candidate cook has no mounts');
+  for (const row of rows as unknown[]) {
+    if (!record(row) || typeof row['url'] !== 'string' || !row['url'].startsWith('/') || row['url'].split('/').includes('..') || !size(row['bytes'])) throw new Error('Invalid inline candidate mount');
+    out[row['url']] = row['bytes'];
+  }
+  return out;
+}
+/** SHARD-AUTHORING SA15 / SA43 (MEMORY-GATES MG9): `wildshard dev` and `wildshard prepare` serve the inline candidate's cook
+ * mounts at their URLs beside the page, but this build's tables list only its pinned revisions' files. A candidate whose cook
+ * made a file the pin lacks (S12d's phone ASTC 6x6 KTX2s) refused at level.data ("declares … but public/assets has no such
+ * file"), so prepare timed out at 240 s. The candidate's mounts join the byte table; a draft with no cook adds nothing. */
+export async function adoptInlineMounts(descriptor: unknown, base: string, read: (url: string) => Promise<Response> = url => fetch(url)): Promise<number> {
+  const cook: unknown = record(descriptor) ? descriptor['cook'] : undefined;
+  if (!record(cook) || typeof cook['path'] !== 'string') return 0;
+  const response = await read(new URL(cook['path'], base).href);
+  if (!response.ok) throw new Error(`Inline candidate cook unreadable: ${String(response.status)}`);
+  const added = inlineMountBytes(await response.json());
+  installAssetTables({ bytes: { ...publicBytes(), ...added }, versions: assetVersions(), music: musicManifests(), sfx: sfxManifests(), packs: bootPacks() });
+  return Object.keys(added).length;
+}

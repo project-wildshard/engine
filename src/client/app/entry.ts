@@ -614,7 +614,7 @@ async function startSelected(): Promise<void> {
     // the loader, a few. NINE-DRAGON-BENCHMAX NB4: Nine's standalone page took 1 of the 45 by control and after play
     // (benchmax census) while the 45 cost Jake's Low Power iPhone 1.1 s of modules. A miss allocates in place, as before.
     const grid = page.mode === 'grid';
-    const packs = (await import('./assetTables')).prepareAssetPackRead(grid || TIER !== 'phone' ? undefined : game.shard.slug);
+    const assetTables = await import('./assetTables'), packs = assetTables.prepareAssetPackRead(grid || TIER !== 'phone' ? undefined : game.shard.slug);
     const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }] = await Promise.all([
       import('@wildshard/engine/script/moduleV2'), import('@wildshard/engine/core/workSlice'),
       import('@wildshard/engine/core/clock'),
@@ -633,6 +633,8 @@ async function startSelected(): Promise<void> {
     performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
       detail: { memoryTurns, memoryWaitMs, grid } });
     await packs.ready();
+    // SA43: the inline candidate's own cook mounts join the byte table (assetTables.ts adoptInlineMounts)
+    if (authored) await assetTables.adoptInlineMounts(JSON.parse(document.getElementById('ws-shardfile')?.textContent ?? 'null'), document.baseURI);
     await completePageCatalogue(page.mode, catalogue?.ready);
     if (runtimePage !== null) selectInlineRuntime(runtimePage);
     const path = page.mode === 'grid' ? 'grid' : 'shardfile';
