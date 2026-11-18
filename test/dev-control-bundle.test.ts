@@ -1,7 +1,7 @@
 // MEMORY-STRUCTURE STR4 (J414): the dev control channel is in the local dev server's bundle (`build-server.mjs --dev`) and
 // absent from the box's (no `--dev`), which `build-server.mjs --tar` packs.
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 
@@ -28,7 +28,7 @@ test('the npm artifact carries the native dev server and frozen format', () => {
   const staged = join(scratch, 'package');
   mkdirSync(staged, { recursive: true });
   cpSync('package.json', join(staged, 'package.json'));
-  cpSync('patches', join(staged, 'patches'), { recursive: true });
+  if (existsSync('patches')) cpSync('patches', join(staged, 'patches'), { recursive: true });
   const installedFormat = realpathSync('node_modules/@wildshard/format');
   for (const name of ['@wildshard/format', 'meshoptimizer', 'valibot']) {
     const link = join(staged, 'node_modules', name);
@@ -52,8 +52,8 @@ test('the npm artifact carries the native dev server and frozen format', () => {
   expect(unpack.status, unpack.stderr).toBe(0);
   const content = readFileSync(join(extracted, 'package/node_modules/@wildshard/format', module));
   expect(content.equals(readFileSync(join(installedFormat, module)))).toBe(true);
-  const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as { pnpm: { patchedDependencies: Record<string, string> } };
-  for (const patch of Object.values(manifest.pnpm.patchedDependencies)) {
+  const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as { pnpm: { patchedDependencies?: Record<string, string> } };
+  for (const patch of Object.values(manifest.pnpm.patchedDependencies ?? {})) {
     expect(readFileSync(join(extracted, 'package', patch)).equals(readFileSync(patch))).toBe(true);
   }
 }, 30_000);
