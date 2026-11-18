@@ -11,7 +11,8 @@ import {legacyDouble} from '@wildshard/engine/test/FakeGame';
 test('weather diagnostics wait for the original play-phase weather publication',async()=>{
  const scope=new Scope('late-weather-debug'),expose=vi.fn<ShardContext['debug']['expose']>();
  const ctx=legacyDouble<ShardContext>({scope,game:legacyDouble<ShardContext['game']>({runtime:legacyDouble<NonNullable<ShardContext['game']['runtime']>>({})}),
-  product:legacyDouble<ShardContext['product']>({slug:'orchard'}),debug:{expose}});
+  // installClientPhase paces rows at the product's tier (f1daaa0c), so the product carries a shardfile.
+  product:legacyDouble<ShardContext['product']>({slug:'orchard',shardfile:legacyDouble<ShardContext['product']['shardfile']>({runtime:null,budgets:legacyDouble<ShardContext['product']['shardfile']['budgets']>({tier:'small'})})}),debug:{expose}});
  const plan=parseClientPlan({version:1,features:[{kind:'debug.expose',name:'weather',source:{kind:'world-weather',owner:'orchard.weather'}}]});
  try{
   // World bindings run before weather.forest constructs and publishes at play/40.
