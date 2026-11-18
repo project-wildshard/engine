@@ -18,11 +18,11 @@ export interface StreamedCoverStats {
 
 /** shader modes: a near plant that just shrinks away / hands over to its far model; a far model */
 const MODE_NEAR = 0, MODE_HANDOVER = 1, MODE_FAR = 2;
-/** floats per cached candidate: x y z yaw scale · tint rgb · ground normal xyz, cover side (aNrm) · ground rgb (aGround) ·
- *  cover rgb top (aCover) */
-const STRIDE = 19;
+/** Floats per cached candidate: x y z yaw scale, tint rgb, ground normal xyz and cover side. */
+const STRIDE = 12;
 /** the baked file's header (u32s) and bytes per plant (generators/coverCells.ts) */
-const MAGIC = 0x43435357, VERSION = 1, HEAD = 9, PLANT = 22, TAU = Math.PI * 2, EMPTY = new Float32Array(0);
+const MAGIC = 0x43435357, VERSION = 1, HEAD = 9, PLANT = 22, TAU = Math.PI * 2;
+interface CoverCell { readonly values: Float32Array; readonly start: number }
 
 /** the baked file: its cells' rect (cell coordinates), kinds, tinted kinds (a bit each) and each (cell, kind)'s first byte */
 interface CellFile { readonly view: DataView; readonly x0: number; readonly z0: number; readonly w: number; readonly h: number; readonly nk: number; readonly tinted: number; readonly starts: Uint32Array }
@@ -40,7 +40,7 @@ function readCells(bytes: Uint8Array, cell: number): CellFile {
 }
 
 /** the cover's per-instance attributes: the ground's colour, the cover's (rgb, top) and the ground normal + cover side */
-const ATTRS = [{ name: 'aGround', size: 3 }, { name: 'aCover', size: 4 }, { name: 'aNrm', size: 4 }] as const;
+const ATTRS = [{ name: 'aGround', size: 3, normalizedBytes: true }, { name: 'aCover', size: 4, normalizedBytes: true }, { name: 'aNrm', size: 4 }] as const;
 
 interface FarTier {
   set: InstanceTier;
@@ -64,7 +64,8 @@ const forTier = (pair: { readonly phone: number; readonly desktop: number }): nu
 const ss = (e0: number, e1: number, x: number): number => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 
 /** cached plant `i` of `v` into instance `n` of a tier's back arrays (the far model is its near one's size) */
-function writePlant(A: InstanceArrays, n: number, v: Float32Array, i: number): void {
+function writePlant(A: InstanceArrays, n: number, entry: CoverCell, i: number, file: DataView): void {
+  const v = entry.values;
   const yaw = v[i + 3] ?? 0, s = v[i + 4] ?? 1, c = Math.cos(yaw) * s, sn = Math.sin(yaw) * s, m = A.matrix, o = n * 16;
   const [gnd, cov, nrm] = A.attrs, col = A.colour;
   // a turn about +y, scaled: what Matrix4.compose writes, without the quaternion
@@ -73,7 +74,10 @@ function writePlant(A: InstanceArrays, n: number, v: Float32Array, i: number): v
   m[o + 8] = sn; m[o + 9] = 0; m[o + 10] = c; m[o + 11] = 0;
   m[o + 12] = v[i] ?? 0; m[o + 13] = v[i + 1] ?? 0; m[o + 14] = v[i + 2] ?? 0; m[o + 15] = 1;
   if (col) { col[n * 3] = v[i + 5] ?? 1; col[n * 3 + 1] = v[i + 6] ?? 1; col[n * 3 + 2] = v[i + 7] ?? 1; }
-  gnd?.set(v.subarray(i + 12, i + 15), n * 3); nrm?.set(v.subarray(i + 8, i + 12), n * 4); cov?.set(v.subarray(i + 15, i + 19), n * 4);
+  const colors = entry.start + i / STRIDE * PLANT + 15;
+  if (gnd !== undefined) for (let k = 0; k < 3; k++) gnd[n * 3 + k] = file.getUint8(colors + k);
+  if (cov !== undefined) for (let k = 0; k < 4; k++) cov[n * 4 + k] = file.getUint8(colors + 3 + k);
+  nrm?.set(v.subarray(i + 8, i + 12), n * 4);
 }
 
 /** A ground cover streamed round the viewer (see the module comment). */
@@ -88,7 +92,7 @@ class StreamedCover {
   private readonly farBudgetMs: number;
   private readonly kinds: Kind[] = [];
   private readonly appearance: CoverAppearance;
-  private readonly cells: CellWindow<Float32Array[]>;
+  private readonly cells: CellWindow<CoverCell[]>;
   private readonly last = new THREE.Vector3(1e9, 0, 1e9);
   private readonly uniforms = { uPlayer: { value: new THREE.Vector3() }, uReachUp: { value: 1 } };
   /** The shared graph book owns the ids and view params; the live toon family still follows its lighting. */
@@ -117,7 +121,7 @@ class StreamedCover {
     this.file = readCells(cells, row.cell);
     if (this.file.nk !== row.kinds.length) throw new Error('StreamedCover: baked kind count differs from rows');
     this.farBudgetMs = forTier(this.row.farBudgetMs);
-    this.cells = new CellWindow<Float32Array[]>(this.row.cell);
+    this.cells = new CellWindow<CoverCell[]>(this.row.cell);
   }
 
   /** A cached candidate's reach factor at the strength the camera's height allows, at the most it can grow to before the
@@ -162,11 +166,11 @@ class StreamedCover {
   }
 
   /** a cell's plants per kind (STRIDE floats each), decoded once from the baked file (the window caches them) */
-  private generate(cx: number, cz: number): Float32Array[] {
-    const f = this.file, d = f.view, CELL = this.row.cell, i = cx - f.x0, k = cz - f.z0, out: Float32Array[] = [];
+  private generate(cx: number, cz: number): CoverCell[] {
+    const f = this.file, d = f.view, CELL = this.row.cell, i = cx - f.x0, k = cz - f.z0, out: CoverCell[] = [];
+    if (i < 0 || k < 0 || i >= f.w || k >= f.h) return out;
     this.kinds.forEach((kind, ki) => {
       const c = (k * f.w + i) * f.nk + ki, a = f.starts[c] ?? 0, b = f.starts[c + 1] ?? 0, [s0, s1] = kind.scale;
-      if (i < 0 || k < 0 || i >= f.w || k >= f.h || ki >= f.nk) { out.push(EMPTY); return; }
       const count = (b - a) / PLANT, v = new Float32Array(count * STRIDE);
       for (let e = 0; e < Math.min(count, 65535); e++) {
         const o = a + e * PLANT, p = e * STRIDE;
@@ -176,14 +180,14 @@ class StreamedCover {
         v[p + 4] = s0 + (d.getUint8(o + 8) / 255) * (s1 - s0);
         for (let j = 0; j < 3; j++) v[p + 5 + j] = (d.getUint8(o + 9 + j) / 255) * 2;
         v[p + 8] = nx; v[p + 9] = Math.sqrt(Math.max(0, 1 - nx * nx - nz * nz)); v[p + 10] = nz;
-        for (let j = 0; j < 8; j++) v[p + 11 + j] = d.getUint8(o + 14 + j) / 255;
+        v[p + 11] = d.getUint8(o + 14) / 255;
       }
-      out.push(v);
+      out.push({ values: v, start: a });
     });
     return out;
   }
 
-  private cell(cx: number, cz: number): Float32Array[] {
+  private cell(cx: number, cz: number): CoverCell[] {
     return this.cells.get(cx, cz) ?? this.cells.set(cx, cz, this.generate(cx, cz));
   }
 
@@ -198,13 +202,14 @@ class StreamedCover {
     for (const [cx, cz] of this.cells.within(px, pz, this.rMax)) {
       const data = this.cell(cx, cz);
       this.kinds.forEach((k, ki) => {
-        const v = data[ki], A = arrs[ki], near = k.reach.x, far = k.reach.y, grow = k.reach.z;
-        if (v === undefined || A === undefined) return;
+        const entry = data[ki], A = arrs[ki], near = k.reach.x, far = k.reach.y, grow = k.reach.z;
+        if (entry === undefined || A === undefined) return;
+        const v = entry.values;
         for (let i = 0; i < v.length && k.set.n < k.cap; i += STRIDE) {
           // this plant's edge (the shader's): yaw / 2π; round the wrap (the GPU's atan may land either side) to the far end
           const d2 = ((v[i] ?? 0) - px) ** 2 + ((v[i + 1] ?? 0) - py) ** 2 + ((v[i + 2] ?? 0) - pz) ** 2, rk = this.reachMax(v, i, up, slack);
           const h = (v[i + 3] ?? 0) / TAU, edge = (h < 0.005 || h > 0.995 ? far : near + grow + (far - near - grow) * h) * rk, lim = edge + slack;
-          if (d2 <= lim * lim) writePlant(A, k.set.n++, v, i);
+          if (d2 <= lim * lim) writePlant(A, k.set.n++, entry, i, this.file.view);
         }
       });
     }
@@ -226,8 +231,9 @@ class StreamedCover {
       if (!this.cells.has(cx, cz)) { this.cell(cx, cz); this.stats.cellsBuilt++; yield undefined; } // a new cell is its own slice
       const data = this.cell(cx, cz);
       this.kinds.forEach((k, ki) => {
-        const f = k.far, v = data[ki];
-        if (f === null || v === undefined) return;
+        const f = k.far, entry = data[ki];
+        if (f === null || entry === undefined) return;
+        const v = entry.values;
         const near = k.reach.x, grow = k.reach.z, far = k.reach.y, fNear = f.reach.x, fFar = f.reach.y, fGrow = f.reach.z;
         const st = arrs[ki], keep = f.keep;
         if (!st) return;
@@ -238,7 +244,7 @@ class StreamedCover {
           const edge = (wrap ? near + grow : near + grow + (far - near - grow) * h) * rk, fEdge = (wrap ? fFar : fNear + fGrow + (fFar - fNear - fGrow) * h) * rk;
           // the lower bound takes the plant's reach at 1× (the camera may climb and the strength fall before the next rebuild)
           const lo = Math.max(0, (edge / rk) - grow - slack), hi = fEdge + slack;
-          if (d2 <= hi * hi && d2 >= lo * lo) writePlant(st, f.set.n++, v, i);
+          if (d2 <= hi * hi && d2 >= lo * lo) writePlant(st, f.set.n++, entry, i, this.file.view);
         }
       });
       yield undefined;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { drawNeutral } from './drawNeutral';
+import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
 
 /**
  * Cell-streamed instances (SHARD-PLATFORM W2, G441): the bookkeeping a scatter streamed round a viewer shares, with
@@ -81,17 +82,19 @@ export class CellWindow<T> {
   }
 }
 
-/** A per-instance attribute the tier carries: its name and floats per instance. */
+/** A per-instance attribute and its stored components. */
 export interface InstanceAttr {
   readonly name: string;
   readonly size: number;
+  readonly normalizedBytes?: boolean;
 }
 
+type InstanceWords = Float32Array | Uint8Array;
 /** The back mesh's per-instance arrays: matrices, colours (a coloured tier) and the declared attributes in order. */
 export interface InstanceArrays {
   readonly matrix: Float32Array;
   readonly colour: Float32Array | null;
-  readonly attrs: readonly Float32Array[];
+  readonly attrs: readonly InstanceWords[];
 }
 
 const floats = (a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined): Float32Array => (a !== undefined && a.array instanceof Float32Array ? a.array : new Float32Array(0));
@@ -119,7 +122,7 @@ export class InstanceTier {
   constructor(meshes: readonly [THREE.InstancedMesh, THREE.InstancedMesh], attrs: readonly InstanceAttr[]) {
     this.meshes = meshes;
     this.attrs = attrs;
-    this.bytesPer = 4 * (16 + (meshes[0].instanceColor ? 3 : 0) + attrs.reduce((s, a) => s + a.size, 0));
+    this.bytesPer = 4 * (16 + (meshes[0].instanceColor ? 3 : 0)) + attrs.reduce((bytes, attr) => bytes + attr.size * (attr.normalizedBytes === true ? 1 : 4), 0);
     meshes.forEach((m, i) => { m.onBeforeRender = drawNeutral(() => { this.drawn[i] = true; }); });
   }
   /** The mesh drawn. */
@@ -129,7 +132,11 @@ export class InstanceTier {
   /** The back mesh's per-instance arrays, to write the next set into. */
   arrays(): InstanceArrays {
     const b = this.back, col = b.instanceColor;
-    return { matrix: floats(b.instanceMatrix), colour: col ? floats(col) : null, attrs: this.attrs.map((a) => floats(b.geometry.getAttribute(a.name))) };
+    const attrs = this.attrs.map(({ name }): InstanceWords => {
+      const attr = b.geometry.getAttribute(name);
+      return attr?.array instanceof Uint8Array ? attr.array : floats(attr);
+    });
+    return { matrix: floats(b.instanceMatrix), colour: col ? floats(col) : null, attrs };
   }
   /** Start the next set in the back mesh. */
   begin(): void { this.n = 0; this.up = 0; const b = this.back; b.count = 0; b.visible = true; }
@@ -176,7 +183,12 @@ export function instanceTier(parent: THREE.Object3D, name: string, geometry: THR
     mesh.castShadow = options.castShadow ?? false; mesh.receiveShadow = true;
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     if (options.coloured === true) { mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); mesh.instanceColor.setUsage(THREE.DynamicDrawUsage); }
-    for (const a of attrs) { const b = new THREE.InstancedBufferAttribute(new Float32Array(cap * a.size), a.size); b.setUsage(THREE.DynamicDrawUsage); g.setAttribute(a.name, b); }
+    for (const attr of attrs) {
+      const label = { owner: 'engine/streamed-instances', asset: `${name}/${attr.name}`, kind: 'array-buffer' } as const;
+      const array = attr.normalizedBytes === true ? ownedArray(Uint8Array, cap * attr.size, label) : ownedArray(Float32Array, cap * attr.size, label);
+      const channel = new THREE.InstancedBufferAttribute(array, attr.size, attr.normalizedBytes === true);
+      channel.setUsage(THREE.DynamicDrawUsage); g.setAttribute(attr.name, channel);
+    }
     parent.add(mesh);
     return mesh;
   };
