@@ -33,9 +33,12 @@ try {
   }
   for (const chunk of readings) {
     const rounds = mode === 'ledger' && !baseline ? (chunk === '_template' ? 5 : 3) : 1;
+    // Nine's phone boot on hosted SwiftShader exceeded the generic deadline.
+    // Use the same deadline as the existing hosted Nine memory probe.
+    const timeout = chunk === 'nine-dragon-stack' ? 480 : 180;
     for (let i = 0; i < rounds; i++) {
       const file = join(directory, `measure-${chunk}-${i + 1}.json`);
-      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file}`,
+      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, `--timeout=${timeout}`, `--out=${file}`,
         ...(mode === 'ledger' ? ['--ledger-only'] : ['--runs=5'])]);
       files.push(file);
     }

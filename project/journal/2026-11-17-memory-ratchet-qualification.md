@@ -27,3 +27,9 @@ across five native WebKit boots. The settled median was 646.96 MB.
 The committed positive spread is 19.09 MB. A regular production CI
 run loads this file and fails above its 666.05 MB ceiling.
 [Qualification job](https://github.com/project-wildshard/engine/actions/runs/44233634711/job/134565599126).
+
+The extended recording reached Nine after 20 successful Chromium
+boots across six zones. The first Nine boot timed out waiting for
+control at 180 seconds. The hosted ledger now gives Nine the existing
+480-second memory-probe deadline. Other zones keep 180 seconds.
+[First extended run](https://github.com/project-wildshard/engine/actions/runs/44239650390/job/134585981330).
