@@ -624,10 +624,12 @@ jobs:
   memory-footprint-guard:
     # J426: the armed zones must pass both phone footprint lines.
     # With an empty policy, ci-reports owns the advisory native readings.
+    # EM11 was fitted on macOS 27 WebKit. macOS 15 charged significantly more
+    # of the same Nalati build to WebContent (44375696856).
     needs: memory-client-build
     if: ${{ !cancelled() && needs.memory-client-build.result == 'success' && needs.memory-client-build.outputs.armed != 'false' }}
-    runs-on: macos-15
-    timeout-minutes: 60
+    runs-on: xcode-27
+    timeout-minutes: 90 # Full 26-zone sweep, five cold boots per zone.
     env:
       WS_LANE_NAME: memory-footprint
     steps:
@@ -636,6 +638,8 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - run: node scripts/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
+      - name: Record the native measurement host
+        run: sw_vers
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: memory-pinned-client

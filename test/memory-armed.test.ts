@@ -81,7 +81,7 @@ test('CI keeps both armed jobs blocking during normal comparisons and recordings
   expect(ledger).toContain('name: memory-pinned-client');
   expect(native).toContain('name: memory-pinned-client');
   expect(ledger).toMatch(/\n {4}runs-on:/u);
-  expect(native).toMatch(/\n {4}runs-on:/u);
+  expect(native).toContain('runs-on: xcode-27');
   expect(ledger).not.toMatch(/\n {4}continue-on-error:/u);
   expect(native).not.toContain('continue-on-error');
 });

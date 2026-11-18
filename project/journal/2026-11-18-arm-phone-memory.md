@@ -65,3 +65,19 @@ were 594,716,039 and 851,164,947 B for Desert Ruin, and 578,591,866 and
 787,308,423 B for Thin Ice. The existing Ubuntu ledger uses standalone
 Chromium. The raw native readings and computed table are in the lane's
 `j426-2026-11-18/pinned-native` receipt directory.
+
+The first hosted hard qualification on `4026d299` passed all 25
+armed Ubuntu ledger comparisons. Its macOS 15 native job refused
+Nalati's 1,043,634,221 B playing reading. Loading was 1,229,520,942 B.
+Five locked boots of the exact same pin and engine build on the mini
+read 986,803,116 B playing and 1,317,890,545 B loading. Hosted settled
+medians were 786.55 MB WebContent and 319.05 MB GPU. The mini read
+601.30 MB WebContent and 424.81 MB GPU.
+
+EM11 was fitted on macOS 27. The native job now targets GitHub's
+macOS 27 image through its `xcode-27` label and records the OS build.
+It keeps the same model, limits and five cold boots per zone. The job
+has 90 minutes for the 130-boot sweep. The hosted Ubuntu job stays on
+the original instrument and comparator.
+[First hosted qualification](https://github.com/project-wildshard/engine/actions/runs/44375696856).
+[GitHub macOS 27 image](https://github.blog/changelog/2026-10-15-xcode-27-runner-image-generally-available/).
