@@ -49,9 +49,10 @@ export function placedStatus(row: {readonly slug: string}): string | undefined {
 export function titleStatus(row: {readonly slug: string; readonly status?: string}): string | undefined {
   return placedStatus(row) ?? row.status;
 }
-/** Hidden from a player: a `hidden` status, or a `_` prototype whose catalogue placement doesn't open it (J313: Mossgate). */
+/** Hidden from a player: a `hidden` status, or a `_` prototype. J313 let the catalogue open `_template` while that slug was
+ *  Mossgate; Mossgate Hollow is `mossgate` now, so a prototype is Developer only whatever its placement says (SB46). */
 export function playerHidden(row: {readonly slug: string; readonly status?: string}): boolean {
-  return titleStatus(row) === 'hidden' || (row.slug.startsWith('_') && placedStatus(row) === undefined);
+  return titleStatus(row) === 'hidden' || row.slug.startsWith('_');
 }
 /**
  * SA34 (J314, grill Q12): an auto-placed shard gets no Shard Select card; you cross in from a neighbour. Auto-placed means the

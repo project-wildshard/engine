@@ -42,7 +42,7 @@ const view = (deck: TitleDeck): { name: string; tag: string; enters: boolean }[]
   enters: card instanceof HTMLElement && card.dataset['enters'] === '1',
 }));
 
-test('J313: with Developer off, the three unlocked shards enter with their labels, Mossgate shows, no open plot or Thin Ice card', () => {
+test('J313: with Developer off, the three unlocked shards enter with their labels, no Template, open plot or Thin Ice card', () => {
   const cards = view(deckOf(false, PLAYER));
   expect(cards).toEqual([
     { name: 'Driftwood Isle', tag: '', enters: true },
@@ -51,7 +51,6 @@ test('J313: with Developer off, the three unlocked shards enter with their label
     { name: 'Nine Dragon Stack', tag: 'Partial', enters: true },
     { name: 'Signal Dunes', tag: 'Experimental', enters: true },
     { name: 'Sky Reach', tag: 'Experimental', enters: true },
-    { name: 'Template shard', tag: '', enters: true },
   ]);
   expect(cards.some(({ tag }) => tag === 'Coming soon')).toBe(false);
   expect(cards.some(({ name }) => name.startsWith('Open Plot') || name === 'Thin Ice')).toBe(false);
@@ -60,7 +59,7 @@ test('J313: with Developer off, the three unlocked shards enter with their label
 
 test('J313: ENTER ZONE (MS3, was ENTER WORLD) reads Enter zone, not Coming soon, on each unlocked card for a player', () => {
   const deck = deckOf(false, PLAYER);
-  for (const slug of ['nine-dragon-stack', 'sunscar-dunes', 'far-reach', '_template']) {
+  for (const slug of ['nine-dragon-stack', 'sunscar-dunes', 'far-reach']) {
     deck.select(deck.cards.findIndex((card) => card.slug === slug), false);
     expect(deck.root.querySelector('.ws-menu-play b')?.textContent).toBe('Enter zone');
   }
@@ -70,15 +69,15 @@ test('J313: Developer still sees the Thin Ice draft and the hidden shards; open 
   const names = view(deckOf(true, { developer: true, devserver: false })).map(({ name }) => name);
   expect(names).toContain('Thin Ice');
   expect(names).toContain('Brasscap Mesa');
+  expect(names).toContain('Template shard');
   expect(names.some((name) => name.startsWith('Open Plot'))).toBe(false);
 });
 
-test('J313: the title summary counts Mossgate for a player, since its catalogue placement opens it', async () => {
+test('SB46: the title summary counts an opened shard for a player, never the Template prototype', async () => {
   const { summaryView } = await import('../src/client/game/summary');
-  const view = summaryView({ v: 1, shards: { _template: { earned: 2, total: null, playS: 10, at: 0 } } }, ROWS);
-  expect(view.lines.map(({ slug }) => slug)).toContain('_template');
-  expect(view.earned).toBe(2);
-  expect(view.lines.some(({ slug }) => slug === 'brasscap-mesa')).toBe(false);
+  const view = summaryView({ v: 1, shards: { _template: { earned: 2, total: null, playS: 10, at: 0 }, 'far-reach': { earned: 3, total: null, playS: 10, at: 0 } } }, ROWS);
+  expect(view.lines.map(({ slug }) => slug)).toContain('far-reach');
+  expect(view.lines.some(({ slug }) => slug === '_template' || slug === 'brasscap-mesa')).toBe(false);
 });
 
 // FM4 9b/10b (meta MMO-FAILURE-MODES-PLAN; review of plan/mfm2): a world build's title gate may hold ENTER WORLD while it asks the world.
@@ -100,4 +99,14 @@ test('a gated ENTER WORLD stays busy while the gate asks, and enters the card ta
   expect(play?.getAttribute('aria-busy')).toBeNull();
   await new Promise((resolve) => { setTimeout(resolve, 50); });
   expect(entered).toEqual(['pine-hollow']);
+});
+
+/** STAGING-BUGBASH SB46 (Jake's pick on the zone sweep board, recommended): J313 opened `_template` to players while that slug
+ *  was Mossgate; Mossgate Hollow is `mossgate` now (SS-SHIPa), so the grey-box Template is Developer only again. A `_`
+ *  prototype stays off a player's deck even when a catalogue placement still says `live` (an API grid a pin refresh copies). */
+test('SB46: a `_` prototype is Developer only, even when its catalogue placement says live', () => {
+  installCatalogue({ ...catalogueBeforePlacements, placements: catalogueBeforePlacements.placements.map(placed =>
+    placed.slug === '_template' ? { ...placed, status: 'live' } : placed) });
+  expect(view(deckOf(false, PLAYER)).map(({ name }) => name)).not.toContain('Template shard');
+  expect(view(deckOf(true, { developer: true, devserver: false })).map(({ name }) => name)).toContain('Template shard');
 });
