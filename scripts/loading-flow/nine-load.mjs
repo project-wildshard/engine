@@ -3,7 +3,7 @@ import {join} from 'node:path';
 import {devices} from "../browser-playwright.mjs";
 import {developerSettings,saveFixture,NAME_ASKED} from '../debug-settings.mjs';
 import {startStallProfile,finishStallProfile,bootTimelineEntries} from './stalls.mjs';
-import {bootMemoryMarks,bootMemoryVerdict,liveHeapBytes} from './boot-memory-ratchet.mjs';
+import {bootMemoryMarks,bootMemoryVerdict,liveHeapBytes,retainedGeometryBytes} from './boot-memory-ratchet.mjs';
 
 // Hosted green total loads: 98.239-166.456 s (six runs). Reserve one
 // observed spread: ceil(166456 + (166456 - 98239)) = 235 s.
@@ -40,7 +40,11 @@ export async function assertNineLoad(browser,base,out) {
       // mini QA 2026-11-17 row 19: the boot's memory cuts hold (boot-memory-ratchet.mjs)
       const heap=await page.context().newCDPSession(page);
       let memory;
-      try {memory=bootMemoryVerdict(await page.evaluate(bootMemoryMarks),await liveHeapBytes(heap));} finally {await heap.detach().catch(()=>undefined);}
+      try {
+        const marks=await page.evaluate(bootMemoryMarks);
+        const retained=await page.evaluate(retainedGeometryBytes);
+        memory=bootMemoryVerdict(marks,retained,await liveHeapBytes(heap));
+      } finally {await heap.detach().catch(()=>undefined);}
       faults.push(...memory.faults);
       const receipt={...state,elapsedMs:Date.now()-started,stalls:read.stalls,memory,faults};
       writeFileSync(join(out,'load.json'),`${JSON.stringify(receipt,null,2)}\n`);
