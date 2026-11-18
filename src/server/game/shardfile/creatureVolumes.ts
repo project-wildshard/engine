@@ -62,7 +62,10 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     // CC31: authored volumes with hp break at 0 (their volume goes off and `creature.part-broken` fires once)
     const hp = new Map((body.volumes ?? []).flatMap(row => row.hp === undefined ? [] : [[row.part, row.hp] as const]));
     if (hp.size > 0 && pose === undefined) throw new Error(`species ${spawn.species}: part hp needs hit volumes`);
-    const parts = hp.size === 0 || pose === undefined ? undefined : new PartHealth(pose, hp, actor.combatActor(), host.combat, host.events, host.scope);
+    // CC30b: a volume's break channel goes to 1 as it breaks, so every page reads the break off the actor channels
+    const breaks = new Map((body.volumes ?? []).flatMap(row => row.channel === undefined ? [] : [[row.part, (body.channels ?? []).findIndex(channel => channel.name === row.channel)] as const]));
+    const onBreak = breaks.size === 0 ? undefined : (part: string): void => { const index = breaks.get(part); if (index !== undefined && index >= 0) actor.channels[index] = 1; };
+    const parts = hp.size === 0 || pose === undefined ? undefined : new PartHealth(pose, hp, actor.combatActor(), host.combat, host.events, host.scope, onBreak);
     return [{ actor, pose: parts?.pose ?? pose, parts, trail: pose instanceof TrailCreatureVolumes ? pose : undefined,
       locks: body.skeleton === undefined && body.lock === undefined ? undefined : new CreatureSockets(body, joints, root),
       strikes, contract: { id: spawn.id, body, skin: skin.hash, joints, ...(strikes === undefined ? {} : { strikeNames }) } }];

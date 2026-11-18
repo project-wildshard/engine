@@ -9,14 +9,15 @@ const SavedParts = v.array(v.pipe(v.number(), v.finite(), v.minValue(0)));
 /**
  * Part hp (ONE-FORMAT CC31). A volume with `hp` loses the hit's amount (before its multiplier, so a plate at x0 still
  * wears) on every hit that lands on its part (`CombatPipeline.watchParts`); at 0 it breaks, once: `creature.part-broken` fires and the volume is off
- * from then on, so later hits pass to the next volume behind it. The remaining hp are saved state.
+ * from then on, so later hits pass to the next volume behind it. The remaining hp are saved state. `onBreak` hears each
+ * part as it breaks and again as a broken part is restored (CC30b: a volume's break channel goes to 1).
  */
 export class PartHealth {
   readonly pose: CreatureVolumePose;
   private readonly left: number[];
   private readonly index: ReadonlyMap<string, number>;
   constructor(inner: CreatureVolumePose, private readonly hp: ReadonlyMap<string, number>, private readonly actor: Actor,
-    combat: Pick<CombatPipeline, 'watchParts'>, private readonly events: Events, scope: Scope) {
+    combat: Pick<CombatPipeline, 'watchParts'>, private readonly events: Events, scope: Scope, private readonly onBreak?: (part: string) => void) {
     const parts = inner.volumes.map(row => row.part);
     for (const part of hp.keys()) if (!parts.includes(part)) throw new Error(`Part hp names no volume ${part}`);
     this.index = new Map([...hp.keys()].map(part => [part, parts.indexOf(part)]));
@@ -38,12 +39,12 @@ export class PartHealth {
   restore(input: unknown): void {
     const saved = v.parse(SavedParts, input), slots = [...this.index.entries()];
     if (saved.length !== slots.length) throw new Error('Incompatible part hp continuation');
-    slots.forEach(([part, index], slot) => { const value = saved[slot] ?? 0; if (value > (this.hp.get(part) ?? 0)) throw new Error('Incompatible part hp continuation'); this.left[index] = value; });
+    slots.forEach(([part, index], slot) => { const value = saved[slot] ?? 0; if (value > (this.hp.get(part) ?? 0)) throw new Error('Incompatible part hp continuation'); this.left[index] = value; if (value === 0) this.onBreak?.(part); });
   }
   private wear(part: string, amount: number): void {
     const index = this.index.get(part); if (index === undefined || !Number.isFinite(amount) || amount <= 0) return;
     const before = this.left[index] ?? 0; if (before === 0) return;
     const after = Math.max(0, before - amount); this.left[index] = after;
-    if (after === 0) this.events.emit('creature.part-broken', { actor: this.actor, part, index });
+    if (after === 0) { this.onBreak?.(part); this.events.emit('creature.part-broken', { actor: this.actor, part, index }); }
   }
 }
