@@ -12,7 +12,7 @@ import type { SimCommand } from '../src/server/engine/sim';
 // ONE-FORMAT CC40b1: a plain-JSON creature with a `mount` row is ridden by the one riding primitive, with no shard code.
 const GAITS = { walk: 2, gallop: 10 };
 const look = { id: 'fixture.horse.look', species: 'fixture.horse', recipe: 'fixture.placeholder', material: null, parameters: {}, animation: { recipe: 'fixture.placeholder', parameters: {} } };
-function horseShard(mount: object | null = { gaits: GAITS }) {
+function horseShard(mount: object | null = { gaits: GAITS }, flight?: object) {
   const base = emptyShardfile({ slug: 'riding-fixture', name: 'Riding fixture', author: 'Test', revision: 1, seed: 11 });
   const rows = parseRows({ weather: [], days: [], compendiums: [], loot: [], strikes: [], looks: [look], species: [{
     id: 'fixture.horse', kind: 'horse', label: 'Horse', aggressive: false, lockable: true,
@@ -24,14 +24,15 @@ function horseShard(mount: object | null = { gaits: GAITS }) {
       tuning: { speed: 1.2, turnRate: 4, thinkDivisor: 3, attackCooldownTicks: 60, wanderRadius: 0, wanderEveryTicks: 420 } },
     senses: { notice: 4 },
     ...(mount === null ? {} : { mount }),
+    ...(flight === undefined ? {} : { flight }),
   }] });
   const spawn: ShardCreatures['spawns'][number] = { id: 'fixture.horse:1', species: 'fixture.horse', variant: 'bay', brain: null, strike: null,
     at: [1.5, 0, 0], seed: 3, scale: 1, yaw: 0 };
   return { ...base, spawn: { x: 0, y: 0, z: 0, yaw: 0 }, rows, creatures: { brains: [], groups: [], spawns: [spawn] } };
 }
 /** A walk is the stick pushed a little; a gallop is GALLOP held. */
-const reins = (stick: number, sprint: boolean): SimCommand => ({ commandVersion: 1, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: stick },
-  sprint, moveX: 0, moveZ: 0, yaw: 0 });
+const reins = (stick: number, sprint: boolean, jump = false): SimCommand => ({ commandVersion: 1, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: stick },
+  sprint, ...(jump ? { jump: true as const } : {}), moveX: 0, moveZ: 0, yaw: 0 });
 function ride(sim: ShardfileSimulation, seconds: number, command: SimCommand): number {
   const player = sim.host.players.values().next().value;
   if (player === undefined) throw new Error('Missing player');
@@ -86,4 +87,27 @@ test('CC40b1: a save mid-ride restores the seat and the gait', () => {
     const a = ride(first, 1, reins(1, true)), b = ride(again, 1, reins(1, true));
     expect(b).toBeCloseTo(a, 3);
   } finally { first.dispose(); resumed.simulation.dispose(); }
+});
+
+test('CC40b2: a fly mount takes off on jump, flies, and lands on the ground', () => {
+  const shard = horseShard({ gaits: GAITS, fly: true }, { altitude: 8, climbRate: 4, diveRate: 3 });
+  const sim = createShardfileSim(shard, new Map(), { rapier });
+  try {
+    const player = sim.host.players.values().next().value, horse = sim.host.entities.get('fixture.horse:1');
+    if (player === undefined || horse === undefined) throw new Error('Missing flying fixture');
+    actRoutes(sim.host).ride?.(player.id, 'mount');
+    const ground = sim.host.groundHeightAt(horse.position.x, horse.position.z);
+    ride(sim, 1 / 60, reins(0, false, true));
+    ride(sim, 3, reins(0.3, false));
+    expect(horse.position.y - ground).toBeGreaterThan(3);
+    const start = { x: horse.position.x, z: horse.position.z };
+    ride(sim, 3, reins(1, true));
+    expect(Math.hypot(horse.position.x - start.x, horse.position.z - start.z)).toBeGreaterThan(10);
+    ride(sim, 1 / 60, reins(0, false, true));
+    ride(sim, 5, reins(0, false));
+    expect(horse.position.y - sim.host.groundHeightAt(horse.position.x, horse.position.z)).toBeLessThan(0.2);
+    expect(player.ridden).toBe(horse.entityId);
+    ride(sim, 2, reins(0.3, false));
+    expect(horse.position.y - sim.host.groundHeightAt(horse.position.x, horse.position.z)).toBeLessThan(0.2);
+  } finally { sim.dispose(); }
 });

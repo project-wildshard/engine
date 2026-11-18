@@ -26,6 +26,8 @@ export interface DeclaredRiding {
 /** How far from a mount's centre a player may climb on, in metres beyond its scale. */
 const REACH = 3;
 const STEP_ID = 'riding.declared';
+/** A flying mount cruises at least this high, whatever its flight row's altitude (a ground flyer's 0 would never leave). */
+const MIN_ALTITUDE = 4;
 
 /** A mount row's gaits as the reins read them: a missing trot or canter falls a third or two thirds of the way up. */
 export function mountSpeeds(gaits: { readonly walk: number; readonly trot?: number; readonly canter?: number; readonly gallop: number }): HorseSpeeds {
@@ -34,19 +36,27 @@ export function mountSpeeds(gaits: { readonly walk: number; readonly trot?: numb
 }
 
 const num = v.pipe(v.number(), v.finite());
+const FlightSaved = v.strictObject({ lift: num, phase: v.picklist(['climb', 'cruise', 'descend']) });
 const SeatSaved = v.strictObject({ player: v.string(), horse: v.string(), body: v.unknown(), motor: v.unknown(),
-  rider: v.strictObject({ velocity: v.tuple([num, num, num]), onGround: v.boolean() }) });
+  rider: v.strictObject({ velocity: v.tuple([num, num, num]), onGround: v.boolean() }), flight: v.exactOptional(v.nullable(FlightSaved)) });
 const Saved = v.strictObject({ version: v.literal(1), seats: v.pipe(v.array(SeatSaved), v.maxLength(64)) });
+
+/** CC40b2: a flying mount's air state. `lift` is metres above the ground under it; null on the ground. */
+interface Flight { lift: number; phase: 'climb' | 'cruise' | 'descend' }
+/** What a `fly` mount flies with: its species `flight` row's altitude and climb and dive rates. */
+interface Wings { readonly altitude: number; readonly climb: number; readonly dive: number }
 
 interface Seat {
   readonly player: PlayerSim; readonly body: MountedBody; readonly rider: MountedRider;
-  horse: AnimalSim | null; savedMotor: NonNullable<ConstructorParameters<typeof CharacterMotor>[2]> | null;
+  horse: AnimalSim | null; flight: Flight | null; jumpWas: boolean; savedMotor: NonNullable<ConstructorParameters<typeof CharacterMotor>[2]> | null;
 }
 
 /** Install the riding primitive when any species declares a mount; null when none does. */
 export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'rows'>): DeclaredRiding | null {
   const gaits = new Map(shard.rows.species.flatMap(row => row.mount === undefined ? [] : [[row.id, mountSpeeds(row.mount.gaits)] as const]));
   if (gaits.size === 0) return null;
+  const wings = new Map(shard.rows.species.flatMap(row => row.mount?.fly !== true || row.flight === undefined ? []
+    : [[row.id, { altitude: Math.max(MIN_ALTITUDE, row.flight.altitude), climb: row.flight.climbRate, dive: row.flight.diveRate }] as const]));
   const seats = new Map<string, Seat>();
   const heightAt = (x: number, z: number): number => host.groundHeightAt(x, z);
   const world: MountedWorld = { get physics() { return host.physics; }, heightAt, waterLevel: () => -Infinity, wetAt: undefined,
@@ -60,6 +70,7 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
   const riddenBy = (a: AnimalSim): Seat | undefined => [...seats.values()].find(seat => seat.horse === a);
   const free = (seat: Seat): void => {
     const a = seat.horse; if (a === null) return;
+    if (seat.flight !== null) { seat.body.feet.y = heightAt(seat.body.feet.x, seat.body.feet.z); seat.flight = null; }
     a.position.copy(seat.body.feet); a.yaw = seat.body.heading; a.driven = false; a.levelGround = false;
     a.yOffset = Math.max(0, seat.body.feet.y - heightAt(seat.body.feet.x, seat.body.feet.z));
     a.setMotion(a.yaw, 0, 2);
@@ -72,7 +83,7 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
     player.modes.register({ id: 'ride', hud: 'ride' }, host.scope);
     const speeds = { walk: 1, trot: 2, canter: 3, gallop: 4 };
     const seat: Seat = { player, body: new MountedBody(speeds), rider: { position: player.position, velocity: new Vector3(), onGround: true, sprinting: false, crouching: false, speedFactor: 1 },
-      horse: null, savedMotor: null };
+      horse: null, savedMotor: null, flight: null, jumpWas: false };
     seats.set(player.id, seat);
     return seat;
   };
@@ -83,6 +94,23 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
     seat.rider.position.set(x, heightAt(x, z), z); seat.rider.velocity.set(0, 0, 0); seat.rider.onGround = true;
     seat.player.motor.setEnabled(true); seat.player.fall.grounded = true; seat.player.velocity.y = 0;
     seat.player.modes.exit('ride');
+  };
+  /** One step in the air: the reins steer and pace it as on the ground (no motor, nothing to stand on), then the
+   * lift climbs to the cruise altitude or dives to the ground; touching down hands the feet back to the motor. */
+  const flyStep = (seat: Seat, a: AnimalSim, air: Flight, w: Wings, dt: number): void => {
+    const body = seat.body, motor = body.motor;
+    body.motor = null;
+    try { body.stepBody(dt, a, seat.rider, world); } finally { body.motor = motor; }
+    if (air.phase === 'climb') { air.lift = Math.min(w.altitude, air.lift + w.climb * dt); if (air.lift >= w.altitude) air.phase = 'cruise'; }
+    else if (air.phase === 'descend') air.lift = Math.max(0, air.lift - w.dive * dt);
+    const ground = heightAt(body.feet.x, body.feet.z);
+    body.feet.y = ground + air.lift; a.position.y = body.feet.y; a.levelGround = true;
+    seat.rider.onGround = false;
+    if (air.phase === 'descend' && air.lift <= 0) {
+      seat.flight = null; body.feet.y = ground; a.position.y = ground; seat.rider.onGround = true;
+      if (motor !== null) { motor.resetAt(body.feet); motor.setEnabled(true); }
+    }
+    if (seat.horse !== null) body.placeRider(dt, 1, a, seat.rider, world);
   };
   const frame: ReinsFrameRow = { forward: 0, turn: 0, touchX: 0, touchY: 0, gallop: false, jump: false, drawing: false, moveScale: 1,
     phase: 0, feet: { x: 0, z: 0 }, roads: undefined, inBounds: () => true, refuses: () => false, wet: false };
@@ -98,9 +126,17 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
       seat.player.impulse.set(0, 0, 0);
       commandReins(frame, command); frame.feet = seat.body.feet; frame.moveScale = seat.player.moveScale;
       seat.body.read(dt, frame);
+      const w = wings.get(a.species);
+      if (w !== undefined) {
+        const press = frame.jump && !seat.jumpWas; seat.jumpWas = frame.jump; seat.body.jumpQueued = false;
+        if (press && seat.flight === null) { seat.flight = { lift: 0, phase: 'climb' }; seat.body.motor?.setEnabled(false); }
+        else if (press && seat.flight !== null) seat.flight.phase = 'descend';
+      }
     },
     step: dt => {
       const a = seat.horse; if (a === null) return;
+      const air = seat.flight, w = wings.get(a.species);
+      if (air !== null && w !== undefined) { flyStep(seat, a, air, w, dt); return; }
       seat.body.stepBody(dt, a, seat.rider, world);
       if (seat.horse !== null) seat.body.placeRider(dt, 1, a, seat.rider, world);
     },
@@ -112,6 +148,7 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
     const speeds = gaits.get(a.species); if (speeds === undefined) throw new Error('Mount species lost its gaits');
     const body = new MountedBody(speeds);
     Object.assign(seat, { body });
+    seat.flight = null; seat.jumpWas = false;
     seat.horse = a; a.driven = true; a.yOffset = 0; a.setMotion(a.yaw, 0, 2); holdOwnBody(a, true);
     body.heading = a.yaw; body.speed = 0; body.feet.copy(a.position);
     body.motor = withOwner(null, () => new CharacterMotor(host.physics, mountedMotorOptions(a.scale, a)));
@@ -140,7 +177,8 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
   }, {
     snapshot: (): SimValue => ({ version: 1, seats: [...seats.values()].flatMap(seat => seat.horse === null ? [] : [{ player: seat.player.id, horse: seat.horse.entityId,
       body: seat.body.snapshotBody() as unknown as SimValue, motor: (seat.body.motor?.snapshot() ?? null) as unknown as SimValue,
-      rider: { velocity: seat.rider.velocity.toArray(), onGround: seat.rider.onGround } }]) }),
+      rider: { velocity: seat.rider.velocity.toArray(), onGround: seat.rider.onGround },
+      ...(seat.flight === null ? {} : { flight: { ...seat.flight } }) }]) }),
     restore: value => {
       const saved = v.parse(Saved, value);
       for (const row of saved.seats) {
@@ -149,6 +187,7 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
         const seat = seatFor(p), body = new MountedBody(speeds); body.restoreBody(row.body);
         Object.assign(seat, { body }); seat.horse = a; seat.savedMotor = row.motor as Seat['savedMotor'];
         seat.rider.velocity.fromArray(row.rider.velocity); seat.rider.onGround = row.rider.onGround;
+        seat.flight = row.flight === undefined || row.flight === null ? null : { ...row.flight };
         a.driven = true; holdOwnBody(a, true); p.motor.setEnabled(false); rides.delete(seat); p.modes.enter('ride', rideFor(seat));
       }
     },
@@ -158,6 +197,7 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
         const c = host.physics.world.getCollider(state.colliderHandle);
         if (tagOf(c)?.owner !== a) throw new Error('Invalid declared ride capsule');
         seat.body.motor = withOwner(null, () => new CharacterMotor(host.physics, mountedMotorOptions(a.scale, a), state)); seat.savedMotor = null;
+        if (seat.flight !== null) seat.body.motor.setEnabled(false);
       }
     },
   }, 'afterBodies');
