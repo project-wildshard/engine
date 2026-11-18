@@ -4,7 +4,7 @@ import { materialColourGraph } from '@wildshard/engine/render/graph/colourFuncti
 import { isJsonData } from '@wildshard/format/json';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
 import { unzlibSync } from 'fflate';
-import { type NativeAttributeSchema as WholeAttribute, admitNativeWholeGeometry } from '@wildshard/engine/models/nativeGeometry';
+import { type NativeAttributeSchema as WholeAttribute, admitNativeWholeGeometry, halfAttribute } from '@wildshard/engine/models/nativeGeometry';
 import { fetchDeflatedBytes, fetchLaneBytes, unshuffleLanes as restoreLanes } from '@wildshard/engine/core/deflate';
 import { geometryBoundsSteps } from '@wildshard/engine/world/geometryBounds';
 import { BAKED_BYTES as codecBakedBytes, appendGeometry as codecAppendGeometry, bakedGeometryBytes as codecBakedGeometryBytes, pad4 as codecPad4, readBakedAttribute, readBakedGeometry as codecReadBakedGeometry, type BakedGeometryRow as CodecBakedGeometryRow, type BakedType as CodecBakedType } from './bakedGeometry';
@@ -26,7 +26,7 @@ import { retainCachedResources } from "@wildshard/engine/app/cachedAssets";
 import { cacheUntilDisposed } from "@wildshard/engine/app/disposalCache";
 import { releaseOnUpload } from "@wildshard/engine/render/memorySaver";
 import { ktx2File, prepareCompressedTexture } from "@wildshard/engine/core/ktx2";
-import { RepeatWrapping, Matrix4, Bone, FileLoader, SkinnedMesh, Texture, type AnimationClip, type Wrapping, type MinificationTextureFilter, type MagnificationTextureFilter, Box3, Sphere, BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, Uint16BufferAttribute, Vector3, BufferAttribute, InterleavedBufferAttribute, type Object3D, CanvasTexture, LinearMipmapLinearFilter, SRGBColorSpace, Float16BufferAttribute, BoxGeometry, CylinderGeometry, ConeGeometry, SphereGeometry, TorusGeometry, IcosahedronGeometry, CapsuleGeometry, Shape, ExtrudeGeometry, Color, type MeshStandardMaterialParameters, type Material, InstancedMesh } from "three";
+import { RepeatWrapping, Matrix4, Bone, FileLoader, SkinnedMesh, Texture, type AnimationClip, type Wrapping, type MinificationTextureFilter, type MagnificationTextureFilter, Box3, Sphere, BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, Uint16BufferAttribute, Vector3, BufferAttribute, InterleavedBufferAttribute, type Object3D, CanvasTexture, LinearMipmapLinearFilter, SRGBColorSpace, BoxGeometry, CylinderGeometry, ConeGeometry, SphereGeometry, TorusGeometry, IcosahedronGeometry, CapsuleGeometry, Shape, ExtrudeGeometry, Color, type MeshStandardMaterialParameters, type Material, InstancedMesh } from "three";
 import { applySurfaceLooks, type SurfaceInputs } from "../systems/looks/surfaceLooks";
 import type { SurfaceLook } from "@wildshard/format/surfaceLooks";
 import { Rng } from "@wildshard/engine/core/rng";
@@ -1733,7 +1733,7 @@ function wholeUnsignedIndex(index: unknown): boolean {
 function isWholeMesh(node: Object3D): node is Mesh { return node instanceof Mesh; }
 function wholeStorage(row: wholeV.InferOutput<typeof WholeAttribute>, count: number): BufferAttribute {
   const n = row.itemSize * count;
-  if (row.storage === 'Float16Array') return new Float16BufferAttribute(new Uint16Array(n), row.itemSize, row.normalized);
+  if (row.storage === 'Float16Array') return halfAttribute(new Uint16Array(n), row.itemSize, row.normalized);
   const array = row.storage === 'Float32Array' ? new Float32Array(n) : row.storage === 'Uint16Array' ? new Uint16Array(n)
     : row.storage === 'Uint32Array' ? new Uint32Array(n) : row.storage === 'Int16Array' ? new Int16Array(n)
     : row.storage === 'Int8Array' ? new Int8Array(n) : new Uint8Array(n);

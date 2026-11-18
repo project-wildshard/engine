@@ -5,6 +5,15 @@ import * as channelLaw from '@wildshard/format/nativeGeometryChannels';
 /** The stored channel table: format's law (SDK-SPLIT SP5b), the identical defining format schemas. */
 export const NativeAttributeSchema: typeof channelLaw.NativeAttributeSchema = channelLaw.NativeAttributeSchema;
 export const NativeAttributesSchema: typeof channelLaw.NativeAttributesSchema = channelLaw.NativeAttributesSchema;
+const NO_WORDS = new Uint16Array(0);
+/** MEMORY-GATES MG10: a half-float attribute over `words` itself. three's Float16BufferAttribute constructor copies its
+ *  array (`new Uint16Array(array)`), so every half channel made from words already in hand cost a second buffer and left
+ *  the first as garbage (Nine's slab merge and whole shapes: ~37 MB of dead copies at its loading peak). */
+export function halfAttribute(words: Uint16Array, itemSize: number, normalized?: boolean): Float16BufferAttribute {
+  const attribute = new Float16BufferAttribute(NO_WORDS, itemSize, normalized);
+  attribute.array = words; Reflect.set(attribute, 'count', words.length / itemSize); // three types count read-only; its constructor sets it the same way
+  return attribute;
+}
 const semantics: Readonly<Record<string, string>> = { POSITION: 'position', NORMAL: 'normal', COLOR_0: 'color', TEXCOORD_0: 'uv', TANGENT: 'tangent' };
 
 /** iPhone downloads I3: a padded channel (a 16-bit grid position has an 8-byte stride) reads back interleaved; its stored
@@ -58,7 +67,8 @@ export function admitNativeWholeGeometry(node: Mesh, ownership: 'borrow' | 'take
     if (!(attribute instanceof BufferAttribute) || attribute.itemSize !== row.itemSize || attribute.normalized !== row.normalized) throw new Error(`Whole shape missing typed channel ${channel}`);
     if (row.storage === 'Float16Array') {
       if (!(attribute.array instanceof Uint16Array)) throw new Error('Whole half-float channel needs uint16 bits');
-      result.setAttribute(name, new Float16BufferAttribute(attribute.array, row.itemSize, row.normalized));
+      // borrowed bits are copied (three's constructor copies), taken ones are wrapped where they lie
+      result.setAttribute(name, ownership === 'take' ? halfAttribute(attribute.array, row.itemSize, row.normalized) : new Float16BufferAttribute(attribute.array, row.itemSize, row.normalized));
     } else {
       if (attribute.array.constructor.name !== row.storage) throw new Error('Whole channel storage mismatch');
       result.setAttribute(name, ownership === 'take' ? attribute : attribute.clone());
@@ -87,7 +97,7 @@ export function restoreDrawnChannels(node: Mesh): void {
     if (!(attribute instanceof BufferAttribute) || attribute.itemSize !== row.itemSize || attribute.normalized !== row.normalized) throw new Error(`Native node missing typed channel ${channel}`);
     if (row.storage === 'Float16Array') {
       if (!(attribute.array instanceof Uint16Array)) throw new Error('Native half-float channel needs uint16 bits');
-      geometry.setAttribute(name, new Float16BufferAttribute(attribute.array, row.itemSize, row.normalized));
+      geometry.setAttribute(name, halfAttribute(attribute.array, row.itemSize, row.normalized));
     } else {
       if (attribute.array.constructor.name !== row.storage) throw new Error('Native channel storage mismatch');
       geometry.setAttribute(name, attribute);

@@ -1,4 +1,5 @@
 import { Box3, BufferAttribute, BufferGeometry, Float16BufferAttribute, Sphere, Vector3 } from 'three';
+import { halfAttribute } from '@wildshard/engine/models/nativeGeometry';
 
 /**
  * NINE-DRAGON-BENCHMAX NB8 (mini-nb8e): a slab key's chunks in one bank as one geometry, for the phone. The bake caps a
@@ -38,7 +39,7 @@ export function mergeSlabChunks(chunks: readonly BufferGeometry[]): BufferGeomet
     let at = 0;
     for (const chunk of chunks) { const source = (chunk.getAttribute(name) as BufferAttribute).array; array.set(source, at); at += source.length; }
     merged.setAttribute(name, sample instanceof Float16BufferAttribute
-      ? new Float16BufferAttribute(array, sample.itemSize, sample.normalized)
+      ? halfAttribute(array as Uint16Array, sample.itemSize, sample.normalized)
       : new BufferAttribute(array, sample.itemSize, sample.normalized));
   }
   const index = vertices > 0xffff ? new Uint32Array(corners) : new Uint16Array(corners);

@@ -8,6 +8,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { clearFailure, showFailure } from '@wildshard/engine/telemetry/runtime';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
+import { scratchReader } from '@wildshard/engine/boot/scratchReader';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 import {placedLoose, placedSpawn} from './placedSpawn';
 
@@ -660,7 +661,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
             const response = await ports.fetch(onPacks(part.url, packs), controller.signal, init).catch((failure: unknown) => { transport = true; throw failure; });
             if (!response.ok) status = response.status;
             if (!response.ok || response.body === null) throw new Error(`Spawn part unavailable: ${part.url}`);
-            const body = new Uint8Array(part.bytes), reader = response.body.getReader();
+            const body = new Uint8Array(part.bytes), reader = scratchReader(response.body); // MG10: no buffer per network chunk
             let at = 0, next = 0;
             for (;;) {
               const chunk = await reader.read().catch((failure: unknown) => { transport = true; throw failure; }); if (chunk.done) break;

@@ -6,6 +6,7 @@ import { bootProgress } from '../../../shared/engine/boot/timing';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { showFailure, clearFailure } from '../telemetry/runtime';
 import { clearDownloadGiveUp, downloadGiveUp, onDownloadGiveUp, type DownloadGiveUp } from './downloadGiveUp';
+import { scratchReader } from './scratchReader';
 
 /** A missing or interrupted transport, never a parsed-content or admission refusal. */
 export class ContentReadError extends Error {
@@ -85,7 +86,8 @@ async function body(response: Response, url: string, maximum: number, read?: (by
     if (expected !== undefined && expected !== 0) throw sizeError();
     return new Uint8Array();
   }
-  const reader = response.body.getReader();
+  // MG10: chunks land in a reused scratch buffer and are copied straight into `bytes` (no buffer per chunk)
+  const reader = scratchReader(response.body);
   let bytes = new Uint8Array(length === null ? Math.min(maximum, 65536) : Number(length)), size = 0;
   try {
     for (;;) {

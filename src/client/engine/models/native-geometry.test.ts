@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute, Mesh, type TypedArray } from 'three';
-import { admitNativeWholeGeometry, nativeWholeGeometry, restoreDrawnChannels } from './nativeGeometry';
+import { BufferAttribute, BufferGeometry, Float16BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute, Mesh, type TypedArray } from 'three';
+import { admitNativeWholeGeometry, halfAttribute, nativeWholeGeometry, restoreDrawnChannels } from './nativeGeometry';
 
 const constructors = [Float32Array, Uint16Array, Uint32Array, Int16Array, Int8Array, Uint8Array];
 const bytes = (array: TypedArray): Uint8Array => new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
@@ -69,4 +69,15 @@ test('one restoration returns its detached admitted metadata and rechecks the ne
     expect(admitted.channels['position']?.itemSize).toBe(3);
     expect(() => admitNativeWholeGeometry(mesh)).toThrow(); expect(reads).toBe(2);
   } finally { admitted.geometry.dispose(); geometry.dispose(); }
+});
+
+test('halfAttribute wraps its words without the copy three\'s constructor makes', () => {
+  const words = new Uint16Array([0x3c00, 0x4000, 0x4200, 0x4400, 0x4500, 0x4600]);
+  const attribute = halfAttribute(words, 3, false);
+  expect(attribute.array).toBe(words);
+  expect(attribute.count).toBe(2);
+  expect(attribute.itemSize).toBe(3);
+  expect(attribute.normalized).toBe(false);
+  expect(attribute).toBeInstanceOf(Float16BufferAttribute);
+  expect(attribute.getX(1)).toBe(4);
 });

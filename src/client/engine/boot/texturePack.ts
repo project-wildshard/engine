@@ -1,6 +1,7 @@
 import { assetCacheName } from '../pwa/cacheNames';
 import { publishBootResponse } from './bootCache';
 import { contentURL, isContentOrigin, pageURL } from './contentBase';
+import { scratchReader } from './scratchReader';
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { PackDef, PackPart, PackFile } from '../../../shared/engine/boot/tables';
 
@@ -133,7 +134,7 @@ export class TexturePackReads {
 async function readBody(response: Response, expected: number, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
   if (response.status !== 200) { void response.body?.cancel().catch(() => undefined); throw new Error('Texture pack response differs'); }
   if (signal.aborted) { void response.body?.cancel().catch(() => undefined); throw aborted(); }
-  const bytes = new Uint8Array(expected), reader = response.body?.getReader();
+  const bytes = new Uint8Array(expected), reader = response.body === null ? undefined : scratchReader(response.body);
   if (reader === undefined) throw new Error('Missing texture pack body');
   let offset = 0;
   try {

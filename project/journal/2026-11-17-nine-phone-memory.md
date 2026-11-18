@@ -61,3 +61,20 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
   `selected-discovery`): Nine loading renderer peak median 1058 (base, placement wiring removed, old glsl) -> 1141 MB with
   both cuts (phone x2 2116 -> 2282); Sky Reach 489 -> 499 (noise). The placement wiring is undone (`placementPageText.ts`
   stays, unwired, with its fuzz test) until the dead buffers are cut; the GLSL cut stays (byte-identical, not isolated).
+
+## mini-ninemem4 (relay), 2026-11-17 late night
+
+- Buffer census (`tmp/` tool, not kept: every main-thread ArrayBuffer of 16 KB+ by birth site, a WeakRef each; at `ready`
+  +1.5 s a forced GC names which died): Nine allocates ~1.0 GB of buffers before ready and ~910 MB of them are dead by then;
+  V8 backing stores read ~490 MB at the peak and ~136 MB after one GC. Chromium runs almost no major GC in the boot, so in
+  this probe nearly every dropped buffer is still held at the peak. Largest: network body chunks 233 MB (every default
+  reader hands each chunk over in a buffer of its own), `contentRead` file bodies 99, meshopt decode outputs 75, the
+  member layer's store reads (`exactCopy` `arrayBuffer`) 70, merged slab arrays ~105 (released after upload), spawn part
+  bodies 94, three's `Float16BufferAttribute` constructor copies 37.
+- JavaScriptCore is different: a dropped 400 MB buffer was freed within 2 s with no other work, and
+  `ArrayBuffer.prototype.transfer(0)` frees nothing there (the result keeps the memory until GC); in V8 it frees at once.
+  So detaching is a Chromium-only lever; allocating less is the lever for the phone.
+- Cut A, `scratchReader.ts`: fetch bodies are read BYOB into pooled 64 KB scratch buffers and copied into their destination
+  (spawn parts, `contentRead`, texture packs, `readContentResponse`); `halfAttribute` wraps half-float words where three's
+  constructor copied them. Census: chunk buffers 233 -> 11 MB, half copies 37 -> 0. Peak did not move by itself (WebContent
+  peak 1,844 -> 1,832 MB [K], noise): the buffers it removes were garbage, not the peak's owner on WebKit.

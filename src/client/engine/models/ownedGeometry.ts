@@ -1,5 +1,5 @@
 import { Box3, BufferAttribute, BufferGeometry, Float16BufferAttribute, InterleavedBufferAttribute, type TypedArray, Material, Mesh, Matrix3, type Matrix4, Vector3, type Object3D } from 'three';
-import { nativeWholeGeometry } from './nativeGeometry';
+import { halfAttribute, nativeWholeGeometry } from './nativeGeometry';
 
 function isGeometryMesh(node: Object3D): node is Mesh {
   if (!(node instanceof Mesh)) return false;
@@ -177,7 +177,7 @@ function appendAttributes(parts: readonly BufferAttribute[]): BufferAttribute {
   const bytes = new Uint8Array(parts.reduce((sum, part) => sum + part.array.byteLength, 0));
   let at = 0; for (const part of parts) { bytes.set(raw(part), at); at += part.array.byteLength; }
   const array = new Constructor(bytes.buffer);
-  const result = first instanceof Float16BufferAttribute && array instanceof Uint16Array ? new Float16BufferAttribute(array, first.itemSize, first.normalized) : new BufferAttribute(array, first.itemSize, first.normalized);
+  const result = first instanceof Float16BufferAttribute && array instanceof Uint16Array ? halfAttribute(array, first.itemSize, first.normalized) : new BufferAttribute(array, first.itemSize, first.normalized);
   result.name = first.name; result.gpuType = first.gpuType; result.setUsage(first.usage); return result;
 }
 /** Restore physical storage segments into one native draw, without welding or changing index words. */
