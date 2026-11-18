@@ -95,10 +95,15 @@ export class StaticCapture {
     this.contactXf.set(row.heightOrigin, row.heightOrigin, 1 / row.heightSize, 0);
     contactPass.setParam('xf', this.contactXf.toArray());
     const depthTexture = new THREE.DepthTexture(SIZE, SIZE, THREE.UnsignedIntType);
-    this.shadowRT = new THREE.WebGLRenderTarget(SIZE, SIZE, { depthTexture, depthBuffer: true, type: THREE.UnsignedByteType });
+    const phone = TIER === 'phone';
+    // Receivers read only the depth texture. Keep a single-byte colour attachment for the existing render pass.
+    this.shadowRT = new THREE.WebGLRenderTarget(SIZE, SIZE, { depthTexture, depthBuffer: true, type: THREE.UnsignedByteType,
+      format: phone ? THREE.RedFormat : THREE.RGBAFormat });
     depthTexture.minFilter = depthTexture.magFilter = THREE.NearestFilter;
+    // The contact bake stores its height in red. Keep the same half-float value and mip chain in R16F where renderable.
+    const contactFormat = phone && renderer.extensions.has('EXT_color_buffer_float') ? THREE.RedFormat : THREE.RGBAFormat;
     this.contactRT = new THREE.WebGLRenderTarget(AO_SIZE, AO_SIZE, {
-      type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true,
+      type: THREE.HalfFloatType, format: contactFormat, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true,
     });
     this.contactMat = contactPass.material;
     this.shadowCam.layers.set(LAYER);
