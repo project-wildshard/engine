@@ -11,6 +11,7 @@ import { BossRowBar } from '../boss/barFeed';
 import { easeField } from '@wildshard/engine/world/easedFields';
 import { wirePage } from '../shardfile/wirePage';
 import { liftPrompt } from '../../../shared/game/shardfile/wirePrompts';
+import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { WorldTargetHost, type WorldTargetLanding } from '../../../shared/game/shardfile/worldTargets';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { parseWorldTargets, type WorldTargets } from '@wildshard/format/worldTargets';
@@ -655,7 +656,7 @@ export function bindClientChannels(programs: readonly ClientChannelProgram[], po
           || new Set(grant.flags.map(flag => flag.name)).size !== grant.flags.length
           || grant.flags.some(flag => flag.name.length === 0 || !Number.isSafeInteger(flag.bit) || flag.bit < 0 || flag.bit > 65536))) throw new Error('Invalid client mover flag grants');
       installed = true;
-      runtime = installFollowedMovers(ctx, world, { data: source.movers, views: movers, systemId: row.systemId,
+      runtime = installFollowedMovers(ctx, world, { data: source.movers, views: movers, systemId: row.systemId, hulls: vehicleHulls(source),
         restoreFlags: new Set(source.movers.flatMap(mover => mover.restoreFrom !== undefined && flags.has(mover.restoreFrom.flag) ? [mover.restoreFrom.flag] : [])),
         onDispose: () => { runtime = null; } });
       if (row.socketLiftPrompts === true) binding.bindPrompts({ socketLifts: { entryways: source.entryways, runtime: () => runtime } });

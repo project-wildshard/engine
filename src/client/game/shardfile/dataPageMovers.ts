@@ -16,6 +16,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { FollowedMovers, type MoverView } from '../plugin/followedMovers';
 import { moverPanelPose } from '../grid/neighbourPanels';
 import { wirePage } from './wirePage';
+import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 
 /** What a one-shard page lends its data movers. */
 export interface DataPagePorts {
@@ -27,10 +28,10 @@ export interface DataPagePorts {
 }
 
 /** Install a plain data page's movers in its physics, each posed off the wire with its drawn panel; they leave with `scope`. */
-export function installDataPageMovers(source: Pick<Shardfile, 'movers'>, page: DataPagePorts): FollowedMovers | null {
+export function installDataPageMovers(source: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>, page: DataPagePorts): FollowedMovers | null {
   if (source.movers.length === 0) return null;
   // a saved end stands where the wire's first row puts it: the page holds no flags of its own here
-  const movers = new FollowedMovers(source.movers, { physics: page.physics, scope: page.scope, restoreFlags: new Set() });
+  const movers = new FollowedMovers(source.movers, { physics: page.physics, scope: page.scope, restoreFlags: new Set(), hulls: vehicleHulls(source) });
   for (const row of movers.data) {
     const panel = page.panels?.get(row.id);
     let look: ((pose: MoverPose) => void) | undefined;

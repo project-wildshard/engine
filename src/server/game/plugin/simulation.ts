@@ -79,6 +79,7 @@ import { bindPlayerColumns, dataCreaturePorts } from "../../../shared/game/shard
 import { prepareDeclaredGroupBrains, type DeclaredGroupPorts, type DeclaredGroupPolicy } from "../shardfile/groupRuntime";
 import { prepareDeclaredCrowds, type DeclaredCrowdPorts, type PreparedCrowds } from "../../../shared/game/shardfile/crowdRuntime";
 import { installLadders, type LadderClientPorts } from '../../../shared/game/shardfile/ladder';
+import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { MoverScriptDriver, playerGrounds, verifiedMoverModules, proveTerrainEntries, type TerrainEntryWalk, type DeclaredMoverComposition, type MoverRuntime } from "./mover";
 import { socketLiftEntries } from "@wildshard/format/socketLiftAssets";
 import { createClientChannels } from "../../../shared/game/plugin/channels";
@@ -594,7 +595,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       } else lane = moverDriver === undefined ? createShardfileScriptLane(shard, assets, options) : moverDriver.compose(shard, assets, options);
       if (moverDriver !== undefined) {
         const stateWorld = lane.world;
-        const runtime = moverDriver.install(host, lane, { id: 'movers.declared', restoreFlags: new Set(host.flags.all),
+        const runtime = moverDriver.install(host, lane, { id: 'movers.declared', restoreFlags: new Set(host.flags.all), hulls: vehicleHulls(shard),
           activation: { ground: () => playerGrounds(host), shared: id => {
             const field = shard.state.shared.find(row => row.id === id);
             const value = field === undefined ? undefined : stateWorld.publicField(field.name);

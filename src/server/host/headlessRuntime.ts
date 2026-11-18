@@ -39,6 +39,7 @@ import { holdPageState, type RuntimeStateValue } from '@wildshard/engine/game/sh
 import type { NativeAssemblyPorts } from '@wildshard/engine/game/shardfile/nativeAssemblyInput';
 import type { LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
 import { installCellHome } from '@wildshard/engine/game/grid/cellHome';
+import { vehicleHulls } from '@wildshard/engine/game/shardfile/vehicleHulls';
 
 /** The same admitted bytes and native physics implementation used by the ordinary headless worker. */
 export interface HeadlessRuntimePreparation { shard: Shardfile; assets: ReadonlyMap<string, Uint8Array>; rapier: Rapier; readonly product: ShardFolder }
@@ -220,7 +221,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
       motion = new MoverScriptDriver(carried, host).install(host, { content: { identity: source.identity,
         sim: { ...source.sim, bindings: [] }, state: source.state }, assets: new Map(),
         rules: { fields: {}, archetypes: [], events: [], maxEntities: 32 } },
-      { id: 'movers.carried', restoring: context.restoring, restoreFlags: new Set(host.flags.all), drive: true });
+      { id: 'movers.carried', restoring: context.restoring, restoreFlags: new Set(host.flags.all), drive: true, hulls: vehicleHulls(source) });
     }
     plan.install(host, context);
     if (carried.length > 0) registerInstalled(host, 'movers'); // SS3

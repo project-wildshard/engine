@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import type { World } from '@wildshard/engine/core/bootstrap';
 import type { LevelContext } from '@wildshard/engine/level/context';
-import { KinematicMover, type MoverPose } from '@wildshard/engine/physics/mover';
+import { KinematicMover, type MoverBox, type MoverPose } from '@wildshard/engine/physics/mover';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { RopeChain } from '@wildshard/engine/physics/ropeChain';
 import { MoverLifecycle, moverEndState, type MoverEndEvent } from '@wildshard/engine/sim/moverLifecycle';
@@ -71,7 +71,9 @@ export class FollowedMovers {
   private readonly steerPrompts = new Map<string, readonly { readonly local: readonly [number, number, number]; readonly at: Vector3 }[]>();
   /** SS-MS2a3: the steer vehicle this page's player rides now, as the page's steer ride reads it (`steerRide.ts`), or null. */
   steered: string | null = null;
-  constructor(data: MoverData, ports: { readonly physics: Physics; readonly scope: Scope; readonly adopt?: (id: string) => MoverView | undefined; readonly restoreFlags?: ReadonlySet<string> }) {
+  constructor(data: MoverData, ports: { readonly physics: Physics; readonly scope: Scope; readonly adopt?: (id: string) => MoverView | undefined; readonly restoreFlags?: ReadonlySet<string>;
+    /** SS-GP5: each steer vehicle's hull in its own frame (`vehicleHulls`), which rides it as a platform's boxes do. */
+    readonly hulls?: ReadonlyMap<string, readonly MoverBox[]> }) {
     this.data = parseMovers(data);
     this.lifecycle = new MoverLifecycle(this.data.map(row => ({ id: row.id, ...(row.atEnd === undefined ? {} : { atEnd: row.atEnd }), ...(row.restoreFrom === undefined ? {} : { restoreFrom: row.restoreFrom }) })));
     if (this.data.some(row => row.restoreFrom !== undefined) && ports.restoreFlags === undefined) throw new Error('Mover restore requires saved flag data');
@@ -98,8 +100,8 @@ export class FollowedMovers {
         let enabled = row.enabled; chain.setEnabled(enabled);
         this.sinks.set(row.id, pose => { if (enabled !== pose.enabled) { enabled = pose.enabled; chain.setEnabled(enabled); } });
         ports.scope.onDispose(() => { chain.dispose(); });
-      } else if (row.kind !== 'channel') {
-        const body = new KinematicMover(ports.physics, row.boxes, this.pose(row.id), row.id, row.kind === 'static'); this.bodies.set(row.id, body);
+      } else if (row.kind !== 'channel' || ports.hulls?.has(row.id) === true) {
+        const body = new KinematicMover(ports.physics, row.kind === 'channel' ? ports.hulls?.get(row.id) ?? [] : row.boxes, this.pose(row.id), row.id, row.kind === 'static'); this.bodies.set(row.id, body);
         this.sinks.set(row.id, pose => { body.setPose(pose); });
         ports.scope.onDispose(() => { body.dispose(); });
       }
@@ -186,12 +188,15 @@ export class FollowedMovers {
 export interface FollowedMoverInstallation {
   readonly data: MoverData; readonly systemId: string; readonly views?: ReadonlyMap<string, MoverView>;
   readonly prompts?: Interactable[]; readonly restoreFlags?: ReadonlySet<string>; readonly onDispose?: () => void;
+  /** SS-GP5: each steer vehicle's hull (`vehicleHulls`). */
+  readonly hulls?: ReadonlyMap<string, readonly MoverBox[]>;
 }
 /** Install a page's movers on its level, and hand each to the rows that pose it. */
 export function installFollowedMovers(ctx: LevelContext, world: World, options: FollowedMoverInstallation): FollowedMovers {
   if (ctx.scope.disposed || ctx.scope.disposing) throw new Error('Mover scope left during admission');
   const views = options.views, movers = new FollowedMovers(options.data, { physics: world.physics, scope: ctx.scope,
-    ...(views === undefined ? {} : { adopt: (id: string) => views.get(id) }), ...(options.restoreFlags === undefined ? {} : { restoreFlags: options.restoreFlags }) });
+    ...(views === undefined ? {} : { adopt: (id: string) => views.get(id) }), ...(options.restoreFlags === undefined ? {} : { restoreFlags: options.restoreFlags }),
+    ...(options.hulls === undefined ? {} : { hulls: options.hulls }) });
   options.prompts?.push(...movers.ridePrompts());
   ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });
   if (options.onDispose !== undefined) ctx.scope.onDispose(options.onDispose);
