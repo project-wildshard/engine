@@ -219,7 +219,10 @@
       "@typescript/typescript-sunos-x64",
       "@typescript/typescript-win32-arm64",
       "@typescript/typescript-win32-x64"
-    ]
+    ],
+    "patchedDependencies": {
+      "@wildshard/shard-format@0.37.1": "patches/@wildshard__shard-format@0.37.1.patch"
+    }
   },
   "exports": {
     "./game/population/census": "./src/shared/game/population/census.ts",

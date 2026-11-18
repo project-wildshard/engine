@@ -1,0 +1,250 @@
+diff --git a/src/format/budget-tiers.ts b/src/format/budget-tiers.ts
+index af001b6115726433a64ea76058f3cb46735a2b3e..f781369919d4df927ccf3eb8c4b253ded4ae55ed 100644
+--- a/src/format/budget-tiers.ts
++++ b/src/format/budget-tiers.ts
+@@ -10,13 +10,21 @@ import type { PicklistSchema } from 'valibot'
+  * - `cpuMicrosPerFrame`: the shard's own runtime and page features, per 60 Hz frame on the reference phone.
+  * - `memoryBytes`: resident memory its runtime and owned stages may hold beyond the admitted content.
+  * - `bandwidthBytes`: compressed bytes a player downloads for the shard (J338: 50 MB is fine, 100 MB is the hard cap).
++ * - `gpu`: graph nodes, sampler slots, estimated instructions, and authored post passes.
+  */
+ interface BudgetTierLimits {
+   readonly cpuMicrosPerFrame: number
+   readonly memoryBytes: number
+   readonly bandwidthBytes: number
++  readonly gpu: GraphTierLimit
+ }
+ type BudgetTier = 'small' | 'medium' | 'large'
++interface GraphTierLimit {
++  readonly nodes: number
++  readonly samplers: number
++  readonly instructions: number
++  readonly passes: number
++}
+ 
+ const MEBIBYTE = 1_048_576
+ const SMALL_CPU = 1000
+@@ -34,16 +42,19 @@ const BUDGET_TIERS: Readonly<Record<BudgetTier, BudgetTierLimits>> = {
+     cpuMicrosPerFrame: SMALL_CPU,
+     memoryBytes: SMALL_MEMORY * MEBIBYTE,
+     bandwidthBytes: SMALL_BANDWIDTH,
++    gpu: { nodes: 512, samplers: 4, instructions: 1024, passes: 2 },
+   },
+   medium: {
+     cpuMicrosPerFrame: MEDIUM_CPU,
+     memoryBytes: MEDIUM_MEMORY * MEBIBYTE,
+     bandwidthBytes: MEDIUM_BANDWIDTH,
++    gpu: { nodes: 1280, samplers: 8, instructions: 3072, passes: 3 },
+   },
+   large: {
+     cpuMicrosPerFrame: LARGE_CPU,
+     memoryBytes: LARGE_MEMORY * MEBIBYTE,
+     bandwidthBytes: LARGE_BANDWIDTH,
++    gpu: { nodes: 4096, samplers: 16, instructions: 8192, passes: 4 },
+   },
+ }
+ /** The tier a shard picks; an unknown tier refuses. */
+@@ -58,5 +69,26 @@ function budgetTierLimits(budgets: {
+   return BUDGET_TIERS[budgets.tier ?? 'small']
+ }
+ 
+-export { BUDGET_TIERS, BudgetTierSchema, budgetTierLimits }
++/** The compatibility tier for older runtime publications. */
++const UNNAMED_TIER: BudgetTier = 'large'
++
++/** Material programs and authored post stacks use their product's tier. */
++function graphTierLimits(source: {
++  readonly budgets?: { readonly tier?: BudgetTier }
++  readonly runtime?: unknown
++}): GraphTierLimit {
++  const fallback =
++    source.runtime === null || source.runtime === undefined
++      ? 'small'
++      : UNNAMED_TIER
++  return budgetTierLimits({ tier: source.budgets?.tier ?? fallback }).gpu
++}
++
++export {
++  BUDGET_TIERS,
++  BudgetTierSchema,
++  UNNAMED_TIER,
++  budgetTierLimits,
++  graphTierLimits,
++}
+ export type { BudgetTier, BudgetTierLimits }
+diff --git a/src/format/materialGraph.ts b/src/format/materialGraph.ts
+index b9a17f4a361554247e1e297145b28413f3daedc7..479dde264d2a30d857ef63f9f5e6f100c19c8188 100644
+--- a/src/format/materialGraph.ts
++++ b/src/format/materialGraph.ts
+@@ -252,7 +252,7 @@ export interface GraphBudget {
+ }
+ /** the default ceilings (a starter graph: the measure preset is ≈ 60 nodes, ≈ 170 instructions) */
+ export const DEFAULT_GRAPH_BUDGET: GraphBudget = { nodes: 160, samplers: 4, instructions: 480 };
+-/** Hard ceilings for a native declaration; loop trips remain charged to the estimated cost. */
++/** Hard ceilings for an authored declaration; loop trips remain charged to the estimated cost. */
+ export const MAX_GRAPH_BUDGET: GraphBudget = Object.freeze({ nodes: 4096, samplers: 16, instructions: 8192 });
+ 
+ /** Raw graph JSON bounds, enforced before typing or compiler work; host-owned presets supply their own node budget. */
+@@ -559,6 +559,8 @@ export interface GraphValidationOptions {
+   /** the shard's declared public numeric state fields a param may bind to (any name when absent) */
+   readonly stateFields?: readonly string[];
+   readonly budget?: GraphBudget;
++  /** A product's ceiling also bounds explicit budgets and nested graphs. */
++  readonly budgetCeiling?: GraphBudget;
+   /** Host authority to use an explicit declaration; content cannot grant this. */
+   readonly declaredBudget?: boolean;
+   /** the directional lights a `sun` sub-graph is built for (1 … SUN_CASCADES_MAX; SUN_CASCADES when absent) */
+@@ -624,7 +626,9 @@ interface Scope {
+  * every reason it is refused.
+  */
+ export function validateGraph(input: unknown, opts: GraphValidationOptions = {}): GraphValidation {
+-  const rawErrors = graphAdmissionErrors(input, opts.declaredBudget === true ? MAX_GRAPH_BUDGET.nodes : opts.budget?.nodes ?? DEFAULT_GRAPH_BUDGET.nodes);
++  const ceiling = opts.budgetCeiling;
++  const rawLimit = opts.declaredBudget === true ? MAX_GRAPH_BUDGET.nodes : opts.budget?.nodes ?? DEFAULT_GRAPH_BUDGET.nodes;
++  const rawErrors = graphAdmissionErrors(input, Math.min(rawLimit, ceiling?.nodes ?? rawLimit));
+   if (rawErrors.length > 0) return { ok: false, errors: rawErrors };
+   const errors: string[] = [];
+   const fail = (msg: string): null => { errors.push(msg); return null; };
+@@ -642,6 +646,13 @@ export function validateGraph(input: unknown, opts: GraphValidationOptions = {})
+     if (opts.declaredBudget !== true) return { ok: false, errors: ['graph: declared budget requires native runtime authority'] };
+     budget = { nodes: Number(declared.nodes), samplers: Number(declared['samplers']), instructions: Number(declared['instructions']) };
+   }
++  if (ceiling !== undefined) {
++    budget = {
++      nodes: Math.min(budget.nodes, ceiling.nodes),
++      samplers: Math.min(budget.samplers, ceiling.samplers),
++      instructions: Math.min(budget.instructions, ceiling.instructions),
++    };
++  }
+   if (input.version !== GRAPH_IR_VERSION) fail(`graph: version ${String(input.version)} (this engine reads ${GRAPH_IR_VERSION})`);
+   const kind = input.kind, primitive = input.primitive;
+   if (kind !== 'material' && kind !== 'post' && kind !== 'fog') fail(`graph: kind ${String(kind)} (material, post or fog)`);
+diff --git a/src/format/materials.ts b/src/format/materials.ts
+index b4cb822bf3dda1d792f76f118024913fef7971d1..7fb38f331d13e4d600f5866a38da7e9ea0982ace 100644
+--- a/src/format/materials.ts
++++ b/src/format/materials.ts
+@@ -1,3 +1,4 @@
++import { graphTierLimits } from './budget-tiers.ts';
+ import { hasDeclaredClientPage } from './runtimeBinds.ts';
+ import * as v from 'valibot';
+ import {
+@@ -155,9 +156,10 @@ function numericFields(state: Shardfile['state'], privacy: 'public' | 'host'): s
+  * programs are held to `PRESET_GRAPH_BUDGET` by the engine's own tests, never the author caps); a graph file must be a
+  * JSON file of the library closure (`files` / `library` given: its bytes are validated by product admission, `graphFileRules`).
+  */
+-export function materialGraphRules(source: Pick<Shardfile, 'look' | 'state'> & Partial<Pick<Shardfile, 'files' | 'library' | 'runtime' | 'questHost'>>): string[] {
++export function materialGraphRules(source: Pick<Shardfile, 'look' | 'state'> & Partial<Pick<Shardfile, 'files' | 'library' | 'runtime' | 'questHost' | 'budgets'>>): string[] {
+   const errors: string[] = [];
+   const { day: dayChannels, state: stateFields } = graphBindingSources(source);
++  const budget = graphTierLimits(source);
+   const files = new Map((source.files ?? []).map((row) => [row.hash, row])), closure = new Set<string>(), pending = [...source.library ?? []];
+   while (pending.length > 0) { const hash = pending.pop(); if (hash === undefined || closure.has(hash)) continue; closure.add(hash); pending.push(...files.get(hash)?.dependencies ?? []); }
+   for (const [materialId, material] of Object.entries(source.look.materials)) {
+@@ -167,7 +169,7 @@ export function materialGraphRules(source: Pick<Shardfile, 'look' | 'state'> & P
+       continue;
+     }
+     if ('preset' in material) { const refusal = presetRefusal(material.preset); if (refusal !== null) errors.push(`material ${materialId}: ${refusal}`); continue; }
+-    const checked = validateGraph(material.graph, { dayKeys: [...dayChannels.keys()], stateFields, declaredBudget: source.runtime !== null && source.runtime !== undefined || hasDeclaredClientPage(source) });
++    const checked = validateGraph(material.graph, { dayKeys: [...dayChannels.keys()], stateFields, budget, budgetCeiling: budget, declaredBudget: true });
+     if (!checked.ok) { errors.push(...checked.errors.map((error) => `material ${materialId}: ${error}`)); continue; }
+     errors.push(...bindingTypeErrors(materialId, checked.graph, dayChannels));
+     const fog = checked.graph.effectState?.fog;
+@@ -184,15 +186,16 @@ export function materialGraphRules(source: Pick<Shardfile, 'look' | 'state'> & P
+  * one `kind: "material"` graph that validates under the author caps against the shard's admitted bindings, and every
+  * texture param names a KTX2 file its row declares as a direct dependency (so the texture is charged with the closure).
+  */
+-export function graphFileRules(source: Pick<Shardfile, 'look' | 'state' | 'files'> & Partial<Pick<Shardfile, 'runtime' | 'questHost'>>, bytes: (hash: string) => Uint8Array | undefined): string[] {
++export function graphFileRules(source: Pick<Shardfile, 'look' | 'state' | 'files'> & Partial<Pick<Shardfile, 'runtime' | 'questHost' | 'budgets'>>, bytes: (hash: string) => Uint8Array | undefined): string[] {
+   const errors: string[] = [];
+   const { day: dayChannels, state: stateFields } = graphBindingSources(source);
++  const budget = graphTierLimits(source);
+   const files = new Map(source.files.map((row) => [row.hash, row]));
+   for (const [materialId, material] of Object.entries(source.look.materials)) {
+     if (material.family !== 'graph' || !('file' in material)) continue;
+     let ir: unknown;
+     try { ir = graphFileJson(material.file, bytes); } catch (error) { errors.push(`material ${materialId}: ${error instanceof Error ? error.message : 'graph file'}`); continue; }
+-    const checked = validateGraph(ir, { dayKeys: [...dayChannels.keys()], stateFields, declaredBudget: source.runtime !== null && source.runtime !== undefined || hasDeclaredClientPage(source) });
++    const checked = validateGraph(ir, { dayKeys: [...dayChannels.keys()], stateFields, budget, budgetCeiling: budget, declaredBudget: true });
+     if (!checked.ok) { errors.push(...checked.errors.map((error) => `material ${materialId}: ${error}`)); continue; }
+     if (checked.graph.kind === 'post') { errors.push(`material ${materialId}: a graph file in a material slot holds a material or fog graph, not a post pass`); continue; }
+     const fog = checked.graph.effectState?.fog, target = typeof fog === 'string' ? source.look.materials[fog] : undefined;
+diff --git a/src/format/postStack.ts b/src/format/postStack.ts
+index 59f46569a2e05b59a8768023b3c3000eb38b1d32..908069c91c6267bb0722007dfcecf153b8dd3442 100644
+--- a/src/format/postStack.ts
++++ b/src/format/postStack.ts
+@@ -1,7 +1,7 @@
+ /**
+  * A shard's own post stack (SHARD-PLATFORM SF59 steps 3–4, G158, budget v1 C4-R1-A5 / C7): inside its cell a shard's
+  * look owns the whole frame, its post passes included, as data. `look.post` is an ordered list of at most
+- * {@link POST_STACK_BUDGET}`.passes` authored post graphs (`kind: "post"`), each inline (`{ graph }`) or a graph file of the
++ * its tier’s allowed number of authored post graphs (`kind: "post"`), each inline (`{ graph }`) or a graph file of the
+  * library closure (`{ file }`, validated with its bytes at product admission). Each pass is a full-screen program; its
+  * instruction estimate is a per-pixel cost at the phone's 2× render scale, so the stack's cost is the sum of its passes'
+  * estimates plus the normal pre-pass when any pass reads `sceneNormal` ({@link POST_NORMAL_PREPASS_COST}, paid once).
+@@ -12,6 +12,7 @@
+ import * as v from 'valibot';
+ import { validateGraph, type GraphIr, type PostInputs } from './materialGraph.ts';
+ import { graphBindingSources, graphFileJson } from './materials.ts';
++import { graphTierLimits } from './budget-tiers.ts';
+ import { isJsonData } from './json.ts';
+ import type { Shardfile } from './shardSchema.ts';
+ 
+@@ -48,7 +49,7 @@ export interface PostStackCost { readonly passes: number; readonly instructions:
+  * Validate and cost a stack: each pass under the author caps against the shard's admitted bindings (a graph file read
+  * through `bytes`; undefined bytes are refused), the sum against the stack budget. Returns the cost and every refusal.
+  */
+-export function postStackCost(source: Pick<Shardfile, 'look' | 'state'> & { readonly look: { readonly post?: readonly PostPass[] } }, bytes: (hash: string) => Uint8Array | undefined): { cost: PostStackCost; errors: string[] } {
++export function postStackCost(source: Pick<Shardfile, 'look' | 'state'> & Partial<Pick<Shardfile, 'budgets' | 'runtime'>> & { readonly look: { readonly post?: readonly PostPass[] } }, bytes: (hash: string) => Uint8Array | undefined): { cost: PostStackCost; errors: string[] } {
+   const errors: string[] = [], passes = source.look.post ?? [];
+   const { day, state } = graphBindingSources(source);
+   let instructions = 0;
+@@ -63,7 +64,8 @@ export function postStackCost(source: Pick<Shardfile, 'look' | 'state'> & { read
+     inputs.colour ||= checked.inputs.colour; inputs.depth ||= checked.inputs.depth; inputs.normal ||= checked.inputs.normal;
+   });
+   if (inputs.normal) instructions += POST_NORMAL_PREPASS_COST;
+-  if (passes.length > POST_STACK_BUDGET.passes) errors.push(`post: ${passes.length} passes (at most ${POST_STACK_BUDGET.passes})`);
++  const passLimit = Math.min(POST_STACK_BUDGET.passes, graphTierLimits(source).passes);
++  if (passes.length > passLimit) errors.push(`post: ${passes.length} passes (at most ${passLimit})`);
+   if (instructions > POST_STACK_BUDGET.instructions) errors.push(`post: ≈ ${instructions} instructions per pixel at 2× (at most ${POST_STACK_BUDGET.instructions})`);
+   return { cost: { passes: passes.length, instructions, inputs }, errors };
+ }
+@@ -73,7 +75,7 @@ export function postStackCost(source: Pick<Shardfile, 'look' | 'state'> & { read
+  * file pass must be a JSON file of the library closure (`files` / `library` given; its bytes are costed by product
+  * admission through `postStackCost`, so a stack holding files is summed there).
+  */
+-export function postStackRules(source: Pick<Shardfile, 'look' | 'state'> & Partial<Pick<Shardfile, 'files' | 'library'>> & { readonly look: { readonly post?: readonly PostPass[] } }): string[] {
++export function postStackRules(source: Pick<Shardfile, 'look' | 'state'> & Partial<Pick<Shardfile, 'budgets' | 'runtime'>> & Partial<Pick<Shardfile, 'files' | 'library'>> & { readonly look: { readonly post?: readonly PostPass[] } }): string[] {
+   const passes = source.look.post ?? [];
+   if (passes.length === 0) return [];
+   const errors: string[] = [];
+diff --git a/src/format/runtime-tier.ts b/src/format/runtime-tier.ts
+index 4b476540d1bce7b16dbf1d90a814b2f11fc23fd8..6aa1a3c79971f5c28f395558d4f45a965d77db02 100644
+--- a/src/format/runtime-tier.ts
++++ b/src/format/runtime-tier.ts
+@@ -1,12 +1,9 @@
+-import { budgetTierLimits } from './budget-tiers.ts'
++import { UNNAMED_TIER, budgetTierLimits } from './budget-tiers.ts'
+ import { ratchetNote, ratchetSeverity } from './memory-ratchet.ts'
+ import { runtimeAccountedBytes } from './runtimeCost.ts'
+ 
+ import type { BudgetTier } from './budget-tiers.ts'
+ 
+-/** The tier an unnamed runtime is held to until OF10c1b names every runtime shard's tier. */
+-const UNNAMED_TIER: BudgetTier = 'large'
+-
+ /** What the check reads of a shard: its runtime's reviewed cost and its budgets. */
+ type RuntimeTierSource = Readonly<{
+   runtime: Readonly<{ cost?: unknown }> | null
+@@ -55,9 +52,6 @@ function runtimeTierIssues(source: RuntimeTierSource): RuntimeTierIssue[] {
+   ]
+ }
+ 
+-export {
+-  UNNAMED_TIER,
+-  type RuntimeTierIssue,
+-  type RuntimeTierSource,
+-  runtimeTierIssues,
+-}
++export { UNNAMED_TIER } from './budget-tiers.ts'
++
++export { type RuntimeTierIssue, type RuntimeTierSource, runtimeTierIssues }
