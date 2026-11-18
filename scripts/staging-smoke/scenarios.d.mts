@@ -45,7 +45,7 @@ export function runScenario(scenario: {
     id: ScenarioId;
     title: string;
     browser: BrowserName;
-}, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs, candidateBuild, deploy, pw }: {
+}, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs, candidateBuild, deploy, cells, pw }: {
     url: string;
     out: string;
     card: string;
@@ -57,6 +57,7 @@ export function runScenario(scenario: {
     budgetMs?: number;
     candidateBuild?: string;
     deploy?: boolean;
+    cells?: readonly string[];
     pw: typeof import("playwright");
 }): Promise<ScenarioResult>;
 /** Judge every play frame's world (worldFrame.mjs). @param {Record<string, string>} frames
@@ -134,6 +135,8 @@ export const SEL: Readonly<{
     drop: "#wsdrop";
     dropDismiss: "#wsdrop .dismiss";
 }>;
+/** SQ11: the latency K2 adds to every page request. */
+export const SLOW_MS: 400;
 export const K6_BUDGET_MS: 240000;
 export const CELL_BUDGET_MS: 60000;
 /** How long a cell plays before its world frame (the arrival reveal is 3 s on the grid; play has held 1.5 s by then). */
@@ -208,4 +211,5 @@ export type ScenarioResult = {
         stats: WorldStats;
         black: string | null;
     }>;
+    cells?: string[];
 };

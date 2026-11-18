@@ -19,11 +19,12 @@ export function served(url: string): Promise<{
  * `store` (the CLI's default: ~/.cache/wildshard/plan-artifacts/staging-smoke) keeps the run and gives the last release's
  * frames and times; without one the run is kept only in `out` and the vision pass has no baseline (no calls).
  */
-export function runSmoke({ url, release, out, only, card, deepLink, watchMs, budgetMs, build, lastTimeToPlay, oldProfiles, oldState, store, vision, deploy, changelog, bugbash, receipts, runBudgetS, log }: {
+export function runSmoke({ url, release, out, only, cells, card, deepLink, watchMs, budgetMs, build, lastTimeToPlay, oldProfiles, oldState, store, vision, deploy, changelog, bugbash, receipts, runBudgetS, log }: {
     url: string;
     release: string;
     out: string;
     only?: readonly string[];
+    cells?: readonly string[];
     card?: string;
     deepLink?: string;
     watchMs?: number;

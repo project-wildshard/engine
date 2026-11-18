@@ -6,14 +6,33 @@
  */
 export function contactSheet(top: readonly (string | undefined)[], bottom: readonly (string | undefined)[], out: string): string;
 /** The prompt for one scenario. @param {{ sheet: string, scenario: string, title: string, last: string, release: string, bullets: readonly string[] }} o */
-export function visionPrompt({ sheet, scenario, title, last, release, bullets }: {
+export function visionPrompt({ sheet, scenario, title, last, release, bullets, columns }: {
     sheet: string;
     scenario: string;
     title: string;
     last: string;
     release: string;
     bullets: readonly string[];
+    columns?: string;
 }): string;
+/** The same call as askClaude, without blocking (SQ13). */
+export function askClaudeAsync(prompt: string, cwd: string, o?: { claude?: string; timeoutMs?: number }): Promise<Omit<Vision, "scenario">>;
+/** STAGING-QA SQ13: the most model calls one deploy run makes, and how many run at once. */
+export const VISION_MAX_CALLS: 12;
+export const VISION_PARALLEL: 4;
+/** SQ13, the deploy judge (report-only): skips held scenarios, at most `maxCalls` calls, `parallel` at a time. */
+export function deployVision(o: {
+    scenarios: readonly { id: string; title: string; status: string; frames: Record<string, string>; cells?: readonly string[] }[];
+    held: ReadonlySet<string>;
+    release: string;
+    last?: { release: string; dir: string };
+    bullets: readonly string[];
+    out: string;
+    claude?: string;
+    timeoutMs?: number;
+    maxCalls?: number;
+    parallel?: number;
+}): Promise<Vision[]>;
 /** The last JSON object in a model reply, checked. @param {string} text @returns {Omit<Vision, 'scenario'> | undefined} */
 export function parseVision(text: string): Omit<Vision, "scenario"> | undefined;
 /**
@@ -57,7 +76,7 @@ export function visionFindings(vision: readonly Vision[]): (import("./checks.mjs
 /** @typedef {'same' | 'changed' | 'regressed' | 'baseline' | 'error'} VisionVerdict */
 /** @typedef {{ scenario: string, verdict: VisionVerdict, severity?: 'P0' | 'P1' | 'P2', bullet?: string, line: string, sheet?: string }} Vision */
 export const VISION_MODEL: "claude-opus-5-5";
-export type VisionVerdict = "same" | "changed" | "regressed" | "baseline" | "error";
+export type VisionVerdict = "same" | "changed" | "regressed" | "baseline" | "error" | "skipped";
 export type Vision = {
     scenario: string;
     verdict: VisionVerdict;

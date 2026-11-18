@@ -27,14 +27,15 @@ import { saveFixture } from '../debug-settings.mjs';
  *   seconds: number, legs: Leg[], errors: string[], events: ProbeEvent[], log: string[], frames: Record<string, string>,
  *   video?: string, settings?: { opened: boolean, closed: boolean }, quietTitle?: { drop: boolean, left: boolean }, drops?: number,
  *   oldCache?: { before: StorageState, after: StorageState, minClient?: string }, profile?: string, endState?: StorageState,
- *   world?: Record<string, { stats: WorldStats, black: string | null }>,
+ *   world?: Record<string, { stats: WorldStats, black: string | null }>, cells?: string[],
  * }} ScenarioResult
  */
 
 /** The kept set (plan SM0), in run order: one browser at a time (SB31: two headless browsers at once fake a RECONNECTING strip). */
 export const SCENARIOS = Object.freeze(/** @type {const} */ ([
   { id: 'K1', title: 'old cache (Chromium)', browser: 'chromium' },
-  { id: 'K2', title: 'old cache (WebKit)', browser: 'webkit' },
+  // STAGING-QA SQ11: how Jake's iPhone met SB48, in one leg: a return visit, Low Power (phone Low) and a 400 ms connection
+  { id: 'K2', title: 'return visit, Low Power, 400 ms (WebKit)', browser: 'webkit' },
   { id: 'K3', title: 'Driftwood chain (WebKit)', browser: 'webkit' },
   { id: 'K4', title: 'deep link (WebKit)', browser: 'webkit' },
   { id: 'K5', title: 'Infinite Wildshard (WebKit)', browser: 'webkit' },
@@ -245,6 +246,11 @@ export async function oldProfileTitle(page, { onDrop = () => undefined, onRecove
   throw new Error('Old profile did not return to title through its controls');
 }
 
+/** SQ11: the latency K2 adds to every page request (Jake's phone showed SLOW CONNECTION 416 ms on SB48). */
+export const SLOW_MS = 400;
+/** Scenarios that play at phone Low, the mode Low Power forces on a phone (graphicsMode.ts). */
+const PHONE_LOW = new Set(['K2', 'K6']);
+
 /** K6's whole budget and each cell's: past it, the cells left are named as not entered (SM8 (d)). */
 export const K6_BUDGET_MS = 240_000, CELL_BUDGET_MS = 60_000;
 /** How long a cell plays before its world frame (the arrival reveal is 3 s on the grid; play has held 1.5 s by then). */
@@ -289,11 +295,12 @@ export async function liveCells(page) {
  * One scenario, start to finish, in its own persistent profile.
  * @param {{ id: ScenarioId, title: string, browser: BrowserName }} scenario
  * @param {{ url: string, out: string, card: string, deepLink: string, oldProfile?: string, oldState?: StorageState, minClient?: string,
- *   watchMs?: number, budgetMs?: number, candidateBuild?: string, deploy?: boolean, pw: typeof import('playwright') }} options
+ *   watchMs?: number, budgetMs?: number, candidateBuild?: string, deploy?: boolean, cells?: readonly string[], pw: typeof import('playwright') }} options
+ * `cells` limits K6 to those Shard Select cards (placement-sweep.mjs: the slugs a placement move touched).
  * K1 and K2 with no saved profile seed one (a fresh profile played into Driftwood) and report SKIP: there is no old cache yet.
  * @returns {Promise<ScenarioResult>}
  */
-export async function runScenario(scenario, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs = 90_000, candidateBuild, deploy = false, pw }) {
+export async function runScenario(scenario, { url, out, card, deepLink, oldProfile, oldState, minClient, watchMs, budgetMs = 90_000, candidateBuild, deploy = false, cells: only, pw }) {
   const dir = join(out, scenario.id);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, 'frames'), { recursive: true });
@@ -311,11 +318,16 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
     recordVideo: { dir: join(dir, 'video'), size: PHONE.viewport },
     ...(scenario.browser === 'webkit' ? {} : { args: [...KEYCHAIN_ARGS, '--use-angle=metal'] }),
   });
-  // only GETs leave the page, as in journey-proof.mjs
-  await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
+  // only GETs leave the page, as in journey-proof.mjs; on K2's way into the world they arrive SLOW_MS late (SQ11). Not before the
+  // title: the old worker's update precaches hundreds of files one by one through this route, 3 minutes at 400 ms each
+  let lag = 0;
+  await context.route('**/*', async (route) => {
+    if (route.request().method() !== 'GET') { await route.abort(); return; }
+    if (lag > 0) await new Promise((resolve) => { setTimeout(resolve, lag); });
+    await route.continue();
+  });
   await context.addInitScript(smokeProbes);
-  // K6 plays at phone Low, the mode Low Power forces on a phone (graphicsMode.ts), which K1-K5 never reach
-  if (scenario.id === 'K6') await saveFixture(context, { scope: 'device', key: 'graphics', data: 'low' });
+  if (PHONE_LOW.has(scenario.id)) await saveFixture(context, { scope: 'device', key: 'graphics', data: 'low' });
   const page = context.pages()[0] ?? await context.newPage();
   /** @param {Page} p */
   const watch = (p) => {
@@ -377,6 +389,7 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
         say(`old cache: page ${after.build?.slice(0, 8) ?? '?'}, caches ${after.caches.join(' ')}, databases ${after.databases.join(' ')}`);
       } else say('no saved profile: seeding one for the next release');
       await shoot('title');
+      if (scenario.id === 'K2') { lag = SLOW_MS; say(`every request ${String(SLOW_MS)} ms late from here`); }
       const leg = await observe({ name: 'journey', tap: await toShardSelect(page, card, onDrop), shoot, budgetMs });
       if (!deploy && leg.playAt !== null && leg.problems.length === 0) leg.stick = await stickMoves(page);
       result.legs.push(leg);
@@ -446,18 +459,28 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
       await open('/');
       await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 });
       await shoot('title');
-      const cells = await liveCells(page);
+      const cells = (await liveCells(page)).filter((slug) => only === undefined || only.includes(slug));
+      result.cells = cells;
       say(`live cells: ${cells.join(', ')}`);
       await open('/');
       for (const slug of cells) {
         if (Date.now() - started > K6_BUDGET_MS) { say(`K6 budget spent: ${slug} and after not entered`); break; }
         let leg;
-        try { leg = await watchLeg(page, { name: slug, tap: await toShardSelect(page, slug, onDrop), budgetMs: CELL_BUDGET_MS, holdMs: 1500 }); }
-        catch (error) { say(`${slug}: ${error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error)}`); await open('/'); await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined); continue; }
+        // SQ9: on a deploy each card gets the deploy checks (play in budget, error card, the stick moves, a drawn world)
+        try {
+          const cell = { name: slug, tap: await toShardSelect(page, slug, onDrop), budgetMs: CELL_BUDGET_MS, holdMs: 1500 };
+          leg = deploy ? await observe(cell) : await watchLeg(page, cell);
+        } catch (error) {
+          const why = error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error);
+          say(`${slug}: ${why}`);
+          // a card the title offers but the run could not enter is reported as never reaching play, not skipped (SQ9)
+          if (deploy) result.legs.push({ name: slug, at: Date.now(), samples: [], problems: [{ at: 0, text: `never reached play: could not enter (${why.slice(0, 80)})` }], path: '', tapAt: Date.now(), playAt: null });
+          await open('/'); await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined); continue;
+        }
         result.legs.push(leg);
         say(`${slug}: ${leg.path}`);
         if (leg.playAt !== null) {
-          await page.waitForTimeout(CELL_SETTLE_MS);
+          if (!deploy) await page.waitForTimeout(CELL_SETTLE_MS);
           const path = join(dir, 'frames', `cell-${slug}.jpg`);
           try { await page.screenshot({ path, type: 'jpeg', quality: 75, scale: 'css', timeout: 5000 }); result.frames[`cell-${slug}`] = path; } catch { /* a navigation ate it */ }
         }

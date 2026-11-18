@@ -10,6 +10,37 @@
 /** The journey judge's words that are not P1 on their own: no play is P0, a modal is named by its own check. */
 const NOT_P1 = /^never reached play|^an error or drop modal opened$/u;
 
+/** STAGING-QA SQ12 (SB47's done-when): a return visit to Driftwood at Low Power reaches play within this, or it is a P1. */
+export const RETURN_PLAY_BUDGET_MS = 20_000;
+/** SQ12: time to play over this share of the last release's is a P2 on a deploy. */
+export const SLOWER_SHARE = 1.25;
+
+/** Each leg's milliseconds from its tap to play, by leg name (a K6 leg is one card). @param {ScenarioResult} s @returns {Record<string, number>} */
+export function legTimes(s) {
+  return Object.fromEntries(s.legs.flatMap((leg) => leg.playAt === null ? [] : [[leg.name, leg.playAt - leg.tapAt]]));
+}
+
+/** SQ12 on a deploy: K2's return visit inside its budget (P1), and each leg no more than SLOWER_SHARE of the last release's
+ * time (P2; K1 and K2 compare only against the budget: a forced update's time is the old build's).
+ * @param {ScenarioResult} s @param {Record<string, number> | undefined} last @returns {Check[]} */
+export function loadChecks(s, last) {
+  const ttp = timeToPlay(s);
+  /** @type {Check[]} */
+  const checks = [];
+  if (s.id === 'K2' && ttp !== undefined) {
+    checks.push({ key: 'load', severity: 'P1', ok: ttp <= RETURN_PLAY_BUDGET_MS,
+      text: `a return visit at Low Power and 400 ms reached play in ${(ttp / 1000).toFixed(1)} s, over the ${String(RETURN_PLAY_BUDGET_MS / 1000)} s budget (SB47)` });
+  }
+  if (last === undefined || s.id === 'K1' || s.id === 'K2') return checks;
+  const slower = Object.entries(legTimes(s)).flatMap(([name, ms]) => {
+    const before = last[s.id === 'K6' ? `K6:${name}` : s.id];
+    return before !== undefined && (s.id === 'K6' || name === s.legs[0]?.name) && ms > before * SLOWER_SHARE
+      ? [`${name} ${(ms / 1000).toFixed(1)} s against ${(before / 1000).toFixed(1)} s`] : [];
+  });
+  checks.push({ key: 'slow-play', severity: 'P2', ok: slower.length === 0, text: `time to play over ${String(Math.round((SLOWER_SHARE - 1) * 100))}% slower than the last release: ${slower.join('; ')}` });
+  return checks;
+}
+
 /** a.b.c below x.y.z @param {string} a @param {string} b */
 export function olderVersion(a, b) {
   const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
@@ -41,6 +72,7 @@ export function checkScenario(s, ctx) {
       { key: 'error-card', severity: 'P0', ok: !error, text: 'an error card opened' },
       { key: 'stick', severity: 'P0', ok: stuck.length === 0, text: `the move stick did not move the player (${stuck.join(', ')})` },
       { key: 'black-world', severity: 'P0', ok: black === undefined, text: black ?? 'the world drew' },
+      ...loadChecks(s, ctx.lastTimeToPlay),
     ];
   }
   /** @type {Check[]} */
@@ -143,7 +175,7 @@ export function verdictOf(scenarios, ctx) {
   const rows = scenarios.map((s) => {
     const checks = checkScenario(s, { ...ctx, checkVersion: s === first });
     const ttp = timeToPlay(s);
-    return { scenario: s, checks, findings: findingsOf(s, checks), ...(ttp === undefined ? {} : { timeToPlay: ttp }) };
+    return { scenario: s, checks, findings: findingsOf(s, checks), legTimes: legTimes(s), ...(ttp === undefined ? {} : { timeToPlay: ttp }) };
   });
   const findings = rows.flatMap((r) => r.findings).sort(worstFirst);
   return { rows, findings, hold: holds(findings) };

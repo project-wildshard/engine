@@ -27,11 +27,15 @@ export function releases(store) {
 export function lastRelease(store, release) {
   const row = releases(store).find((r) => r.release !== release);
   if (row === undefined) return undefined;
-  /** @type {{ scenarios?: { id: string, timeToPlay?: number, frames?: Record<string, string> }[] }} */
+  /** @type {{ scenarios?: { id: string, timeToPlay?: number, legTimes?: Record<string, number>, frames?: Record<string, string> }[] }} */
   const verdict = JSON.parse(readFileSync(join(row.dir, 'verdict.json'), 'utf8'));
   /** @type {Record<string, number>} */
   const timeToPlay = {};
-  for (const s of verdict.scenarios ?? []) if (typeof s.timeToPlay === 'number') timeToPlay[s.id] = s.timeToPlay;
+  for (const s of verdict.scenarios ?? []) {
+    if (typeof s.timeToPlay === 'number') timeToPlay[s.id] = s.timeToPlay;
+    // SQ12: each K6 card's own time, keyed K6:<slug>
+    if (s.id === 'K6') for (const [name, ms] of Object.entries(s.legTimes ?? {})) if (typeof ms === 'number') timeToPlay[`K6:${name}`] = ms;
+  }
   return { ...row, verdict, timeToPlay };
 }
 
@@ -49,6 +53,19 @@ export function storedFrame(dir, id, name) {
 export function keepRun(store, release, out, verdict) {
   const dir = join(store, release);
   mkdirSync(dir, { recursive: true });
+  // STAGING-QA SQ16: the legs run different scenarios on one release (the candidate K1, K2, K5, K6; after the flip K3, K5), so
+  // a scenario this run did not play keeps its stored row
+  const file = join(dir, 'verdict.json');
+  /** @type {{ id: string, timeToPlay?: number, legTimes?: Record<string, number> }[]} */
+  let kept = [];
+  if (existsSync(file)) {
+    try {
+      /** @type {{ build?: string, scenarios?: { id: string }[] }} */
+      const stored = JSON.parse(readFileSync(file, 'utf8'));
+      const ran = new Set((verdict.scenarios ?? []).map((/** @type {{ id: string }} */ s) => s.id));
+      if (stored.build === verdict.build) kept = (stored.scenarios ?? []).filter((s) => !ran.has(s.id));
+    } catch { /* an unreadable verdict is replaced */ }
+  }
   /** @param {string} path */
   const moved = (path) => path.startsWith(out) ? join(dir, path.slice(out.length + 1)) : path;
   for (const s of verdict.scenarios ?? []) {
@@ -62,9 +79,15 @@ export function keepRun(store, release, out, verdict) {
     if (typeof f.sheet === 'string' && existsSync(f.sheet)) { cpSync(f.sheet, moved(f.sheet)); f.sheet = moved(f.sheet); }
   }
   for (const v of verdict.vision ?? []) if (typeof v.sheet === 'string' && existsSync(v.sheet)) { cpSync(v.sheet, moved(v.sheet)); v.sheet = moved(v.sheet); }
+  // the kept rows' files are in the store already
+  if (kept.length > 0) verdict.scenarios = [...kept, ...(verdict.scenarios ?? [])];
   /** @type {Record<string, number>} */
   const timeToPlay = {};
-  for (const s of verdict.scenarios ?? []) if (typeof s.timeToPlay === 'number') timeToPlay[s.id] = s.timeToPlay;
+  for (const s of verdict.scenarios ?? []) {
+    if (typeof s.timeToPlay === 'number') timeToPlay[s.id] = s.timeToPlay;
+    // SQ12: each K6 card's own time, keyed K6:<slug>
+    if (s.id === 'K6') for (const [name, ms] of Object.entries(s.legTimes ?? {})) if (typeof ms === 'number') timeToPlay[`K6:${name}`] = ms;
+  }
   writeFileSync(join(dir, 'time-to-play.json'), `${JSON.stringify(timeToPlay, null, 1)}\n`);
   writeFileSync(join(dir, 'verdict.json'), `${JSON.stringify(verdict, null, 1)}\n`);
   for (const old of releases(store).slice(KEEP_RELEASES)) rmSync(old.dir, { recursive: true, force: true });

@@ -27,7 +27,7 @@ import { join, resolve } from 'node:path';
 import { SCENARIOS, runScenario } from './staging-smoke/scenarios.mjs';
 import { holds, verdictOf, worstFirst } from './staging-smoke/checks.mjs';
 import { keepRun, lastRelease, newestProfiles, saveProfiles, STORE } from './staging-smoke/store.mjs';
-import { changelogBullets, visionFindings, visionPass } from './staging-smoke/vision.mjs';
+import { changelogBullets, deployVision, visionFindings, visionPass } from './staging-smoke/vision.mjs';
 import { bugbashRows } from './staging-smoke/bugbash.mjs';
 import { isClean, receiptLine, writeBoard } from './staging-smoke/board.mjs';
 import { homedir } from 'node:os';
@@ -54,14 +54,14 @@ export async function served(url) {
 
 /**
  * Run the smoke and write <out>/verdict.json.
- * @param {{ url: string, release: string, out: string, only?: readonly string[], card?: string, deepLink?: string, watchMs?: number, budgetMs?: number,
+ * @param {{ url: string, release: string, out: string, only?: readonly string[], cells?: readonly string[], card?: string, deepLink?: string, watchMs?: number, budgetMs?: number,
  *   build?: string, lastTimeToPlay?: Record<string, number>, oldProfiles?: Partial<Record<'chromium' | 'webkit', string>>,
  *   oldState?: import('./staging-smoke/scenarios.mjs').StorageState, store?: string, vision?: boolean, deploy?: boolean, changelog?: string, bugbash?: string, receipts?: string, runBudgetS?: number,
  *   log?: (line: string) => void }} options
  * `store` (the CLI's default: ~/.cache/wildshard/plan-artifacts/staging-smoke) keeps the run and gives the last release's
  * frames and times; without one the run is kept only in `out` and the vision pass has no baseline (no calls).
  */
-export async function runSmoke({ url, release, out, only, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, store, vision = true, deploy = false, changelog = resolve('CHANGELOG.md'), bugbash, receipts, runBudgetS = RUN_BUDGET_S, log = console.log }) {
+export async function runSmoke({ url, release, out, only, cells, card = 'driftwood-isle', deepLink = 'pine-hollow', watchMs, budgetMs, build, lastTimeToPlay, oldProfiles = {}, oldState, store, vision = true, deploy = false, changelog = resolve('CHANGELOG.md'), bugbash, receipts, runBudgetS = RUN_BUDGET_S, log = console.log }) {
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The staging smoke joins worlds: staging or local only, never production');
   const pw = await import('./browser-playwright.mjs');
   const started = Date.now();
@@ -84,7 +84,7 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
   for (const scenario of SCENARIOS) {
     if (only !== undefined && !only.includes(scenario.id)) continue;
     const result = await runScenario(scenario, {
-      url, out, card, deepLink, pw, deploy, ...(watchMs === undefined ? {} : { watchMs }), ...(budgetMs === undefined ? {} : { budgetMs }),
+      url, out, card, deepLink, pw, deploy, ...(cells === undefined ? {} : { cells }), ...(watchMs === undefined ? {} : { watchMs }), ...(budgetMs === undefined ? {} : { budgetMs }),
       ...(scenario.id === 'K1' || scenario.id === 'K2' ? oldFor(scenario.browser) : {}),
       ...(version.minClient === undefined ? {} : { minClient: version.minClient }), ...(version.build === undefined ? {} : { candidateBuild: version.build }),
     });
@@ -102,8 +102,11 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
   let looks = [];
   if (vision) {
     try {
-      looks = visionPass({ scenarios, release, ...(last === undefined ? {} : { last }),
-        bullets: changelogBullets(changelog, release), out, ...(deploy ? { timeoutMs: 8000 } : {}) });
+      const bullets = changelogBullets(changelog, release);
+      // STAGING-QA SQ13: on a deploy the judge only reports, skips what already holds and makes at most 12 calls, 4 at a time
+      const held = new Set(judged.findings.filter((f) => f.severity === 'P0' || f.severity === 'P1').map((f) => f.scenario));
+      looks = deploy ? await deployVision({ scenarios, held, release, ...(last === undefined ? {} : { last }), bullets, out })
+        : visionPass({ scenarios, release, ...(last === undefined ? {} : { last }), bullets, out });
     } catch (error) {
       if (!deploy) throw error;
       looks = [{ scenario: 'vision', verdict: 'error', line: 'vision evidence could not be prepared' }];
@@ -115,7 +118,7 @@ export async function runSmoke({ url, release, out, only, card = 'driftwood-isle
   const verdict = {
     url, release, ...(version.build === undefined ? {} : { build: version.build }), ...(version.describe === undefined ? {} : { describe: version.describe }),
     version, at: new Date().toISOString(), seconds,
-    scenarios: judged.rows.map(({ scenario, checks, timeToPlay }) => Object.assign(scenario, { checks, timeToPlay })),
+    scenarios: judged.rows.map(({ scenario, checks, timeToPlay, legTimes }) => Object.assign(scenario, { checks, timeToPlay, legTimes })),
     ...(last === undefined ? {} : { last: last.release }), vision: looks, findings, hold: holds(findings),
   };
   // SM6: every finding becomes a STAGING-BUGBASH row, or a "seen again" line on its open row (the caller commits the file)

@@ -1,5 +1,13 @@
 // Generated from the JSDoc in the .mjs beside it (meta STAGING-SMOKE): npx tsc --ignoreConfig <the .mjs files> --allowJs --declaration --emitDeclarationOnly
 /* oxlint-disable typescript/consistent-type-definitions, typescript/consistent-type-imports -- tsc's declaration output */
+/** STAGING-QA SQ12 (SB47's done-when): a return visit to Driftwood at Low Power reaches play within this, or it is a P1. */
+export const RETURN_PLAY_BUDGET_MS: 20000;
+/** SQ12: time to play over this share of the last release's is a P2 on a deploy. */
+export const SLOWER_SHARE: 1.25;
+/** Each leg's milliseconds from its tap to play, by leg name. */
+export function legTimes(s: ScenarioResult): Record<string, number>;
+/** SQ12 on a deploy: K2's return visit inside its budget (P1), and each leg within SLOWER_SHARE of the last release's (P2). */
+export function loadChecks(s: ScenarioResult, last: Record<string, number> | undefined): Check[];
 /** a.b.c below x.y.z @param {string} a @param {string} b */
 export function olderVersion(a: string, b: string): boolean;
 /** Milliseconds from the first leg's tap to play, or undefined when it never played. @param {ScenarioResult} s */
@@ -21,6 +29,7 @@ export function verdictOf(scenarios: readonly ScenarioResult[], ctx: CheckContex
         scenario: import("./scenarios.mjs").ScenarioResult;
         checks: Check[];
         findings: Finding[];
+        legTimes: Record<string, number>;
     }[];
     findings: Finding[];
     hold: boolean;

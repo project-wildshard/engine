@@ -1,6 +1,6 @@
 // Meta STAGING-SMOKE SM2: each hard check, fed a recorded sample or log, gives its listed severity; `hold` is true exactly when
 // a P0 or P1 is present.
-import { expect, test } from 'vitest';
+import { describe, expect, it, test } from 'vitest';
 import {createTempRepo} from '../src/test/helpers/git';
 import {engineRelease} from '../scripts/changelog.mjs';
 import { checkScenario, holds, olderVersion, verdictOf } from '../scripts/staging-smoke/checks.mjs';
@@ -125,4 +125,20 @@ test('SB48: the world region of a play frame, with no golden image', () => {
   // Driftwood's sky over sea, and a dark textured night: drawn
   expect(blackWorld(worldStats(frame(W, H, (_x, y) => (y < H / 2 ? [120, 190, 240] : [30, 90, 120])), W, H, 3))).toBeNull();
   expect(blackWorld(worldStats(frame(W, H, (x, y) => ((x + y) % 4 < 2 ? [4, 6, 12] : [40, 46, 60])), W, H, 3))).toBeNull();
+});
+
+describe('the deploy load budget (STAGING-QA SQ12)', () => {
+  const deploy = { ...ctx, deploy: true, lastTimeToPlay: { K3: 10_000, 'K6:pine-hollow': 10_000 } };
+  it('holds a return visit over 20 s as a P1 and passes one inside it', () => {
+    const k2 = (ms: number) => clean({ id: 'K2', legs: [leg({ name: 'journey', tapAt: 0, playAt: ms })] });
+    expect(failed(k2(21_000), deploy)).toEqual(['P1 load']);
+    expect(failed(k2(19_000), deploy)).toEqual([]);
+  });
+  it('reports a 30% rise over the last release as a P2, per K6 card', () => {
+    expect(failed(clean({ legs: [leg({ tapAt: 0, playAt: 13_000 })] }), deploy)).toEqual(['P2 slow-play']);
+    expect(failed(clean({ legs: [leg({ tapAt: 0, playAt: 12_000 })] }), deploy)).toEqual([]);
+    const k6 = clean({ id: 'K6', legs: [leg({ name: 'pine-hollow', tapAt: 0, playAt: 13_000 }), leg({ name: 'far-reach', tapAt: 0, playAt: 30_000 })] });
+    expect(failed(k6, deploy)).toEqual(['P2 slow-play']);
+    expect(checkScenario(k6, deploy).find(check => check.key === 'slow-play')?.text).toContain('pine-hollow 13.0 s against 10.0 s');
+  });
 });

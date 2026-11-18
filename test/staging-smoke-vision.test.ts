@@ -11,7 +11,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { holds } from '../scripts/staging-smoke/checks.mjs';
 import { KEYFRAMES } from '../scripts/staging-smoke/scenarios.mjs';
 import { keepRun, lastRelease, releases } from '../scripts/staging-smoke/store.mjs';
-import { changelogBullets, parseVision, visionFindings, visionPass } from '../scripts/staging-smoke/vision.mjs';
+import { changelogBullets, deployVision, parseVision, visionFindings, visionPass } from '../scripts/staging-smoke/vision.mjs';
 
 const ROOT = resolve('tmp/staging-smoke-vision-test');
 const FFMPEG = (() => { try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true; } catch { return false; } })();
@@ -83,4 +83,29 @@ test('the store keeps the last 5 releases', () => {
   const store = join(ROOT, 'retain'), out = join(ROOT, 'retain-run');
   for (let i = 1; i <= 7; i++) keepRun(store, `v0.1.${String(i)}`, out, { release: `v0.1.${String(i)}`, at: `2026-11-1${String(i)}T00:00:00.000Z`, scenarios: [], findings: [], hold: false });
   expect(releases(store).map(r => r.release)).toEqual(['v0.1.7', 'v0.1.6', 'v0.1.5', 'v0.1.4', 'v0.1.3']);
+});
+
+test.skipIf(!FFMPEG)('the deploy judge (STAGING-QA SQ13) only reports, skips what holds and stops at its call cap', async () => {
+  const store = join(ROOT, 'store-sq13'), out = join(ROOT, 'run-sq13'), lastOut = join(ROOT, 'last-sq13');
+  const ids = ['K1', 'K2', 'K3', 'K4'];
+  const lastScenarios = ids.map(id => ({ id, title: id, status: 'ran', frames: Object.fromEntries(KEYFRAMES.map(k => [k, frame(join(lastOut, id, 'frames', `${k}.jpg`), 'green')])) }));
+  keepRun(store, 'v0.1.33', lastOut, { release: 'v0.1.33', at: '2026-11-16T20:00:00.000Z', scenarios: lastScenarios, findings: [], hold: false });
+  const last = lastRelease(store, 'v0.1.34');
+  const scenarios = ids.map(id => ({ id, title: id, status: 'ran', frames: Object.fromEntries(KEYFRAMES.map(k => [k, frame(join(out, id, 'frames', `${k}.jpg`), 'navy')])) }));
+  const calls = () => existsSync(join(ROOT, 'calls.log')) ? readFileSync(join(ROOT, 'calls.log'), 'utf8').split('--model claude-opus-5-5').length - 1 : 0;
+  const before = calls();
+  const looks = await deployVision({ scenarios, held: new Set(['K2']), release: 'v0.1.34', ...(last === undefined ? {} : { last }), bullets: [], out, maxCalls: 2 });
+  expect(looks.map(v => `${v.scenario} ${v.verdict}`)).toEqual(['K1 regressed', 'K2 skipped', 'K3 regressed', 'K4 skipped']);
+  expect(calls() - before).toBe(2);
+  expect(looks[3]?.line).toContain('2-call cap');
+});
+
+test('a release keeps each leg\'s newest scenarios: the candidate\'s K6 stays when live staging runs K3 (STAGING-QA SQ16)', () => {
+  const store = join(ROOT, 'store-merge'), out = join(ROOT, 'run-merge');
+  const build = 'c'.repeat(40);
+  keepRun(store, 'v0.1.40', out, { release: 'v0.1.40', build, at: '2026-11-18T20:00:00.000Z', scenarios: [{ id: 'K6', frames: {}, timeToPlay: 12_000, legTimes: { 'far-reach': 12_000 } }], findings: [] });
+  keepRun(store, 'v0.1.40', out, { release: 'v0.1.40', build, at: '2026-11-18T20:10:00.000Z', scenarios: [{ id: 'K3', frames: {}, timeToPlay: 9000 }], findings: [] });
+  expect(lastRelease(store, 'v0.1.41')?.timeToPlay).toEqual({ K6: 12_000, 'K6:far-reach': 12_000, K3: 9000 });
+  keepRun(store, 'v0.1.40', out, { release: 'v0.1.40', build: 'd'.repeat(40), at: '2026-11-18T21:00:00.000Z', scenarios: [{ id: 'K3', frames: {}, timeToPlay: 8000 }], findings: [] });
+  expect(lastRelease(store, 'v0.1.41')?.timeToPlay).toEqual({ K3: 8000 });
 });
