@@ -2,7 +2,7 @@ import { createClientChannelView, moverChannelValues, type ClientGeometryKernels
 import { bindPageQuest, type RuntimeQuestPorts } from '../../../shared/game/quest/pageState';
 import { bindPagePersistence, bindPageBossRecord, type PagePersistenceRows, type PagePersistence } from '../../../shared/game/quest/pagePersistence';
 import { lightEmitterPresentation } from '../shardfile/lightEmitters';
-import { residentWorldScope } from '../shardfile/hybridPresentation';
+import { residentWorldScope } from '../shardfile/runtimePagePresentation';
 import { readBorrowedOwner, type BorrowedOwnerPath } from '../../../shared/game/plugin/borrowed';
 import { createClientChannels, type ClientChannelObservation, type ClientChannelFrame } from '../../../shared/game/plugin/channels';
 import type { World } from '@wildshard/engine/core/bootstrap';

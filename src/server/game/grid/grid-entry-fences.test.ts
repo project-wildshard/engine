@@ -19,7 +19,7 @@ const assembly = new GridAssembly({ developer: false, devserver: false }), cell 
 const empty = assembly.emptyNeighbour.edge;
 const strips = generatePlatform([{ ...cell, edges: { north: empty, east: empty, south: empty, west: empty },
   observations: { north: { entryWidth: 8 }, east: { entryWidth: 8 }, south: { entryWidth: 8 }, west: { entryWidth: 8 } } }], empty);
-const estimate = readinessModel({ criticalWireBytes: 0, hybridWireBytes: 0, decodeSeconds: 0, runtimeParseSeconds: 0 },
+const estimate = readinessModel({ criticalWireBytes: 0, runtimePageWireBytes: 0, decodeSeconds: 0, runtimeParseSeconds: 0 },
   { speed: 30, linkBitsPerSecond: 1_000_000, requestLatencySeconds: 0.1, maxStallSeconds: 0 });
 const sides = [{ name: 'north', x: 0, z: 1 }, { name: 'east', x: 1, z: 0 },
   { name: 'south', x: 0, z: -1 }, { name: 'west', x: -1, z: 0 }] as const;

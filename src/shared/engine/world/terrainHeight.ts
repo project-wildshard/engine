@@ -13,7 +13,7 @@ let datum: () => number = () => 0;
 /** Bind the level's vertical datum (its terrain field's `datum`: a level shifted up or down at runtime, 0 for every level
  *  that isn't). Heightfield binds it; nothing else should. */
 export function setTerrainDatum(fn: () => number): void { datum = fn; }
-/** How far the level's world is shifted vertically at runtime (Driftwood's G164 drop with its hybrid row ON: −0.8). Readers
+/** How far the level's world is shifted vertically at runtime (Driftwood's G164 drop with its runtime row ON: −0.8). Readers
  *  that keep a pose or a mesh in the level's authored frame (a `?at=` reload, the baked navmesh) add it on the way in and
  *  take it off on the way out, so the same saved pose stands on the same ground in either state. */
 export function terrainDatum(): number { return datum(); }

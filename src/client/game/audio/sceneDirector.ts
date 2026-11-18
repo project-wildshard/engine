@@ -1,5 +1,5 @@
 import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
-import { boundResidentWorldScope } from '../shardfile/hybridPresentation';
+import { boundResidentWorldScope } from '../shardfile/runtimePagePresentation';
 import type { Tier } from '@wildshard/engine/core/tier';
 import { runtimeAudio, installRuntimeAudioEntry, installRuntimeGameplayAudio, type RuntimeGameplayAudioEnvironment } from '../plugin/audio';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';

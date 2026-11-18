@@ -10,7 +10,7 @@ export function clientResidency(source: Pick<Shardfile, 'budgets' | 'runtime'>, 
   const owner = bindings.residency;
   if (owner === undefined) return { allocator: bindings.allocator ?? new ResidencyAllocator() };
   if (bindings.allocator !== undefined && bindings.allocator !== owner.allocator) throw new Error('Shardfile page and client must share one residency allocator');
-  // A hybrid world hook runs after the shell allocated. Preserve any root preclaim;
+  // A runtime world hook runs after the shell allocated. Preserve any root preclaim;
   // declared critical sim cost is a lower-bound check, never a replacement for a runtime's whole-home measurement.
   const preclaimed = source.runtime !== null || owner.allocator.has(`sim:${bindings.instance}`);
   // The boot cannot resolve the texture mode yet; a reviewed images-first figure rides beside the claim for the grid entry's

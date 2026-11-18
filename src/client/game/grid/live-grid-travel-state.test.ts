@@ -8,7 +8,7 @@ test('travel facts stay fresh without invoking retained-program and debug reader
   const host = {state: () => { reads++; return {current, gameplayReady: current !== null, pending: current === null ? ['next'] : []}; }};
   const crossing = {state: () => ({phase, issue}), timings: () => { throw new Error('Unused crossing history'); }};
   const runtime = {timings: () => ({current: current === null ? {instance: 'next', hook: 'world', start: 10} : null, completed: []})};
-  Reflect.set(value, 'live', host); Reflect.set(value, 'crossing', {crossing}); Reflect.set(value, 'hybrid', runtime);
+  Reflect.set(value, 'live', host); Reflect.set(value, 'crossing', {crossing}); Reflect.set(value, 'runtimePage', runtime);
   for (const field of ['page', 'keeper', 'bootPrograms', 'offset', 'leaveTiming']) {
     Object.defineProperty(value, field, {get: () => { throw new Error(`Unused debug field ${field}`); }});
   }
@@ -30,7 +30,7 @@ test('GC6: a world built ahead stays unenterable while its entry is deferred or 
   if (!(value instanceof LiveGridSession)) throw new Error('Missing live session prototype');
   const deferred = new Map<string, unknown>([['nalati', {}]]), preparing: string[] = [];
   const queued = new Set<string>();
-  Reflect.set(value, 'deferredEntries', deferred); Reflect.set(value, 'queuedEntries', queued); Reflect.set(value, 'hybrid', {preparing: () => preparing});
+  Reflect.set(value, 'deferredEntries', deferred); Reflect.set(value, 'queuedEntries', queued); Reflect.set(value, 'runtimePage', {preparing: () => preparing});
   expect(value.entryPending('nalati')).toBe(true);
   deferred.clear(); queued.add('nalati');
   expect(value.entryPending('nalati')).toBe(true); // queued behind another entry's preparation

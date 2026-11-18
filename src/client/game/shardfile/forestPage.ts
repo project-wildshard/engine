@@ -24,7 +24,7 @@ import { plumbingKnob } from '../shard/declaredPlumbing';
 import { LivingBuildings } from './livingBuildings';
 import { installWorldScenes } from './worldScenes';
 import { hydrateWorldSceneWeld } from './worldSceneWeld';
-import { residentWorldScope } from './hybridPresentation';
+import { residentWorldScope } from './runtimePagePresentation';
 import { runtimeLookMaterials } from './runtimeFolder';
 import { timeClientPreparation } from './preparationTiming';
 import { lendLooks, setLentParam } from './lentLooks';

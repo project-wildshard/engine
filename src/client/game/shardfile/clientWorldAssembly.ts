@@ -8,8 +8,8 @@ import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { buildProgress, type ShardContext } from '../plugin/context';
 import { admittedIslandBook, preflightIslandBook } from './islandBook';
 import { WorldAssembly } from './worldAssembly';
-import { HybridResidentWorld } from './hybrid';
-import { boundResidentWorldScope } from './hybridPresentation';
+import { RuntimePageResidentWorld } from './runtimePage';
+import { boundResidentWorldScope } from './runtimePagePresentation';
 import { runtimeLookMaterials } from './runtimeFolder';
 import { lendLooks } from './lentLooks';
 import { installWorldScenes } from './worldScenes';
@@ -23,7 +23,7 @@ import { wholeRefinementCover } from './wholeRefinementCover';
 
 const enteredScopes = new WeakSet<ShardContext['scope']>();
 const residents = new WeakMap<IslandLibrary<unknown> | ShardFolder, {
-  readonly recipe: string; readonly scenes: unknown; readonly world: HybridResidentWorld<SceneHandles>;
+  readonly recipe: string; readonly scenes: unknown; readonly world: RuntimePageResidentWorld<SceneHandles>;
 }>();
 /** Construction remains on its original bound owner; entered reads borrow only
  * after it completes. Leaving an entry never cancels a still-live resident. */
@@ -89,7 +89,7 @@ export async function installClientWorldAssembly(ctx: ShardContext, row: Extract
     const key = book?.library ?? product, recipe = JSON.stringify(row);
     let cached = residents.get(key);
     if (cached !== undefined && (cached.recipe !== recipe || cached.scenes !== sceneRows)) throw new Error('World assembly declaration changed');
-    if (cached === undefined) { cached = { recipe, scenes: sceneRows, world: new HybridResidentWorld<SceneHandles>() }; residents.set(key, cached); }
+    if (cached === undefined) { cached = { recipe, scenes: sceneRows, world: new RuntimePageResidentWorld<SceneHandles>() }; residents.set(key, cached); }
     scenes = await cached.world.load(ctx, owner => build(owner, true));
   }
   live(); publishClientSceneHandles(product, resident ?? scope, scenes); WorldAssembly.lend(row.rows, resident ?? scope, scope);

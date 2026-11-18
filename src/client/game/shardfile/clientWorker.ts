@@ -331,7 +331,7 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   // J311: on a grid page, Shard select's pick is where the in-page grid starts, wherever this device last stood.
   // ZE10b: a gate's zone entry also names where in that cell it arrives (its entryway, past the gate)
   const goto = lone ? null : chosenCell(), enter = goto === null ? null : chosenArrival();
-  // NB19: the inline hybrid candidate this page owns reads its own server files (inlineOwner.ts)
+  // NB19: the inline runtime candidate this page owns reads its own server files (inlineOwner.ts)
   return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...ownsInlineCandidate(slug) ? { ownServer: true as const } : {}, ...goto === null ? {} : { goto }, ...enter === null ? {} : { enter }, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
 }
 /** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of

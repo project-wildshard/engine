@@ -100,7 +100,7 @@
     "chains": [
       [
         "src/shards/driftwood-isle/runtime/hybrid.ts",
-        "src/game/client/shardfile/hybrid.ts",
+        "src/game/client/shardfile/runtimePage.ts",
         "src/game/grid/boot.ts",
         "src/engine/client/app/runtime.ts"
       ],
@@ -118,14 +118,14 @@
       ],
       [
         "src/shards/driftwood-isle/runtime/hybrid.ts",
-        "src/game/client/shardfile/hybrid.ts",
+        "src/game/client/shardfile/runtimePage.ts",
         "src/game/grid/boot.ts",
         "src/game/grid/debug.ts",
         "src/engine/client/ui/authoredDebugRows.ts"
       ],
       [
         "src/shards/driftwood-isle/runtime/hybrid.ts",
-        "src/game/client/shardfile/hybrid.ts",
+        "src/game/client/shardfile/runtimePage.ts",
         "src/game/shardfile/loader.ts",
         "src/game/client/shardfile/look.ts",
         "src/engine/client/render/dataLook.ts"

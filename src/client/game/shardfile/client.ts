@@ -108,7 +108,7 @@ export interface ShardfileClientBindings {
   nativeRuntime?: boolean;
   /** Transitional entry owns its stages, while client/plan still installs platform features. */
   runtimeStagesOnly?: boolean;
-  /** Hybrid runtimes install entered features on their actual entered context. */
+  /** Runtimes install entered features on their actual entered context. */
   planLifetime?: 'resident';
   /** Declared audio is the default. A native transition may let its runtime consume the same audio declaration exactly once. */
   audioOwner?: 'declared' | 'runtime';
@@ -132,7 +132,7 @@ function placeholderFiles(source: Shardfile): ReadonlySet<string> {
   return out;
 }
 
-function emptyHybridData(source: Shardfile, audioOwner: ShardfileClientBindings['audioOwner'], worldOwner: ShardfileClientBindings['worldOwner']): boolean {
+function emptyRuntimePageData(source: Shardfile, audioOwner: ShardfileClientBindings['audioOwner'], worldOwner: ShardfileClientBindings['worldOwner']): boolean {
   // a runtime-owned world declaration: water rows and props that only declare colliders (no tiles, panels, models, far or textures)
   const runtimeWorld = worldOwner === 'runtime', props = source.props;
   // G348: placeholders (a far proxy, a near row and their files) are grid presentation, never data this client installs, so a
@@ -152,7 +152,7 @@ function emptyHybridData(source: Shardfile, audioOwner: ShardfileClientBindings[
 }
 
 /**
- * G345: a native hybrid's data without its presentation sections: the terrain (its collider and tiles) and the look's
+ * G345: a native runtime shard's data without its presentation sections: the terrain (its collider and tiles) and the look's
  * family materials (their entries, family looks and curves, and the textures only they name). When this is empty the data
  * is presentation-only: its runtime keeps the simulation and the data client only draws.
  */
@@ -224,15 +224,15 @@ export class ShardfileClient {
       const home = bindings.residency.home();
       if (home.instance !== bindings.instance || home.allocator !== bindings.allocator) throw new Error('Shardfile client requires its early page home residency');
     }
-    // M3: a native runtime's bound sections (runtime.binds) are its own to install (hybridRows.ts); the data client never installs them
+    // M3: a native runtime's bound sections (runtime.binds) are its own to install (runtimePageRows.ts); the data client never installs them
     // P1: a runtime-bound splat ground the Debug row draws streams through this client (its primary files keep their transport)
     const data = bindings.nativeRuntime === true ? withSplatGround(withoutRuntimeRows(source), source) : source;
     if (bindings.nativeRuntime === true) { const ground = splatGroundFiles(data); assets.releaseTransport(new Set([...runtimeBoundWorldFiles(source)].filter(ref => !ground.has(ref)))); }
     this.source = data; this.assets = assets; this.bindings = bindings; this.curveState = source.state;
     // a runtime that owns the client stages draws nothing of this data, but a splat ground the Debug row draws (P1)
     this.mode = bindings.runtimeStagesOnly === true ? splatGroundFiles(data).size > 0 ? 'presentation' : 'empty' : bindings.nativeRuntime !== true ? 'full'
-      : emptyHybridData(data, bindings.audioOwner, bindings.worldOwner) ? 'empty'
-      : emptyHybridData(withoutPresentation(data), bindings.audioOwner, bindings.worldOwner) ? 'presentation' : 'full';
+      : emptyRuntimePageData(data, bindings.audioOwner, bindings.worldOwner) ? 'empty'
+      : emptyRuntimePageData(withoutPresentation(data), bindings.audioOwner, bindings.worldOwner) ? 'presentation' : 'full';
 
     if (this.mode === 'full' && !hasDeclaredClientPage(source)) readModuleGroups([
       ...(data.clientScripts.bindings.length > 0 || data.quests.quests.length > 0 || (data.targets.talks?.length ?? 0) > 0 ? ['presentation'] : []),

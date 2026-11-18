@@ -3,7 +3,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { ShardContext } from '../plugin/context';
 import { installFollowedMovers, type FollowedMovers, type MoverView } from '../plugin/followedMovers';
 import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
-import { boundResidentWorldScope } from './hybridPresentation';
+import { boundResidentWorldScope } from './runtimePagePresentation';
 import { hasLentLook, lentLooksOf, setLentParam, type LentLooks } from './lentLooks';
 import { folderClosureFile } from '../../../shared/game/shardfile/shardFolder';
 import { materialGraphIr } from '@wildshard/format/materials';
@@ -26,7 +26,7 @@ export async function installClientMoverOwners(ctx:ShardContext,rows:MoverOwnerR
   };
   live();
   // A direct native entry kept the authored rest and never owned a client drive.
-  // Standalone shardfile entries use hybridInstallation and bind a resident too.
+  // Standalone shardfile entries use runtimePageInstallation and bind a resident too.
   if(construction===undefined)return undefined;
   const world=ctx.game.runtime?.world;
   if(world===undefined||world===null)throw new Error('Mover entry requires its world');

@@ -20,8 +20,8 @@ type Physics = NonNullable<Parameters<typeof pickInteractable>[2]>;
  * home's prompts at their local coordinates in another frame.
  */
 export interface EnteredRuntimeState {
-  /** the hybrid session's active runtime and whether its native hooks completed */
-  readonly hybrid: Readonly<{ instance: string | null; ready: boolean }>;
+  /** the runtime session's active runtime and whether its native hooks completed */
+  readonly runtimePage: Readonly<{ instance: string | null; ready: boolean }>;
   /** the live frame the traveller stands in (null: the road) */
   readonly current: string | null;
   /** the cell the feet stand in geometrically (independent of the motor frame's hysteresis) */
@@ -30,7 +30,7 @@ export interface EnteredRuntimeState {
 
 /** The runtime cell whose prompts (and aim bodies) the page may use now, or null. */
 export function enteredRuntime(state: EnteredRuntimeState): string | null {
-  const { instance, ready } = state.hybrid;
+  const { instance, ready } = state.runtimePage;
   if (!ready || instance === null || state.current !== instance || state.feetCell !== instance) return null;
   return instance;
 }

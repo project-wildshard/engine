@@ -463,7 +463,7 @@ export interface ShardManifest {
   next?: string;
   /** Built first-party data source, admitted before the existing session boot; picker identity stays on this manifest. */
   shardfile?: string;
-  /** First-party grid declaration for a native hybrid; discovery alone does not replace the standalone boot path. */
+  /** First-party grid declaration for a native runtime shard; discovery alone does not replace the standalone boot path. */
   gridShardfile?: string;
   /** Built-in finite page owner, derived from the admitted entry policy; no source module exists. */
   clientPlanRuntime?: true;

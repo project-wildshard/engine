@@ -26,7 +26,7 @@ export function requireBound(source: Pick<Shardfile, 'runtime'>, section: Runtim
 /**
  * The immutable files only a runtime-bound world section references (G227): the terrain's collider and tile files, the
  * props' tile, library, panel, far and texture files. Admission still fetches and verifies them with the product; the data
- * client's view drops them so a hybrid whose world is bound stays an empty data declaration.
+ * client's view drops them so a runtime page whose world is bound stays an empty data declaration.
  */
 export function runtimeBoundWorldFiles(source: Shardfile): ReadonlySet<string> {
   const binds = runtimeBinds(source), files = new Set<string>();

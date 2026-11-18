@@ -35,8 +35,8 @@ const { imagesFirst: _none, ...DRIFTWOOD } = { ...NALATI, residentBaseMB: 442.73
 const SKY_BUDGETS = { client: SKY_REACH, library: { compressed: 32_938_633, downloadAllowance: 32_938_633, resident: 151_870_129 }, overlap: 0,
   sim: { compressed: 36_920, resident: 1_360_444 } } as const;
 
-/** The entry's admitted product for a hybrid runtime home (Nalati, Driftwood): its declared cost matches its manifest's. */
-function hybrid(slug: string, cost: RuntimeCost): Parameters<typeof regionalRuntimeAccountedBytes>[0] {
+/** The entry's admitted product for a runtime home (Nalati, Driftwood): its declared cost matches its manifest's. */
+function runtimePage(slug: string, cost: RuntimeCost): Parameters<typeof regionalRuntimeAccountedBytes>[0] {
   return { source: { identity: { slug }, runtime: { cost }, sections: [], budgets: { sim: { resident: 1 } } } } as unknown as Parameters<typeof regionalRuntimeAccountedBytes>[0];
 }
 /** The entry's admitted product for a declared client page home (Sky Reach). */
@@ -63,7 +63,7 @@ test.each([
   const residency = bootGridHome('nalati-grasslands', NALATI); live.push(residency);
   const home = residency.home(), boot = runtimeAccountedBytes(NALATI);
   expect(home.bytes, 'the boot holds the compressed reading').toBe(boot);
-  const entry = regionalRuntimeAccountedBytes(hybrid('nalati-grasslands', NALATI), { slug: parseShardSlug('nalati-grasslands'), runtimeCost: NALATI }, mode);
+  const entry = regionalRuntimeAccountedBytes(runtimePage('nalati-grasslands', NALATI), { slug: parseShardSlug('nalati-grasslands'), runtimeCost: NALATI }, mode);
   if (mode === 'img') expect(entry, 'a desktop with no KTX2 set charges another reading').not.toBe(boot);
   const lease = home.handoff(entry);
   expect(home.bytes).toBe(entry);
@@ -86,8 +86,8 @@ test.each(['img', 'ktx2'] as const)('Sky Reach: its declared page hands off its 
 test('Driftwood (no images-first reading) hands off the same cost in either mode', () => {
   const residency = bootGridHome('driftwood-isle', DRIFTWOOD); live.push(residency);
   const manifest = { slug: parseShardSlug('driftwood-isle'), runtimeCost: DRIFTWOOD };
-  const img = regionalRuntimeAccountedBytes(hybrid('driftwood-isle', DRIFTWOOD), manifest, 'img');
-  expect(regionalRuntimeAccountedBytes(hybrid('driftwood-isle', DRIFTWOOD), manifest, 'ktx2')).toBe(img);
+  const img = regionalRuntimeAccountedBytes(runtimePage('driftwood-isle', DRIFTWOOD), manifest, 'img');
+  expect(regionalRuntimeAccountedBytes(runtimePage('driftwood-isle', DRIFTWOOD), manifest, 'ktx2')).toBe(img);
   residency.home().handoff(img).release();
 });
 

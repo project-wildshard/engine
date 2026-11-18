@@ -24,7 +24,7 @@ import { shardContext, type ShardContext } from "../plugin/context";
 import type { ShardManifest } from '../shard/manifest';
 import type { ShardPlayHost, ShardRuntime } from '../../../shared/game/shard/runtime';
 import type { ShardWorld } from '../../../server/game/shard/world';
-import type { HybridResident } from '../shardfile/hybrid';
+import type { RuntimePageResident } from '../shardfile/runtimePage';
 import type { AdmittedFolder } from '../shardfile/folder';
 import { admittedRuntimeFolder, shardFolderFromAdmission } from '../shardfile/runtimeFolder';
 import type { GridCell } from '../../../shared/game/grid/assembly';
@@ -114,7 +114,7 @@ export interface RegionalRuntimeRequest {
 export interface PreparedRegionalRuntime {
   readonly region: LiveGridRegion & { readonly host: RegionShell };
   readonly queries: PlayerFrameQueries;
-  readonly resident: HybridResident;
+  readonly resident: RuntimePageResident;
   /** Scalar warm-up progress only when the page trace belongs to this exact destination root. */
   readonly warmPreparation?: Game['entryPreparation'];
   readonly loadout: GridLoadout;
@@ -266,7 +266,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
         const logical = true;
         return progress && inventory && native && logical;
       };
-      const resident: HybridResident = { instance: request.cell.instance, slug: request.cell.slug, declaration, trust: dangerousTrust(),
+      const resident: RuntimePageResident = { instance: request.cell.instance, slug: request.cell.slug, declaration, trust: dangerousTrust(),
         ...(foundation.renderReady === undefined ? {} : { renderReady: foundation.renderReady }),
         scope, product: shardFolderFromAdmission(request.admitted, scope), runtime: parent, retainRuntime: true, context: (owner, runtime) => {
           viewmodelSets ??= startViewmodelTextures(request.manifest.boot?.viewmodelSets ?? false);

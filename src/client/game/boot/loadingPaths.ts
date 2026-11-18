@@ -21,7 +21,7 @@ const SHARDFILE_MEASURED_SECONDS: Readonly<Record<string, number>> = {
   server: 1.8716, audio: 0.0010,
 };
 
-/** LS8 (J188): the native and hybrid world stages (Driftwood, Pine, Nalati and Nine still build theirs in TypeScript),
+/** LS8 (J188): the native and runtime world stages (Driftwood, Pine, Nalati and Nine still build theirs in TypeScript),
  *  measured the same way: Driftwood Isle, the same phone profile and headless Chromium, its `-rows.json` from
  *  `scripts/loading-card-proof.mjs --shard=driftwood-isle --throttle --dump` (build d0f800b-mw9lffqd with the creature
  *  warm-up and FIRST_DRAW_NARROW, 2026-11-09), at 0.1 ms. `modules` is its `game-stage:modules` span, 685 ms, as above.
@@ -78,7 +78,7 @@ export type LoadingPathId = 'legacy' | 'shardfile' | 'grid' | 'crossing' | 'cell
 type Path = Parameters<Loading['setPath']>[0];
 const step = (key: string, label: string, aliases: readonly string[] = []): Path['steps'][number] => ({ key, label, aliases, weight: 1 });
 /** A grid shell has no regional terrain, trees or physics to report; its real home has its own row. */
-export function loadingPath(id: LoadingPathId, own?: Readonly<Record<string, { label: string; weight: number }>>, hybrid = false): Path {
+export function loadingPath(id: LoadingPathId, own?: Readonly<Record<string, { label: string; weight: number }>>, runtimePage = false): Path {
   const early = [step('modules', 'Application modules'),
     step('runtimeModules', 'Runtime modules', ['manifest.load']),
     step('data', 'Texture formats and audio catalogue', ['level.data', 'ktx2', 'audio.preload']),
@@ -88,7 +88,7 @@ export function loadingPath(id: LoadingPathId, own?: Readonly<Record<string, { l
   const leaf = (key: typeof BOOT_STEPS[number]): Path['steps'][number] => ({ key,
     label: own?.[key]?.label ?? STEP_INFO[key].label, weight: own?.[key]?.weight ?? STEP_INFO[key].weight });
   const worldKeys = BOOT_STEPS.filter(key => !['weapon', 'assembly', 'menu', 'shaders', 'firstFrame', 'audio'].includes(key));
-  const native = id === 'legacy' || hybrid;
+  const native = id === 'legacy' || runtimePage;
   if (id === 'cell') return { id, steps: [step('world', 'Region world'),
     step('loadout', 'Equipment and HUD'), step('gameplay', 'Gameplay and saved state'), step('warm', 'Entry warm-up'),
     step('colliders', 'Colliders and simulation'), step('enter', 'Enter the cell')], ignored: [] };

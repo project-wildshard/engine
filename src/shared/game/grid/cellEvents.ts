@@ -1,7 +1,7 @@
 import type { GridCellRef } from '../../../client/game/plugin/context';
 
 /**
- * The seam for inside-cell enter / leave notifications (SF46's hybrid runtime activation consumes them; the grid client
+ * The seam for inside-cell enter / leave notifications (SF46's runtime activation consumes them; the grid client
  * produces them). Today's home-cell boot enters its one cell at boot and never leaves it; the grid client calls
  * `enter` / `leave` as the player's frame crosses cell interiors. A late subscriber hears `enter` for the current cell.
  */

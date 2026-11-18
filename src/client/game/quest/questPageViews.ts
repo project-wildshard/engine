@@ -25,7 +25,7 @@ import { setLiveWaterLevel } from '@wildshard/engine/world/water/declared';
 import { WaterSurface } from '../systems/looks/waterSurface';
 import { parseWaterSurface } from '@wildshard/format/water';
 import { installWorldScenes } from '../shardfile/worldScenes';
-import { residentWorldScope } from '../shardfile/hybridPresentation';
+import { residentWorldScope } from '../shardfile/runtimePagePresentation';
 import { lentLook, setLentParam } from '../shardfile/lentLooks';
 
 const id = v.pipe(v.string(), v.minLength(1), v.maxLength(128)), n = v.pipe(v.number(), v.finite());

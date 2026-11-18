@@ -19,7 +19,7 @@ import { FolderFigureCatalogue } from '../models/figureCatalogue';
 import type { ShardContext } from '../plugin/context';
 import { QuestViews, type QuestNpcTalkPorts } from '../plugin/ui';
 import { ControlRefinement } from '../shardfile/controlRefinement';
-import { residentWorldScope } from '../shardfile/hybridPresentation';
+import { residentWorldScope } from '../shardfile/runtimePagePresentation';
 import { SceneHandles } from '../shardfile/sceneHandles';
 import { StreamingCamera } from '../shardfile/streamingView';
 import { installWorldScenes } from '../shardfile/worldScenes';

@@ -5,7 +5,7 @@ import { clientGround } from '../../../shared/game/shardfile/clientGround';
 import { firstPartyDescriptor, runtimeFolder, slugRuntimeFolder, type RuntimeFolder } from './runtimeFolder';
 import { selectedLevel } from '@wildshard/engine/level/selection';
 import { findShard } from '../shard/registry';
-import { hybridPointer } from '../shard/pointer';
+import { runtimePagePointer } from '../shard/pointer';
 
 /**
  * The game session's required-ground loader (E434: `startSession` installs it; importing this module installs nothing). A
@@ -16,7 +16,7 @@ import { hybridPointer } from '../shard/pointer';
  */
 export function installFolderGround(): () => void {
   return installRequiredGroundLoader(async (declared) => {
-    const product = slugRuntimeFolder(declared.key) ?? await standaloneHybrid(declared.key);
+    const product = slugRuntimeFolder(declared.key) ?? await standaloneRuntimePage(declared.key);
     if (product === null) throw new Error(`Required ground ${declared.key} has no admitted product`);
     const terrain = product.source.terrain;
     if (terrain === null) throw new Error(`Required ground ${declared.key}: its product declares no terrain collider`);
@@ -30,11 +30,11 @@ export function installFolderGround(): () => void {
   });
 }
 
-/** The product a standalone page will admit for `slug` before its hybrid boot runs (its level's physics and terrain steps come first):
+/** The product a standalone page will admit for `slug` before its runtime boot runs (its level's physics and terrain steps come first):
  *  only for the selected level of a compiled client page entered as its shardfile (keyed by its slug). */
-export function standaloneHybrid(key: string): Promise<RuntimeFolder> | null {
+export function standaloneRuntimePage(key: string): Promise<RuntimeFolder> | null {
   const manifest = findShard(key);
-  if (manifest === undefined || hybridPointer(manifest) === undefined || manifest.clientPlanRuntime !== true || selectedLevel()?.id !== key) return null;
+  if (manifest === undefined || runtimePagePointer(manifest) === undefined || manifest.clientPlanRuntime !== true || selectedLevel()?.id !== key) return null;
   return firstPartyDescriptor(key).then(runtimeFolder);
 }
 
@@ -42,13 +42,13 @@ export function standaloneHybrid(key: string): Promise<RuntimeFolder> | null {
  * The game session's baked-samples reader (E434: `startSession` installs it beside `installFolderGround`). A level's
  * optional bake (`loadBakedTerrain`, keyed by its baked id) whose shard declares query-only terrain (`terrain.form: 'query'`,
  * its native lattice re-encoded without resampling, G384) is that product's sampling file, read once through the shard's
- * product reader: a grid cell's admitted bytes, or standalone, ahead of the hybrid boot, the canonical product (its descriptor
+ * product reader: a grid cell's admitted bytes, or standalone, ahead of the runtime boot, the canonical product (its descriptor
  * shared with that boot, the file cached for its admission). It is sampled under its own law, epsilon and datum, so the page
  * never downloads the same lattice as `terrain.bin` too. Any other key keeps the engine's fetch. Returns the restore.
  */
 export function installFolderSampling(): () => void {
   return installBakedSamplesReader((key) => {
-    const resident = slugRuntimeFolder(key.key), pending = resident === null ? standaloneHybrid(key.key) : Promise.resolve(resident);
+    const resident = slugRuntimeFolder(key.key), pending = resident === null ? standaloneRuntimePage(key.key) : Promise.resolve(resident);
     return pending === null ? null : pending.then(async (product) => {
       const terrain = product.source.terrain;
       if (terrain === null || terrain.form !== 'query') return null;

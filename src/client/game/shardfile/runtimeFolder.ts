@@ -39,7 +39,7 @@ import { contentURL } from '@wildshard/engine/boot/contentBase';
 
 /**
  * The native runtime's product reader (SHARD-PLATFORM M3 tiles-swap, G227, E435): the same `ClientAssets` in both modes,
- * so a hybrid whose `runtime.binds` names `terrain` streams its compiled tiles whether it boots standalone or as a grid cell.
+ * so a runtime page whose `runtime.binds` names `terrain` streams its compiled tiles whether it boots standalone or as a grid cell.
  *
  * - **Grid**: the cell's admission already holds the verified product (`liveSession.admitRuntime`); the regional world hands
  *   it to its resident runtime (`provideRuntimeFolder`, keyed by the shard's identity, for the resident scope's lifetime).
@@ -190,11 +190,11 @@ export function admittedRuntimeFolder(slug: string): RuntimeFolder | null {
 const declared = new Map<string, Shardfile>();
 
 /**
- * A native hybrid's own declaration, recorded when its page prepares it (`prepareHybridShard`), so a session reader that
+ * A native runtime shard's own declaration, recorded when its page prepares it (`prepareRuntimePage`), so a session reader that
  * knows only the shard's slug (the baked-samples reader, `installFolderSampling`) reaches the same product reader as its
  * runtime (`runtimeFolder`). The declaration is its module's own constant, so recording it retains nothing new.
  */
-export function provideHybridDeclaration(source: Shardfile): void {
+export function provideRuntimeDeclaration(source: Shardfile): void {
   declared.set(source.identity.slug, source);
 }
 
@@ -268,7 +268,7 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
     const release = entry.assets.pin(), sections = entry.options.cache?.pin?.(outputDescriptor(entry.source)?.index.sections.map(section => section.hash) ?? []);
     scope.onDispose(() => { release(); sections?.(); entry.owners.delete(scope); retireFolder(entry); });
   }
-  provideHybridDeclaration(entry.source);
+  provideRuntimeDeclaration(entry.source);
   return entry.product;
 }
 
@@ -344,7 +344,7 @@ export function firstPartyDescriptor(slug: string): Promise<Shardfile> {
   return loadFirstPartyFolder(slug).then(product => product.shardfile);
 }
 
-/** The product reader for `slug`: its runtime's (`runtimeFolder`) once its hybrid was prepared, else a resident grid cell's, else null. */
+/** The product reader for `slug`: its runtime's (`runtimeFolder`) once its runtime page was prepared, else a resident grid cell's, else null. */
 export function slugRuntimeFolder(slug: string): RuntimeFolder | null {
   const source = declared.get(slug);
   return source === undefined ? admittedRuntimeFolder(slug) : runtimeFolder(source);

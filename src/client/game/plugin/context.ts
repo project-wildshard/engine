@@ -32,7 +32,7 @@ export const gridCells: typeof pageGridCells = pageGridCells;
 /** The home cell's restored simulation as its client hands it over (sp-x5's `onSimulation`, SF15a): the existing driver's gate and its durable save. */
 export interface GridHomeSimulation { readonly setActive: (active: boolean) => void; readonly checkpoint: () => boolean; readonly disposed: () => boolean; readonly residency?: HomeResidencyClaim }
 /**
- * The seam between the home cell's client (its shardfile simulation, when one runs: Driftwood's hybrid boot) and the live
+ * The seam between the home cell's client (its shardfile simulation, when one runs: Driftwood's runtime boot) and the live
  * grid owner. The client offers its handoff once; the grid's live session takes it and gates the existing home driver
  * while the traveller is in another region (the freeze fence). A late taker hears the current offer.
  */
@@ -41,7 +41,7 @@ export class GridHomeHandoff {
   private readonly takers = new Set<(sim: GridHomeSimulation) => void>();
   get simulation(): GridHomeSimulation | null { return this.current !== null && !this.current.disposed() ? this.current : null; }
   private expected = false;
-  /** the home client announces a handoff on its way (a hybrid home in a grid page), so the entry reveal waits for it (G98) */
+  /** the home client announces a handoff on its way (a runtime home in a grid page), so the entry reveal waits for it (G98) */
   expect(): void { this.expected = true; }
   /** true while an announced handoff has not arrived (the reveal's third wait; false when none was announced) */
   get pending(): boolean { return this.expected && this.current === null; }
@@ -67,7 +67,7 @@ export interface GameRowMap { item: ItemRow; lootTable: ContentRow; skin: SkinDe
 export type GameRows = { [K in keyof GameRowMap]: (value: GameRowMap[K] | readonly GameRowMap[K][]) => void };
 /** Game services provided by the composition root, scoped to one shard. */
 export interface GameServices {
-  /** The composition root's pre-bootstrap residency owner, shared with native hybrid data and the grid. */
+  /** The composition root's pre-bootstrap residency owner, shared with native runtime data and the grid. */
   readonly residency?: PageResidency;
   readonly runtime?: ShardRuntime;
   /** The admitted emitted audio rows for this runtime's own resident; absent for legacy-only entries. */

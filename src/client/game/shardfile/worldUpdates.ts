@@ -12,7 +12,7 @@ import { followToonLook } from '../looks/toonLook';
 import { toonLightingOf } from '../looks/toonLighting';
 import { entryOwner, lateEntryOwner, presentEntryOwner } from '../../../shared/game/shardfile/entryOwners';
 import { lentToon } from './lentLooks';
-import { boundResidentWorldScope } from './hybridPresentation';
+import { boundResidentWorldScope } from './runtimePagePresentation';
 import { paintedWorldUpdate } from './paintedWorldStages';
 import { clientCosmeticFinishes } from './clientCosmeticFinishes';
 

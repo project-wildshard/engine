@@ -1,5 +1,5 @@
 import { ShardPlugin, type ShardContext } from '../plugin/context';
-import type { prepareHybridShard as PrepareHybrid } from '../shardfile/hybrid';
+import type { prepareRuntimePage as PrepareRuntimePage } from '../shardfile/runtimePage';
 
 /** A shard's declared home/stage ownership (its manifest's `bindings.entry`): Driftwood false/declared, Nalati and Nine
  * true/declared, Pine true/runtime. Data at the one entry, never a shard-name lookup. */
@@ -9,10 +9,10 @@ export interface ClientPlanEntryPolicy { readonly retainHomeRuntime: boolean; re
  * with the declared ownership. The page's residency owner and image scope come from the boot context. An injected
  * preparation port preserves native fixture/host admission checks. */
 export async function prepareClientPlanShard(ctx: ShardContext, policy: ClientPlanEntryPolicy,
-  prepare?: typeof PrepareHybrid): Promise<ShardPlugin> {
+  prepare?: typeof PrepareRuntimePage): Promise<ShardPlugin> {
   if (!ctx.product.has('client/plan') || ctx.product.shardfile.runtime === null) throw new Error('Client-plan entry requires its compiled runtime declaration');
-  // the hybrid admission stays its own lazy chunk, fetched when world() runs (as before LD9)
-  return (prepare ?? (await import('../shardfile/hybrid')).prepareHybridShard)(ctx.product, { granted: true }, { residencyContext: ctx,
+  // the runtime admission stays its own lazy chunk, fetched when world() runs (as before LD9)
+  return (prepare ?? (await import('../shardfile/runtimePage')).prepareRuntimePage)(ctx.product, { granted: true }, { residencyContext: ctx,
     retainHomeRuntime: policy.retainHomeRuntime, stagesOwner: policy.stagesOwner,
     catalogue: [], items: new Map(), recipes: new Map(), voices: () => new Map(),
     icon: () => { throw new Error('Client-plan runtime has no declared item icon'); },

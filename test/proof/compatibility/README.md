@@ -38,7 +38,7 @@ headless adapters and coverage are recorded in the per-shard reports, rather tha
 | Signal Dunes | `sunscar-dunes/runtime/headless.ts` | none: passes (headless, replay, ledger from gameplay) | 2 rules, both from gameplay |
 | Sky Reach | `far-reach/runtime/headless.ts` | none: passes (headless, replay, ledger from gameplay); CI runs it in checkpointed slices | 2 rules, both from gameplay |
 | Pine Hollow | `pine-hollow/runtime/index.ts` | `runtime/audio/score.ts` parameter property | Loads; 19 rules tested |
-| Driftwood | `driftwood-isle/runtime/hybrid.ts` | `game/client/shardfile/hybrid.ts` parameter property | Loads; 10 rules tested |
+| Driftwood | `driftwood-isle/runtime/hybrid.ts` | `game/client/shardfile/runtimePage.ts` parameter property | Loads; 10 rules tested |
 | Nalati | `nalati-grasslands/runtime/index.ts` | `engine/client/app/runtime.ts` | Loads; 17 rules tested |
 | Nine Dragon | `tmp/headless-modules/nine-dragon-stack/modules.mjs` | none: passes (headless, replay, ledger from gameplay, G285) | 2 rules, both from gameplay |
 
@@ -123,7 +123,7 @@ real King encounter checkpoint/death/restore/victory suffix with the declared pr
 ### Driftwood
 
 Use the **actual declared `runtime/hybrid.ts`**, not legacy `runtime/index.ts` by itself. Its first
-observed refusal is the parameter property in `game/client/shardfile/hybrid.ts:304`. Its value closure continues
+observed refusal is the parameter property in `game/client/shardfile/runtimePage.ts:304`. Its value closure continues
 `hybrid.ts -> game/grid/boot.ts -> engine/client/app/runtime.ts`; the browser resident-world wrapper must not be
 the headless installer. `world/build.ts -> world/Ocean.ts -> engine/client/render/shaderPatches.ts` and
 `creatures/install.ts -> creatures/Enemies.ts -> engine/client/fx/ParticlePool.ts` need view/FX separation.

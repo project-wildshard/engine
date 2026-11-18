@@ -10,7 +10,7 @@ import { OUTPUT_SECTIONS, outputSectionPayloads } from '@wildshard/format/output
 import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
 import { parseStateLineage } from '@wildshard/format/stateLineage';
 import { readFolderDescriptor, admitFolder, type CachedFolder, type FolderCache, type FolderOptions } from '../src/client/game/shardfile/folder';
-import { provideHybridDeclaration, runtimeFolder, loadShardFolder, completeManifestCache } from '../src/client/game/shardfile/runtimeFolder';
+import { provideRuntimeDeclaration, runtimeFolder, loadShardFolder, completeManifestCache } from '../src/client/game/shardfile/runtimeFolder';
 import { ClientAssets } from '../src/client/game/shardfile/clientAssets';
 import { isBuildValidatedOutput, outputBlobUrl, outputDescriptor, resolveOutputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { saves } from '../src/shared/engine/saves/runtime';
@@ -389,7 +389,7 @@ test('v2 sections reconstruct host values and refuse the old monolithic transpor
   const { source, wires } = fixture(true), opts = options(wires);
   const read = await readFolderDescriptor(opts);
   expect(read).toEqual(parseShardfile(source));
-  provideHybridDeclaration(read);
+  provideRuntimeDeclaration(read);
   expect(runtimeFolder(parseShardfile(source)).source).toBe(read);
   const file = read.files[0]; if (file === undefined) throw new Error('Missing blob');
   expect(outputBlobUrl(read, file.hash, base)).toBe(`${base}blobs/bin/${file.hash}.bin`);

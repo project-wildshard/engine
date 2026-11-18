@@ -135,7 +135,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     } catch { /* the Worker boot step imports it again and reports its failure */ }
   })();
   // R12: a standalone page's own sky clock (a painted sky, published by its runtime) is the day cycle while the level lives
-  // and takes the pinned time; on the grid each entered cell registers its own (hybrid.ts)
+  // and takes the pinned time; on the grid each entered cell registers its own (runtime shard.ts)
   if (ctx.grid === null) enterSkyClock(app, [game.levelScope], game.levelScope);
   if (!eagerGridComposer) { await game.prepareComposer(); game.buildComposer(); }
   // DL24 (J198): every body a row can bring, parked hidden after the compose, so the first frame builds its programs

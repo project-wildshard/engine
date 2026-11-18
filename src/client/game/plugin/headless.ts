@@ -10,7 +10,7 @@ import type { Shardfile } from "@wildshard/format/shardSchema";
 
 
 /**
- * The runtime-owner binding (SHARD-PLATFORM M3, E435). A hybrid shard's native runtime owns its world and its play scope;
+ * The runtime-owner binding (SHARD-PLATFORM M3, E435). A runtime shard's native runtime owns its world and its play scope;
  * the behaviour sections it names in `runtime.binds` stay declared data, and these installers put them into that scope
  * (the entered `runtime:<instance>` scope in a grid cell, the level scope standalone) through the template's own
  * installers: the platform `Ledger`, engine `QuestState`, `installDeclaredItems`, the platform `Purse`, and the home keeper

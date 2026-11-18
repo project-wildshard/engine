@@ -12,7 +12,7 @@ import { FolderFigureCatalogue } from '../models/figureCatalogue';
 import { defineWorldSceneCatalogue } from '../models/worldSceneCatalogue';
 import type { ShardContext } from '../plugin/context';
 import { entryOwner, publishEntryOwner } from '../../../shared/game/shardfile/entryOwners';
-import { residentWorldScope } from './hybridPresentation';
+import { residentWorldScope } from './runtimePagePresentation';
 import { installWorldScenes } from './worldScenes';
 
 const ended = (ctx: ShardContext): boolean => ctx.scope.disposed || ctx.scope.disposing;

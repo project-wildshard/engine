@@ -57,7 +57,7 @@ import { installGridTravellerCombat } from '../../../shared/game/grid/travellerC
 import { gridHomeSim, gridCells, type GridHomeSimulation } from '../plugin/context';
 import { gateEnters } from './cellPresence';
 import { findShard } from '../shard/registry';
-import { hybridPointer } from '../shard/pointer';
+import { runtimePagePointer } from '../shard/pointer';
 import { gridPostCosts, gridShardfileFolder, prioritizeGridFolder, type GridFolderMetadata } from './folders';
 import { preparationAdmission, type GridAdmissionMetadata } from './preparationAdmission';
 import { gridPostPairRefusal } from '../../../shared/game/grid/postPairs';
@@ -79,7 +79,7 @@ import { enteredRuntime, pickInFrame } from './enteredInteract';
 import { copyPrompts, copySpent, enteredCopy } from './copyPrompts';
 import { enterDataCellTalks, hasTalks } from './dataCellTalks';
 import { yieldGridAdmission, yieldGridConstruction } from './admissionYield';
-import { HybridRuntimeSession, type HybridResident } from '../shardfile/hybrid';
+import { RuntimePageSession, type RuntimePageResident } from '../shardfile/runtimePage';
 
 import { enterDataCellKit, holdsItems } from './dataCellKit';
 import { enterPlotAudio, pagePlotAudioPorts, plotAudioScene, type PlotAudioPorts, type PlotAudioScene } from './plotAudio';
@@ -113,7 +113,7 @@ export interface LiveTraveller {
 }
 /** What the live wiring reads from the page once the player's health and equipment exist. */
 export interface LiveGridPage {
-  /** G226: the page has no shard world; its catalogue home uses the same owned factory as every other hybrid. */
+  /** G226: the page has no shard world; its catalogue home uses the same owned factory as every other runtime shard. */
   /** Actual staged services; a neighbour never constructs another page shell. */
   readonly runtimePage?: () => RegionalRuntimePage | null;
   readonly traveller: LiveTraveller;
@@ -183,7 +183,7 @@ export interface LiveGridSessionState {
   readonly keptPrograms: number | null;
   readonly live: LiveGridState; readonly crossing: GridCrossingState; readonly stowed: boolean; readonly renderOrigin: { x: number; z: number };
   /** Entered hook intervals in the same performance clock as browser long tasks. */
-  readonly runtimeTiming: ReturnType<HybridRuntimeSession['timings']>;
+  readonly runtimeTiming: ReturnType<RuntimePageSession['timings']>;
   /** Committed synchronous transitions; approach preparation wall intervals remain separate. */
   readonly crossingTiming: ReturnType<GridCrossingSession['crossing']['timings']>;
   /** O20: each road crossing's entered-callback leave (ms) before its source region retires */
@@ -238,7 +238,7 @@ export class LiveGridSession {
   private readonly transferWalls = new Map<string | null, TransferWalls>();
   private readonly offset = new Vector3();
   private framePhysics: Physics;
-  /** the home runtime's own simulation driver (its hybrid binding offers it): the live grid drives that region, so it runs
+  /** the home runtime's own simulation driver (its runtime binding offers it): the live grid drives that region, so it runs
    *  only while bound as the current frame's (never on a grid page today); taking the offer settles the boot's handoff */
   private homeSim: GridHomeSimulation | null = null;
   private readonly applied = new Vector3();
@@ -263,12 +263,12 @@ export class LiveGridSession {
   private readonly runtimeScope: Scope;
   private readonly runtimeRegions = new Map<string, PreparedRegionalRuntime>();
   /** GC9: worlds pre-warmed from inside an entered runtime (GC5), whose entry preparation waits for the source to be left:
-   *  the hybrid session prepares an entry only from the neutral road, so preparing it inside the source threw away the
+   *  the runtime session prepares an entry only from the neutral road, so preparing it inside the source threw away the
    *  whole world just built ("Entry preparation requires the neutral road") and closed the cell until a retry. */
   private readonly deferredEntries = new Map<string, { readonly prepared: PreparedRegionalRuntime; readonly signal: AbortSignal | undefined }>();
   private readonly leaveTiming: { instance: string; leaveMs: number }[] = [];
-  private readonly runtimeResidents = new Map<string, HybridResident>();
-  private readonly hybrid: HybridRuntimeSession;
+  private readonly runtimeResidents = new Map<string, RuntimePageResident>();
+  private readonly runtimePage: RuntimePageSession;
   private readonly startedRuntimes = new Set<string>();
   private activation: Promise<boolean> | undefined;
   /** G580 T2: the Developer choice, read at construction; the keeper is made at the first retirement */
@@ -292,13 +292,13 @@ export class LiveGridSession {
     const traveller = page.traveller;
     // Register the resident parent before the live host disposer: the traveller returns before native children free.
     this.runtimeScope = scope.child('grid.runtime.residents');
-    this.hybrid = new HybridRuntimeSession(this.runtimeResidents, scope, { pause: yieldGridConstruction });
-    scope.onDispose(gridCells.onLeave(() => { this.hybrid.leave(); this.prepareDeferredEntries(); }));
+    this.runtimePage = new RuntimePageSession(this.runtimeResidents, scope, { pause: yieldGridConstruction });
+    scope.onDispose(gridCells.onLeave(() => { this.runtimePage.leave(); this.prepareDeferredEntries(); }));
     scope.onDispose(gridCells.onLeave(() => { this.leavePlotAudio(); this.leaveDataKit(); this.leaveDataTalks(); }));
     scope.onDispose(gridCells.onEnter(cell => {
       if (!this.runtimeResidents.has(cell.instance)) { this.dataMovers.get(cell.instance)?.claim(); this.dataBodies.get(cell.instance)?.claim(); this.enterPlotAudio(cell.instance); this.enterDataKit(cell.instance); this.enterDataTalks(cell.instance); ports.lightingSettled?.(); return; }
       this.startedRuntimes.add(cell.instance);
-      const activation = this.hybrid.enter(cell);
+      const activation = this.runtimePage.enter(cell);
       this.activation = activation;
       const report = async (): Promise<void> => {
         try { await activation; ports.lightingSettled?.(); } catch (error) { console.error('Regional runtime entry failed', error); }
@@ -342,13 +342,13 @@ export class LiveGridSession {
     scope.onDispose(() => { this.live.dispose(); });
     this.crossing = this.installCrossing();
     installGridTravellerCombat(page.events, scope, page.health, () => {
-      const active = this.hybrid.state();
+      const active = this.runtimePage.state();
       return active.ready ? active.instance : home.instance;
     }, () => {
       const feet = this.live.worldFeet();
       return assembly.at(feet.x, feet.z)?.instance ?? null;
     }, () => {
-      const active = this.hybrid.state();
+      const active = this.runtimePage.state();
       return active.instance === null ? undefined : this.runtimeRegions.get(active.instance)?.combatActors();
     });
     // Resolve immutable authored classes once; the physics tick reads the geometric cell, never the active motor frame.
@@ -684,8 +684,8 @@ export class LiveGridSession {
 
   private bundle(cell: GridCell): ReadinessBundle {
     const manifest = findShard(cell.slug);
-    if (manifest !== undefined && hybridPointer(manifest) !== undefined && manifest.clientPlanRuntime === true) return { criticalWireBytes: 2_000_000, hybridWireBytes: 2_000_000, decodeSeconds: 1, runtimeParseSeconds: 1 };
-    return { criticalWireBytes: findShard(cell.slug)?.shardfile === undefined ? 0 : 2_000_000, hybridWireBytes: 0, decodeSeconds: 1, runtimeParseSeconds: 0 };
+    if (manifest !== undefined && runtimePagePointer(manifest) !== undefined && manifest.clientPlanRuntime === true) return { criticalWireBytes: 2_000_000, runtimePageWireBytes: 2_000_000, decodeSeconds: 1, runtimeParseSeconds: 1 };
+    return { criticalWireBytes: findShard(cell.slug)?.shardfile === undefined ? 0 : 2_000_000, runtimePageWireBytes: 0, decodeSeconds: 1, runtimeParseSeconds: 0 };
   }
 
   /** Shardfile cells admit a bodyless regional host with their strip duplicates; every other cell waits for M3. */
@@ -841,8 +841,8 @@ export class LiveGridSession {
       this.runtimeRegions.set(cell.instance, prepared); this.runtimeResidents.set(cell.instance, prepared.resident);
       this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: retained.admitted.source.entryways });
       try {
-        await this.hybrid.prepare(cell.instance);
-        if (this.hybrid.state().instance === null) { if (!await this.hybrid.prepareEntry(cell.instance, signal)) throw new Error('Admitted entry preparation left its requested cell'); }
+        await this.runtimePage.prepare(cell.instance);
+        if (this.runtimePage.state().instance === null) { if (!await this.runtimePage.prepareEntry(cell.instance, signal)) throw new Error('Admitted entry preparation left its requested cell'); }
         else this.deferredEntries.set(cell.instance, { prepared, signal });
         prepared.park?.(); // Only actual entry demand reaches here; keep its frame hidden until commit.
       }
@@ -867,7 +867,7 @@ export class LiveGridSession {
       };
       const retireSteps = prepared.region.retire;
       return { ...prepared.region, checkpoint: () => !this.startedRuntimes.has(cell.instance) ? true
-        : this.hybrid.state().instance === cell.instance && !this.hybrid.state().ready ? false : prepared.checkpoint(), dispose: () => {
+        : this.runtimePage.state().instance === cell.instance && !this.runtimePage.state().ready ? false : prepared.checkpoint(), dispose: () => {
         if (disposalFailure !== undefined) throw disposalFailure;
         try { prepared.region.dispose(); }
         catch (error) { disposalFailure = error instanceof Error ? error : new Error(String(error)); throw disposalFailure; }
@@ -950,12 +950,12 @@ export class LiveGridSession {
   /** GC6 (QA 11-14 row 6): a world built ahead whose entry still prepares (deferred inside the source, or running on the
    *  road). Inside the cell its gameplay gate (`frameReady`) stops the page's frames, and that preparation's warm-up waits on
    *  drawn frames: the traveller stood in the cell with no control for good. Its crossing holds on the road instead. */
-  entryPending(instance: string): boolean { return this.deferredEntries.has(instance) || this.queuedEntries.has(instance) || this.hybrid.preparing().includes(instance); }
+  entryPending(instance: string): boolean { return this.deferredEntries.has(instance) || this.queuedEntries.has(instance) || this.runtimePage.preparing().includes(instance); }
   /** GC6: whether any world built ahead still prepares its entry (the road then builds with the urgent budget) */
-  entriesPending(): boolean { return this.deferredEntries.size > 0 || this.queuedEntries.size > 0 || this.hybrid.preparing().length > 0; }
+  entriesPending(): boolean { return this.deferredEntries.size > 0 || this.queuedEntries.size > 0 || this.runtimePage.preparing().length > 0; }
   /** GC6: entries taken from `deferredEntries` and waiting their turn behind another's preparation (`prepareInTurn`) */
   private readonly queuedEntries = new Set<string>();
-  /** GC9: once the source is left (the hybrid session is neutral), each world pre-warmed inside it prepares its entry, so the
+  /** GC9: once the source is left (the runtime session is neutral), each world pre-warmed inside it prepares its entry, so the
    *  crossing finds it ready; a crossing that arrives first holds on the road until it is (`entryPending`, GC6). */
   private prepareDeferredEntries(): void {
     // one at a time, nearest first: an entry preparation binds the page's one construction environment
@@ -976,22 +976,22 @@ export class LiveGridSession {
     const live = (): boolean => this.runtimeRegions.get(instance) === row.prepared && row.signal?.aborted !== true;
     // prepareEntry registers its installation synchronously, so the entry stays pending across this hand-over
     this.queuedEntries.delete(instance);
-    const entered = (): boolean => this.hybrid.state().instance === instance;
-    if (!live() || this.hybrid.state().instance !== null) { if (live() && !entered()) this.deferredEntries.set(instance, row); return; }
+    const entered = (): boolean => this.runtimePage.state().instance === instance;
+    if (!live() || this.runtimePage.state().instance !== null) { if (live() && !entered()) this.deferredEntries.set(instance, row); return; }
     let prepared = false;
-    try { prepared = await this.hybrid.prepareEntry(instance, row.signal); }
+    try { prepared = await this.runtimePage.prepareEntry(instance, row.signal); }
     catch (error) { console.warn(`[grid] ${instance}: entry preparation on the road`, error); }
     // a turn back into the source meanwhile (its entry made the session active) waits for the next leave
-    if (!prepared && live() && this.hybrid.state().instance !== null && !entered()) this.deferredEntries.set(instance, row);
+    if (!prepared && live() && this.runtimePage.state().instance !== null && !entered()) this.deferredEntries.set(instance, row);
   }
   /** G555: the entered runtime hooks' timings (the one running and those finished), for the cell loading screen. */
-  hookTimings(): ReturnType<HybridRuntimeSession['timings']> { return this.hybrid.timings(); }
+  hookTimings(): ReturnType<RuntimePageSession['timings']> { return this.runtimePage.timings(); }
   /** GC6: the entered runtime, whether its hooks finished, the hook running, the last finished, and the entries preparing */
-  hybridState(): { readonly instance: string | null; readonly ready: boolean; readonly hook: string | null; readonly last: string | null; readonly preparing: readonly string[]; readonly deferred: readonly string[]; readonly warm: readonly string[] } {
-    const state = this.hybrid.state(), timings = this.hybrid.timings(), last = timings.completed.at(-1);
+  runtimePageState(): { readonly instance: string | null; readonly ready: boolean; readonly hook: string | null; readonly last: string | null; readonly preparing: readonly string[]; readonly deferred: readonly string[]; readonly warm: readonly string[] } {
+    const state = this.runtimePage.state(), timings = this.runtimePage.timings(), last = timings.completed.at(-1);
     return { ...state, hook: timings.current === null ? null : `${timings.current.instance}:${timings.current.hook}`,
-      last: last === undefined ? null : `${last.instance}:${last.hook}:${last.outcome}`, preparing: this.hybrid.preparing(), deferred: [...this.deferredEntries.keys()],
-      warm: this.hybrid.preparing().map(id => { const w = this.warmPreparation(id); return w === null ? `${id}:-` : `${id}:${w.phase}:${w.completed ? 'done' : w.progress?.detail ?? ''}`; }) };
+      last: last === undefined ? null : `${last.instance}:${last.hook}:${last.outcome}`, preparing: this.runtimePage.preparing(), deferred: [...this.deferredEntries.keys()],
+      warm: this.runtimePage.preparing().map(id => { const w = this.warmPreparation(id); return w === null ? `${id}:-` : `${id}:${w.phase}:${w.completed ? 'done' : w.progress?.detail ?? ''}`; }) };
   }
   /** GC2: the server still has this client in `instance` (an online cell is still walled, C5). */
   serverHolds(instance: string): boolean { return this.wire !== null && this.wire.site() === instance; }
@@ -1011,12 +1011,12 @@ export class LiveGridSession {
     if (current === null || !this.runtimeRegions.has(current)) return true;
     const feet = this.live.worldFeet();
     if (this.ports.assembly.at(feet.x, feet.z)?.instance !== current) return true;
-    const state = this.hybrid.state(); return state.instance === current && state.ready;
+    const state = this.runtimePage.state(); return state.instance === current && state.ready;
   }
 
   /** Actual regional aim bodies only after entered hooks complete; parked neighbours and the road supply none. */
   aimAnimals(): ReturnType<PreparedRegionalRuntime['aimAnimals']> {
-    const state = this.hybrid.state();
+    const state = this.runtimePage.state();
     if (!state.ready || state.instance === null || this.live.current() !== state.instance) return [];
     const feet = this.live.worldFeet();
     if (this.ports.assembly.at(feet.x, feet.z)?.instance !== state.instance) return [];
@@ -1040,7 +1040,7 @@ export class LiveGridSession {
   private readonly eye = new Vector3();
   private enteredRuntimeInstance(): string | null {
     const feet = this.live.worldFeet();
-    return enteredRuntime({ hybrid: this.hybrid.state(), current: this.live.current(), feetCell: this.ports.assembly.at(feet.x, feet.z)?.instance });
+    return enteredRuntime({ runtimePage: this.runtimePage.state(), current: this.live.current(), feetCell: this.ports.assembly.at(feet.x, feet.z)?.instance });
   }
 
   /** The fixed-boundary rebind: the page's stepped world, the player's motor and the render origin. */
@@ -1094,7 +1094,7 @@ export class LiveGridSession {
     const feet = this.worldFeet(), cell = this.ports.assembly.at(feet.x, feet.z);
     if (cell === undefined) return -60;
     const runtime = this.runtimeRegions.get(cell.instance);
-    const active = this.hybrid.state();
+    const active = this.runtimePage.state();
     // The entry can be at road level while its asynchronous world hook is still installing its bounds.
     // Like regional input/gameplay, authored recovery must wait for that entered installation.
     if (runtime !== undefined && (active.instance !== cell.instance || !active.ready)) return -CHUNK_HALF;
@@ -1131,12 +1131,12 @@ export class LiveGridSession {
 
   /** Fresh per-frame travel facts; setup/final witnesses use the complete state readout. */
   travelState(): Pick<LiveGridSessionState, 'live' | 'crossing' | 'runtimeTiming'> {
-    return { live: this.live.state(), crossing: this.crossing.crossing.state(), runtimeTiming: this.hybrid.timings() };
+    return { live: this.live.state(), crossing: this.crossing.crossing.state(), runtimeTiming: this.runtimePage.timings() };
   }
 
   state(): LiveGridSessionState {
     const cap = this.page.traveller.hoverSpeedLimit?.();
-    return { keptPrograms: this.keeper?.size ?? 0, live: this.live.state(), crossing: this.crossing.crossing.state(), stowed: this.page.equipment.stowed, renderOrigin: { x: this.offset.x, z: this.offset.z }, runtimeTiming: this.hybrid.timings(), crossingTiming: this.crossing.crossing.timings(), leaveTiming: this.leaveTiming.map(row => ({ ...row })), crossingLoading: this.crossing.crossing.timings().map(crossingLoadingRows),
+    return { keptPrograms: this.keeper?.size ?? 0, live: this.live.state(), crossing: this.crossing.crossing.state(), stowed: this.page.equipment.stowed, renderOrigin: { x: this.offset.x, z: this.offset.z }, runtimeTiming: this.runtimePage.timings(), crossingTiming: this.crossing.crossing.timings(), leaveTiming: this.leaveTiming.map(row => ({ ...row })), crossingLoading: this.crossing.crossing.timings().map(crossingLoadingRows),
       hoverCap: cap === undefined ? null : Math.round(cap * 100) / 100 };
   }
 }

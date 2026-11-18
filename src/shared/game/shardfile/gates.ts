@@ -35,7 +35,7 @@ export interface Gate {
 const FOLDER = 'src/client/game/shardfile/folder.ts';
 const CLIENT_SOURCE = 'src/client/game/shardfile/clientSource.ts';
 // OF15 renames this file; until then its path is the one place the ledger names the retired word.
-const PLAN_PAGE = 'src/client/game/shardfile/hybrid.ts';
+const PLAN_PAGE = 'src/client/game/shardfile/runtimePage.ts';
 /** OF10b: each dangerous gate is one deprecated function here; its sites call it by name. */
 export const DANGEROUS_GATES = 'src/shared/game/shardfile/dangerousGates.ts';
 

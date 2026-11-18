@@ -1,7 +1,7 @@
 import type { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { enterDeclaredAudioPhase } from '../audio/sceneDirector';
 import { admittedFolderClientPlan, installClientPhase, type ClientPhase } from './clientPlan';
-import { bindResidentWorldScope, boundResidentWorldScope, residentWorldScope } from './hybridPresentation';
+import { bindResidentWorldScope, boundResidentWorldScope, residentWorldScope } from './runtimePagePresentation';
 import { enterMovers, type BorrowedMoverRow } from '../plugin/moverViews';
 import { ownerTask, withOwner } from '@wildshard/engine/app/ownership';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -18,7 +18,7 @@ import { shardfileSource } from './clientSource';
 import type { FolderOptions } from './folder';
 import { configureLevel, selectedLevel } from '@wildshard/engine/level/selection';
 import { reserveMapImage } from './mapImage';
-import { browserShardfileOptions, folderBase, provideHybridDeclaration } from './runtimeFolder';
+import { browserShardfileOptions, folderBase, provideRuntimeDeclaration } from './runtimeFolder';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { ShardfileClientBindings } from './client';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -42,7 +42,7 @@ function preparePageRuntime(product: ShardFolder, owned: boolean): new () => Sha
 }
 
 /** A resident's data world stays alive when its independently scoped native play hooks leave. */
-export interface HybridResident {
+export interface RuntimePageResident {
   readonly instance: string;
   readonly slug: string;
   readonly declaration: RuntimeDeclaration | null;
@@ -73,9 +73,9 @@ export interface HybridResident {
   };
 }
 /** Runtime activation status is separate from data residency and asynchronous module preparation. */
-export interface HybridRuntimeState { readonly instance: string | null; readonly ready: boolean }
+export interface RuntimePageState { readonly instance: string | null; readonly ready: boolean }
 /** Entered installation timing in the page performance clock; bounded diagnostics, never a readiness signal. */
-export interface HybridHookTiming {
+export interface RuntimePageHookTiming {
   readonly instance: string;
   readonly hook: 'beforeWorld' | 'constructor' | 'world' | 'afterWorld' | 'kit' | 'afterKit' | 'play' | 'afterPlay' | 'activate';
   readonly start: number;
@@ -83,9 +83,9 @@ export interface HybridHookTiming {
   readonly outcome: 'done' | 'failed';
 }
 /** Optional presentation boundary for grid entered stages; standalone callers keep the existing staged path. */
-export interface HybridRuntimeOptions { readonly pause?: (scope: Scope) => Promise<void> }
+export interface RuntimePageOptions { readonly pause?: (scope: Scope) => Promise<void> }
 interface ActiveRuntime {
-  resident: HybridResident; scope: Scope; ready: boolean;
+  resident: RuntimePageResident; scope: Scope; ready: boolean;
   retained?: { slots: ScopedRuntimeBinding; hooks: RetainedRuntimeHooks };
 }
 
@@ -95,7 +95,7 @@ export interface ResidentWorldRecipe {
   readonly motion?: { readonly source: Shardfile; readonly systemId: string;
     readonly rows: readonly BorrowedMoverRow[] };
 }
-export class HybridResidentWorld<T> {
+export class RuntimePageResidentWorld<T> {
   private readonly builds = new WeakMap<Scope, Promise<T>>();
   private readonly recipe: ResidentWorldRecipe;
   constructor(recipe: ResidentWorldRecipe = {}) { this.recipe = recipe; }
@@ -113,13 +113,13 @@ export class HybridResidentWorld<T> {
   /** Reuse one asynchronous build across entries; the supplied owner outlives each entered play scope. */
   load(context: ShardContext, build: (owner: Scope) => Promise<T>): Promise<T> {
     const owner = boundResidentWorldScope(context.scope);
-    if (owner === undefined || owner.disposed || context.scope.disposed) return Promise.reject(new Error('Missing live hybrid resident world'));
+    if (owner === undefined || owner.disposed || context.scope.disposed) return Promise.reject(new Error('Missing live runtime resident world'));
     const existing = this.builds.get(owner); if (existing !== undefined) return this.entered(context, existing);
     const pending = Promise.resolve().then(() => {
-      if (owner.disposed) throw new Error('Hybrid resident left before world construction');
+      if (owner.disposed) throw new Error('Runtime resident left before world construction');
       return withOwner(owner, () => build(owner));
     }).then((value) => {
-      if (owner.disposed) throw new Error('Hybrid resident left during world construction');
+      if (owner.disposed) throw new Error('Runtime resident left during world construction');
       return value;
     });
     this.builds.set(owner, pending);
@@ -130,7 +130,7 @@ export class HybridResidentWorld<T> {
 }
 
 /** Reuse the ordinary registration verbs with a child owner; changing ctx.scope alone would retain parent registrations. */
-export function hybridInstallation(base: ShardContext, scope: Scope, runtime: ShardRuntime): LevelInstallation & { context: ShardContext } {
+export function runtimePageInstallation(base: ShardContext, scope: Scope, runtime: ShardRuntime): LevelInstallation & { context: ShardContext } {
   bindResidentWorldScope(scope, base.scope);
   const installation = createLevelInstallation(base.app, scope, base.app.levelAdapters, () => base.progress);
   base.root.add(installation.context.root);
@@ -158,7 +158,7 @@ export function hybridInstallation(base: ShardContext, scope: Scope, runtime: Sh
 }
 
 /** Interior events for one catalogue resident; another cell never activates its native hooks. */
-export interface HybridCellBinding {
+export interface RuntimePageCellBinding {
   readonly instance: string;
   readonly cells: Pick<GridCellEvents, 'cell' | 'onEnter' | 'onLeave'>;
   /** Hold region gameplay while entered hooks install; admission of the runtime module is a separate fence. */
@@ -176,13 +176,13 @@ interface CustomRuntime {
 }
 
 /** Standalone staged composition keeps the resident data plugin and native hooks on the existing Game boot path. */
-export class HybridShardPlugin extends ShardPlugin {
+export class RuntimePagePlugin extends ShardPlugin {
   private readonly data: ShardPlugin;
   private readonly Runtime: new () => ShardPlugin;
   private custom: CustomRuntime | undefined;
-  private readonly binding: HybridCellBinding | undefined;
+  private readonly binding: RuntimePageCellBinding | undefined;
   private generation = 0;
-  constructor(data: ShardPlugin, Runtime: new () => ShardPlugin, binding?: HybridCellBinding,
+  constructor(data: ShardPlugin, Runtime: new () => ShardPlugin, binding?: RuntimePageCellBinding,
     private readonly declaredAudio?: AudioData) {
     super(); this.data = data; this.Runtime = Runtime; this.binding = binding;
   }
@@ -190,7 +190,7 @@ export class HybridShardPlugin extends ShardPlugin {
     const ctx = this.declaredAudio === undefined ? provided : { ...provided, get progress() { return provided.progress; },
       game: { ...provided.game, declaredAudio: this.declaredAudio } };
     await this.data.world?.(ctx);
-    if (ctx.scope.disposed) throw new Error('Hybrid world was unloaded during admission');
+    if (ctx.scope.disposed) throw new Error('Runtime world was unloaded during admission');
     if (this.binding !== undefined) {
       const binding = this.binding;
       ctx.scope.onDispose(binding.cells.onLeave((cell) => {
@@ -220,12 +220,12 @@ export class HybridShardPlugin extends ShardPlugin {
       catch (error) { retained.slots.deactivate(); throw error; }
       return;
     }
-    const parent = ctx.game.runtime; if (parent === undefined) throw new Error('Hybrid requires the normal runtime host');
+    const parent = ctx.game.runtime; if (parent === undefined) throw new Error('Runtime page requires the normal runtime host');
     const scope = ctx.scope.child('runtime.play');
     try {
       const slots = this.binding?.retainHomeRuntime === true ? createScopedRuntimeBinding(parent, scope) : undefined;
       slots?.activate();
-      const runtime = slots?.runtime ?? bindScopedRuntime(parent, scope), base = hybridInstallation(ctx, scope, runtime);
+      const runtime = slots?.runtime ?? bindScopedRuntime(parent, scope), base = runtimePageInstallation(ctx, scope, runtime);
       const hooks = slots === undefined ? undefined : new RetainedRuntimeHooks(base.context);
       // R12: while entered, the runtime's own sky clock is the day cycle (a painted sky's, published on its runtime)
       if (hooks !== undefined) { const owned = hooks.context; installEnteredRuntimeService(owned, (entered) => { enterSkyClock(owned.app, [owned.scope], entered); }); }
@@ -241,10 +241,10 @@ export class HybridShardPlugin extends ShardPlugin {
       await this.enteredPlan(installation.context, 'world');
       await withOwner(scope, () => plugin.world?.(installation.context));
       await this.enteredPlan(installation.context, 'world-bindings');
-      if (scope.disposed) throw new Error('Hybrid runtime left during world installation');
+      if (scope.disposed) throw new Error('Runtime left during world installation');
     } catch (error) {
       try { scope.dispose(); }
-      catch (cleanup) { throw new AggregateError([error, cleanup], 'Hybrid world installation and cleanup failed', { cause: cleanup }); }
+      catch (cleanup) { throw new AggregateError([error, cleanup], 'Runtime world installation and cleanup failed', { cause: cleanup }); }
       throw error;
     }
   }
@@ -253,12 +253,12 @@ export class HybridShardPlugin extends ShardPlugin {
     await this.runtimeKit();
   }
   private async runtimeKit(): Promise<void> {
-    const custom = this.custom; if (custom === undefined || !custom.active) throw new Error('Hybrid runtime world is not installed');
+    const custom = this.custom; if (custom === undefined || !custom.active) throw new Error('Runtime world is not installed');
     if (custom.retained !== undefined && custom.ready) return;
     custom.installation.openKit();
     try { await enterDeclaredAudioPhase(custom.installation.context, 'kit'); await withOwner(custom.installation.context.scope, () => custom.plugin.kit?.(custom.installation.context)); await this.enteredPlan(custom.installation.context, 'kit'); }
     finally { custom.installation.closeKit(); }
-    if (custom.installation.context.scope.disposed) throw new Error('Hybrid runtime left during kit installation');
+    if (custom.installation.context.scope.disposed) throw new Error('Runtime left during kit installation');
   }
   override async play(ctx: ShardContext): Promise<void> {
     await this.data.play?.(ctx);
@@ -279,22 +279,22 @@ export class HybridShardPlugin extends ShardPlugin {
       if (generation !== this.generation || ctx.scope.disposed) return;
       let failure = error;
       try { this.custom?.installation.context.scope.dispose(); }
-      catch (cleanup) { failure = new AggregateError([error, cleanup], 'Hybrid activation and cleanup failed'); }
-      ctx.app.events.emit('fault', { source: 'hybrid.runtime', message: failure instanceof Error ? failure.message : String(failure), error: failure });
+      catch (cleanup) { failure = new AggregateError([error, cleanup], 'Runtime activation and cleanup failed'); }
+      ctx.app.events.emit('fault', { source: 'runtimePage.runtime', message: failure instanceof Error ? failure.message : String(failure), error: failure });
     }
   }
   private async runtimePlay(): Promise<void> {
-    const custom = this.custom; if (custom === undefined || !custom.active) throw new Error('Hybrid runtime kit is not installed');
+    const custom = this.custom; if (custom === undefined || !custom.active) throw new Error('Runtime kit is not installed');
     if (custom.retained !== undefined && custom.ready) { this.binding?.readiness?.(true); return; }
     await enterDeclaredAudioPhase(custom.installation.context, 'play'); await this.enteredPlan(custom.installation.context, 'prepare-play'); await withOwner(custom.installation.context.scope, () => custom.plugin.play?.(custom.installation.context));
     await this.enteredPlan(custom.installation.context, 'play');
-    if (custom.installation.context.scope.disposed) throw new Error('Hybrid runtime left during play installation');
+    if (custom.installation.context.scope.disposed) throw new Error('Runtime left during play installation');
     custom.ready = true; this.binding?.readiness?.(true);
   }
 }
 
 /** Admit declared data and native hooks; catalogue placement and cell activation stay in the game layer. */
-export async function prepareHybridShard(product: ShardFolder, options: FolderOptions | { granted: true },
+export async function prepareRuntimePage(product: ShardFolder, options: FolderOptions | { granted: true },
   bindings: Omit<ShardfileClientBindings, 'instance' | 'nativeRuntime'> & {
     /** The game adapter forwards the page owner; the shard need not read or own another service. */
     readonly residencyContext?: Pick<ShardContext, 'game' | 'scope'>;
@@ -307,14 +307,14 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
   // Every entry passes the product already loaded before its hooks.
   const folderOptions = 'base' in options ? options : browserShardfileOptions(folderBase(product.slug), options.granted);
   const source = product.shardfile;
-  if (source.runtime === null) throw new Error('Hybrid requires a compiled client-plan runtime declaration');
-  provideHybridDeclaration(source);
+  if (source.runtime === null) throw new Error('Runtime page requires a compiled client-plan runtime declaration');
+  provideRuntimeDeclaration(source);
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
   if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(folderOptions)) throw new Error('Runtime stage ownership requires a native shard');
   const { residencyContext, retainHomeRuntime, stagesOwner, ...providedBindings } = bindings;
   const residency = residencyContext?.game.residency;
   if (residency !== undefined && providedBindings.residency !== undefined && residency !== providedBindings.residency) {
-    throw new Error('Hybrid installation and bindings must share one page residency owner');
+    throw new Error('Runtime installation and bindings must share one page residency owner');
   }
   const imageOwner = providedBindings.imageOwner ?? residencyContext?.scope;
   const clientBindings = { ...providedBindings, ...(residency === undefined ? {} : { residency }),
@@ -332,14 +332,14 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
   };
   const { load, mapImage } = await shardfileSource(source, folderOptions, { ...clientBindings, instance, nativeRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime', onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
     .then(data => ({ load: data.load, mapImage: data.minimap?.image }));
-  if (load === undefined) throw new Error('Missing admitted hybrid data plugin');
+  if (load === undefined) throw new Error('Missing admitted runtime data plugin');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
   const Runtime = preparePageRuntime(product, dangerousRuntimeOwnership(folderOptions));
   const installed = await load().then(({ default: Data }) => new Data());
   const mapped: ShardPlugin = source.map === undefined ? installed : {
     async world(ctx) {
       const allocator = clientBindings.residency?.allocator ?? clientBindings.allocator;
-      if (allocator === undefined) throw new Error('Hybrid map requires its page allocator');
+      if (allocator === undefined) throw new Error('Runtime map requires its page allocator');
       reserveMapImage(source, allocator, ctx.scope);
       const level = selectedLevel(), image = mapImage;
       if (gridInstance === null && level !== null && image !== undefined) configureLevel({ ...level, minimap: { ...level.minimap, image } });
@@ -347,22 +347,22 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
     },
     kit: ctx => installed.kit?.(ctx), play: ctx => installed.play?.(ctx),
   };
-  return new HybridShardPlugin(mapped, Runtime, gridInstance === null ? undefined : { instance, cells: gridCells, ...(retainHomeRuntime === undefined ? {} : { retainHomeRuntime }) }, source.audio);
+  return new RuntimePagePlugin(mapped, Runtime, gridInstance === null ? undefined : { instance, cells: gridCells, ...(retainHomeRuntime === undefined ? {} : { retainHomeRuntime }) }, source.audio);
 }
 
 
 /** Only the entered cell owns gameplay callbacks. Neighbour prefetch admits modules and data only. */
-export class HybridRuntimeSession {
-  private readonly residents: ReadonlyMap<string, HybridResident>;
+export class RuntimePageSession {
+  private readonly residents: ReadonlyMap<string, RuntimePageResident>;
   private readonly prepared = new Map<string, Promise<new () => ShardPlugin>>();
   private readonly retained = new Map<string, ActiveRuntime>();
   private readonly installations = new Map<string, Promise<boolean>>();
   private active: ActiveRuntime | undefined;
   private generation = 0;
   private disposed = false;
-  private currentHook: Readonly<Pick<HybridHookTiming, 'instance' | 'hook' | 'start'>> | null = null;
-  private readonly completedHooks: HybridHookTiming[] = [];
-  constructor(residents: ReadonlyMap<string, HybridResident>, scope: Scope, private readonly options: HybridRuntimeOptions = {}) {
+  private currentHook: Readonly<Pick<RuntimePageHookTiming, 'instance' | 'hook' | 'start'>> | null = null;
+  private readonly completedHooks: RuntimePageHookTiming[] = [];
+  constructor(residents: ReadonlyMap<string, RuntimePageResident>, scope: Scope, private readonly options: RuntimePageOptions = {}) {
     this.residents = residents;
     scope.onDispose(() => {
       this.disposed = true; this.leave();
@@ -372,9 +372,9 @@ export class HybridRuntimeSession {
   }
   /** Module admission can run while a neighbour is frozen; no constructor or world/kit/play hook runs here. */
   prepare(instance: string): Promise<new () => ShardPlugin> {
-    if (this.disposed) return Promise.reject(new Error('Hybrid session is disposed'));
+    if (this.disposed) return Promise.reject(new Error('Runtime session is disposed'));
     const resident = this.residents.get(instance);
-    if (resident === undefined) return Promise.reject(new Error('Missing hybrid resident'));
+    if (resident === undefined) return Promise.reject(new Error('Missing runtime resident'));
     const prior = this.prepared.get(instance); if (prior !== undefined) return prior;
     const product = resident.product;
     // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
@@ -385,10 +385,10 @@ export class HybridRuntimeSession {
     void prepared.catch(() => { if (this.prepared.get(instance) === prepared) this.prepared.delete(instance); });
     return prepared;
   }
-  private async stage<T>(scope: Scope, instance: string, hook: HybridHookTiming['hook'], run: () => T | Promise<T>): Promise<T> {
+  private async stage<T>(scope: Scope, instance: string, hook: RuntimePageHookTiming['hook'], run: () => T | Promise<T>): Promise<T> {
     const current = Object.freeze({ instance, hook, start: diagnosticNow() });
     this.currentHook = current;
-    let outcome: HybridHookTiming['outcome'] = 'failed';
+    let outcome: RuntimePageHookTiming['outcome'] = 'failed';
     let value: T;
     try { value = await run(); outcome = 'done'; }
     finally {
@@ -397,11 +397,11 @@ export class HybridRuntimeSession {
       if (this.currentHook === current) this.currentHook = null;
     }
     if (this.options.pause !== undefined) await this.options.pause(scope);
-    if (scope.disposed) throw new Error('Hybrid runtime left between entered stages');
+    if (scope.disposed) throw new Error('Runtime left between entered stages');
     return value;
   }
   /** Correlate long-task intervals with the current hook and the last 32 completed hooks, including failed installs. */
-  timings(): { readonly current: Readonly<Pick<HybridHookTiming, 'instance' | 'hook' | 'start'>> | null; readonly completed: readonly HybridHookTiming[] } {
+  timings(): { readonly current: Readonly<Pick<RuntimePageHookTiming, 'instance' | 'hook' | 'start'>> | null; readonly completed: readonly RuntimePageHookTiming[] } {
     return { current: this.currentHook, completed: [...this.completedHooks] };
   }
   /** GC6: the cells whose entry is being prepared on the road (for the tour's trace) */
@@ -409,11 +409,11 @@ export class HybridRuntimeSession {
   /** Finish an actually requested entry before its frame transfer. Neighbours use inert prepare() only.
    * A source must leave first; entered services and parent runtime slots publish only at enter(). */
   prepareEntry(instance: string, signal?: AbortSignal): Promise<boolean> {
-    if (this.disposed) return Promise.reject(new Error('Hybrid session is disposed'));
+    if (this.disposed) return Promise.reject(new Error('Runtime session is disposed'));
     if (this.active !== undefined) return Promise.reject(new Error('Entry preparation requires the neutral road'));
     if (signal?.aborted === true) return Promise.reject(new Error('Entry preparation was cancelled'));
     const resident = this.residents.get(instance);
-    if (resident === undefined) return Promise.reject(new Error('Missing hybrid resident'));
+    if (resident === undefined) return Promise.reject(new Error('Missing runtime resident'));
     const prior = this.installations.get(instance); if (prior !== undefined) return prior;
     const request = this.install({ instance, slug: resident.slug }, true, signal);
     this.installations.set(instance, request);
@@ -427,11 +427,11 @@ export class HybridRuntimeSession {
     return this.install(cell, false);
   }
   private async install(cell: GridCellRef, preparing: boolean, signal?: AbortSignal): Promise<boolean> {
-    if (this.disposed) throw new Error('Hybrid session is disposed');
+    if (this.disposed) throw new Error('Runtime session is disposed');
     const resident = this.residents.get(cell.instance);
-    if (resident === undefined) throw new Error('Missing hybrid resident');
+    if (resident === undefined) throw new Error('Missing runtime resident');
     const { slug: identity } = resident, { slug: cellIdentity } = cell;
-    if (identity !== cellIdentity) throw new Error('Hybrid cell must match its catalogue instance and shard');
+    if (identity !== cellIdentity) throw new Error('Runtime cell must match its catalogue instance and shard');
     if (this.active?.resident === resident) return this.active.ready;
     if (preparing && (this.active !== undefined || resident.retainRuntime !== true)) throw new Error('Entry preparation requires a neutral retained resident');
     if (!preparing) this.leave();
@@ -442,7 +442,7 @@ export class HybridRuntimeSession {
       const parked = this.retained.get(cell.instance);
       if (parked !== undefined && !parked.scope.disposed && parked.retained !== undefined) {
         if (preparing) return true;
-        const start = diagnosticNow(); let outcome: HybridHookTiming['outcome'] = 'failed';
+        const start = diagnosticNow(); let outcome: RuntimePageHookTiming['outcome'] = 'failed';
         try {
           const { slots, hooks } = parked.retained;
           slots.activate();
@@ -502,7 +502,7 @@ export class HybridRuntimeSession {
       })); if (!live()) return false;
       await this.stage(scope, cell.instance, 'afterWorld', () => ownerTask(scope, async () => {
         if (renderReady !== undefined) await renderReady;
-        if (!live()) throw new Error('Hybrid runtime left while preparing render tiles');
+        if (!live()) throw new Error('Runtime left while preparing render tiles');
         await installation.afterWorld?.(context);
       })); if (!live()) return false;
       installation.openKit();
@@ -524,7 +524,7 @@ export class HybridRuntimeSession {
       if (rendering !== undefined) await rendering;
       if (preparing) { preparingScope?.dispose(); throw error; }
       if (generation !== this.generation) return false;
-      try { this.leave(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Hybrid activation and cleanup failed', { cause: cleanup }); }
+      try { this.leave(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Runtime activation and cleanup failed', { cause: cleanup }); }
       throw error;
     } finally {
       if (rendering !== undefined) await rendering;
@@ -540,5 +540,5 @@ export class HybridRuntimeSession {
     try { active.retained.hooks.deactivate(); } finally { active.retained.slots.deactivate(); }
   }
   /** Admission fences can observe whether the current inside-cell runtime finished its native stages. */
-  state(): HybridRuntimeState { return { instance: this.active?.resident.instance ?? null, ready: this.active?.ready ?? false }; }
+  state(): RuntimePageState { return { instance: this.active?.resident.instance ?? null, ready: this.active?.ready ?? false }; }
 }

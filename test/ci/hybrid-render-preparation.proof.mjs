@@ -40,7 +40,7 @@ const { createLevelInstallation } = await import("../../src/client/engine/level/
 const { shardContext, sourceManifest } = await import("../../src/client/game/plugin/context.ts");
 const { installEnteredRuntimeService } =
   await import("../../src/client/game/shard/retainedHooks.ts");
-const { HybridRuntimeSession } = await import("../../src/client/game/shardfile/hybrid.ts");
+const { RuntimePageSession } = await import("../../src/client/game/shardfile/runtimePage.ts");
 const { emptyShardfile } = await import("../../src/shared/host/author.ts");
 const { dangerousTrust } = await import("../../src/shared/game/shardfile/dangerousGates.ts");
 const { createShardFolder } = await import("../../src/shared/game/shardfile/shardFolder.ts");
@@ -152,7 +152,7 @@ function fixture(refusal) {
       };
     },
   };
-  const session = new HybridRuntimeSession(new Map([["owner", resident]]), scope);
+  const session = new RuntimePageSession(new Map([["owner", resident]]), scope);
   return {
     scope,
     render,

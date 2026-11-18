@@ -51,7 +51,7 @@ export interface DeclaredItemPorts {
   runtime: (row: ShardItems['rows'][number]) => ItemPorts;
   /** A native shard's own families (M3): each named `<slug>.<name>`, never shadowing a kit family; resolved like the kit's. */
   shardFamilies?: { readonly slug: string; readonly families: ReadonlyMap<string, ItemFamily> };
-  /** `runtime`: a hybrid runtime registers the declared input contexts through its own entered-input path (hybridRows.ts). */
+  /** `runtime`: a runtime registers the declared input contexts through its own entered-input path (runtimePageRows.ts). */
   contexts?: 'install' | 'runtime';
   observation?: InputObservation;
   bindings?: Pick<InputService['bindings'], 'describe'>;

@@ -34,7 +34,7 @@ async function fixture(options: { cap?: number; isolated?: boolean; keepHome?: n
     bindFrame: () => undefined, gameplayReady: () => true, prefetchable: () => false,
     highway: { bytes: 1000, create: () => ({ physics: page.physics, dispose: () => undefined }) },
     readiness: { link: { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: .25, maxStallSeconds: 3 },
-      bundle: () => ({ criticalWireBytes: 1000, hybridWireBytes: 1000, decodeSeconds: 0, runtimeParseSeconds: 0 }) },
+      bundle: () => ({ criticalWireBytes: 1000, runtimePageWireBytes: 1000, decodeSeconds: 0, runtimeParseSeconds: 0 }) },
     admit: async (cell, required) => { await options.beforeAdmit?.(cell.instance, required === true); return { bytes: 50_000_000, exclusiveRuntime: true, isolatedPreparation: options.isolated !== false,
       prepareRuntime: () => Promise.resolve(), create: () => {
         created.push(cell.instance); objects.set(cell.instance, {});

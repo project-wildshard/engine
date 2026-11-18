@@ -2,7 +2,7 @@
 
 The retained SDK lifetime fixture drove RetainedRuntimeHooks directly.
 Its successor instead enters/leaves real GridCellEvents, which drive the
-actual HybridShardPlugin owner, and constructs the real QuestViews and
+actual RuntimePagePlugin owner, and constructs the real QuestViews and
 DialogueBox. The authored probe is deliberately only dialogue: no empty
 world is claimed as a playable shard or a renderer proof.
 

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { TraversalReadiness, readinessModel, type ReadinessBundle, type ReadinessLink } from './readiness';
 import { CONTENT_CAPS } from '../core/config';
 
-const bundle = (): ReadinessBundle => ({ criticalWireBytes: 125000, hybridWireBytes: 62500, decodeSeconds: 0.5, runtimeParseSeconds: 0.25 });
+const bundle = (): ReadinessBundle => ({ criticalWireBytes: 125000, runtimePageWireBytes: 62500, decodeSeconds: 0.5, runtimeParseSeconds: 0.25 });
 const link = (): ReadinessLink => ({ speed: 2, linkBitsPerSecond: 1000000, requestLatencySeconds: 0.25, maxStallSeconds: 1 });
 
 test('scalar readiness retains every fence combination and stale-generation refusal', () => {
@@ -31,13 +31,13 @@ test('scalar readiness retains every fence combination and stale-generation refu
 });
 
 test('cold travel retains critical work, the second request and zero-byte runtime parsing', () => {
-  expect(readinessModel(bundle(), link())).toEqual({ criticalTransferSeconds: 1, hybridTransferSeconds: 0.5,
-    criticalSeconds: 2.75, hybridSeconds: 1, seconds: 3.75, distance: 7.5 });
-  expect(readinessModel({ ...bundle(), hybridWireBytes: 0 }, link())).toEqual({ criticalTransferSeconds: 1, hybridTransferSeconds: 0,
-    criticalSeconds: 2.75, hybridSeconds: 0.25, seconds: 3, distance: 6 });
+  expect(readinessModel(bundle(), link())).toEqual({ criticalTransferSeconds: 1, runtimePageTransferSeconds: 0.5,
+    criticalSeconds: 2.75, runtimePageSeconds: 1, seconds: 3.75, distance: 7.5 });
+  expect(readinessModel({ ...bundle(), runtimePageWireBytes: 0 }, link())).toEqual({ criticalTransferSeconds: 1, runtimePageTransferSeconds: 0,
+    criticalSeconds: 2.75, runtimePageSeconds: 0.25, seconds: 3, distance: 6 });
 });
 
-for (const field of ['criticalWireBytes', 'hybridWireBytes', 'decodeSeconds', 'runtimeParseSeconds'] as const) {
+for (const field of ['criticalWireBytes', 'runtimePageWireBytes', 'decodeSeconds', 'runtimeParseSeconds'] as const) {
   test.each([Number.NaN, Infinity, -Infinity, -1])(`invalid bundle ${field} refuses (%s)`, value => {
     expect(() => readinessModel({ ...bundle(), [field]: value }, link())).toThrow('Invalid readiness envelope');
   });
@@ -49,8 +49,8 @@ for (const field of ['speed', 'linkBitsPerSecond', 'requestLatencySeconds', 'max
 }
 
 test('byte integers, the critical cap and positive link rate retain their independent fence', () => {
-  for (const row of [{ ...bundle(), criticalWireBytes: 0.5 }, { ...bundle(), hybridWireBytes: 0.5 },
-    { ...bundle(), criticalWireBytes: CONTENT_CAPS.sim.compressed + 1 }, { ...bundle(), hybridWireBytes: Number.MAX_SAFE_INTEGER + 1 }]) {
+  for (const row of [{ ...bundle(), criticalWireBytes: 0.5 }, { ...bundle(), runtimePageWireBytes: 0.5 },
+    { ...bundle(), criticalWireBytes: CONTENT_CAPS.sim.compressed + 1 }, { ...bundle(), runtimePageWireBytes: Number.MAX_SAFE_INTEGER + 1 }]) {
     expect(() => readinessModel(row, link())).toThrow('Critical wire cap or invalid link rate');
   }
   expect(() => readinessModel(bundle(), { ...link(), linkBitsPerSecond: 0 })).toThrow('Critical wire cap or invalid link rate');
@@ -58,10 +58,10 @@ test('byte integers, the critical cap and positive link rate retain their indepe
 });
 
 test('negative zero remains accepted and keeps its transfer and distance signs', () => {
-  const result = readinessModel({ criticalWireBytes: -0, hybridWireBytes: -0, decodeSeconds: -0, runtimeParseSeconds: -0 },
+  const result = readinessModel({ criticalWireBytes: -0, runtimePageWireBytes: -0, decodeSeconds: -0, runtimeParseSeconds: -0 },
     { speed: -0, linkBitsPerSecond: 1, requestLatencySeconds: -0, maxStallSeconds: -0 });
   expect(Object.is(result.criticalTransferSeconds, -0)).toBe(true);
-  expect(Object.is(result.hybridTransferSeconds, -0)).toBe(true);
+  expect(Object.is(result.runtimePageTransferSeconds, -0)).toBe(true);
   expect(Object.is(result.distance, -0)).toBe(true);
 });
 
@@ -69,7 +69,7 @@ test.each([false, true])('all eight initial fields are read before validation; l
   const reads: string[] = [], observe = (name: string, value: number): number => { reads.push(name); return value; };
   const b: ReadinessBundle = {
     get criticalWireBytes() { return observe('critical', invalid ? Number.NaN : 125000); },
-    get hybridWireBytes() { return observe('hybrid', 62500); },
+    get runtimePageWireBytes() { return observe('runtimePage', 62500); },
     get decodeSeconds() { return observe('decode', 0.5); },
     get runtimeParseSeconds() { return observe('parse', 0.25); },
   };
@@ -79,13 +79,13 @@ test.each([false, true])('all eight initial fields are read before validation; l
     get requestLatencySeconds() { return observe('latency', 0.25); },
     get maxStallSeconds() { return observe('stall', 1); },
   };
-  const initial = ['critical', 'hybrid', 'decode', 'parse', 'speed', 'bits', 'latency', 'stall'];
+  const initial = ['critical', 'runtimePage', 'decode', 'parse', 'speed', 'bits', 'latency', 'stall'];
   if (invalid) {
     expect(() => readinessModel(b, l)).toThrow('Invalid readiness envelope');
     expect(reads).toEqual(initial);
   } else {
     expect(readinessModel(b, l).distance).toBe(7.5);
-    expect(reads).toEqual([...initial, 'critical', 'hybrid', 'critical', 'bits', 'critical', 'bits', 'hybrid', 'bits',
-      'latency', 'stall', 'decode', 'hybrid', 'latency', 'parse', 'speed']);
+    expect(reads).toEqual([...initial, 'critical', 'runtimePage', 'critical', 'bits', 'critical', 'bits', 'runtimePage', 'bits',
+      'latency', 'stall', 'decode', 'runtimePage', 'latency', 'parse', 'speed']);
   }
 });

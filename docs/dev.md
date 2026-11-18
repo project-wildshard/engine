@@ -154,7 +154,7 @@ CI runs these two cases explicitly; local hooks and Vitest discovery do
 not add them. Happy DOM supplies the complete page environment; this is
 not a renderer, road-travel or phone-layout claim.
 
-The real grid cell event producer drives `HybridShardPlugin` entry,
+The real grid cell event producer drives `RuntimePagePlugin` entry,
 leave, neighboring-cell entry and retained-home return. A minimal authored
 plugin opens a real dialogue through `QuestViews`; no retained hook is
 activated directly. It proves closed DOM/input, cancellation of a due
@@ -281,11 +281,11 @@ system registrar and asserts a paused owner never advances. Every case
 keeps 9.5 s including cleanup; none runs in hooks or Vitest. No runtime,
 product, old test, pin, live service or image changes.
 
-## Hybrid render preparation contracts
+## Runtime render preparation contracts
 
-Run `node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hybrid-render-preparation.proof.mjs`.
+Run `node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/runtime-render-preparation.proof.mjs`.
 Six explicit CI-only cases enter a valid data product through the actual
-HybridRuntimeSession, plan admission and strings.register feature. The
+RuntimePageSession, plan admission and strings.register feature. The
 public product reader and render promise are borrowed loader boundaries;
 prepare is never replaced. Actual installed text stays unpublished until
 entry. Private construction overlaps rendering; ordinary entry waits.

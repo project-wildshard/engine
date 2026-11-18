@@ -23,7 +23,7 @@ test('the only page path targets the home cell or the road', async () => {
     bindFrame: () => undefined, gameplayReady: () => true,
     lastCell: { windowMs: 30_000, playingBytes: 2_000_000_000, schedule: run => { expiry.push({ run }); return () => undefined; } },
     highway: { bytes: 1000, create: () => ({ physics: page.physics, dispose: () => undefined }) },
-    readiness: { link: { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: .25, maxStallSeconds: 3 }, bundle: () => ({ criticalWireBytes: 1000, hybridWireBytes: 1000, decodeSeconds: 0, runtimeParseSeconds: 0 }) },
+    readiness: { link: { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: .25, maxStallSeconds: 3 }, bundle: () => ({ criticalWireBytes: 1000, runtimePageWireBytes: 1000, decodeSeconds: 0, runtimeParseSeconds: 0 }) },
     admit: async cell => {
       if (cell.instance !== home.instance) { reads.push(cell.instance); throw new Error('gate must not admit another cell'); }
       return { bytes: 1000, exclusiveRuntime: true, isolatedPreparation: true, prepareRuntime: () => Promise.resolve(), create: () => Promise.resolve({ host: page, dispose: () => undefined }) };

@@ -23,7 +23,7 @@ import { firstPartyInstance } from '../../../shared/game/grid/instances';
 import { game } from '../shard/registry';
 import { installShards, shards } from '../shard/list';
 import type { ShardManifest } from '../shard/manifest';
-import { dataPointer, hybridPointer } from '../shard/pointer';
+import { dataPointer, runtimePagePointer } from '../shard/pointer';
 import { toLevelSpec } from '../shard/spec';
 import { shardFromDiscovery } from '../shard/discovery';
 import { ownInlineCandidate } from './inlineOwner';
@@ -52,7 +52,7 @@ export interface PageResidencyBoot {
 
 /**
  * G144's single grid boot seam. Call before descriptor hydration and any world construction. Opaque homes must supply
- * reviewed measurements here, since their hybrid data hook runs after bootstrap. Data homes are admitted by the loader
+ * reviewed measurements here, since their runtime data hook runs after bootstrap. Data homes are admitted by the loader
  * against their declared sim cost, then their actual library and tile claims. The root disposes failed hydration; the
  * successful session installs the owner's level lifetime.
  */
@@ -102,7 +102,7 @@ function withPageMemory(options: FolderOptions, bindings: ShardfileClientBinding
 function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings: ShardfileClientBindings): ShardManifest {
   const source = admitted.source;
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.nativeRuntime === true && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Empty hybrid policy requires a native runtime declaration');
+  if (bindings.nativeRuntime === true && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Empty runtime policy requires a native runtime declaration');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
   if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime audio ownership requires a native runtime declaration');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
@@ -122,7 +122,7 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
     // Traversal belongs to the platform, independently of authored item rows or Developer mode.
     loadout: { weapons: [], tools: ['tool.hoverboard'], start: ['tool.hoverboard'] },
     ...(manifest.navigation === undefined ? {} : { navigation: manifest.navigation }),
-    // A product with no terrain is a structure world, an empty one included: a slab needs rock art only a hybrid's manifest has.
+    // A product with no terrain is a structure world, an empty one included: a slab needs rock art only a runtime shard's manifest has.
     ground: { structures: true, paths: 'plugin', terrain: clientGround(source, assets.retained), water: shardfileWater(source.water) },
     species: source.rows.species.map((row) => row.kind), uses: ['spawns', 'quests', 'bosses', 'elites', 'swim', 'hover', 'explore', 'practice'],
     loot: { coins: source.rows.loot.length > 0 },
@@ -139,7 +139,7 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
 export async function installShardfileFolder(input: unknown, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
   const admitted = await admitFolder(input, options);
-  if (admitted.source.runtime !== null) throw new Error('Custom runtime requires native hybrid composition');
+  if (admitted.source.runtime !== null) throw new Error('Custom runtime requires native runtime composition');
   if (prepared !== undefined) await prepared();
   const source = clientSource(admitted, options, bindings);
   return selectSource(source);
@@ -156,31 +156,31 @@ export async function installShardfileFolder(input: unknown, providedOptions: Fo
  * inline candidate (a released page's inline product is never first-party), and a candidate whose discovery names no
  * client-plan entry, another identity or another descriptor. Returns null when the candidate declares no runtime.
  */
-export async function inlineHybridArrival(source: Shardfile, options: Pick<FolderOptions, 'base'> & DangerousProvenance,
+export async function inlineRuntimeArrival(source: Shardfile, options: Pick<FolderOptions, 'base'> & DangerousProvenance,
   read: (url: string) => Promise<unknown>, discover: (document: unknown) => ShardManifest = shardFromDiscovery): Promise<ShardManifest | null> {
   if (source.runtime === null) return null;
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (!dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires native hybrid composition');
+  if (!dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires native runtime composition');
   const { slug: folder } = source.identity;
-  if (!/^[a-z0-9][a-z0-9-]*$/u.test(folder)) throw new Error('Inline hybrid identity is not a shard folder');
+  if (!/^[a-z0-9][a-z0-9-]*$/u.test(folder)) throw new Error('Inline runtime identity is not a shard folder');
   const url = new URL(`/shardfiles/${folder}/discovery.json`, options.base);
   const document = await read(url.href);
   const native = typeof document === 'object' && document !== null ? Reflect.get(document, 'native') : undefined;
   const load = typeof native === 'object' && native !== null ? Reflect.get(native, 'load') : undefined;
-  if (typeof load !== 'object' || load === null || Reflect.get(load, '$call') !== 'planEntry') throw new Error('Inline hybrid requires its discovery client-plan entry');
+  if (typeof load !== 'object' || load === null || Reflect.get(load, '$call') !== 'planEntry') throw new Error('Inline runtime page requires its discovery client-plan entry');
   const manifest = discover(document), discoveredIdentity = manifest.slug.replace(/^_/u, '');
-  if (discoveredIdentity !== folder) throw new Error('Inline hybrid discovery identity differs');
-  // OF8: the hybrid names its descriptor once, as `shardfile` or (until M9) `gridShardfile`; naming both is refused.
+  if (discoveredIdentity !== folder) throw new Error('Inline runtime discovery identity differs');
+  // OF8: the runtime page names its descriptor once, as `shardfile` or (until M9) `gridShardfile`; naming both is refused.
   const pointer = manifest.gridShardfile ?? manifest.shardfile, descriptor = pointer === undefined ? undefined : new URL(pointer, options.base);
   if (manifest.shardfile !== undefined && manifest.gridShardfile !== undefined || descriptor === undefined || descriptor.origin !== url.origin
     || descriptor.pathname !== `/shardfiles/${folder}/shard.json` || descriptor.search !== '' || descriptor.hash !== '') {
-    throw new Error('Inline hybrid discovery must name its own same-origin descriptor');
+    throw new Error('Inline runtime discovery must name its own same-origin descriptor');
   }
   return manifest;
 }
 
-/** Make an inline hybrid arrival (`inlineHybridArrival`) the selected shard, as catalogue selection does before admission. */
-export function selectInlineHybrid(manifest: ShardManifest): ShardManifest {
+/** Make an inline runtime arrival (`inlineRuntimeArrival`) the selected shard, as catalogue selection does before admission. */
+export function selectInlineRuntime(manifest: ShardManifest): ShardManifest {
   ownInlineCandidate(manifest.slug.replace(/^_/u, ''));
   return selectSource(manifest);
 }
@@ -197,12 +197,12 @@ function selectSource(source: ShardManifest): ShardManifest {
 export async function installManifestShardfile(manifest: ShardManifest, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
   // OF10a6: a manifest's `shardfile` descriptor is admitted like any upload's (same-origin, hash-checked below), whoever made it.
-  const hybrid = hybridPointer(manifest);
-  if (manifest.shardfile === undefined || hybrid !== undefined) {
+  const runtimePage = runtimePagePointer(manifest);
+  if (manifest.shardfile === undefined || runtimePage !== undefined) {
     // Transitional entries bootstrap their native terrain before admitting the world plugin.
     // Read only the receipted header here; never retain an admission or pin its transport to the page owner.
-    if (hybrid === undefined) return manifest;
-    const url = new URL(hybrid, options.base);
+    if (runtimePage === undefined) return manifest;
+    const url = new URL(runtimePage, options.base);
     if (url.origin !== new URL(options.base).origin || url.search !== '' || url.hash !== '') throw new Error('Manifest shardfile must be an unqualified same-origin source');
     const source = await readFolderDescriptor({ ...options, base: new URL('.', url).href, descriptorPath: url.pathname });
     const { slug: authoredIdentity } = source.identity, expectedIdentity = manifest.slug.replace(/^_/u, '');
@@ -217,7 +217,7 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
   const source = await readFolderDescriptor(folderOptions, url);
   const { slug: authoredIdentity } = source.identity, expectedIdentity = manifest.slug.replace(/^_/u, '');
   if (authoredIdentity !== expectedIdentity) throw new Error('Manifest and shardfile identities differ');
-  if (source.runtime !== null) throw new Error('Custom runtime requires native hybrid composition');
+  if (source.runtime !== null) throw new Error('Custom runtime requires native runtime composition');
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
   const admitted = await admitFolder(source, folderOptions);

@@ -16,7 +16,7 @@ import { installEntryQuestComposition, installEntryQuestReference } from '../src
 import * as composition from '../src/client/game/quest/pageComposition';
 import * as enteredFigures from '../src/client/game/quest/figures';
 import * as worldScenes from '../src/client/game/shardfile/worldScenes';
-import { bindResidentWorldScope } from '../src/client/game/shardfile/hybridPresentation';
+import { bindResidentWorldScope } from '../src/client/game/shardfile/runtimePagePresentation';
 import { emptyShardfile } from '../src/shared/host/author';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 

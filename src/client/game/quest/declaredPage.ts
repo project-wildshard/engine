@@ -10,7 +10,7 @@ import { InteractionRules } from '../../../shared/game/quest/interactionRows';
 import { commitQuestEffects } from '../../../shared/game/quest/effects';
 import type { QuestEffect } from '@wildshard/format/questSteps';
 import { lightEmitterPresentation } from '../shardfile/lightEmitters';
-import { residentWorldScope } from '../shardfile/hybridPresentation';
+import { residentWorldScope } from '../shardfile/runtimePagePresentation';
 import { readQuestObservation } from '../../../shared/game/quest/chapterBindings';
 import type { PageQuestStages } from '../plugin/ui';
 

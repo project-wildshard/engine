@@ -481,7 +481,7 @@
   "src/client/game/shardfile/entered-tile-readout.test.ts": 0.007,
   "src/client/game/shardfile/far-stand-in.test.ts": 0.204,
   "src/client/game/shardfile/ground-merge.test.ts": 0.032,
-  "src/client/game/shardfile/inline-hybrid.test.ts": 0.824,
+  "src/client/game/shardfile/inline-runtime.test.ts": 0.824,
   "src/client/game/shardfile/json-resident-bytes.test.ts": 0.45,
   "src/client/game/shardfile/legacyAsset.test.ts": 0.069,
   "src/client/game/shardfile/lent-look-instance.test.ts": 0.017,

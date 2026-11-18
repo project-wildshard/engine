@@ -20,8 +20,8 @@
 - OF10a7 provenance-flag: `FolderOptions.firstParty` and the descriptor reader's field go.
   What is left of the option is the dangerous gates' input only: `DangerousProvenance` and the
   host's grant `dangerousTrust()` in `dangerousGates.ts`, the one file that still spells it.
-  `browserShardfileOptions(base, trusted)`, `prepareHybridShard(.., { trusted })`,
-  `HybridResident.trust`.
+  `browserShardfileOptions(base, trusted)`, `prepareRuntimePage(.., { trusted })`,
+  `RuntimePageResident.trust`.
 
 ## Review fixes before the land (OF10a4, OF10a5)
 

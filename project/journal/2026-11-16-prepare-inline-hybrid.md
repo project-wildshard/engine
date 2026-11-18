@@ -6,7 +6,7 @@ Meta NINE-DRAGON-BENCHMAX NB19, mini QA 11-16 row 42.
   runtime ("Custom runtime requires trusted hybrid composition"). The live game admits Nine by its discovery's
   client-plan entry (`planEntry`), first-party, with `gridShardfile` naming its own descriptor; the runtime is data.
 - The page that owns its inline candidate (DEVSERVER / PREPARATION_ONLY) now reads the candidate's discovery and enters
-  it as a catalogue arrival (`inlineHybridArrival`, `selectInlineHybrid`, entry.ts). The bare inline path still refuses
+  it as a catalogue arrival (`inlineRuntimeArrival`, `selectInlineRuntime`, entry.ts). The bare inline path still refuses
   any runtime, so does every released page; the discovery must name the client-plan entry, the same identity and its own
   same-origin descriptor.
 - Second gap: the in-page server read `server/` files only from the build's server book (the pinned revision's packs,

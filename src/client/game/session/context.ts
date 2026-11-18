@@ -29,7 +29,7 @@ export interface KitPorts {
 }
 export interface SessionState {
   readonly crashResume?: CrashResume;
-  /** G226: the page is only a platform shell; even its initial hybrid home is an evictable owned region. */
+  /** G226: the page is only a platform shell; even its initial runtime home is an evictable owned region. */
   ownedGridHome?: boolean;
   /** G216's native policy, including validation warnings before the ordinary HUD has been constructed. */
   readonly memory?: MemoryAdmission;

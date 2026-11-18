@@ -67,7 +67,7 @@ export class GridAssembly {
   /**
    * O11: a radial admission (runtime prefetch, tile admission) of a cell `distance` metres from its content square
    * fires within `reach`, and never at a pitch or more: that far, a whole cell column stands between (the outer road
-   * is 562.5-625 m from ring 1, inside a hybrid shard's 567 m readiness reach and the boosted 640 m tile reach).
+   * is 562.5-625 m from ring 1, inside a runtime shard's 567 m readiness reach and the boosted 640 m tile reach).
    */
   approaching(distance: number, reach: number): boolean { return distance <= reach && distance < this.pitch; }
 }

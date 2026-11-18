@@ -509,7 +509,7 @@ async function installInPageEntry(): Promise<void> {
 /** NB19: the inline candidate's discovery document, read where the page serves it. */
 async function readJson(url: string): Promise<unknown> {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Inline hybrid discovery answered ${response.status}`);
+  if (!response.ok) throw new Error(`Inline runtime discovery answered ${response.status}`);
   return JSON.parse(await response.text());
 }
 
@@ -593,7 +593,7 @@ async function startSelected(): Promise<void> {
     starterModule, hoverboardModule, voicesModule, boarModule, familiesModule, sourceModule, runtimeModule,
     gridEntryModule, pathsModule, prefetchModule])));
   const [{ sharedWeaponVoices, declaredWeaponVoices }, { BOAR_LOOK }, { declaredKitItemFamilies, declaredItemIcon },
-    { configuredShardfile, installShardfileFolder, installManifestShardfile, preparePageResidency, inlineHybridArrival, selectInlineHybrid }, { browserShardfileOptions },
+    { configuredShardfile, installShardfileFolder, installManifestShardfile, preparePageResidency, inlineRuntimeArrival, selectInlineRuntime }, { browserShardfileOptions },
     { pageGridRecovery }, { loadingPath }, { gridPrefetchStatus }] = await Promise.all([
     voicesModule, boarModule, familiesModule, sourceModule, runtimeModule, gridEntryModule, pathsModule,
     prefetchModule,
@@ -605,9 +605,9 @@ async function startSelected(): Promise<void> {
     loading.setPrefetchSource(gridPrefetchStatus);
     const inline = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI, inlineOwner))) : null;
     // NB19: an inline candidate that declares a runtime enters as the catalogue enters it, by its own discovery's
-    // client-plan entry; only a page that owns its inline candidate may (inlineHybridArrival), and the bare inline path refuses.
-    const hybrid = inline === null ? null : await inlineHybridArrival(inline, browserShardfileOptions(document.baseURI, inlineOwner), readJson);
-    const source = hybrid === null ? inline : null, admitted = hybrid ?? arrival;
+    // client-plan entry; only a page that owns its inline candidate may (inlineRuntimeArrival), and the bare inline path refuses.
+    const runtimePage = inline === null ? null : await inlineRuntimeArrival(inline, browserShardfileOptions(document.baseURI, inlineOwner), readJson);
+    const source = runtimePage === null ? inline : null, admitted = runtimePage ?? arrival;
     page = preparePageResidency(admitted, source?.identity.slug);
     // The script memory bank, sized by route: each reserve can cost JSC a full GC (e472f34069), so a grid page reserves
     // the full-ALL route's demand for its cell activations in play, and a standalone page, which builds its one world under
@@ -634,11 +634,11 @@ async function startSelected(): Promise<void> {
       detail: { memoryTurns, memoryWaitMs, grid } });
     await packs.ready();
     await completePageCatalogue(page.mode, catalogue?.ready);
-    if (hybrid !== null) selectInlineHybrid(hybrid);
+    if (runtimePage !== null) selectInlineRuntime(runtimePage);
     const path = page.mode === 'grid' ? 'grid' : 'shardfile';
     if (path === 'shardfile') modules('client');
     if (path === 'grid') modules('grid');
-    // Hybrid shardfile entries retain real TypeScript stages until their page is data-only.
+    // Runtime shardfile entries retain real TypeScript stages until their page is data-only.
     loading.setPath(loadingPath(path, game.shard.boot?.steps, path === 'shardfile' && source === null && dataPointer(game.shard) === undefined));
     const bindings: Parameters<typeof installShardfileFolder>[2] = {
       imageOwner,

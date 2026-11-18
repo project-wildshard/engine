@@ -20,7 +20,7 @@ import { questPageWorld } from '../../../shared/game/quest/pageResources';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import { installWorldScenes } from '../shardfile/worldScenes';
-import { residentWorldScope } from '../shardfile/hybridPresentation';
+import { residentWorldScope } from '../shardfile/runtimePagePresentation';
 import type { cableModes } from '@wildshard/engine/player/modes';
 import type { Flags } from '@wildshard/engine/world/interact/flags';
 import type { Interactables, InteractEvent } from '@wildshard/engine/world/interact/Interactables';

@@ -281,7 +281,7 @@
      "emits": "this.app.events.emit('fault'"
     },
     {
-     "file": "src/client/game/shardfile/hybrid.ts",
+     "file": "src/client/game/shardfile/runtimePage.ts",
      "emits": "ctx.app.events.emit('fault'"
     }
    ],

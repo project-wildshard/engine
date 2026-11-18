@@ -21,7 +21,7 @@ import { bootWaits, waitFor, type BootWait } from '@wildshard/engine/boot/waits'
  *   when ready and crosses the one page traveller at the fixed boundary; the rest stay closed until M3.
  *   The grid's outer rim is the outer road's shoulder: a glowing rail and closed walls, the VR void past it (G77 / G89).
  * - **cell events**: `gridCells.enter` while the player's feet are in the home cell's interior, `leave` on the deck
- *   (SF46's hybrid runtime runs only inside its cell).
+ *   (SF46's runtime runs only inside its cell).
  * - **legacy bounds yield** (SF17a): the session asks the level to leave out its chunk-edge walls and hide the edge
  *   veil (`gridLevel`), the bounds' horizontal check reads `grid`; fall recovery stays.
  */
@@ -227,8 +227,8 @@ export interface GridSessionState {
   readonly cellStage: string | null;
   /** GC8: the `cell` path step that screen shows now and its detail, so a harness times each step. */
   readonly cellStep: { readonly step: string; readonly detail: string } | null;
-  /** GC6: the hybrid runtime session's entry state (liveSession `hybridState`) */
-  readonly hybrid?: ReturnType<LiveGridSession['hybridState']> | null;
+  /** GC6: the runtime session's entry state (liveSession `runtimePageState`) */
+  readonly runtimePage?: ReturnType<LiveGridSession['runtimePageState']> | null;
   /** the allocator's grid content (MB) and the §3.2 playing total with the engine base (MB, the 1.0 GB envelope, G65) */
   readonly residentMB: number; readonly playingMB: number;
   /** GC6: the playing envelope the allocator admits against (MB) */
@@ -761,7 +761,7 @@ export class GridSession {
     this.constructorTiming?.('physics');
     const roots = this.viewRoots;
     for (const cell of this.neighbours) {
-      // G164: a shard whose whole world is shifted vertically at runtime (its terrain field's `datum`, Driftwood's hybrid row)
+      // G164: a shard whose whole world is shifted vertically at runtime (its terrain field's `datum`, Driftwood's runtime row)
       // shows its baked far proxy shifted by the same amount, as its own bake installs; absent, the root sits at road height
       const root = new Group(); root.name = `grid-cell:${cell.instance}`; root.position.set(cell.origin.x - home.origin.x, findShard(cell.slug)?.ground.terrain?.datum ?? 0, cell.origin.z - home.origin.z);
       const prepareView = host.prepareView;
@@ -929,7 +929,7 @@ export class GridSession {
     const homeClaim = residency.home(), homeResidency = (): { instance: string; bytes: number } => ({ instance: homeClaim.instance, bytes: homeClaim.bytes });
     host.scope.onDispose(app.debug.scopedExpose('grid', { state: () => this.state(), roadView: () => this.roadBudget.view(), roadResident: () => this.roadBudget.resident(),
       roadTileResidency: () => this.roadTiles?.state() ?? null,
-      // GC6: the hybrid hooks' timings (each entry's world, kit, play and their after-hooks), for the crossing tour
+      // GC6: the runtime hooks' timings (each entry's world, kit, play and their after-hooks), for the crossing tour
       hookTimings: () => this.live?.hookTimings() ?? null,
       // G144 admission receipts read the same allocator, without reserving or changing any claim.
       residency: () => ({ cost: this.allocator.cost(), claims: this.allocator.entries(), home: homeResidency() }),
@@ -1309,7 +1309,7 @@ export class GridSession {
       pitch: this.assembly.pitch,
       home: this.home.instance, inside: gridCells.cell?.instance ?? null, feet: { x: Math.round(at.x * 100) / 100, z: Math.round(at.z * 100) / 100 },
       cells: this.assembly.cells.map((cell) => { const d = drawn(cell.instance); return { instance: cell.instance, slug: cell.slug, cell: cell.cell, shows: shows(cell.instance, d), drawn: d }; }),
-      strips: this.strips.length, road: this.road, seams: this.seams, seamSource: this.seamSource, softWalls: this.softWalls.state(), gate: { cell: this.gateState.cell, count: this.gateState.count, card: this.gateCard?.text ?? null }, shimmer: this.shimmer.state(), cellLoading: null, cellStage: null, cellStep: null, hybrid: this.live?.hybridState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
+      strips: this.strips.length, road: this.road, seams: this.seams, seamSource: this.seamSource, softWalls: this.softWalls.state(), gate: { cell: this.gateState.cell, count: this.gateState.count, card: this.gateCard?.text ?? null }, shimmer: this.shimmer.state(), cellLoading: null, cellStage: null, cellStep: null, runtimePage: this.live?.runtimePageState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
       residentMB: Math.round(cost.accounted / 1e4) / 100, playingMB: Math.round(cost.playing / 1e4) / 100, envelopeMB: Math.round(this.allocator.envelope() / 1e4) / 100,
       accountedBytes: cost.accounted,
       rings: { frame: stats.frame, far: stats.resident.far, l1: stats.resident.l1, l0: stats.resident.l0, refused: stats.refused, inFlight: stats.inFlight, queued: stats.queued,

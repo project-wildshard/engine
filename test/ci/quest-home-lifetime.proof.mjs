@@ -22,7 +22,7 @@ const { QuestViews } = await import('../../src/client/game/plugin/ui.ts');
 const { installQuestInteractables } = await import('../../src/client/game/quest/chapter.ts');
 const { DialogueBox } = await import('../../src/client/engine/quest/view/ui.ts');
 const { GridCellEvents } = await import('../../src/shared/game/grid/cellEvents.ts');
-const { HybridShardPlugin } = await import('../../src/client/game/shardfile/hybrid.ts');
+const { RuntimePagePlugin } = await import('../../src/client/game/shardfile/runtimePage.ts');
 const { emptyShardfile } = await import('../../src/shared/host/author.ts');
 const { createShardFolder } = await import('../../src/shared/game/shardfile/shardFolder.ts');
 const limit = 9500;
@@ -55,7 +55,7 @@ void test('actual grid home leave and reentry retire dialogue input and timers w
       views.leave(() => { events.push('leave'); });
     }
   }
-  const plugin = new HybridShardPlugin(new ShardPlugin(), DialogueHome, {
+  const plugin = new RuntimePagePlugin(new ShardPlugin(), DialogueHome, {
     instance: home.instance, cells, retainHomeRuntime: true,
     readiness(value) { if (value) ready?.resolve(); },
   });

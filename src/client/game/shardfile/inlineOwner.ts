@@ -1,6 +1,6 @@
 /**
- * NINE-DRAGON-BENCHMAX NB19 (mini QA 11-16 row 42): the inline hybrid candidate this page owns (`wildshard dev`,
- * `wildshard prepare`), recorded when entry selects it (clientSource.ts `selectInlineHybrid`). Its in-page server reads the
+ * NINE-DRAGON-BENCHMAX NB19 (mini QA 11-16 row 42): the inline runtime candidate this page owns (`wildshard dev`,
+ * `wildshard prepare`), recorded when entry selects it (clientSource.ts `selectInlineRuntime`). Its in-page server reads the
  * candidate's own server files beside it, hash-verified as every server input is, because this build's server book names
  * only the pinned revision's packs (and an author's preparation archive drops those). No other slug, and no page that
  * owns no inline candidate, changes where its server reads.

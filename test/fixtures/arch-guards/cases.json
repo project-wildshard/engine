@@ -276,7 +276,7 @@
     "id": "owned-setting",
     "file": "src/shards/nalati-grasslands/owned-setting.ts",
     "rule": "shard-sandbox",
-    "code": "setting('nalatiHybrid');",
+    "code": "setting('nalatiRuntimePage');",
     "count": 0
   },
   {
@@ -353,7 +353,7 @@
     "id": "owned-setting-const",
     "file": "src/shards/nalati-grasslands/owned-setting-const.ts",
     "rule": "shard-sandbox",
-    "code": "const KEY = 'nalatiHybrid'; setting(KEY);",
+    "code": "const KEY = 'nalatiRuntimePage'; setting(KEY);",
     "count": 0
   },
   {

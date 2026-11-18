@@ -229,7 +229,7 @@ export class LiveGridHost {
         admission = admitted; this.assertAlive();
         if (admission.tilePreparation === true) this.tileMetadata.add(instance);
         const bundle = this.ports.readiness.bundle(cell);
-        if ((bundle.hybridWireBytes > 0 || admission.exclusiveRuntime === true) && admission.prepareRuntime === undefined) throw new Error('Hybrid runtime admission is missing');
+        if ((bundle.runtimePageWireBytes > 0 || admission.exclusiveRuntime === true) && admission.prepareRuntime === undefined) throw new Error('Runtime admission is missing');
         await (timing === undefined ? admission.prepareRuntime?.() : timing.run('runtime', async () => { await admitted.prepareRuntime?.(); }));
         this.assertAlive();
         this.deferredFolders.delete(instance); this.deferredDemand.delete(instance); this.products.set(instance, admission); return admission;
@@ -284,7 +284,7 @@ export class LiveGridHost {
     const pending = this.requests.get(instance); if (pending !== undefined) return pending;
     const issue = this.issues.get(instance); if (issue !== undefined) return Promise.reject(new Error(issue));
     const bundle = this.ports.readiness.bundle(cell), estimate = readinessModel(bundle, this.ports.readiness.link);
-    const ticket = this.readiness.request(instance, 0, estimate, bundle.hybridWireBytes > 0);
+    const ticket = this.readiness.request(instance, 0, estimate, bundle.runtimePageWireBytes > 0);
     if (ticket === null) return Promise.reject(new Error('Stale live grid readiness request'));
     const transport = this.transportApproach, releasePriority = this.ports.prioritize?.(cell);
     const request = this.admitRegion(cell, bundle, ticket, this.sequence).finally(() => {
@@ -327,7 +327,7 @@ export class LiveGridHost {
       }
       let region: LiveGridRegion | undefined;
       try {
-        if (bundle.hybridWireBytes > 0 && admitted.prepareRuntime === undefined) throw new Error('Hybrid runtime admission is missing');
+        if (bundle.runtimePageWireBytes > 0 && admitted.prepareRuntime === undefined) throw new Error('Runtime admission is missing');
         this.assertAlive(); this.readiness.complete(ticket, 'runtime');
         if (this.ports.pause !== undefined) await this.ports.pause();
         this.assertAlive();
