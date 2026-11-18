@@ -58,7 +58,21 @@ export function tierUrl(url: string, tex: TexMode = texMode()): string {
   const u = phoneUrl(url);
   // E157: a model whose textures ride as KTX2 (KHR_texture_basisu) when the page loads KTX2 — three's loaders, the boot
   // pack and the manifest all come through here, so they agree on the file (src/client/engine/boot/gpuFiles.ts; images: src/client/engine/core/ktx2.ts)
-  return /\.(glb|gltf)$/.test(u) ? standIn(u, tex) ?? u : u;
+  if (/\.(glb|gltf)$/.test(u)) return standIn(u, tex) ?? u;
+  return u.endsWith('.ktx2') ? ktx2StandIn(u, tex) ?? u : u;
+}
+/** SHARD-SOURCE S12f1b: a KTX2 a model names itself (a glTF recipe's map) reads the phone row the table keys by that file,
+ *  so the cook's 6×6 file stands in for a 1k master the recipe names. Three hands this a resolved URL (absolute, or with
+ *  `..` left in): the table keys same-origin paths. */
+function ktx2StandIn(url: string, tex: TexMode): string | undefined {
+  const page = typeof location === 'undefined' ? 'http://page.invalid/' : location.href;
+  let path: string;
+  try {
+    const resolved = new URL(url, page);
+    if (resolved.origin !== new URL(page).origin || resolved.search !== '' || resolved.hash !== '') return undefined;
+    path = resolved.pathname;
+  } catch { return undefined; }
+  return standIn(path, tex);
 }
 /** the tier's copy of a file (`.phone.webp` / `.phone.glb`), whatever the textures ride as */
 export function phoneUrl(url: string): string {
