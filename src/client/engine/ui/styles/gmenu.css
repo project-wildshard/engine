@@ -2,8 +2,10 @@
    One full-height glass sheet over the blurred, still-running world (art/menu/round-2-tabs/menu-tab-*.png). Header (the bar, E178:
    [RESUME] PAUSED / shard [EXIT TO MAIN], [CLOSE] BAG), a four-tab bar with the cyan underline, the active tab's panel, a footer hint. Lives on <body>
    above the HUD, the minimap (z 6) and the phone's touch layer (z 5). */
-.ws-gmenu { position: fixed; inset: 0; z-index: calc(var(--ws-layer-gameMenu) + 0); display: flex; align-items: stretch; justify-content: center; padding: calc(var(--ws-top) + 4px + var(--ws-pill, 0px)) 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(6, 10, 18, 0.55); -webkit-backdrop-filter: blur(6px) saturate(1.1); backdrop-filter: blur(6px) saturate(1.1); opacity: 0; pointer-events: none; transition: opacity 0.18s; font-family: var(--ws-mono); color: var(--ws-text); }
-.ws-gmenu.show { opacity: 1; pointer-events: auto; }
+.ws-gmenu { position: fixed; inset: 0; z-index: calc(var(--ws-layer-gameMenu) + 0); display: flex; align-items: stretch; justify-content: center; padding: calc(var(--ws-top) + 4px + var(--ws-pill, 0px)) 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(6, 10, 18, 0.55); -webkit-backdrop-filter: blur(6px) saturate(1.1); backdrop-filter: blur(6px) saturate(1.1); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.18s, visibility 0s linear 0.18s; font-family: var(--ws-mono); color: var(--ws-text); }
+.ws-gmenu.show { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.18s; }
+/* MG10 (mini-ninesteady): closed, the menu is hidden, not only transparent: at opacity 0 WebKit kept its backdrop blur and
+   glass sheet as full-screen composited layers (backing stores at the device scale) for the whole play */
 .ws-gmenu * { box-sizing: border-box; } /* on <body>, outside #hud's reset: a 100 %-wide padded .ws-gmenu-row ran 26 px past the sheet */
 .ws-gmenu .ws-gmenu-sheet { width: 100%; max-width: 560px; display: flex; flex-direction: column; min-height: 0; background: rgba(8, 12, 20, 0.86); padding: 0; }
 .ws-gmenu .ws-gmenu-sheet::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 18px; height: 18px; border-right: 1px solid var(--ws-cyan); border-bottom: 1px solid var(--ws-cyan); opacity: 0.8; pointer-events: none; }

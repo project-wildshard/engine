@@ -25,6 +25,9 @@ export class SpeedLines {
     this.el.className = 'ws-game-speed';
     this.smear = document.createElement('div');
     this.smear.className = 'ws-game-smear';
+    // MG10 (mini-ninesteady): hidden at rest, not only transparent: at opacity 0 each kept a composited layer wider than
+    // the screen (the smear's transform, the streaks' mask) with a backing store at the device scale
+    this.el.style.visibility = 'hidden'; this.smear.style.visibility = 'hidden';
     mountUi(this.el, this.scope); mountUi(this.smear, this.scope);
   }
 
@@ -34,12 +37,12 @@ export class SpeedLines {
     this.level = target > this.level ? target : this.level * Math.exp(-dt * 10);
     if (this.level < 0.02) this.level = 0;
     const q = Math.round(this.level * 50) / 50;
-    if (q !== this.shown) { this.shown = q; this.el.style.setProperty('--speed', String(q)); }
+    if (q !== this.shown) { this.shown = q; this.el.style.setProperty('--speed', String(q)); this.el.style.visibility = q === 0 ? 'hidden' : ''; }
 
     // the dodge feel (E63 T)
     const ms = dodgeFx.t;
     const smear = ms >= 0 && !dodgeFx.back ? Math.round(Math.max(0, Math.min(1, dodgeEnv(ms))) * 50) / 50 : 0;
-    if (smear !== this.smearShown) { this.smearShown = smear; this.smear.style.setProperty('--smear', String(smear)); }
+    if (smear !== this.smearShown) { this.smearShown = smear; this.smear.style.setProperty('--smear', String(smear)); this.smear.style.visibility = smear === 0 ? 'hidden' : ''; }
     const side = dodgeFx.side >= 0 ? 1 : -1;
     if (smear > 0 && side !== this.sideShown) { this.sideShown = side; this.smear.style.setProperty('--side', String(side)); }
   }

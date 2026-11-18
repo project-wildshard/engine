@@ -149,8 +149,8 @@
 .ws-game-toasts .ws-game-toast:nth-last-child(3) { opacity: 0.45; }
 
 /* ── damage flash + vignette ── */
-.ws-game-flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 40, 20, 0.55) 100%); opacity: 0; }
-.ws-game-flash.show { animation: ws-flash 0.55s ease-out forwards; }
+.ws-game-flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 40, 20, 0.55) 100%); opacity: 0; visibility: hidden; }
+.ws-game-flash.show { visibility: visible; animation: ws-flash 0.55s ease-out forwards; }
 
 /* ── hit marker ring (subtle) ── */
 .ws-game-hitring { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px; border: 1px solid var(--ws-red); border-radius: 50%; opacity: 0; }

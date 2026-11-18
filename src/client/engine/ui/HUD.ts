@@ -299,6 +299,8 @@ export class HUD {
     this.boundary = el('div', engineString('s_befab9df4f5c'), engineString('s_9029b332a959')); this.boundary.hidden = true; perfDockSection(this.boundary, this.scope, -8);
     const toasts = el('div', engineString('s_dcccdb8a40d1')); mountUi(toasts, this.scope, r); this.toasts = new ToastStack(toasts); this.toastBox = toasts;
     this.flash = el('div', engineString('s_18547caf898d')); mountUi(this.flash, this.scope, r);
+    // MG10: a finished flash hides again (a filled opacity animation kept its full-screen layer composited)
+    this.scope.listen(this.flash, 'animationend', () => { this.flash.classList.remove('show'); });
 
     // pause = the in-game menu on its Settings tab (src/client/engine/ui/Menu.ts, attached by main.ts as `hud.menu`):
     // the touch PAUSE button (TouchControls) and a released pointer lock; Escape (and M / I) is the menu's own key listener,

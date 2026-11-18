@@ -15,15 +15,15 @@ const FADE_TO = 0.12;   // … and where it is fully on
 const DEEP_AT = 6;      // m of eye depth at which the dark layer is fully on
 
 const CSS = `
-.ws-waterline { position: fixed; inset: 0; pointer-events: none; opacity: 0; will-change: opacity; overflow: hidden; }
+.ws-waterline { position: fixed; inset: 0; pointer-events: none; opacity: 0; visibility: hidden; will-change: opacity; overflow: hidden; }
 .ws-waterline > i { position: absolute; inset: 0; display: block; opacity: 0; transition: opacity 0.35s; }
-.ws-waterline .caustic { inset: -25%; mix-blend-mode: screen; will-change: background-position;
+.ws-waterline .caustic { inset: -25%; mix-blend-mode: screen;
   background:
     radial-gradient(ellipse 42% 30% at 50% 50%, rgba(190, 250, 255, 0.55) 0%, rgba(190, 250, 255, 0) 70%),
     radial-gradient(ellipse 30% 45% at 20% 70%, rgba(170, 240, 255, 0.45) 0%, rgba(170, 240, 255, 0) 70%);
   background-size: 340px 260px, 420px 300px;
   animation: ws-caustic-a 13s ease-in-out infinite alternate; }
-.ws-waterline .caustic2 { inset: -25%; mix-blend-mode: screen; will-change: background-position;
+.ws-waterline .caustic2 { inset: -25%; mix-blend-mode: screen;
   background:
     radial-gradient(ellipse 36% 26% at 65% 35%, rgba(200, 255, 255, 0.5) 0%, rgba(200, 255, 255, 0) 70%),
     radial-gradient(ellipse 26% 40% at 30% 60%, rgba(160, 235, 255, 0.4) 0%, rgba(160, 235, 255, 0) 70%);
@@ -32,6 +32,8 @@ const CSS = `
 .ws-waterline .vignette { background: radial-gradient(ellipse at 50% 50%, rgba(2, 18, 28, 0) 48%, rgba(2, 18, 28, 0.42) 100%); }
 .ws-waterline .deep { background: rgba(4, 36, 58, 1); transition: opacity 0.6s; }
 .ws-waterline.under .caustic { opacity: 0.17; } .ws-waterline.under .caustic2 { opacity: 0.14; } .ws-waterline.under .vignette { opacity: 1; }
+.ws-waterline.under .caustic, .ws-waterline.under .caustic2 { will-change: background-position; }
+.ws-waterline:not(.under) .caustic, .ws-waterline:not(.under) .caustic2 { animation-play-state: paused; }
 @keyframes ws-caustic-a { from { background-position: 0 0, 0 0; } to { background-position: 180px 90px, -120px 150px; } }
 @keyframes ws-caustic-b { from { background-position: 0 0, 0 0; } to { background-position: -220px 120px, 140px -160px; } }
 .ws-dive-hint { position: absolute; left: 50%; bottom: 160px; transform: translateX(-50%); padding: 7px 14px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-text, #e6f2f8); opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
@@ -78,7 +80,9 @@ export class WaterLine implements WaterLineView {
       this.el.classList.toggle('under', under);
     }
     const a = under ? 1 : eyeAbove >= FADE_FROM ? 0 : Math.min(1, (FADE_FROM - eyeAbove) / (FADE_FROM - FADE_TO));
-    if (Math.abs(a - this.lastA) > 0.01) { this.lastA = a; this.el.style.opacity = a.toFixed(2); }
+    // MG10 (mini-ninesteady): dry, the line is hidden, not only transparent: at opacity 0 its will-change layer and the
+    // two caustic layers (each 1.5x the screen, repainted by their animations) kept backing stores at the device scale
+    if (Math.abs(a - this.lastA) > 0.01) { this.lastA = a; this.el.style.opacity = a.toFixed(2); this.el.style.visibility = a > 0 ? 'visible' : 'hidden'; }
     // the deeper the eye, the darker the wash (the surface light fades; the fog does the rest in-scene)
     const d = under ? Math.min(0.18, (-eyeAbove / DEEP_AT) * 0.18) : 0;
     if (Math.abs(d - this.lastDeep) > 0.01) { this.lastDeep = d; this.deep.style.opacity = d.toFixed(2); }
