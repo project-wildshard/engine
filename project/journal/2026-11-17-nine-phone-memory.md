@@ -145,3 +145,16 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
 - WebKit [K], 5 alternating cold runs, instrument minimal, base `7addc873`: WebContent peak 1,473 -> 1,245 MB, settled
   756 -> 762 (noise), GPU 519 -> 527; with a 10 s settle (after the pass) 745 -> 732 and 508 -> 522. Simulator n1:
   loading 0.870 -> 0.807 GB native, play high-water 0.753 -> 0.803 (the pass now lands in play).
+
+## mini-ninemem8, 2026-11-18: late-boot garbage (save writes, the card's server row)
+
+- The prespawned server worker on WebKit, alone on a blank page (`tmp/mini-ninemem8/worker-probe.mjs`): importing
+  `serverRuntime` (3.5 MB, shard-format 1.0 MB of it) is +155 MB peak / +80 MB held; Rapier and the warm-up +26 held;
+  the whole Nine zone boot only +45 peak / +15 held. V8 holds 11 MB after the same import: the cost is JavaScriptCore's.
+- WebKit's loading peak is the plateau before the first full GC: at control, WebKit Malloc 900 -> 575 MB and ArrayBuffer
+  contents 212 -> 110 after the harness's GC. Fewer late allocations lower it more than their own size.
+- Chromium allocation sampling from `loadout` to control (source-mapped): the JSON save slots' valibot union (boot-trace
+  writes, ~60 MB of issue garbage) and the card's whole-timeline snapshot on every boot-timing event (~6 MB late, ~31 MB
+  whole boot) were the largest engine-owned sites. Cut: a plain-JSON fast check for those slots' writes, and a one-row
+  read of the server step. 239 -> 164 MB late, 1,003 -> 910 MB whole boot. WebKit [K], 5 alternating cold runs: peak
+  median 1,267 -> 1,051 MB, settled 765 -> 733.

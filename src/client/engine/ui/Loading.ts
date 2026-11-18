@@ -593,10 +593,12 @@ export class Loading {
   private readServerProgress(): void {
     // LS7: the worker's completed internal work is already in the collector.
     // Sampling it cannot mint work; a quiet/failed worker leaves the count fixed.
-    const server = this.timeline.snapshot().rows.find(row => row.key === 'server' && row.state === 'on');
+    // MG10 (J410): this runs on every boot-timing event (each file, step and worker message), so it reads the one row it
+    // needs; a whole snapshot each time was ~19-31 MB of Nine's boot garbage (V8 allocation sampling)
+    const startedAt = this.timeline.runningSince('server');
     const timing = bootTiming();
-    if (server?.startedAt !== undefined && timing !== undefined) {
-      const progress = serverBootProgress(timing, server.startedAt);
+    if (startedAt !== undefined && timing !== undefined) {
+      const progress = serverBootProgress(timing, startedAt);
       this.timeline.report('server', progress.detail, progress.done, progress.total);
       setData(this.root, 'serverSteps', String(progress.steps));
       setData(this.root, 'serverFiles', String(progress.files));

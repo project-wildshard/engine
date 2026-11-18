@@ -17,6 +17,10 @@ export interface SaveKeyDef<T> {
   migrate?: Readonly<Record<number, (old: unknown) => unknown>>;
   /** Says only that a file may hold this key, so an import keeps it. The definition that reads it takes its place. */
   stub?: true;
+  /** MG10 (J410): a write's fast check. A value it accepts is one `schema` passes unchanged, so the write keeps it without
+   *  running `schema` (a write keeps only the serialized text, parsed again); any other value goes through `schema`, issues
+   *  and all. The JSON slots' valibot union built ~60 MB of issue garbage per Nine boot, validating the boot trace. */
+  accepts?: (value: unknown) => boolean;
 }
 export interface SaveSlot<T> { /** Validated existing data, without creating or changing a save. */ peek: (namespace?: string) => T | null;
   /** Storage/admission metadata only; nullable valid values remain distinct from malformed or absent entries. */ status?: (namespace?: string) => 'absent' | 'valid' | 'invalid' | 'future';
@@ -207,12 +211,13 @@ export class SaveStore {
       if (generations.get(name) !== (savedDoc.reset ?? 0)) return false;
       const prior = savedDoc.keys[definition.key];
       if (this.readonlyKeys.has(`${name}/${definition.key}`) || (entry(prior) && prior.v > definition.version)) return false;
-      const result = v.safeParse(definition.schema, value);
-      if (!result.success) { this.report(scopeOf(name), definition.key, definition.version, result.issues[0].message); return false; }
+      const result = definition.accepts?.(value) === true ? null : v.safeParse(definition.schema, value);
+      if (result !== null && !result.success) { this.report(scopeOf(name), definition.key, definition.version, result.issues[0].message); return false; }
+      const valid = result === null ? value : result.output;
       // Equality is exact JSON content, not object identity. A failed durable
       // write still retries even when this page already retained the value.
       // WR7: the whole document goes back, with the fields this build does not know.
-      const output = entry(prior) && prior.v === definition.version ? keepUnknown(definition.schema, prior.data, result.output) : result.output;
+      const output = entry(prior) && prior.v === definition.version ? keepUnknown(definition.schema, prior.data, valid) : valid;
       const text = JSON.stringify(output);
       if (entry(prior) && prior.v === definition.version && !this.failedWrites.has(name) && this.entryText(prior) === text) return true;
       if (text === undefined) { savedDoc.keys[definition.key] = { v: definition.version, data: output }; return this.putDocument(definition.scope, name, savedDoc); }

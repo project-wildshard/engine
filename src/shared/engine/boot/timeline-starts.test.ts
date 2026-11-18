@@ -95,3 +95,17 @@ test('DL21: a sub-stage begun under its step\'s alias names itself on the step',
   const models = timeline.begin('fieldModels'); expect(detail()).toBe('field models'); models.end();
   timeline.begin('sword', 'Blade of the shore'); expect(detail()).toBe('Blade of the shore');
 });
+
+test('runningSince reads the one running row a snapshot would show', () => {
+  let now = 10;
+  const timeline = new LoadingTimeline({id: 'capture', steps: ['outer', 'server'].map(key => ({key, label: key, weight: 1}))}, now, () => now);
+  expect(timeline.runningSince('server')).toBeUndefined();
+  const outer = timeline.begin('outer'); now = 20;
+  const server = timeline.begin('server'); now = 30;
+  const row = timeline.snapshot().rows.find(r => r.key === 'server' && r.state === 'on');
+  expect(timeline.runningSince('server')).toBe(row?.startedAt);
+  expect(timeline.runningSince('server')).toBe(20);
+  server.end(); outer.end();
+  expect(timeline.runningSince('server')).toBeUndefined();
+  expect(timeline.snapshot().rows.find(r => r.key === 'server')?.state).toBe('ok');
+});

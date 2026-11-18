@@ -151,6 +151,11 @@ export class LoadingTimeline {
       if (row !== undefined && ![...this.active.values()].some(value => value.key === key)) row.endedAt = this.at;
     }, detail: text => { stage.detail = text; } };
   }
+  /** When `key` started, while it runs (its `snapshot()` row is 'on'); otherwise undefined. One row, without a snapshot. */
+  runningSince(key: string): number | undefined {
+    for (const stage of this.active.values()) if (stage.key === key) return this.rows.get(key)?.startedAt;
+    return undefined;
+  }
   snapshot(): { path: string; rows: LoadingRow[]; gaps: LoadingGap[]; current: string | null; display: string | null } {
     this.accrue();
     const running = new Set([...this.active.values()].map(stage => stage.key));
