@@ -359,13 +359,14 @@ export class MoverRuntime {
   }
   private carryNative(host: SimHost): void {
     for (const [id, carry] of this.carryPoses) {
-      const named = this.riders.get(id), rider = host.players.get(named ?? this.nativeOwner);
+      const named = this.riders.get(id), seat = named ?? this.nativeOwner, rider = host.players.get(seat);
       if (!carry.riding) this.riders.delete(id);
-      if (rider === undefined) {
-        // left the world mid-ride: the boat goes on without them; a steer vehicle is let go, so another can board it
-        if (carry.riding && this.data.some(row => row.id === id && row.driver?.kind === 'steer')) { this.pending.set(id, 2); }
-        continue;
-      }
+      // left the world mid-ride, or a parked seat (SS-GP5b: a room clears a lead seat whose hold ran out and parks its body for
+      // the next player): the boat goes on without them; a steer vehicle is let go, so another can board it, and so the next
+      // player in that seat is not carried off on it
+      const steered = carry.riding && this.data.some(row => row.id === id && row.driver?.kind === 'steer');
+      if (steered && (rider === undefined || host.parked.has(seat))) { this.pending.set(id, 2); continue; }
+      if (rider === undefined) continue;
       rider.position.set(...carry.at); rider.motor.resetAt(rider.position); rider.velocity.y = 0; rider.fall.grounded = false; if (!carry.riding) rider.yaw = carry.yaw;
     }
     this.carryPoses.clear();
