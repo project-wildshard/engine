@@ -12,3 +12,9 @@
   real GPU keeps the wide first frame, which still narrows itself after
   a slice over 400 ms (FIRST_DRAW_NARROW), and its canvas is no longer
   covered during load.
+- Then the script memory bank (`app/scriptMemoryPlan.ts`): a grid page
+  reserved its whole in-play bank (35 fixed, 9 virgin) under the loader,
+  1.1-2.0 s of Application modules at 4x CPU on headless WebKit and
+  0.4 s in the iOS Simulator. It now reserves the standalone bank there
+  (its one home cell) and tops up after `ws:control-ready`, a reserve an
+  idle turn; a miss still allocates in place.

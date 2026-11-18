@@ -609,27 +609,30 @@ async function startSelected(): Promise<void> {
     const runtimePage = inline === null || !inlineOwner ? null : await inlineRuntimeArrival(inline, { base: document.baseURI }, readJson);
     const source = runtimePage === null ? inline : null, admitted = runtimePage ?? arrival;
     page = preparePageResidency(admitted, source?.identity.slug);
-    // The script memory bank, sized by route: each reserve can cost JSC a full GC (e472f34069), so a grid page reserves
-    // the full-ALL route's demand for its cell activations in play, and a standalone page, which builds its one world under
-    // the loader, a few. NINE-DRAGON-BENCHMAX NB4: Nine's standalone page took 1 of the 45 by control and after play
-    // (benchmax census) while the 45 cost Jake's Low Power iPhone 1.1 s of modules. A miss allocates in place, as before.
+    // The script memory bank (scriptMemoryPlan.ts): each reserve can cost JSC a full GC (e472f34069). NINE-DRAGON-BENCHMAX NB4:
+    // Nine's standalone page took 1 of a 45 bank by control, while the 45 cost Jake's Low Power iPhone 1.1 s of modules.
+    // SB47: a grid page reserves the standalone bank under the loader too (its one home cell), and tops up the full-ALL
+    // route's demand for its cell activations after control, a reserve an idle turn. A miss allocates in place, as before.
     const grid = page.mode === 'grid';
     const assetTables = await import('./assetTables'), packs = assetTables.prepareAssetPackRead(grid || TIER !== 'phone' ? undefined : game.shard.slug);
-    const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }] = await Promise.all([
+    const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }, { reserveScriptMemory }, { idleTurn }] = await Promise.all([
       import('@wildshard/engine/script/moduleV2'), import('@wildshard/engine/core/workSlice'),
-      import('@wildshard/engine/core/clock'),
+      import('@wildshard/engine/core/clock'), import('./scriptMemoryPlan'), import('@wildshard/engine/boot/idle'),
     ]);
     const memoryStartedAt = diagnosticNow();
     // NB4: a reserve yields once its slice has run 8 ms, not after every reserve. In Chromium the 45 reserves cost
     // 0.6 ms together; the 45 timer turns between them were the whole 0.35 s of this span at CPU x4 (NB1). A reserve
     // that does cost JSC a full GC still spends its slice, so it still ends its own task.
     let memoryTurns = 0, memoryWaitMs = 0, memorySliceAt = diagnosticNow();
-    await bootTask('app:script-memory-reservation', () => prepareScriptMemoryBank(grid ? [35, 0, 1, 0] : [4, 0, 1, 0], async () => {
-      if (diagnosticNow() - memorySliceAt >= 8) {
-        memoryTurns++; const at = diagnosticNow(); await yieldTask(entryScope); memorySliceAt = diagnosticNow(); memoryWaitMs += memorySliceAt - at;
-      }
-      if (entryScope.disposed || entryScope.disposing) throw new Error('Entry memory preparation ended');
-    }, grid ? [{ initial: 1, maximum: 2, count: 5 }, { initial: 1, maximum: 64, count: 4 }] : [{ initial: 1, maximum: 2, count: 1 }, { initial: 1, maximum: 64, count: 1 }]));
+    await bootTask('app:script-memory-reservation', () => reserveScriptMemory(grid, { prepare: prepareScriptMemoryBank,
+      yieldTask: async () => {
+        if (diagnosticNow() - memorySliceAt >= 8) {
+          memoryTurns++; const at = diagnosticNow(); await yieldTask(entryScope); memorySliceAt = diagnosticNow(); memoryWaitMs += memorySliceAt - at;
+        }
+        if (entryScope.disposed || entryScope.disposing) throw new Error('Entry memory preparation ended');
+      },
+      afterControl: (run) => { entryScope.listen(document, 'ws:control-ready', run, { once: true }); },
+      idle: () => idleTurn(entryScope) }));
     performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
       detail: { memoryTurns, memoryWaitMs, grid } });
     await packs.ready();
