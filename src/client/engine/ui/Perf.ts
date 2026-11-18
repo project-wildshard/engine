@@ -1,4 +1,3 @@
-import { appIdentity, currentProbe } from '../../../shared/engine/app/identity';
 import { uiScope, mountUi } from './ownership';
 import { perfDockChip, perfDockSections } from './perfDock';
 import { activeDevPixels, drawingBuffer } from '../core/devPixels';
@@ -24,9 +23,7 @@ import { saveStorage } from '../saves/slots';
  * (derived limits and each level's recorded rollout ceilings),
  * `OK` / `OVER` on the meter (red when over), and `window.__perfBudget` for scripted checks.
  */
-import * as THREE from 'three';
 import type { Game } from '../core/Game';
-import { activeLevel } from '../../../shared/engine/level/selection';
 import { TIER } from '../core/tier';
 import { frameBudget } from '../render/budgetReport';
 import { tierPickInfo, tierPickLine, forgetTierPick } from '../render/tierBoot';
@@ -41,7 +38,6 @@ import './perf.css';
 
 const savedStorage = saveStorage('device');
 
-declare const __BUILD_ID__: string; // vite.config.ts define
 /** the last probe's full report (E189: COPY), kept across a reload */
 const PROBE_KEY = 'perf.probe';
 
@@ -244,9 +240,9 @@ export class Perf {
   private async runProbe(): Promise<void> {
     const out = this.probeOut, g = this.game;
     this.panel.classList.add('probed');
-    const header = this.probeHeader(); // before the rows switch things off: the frame as played
-    const { runPerfProbe, probeLines, probeReport, probeSamples } = await loadModuleWithProgress('Performance probe', () => import('./perfProbe'));
+    const { runPerfProbe, probeHeader, probeLines, probeReport, probeSamples } = await loadModuleWithProgress('Performance probe', () => import('./perfProbe'));
     if (this.scope.disposed) return;
+    const header = probeHeader(g); // before the rows switch things off: the frame as played
     const rows = await runPerfProbe(g, (line) => { out.textContent = line; });
     if (this.scope.disposed || rows.length === 0) return;
     const head = `${g.renderer.domElement.width}×${g.renderer.domElement.height} · ${TIER} · ${Math.round(devicePixelRatio)}× screen`;
@@ -257,22 +253,6 @@ export class Perf {
     try { savedStorage.setItem(PROBE_KEY, this.probeText); } catch { /* not kept past this load */ }
     this.scope.expose(window, '__perfProbe', rows);
     this.open(true);
-  }
-  /** the report's header: what ran, on what, where (E189) */
-  private probeHeader(): string[] {
-    const g = this.game, r = g.renderer, cv = r.domElement, info = r.info, w: unknown = currentProbe()?.world ?? null;
-    let build = ''; try { build = __BUILD_ID__; } catch { /* a dev page */ }
-    let settings = ''; try { settings = saveStorage('global').getItem('settings') ?? ''; } catch { /* storage blocked */ }
-    const pl: unknown = typeof w === 'object' && w !== null ? Reflect.get(w, 'player') : null;
-    const pos: unknown = typeof pl === 'object' && pl !== null ? Reflect.get(pl, 'position') : null;
-    const where = pos instanceof THREE.Vector3 ? `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}` : '?';
-    return [
-      `${appIdentity().name.toUpperCase()} PROBE · ${new Date().toISOString()} · build ${build}`,
-      `${engineString('s_level_word_lower')} ${activeLevel().id} · tier ${TIER} · canvas ${String(cv.width)}×${String(cv.height)} · dpr ${String(devicePixelRatio)} · screen ${String(screen.width)}×${String(screen.height)} · ${String(navigator.hardwareConcurrency)} cores`,
-      `ua ${navigator.userAgent}`,
-      `player at ${where} · calls ${String(g.lastFrame.calls)} · tris ${String(g.lastFrame.triangles)} · programs ${String(info.programs?.length ?? 0)} · textures ${String(info.memory.textures)} · geometries ${String(info.memory.geometries)}`,
-      `settings ${settings}`,
-    ];
   }
   private active = true; // until the menu first hides it (main.ts)
   /** the details panel over the minimap (phones) */

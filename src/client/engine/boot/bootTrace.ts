@@ -18,9 +18,9 @@ type Status = 'in_progress' | 'ready' | 'planned' | 'handled_error' | 'context_l
 type Facts = Record<string, string | number | boolean | null>;
 /** `ledger`: the memory ledger's totals by kind at the checkpoint, decimal MB to 0.1 (ENGINE-MEMORY EM9), so a report of a
  * page the phone killed says what the engine held when it died */
-interface Checkpoint { atMs: number; operation: string; facts: Facts; ledger?: Record<string, number> }
+export interface Checkpoint { atMs: number; operation: string; facts: Facts; ledger?: Record<string, number> }
 
-interface BootRecord {
+export interface BootRecord {
   levelId: string;
   levelName: string;
   id: string;
@@ -35,6 +35,9 @@ interface BootRecord {
   detail?: string;
   checkpoints?: Checkpoint[];
 }
+
+/** one interrupted boot waiting for its two channels */
+export interface PendingReport { record: BootRecord; reason: string; inbox: boolean; sentry: boolean }
 
 /** where an interrupted boot's evidence goes: the review inbox and the browser error tracker */
 export interface BootTraceTransports {
@@ -101,7 +104,6 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
   function previousBootLevel(): string { return previousLevelId; }
   let transition: { frames: number; firstDrawAt: number | null } | null = null;
   let hiddenStatus: Status | null = null;
-  interface PendingReport { record: BootRecord; reason: string; inbox: boolean; sentry: boolean }
   let flushing = false;
   let retryListener = false;
   /** S18: index.html's self-reload claim as this page found it, and whether the page before marked its reload */
@@ -139,36 +141,12 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
     return `Abrupt previous page: ${prior.levelName} ${stage} ${prior.setup}% setup / ${prior.download}% download${last ? ` at ${last}` : ''} (cause unknown)`;
   }
 
-  /** Retry independent channels from the renderer-free title; retain evidence until each one acknowledges it. */
+  /** Retry independent channels from the renderer-free title; retain evidence until each one acknowledges it. The sending
+   *  half is in the inbox's chunk (telemetry/bootInbox.ts), loaded only when something is queued. */
   async function flushBootReports(): Promise<void> {
-    if (flushing) return;
+    if (flushing || reports().length === 0) return;
     flushing = true;
-    try {
-      for (const pending of reports()) {
-        const prior = pending.record;
-        const system = pending.reason ? 'gpu-recovery' : 'boot-abrupt';
-        const diagnostic = { previousBuild: prior.build, attempt: prior.id, stage: prior.stage, detail: prior.detail ?? '',
-          elapsedMs: prior.updatedAt - prior.startedAt, visibility: prior.visibility, checkpoints: prior.checkpoints ?? [] };
-        const message = `${reportLine(prior, pending.reason)}; previous build ${prior.build}; visibility ${prior.visibility}`;
-        const acknowledge = (channel: 'inbox' | 'sentry'): void => {
-          const queue = reports();
-          const entry = queue.find((p) => p.record.id === prior.id);
-          if (entry) entry[channel] = true;
-          saveReports(queue.filter((p) => !p.inbox || !p.sentry));
-        };
-        await Promise.all([
-          pending.inbox ? Promise.resolve() : Promise.resolve().then(async () => {
-            const result = await transports.inbox(new Error(message), prior.build,
-              JSON.stringify({ ...diagnostic, checkpoints: diagnostic.checkpoints.slice(-8) }), system, prior.levelId);
-            if (result === 'ok' || result === 'reject') acknowledge('inbox');
-            return undefined;
-          }).catch(() => { /* leave durable evidence for the next online event or document */ }),
-          pending.sentry ? Promise.resolve() : transports.deliver(new Error(message), {
-            system, build: prior.build, shard: prior.levelId, bootStage: prior.stage, fatal: false, diagnostic,
-          }).then((ok) => { if (ok) acknowledge('sentry'); return undefined; }).catch(() => { /* independently retry Sentry */ }),
-        ]);
-      }
-    } finally { flushing = false; }
+    try { await (await import('../telemetry/bootInbox')).flushPending({ reports, saveReports, reportLine, transports }); } finally { flushing = false; }
   }
 
   function storage(): ReturnType<typeof saveStorage> | null { return saveStorage('device'); }
