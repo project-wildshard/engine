@@ -69,6 +69,7 @@ import { GridCellWaitingError } from './refusal';
 import { withCopyLayout } from './copyLayout';
 import { dataCellWorld, type RegionShell } from './regionShell';
 import { installDataCellMovers, type DataCellMovers } from './dataCellMovers';
+import { enterCellLooks, followCellLooks } from './dataCellLooks';
 import { installDataCellBodies } from '../shardfile/touchViews';
 import type { PanelRegion } from './neighbourPanels';
 import { wirePage } from '../shardfile/wirePage';
@@ -316,6 +317,8 @@ export class LiveGridSession {
       void report();
     }));
     scope.onDispose(gridCells.onLeave(() => { ports.lightingSettled?.(); }));
+    // SS-GP6: an entered data cell's look graphs read its fields and tick while the feet stand in it
+    followCellLooks(scope, gridCells, instance => !this.runtimeResidents.has(instance), (instance, stay) => { enterCellLooks(instance, stay, () => this.wire === null || this.wire.site() === instance); });
     const transferScope = scope.child('grid.transfer.home');
     this.roadWallet = new GridWallet(page.saves, { id: home.instance, shard: home.slug });
     this.road = new RoadRecovery(assembly);

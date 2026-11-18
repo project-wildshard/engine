@@ -125,6 +125,7 @@ import { clientPreparationBatch } from '../shardfile/preparationTiming';
 
 import { admittedRuntimeFolder } from '../shardfile/runtimeFolder';
 import { gridArea } from './area';
+import { offerCellLook, type CellLook } from './dataCellLooks';
 import type { ProbeArea } from '@wildshard/engine/debug/probe';
 
 /** D12: the A1 outer ring's share of a drawn frame (ms). On the phone tier its strips, colliders and road stop 4 ms after
@@ -956,7 +957,7 @@ export class GridSession {
     complete: (cell: GridCell, required?: boolean) => Promise<void>; render: (cell: GridCell) => Promise<boolean>;
   } {
     const scope = this.host.scope, skins = new Map<string, Promise<ReadonlyMap<string, ClientSkin>>>();
-    const shared = new Map<string, Promise<{ source: ClientRingInstance['source']; assets: ClientAssets; views: ClientTileViews; compile: (entry: unknown) => Material; scene: CellScenePresentation }>>();
+    const shared = new Map<string, Promise<{ source: ClientRingInstance['source']; assets: ClientAssets; views: ClientTileViews; compile: (entry: unknown) => Material; scene: CellScenePresentation; look: Omit<CellLook, 'source'> }>>();
     const optional = new AbortController(); scope.onDispose(() => { optional.abort(); });
     const admit = async (cell: GridCell, required: boolean, offered: () => void): Promise<void> => {
       const root = roots.get(cell.instance); if (root === undefined) return;
@@ -977,13 +978,14 @@ export class GridSession {
                 // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
                 const presentation = await clientMaterials(source, admitted.assets, renderer, scope, { declaredGraphCeilings: dangerousUnbudgetedMaterialGraph(source) });
                 return { source, assets: retained.reader, views: clientTileViews({ terrain: source.terrain, terrainShadow: source.terrain?.shadow, terrainOrder: source.terrain?.order, ...presentation }), compile: presentation.compile,
-                  scene: { materials: presentation.materials, swings: presentation.swings } };
+                  scene: { materials: presentation.materials, swings: presentation.swings }, look: { bind: presentation.graphs.bind, tick: presentation.tick } };
               } catch (error) { retained.release(); throw error; }
             })();
             shared.set(cell.slug, loading);
           }
-          const { source, assets, views, compile, scene } = await loading;
+          const { source, assets, views, compile, scene, look } = await loading;
           if (scope.disposed) return;
+          offerCellLook(cell.instance, { source, ...look }); // SS-GP6: bound and ticked while the feet stand in a data copy
           this.clientTiles.offer(cell.instance, { source, assets, root, views });
           offered(); // Render-only pins need no life-script or panel construction.
           const bytes = retained.admitted.assets;
