@@ -115,7 +115,7 @@ export function pinnedReleaseKey(configured) {
  * @property {number} [pollMs]
  * @property {boolean} [afterStagingProofs]  Production go-live: the strict staging proofs passed on this build.
  * @property {readonly JourneyRow[]} [journeys]  Production go-live (SB3): the staging journey runs found for the release
- *   (page-release.mjs reads them from `tmp/verify-staging/<browser>/journey-<card>/report.json`).
+ *   (page-release.mjs reads the journey and sweep reports from `tmp/verify-staging/<browser>/`).
  * @property {SmokeVerdict} [smoke]  Production go-live (meta STAGING-SMOKE SM5, J398): the staging smoke's verdict.json
  *   (`page-release.mjs --smoke=<file>`; `{problem}` when it could not be read).
  * @property {string} [releaseKey]  Defaults to RELEASE_PUBLIC_KEY; tests sign with their own.
@@ -128,7 +128,7 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
 /**
  * One tapped journey run on staging (scripts/journey-proof.mjs): the card, the browser, cold or warm, the build staging
  * served through the whole run (absent when it changed mid-run or could not be read), whether it passed, and when.
- * A zone sweep (scripts/zone-sweep.mjs) is one row, card `zone-sweep`, run `sweep`, naming the zones that failed.
+ * A card or cold link sweep (scripts/zone-sweep.mjs) names the zones that failed in its own row.
  * @typedef {{card: string, browser: string, run: string, build?: string, ok: boolean, at: string, failed?: readonly string[]}} JourneyRow
  */
 
@@ -137,7 +137,7 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
 export const JOURNEY_GATE = Object.freeze({cards: ['driftwood-isle', 'pine-hollow'], browsers: ['chromium', 'webkit'], runs: ['cold', 'warm']});
 
 /** Meta QA-FEEDBACK-2026-11-17 row 21 (Jake: "i have no confidence that each one of the zones in zone select will open"): production
- * go-live also needs every Zone select card opening on staging, on this exact build (verify-staging.sh runs scripts/zone-sweep.mjs). */
+ * go-live also needs every Zone select card and cold link opening on staging on this exact build. */
 export const ZONE_SWEEP_GATE = Object.freeze({browsers: ['chromium']});
 
 /**
@@ -146,13 +146,14 @@ export const ZONE_SWEEP_GATE = Object.freeze({browsers: ['chromium']});
  */
 export function zoneSweepRows(report) {
   if (report === null || typeof report !== 'object') return [];
-  const {browser, build, at, results} = /** @type {{browser?: unknown, build?: unknown, at?: unknown, results?: unknown}} */ (report);
+  const {browser, build, at, results, entry} = /** @type {{browser?: unknown, build?: unknown, at?: unknown, results?: unknown, entry?: unknown}} */ (report);
   if (typeof browser !== 'string' || typeof at !== 'string' || !Array.isArray(results)) return [];
+  if (entry !== undefined && entry !== 'card' && entry !== 'chunk') return [];
   const failed = results.flatMap(row => {
     const {slug, pass} = /** @type {{slug?: unknown, pass?: unknown}} */ (row ?? {});
     return pass === true ? [] : [typeof slug === 'string' ? slug : '?'];
   });
-  return [{card: 'zone-sweep', browser, run: 'sweep', ok: results.length > 0 && failed.length === 0, at, failed, ...(typeof build === 'string' ? {build} : {})}];
+  return [{card: entry === 'chunk' ? 'zone-sweep-chunk' : 'zone-sweep', browser, run: 'sweep', ok: results.length > 0 && failed.length === 0, at, failed, ...(typeof build === 'string' ? {build} : {})}];
 }
 
 /**
@@ -185,11 +186,11 @@ export function journeyGaps(journeys, build) {
     if (newest === undefined) gaps.push(`${card} ${browser} ${run} not run on this build`);
     else if (!newest.ok) gaps.push(`${card} ${browser} ${run} FAIL`);
   }
-  for (const browser of ZONE_SWEEP_GATE.browsers) {
-    const newest = (journeys ?? []).filter(row => row.card === 'zone-sweep' && row.browser === browser && row.build === build)
+  for (const [card, label] of [['zone-sweep', 'zone sweep'], ['zone-sweep-chunk', 'cold link sweep']]) for (const browser of ZONE_SWEEP_GATE.browsers) {
+    const newest = (journeys ?? []).filter(row => row.card === card && row.browser === browser && row.build === build)
       .sort((a, b) => b.at.localeCompare(a.at))[0];
-    if (newest === undefined) gaps.push(`zone sweep ${browser} not run on this build`);
-    else if (!newest.ok) gaps.push(`zone sweep ${browser} FAIL${(newest.failed ?? []).length === 0 ? '' : `: ${(newest.failed ?? []).join(', ')}`}`);
+    if (newest === undefined) gaps.push(`${label} ${browser} not run on this build`);
+    else if (!newest.ok) gaps.push(`${label} ${browser} FAIL${(newest.failed ?? []).length === 0 ? '' : `: ${(newest.failed ?? []).join(', ')}`}`);
   }
   return gaps;
 }

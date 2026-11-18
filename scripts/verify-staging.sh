@@ -4,7 +4,8 @@
 #   bash scripts/verify-staging.sh chromium|webkit [<build>] [<cards, comma separated>]
 # <build> defaults to what staging.wildshard.io serves now; <cards> to Driftwood and Pine Hollow, the two production go-live
 # reads (SB3: page-release.mjs refuses go-live until both pass cold and warm in both browsers on the build). The proofs: J386's tapped journey (journey-proof.mjs) per
-# card, cold then warm; every Zone select card once (zone-sweep.mjs); Doctor (e7-doctor-proof.mjs); the live two-player proof (e7-live-staging-proof.mjs). Off the
+# card, cold then warm; every Zone select card and cold chunk link (zone-sweep.mjs); Doctor (e7-doctor-proof.mjs);
+# the live two-player proof (e7-live-staging-proof.mjs). Off the
 # tailnet (a hosted runner) set WS_PRIVATE_HEALTH=skip; the box's own build and serial are then left to live-status.
 # Exit 0 when every proof passed. Output in tmp/verify-staging/<browser>.
 set -uo pipefail
@@ -16,6 +17,8 @@ cards=${3:-driftwood-isle,pine-hollow}
 base=https://staging.wildshard.io
 out=tmp/verify-staging/$browser
 mkdir -p "$out"
+# A launch failure may produce no report. A previous pass must not survive it.
+rm -f "$out/zone-sweep/results.json" "$out/zone-sweep-chunk/results.json" || exit 1
 summary=${GITHUB_STEP_SUMMARY:-$out/summary.md}
 if [ -z "$build" ]; then
   build=$(curl -fsS --max-time 30 "$base/version.json" | node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(0,"utf8")).build)')
@@ -42,6 +45,7 @@ for card in ${cards//,/ }; do
 done
 # meta QA-FEEDBACK-2026-11-17 row 21: every card Zone select shows opens (production go-live reads its results.json)
 proof zone-sweep node scripts/zone-sweep.mjs --url "$base" --browser "$browser" --out "$out/zone-sweep"
+proof zone-sweep-chunk node scripts/zone-sweep.mjs --url "$base" --browser "$browser" --chunk --out "$out/zone-sweep-chunk"
 proof doctor node scripts/e7-doctor-proof.mjs "$base" "$build" "$key" "--engine=$browser"
 proof live node scripts/e7-live-staging-proof.mjs "$base" "$build" "$key" "$browser"
 {

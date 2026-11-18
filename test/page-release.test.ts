@@ -18,7 +18,8 @@ const build = 'a'.repeat(40);
 const journeysOn = (on: string = build) => [...JOURNEY_GATE.cards.flatMap(card => JOURNEY_GATE.browsers.flatMap(browser =>
   JOURNEY_GATE.runs.map(run => ({card, browser, run, build: on, ok: true, at: '2026-11-17T05:00:00.000Z'})))),
   // QA 11-17 row 21: and a clean zone sweep (every Zone select card) per gated browser
-  ...ZONE_SWEEP_GATE.browsers.map(browser => ({card: 'zone-sweep', browser, run: 'sweep', build: on, ok: true, at: '2026-11-17T05:00:00.000Z', failed: []}))];
+  ...ZONE_SWEEP_GATE.browsers.flatMap(browser => ['zone-sweep', 'zone-sweep-chunk'].map(card =>
+    ({card, browser, run: 'sweep', build: on, ok: true, at: '2026-11-17T05:00:00.000Z', failed: []})))];
 /** STAGING-SMOKE SM5: a staging smoke verdict for `on`, clean unless `hold`. */
 const smokeOn = (on: string = build, hold = false) => ({build: on, url: CHANNELS.staging.origin, scenarios: ['K1', 'K2', 'K3', 'K4', 'K5'].map(id => ({id, status: id === 'K1' ? 'skip' : 'ran'})), hold, findings: hold ? [{scenario: 'K3', key: 'journey', severity: 'P1', text: 'the main menu came back after Enter World'}] : []});
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
@@ -342,6 +343,25 @@ test('production go-live needs every Zone select card opening on staging, on thi
   deps.journeys = [...others, ...zoneSweepRows(sweep)];
   await expect(runPhase('go-live', deps)).rejects.toThrow(/zone sweep chromium FAIL: glowfen/u);
   expect(calls).not.toContain('goLive');
+});
+
+test('cold link results independently gate go-live on the exact staging build', async () => {
+  const report = {entry: 'chunk', build, browser: 'chromium', at: '2026-11-17T20:00:00.000Z',
+    results: [{slug: 'pine-hollow', pass: false}]};
+  const cards = journeysOn().filter(row => row.card !== 'zone-sweep-chunk');
+  const {deps, calls} = rig('production');
+  await through(deps, 'check');
+  deps.afterStagingProofs = true;
+  deps.smoke = smokeOn();
+  deps.journeys = cards;
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/cold link sweep chromium not run on this build/u);
+  deps.journeys = [...cards, ...zoneSweepRows(report)];
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/cold link sweep chromium FAIL: pine-hollow/u);
+  expect(calls).not.toContain('goLive');
+  const passed = {...report, results: [{slug: 'pine-hollow', pass: true}]};
+  expect(journeyGaps([...cards, ...zoneSweepRows({...passed, build: 'b'.repeat(40)})], build))
+    .toEqual(['cold link sweep chromium not run on this build']);
+  expect(journeyGaps([...cards, ...zoneSweepRows(passed)], build)).toEqual([]);
 });
 
 test('a dirty tree or another HEAD refuses before the host is touched', async () => {

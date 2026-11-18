@@ -11,7 +11,7 @@
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
 //   --after-staging-proofs   production go-live: the strict staging proofs passed on this exact build
 //   --journeys=<dir>         production go-live (SB3): where verify-staging.sh wrote its journey reports, read as
-//                            <dir>/<browser>/journey-<card>/report.json (default <root>/tmp/verify-staging)
+//                            <dir>/<browser>/{journey-<card>,zone-sweep,zone-sweep-chunk}/ (default <root>/tmp/verify-staging)
 //   --smoke=<verdict.json>   production go-live (meta STAGING-SMOKE SM5, J398): the staging smoke's verdict for this build;
 //                            go-live refuses without one, for another build, or when it holds (a P0 or P1)
 //   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
@@ -36,7 +36,7 @@ import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 
-/** SB3: every journey row verify-staging.sh left under `dir` (<browser>/journey-<card>/report.json, and <browser>/zone-sweep/results.json); none when absent.
+/** SB3: every journey row verify-staging.sh left under `dir` (journey reports and both sweep results); none when absent.
  * @param {string} dir */
 function readJourneys(dir) {
   if (!existsSync(dir)) return [];
@@ -46,7 +46,7 @@ function readJourneys(dir) {
     try { names = readdirSync(join(dir, browser)); } catch { return []; }
     return names.flatMap(name => {
       try {
-        if (name === 'zone-sweep') return zoneSweepRows(JSON.parse(readFileSync(join(dir, browser, name, 'results.json'), 'utf8')));
+        if (name === 'zone-sweep' || name === 'zone-sweep-chunk') return zoneSweepRows(JSON.parse(readFileSync(join(dir, browser, name, 'results.json'), 'utf8')));
         return name.startsWith('journey-') ? journeyRows(JSON.parse(readFileSync(join(dir, browser, name, 'report.json'), 'utf8'))) : [];
       } catch { return []; }
     });
