@@ -35,6 +35,23 @@ test('progress (a new step, setup share or bytes) restarts the bound', () => {
   h.tick(1000); expect(h.stalls).toEqual([['download', 60_000]]);
 });
 
+// Hosted ledger run 44276449981: Driftwood's props step read "no progress for 61 s" on SwiftShader, where the page's main
+// thread blocks for many seconds at a time (a ~23 s block on hosted Nine, 44272554796). A blocked page runs no timer and
+// no step: only seconds the watch could see count toward the bound.
+test('a page frozen past the bound is not a stuck step when loading moves once it runs again', () => {
+  let setup = 40;
+  const h = harness(() => ({ step: 'world.props', signature: `world.props|${String(setup)}` }));
+  let frozen = 0;
+  const ports: StuckStepPorts = { ...h.ports, now: () => h.ports.now?.() ?? 0 };
+  watchStuckStep(never, { ...ports, now: () => (ports.now?.() ?? 0) + frozen }, 60_000);
+  h.tick(5000);
+  frozen += 55_000; // no tick ran: the page was blocked
+  h.tick(3000); expect(h.stalls).toEqual([]);
+  setup = 41; h.tick(1000);
+  h.tick(59_000); expect(h.stalls).toEqual([]);
+  h.tick(1000); expect(h.stalls).toEqual([['world.props', 60_000]]);
+});
+
 test('a start that settles, resolved or thrown, ends the watch without a stall', async () => {
   for (const started of [Promise.resolve(), Promise.reject(new Error('refused'))]) {
     const h = harness(() => ({ step: 'gap', signature: 'gap' }));

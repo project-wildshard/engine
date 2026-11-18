@@ -30,15 +30,20 @@ export interface StuckStepPorts {
 /** Watch `started` until it settles; calls `stalled` at most once. Returns the stop. */
 export function watchStuckStep(started: Promise<unknown>, ports: StuckStepPorts, boundMs: number = STUCK_STEP_MS): () => void {
   const now = ports.now ?? diagnosticNow;
-  let last = ports.progress().signature, since = now(), live = true;
+  let last = ports.progress().signature, stuck = 0, looked = now(), live = true;
   const tick = (): void => {
     if (!live) return;
     const { step, signature, player = false } = ports.progress(), at = now();
+    // Only seconds the watch could see count: a gap past two ticks is the page itself blocked (hosted SwiftShader held
+    // Nine's main thread ~23 s, 44272554796; Driftwood's props read "no progress for 61 s", 44276449981), not a stopped boot.
+    const watched = Math.min(at - looked, 2000);
+    looked = at;
     // a wait on the player holds the bound at zero; whatever follows it gets the whole bound again
-    if (player || signature !== last) { last = signature; since = at; return; }
-    if (at - since < boundMs) return;
+    if (player || signature !== last) { last = signature; stuck = 0; return; }
+    stuck += watched;
+    if (stuck < boundMs) return;
     stop();
-    ports.stalled(step, at - since);
+    ports.stalled(step, stuck);
   };
   const cancel = ports.every(1000, tick);
   function stop(): void { if (live) { live = false; cancel(); } }
