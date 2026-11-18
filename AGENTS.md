@@ -23,6 +23,9 @@ Git hygiene
 
 One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land per plan and J290's mode-2 land; MacBook)
 
+ - **The rules on one capped page:** meta `docs/flow/RULES.md` (`~/projects/games/project-wildshard-meta`). This
+   section holds only engine's commands; a rule that disagrees with the page is wrong here.
+
  - **Every row, plan row or one-line fix, reaches main the same way:** commit, rebase, the push gate (lint, types,
    related tests, about 74 s), push main, and move on to the next row. No plan-branch push, no full suite in the lane,
    no queue. Main's hosted `ci` runs the full suite once per tip.
