@@ -1,0 +1,69 @@
+# Meta MINI-AUTONOMY MA7a (D7): read the box's numbers without a box key on the Mac mini. One read-only tick: three
+# loopback Prometheus queries over the agents' account (tick p95 per worker, resident memory, heap slope, last 10 min),
+# one JSON line and a summary table. Production is read like staging; nothing on the box changes.
+#   gh workflow run box-probe.yml -R project-wildshard/engine -f channel=staging|production
+# Hosted runners are off the tailnet (verify-staging.yml), so the job joins it with a Tailscale OAuth client (tag:ci).
+# OPEN QUESTION (Jake's Tailscale admin): that client is not made yet; until TS_OAUTH_CLIENT_ID is set the job stops
+# with a notice before any box step. The box key, host and known_hosts sit in environment `box` (main only), set
+# from the MacBook's files without printing them.
+name: box-probe
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Which server's numbers to read (read-only on both)
+        type: choice
+        options: [staging, production]
+        default: staging
+permissions:
+  contents: read
+concurrency:
+  group: box-ops
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: github.repository == 'project-wildshard/engine'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: box
+    env:
+      CHANNEL: ${{ inputs.channel }}
+      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/box-ops.mjs
+          sparse-checkout-cone-mode: false
+      - name: Stop before the box without a tailnet client (OPEN QUESTION)
+        if: env.TS_OAUTH_CLIENT_ID == ''
+        run: |
+          echo "::error::OPEN QUESTION: no Tailscale OAuth client in environment box (TS_OAUTH_CLIENT_ID); the box is tailnet-only"
+          exit 1
+      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Write the agents' ssh alias from secrets
+        env:
+          BOX_SSH_KEY: ${{ secrets.BOX_SSH_KEY }}
+          BOX_SSH_HOST: ${{ secrets.BOX_SSH_HOST }}
+          BOX_KNOWN_HOSTS: ${{ secrets.BOX_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          (umask 077; printf '%s\n' "$BOX_SSH_KEY" > ~/.ssh/wildshard-agent; printf '%s\n' "$BOX_KNOWN_HOSTS" > ~/.ssh/known_hosts)
+          printf 'Host wildshard-agent\n  HostName %s\n  User wildshard-agent\n  IdentityFile ~/.ssh/wildshard-agent\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$BOX_SSH_HOST" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+      - name: Read tick p95, RSS and heap slope
+        run: |
+          node scripts/box-ops.mjs probe "$CHANNEL" | tee "$RUNNER_TEMP/probe.json"
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            const rows = [["tick p95 (worst worker, ms)", s.tickP95MaxMs + " (worker " + s.tickP95Worker + " of " + s.workers + ")", s.tickOk ? "under 12 ms" : "OVER 12 ms"],
+              ["RSS (MiB)", s.rssMiB, s.rssOk ? "under 60% of cap" : "OVER 60% of cap"], ["heap slope (KiB/min)", s.heapSlopeKiBPerMin, "trend"]];
+            console.log("### box-probe " + s.channel + " (last " + s.window + ")\n\n| Read | Value | Budget |\n|---|---|---|\n" + rows.map(r => "| " + r.join(" | ") + " |").join("\n"));
+          ' "$RUNNER_TEMP/probe.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Forget the key
+        if: always()
+        run: rm -f ~/.ssh/wildshard-agent ~/.ssh/config
