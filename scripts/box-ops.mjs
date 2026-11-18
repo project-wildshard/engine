@@ -16,13 +16,16 @@ export const RSS_CAP_BYTES = {staging: 6 * 2 ** 30, production: 18 * 2 ** 30};
 export const RSS_SHARE = 0.6;
 const WINDOW = '10m';
 
-/** @param {string} channel */
+/** @typedef {'staging' | 'production'} Channel */
+/** @typedef {{status?: string, data?: {result?: unknown}}} PromAnswer */
+
+/** @param {string} channel @returns {Channel} */
 function known(channel) {
   if (!CHANNELS.includes(channel)) throw new Error(`unknown channel '${channel}': want staging or production`);
-  return channel;
+  return /** @type {Channel} */ (channel);
 }
 
-/** The three PromQL reads for one channel, each over the last 10 minutes. */
+/** The three PromQL reads for one channel, each over the last 10 minutes. @param {string} channel */
 export function probeQueries(channel) {
   const c = known(channel);
   return {
@@ -32,17 +35,17 @@ export function probeQueries(channel) {
   };
 }
 
-/** POSIX single-quote a string for the remote shell. */
+/** POSIX single-quote a string for the remote shell. @param {string} text */
 export function shq(text) {
-  return `'${String(text).replaceAll("'", `'\\''`)}'`;
+  return `'${text.replaceAll("'", `'\\''`)}'`;
 }
 
-/** The remote command for one instant query: a loopback curl, nothing leaves the box. */
+/** The remote command for one instant query: a loopback curl, nothing leaves the box. @param {string} query */
 export function promCommand(query) {
   return `curl -s -m 15 --get --data-urlencode ${shq(`query=${query}`)} 127.0.0.1:9090/api/v1/query`;
 }
 
-/** Staging only: production is read-only from every workflow (MA7a). */
+/** Staging only: production is read-only from every workflow (MA7a). @param {string} channel */
 export function restartCommand(channel) {
   if (channel !== 'staging') {
     throw new Error(`refused: only the staging server restarts from a workflow; '${channel}' is read-only (MA7a)`);
@@ -60,7 +63,8 @@ function rows(answer) {
   return result.map(row => ({labels: row.metric ?? {}, value: Number(row.value?.[1])}));
 }
 
-/** One summary from the three answers; a missing series is a failure, never a zero. */
+/** One summary from the three answers; a missing series is a failure, never a zero.
+ * @param {string} channel @param {{tick: unknown, rss: unknown, heapSlope: unknown}} answers */
 export function summarize(channel, answers) {
   const c = known(channel);
   const ticks = rows(answers.tick).filter(row => Number.isFinite(row.value));
@@ -84,22 +88,26 @@ export function summarize(channel, answers) {
   };
 }
 
+/** @param {number} value */
 function round(value) {
   return Math.round(value * 100) / 100;
 }
 
+/** @param {string} command @returns {string} */
 function ssh(command) {
   const done = spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', HOST, command], {encoding: 'utf8', maxBuffer: 1 << 24});
   if (done.status !== 0) throw new Error(`ssh ${HOST} exited ${done.status ?? done.signal}`);
   return done.stdout;
 }
 
-/** @param {string[]} argv */
+/** @param {string[]} argv @param {(command: string) => string} run */
 export function main(argv, run = ssh) {
   const [verb, channel = ''] = argv;
   if (verb === 'probe') {
     const queries = probeQueries(channel);
-    const answers = Object.fromEntries(Object.entries(queries).map(([key, query]) => [key, JSON.parse(run(promCommand(query)))]));
+    /** @param {string} query @returns {unknown} */
+    const read = query => JSON.parse(run(promCommand(query)));
+    const answers = {tick: read(queries.tick), rss: read(queries.rss), heapSlope: read(queries.heapSlope)};
     return summarize(channel, answers);
   }
   if (verb === 'restart') {
