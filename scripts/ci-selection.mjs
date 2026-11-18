@@ -8,14 +8,22 @@ import {provesCode} from './ci-proof-jobs.mjs';
 const shaPattern=/^[a-f0-9]{40}$/u;
 /** @param {unknown} value @returns {value is Record<string,unknown>} */
 const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+const historyStep='Scan the complete incoming history';
+
+/** @param {readonly unknown[]} jobs */
+function provesHistory(jobs){
+ return jobs.some(job=>record(job)&&job.name==='tests (1)'&&job.status==='completed'&&job.conclusion==='success'
+   &&Array.isArray(job.steps)&&job.steps.some(step=>record(step)&&step.name===historyStep&&step.status==='completed'&&step.conclusion==='success'));
+}
 
 /** The optimization fails closed on missing API evidence, incomplete jobs or history.
- * @param {NodeJS.ProcessEnv} [env] @param {string} [cwd] */
-export async function selectCI(env=process.env,cwd=process.cwd()){
+ * @param {NodeJS.ProcessEnv} [env] @param {string} [cwd] @param {boolean} [historyOnly] */
+export async function selectCI(env=process.env,cwd=process.cwd(),historyOnly=false){
  const sha=env.GITHUB_SHA??'',repo=env.GITHUB_REPOSITORY??'',token=env.GH_TOKEN;
  /** @param {string} reason */
  const full=reason=>({docs:false,base:null,tests:/** @type {string[]} */([]),reason});
- if(env.GITHUB_EVENT_NAME!=='push'||!shaPattern.test(sha)||!token||!/^[-\w.]+\/[-\w.]+$/u.test(repo))return full('No exact successful code proof; run full');
+ const event=historyOnly?'workflow_dispatch':'push';
+ if(env.GITHUB_EVENT_NAME!==event||!shaPattern.test(sha)||!token||!/^[-\w.]+\/[-\w.]+$/u.test(repo))return full('No exact successful code proof; run full');
  const origin=env.GITHUB_API_URL??'https://api.github.com';
  /** @param {string} path @returns {Promise<unknown>} */
  const api=async path=>{
@@ -39,6 +47,10 @@ export async function selectCI(env=process.env,cwd=process.cwd()){
     if(page===20)throw new Error('Incomplete code-proof job inventory');
    }
    if(!provesCode('ci.yml',jobs))continue;
+   if(historyOnly){
+    if(!provesHistory(jobs))continue;
+    return {...full(`History scanned by CI run ${run.id}`),base:run.head_sha};
+   }
    const selected=pushSelection(`refs/heads/main ${sha} refs/heads/main ${run.head_sha}`,cwd,{hosted:true});
    // EV9: tests that read a changed doc's content run in the docs lane (scripts/ci-static.sh docs).
    return {docs:selected.mode==='docs',base:run.head_sha,tests:selected.mode==='docs'?selected.tests??[]:[],reason:`Compared with code-proving CI run ${run.id}: ${selected.reason}`};
@@ -48,7 +60,11 @@ export async function selectCI(env=process.env,cwd=process.cwd()){
 }
 
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(process.argv[1]).href){
- const result=await selectCI();
- if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,`docs=${String(result.docs)}\ncode_base=${result.base??''}\ndocs_tests=${result.tests.join(' ')}\n`);
- console.log(JSON.stringify(result));
+ const historyOnly=process.argv[2]==='--history-base';
+ const result=await selectCI(process.env,process.cwd(),historyOnly);
+ if(historyOnly)console.log(result.base??'');
+ else{
+  if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,`docs=${String(result.docs)}\ncode_base=${result.base??''}\ndocs_tests=${result.tests.join(' ')}\n`);
+  console.log(JSON.stringify(result));
+ }
 }

@@ -102,11 +102,17 @@ jobs:
         if: matrix.job == 1
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
+          GH_TOKEN: ${{ github.token }}
         # Plan pushes can be new or rebased. New release branches also have
         # a zero before SHA. Their commits inherited from main were scanned
         # there, so only the commits outside main need scanning here.
         run: |
           base="$BASE_SHA"
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main && "$base" =~ ^0+$ ]]; then
+            # A main dispatch has no before SHA. Reuse only a proved ancestor whose scan passed.
+            proved="$(node scripts/ci-selection.mjs --history-base)"
+            if [[ -n "$proved" ]]; then base="$proved"; fi
+          fi
           case "$GITHUB_REF:$base" in
             refs/heads/plan/*|refs/heads/release/*:0000000000000000000000000000000000000000)
               base="$(git merge-base origin/main "$GITHUB_SHA")" ;;
