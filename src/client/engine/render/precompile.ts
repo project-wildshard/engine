@@ -383,6 +383,18 @@ function prepareInstances(mesh: MeshLike): void {
   }
 }
 /**
+ * MEMORY-GATES MG9: `clone(false)`, except that a BatchedMesh stand-in shares its source's geometry. three's
+ * BatchedMesh.copy clones the whole batch geometry, every vertex and index array of every packed model, for a copy that
+ * is only compiled (never drawn: `renderer.compile` reads the geometry's channels, it uploads nothing). On Pine's phone
+ * Low boot that was 90 MB of copies made between spawnDetail and control, garbage at the load's peak.
+ */
+function cloneSharingGeometry(mesh: MeshLike): THREE.Object3D {
+  const geometry = mesh.geometry;
+  if ((mesh as BatchedLike).isBatchedMesh !== true || geometry === undefined) return mesh.clone(false);
+  Object.defineProperty(geometry, 'clone', { value: () => geometry, configurable: true, writable: true });
+  try { return mesh.clone(false); } finally { Reflect.deleteProperty(geometry, 'clone'); }
+}
+/**
  * A detached stand-in for `mesh` that computes the same program: `clone(false)` keeps the
  * instancing / skinning / morph flags, geometry and skeleton. BatchedMesh.copy in r186 never
  * copies `_colorsTexture` (it tests the destination, which is null), yet `batchingColor` is a
@@ -391,7 +403,7 @@ function prepareInstances(mesh: MeshLike): void {
  */
 function standIn(mesh: MeshLike): MeshLike {
   prepareInstances(mesh);
-  const copy = mesh.clone(false) as BatchedLike;
+  const copy = cloneSharingGeometry(mesh) as BatchedLike;
   const src = mesh as BatchedLike;
   if (src.isBatchedMesh && src._colorsTexture && !copy._colorsTexture) copy._colorsTexture = src._colorsTexture;
   // compile() walks visible objects only: a culled level (an LOD step hidden until its first draw) still needs its program
