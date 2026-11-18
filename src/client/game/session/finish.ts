@@ -23,6 +23,7 @@ import { afterControl, reachControl, whenControl } from '@wildshard/engine/boot/
 import { idleTurn } from '@wildshard/engine/boot/idle';
 import { installGpuRecovery } from '@wildshard/engine/core/GpuRecovery';
 import { installWorldWatch } from '@wildshard/engine/core/worldWatch';
+import { webglRendererName } from '@wildshard/engine/core/slowGpuPacing';
 import { TIER } from '@wildshard/engine/core/tier';
 import { installProbe } from '@wildshard/engine/debug/probe';
 import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
@@ -193,7 +194,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     releaseDrawn('shaders');
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during shader compile');
     const shaderMs = diagnosticNow() - shadersAt, built = (game.renderer.info.programs?.length ?? 0) - programsBefore;
-    const slowGpu = slowShaderGpu({ stepMs: shaderMs, uploadMs, programs: built });
+    const slowGpu = slowShaderGpu({ stepMs: shaderMs, uploadMs, programs: built, renderer: webglRendererName(game.renderer.getContext()) });
     bootMark('app:first-frame-plan', { shaderMs: Math.round(shaderMs), uploadMs: Math.round(uploadMs), programs: built, narrow: slowGpu });
     // LS11 (J204): a GPU this slow composites the page in software; the card covers the world until it fades
     if (slowGpu) loading.coverCanvas(game.canvas);
