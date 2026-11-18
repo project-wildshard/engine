@@ -7,7 +7,7 @@
 //      file it wrote under out/<folder>/ and of every mount it published (or found tracked) under public/. It writes
 //      the manifest only if the key, recomputed after the install, still matches the one it started with. Any other
 //      install (some slugs, a ring, --from-format) deletes the manifest first, so a manifest only ever describes the
-//      exact result of the last full install.
+//      exact result of the last full install. Each pin also records which product and mounts it supplied.
 //   2. The key hashes everything that decides those bytes: the pins and asset pins, the installer's own source, and
 //      the shardfile validation revision (package.json, the lockfile, so `@wildshard/format`, and the admission code).
 //   3. `reusePins` tries this tree first (a rebuild with unchanged pins verifies in place and writes nothing), then
@@ -15,8 +15,8 @@
 //      install lock is free. From a source it clones each product folder and each untracked mount; a mount this tree
 //      tracks in Git is not cloned but must hash the same, as a full install requires.
 //   4. Every product folder must hold exactly the manifest's files, all regular, none executable, and every file must
-//      hash to the manifest; the products' receipts must name exactly this tree's pins. One mismatch and this tree's
-//      clones are removed: the caller runs the full install.
+//      hash to the manifest; the products' receipts must name exactly this tree's pins. One mismatch discards the
+//      clones. A full install can retain unchanged, verified products in place when the other inputs still match.
 //
 // Paths: a manifest or ledger path is used only if it is a plain folder name under out/ or a plain path under public/,
 // and nothing is deleted or written unless its parent directory resolves, with every link followed, to the same path
@@ -31,15 +31,16 @@ import {Worker} from 'node:worker_threads';
 import {clonePaths} from './apfs-clone.mjs';
 import {pidLock} from './pid-lock.mjs';
 import {shardfileValidationRevision} from './shardfile-validation-revision.mjs';
+import {trackedPublic} from './tracked-public.mjs';
 
 export const MANIFEST='out/.pins-manifest.json';
-const VERSION=2,KEY_VERSION='pins-reuse/2',LEDGER='out/.pins.json',LOCK='out/.pins.lock',PINS='test/pins/shardfiles.json';
+const VERSION=2,KEY_VERSION='pins-reuse/3',LEDGER='out/.pins.json',LOCK='out/.pins.lock',PINS='test/pins/shardfiles.json';
 const HEX=/^[a-f0-9]{64}$/u;
 /** Every tracked file whose bytes decide what a full install writes. A local module `pins.ts` or `bake-loader.mjs`
  * imports is here unless KEY_EXEMPT says why its bytes can't change out/ or public/ (pins-reuse.test.mjs checks). */
 export const KEY_SOURCES=Object.freeze(['scripts/pins.ts','scripts/pin-packs.ts','scripts/pin-assets.ts','scripts/pin-format.ts',
  'scripts/bake-loader.mjs','scripts/format-hook.mjs','scripts/shardfile-validation-revision.mjs','scripts/pins-reuse.mjs',
- 'scripts/tracked-public.mjs','scripts/pin-local.ts','scripts/local-candidates.ts',PINS,'test/pins/assets.json']);
+ 'scripts/tracked-public.mjs','scripts/pin-local.ts','scripts/local-candidates.ts','pnpm-lock.yaml',PINS,'test/pins/assets.json']);
 export const KEY_EXEMPT=Object.freeze({
  'scripts/pins-exclude.mjs':'writes Git\'s exclude file only',
  'scripts/apfs-clone.mjs':'clones bytes that are then hashed against the manifest',
@@ -52,17 +53,37 @@ export const KEY_EXEMPT=Object.freeze({
  'scripts/server-release/served-slug.mjs':'refresh check only (DEL9): names a slug\'s served folder for the catalogue compare',
 });
 
-/** @typedef {{version:number,key:string,products:Record<string,Record<string,string>>,mounts:Record<string,string>}} Manifest */
+/** @typedef {{slug:string,hash:string,revision:number,bytes:number}} Pin */
+/** @typedef {{folder:string,descriptor:string,mounts:string[]}} PinOwner */
+/** @typedef {{inputs:string,owners:Record<string,PinOwner>}} Incremental */
+/** @typedef {{version:number,key:string,products:Record<string,Record<string,string>>,mounts:Record<string,string>,incremental?:Incremental}} Manifest */
 
-/** The reuse key of `root`'s pins. @param {string} root @param {string} revision the shardfile validation revision */
-export function pinsKey(root,revision){
+/** All shared admission inputs. KTX2 target checks depend on which public paths Git tracks.
+ * @param {string} root @param {string} revision the shardfile validation revision */
+export function pinsCompatibilityKey(root,revision){
  const hash=createHash('sha256').update(`${KEY_VERSION}\0${revision}\0`);
  for(const path of KEY_SOURCES){
+  if(path===PINS)continue;
   const file=join(root,path);
   hash.update(`${path}\0`).update(existsSync(file)?readFileSync(file):'absent').update('\0');
  }
+ const assets=join(root,'test/pins/assets');
+ if(existsSync(assets)&&lstatSync(assets).isDirectory())for(const entry of readdirSync(assets,{withFileTypes:true}).sort((a,b)=>a.name<b.name?-1:1)){
+  hash.update(`asset:${entry.name}\0`).update(entry.isFile()?readFileSync(join(assets,entry.name)):'not a file').update('\0');
+ }
+ for(const path of [...trackedPublic(undefined,root)].sort())hash.update(`tracked:${path}\0`);
  return hash.digest('hex');
 }
+
+/** The exact reuse key for a complete installation.
+ * @param {string} root @param {string} revision @param {string} [inputs] */
+export function pinsKey(root,revision,inputs=pinsCompatibilityKey(root,revision)){
+ const file=join(root,PINS);
+ return createHash('sha256').update(inputs).update('\0').update(existsSync(file)?readFileSync(file):'absent').digest('hex');
+}
+
+/** Hash the full pin descriptor, including its size and revision. @param {Pin} pin */
+export const pinDescriptor=pin=>createHash('sha256').update(JSON.stringify(pin)).digest('hex');
 
 /** A product folder name a full install could have made. @param {string} name */
 export const folderName=name=>/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/u.test(name);
@@ -84,6 +105,18 @@ function readManifest(root){
   for(const [path,hash] of Object.entries(files))if(!plainPath(path)||typeof hash!=='string'||!HEX.test(hash))return undefined;
  }
  for(const [path,hash] of Object.entries(value.mounts))if(!mountPath(path)||typeof hash!=='string'||!HEX.test(hash))return undefined;
+ if(value.incremental!==undefined){
+  const {incremental,products,mounts}=value;
+  if(!record(incremental)||typeof incremental.inputs!=='string'||!HEX.test(incremental.inputs)||!record(incremental.owners))return undefined;
+  const folders=new Set();
+  for(const [slug,owner] of Object.entries(incremental.owners)){
+   if(!folderName(slug)||!record(owner)||typeof owner.folder!=='string'||!Object.hasOwn(products,owner.folder)||folders.has(owner.folder)
+     ||typeof owner.descriptor!=='string'||!HEX.test(owner.descriptor)||!Array.isArray(owner.mounts)
+     ||owner.mounts.some(path=>typeof path!=='string'||!Object.hasOwn(mounts,path)))return undefined;
+   folders.add(owner.folder);
+  }
+  if(folders.size!==Object.keys(products).length)return undefined;
+ }
  return /** @type {Manifest} */(value);
 }
 
@@ -116,10 +149,13 @@ export function verifiedPinsOutputs(root){
 export function dropManifest(root){rmSync(join(root,MANIFEST),{force:true});}
 
 /** Record a complete full install. Products by folder then path inside it, mounts as `public/...`.
- * @param {string} root @param {string} key @param {Manifest['products']} products @param {Manifest['mounts']} mounts */
-export function writeManifest(root,key,products,mounts){
- const sorted=(/** @type {Record<string,string>} */ files)=>Object.fromEntries(Object.entries(files).sort(([a],[b])=>a<b?-1:1));
- const value={version:VERSION,key,products:Object.fromEntries(Object.entries(products).sort(([a],[b])=>a<b?-1:1).map(([folder,files])=>[folder,sorted(files)])),mounts:sorted(mounts)};
+ * @param {string} root @param {string} key @param {Manifest['products']} products @param {Manifest['mounts']} mounts
+ * @param {Incremental} [incremental] */
+export function writeManifest(root,key,products,mounts,incremental){
+ /** @template T @param {Record<string,T>} entries */
+ const sorted=entries=>Object.entries(entries).sort(([a],[b])=>a<b?-1:1);
+ const value={version:VERSION,key,products:Object.fromEntries(sorted(products).map(([folder,files])=>[folder,Object.fromEntries(sorted(files))])),mounts:Object.fromEntries(sorted(mounts)),
+  incremental:incremental===undefined?undefined:{inputs:incremental.inputs,owners:Object.fromEntries(sorted(incremental.owners))}};
  insideTree(root,'out',true);
  const part=join(root,`${MANIFEST}.${String(process.pid)}`);
  writeFileSync(part,`${JSON.stringify(value)}\n`);
@@ -185,12 +221,6 @@ function worktreeRoots(root){
   return execFileSync('git',['worktree','list','--porcelain','-z'],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']})
    .split('\0').filter(line=>line.startsWith('worktree ')).map(line=>resolve(line.slice('worktree '.length)));
  }catch{return [];}
-}
-
-/** Paths `root` tracks under public/. @param {string} root */
-function trackedPublic(root){
- try{return new Set(execFileSync('git',['ls-files','-z','public'],{cwd:root,encoding:'utf8',maxBuffer:1<<28,stdio:['ignore','pipe','ignore']}).split('\0').filter(Boolean));}
- catch{return new Set();}
 }
 
 /** The pin hashes `root` names. @param {string} root @returns {string[]} */
@@ -275,6 +305,71 @@ function regularFiles(directory){
  try{const refused=walk(directory);return refused===''?files:refused;}catch(error){return error instanceof Error?error.message:String(error);}
 }
 
+/** @typedef {{path:string,bytes:number,hash:string}} ExpectedFile */
+
+/** @param {string} root @param {string} folder @param {Record<string,string>} want @returns {ExpectedFile[]|string} */
+function productFiles(root,folder,want){
+ const directory=join(root,'out',folder),have=regularFiles(directory);
+ if(typeof have==='string')return `out/${folder}: ${have}`;
+ const extra=[...have.keys()].find(path=>!Object.hasOwn(want,path)),missing=Object.keys(want).find(path=>!have.has(path));
+ if(extra!==undefined||missing!==undefined)return `out/${folder}/${extra??missing} is ${extra===undefined?'missing':'not in the manifest'}`;
+ return [...have].map(([path,bytes])=>({path:join(directory,path),bytes,hash:want[path]??''}));
+}
+
+/** @param {string} root @param {string} path @param {string} hash @returns {ExpectedFile|undefined} */
+function mountFile(root,path,hash){
+ try{
+  insideTree(root,dirname(path));
+  const file=join(root,path),stat=lstatSync(file);
+  if(stat.isFile())return {path:file,bytes:stat.size,hash};
+ }catch{/* Missing or outside. */}
+ return undefined;
+}
+
+/** Check same-tree products independently, hashing shared mounts only once.
+ * The caller holds the install lock. This only selects retained output and does not write anything.
+ * @param {string} root @param {string} inputs @param {readonly Pin[]} pins
+ * @returns {Promise<(Pick<Manifest,'products'|'mounts'>&{owners:Incremental['owners']})|undefined>} */
+export async function reuseUnchangedPins(root,inputs,pins){
+ const manifest=readManifest(root),incremental=manifest?.incremental;
+ if(manifest===undefined||incremental?.inputs!==inputs)return undefined;
+ // Pin membership controls which fallback public assets can satisfy any product's KTX2 table.
+ const slugs=new Set(pins.map(({slug})=>slug));
+ if(slugs.size!==pins.length||Object.keys(incremental.owners).length!==slugs.size||[...slugs].some(slug=>!Object.hasOwn(incremental.owners,slug)))return undefined;
+ insideTree(root,'out');
+ /** @type {Map<string,ExpectedFile>} */const files=new Map();
+ /** @type {{pin:Pin,owner:PinOwner,paths:string[]}[]} */const candidates=[];
+ for(const pin of pins){
+  if(!Object.hasOwn(incremental.owners,pin.slug))continue;
+  const owner=incremental.owners[pin.slug];
+  if(owner===undefined||owner.descriptor!==pinDescriptor(pin))continue;
+  const product=productFiles(root,owner.folder,manifest.products[owner.folder]??{});
+  if(typeof product==='string')continue;
+  const mounts=owner.mounts.map(path=>files.get(join(root,path))??mountFile(root,path,manifest.mounts[path]??''));
+  if(mounts.some(file=>file===undefined))continue;
+  const expected=product.concat(mounts.filter(file=>file!==undefined));
+  for(const file of expected)files.set(file.path,file);
+  candidates.push({pin,owner,paths:expected.map(file=>file.path)});
+ }
+ const expected=[...files.values()],hashes=await hashFiles(expected);
+ const wrong=new Set(expected.filter((file,at)=>hashes[at]!==file.hash).map(file=>file.path));
+ const verified=candidates.filter(({pin,owner,paths})=>!paths.some(path=>wrong.has(path))&&receiptMatches(root,owner.folder,pin));
+ if(verified.length===0)return undefined;
+ return {
+  owners:Object.fromEntries(verified.map(({pin,owner})=>[pin.slug,owner])),
+  products:Object.fromEntries(verified.map(({owner})=>[owner.folder,manifest.products[owner.folder]??{}])),
+  mounts:Object.fromEntries(verified.flatMap(({owner})=>owner.mounts.map(path=>[path,manifest.mounts[path]??'']))),
+ };
+}
+
+/** @param {string} root @param {string} folder @param {Pin} pin */
+function receiptMatches(root,folder,pin){
+ try{
+  const receipt=JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8'));
+  return receipt.source===undefined&&receipt.pin?.hash===pin.hash&&receipt.pin?.revision===pin.revision;
+ }catch{return false;}
+}
+
 /** @typedef {{source:string,mode:'in place'|'clone'|'copy',files:number,bytes:number,published:string[],seconds:{clone:number,verify:number}}} Reused */
 
 /**
@@ -287,7 +382,7 @@ function regularFiles(directory){
 export async function reusePins(tree,key,{sources,log=()=>undefined}={}){
  const root=resolve(tree);
  const candidates=[root,...(sources??worktreeRoots(root)).map(path=>resolve(path)).filter(path=>path!==root)];
- const tracked=trackedPublic(root);
+ const tracked=trackedPublic(undefined,root);
  for(const source of candidates){
   const manifest=readManifest(source);
   if(manifest===undefined){if(existsSync(join(source,MANIFEST)))log(`pins reuse: ${source} has a malformed manifest; skipped`);continue;}
@@ -303,7 +398,7 @@ export async function reusePins(tree,key,{sources,log=()=>undefined}={}){
  return undefined;
 }
 
-/** @param {string} root @param {string} source @param {Manifest} manifest @param {Set<string>} tracked
+/** @param {string} root @param {string} source @param {Manifest} manifest @param {ReadonlySet<string>} tracked
  * @param {(line:string)=>void} log @returns {Promise<Reused|undefined>} */
 async function reuseFrom(root,source,manifest,tracked,log){
  const self=source===root,started=performance.now();
@@ -339,19 +434,16 @@ async function reuseFrom(root,source,manifest,tracked,log){
   }
  }catch(error){refusal=`cloning failed (${error instanceof Error?error.message:String(error)})`;}
  const cloned=performance.now();
- /** @type {{path:string,bytes:number,hash:string}[]} */const files=[];
+ /** @type {ExpectedFile[]} */const files=[];
  if(refusal==='')for(const folder of folders){
-  const want=manifest.products[folder]??{},have=regularFiles(join(root,'out',folder));
-  if(typeof have==='string'){refusal=`out/${folder}: ${have}`;break;}
-  const extra=[...have.keys()].find(path=>!Object.hasOwn(want,path)),missing=Object.keys(want).find(path=>!have.has(path));
-  if(extra!==undefined||missing!==undefined){refusal=`out/${folder}/${extra??missing} is ${extra===undefined?'missing':'not in the manifest'}`;break;}
-  for(const [path,bytes] of have)files.push({path:join(root,'out',folder,path),bytes,hash:want[path]??''});
+  const expected=productFiles(root,folder,manifest.products[folder]??{});
+  if(typeof expected==='string'){refusal=expected;break;}
+  files.push(...expected);
  }
  if(refusal==='')for(const path of mounts){
-  let bytes=-1;
-  try{insideTree(root,dirname(path));const stat=lstatSync(join(root,path));if(stat.isFile())bytes=stat.size;}catch{/* Missing or outside. */}
-  if(bytes<0){refusal=`${path} is missing or not a regular file`;break;}
-  files.push({path:join(root,path),bytes,hash:manifest.mounts[path]??''});
+  const file=mountFile(root,path,manifest.mounts[path]??'');
+  if(file===undefined){refusal=`${path} is missing or not a regular file`;break;}
+  files.push(file);
  }
  if(refusal===''){
   const hashes=await hashFiles(files);
@@ -371,7 +463,7 @@ async function reuseFrom(root,source,manifest,tracked,log){
   log(`pins reuse: refused ${self?'this tree':source}: ${refusal}`);
   return undefined;
  }
- if(!self)writeManifest(root,manifest.key,manifest.products,manifest.mounts);
+ if(!self)writeManifest(root,manifest.key,manifest.products,manifest.mounts,manifest.incremental);
  const verified=performance.now();
  return {source,mode,files:files.length,bytes:files.reduce((sum,file)=>sum+file.bytes,0),published,
   seconds:{clone:Number(((cloned-started)/1000).toFixed(2)),verify:Number(((verified-cloned)/1000).toFixed(2))}};

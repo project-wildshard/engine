@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
 import {clonePaths} from '../../scripts/apfs-clone.mjs';
-import {KEY_EXEMPT, KEY_SOURCES, MANIFEST, hashFiles, lockPins, pinsKey, reusePins, writeManifest} from '../../scripts/pins-reuse.mjs';
+import {KEY_EXEMPT, KEY_SOURCES, MANIFEST, hashFiles, lockPins, pinsCompatibilityKey, pinsKey, reusePins, reuseUnchangedPins, writeManifest} from '../../scripts/pins-reuse.mjs';
 
 /** @type {string[]} */
 const roots = [];
@@ -203,6 +203,47 @@ describe('pins reuse', () => {
     expect(pinned).not.toBe(base);
     put(root, 'scripts/pin-packs.ts', '// changed');
     expect(pinsKey(root, 'r1')).not.toBe(pinned);
+  });
+
+  test('a pin edit retains only unchanged verified products and their mounts', async () => {
+    const {root} = repos();
+    const first = {slug: 'dunes', hash: PIN, revision: 1, bytes: 100};
+    const second = {slug: 'pine', hash: 'c'.repeat(64), revision: 2, bytes: 200};
+    const changed = {...second, hash: 'd'.repeat(64), revision: 3};
+    const shared = 'public/assets/a/m.bin', tracked = 'public/assets/a/tracked.bin';
+    const pineMount = 'public/assets/a/pine.bin';
+    const inputs = pinsCompatibilityKey(root, 'r1');
+    const hashes = (/** @type {Record<string,string>} */ files) => Object.fromEntries(Object.entries(files).map(([path, body]) => [path, sha(body)]));
+    const dunes = {...PRODUCT, 'validation.json': JSON.stringify({pin: first})};
+    const pine = {...PRODUCT, 'validation.json': JSON.stringify({pin: second})};
+    for (const [path, body] of Object.entries(dunes)) put(root, `out/dunes/${path}`, body);
+    for (const [path, body] of Object.entries(pine)) put(root, `out/pine/${path}`, body);
+    put(root, pineMount, 'pine');
+    writeManifest(root, KEY, {dunes: hashes(dunes), pine: hashes(pine)}, hashes({...MOUNTS, [pineMount]: 'pine'}), {
+      inputs, owners: {
+        dunes: {descriptor: sha(JSON.stringify(first)), folder: 'dunes', mounts: [shared, tracked]},
+        pine: {descriptor: sha(JSON.stringify(second)), folder: 'pine', mounts: [shared, pineMount]},
+      },
+    });
+    put(root, 'test/pins/shardfiles.json', JSON.stringify({shards: [first, changed]}));
+    expect(pinsCompatibilityKey(root, 'r1')).toBe(inputs);
+    const retained = await reuseUnchangedPins(root, inputs, [first, changed]);
+    expect(retained).toMatchObject({
+      products: {dunes: hashes(dunes)}, mounts: hashes(MOUNTS), owners: {dunes: {folder: 'dunes'}},
+    });
+    expect(Object.keys(retained?.products ?? {})).toEqual(['dunes']);
+    expect(await reuseUnchangedPins(root, inputs, [first])).toBeUndefined();
+    put(root, tracked, 'edited');
+    expect(await reuseUnchangedPins(root, inputs, [first, second])).toMatchObject({products: {pine: hashes(pine)}});
+    put(root, pineMount, 'corrupt');
+    expect(await reuseUnchangedPins(root, inputs, [first, second])).toBeUndefined();
+    put(root, 'scripts/pin-packs.ts', '// changed');
+    expect(await reuseUnchangedPins(root, pinsCompatibilityKey(root, 'r1'), [first, second])).toBeUndefined();
+    expect(pinsCompatibilityKey(root, 'r2')).not.toBe(inputs);
+    const changedInstallerInputs = pinsCompatibilityKey(root, 'r1');
+    put(root, 'public/assets/new.ktx2', 'shared');
+    git(root, ['add', 'public/assets/new.ktx2']);
+    expect(pinsCompatibilityKey(root, 'r1')).not.toBe(changedInstallerInputs);
   });
 
   test('every local module the installer loads is in the key or says why its bytes cannot change out/', () => {
