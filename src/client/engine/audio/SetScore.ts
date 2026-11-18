@@ -10,7 +10,7 @@ import { resourceScope } from '../../../shared/engine/app/resources';
 /** reads a stem file's bytes (fetch by default; a test hands its own) */
 export type AudioRead = (url: string) => Promise<ArrayBuffer>;
 /** decodes a stem's bytes into an AudioBuffer (the audio context by default; a test hands its own) */
-export type AudioDecode = (bytes: ArrayBuffer, purpose?: 'effect') => Promise<AudioBuffer>;
+export type AudioDecode = (bytes: ArrayBuffer, purpose?: 'effect' | 'bed') => Promise<AudioBuffer>;
 /** a set's decoded score: every slot's stems and the stings, ready for SetScore to play */
 export interface ScoreBank { slots: Map<string, SlotAudio>; stings: Map<StemSting, AudioBuffer> }
 export interface ScoreSource {

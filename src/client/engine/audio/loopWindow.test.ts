@@ -1,12 +1,13 @@
 import { expect, it, vi } from 'vitest';
 import { compactLoopWindow } from './loopWindow';
+import { initializeTier, TIER } from '../core/tier';
 
 class Pcm {
   readonly numberOfChannels = 2;
-  readonly sampleRate = 48000;
+  readonly sampleRate: number;
   readonly channels: Float32Array<ArrayBuffer>[];
   readonly length: number;
-  constructor(length: number) { this.length = length; this.channels = [new Float32Array(length), new Float32Array(length)]; }
+  constructor(length: number, sampleRate = 48000) { this.length = length; this.sampleRate = sampleRate; this.channels = [new Float32Array(length), new Float32Array(length)]; }
   getChannelData(channel: number): Float32Array<ArrayBuffer> {
     const data = this.channels[channel]; if (data === undefined) throw new Error('Missing PCM channel'); return data;
   }
@@ -42,8 +43,16 @@ it('keeps fractional cuts and already compact recordings on their original intak
 });
 
 it('shares compact decoded content without replacing the full-file decoder entry', async () => {
-  vi.stubGlobal('AudioBuffer', class extends Pcm { constructor(options: { length: number }) { super(options.length); } });
-  vi.stubGlobal('OfflineAudioContext', class { decodeAudioData(): Promise<Pcm> { return Promise.resolve(new Pcm(48000)); } });
+  const restoreTier = TIER;
+  initializeTier('phone');
+  vi.stubGlobal('AudioBuffer', class extends Pcm { constructor(options: { length: number; sampleRate: number }) { super(options.length, options.sampleRate); } });
+  vi.stubGlobal('OfflineAudioContext', class {
+    private readonly rate: number;
+    constructor(channels: number, length: number, rate: number) {
+      expect(channels).toBe(2); expect(length).toBe(1); this.rate = rate;
+    }
+    decodeAudioData(): Promise<Pcm> { return Promise.resolve(new Pcm(this.rate, this.rate)); }
+  });
   try {
     const { decodeBytes, compactSampleLoop } = await import('./preload');
     const buffer = await decodeBytes(new Uint8Array([1, 2, 3]).buffer);
@@ -54,5 +63,14 @@ it('shares compact decoded content without replacing the full-file decoder entry
     expect(a.buffer.length).toBeLessThan(buffer.length);
     expect(await decodeBytes(new Uint8Array([1, 2, 3]).buffer)).toBe(buffer);
     expect(buffer.length).toBe(48000);
-  } finally { vi.unstubAllGlobals(); }
+    const bed = await decodeBytes(new Uint8Array([1, 2, 3]).buffer, 'bed');
+    expect(bed.sampleRate).toBe(24000);
+    expect(bed.numberOfChannels).toBe(2);
+    expect(bed.length / bed.sampleRate).toBe(buffer.length / buffer.sampleRate);
+    expect(await decodeBytes(new Uint8Array([1, 2, 3]).buffer, 'bed')).toBe(bed);
+    const loop = compactSampleLoop(bed, bounds, '/assets/sfx/fixture/loop.m4a');
+    expect(Math.round((loop.loopEnd - loop.loopStart) * bed.sampleRate)).toBe(12000);
+    expect(loop.buffer.length).toBe(12000 + 256);
+    expect(await decodeBytes(new Uint8Array([1, 2, 3]).buffer)).toBe(buffer);
+  } finally { initializeTier(restoreTier); vi.unstubAllGlobals(); }
 });

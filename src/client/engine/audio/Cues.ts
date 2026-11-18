@@ -92,7 +92,7 @@ export class CueCatalogue {
       if(!this.available)return undefined;
       const rows=this.manifest?.['beds'],row=obj(rows)?rows[name]:undefined;if(!obj(row))return undefined;
       const url=cueFile(this.key,row['file']);if(url===undefined)return undefined;
-      try{const buffer=await this.decode(await this.read(url));return this.live()?this.loop(buffer,row,url):undefined;}
+      try{const buffer=await this.decode(await this.read(url),'bed');return this.live()?this.loop(buffer,row,url):undefined;}
       catch(error){console.info(`[sfx] ${url}: ${error instanceof Error?error.message:String(error)} — that bed stays silent`);return undefined;}
     })();this.beds.set(name,pending);return pending;
   }
@@ -131,7 +131,14 @@ export class CueCatalogue {
   async decodeAll(onFile?:()=>void):Promise<CueBank> {
     const raw=this.manifest,bank={loops:this.loops,shots:this.shots};if(raw===undefined||!this.live())return bank;
     const buffers=new Map<string,AudioBuffer>(),effects=new Set(this.shotFiles());
-    await Promise.all(cueFiles(this.key).map(async url=>{try{buffers.set(url,await this.decode(await this.read(url),effects.has(url)?'effect':undefined));}
+    const files = (section: unknown): Set<string> => new Set(obj(section) ? Object.values(section).flatMap(row => {
+      const url = obj(row) ? cueFile(this.key, row['file']) : undefined;
+      return url === undefined ? [] : [url];
+    }) : []);
+    const beds = files(raw['beds']), hums = files(raw['hums']);
+    await Promise.all(cueFiles(this.key).map(async url=>{try{
+      const purpose = effects.has(url) ? 'effect' : beds.has(url) && !hums.has(url) ? 'bed' : undefined;
+      buffers.set(url,await this.decode(await this.read(url),purpose));}
       catch(error){console.info(`[sfx] ${url}: ${error instanceof Error?error.message:String(error)} — synth kept`);}finally{onFile?.();}}));
     if(!this.live())return bank;
     for(const section of ['beds','hums']){

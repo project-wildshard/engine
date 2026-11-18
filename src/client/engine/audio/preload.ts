@@ -26,13 +26,17 @@ import type { AudioDecode } from './SetScore';
 import type { SampleClip } from './Cues';
 
 export const DECODE_RATE = 48000;
-const PHONE_EFFECT_RATE = 24000;
-let offline: OfflineAudioContext | undefined, phoneEffects: OfflineAudioContext | undefined;
-function decodeContext(phoneEffect: boolean): OfflineAudioContext {
+const PHONE_SAMPLE_RATE = 24000;
+let offline: OfflineAudioContext | undefined, phoneEffects: OfflineAudioContext | undefined, phoneBeds: OfflineAudioContext | undefined;
+function decodeContext(purpose: Parameters<AudioDecode>[1]): OfflineAudioContext {
   // The three-argument form is supported by Safari.
-  if (phoneEffect) {
-    phoneEffects ??= new OfflineAudioContext(1, 1, PHONE_EFFECT_RATE);
+  if (purpose === 'effect') {
+    phoneEffects ??= new OfflineAudioContext(1, 1, PHONE_SAMPLE_RATE);
     return phoneEffects;
+  }
+  if (purpose === 'bed') {
+    phoneBeds ??= new OfflineAudioContext(2, 1, PHONE_SAMPLE_RATE);
+    return phoneBeds;
   }
   offline ??= new OfflineAudioContext(2, 1, DECODE_RATE);
   return offline;
@@ -68,17 +72,17 @@ function audioLabel(owner: string, url: string | undefined): { owner: string; as
 }
 /** Share live recordings within the same output format without retaining retired PCM. */
 export const decodeBytes: AudioDecode = async (bytes, purpose) => {
-  const phoneEffect = purpose === 'effect' && TIER === 'phone';
+  const phonePurpose = TIER === 'phone' ? purpose : undefined;
   const label = audioLabel(currentOwner()?.name ?? 'engine/audio', sources.get(bytes));
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   const hash = Array.from(digest, value => value.toString(16).padStart(2, '0')).join('');
-  const key = phoneEffect ? `mono24:${hash}` : hash;
+  const key = phonePurpose === undefined ? hash : `${phonePurpose}24:${hash}`;
   const live = decoded.get(key)?.deref();
   if (live) return live;
   const pending = decoding.get(key);
   if (pending) return pending;
-  const decodedAudio = decodeContext(phoneEffect).decodeAudioData(bytes);
-  const work = phoneEffect ? decodedAudio.then(monoEffect) : decodedAudio;
+  const decodedAudio = decodeContext(phonePurpose).decodeAudioData(bytes);
+  const work = phonePurpose === 'effect' ? decodedAudio.then(monoEffect) : decodedAudio;
   decoding.set(key, work);
   try {
     const buffer = observeAudioMemory(await work, { owner: label.owner, asset: label.asset ?? `audio/sha256:${hash}` });
@@ -95,7 +99,7 @@ export const decodeBytes: AudioDecode = async (bytes, purpose) => {
 
 async function sampleClip(buffer: AudioBuffer, gain: number, url: string): Promise<SampleClip> {
   const clip = { buffer, offset: 0, duration: buffer.duration, gain };
-  if (TIER !== 'phone' || buffer.sampleRate !== PHONE_EFFECT_RATE || buffer.numberOfChannels !== 1) return clip;
+  if (TIER !== 'phone' || buffer.sampleRate !== PHONE_SAMPLE_RATE || buffer.numberOfChannels !== 1) return clip;
   const { packMonoCue, cueGain } = await import('./packedCues');
   const key = decodedKeys.get(buffer), cached = key === undefined ? undefined : packedEffects.get(key)?.deref();
   if (cached) return cueGain(cached, gain);
