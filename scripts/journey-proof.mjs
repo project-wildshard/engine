@@ -261,9 +261,23 @@ async function sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample,
   return samples;
 }
 
-/** Real movement on any build: hold the move stick up for 1.2 s and see the world's pixels change.
+/** A Playwright error from a page that navigated under a call (its document, and the call's context, are gone). */
+const LEFT_PAGE = /Execution context was destroyed|frame was detached|Target page, context or browser has been closed|navigat/iu;
+/** SB44: the move check's verdict, or why the page left play during it (a reload out of play is the run's problem, not a crash).
+ * @param {Page} page @returns {Promise<string | null>} null: the stick moved the player */
+export async function stickProblem(page) {
+  try { return await stickMovesOrThrow(page) ? null : 'the move stick did not move the player'; }
+  catch (error) {
+    if (!(error instanceof Error) || !LEFT_PAGE.test(error.message)) throw error;
+    return `the page left play during the move check (it navigated: now ${page.url()})`;
+  }
+}
+/** Real movement on any build: hold the move stick up for 1.2 s and see the world's pixels change. A page that navigates during it
+ * did not move (SB44: it used to throw out of the whole run).
  * @param {Page} page @returns {Promise<boolean>} */
-export async function stickMoves(page) {
+export async function stickMoves(page) { return await stickProblem(page) === null; }
+/** @param {Page} page @returns {Promise<boolean>} */
+async function stickMovesOrThrow(page) {
   const box = await page.locator('.ws-touch-stick').boundingBox();
   if (box === null) return false;
   const clip = { x: 0, y: 120, width: 402, height: 420 };
@@ -353,7 +367,8 @@ async function cli() {
           await page.screenshot({ path: join(dir, `${String(n++).padStart(3, '0')}-${String(row.t).padStart(6, '0')}-${label(row.s)}.png`), timeout: 5000 });
         } });
         const problems = judge(samples);
-        if (problems.length === 0 && !(await stickMoves(page))) problems.push({ at: samples.at(-1)?.t ?? 0, text: 'the move stick did not move the player' });
+        const stuck = problems.length === 0 ? await stickProblem(page) : null;
+        if (stuck !== null) problems.push({ at: samples.at(-1)?.t ?? 0, text: stuck });
         await faults.settle();
         for (const text of errors) problems.push({ at: samples.at(-1)?.t ?? 0, text });
         /** @type {string[]} */

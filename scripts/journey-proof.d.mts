@@ -24,3 +24,5 @@ export function judge(samples: readonly Sample[], options?: { blankMs?: number; 
 export function titleCardIndex(rows: unknown, names: readonly string[], card: string): number;
 export function tapJourney(page: Page, options: { card: string; path?: JourneyPath; budgetMs?: number; sampleMs?: number; frames?: (row: Sample) => Promise<void> }): Promise<Sample[]>;
 export function stickMoves(page: Page): Promise<boolean>;
+/** SB44: null when the stick moved the player, else why not (the page left play during the check included) */
+export function stickProblem(page: Page): Promise<string | null>;

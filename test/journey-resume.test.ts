@@ -38,3 +38,28 @@ test('an old shell that updates into this build\'s main screen after its resume 
   expect(samples.resumed).toBeUndefined();
   expect(taps).toContain('.ws-main-mmo');
 });
+
+// SB44 (sonnet-v38proofs, staging v0.1.38): a v0.1.36 shell reloaded itself out of play during the move check, and `stickMoves`
+// died on "Execution context was destroyed", taking the whole run (and its report) with it. A page that leaves play is a problem
+// the run reports, never a crash.
+function navigatingPage() {
+  const box = { x: 10, y: 600, width: 80, height: 80 };
+  return {
+    url: () => 'https://staging.wildshard.io/',
+    locator: () => ({ boundingBox: () => Promise.resolve(box) }),
+    screenshot: () => Promise.resolve(Buffer.from('frame')),
+    evaluate: () => Promise.reject(new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation')),
+  };
+}
+
+test('a page that reloads during the move check is reported, not thrown', async () => {
+  const { stickMoves, stickProblem } = await import('../scripts/journey-proof.mjs');
+  expect(await stickMoves(navigatingPage() as never)).toBe(false);
+  expect(await stickProblem(navigatingPage() as never)).toMatch(/left play.*navigat.*https:\/\/staging\.wildshard\.io\//u);
+});
+
+test('any other move-check failure still throws', async () => {
+  const { stickProblem } = await import('../scripts/journey-proof.mjs');
+  const page = { ...navigatingPage(), evaluate: () => Promise.reject(new TypeError('boom')) };
+  await expect(stickProblem(page as never)).rejects.toThrow('boom');
+});
