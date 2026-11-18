@@ -534,7 +534,24 @@ export class Music {
   constructor(audio: Audio) {
     this.audio = audio;
     this._volume = getNumber('music');
-    onNumber('music', (v) => { this._volume = v; if (this.rig) this.rig.out.gain.setTargetAtTime(v, this.rig.ctx.currentTime, 0.05); });
+    this.scope.onDispose(onNumber('music', (v) => {
+      this._volume = v;
+      if (this.rig) this.rig.out.gain.setTargetAtTime(v, this.rig.ctx.currentTime, 0.05);
+    }));
+    this.scope.onDispose(() => {
+      this.queued?.cancel();
+      this.queued = undefined;
+      this.stopTimer();
+      if (this.rig !== undefined) {
+        this.rig.engine.end(this.rig.ctx.currentTime);
+        this.rig.duckGain.disconnect();
+      }
+      this.playing = undefined;
+      this.rig = undefined;
+      this.deck = undefined;
+      this.bank = undefined;
+      this.source = undefined;
+    });
   }
 
   private build(): NonNullable<Music['rig']> {
@@ -542,7 +559,7 @@ export class Music {
     const ctx = this.audio.ctx, out = ctx.createGain(), duckGain = ctx.createGain();
     out.gain.value = this._volume; duckGain.gain.value = this._duck;
     out.connect(duckGain).connect(this.audio.master);
-    const engine = new Engine(ctx, out, this.memoryOwner);
+    const engine = this.scope.run(() => new Engine(ctx, out, this.memoryOwner));
     const stemBus = ctx.createGain(); stemBus.connect(engine.bus); // through the engine's low-pass + chorus: underwater muffles the stems too
     this.rig = { ctx, out, duckGain, engine, stemBus };
     for (const scope of this.silences) this.silenceNow(out, scope);

@@ -53,6 +53,7 @@ export interface MapZone { x: number; z: number; label: string }
 /** 1× fits everything the map spans; the closest zoom shows as much ground as 6× of one chunk */
 const ZOOM_MIN = 1, ZOOM_CHUNK_MAX = 6;
 const CYAN = '#8fe3ff';
+const noMapHold = (): void => undefined;
 const ctx2d = (c: HTMLCanvasElement): CanvasRenderingContext2D => { const ctx = c.getContext('2d'); if (!ctx) throw new Error('FullMap: no 2d context'); return ctx; };
 
 export class FullMap {
@@ -117,9 +118,15 @@ export class FullMap {
     this.poiSource = source; this.tally = opts.tally === true;
     // SF57: a shard's list (and the world it closes over) goes with its owner — a resident's, through its ownedFacade —
     // and a replaced list's hold is dropped at once, so no owner keeps more than the latest
-    this.forgetPois(); this.forgetPois = holdUntilOwnerDispose(() => { if (this.poiSource === source) { this.poiSource = null; this.tally = false; } });
+    this.forgetPois();
+    this.forgetPois = holdUntilOwnerDispose(() => {
+      if (this.poiSource !== source) return;
+      this.poiSource = null;
+      this.tally = false;
+      this.forgetPois = noMapHold;
+    });
   }
-  private forgetPois = (): void => undefined;
+  private forgetPois = noMapHold;
   /** Quest overlays keep the base places and tally intact. */
   addPois(source: () => MapPoi[]): () => void {
     this.poiSources.add(source);
@@ -140,9 +147,14 @@ export class FullMap {
   /** the shard's quest, read by the menu each time the MAP tab shows (null = no quest card) */
   setQuest(source: () => MapQuest | null): void {
     this.questSource = source;
-    this.forgetQuest(); this.forgetQuest = holdUntilOwnerDispose(() => { if (this.questSource === source) this.questSource = null; });
+    this.forgetQuest();
+    this.forgetQuest = holdUntilOwnerDispose(() => {
+      if (this.questSource !== source) return;
+      this.questSource = null;
+      this.forgetQuest = noMapHold;
+    });
   }
-  private forgetQuest = (): void => undefined;
+  private forgetQuest = noMapHold;
   /** Scoped cards may retire in any order without resurrecting a disposed quest. */
   addQuest(source: () => MapQuest | null): () => void {
     this.questSources.push(source);
@@ -277,5 +289,10 @@ export function levelPins(): Pin[] {
 }
 /** Run `release` when the current owner disposes; the returned function drops that hold early (a superseded source). */
 function holdUntilOwnerDispose(release: () => void): () => void {
-  return currentOwner()?.capture('disposers', release) ?? ((): void => undefined);
+  const owner = currentOwner();
+  if (owner?.disposed) {
+    release();
+    return noMapHold;
+  }
+  return owner?.capture('disposers', release) ?? noMapHold;
 }

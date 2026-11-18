@@ -5,6 +5,7 @@ import * as v from 'valibot';
 import { parseClientPlan, type ClientFeatureRow } from '@wildshard/format/clientPlan';
 import { WorldAssemblySchema } from '@wildshard/format/worldAssembly';
 import { resourceScope } from '@wildshard/engine/app/resources';
+import type { Scope } from '@wildshard/engine/app/scope';
 import type { IslandLibrary } from '../models/islandLibrary';
 import { ResolvedIslandLibrarySchema } from '@wildshard/format/islandLibrary';
 import type { defineWorldSceneCatalogue } from '../models/worldSceneCatalogue';
@@ -12,7 +13,7 @@ import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 type AssemblyRow = Extract<ClientFeatureRow, { kind: 'world.assembly' }>;
 const books = new WeakMap<ShardFolder, Map<string, {
-  readonly root: unknown; readonly row: string;
+  readonly root: unknown; readonly row: string; readonly owners: Set<Scope>;
   readonly pending: Promise<{ readonly library: IslandLibrary<unknown>; readonly sites: ReturnType<typeof defineWorldSceneCatalogue> }>;
 }>>();
 
@@ -77,11 +78,19 @@ export async function admittedIslandBook(product: ShardFolder, id: string): Prom
       const library = new IslandLibrary<unknown>(root, product);
       return product.json<unknown>(catalogue).then(input => ({ library, sites: defineWorldSceneCatalogue(input, product) }));
     })();
-    record = { root, row: recipe, pending }; byId.set(id, record);
+    record = { root, row: recipe, pending, owners: new Set() }; byId.set(id, record);
     const current = record, inventory = byId;
     void pending.catch(() => { if (inventory.get(id) === current) inventory.delete(id); });
   }
-  const value = await record.pending; live();
+  const current = record, inventory = byId;
+  if (!current.owners.has(owner)) {
+    current.owners.add(owner);
+    owner.onDispose(() => {
+      current.owners.delete(owner);
+      if (current.owners.size === 0 && inventory.get(id) === current) inventory.delete(id);
+    });
+  }
+  const value = await current.pending; live();
   if (product.section('models/island-library') !== root) throw new Error('Island book declaration changed during read');
   return value;
 }

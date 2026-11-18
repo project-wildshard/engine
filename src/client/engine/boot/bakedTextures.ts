@@ -21,12 +21,36 @@ import { ktx2Texture, readHeldForm } from '../core/ktx2';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { levelBakedId } from '../../../shared/engine/level/spec';
 import { labelAsset, labelClone } from '../render/gpuLabels';
+import { CACHE_BYTE_LIMITS, ResidentByteCache } from '../../../shared/engine/core/memoryBudget';
+import { adoptBuffer } from '../../../shared/engine/core/ownedBuffer';
+import { memoryAttribution } from '../../../shared/engine/core/memoryAttribution';
 
 const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
 const NOBAKE = params.has('nobake');
 
-const loaded = new Map<string, ImageBitmap | HTMLImageElement | THREE.CompressedTexture>();
-const raw = new Map<string, Uint8Array>();
+type BakedImage = ImageBitmap | HTMLImageElement | THREE.CompressedTexture;
+const loaded = new ResidentByteCache<string, BakedImage>(CACHE_BYTE_LIMITS.bakedImages);
+const raw = new ResidentByteCache<string, Uint8Array>(CACHE_BYTE_LIMITS.bakedCommon);
+
+function keepBake(url: string, image: BakedImage): void {
+  const bytes = image instanceof THREE.CompressedTexture
+    ? image.mipmaps.reduce((sum, mip) => sum + mip.data.byteLength, 0)
+    : image.width * image.height * 4;
+  if (!loaded.set(url, image, bytes)) return;
+  const label = { owner: loaded.limit.owner, asset: url };
+  if (image instanceof THREE.CompressedTexture) {
+    for (const mip of image.mipmaps) adoptBuffer(mip.data, label);
+  } else {
+    memoryAttribution.label(image, label);
+    memoryAttribution.allocation(image, 'ram', image instanceof HTMLImageElement ? 'image' : 'image-bitmap', bytes, 'estimate');
+  }
+}
+async function cacheCommon(url: string): Promise<void> {
+  const response = await fetch(versionedUrl(url));
+  if (!response.ok) return;
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (raw.set(url, bytes, bytes.byteLength)) adoptBuffer(bytes, { owner: raw.limit.owner, asset: url });
+}
 
 const dir = (slug: string) => `/assets/baked/${slug}/tex/`;
 /** chunk-independent lossless bakes (raw bytes, never given phone / KTX2 copies): fetched when the level's boot declares them */
@@ -54,13 +78,12 @@ export async function preloadBakedTextures(): Promise<number> {
   const common = bootFileList(level.boot.files, TIER).filter((u) => u.startsWith(COMMON) && u.endsWith('.bin'));
   await Promise.all([...common.map(async (u) => {
     try {
-      const r = await fetch(versionedUrl(u));
-      if (r.ok) raw.set(u, new Uint8Array(await r.arrayBuffer()));
+      await cacheCommon(u);
     } catch (e) { console.warn(`[baked] ${u}: ${(e as Error).message}`); }
   }), ...urls.map(async (u) => {
     // E157: the KTX2 stand-in when there is one (Y-flipped at encode, like fetchImage's bitmap)
     // OF17: a form that fails to read gives way to the other when the cache holds it
-    try { const served = tierUrl(u); loaded.set(u, await readHeldForm(served, tex => ktx2Texture(served, Infinity, tex), instead => fetchImage(u, Infinity, true, false, instead))); }
+    try { const served = tierUrl(u); keepBake(u, await readHeldForm(served, tex => ktx2Texture(served, Infinity, tex), instead => fetchImage(u, Infinity, true, false, instead))); }
     catch (e) { console.warn(`[baked] ${u}: ${(e as Error).message}`); }
   })]);
   return urls.length + common.length;
@@ -72,11 +95,8 @@ export async function preloadBakedTextures(): Promise<number> {
  * marched the fbm on the main thread, 37-53 ms of the frame its cell's sky attached in). A missing file resolves too.
  */
 export async function loadCommonBytes(url: string): Promise<void> {
-  if (NOBAKE || raw.has(url) || !url.startsWith(COMMON) || !(url in publicBytes())) return;
-  try {
-    const r = await fetch(versionedUrl(url));
-    if (r.ok) raw.set(url, new Uint8Array(await r.arrayBuffer()));
-  } catch (e) { console.warn(`[baked] ${url}: ${(e as Error).message}`); }
+  if (NOBAKE || raw.get(url) !== undefined || !url.startsWith(COMMON) || !(url in publicBytes())) return;
+  try { await cacheCommon(url); } catch (e) { console.warn(`[baked] ${url}: ${(e as Error).message}`); }
 }
 
 /**

@@ -1,10 +1,11 @@
 import { GRID_CELL_COUNT } from '@wildshard/format/contentBounds';
+import { CACHE_BYTE_LIMITS } from '@wildshard/engine/core/memoryBudget';
 import { serializeSimSnapshot, decodeSimSnapshot, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
 
 /** In-memory exact continuations are separate from the512K durable region limit and its logical fallback. */
 export const GRID_CONTINUATION_CACHE_CHARS: number = 8 * 1024 * 1024;
 /** UTF16 pool plus an equally large atomic replacement buffer and bounded map metadata (at most one key per grid cell). */
-export const GRID_CONTINUATION_CACHE_BYTES: number = GRID_CONTINUATION_CACHE_CHARS * 4 + 16 * 1024;
+export const GRID_CONTINUATION_CACHE_BYTES: number = CACHE_BYTE_LIMITS.gridContinuation.bytes;
 /** Bounded packed strings only; decoding/capture returns transient arrays to the host's continuation owner. */
 export class GridContinuationCache {
   private readonly values = new Map<string, string>();

@@ -9,7 +9,7 @@ import { AssetResidencyBridge } from '../src/client/game/grid/assetResidency';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { prepareSceneBufferDraws } from '../src/client/game/shardfile/sceneBuffers';
 
-function fixture(bytes = 1000) {
+function fixture(bytes = 1000, revisitLimit?: number) {
   const allocator = new ResidencyAllocator({ playing: CONTENT_CAPS.engineBase + CONTENT_CAPS.overlap + Math.ceil(bytes * CONTENT_CAPS.residentFactor), memory: new MemoryAdmission() });
   const assets = new AssetService(), bridge = new AssetResidencyBridge(allocator, resource => {
     if (!(resource instanceof BufferGeometry)) throw new Error('Expected fixed geometry');
@@ -17,7 +17,7 @@ function fixture(bytes = 1000) {
     if (!(position instanceof BufferAttribute)) throw new Error('Expected fixed channel');
     return [{ identity: position.array.buffer, bytes: position.array.byteLength, kind: 'cpu' },
       { identity: position, bytes: position.array.byteLength, kind: 'gpu' }];
-  });
+  }, undefined, revisitLimit);
   const detach = assets.bindResidency(bridge), material = new MeshBasicMaterial();
   const words = new Float32Array([0, -0, 1]), files = new Map([['position.bin', new Uint8Array(words.buffer)]]);
   const row = { version: 1, buffers: [{ id: 'p', storage: 'f32', file: 'position.bin', byteLength: 12 }],
@@ -89,4 +89,15 @@ test('revisit registration cannot borrow an existing runtime-covered backing', (
     expect(() => f.assets.register('revisit', geometry, { retain: true, cache: true, reusable: true, revisit: true })).toThrow('independently charged');
     expect(f.assets.has('ordinary')).toBe(true); expect(f.assets.has('revisit')).toBe(false);
   } finally { scope.dispose(); claim.release(); f.close(); }
+});
+
+test('the revisit byte limit evicts an idle shape while protecting the next live draw', () => {
+  const f = fixture(1000, 24), first = f.enter('first'), retired = vi.spyOn(first.geometry, 'dispose');
+  first.leave();
+  const active = f.enter('active', 'other-content'), keep = vi.spyOn(active.geometry, 'dispose');
+  try {
+    expect(retired).toHaveBeenCalledOnce();
+    expect(keep).not.toHaveBeenCalled();
+    expect(f.allocator.entries().filter(row => row.category === 'commons').reduce((n, row) => n + row.bytes, 0)).toBe(24);
+  } finally { active.leave(); f.close(); }
 });

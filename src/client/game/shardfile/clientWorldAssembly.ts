@@ -54,7 +54,7 @@ export async function installClientWorldAssembly(ctx: ShardContext, row: Extract
   live(); preflightIslandBook(product, row);
   if (row.entered !== undefined && enteredScopes.has(scope)) throw new Error('World assembly pieces already entered');
   const libraryId = row.library;
-  const book = libraryId === undefined ? undefined : await scope.run(() => admittedIslandBook(product, libraryId)); live();
+  const book = libraryId === undefined ? undefined : await (resident ?? scope).run(() => admittedIslandBook(product, libraryId)); live();
   const construction = row.rows.construction;
   if (construction?.looks === undefined) throw new Error('World construction metadata missing');
   const { looks, publish } = construction;

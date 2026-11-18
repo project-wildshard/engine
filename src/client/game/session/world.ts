@@ -24,7 +24,6 @@ import { gridLevel } from '../../../shared/game/grid/pageMode';
 import { gridPageShellLevel } from '../grid/pageShell';
 import type * as THREE from 'three';
 import type { dataStage } from './data';
-import { asShell } from '@wildshard/engine/app/ownership';
 import { app } from '@wildshard/engine/app/runtime';
 import { markBootContextLost, markBootHandledError } from '@wildshard/engine/boot/bootTrace';
 import { macrotask, type Plan, type StepRunner } from '@wildshard/engine/boot/plan';
@@ -143,13 +142,14 @@ async function buildWorld(ctx: Awaited<ReturnType<typeof dataStage>>, level: Lev
   let preparedAudio: { audio: LevelAudio; music: LevelMusic } | undefined;
   const prepareAudio = (): { audio: LevelAudio; music: LevelMusic } => {
     if (preparedAudio) return preparedAudio;
-    const audio = new Audio(manifest.audio);
+    const audio = game.levelScope.run(() => new Audio(manifest.audio));
+    game.levelScope.onDispose(() => { audio.evict(); });
     // headless tests / captures: never make a sound (the master builds at gain 0 while muted; reading it here built the
     // AudioContext during load, G325)
     if (params.has('mute')) audio.muted = true;
     // the Wildshard theme (project/archive/2026-09-23-music.md): the same score as the trailer, adaptive in play — menu / calm / alert / combat / underwater + stings
-    // the page's one score (the shell's): built with the first shard, routed through the running shard's master (Music.attach)
-    const music = session.music ?? asShell(() => new Music(audio));
+    // The score follows the running shard's master and retires with the session that created it.
+    const music = session.music ?? game.levelScope.run(() => new Music(audio));
     session.music = music;
     music.attach(audio);
     music.setState({ mode: 'menu', intensity: 0, underwater: false });

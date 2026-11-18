@@ -83,6 +83,10 @@ test("an owner label moves a resource's bytes; Developer's journal stacks on the
   expect(Object.hasOwn(gl, 'bufferData')).toBe(true);
   stopCounters();
   expect(Object.hasOwn(gl, 'bufferData')).toBe(false);
+  expect(counters.kinds()).toEqual({});
+  const stopReplacement = installMemoryCounters(gl, counters);
+  try { expect(counters.kinds()).toEqual({ 'drawing-buffer': 40_000 }); }
+  finally { stopReplacement(); }
 });
 
 test('the harness read-out names GPU, RAM and worker kinds', () => {

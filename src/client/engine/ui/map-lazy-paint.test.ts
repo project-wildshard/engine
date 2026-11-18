@@ -68,3 +68,36 @@ test('a second open is ready synchronously without progress',()=>{
     expect(map.isOpen).toBe(true);
   }finally{scope.dispose();}
 });
+
+test('retiring the resident drops the map cleanup handles along with its sources', () => {
+  const { map, scope } = fixture();
+  const first = scope.child('first resident');
+  const second = scope.child('second resident');
+  const idlePois = Reflect.get(map, 'forgetPois');
+  const idleQuest = Reflect.get(map, 'forgetQuest');
+  const quest = { title: 'A quest', objective: 'Cross the sea', hint: 'Find the boat' };
+  try {
+    first.run(() => {
+      map.setPois(() => []);
+      map.setQuest(() => null);
+    });
+    second.run(() => {
+      map.setPois(() => []);
+      map.setQuest(() => quest);
+    });
+    first.dispose();
+    expect(map.quest).toBe(quest);
+    expect(Reflect.get(map, 'forgetPois')).not.toBe(idlePois);
+    expect(Reflect.get(map, 'forgetQuest')).not.toBe(idleQuest);
+    second.dispose();
+    expect(map.quest).toBeNull();
+    expect(Reflect.get(map, 'forgetPois')).toBe(idlePois);
+    expect(Reflect.get(map, 'forgetQuest')).toBe(idleQuest);
+
+    second.run(() => map.setQuest(() => quest));
+    expect(map.quest).toBeNull();
+    expect(Reflect.get(map, 'forgetQuest')).toBe(idleQuest);
+  } finally {
+    scope.dispose();
+  }
+});

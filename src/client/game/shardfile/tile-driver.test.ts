@@ -166,6 +166,9 @@ test('resident boot callers share pending tiles and coarse readiness before publ
     const count = prepares;
     await residentTiles(scope, [source], { x: 0, z: 0 }, [], tileRing);
     expect(prepares).toBe(count);
+    scope.dispose();
+    expect(followResidentTiles(scope, () => ({ x: 0, z: 0 }))).toBeNull();
+    await expect(residentTiles(scope, [source], { x: 0, z: 0 }, [], tileRing)).rejects.toThrow('Tile resident is disposed');
   } finally { tile.release(); coarse.release(); await Promise.allSettled([first]); scope.dispose(); }
 });
 

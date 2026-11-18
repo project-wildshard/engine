@@ -53,7 +53,11 @@ export class GlCounters implements JournalSink {
   source(): void { /* counters keep no CPU source identities */ }
   buffer(): string { return ''; }
   /** The canvas's default framebuffer: RGBA8 color plus a 32-bit depth buffer, at its current drawing-buffer size. */
-  drawingBuffer(context: DrawingBuffer): void { this.buffers.add(new WeakRef(context)); }
+  drawingBuffer(context: DrawingBuffer): () => void {
+    const entry = new WeakRef(context);
+    this.buffers.add(entry);
+    return () => { this.buffers.delete(entry); };
+  }
   private drawingBufferBytes(): number {
     let bytes = 0;
     for (const weak of this.buffers) {
@@ -94,7 +98,8 @@ export function publishMemoryCounters(): void {
 
 /** Counters on this context, from before its first storage call until the renderer is disposed. */
 export function installMemoryCounters(context: Parameters<typeof installAllocationJournal>[0] & DrawingBuffer, counters: GlCounters = glCounters): () => void {
-  counters.drawingBuffer(context);
+  const forgetBuffer = counters.drawingBuffer(context);
   publishMemoryCounters();
-  return installAllocationJournal(context, counters);
+  const stopJournal = installAllocationJournal(context, counters);
+  return () => { forgetBuffer(); stopJournal(); };
 }

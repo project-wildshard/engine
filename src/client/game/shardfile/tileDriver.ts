@@ -432,8 +432,17 @@ export function noteTileBytes(resident: Scope, rows: readonly { readonly lod: nu
 export function residentTiles(resident: Scope, contents: readonly TileContent[], spawn: { readonly x: number; readonly z: number },
   _entryways: readonly TileEntryway[], radius: () => number): Promise<void> {
   if (contents.length === 0) return Promise.resolve();
+  if (resident.disposed || resident.disposing) return Promise.reject(new Error('Tile resident is disposed'));
   const existing = started.get(resident);
   if (existing !== undefined && !existing.state.complete) return existing.pending;
+  // A scope can stay reachable from a surviving facade after retirement.
+  // Its weak entries must no longer keep the tile recipes and scene alive.
+  if (existing === undefined) resident.onDispose(() => {
+    drivers.delete(resident);
+    started.delete(resident);
+    tileBytes.delete(resident);
+    tileBounds.delete(resident);
+  });
   // Reserve before any content callback can re-enter this boot path.
   const preparation = { complete: false };
   const pending = Promise.resolve().then(async () => {

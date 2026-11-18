@@ -25,7 +25,7 @@ const MEMORY_BUDGET_KINDS = {
   ram: {
     'geometry-cpu': 'scene', physics: 'scene', wasm: 'workers',
     'audio-buffer': 'audio', 'audio-data': 'audio', 'audio-sprite-pcm': 'audio',
-    'array-buffer': 'loading', wire: 'loading', decode: 'loading', scratch: 'loading', canvas: 'loading', image: 'loading', 'image-bitmap': 'loading',
+    'array-buffer': 'loading', wire: 'loading', decode: 'loading', scratch: 'loading', 'cache-document': 'loading', canvas: 'loading', image: 'loading', 'image-bitmap': 'loading',
   },
 } as const satisfies { gpu: Record<string, MemorySubsystem>; ram: Record<OwnedKind, MemorySubsystem> & Record<string, MemorySubsystem> };
 
@@ -50,4 +50,54 @@ export function memorySubsystems(ledger: BudgetLedger): SubsystemLedger {
     }
   }
   return totals;
+}
+
+/** Optional page caches keep only these bytes across cell crossings. Live
+ * products, render resources and simulations retain their allocator leases. */
+export const CACHE_BYTE_LIMITS = {
+  gridSections: { owner: 'grid/section-cache', bytes: 2_097_152 },
+  gridIndexes: { owner: 'grid/index-cache', bytes: 12_582_912 },
+  gridEdges: { owner: 'grid/edge-cache', bytes: 4_194_304 },
+  packedFallback: { owner: 'boot/spawn-quota-cache', bytes: 33_554_432 },
+  packedIndexes: { owner: 'boot/spawn-index-cache', bytes: 8_388_608 },
+  bakedImages: { owner: 'engine/baked-image-cache', bytes: 50_331_648 },
+  bakedCommon: { owner: 'engine/baked-common-cache', bytes: 8_388_608 },
+  gridContinuation: { owner: 'grid/continuations', bytes: 33_570_816 },
+  revisit: { owner: 'platform', bytes: 16_777_216 },
+} as const;
+
+/** Cache references only. Callers keep their own ownership of live loans.
+ * An oversized value is delivered to its reader without entering the cache. */
+export class ResidentByteCache<K, V> {
+  private readonly entries = new Map<K, { value: V; bytes: number }>();
+  private used = 0;
+  readonly limit: Readonly<{ owner: string; bytes: number }>;
+  constructor(limit: Readonly<{ owner: string; bytes: number }>) { this.limit = limit; }
+
+  get bytes(): number { return this.used; }
+
+  get(key: K): V | undefined {
+    const entry = this.entries.get(key);
+    if (!entry) return undefined;
+    this.entries.delete(key);
+    this.entries.set(key, entry);
+    return entry.value;
+  }
+
+  set(key: K, value: V, bytes: number): boolean {
+    if (!Number.isSafeInteger(bytes) || bytes < 1 || bytes > this.limit.bytes) return false;
+    const previous = this.entries.get(key);
+    if (previous) {
+      this.entries.delete(key);
+      this.used -= previous.bytes;
+    }
+    for (const [oldest, entry] of this.entries) {
+      if (this.used + bytes <= this.limit.bytes) break;
+      this.entries.delete(oldest);
+      this.used -= entry.bytes;
+    }
+    this.entries.set(key, { value, bytes });
+    this.used += bytes;
+    return true;
+  }
 }

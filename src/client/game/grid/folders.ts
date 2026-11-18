@@ -11,6 +11,9 @@ import { browserShardfileOptions } from '../shardfile/runtimeFolder';
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
 import {builtIndexHash} from '@wildshard/format/builtIndexes';
 import { FolderLeases } from './folderLeases';
+import { CACHE_BYTE_LIMITS, ResidentByteCache } from '@wildshard/engine/core/memoryBudget';
+import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
+import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 import { ApproachInputsDeferredError, FolderInputs, type FolderInputLease } from './folderInputs';
 import type { ClientAssets } from '../shardfile/clientAssets';
 import { GridPostCosts } from '../../../shared/game/grid/postPairs';
@@ -37,14 +40,23 @@ const farRows = { tiles: v.looseObject({ far: FarSchema }), props: v.looseObject
   look: v.looseObject({ look: v.looseObject({ keys: v.array(v.looseObject({ fog: v.looseObject({ colour: v.tuple([v.number(), v.number(), v.number()]) }) })) }) }),
   collision: v.looseObject({ meshCollision: v.unknown() }) };
 const nearRow = v.looseObject({ near: v.optional(NearPlaceholderSchema) });
-const edges = new WeakMap<ResidencyAllocator, Map<string, Promise<Pick<Shardfile, 'edge' | 'entryways'>>>>();
+type GridEdges = Pick<Shardfile, 'edge' | 'entryways'>;
+const edges = new WeakMap<ResidencyAllocator, {
+  ready: ResidentByteCache<string, GridEdges>;
+  reads: Map<string, Promise<GridEdges>>;
+}>();
 
 /** A product's bounded index, read once for several section or file reads (no runtime or asset is admitted). */
 interface GridFolderIndex { readonly index: OutputIndex; readonly url: string; readonly options: FolderOptions; readonly packed: PackReads }
 /** each index's parse by its bytes' hash: a cell's far, near and edge reads each parsed the same index (G639: ~0.9 ms a
  *  frame over a Sky Reach drive at phone 4x). The index is still read and its stale-client check still runs every time;
- *  only the parse of the same bytes is kept. The oldest of 32 leaves first. */
-const parsedIndexes = new Map<string, OutputIndex>();
+ *  only the parse of the same bytes is kept, under an estimated heap byte limit. */
+const parsedIndexes = new ResidentByteCache<string, OutputIndex>(CACHE_BYTE_LIMITS.gridIndexes);
+function keepGridDocument<T extends object>(cache: ResidentByteCache<string, T>, key: string, document: T, bytes: number): void {
+  if (!cache.set(key, document, bytes)) return;
+  memoryAttribution.label(document, { owner: cache.limit.owner, asset: key });
+  memoryAttribution.allocation(document, 'ram', 'cache-document', bytes, 'estimate');
+}
 // The input below is parsed privately from these exact wire bytes. Only the
 // bundle's own validated index inventory proves its schema output type.
 function builtGridIndex(input: unknown, hash: string, options: FolderOptions): input is OutputIndex {
@@ -62,8 +74,8 @@ async function readGridFolderIndex(url: string, identity: string, options: Folde
   else {
     const input = await readIndexBytes(bytes, options);
     index = builtGridIndex(input, key, options) ? input : await readCheckedOutputIndex(input);
-    parsedIndexes.set(key, index);
-    if (parsedIndexes.size > 32) { const oldest = parsedIndexes.keys().next().value; if (oldest !== undefined) parsedIndexes.delete(oldest); }
+    // The validated wire size weights object fields, strings and array entries.
+    keepGridDocument(parsedIndexes, key, index, bytes.byteLength * 4);
   }
   const { slug: declaredIdentity } = index.identity;
   if (declaredIdentity !== identity.replace(/^_/u, '')) throw new Error('Grid product index identity differs from its cell');
@@ -103,18 +115,11 @@ async function readGridFolderFile(at: GridFolderIndex, path: string, hash: strin
  *  read up to 5 times in a load. A read in flight is shared; each caller parses its own copy. */
 const sectionReads = new Map<string, Promise<Uint8Array>>();
 /** A built-in section's verified bytes, kept after the read settles so the next caller in the same load reads none. Its
- *  URL names its hash, so a kept copy is never stale. Least recently used leaves first past `SECTION_BYTES` (one load's
+ *  URL names its hash, so a kept copy is never stale. Least recently used leaves first past its byte limit (one load's
  *  neighbour sections are about 0.3-1 MB; the largest seen is 73 KB). */
-const settledSections = new Map<string, Uint8Array>();
-const SECTION_BYTES = 2 * 1024 * 1024;
-let settledBytes = 0;
+const settledSections = new ResidentByteCache<string, Uint8Array>(CACHE_BYTE_LIMITS.gridSections);
 function keepSection(key: string, bytes: Uint8Array): void {
-  if (bytes.length > SECTION_BYTES || settledSections.has(key)) return;
-  settledSections.set(key, bytes); settledBytes += bytes.length;
-  for (const [oldest, held] of settledSections) {
-    if (settledBytes <= SECTION_BYTES) break;
-    settledSections.delete(oldest); settledBytes -= held.length;
-  }
+  if (settledSections.set(key, bytes, bytes.buffer.byteLength)) adoptBuffer(bytes, { owner: settledSections.limit.owner, asset: key });
 }
 /** A built-in section's URL carries `?v=` and the first 8 hex of the hash its index declares, as the cook names it in a
  *  spawn manifest (`shardCook.ts` folderFile), so the service worker's `immutable()` keeps it and a spawn download's copy
@@ -136,11 +141,7 @@ async function readGridSection(at: GridFolderIndex, name: string): Promise<unkno
   const decode = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   // Only a built-in section is kept once settled: the checked path has its own content cache and revalidation.
   const held = versioned ? settledSections.get(`${address} ${section.hash}`) : undefined;
-  if (held !== undefined) {
-    const kept = `${address} ${section.hash}`;
-    settledSections.delete(kept); settledSections.set(kept, held);
-    return decode(held);
-  }
+  if (held !== undefined) return decode(held);
   // an offline caller on the checked path refuses what an online one would fetch, so they never share a read
   const key = `${address} ${section.hash} ${String(at.options.offline)}`;
   let reading = sectionReads.get(key);
@@ -158,10 +159,15 @@ async function readGridFolderSection(url: string, identity: string, name: string
   return readGridSection(await readGridFolderIndex(url, identity, options), name);
 }
 /** Read only the bounded index and its hash-verified world/edge section. This does not admit a runtime or asset. */
-export async function readGridFolderEdges(url: string, identity: string, options: FolderOptions): Promise<Pick<Shardfile, 'edge' | 'entryways'>> {
-  const rows = await readGridFolderSection(url, identity, 'world/edge', options);
+export async function readGridFolderEdges(url: string, identity: string, options: FolderOptions): Promise<GridEdges> {
+  return (await readGridEdges(url, identity, options)).value;
+}
+async function readGridEdges(url: string, identity: string, options: FolderOptions): Promise<{ value: GridEdges; bytes: number }> {
+  const at = await readGridFolderIndex(url, identity, options), section = at.index.sections.find(row => row.name === 'world/edge');
+  if (section === undefined) throw new Error('Grid edge index lacks world/edge');
+  const rows = await readGridSection(at, section.name);
   if (rows === null) throw new Error('Grid edge index lacks world/edge');
-  return v.parse(edgeRows, rows);
+  return { value: v.parse(edgeRows, rows), bytes: section.bytes * 4 };
 }
 /** A head added after this build has title metadata but no prepared native
  * manifest. Its verified product owns the far view just like a built world. */
@@ -265,20 +271,26 @@ export async function readGridFolderNear(url: string, identity: string, options:
 }
 
 /** Equal catalogue copies share edge metadata; full product admission stays on the ordinary approach path. */
-export function gridShardfileEdges(slug: string, owner: GridFolderOwner): Promise<Pick<Shardfile, 'edge' | 'entryways'>> | null {
+export function gridShardfileEdges(slug: string, owner: GridFolderOwner): Promise<GridEdges> | null {
   const manifest = findShard(slug), descriptor = manifest?.shardfile ?? manifest?.gridShardfile;
   if (descriptor === undefined) return null;
   if (owner.scope.disposed) return Promise.reject(new Error('Grid edge page disposed'));
   let cache = edges.get(owner.allocator);
   if (cache === undefined) {
-    cache = new Map(); edges.set(owner.allocator, cache);
+    cache = { ready: new ResidentByteCache(CACHE_BYTE_LIMITS.gridEdges), reads: new Map() };
+    edges.set(owner.allocator, cache);
     owner.scope.onDispose(() => { edges.delete(owner.allocator); });
   }
-  const previous = cache.get(slug); if (previous !== undefined) return previous;
-  const url = new URL(descriptor, location.href), pending = readGridFolderEdges(url.href, slug, browserShardfileOptions(new URL('.', url).href, true));
-  cache.set(slug, pending);
-  const held = cache;
-  void pending.catch(() => { if (held.get(slug) === pending) held.delete(slug); });
+  const { ready, reads } = cache, cached = ready.get(slug);
+  if (cached !== undefined) return Promise.resolve(cached);
+  const previous = reads.get(slug);
+  if (previous !== undefined) return previous;
+  const url = new URL(descriptor, location.href);
+  const pending = readGridEdges(url.href, slug, browserShardfileOptions(new URL('.', url).href, true)).then(({ value, bytes }) => {
+    if (!owner.scope.disposed) keepGridDocument(ready, slug, value, bytes);
+    return value;
+  }).finally(() => { reads.delete(slug); });
+  reads.set(slug, pending);
   return pending;
 }
 

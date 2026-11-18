@@ -1,4 +1,5 @@
 import type { App } from '@wildshard/engine/app/app';
+import { CACHE_BYTE_LIMITS } from '@wildshard/engine/core/memoryBudget';
 import type { Disposable3, Scope } from '@wildshard/engine/app/scope';
 import type { ResidencyAllocator, ResidencyLease, ResidencyEviction } from '../../../shared/game/grid/allocator';
 
@@ -17,11 +18,14 @@ export class AssetResidencyBridge implements AssetPort {
   private readonly owners = new Map<Scope, string>();
   private sequence = 0;
   private uses = 0;
+  private revisitBytes = 0;
+  private readonly revisitLimit: number;
   private readonly allocator: ResidencyAllocator;
   private readonly readAllocations: AssetAllocationReader;
   private readonly readOwner: () => Scope | null;
-  constructor(allocator: ResidencyAllocator, readAllocations: AssetAllocationReader, readOwner: () => Scope | null = () => null) {
-    this.allocator = allocator; this.readAllocations = readAllocations; this.readOwner = readOwner;
+  constructor(allocator: ResidencyAllocator, readAllocations: AssetAllocationReader, readOwner: () => Scope | null = () => null,
+    revisitLimit: number = CACHE_BYTE_LIMITS.revisit.bytes) {
+    this.allocator = allocator; this.readAllocations = readAllocations; this.readOwner = readOwner; this.revisitLimit = revisitLimit;
     if (bridges.has(allocator)) throw new Error('Allocator already has an asset bridge');
     bridges.set(allocator, this);
   }
@@ -45,6 +49,7 @@ export class AssetResidencyBridge implements AssetPort {
       try { this.evictUnused(consumer); } catch (error) { errors.push(error); }
       yield;
     }
+    try { this.trimRevisit(); } catch (error) { errors.push(error); }
     if (errors.length > 0) throw new AggregateError(errors, 'Runtime cache retirement failed');
   }
   private runtimeOwner(scope: Scope | null): Scope | undefined {
@@ -88,7 +93,10 @@ export class AssetResidencyBridge implements AssetPort {
     if (consumer.users.has(scope)) return;
     // Covered runtimes retain their existing stepped eviction/error boundary.
     const forget = independent ? scope.capture('disposers', () => {
-      consumer.users.delete(scope); consumer.retired = true; this.evictUnused(consumer);
+      consumer.users.delete(scope);
+      consumer.retired = true;
+      this.evictUnused(consumer);
+      if (consumer.revisit) this.trimRevisit();
     }) : undefined;
     consumer.users.set(scope, forget);
   }
@@ -102,6 +110,24 @@ export class AssetResidencyBridge implements AssetPort {
     return { commit: () => {
       for (const consumer of consumers) if (consumer.evict?.() !== true) throw new Error('Retained cache eviction refused');
     }, abort: () => undefined };
+  }
+  /** The optional revisit pool uses the same unique storage sizes as its
+   * allocator claims. Active loans can exhaust the pool but retain their data. */
+  private trimRevisit(): void {
+    if (this.revisitBytes <= this.revisitLimit) return;
+    const idle: { entry: Allocation; lastUse: number }[] = [];
+    for (const entry of this.allocations.values()) {
+      if (!entry.independent || entry.refs === 0) continue;
+      const consumers = [...entry.consumers];
+      if (consumers.every(consumer => consumer.revisit && consumer.retired && !consumer.active && consumer.users.size === 0)) {
+        idle.push({ entry, lastUse: Math.max(0, ...consumers.map(consumer => consumer.lastUse)) });
+      }
+    }
+    idle.sort((a, b) => a.lastUse - b.lastUse);
+    for (const { entry } of idle) {
+      if (this.revisitBytes <= this.revisitLimit) break;
+      this.prepareEviction(entry.identity)?.commit();
+    }
   }
   /** The allocator keeps the same real charges; only idle reusable allocations become eviction candidates. */
   private refresh(held: readonly Allocation[]): void {
@@ -123,9 +149,11 @@ export class AssetResidencyBridge implements AssetPort {
         if (revisit && entry?.covering !== undefined) throw new Error('Revisit backing must be independently charged');
         if (entry === undefined) {
           const actualCoverage = this.coverage(row.bytes, covering), lease = this.reserve(row.bytes, row.kind, actualCoverage, row.identity);
-          entry = { identity: row.identity, lease, bytes: row.bytes, kind: row.kind, consumers: new Set(), refs: 0, covering: actualCoverage, independent: revisit }; this.allocations.set(row.identity, entry);
+          entry = { identity: row.identity, lease, bytes: row.bytes, kind: row.kind, consumers: new Set(), refs: 0, covering: actualCoverage, independent: false }; this.allocations.set(row.identity, entry);
         }
-        if (revisit) entry.independent = true;
+        if (revisit && !entry.independent) {
+          entry.independent = true; this.revisitBytes += entry.bytes;
+        }
         entry.refs++; held.push(entry); unhold.push(entry.lease.hold());
       }
     } catch (error) { this.release(held); for (const release of unhold) release(); throw error; }
@@ -156,28 +184,30 @@ export class AssetResidencyBridge implements AssetPort {
       }
       if (user !== undefined) this.observeUser(consumer, user, runtime === undefined);
     };
-    try { observe(initialOwner ?? null); this.refresh(held); }
+    try { observe(initialOwner ?? null); this.refresh(held); if (revisit) this.trimRevisit(); }
     catch (error) { live = false; this.consumers.delete(consumer); this.release(held, consumer); throw error; }
     finally { for (const release of unhold) release(); }
     return { observe, active: value => {
       if (!live) return;
       consumer.active = value; consumer.lastUse = ++this.uses; this.refresh(held);
-    }, unused: () => { if (live) this.evictUnused(consumer); }, release: () => { if (live) { live = false; this.consumers.delete(consumer); this.release(held, consumer); } } };
+    }, unused: () => { if (live) { this.evictUnused(consumer); if (consumer.revisit && consumer.retired) this.trimRevisit(); } }, release: () => { if (live) { live = false; this.consumers.delete(consumer); this.release(held, consumer); } } };
   }
   private release(held: readonly Allocation[], consumer?: CacheConsumer): void {
     if (consumer !== undefined) for (const scope of consumer.users.keys()) this.forgetUser(consumer, scope);
     // O20: each entry keeps its identity, so a region's retirement deletes in O(1) instead of scanning every allocation
     for (const entry of held) {
       if (consumer !== undefined) entry.consumers.delete(consumer);
-      if (--entry.refs === 0) { entry.lease.release(); this.allocations.delete(entry.identity); }
-      else this.refresh([entry]);
+      if (--entry.refs === 0) {
+        if (entry.independent) this.revisitBytes -= entry.bytes;
+        entry.lease.release(); this.allocations.delete(entry.identity);
+      } else this.refresh([entry]);
     }
   }
   /** Detach only with the actual renderer owner; unloading a level alone must not uncharge still-live cached GPU data. */
   dispose(): void {
     for (const consumer of this.consumers) for (const scope of consumer.users.keys()) this.forgetUser(consumer, scope);
     for (const entry of this.allocations.values()) entry.lease.release();
-    this.allocations.clear(); this.owners.clear(); this.consumers.clear(); bridges.delete(this.allocator);
+    this.allocations.clear(); this.owners.clear(); this.consumers.clear(); this.revisitBytes = 0; bridges.delete(this.allocator);
   }
 }
 

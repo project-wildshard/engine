@@ -8,7 +8,7 @@
 import { BackSide, type BufferGeometry, ClampToEdgeWrapping, CompressedTexture, DataTexture, DoubleSide, LinearMipmapLinearFilter, type Material, Mesh, NoColorSpace,
   type Object3D, type PerspectiveCamera, Quaternion, RedFormat, RepeatWrapping, SkinnedMesh, Texture, UnsignedByteType, Vector2, Vector3 } from 'three';
 import type { RigBake, RigContract } from '@wildshard/engine/anim/rig';
-import { retainCachedResources } from '@wildshard/engine/app/cachedAssets';
+import { forgetWhenDisposed, retainCachedResources } from '@wildshard/engine/app/cachedAssets';
 import { ownSceneResource } from '@wildshard/engine/app/sceneOwnership';
 import { resourceScope } from '@wildshard/engine/app/resources';
 import { app } from '@wildshard/engine/app/runtime';
@@ -88,9 +88,11 @@ function loadMap(path: string, anisotropy: number): Promise<Texture> {
       const value = read instanceof CompressedTexture ? read : new Texture(read);
       value.colorSpace = NoColorSpace; value.flipY = false; value.minFilter = LinearMipmapLinearFilter; value.anisotropy = anisotropy; value.needsUpdate = true;
       resolved.set(path, value);
+      forgetWhenDisposed(value, resolved, path, value);
       return retainCachedResources(value);
     })();
     images.set(path, loading);
+    forgetWhenDisposed(loading, images, path, loading);
   }
   return loading;
 }
@@ -355,7 +357,11 @@ export class HeldView {
     const key = product.url(row.decal.files[tier]);
     let decal = atlases.get(key);
     if (decal !== undefined && !app.assets.isAcquired(decal)) decal = undefined;
-    if (decal === undefined) { decal = retainCachedResources(await loadTextureRow({ url: key, srgb: true, anisotropy: 8, wrapS: ClampToEdgeWrapping, wrapT: ClampToEdgeWrapping })); atlases.set(key, decal); }
+    if (decal === undefined) {
+      decal = retainCachedResources(await loadTextureRow({ url: key, srgb: true, anisotropy: 8, wrapS: ClampToEdgeWrapping, wrapT: ClampToEdgeWrapping }));
+      atlases.set(key, decal);
+      forgetWhenDisposed(decal, atlases, key, decal);
+    }
     ownSceneResource(decal, owner, app.assets);
     const maps = new Map(await Promise.all(row.maps.names.map(async name => [name, await Promise.all((['maps', 'nrm'] as const).map(async kind => {
       const texture = await loadMap(`${row.maps.base}${name}-${kind}.webp`, row.maps.anisotropy);

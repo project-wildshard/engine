@@ -9,6 +9,9 @@ import { clearFailure, showFailure } from '@wildshard/engine/telemetry/runtime';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { scratchReader } from '@wildshard/engine/boot/scratchReader';
+import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
+import { CACHE_BYTE_LIMITS, ResidentByteCache } from '@wildshard/engine/core/memoryBudget';
+import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 import {placedLoose, placedSpawn} from './placedSpawn';
 
@@ -215,11 +218,13 @@ function installMemberLayer(): boolean {
  *  whole-level parts and nowhere else, so a page read of one that answers 404 finds its part in the shard's whole manifest,
  *  reads the part once, and keeps its members in the asset cache; the rest of the shard's reads of that part answer there. */
 interface PartMembers {readonly base: string; readonly store: Promise<Cache>; readonly files: ReadonlyMap<string, {readonly file: SpawnManifest['files'][number]; readonly part: SpawnPart; readonly offset: number}>}
-const partTables = new Map<string, Promise<PartMembers | null>>(), partReads = new Map<string, Promise<void>>();
+type PartFallback = ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
+const partTables = new ResidentByteCache<string, PartMembers>(CACHE_BYTE_LIMITS.packedIndexes);
+const partTableReads = new Map<string, Promise<PartMembers | null>>(), partReads = new Map<string, Promise<PartFallback>>();
 /** Members a part read kept, by path: these never ask the network first. */
 const keptMembers = new Set<string>();
 /** Verified play-time members whose optional disk publication exhausted quota. */
-const memoryPartMembers = new Map<string, Uint8Array<ArrayBuffer>>();
+const memoryPartMembers = new ResidentByteCache<string, Uint8Array<ArrayBuffer>>(CACHE_BYTE_LIMITS.packedFallback);
 let partTier: 'phone' | 'desktop' = 'phone';
 async function partTable(slug: string): Promise<PartMembers | null> {
   const selected = spawnSelection(slug, 'client', partTier, '000');
@@ -233,10 +238,25 @@ async function partTable(slug: string): Promise<PartMembers | null> {
   for (const part of manifest.parts ?? []) for (const [index, offset] of part.members) {
     const file = manifest.files[index]; if (file !== undefined) files.set(new URL(file.url, document.baseURI).pathname, {file, part, offset});
   }
-  const cacheName = selected.cacheName;
-  return {base: selected.base, store: nativeCacheCall(() => caches.open(cacheName)), files};
+  const cacheName = selected.cacheName, table = { base: selected.base, store: nativeCacheCall(() => caches.open(cacheName)), files };
+  // Charge parsed objects, strings and Map entries conservatively from the bounded manifest.
+  const bytes = (address.bytes + (address.code?.bytes ?? 0)) * 4 + files.size * 96;
+  if (partTables.set(slug, table, bytes)) {
+    memoryAttribution.label(table, { owner: partTables.limit.owner, asset: address.url });
+    memoryAttribution.allocation(table, 'ram', 'cache-document', bytes, 'estimate');
+  }
+  return table;
 }
-function readMembersOf(part: SpawnPart, table: PartMembers): Promise<void> {
+function lookupPartTable(slug: string): Promise<PartMembers | null> {
+  const ready = partTables.get(slug);
+  if (ready !== undefined) return Promise.resolve(ready);
+  const pending = partTableReads.get(slug);
+  if (pending !== undefined) return pending;
+  const read = partTable(slug).finally(() => { partTableReads.delete(slug); });
+  partTableReads.set(slug, read);
+  return read;
+}
+function readMembersOf(part: SpawnPart, table: PartMembers): Promise<PartFallback> {
   const held = partReads.get(part.url);
   if (held !== undefined) return held;
   const read = (async () => {
@@ -245,6 +265,7 @@ function readMembersOf(part: SpawnPart, table: PartMembers): Promise<void> {
     const body = new Uint8Array(await response.arrayBuffer()), store = await table.store;
     if (body.length !== part.bytes) throw new Error(`Spawn part size differs: ${part.url}`);
     let quotaDenied = false;
+    const fallback = new Map<string, Uint8Array<ArrayBuffer>>();
     await Promise.all([...table.files].filter(([, row]) => row.part.url === part.url).map(async ([path, {file, offset}]) => {
       const member = body.slice(offset, offset + file.bytes);
       if (await sha256(member) !== file.hash) throw new Error(`Spawn part member differs: ${part.url}`);
@@ -257,31 +278,38 @@ function readMembersOf(part: SpawnPart, table: PartMembers): Promise<void> {
           quotaDenied = true; bootMark('download:part-cache-quota');
         }
       }
-      memoryPartMembers.set(path, member);
+      fallback.set(path, member);
+      if (memoryPartMembers.set(path, member, member.byteLength)) {
+        adoptBuffer(member, { owner: memoryPartMembers.limit.owner, asset: path, kind: 'wire' });
+      }
     }));
+    return fallback;
   })();
   partReads.set(part.url, read);
   const settled = (): void => { partReads.delete(part.url); };
   void read.then(settled, settled);
   return read;
 }
+function memberResponse(url: URL, bytes: Uint8Array<ArrayBuffer>): Response {
+  return new Response(bytes, { headers: { 'content-type': typeOf(url.pathname), 'content-length': String(bytes.byteLength) } });
+}
 async function heldPartMember(url: URL): Promise<Response | null> {
   const memory = memoryPartMembers.get(url.pathname);
-  if (memory !== undefined) return new Response(memory, {headers: {'content-type': typeOf(url.pathname), 'content-length': String(memory.byteLength)}});
+  if (memory !== undefined) return memberResponse(url, memory);
   if (!keptMembers.has(url.pathname)) return null;
-  const slug = url.pathname.split('/')[2] ?? '', table = await partTables.get(slug);
-  return await nativeCacheCall(async () => (await table?.store)?.match(new URL(url.pathname, document.baseURI).href)) ?? null;
+  const slug = url.pathname.split('/')[2] ?? '';
+  const table = partTables.get(slug), cacheName = spawnSelection(slug, 'client', partTier, '000')?.cacheName;
+  const store = table?.store ?? (typeof cacheName === 'string' ? nativeCacheCall(() => caches.open(cacheName)) : undefined);
+  return await nativeCacheCall(async () => (await store)?.match(new URL(url.pathname, document.baseURI).href)) ?? null;
 }
 /** The file's bytes from its part, or null when no part holds it (the read keeps its 404). */
 async function partMember(url: URL): Promise<Response | null> {
   try {
     const slug = url.pathname.split('/')[2] ?? '';
-    let tabled = partTables.get(slug);
-    if (tabled === undefined) { tabled = partTable(slug); partTables.set(slug, tabled); void tabled.catch(() => { partTables.delete(slug); }); }
-    const table = await tabled, row = table?.files.get(url.pathname);
-    if (table === null || table === undefined || row === undefined) return null;
-    await readMembersOf(row.part, table);
-    return await heldPartMember(url);
+    const table = await lookupPartTable(slug), row = table?.files.get(url.pathname);
+    if (table === null || row === undefined) return null;
+    const fallback = (await readMembersOf(row.part, table)).get(url.pathname);
+    return fallback === undefined ? await heldPartMember(url) : memberResponse(url, fallback);
   } catch { return null; }
 }
 async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<string> {

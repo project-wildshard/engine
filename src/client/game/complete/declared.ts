@@ -94,7 +94,6 @@ export function installCompletion(ctx: CompletionContext, flags: Flags, progress
     syncEntry(); const off = flags.onChange(flag => { if (flag === rows.doneFlag) syncEntry(); });
     scope.onDispose(() => { off(); if (mine !== null && completeEntry() === mine) setCompleteEntry(null); mine = null; });
   });
-  ctx.scope.onDispose(() => { card.close(); });
   let offered = false, checkT = 0;
   ctx.system({ id: rows.system, phase: 'update', before: rows.before, after: rows.after, run: (_dt, t) => {
     if (offered || t - checkT < rows.pollSeconds) return;
@@ -106,6 +105,11 @@ export function installCompletion(ctx: CompletionContext, flags: Flags, progress
   } });
   const completion: Completion = { showAfterReward: () => { if (flags.has(rows.seenFlag)) return false; open(); return true; }, open,
     get up() { return card.isOpen; }, leftMarkers: () => project().markers };
-  completions.set(ctx.scope, completion);
+  const owner = ctx.scope;
+  completions.set(owner, completion);
+  owner.onDispose(() => {
+    if (completions.get(owner) === completion) completions.delete(owner);
+    card.close();
+  });
   return completion;
 }
