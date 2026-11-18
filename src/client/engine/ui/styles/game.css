@@ -150,6 +150,8 @@
 
 /* ── damage flash + vignette ── */
 .ws-game-flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 40, 20, 0.55) 100%); opacity: 0; visibility: hidden; }
+/* MG10: the full-screen effects keep their own layers only while shown (base.css `:where(#hud.touch) > *`) */
+#hud.touch > .ws-game-speed, #hud.touch > .ws-game-smear, #hud.touch > .ws-game-flash { will-change: auto; }
 .ws-game-flash.show { visibility: visible; animation: ws-flash 0.55s ease-out forwards; }
 
 /* ── hit marker ring (subtle) ── */

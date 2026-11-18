@@ -20,6 +20,9 @@ html[data-ws-keyboard] .ws-touch { visibility: hidden; pointer-events: none; }
    cancels the layer's touch events and marks every element draggable="false". */
 #hud .ws-touch, #hud .ws-touch * { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
 #hud.touch:not(.intro) .ws-touch { display: block; }
+/* MG10 (base.css `:where(#hud.touch) > *`): the touch layer itself paints nothing; each control in it draws in its own small layer */
+#hud.touch > .ws-touch { will-change: auto; }
+#hud.touch .ws-touch > * { will-change: opacity; }
 .ws-touch-pause { position: absolute; left: 12px; top: var(--ws-top); transform: none; padding: 5px 12px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 8.5px; letter-spacing: 0.22em; text-transform: uppercase; -webkit-tap-highlight-color: transparent; }
 .ws-touch-pause::after { content: ''; position: absolute; inset: -10px -6px; } /* ≥ 44 px hit target */
 /* J245: the top-left button opens SETTINGS: a cog and the word (it was ❚❚ PAUSE) */
