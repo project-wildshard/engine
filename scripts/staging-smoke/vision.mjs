@@ -2,10 +2,10 @@
 // scenario looks at a two-row contact sheet (the last release's six keyframes over this one's, ffmpeg) with the release's
 // changelog bullets, and answers `same`, `changed` (named by a bullet) or `regressed` (a severity and one line). No previous
 // frames: `baseline`, and no call. Five calls a release at most; each reads one ~1600x1170 JPEG and a short prompt.
-import { execFile, execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { promisify } from 'node:util';
 import { homedir } from 'node:os';
 import { KEYFRAMES } from './scenarios.mjs';
 
@@ -92,14 +92,19 @@ export function askClaude(prompt, cwd, { claude = 'claude', timeoutMs = 240_000 
 /** The same call as askClaude, without blocking: deploy runs judge several sheets at once (SQ13).
  * @param {string} prompt @param {string} cwd @param {{ claude?: string, timeoutMs?: number }} [o] @returns {Promise<Omit<Vision, 'scenario'>>} */
 export async function askClaudeAsync(prompt, cwd, { claude = 'claude', timeoutMs = 120_000 } = {}) {
-  /** @type {string} */
-  let out;
-  try {
-    ({ stdout: out } = await promisify(execFile)(claude, ['-p', prompt, '--model', VISION_MODEL, '--output-format', 'json', '--tools', 'Read', '--allowedTools', 'Read',
-      '--add-dir', cwd, '--no-session-persistence', '--strict-mcp-config', '--disable-slash-commands'], { cwd: VISION_CWD, encoding: 'utf8', timeout: timeoutMs }));
-  } catch (error) {
-    return { verdict: 'error', line: `claude -p failed: ${error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error)}` };
-  }
+  const child = spawn(claude, ['-p', prompt, '--model', VISION_MODEL, '--output-format', 'json', '--tools', 'Read', '--allowedTools', 'Read',
+    '--add-dir', cwd, '--no-session-persistence', '--strict-mcp-config', '--disable-slash-commands'], { cwd: VISION_CWD, stdio: ['ignore', 'pipe', 'ignore'] });
+  /** @type {Buffer[]} */
+  const chunks = [];
+  child.stdout.on('data', (chunk) => { chunks.push(Buffer.from(chunk)); });
+  const timer = setTimeout(() => { child.kill('SIGTERM'); }, timeoutMs);
+  /** @type {[number | null]} */
+  let closed;
+  try { closed = /** @type {[number | null]} */ (await once(child, 'close')); }
+  catch (error) { return { verdict: 'error', line: `claude -p failed: ${error instanceof Error ? error.message : String(error)}` }; }
+  finally { clearTimeout(timer); }
+  if (closed[0] !== 0) return { verdict: 'error', line: `claude -p failed: exit ${String(closed[0])}` };
+  const out = Buffer.concat(chunks).toString('utf8');
   let text = out;
   try { const wrapped = JSON.parse(out); if (typeof wrapped.result === 'string') text = wrapped.result; } catch { /* plain text */ }
   return parseVision(text) ?? { verdict: 'error', line: `no verdict in the reply: ${text.slice(0, 160)}` };

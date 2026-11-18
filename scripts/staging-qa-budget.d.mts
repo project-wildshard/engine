@@ -1,6 +1,7 @@
 // Generated from the JSDoc in the .mjs beside it (meta STAGING-QA SQ16): npx tsc --ignoreConfig <the .mjs files> --allowJs --declaration --emitDeclarationOnly
+import type { Finding } from './staging-smoke/checks.mjs';
+
 export type LegKind = 'local' | 'candidate' | 'staging';
-export type Finding = import('./staging-smoke/checks.mjs').Finding;
 export const LEG_TARGET_S: 600;
 export const LEG_CAP_S: 720;
 export const STEPS: Readonly<Record<string, { seconds: number; catches: string }>>;
