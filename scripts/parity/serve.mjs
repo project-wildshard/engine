@@ -14,17 +14,36 @@ export const EXPORT_IGNORE=`${['/node_modules','/dist','/progress','/sources','/
 
 /** @param {string} root @param {string} sha */
 export function exportTree(root, sha) {
-  const dir=realpathSync(mkdtempSync(join(tmpdir(),'wildshard-parity-'))), ign=join(dir,'ign'); mkdirSync(ign); // canonical (E432)
-  execFileSync('git',['init','-q',ign]);
-  writeFileSync(join(dir,'ignore'),EXPORT_IGNORE);
-  const paths=execFileSync('git',['ls-tree','-r','--name-only',sha],{cwd:root,encoding:'utf8',maxBuffer:64*1024**2}).trim().split('\n');
-  const ignored=execFileSync('git',['-C',ign,'-c',`core.excludesFile=${join(dir,'ignore')}`,'check-ignore','--no-index','--stdin'],{input:paths.join('\n'),encoding:'utf8',maxBuffer:64*1024**2}).trim().split('\n');
-  const excluded=new Set(ignored), keep=paths.filter((p)=>p.startsWith('test/parity/') || !excluded.has(p));
-  const tree=join(dir,'tree');mkdirSync(tree);
-  const archive=execFileSync('git',['archive',sha,'--',...keep],{cwd:root,maxBuffer:1024**3});
-  execFileSync('tar',['-x','-C',tree],{input:archive,maxBuffer:1024**3});
-  linkNodeModules(root,tree); // E432: @wildshard/* → this export
-  return {tree,cleanup:()=>rmSync(dir,{recursive:true,force:true})};
+  const commit=execFileSync('git',['rev-parse','--verify',`${sha}^{commit}`],{cwd:root,encoding:'utf8'}).trim();
+  const dir=realpathSync(mkdtempSync(join(tmpdir(),'wildshard-parity-'))); // canonical (E432)
+  const cleanup=()=>rmSync(dir,{recursive:true,force:true});
+  try {
+    const ign=join(dir,'ign');mkdirSync(ign);
+    execFileSync('git',['init','-q',ign]);
+    writeFileSync(join(dir,'ignore'),EXPORT_IGNORE);
+    const paths=execFileSync('git',['ls-tree','-r','--name-only',commit],{cwd:root,encoding:'utf8',maxBuffer:64*1024**2}).trim().split('\n');
+    const ignored=execFileSync('git',['-C',ign,'-c',`core.excludesFile=${join(dir,'ignore')}`,'check-ignore','--no-index','--stdin'],{input:paths.join('\n'),encoding:'utf8',maxBuffer:64*1024**2}).trim().split('\n');
+    const excluded=new Set(ignored), keep=paths.filter((p)=>p.startsWith('test/parity/') || !excluded.has(p));
+    const tree=join(dir,'tree');mkdirSync(tree);
+    const archive=execFileSync('git',['archive',commit,'--',...keep],{cwd:root,maxBuffer:1024**3});
+    execFileSync('tar',['-x','-C',tree],{input:archive,maxBuffer:1024**3});
+    linkNodeModules(root,tree); // E432: @wildshard/* → this export
+    if (existsSync(join(tree,'scripts/pins.ts')) && existsSync(join(tree,'test/pins/shardfiles.json'))) {
+      // The installer reads tracked public assets from the index, and generation reads HEAD.
+      // A private detached index gives both the archived inventory and keeps pin excludes local.
+      const objects=execFileSync('git',['rev-parse','--path-format=absolute','--git-path','objects'],{cwd:root,encoding:'utf8'}).trim();
+      const gitDir=join(tree,'.git');
+      const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>!name.startsWith('GIT_')));
+      const options={cwd:tree,env:{...env,GIT_DIR:gitDir,GIT_WORK_TREE:tree,GIT_INDEX_FILE:join(gitDir,'index')}};
+      const git=(/** @type {string[]} */ args)=>execFileSync('git',args,options);
+      git(['init','-q']);
+      writeFileSync(join(gitDir,'objects','info','alternates'),`${realpathSync(objects)}\n`);
+      git(['update-ref','--no-deref','HEAD',commit]);
+      git(['read-tree',commit]);
+      execFileSync(process.execPath,['scripts/pins.ts','install'],{...options,maxBuffer:16*1024**2});
+    }
+    return {tree,cleanup};
+  } catch(error) {cleanup();throw error;}
 }
 /** A bounded native HTTP readiness probe. Avoid undici's macOS socket QoS failure before browser capture.
  * @param {string} url @param {number} [timeoutMs] @returns {Promise<boolean>} */
@@ -80,8 +99,8 @@ export function runtimeTree(root,sha) {
     const paths=entries.map((entry)=>entry.split('\t')[1]??'');
     const check=execFileSync('git',['-C',temp,'-c',`core.excludesFile=${join(temp,'ignore')}`,'check-ignore','--no-index','--stdin'],{input:paths.join('\n'),encoding:'utf8',maxBuffer:64*1024**2});
     const ignored=new Set(check.trim().split('\n'));
-    const inputs=entries.filter((entry)=>{const path=entry.split('\t')[1]??'';return !ignored.has(path)&&!path.startsWith('test/')&&!path.startsWith('scripts/parity/')&&path!=='scripts/parity.mjs';});
-    return createHash('sha256').update(`parity-build-v2-shardfiles\n${process.version}\n${patterns}\n${inputs.join('\n')}`).digest('hex');
+    const inputs=entries.filter((entry)=>{const path=entry.split('\t')[1]??'';return !ignored.has(path)&&(!path.startsWith('test/')||path.startsWith('test/pins/'))&&!path.startsWith('scripts/parity/')&&path!=='scripts/parity.mjs';});
+    return createHash('sha256').update(`parity-build-v3-pins\n${process.version}\n${patterns}\n${inputs.join('\n')}`).digest('hex');
   } finally {rmSync(temp,{recursive:true,force:true});}
 }
 
