@@ -130,3 +130,18 @@ runners as advisory. A completed measured failure stays blocking
 when the runner is later interrupted.
 [Strict fix-forward CI](https://github.com/project-wildshard/engine/actions/runs/44383961018).
 [Strict STR9 CI](https://github.com/project-wildshard/engine/actions/runs/44385800353).
+
+## Nine's online boot audio ceiling
+
+All 26 armed footprints passed the first detached native sweep.
+Its separate Nine ledger measured 854,400 B of audio at control
+against 391,680 B allowed. The 470,400 B over the recorded baseline
+is entirely `audio-buffer`. The two earlier strict native runs
+already recorded 854,400 B at control in their five-boot online
+footprint cohorts on the same Nine pin. Their shorter ledger cohort
+had only seen 384,000 B. Across all three hosted sweeps the larger
+reading appears on the slower online joins after the finish checkpoint.
+
+Both audio entries now record the existing 854,400 B high. The
+2% subsystem comparator and both phone ceilings stay in force.
+[First detached sweep](https://github.com/project-wildshard/engine/actions/runs/44405632324).
