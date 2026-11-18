@@ -199,26 +199,42 @@ export async function oldProfileTitle(page, { onDrop = () => undefined, onRecove
   const back = '.ws-title-stack[data-screen="select"] .ws-menu-back';
   const controls = [SEL.dropDismiss, back, SEL.exit, SEL.pause, SEL.titleSelect];
   let recovered = false;
+  /** @type {{ selector: string, document: number } | undefined} */
+  let previous;
   for (let step = 0; step < 8; step++) {
-    // A laid-out HUD or menu can still be covered by the loading card. Wait for a real hit target, then choose again.
-    const ready = await page.waitForFunction((selectors) => selectors.find((selector) => [...document.querySelectorAll(selector)].some((element) => {
-      if (element.closest('[inert]') !== null || element.matches(':disabled')) return false;
-      const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
-      if (rect.width <= 0 || rect.height <= 0 || style.visibility === 'hidden') return false;
-      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-      return hit !== null && element.contains(hit);
-    })) ?? false, controls, { timeout: 90_000 });
-    const selector = await ready.jsonValue();
+    // Wait for the previous tap to change the actionable control or document. Exit can stay visible while it saves.
+    const ready = await page.waitForFunction(({ selectors, previous: previousTarget }) => {
+      const selector = selectors.find((candidate) => [...document.querySelectorAll(candidate)].some((element) => {
+        if (element.closest('[inert]') !== null || element.matches(':disabled')) return false;
+        const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+        if (rect.width <= 0 || rect.height <= 0 || style.visibility === 'hidden') return false;
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return hit !== null && element.contains(hit);
+      }));
+      const origin = performance.timeOrigin;
+      return selector !== undefined && (previousTarget === undefined || selector !== previousTarget.selector || origin !== previousTarget.document)
+        ? { selector, document: origin } : false;
+    }, { selectors: controls, previous }, { timeout: 90_000 });
+    const target = await ready.jsonValue();
     await ready.dispose();
-    if (typeof selector !== 'string') throw new Error('Old profile has no actionable title control');
+    if (target === false) throw new Error('Old profile has no actionable title control');
+    const { selector } = target;
     if (selector === SEL.titleSelect) return;
     if (!recovered && [SEL.dropDismiss, SEL.pause, SEL.exit].includes(selector)) {
       recovered = true;
       await onRecovery();
       continue; // a recovery capture can cross a transition; choose the current hit target again
     }
-    if (selector === SEL.dropDismiss) { if (await clearDrop(page)) onDrop(); }
-    else await page.locator(selector).tap();
+    try {
+      if (selector === SEL.dropDismiss) { if (await clearDrop(page)) onDrop(); }
+      else await page.locator(selector).tap({ timeout: 5000 });
+      previous = target;
+    } catch (error) {
+      // If navigation took the tapped control away, choose again on the new document. A stuck control still fails.
+      const navigated = await page.waitForFunction(origin => performance.timeOrigin !== origin, target.document, { timeout: 2000 })
+        .then(async handle => { await handle.dispose(); return true; }, () => false);
+      if (!navigated) throw error;
+    }
   }
   throw new Error('Old profile did not return to title through its controls');
 }
