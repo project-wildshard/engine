@@ -57,18 +57,20 @@ export class PhaseEncounter {
     const party = this.party = new BossContenders(sim.players, (point) => point.distanceTo(focus) < spec.arena.radius, (player, position, yaw) => {
       player.position.copy(position); player.yaw = yaw; player.health.attributes.health = player.health.attributes.maxHealth;
     }, { served: () => sim.respawn.served, rearm: true });
+    // AC6: a form a script's `despawn` holds out of the world (hidden, not alive) is neither beaten nor revived by its fight
+    const held = (): boolean => 'hidden' in actor && actor.hidden === true;
     const phase = (): EncounterPhase => { const value = this.spec.phases[this.boss.phase]; if (!value) throw new Error('Missing encounter phase'); return value; };
     this.boss = new BossBrain({ id: spec.id, name: spec.name, title: spec.title, retryTitle: spec.retry, intro: spec.intro, introShort: spec.introShort,
       phases: spec.phases.map((p) => ({ at: p.at, name: p.name, caption: p.caption })), reward: {} }, {
       inArena: (point) => point.distanceTo(focus) < spec.arena.radius,
-      reset: (index) => { const value = spec.phases[index]; if (!value) throw new Error('Missing checkpoint'); actor.hp = actor.maxHp * value.at; actor.alive = true; actor.cancelAttack(); sim.strikes.get(actor.entityId)?.cancel(); actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; },
+      reset: (index) => { const value = spec.phases[index]; if (!value) throw new Error('Missing checkpoint'); actor.hp = actor.maxHp * value.at; actor.alive = !held(); actor.cancelAttack(); sim.strikes.get(actor.entityId)?.cancel(); actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; },
       seal: () => undefined, intro: () => focus, begin: () => undefined, enterPhase: () => undefined,
       update: (_dt, _t, fighting) => {
         if (decisionOwned) return;
         const foe = sim.nearestPlayer(actor.position), player = foe.position, tune = phase(), dx = player.x - actor.position.x, dz = player.z - actor.position.z;
         actor.setMotion(Math.atan2(dx, dz), fighting && actor.alive && Math.hypot(dx, dz) > tune.stopDistance ? tune.speed : 0, tune.turnRate);
         if (fighting && actor.alive && foe.health.alive) sim.startStrike(actor.entityId, foe.id);
-      }, get hpFrac() { return actor.hp / actor.maxHp; }, get shielded() { return false; }, get dead() { return !actor.alive; },
+      }, get hpFrac() { return actor.hp / actor.maxHp; }, get shielded() { return false; }, get dead() { return !actor.alive && !held(); },
       clampHp: (fraction) => { actor.hp = actor.maxHp * fraction; }, setInvulnerable: (on) => { this.shield = on; },
       victory: () => { actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; }, rewardPoint: () => focus,
       respawnPoint: () => ({ pos: new Vector3(...spec.respawn.at), yaw: spec.respawn.yaw }),

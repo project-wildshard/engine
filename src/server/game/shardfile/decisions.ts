@@ -490,11 +490,12 @@ export class ShardDecisions {
     if (next !== undefined) {
       const share = body.hp / body.maxHp;
       next.place(body.position.x, body.position.z, body.yaw, body.position.y); next.alive = false; next.revive();
-      next.hp = Math.max(1, Math.round(share * next.maxHp)); Object.assign(next, { hidden: false }); next.motor?.resetAt?.(next.position);
+      next.hp = Math.max(1, Math.round(share * next.maxHp)); Object.assign(next, { hidden: false }); next.airborne = false; next.motor?.resetAt?.(next.position);
       this.absent.delete(nextHandle);
     }
     this.stop(handle, true);
-    Object.assign(body, { hidden: true }); body.alive = false; body.place(body.position.x, body.position.z, body.yaw, ABSENT_Y); body.motor?.resetAt?.(body.position);
+    // airborne: no ground follow draws a held form back up into the world
+    Object.assign(body, { hidden: true }); body.alive = false; body.place(body.position.x, body.position.z, body.yaw, ABSENT_Y); body.airborne = true; body.motor?.resetAt?.(body.position);
     this.absent.add(handle);
   }
   private stop(actor: number, reset = false): void {
@@ -739,6 +740,6 @@ export class ShardDecisions {
     for (const handle of this.fieldActors) { const body = this.actor(handle); if (body !== undefined) body.nextAbility = null; }
     for (const [actor, strike] of saved.abilities) { const body = this.actor(actor); if (body !== undefined) body.nextAbility = this.name('strikes', strike); }
     for (const handle of this.absent) { const body = this.actor(handle); if (body !== undefined) Object.assign(body, { hidden: false }); }
-    this.absent.clear(); for (const handle of saved.absent) { this.absent.add(handle); const body = this.actor(handle); if (body !== undefined) Object.assign(body, { hidden: true }); }
+    this.absent.clear(); for (const handle of saved.absent) { this.absent.add(handle); const body = this.actor(handle); if (body !== undefined) { Object.assign(body, { hidden: true }); body.airborne = true; } }
   }
 }

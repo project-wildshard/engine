@@ -38,6 +38,9 @@ test('despawn swaps a form for its other, keeping hp %', async () => {
     expect([other.position.x, other.position.z, other.yaw]).toEqual([4, 9, 1.25]);
     expect(first.alive).toBe(false); expect(first.position.y).toBeLessThan(-1000);
     expect(died).toEqual([]);
+    // each form's encounter fights on: a held-out form is not a beaten boss, so the arrival is not re-armed at full hp
+    live.step(120);
+    expect([other.alive, other.hp, first.alive, first.position.y < -1000]).toEqual([true, 60, false, true]);
     expect(live.decisions.host.metrics()[0]).toMatchObject({ refusals: 0 });
     // the swap is saved: a restore keeps the waiting form out of the world
     const saved = live.decisions.snapshot();
