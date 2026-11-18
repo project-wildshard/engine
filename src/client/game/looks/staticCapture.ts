@@ -94,8 +94,10 @@ export class StaticCapture {
     this.contactCam.left = -HALF; this.contactCam.right = HALF; this.contactCam.top = HALF; this.contactCam.bottom = -HALF; this.contactCam.near = 1; this.contactCam.far = 600; this.contactCam.updateProjectionMatrix();
     this.contactXf.set(row.heightOrigin, row.heightOrigin, 1 / row.heightSize, 0);
     contactPass.setParam('xf', this.contactXf.toArray());
-    const depthTexture = new THREE.DepthTexture(SIZE, SIZE, THREE.UnsignedIntType);
     const phone = TIER === 'phone';
+    // MG11 (J410): on the phone both bakes keep 16-bit depth. The shadow camera spans 700 m, so a step is ~1.1 cm against
+    // the 0.0004 (~28 cm) bias; the contact camera only orders casters from above. A 24-bit attachment held 4 bytes a texel.
+    const depthTexture = new THREE.DepthTexture(SIZE, SIZE, phone ? THREE.UnsignedShortType : THREE.UnsignedIntType);
     // Receivers read only the depth texture. Keep a single-byte colour attachment for the existing render pass.
     this.shadowRT = new THREE.WebGLRenderTarget(SIZE, SIZE, { depthTexture, depthBuffer: true, type: THREE.UnsignedByteType,
       format: phone ? THREE.RedFormat : THREE.RGBAFormat });
@@ -104,6 +106,7 @@ export class StaticCapture {
     const contactFormat = phone && renderer.extensions.has('EXT_color_buffer_float') ? THREE.RedFormat : THREE.RGBAFormat;
     this.contactRT = new THREE.WebGLRenderTarget(AO_SIZE, AO_SIZE, {
       type: THREE.HalfFloatType, format: contactFormat, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true,
+      ...(phone ? { depthTexture: new THREE.DepthTexture(AO_SIZE, AO_SIZE, THREE.UnsignedShortType) } : {}),
     });
     this.contactMat = contactPass.material;
     this.shadowCam.layers.set(LAYER);
