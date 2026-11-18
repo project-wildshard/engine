@@ -158,6 +158,7 @@
     "src/client/engine/core/Game.ts": "client",
     "src/client/engine/core/gpuOnly.ts": "client",
     "src/client/engine/core/GpuRecovery.ts": "client",
+    "src/client/engine/core/worldWatch.ts": "client",
     "src/client/engine/core/Grade.ts": "client",
     "src/client/engine/core/heldTiming.ts": "client",
     "src/client/engine/core/KeepAlive.ts": "client",

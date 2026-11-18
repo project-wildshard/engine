@@ -418,6 +418,7 @@
     "./combat/view/projectedTrail": "./src/client/engine/combat/view/projectedTrail.ts",
     "./core/Game": "./src/client/engine/core/Game.ts",
     "./core/GpuRecovery": "./src/client/engine/core/GpuRecovery.ts",
+    "./core/worldWatch": "./src/client/engine/core/worldWatch.ts",
     "./core/Grade": "./src/client/engine/core/Grade.ts",
     "./core/KeepAlive": "./src/client/engine/core/KeepAlive.ts",
     "./core/assets": "./src/client/engine/core/assets.ts",

@@ -19,9 +19,10 @@ import { loadingStage, loadingUnits, waitFor } from '@wildshard/engine/boot/wait
 import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/loadingWaits';
 import { currentLoadingTimeline } from '@wildshard/engine/boot/timeline';
 import { startShardPrefetch } from '@wildshard/engine/boot/shardPrefetch';
-import { afterControl, reachControl } from '@wildshard/engine/boot/prefetch';
+import { afterControl, reachControl, whenControl } from '@wildshard/engine/boot/prefetch';
 import { idleTurn } from '@wildshard/engine/boot/idle';
 import { installGpuRecovery } from '@wildshard/engine/core/GpuRecovery';
+import { installWorldWatch } from '@wildshard/engine/core/worldWatch';
 import { TIER } from '@wildshard/engine/core/tier';
 import { installProbe } from '@wildshard/engine/debug/probe';
 import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
@@ -253,6 +254,19 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     fragileBoot: () => TIER === 'phone' && performance.now() - recoveryInstalledAt < 20_000,
   });
   disableBootGpuGuard();
+  // SB48 (Jake's iPhone, v0.1.43: the HUD over a black world): look at the world a few times after control; a canvas left
+  // hidden comes back, a world that never draws is reported and gets the error card's RELOAD (worldWatch.ts)
+  whenControl(game.levelScope, game.levelScope, () => {
+    installWorldWatch({ canvas: game.canvas, get hold() { return game.hold; }, captureFrame: (w) => game.captureFrame(w),
+      contextLost: () => game.renderer.getContext().isContextLost(),
+      playing: () => hud.entered && document.querySelector('#hud.ws-grid-revealing') === null && document.querySelector('.ws-load:not(.hide)') === null,
+      detail: () => {
+        const gl = game.renderer.getContext();
+        return { tier: TIER, buffer: `${String(gl.drawingBufferWidth)}x${String(gl.drawingBufferHeight)}`,
+          canvas: `${String(game.canvas.width)}x${String(game.canvas.height)}`, programs: game.renderer.info.programs?.length ?? 0, frame: game.frameCount, slug };
+      },
+      scope: game.levelScope });
+  });
   if (fragileBoot) game.levelScope.unlisten(game.canvas, 'webglcontextlost', onBootContextLost);
   setPoseProvider(() => (hud.entered ? { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch } : null)); // the Look Lab's reload prompt comes back right here (E65)
   // L15: the loader fades over the live world, not over the boot's last warm-up render (round 53: a washed-out lower
