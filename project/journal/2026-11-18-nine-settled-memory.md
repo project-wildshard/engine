@@ -107,3 +107,6 @@ shrink it further (the fog chunk's `vFogWorldPos` and the graph's `wsVFogWorld` 
 in every fogged graph program; `regionLook.ts` rewrites `vFogWorldPos`, so check it first). IOAccelerator ~200 MB is the
 GL buffers (117 [L], led by Nine's aMisc f32x4 15 MB, positions 14, aSpill 12, aOff 7.5, f16 aPat/aFace 7.4 each),
 textures 47 and programs 26. "Owned (graphics)" 128 is mostly the browser's: a blank WebGL page holds 108.
+Read back from the GPU (`getBufferSubData`), aMisc, position, aSpill and aOff are not float16-exact (14.5, 14.1, 11.3
+and 7.0 MB inexact); only the float32 aFace/aPat/aMat/aUv copies (~6 MB) are, so a lossless half repack saves ~3 MB.
+A Metal pipeline (a new program, vertex layout or blend state) costs ~0.13 MB of IOAccelerator on a blank page.
