@@ -429,6 +429,7 @@
    "name": "player.died",
    "bus": "page",
    "listeners": [
+    "src/client/game/grid/dataCellHud.ts",
     "src/client/game/shardfile/client.ts"
    ],
    "producers": [
