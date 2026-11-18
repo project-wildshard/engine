@@ -14,6 +14,10 @@ const LOOSE = new Uint8Array(0);
 export class ClientAssets {
   private readonly wire: Map<string, Uint8Array>;
   private readonly pending = new Map<string, Promise<Uint8Array>>();
+  /** EM35: open reads of each backing buffer (`read` lends, `returned` gives back), and buffers a background cache write
+   *  still holds. A buffer nobody holds leaves the ledger at once instead of whenever the collector finalizes it. */
+  private readonly loans = new WeakMap<ArrayBufferLike, number>();
+  private readonly writing = new WeakSet<ArrayBufferLike>();
   private readonly source: Shardfile;
   private readonly options: FolderOptions;
   // The admitted source's files by hash, built on the first lease (every tile scope leases its closure at boot).
@@ -34,6 +38,26 @@ export class ClientAssets {
   lease(refs: Iterable<string>): () => void { return this.options.cache?.pin?.([...this.closure(refs)].map((ref) => ref.replace(/^commons:/u, ''))) ?? (() => undefined); }
   /** Optional read-ahead shares actual demand's pending verification, at low network priority. */
   async read(ref: string, priority?: 'low'): Promise<Uint8Array> {
+    const bytes = await this.readShared(ref, priority), buffer = bytes.buffer;
+    this.loans.set(buffer, (this.loans.get(buffer) ?? 0) + 1);
+    return bytes;
+  }
+  /**
+   * EM35 (Coral Drift's ledger guard): the caller has finished with what `read` lent it. A buffer no other reader, the
+   * admitted wire or a cache write still holds leaves the memory ledger now: 28 decoded prop GLBs (4.3 MB) otherwise
+   * stayed counted until a collection ran, so two boots of one build read 4.3 MB apart. A later read observes it again.
+   */
+  returned(ref: string, bytes: Uint8Array): void {
+    const buffer = bytes.buffer, left = (this.loans.get(buffer) ?? 1) - 1;
+    if (left > 0) { this.loans.set(buffer, left); return; }
+    this.loans.delete(buffer);
+    this.unobserve(ref, buffer);
+  }
+  private unobserve(ref: string, buffer: ArrayBufferLike): void {
+    if (!isDev() || this.loans.has(buffer) || this.writing.has(buffer) || this.wire.get(ref)?.buffer === buffer) return;
+    memoryAttribution.release(buffer, 'ram');
+  }
+  private async readShared(ref: string, priority?: 'low'): Promise<Uint8Array> {
     const file = this.source.files.find((row) => row.hash === ref);
     if (file === undefined && !this.source.requires.commons.some((hash) => ref === `commons:${hash}`)) throw new Error('Undeclared resident asset');
     // a cached read resolves at once, unless the frame's build budget is spent (pacedResolve): a hook's chain of
@@ -83,10 +107,13 @@ export class ClientAssets {
       // The verified network response is the build input. Disk persistence must
       // not hold the home load behind a background writer or a cache refusal.
       const cache = this.options.cache, wire = bytes;
-      if (cache !== undefined) void Promise.resolve().then(async () => {
-        await (cache.putAssetBackground === undefined ? cache.putAsset(base, hash, wire) : cache.putAssetBackground(base, hash, wire));
-        return undefined;
-      }).catch(() => undefined);
+      if (cache !== undefined) {
+        this.writing.add(wire.buffer);
+        void Promise.resolve().then(async () => {
+          await (cache.putAssetBackground === undefined ? cache.putAsset(base, hash, wire) : cache.putAssetBackground(base, hash, wire));
+          return undefined;
+        }).catch(() => undefined).finally(() => { this.writing.delete(wire.buffer); this.unobserve(ref, wire.buffer); });
+      }
     }
     return this.observe(ref, bytes);
   }

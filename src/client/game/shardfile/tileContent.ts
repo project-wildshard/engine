@@ -252,6 +252,8 @@ export async function prepareClientTile(source: Shardfile, assets: ClientAssets,
     const bytes = bytesOf(row.file), additional = new Map<string, Uint8Array>();
     for (const file of row.additionalFiles ?? []) additional.set(file, bytesOf(file));
     model = await views.props(props, key, bytes, scope, additional);
+    // EM35: the props GLB is parsed into its own geometry copies; its transport bytes leave with this tile's last read
+    assets.returned(row.file, bytes); ready.delete(row.file);
     active();
   }
   return [terrain, model].filter((tile): tile is ResidentTile => tile !== null);

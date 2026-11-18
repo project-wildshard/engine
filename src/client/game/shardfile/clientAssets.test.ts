@@ -202,3 +202,21 @@ test('EM24: released wire rereads from the content cache with the network off', 
   await expect(gone.read(f.ref)).rejects.toThrow('Missing cached resident tile');
   expect(f.fetch).not.toHaveBeenCalled();
 });
+
+test('EM35: a released read leaves the ledger when its last reader returns it, not when the collector runs', async () => {
+  setDev(true);
+  const f = fixture(), verifiedAsset = vi.fn(() => Promise.resolve(f.bytes));
+  const assets = new ClientAssets(f.source, new Map(), { ...f.options, cache: {
+    product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
+    asset: () => Promise.reject(new Error('Unexpected unverified read')),
+    putAsset: () => Promise.resolve(true), verifiedAsset,
+  } });
+  const a = await assets.read(f.ref), b = await assets.read(f.ref);
+  expect(f.rows()).toHaveLength(1);
+  assets.returned(f.ref, a); expect(f.rows()).toHaveLength(1);
+  assets.returned(f.ref, b); expect(f.rows()).toHaveLength(0);
+  expect(await assets.read(f.ref)).toBe(f.bytes); expect(f.rows()).toHaveLength(1);
+  // the admitted wire still holds its bytes: returning a read of them keeps them counted
+  const held = new ClientAssets(f.source, new Map([[f.ref, f.bytes]]), f.options);
+  held.returned(f.ref, await held.read(f.ref)); expect(f.rows()).toHaveLength(1);
+});

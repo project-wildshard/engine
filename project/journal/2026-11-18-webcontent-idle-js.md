@@ -16,3 +16,10 @@ dropped at control and the CSM map keeps only `uniforms`.
 Pine, 10 locked alternating WebKit pairs: settled WebContent 783 -> 742 MB, EM11 playing 1.018 -> 0.976 GB (upper
 1.142 -> 1.123), loading upper 1.571 -> 1.549. Not enough for the 1.0 GB upper alone: the rest of Pine's WebContent over
 Template is JSC heap capacity and a diffuse long tail of live cells.
+
+## EM35: prop GLB loans leave the ledger when returned
+
+Main went red on the ledger guard (Coral Drift loading 34.0 MB > 30.7). codex-memgates found 28 compressed prop-tile GLBs,
+garbage once parsed, that the weak ledger kept counting until the collector ran. `ClientAssets` now counts loans
+(`read` / `returned`); a buffer no reader, wire entry or cache write holds leaves the ledger at once. Coral reads 24.99 MB in
+every boot, Clockwork 19.03.
