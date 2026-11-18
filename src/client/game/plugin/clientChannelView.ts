@@ -56,7 +56,7 @@ function clientConnector(row: NonNullable<ClientChannelProgram['connectors']>[nu
 }
 
 /** A detached visual observation; only these numeric values and the clock cross the presentation boundary. */
-/** A trusted private view supplies its own declared geometry kernel; admission never accepts a function. */
+/** A native private view supplies its own declared geometry kernel; admission never accepts a function. */
 export type ClientGeometryKernels = ReadonlyMap<string, (row: NonNullable<ClientChannelProgram['geometry']>, target: unknown) => (frame: ClientTubeFrame, time: number) => void>;
 
 function bindTubeCurve(row: NonNullable<ClientChannelProgram['geometry']>, target: unknown): (frame: ClientTubeFrame,time:number)=>void {

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll,expect,test } from 'vitest';
 import { createSimHost } from '../src/server/engine/sim';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { trustedLevel } from '../src/server/game/plugin/simulation';
+import { shardLevel } from '../src/server/game/plugin/simulation';
 import { hasStaticGround } from '../src/shared/engine/physics/query';
 import { loadRapier,type Rapier } from '../src/shared/engine/physics/rapier';
 import { tagCollider } from '../src/shared/engine/physics/surface';
@@ -18,7 +18,7 @@ beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/ph
 
 /** Typed fixture composition retains native contracts independently of the retiring DSL. */
 function directPlan(shard: ReturnType<typeof emptyShardfile>, install: HeadlessRuntimePlan['install']): HeadlessRuntimePlan {
-  return { level: trustedLevel(shard, {at:{x:shard.spawn.x,y:Math.max(shard.spawn.y,.1),z:shard.spawn.z},yaw:shard.spawn.yaw,speed:5}, {size:500,height:0}),
+  return { level: shardLevel(shard, {at:{x:shard.spawn.x,y:Math.max(shard.spawn.y,.1),z:shard.spawn.z},yaw:shard.spawn.yaw,speed:5}, {size:500,height:0}),
     ports:{ground:false,heightAt:()=>0},install };
 }
 

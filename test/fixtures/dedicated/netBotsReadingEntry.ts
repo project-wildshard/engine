@@ -10,7 +10,7 @@ import { leadPlayer } from '../../../src/shared/engine/sim/leadPlayer';
 import { NetRoom } from '../../../src/server/engine/net/room';
 import { SimNetWorld } from '../../../src/server/engine/net/simWorld';
 import { readPackFolder } from '../../../src/server/host/dedicated/packReader';
-import { createTrustedHeadlessResident } from '../../../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../../../src/server/host/headlessRuntime';
 import { netTickCommands } from '../../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../../src/shared/host/tickProtocol';
 import { directLoopback, type DirectLoopback } from '../../../src/test/engine/netLoopback';
@@ -19,7 +19,7 @@ import { directLoopback, type DirectLoopback } from '../../../src/test/engine/ne
 const [origin = '', cache = '', slug = 'driftwood-isle', build = 'dev', wasm = ''] = process.argv.slice(2), PLAYERS = 32, WARM = 300, TICKS = 1800;
 installAppIdentity({ name: '', wordmark: '', tagline: '', savePrefix: 'wildshard.room.', saveFormat: '', fileSlug: '', exposeProbe: () => undefined, harness: () => undefined });
 const rapier = await loadRapier(readFileSync(wasm)), input = await readPackFolder(slug, build, rapier, { origin, cache }, { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 });
-const live = await createTrustedHeadlessResident(input), { host } = live, world = new SimNetWorld(host), spawn = leadPlayer(host).position;
+const live = await createNativeHeadlessResident(input), { host } = live, world = new SimNetWorld(host), spawn = leadPlayer(host).position;
 const room = new NetRoom({ world, step: inputs => {
   const [lead, ...others] = inputs, commands = new Map<string, NetCommand>();
   for (const other of others) if (other.command !== null) commands.set(other.player, other.command);

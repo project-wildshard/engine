@@ -62,7 +62,7 @@ export function bindPlayerColumns(host: Pick<SimHost, 'players' | 'parked' | 'fo
   });
 }
 
-/** Default data-only herd and diver recipes over one real host; injected trusted recipes remain separate. */
+/** Default data-only herd and diver recipes over one real host; injected native recipes remain separate. */
 export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardCreatures['spawns'] = [], borrowedImpulse?: (velocity: Vector3) => void): {
   brains: DeclaredBrainPorts; groups: DeclaredGroupPorts; install: () => void;
 } {

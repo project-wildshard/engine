@@ -1246,7 +1246,7 @@ export function fetchDeflated(url: string): Promise<Uint8Array> {
 }
 
 /**
- * Fetch a trusted runtime's own build file (its generator's output, imported with Vite's `?url`) as its bytes, for a runtime
+ * Fetch a native runtime's own build file (its generator's output, imported with Vite's `?url`) as its bytes, for a runtime
  * that decodes it in its own slices rather than evaluating it as module data (Nine Dragon's 6.8 MB layout). A failed fetch
  * throws.
  */

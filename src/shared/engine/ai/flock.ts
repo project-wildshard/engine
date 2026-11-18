@@ -8,7 +8,7 @@ import { emitFault } from '../core/faults';
 export interface FlockThreat { readonly alive: boolean; readonly position: TickPoint }
 /** Seeded home, ordered roster and speeds for an instanced grazing crowd. */
 export interface FlockSpec { x: number; z: number; count: number; seed: number; range: number; runSpeed: number; walkSpeed: number; grazeStep: number; bleatCue: string }
-/** Trusted terrain, stealth and effect recipes; no application or renderer service is imported. */
+/** Host-owned terrain, stealth and effect recipes; no application or renderer service is imported. */
 export interface FlockPorts {
   heightAt: (x: number, z: number) => number;
   normalY: (x: number, z: number) => number;

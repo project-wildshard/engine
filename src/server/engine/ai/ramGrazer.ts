@@ -24,7 +24,7 @@ export class RamGrazerBrain<A extends AnimalSim> {
   snapshot(): SimValue { return this.policy.snapshot(); }
   /** Restore atomically through the admitted shared policy. */
   restore(saved: SimValue): void { this.policy.restore(saved); }
-  /** Keep the existing trusted observation API while selecting this pattern explicitly. */
+  /** Keep the existing host observation API while selecting this pattern explicitly. */
   think(c: RamGrazerPorts<A>): void { this.policy.think({ ...c, pattern: 'wander-ram' }); }
   /** Keep the existing body API, strike order and host-owned movement authority. */
   act(c: RamGrazerPorts<A>): void { this.policy.act({ ...c, pattern: 'wander-ram' }); }

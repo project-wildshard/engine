@@ -25,7 +25,7 @@ export function useOwnedGridHome(mode: PageMode, manifest: Pick<ShardManifest, '
 /**
  * G226: the page owns the renderer, player and platform controls, never an opaque home world. Keep only identity and
  * scalar presentation data here: the original manifest remains in the catalogue and its owned region builds its
- * terrain, creatures, equipment and hooks through the ordinary trusted factory. Standalone boots never use this copy.
+ * terrain, creatures, equipment and hooks through the ordinary native factory. Standalone boots never use this copy.
  */
 export function gridPageShell(source: ShardManifest): ShardManifest {
   const { slug, api, order, status, name, label, seed, biome, blurb, card, sky, atmosphere, grade, style, weapon, spawn } = source;

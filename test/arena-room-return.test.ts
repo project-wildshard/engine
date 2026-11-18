@@ -9,7 +9,7 @@ import { arenaEntryOf } from '../src/server/game/boss/arenaRoomEntry';
 import { bossFlagRecord } from '../src/shared/game/plugin/bossRecord';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { Flags } from '../src/shared/engine/world/interact/flags';
 import { builtFolder } from '../src/test/game/builtFolder';
 
@@ -22,7 +22,7 @@ test('a served world\'s beaten King stands again and the world forgets his fall 
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  const live = await createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room: true }), { host } = live, fight = arenaEntryOf(host);
+  const live = await createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room: true }), { host } = live, fight = arenaEntryOf(host);
   try {
     if (fight === undefined) throw new Error('No room fight');
     host.respawn.served = true;

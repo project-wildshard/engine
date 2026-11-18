@@ -169,7 +169,7 @@ export interface CirclingPackContext<A extends AnimalSim> {
   steer: (actor: A, yaw: number, speed: number, turnRate: number) => void;
   pathYaw: (actor: A, x: number, z: number, every?: number) => number;
 }
-/** Trusted shared observations, terrain, token registration and strike recipe. */
+/** Host-owned shared observations, terrain, token registration and strike recipe. */
 export interface CirclingPackPorts<A extends AnimalSim> {
   sharedRng: () => Rng;
   environment: () => { playerFwdX: number; playerFwdZ: number; playerMounted: boolean; playerHealth01: number; grassHeightAt: (x: number, z: number) => number };
@@ -963,7 +963,7 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
     this.initialized = true;
   }
 
-  /** Group continuation stores timers, tokens and trusted prey references; actors and shared RNG are snapshotted by their owner. */
+  /** Group continuation stores timers, tokens and host-owned prey references; actors and shared RNG are snapshotted by their owner. */
   snapshotPack(): string { this.requirePack();
     const preyId = (prey: CirclingPackPrey | null): string | null => {
       if (prey === null) return null;

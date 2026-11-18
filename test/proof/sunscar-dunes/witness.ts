@@ -37,9 +37,9 @@ const baked: unknown = JSON.parse(physicsDocument);
 
 /**
  * Signal Dunes' whole-shard witness (E435 §C / SF72) on its admitted sim/runtime-plan section, composed
- * exactly as the platform's trusted adapter composes it (`createTrustedHeadlessAdapter`: the plan's level and ports, one
+ * exactly as the platform's native adapter composes it (`createNativeHeadlessAdapter`: the plan's level and ports, one
  * install, the tick's commands lent to the runtime, its effects buffered per tick), and cross-checked against the
- * shipping worker (`HeadlessSimulation` + `trustedRuntime`) from the mid-fight checkpoint. The player's tape is a set of
+ * shipping worker (`HeadlessSimulation` + `nativeRuntime`) from the mid-fight checkpoint. The player's tape is a set of
  * tick commands only (`player` moves and whip attacks, `script` interactions), chosen each tick from what a player sees:
  * the prompts in reach, the creature in the lash's reach. It walks the signal quest from the spawn, lights the fire and
  * fights the Dune Matriarch to her fall. Nothing writes health, flags, positions or facts: every outcome is gameplay.
@@ -96,14 +96,14 @@ function restore(plan: HeadlessRuntimePlan, rapier: Rapier, saved: string): Sess
   if (session.tick.length > 0) throw new Error('Restore emitted gameplay effects');
   return Object.assign(session, { host });
 }
-/** One tick as the trusted adapter runs it; only a completed tick commits its effects. */
+/** One tick as the native adapter runs it; only a completed tick commits its effects. */
 function step(session: Session, commands: readonly HeadlessCommand[]): HeadlessEffect[] {
   session.tape = commands; session.tick = [];
   try {
     const player = commands.find(command => command.kind === 'player');
     session.host.step(leadCommands(session.host, player?.kind === 'player' ? { moveX: player.moveX, moveZ: player.moveZ, yaw: player.yaw, ...(player.attack === undefined ? {} : { attack: player.attack }) } : undefined));
   } finally { session.tape = []; }
-  if (![leadPlayer(session.host).position, ...[...session.host.entities.values()].map(entity => entity.position)].every(point => [point.x, point.y, point.z].every(Number.isFinite))) throw new Error('Nonfinite trusted simulation state');
+  if (![leadPlayer(session.host).position, ...[...session.host.entities.values()].map(entity => entity.position)].every(point => [point.x, point.y, point.z].every(Number.isFinite))) throw new Error('Nonfinite native simulation state');
   session.effects.push(...session.tick); return session.tick;
 }
 

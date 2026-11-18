@@ -7,7 +7,7 @@ import { leaseClientLibrary } from '../shardfile/clientLibrary';
 import { ktx2TranscodeSupport } from '@wildshard/engine/core/ktx2';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 /**
- * The concrete regional world of a trusted hybrid cell (SHARD-PLATFORM SF47 / M3, E452): the foundation that
+ * The concrete regional world of a native hybrid cell (SHARD-PLATFORM SF47 / M3, E452): the foundation that
  * `createRegionalRuntimeFactory` composes, so an admitted first-party runtime can run as a neighbour cell instead of the
  * page's home.
  *
@@ -105,7 +105,7 @@ export interface RegionalWorldPorts {
   /** The page's existing scheduler owns render tiles; regions borrow scoped instance registration. */
   readonly tiles?: ClientTileRegistration;
   readonly rapier: Rapier;
-  /** The trusted level of the admitted manifest (default: the manifest's ordinary `toLevelSpec`). */
+  /** The native level of the admitted manifest (default: the manifest's ordinary `toLevelSpec`). */
   readonly level?: (manifest: ShardManifest) => LevelSpec;
   /** The level's baked navmesh (the browser passes `loadNavmesh`); absent: none. */
   readonly navmesh?: (level: LevelSpec) => Promise<LevelFrameOptions['navmesh']>;
@@ -154,7 +154,7 @@ async function prepareRegionalPresentation(admitted: AdmittedFolder, renderer: P
   const assets = runtimeFolder(full).assets, terrain = full.terrain;
   const collider = terrain === null ? undefined : await assets.read(terrain.collider);
   if (scope.disposed || scope.disposing) throw new Error('Regional world left while reading its presentation collider');
-  const presentation = await clientMaterials({ ...full, state: full.state }, assets.retained, renderer, scope, { trustedGraphs: true });
+  const presentation = await clientMaterials({ ...full, state: full.state }, assets.retained, renderer, scope, { declaredGraphCeilings: true });
   if (scope.disposed || scope.disposing) throw new Error('Regional world left while preparing its presentation materials');
   return { collider, presentation };
 }
@@ -256,7 +256,7 @@ export function resolveRegionalRuntimeTextures(manifest: Pick<ShardManifest, 'sl
   finally { leave(); }
 }
 
-/** The `prepareFoundation` port of `createRegionalRuntimeFactory` for any trusted hybrid manifest. */
+/** The `prepareFoundation` port of `createRegionalRuntimeFactory` for any native hybrid manifest. */
 export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (request: RegionalRuntimeRequest) => Promise<RegionalRuntimeFoundation> {
   return async request => {
     if (request.scope.disposed) throw new Error('Regional world requires a live runtime scope');
@@ -268,7 +268,7 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
     if(product!==undefined)await timeClientPreparation(request.manifest.slug,'native.scalar-blocks',()=>prepareManifestScalarBlocks(request.manifest,product,request.scope));
     const level = ports.level === undefined ? toLevelSpec(hasDeclaredClientPage(request.admitted.source) ? { ...request.manifest, ground: clientPageGround(request.admitted.source, request.admitted.assets) } : request.manifest, product) : ports.level(request.manifest);
     const { slug: identity } = request.manifest;
-    if (level.id !== identity) throw new Error('Regional level identity differs from its trusted manifest');
+    if (level.id !== identity) throw new Error('Regional level identity differs from its native manifest');
     // PZ22: the table goes in before Auto resolves, and before the resident's scope exists to leak on a refusal
     if (request.textures === undefined) await registerRegionalTextureTable(request.manifest);
     const resident = request.scope.child(`grid.world:${cell.instance}`), left = (): boolean => resident.disposed;

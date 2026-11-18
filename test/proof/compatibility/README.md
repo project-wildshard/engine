@@ -3,10 +3,10 @@
 **Signal Dunes, Sky Reach and Nine Dragon pass (`compatible: true`, SF72).** Their current native reports prove
 real gameplay, canonical replay and durable Ledger facts. Pine, Driftwood and Nalati retain `compatible: false`
 reports with partial native coverage; their per-shard reports describe that coverage. Signal's witness
-(`test/proof/sunscar-dunes/witness.ts`) runs its renderer-free trusted entry `runtime/headless.ts`, composed as the
-platform's trusted adapter composes it, on a tape of tick commands alone: it walks the signal quest from the spawn,
+(`test/proof/sunscar-dunes/witness.ts`) runs its renderer-free native entry `runtime/headless.ts`, composed as the
+platform's native adapter composes it, on a tape of tick commands alone: it walks the signal quest from the spawn,
 lights the fire, fells the Dune Matriarch (no health, flag, position or fact is ever written), restores her
-storm-phase checkpoint byte-exactly in process and in the shipping worker (`HeadlessSimulation` + `trustedRuntime`),
+storm-phase checkpoint byte-exactly in process and in the shipping worker (`HeadlessSimulation` + `nativeRuntime`),
 and feeds the committed facts to the real `Ledger`. Nine additionally restores both its portal/sword and lifting
 crossing checkpoints in the shipping worker, comparing every suffix tick's state and effects. Hook-placement
 extraction remains a separate authoring task, not a compatibility failure.
@@ -33,7 +33,7 @@ compatibility green. Unknown modes throw rather than emit a passing result.
 The following table retains the original boot inventory for the unfinished entries; their current partial
 headless adapters and coverage are recorded in the per-shard reports, rather than those historical refusal paths.
 
-| Shard | Audited trusted entry | Historical runtime blocker / passing witness | Full source / partial ledger |
+| Shard | Audited native entry | Historical runtime blocker / passing witness | Full source / partial ledger |
 | --- | --- | --- | --- |
 | Signal Dunes | `sunscar-dunes/runtime/headless.ts` | none: passes (headless, replay, ledger from gameplay) | 2 rules, both from gameplay |
 | Sky Reach | `far-reach/runtime/headless.ts` | none: passes (headless, replay, ledger from gameplay); CI runs it in checkpointed slices | 2 rules, both from gameplay |
@@ -70,7 +70,7 @@ draws, body duplication or reward replay. Snapshot adapters must cover gameplay 
 ### Signal Dunes (passes)
 
 The legacy browser entry (`runtime/index.ts -> plugin.ts -> world/meshes.ts -> engine/client/anim/rig.ts`) is unchanged; the
-witness names the renderer-free trusted entry `runtime/headless.ts` instead. It owns the admitted terrain collider and
+witness names the renderer-free native entry `runtime/headless.ts` instead. It owns the admitted terrain collider and
 baked pieces, the 13 declared homes (1 dune ray, 10 sand skitterers, 2 dune striders) with their shipping policies,
 stream and respawn clocks, the whip as its declared item row (contact on the head ball / body capsule, then the lane:
 the browser whip's rule, `weapons/lash.ts`), the signal quest and interactions on `host.flags`, the Matriarch's
@@ -97,7 +97,7 @@ continuations pass. Signal's held-heavy native binding is also covered by its re
 
 ### Sky Reach (`far-reach`)
 
-Passes on the trusted renderer-free entry `runtime/headless.ts` (SF72). `run.mjs all` plays one tape of tick commands
+Passes on the native renderer-free entry `runtime/headless.ts` (SF72). `run.mjs all` plays one tape of tick commands
 from the spawn to the Storm Roc's fall (21,134 ticks): the keeper, the three vanes GUSTed, the roost's rays felled by the
 War Fan, both hover bridges and the updraft on the board, the winch, the raised bridge and the Roc felled by fan play;
 its gale-wall checkpoint (phase 1) restores byte-exactly, the suffix to the fall hashes identically and the shipping

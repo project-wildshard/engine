@@ -27,7 +27,7 @@ import { headlessSections } from '../../shared/host/headlessSections';
 export class HeadlessSimulation {
   private readonly runner: TickWorkerHost;
   private constructor(runner: TickWorkerHost) { this.runner = runner; }
-  /** Start the fixed worker with runtime deadlines by default. `product` names a built output folder: the worker then runs its native plan, server-class files included. Trusted offline validation selects advisory timing; author data cannot select this policy. */
+  /** Start the fixed worker with runtime deadlines by default. `product` names a built output folder: the worker then runs its native plan, server-class files included. Advisory offline validation selects advisory timing; author data cannot select this policy. */
   static async create(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, snapshot?: string, options: { deadline?: 'runtime' | 'advisory'; sections?: ReadonlyMap<string, unknown>; product?: string } = {}): Promise<HeadlessSimulation> {
     const sections = headlessSections(options.sections ?? outputDescriptor(shard)?.sections);
     const memory = offlineMemoryAdmission('refuse');
@@ -52,7 +52,7 @@ export class HeadlessSimulation {
   }
   /** Last committed state is detached; callers cannot change the checkpoint used after a refused or unfinished tick. */
   get checkpoint(): HeadlessTickCommit | undefined { return this.runner.checkpoint; }
-  /** Quarantined sessions cannot execute again; a trusted caller may start a new worker from the retained checkpoint. */
+  /** Quarantined sessions cannot execute again; an engine caller may start a new worker from the retained checkpoint. */
   get quarantined(): boolean { return this.runner.quarantined; }
   /** Actual timed work, excluding detached checkpoint encoding and IPC. The first touch has a bounded 16.666 ms JIT allowance. */
   get lastTickMicros(): number { return this.runner.lastTickMicros; }
@@ -68,7 +68,7 @@ export class HeadlessSimulation {
   verbTapePart(plan:HeadlessTapePlan):Promise<HeadlessTapePartReport>{return this.runner.verbTapePart(plan);}
   /** Terminal native replay with bounded next-segment prefetch and one unchanged 30s request clock. */
   streamVerbTape(observe:readonly string[],source:AsyncIterable<HeadlessTapeSegment>):Promise<HeadlessTapeReport>{return this.runner.streamVerbTape(observe,source);}
-  /** Terminal native route proof without per-tick continuation encoding. Trusted offline sessions only. */
+  /** Terminal native route proof without per-tick continuation encoding. Advisory offline sessions only. */
   journey(plan:HeadlessJourneyPlan):Promise<HeadlessJourneyReport>{return this.runner.journey(plan);}
   /** Complete one offline physics leg, retaining its full checkpoint and resident for ordered later legs. */
   walkLeg(plan:HeadlessJourneyPlan):Promise<HeadlessJourneyReport>{return this.runner.walkLeg(plan);}
@@ -133,7 +133,7 @@ export async function validateSimulation(shard: Shardfile, assets: ReadonlyMap<s
   finally { await sim.dispose(); }
 }
 
-/** Prove author data in an isolated native worker; trusted runtime bindings and injected facts are refused. */
+/** Prove author data in an isolated native worker; native runtime bindings and injected facts are refused. */
 /** `sections` are the checked project's output sections, as `validateSimulation` takes them (TC-NE5b): a shard without an
  * engine output descriptor otherwise admits every Wasm as ABI 0, and a v1 decision fails `Import signature outside ABI`. */
 export async function proveAuthorSimulation(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, input: AuthorProofPlan, sections?: ReadonlyMap<string, unknown>): Promise<AuthorProofReport> {

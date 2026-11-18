@@ -15,7 +15,7 @@ export interface DeclaredAudioData {
   cues: readonly { id: string; voice: string }[];
   gameplay?:NonNullable<AudioData['gameplay']>;observations?:NonNullable<AudioData['observations']>;
   bank?: NonNullable<AudioData['bank']>; playback?: NonNullable<AudioData['playback']>; pcm?: NonNullable<AudioData['pcm']>; synth?: NonNullable<AudioData['synth']>;
-  /** Extended profiles resolve only through trusted platform catalogue installers. */
+  /** Extended profiles resolve only through platform catalogue installers. */
   music?: AudioMusicProfile | undefined; samples?: AudioSampleProfile | undefined; zones?: AudioZoneProfile | undefined;
   /** Ordered cue rules resolve the same admitted voice catalogue, with scoped delayed playback. */
   routing?: readonly CueRoute[] | undefined;
@@ -30,7 +30,7 @@ export interface DeclaredAudioPorts {
   /** the score's silence for a scope (`Music.silence`): the music bus at 0 while it lives, restored after */
   music: { silence: (scope: Scope) => void };
   scope: Scope;
-  /** Trusted recipes consume bounded data; an unbound profile is refused before any sound changes. */
+  /** Native recipes consume bounded data; an unbound profile is refused before any sound changes. */
   profiles?: {
     music?: ((profile: AudioMusicProfile, scope: Scope) => void) | undefined;
     samples?: ((profile: AudioSampleProfile, scope: Scope) => void) | undefined;
@@ -67,7 +67,7 @@ export function installDeclaredAudio(data:DeclaredAudioData,ports:DeclaredAudioP
   }
   if(!('cues' in ports))throw new Error('Missing cue ports');
   if (data.ambience?.gust !== undefined) throw new Error('Gust beds require their declared native driver');
-  if ((data.music !== undefined && ports.profiles?.music === undefined) || (data.samples !== undefined && ports.profiles?.samples === undefined) || (data.zones !== undefined && ports.profiles?.zones === undefined)) throw new Error('Audio profile requires its trusted catalogue installer');
+  if ((data.music !== undefined && ports.profiles?.music === undefined) || (data.samples !== undefined && ports.profiles?.samples === undefined) || (data.zones !== undefined && ports.profiles?.zones === undefined)) throw new Error('Audio profile requires its native catalogue installer');
   const voices = new Map(data.cues.map((cue) => {
     const voice = ports.voices.get(cue.voice); if (voice === undefined) throw new Error(`Unknown catalogue voice: ${cue.voice}`);
     return [cue.id, voice] as const;

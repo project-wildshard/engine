@@ -1690,7 +1690,7 @@ function drawnFrom(camera: THREE.Camera, entering?: THREE.Object3D, turns: reado
  * D188 (G808, G815): what an arrival needs drawn before its reveal. Content outside `root` (the page: roads, other
  * cells, the sky) keeps its whole inventory. Inside `root` (the parked destination, hidden while it waits), a drawable
  * whose bounds reach within `radius` of `at` (horizontal, every direction: the player can turn on the reveal) is in; so
- * is one whose bounds can't be trusted (unbounded, unculled, skinned, morphed, drawn through callbacks), which draws
+ * is one whose bounds can't be relied on (unbounded, unculled, skinned, morphed, drawn through callbacks), which draws
  * wherever it is, and one under a hidden subtree (a placement's other LOD level, an alternate shown later): the parked
  * draws warm one of each such pipeline wherever it is, and left out here it compiled inside those held draws.
  */

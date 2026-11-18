@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import * as v from 'valibot';
 import { expect,test } from 'vitest';
 import { createSimHost } from '../src/server/engine/sim';
-import { trustedLevel } from '../src/server/game/plugin/simulation';
+import { shardLevel } from '../src/server/game/plugin/simulation';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { emptyShardfile } from '../src/shared/host/author';
 import { nalatiPin } from './fixtures/engine-lift/pins';
@@ -22,7 +22,7 @@ const chapters=await nalatiPin.product.json('quests/chapters.json');
 test('the elder only grants his authored introduction when the real reading completes in reach',async()=>{
   const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const source=emptyShardfile({slug:'reading-proof',name:'Reading proof',author:'Test',revision:1,seed:1});
-  const host=createSimHost(trustedLevel(source,{at:{x:0,y:0,z:0},yaw:0,speed:4.3},{size:500,height:0}),{rapier});
+  const host=createSimHost(shardLevel(source,{at:{x:0,y:0,z:0},yaw:0,speed:4.3},{size:500,height:0}),{rapier});
   let commands:HeadlessCommand[]=[];const effects:HeadlessEffect[]=[];
   const fixture=v.parse(v.object({figures:FigureGroupSchema,npcs:v.record(v.string(),NpcDialogueRowSchema)}),{figures:peopleRows,npcs:content.npcs});
   try{
@@ -51,7 +51,7 @@ test('the elder only grants his authored introduction when the real reading comp
 test('the moving child uses his live orbit prompt and restores its actual continuation',async()=>{
   const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const source=emptyShardfile({slug:'orbit-proof',name:'Orbit proof',author:'Test',revision:1,seed:1});
-  const host=createSimHost(trustedLevel(source,{at:{x:0,y:0,z:0},yaw:0,speed:4.3},{size:500,height:0}),{rapier});
+  const host=createSimHost(shardLevel(source,{at:{x:0,y:0,z:0},yaw:0,speed:4.3},{size:500,height:0}),{rapier});
   let commands:HeadlessCommand[]=[];const effects:HeadlessEffect[]=[];
   const fixture=v.parse(v.object({figures:FigureGroupSchema,npcs:v.record(v.string(),NpcDialogueRowSchema)}),{figures:peopleRows,npcs:content.npcs});
   try{

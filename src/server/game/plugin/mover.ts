@@ -146,9 +146,9 @@ export async function createMoverHost(data: MoverData, assets: ReadonlyMap<strin
   return host;
 }
 
-/** Verified extra author modules and trusted roles share the existing 32-entity mover host. */
+/** Verified extra author modules and host-owned roles share the existing 32-entity mover host. */
 export interface MoverRoleComposition { modules: ReadonlyMap<string, Uint8Array>; roles: readonly ScriptRole[]; declarations?: readonly DeclaredScriptRoleBinding[]; schedules?: readonly ScriptSchedule[]; seed: number }
-/** Declared constants are read only and selected by the trusted calling entity; physics queries keep their adapter. */
+/** Declared constants are read only and selected by the host-owned calling entity; physics queries keep their adapter. */
 function moverQueries(data: MoverData, physicsQueries: ScriptQuery): ScriptQuery {
   const parameters = new Map(parseMovers(data).map((m) => [m.entity, [...m.input]]));
   return (kind, input, entity) => {
@@ -163,7 +163,7 @@ function moverQueries(data: MoverData, physicsQueries: ScriptQuery): ScriptQuery
 export interface MoverView { pose: (value: MoverPose, fields: Readonly<Record<number, number>>) => void; chain?: RopeChain;
   /** A replay's deck: its collider stands at `at` now, and `next` waits for the physics step after the replay. No view moves. */
   place?: (at: MoverPose, next: MoverPose) => void }
-/** Declared rows plus trusted legacy view callbacks; the platform owns context, world, scripts, scope and fixed systems. */
+/** Declared rows plus host-owned legacy view callbacks; the platform owns context, world, scripts, scope and fixed systems. */
 export interface MoverInstallation {
   flags?: Pick<Flags, 'has' | 'set'>;
   prompts?: Interactable[];
@@ -194,7 +194,7 @@ export function riderStick(host: Pick<SimHost, 'tickCommand'>, player: string, y
   return { throttle: -sin * move.x - cos * move.z, turn: cos * move.x - sin * move.z, boost: command.boost === true || command.sprint === true };
 }
 export function* playerGrounds(host: Pick<SimHost, 'players' | 'parked'>): Generator<CharacterMotor['result']> { for (const player of host.players.values()) if (player.hasMotor && !host.parked.has(player.id)) yield player.motor.result; }
-/** Trusted activation observes real grounded collider ownership and the admitted host shared state. */
+/** Host-owned activation observes real grounded collider ownership and the admitted host shared state. */
 export interface MoverActivationPorts {
   ground?: () => Iterable<CharacterMotor['result']>;
   /** SS-MS2a1b: a steer vehicle's rider's stick this tick, in the vehicle's frame (heading `yaw`); the owner when `rider` is absent. */
@@ -239,7 +239,7 @@ export class MoverRuntime {
   private readonly views = new Map<string, (pose: MoverPose) => void>();
   private readonly host: ScriptHost;
   private readonly composed: ScriptLanePort | undefined;
-  /** Trusted item bindings use this already installed host's actor grants and current tick. */
+  /** Native item bindings use this already installed host's actor grants and current tick. */
   get scriptHost(): ScriptHost { return this.host; }
   /** The lane it was installed on, where a seat may be taken. */
   get lane(): ScriptLanePort | undefined { return this.composed; }
@@ -574,7 +574,7 @@ export class MoverScriptDriver {
       },
     };
   }
-  /** Compose numeric, mover and optional trusted roles under one host's aggregate allowances.
+  /** Compose numeric, mover and optional host-owned roles under one host's aggregate allowances.
    * Extra roles retain their own owner grants and event policy; omitted roles preserve the existing continuation. */
   compose(content: ShardScriptContent, assets: ReadonlyMap<string, Uint8Array>, ports: ShardScriptPorts,
     brains?: DeclaredScriptBrainPorts, permissions: () => ReadonlyMap<string, number> = () => new Map(),

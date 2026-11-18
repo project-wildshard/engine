@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { NATIVE_ASSEMBLY_FILE, parseNativeAssembly } from '@wildshard/format/nativeAssembly';
 import { parseEliteFeature } from '@wildshard/format/eliteFeature';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { readAssemblyInput } from '../src/server/game/shardfile/nativeAssemblyInput';
 import { encounterRows } from '../src/shared/engine/sim/encounterRows';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
@@ -56,7 +56,7 @@ test('removing the Pine elite host leaves its declared lairs unowned on the real
   const broken = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.filter(row => row.host !== 'population.elites' && row.host !== 'population.elites-ready') }));
   // In-memory fault on admitted plan bytes only; no shard pin/source file changes.
   const damaged: ShardFolder = { ...product, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(broken) : product.file(name) };
-  const live = await createTrustedHeadlessResident({ ...preparation, product: damaged }, undefined, { room: true });
+  const live = await createNativeHeadlessResident({ ...preparation, product: damaged }, undefined, { room: true });
   try {
     step(live);
     const published = encounterRows(live.host);

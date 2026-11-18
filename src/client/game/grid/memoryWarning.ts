@@ -37,7 +37,7 @@ export function memoryWarningLines(row: MemoryAdmissionWarning): readonly string
 }
 /**
  * G216 / E332: one scope-owned warning on an entered shard's HUD. A14: a section of the frame meter's panel (`perfDock.ts`); while
- * it shows, the fps pill carries a red "!". The trusted policy also feeds G217's separate blocked
+ * it shows, the fps pill carries a red "!". The native policy also feeds G217's separate blocked
  * cell screen. The warning starts as a tappable chip; only its chip and expanded details receive pointers. Full numeric reports stay available.
  * Cold estimates show only for the entered shard; resident violations remain visible for every loaded shard.
  * The returned setter follows existing cell transitions; reports and admission policy stay unchanged.

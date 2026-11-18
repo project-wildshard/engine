@@ -121,7 +121,7 @@ export class TexturePackReads {
           members = await Promise.all(group.entries.map(entry => direct(entry, false)));
         }
       } else members = together ? split(await direct(first, true)) : [await direct(first, false)];
-      // G881: authored addresses are trusted; no read or publication computes a digest.
+      // G881: authored addresses are taken as given; no read or publication computes a digest.
       check();
       for (const [index, entry] of group.entries.entries()) {
         const member = members[index]; if (member === undefined) throw new Error('Missing texture pack member');

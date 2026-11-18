@@ -49,7 +49,7 @@ function noRayPredicate(_handle: number): undefined { return undefined; }
 
 /** Owns one fixed-step collision world and its complete same-version continuation. */
 export class Physics {
-  /** Trusted native captures read the same surface/owner metadata as collision queries, without inferring identity. */
+  /** Native captures read the same surface/owner metadata as collision queries, without inferring identity. */
   colliderTag(collider: Collider): Readonly<ColliderTag> | undefined { return tagOf(collider); }
   readonly world: World;
   /** Where a phone's server worker keeps the solids far from its player (J68). Elsewhere, every solid is in the world. */

@@ -30,7 +30,7 @@ const TILT_FOLLOW = 0.3;             // the share of the horse's slope pitch / r
 const SEAT_TILT = 0.13;
 const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _seat = new THREE.Vector3(), _tilt = new THREE.Euler(0, 0, 0, 'YXZ');
 const angDiff = (a: number, b: number): number => Math.atan2(Math.sin(a - b), Math.cos(a - b));
-/** Client-only controller; trusted player/actor services bind a data profile and public actions use actor ids. */
+/** Client-only controller; native player/actor services bind a data profile and public actions use actor ids. */
 export class Mount extends MountedBody {
   horse: Animal | null = null;
   input: InputService | null = null;

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { expect,test } from 'vitest';
 import { admitFolder,readFolderDescriptor,type FolderOptions } from '../src/client/game/shardfile/folder';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
@@ -26,7 +26,7 @@ test('published ABI2 declarations survive disk, browser admission and native exe
   expect(scriptAdmissionRows(outputDescriptor(source)?.sections ?? new Map())).toEqual(declarations);
   expect(browser.assets.size).toBeGreaterThan(0);
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const live = await createTrustedHeadlessResident({ shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier });
+  const live = await createNativeHeadlessResident({ shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier });
   try { live.step([]); expect(live.host.state.tick).toBe(1); } finally { live.dispose(); }
 }, 10_000);
 

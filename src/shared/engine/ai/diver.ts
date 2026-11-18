@@ -15,7 +15,7 @@ export interface OrbitDiverSpec {
 }
 /** One admitted orbit, bound by the loader; a restored actor must receive the same orbit. */
 export interface OrbitDiverHome { x: number; z: number; r: number; y: number }
-/** Trusted target observation, flight motion and contact authority for one fixed-step actor. */
+/** Host-owned target observation, flight motion and contact authority for one fixed-step actor. */
 export interface OrbitDiverPorts<A extends AnimalSim> {
   dt: number; player: A['position']; calm: boolean;
   mayAttack: (actor: A) => boolean; reach: (actor: A) => boolean; claim: (actor: A) => boolean;
@@ -30,7 +30,7 @@ export interface PatrolDiverSpec {
   diveMaxSeconds: number; restSeconds: number; targetHeight: number; diveSlope: number;
   climbSpeedBonus: number; orbitLead: number; heldField: string;
 }
-/** Trusted flight/contact authority; the actor's declared held field suppresses new dives. */
+/** Host-owned flight/contact authority; the actor's declared held field suppresses new dives. */
 export interface PatrolDiverPorts<A extends AnimalSim> {
   dt: number; player: A['position']; calm: boolean; reach: (actor: A) => boolean; claim: (actor: A) => boolean;
   hurt: (damage: number) => void;
@@ -41,7 +41,7 @@ export interface PatrolDiverPorts<A extends AnimalSim> {
 export interface BurstFlyerSpec {
   circleSpeed: number; dartSpeed: number; noticeRadius: number; shoveSpeed: number; liftSpeed: number; targetHeight: number;
 }
-/** Trusted flight, reach, token and player impulse authority; guest policy never moves the player directly. */
+/** Host-owned flight, reach, token and player impulse authority; guest policy never moves the player directly. */
 export interface BurstFlyerPorts<A extends AnimalSim> {
   dt: number; player: A['position']; calm: boolean; reach: (actor: A) => boolean; claim: (actor: A) => boolean;
   hurt: (damage: number) => void; shove: (yaw: number, speed: number, lift: number) => void;

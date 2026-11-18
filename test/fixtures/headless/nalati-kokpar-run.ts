@@ -17,7 +17,7 @@ import {parseCarriedQuest} from '@wildshard/format/questSteps';
 import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {createNativeProofWorker} from '../headless-worker';
 import {prepareHeadlessRuntime} from '../nalati-kokpar-native';
-import {runTrustedHeadlessTape,type HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape,type HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {nalatiCampTalkTape} from '../../proof/nalati-grasslands/verbTape';
 import {SKY_ROAD} from '../../../src/shards/nalati-grasslands/generators/layout';
@@ -59,8 +59,8 @@ try{
   };
   step([]);assert.equal(round().carrying,false);assert.equal(host.flags.has('won:kokpar'),false);mark('unmounted-entry');
   const camp=nalatiCampTalkTape(product.shardfile.spawn),end=camp.segments.findIndex(row=>row.id==='walk-to-herderRail')+1;assert.ok(end>0);
-  runTrustedHeadlessTape(host,step,()=>active.effects,{...camp,segments:camp.segments.slice(0,end)});
-  runTrustedHeadlessTape(host,step,()=>active.effects,{version:1,observe:[],segments:[{
+  runNativeHeadlessTape(host,step,()=>active.effects,{...camp,segments:camp.segments.slice(0,end)});
+  runNativeHeadlessTape(host,step,()=>active.effects,{version:1,observe:[],segments:[{
     id:'walk-west-of-camp-horse',ticks:1200,commands:[],route:[{x:72.4,z:212.9},{x:72,z:210},
       {x:68,z:210},{x:66,z:211.5},{x:66.8,z:213.4}],
   }]});

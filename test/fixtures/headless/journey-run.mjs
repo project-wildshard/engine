@@ -51,6 +51,6 @@ try {
   assert.equal((await ordered.step()).tick,previous+1,'completed leg publishes a real continuation');
 } finally {await ordered.dispose();}
 const live=await HeadlessSimulation.create(source,new Map());
-try {await assert.rejects(live.journey(plan),/trusted offline timing/);assert.equal(live.checkpoint.tick,0);}
+try {await assert.rejects(live.journey(plan),/advisory offline timing/);assert.equal(live.checkpoint.tick,0);}
 finally {await live.dispose();}
 console.log('native journey parity, terminal disposal and runtime refusal pass');

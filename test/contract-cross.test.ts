@@ -39,7 +39,7 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -108,11 +108,11 @@ function packageDigest(root: string): string {
   return hash.digest('hex');
 }
 
-async function sunscar(): Promise<TrustedHeadlessResident> {
+async function sunscar(): Promise<NativeHeadlessResident> {
   const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing Sunscar output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product });
 }
 
 /** A raw frame as plain words, to compare two decoders word for word. */

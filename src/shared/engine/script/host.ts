@@ -23,7 +23,7 @@ export interface ScriptHostState {
   tick: number; used: { effects: number; spawns: number; events: number; queries: number; fuel: number }; pending: readonly ScriptEvent[];
   modules: readonly { name: string; memory: readonly number[]; globals: readonly { name: string; type: 'number' | 'bigint'; value: string }[]; failures: number; disabled: boolean }[];
 }
-/** Trusted schedulers retain events for sleeping bindings and consume request-only outputs without redelivery. */
+/** Host-owned schedulers retain events for sleeping bindings and consume request-only outputs without redelivery. */
 export interface ScriptEventDelivery { targets: ReadonlySet<number>; consume: ReadonlySet<number> }
 /** Results expose validated requests only after the atomic world-state transaction succeeds. */
 export interface ScriptCall { ok: boolean; effects: readonly ScriptEffect[]; events: readonly ScriptEvent[]; fuel: number; reason: string | undefined; disabled: boolean }

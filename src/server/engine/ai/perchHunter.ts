@@ -15,6 +15,6 @@ export class PerchHunterBrain<A extends AnimalSim> {
   snapshot(): SimValue { return this.policy.snapshot(); }
   /** Validate without invoking a body recipe or consuming RNG. */
   restore(saved: SimValue): void { this.policy.restore(saved); }
-  /** Preserve the trusted observation API and the host's vertical/contact recipe. */
+  /** Preserve the host observation API and the host's vertical/contact recipe. */
   think(c: PerchHunterPorts<A>): void { this.policy.think({ ...c, pattern: 'perch' }); }
 }

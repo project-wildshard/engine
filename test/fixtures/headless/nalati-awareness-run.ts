@@ -7,7 +7,7 @@ import {readFileSync} from 'node:fs';
 import * as v from 'valibot';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHostBytes,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
-import {runTrustedHeadlessTape,type HeadlessTapeObservation} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape,type HeadlessTapeObservation} from '../../../src/shared/host/headlessTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-stealth-native';
@@ -114,7 +114,7 @@ try{
   await replay.dispose();replay=undefined;
   console.info(JSON.stringify({phase:'restore-start',checkpointTick}));
   assert.ok(restoring);const restored=await restoring;restoring=undefined;replay=await restored.ready();
-  const report=runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
+  const report=runNativeHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
     {version:1,observe:['nalati.stealth'],segments:[{id:'after-awareness-restore',ticks:1,commands:[]}]});
   let restoredTicks=0;
   for(const expected of parts.filter(part=>part.tick>checkpointTick)){

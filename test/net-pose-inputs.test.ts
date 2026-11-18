@@ -13,7 +13,7 @@ import { directLoopback } from '../src/test/engine/netLoopback';
 import { numericCreaturePose, poseInputNames } from '../src/shared/game/plugin/channelPrograms';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netWorldInput, stepResident } from '../src/shared/host/standalone/netInput';
 import { builtFolder } from '../src/test/game/builtFolder';
 
@@ -23,7 +23,7 @@ test('a server says the pose inputs a page names and nothing else of a body', { 
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
+  const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
   try {
     const { host } = live, lead = leadPlayer(host), world = new SimNetWorld(host, 0), link = directLoopback();
     const room = new NetRoom({ world, step: inputs => { netWorldInput(actRoutes(host), inputs); stepResident(live, lead.id, inputs); } }); // as `StandaloneGrid` steps one

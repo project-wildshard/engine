@@ -13,7 +13,7 @@ import { loadRapier, type Rapier } from '../../src/shared/engine/physics/rapier'
 import { leadPlayer } from '../../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../../src/server/host/headlessRuntime';
 import { ledgerFilings } from '../../src/server/host/standalone/ledgerFilings';
 import { netTickCommands } from '../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../src/shared/host/tickProtocol';
@@ -25,11 +25,11 @@ export const PLAYERS = 32, TICKS = 900, TARGETS = 4;
 export let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
-export async function resident(slug: string): Promise<TrustedHeadlessResident> {
+export async function resident(slug: string): Promise<NativeHeadlessResident> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product });
 }
 /** Ticks the bots stand and fight before they wander. */
 export const FIGHT = 600;
@@ -45,7 +45,7 @@ export function input(index: number, tick: number, target: string | undefined): 
 export interface Session { readonly facts: readonly (readonly string[])[]; readonly ledger: readonly (readonly string[])[]; readonly ends: readonly (readonly (number | undefined)[])[]; readonly dropped: number; readonly refused: number }
 
 /** One room, one transport pair per bot, stepped in lockstep with `pump`: the same inputs at the same ticks, however bytes travel. */
-export async function session(live: TrustedHeadlessResident, pairs: readonly { readonly client: Transport; readonly server: Transport }[], pump: () => Promise<void>): Promise<Session> {
+export async function session(live: NativeHeadlessResident, pairs: readonly { readonly client: Transport; readonly server: Transport }[], pump: () => Promise<void>): Promise<Session> {
   const { host } = live, first = leadPlayer(host).id, planted: LedgerFiling[] = [];
   const world = new SimNetWorld(host, 0, () => [...planted.splice(0), ...ledgerFilings(host, first, live.effects, null)]);
   const room = new NetRoom({ world, step: inputs => {

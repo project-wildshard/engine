@@ -41,7 +41,7 @@ export class EnteredEquipment {
     });
   }
 
-  /** Install only after trusted play and continuation succeed; leaving restores every prior callback descriptor. */
+  /** Install only after native play and continuation succeed; leaving restores every prior callback descriptor. */
   /** `wire`: the kit plays on the server's wire as the road does (a data cell's declared kit, TC-E1b); leaving gives the server
    *  the road's held row again. A regional runtime's kit keeps its own contacts. */
   bind(equipment: EquipmentService, entry: Scope, options: { readonly wire?: boolean } = {}): void {

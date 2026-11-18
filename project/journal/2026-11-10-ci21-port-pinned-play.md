@@ -3,7 +3,7 @@
 J232 batch three. `headless-byte-capture` and `script-seats` are engine law
 that only borrowed shard source to get a product: the first built a fresh
 SDK template project as an admitted shell (its actor and reward come from
-engine's own trustedRuntime fixture), the second compiled Pastel Plain. Both
+engine's own nativeRuntime fixture), the second compiled Pastel Plain. Both
 now read pinned products (`_template`, `pastel-plain`) and every case is
 unchanged. `script-seats` runs in Ring 2 because Ring 1 doesn't install
 Pastel Plain; both are registered in `scripts/test-products.json`.

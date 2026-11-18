@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import type { TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import type { NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
@@ -16,7 +16,7 @@ import inputs from './fixtures/engine-lift/inputs.json' with { type: 'json' };
 const { input, open } = admittedResidents(['pine-hollow', 'nalati-grasslands', 'driftwood-isle']);
 
 test('Pine pays Miller after its paid flag, and the actual paid adventure resumes silently without a second grant', async () => {
-  const live = await open('pine-hollow'); let resumed: TrustedHeadlessResident | undefined;
+  const live = await open('pine-hollow'); let resumed: NativeHeadlessResident | undefined;
   try {
     const host = live.host, miller = inputs.pineSpots.people.find(row => row.kind === 'miller');
     if (miller === undefined) throw new Error('Missing authored miller');
@@ -42,7 +42,7 @@ test('Pine pays Miller after its paid flag, and the actual paid adventure resume
 }, 10_000);
 
 test('a Nalati adventure resumes its real movement and spent bow ammunition without a refill or duplicate outcomes', async () => {
-  const live = await open('nalati-grasslands'); let resumed: TrustedHeadlessResident | undefined;
+  const live = await open('nalati-grasslands'); let resumed: NativeHeadlessResident | undefined;
   try {
     const player = leadPlayer(live.host), arms = heldArmsOf(live.host)?.of(player);
     if (arms === undefined) throw new Error('Missing published held arms');
@@ -66,7 +66,7 @@ test('a Nalati adventure resumes its real movement and spent bow ammunition with
 }, 10_000);
 
 test('the real harbour rack refuses a living guard despite a stale defeat flag, then grants once after real combat and reload', async () => {
-  const live = await open('driftwood-isle'); let resumed: TrustedHeadlessResident | undefined;
+  const live = await open('driftwood-isle'); let resumed: NativeHeadlessResident | undefined;
   try {
     if (live.host.dayClock === undefined) throw new Error('Missing real island clock');
     live.host.dayClock.phase = .85; step(live, 2);
@@ -99,7 +99,7 @@ test('the real harbour rack refuses a living guard despite a stale defeat flag, 
 }, 10_000);
 
 test('real mounted lance steering rejects the side cone and spends a target contact once per pass across a reload', async () => {
-  const live = await open('nalati-grasslands'); let resumed: TrustedHeadlessResident | undefined;
+  const live = await open('nalati-grasslands'); let resumed: NativeHeadlessResident | undefined;
   try {
     const host = live.host, mount = mountedPlayerOf(host), player = leadPlayer(host);
     if (mount === undefined || mount.mountables[0] === undefined) throw new Error('Missing actual camp mount');

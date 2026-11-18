@@ -15,7 +15,7 @@ import { commandSocketLift, createShardfileSim, type ShardfileSimulation, type S
 
 type Physics = SimHost['physics'];
 
-/** Trusted admission world: advance the existing one host/runtime/world fixed step before moving the real capsule. */
+/** Host-owned admission world: advance the existing one host/runtime/world fixed step before moving the real capsule. */
 export interface SocketLiftProofPorts {
   physics: Physics; runtime: MoverRuntime; fixedStep: () => void;
   waterAt?: (x: number, z: number) => number | null;
@@ -33,7 +33,7 @@ export interface EntryProof { lanes: number; steps: number; liftRides?: number; 
 /**
  * Every declared entryway, proven by its kind: ordinary entries by the caller's `edges` walk (refused when it has none),
  * each socket lift by its complete ride and 23 road-gate lanes on its own `world()`, and all portal links on one more.
- * The untrusted shardfile host and the trusted runtimes share this one law; each brings only how its world is built.
+ * The untrusted shardfile host and the native runtimes share this one law; each brings only how its world is built.
  */
 export function proveEntryways(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: {
   edges?: (sides: readonly Shardfile['entryways'][number]['edge'][]) => { lanes: number; steps: number };

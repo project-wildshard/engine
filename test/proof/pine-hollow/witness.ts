@@ -35,8 +35,8 @@ import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 
 /**
- * Pine Hollow's whole-shard witness (E435 §C / SF72), on its trusted renderer-free entry, the product's `server/native-assembly.json`, composed as
- * the platform's trusted adapter composes it (the plan's level and ports, one install, the tick's commands lent to the
+ * Pine Hollow's whole-shard witness (E435 §C / SF72), on its native renderer-free entry, the product's `server/native-assembly.json`, composed as
+ * the platform's native adapter composes it (the plan's level and ports, one install, the tick's commands lent to the
  * runtime, its effects buffered per tick). The player's tape is tick commands only (`player` moves and `script` prompt
  * presses, `pine.interact`), chosen each tick from where the player stands: from the spawn on the south road to Hale on
  * the cabin's porch, the beaver dam's two logs and its glass, the pond's lantern, up the lookout's five flights to the
@@ -109,7 +109,7 @@ export function restore(plan: HeadlessRuntimePlan, rapier: Rapier, saved: SimSna
   if (session.tick.length > 0) throw new Error('Restore emitted gameplay effects');
   return Object.assign(session, { host });
 }
-/** One tick as the trusted adapter runs it (its last `player` command steps the host); only a completed tick commits its effects. */
+/** One tick as the native adapter runs it (its last `player` command steps the host); only a completed tick commits its effects. */
 function step(session: Session, commands: readonly HeadlessCommand[]): HeadlessEffect[] {
   fillNativeCombatFrame(session.combat, commands); session.tape = commands; session.tick = [];
   try {
@@ -118,7 +118,7 @@ function step(session: Session, commands: readonly HeadlessCommand[]): HeadlessE
     session.host.step(leadCommands(session.host, player?.kind === 'player' ? { moveX: player.moveX, moveZ: player.moveZ, yaw: player.yaw, ...(player.attack === undefined ? {} : { attack: player.attack }),
       ...(player.hover === undefined ? {} : { hover: player.hover }), ...(player.jump === undefined ? {} : { jump: player.jump }), ...(player.dodge === undefined ? {} : { dodge: player.dodge }) } : undefined));
   } finally { session.tape = []; }
-  if (![leadPlayer(session.host).position, ...[...session.host.entities.values()].map(entity => entity.position)].every(point => [point.x, point.y, point.z].every(Number.isFinite))) throw new Error('Nonfinite trusted simulation state');
+  if (![leadPlayer(session.host).position, ...[...session.host.entities.values()].map(entity => entity.position)].every(point => [point.x, point.y, point.z].every(Number.isFinite))) throw new Error('Nonfinite native simulation state');
   session.effects.push(...session.tick); return session.tick;
 }
 

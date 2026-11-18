@@ -35,7 +35,7 @@ export function bindPageQuest(ctx: Pick<ShardContext, 'app' | 'scope'>, source: 
 type QuestRow = Shardfile['quests']['quests'][number];
 type MarkerRow = NonNullable<QuestRow['steps'][number]['markers']>[number];
 
-/** What a runtime lends a declared quest: its flags, built marker positions and an optional trusted presentation override. */
+/** What a runtime lends a declared quest: its flags, built marker positions and an optional native presentation override. */
 export interface RuntimeQuestPorts {
   readonly flags: Flags;
   /** Required when the quest's `onComplete` names a fact. */

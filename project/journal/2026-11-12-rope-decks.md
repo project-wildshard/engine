@@ -3,7 +3,7 @@
 - Jake: "i fucking clipped through the rope bridge because of the lag lol".
   Not prediction: the room built no rope chain. The page builds Driftwood's
   span from its `client/plan` rope-chain stage and stands the player on it;
-  the room's resident (`createTrustedHeadlessResident`, what `cellWorld`
+  the room's resident (`createNativeHeadlessResident`, what `cellWorld`
   runs) never did, so the server's player walked on air over the gully,
   fell to its floor (y -0.89 at mid-span), and the page's next correction
   pulled the player down through the planks. Test walks hid it: the proof

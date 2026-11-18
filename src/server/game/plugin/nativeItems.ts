@@ -106,7 +106,7 @@ function bodyAlong(host: SimHost, viewTick: number, from: Vector3, direction: Ve
   const seen = seenBodies(host, viewTick);
   return seen === null ? nativeRangedHit(bodies(host), from, direction, distance) : seenRay(seen, from, direction, distance);
 }
-/** A free shot's line (P1-E3.2): from the server's own eye, along the commanded look. The client's aim origin is not trusted. */
+/** A free shot's line (P1-E3.2): from the server's own eye, along the commanded look. The client's aim origin is not relied on. */
 function lookAlong(player: PlayerSim, frame: NativeCombatFrame, height: number, eye: Vector3, dir: Vector3): void {
   const p = player.position, level = Math.cos(frame.pitch);
   eye.set(p.x, p.y + height, p.z); dir.set(-Math.sin(player.yaw) * level, Math.sin(frame.pitch), -Math.cos(player.yaw) * level);

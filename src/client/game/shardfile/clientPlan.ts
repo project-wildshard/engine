@@ -508,7 +508,7 @@ export async function installClientPhase(ctx: ShardContext, plan: AdmittedClient
     if (ctx.scope.disposed || ctx.scope.disposing || resident.disposed || resident.disposing) throw new Error('Client feature owner is disposed');
   };
   // The platform's look phase precedes every entered world step, including
-  // trusted runtimes whose data client intentionally skips presentation. A
+  // native runtimes whose data client intentionally skips presentation. A
   // metadata-only phase leaves look construction to its original native owner.
   if (phase === 'world' && lifetime !== 'resident' && rows.some(({ row }) => CLIENT_FEATURES[row.kind].needsWorldLooks !== false)) {
     live();

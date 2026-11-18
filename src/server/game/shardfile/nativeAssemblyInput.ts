@@ -39,7 +39,7 @@ export interface NativeAssemblyPorts<C extends NativeAssemblyContext> {
   /** This plan builds a net room's world, whose encounters lend their species to its rosters. */
   readonly room?: boolean;
   readonly tamingCommands: (context: C) => () => readonly ({ kind: 'player'; steer?: { keyX: number } } | { kind: 'script'; actorId: string; value: number } | { kind: 'action' })[];
-  /** A trusted wrapper's loans over the same world (proofs that drive a raid, the storm or an elite). The server sets none. */
+  /** A native wrapper's loans over the same world (proofs that drive a raid, the storm or an elite). The server sets none. */
   readonly pastureCues?: PastureCues;
   readonly observeWeather?: (host: SimHost, weather: { readonly wind: Wind; readonly storm: WeatherReactions }) => void;
   readonly observeBindings?: (host: SimHost, bindings: NativeEliteBindings) => void;

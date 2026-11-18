@@ -4,7 +4,7 @@ import type { SaveStorage } from '../saves/store';
 
 // P1-E5.2c (J111): who a client says it is, for the first playtest: a device id and a typed Name, no accounts. `player` is
 // what the wire keeps, so a real login can claim it later without the wire changing. Nothing proves it yet: the server trusts
-// it as far as a device id can be trusted, and never sends one player's id to another.
+// it as far as a device id can be relied on, and never sends one player's id to another.
 
 /** The longest typed Name, in UTF-16 units. */
 export const MAX_NAME_LENGTH = 24;

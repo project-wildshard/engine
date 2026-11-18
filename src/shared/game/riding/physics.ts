@@ -301,7 +301,7 @@ export interface MountedAnimal {
 }
 /** What a jostle reads of the body it met. */
 export interface MountedContact { readonly position: { readonly x: number; readonly z: number }; readonly yaw: number; readonly speed: number }
-/** Explicit world queries and contact classification, shared by the page and trusted native host. */
+/** Explicit world queries and contact classification, shared by the page and native host. */
 export interface MountedWorld {
   readonly physics: Physics | null;
   readonly heightAt: (x: number, z: number) => number;

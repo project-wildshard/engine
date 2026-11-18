@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import {HeadlessSimulation} from '../src/server/host/headless';
-import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
+import {createNativeHeadlessResident} from '../src/server/host/headlessRuntime';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {serializeSimSnapshot,snapshotSimHostBytes} from '../src/shared/engine/sim/snapshot';
@@ -39,7 +39,7 @@ for(const slug of [...ring['1'].products,...ring['1'].slices].map(walked))test(`
       const sim=await HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'});let current=saved??'';
       return {step:async command=>{current=(await sim.step([{source:'restore-proof',commands:[command]}])).snapshot;},save:()=>current,close:()=>sim.dispose()};
     }
-    const live=await createTrustedHeadlessResident({shard,assets,product,rapier:await rapier()},saved);
+    const live=await createNativeHeadlessResident({shard,assets,product,rapier:await rapier()},saved);
     return {step:command=>{live.step([command]);return Promise.resolve();},save:()=>serializeSimSnapshot(snapshotSimHostBytes(live.host)),close:()=>{live.dispose();return Promise.resolve();}};
   };
   let straight:World|null=null,restored:World|null=null;

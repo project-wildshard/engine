@@ -31,7 +31,7 @@ export interface SessionState {
   readonly crashResume?: CrashResume;
   /** G226: the page is only a platform shell; even its initial hybrid home is an evictable owned region. */
   ownedGridHome?: boolean;
-  /** G216's trusted policy, including validation warnings before the ordinary HUD has been constructed. */
+  /** G216's native policy, including validation warnings before the ordinary HUD has been constructed. */
   readonly memory?: MemoryAdmission;
   /** Created before manifest hydration; the level disposes it after its allocated consumers. */
   readonly residency?: PageResidency;

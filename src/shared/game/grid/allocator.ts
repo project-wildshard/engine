@@ -74,7 +74,7 @@ export function shardCost(accounted: number, page: ContentCostInput): { playing:
 
 /** One allocator per grid session. `playing` defaults to the §3.2 envelope (1.0 GB, G65). */
 export class ResidencyAllocator {
-  /** G216: the page's trusted Developer policy; omitted callers retain strict admission. */
+  /** G216: the page's host-owned Developer policy; omitted callers retain strict admission. */
   readonly memory: MemoryAdmission;
   private readonly entries_ = new Map<string, Entry>();
   private orderedEntries: readonly Entry[] | null = null;

@@ -9,7 +9,7 @@ export interface GuardianSpec {
   speed: number; holdRadius: number; sideSpeed: number; sideFlipSeconds: number; sinkAfterSeconds: number;
   cooldownSeconds: number; hideOffset: number; noticeCue: string;
 }
-/** Trusted interior floor and vertical-motion recipes publish completion through the actor's numeric memory. */
+/** Host-owned interior floor and vertical-motion recipes publish completion through the actor's numeric memory. */
 export interface GuardianPorts<A extends AnimalSim> {
   dt: number; player: A['position']; calm: boolean; rng: Pick<Rng, 'next'>;
   world: { hold?: { x: number; z: number; r: number; guardR: number; floorAt: (x: number, z: number) => number | undefined };

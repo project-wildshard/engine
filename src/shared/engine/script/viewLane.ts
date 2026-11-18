@@ -2,7 +2,7 @@
  * WASM-HOST H9: the view frame lane (SCRIPT-ABI v2, lane 3). One admitted view module per owner, in its own fixed memory
  * that persists between frames: the host writes the v2 header, the region directory, each binding's row and its
  * stamped public sample columns, calls `ws_view(dt, alpha, fuel)` once per scheduled frame, then validates the whole
- * candidate frame (every changed transform against its trusted target and translation / scale / shear bounds, the
+ * candidate frame (every changed transform against its host-owned target and translation / scale / shear bounds, the
  * complete channel bank finite) before anything reaches a target; `upload` runs only after the frame validated. A trap,
  * an invalid frame or a fuel refusal uploads nothing and freezes the binding the guest's hint names (else the module);
  * frozen targets never upload again. The rate is host-owned: display rate, halved after three successive scheduled
@@ -324,7 +324,7 @@ export class ViewLane {
     this.land(); return true;
   }
 
-  /** The whole candidate frame against the trusted table: counts, identities, finite bounded matrices, finite channels. */
+  /** The whole candidate frame against the host-owned table: counts, identities, finite bounded matrices, finite channels. */
   private validate(): boolean {
     const v = this.view, io = this.io, transforms = this.rows.transforms, base = this.region(TRANSFORMS);
     const count = v.getUint32(io + HEADER + (TRANSFORMS - 1) * ENTRY + 16, true), changed = v.getUint32(io + 72, true);

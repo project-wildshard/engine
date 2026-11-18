@@ -41,7 +41,7 @@ function preparePageRuntime(product: ShardFolder, owned: boolean): new () => Sha
   return ClientPlanRuntime;
 }
 
-/** A resident's data world stays alive when its independently scoped trusted play hooks leave. */
+/** A resident's data world stays alive when its independently scoped native play hooks leave. */
 export interface HybridResident {
   readonly instance: string;
   readonly slug: string;
@@ -62,13 +62,13 @@ export interface HybridResident {
     closeKit: () => void;
     /** Bind reversible construction services while queued entered services remain unpublished. */
     prepareConstruction?: (context: ShardContext) => () => void;
-    /** Apply entered regional bindings before any trusted world hook reads ambient engine services. */
+    /** Apply entered regional bindings before any native world hook reads ambient engine services. */
     beforeWorld?: (context: ShardContext) => Promise<void> | void;
-    /** Finish the regional shell's world stage, after trusted world and before its kit registration window. */
+    /** Finish the regional shell's world stage, after native world and before its kit registration window. */
     afterWorld?: (context: ShardContext) => Promise<void> | void;
-    /** Create actual creature/equipment/play services from kit rows before trusted play. */
+    /** Create actual creature/equipment/play services from kit rows before native play. */
     afterKit?: (context: ShardContext) => Promise<void> | void;
-    /** Apply continuation only after trusted play has created its complete authored encounter herd. */
+    /** Apply continuation only after native play has created its complete authored encounter herd. */
     afterPlay?: (context: ShardContext) => Promise<void> | void;
   };
 }
@@ -157,7 +157,7 @@ export function hybridInstallation(base: ShardContext, scope: Scope, runtime: Sh
   return { ...installation, context: shardContext(installation.context, base.manifest, { ...base.game, runtime: captured }, base.product) };
 }
 
-/** Interior events for one catalogue resident; another cell never activates its trusted hooks. */
+/** Interior events for one catalogue resident; another cell never activates its native hooks. */
 export interface HybridCellBinding {
   readonly instance: string;
   readonly cells: Pick<GridCellEvents, 'cell' | 'onEnter' | 'onLeave'>;
@@ -175,7 +175,7 @@ interface CustomRuntime {
   retained?: { slots: ScopedRuntimeBinding; hooks: RetainedRuntimeHooks };
 }
 
-/** Standalone staged composition keeps the resident data plugin and trusted hooks on the existing Game boot path. */
+/** Standalone staged composition keeps the resident data plugin and native hooks on the existing Game boot path. */
 export class HybridShardPlugin extends ShardPlugin {
   private readonly data: ShardPlugin;
   private readonly Runtime: new () => ShardPlugin;
@@ -210,7 +210,7 @@ export class HybridShardPlugin extends ShardPlugin {
     await runtimeClientPhase(ctx, phase, residentWorldScope(ctx), 'entered');
   }
   private async runtimeWorld(ctx: ShardContext): Promise<void> {
-    if (this.binding !== undefined && this.binding.cells.cell?.instance !== this.binding.instance) throw new Error('Trusted hooks require the entered cell interior');
+    if (this.binding !== undefined && this.binding.cells.cell?.instance !== this.binding.instance) throw new Error('Native hooks require the entered cell interior');
     this.generation++;
     const existing = this.custom;
     if (existing?.retained !== undefined && existing.ready) {
@@ -263,7 +263,7 @@ export class HybridShardPlugin extends ShardPlugin {
   override async play(ctx: ShardContext): Promise<void> {
     await this.data.play?.(ctx);
     await this.runtimePlay();
-    // The shell creates creature motors between kit and play. Release their trusted dependants before those later
+    // The shell creates creature motors between kit and play. Release their host-owned dependants before those later
     // parent registrations unwind, rather than relying on the child's early world-stage insertion order.
     ctx.scope.onDispose(() => { this.generation++; this.custom?.installation.context.scope.dispose(); });
     const binding = this.binding;
@@ -293,9 +293,9 @@ export class HybridShardPlugin extends ShardPlugin {
   }
 }
 
-/** Admit declared data and trusted hooks; catalogue placement and cell activation stay in the game layer. */
-export async function prepareHybridShard(product: ShardFolder, options: FolderOptions | { trusted: true },
-  bindings: Omit<ShardfileClientBindings, 'instance' | 'trustedRuntime'> & {
+/** Admit declared data and native hooks; catalogue placement and cell activation stay in the game layer. */
+export async function prepareHybridShard(product: ShardFolder, options: FolderOptions | { granted: true },
+  bindings: Omit<ShardfileClientBindings, 'instance' | 'nativeRuntime'> & {
     /** The game adapter forwards the page owner; the shard need not read or own another service. */
     readonly residencyContext?: Pick<ShardContext, 'game' | 'scope'>;
     /** Retain an adapted borrowed home runtime across road visits; neighbours remain fenced. */
@@ -305,12 +305,12 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
     readonly stagesOwner?: 'declared' | 'runtime';
   }): Promise<ShardPlugin> {
   // Every entry passes the product already loaded before its hooks.
-  const folderOptions = 'base' in options ? options : browserShardfileOptions(folderBase(product.slug), options.trusted);
+  const folderOptions = 'base' in options ? options : browserShardfileOptions(folderBase(product.slug), options.granted);
   const source = product.shardfile;
   if (source.runtime === null) throw new Error('Hybrid requires a compiled client-plan runtime declaration');
   provideHybridDeclaration(source);
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(folderOptions)) throw new Error('Runtime stage ownership requires a trusted first-party shard');
+  if (bindings.stagesOwner === 'runtime' && !dangerousRuntimeOwnership(folderOptions)) throw new Error('Runtime stage ownership requires a native shard');
   const { residencyContext, retainHomeRuntime, stagesOwner, ...providedBindings } = bindings;
   const residency = residencyContext?.game.residency;
   if (residency !== undefined && providedBindings.residency !== undefined && residency !== providedBindings.residency) {
@@ -320,7 +320,7 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
   const clientBindings = { ...providedBindings, ...(residency === undefined ? {} : { residency }),
     ...(imageOwner === undefined ? {} : { imageOwner }) };
   const gridInstance = pageGridInstance(), instance = gridInstance ?? source.identity.slug;
-  // The data client announces only when it will actually build a simulation. An empty trusted transition runs its
+  // The data client announces only when it will actually build a simulation. An empty native transition runs its
   // legacy gameplay directly and has no handoff; promising one would hold the reveal until its safety ceiling.
   const onSimulationExpected = (): void => { clientBindings.onSimulationExpected?.(); if (gridInstance !== null) gridHomeSim.expect(); };
   // in a grid page the restored home simulation goes to the live grid owner (its freeze fence gates the existing driver)
@@ -330,7 +330,7 @@ export async function prepareHybridShard(product: ShardFolder, options: FolderOp
       ...(binding.residency === undefined ? {} : { residency: binding.residency }),
     });
   };
-  const { load, mapImage } = await shardfileSource(source, folderOptions, { ...clientBindings, instance, trustedRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime', onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
+  const { load, mapImage } = await shardfileSource(source, folderOptions, { ...clientBindings, instance, nativeRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime', onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
     .then(data => ({ load: data.load, mapImage: data.minimap?.image }));
   if (load === undefined) throw new Error('Missing admitted hybrid data plugin');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
@@ -539,6 +539,6 @@ export class HybridRuntimeSession {
     if (active.retained === undefined || !active.ready) { active.scope.dispose(); return; }
     try { active.retained.hooks.deactivate(); } finally { active.retained.slots.deactivate(); }
   }
-  /** Admission fences can observe whether the current inside-cell runtime finished its trusted stages. */
+  /** Admission fences can observe whether the current inside-cell runtime finished its native stages. */
   state(): HybridRuntimeState { return { instance: this.active?.resident.instance ?? null, ready: this.active?.ready ?? false }; }
 }

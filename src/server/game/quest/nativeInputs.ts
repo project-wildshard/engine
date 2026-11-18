@@ -8,7 +8,7 @@ export interface NativeQuestInputs {
   readonly ledger: { readonly fact: (name: string, entity: string) => void; readonly coins: (amount: number, entity: string) => void };
 }
 const inputs = new WeakMap<SimHost, NativeQuestInputs>();
-/** Trusted worker bootstrap: publish the actual command adapter once. */
+/** Native worker bootstrap: publish the actual command adapter once. */
 export function registerNativeQuestInputs(host: SimHost, input: NativeQuestInputs): void {
   if (inputs.has(host)) throw new Error('Duplicate native quest input');
   inputs.set(host, input); host.scope.onDispose(() => { inputs.delete(host); });

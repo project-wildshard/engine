@@ -52,7 +52,7 @@ published pose, while body updates advance current locals; snapshots preserve bo
 covers each living rig for 10k frames and a restored suffix, including 60 / 30 / 20 Hz and paused scheduling.
 Rendered ragdoll bodies remain outside the witness.
 
-The sailor rise/sink/deck transition has one pure defining function, called by the page animation and the trusted body
+The sailor rise/sink/deck transition has one pure defining function, called by the page animation and the native body
 callback. Visual rig work stays on the page. Actual Driftwood and Pine browser captures retain every earlier gameplay
 field; Driftwood adds 35 captured pose recipes. Before the SF34 swim extension above, the tape stayed at 19,255 ticks, with the living Captain at
 18,339 (190 HP), the same fact ticks and the same 916-tick fight/reward suffix. Its new checkpoint payloads include the
@@ -66,7 +66,7 @@ treasure fact, then restores exactly and refuses a duplicate opening. That test 
 does not claim underwater travel by itself; the independent reef journey above now covers that approach. Reward
 carry/camera is hosted below; the real zipline approach and landing are now covered by the independent journey below.
 
-The finale now executes the same immutable AssemblyScript director in the page and trusted worker. Its complete
+The finale now executes the same immutable AssemblyScript director in the page and host-owned worker. Its complete
 author continuation replaces the quest adapter's native `reward` timer in the three checkpoints. All other canonical
 fields (physics, actors, strikes, RNG, clock, flags, pack and native keepers), the 19,816-tick command tape, fact ticks
 and profile prefixes remain exact. The real Captain replay still starts at tick 18,898 with 190 HP and reaches victory

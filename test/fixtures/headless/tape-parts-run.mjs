@@ -68,7 +68,7 @@ for(const prefix of ['step','walk']){
   }finally{await restored?.dispose();await first.dispose();}
 }
 const runtime=await createSimulation(source,new Map());
-try{const before=runtime.checkpoint;await assert.rejects(runtime.verbTapePart(plan('runtime',[[]])),/trusted offline/);assert.deepEqual(runtime.checkpoint,before);}
+try{const before=runtime.checkpoint;await assert.rejects(runtime.verbTapePart(plan('runtime',[[]])),/advisory offline/);assert.deepEqual(runtime.checkpoint,before);}
 finally{await runtime.dispose();}
 const idle=await open(),realClock=hrtime.bigint;
 try{

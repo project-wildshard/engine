@@ -9,7 +9,7 @@ import {SimNetWorld} from '../src/server/engine/net/simWorld';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {leadPlayer} from '../src/shared/engine/sim/leadPlayer';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
-import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
+import {createNativeHeadlessResident} from '../src/server/host/headlessRuntime';
 import {stepResident} from '../src/shared/host/standalone/netInput';
 import {directLoopback} from '../src/test/engine/netLoopback';
 import {builtFolder,runtimeAssets} from './fixtures/engine-lift/folder';
@@ -22,7 +22,7 @@ if(seeds.some(seed=>!Number.isSafeInteger(seed)||seed<0||seed>0xffffffff))throw 
 for(const slug of ['sunscar-dunes','pine-hollow'])for(const seed of seeds)
   test(`hostile traffic leaves another player walking on ${slug}, seed ${seed}`,async()=>{
     const directory=builtFolder(slug),product=await loadHeadlessFolder(directory);
-    const live=await createTrustedHeadlessResident({product,shard:product.shardfile,assets:runtimeAssets(product,directory),
+    const live=await createNativeHeadlessResident({product,shard:product.shardfile,assets:runtimeAssets(product,directory),
       rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},undefined,{room:true});
     const links:ReturnType<typeof directLoopback>[]=[];
     try {

@@ -19,7 +19,7 @@ export interface NativeProofWorkerOptions {
   binary?: string;
 }
 
-/** Trusted Node proofs choose their own prepareHeadlessRuntime module. This is
+/** Host-owned Node proofs choose their own prepareHeadlessRuntime module. This is
  * executable test code, never a URL supplied by a shardfile or a gameplay command. */
 export async function createNativeProofWorker(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, prepare: URL,
   options: NativeProofWorkerOptions = {}): Promise<TickWorkerHost> {

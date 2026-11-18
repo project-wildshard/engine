@@ -70,7 +70,7 @@ export function splatGroundFiles(source: Pick<Shardfile, 'props'>): Set<string> 
   return props === null || splat === undefined ? new Set() : new Set([...props.tiles.map(tile => tile.file), ...splatTextureRefs(splat)]);
 }
 /**
- * A trusted runtime's data source (`withoutRuntimeRows`, its bound props emptied) with its splat ground back when the ground
+ * A native runtime's data source (`withoutRuntimeRows`, its bound props emptied) with its splat ground back when the ground
  * tiles draw (`splatGroundDrawn`): the bound props tiles' primary (ground) files only, never their additional files (the
  * runtime draws those), with their tile rows, files and layer library entries, so the data client streams the ground.
  */

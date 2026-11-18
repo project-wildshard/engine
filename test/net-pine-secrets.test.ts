@@ -9,7 +9,7 @@ import { questBooks } from '../src/shared/engine/quest/players';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 const FLAG = 'secret:log';
@@ -19,7 +19,7 @@ test('a room player who enters the hollow log finds its secret in their own book
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const { secret } = await product.json<{ readonly secret: { readonly mid: readonly [number, number, number]; readonly floorY: number } }>('quests/forest-story.json');
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
+  const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
   try {
     const { host } = live, lead = leadPlayer(host), books = questBooks(host), [x, , z] = secret.mid;
     const away = { x: x + 40, z: z + 40 }, other = host.addPlayer('bot:1', { x: away.x, y: host.groundHeightAt(away.x, away.z) + 0.2, z: away.z });

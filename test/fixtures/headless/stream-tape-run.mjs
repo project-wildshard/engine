@@ -55,7 +55,7 @@ const deadline=await open(),realClock=hrtime.bigint;try{
  await assert.rejects(deadline.streamVerbTape([],late()),/request deadline exceeded/);assert.equal(deadline.quarantined,true);
 }finally{hrtime.bigint=realClock;await deadline.dispose();}
 const runtime=await HeadlessSimulation.create(source,new Map());try{
- await assert.rejects(runtime.streamVerbTape([],parts([{id:'x',ticks:1,commands:[]}])),/trusted offline timing/);assert.equal(runtime.checkpoint.tick,0);
+ await assert.rejects(runtime.streamVerbTape([],parts([{id:'x',ticks:1,commands:[]}])),/advisory offline timing/);assert.equal(runtime.checkpoint.tick,0);
 }finally{await runtime.dispose();}
 console.log('streamed native parity, aggregate budgets, producer failure, disposal and global deadline pass');
 

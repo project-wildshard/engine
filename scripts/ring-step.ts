@@ -30,7 +30,7 @@ const only = option('only')?.split(',');
 const { prepareAssetDecoders } = await import('@wildshard/format/shardfileAssets');
 const { loadRapier } = await import('../src/shared/engine/physics/rapier.ts');
 const { loadHeadlessFolder } = await import('../src/server/host/headlessFolder.ts');
-const { createTrustedHeadlessResident } = await import('../src/server/host/headlessRuntime.ts');
+const { createNativeHeadlessResident } = await import('../src/server/host/headlessRuntime.ts');
 const { HeadlessSimulation } = await import('../src/server/host/headless.ts');
 const { outputDescriptor, serverReadsFile } = await import('../src/shared/game/shardfile/outputDescriptor.ts');
 const { serializeSimSnapshot, snapshotSimHostBytes } = await import('../src/shared/engine/sim/snapshot.ts');
@@ -51,7 +51,7 @@ async function stepDeclared(shard: Awaited<ReturnType<typeof loadHeadlessFolder>
 /** Held-melee and native-assembly shards: the resident a worker composes, in this process, walking a fixed line. */
 async function stepResident(input: { shard: Awaited<ReturnType<typeof loadHeadlessFolder>>['shardfile']; assets: ReadonlyMap<string, Uint8Array>; product: Awaited<ReturnType<typeof loadHeadlessFolder>> }): Promise<string[]> {
   const rapier = await loadRapier(readFileSync(createRequire(resolve('package.json')).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm')));
-  const resident = await createTrustedHeadlessResident({ ...input, rapier }), chain: string[] = [];
+  const resident = await createNativeHeadlessResident({ ...input, rapier }), chain: string[] = [];
   try {
     for (let tick = 1; tick <= TICKS; tick++) {
       resident.step([line(tick)]);

@@ -17,12 +17,12 @@ export interface TickWorkerAdapter {
   step: (commands: readonly HeadlessCommand[]) => void;
   commit: () => HeadlessTickCommit;
   finish: () => { ticks: number; lanes: number; steps: number; liftRides?: number; liftCalls?: number; portalTransfers?: number };
-  /** Optional fixed platform proof; trusted shard adapters without it refuse. */
+  /** Optional fixed platform proof; native shard adapters without it refuse. */
   authorProof?: (plan: AuthorProofPlan) => Promise<AuthorProofReport>;
   dispose: () => void;
 }
 export const WorkerEnvelopeSchema: v.ObjectSchema<{ readonly clock: v.InstanceSchema<SharedArrayBufferConstructor, undefined>; readonly tickMicros: v.SchemaWithPipe<readonly [v.NumberSchema<undefined>, v.IntegerAction<number, undefined>, v.MinValueAction<number, 1, undefined>, v.MaxValueAction<number, 16666, undefined>]>; readonly commandsPerTick: v.SchemaWithPipe<readonly [v.NumberSchema<undefined>, v.IntegerAction<number, undefined>, v.MinValueAction<number, 0, undefined>, v.MaxValueAction<number, 1024, undefined>]>; readonly deferredPayload: v.OptionalSchema<v.BooleanSchema<undefined>, false>; readonly enforceTickDeadline: v.OptionalSchema<v.BooleanSchema<undefined>, true>; readonly payload: v.UnknownSchema; }, undefined> = v.object({ clock: v.instance(SharedArrayBuffer), tickMicros: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(16_666)), commandsPerTick: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1024)), deferredPayload: v.optional(v.boolean(), false), enforceTickDeadline: v.optional(v.boolean(), true), payload: v.unknown() });
-/** Internal trusted worker adapter. Author modules are admitted WASM, never a configurable JS module URL. */
+/** Internal native worker adapter. Author modules are admitted WASM, never a configurable JS module URL. */
 export async function runTickWorker(create: (payload: unknown) => Promise<TickWorkerAdapter>): Promise<void> {
   const port = parentPort; if (port === null) throw new Error('Tick worker requires a parent');
   const envelope = v.parse(WorkerEnvelopeSchema, workerData), clock = new BigInt64Array(envelope.clock);
@@ -59,7 +59,7 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
       if(partsFinished)throw new Error('Headless tape parts already finished');
       if(parts!==undefined&&request.kind!=='verbTapePart'&&request.kind!=='finish')throw new Error('Tape parts own this worker until finish');
       if(request.kind==='verbTapePart'){
-        if(envelope.enforceTickDeadline)throw new Error('Verb tape requires trusted offline timing');
+        if(envelope.enforceTickDeadline)throw new Error('Verb tape requires advisory offline timing');
         for(const segment of request.plan.segments)for(const commands of segment.frames??[segment.commands])
           if(commands.length+(segment.route===undefined?0:1)>envelope.commandsPerTick)throw new Error('Aggregate commandsPerTick exceeded');
         if(adapter.verbTape===undefined)throw new Error('Missing native verb tape capability');
@@ -72,7 +72,7 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
         guard.accept(result);committedTick=result.commit.tick;port.postMessage({verbTapePart:result});return;
       }
       if (request.kind === 'observe') {
-        if (envelope.enforceTickDeadline) throw new Error('Observation requires trusted offline timing');
+        if (envelope.enforceTickDeadline) throw new Error('Observation requires advisory offline timing');
         if (adapter.observe === undefined) throw new Error('Missing offline observation capability');
         const samples: HeadlessTickSample[] = [];
         let commit: HeadlessTickCommit | undefined;
@@ -89,14 +89,14 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
         port.postMessage({ observation: v.parse(HeadlessObservationReportSchema, { samples, commit }) }); return;
       }
       if(request.kind==='verbTape'){
-        if(envelope.enforceTickDeadline)throw new Error('Verb tape requires trusted offline timing');
+        if(envelope.enforceTickDeadline)throw new Error('Verb tape requires advisory offline timing');
         for(const segment of request.plan.segments)for(const commands of segment.frames??[segment.commands])
           if(commands.length+(segment.route===undefined?0:1)>envelope.commandsPerTick)throw new Error('Aggregate commandsPerTick exceeded');
         if(adapter.verbTape===undefined)throw new Error('Missing native verb tape capability');
         port.postMessage({verbTape:v.parse(HeadlessTapeReportSchema,adapter.verbTape(request.plan))});return;
       }
       if(request.kind==='journey'||request.kind==='walk'){
-        if(envelope.enforceTickDeadline)throw new Error('Journey requires trusted offline timing');
+        if(envelope.enforceTickDeadline)throw new Error('Journey requires advisory offline timing');
         if(envelope.commandsPerTick<1)throw new Error('Journey needs one player command per tick');
         if(adapter.journey===undefined)throw new Error('Missing native journey capability');
         const report=v.parse(HeadlessJourneyReportSchema,adapter.journey(request.plan));

@@ -6,7 +6,7 @@ import { Vector3 } from 'three';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { FIXED_STEP } from '../src/shared/engine/core/fixedStep';
@@ -25,26 +25,26 @@ import { RowBodies } from '../src/client/engine/entities/RowBodies';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
 
-// P1-E3.1: population and creature spawning on the shipped headless host (`createTrustedHeadlessResident`, the tick
+// P1-E3.1: population and creature spawning on the shipped headless host (`createNativeHeadlessResident`, the tick
 // worker's own composition) for a real shard. Sunscar Dunes' homes keeper spawns, thinks, moves, kills and refills
 // its creatures in the fixed tick; the census is their serialisable read model.
 
-async function shipped(slug: string): Promise<{ resident: (snapshot?: string) => Promise<TrustedHeadlessResident>; product: Awaited<ReturnType<typeof loadHeadlessFolder>> }> {
+async function shipped(slug: string): Promise<{ resident: (snapshot?: string) => Promise<NativeHeadlessResident>; product: Awaited<ReturnType<typeof loadHeadlessFolder>> }> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier: Rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  return { product, resident: snapshot => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
+  return { product, resident: snapshot => createNativeHeadlessResident({ shard, assets, rapier, product }, snapshot) };
 }
-const kill = (resident: TrustedHeadlessResident, id: string): void => {
+const kill = (resident: NativeHeadlessResident, id: string): void => {
   const actor = resident.host.entities.get(id);
   if (actor === undefined || !actor.alive) throw new Error(`No live creature ${id}`);
   const dealt = resident.host.combat.hit({ source: 'env', sourceTags: ['dmg.legacy', 'cover.checked'], target: actor.combatActor(),
     amount: actor.maxHp * 10, point: actor.position.clone(), dir: new Vector3(0, 0, 1) });
   if (dealt?.killed !== true) throw new Error(`Creature ${id} did not fall`);
 };
-const steps = (resident: TrustedHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
+const steps = (resident: NativeHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
 const home = (census: PopulationCensus, id: string): PopulationCensus['homes'][number] => {
   const row = census.homes.find(entry => entry.id === id); if (row === undefined) throw new Error(`Missing census home ${id}`); return row;
 };
@@ -53,7 +53,7 @@ test('Sunscar spawns, moves, kills and refills its creatures headless, and its c
   const { product, resident } = await shipped('sunscar-dunes');
   const browser = pagePopulationRows(parseNativeRuntimePlan(product.section('sim/runtime-plan')));
   const live = await resident();
-  let restored: TrustedHeadlessResident | undefined;
+  let restored: NativeHeadlessResident | undefined;
   try {
     // spawning: the install draws every declared home, exactly the rows the browser's page population spawns
     const born = populationCensus(live.host);

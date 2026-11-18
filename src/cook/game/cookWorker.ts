@@ -117,7 +117,7 @@ export interface CookLimits {
   readonly heapMB: number;
   /** The job's shardfile cap, when `api-server`'s has moved past D31's. */
   readonly maxBytes?: number;
-  /** Trusted host CPU grant, including the job's coordinating thread. */
+  /** Host CPU grant, including the job's coordinating thread. */
   readonly cpuSlots?: number;
 }
 /** 16 cores and 30 GB on the VPS; Pine's 300 MB ceiling cooks in under two minutes with its proof. */

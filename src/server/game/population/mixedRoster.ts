@@ -25,7 +25,7 @@ import type { SimSnapshot } from '@wildshard/engine/sim/snapshot';
 import { strikeFromData } from '@wildshard/engine/ai/strikeRows';
 
 export interface MixedPopulationBody extends NativeCreatureSlot { brain: KeptPolicy | null }
-/** Trusted native products contain data only. Queries are resolved on installed hosts. */
+/** Native products contain data only. Queries are resolved on installed hosts. */
 export interface MixedPopulationInput {
   readonly rows: unknown; readonly keeper: unknown; readonly perchProgram: unknown;
   readonly population: SpeciesPrograms;

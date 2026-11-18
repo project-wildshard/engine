@@ -70,7 +70,7 @@ test('the real parent and worker admit a native item context before ticking', {t
   const fixture = product();
   await onDisk(fixture.files, async directory => {
     const admitted = await loadHeadlessFolder(directory);
-    const prepare = new URL('./fixtures/headless/trustedRuntime.ts', import.meta.url);
+    const prepare = new URL('./fixtures/headless/nativeRuntime.ts', import.meta.url);
     const worker = await createNativeProofWorker(admitted.shardfile, new Map(), prepare, {directory, sections: folderHeadlessSections(admitted)});
     try { expect(worker).toBeDefined(); } finally { await worker.dispose(); }
   });

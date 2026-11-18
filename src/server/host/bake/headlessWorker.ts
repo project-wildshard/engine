@@ -1,10 +1,10 @@
 // oxlint-disable-next-line import/no-unassigned-import -- The sim's Math goes in before any module body runs.
 import '@wildshard/engine/core/portableMathFirst';
-import {createTrustedHeadlessTape} from '../../../shared/host/headlessTape';
+import {createNativeHeadlessTape} from '../../../shared/host/headlessTape';
 import { runHeadlessJourney } from '../../../shared/host/headlessJourney';
 import { proveShardfileEntries } from '@wildshard/engine/game/bake/entryways';
 import { openWorldAdapter } from '../openWorld';
-import { createTrustedHeadlessAdapter } from '../headlessRuntime';
+import { createNativeHeadlessAdapter } from '../headlessRuntime';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 // oxlint-disable-next-line import/no-nodejs-modules -- Only the platform-selected physics binary is read inside the isolated worker.
 import { readFileSync } from 'node:fs';
@@ -40,7 +40,7 @@ await runTickWorker(async raw => {
   // SERVER-PARITY HS1 left: a runtime plan carried as sections, with no product, still ticks the bare resident. Far Reach's and
   // Dunes' proof witnesses build their checkpoints that way; moving it to `openWorldAdapter` re-records them.
   // oxlint-disable-next-line typescript/no-deprecated -- HS1 left, above
-  if (sections.has('sim/runtime-plan')) return createTrustedHeadlessAdapter({ shard, assets: payload.assets, rapier, sections }, payload.snapshot);
+  if (sections.has('sim/runtime-plan')) return createNativeHeadlessAdapter({ shard, assets: payload.assets, rapier, sections }, payload.snapshot);
   let commands: ReadonlyMap<string, number> = new Map();
   let effects: HeadlessEffect[] = [];
   const ports = { rapier, sections, commands: () => commands, quest: {
@@ -93,7 +93,7 @@ await runTickWorker(async raw => {
       if(sim.decisions?.host.metrics().some(row=>row.refusals>0||row.disabled))throw new Error('Headless decision call failed');
   };
   const serializer=createSimSnapshotSerializer();
-  const tape=createTrustedHeadlessTape(sim.host,step,()=>effects);
+  const tape=createNativeHeadlessTape(sim.host,step,()=>effects);
   return {
     step,
     observe: () => {

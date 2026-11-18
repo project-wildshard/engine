@@ -67,7 +67,7 @@ function pipelineKey(object: Drawable, camera: THREE.Camera): string {
 }
 
 /** `reveal` gains the hidden ancestors of every hidden drawable the warm adds (drawSlice shows them for its draw only). */
-/** D188: order drawables by their bounds' horizontal distance from `at` (an origin's without trusted bounds), nearest first. */
+/** D188: order drawables by their bounds' horizontal distance from `at` (an origin's without reliable bounds), nearest first. */
 function sortNearest(drawables: Drawable[], at: THREE.Vector3): void {
   const centre = new THREE.Vector3(), distance = new Map<Drawable, number>();
   for (const object of drawables) {

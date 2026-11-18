@@ -4,7 +4,7 @@ import { ScriptWorld, SCRIPT_OP, type ScriptEntity, type ScriptEffect, type Effe
 import { ScriptHost, type ScriptHostOptions, type ScriptCall } from '../../../shared/engine/script/host';
 import type { ScriptModule } from './lane';
 
-/** A trusted role owns its entity handles, effect validation, query provenance and complete world continuation. */
+/** A host-owned role owns its entity handles, effect validation, query provenance and complete world continuation. */
 export interface ScriptRole {
   moduleContract?: true;
   id: string; world: ScriptWorld; query: ScriptHostOptions['query']; events: 'deliver' | 'consume';

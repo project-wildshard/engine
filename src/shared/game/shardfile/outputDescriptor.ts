@@ -8,7 +8,7 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { parseOutputLineageIndex } from '@wildshard/format/stateLineage';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 
-/** Trusted checked-ingestion capability, supplied explicitly by Node author readers. */
+/** Host-owned checked-ingestion capability, supplied explicitly by Node author readers. */
 /**
  * Whether a server reads this file: its terrain collider, and the bin, json and wasm that hold collision, navigation and
  * scripts. Models, textures, sound and the view's terrain tiles stay on the page. C2's server packs replace this.
@@ -39,7 +39,7 @@ export interface OutputDescriptorReader {
   /** I5: a section served from its pack (no request of its own) completes its declared path. */
   packedHit?: (path: string, hash: string) => void;
   hash: (bytes: Uint8Array) => Promise<string>;
-  /** Trusted transport returns owned bytes already checked against this exact hash and size.
+  /** Host-owned transport returns owned bytes already checked against this exact hash and size.
    * `stored` proves durable content-cache persistence, not merely a scheduled write. */
   verified?: (hash: string, path: string, maximum: number) => Promise<{ bytes: Uint8Array; cached: boolean; stored: boolean } | null>;
   /** Only the private content-cache port may return verified owned bytes. Raw

@@ -338,7 +338,7 @@ export function gridPostCosts(allocator: ResidencyAllocator): GridPostCosts {
   if (costs === undefined) { costs = new GridPostCosts(); postCosts.set(allocator, costs); }
   return costs;
 }
-/** The slug's admitted data or trusted hybrid declaration; runtime entry still requires a separate regional factory. */
+/** The slug's admitted data or native hybrid declaration; runtime entry still requires a separate regional factory. */
 export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode?: { readonly signal?: AbortSignal; readonly files?: readonly string[] }): Promise<GridFolder> | null;
 export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode: 'metadata' | 'optional-metadata'): Promise<GridFolderMetadata> | null;
 export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode?: 'metadata' | 'optional-metadata' | { readonly signal?: AbortSignal; readonly files?: readonly string[] }): Promise<GridFolder | GridFolderMetadata> | null {

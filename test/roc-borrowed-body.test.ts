@@ -7,7 +7,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const policySchema = v.object({ phase: v.number(), fighting: v.boolean(), decision: v.string(), strike: v.object({ clock: v.number(), currentId: v.nullable(v.string()) }) });
@@ -19,8 +19,8 @@ test('the published Roc guest drives the retained native body through phases and
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash,
     Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const preparation = { product, shard: product.shardfile, assets, rapier };
-  const resident = await createTrustedHeadlessResident(preparation);
-  let resumed: Awaited<ReturnType<typeof createTrustedHeadlessResident>> | undefined;
+  const resident = await createNativeHeadlessResident(preparation);
+  let resumed: Awaited<ReturnType<typeof createNativeHeadlessResident>> | undefined;
   const policy = (owner: typeof resident) => {
     const slot = snapshotSimHost(owner.host).adapters.find(row => row.id === 'far.flock');
     const keeper = v.parse(v.object({ homes: v.array(v.object({ id: v.string(), policy: v.nullable(v.string()) })) }), slot?.state);
@@ -47,7 +47,7 @@ test('the published Roc guest drives the retained native body through phases and
       expect(logical.decision.bindings[0]?.slots['step']).toBeGreaterThanOrEqual(phase * 10);
     }
     const saved = snapshotSimHost(host), before = policy(resident);
-    resumed = await createTrustedHeadlessResident(preparation, saved);
+    resumed = await createNativeHeadlessResident(preparation, saved);
     expect(policy(resumed)).toEqual(before);
     expect(resumed.host.entities.size).toBe(host.entities.size);
     for (let i = 0; i < 30; i++) { resident.step([]); resumed.step([]); }

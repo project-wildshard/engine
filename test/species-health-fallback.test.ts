@@ -9,7 +9,7 @@ import { LEGACY_HEALTH, speciesHealth, variantOf, type SpeciesDef, type VariantT
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // SB25 (STAGING-BUGBASH, 2026-11-16): d39d6c1d made the page throw "Species deer has no valid health" for a species
@@ -36,7 +36,7 @@ test('pinned Pine Hollow: the page gives every creature the health the server gi
   const descriptor = outputDescriptor(product);
   if (descriptor === undefined) throw new Error('Missing Pine output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  const resident = await createTrustedHeadlessResident({ shard: product, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product: shard });
+  const resident = await createNativeHeadlessResident({ shard: product, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product: shard });
   try {
     // The page's Pine species, frozen from the full world (test/fixtures/frozen/pine-creature-world.json, boar-world.ts).
     const frozen = parse(object({ boar: SpeciesSchema, elk: SpeciesSchema, looks: unknown() }), frozenRuntimeJson('pine-creature-world.json'));

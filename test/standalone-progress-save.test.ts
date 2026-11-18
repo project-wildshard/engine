@@ -7,7 +7,7 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { serializeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type HeadlessRuntimeInput, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -32,7 +32,7 @@ async function product(slug: string): Promise<HeadlessRuntimeInput> {
 }
 /** A page holding a save whose player stands at (x, z). */
 async function standingAt(slug: string, input: HeadlessRuntimeInput, x: number, z: number): Promise<PageStorage> {
-  const live: TrustedHeadlessResident = await createTrustedHeadlessResident(input), storage = new PageStorage();
+  const live: NativeHeadlessResident = await createNativeHeadlessResident(input), storage = new PageStorage();
   const player = leadPlayer(live.host); player.position.set(x, live.host.groundHeightAt(x, z), z); player.motor.resetAt(player.position);
   live.step([]); live.step([]);
   const data = { tick: live.host.state.tick, snapshot: serializeSimSnapshot(snapshotSimHostBytes(live.host)) };

@@ -11,7 +11,7 @@ import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 export interface DangerousProvenance { readonly firstParty?: boolean }
 type Provenance = DangerousProvenance;
 /** The host's grant of the dangerous capabilities (runtime, page features, ownership) until OF10c budgets them. */
-export function dangerousTrust(trusted = true): DangerousProvenance { return trusted ? { firstParty: true } : {}; }
+export function dangerousTrust(granted = true): DangerousProvenance { return granted ? { firstParty: true } : {}; }
 
 /** @deprecated ONE-FORMAT OF10c1: a declared `runtime` binds a native engine module with no CPU, memory or bandwidth limit
  * of its own; the shard's tier CPU and memory limits, metered on that module, replace this provenance check. */

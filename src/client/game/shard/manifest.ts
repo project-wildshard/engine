@@ -463,7 +463,7 @@ export interface ShardManifest {
   next?: string;
   /** Built first-party data source, admitted before the existing session boot; picker identity stays on this manifest. */
   shardfile?: string;
-  /** First-party grid declaration for a trusted hybrid; discovery alone does not replace the standalone boot path. */
+  /** First-party grid declaration for a native hybrid; discovery alone does not replace the standalone boot path. */
   gridShardfile?: string;
   /** Built-in finite page owner, derived from the admitted entry policy; no source module exists. */
   clientPlanRuntime?: true;
@@ -472,7 +472,7 @@ export interface ShardManifest {
   blender?: { area: { x0: number; x1: number; z0: number; z1: number }; models: readonly string[] };
   /** Migrated manifests declare their plugin and level policy; legacy hooks retire per shard phase. */
   load?: () => Promise<{ default: new () => ShardPlugin;
-    resolveTrustedRuntime?: (entry: string) => new () => ShardPlugin }>;
+    resolveNativeRuntime?: (entry: string) => new () => ShardPlugin }>;
   kitLook?: LevelSpec['kitLook'];
   /** the first-person hands' style; 'pbr' when absent (E405 AG25) */
   hands?: LevelSpec['hands'];

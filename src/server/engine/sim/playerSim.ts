@@ -203,7 +203,7 @@ export class PlayerSim implements PlayerMotionState {
   }
   /** Drop an external binding with its host. */
   releaseExternal(): void { this.external?.scope.dispose(); this.external = undefined; }
-  /** Trusted page-object alias used only by same-engine continuation encoding, never author-selected query input. */
+  /** Native page-object alias used only by same-engine continuation encoding, never author-selected query input. */
   isExternalObject(value: unknown): boolean { return this.external !== undefined && value === this.external.value.owner; }
   /** The bound page traveller's pose into this player, or throw while none is bound. */
   followExternal(): void {

@@ -80,7 +80,7 @@ function turnAlong(collider: Collider, pose: Float64Array, at: number, direction
 export class CreatureBodies<C extends Creature = Creature> {
   private readonly boxes = new Map<C, Boxes>();
   /** collider handle → the animal part it is: the only colliders cast() answers with. The HITBOX group is shared (the
-   *  practice dummies' volumes, src/shared/engine/physics/trainingTargets.ts, sit in it too), so a tag's owner is never trusted to be
+   *  practice dummies' volumes, src/shared/engine/physics/trainingTargets.ts, sit in it too), so a tag's owner is never relied on to be
    *  an animal's — E300: a dummy hit came back as `animal: undefined` and the crossbow's aim readout threw on `.alive`. */
   private readonly owners = new Map<number, HitboxOwner<C>>();
   private readonly hitGroups = queryGroups(['HITBOX'], 'PROJECTILE');

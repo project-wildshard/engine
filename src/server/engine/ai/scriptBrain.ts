@@ -8,7 +8,7 @@ import type { ScriptRole, ScriptSchedule, ScheduledScriptBinding } from '../scri
 
 /** Numeric motion intentions; the guest cannot write positions, spawn actors or deal damage. */
 export const BRAIN_FIELD: Readonly<{ yaw: 1; speed: 2; strafe: 3; turnRate: 4; }> = Object.freeze({ yaw: 1, speed: 2, strafe: 3, turnRate: 4 });
-/** One trusted actor binding, with admitted motion bounds and a finite catalogue of strike requests. */
+/** One host-owned actor binding, with admitted motion bounds and a finite catalogue of strike requests. */
 export interface ScriptBrainBinding {
   module: string; entity: number; actorId: string; maxSpeed: number; maxStrafe: number; maxTurnRate: number;
   parameters: readonly number[]; strikes: readonly { event: number; strike: string }[];
@@ -88,7 +88,7 @@ export class ScriptBrainDriver {
     this.bindings = v.parse(v.pipe(v.array(bindingSchema), v.maxLength(128)), options.bindings).sort((a, b) => a.entity - b.entity);
     if (new Set(this.bindings.map(b => b.entity)).size !== this.bindings.length || new Set(this.bindings.map(b => b.actorId)).size !== this.bindings.length
       || this.bindings.some(b => this.actors.get(b.actorId)?.entityId !== b.actorId || !options.modules.some(m => m.name === b.module)
-        || new Set(b.strikes.map(s => s.event)).size !== b.strikes.length)) throw new Error('Invalid trusted brain bindings');
+        || new Set(b.strikes.map(s => s.event)).size !== b.strikes.length)) throw new Error('Invalid native brain bindings');
     if ([...cadences].some(([entity, divisor]) => !this.bindings.some(b => b.entity === entity) || !Number.isInteger(divisor) || divisor < 1 || 60 % divisor !== 0)) throw new Error('Invalid brain binding cadence');
     this.divisors = new Map(this.bindings.map(b => [b.entity, cadences.get(b.entity) ?? options.divisor]));
     const bindings = new Map(this.bindings.map(b => [b.entity, b]));
@@ -96,13 +96,13 @@ export class ScriptBrainDriver {
     this.query = (kind, input, self) => {
       if (kind !== SCRIPT_PARAMETER_QUERY) return options.query(kind, input, self);
       const binding = bindings.get(self);
-      if (binding === undefined || input.length !== 8 || input.some(n => n !== 0)) throw new Error('Brain parameters require trusted self');
+      if (binding === undefined || input.length !== 8 || input.some(n => n !== 0)) throw new Error('Brain parameters require a bound self');
       return [...binding.parameters];
     };
     this.contract = JSON.stringify({ divisors: [...this.divisors], bindings: this.bindings,
       modules: options.modules.map(m => ({ ...m, bytes: Array.from(m.bytes) })).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0) });
   }
-  /** Trusted entity roles select brain-only effect validation, never a general numeric-state translator. */
+  /** Host-owned entity roles select brain-only effect validation, never a general numeric-state translator. */
   role(roleId: string): ScriptRole { return { id: roleId, moduleContract: true, world: this.world, query: this.query, events: 'consume', snapshot: () => this.snapshot(), restore: saved => { this.restore(saved); } }; }
   /** Independent per-actor decisions submit to a composed host without resetting any allowance. */
   schedule(scheduleId: string, role: string): ScriptSchedule {
@@ -112,7 +112,7 @@ export class ScriptBrainDriver {
   private input(scheduled: ScheduledScriptBinding, tick: number): readonly number[] | undefined {
     const binding = this.bindings.find(b => b.entity === scheduled.entity && b.module === scheduled.module);
     const actor = binding === undefined ? undefined : this.actors.get(binding.actorId);
-    if (actor === undefined) throw new Error('Missing trusted brain actor');
+    if (actor === undefined) throw new Error('Missing native brain actor');
     if (!actor.alive) return undefined;
     const values = [...this.ports.observe(actor)];
     if (values.length > 16 || !values.every(Number.isFinite)) throw new Error('Invalid brain observations');
@@ -122,7 +122,7 @@ export class ScriptBrainDriver {
   private committed(scheduled: ScheduledScriptBinding, call: ScriptCall): void {
     const binding = this.bindings.find(b => b.entity === scheduled.entity && b.module === scheduled.module);
     const actor = binding === undefined ? undefined : this.actors.get(binding.actorId);
-    if (binding === undefined || actor === undefined) throw new Error('Missing trusted brain actor');
+    if (binding === undefined || actor === undefined) throw new Error('Missing native brain actor');
     const state = this.world.entity(binding.entity);
     if (!call.ok || state === undefined) { actor.setMotion(actor.yaw, 0, 0); actor.setStrafe(0); return; }
     actor.setMotion(state.fields[1] ?? 0, state.fields[2] ?? 0, state.fields[4] ?? 0); actor.setStrafe(state.fields[3] ?? 0);

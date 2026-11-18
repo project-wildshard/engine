@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the native physics module.
 import { readFileSync } from 'node:fs';
 import { createNativeProofAdapter, createNativeProofResident } from '../../../src/test/game/headlessNative.ts';
-import { prepareHeadlessRuntime } from './trustedRuntime.ts';
+import { prepareHeadlessRuntime } from './nativeRuntime.ts';
 import { createShardFolder } from '../../../src/shared/game/shardfile/shardFolder.ts';
 import { emptyShardfile } from '../../../src/shared/host/author.ts';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier.ts';

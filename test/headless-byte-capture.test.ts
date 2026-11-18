@@ -9,7 +9,7 @@ import {SIM_LEVEL,fightCommand} from './fixtures/sim-level/level';
 import {builtFolder} from '../src/test/game/builtFolder';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {createNativeProofAdapter,createNativeProofResident} from '../src/test/game/headlessNative';
-import {prepareHeadlessRuntime} from './fixtures/headless/trustedRuntime';
+import {prepareHeadlessRuntime} from './fixtures/headless/nativeRuntime';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
 import type {TickWorkerAdapter} from '../src/server/host/tickWorkerLoop';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';

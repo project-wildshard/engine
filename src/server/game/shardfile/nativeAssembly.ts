@@ -7,7 +7,7 @@ import { decodeTerrainTile, terrainTileHeight } from '@wildshard/format/terrainT
 import { nativeArenaSealSolids } from '../boss/nativeArenaSeal';
 import type { ArenaSealDimensions } from '../../../shared/game/boss/arenaCollision';
 import { proveTerrainEntries } from '../plugin/mover';
-import { trustedLevel } from '../plugin/simulation';
+import { shardLevel } from '../plugin/simulation';
 import { createNativeBakeReader, installNativeCollision, nativeBakeGround, type NativeCollisionBake, type NativeCollisionSolid } from '../population/nativeBake';
 import { NativePopulationField } from '../population/environment';
 import { need, readAssemblyInput, type AssemblyGround, type AssemblyPrepared, type NativeAssemblyContext, type NativeAssemblyPorts } from './nativeAssemblyInput';
@@ -86,7 +86,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
   const harvest = species === undefined ? [] : [...species.native, ...species.program?.species ?? []];
   const heightAt = ground.heightAt, speed = plan.level.authorCap === true ? clamp(shard.authorCaps.speed, 0, plan.level.speed) : plan.level.speed;
-  const level = trustedLevel(shard, { at: { x: shard.spawn.x, y: Math.max(shard.spawn.y, plan.level.stand ?? heightAt(shard.spawn.x, shard.spawn.z) + 0.1), z: shard.spawn.z }, yaw: shard.spawn.yaw, speed }, plan.level.ground);
+  const level = shardLevel(shard, { at: { x: shard.spawn.x, y: Math.max(shard.spawn.y, plan.level.stand ?? heightAt(shard.spawn.x, shard.spawn.z) + 0.1), z: shard.spawn.z }, yaw: shard.spawn.yaw, speed }, plan.level.ground);
   const levelPorts = { ground: false as const, heightAt };
   const walk = (host: SimHost): ReturnType<typeof proveTerrainEntries> => proveTerrainEntries(host.physics, shard.entryways, heightAt, plan.entries.walk as Parameters<typeof proveTerrainEntries>[3]);
   return { level, ports: levelPorts, proveEntries: host => {

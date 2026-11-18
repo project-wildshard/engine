@@ -44,7 +44,7 @@ export interface PageResidencyBoot {
   readonly mode: PageMode;
   readonly instance: string | null;
   readonly residency?: PageResidency;
-  /** G216: one trusted page policy also reaches data-only SHARD SELECT validation and its warning surface. */
+  /** G216: one native page policy also reaches data-only SHARD SELECT validation and its warning surface. */
   readonly memory: MemoryAdmission;
   /** Validated recovery uses the ordinary owner, then returns to the road. */
   readonly recovery?: NonNullable<GridRecoveryRecord>;
@@ -102,11 +102,11 @@ function withPageMemory(options: FolderOptions, bindings: ShardfileClientBinding
 function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings: ShardfileClientBindings): ShardManifest {
   const source = admitted.source;
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.trustedRuntime === true && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Empty hybrid policy requires a trusted first-party runtime declaration');
+  if (bindings.nativeRuntime === true && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Empty hybrid policy requires a native runtime declaration');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime audio ownership requires a trusted first-party runtime declaration');
+  if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime audio ownership requires a native runtime declaration');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime world ownership requires a trusted first-party runtime declaration');
+  if (bindings.worldOwner === 'runtime' && (!dangerousRuntimeOwnership(options) || source.runtime === null)) throw new Error('Runtime world ownership requires a native runtime declaration');
   if (!cataloguePlaced(source.identity.slug) && admitted.instance === undefined) throw new Error('Outside shardfile is missing its admitted save identity');
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
@@ -135,11 +135,11 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
 }
 
 /** Select a fully admitted external product before the ordinary session starts; first-party discovery remains installed.
- * A trusted preparation barrier may overlap admission, but precedes every live binding and publication. */
+ * A native preparation barrier may overlap admission, but precedes every live binding and publication. */
 export async function installShardfileFolder(input: unknown, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
   const admitted = await admitFolder(input, options);
-  if (admitted.source.runtime !== null) throw new Error('Custom runtime requires trusted hybrid composition');
+  if (admitted.source.runtime !== null) throw new Error('Custom runtime requires native hybrid composition');
   if (prepared !== undefined) await prepared();
   const source = clientSource(admitted, options, bindings);
   return selectSource(source);
@@ -160,7 +160,7 @@ export async function inlineHybridArrival(source: Shardfile, options: Pick<Folde
   read: (url: string) => Promise<unknown>, discover: (document: unknown) => ShardManifest = shardFromDiscovery): Promise<ShardManifest | null> {
   if (source.runtime === null) return null;
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (!dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires trusted hybrid composition');
+  if (!dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires native hybrid composition');
   const { slug: folder } = source.identity;
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(folder)) throw new Error('Inline hybrid identity is not a shard folder');
   const url = new URL(`/shardfiles/${folder}/discovery.json`, options.base);
@@ -193,7 +193,7 @@ function selectSource(source: ShardManifest): ShardManifest {
 }
 
 /** Admit a built first-party descriptor before the normal session, preserving picker identity and its canonical save instance.
- * A trusted preparation barrier may overlap admission, but precedes every live binding and publication. */
+ * A native preparation barrier may overlap admission, but precedes every live binding and publication. */
 export async function installManifestShardfile(manifest: ShardManifest, providedOptions: FolderOptions, bindings: ShardfileClientBindings, prepared?: () => Promise<unknown>): Promise<ShardManifest> {
   const options = withPageMemory(providedOptions, bindings);
   // OF10a6: a manifest's `shardfile` descriptor is admitted like any upload's (same-origin, hash-checked below), whoever made it.
@@ -217,7 +217,7 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
   const source = await readFolderDescriptor(folderOptions, url);
   const { slug: authoredIdentity } = source.identity, expectedIdentity = manifest.slug.replace(/^_/u, '');
   if (authoredIdentity !== expectedIdentity) throw new Error('Manifest and shardfile identities differ');
-  if (source.runtime !== null) throw new Error('Custom runtime requires trusted hybrid composition');
+  if (source.runtime !== null) throw new Error('Custom runtime requires native hybrid composition');
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
   const admitted = await admitFolder(source, folderOptions);

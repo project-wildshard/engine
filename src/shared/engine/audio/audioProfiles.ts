@@ -15,9 +15,9 @@ export interface AudioMusicProfile {
   /** Declared cache/decode policy, preserving slot fallback or an entire boot bank. */
   catalogue?: { mode:'slots'|'bank'; extraStings:readonly ('pickup'|'death'|'chunk'|'dawn')[]; stingSets:Readonly<Partial<Record<'pickup'|'death'|'chunk'|'dawn',string>>> } | undefined;
 }
-/** Named circular ambience zones; a source id resolves a trusted moving-emitter or geometry port. */
+/** Named circular ambience zones; a source id resolves a host-owned moving-emitter or geometry port. */
 export interface AudioZone { id: string; x: number; z: number; inner: number; outer: number; gain: number; /** Exact authored width; avoids subtracting rounded outer/inner radii. */ fade?: number | undefined; open?: boolean | undefined; source?: string | undefined }
-/** Mixer timing, bed levels, room sends and named zones consumed by a trusted catalogue recipe. */
+/** Mixer timing, bed levels, room sends and named zones consumed by a native catalogue recipe. */
 export interface AudioZoneProfile {
   sampleMix?:AudioSampleMix;
   lifecycle?:AudioAmbienceLifecycle;

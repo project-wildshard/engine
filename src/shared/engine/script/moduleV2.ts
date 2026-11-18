@@ -75,7 +75,7 @@ export class ScriptModuleV2 {
   constructor(bytes: Uint8Array,options: {
     readonly seed: readonly [number,number]; readonly initFuel: number;
     readonly output: readonly FloatColumnV2[]; readonly ioBytes?: number;
-    /** Trusted native owner only: write/read must never retain borrowed views.
+    /** Native owner only: write/read must never retain borrowed views.
      * Public low-level users and arbitrary initializers keep fresh storage. */
     readonly owner?: Scope;
     readonly initialize?: (view: DataView,io: number) => void;

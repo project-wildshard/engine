@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { SimHost } from '../src/server/engine/sim';
 import type { PlayerSim } from '../src/server/engine/sim/playerSim';
 import { floorBelow } from '../src/shared/engine/physics/query';
@@ -70,7 +70,7 @@ async function fallsAndRecovers(slug: string, host: SimHost, player: PlayerSim, 
 
 for (const { slug } of REPROS) {
   test(`ENG-18 offline: the bare resident catches a fall off ${slug}`, { timeout: 120_000 }, async () => {
-    const resident: TrustedHeadlessResident = await createTrustedHeadlessResident(await serverInput(slug));
+    const resident: NativeHeadlessResident = await createNativeHeadlessResident(await serverInput(slug));
     closers.push(() => { resident.dispose(); });
     const { host } = resident, player = [...host.players.values()][0];
     if (player === undefined) throw new Error('No player');

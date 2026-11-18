@@ -13,7 +13,7 @@ import { directLoopback, type DirectLoopback } from '../../src/test/engine/netLo
 import { leadPlayer } from '../../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../../src/server/host/headlessRuntime';
 import { netTickCommands } from '../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../src/shared/host/tickProtocol';
 import { builtFolder } from '../../src/test/game/builtFolder';
@@ -28,11 +28,11 @@ export let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
 /** `world` as a cell's room opens it (MP1.2: `{ room: true, near }` runs the seats' held arms, as the box does). */
-export async function resident(slug: string, world?: Parameters<typeof createTrustedHeadlessResident>[2]): Promise<TrustedHeadlessResident> {
+export async function resident(slug: string, world?: Parameters<typeof createNativeHeadlessResident>[2]): Promise<NativeHeadlessResident> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, world);
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, world);
 }
 export interface Bot { readonly id: string; readonly client: NetClient; readonly link: DirectLoopback }
 /** A wandering, jumping, dodging, occasionally swinging thumb, from a fixed sequence so a run repeats. */
@@ -44,7 +44,7 @@ export function input(index: number, tick: number, target: string | undefined): 
 }
 export const percentile = (sorted: readonly number[], at: number): number => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * at))] ?? Infinity;
 
-export function run(live: TrustedHeadlessResident): { tierSkipsPerFrame: number; p50: number; p95: number; p99: number; max: number; creatures: number; downPerClient: number; rowsSeen: number; moved: number } {
+export function run(live: NativeHeadlessResident): { tierSkipsPerFrame: number; p50: number; p95: number; p99: number; max: number; creatures: number; downPerClient: number; rowsSeen: number; moved: number } {
   const { host } = live, world = new SimNetWorld(host), spawn = leadPlayer(host).position, bots: Bot[] = [];
   const room = new NetRoom({ world, step: inputs => {
     const [lead, ...others] = inputs, commands = new Map<string, NetCommand>();

@@ -6,7 +6,7 @@ import {Session} from 'node:inspector/promises';
 import {dirname,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
-import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
+import {createNativeHeadlessResident} from '../src/server/host/headlessRuntime';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {outputDescriptor,serverReadsFile} from '../src/shared/game/shardfile/outputDescriptor';
 
@@ -21,7 +21,7 @@ try {
     if(descriptor===undefined)throw new Error(`No admitted index for ${slug}`);
     const assets=new Map(descriptor.index.files.filter(file=>serverReadsFile(file,product.shardfile.terrain?.collider)&&(file.name===undefined||file.kind==='wasm'||file.kind==='tile'))
       .map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-    const live=await createTrustedHeadlessResident({product,shard:product.shardfile,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))});
+    const live=await createNativeHeadlessResident({product,shard:product.shardfile,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))});
     try {
       await session.post('Profiler.startPreciseCoverage',{callCount:true,detailed:false});
       await session.post('Profiler.takePreciseCoverage'); // Clear any pre-play profiler activity.

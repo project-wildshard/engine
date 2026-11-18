@@ -4,7 +4,7 @@
 
 Each world was built more than once: a dedicated room and the phone's grid opened `openCellWorld` (the trusted resident, then
 chapters, doors, discoveries, the owned book, lone walls, the fall floor), while the headless tick adapter that shard CI
-journeys and the bake worker run booted the bare `createTrustedHeadlessResident`, a world no player runs. Shard journeys
+journeys and the bake worker run booted the bare `createNativeHeadlessResident`, a world no player runs. Shard journeys
 installed chapters by hand (Nalati's taming journey) to test what a room does.
 
 `src/server/host/openWorld.ts`: `openWorld(input, { room, saves, cell, snapshot, ... })` opens the room's composition;
@@ -14,7 +14,7 @@ fixed-step owners, and `test/open-world.test.ts` boots every pin as a room and t
 bare resident 7 pins failed (Nalati had no king, patrols, stealth or story chapters; every native pin lacked the owned book).
 
 Left: a runtime plan sent as sections with no product still ticks the bare resident (Far Reach's and Dunes' proof
-witnesses build their checkpoints that way). `createTrustedHeadlessAdapter` is deprecated; shard CI moves to
+witnesses build their checkpoints that way). `createNativeHeadlessAdapter` is deprecated; shard CI moves to
 `@wildshard/engine/host/openWorld` once it pins this engine.
 
 ## SS1's owed Driftwood lines (HS7)

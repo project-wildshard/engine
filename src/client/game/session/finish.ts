@@ -86,7 +86,7 @@ async function linkWorldUnderLoader(game: Awaited<ReturnType<typeof playStage>>[
 export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): Promise<BuiltWorld> {
   const { manifest, boot, slug, loading, audioProfile, files, plan, step, audioLoad, deferredAudio, world, game, sky, player, chunk, fragileBoot, failGpuBoot, onBootContextLost, edgeDressing, boundary, water, interactables, props, disableBootGpuGuard, level, animals, getArena, crossbow, weapons, lockSys, hud, perf, audio, music, playerHealth, exploring, hands, windupWarn, resuming, arrival, menuFirst, enter, getPlayground, leakPhysics } = ctx;
 
-  // The staged loader invokes the trusted play hook after buildPlay. Only a fully installed runtime can leave:
+  // The staged loader invokes the native play hook after buildPlay. Only a fully installed runtime can leave:
   // leaving during buildPlay disposes its kit scope before that hook runs and makes recovery fall back to title.
   const enterGrid = async (): Promise<void> => {
     if (ctx.session.ownedGridHome === true) {

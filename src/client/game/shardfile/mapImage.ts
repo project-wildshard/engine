@@ -36,7 +36,7 @@ export function leaseMapImage(source: Shardfile, assets: ReadonlyMap<string, Uin
   catch (error) { lease.release(); throw error; }
 }
 
-/** Reserve a validated map independently of a trusted runtime's opaque memory claim. */
+/** Reserve a validated map independently of a native runtime's opaque memory claim. */
 export function reserveMapImage(source: Shardfile, allocator: ResidencyAllocator, scope: { readonly disposed: boolean; onDispose: (fn: () => void) => void }, optional = false): { release: () => void } {
   if (scope.disposed) throw new Error('Map owner disposed');
   const map = source.map, file = source.files.find(row => row.hash === map?.image);

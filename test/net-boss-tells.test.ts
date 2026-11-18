@@ -3,7 +3,7 @@ import { runtimeAssets } from './fixtures/engine-lift/folder';
 const { ANTLER_KING_FIGHT } = liftInputs;
 // oxlint-disable-next-line import/no-nodejs-modules -- A resident runs the shipped product bytes and physics module.
 import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
-import { createTrustedHeadlessResident,type TrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
+import { createNativeHeadlessResident,type NativeHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { readFileSync } from 'node:fs';
 import { expect,test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
@@ -16,14 +16,14 @@ import { builtFolder } from './fixtures/engine-lift/folder';
 
 // A page on a server steps no fight, so what a fight tells its views has to be said. Real products on a real resident: what a page
 // would paint or play, heard where a room hears it. Whether a page paints it is the row's browser proof, not this.
-async function residentOn(slug: string): Promise<TrustedHeadlessResident> {
+async function residentOn(slug: string): Promise<NativeHeadlessResident> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = runtimeAssets(product, directory);
-  return createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) });
+  return createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) });
 }
 /** Step, taking what the host told its views as a room would. */
-function hear(live: TrustedHeadlessResident, ticks: number, each?: () => void,
+function hear(live: NativeHeadlessResident, ticks: number, each?: () => void,
   done?: (heard: ReadonlyMap<string, (readonly number[])[]>) => boolean): Map<string, (readonly number[])[]> {
   const heard = new Map<string, (readonly number[])[]>();
   for (let tick = 0; tick < ticks; tick++) {

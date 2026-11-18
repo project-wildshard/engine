@@ -10,7 +10,7 @@ export interface PlumbingPorts {
   instance: string; tier: 'phone' | 'desktop'; scope: Scope; input: InputService;
   active: () => boolean; scene: (id: string) => void;
   knobs: (schema: TierKnobSchema) => void; debugRow: (row: DebugRowSpec) => void;
-  /** Trusted item inputs already have a scoped callback; register their keys/touch without a second scene callback. */
+  /** Native item inputs already have a scoped callback; register their keys/touch without a second scene callback. */
   handledInput?: ReadonlySet<string>;
   /** Live host observations. These are not author callbacks or property paths. */
   observation?: InputObservation;

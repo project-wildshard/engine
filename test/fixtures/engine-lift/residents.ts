@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll } from 'vitest';
 import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../../../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type HeadlessRuntimeInput, type NativeHeadlessResident } from '../../../src/server/host/headlessRuntime';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier';
 import type { snapshotSimHostBytes } from '../../../src/shared/engine/sim/snapshot';
 import { actRoutes } from '../../../src/shared/engine/sim/actRoutes';
@@ -11,7 +11,7 @@ import { builtFolder, runtimeAssets } from './folder';
 
 export interface AdmittedResidents {
   input: (slug: string) => HeadlessRuntimeInput;
-  open: (slug: string, saved?: ReturnType<typeof snapshotSimHostBytes>) => Promise<TrustedHeadlessResident>;
+  open: (slug: string, saved?: ReturnType<typeof snapshotSimHostBytes>) => Promise<NativeHeadlessResident>;
 }
 
 /** Admit each named product once per file, before its cases, through the same strict resident admission.
@@ -26,13 +26,13 @@ export function admittedResidents(slugs: readonly string[]): AdmittedResidents {
     }
   });
   const input = (slug: string): HeadlessRuntimeInput => { const value = products.get(slug); if (value === undefined) throw new Error('Missing admitted test product'); return value; };
-  return { input, open: (slug, saved) => createTrustedHeadlessResident(input(slug), saved, { room: true }) };
+  return { input, open: (slug, saved) => createNativeHeadlessResident(input(slug), saved, { room: true }) };
 }
 
-export function step(live: TrustedHeadlessResident, ticks = 1, commands: readonly HeadlessCommand[] = []): void {
+export function step(live: NativeHeadlessResident, ticks = 1, commands: readonly HeadlessCommand[] = []): void {
   for (let tick = 0; tick < ticks; tick++) live.step(tick === 0 ? commands : []);
 }
-export function press(live: TrustedHeadlessResident, id: string): void {
+export function press(live: NativeHeadlessResident, id: string): void {
   const route = actRoutes(live.host).interactions.get(id);
   if (route === undefined) throw new Error(`No published interaction: ${id}`);
   step(live, 1, [{ kind: 'script', actorId: route.actorId, value: route.value }]);

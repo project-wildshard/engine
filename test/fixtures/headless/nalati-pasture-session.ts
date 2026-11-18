@@ -8,7 +8,7 @@ import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescrip
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
 import {nativePopulationOf,type NativePopulation} from '../../../src/server/game/riding/nativePopulation';
-import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape} from '../../../src/shared/host/headlessTape';
 import type {WalkPoint} from '../../../src/shared/host/headlessJourney';
 import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-predators-native';
@@ -35,13 +35,13 @@ export async function earnNalatiPasture(interception?:readonly WalkPoint[]):Prom
     const flock=population.flocks[0];assert.ok(flock);
     const sheep=flock.alive,originalWolves=[...resident.host.entities.values()].filter(actor=>actor.kind==='wolf').map(actor=>actor.entityId);
     const delay=population.raid.snapshot().state.raidT;assert.ok(delay>0);
-    runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:[],segments:[{
+    runNativeHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:[],segments:[{
       id:'walk-and-jump-to-pasture',ticks:6000,commands:[],route:[{x:-10,z:232,jump:true,jumpAt:6},{x:-30,z:228},{x:-60,z:222},{x:-100,z:212}],
     }]});
     let arrivalTick=resident.host.state.tick;
     assert.ok(Math.hypot(leadPlayer(resident.host).position.x-flock.cx,leadPlayer(resident.host).position.z-flock.cz)<30);
     if(interception!==undefined){
-      runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:[],segments:[{
+      runNativeHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:[],segments:[{
         id:'walk-to-interception',ticks:6000,commands:[],route:[...interception],
       }]});
       arrivalTick=resident.host.state.tick;

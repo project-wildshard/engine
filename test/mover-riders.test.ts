@@ -2,7 +2,7 @@ import { canoeRow } from './fixtures/engine-lift/canoe';
 import { runtimeAssets } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise real native carry and its physics continuation.
 import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
-import { createTrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
+import { createNativeHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { expect,test } from 'vitest';
@@ -130,7 +130,7 @@ test('built Pine: a bot rides the canoe on a scripted tape and a client sees the
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), source = product.shardfile;
   const descriptor = outputDescriptor(source); if (descriptor === undefined) throw new Error('Missing admitted inventory');
   const assets = runtimeAssets(product, directory);
-  const resident = await createTrustedHeadlessResident({ shard: source, assets, rapier: await rapierNow(), product });
+  const resident = await createNativeHeadlessResident({ shard: source, assets, rapier: await rapierNow(), product });
   try {
     const { host } = resident, canoe = source.movers.find(value => value.id === 'pine.canoe');
     if (canoe?.carry === undefined) throw new Error('Missing admitted carry row');

@@ -74,7 +74,7 @@ export class DeclaredScriptWorld extends ScriptWorld {
     this.declaredRevision++; this.declaredContent++;
     return handles;
   }
-  /** Trusted server input in declaration order, never another actor's private record. */
+  /** Host-owned server input in declaration order, never another actor's private record. */
   input(handle: number): readonly number[] { const out: number[] = []; this.appendInput(handle, out); return out; }
   /** `input(handle)` appended to a caller's row (the lane's ABI input), without an intermediate copy. */
   appendInput(handle: number, out: number[]): void {
@@ -98,7 +98,7 @@ export class DeclaredScriptWorld extends ScriptWorld {
     const index = this.declaration.shared.findIndex(field => field.name === name);
     return this.declaration.shared[index]?.privacy === 'public' ? this.shared[index] : undefined;
   }
-  /** A trusted host write of one public numeric shared field (a decision's scene field, TE-ENG1). Same bounds as a
+  /** A host-owned host write of one public numeric shared field (a decision's scene field, TE-ENG1). Same bounds as a
    *  script's state effect; panels, colliders and the room's state row read it like any other shared value. */
   writePublicShared(id: number, value: number): void {
     const index = this.declaration.shared.findIndex(field => field.id === id), field = this.declaration.shared[index];

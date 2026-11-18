@@ -96,7 +96,7 @@ export class App {
     this.players.set(scope, player);
     scope.onDispose(() => { this.players.delete(scope); });
   }
-  /** Offline benchmarks enable this; trusted content registration alone chooses the charged owner. */
+  /** Offline benchmarks enable this; native content registration alone chooses the charged owner. */
   readonly cpu: ScopedCpuMeter = new ScopedCpuMeter();
   readonly input: InputService = new InputService(() => this.clock.now * 1000);
   private readonly equipmentHosts = new WeakMap<Scope, EquipmentHost>();
@@ -225,7 +225,7 @@ export class App {
   onEnter(state: AppState, fn: () => void, scope: Scope): void { this.hook(this.enters, state, fn, scope); }
   onExit(state: AppState, fn: () => void, scope: Scope): void { this.hook(this.exits, state, fn, scope); }
 
-  /** Content callbacks use their trusted level/instance ticket; system IDs and core flags never select the allowance. */
+  /** Content callbacks use their native level/instance ticket; system IDs and core flags never select the allowance. */
   addContentSystem(spec: SystemSpec, scope: Scope): void {
     const ticket = this.cpu.ticket(scope);
     this.addSystem({ ...spec, run: (dt, t) => {

@@ -14,7 +14,7 @@ export interface ReleaseFile {
   readonly bundle?: { readonly name: string; readonly sha256: string };
   /** The address clients dial. For the first sitting this is the quick tunnel's name (C22). */
   readonly socket?: string;
-  /** Q37: immutable trusted item data, copied from the API before this release is signed. */
+  /** Q37: immutable native item data, copied from the API before this release is signed. */
   readonly items?: { readonly path: string; readonly sha256: string; readonly bytes: number };
 }
 const Whole = v.pipe(v.number(), v.integer(), v.minValue(0));

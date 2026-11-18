@@ -1,7 +1,7 @@
 // VPS-HARDENING VH10: a client behind the proxy cannot choose its own per-address key, and a page on another site cannot open a socket.
 import { expect, test } from 'vitest';
 import { gatewayDoor } from './fixtures/dedicated/gatewayDoor';
-import { DEFAULT_ALLOWED_ORIGINS, doorTrust, originAllowed, trustedAddress } from '../src/server/host/dedicated/doorTrust';
+import { DEFAULT_ALLOWED_ORIGINS, doorTrust, originAllowed, clientAddress } from '../src/server/host/dedicated/doorTrust';
 
 test('caddy mode: a forged first forwarded-for hop and a spoofed CF-Connecting-IP share one key', async () => {
   const door = await gatewayDoor({ connectsPerMinute: 2 });
@@ -38,13 +38,13 @@ test('cloudflare mode reads only CF-Connecting-IP, and none mode reads no header
 
 test('only a loopback peer may forward, and the last hop is the proxy\'s', () => {
   const headers = { 'x-forwarded-for': '198.51.100.1, 203.0.113.7', 'cf-connecting-ip': '10.9.9.1' };
-  for (const mode of ['caddy', 'cloudflare', 'none'] as const) expect(trustedAddress('203.0.113.50', headers, mode)).toBe('203.0.113.50');
-  expect(trustedAddress('127.0.0.1', headers, 'caddy')).toBe('203.0.113.7');
-  expect(trustedAddress('::ffff:127.0.0.1', { 'x-forwarded-for': '203.0.113.9' }, 'caddy')).toBe('203.0.113.9');
-  expect(trustedAddress('::1', headers, 'cloudflare')).toBe('10.9.9.1');
-  expect(trustedAddress('127.0.0.1', headers, 'none')).toBe('127.0.0.1');
-  expect(trustedAddress('127.0.0.1', {}, 'caddy')).toBe('127.0.0.1');
-  expect(trustedAddress('127.0.0.1', { 'x-forwarded-for': ' ' }, 'caddy')).toBe('127.0.0.1');
+  for (const mode of ['caddy', 'cloudflare', 'none'] as const) expect(clientAddress('203.0.113.50', headers, mode)).toBe('203.0.113.50');
+  expect(clientAddress('127.0.0.1', headers, 'caddy')).toBe('203.0.113.7');
+  expect(clientAddress('::ffff:127.0.0.1', { 'x-forwarded-for': '203.0.113.9' }, 'caddy')).toBe('203.0.113.9');
+  expect(clientAddress('::1', headers, 'cloudflare')).toBe('10.9.9.1');
+  expect(clientAddress('127.0.0.1', headers, 'none')).toBe('127.0.0.1');
+  expect(clientAddress('127.0.0.1', {}, 'caddy')).toBe('127.0.0.1');
+  expect(clientAddress('127.0.0.1', { 'x-forwarded-for': ' ' }, 'caddy')).toBe('127.0.0.1');
 });
 
 test('a bad Origin gets 403; a listed one or none gets a socket', async () => {

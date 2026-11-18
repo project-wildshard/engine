@@ -39,8 +39,8 @@ export function doorTrust(env: Readonly<Record<string, string | undefined>>): Do
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 type Headers = Readonly<Record<string, string | readonly string[] | undefined>>;
 
-/** The address a connection counts against. Only a loopback peer is a proxy, and only the trusted header is read from it. */
-export function trustedAddress(peer: string, headers: Headers, mode: TrustProxy): string {
+/** The address a connection counts against. Only a loopback peer is a proxy, and only the configured header is read from it. */
+export function clientAddress(peer: string, headers: Headers, mode: TrustProxy): string {
   if (mode === 'none' || !LOOPBACK.has(peer)) return peer;
   if (mode === 'cloudflare') { const tunnel = headers['cf-connecting-ip']; return typeof tunnel === 'string' ? tunnel.trim() : peer; }
   // Node joins repeated `X-Forwarded-For` lines with ", ", so the last hop is still the one the proxy wrote.

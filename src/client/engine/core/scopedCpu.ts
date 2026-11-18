@@ -4,7 +4,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 export interface ScopedCpuSample { id: string; ms: number; calls: number }
 interface Owner { scope: Scope; id: string; pendingMs: number; pendingCalls: number; ms: number; calls: number }
 
-/** Trusted composition assigns scope ownership; content IDs and system flags cannot select a CPU allowance. */
+/** Native composition assigns scope ownership; content IDs and system flags cannot select a CPU allowance. */
 export class ScopedCpuMeter {
   enabled = false;
   private readonly owners: Owner[] = [];
@@ -16,7 +16,7 @@ export class ScopedCpuMeter {
     this.owners.push(owner);
     scope.onDispose(() => { const index = this.owners.indexOf(owner); if (index !== -1) this.owners.splice(index, 1); });
   }
-  /** Resolve once when a trusted content callback registers; shell systems never acquire this ticket. */
+  /** Resolve once when a native content callback registers; shell systems never acquire this ticket. */
   ticket(scope: Scope): ScopedCpuSample | null {
     let found: Owner | null = null;
     for (const owner of this.owners) if (scope.belongsTo(owner.scope) && (found === null || owner.scope.belongsTo(found.scope))) found = owner;
@@ -30,7 +30,7 @@ export class ScopedCpuMeter {
   /** Count even a throwing callback; the usual fault handler retains its original behavior. */
   record(ticket: ScopedCpuSample | null, ms: number): void {
     if (!this.enabled || ticket === null) return;
-    // Tickets cannot be fabricated by data: identity must match a live, trusted scope binding.
+    // Tickets cannot be fabricated by data: identity must match a live, native scope binding.
     for (const owner of this.owners) if (owner === ticket) {
       if (!Number.isFinite(ms) || ms < 0) throw new RangeError('Invalid CPU measurement');
       owner.pendingMs += ms; owner.pendingCalls++; return;

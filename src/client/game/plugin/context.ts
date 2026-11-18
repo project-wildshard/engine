@@ -59,15 +59,15 @@ export const gridHomeSim: GridHomeHandoff = new GridHomeHandoff();
 export function pageMode(): PageMode { return currentPageMode(); }
 /** the catalogue instance this grid page booted into (null in shard mode) */
 export function pageGridInstance(): string | null { return currentPageMode() === 'grid' ? gridCells.cell?.instance ?? null : null; }
-/** Scoped bag registration verbs supplied to trusted plugins. */
+/** Scoped bag registration verbs supplied to native plugins. */
 export interface BagVerbs { tab: (spec: BagTabSpec) => void; fragment: (tab: BagTabId, fragment: BagFragment) => void }
-/** Content rows a trusted plugin may register through its owned context. */
+/** Content rows a native plugin may register through its owned context. */
 export interface GameRowMap { item: ItemRow; lootTable: ContentRow; skin: SkinDef; feat: AchievementDef; shop: ContentRow; compendium: ShardCompendium & { id: string } }
 /** Typed registration verbs for game content rows. */
 export type GameRows = { [K in keyof GameRowMap]: (value: GameRowMap[K] | readonly GameRowMap[K][]) => void };
 /** Game services provided by the composition root, scoped to one shard. */
 export interface GameServices {
-  /** The composition root's pre-bootstrap residency owner, shared with trusted hybrid data and the grid. */
+  /** The composition root's pre-bootstrap residency owner, shared with native hybrid data and the grid. */
   readonly residency?: PageResidency;
   readonly runtime?: ShardRuntime;
   /** The admitted emitted audio rows for this runtime's own resident; absent for legacy-only entries. */
@@ -79,7 +79,7 @@ export interface GameServices {
     fragment: (tab: BagTabId, fragment: BagFragment) => () => void;
   };
 }
-/** A trusted plugin's owned engine and game context. */
+/** A native plugin's owned engine and game context. */
 export interface ShardContext extends LevelContext {
   /** the shard's own manifest */
   readonly manifest: ShardManifest;
@@ -191,7 +191,7 @@ export function sourceManifest(source: Pick<Shardfile, 'identity' | 'accent' | '
   };
 }
 
-/** Staged trusted plugin hooks; invoked only by the owning session. */
+/** Staged native plugin hooks; invoked only by the owning session. */
 export abstract class ShardPlugin {
   world?(ctx: ShardContext): Promise<void> | void;
   kit?(ctx: ShardContext): Promise<void> | void;

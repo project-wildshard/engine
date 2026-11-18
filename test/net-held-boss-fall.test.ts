@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { encounterRows } from '../src/shared/engine/sim/encounterRows';
@@ -11,14 +11,14 @@ import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 // off the crown, and its fight paid the victory, the Ledger fact and 25 coins for a death no player dealt (shard-sky-reach
 // 636d12e, SKY-2). A held boss under the plane goes back to its anchor, alive, and the fight carries on unpaid.
 const KILL_Y = 6;
-async function resident(slug: string): Promise<TrustedHeadlessResident> {
+async function resident(slug: string): Promise<NativeHeadlessResident> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory);
-  return createTrustedHeadlessResident({ product, shard: product.shardfile, assets: runtimeAssets(product, directory),
+  return createNativeHeadlessResident({ product, shard: product.shardfile, assets: runtimeAssets(product, directory),
     rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) });
 }
 
 /** Far Reach's resident with the lead player standing in the crown fight, unhurt. */
-async function inFight(): Promise<{ live: TrustedHeadlessResident; roc: NonNullable<ReturnType<TrustedHeadlessResident['host']['entities']['get']>>; fight: () => string | undefined }> {
+async function inFight(): Promise<{ live: NativeHeadlessResident; roc: NonNullable<ReturnType<NativeHeadlessResident['host']['entities']['get']>>; fight: () => string | undefined }> {
   const live = await resident('far-reach'), { host } = live, lead = leadPlayer(host), roc = host.entities.get('far.roc');
   if (roc === undefined) throw new Error('Missing Roc');
   host.events.answer('damage.modify', request => request?.target === lead.health ? null : request, host.scope);
@@ -28,7 +28,7 @@ async function inFight(): Promise<{ live: TrustedHeadlessResident; roc: NonNulla
   return { live, roc, fight };
 }
 /** Step `ticks` times; the facts and coins the ticks filed. */
-function run(live: TrustedHeadlessResident, ticks: number): { kind: string }[] {
+function run(live: NativeHeadlessResident, ticks: number): { kind: string }[] {
   const paid: { kind: string }[] = [];
   for (let tick = 0; tick < ticks; tick++) { live.step([]); paid.push(...live.effects.filter(effect => effect.kind === 'coins' || effect.kind === 'fact')); }
   return paid;

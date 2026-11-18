@@ -31,7 +31,7 @@ export function declaredItemContext(row: ShardItems['contexts'][number], observa
       ...(extra?.verbs === undefined ? {} : { verbs: Object.fromEntries(Object.entries(extra.verbs).map(([slot, verb]) => [slot, { ...verb, show }])) }) } };
 }
 
-/** Build trusted item-handle aliases for the one script lane; actor identity comes from the host session. */
+/** Build native item-handle aliases for the one script lane; actor identity comes from the host session. */
 export function declaredItemScriptEntities(input: unknown, actorId: string): { entities: readonly ScriptEntity[]; actors: ReadonlyMap<number, string> } {
   if (actorId.length === 0) throw new Error('Item owner required');
   const items = parseItems(input), entities: ScriptEntity[] = [];
@@ -42,14 +42,14 @@ export function declaredItemScriptEntities(input: unknown, actorId: string): { e
   }
   return { entities, actors };
 }
-/** Trusted loader dependencies; factories and icons are resolved below the game layer. */
+/** Native loader dependencies; factories and icons are resolved below the game layer. */
 export interface DeclaredItemPorts {
   scope: Scope; actorId: string; input: Pick<InputService, 'bind' | 'held' | 'register' | 'has'>; aim: () => AimCommand;
   /** Resolve charged static models before creating any equipment. */
   models?: ReadonlyMap<string, unknown>;
   families: ReadonlyMap<string, ItemFamily>; icon: (name: string) => EquipmentIcon;
   runtime: (row: ShardItems['rows'][number]) => ItemPorts;
-  /** A trusted shard's own families (M3): each named `<slug>.<name>`, never shadowing a kit family; resolved like the kit's. */
+  /** A native shard's own families (M3): each named `<slug>.<name>`, never shadowing a kit family; resolved like the kit's. */
   shardFamilies?: { readonly slug: string; readonly families: ReadonlyMap<string, ItemFamily> };
   /** `runtime`: a hybrid runtime registers the declared input contexts through its own entered-input path (hybridRows.ts). */
   contexts?: 'install' | 'runtime';
@@ -61,7 +61,7 @@ export interface DeclaredItemPorts {
    *  SS-GF1a1a: and tools on a stand (`rackToolRows`): in the kit, locked (not drawn, not used) until taken. */
   racked?: ReadonlySet<string>;
 }
-/** Merge a trusted shard's own item families over the kit's, refusing a foreign or shadowing name. */
+/** Merge a native shard's own item families over the kit's, refusing a foreign or shadowing name. */
 export function shardItemFamilies(kit: ReadonlyMap<string, ItemFamily>, shard: NonNullable<DeclaredItemPorts['shardFamilies']>): ReadonlyMap<string, ItemFamily> {
   if (!/^[a-z][a-z0-9-]*$/u.test(shard.slug)) throw new Error('Shard item families need a shard slug');
   const merged = new Map(kit);

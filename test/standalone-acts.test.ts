@@ -9,7 +9,7 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { serializeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type HeadlessRuntimeInput, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -31,8 +31,8 @@ async function product(slug: string): Promise<HeadlessRuntimeInput> {
   return { shard: loaded.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product: loaded };
 }
 /** A page holding a save made after `arrange`. */
-async function saved(slug: string, input: HeadlessRuntimeInput, arrange: (live: TrustedHeadlessResident) => void): Promise<PageStorage> {
-  const live = await createTrustedHeadlessResident(input), storage = new PageStorage();
+async function saved(slug: string, input: HeadlessRuntimeInput, arrange: (live: NativeHeadlessResident) => void): Promise<PageStorage> {
+  const live = await createNativeHeadlessResident(input), storage = new PageStorage();
   arrange(live); live.step([]); live.step([]);
   const data = { tick: live.host.state.tick, snapshot: serializeSimSnapshot(snapshotSimHostBytes(live.host)) };
   storage.setItem(`wildshard.standalone-${slug}`, JSON.stringify({ keys: { continuation: { v: 1, data } } }));
@@ -45,7 +45,7 @@ function start(slug: string, storage: SaveStorage, input: HeadlessRuntimeInput):
   return connectStandalone({ slug, base: `/shards/${slug}/`, build: 'test', savePrefix: 'wildshard.', storage }, control.port2, game.port2, () => { server.dispose(); });
 }
 const until = async (ready: () => boolean): Promise<void> => { await vi.waitFor(() => { expect(ready()).toBe(true); }, { timeout: 10_000, interval: 5 }); };
-const stand = (live: TrustedHeadlessResident, x: number, z: number): void => {
+const stand = (live: NativeHeadlessResident, x: number, z: number): void => {
   const player = leadPlayer(live.host); player.position.set(x, live.host.groundHeightAt(x, z), z); player.motor.resetAt(player.position);
 };
 

@@ -358,7 +358,7 @@ class DeclaredLantern extends Tool {
 /** The view spring a held contact weapon's model sways on (`blocks.viewmodel`). */
 export type HeldContactSpring = Parameters<typeof blocks.viewmodel>[0];
 /**
- * A held contact weapon (SHARD-PLATFORM SF85): the chassis a trusted family's held weapon shares over its move rows
+ * A held contact weapon (SHARD-PLATFORM SF85): the chassis a native family's held weapon shares over its move rows
  * (`BladeMoves`). Attack swings light, Heavy swings heavy, and a still hold (touch) fills the charge ring over
  * `chargeSeconds` and its release swings heavy at once; the model sways on the view spring; contacts go through the
  * shared melee block. A family gives its rows' runtime (`moves`), its `swing` and its view in `update` (after `stepHeld`).
@@ -407,10 +407,10 @@ export abstract class HeldContactWeapon<T extends BladeBody = BladeBody> extends
   }
 }
 
-/** Register one trusted weapon family in the caller's session-local registry, without allocating a weapon or installing inputs.
+/** Register one native weapon family in the caller's session-local registry, without allocating a weapon or installing inputs.
  * The loader checks the shard namespace and every item before construction. Duplicate and reserved kit names refuse here. */
 export function registerWeaponFamily(registry: Map<string, ItemFamily>, id: string, family: ItemFamily): void {
-  if (typeof id !== 'string' || id.length > 128 || !/^[a-z][a-zA-Z0-9.-]*$/u.test(id) || !id.includes('.') || id.startsWith('kit.')) throw new Error('A trusted weapon family needs a bounded shard-local id');
+  if (typeof id !== 'string' || id.length > 128 || !/^[a-z][a-zA-Z0-9.-]*$/u.test(id) || !id.includes('.') || id.startsWith('kit.')) throw new Error('A native weapon family needs a bounded shard-local id');
   if (family.kind !== 'weapon') throw new Error('Weapon family registration requires a weapon constructor');
   if (registry.has(id)) throw new Error(`Duplicate weapon family ${id}`);
   registry.set(id, family);
@@ -544,7 +544,7 @@ export class HeldPlayback {
 }
 
 
-/** Owned presentation parts and the trusted contact factory; the factory retains the original source/reaction laws. */
+/** Owned presentation parts and the native contact factory; the factory retains the original source/reaction laws. */
 export interface HeldMeleePorts<T extends BladeBody, P> {
   readonly model: Group; readonly parts: P; readonly presentation: HeldPlayback;
   readonly nodes: ReadonlyMap<string, unknown>;

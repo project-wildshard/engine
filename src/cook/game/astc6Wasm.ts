@@ -9,7 +9,7 @@
  * `encode` is synchronous, as `phoneTier` calls it. `record` and `flush` let a cook run the same encodes on worker
  * threads first: a recording pass collects every input, `flush` encodes them `lanes` at a time, and the real pass then
  * reads them back. A cache folder, when given, keeps encodes across cooks by input hash (C4); the box's job passes none,
- * because a cook job's files can't be trusted by the next one. */
+ * because a cook job's files can't be relied on by the next one. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).

@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import { Vector3 } from 'three'
 
 import { loadHeadlessFolder } from '../../src/server/host/headlessFolder.ts'
-import { createTrustedHeadlessResident } from '../../src/server/host/headlessRuntime.ts'
+import { createNativeHeadlessResident } from '../../src/server/host/headlessRuntime.ts'
 import { loadRapier } from '../../src/shared/engine/physics/rapier.ts'
 import { cableModes } from '../../src/shared/engine/player/modes.ts'
 import { questBooks } from '../../src/shared/engine/quest/players.ts'
@@ -46,7 +46,7 @@ async function fixture(slug, work) {
       assets: runtimeAssets(product, directory),
       rapier,
     }
-  const live = await createTrustedHeadlessResident(preparation)
+  const live = await createNativeHeadlessResident(preparation)
   try {
     await work(live, product, preparation)
   } finally {
@@ -97,7 +97,7 @@ timed(
       assert.equal(questBooks(host).of(botId).flags.has('used:zipline'), true)
       assert.equal(host.flags.has('used:zipline'), false)
       assert.ok(lead.position.distanceTo(spawn) < 1)
-      const resumed = await createTrustedHeadlessResident(preparation, wire)
+      const resumed = await createNativeHeadlessResident(preparation, wire)
       try {
         questBooks(resumed.host).of(botId)
         const restored = cableModes(resumed.host.scope)

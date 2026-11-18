@@ -32,7 +32,7 @@ export interface AudioSpec {
   /** 'none' declares no ambience: omit bed and install no sampled/synth/zoned ambient content. Score and cues remain independent. */
   ambience: string;
   score: string;
-  /** Serializable cue IDs; frozen trusted manifests may retain their lazy legacy loader. */
+  /** Serializable cue IDs; frozen native manifests may retain their lazy legacy loader. */
   cues?: Readonly<Record<string, string>> | (() => Promise<object>);
   preload?: () => Promise<LevelAudioProfile>;
 }
@@ -58,7 +58,7 @@ export interface BootSpec {
   bakedUnread?: RegExp;
   steps?: Readonly<Record<string, { label: string; weight: number }>>;
   bytes?: Readonly<Partial<Record<ByteKey, string>>>;
-  /** Serializable audio URLs; a trusted legacy loader remains supported during conversion. */
+  /** Serializable audio URLs; a host-owned legacy loader remains supported during conversion. */
   audio?: readonly string[] | (() => Promise<readonly string[]>);
   explore?: { art: readonly string[] };
   precache?: readonly string[];

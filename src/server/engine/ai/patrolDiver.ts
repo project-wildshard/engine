@@ -24,7 +24,7 @@ export class PatrolDiverBrain<A extends AnimalSim> {
   snapshot(): SimValue { return this.policy.snapshot(); }
   /** Validate atomically through the admitted shared policy. */
   restore(saved: SimValue): void { this.policy.restore(saved); }
-  /** Select this pattern while preserving the trusted observation API. */
+  /** Select this pattern while preserving the host observation API. */
   think(c: PatrolDiverPorts<A>): void { this.policy.think({ ...c, pattern: 'patrol' }); }
   /** Execute the unchanged native body and contact laws. */
   act(c: PatrolDiverPorts<A>): void { this.policy.act({ ...c, pattern: 'patrol' }); }

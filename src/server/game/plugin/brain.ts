@@ -330,7 +330,7 @@ export function simStrikes(rows: ShardRows): ReadonlyMap<string, SimStrike> {
  * answer is field records on the entity — 1… the new slots, 21… new memory values, 31-33 a steer (yaw, speed, turn rate,
  * speed and turn within the declared bounds) — and at most one declared strike event (trigonometry goes through the math
  * query, `SPECIES_MATH_QUERY`, so it matches the host's Math exactly): the host then asks reach, then an
- * attack token, then picks the strike from the declared catalogue (the trusted StrikeRunner owns windup, contact, damage
+ * attack token, then picks the strike from the declared catalogue (the host-owned StrikeRunner owns windup, contact, damage
  * and cooldown). A trap, a fuel overrun or an undeclared record refuses the call (the body stands still that step).
  */
 
@@ -353,7 +353,7 @@ export const SPECIES_SCRIPT_PHASE: Readonly<{ think: 1; act: 2; }> = Object.free
 const speciesScriptsENTITY = 1, speciesScriptsSLOT = 1, MEMORY = 21, STEER = 31, INPUT_SLOTS = 17;
 const PHASES = ['idle', 'windup', 'active', 'recover', 'cooldown'] as const;
 
-/** A module's bytes from the base64 its bake wrote (a trusted runtime imports them as data, so admission stays synchronous). */
+/** A module's bytes from the base64 its bake wrote (a native runtime imports them as data, so admission stays synchronous). */
 export function moduleBytes(base64: string): Uint8Array { return Uint8Array.from(atob(base64), char => char.codePointAt(0) ?? 0); }
 /** A stable per-actor hash of its seed (an integer below 43,759): `seedHash(seed) % n` is its slot of n. */
 export function seedHash(seed: number): number { return Math.floor(Math.abs(Math.sin(seed * 12.9898 + 1.7) * 43758.5)); }
@@ -502,7 +502,7 @@ export class ScriptSpeciesPolicy<A extends AnimalSim> {
  * Admitted AssemblyScript elite fight scripts (SHARD-PLATFORM SF27): a named elite's fight — the moves it picks, its clocks
  * and its tells — is a module the game admits on its own ScriptHost under the unchanged ABI-v0 ceilings (as the species
  * scripts, the directors and the weapon hooks). The game's elite rules (lair, aware / engaged / leash, phase 2, respawn) and
- * the trusted strike runners stay the host's; each engaged step is one pure call (the module returns to its admitted memory
+ * the native strike runners stay the host's; each engaged step is one pure call (the module returns to its admitted memory
  * after it) whose state lives in the host as declared numeric `slots`, so the elite's continuation is its slots.
  *
  * The call's inputs (f64): 0 the call's tick, 1 dt, 2 the clock, 3 the module's entity, 4 the elite's mode (its index in
@@ -714,7 +714,7 @@ export type SpeciesDecision<A extends AnimalSim> =
   | { readonly archetype: 'skirmisher'; readonly policy: SkirmisherBrain<A> }
   | { readonly archetype: 'guardian'; readonly policy: GuardianBrain<A> }
   | { readonly archetype: 'perch-hunter'; readonly policy: PerchHunterBrain<A> };
-/** A trusted browser body adapter, constructed once at the first think/act without advancing policy or RNG.
+/** A host-owned browser body adapter, constructed once at the first think/act without advancing policy or RNG.
  * The optional third argument lends that first callback context; subsequent callbacks keep their own live context. */
 export type SpeciesNativeFactory = (actor: Animal, decision: SpeciesDecision<Animal>, firstContext?: ThinkCtx) => {
   think: (context: ThinkCtx) => void; act: (context: ThinkCtx) => void;
@@ -774,7 +774,7 @@ export interface SpeciesBrains {
   held: (kind: string, actor: AnimalSim) => HeldSpeciesControl | null;
   /** Interpret declared body action rows on the actor's existing grounded observations. */
   actions: <A extends AnimalSim>(kind: string, actor: A) => SpeciesPolicy<SpeciesActionPorts<A>> | null;
-  /** Construct a decision-only family for a trusted native body adapter; refuses self-contained policy kinds. */
+  /** Construct a decision-only family for a native body adapter; refuses self-contained policy kinds. */
   decision: <A extends AnimalSim>(kind: string, actor: A, home?: SpeciesBodyHome) => SpeciesDecision<A>;
   /** The archetype a live browser animal runs (null when it runs none of these rows' brains). */
   witness: (actor: Animal) => string | null;
@@ -786,7 +786,7 @@ export interface SpeciesBrains {
   phase: (kind: string, actor: AnimalSim) => number;
 }
 
-/** Trusted held-body authority supplies player impulses; rows select only admitted numeric recipes. */
+/** Host-owned held-body authority supplies player impulses; rows select only admitted numeric recipes. */
 export interface SpeciesHeldPorts { readonly shove: (yaw: number, speed: number, lift: number) => void }
 /** A held encounter drives its existing body, with read-only strike observations for presentation. */
 export interface HeldSpeciesControl {
@@ -876,7 +876,7 @@ function browserCallbacks(brain: Admitted, native?: SpeciesNativeFactory, homes?
     case 'ram-grazer': case 'orbit-diver': case 'burst-flyer': case 'skirmisher': case 'guardian': case 'perch-hunter': {
       let adapter = native;
       if (adapter === undefined && (brain.archetype === 'ram-grazer' || brain.archetype === 'orbit-diver' || brain.archetype === 'burst-flyer')) {
-        if (homes === undefined || (brain.archetype === 'burst-flyer' && held?.shove === undefined)) throw new Error('Species requires its trusted home and body authority');
+        if (homes === undefined || (brain.archetype === 'burst-flyer' && held?.shove === undefined)) throw new Error('Species requires its native home and body authority');
         adapter = (actor, decision) => {
           if (actor.kind !== held?.kind && held !== undefined) throw new Error('Species requires its declared live body');
           if (decision.archetype === 'ram-grazer') return {
@@ -894,7 +894,7 @@ function browserCallbacks(brain: Admitted, native?: SpeciesNativeFactory, homes?
           throw new Error('Species requires its matching declared body policy');
         };
       }
-      if (adapter === undefined) throw new Error(`Species ${brain.archetype} requires a trusted native body adapter`);
+      if (adapter === undefined) throw new Error(`Species ${brain.archetype} requires a native body adapter`);
       if ((brain.archetype === 'orbit-diver' || brain.archetype === 'burst-flyer') && homes === undefined) throw new Error(`Species ${brain.archetype} requires its native body home`);
       return bindCreatureBrain((actor, context) => adapter(actor, decisionOf(brain, actor, homes?.(actor)), context));
     }
@@ -1003,7 +1003,7 @@ function homePolicy(brain: Admitted, actor: AnimalSim): SpeciesPolicy<HomeObserv
     case 'patrol-diver': return new PatrolDiverBrain(actor, brain.data, brain.data.home, brain.strike);
     case 'script': return new ScriptSpeciesPolicy(actor, brain.lane, brain.catalogue);
     case 'ram-grazer': case 'orbit-diver': case 'burst-flyer': case 'decision': case 'skirmisher': case 'guardian': case 'perch-hunter':
-      throw new Error(`Species ${actor.kind} requires a trusted native body adapter`);
+      throw new Error(`Species ${actor.kind} requires a native body adapter`);
     default: throw new Error('Unknown admitted brain archetype');
   }
 }
@@ -1064,9 +1064,9 @@ export function admitSpeciesBrains(species: readonly BrainedSpecies[], strikeRow
         const brain = admitted.get(row.kind), home = ports.homes?.[row.kind];
         if (brain === undefined) throw new Error(`Species ${row.kind} declares no brain`);
         if (home !== undefined) v.parse(CreatureHomeSchema, home);
-        if (brain.archetype === 'decision' && ports.decisions === undefined) throw new Error('Held species requires its trusted body authority');
+        if (brain.archetype === 'decision' && ports.decisions === undefined) throw new Error('Held species requires its native body authority');
         if ((brain.archetype === 'ram-grazer' || brain.archetype === 'orbit-diver' || brain.archetype === 'burst-flyer')
-          && (home === undefined || (brain.archetype === 'burst-flyer' && ports.held === undefined))) throw new Error('Species requires its trusted home and body authority');
+          && (home === undefined || (brain.archetype === 'burst-flyer' && ports.held === undefined))) throw new Error('Species requires its native home and body authority');
         if ((brain.archetype === 'skirmisher' || brain.archetype === 'guardian' || brain.archetype === 'perch-hunter') && bodies.get(row.kind)?.actions === undefined) throw new Error('Species catalogue requires declared body authority');
       }
       const bindings = new Map<string, SpeciesBinding>();

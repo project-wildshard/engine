@@ -14,7 +14,7 @@ import type {CarriedQuestRows} from '@wildshard/format/questSteps';
 import {SKY_ROAD} from '../../../src/shards/nalati-grasslands/generators/layout';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
-/** Yield the existing trusted route's exact commands, allowing a checked
+/** Yield the existing host-owned route's exact commands, allowing a checked
  * worker reply between ticks. The consumer must commit each yielded tick. */
 function* planInputs(host:SimHost,plan:HeadlessTapePlan):Generator<readonly HeadlessCommand[]> {
   for(const segment of plan.segments){

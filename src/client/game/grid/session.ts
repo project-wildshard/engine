@@ -975,7 +975,7 @@ export class GridSession {
                 if (scope.disposed) throw new Error('Grid product view disposed during admission');
                 // A neighbour's tiles hold the authority its entered page holds, or Nine's look graphs are refused by whichever walk reaches it first.
                 // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-                const presentation = await clientMaterials(source, admitted.assets, renderer, scope, { trustedGraphs: dangerousUnbudgetedMaterialGraph(source) });
+                const presentation = await clientMaterials(source, admitted.assets, renderer, scope, { declaredGraphCeilings: dangerousUnbudgetedMaterialGraph(source) });
                 return { source, assets: retained.reader, views: clientTileViews({ terrain: source.terrain, terrainShadow: source.terrain?.shadow, terrainOrder: source.terrain?.order, ...presentation }), compile: presentation.compile,
                   scene: { materials: presentation.materials, swings: presentation.swings } };
               } catch (error) { retained.release(); throw error; }

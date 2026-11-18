@@ -38,7 +38,7 @@ export interface CachedFolder { source: unknown; validation?: ValidationReceipt 
 export interface FolderCache {
   product: (key: string) => Promise<CachedFolder | null>;
   asset: (base: string, hash: string) => Promise<Uint8Array | null>;
-  /** Trusted content-cache read returning owned SHA-256-checked bytes; replaces raw asset reads when present. */
+  /** Native content-cache read returning owned SHA-256-checked bytes; replaces raw asset reads when present. */
   verifiedAsset?: (hash: string) => Promise<Uint8Array | null>;
   /** Checked durable presence without transferring a discarded asset to the page. */
   verifiedPresent?: (hash: string, bytes: number) => Promise<boolean>;
@@ -72,11 +72,11 @@ export interface FolderOptions extends DangerousProvenance {
   directFiles?: boolean;
   /** Optional live parser; boot and receipts stay on the page. Hashes/validators retain admission. */
   parseJson?: (bytes: Uint8Array) => Promise<unknown>;
-  /** Trusted renderer tier; only typed host alternatives affect transport selection and resident estimates. */
+  /** Host-owned renderer tier; only typed host alternatives affect transport selection and resident estimates. */
   tier?: 'phone' | 'desktop';
-  /** Trusted namespaced quality overrides, captured before profile admission. */
+  /** Host-owned namespaced quality overrides, captured before profile admission. */
   quality?: Readonly<Partial<Record<`${string}.${string}`, number | boolean>>>;
-  /** Trusted probe-filtered device support; authored content cannot select its charge. */
+  /** Host-owned probe-filtered device support; authored content cannot select its charge. */
   textures?: TextureTranscodeSupport;
   /** Optional catalogue SHA-256 of the exact format-2 index wire bytes. */
   descriptorHash?: string;
@@ -85,7 +85,7 @@ export interface FolderOptions extends DangerousProvenance {
   base: string; cache?: FolderCache; offline: boolean;
   /** Optional URL-cache hint for sections and blobs; readers still verify declared sizes and hashes. */
   cachedResponse?: (url: string, hash: string, maximum: number) => Promise<Uint8Array | null>;
-  /** Trusted URL-cache read returning owned checked bytes; replaces raw URL hints for asset reads when present. */
+  /** Host-owned URL-cache read returning owned checked bytes; replaces raw URL hints for asset reads when present. */
   verifiedResponse?: (url: string, hash: string, maximum: number, signal?: AbortSignal) => Promise<Uint8Array | null>;
   /** Foreground online URL hints may borrow this paint turn; afterward demand uses normal verified transport.
    * Offline and low-priority warming keep their original cache completion. */
@@ -97,24 +97,24 @@ export interface FolderOptions extends DangerousProvenance {
   fetchRange?: (url: string, start: number, end: number, priority?: 'low') => Promise<Response>;
   /** Same verified network capability at low priority, used only by after-control warming. */
   backgroundFetch?: (url: string, signal?: AbortSignal) => Promise<Response>;
-  /** Optional off-page asset read (the content-cache worker): the URL cache when trusted, else the network, verified
+  /** Optional off-page asset read (the content-cache worker): the URL cache when granted, else the network, verified
    *  against `hash` and stored, its body transferred to the page. Null where no worker can; the page then reads it. */
   transport?: (url: string, hash: string, bytes: number) => Promise<{ bytes: Uint8Array; cached: boolean; stored: boolean } | null>;
   hash: (bytes: Uint8Array) => Promise<string>;
   /** Optional off-page hash of an asset's owned copy (transferred and returned with its digest); where it rejects, the
    *  copy is made again and `hash` checks it on the page. */
   hashOwned?: (bytes: Uint8Array) => Promise<{ hash: string; bytes: Uint8Array }>;
-  /** G216: trusted page Developer policy; authored data cannot provide it or bypass exact asset checks. */
+  /** G216: native page Developer policy; authored data cannot provide it or bypass exact asset checks. */
   memory?: MemoryAdmission;
-  /** Trusted residency owner reserves parsed source and immutable transport before any asset-cache read or owned copy. */
+  /** Host-owned residency owner reserves parsed source and immutable transport before any asset-cache read or owned copy. */
   reserve?: (source: Shardfile) => void | Promise<void>;
-  /** GC9: files the trusted owner releases straight after admission (a grid neighbour's runtime-only wires, read back
+  /** GC9: files the native owner releases straight after admission (a grid neighbour's runtime-only wires, read back
    * from cache or network by its inputs). A first-party read leaves them unread instead of fetching and dropping them;
    * checked admission still reads every file. */
   deferred?: (source: Shardfile) => Promise<readonly string[]>;
-  /** Trusted presentation observer; it does not participate in admission decisions. */
+  /** Native presentation observer; it does not participate in admission decisions. */
   progress?: (progress: FolderProgress) => void;
-  /** Trusted presentation scheduling between complete checks; validation never skips work. */
+  /** Native presentation scheduling between complete checks; validation never skips work. */
   pause?: () => Promise<void>;
   /** At most four cache requests in flight (the browser loader, G580 T2/G590); durable checks and pins stay. */
   cacheBatch?: boolean;
@@ -508,9 +508,9 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   const worst = receipt?.worst ?? await checkedFolderCosts(source, options.memory);
   if (receipt !== null) acceptValidatedCost(source, worst, options.memory);
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (source.runtime !== null && !dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires a trusted first-party shard');
+  if (source.runtime !== null && !dangerousUnbudgetedRuntime(options)) throw new Error('Custom runtime requires a native shard');
   // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (hasDeclaredClientPage(source) && !dangerousUnbudgetedPageFeatures(options)) throw new Error('Native page features require a trusted first-party shard');
+  if (hasDeclaredClientPage(source) && !dangerousUnbudgetedPageFeatures(options)) throw new Error('Native page features require a native shard');
   if (!options.offline && visited !== null && visited !== undefined && isOutputIndex(visited.source) && compatibleShardfileVersion(version(visited.source))) {
     let previous: unknown;
     // Only its identity and state are compared: an older build's sections can fail this build's schemas (G531 retired

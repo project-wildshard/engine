@@ -94,7 +94,7 @@ function isProofMesh(value: Object3D): value is Mesh { return value instanceof M
 
 function isItemModel(value: unknown): value is Object3D { return value instanceof Object3D; }
 
-/** Trusted catalogue dependencies are injected by the normal composition root, never imported upward by the loader. */
+/** Native catalogue dependencies are injected by the normal composition root, never imported upward by the loader. */
 export interface ShardfileClientBindings {
   recipes: ReadonlyMap<string, ShardViewRecipe>; items: ReadonlyMap<string, ItemFamily>; icon: (name: string) => EquipmentIcon;
   voices: (audio: ShardPlayHost['audio']) => DeclaredAudioPorts['voices']; catalogue: readonly LedgerCatalogueItem[];
@@ -105,20 +105,20 @@ export interface ShardfileClientBindings {
   /** Optional grid-page owner, created before hydration. Runtime homes reuse its reviewed early claim. */
   residency?: PageResidency;
   /** Explicit first-party transition policy: a completely empty data declaration adds no gameplay services. */
-  trustedRuntime?: boolean;
+  nativeRuntime?: boolean;
   /** Transitional entry owns its stages, while client/plan still installs platform features. */
   runtimeStagesOnly?: boolean;
   /** Hybrid runtimes install entered features on their actual entered context. */
   planLifetime?: 'resident';
-  /** Declared audio is the default. A trusted first-party transition may let its runtime consume the same audio declaration exactly once. */
+  /** Declared audio is the default. A native transition may let its runtime consume the same audio declaration exactly once. */
   audioOwner?: 'declared' | 'runtime';
-  /** Declared water rows and collider-only props are installed by the data client by default. A trusted first-party transition may
+  /** Declared water rows and collider-only props are installed by the data client by default. A native transition may
    *  let its runtime consume them exactly once (G164: Driftwood's sea row with its dry sockets and its socket landings). */
   worldOwner?: 'declared' | 'runtime';
   /** Platform installers receive the emitted audio declaration and its admitted recording reader.
-   * An absent reader preserves existing trusted catalogue resolution; a declared reader refuses unknown paths. */
+   * An absent reader preserves existing native catalogue resolution; a declared reader refuses unknown paths. */
   audioProfiles?: (play: ShardPlayHost, product: { source: Shardfile['audio']; read: ((path: string) => Promise<ArrayBuffer>) | undefined }) => DeclaredAudioPorts['profiles'];
-  /** Announced during construction only when this data client will create a simulation; empty trusted transitions never announce a handoff. */
+  /** Announced during construction only when this data client will create a simulation; empty native transitions never announce a handoff. */
   onSimulationExpected?: () => void;
   /** Production handoff to a grid home; the server keeps its saves, so `checkpoint` says only that this page still stands. */
   onSimulation?: (binding: { scope: ShardContext['scope']; checkpoint: () => boolean; setActive: (active: boolean) => void; residency?: HomeResidencyClaim }) => void;
@@ -136,12 +136,12 @@ function emptyHybridData(source: Shardfile, audioOwner: ShardfileClientBindings[
   // a runtime-owned world declaration: water rows and props that only declare colliders (no tiles, panels, models, far or textures)
   const runtimeWorld = worldOwner === 'runtime', props = source.props;
   // G348: placeholders (a far proxy, a near row and their files) are grid presentation, never data this client installs, so a
-  // trusted transition that ships them stays empty (Signal's play stage, 54603cb17); an authored props far still counts
+  // native transition that ships them stays empty (Signal's play stage, 54603cb17); an authored props far still counts
   const placeholders = placeholderFiles(source), shown = (ref: string): boolean => ref !== source.map?.image && ref !== source.navigation?.file && !placeholders.has(ref);
   const propsEmpty = props === null || (runtimeWorld && props.tiles.length + props.panels.length + props.models.length + props.textures.length === 0 && props.far === null);
   const audioEmpty = audioOwner === 'runtime' || (source.audio.cues.length + source.audio.routing.length === 0 && source.audio.ambience === null && source.audio.score === 'silent' && source.audio.music === undefined && source.audio.samples === undefined && source.audio.zones === undefined);
   // Named blobs are an admitted inventory, not a request to install a second
-  // simulation. A trusted runtime-owned world reads those bytes itself; actual
+  // simulation. A native runtime-owned world reads those bytes itself; actual
   // behavior and presentation declarations below still select their data host.
   const inventory = runtimeWorld ? 0 : source.files.filter(file => shown(file.hash)).length + source.requires.commons.length
     + source.library.filter(shown).length + source.critical.filter(ref => ref !== source.navigation?.file).length;
@@ -152,7 +152,7 @@ function emptyHybridData(source: Shardfile, audioOwner: ShardfileClientBindings[
 }
 
 /**
- * G345: a trusted hybrid's data without its presentation sections: the terrain (its collider and tiles) and the look's
+ * G345: a native hybrid's data without its presentation sections: the terrain (its collider and tiles) and the look's
  * family materials (their entries, family looks and curves, and the textures only they name). When this is empty the data
  * is presentation-only: its runtime keeps the simulation and the data client only draws.
  */
@@ -164,7 +164,7 @@ function graphFileRefs(source: Shardfile): string[] {
   return refs;
 }
 function withoutPresentation(source: Shardfile): Shardfile {
-  // a splat ground's tiles and layers are presentation too (P1: the ground a trusted runtime's data client draws)
+  // a splat ground's tiles and layers are presentation too (P1: the ground a native runtime's data client draws)
   const files = new Set([...(source.terrain === null ? [] : [source.terrain.collider,
     ...(source.terrain.sampling === undefined ? [] : [source.terrain.sampling.file]), ...source.terrain.tiles.map((tile) => tile.file)]), ...materialTextureRefs(source.look.materials), ...graphFileRefs(source), ...splatGroundFiles(source)]);
   const keep = (ref: string): boolean => !files.has(ref);
@@ -173,7 +173,7 @@ function withoutPresentation(source: Shardfile): Shardfile {
     look: { ...source.look, families: [], materials: {}, familyLooks: {} } };
 }
 
-/** Look-only trusted data draws with its native world and never creates another gameplay owner. */
+/** Look-only native data draws with its native world and never creates another gameplay owner. */
 type DataMode = 'full' | 'empty' | 'presentation';
 /** How far (m) the viewer moves before the tile residency re-centres, when the terrain declares no `follow`. */
 const FOLLOW = 5;
@@ -224,13 +224,13 @@ export class ShardfileClient {
       const home = bindings.residency.home();
       if (home.instance !== bindings.instance || home.allocator !== bindings.allocator) throw new Error('Shardfile client requires its early page home residency');
     }
-    // M3: a trusted runtime's bound sections (runtime.binds) are its own to install (hybridRows.ts); the data client never installs them
+    // M3: a native runtime's bound sections (runtime.binds) are its own to install (hybridRows.ts); the data client never installs them
     // P1: a runtime-bound splat ground the Debug row draws streams through this client (its primary files keep their transport)
-    const data = bindings.trustedRuntime === true ? withSplatGround(withoutRuntimeRows(source), source) : source;
-    if (bindings.trustedRuntime === true) { const ground = splatGroundFiles(data); assets.releaseTransport(new Set([...runtimeBoundWorldFiles(source)].filter(ref => !ground.has(ref)))); }
+    const data = bindings.nativeRuntime === true ? withSplatGround(withoutRuntimeRows(source), source) : source;
+    if (bindings.nativeRuntime === true) { const ground = splatGroundFiles(data); assets.releaseTransport(new Set([...runtimeBoundWorldFiles(source)].filter(ref => !ground.has(ref)))); }
     this.source = data; this.assets = assets; this.bindings = bindings; this.curveState = source.state;
     // a runtime that owns the client stages draws nothing of this data, but a splat ground the Debug row draws (P1)
-    this.mode = bindings.runtimeStagesOnly === true ? splatGroundFiles(data).size > 0 ? 'presentation' : 'empty' : bindings.trustedRuntime !== true ? 'full'
+    this.mode = bindings.runtimeStagesOnly === true ? splatGroundFiles(data).size > 0 ? 'presentation' : 'empty' : bindings.nativeRuntime !== true ? 'full'
       : emptyHybridData(data, bindings.audioOwner, bindings.worldOwner) ? 'empty'
       : emptyHybridData(withoutPresentation(data), bindings.audioOwner, bindings.worldOwner) ? 'presentation' : 'full';
 
@@ -277,7 +277,7 @@ export class ShardfileClient {
     // ordinary data homes account library/commons and tile parts independently in the same allocator.
     if (this.bindings.residency === undefined || this.source.runtime === null) await leaseClientLibrary(this.source, this.assets.retained, { validatedSource: this.validatedSource, scope: ctx.scope, allocator, owner: this.bindings.instance, textures: ktx2TranscodeSupport(world.game.renderer), read: ref => this.assets.read(ref) });
     worldStep(ctx, 'library');
-    const presentation = await clientMaterials({ ...this.source, state: this.curveState }, this.assets.retained, world.game.renderer, ctx.scope, { trustedGraphs: this.nativeFeatures || this.bindings.trustedRuntime === true });
+    const presentation = await clientMaterials({ ...this.source, state: this.curveState }, this.assets.retained, world.game.renderer, ctx.scope, { declaredGraphCeilings: this.nativeFeatures || this.bindings.nativeRuntime === true });
     worldStep(ctx, 'materials');
     this.presentation = presentation;
     if (this.nativeFeatures) presentation.graphs.bind({ hour: () => world.game.sky.dayNight?.hour ?? null });
@@ -596,7 +596,7 @@ export class ShardfileClient {
     // the bodies whatever the plan's movers, so the page does too)
     installDataPageBodies(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map() });
     // TEMPLATE-E2E TC-E5c: a plain data shard's lift and doors stand on its page; a client plan's movers install their own
-    if (this.bindings.trustedRuntime !== true && !(this.plan?.features ?? []).some(row => row.kind === 'world.movers' || row.kind === 'motion.channels')) {
+    if (this.bindings.nativeRuntime !== true && !(this.plan?.features ?? []).some(row => row.kind === 'world.movers' || row.kind === 'motion.channels')) {
       const movers = installDataPageMovers(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map(), prompts: runtime.interactables });
       if (movers !== null) {
         ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });

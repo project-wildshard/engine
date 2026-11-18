@@ -29,7 +29,7 @@ try {
 }finally{await sim.dispose();await control.dispose();}
 const runtime=await HeadlessSimulation.create(source,new Map());
 try {
-  await assert.rejects(runtime.verbTape(plan),/trusted offline timing/);
+  await assert.rejects(runtime.verbTape(plan),/advisory offline timing/);
   assert.equal(runtime.checkpoint.tick,0);await runtime.step();
 }finally{await runtime.dispose();}
 const failed=await HeadlessSimulation.create(source,new Map(),undefined,{deadline:'advisory'});

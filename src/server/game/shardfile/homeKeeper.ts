@@ -37,7 +37,7 @@ export function creatureFloor(host: Pick<SimHost, 'physics'>, terrainAt: (x: num
   };
 }
 
-/** Reinstall trusted actors at their original adapter boundaries, then settle deferred play-time spawns. */
+/** Reinstall host-owned actors at their original adapter boundaries, then settle deferred play-time spawns. */
 export function orderedNativeReinstall<B extends { readonly id: string }>(saved: Pick<SimSnapshot, 'adapters'>, step: string, live: readonly B[],
   reinstall: (body: B) => void, installStep?: () => void): () => void {
   const ids = saved.adapters.map(adapter => adapter.id), boundary = ids.indexOf(step);
@@ -104,7 +104,7 @@ export interface HomeKeeperSpec {
 const finite = v.pipe(v.number(), v.finite());
 const Value: v.GenericSchema<SimValue> = v.lazy(() => v.union([v.null(), v.boolean(), finite, v.string(), v.array(Value), v.record(v.string(), Value)]));
 const Stream = v.strictObject({ version: v.literal(1), state: finite, initial: finite, scrambledFork: v.boolean() });
-/** A saved trusted recipe's placement; the spec is this build's bake, so a changed spec refuses at the host's restore. */
+/** A saved native recipe's placement; the spec is this build's bake, so a changed spec refuses at the host's restore. */
 const Placed = v.object({ id: v.string(), seed: finite, scale: finite, at: v.strictObject({ x: finite, y: finite, z: finite }), yaw: finite });
 const NativeRecipe: v.GenericSchema<BoundedHomeNativeRecipeInput, BoundedHomeNativeRecipe> = v.looseObject({ ...Placed.entries, spec: v.looseObject({ kind: v.string(), variant: v.string() }) });
 const Saved = v.strictObject({ version: v.literal(1), rng: Stream, tokens: v.array(v.string()),
@@ -119,7 +119,7 @@ interface Home extends Body { readonly respawn: number; readonly late: boolean; 
  * (as `bindRuntimeHomes` keeps them in the browser), the creature manager's own random stream `Rng(seed + 31)` (six
  * draws per spawn: scale, rig seed, actor seed, timer, fleeUntil, callT), its attack tokens (swept once a holder is dead
  * or its attack is over), and each body's shipping policy on a fixed decision cadence with movement every tick. Bodies
- * are trusted dynamic actors (`host.spawn`) standing on the host's ground (a flyer at its flight altitude). An optional
+ * are host-owned dynamic actors (`host.spawn`) standing on the host's ground (a flyer at its flight altitude). An optional
  * boss body is one more animal of the same manager after the homes: its encounter spawns it (six draws from the same
  * stream) and frees it, its policy shares the tokens and cadence, and nothing refills it.
  *

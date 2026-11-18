@@ -167,7 +167,7 @@ export interface EngineProbe<W extends ProbeWorld = ProbeWorld> {
   readonly boot: Fingerprint;
   /** Active-level access for controls; throws once the world has retired. */
   requireWorld: () => W;
-  /** Actual query material / owner identity in the active probe world, for trusted bake capture; no native write. */
+  /** Actual query material / owner identity in the active probe world, for native bake capture; no native write. */
   colliderTag: (handle: number) => Readonly<ColliderTag> | undefined;
   fingerprint: () => Fingerprint;
   pose: (p: ProbePose) => Promise<void>;

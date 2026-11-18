@@ -29,7 +29,7 @@ export function projectileFlightStep(pos: Vector3, vel: Vector3, h: number,
 /** Mechanical flight-slot state; presentation/ammunition data is borrowed. */
 export interface FlightSlotState { pos: Vector3; vel: Vector3; active: boolean; age: number; glanced: boolean }
 export type FlightSlot<Data extends object> = FlightSlotState & Data;
-/** Declared slot bounds and trusted integration/contact/presentation ports. */
+/** Declared slot bounds and host-owned integration/contact/presentation ports. */
 export interface FlightSlotPorts<Data extends object> {
   readonly substeps: number; readonly extent: number; readonly floor: number; readonly lifetime: number;
   readonly integrate: (slot: FlightSlot<Data>, h: number) => void;

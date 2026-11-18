@@ -4,7 +4,7 @@
  *
  * Gates, in order: `api-server` already refused what it could (F3 (a)); the cap of D31; the format's product validator
  * again, because this host trusts no other host; the simulation proof (F3 (b)); then the cook. A shard with first-party
- * runtime bindings can't be proved without its trusted recipes, so its proof says `unmeasured` and never invents one. */
+ * runtime bindings can't be proved without its native recipes, so its proof says `unmeasured` and never invents one. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -32,7 +32,7 @@ export class ShardfileRefusedError extends Error {
 
 export type SimulationProof = ShardfileEntryProof;
 export interface CookJobPorts {
-  /** Trusted notice identity; reject a valid product for another shard before its simulation/cook. */
+  /** Host-owned notice identity; reject a valid product for another shard before its simulation/cook. */
   readonly expectedSlug?: string;
   /** SP19: mandatory full check, composed by the host above this layer. */
   readonly check: (shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, sections: ReadonlyMap<string, unknown>) => Promise<ShardfileCheckReport>;

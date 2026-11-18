@@ -62,14 +62,14 @@ function sameMeasurement(a: RuntimeCost, b: RuntimeCost): boolean {
 export function regionalRuntimeAccountedBytes(admitted: Pick<AdmittedFolder, 'source'>, manifest: Pick<ShardManifest, 'slug' | 'runtimeCost'>, textureMode?: 'img' | 'ktx2'): number {
   const { source } = admitted;
   const { slug: declaredIdentity } = source.identity, { slug: registeredIdentity } = manifest;
-  if (declaredIdentity !== registeredIdentity) throw new Error('Regional runtime identity differs from its trusted manifest');
+  if (declaredIdentity !== registeredIdentity) throw new Error('Regional runtime identity differs from its native manifest');
   if (hasDeclaredClientPage(source)) return clientHomeBytes(source.budgets, textureMode);
   const declared = source.runtime?.cost, measured = manifest.runtimeCost;
   if (declared === undefined || measured === undefined) throw new Error('Regional runtime requires reviewed whole-runtime measurements');
   const bytes = runtimeAccountedBytes(declared);
   runtimeAccountedBytes(measured);
   if (!sameMeasurement(declared, measured) || (declared.imagesFirst === undefined) !== (measured.imagesFirst === undefined)
-    || !sameMeasurement(declared.imagesFirst ?? declared, measured.imagesFirst ?? measured)) throw new Error('Regional runtime measurement differs from its trusted manifest');
+    || !sameMeasurement(declared.imagesFirst ?? declared, measured.imagesFirst ?? measured)) throw new Error('Regional runtime measurement differs from its native manifest');
   return textureMode === 'img' ? runtimeAccountedBytes(declared.imagesFirst ?? declared) : bytes;
 }
 
@@ -88,7 +88,7 @@ export interface RegionalRuntimeTextures {
   readonly enter: () => () => void;
 }
 
-/** Fully admitted immutable content and the one page owner, supplied before any trusted gameplay hook executes. */
+/** Fully admitted immutable content and the one page owner, supplied before any native gameplay hook executes. */
 export interface RegionalRuntimeRequest {
   readonly cell: GridCell;
   /** Actual requested approach in destination cell metres; absent for non-crossing callers. */
@@ -108,7 +108,7 @@ export interface RegionalRuntimeRequest {
  * The view adapter owns the real region, including critical terrain/colliders and a registry whose additions target
  * its own Physics. Its resident context supplies regional sky/terrain/forest; afterWorld and afterKit finish the shell
  * stages under isolated construction bindings, including the real AnimalManager, equipment, inventory and progress
- * before trusted play. Entered services publish only when the prepared resident crosses into its cell.
+ * before native play. Entered services publish only when the prepared resident crosses into its cell.
  * The resident's scope owns disposal in dependency order. A synthetic empty host cannot stand in for this contract.
  */
 export interface PreparedRegionalRuntime {
@@ -136,7 +136,7 @@ export interface PreparedRegionalRuntime {
   readonly combatActors: () => ReadonlyMap<ReturnType<RowBodiesView['animals'][number]['combatActor']>, Readonly<{ x: number; y: number; z: number }>>;
 }
 
-/** Trusted composition-root adapter. Whole-runtime admission precedes construction; entered services stay interior-only. */
+/** Native composition-root adapter. Whole-runtime admission precedes construction; entered services stay interior-only. */
 export type RegionalRuntimeFactory = (request: RegionalRuntimeRequest) => Promise<PreparedRegionalRuntime>;
 
 /**
@@ -178,7 +178,7 @@ export interface RegionalRuntimeFactoryPorts {
   readonly prepareFoundation?: (request: RegionalRuntimeRequest) => Promise<RegionalRuntimeFoundation>;
 }
 
-/** Compose the trusted regional stages without changing discovery, module admission or the fixed crossing driver. */
+/** Compose the native regional stages without changing discovery, module admission or the fixed crossing driver. */
 export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts): RegionalRuntimeFactory {
   return async request => {
     const declaration = request.admitted.source.runtime;
@@ -422,7 +422,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
             },
             afterPlay: async entered => {
               if (localPlay === null) throw new Error('Regional play services are not installed');
-              // Trusted play can install encounter creatures; validate the complete herd before publishing readiness.
+              // Native play can install encounter creatures; validate the complete herd before publishing readiness.
 
               const equipment = request.page.equipment, weapons = localPlay.weapons;
               await timeClientPreparation(request.cell.slug, 'entry.selection', () => weapons.settleSelection());

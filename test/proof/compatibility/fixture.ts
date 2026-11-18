@@ -57,7 +57,7 @@ function ledgerContract(source: Shardfile): object {
     durableReload: true, refusedWriteRetried: true, duplicateStable: true, gameplayEmissionProven: false };
 }
 
-/** Run the shipping trusted entry under exactly the template's strict Node dependency fence. */
+/** Run the shipping native entry under exactly the template's strict Node dependency fence. */
 export async function compatibilityProbe(slug: string, entry: string, mode: string): Promise<object> {
   assert.equal(typeof window, 'undefined'); assert.equal(typeof document, 'undefined');
   installAppIdentity(WILDSHARD_IDENTITY);

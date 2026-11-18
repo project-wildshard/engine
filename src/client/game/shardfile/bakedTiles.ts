@@ -189,11 +189,11 @@ export function bakedTileContents(baked: BakedTiles): TileContent[] {
   return contents;
 }
 
-/** One draw per shard while its first resident lives, whichever path asks first: the `world.baked` feature, or a trusted
+/** One draw per shard while its first resident lives, whichever path asks first: the `world.baked` feature, or a host-owned
  *  runtime's world build (`residentBakedTiles`), which in a grid can build its resident world before any plan phase. Keyed
  *  by slug: a grid may hold more than one admitted product object for the same shard. */
 const drawnBy = new Map<string, Promise<ReadonlyMap<string, BakedTiles>>>();
-/** Per app (its system registry: a data client and a trusted runtime see different world wrappers over the same one):
+/** Per app (its system registry: a data client and a native runtime see different world wrappers over the same one):
  *  every drawn set it shows, and the one bounce system moving them (its owner's scope ends it; the next entering path
  *  registers it again). Two paths, two shards or two scopes on one page never register it twice. */
 const shown = new WeakMap<object, Set<ReadonlyMap<string, BakedTiles>>>(), ticking = new WeakSet();
@@ -224,7 +224,7 @@ export async function installClientBakedTiles(ctx: ShardContext, feature: Client
   if (feature.kind !== 'world.baked') throw new Error('Invalid baked tiles feature');
   await enterBakedTiles(ctx, feature.rows, resident);
 }
-/** A trusted runtime's world build: its product's declared `world.baked` rows, drawn now if no plan phase drew them yet,
+/** A native runtime's world build: its product's declared `world.baked` rows, drawn now if no plan phase drew them yet,
  *  by row id for the view code that dresses them further. */
 export function residentBakedTiles(ctx: ShardContext, resident: Scope): Promise<ReadonlyMap<string, BakedTiles>> {
   const plan = ctx.product.has('client/plan') ? ctx.product.section('client/plan') : { version: 1, features: [] };

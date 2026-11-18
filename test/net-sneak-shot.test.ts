@@ -13,7 +13,7 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { nativeStealthOf } from '../src/server/game/stealth/nativeStealth';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol';
 import { builtFolder } from '../src/test/game/builtFolder';
 
@@ -24,7 +24,7 @@ test('a room bow shot from Hidden deals double damage on the server', { timeout:
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
+  const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
   try {
     const { host } = live, lead = leadPlayer(host);
     const arrows: number[] = [];

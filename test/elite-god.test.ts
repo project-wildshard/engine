@@ -8,7 +8,7 @@ import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 interface Lair { readonly shard: string; readonly x: number; readonly z: number; readonly elite: string }
@@ -16,7 +16,7 @@ async function blowsAtLair({ shard, x, z, elite }: Lair, god: boolean): Promise<
   const directory = builtFolder(shard), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
+  const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
   try {
     const { host } = live, lead = leadPlayer(host), blows: string[] = [];
     if (god) { host.combat.playerRules(host.scope, { bossGod: true }); actRoutes(host).god = true; } // what `StandaloneGrid.bossGod` does

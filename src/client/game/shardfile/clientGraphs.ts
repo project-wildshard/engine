@@ -11,7 +11,7 @@ import { sceneScalarValue } from './sceneInputs';
  *   samples the shard's own look keys at the frame owner's hour (G158: one world clock; the owner's fog and grade then
  *   apply on top through the engine epilogue), a state binding reads the live state source or the field's declared default.
  * - **Textures** resolve to the admitted, charged KTX2 library textures (colour role).
- * - **Budget:** explicit trusted declarations refuse above their ceilings. Legacy graphs past the default budget fall back
+ * - **Budget:** explicit native declarations refuse above their ceilings. Legacy graphs past the default budget fall back
  *   to their family preset (a standard graph → the plain
  *   vertex-coloured PBR family, an unlit one → the plain emissive family) instead of compiling. So does every graph while the
  *   default-off Debug row (Look ▸ "Graph materials") is off: the first graph-compiled look waits for a physical-iPhone
@@ -174,7 +174,7 @@ export function graphFallbackEntry(graph: Pick<GraphIr, 'model' | 'doubleSided' 
 /**
  * The graph side of a shardfile's materials. `compiler` is null while the Debug row is off (every graph falls back);
  * `fallback` compiles a family entry on the family looks; `textures` resolves an admitted texture reference.
- * `trustedGraphs` is host authority from an admitted runtime, never a field read from graph JSON.
+ * `declaredGraphCeilings` is host authority from an admitted runtime, never a field read from graph JSON.
  * An explicit budget refuses on admission failure instead of using a family material.
  */
 /**
@@ -211,7 +211,7 @@ export function keptGraphFileTextureRefs(materials: Shardfile['look']['materials
   return refs;
 }
 
-export function clientGraphs(source:Pick<Shardfile, 'identity' | 'look' | 'state'> & Partial<Pick<Shardfile, 'runtime' | 'questHost'>>, options: { compiler: LookGraphCompiler | null; toon?: ToonLook; trustedGraphs?: boolean; fallback: (entry: Readonly<Record<string, unknown>>) => Material; textures: (ref: string, role?: 'colour' | 'data') => Texture; file?: (hash: string) => Uint8Array | undefined }): {
+export function clientGraphs(source:Pick<Shardfile, 'identity' | 'look' | 'state'> & Partial<Pick<Shardfile, 'runtime' | 'questHost'>>, options: { compiler: LookGraphCompiler | null; toon?: ToonLook; declaredGraphCeilings?: boolean; fallback: (entry: Readonly<Record<string, unknown>>) => Material; textures: (ref: string, role?: 'colour' | 'data') => Texture; file?: (hash: string) => Uint8Array | undefined }): {
   /** Update a compiled material uniform; unknown/fallback materials and invalid values refuse. */
   setParam: (material: Material, name: string, value: GraphLiteral) => void;
   /** Lend a compiled material's `role: 'lent'` texture param its texture; unknown/fallback materials refuse. */
@@ -254,7 +254,7 @@ export function clientGraphs(source:Pick<Shardfile, 'identity' | 'look' | 'state
     return material;
   };
   // NB2: a graph file's passing validation under these lists, as validateFile keeps it
-  const fileLists = JSON.stringify([dayKeys, stateFields, options.trustedGraphs === true]);
+  const fileLists = JSON.stringify([dayKeys, stateFields, options.declaredGraphCeilings === true]);
   const compile = (entry: GraphMaterialEntry): Material => {
     const carried = fogCarriers.get(entry); if (carried !== undefined) return carried;
     const fileKey = entry.preset === undefined && typeof entry.file === 'string' ? `${entry.file}|${fileLists}` : null;
@@ -264,7 +264,7 @@ export function clientGraphs(source:Pick<Shardfile, 'identity' | 'look' | 'state
     // a preset reference while the row is off draws its own family: the preset is held to parity with it
     if (resolved.family !== null && lookCompiler === null) { readout.fallback++; readout.reasons.push('graph materials row off'); return options.fallback(resolved.family); }
     // validation with the admitted lists first: a refusal (an unknown binding, a bad program) throws, row on or off
-    const checked = known ?? validateGraph(graph, { dayKeys, stateFields, budget, trustedBudget: options.trustedGraphs === true });
+    const checked = known ?? validateGraph(graph, { dayKeys, stateFields, budget, trustedBudget: options.declaredGraphCeilings === true });
     if (known === undefined && fileKey !== null && checked.ok) keepValidatedFile(fileKey, checked);
     if (!checked.ok) {
       if (typeof graph === 'object' && graph !== null && Reflect.has(graph, 'budget')) throw new Error(`material graph refused: ${checked.errors.join('; ')}`);
@@ -283,7 +283,7 @@ export function clientGraphs(source:Pick<Shardfile, 'identity' | 'look' | 'state
       return ir.primitive === 'points' ? pointFallback() : options.fallback(graphFallbackEntry(ir));
     }
     // a toon preset leaves the environment's diffuse out, as its family does (the tone-parity harness, scripts/tone-parity)
-    const compiler = lookCompiler, compiled = compiler.compileGraph(ir, { ...(options.toon === undefined ? {} : { toon: options.toon }), ...(resolved.family?.['family'] === 'toon' ? { replaceEnvironmentDiffuse: true } : {}), dayKeys, stateFields, budget, trustedBudget: options.trustedGraphs === true, textures: options.textures, fog: fogFor, validated: checked });
+    const compiler = lookCompiler, compiled = compiler.compileGraph(ir, { ...(options.toon === undefined ? {} : { toon: options.toon }), ...(resolved.family?.['family'] === 'toon' ? { replaceEnvironmentDiffuse: true } : {}), dayKeys, stateFields, budget, trustedBudget: options.declaredGraphCeilings === true, textures: options.textures, fog: fogFor, validated: checked });
     if (compiled.fog !== null) { fogPatches.set(compiled.material, compiled.fog); fogCarriers.set(entry, compiled.material); }
     if (resolved.preset) for (const name of PRESET_CLOCK_PARAMS) if (ir.params?.[name] !== undefined) { compiled.setParam(name, elapsed); clocks.push(() => { compiled.setParam(name, elapsed); }); }
     setters.set(compiled.material, compiled.setParam);

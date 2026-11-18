@@ -8,7 +8,7 @@ export const enteredServices: WeakMap<object, EnteredServices> = new WeakMap<obj
 
 /** Install a transient service for each home entry; ordinary staged contexts keep their original level scope. */
 export function installEnteredService(context: { readonly scope: Scope }, install: (scope: Scope) => void): void {
-  if (context.scope.disposed) throw new Error('Trusted runtime is disposed');
+  if (context.scope.disposed) throw new Error('Native runtime is disposed');
   const entered = enteredServices.get(context);
   if (entered === undefined) install(context.scope); else entered(install);
 }

@@ -7,7 +7,7 @@ import {readFileSync} from 'node:fs';
 import * as v from 'valibot';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
-import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape} from '../../../src/shared/host/headlessTape';
 import {StealthRowsSchema} from '@wildshard/format/stealth';
 import type {HeadlessCommand,HeadlessEffect} from '../../../src/shared/host/tickProtocol';
 import {createNativeProofResident} from '../../../src/test/game/headlessNative';
@@ -41,7 +41,7 @@ try{
   };
   const advance=(ticks:number,commands:readonly HeadlessCommand[]=[]):void=>{for(let tick=0;tick<ticks;tick++)step(commands);};
   advance(60);assert.equal(state().grass,0);assert.equal(state().law.canCrouch,false);assert.equal(state().hints,0);
-  runTrustedHeadlessTape(resident.host,step,()=>resident.effects,{version:1,observe:[],segments:[{id:'walk-through-camp-gate-to-grass',ticks:3600,commands:[],
+  runNativeHeadlessTape(resident.host,step,()=>resident.effects,{version:1,observe:[],segments:[{id:'walk-through-camp-gate-to-grass',ticks:3600,commands:[],
     route:[{x:20,z:216},{x:40,z:218},{x:60,z:214},{x:66,z:209.5},{x:60,z:205},{x:45,z:205},{x:34,z:198}]}]});
   advance(60);assert.equal(state().law.canCrouch,true);assert.equal(state().label,'Visible');assert.equal(state().hints,1);
   step([{kind:'script',actorId:'nalati.stealth.toggle',value:1}]);advance(12);
@@ -51,11 +51,11 @@ try{
   assert.ok(hidden.law.cover>=hiddenCover);assert.equal(hidden.hints,1);assert.equal(leadPlayer(resident.host).health.alive,true);
   const checkpoint=serializeSimSnapshot(snapshotSimHost(resident.host)),checkpointTick=frames.length;
   advance(60,[player()]);assert.equal(state().label,'Visible');
-  runTrustedHeadlessTape(resident.host,step,()=>resident.effects,{version:1,observe:[],segments:[{id:'leave-real-grass-through-gate',ticks:2400,commands:[],
+  runNativeHeadlessTape(resident.host,step,()=>resident.effects,{version:1,observe:[],segments:[{id:'leave-real-grass-through-gate',ticks:2400,commands:[],
     route:[{x:45,z:205},{x:60,z:205},{x:66,z:209.5}]}]});
   advance(120);assert.equal(state().law.canCrouch,false);assert.equal(state().law.state,'none');assert.equal(state().hints,1);
   assert.equal(effects.filter(effect=>effect.kind==='hint'&&effect.text===hidden.hint).length,1,'only real entry into grass raises the one-time hint');
-  const suffix=frames.slice(checkpointTick),report=runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
+  const suffix=frames.slice(checkpointTick),report=runNativeHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
     {version:1,observe:['nalati.stealth'],segments:[{id:'after-stealth-walk',ticks:1,commands:[]}]});
   replay=await session.ready();
   const repeated=await replay.verbTape({version:1,observe:['nalati.stealth'],segments:[

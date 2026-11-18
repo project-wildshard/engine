@@ -10,7 +10,7 @@ import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-weapons-native';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {mountedPlayerOf} from '../../../src/server/game/riding/native';
-import {runTrustedHeadlessTape,type HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape,type HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
 import {BladeRowsSchema} from '@wildshard/format/heldMelee';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
@@ -58,7 +58,7 @@ try{
   advance(180);assert.equal(mark('javelin-landed').javelins.some(row=>row.state===1),false);
   // Each swap is the actual next-slot press; no weapon ownership is granted.
   step([input('nalati.weapon.swap')]);assert.equal(mark('swap-back-to-bow').slot,'bow');
-  runTrustedHeadlessTape(resident.host,step,()=>resident.effects,{version:1,observe:[],segments:[{id:'walk-to-real-camp-mount',ticks:6000,commands:[],
+  runNativeHeadlessTape(resident.host,step,()=>resident.effects,{version:1,observe:[],segments:[{id:'walk-to-real-camp-mount',ticks:6000,commands:[],
     route:[{x:20,z:216},{x:40,z:218},{x:60,z:214},{x:66,z:209.5},{x:66,z:211.5},{x:66.8,z:213.4}]}]});
   step([input('nalati.companion.use')]);assert.equal(mounted.mounted,true);mark('mount-real-horse');
   const ridden=mounted.horse;assert.ok(ridden);const riddenHealth=ridden.hp;

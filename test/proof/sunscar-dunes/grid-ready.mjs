@@ -1,4 +1,4 @@
-// Plain Node grid admission and durable regional continuation of the actual shard through its declared trusted headless entry.
+// Plain Node grid admission and durable regional continuation of the actual shard through its declared host-owned headless entry.
 import { source, sourceAssets } from '../../fixtures/sunscar-source-program.ts';
 import { proveTrustedGridReady } from '../compatibility/gridReady.mjs';
 

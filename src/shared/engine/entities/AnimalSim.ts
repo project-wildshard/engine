@@ -21,7 +21,7 @@ export interface AnimalMotor {
   /** Stand the capsule at `feet` without a sweep (a revived body back at its spawn, TEMPLATE-E2E TC-E2). */
   resetAt?: (feet: Vector3) => void;
 }
-/** Trusted collision-pose owner. It reads only the last published joints, never advances a body or pose.
+/** Host-owned collision-pose owner. It reads only the last published joints, never advances a body or pose.
  * The installer snapshots/restores its publication history through the host adapter alongside this actor. */
 export interface AnimalVolumePort {
   readonly entityId: string;
@@ -237,7 +237,7 @@ export class AnimalSim {
     i.groundY = this.groundY; i.tiltRollT = this.tiltRollT; i.levelGround = this.levelGround; i.flying = this.flight !== null;
     i.advanceAttack = advanceAttack; i.desiredSpeed = this.desiredSpeed; i.debugGait = debugGait;
   }
-  /** Bind one trusted posed-volume owner before restoring the host. Actor clocks stay with this actor;
+  /** Bind one host-owned posed-volume owner before restoring the host. Actor clocks stay with this actor;
    * publication/restore cadence stays with the installer. No callback executes during binding. */
   bindVolumes(port: AnimalVolumePort): void {
     if (this.volumePort !== null || port.entityId !== this.entityId || typeof port.headWorld !== 'function'
@@ -246,13 +246,13 @@ export class AnimalSim {
     }
     this.volumePort = port;
   }
-  /** Head and body defaults use authored dimensions until a trusted installer binds published posed volumes. */
+  /** Head and body defaults use authored dimensions until a native installer binds published posed volumes. */
   headWorld(out: Vector3): Vector3 {
     if (this.volumePort !== null) { this.volumePort.headWorld(out); return out; }
     return out.set(this.position.x + Math.sin(this.yaw) * this.dims.bodyHalfLen * this.scale,
       this.position.y + this.dims.bodyY * this.scale, this.position.z + Math.cos(this.yaw) * this.dims.bodyHalfLen * this.scale);
   }
-  /** The optional fore volume is absent until its trusted pose owner supplies one. */
+  /** The optional fore volume is absent until its host-owned pose owner supplies one. */
   foreCapsule(rear: Vector3, front: Vector3): boolean { return this.volumePort?.foreCapsule?.(rear, front) ?? false; }
   bodyCapsule(a: Vector3, b: Vector3): void {
     if (this.volumePort !== null) { this.volumePort.bodyCapsule(a, b); return; }

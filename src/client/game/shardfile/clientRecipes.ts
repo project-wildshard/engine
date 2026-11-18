@@ -5,7 +5,7 @@ import type { ShardRows } from '@wildshard/format/rows';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import { skinSpeciesLook, type ClientSkin } from './clientSkins';
 
-/** A trusted catalogue recipe receives validated JSON parameters and the chosen declared species. */
+/** A native catalogue recipe receives validated JSON parameters and the chosen declared species. */
 export type ShardViewRecipe = (row: ShardRows['looks'][number], species: ShardRows['species'][number]) => SpeciesLook;
 
 function number(row: ShardRows['looks'][number], key: string, fallback: number, min: number, max: number): number {

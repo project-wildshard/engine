@@ -1,4 +1,4 @@
-// oxlint-disable-next-line import/no-nodejs-modules -- Only the trusted supervisor reads installed package manifests.
+// oxlint-disable-next-line import/no-nodejs-modules -- Only the native supervisor reads installed package manifests.
 import {existsSync,readFileSync,realpathSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the installed runtime closure, not a machine-wide store.
 import {basename,dirname,isAbsolute,join,relative,sep} from 'node:path';
@@ -20,7 +20,7 @@ function installed(name:string,from:string):{directory:string;lookup:string}|und
     if(dirname(at)===at)return undefined;
   }
 }
-/** One launcher's trusted installed runtime closure. Never grant an entire store,
+/** One launcher's host-owned installed runtime closure. Never grant an entire store,
  * node_modules directory, dev dependencies, or names supplied by a shard. Node
  * needs the exact declared link path for metadata reads before resolving it. */
 export function installedRuntimeReads(launcher:object,root:string):readonly string[]{

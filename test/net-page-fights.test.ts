@@ -7,14 +7,14 @@ import { serializeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine
 import { memoryElitePersistence } from '../src/shared/game/eliteSystem';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type PageProgress } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type PageProgress } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 async function nalati(page?: PageProgress, snapshot?: string) {
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, { room: true, ...page === undefined ? {} : { page } });
+  return createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, { room: true, ...page === undefined ? {} : { page } });
 }
 const adapter = (host: Awaited<ReturnType<typeof nalati>>['host'], id: string): unknown => { const value = host.adapters.get(id)?.snapshot(); return typeof value === 'string' ? JSON.parse(value) : value; };
 

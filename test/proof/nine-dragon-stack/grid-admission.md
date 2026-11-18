@@ -1,6 +1,6 @@
 # Nine Dragon DEVSERVER grid admission (SF51-g, E435)
 
-The descriptor now admits Nine Dragon as a first-party runtime-owned grid product at its stable cell `(1, -1)`. SHARD SELECT retains its native entry. Non-DEVSERVER builds exclude this cell. The resolver accepts only `runtime/index.ts`; it does not widen the trusted-runtime gate.
+The descriptor now admits Nine Dragon as a first-party runtime-owned grid product at its stable cell `(1, -1)`. SHARD SELECT retains its native entry. Non-DEVSERVER builds exclude this cell. The resolver accepts only `runtime/index.ts`; it does not widen the host-owned-runtime gate.
 
 ## Real browser proof
 

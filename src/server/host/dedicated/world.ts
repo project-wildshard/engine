@@ -5,7 +5,7 @@
 import type { IncomingMessage } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- The server's own door.
 import type { Duplex } from 'node:stream';
-// oxlint-disable-next-line import/no-nodejs-modules -- Canonical network identity at the trusted proxy boundary.
+// oxlint-disable-next-line import/no-nodejs-modules -- Canonical network identity at the proxy boundary.
 import { isIP } from 'node:net';
 import * as v from 'valibot';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -33,7 +33,7 @@ import type { AccountExport } from './saves/account';
 import { workerTable } from './workerTable';
 import { cellName, cellShard, gridAssembly, placedCells, roadHome } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
-import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, trustedAddress, type TrustProxy } from './doorTrust';
+import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, clientAddress, type TrustProxy } from './doorTrust';
 import {checkpointWord,type CheckpointCertificate} from './checkpointWitness';
 import type { PersistenceStatus } from './saves/persistenceStatus';
 import { persistenceEnvelope } from '@wildshard/engine/net/persistenceWord';
@@ -436,7 +436,7 @@ export class World {
       this.refuse('origin'); socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return;
     }
     if (this.draining) { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
-    const ip = connectionKey(trustedAddress(request.socket.remoteAddress ?? '', request.headers, this.options.trustProxy ?? DEFAULT_TRUST_PROXY));
+    const ip = connectionKey(clientAddress(request.socket.remoteAddress ?? '', request.headers, this.options.trustProxy ?? DEFAULT_TRUST_PROXY));
     const pass = passText(request.headers['sec-websocket-protocol']);
     if (pass === null) { this.admitUpgrade(request, socket, head, ip, false); return; }
     void this.passKey(pass, ip).then(key => { if (!socket.destroyed) this.admitUpgrade(request, socket, head, key ?? ip, key !== null); return undefined; });

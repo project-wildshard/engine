@@ -19,13 +19,13 @@ import { nativeGroupBrain, groupBrainRules, type ShardGroupBrain, type ShardPack
 
 /** One group continuation; actor memory, motors and random streams remain with the simulation owner. */
 export type DeclaredGroupPolicy = PackBrain<AnimalSim> | HerdBrain<AnimalSim>;
-/** Trusted pack perception, prey/contact identities and per-actor steering observations. Recipe construction is pure. */
+/** Host-owned pack perception, prey/contact identities and per-actor steering observations. Recipe construction is pure. */
 export interface DeclaredPackRecipe {
   ports: PackPorts<AnimalSim>;
   observe: (actor: AnimalSim, dt: number) => PackContext<AnimalSim>;
   confine: (actor: AnimalSim) => void;
 }
-/** Trusted herd perception, taming/contact identities and per-actor steering observations. Recipe construction is pure. */
+/** Host-owned herd perception, taming/contact identities and per-actor steering observations. Recipe construction is pure. */
 export interface DeclaredHerdRecipe {
   ports: HerdPorts<AnimalSim>;
   observe: (actor: AnimalSim, dt: number) => HerdContext<AnimalSim>;

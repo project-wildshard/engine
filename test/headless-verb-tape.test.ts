@@ -5,7 +5,7 @@ import {beforeAll,expect,test} from 'vitest';
 import * as v from 'valibot';
 import {loadRapier,type Rapier} from '../src/shared/engine/physics/rapier';
 import {createSimHost} from '../src/server/engine/sim';
-import {headlessTapePlanSchema,runTrustedHeadlessTape,createTrustedHeadlessTape,type HeadlessTapePlan} from '../src/shared/host/headlessTape';
+import {headlessTapePlanSchema,runNativeHeadlessTape,createNativeHeadlessTape,type HeadlessTapePlan} from '../src/shared/host/headlessTape';
 import {TickCommandSchema,simPlayerCommand} from '../src/shared/host/tickProtocol';
 import {SIM_LEVEL} from './fixtures/sim-level/level';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
@@ -45,7 +45,7 @@ test('compact tape executes every native tick and reads actual owners at each se
   const host=createSimHost({...SIM_LEVEL,entities:[]},{rapier});let count=0;
   host.onStep('counter',()=>{count++;},{snapshot:()=>({count}),restore:()=>undefined});
   try {
-    const report=runTrustedHeadlessTape(host,commands=>{
+    const report=runNativeHeadlessTape(host,commands=>{
       const player=commands.find(command=>command.kind==='player');host.step(leadCommands(host, player===undefined?undefined:simPlayerCommand(player)));
     },()=>[],v.parse(schema,plan));
     expect(report.ticks).toBe(180);expect(count).toBe(180);
@@ -60,7 +60,7 @@ test('compact tape executes every native tick and reads actual owners at each se
 test('a tape observes its selected player instead of the first seat',()=>{
   const host=createSimHost({...SIM_LEVEL,entities:[]},{rapier}),selected=host.addPlayer('bot:1',{x:10,y:0,z:0});
   try{
-    const tape=createTrustedHeadlessTape(host,commands=>{
+    const tape=createNativeHeadlessTape(host,commands=>{
       const command=commands.find(row=>row.kind==='player');
       host.step(command===undefined?undefined:new Map([[selected.id,simPlayerCommand(command)]]));
     },()=>[],selected.id);
@@ -68,20 +68,20 @@ test('a tape observes its selected player instead of the first seat',()=>{
     expect(report.observations[0]?.position[0]).toBeGreaterThan(10);
     expect(report.observations[1]?.position[0]).toBeCloseTo(selected.position.x);
     expect(host.players.get('actor.player')?.position.x).toBeCloseTo(0);
-    expect(()=>runTrustedHeadlessTape(host,()=>host.step(),()=>[],{...plan,observe:[]},'missing')).toThrow('Unknown tape player');
+    expect(()=>runNativeHeadlessTape(host,()=>host.step(),()=>[],{...plan,observe:[]},'missing')).toThrow('Unknown tape player');
   }finally{host.dispose();}
 });
 
 test('missing, replaced and nonfinite owners cannot publish a successful tape observation',()=>{
   const host=createSimHost({...SIM_LEVEL,entities:[]},{rapier});
   try {
-    expect(()=>runTrustedHeadlessTape(host,()=>host.step(),()=>[],plan)).toThrow('Missing tape observation owner');
+    expect(()=>runNativeHeadlessTape(host,()=>host.step(),()=>[],plan)).toThrow('Missing tape observation owner');
     expect(host.state.tick).toBe(0);
     host.onStep('counter',()=>undefined,{snapshot:()=>({value:Number.NaN}),restore:()=>undefined});
-    expect(()=>runTrustedHeadlessTape(host,()=>host.step(),()=>[],plan)).toThrow('Nonfinite tape owner');
-    expect(()=>runTrustedHeadlessTape(host,()=>{host.step();host.adapters.delete('counter');},()=>[],plan)).toThrow('owner changed');
+    expect(()=>runNativeHeadlessTape(host,()=>host.step(),()=>[],plan)).toThrow('Nonfinite tape owner');
+    expect(()=>runNativeHeadlessTape(host,()=>{host.step();host.adapters.delete('counter');},()=>[],plan)).toThrow('owner changed');
   }finally{host.dispose();}
-  expect(()=>runTrustedHeadlessTape(host,()=>undefined,()=>[],plan)).toThrow('owner retired');
+  expect(()=>runNativeHeadlessTape(host,()=>undefined,()=>[],plan)).toThrow('owner retired');
 });
 
 
@@ -89,11 +89,11 @@ test('a declared route uses actual movement and refuses a blocked endpoint inste
   const host=createSimHost({...SIM_LEVEL,entities:[]},{rapier});
   const route:HeadlessTapePlan={version:1,observe:[],segments:[{id:'approach',ticks:600,commands:[],route:[{x:0,z:0},{x:2,z:0}]}]};
   try {
-    const report=runTrustedHeadlessTape(host,commands=>{const command=commands.find(row=>row.kind==='player');host.step(leadCommands(host, command===undefined?undefined:simPlayerCommand(command)));},()=>[],v.parse(schema,route));
+    const report=runNativeHeadlessTape(host,commands=>{const command=commands.find(row=>row.kind==='player');host.step(leadCommands(host, command===undefined?undefined:simPlayerCommand(command)));},()=>[],v.parse(schema,route));
     expect(report.ticks).toBeGreaterThan(0);expect(report.ticks).toBeLessThan(600);
     expect(report.observations[0]?.position[0]).toBeGreaterThan(1.2);
     const blocked=createSimHost({...SIM_LEVEL,entities:[]},{rapier});
-    try {expect(()=>runTrustedHeadlessTape(blocked,()=>blocked.step(),()=>[],v.parse(schema,route))).toThrow('route stuck');}
+    try {expect(()=>runNativeHeadlessTape(blocked,()=>blocked.step(),()=>[],v.parse(schema,route))).toThrow('route stuck');}
     finally{blocked.dispose();}
   }finally{host.dispose();}
 });
@@ -103,7 +103,7 @@ test('a streamed resident keeps the original observation owner between parts',()
   const host=createSimHost({...SIM_LEVEL,entities:[]},{rapier});
   host.onStep('counter',()=>undefined,{snapshot:()=>({count:host.state.tick}),restore:()=>undefined});
   try{
-    const tape=createTrustedHeadlessTape(host,()=>host.step(),()=>[]);
+    const tape=createNativeHeadlessTape(host,()=>host.step(),()=>[]);
     tape({...plan,segments:[{id:'first',ticks:1,commands:[]}]});
     const old=host.adapters.get('counter');if(old===undefined)throw new Error('Missing counter owner');
     host.adapters.set('counter',{...old,snapshot:()=>({count:host.state.tick})});

@@ -7,17 +7,17 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { heldArmsOf } from '../src/server/game/weapons/nativeHeld';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // A bot's own sabre and polearm in Nalati's product: their seats, their commands, their kills in the damage book.
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
-async function nalati(room: boolean): Promise<TrustedHeadlessResident> {
+async function nalati(room: boolean): Promise<NativeHeadlessResident> {
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room });
 }
 const BLADE = 1, SPEAR = 2, SECOND = 60;
 const command = (seq: number, yaw: number, targetId?: string): NetCommand => ({ seq, viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw, pitch: 0, buttons: 0,

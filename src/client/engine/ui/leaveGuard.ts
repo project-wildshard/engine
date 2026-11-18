@@ -44,11 +44,11 @@ export function isReloadKey(event: KeyboardEvent): boolean {
 // page-wide: a level swapped in place (E155) keeps what this page has already seen
 let keyboard = false, reloadKeyAt = Number.NEGATIVE_INFINITY, pointerOut = false;
 export interface LeaveGuard { armed: () => boolean }
-/** `trusted`: tests pass `() => true`; a page counts only the browser's own key events */
-export function installLeaveGuard(scope: Scope, trusted: (event: Event) => boolean = (event) => event.isTrusted): LeaveGuard {
+/** `userInitiated`: tests pass `() => true`; a page counts only the browser's own key events */
+export function installLeaveGuard(scope: Scope, userInitiated: (event: Event) => boolean = (event) => event.isTrusted): LeaveGuard {
   listenPage(scope, 'keydown', (event) => {
     if (isReloadKey(event)) reloadKeyAt = Date.now();
-    if (trusted(event) && physicalKey(event)) keyboard = true;
+    if (userInitiated(event) && physicalKey(event)) keyboard = true;
   }, { capture: true });
   // the pointer left the page (toward the toolbar, the tab strip, the menu bar) or came back
   scope.listen(document, 'mouseout', (event) => { if (event instanceof MouseEvent && event.relatedTarget === null) pointerOut = true; });

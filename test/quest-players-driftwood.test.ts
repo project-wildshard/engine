@@ -12,22 +12,22 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // P1-E3.3: Driftwood's real quest, in a room of two. A bot takes the same steps as the verb tape's and the quest is the
 // bot's: the headless host runs it from the built product, on script commands that name the bot.
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
-async function resident(snapshot?: string): Promise<TrustedHeadlessResident> {
+async function resident(snapshot?: string): Promise<NativeHeadlessResident> {
   const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, snapshot);
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product }, snapshot);
 }
 const use = (value: number) => ({ kind: 'script' as const, actorId: 'driftwood.interact', value, playerId: 'bot:1' });
 /** Stand the bot on the ground at a tape stop: the tape walks there; this test is about who the steps belong to. */
-function stand(live: TrustedHeadlessResident, x: number, z: number): void {
+function stand(live: NativeHeadlessResident, x: number, z: number): void {
   const bot = live.host.players.get('bot:1'); if (bot === undefined) throw new Error('No bot');
   bot.position.set(x, live.host.groundHeightAt(x, z), z); bot.motor.resetAt(bot.position);
   for (let tick = 0; tick < 3; tick++) live.step([]);

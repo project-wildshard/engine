@@ -12,7 +12,7 @@ import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { spawnCueWord } from '../src/shared/game/shardfile/wirePrompts';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 const RACE = { x: -181, z: -144 }, WAKE = 2;
@@ -21,7 +21,7 @@ test('the millrace runs on the server: its thralls wake, its last fall raises th
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
+  const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
   try {
     const { host } = live, lead = leadPlayer(host), { flags } = questBooks(host).of(lead.id), raised: string[] = [], said: number[] = [];
     const heard = shardRows(host).calls, push = heard.push.bind(heard); // a room empties these each tick

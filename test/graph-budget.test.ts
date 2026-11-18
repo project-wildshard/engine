@@ -22,7 +22,7 @@ it('compiles a declared larger graph only with trusted authority and never subst
   const source = emptyShardfile({ slug: 'graph-proof', name: 'Graph', author: 'Wildshard', seed: 1, revision: 1 });
   let fallbacks = 0;
   const options = { compiler: classicLookCompiler(), fallback: () => { fallbacks++; return new THREE.MeshBasicMaterial(); }, textures: () => { throw new Error('No texture expected'); } };
-  const trusted = clientGraphs(source, { ...options, trustedGraphs: true });
+  const trusted = clientGraphs(source, { ...options, declaredGraphCeilings: true });
   const material = trusted.compile({ family: 'graph', graph });
   material.dispose();
   expect(trusted.readout.compiled).toBeGreaterThan(0);

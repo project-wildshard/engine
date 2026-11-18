@@ -2,7 +2,7 @@
 import '../../../src/shared/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-nodejs-modules -- Assert actual native outcomes and independent replay.
 import assert from 'node:assert/strict';
-import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape} from '../../../src/shared/host/headlessTape';
 import {earnNalatiPasture} from './nalati-pasture-session';
 import {beginFolderSession} from './folderSession';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
@@ -12,7 +12,7 @@ let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['re
 try{
   const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);
   replay=await pending.ready();
-  const report=runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:['nalati.predators'],segments:[{
+  const report=runNativeHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:['nalati.predators'],segments:[{
     id:'ordinary-raid-and-shepherd-defense',ticks:1800,commands:[],
   }]});
   assert.ok(report.observations.some(row=>row.effects.some(effect=>effect.kind==='hint'&&effect.text==='Wolves are raiding the flock — the shepherd rides out')));

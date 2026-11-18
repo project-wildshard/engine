@@ -20,21 +20,21 @@ import { WorldRegistry } from '../src/client/engine/world/registry';
 import { Object3D } from 'three';
 import { QuestState } from '../src/shared/engine/quest/core';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // E6, QUEST: a view reads one port. The page feeds it with its own QuestState; here a NetClient feeds it over a loopback
 // from Driftwood's real quest, and what a view would draw is the same, step by step, and the player's own.
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
-async function resident(): Promise<TrustedHeadlessResident> {
+async function resident(): Promise<NativeHeadlessResident> {
   const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product });
 }
 const use = (value: number) => ({ kind: 'script' as const, actorId: 'driftwood.interact', value, playerId: 'bot:1' });
-function stand(live: TrustedHeadlessResident, x: number, z: number): void {
+function stand(live: NativeHeadlessResident, x: number, z: number): void {
   const bot = live.host.players.get('bot:1'); if (bot === undefined) throw new Error('No bot');
   bot.position.set(x, live.host.groundHeightAt(x, z), z); bot.motor.resetAt(bot.position);
   for (let tick = 0; tick < 3; tick++) live.step([]);

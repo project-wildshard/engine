@@ -7,9 +7,9 @@ import type { Scope } from '../app/scope';
 
 /** Numeric action requests accepted from input and an admitted item hook. */
 export type ItemAction = 1 | 2 | 3 | 4;
-/** Trusted contact values; scripts select a row but never supply damage or an effect id. */
+/** Native contact values; scripts select a row but never supply damage or an effect id. */
 export interface ItemAttack { id: string; damage: number; cooldown: number; range: number; width: number; tags: readonly CombatTag[]; effect: EffectId | null }
-/** Data used by an authoritative item; kit factories add equipment UI and a view. A null tool action leaves input with its trusted runtime. */
+/** Data used by an authoritative item; kit factories add equipment UI and a view. A null tool action leaves input with its native runtime. */
 export type ItemSpec = { id: string; kind: 'weapon'; light: ItemAttack; heavy: ItemAttack; charge: number }
   | { id: string; kind: 'tool'; action: `${string}.${string}` | null; fuelSeconds: number; intensity: number };
 /** Script hooks return only a bounded action selection. The host owns tick admission and aggregate allowances. */

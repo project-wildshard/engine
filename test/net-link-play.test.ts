@@ -8,7 +8,7 @@ import {Predictor} from '../src/client/engine/net/predictor';
 import {NetRoom} from '../src/server/engine/net/room';
 import {SimNetWorld} from '../src/server/engine/net/simWorld';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
-import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
+import {createNativeHeadlessResident} from '../src/server/host/headlessRuntime';
 import {leadPlayer} from '../src/shared/engine/sim/leadPlayer';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {PLAYER_CLASS} from '../src/shared/engine/net/netSchemas';
@@ -20,11 +20,11 @@ for(const profile of [{rtt:0,jitter:0,loss:0,reorder:0},{rtt:124,jitter:30,loss:
   test(`a real walk and melee hold over ${profile.rtt} ms RTT`,async()=>{
     const directory=builtFolder('driftwood-isle'),product=await loadHeadlessFolder(directory);
     const input={product,shard:product.shardfile,assets:runtimeAssets(product,directory),rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))};
-    const server=await createTrustedHeadlessResident(input,undefined,{room:true});
-    let page:Awaited<ReturnType<typeof createTrustedHeadlessResident>>|undefined;
+    const server=await createNativeHeadlessResident(input,undefined,{room:true});
+    let page:Awaited<ReturnType<typeof createNativeHeadlessResident>>|undefined;
     const link=directLoopback();
     try {
-      page=await createTrustedHeadlessResident(input,undefined,{room:true});
+      page=await createNativeHeadlessResident(input,undefined,{room:true});
       const local=page,body=leadPlayer(local.host),lead=leadPlayer(server.host);
       // A real owned native body implements the prediction port. Replays move
       // only that character through its real motor, never the world or actors.

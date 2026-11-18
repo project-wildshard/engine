@@ -2,7 +2,7 @@ import { runtimeAssets } from './fixtures/engine-lift/folder';
 // @vitest-environment happy-dom
 // oxlint-disable-next-line import/no-nodejs-modules -- The room runs the shipped product bytes and physics module.
 import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
-import { createTrustedHeadlessResident,type TrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
+import { createNativeHeadlessResident,type NativeHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { tickCommands } from '@wildshard/engine/host/tickProtocol';
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import { readFileSync } from 'node:fs';
@@ -45,13 +45,13 @@ class HeldRow extends Weapon {
 const SLOTS = new Map([['weapon.crossbow', 0], ['weapon.lever', 1], ['weapon.longbow', 2]]);
 const scenario: MotionScenario = { id: 'net-held', start: { x: -10, z: 0, yaw: 0 }, ticks: 0, intent: () => ({}), bodyAt: { x: -5, z: 30 } };
 
-async function resident(shard = 'pine-hollow'): Promise<TrustedHeadlessResident> {
+async function resident(shard = 'pine-hollow'): Promise<NativeHeadlessResident> {
   const directory = builtFolder(shard), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = runtimeAssets(product, directory);
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier: serverR, product });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier: serverR, product });
 }
-interface Rig { readonly net: NetPlayer; readonly client: NetClient; readonly live: TrustedHeadlessResident; readonly followed: string[]; readonly hits: OwnHit[]; readonly refusals: number[]; run: (ticks: number) => void; held: () => unknown; done: () => void }
+interface Rig { readonly net: NetPlayer; readonly client: NetClient; readonly live: NativeHeadlessResident; readonly followed: string[]; readonly hits: OwnHit[]; readonly refusals: number[]; run: (ticks: number) => void; held: () => unknown; done: () => void }
 async function rig(shard = 'pine-hollow', slots: ReadonlyMap<string, number> = SLOTS, kit?: readonly string[]): Promise<Rig> {
   const live = await resident(shard), { host } = live, lead = leadPlayer(host).id, world = new SimNetWorld(host), page = new PageSide(R, scenario), { player } = page, link = directLoopback(), client = new NetClient(link.client);
   const room = new NetRoom({ world, step: (inputs: readonly NetTickInput[]) => {

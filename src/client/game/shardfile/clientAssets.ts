@@ -57,7 +57,7 @@ export class ClientAssets {
       return this.observe(ref, await this.options.firstPartyRead(outputBlobUrl(this.source, ref, base), cap, undefined, hash, priority));
     }
 
-    // a trusted content-cache read already checked its SHA-256 (ContentCache.get): no page re-hash (~150 ms of a
+    // a native content-cache read already checked its SHA-256 (ContentCache.get): no page re-hash (~150 ms of a
     // phone-tier home region); every other read is checked here, off the page where a worker can
     const url = outputDescriptor(this.source) === undefined ? undefined : outputBlobUrl(this.source, ref, base);
     const verified = await this.options.cache?.verifiedAsset?.(hash)

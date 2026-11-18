@@ -10,14 +10,14 @@ import {admittedFolder} from './admittedFolderCache';
 
 export type FolderSimulation = Pick<HeadlessSimulation, 'verbTape' | 'verbTapePart' | 'streamVerbTape' | 'journey' | 'walkLeg' | 'step' | 'dispose' | 'quarantined' | 'checkpoint'>;
 export interface FolderSessionOptions {
-  /** Trusted proof composition owned by the consumer. Omit to run the product's ordinary native runtime. */
+  /** Host-owned proof composition owned by the consumer. Omit to run the product's ordinary native runtime. */
   prepare?: URL;
   snapshot?: string;
 }
 
 /** Start replay admission while its caller records native input. With no `prepare`, the replay runs on the room's world
  * (`openWorldAdapter`, as a dedicated room boots it), so record on that same world: `openWorld(input, { room: true })` or
- * `openWorldAdapter`. A tape recorded on the bare `createTrustedHeadlessResident` leaves it once the worlds differ (Dunes'
+ * `openWorldAdapter`. A tape recorded on the bare `createNativeHeadlessResident` leaves it once the worlds differ (Dunes'
  * Signal: the Matriarch fight the fire summons, from tick 9280); that is two worlds, not replay drift (mini-replay).
  * A failed admission is observed immediately, even before the caller asks for ready(). */
 export async function beginFolderSession(slug: string, options: FolderSessionOptions = {}): Promise<{

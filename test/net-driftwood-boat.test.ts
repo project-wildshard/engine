@@ -10,12 +10,12 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { SimHost } from '../src/server/engine/sim';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // SERVER-PARITY HS2. Driftwood's moored boat is a `platform` mover on the swell. The page stands its player on the boat's planks,
-// posed from the room's `script:driftwood.boat` row (`FollowedMovers.follow`). Before HS2 the room (`createTrustedHeadlessResident`,
+// posed from the room's `script:driftwood.boat` row (`FollowedMovers.follow`). Before HS2 the room (`createNativeHeadlessResident`,
 // what `cellWorld` runs) drove only `carry` movers: it built no boat at all and sent no row, so the room's player stood on nothing,
 // dropped into the sea, and every correction pulled the page's player off the deck it stands on.
 
@@ -42,7 +42,7 @@ test('a room player standing on Driftwood\'s moored boat for 30 s rides the deck
     const hit = page.castRay(new rapier.Ray({ x, y: row.at.y + 20, z }, { x: 0, y: -1, z: 0 }), 40, true);
     return hit === null ? null : row.at.y + 20 - hit.timeOfImpact;
   };
-  const resident = await createTrustedHeadlessResident(input, undefined, { room: true });
+  const resident = await createNativeHeadlessResident(input, undefined, { room: true });
   let saved: ReturnType<typeof snapshotSimHostBytes>;
   try {
     const host = resident.host, player = leadPlayer(host), boatRow = (): MoverPose | null => {
@@ -70,7 +70,7 @@ test('a room player standing on Driftwood\'s moored boat for 30 s rides the deck
     saved = snapshotSimHostBytes(host);
   } finally { resident.dispose(); }
   // a restored room keeps one boat, and moves it
-  const restored = await createTrustedHeadlessResident(input, saved, { room: true });
+  const restored = await createNativeHeadlessResident(input, saved, { room: true });
   try {
     expect(boatColliders(restored.host)).toBe(row.boxes.length);
     const read = shardRows(restored.host).bodies.get(`script:${BOAT}`), was = JSON.stringify(read?.());
@@ -78,7 +78,7 @@ test('a room player standing on Driftwood\'s moored boat for 30 s rides the deck
     expect(JSON.stringify(read?.())).not.toBe(was);
   } finally { restored.dispose(); }
   // a room saved before HS2 holds no boat and no mover step: its restore joins the step and builds the boat fresh
-  const old = await createTrustedHeadlessResident(input, undefined, { room: true });
+  const old = await createNativeHeadlessResident(input, undefined, { room: true });
   try {
     const { world } = old.host.physics, bodies = new Set<number>();
     world.forEachCollider(collider => { const body = collider.parent(); if (tagOf(collider)?.owner === BOAT && body !== null) bodies.add(body.handle); });
@@ -87,7 +87,7 @@ test('a room player standing on Driftwood\'s moored boat for 30 s rides the deck
     expect(boatColliders(old.host)).toBe(0);
     saved = snapshotSimHostBytes(old.host);
   } finally { old.dispose(); }
-  const upgraded = await createTrustedHeadlessResident(input, saved, { room: true });
+  const upgraded = await createNativeHeadlessResident(input, saved, { room: true });
   try {
     expect(boatColliders(upgraded.host)).toBe(row.boxes.length);
     for (let tick = 0; tick < 60; tick++) upgraded.step([]);

@@ -12,7 +12,7 @@ import {join} from 'node:path';
 import {brotliDecompressSync} from 'node:zlib';
 import {expect,test} from 'vitest';
 import {HeadlessSimulation} from '../src/server/host/headless';
-import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
+import {createNativeHeadlessResident} from '../src/server/host/headlessRuntime';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {decodeSimSnapshot,leadSnapshot,SIM_SNAPSHOT_VERSION} from '../src/shared/engine/sim/snapshot';
@@ -88,7 +88,7 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refu
       expect(result.tick).toBe(fixture.tick+13);expect(distance(last[0]??Infinity,last[2]??Infinity)).toBeGreaterThan(.25);
     } finally {await sim.dispose();}
   } else {
-    const live=await createTrustedHeadlessResident({shard,product,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},saved);
+    const live=await createNativeHeadlessResident({shard,product,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},saved);
     try {
       const player=leadPlayer(live.host);expect(distance(player.position.x,player.position.z)).toBeLessThan(.001);
       expect(live.host.state.tick).toBe(fixture.tick);

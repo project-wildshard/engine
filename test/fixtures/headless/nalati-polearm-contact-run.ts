@@ -7,7 +7,7 @@ import {Vector3} from 'three';
 import {ThrownWeaponProfileSchema} from '@wildshard/format/weaponProfiles';
 import {parseHeldSlots} from '@wildshard/format/heldArms';
 import {nativeGroupCollection} from '../../../src/server/game/shardfile/groupRuntime';
-import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape} from '../../../src/shared/host/headlessTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {earnNalatiPasture} from './nalati-pasture-session';
 import {beginFolderSession} from './folderSession';
@@ -76,7 +76,7 @@ try{
   if(mode==='thrust')assert.ok(state.thrusts>0);else{assert.ok(state.throws>0);assert.equal(state.ammo,thrown.carried-state.throws);}
   const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();
   const observed=['nalati.predators','nalati.weapons'];
-  const report=runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
+  const report=runNativeHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
     {version:1,observe:observed,segments:[{id:'after-polearm-contact',ticks:1,commands:[]}]});
   const repeated=await replay.verbTape({version:1,observe:observed,segments:[
     {id:'captured-polearm-inputs',ticks:frames.length,commands:[],frames},{id:'after-polearm-contact',ticks:1,commands:[]},

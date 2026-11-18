@@ -6,7 +6,7 @@ import { Vector3 } from 'three';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
@@ -20,20 +20,20 @@ import { jumpOwnerClock } from './fixtures/ownerClock';
 
 const SLUG = 'nalati-grasslands', Roster = v.looseObject({ roster: v.looseObject({ bodies: v.array(v.looseObject({ id: v.string(), kind: v.string(), variant: v.looseObject({ id: v.string() }) })) }) });
 
-async function shipped(): Promise<{ directory: string; product: Awaited<ReturnType<typeof loadHeadlessFolder>>; assets: Map<string, Uint8Array>; rapier: Rapier; resident: (snapshot?: string) => Promise<TrustedHeadlessResident> }> {
+async function shipped(): Promise<{ directory: string; product: Awaited<ReturnType<typeof loadHeadlessFolder>>; assets: Map<string, Uint8Array>; rapier: Rapier; resident: (snapshot?: string) => Promise<NativeHeadlessResident> }> {
   const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  return { directory, product, assets, rapier, resident: snapshot => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
+  return { directory, product, assets, rapier, resident: snapshot => createNativeHeadlessResident({ shard, assets, rapier, product }, snapshot) };
 }
 const Raid = v.looseObject({ state: v.looseObject({ raidT: v.number(), spawned: v.number() }) });
-const steps = (resident: TrustedHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
+const steps = (resident: NativeHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
 const byId = (census: PopulationCensus, id: string): PopulationCensus['bodies'][number] => {
   const body = census.bodies.find(row => row.id === id); if (body === undefined) throw new Error(`Missing census body ${id}`); return body;
 };
-const kill = (resident: TrustedHeadlessResident, id: string): void => {
+const kill = (resident: NativeHeadlessResident, id: string): void => {
   const actor = resident.host.entities.get(id);
   if (actor === undefined || !actor.alive) throw new Error(`No live creature ${id}`);
   const dealt = resident.host.combat.hit({ source: 'env', sourceTags: ['dmg.legacy', 'cover.checked'], target: actor.combatActor(),
@@ -46,7 +46,7 @@ test('Nalati runs its whole population headless from the product: roster, wolves
   expect(product.hasFile(NATIVE_ASSEMBLY_FILE)).toBe(true);
   const roster = v.parse(Roster, await product.json('server/boot.json')).roster.bodies;
   const live = await resident();
-  let restored: TrustedHeadlessResident | undefined;
+  let restored: NativeHeadlessResident | undefined;
   try {
     // spawning: the install stands every declared body, in place of the direct fixture's rows
     const born = populationCensus(live.host);

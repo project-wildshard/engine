@@ -52,7 +52,7 @@ export interface CollisionJoint {
   readonly scale?: readonly [number, number, number];
 }
 
-/** Absolute local transform from a trusted numeric rig; Euler order can change when the pose sets it. */
+/** Absolute local transform from a host-owned numeric rig; Euler order can change when the pose sets it. */
 export interface CollisionTransform {
   readonly position: Readonly<{ x: number; y: number; z: number }>;
   readonly rotation: Readonly<{ x: number; y: number; z: number; order: EulerOrder }>;
@@ -563,7 +563,7 @@ export class NativeCreaturePose {
   }
 }
 
-/** One-time native spawn attachment, after the trusted roster has admitted its actual baked recipe. */
+/** One-time native spawn attachment, after the host-owned roster has admitted its actual baked recipe. */
 export function attachNativeCreaturePose(actor: AnimalSim, recipe: NativeCreaturePoseRecipe, animate?: (context: AnimalRigContext) => void): {
   readonly pose: NativeCreaturePose; readonly body: AnimalSim & { hidden: boolean; sampleTerrain: () => void };
 } {

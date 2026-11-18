@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Load the ordinary pinned server physics asset.
 import { readFileSync } from 'node:fs';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime.ts';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime.ts';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder.ts';
 import { loadRapier } from '../src/shared/engine/physics/rapier.ts';
 import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim.ts';
@@ -16,7 +16,7 @@ import type { HeadlessCommand } from '../src/shared/host/tickProtocol.ts';
 import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder.ts';
 
 /** Real steering follows the nearest living horse; no controller, body or clock is held. */
-function follow(live: TrustedHeadlessResident): { readonly distance: number; readonly commands: readonly HeadlessCommand[] } {
+function follow(live: NativeHeadlessResident): { readonly distance: number; readonly commands: readonly HeadlessCommand[] } {
   const player = leadPlayer(live.host), feet = player.position;
   let closest: AnimalSim | undefined;
   let squared = Infinity;
@@ -34,7 +34,7 @@ function follow(live: TrustedHeadlessResident): { readonly distance: number; rea
 // node --experimental-transform-types --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
 test('the full Nalati server keeps 60 Hz beside a reacting herd', { timeout: 9500 }, async (): Promise<void> => {
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory);
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets: runtimeAssets(product, directory),
+  const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets: runtimeAssets(product, directory),
     rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) });
   try {
     const born = populationCensus(live.host), horse = [...live.host.entities.values()].find(actor => actor.kind === 'horse');

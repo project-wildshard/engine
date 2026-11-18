@@ -6,7 +6,7 @@ import * as v from 'valibot';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { mixedPopulation } from '../src/server/game/population/mixedRoster';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
@@ -20,33 +20,33 @@ import { jumpOwnerClock } from './fixtures/ownerClock';
 
 const SLUG = 'driftwood-isle', STEP = 'driftwood.island', FULL = 255;
 
-async function shipped(): Promise<(snapshot?: string) => Promise<TrustedHeadlessResident>> {
+async function shipped(): Promise<(snapshot?: string) => Promise<NativeHeadlessResident>> {
   const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  return snapshot => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot);
+  return snapshot => createNativeHeadlessResident({ shard, assets, rapier, product }, snapshot);
 }
-const clearIsland = (resident: TrustedHeadlessResident): void => {
+const clearIsland = (resident: NativeHeadlessResident): void => {
   for (const body of mixedPopulation(resident.host, STEP).bodies()) {
     const actor = body.actor; if (actor === null || !actor.alive) continue;
     resident.host.combat.hit({ source: 'env', sourceTags: ['dmg.legacy', 'cover.checked'], target: actor.combatActor(),
       amount: actor.maxHp * 10, point: actor.position.clone(), dir: new Vector3(0, 0, 1) });
   }
 };
-const second = (resident: TrustedHeadlessResident): void => { for (let i = 0; i < 60; i++) resident.step([]); };
+const second = (resident: NativeHeadlessResident): void => { for (let i = 0; i < 60; i++) resident.step([]); };
 const Ecology = v.looseObject({ ecology: v.looseObject({ now: v.number(), pending: v.array(v.looseObject({ due: v.number() })) }) });
-const returnClock = (resident: TrustedHeadlessResident): number => v.parse(Ecology, resident.host.adapters.get(STEP)?.snapshot()).ecology.now;
+const returnClock = (resident: NativeHeadlessResident): number => v.parse(Ecology, resident.host.adapters.get(STEP)?.snapshot()).ecology.now;
 /** Every owed return falls due now, as if its real delay had passed; the saved clock is the only thing that moves. */
-const skipWaits = (resident: TrustedHeadlessResident): void => {
+const skipWaits = (resident: NativeHeadlessResident): void => {
   jumpOwnerClock(resident.host, STEP, ['ecology.now'], state => v.parse(Ecology, state), state => {
     const { ecology } = state;
     return { ...state, ecology: { ...ecology, now: Math.max(ecology.now, ...ecology.pending.map(entry => entry.due)) } };
   });
 };
 /** One cleared second on the island's own clock, which must still run a full second, then the jump past the waits. */
-const session = (resident: TrustedHeadlessResident): void => {
+const session = (resident: NativeHeadlessResident): void => {
   const was = returnClock(resident);
   clearIsland(resident); second(resident);
   expect(returnClock(resident) - was).toBeCloseTo(1, 9);
@@ -58,7 +58,7 @@ const AT_BOUND = 20, SUFFIX = 10;
 
 test('a session that keeps clearing Driftwood passes the roster bound, reuses dead slots and saves there', async () => {
   const open = await shipped(), live = await open(), population = mixedPopulation(live.host, STEP);
-  let restored: TrustedHeadlessResident | undefined;
+  let restored: NativeHeadlessResident | undefined;
   try {
     const bodies = () => population.bodies();
     expect(bodies()).toHaveLength(34);

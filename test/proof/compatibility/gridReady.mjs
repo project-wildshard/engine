@@ -1,6 +1,6 @@
 // Plain Node grid admission through the built native plan or a direct typed proof factory (SF72 gridReady): the same
 // GridAssembly / GridSimulation / ResidencyAllocator path the template's proof runs, with the cell's `load` composing the
-// shard's trusted runtime exactly as the headless worker does (`createTrustedHeadlessResident`, @wildshard/engine/host/headlessRuntime).
+// shard's host-owned runtime exactly as the headless worker does (`createNativeHeadlessResident`, @wildshard/engine/host/headlessRuntime).
 // oxlint-disable-next-line import/no-nodejs-modules -- Native witness assertions must fail the process.
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read immutable authored payloads, never a renderer.
@@ -17,7 +17,7 @@ import { WILDSHARD_IDENTITY } from '../../../src/client/game/identity.ts';
 import { GridAssembly } from '../../../src/shared/game/grid/assembly.ts';
 import { GridSimulation } from '../../../src/server/game/grid/simulation.ts';
 import { ResidencyAllocator } from '../../../src/shared/game/grid/allocator.ts';
-import { createTrustedHeadlessResident } from '../../../src/server/host/headlessRuntime.ts';
+import { createNativeHeadlessResident } from '../../../src/server/host/headlessRuntime.ts';
 import { createNativeProofResident } from '../../../src/test/game/headlessNative.ts';
 import { leadPlayer } from '../../../src/shared/engine/sim/leadPlayer.ts';
 
@@ -37,7 +37,7 @@ const bodies = (host) => JSON.stringify([host.state.tick, ...[...host.entities].
  * Admit `source` through its native data plan or direct typed factory into its catalogue grid cell and walk the
  * template's readiness contract: one sim lease reserved before native physics, readiness false until the runtime fence
  * admits, `checkpoint` refused until durable, a frozen region while away, and the durable continuation restored on re-entry
- * through the same trusted entry. The template's door/script step (natives declare no script door) becomes play on the
+ * through the same native entry. The template's door/script step (natives declare no script door) becomes play on the
  * region's own clock: a hurt creature, or a lent weapon swing where the region has no fauna (Nine Dragon Stack).
  */
 export async function proveTrustedGridReady(source, mode = CATALOGUE_MODE, prepare = null, sourceAssets = null) {
@@ -71,7 +71,7 @@ export async function proveTrustedGridReady(source, mode = CATALOGUE_MODE, prepa
       const { loadHeadlessFolder } = await import('../../../src/server/host/headlessFolder.ts');
       const product = await loadHeadlessFolder(`out/${slug}`);
       const preparation={shard:source,assets,rapier,product};
-      if(product.has('sim/runtime-plan')) resident=await createTrustedHeadlessResident(preparation,snapshot);
+      if(product.has('sim/runtime-plan')) resident=await createNativeHeadlessResident(preparation,snapshot);
       else {
         assert.equal(typeof prepare,'function','A native proof needs its direct typed factory');
         resident=await createNativeProofResident(preparation,prepare,snapshot);

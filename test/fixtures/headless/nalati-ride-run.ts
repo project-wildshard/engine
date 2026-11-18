@@ -13,7 +13,7 @@ import {mountedPlayerOf} from '../../../src/server/game/riding/native';
 import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {createNativeProofWorker} from '../headless-worker';
 import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
-import {runTrustedHeadlessTape,type HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape,type HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {prepareHeadlessRuntime} from '../nalati-verbs';
 import {nalatiCampTalkTape} from '../../proof/nalati-grasslands/verbTape';
@@ -34,8 +34,8 @@ try{
   step([{kind:'script',actorId:'nalati.ride',value:1}]);assert.equal(mounted.mounted,false);mark('mount-out-of-reach');
   const camp=nalatiCampTalkTape(source.spawn),end=camp.segments.findIndex(row=>row.id==='walk-to-herderRail')+1;
   assert.ok(end>0);
-  runTrustedHeadlessTape(resident.host,step,()=>resident.effects,{...camp,segments:camp.segments.slice(0,end)});
-  runTrustedHeadlessTape(resident.host,step,()=>resident.effects,{version:1,observe:[],segments:[{
+  runNativeHeadlessTape(resident.host,step,()=>resident.effects,{...camp,segments:camp.segments.slice(0,end)});
+  runNativeHeadlessTape(resident.host,step,()=>resident.effects,{version:1,observe:[],segments:[{
     id:'walk-west-of-camp-horse',ticks:1200,commands:[],route:[{x:72.4,z:212.9},{x:72,z:210},
       {x:68,z:210},{x:66,z:211.5},{x:66.8,z:213.4}],
   }]});

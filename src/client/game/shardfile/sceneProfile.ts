@@ -1,7 +1,7 @@
 import type { Shardfile } from '@wildshard/format/shardSchema';
 
 const profiles = new WeakMap<object, readonly string[]>();
-/** The trusted estimate records the exact world profile before any geometry is decoded. */
+/** The host-owned estimate records the exact world profile before any geometry is decoded. */
 export function recordSceneProfile(source: Shardfile, files: readonly string[]): void {
   profiles.set(source.files, [...files]);
 }

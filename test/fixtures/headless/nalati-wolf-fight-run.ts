@@ -7,7 +7,7 @@ import {Vector3} from 'three';
 import {HeldBowFileSchema} from '@wildshard/format/weaponProfiles';
 import {heldBowBase} from '../../../src/shared/game/weapons/heldBowBase';
 import {bowLaunchSpeed} from '../../../src/shared/engine/combat/bowLaw';
-import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape} from '../../../src/shared/host/headlessTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {beginFolderSession} from './folderSession';
 import {earnNalatiPasture} from './nalati-pasture-session';
@@ -55,7 +55,7 @@ try{
   const weapons=v.parse(v.object({shots:v.number(),bolts:v.number()}),JSON.parse(saved));
   assert.equal(weapons.shots,8);assert.equal(weapons.bolts,bow.base.quiver-weapons.shots);
   const observed=['nalati.predators','nalati.weapons'];
-  const report=runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:observed,
+  const report=runNativeHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:observed,
     segments:[{id:'after-real-wolf-fight',ticks:1,commands:[]}]});
   const repeated=await replay.verbTape({version:1,observe:observed,segments:[
     {id:'captured-wolf-fight',ticks:frames.length,commands:[],frames},

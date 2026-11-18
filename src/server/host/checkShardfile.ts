@@ -4,7 +4,7 @@ import type {ShardfileCheckFailure, ShardfileCheckReport, ShardfileEntryProof} f
 import {validateSimulation} from './headless';
 
 type CheckObservations = ShardfileEntryProof & PerformanceObservations;
-/** Trusted host inputs, never fields in a shard or options accepted from author data. */
+/** Host inputs, never fields in a shard or options accepted from author data. */
 export interface ShardfileCheckOptions {
   readonly sections?: ReadonlyMap<string, unknown>;
   readonly policy?: 'warn' | 'refuse';
@@ -32,7 +32,7 @@ function infrastructureFailure(error: unknown): boolean {
 }
 
 async function evidence(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, options: ShardfileCheckOptions): Promise<Evidence> {
-  // J370: no trusted recipes are invented for a native client plan.
+  // J370: no native recipes are invented for a native client plan.
   if (shard.runtime !== null) return {proof: 'unmeasured', observed: unmeasured(), failures: []};
   try {
     // validateSimulation already observes and walks every entry in one resident.
@@ -45,7 +45,7 @@ async function evidence(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array
 
 /** Full offline check: the same execution/entry proof and performance law for both callers.
  * Native execution remains explicitly unmeasured under the existing author warning policy (J370).
- * The cook calls the default policy; only trusted local checkout provenance may select warnings. */
+ * The cook calls the default policy; only local checkout provenance may select warnings. */
 export async function checkShardfile(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, options: ShardfileCheckOptions = {}): Promise<ShardfileCheckReport> {
   const checked = await evidence(shard, assets, options);
   const policy = options.policy ?? (shard.runtime === null ? 'refuse' : 'warn');

@@ -26,7 +26,7 @@ export interface LiveGridRegion { host: Pick<RegionShell, 'physics'>; dispose: (
   retire?: () => Generator<DisposeStep, void>;
   /** A runtime's own flush of what it holds; false keeps the traveller in the source frame. Nothing else here saves. */
   checkpoint?: () => boolean; walls?: ReadinessWalls }
-/** Immutable content is admitted before its sim claim and world allocation; trusted runtime preparation imports only. */
+/** Immutable content is admitted before its sim claim and world allocation; native runtime preparation imports only. */
 export interface LiveGridAdmission {
   bytes: number;
   /** `signal` aborts a road-approach build when the traveller commits to a crossing into another cell: stop at the next safe
@@ -36,9 +36,9 @@ export interface LiveGridAdmission {
    *  successful publication transfers release to the returned region's dispose. */
   cancel?: () => void;
   prepareRuntime?: () => Promise<void>;
-  /** Opaque foundations stay mutually exclusive unless their trusted factory explicitly promises isolated preparation. */
+  /** Opaque foundations stay mutually exclusive unless their native factory explicitly promises isolated preparation. */
   exclusiveRuntime?: boolean;
-  /** Trusted bodyless declarative/client-plan construction owns its bindings and defers entered services.
+  /** Host-owned bodyless declarative/client-plan construction owns its bindings and defers entered services.
    * Unknown/legacy factories never opt in merely because they accept an abort signal. */
   isolatedPreparation?: boolean;
   /** Declared render tiles can prepare a neighbour without constructing its region. */

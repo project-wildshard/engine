@@ -6,7 +6,7 @@ import { legacyDouble } from '../../../src/test/engine/FakeGame';
 import { FIXED_STEP } from '../../../src/shared/engine/core/fixedStep';
 import { leadPlayer } from '../../../src/shared/engine/sim/leadPlayer';
 import { runHeadlessJourney, type HeadlessJourneyPlan, type HeadlessJourneyReport, type HeadlessJourneySample } from '../../../src/shared/host/headlessJourney';
-import type { TrustedHeadlessResident } from '../../../src/server/host/headlessRuntime';
+import type { NativeHeadlessResident } from '../../../src/server/host/headlessRuntime';
 
 // P1-E5.3 B3: what a real journey did on the server, tick for tick, run again on the client's step in a second world from
 // the same product. The second world is a stand-in for C5's prediction world: the real `Player` on the second resident's
@@ -28,7 +28,7 @@ export interface MotionReplayReport {
 const TOLERANCE = 0.02;
 
 /** One leg on the server, recorded. */
-export function captureJourney(resident: TrustedHeadlessResident, plan: HeadlessJourneyPlan, into: MotionCapture): HeadlessJourneyReport {
+export function captureJourney(resident: NativeHeadlessResident, plan: HeadlessJourneyPlan, into: MotionCapture): HeadlessJourneyReport {
   return runHeadlessJourney(resident.host, input => { resident.step(input); }, plan, sample => { into.samples.push(sample); });
 }
 
@@ -42,7 +42,7 @@ function clientCommand(sample: HeadlessJourneySample, yaw: number): PlayerWireIn
 
 /** Replay a capture on the client's step and report the error against the server's feet, tick by tick. A sample with no
  *  command before any move is a placed start: a leg teleports there, as `Player.spawn` does. */
-export function replayOnClient(resident: TrustedHeadlessResident, capture: MotionCapture): MotionReplayReport {
+export function replayOnClient(resident: NativeHeadlessResident, capture: MotionCapture): MotionReplayReport {
   const { host } = resident, player = new Player(new PerspectiveCamera(), host.physics, legacyDouble<HTMLCanvasElement>({}), { waterLine: { update: () => undefined, setHint: () => undefined } });
   const lead = leadPlayer(host), { samples } = capture, errors = new Float64Array(samples.length);
   const frame = { heightAt: (x: number, z: number) => host.groundHeightAt(x, z), waterSurfaceAt: (x: number, z: number) => host.waterSurfaceAt(x, z), platforms: [] };

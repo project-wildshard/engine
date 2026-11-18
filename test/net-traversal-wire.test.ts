@@ -6,7 +6,7 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { carryPrompt, liftPrompt } from '../src/shared/game/shardfile/wirePrompts';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { tickCommands } from '../src/shared/host/tickProtocol';
 import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
@@ -14,21 +14,21 @@ import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
-const opened: TrustedHeadlessResident[] = [];
+const opened: NativeHeadlessResident[] = [];
 afterEach(() => { for (const live of opened.splice(0)) live.dispose(); });
 let product: Awaited<ReturnType<typeof loadHeadlessFolder>>;
-async function resident(slug: string): Promise<TrustedHeadlessResident> {
+async function resident(slug: string): Promise<NativeHeadlessResident> {
   const directory = builtFolder(slug);
   product = await loadHeadlessFolder(directory);
   const assets = runtimeAssets(product, directory);
-  const live = await createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  const live = await createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product });
   opened.push(live); return live;
 }
-const press = (live: TrustedHeadlessResident, id: string): void => {
+const press = (live: NativeHeadlessResident, id: string): void => {
   live.step(tickCommands([], 8), new Map(), new Map([[leadPlayer(live.host).id, [{ kind: 'interact', seq: 1, id }]]]));
 };
-const idle = (live: TrustedHeadlessResident, ticks: number): void => { for (let tick = 0; tick < ticks; tick++) live.step(tickCommands([], 8)); };
-const stand = (live: TrustedHeadlessResident, x: number, y: number, z: number): void => {
+const idle = (live: NativeHeadlessResident, ticks: number): void => { for (let tick = 0; tick < ticks; tick++) live.step(tickCommands([], 8)); };
+const stand = (live: NativeHeadlessResident, x: number, y: number, z: number): void => {
   const player = leadPlayer(live.host);
   player.position.set(x, y, z); player.motor.resetAt(player.position);
 };

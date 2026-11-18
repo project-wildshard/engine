@@ -15,7 +15,7 @@ import { RESPAWN_NOW_ACT } from '../src/shared/engine/net/acts';
 import { netInteractCommands } from '../src/shared/host/standalone/netInput';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
@@ -91,7 +91,7 @@ test('Pine: a bot falls on the real shard, comes back, and a save carries its pl
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  const live = await createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }), { host } = live;
+  const live = await createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product }), { host } = live;
   const first = [...host.players.values()][0]; if (first === undefined) throw new Error('No lead');
   const bot = host.addPlayer('bot:1', { x: 0, y: host.groundHeightAt(0, -212), z: -212 });
   for (let tick = 0; tick < 240; tick++) live.step([]);

@@ -248,7 +248,7 @@ export interface AudioSelection {
   controlFiles: (style: MusicStyle) => readonly string[];
 }
 /** The selection of a level's admitted audio rows under the engine's one music style and the player's sound-effect set
- *  (`set`, read on each call, as Settings is). `extraFiles` is a trusted sprite catalogue's own one-shot list; a declared bank catalogue supplies its
+ *  (`set`, read on each call, as Settings is). `extraFiles` is a native sprite catalogue's own one-shot list; a declared bank catalogue supplies its
  *  own. Throws when the rows declare no catalogue (createCatalogueAudio's refusal). */
 export function audioSelection(data: AudioData, set: () => SfxSet, extraFiles?: () => readonly string[]): AudioSelection {
   const music = data.music, samples = data.samples;

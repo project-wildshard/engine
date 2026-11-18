@@ -122,9 +122,9 @@ function releaseRawAfterUpload(texture: DataTexture): void {
  * keeps the one-family path. A family entry with `look.curves` (state-bound curves) compiles at its fields' values and
  * moves in `tick`, uniforms only, whenever a field it reads moved: the live state source `graphs.bind` hands over, else
  * the field's declared default.
- * `trustedGraphs` is supplied only by the admitted runtime host to authorize declared graph ceilings.
+ * `declaredGraphCeilings` is supplied only by the admitted runtime host to authorize declared graph ceilings.
  */
-export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<string, Uint8Array>, renderer: Renderer, scope: Scope, options: { graphs?: boolean; sources?: GraphSources; trustedGraphs?: boolean;
+export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<string, Uint8Array>, renderer: Renderer, scope: Scope, options: { graphs?: boolean; sources?: GraphSources; declaredGraphCeilings?: boolean;
   /** LS8 (J204): counted completions for the caller's loading step, given the unit total */ units?: (total: number) => (done: number, detail?: string) => void } = {}): Promise<{
   /** Live toon family shared by classic and graph materials; a day clock may update it in place. */
   readonly toon: ToonLook;
@@ -211,7 +211,7 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
     const bytes = assets.get(file.hash); return bytes === undefined ? [] : [[file.hash, bytes] as const];
   }));
   assets = graphFiles; // Escaping closures must not keep an outer-context slot containing the full input Map.
-  const graphs = clientGraphs(shard, { compiler, toon, trustedGraphs: options.trustedGraphs === true, fallback: (entry) => familyMaterial(entry, context), textures: (ref, role = 'colour') => resolveTexture(ref, role), file: (hash) => graphFiles.get(hash) });
+  const graphs = clientGraphs(shard, { compiler, toon, declaredGraphCeilings: options.declaredGraphCeilings === true, fallback: (entry) => familyMaterial(entry, context), textures: (ref, role = 'colour') => resolveTexture(ref, role), file: (hash) => graphFiles.get(hash) });
   if (options.sources !== undefined) graphs.bind(options.sources);
   const compile = (entry: unknown, meshMap?: Texture): Material => {
     if (!isGraphEntry(entry)) return ownMaterial(familyMaterial(entry, context));

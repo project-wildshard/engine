@@ -159,7 +159,7 @@ build`, `staging upload` (packs before signing, J234), wait for exact
 branch CI and the signed staging serial, then `staging check`,
 `staging go-live` and the strict staging proofs. `release.sh vX.Y.Z
 --finish` tags the exact green head; the tag signs production and
-starts trusted npm publishing. `--published` waits for npm's listing;
+starts npm OIDC publishing. `--published` waits for npm's listing;
 never rerun the publish job while npm processes it. Production build
 and upload may run once the build is green. Run `production check`,
 `verify-staging.sh` in both browsers, `staging-smoke.mjs`, `production go-live --after-staging-proofs --smoke=<verdict.json>`, then the static Doctor

@@ -43,7 +43,7 @@ const savedSchema = (minimum: number, maximum: number) => v.strictObject({ versi
   bodies: v.pipe(v.array(v.strictObject({ id: v.string(), kind: v.string(), seen: v.boolean(), memory: Memory })), v.maxLength(maximum)),
   herds: v.array(v.tuple([finite, finite])) });
 /** Data-driven native population keeper. Boot herd draws, identity replacement, dormant reserves and encounter homes
- * run in declared order on the existing creature stream. Every live recipe is checked against the trusted bake. The
+ * run in declared order on the existing creature stream. Every live recipe is checked against the native bake. The
  * v3 continuation retains the established body/memory order; reinstall does not retain any RNG draw. */
 export function installPopulationRoster(host: SimHost, ports: PopulationRosterPorts, input: unknown): {
   bodies: () => readonly PopulationBody[]; parked: () => readonly DormantPopulationActor[]; hunt: ReturnType<typeof createNativeHunt>['hunt'];

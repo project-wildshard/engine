@@ -9,7 +9,7 @@ import { ELITE_MOMENTS, shardRows } from '../../src/shared/engine/sim/shardRows'
 import type { SimHost } from '../../src/server/engine/sim';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../../src/server/host/headlessRuntime';
 import { builtFolder } from '../../src/test/game/builtFolder';
 
 // Qyran in a room: the page's wind law on a body the world raises, on the shipped product. His own save joins a world's, and an older one loads.
@@ -19,7 +19,7 @@ export async function nalati(snapshot?: string) {
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, { room: true });
+  return createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, { room: true });
 }
 export const row = (host: SimHost) => {
   const read = encounterRows(host).get('encounter:qyran');

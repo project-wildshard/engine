@@ -38,7 +38,7 @@ export const NO_AUDIO: LevelAudioProfile = {
   decode: () => Promise.resolve({ title: undefined, score: { slots: new Map(), stings: new Map() }, cues: { loops: new Map(), shots: new Map() } }),
 };
 
-/** Optional trusted decode hook for an existing sprite catalogue; no playback or scheduling. */
+/** Optional native decode hook for an existing sprite catalogue; no playback or scheduling. */
 export interface AudioCatalogueExtras {
   readonly files: () => readonly string[];
   readonly decode: (read: AudioRead, onFile?: () => void) => Promise<void>;

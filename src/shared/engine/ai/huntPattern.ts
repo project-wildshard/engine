@@ -18,7 +18,7 @@ import { reengage, backoffPoint, aroundPoint, RING_DEFAULT, BACKOFF_MAX_T, BREAK
  *
  * Renderer-free: it reads the world only through `HuntPorts` (ground, water, trees, navmesh, line of sight, the wander
  * goal) and speaks only through them (sounds, charge hits). The browser's AnimalManager wires the ports to the live
- * Heightfield / Forest / app and keeps blood, views and audio; a trusted Node host wires them to baked data. One shared
+ * Heightfield / Forest / app and keeps blood, views and audio; a Node host wires them to baked data. One shared
  * `Rng` (the manager's `Rng(SEED + 31)`) feeds placement, every spawn's rolls (`spawnRolls` then `adopt`) and every
  * decision, in exactly the order the browser always drew them.
  *

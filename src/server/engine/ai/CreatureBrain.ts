@@ -4,7 +4,7 @@ import { Hfsm } from '../../../shared/engine/ai/hfsm';
 import { inspectBrain } from '../../../shared/engine/ai/inspect';
 
 /** Authored creature goals share an inspectable HFSM; movement and strike clocks remain separate.
- * C accepts a trusted renderer-free context; existing subclasses keep ThinkCtx by default.
+ * C accepts a native renderer-free context; existing subclasses keep ThinkCtx by default.
  */
 export abstract class CreatureBrain<S extends string, A extends Animal = Animal, C = ThinkCtx> {
   private readonly machine: Hfsm<S>;

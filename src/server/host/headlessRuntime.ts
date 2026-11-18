@@ -1,4 +1,4 @@
-import {createTrustedHeadlessTape} from '../../shared/host/headlessTape';
+import {createNativeHeadlessTape} from '../../shared/host/headlessTape';
 import * as v from 'valibot';
 import { runHeadlessJourney } from '../../shared/host/headlessJourney';
 import { registerNativeQuestInputs } from '@wildshard/engine/game/quest/nativeInputs';
@@ -45,7 +45,7 @@ export interface HeadlessRuntimePreparation { shard: Shardfile; assets: Readonly
 /** Build workers carry verified native sections before any output exists.
  * Existing native callers may instead supply or explicitly load their built product. */
 export type HeadlessRuntimeInput = Omit<HeadlessRuntimePreparation, 'product'> & { readonly product?: ShardFolder; readonly sections?: ReadonlyMap<string, unknown>;
-  /** Q37: the installed release's immutable trusted catalogue, never the shard's own data. */
+  /** Q37: the installed release's immutable native catalogue, never the shard's own data. */
   readonly catalogue?: readonly LedgerCatalogueItem[] };
 /** Current tick inputs and buffered effects; only a completed tick publishes them to the parent. */
 /** What a page's save held, for a world's first boot: its quest flags and its declared fields, up before its fights install. */
@@ -131,7 +131,7 @@ export type PrepareHeadlessRuntime = (context: HeadlessRuntimePreparation) => He
 
 /**
  * One owned, renderer-free native world: the admitted data plan installed into one native host. The worker's
- * tick adapter (`createTrustedHeadlessAdapter`) and the grid's server-side admission (a `GridSimulation` `load` port,
+ * tick adapter (`createNativeHeadlessAdapter`) and the grid's server-side admission (a `GridSimulation` `load` port,
  * `test/proof/<slug>/grid-ready.mjs`) both compose exactly this, so an admitted region runs the same runtime, controllers
  * and continuation as the worker.
  * - `host` is owned and stepped by its owner (the worker's `step`, or `GridSimulation.step` while the region is current);
@@ -141,7 +141,7 @@ export type PrepareHeadlessRuntime = (context: HeadlessRuntimePreparation) => He
  * - `step(commands)` is the worker's fenced tick: lend, the last `player` command drives the host, and a nonfinite body
  *   refuses the tick.
  */
-export interface TrustedHeadlessResident {
+export interface NativeHeadlessResident {
   readonly host: SimHost;
   lend: (commands: readonly HeadlessCommand[]) => void;
   readonly effects: readonly HeadlessEffect[];
@@ -193,14 +193,14 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
       product = await loadHeadlessFolder(`out/${provided.shard.identity.slug}`);
     }
     const { slug: actualIdentity } = product, { slug: expectedIdentity } = provided.shard.identity;
-    if (actualIdentity !== expectedIdentity || product.revision !== provided.shard.identity.revision) throw new Error('Native product and trusted identity differ');
+    if (actualIdentity !== expectedIdentity || product.revision !== provided.shard.identity.revision) throw new Error('Native product and admitted identity differ');
     source = product.shardfile; decks = product;
     plan = await prepareFolderRuntimePlan(product, provided.assets, headlessAssemblyPorts(provided.rapier, room));
     if (product.has('economy/loot')) plan = { ...plan, economy: product.section('economy/loot') };
     places = await serverPlaces(product);
   }
   const identity = { id: source.identity.slug, seed: source.identity.seed };
-  if (plan.level.id !== identity.id || plan.level.seed !== identity.seed) throw new Error('Trusted runtime simulation identity mismatch');
+  if (plan.level.id !== identity.id || plan.level.seed !== identity.seed) throw new Error('Native runtime simulation identity mismatch');
   return { ...plan, install: (host, context) => {
     installRoomRespawn(host, places);
     if (places.length > 0) registerInstalled(host, 'places'); // SS3: a room respawns its players at the page's named places
@@ -237,7 +237,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
 }
 /** Install the selected plan into one fresh or strictly restored native host.
  * A failed install disposes its world; installation may emit no gameplay effects. */
-export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly grid?: boolean; readonly near?: NearColliders; readonly page?: PageProgress; readonly install?: (host: SimHost, fact: (name: string, entity: string) => void) => void }): Promise<TrustedHeadlessResident> {
+export async function createNativeHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly grid?: boolean; readonly near?: NearColliders; readonly page?: PageProgress; readonly install?: (host: SimHost, fact: (name: string, entity: string) => void) => void }): Promise<NativeHeadlessResident> {
   // The roster rolls its herds while this installs, so a room opened afterwards is too late: a save from a native-Math boot
   // would hold recipes its restore on the portable table can't reproduce.
   installPortableMath();
@@ -258,12 +258,12 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
     else host = restoreSimHost(plan.level, ports, saved, fresh => {
       installing = fresh; if (ports.heightAt !== undefined) fresh.setHeightQuery(ports.heightAt); install(fresh);
     });
-    if (effects.length > 0) throw new Error('Trusted runtime emitted gameplay effects during installation');
+    if (effects.length > 0) throw new Error('Native runtime emitted gameplay effects during installation');
     if (saved !== undefined && world?.near !== undefined) { host.physics.near = world.near; world.near.attach(host.physics); }
   } catch (error) { installing?.dispose(); throw error; }
   if (plan.economy !== undefined) installRoomLoot(host, plan.economy, context);
   const lead = host.players.get('actor.player');
-  if (lead === undefined) throw new RangeError('Unknown trusted runtime owner');
+  if (lead === undefined) throw new RangeError('Unknown native runtime owner');
   // ENG-18: a room catches its seats' falls itself (cellWorld's FallFloor); a resident alone catches its own, or nobody does.
   const caught = world?.room === true ? null : residentFallNet(host, shardPlayArea(preparation.shard.manifest?.bounds, preparation.product), host.level.player.at);
   if (caught !== null && preparation.product !== undefined) registerInstalled(host, 'fallFloor'); // SS3: the page's play area, read off its rows
@@ -296,22 +296,22 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
       host.step(tick);
       caught?.();
       // MMO-PLAN MP1.2: the same check every tick, without building arrays for it.
-      for (const body of host.players.values()) if (!finitePoint(body.position)) throw new Error('Nonfinite trusted simulation state');
-      for (const body of host.entities.values()) if (!finitePoint(body.position)) throw new Error('Nonfinite trusted simulation state');
+      for (const body of host.players.values()) if (!finitePoint(body.position)) throw new Error('Nonfinite native simulation state');
+      for (const body of host.entities.values()) if (!finitePoint(body.position)) throw new Error('Nonfinite native simulation state');
     },
     proveEntries: () => {
-      if (plan.proveEntries === undefined) throw new Error('Trusted runtime has no entry proof');
+      if (plan.proveEntries === undefined) throw new Error('Native runtime has no entry proof');
       return plan.proveEntries(host);
     },
     dispose: () => { host.dispose(); },
   };
 }
-/** Worker-side composition only: owns one trusted resident (its real SimHost, native continuation and scoped installers).
+/** Worker-side composition only: owns one native resident (its real SimHost, native continuation and scoped installers).
  * @deprecated SERVER-PARITY HS1: the bare resident is a world no player runs. Tick `openWorldAdapter`
  * (`@wildshard/engine/host/openWorld`), the room's own world; this stays only until every shard's CI has moved. */
-export async function createTrustedHeadlessAdapter(preparation: HeadlessRuntimeInput, snapshot?: string): Promise<TickWorkerAdapter> {
-  const resident = await createTrustedHeadlessResident(preparation, snapshot), { host } = resident;
-  const tape=createTrustedHeadlessTape(host,input=>resident.step(input),()=>resident.effects);
+export async function createNativeHeadlessAdapter(preparation: HeadlessRuntimeInput, snapshot?: string): Promise<TickWorkerAdapter> {
+  const resident = await createNativeHeadlessResident(preparation, snapshot), { host } = resident;
+  const tape=createNativeHeadlessTape(host,input=>resident.step(input),()=>resident.effects);
   const serializer=createSimSnapshotSerializer();
   return {
     step: input => { resident.step(input); },

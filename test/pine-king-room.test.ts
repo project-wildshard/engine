@@ -8,16 +8,16 @@ import { nativeGroundBossObservation, takeNativeBossReward } from '../src/server
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
-async function pine(): Promise<TrustedHeadlessResident> {
+async function pine(): Promise<NativeHeadlessResident> {
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room: true });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room: true });
 }
 
 const KING = 'pine.king', CLEARING = { x: 150, z: -30 };

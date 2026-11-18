@@ -10,7 +10,7 @@ import { ForagerPopulation } from '@wildshard/engine/ai/ambientForager';
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { CrowdWeaponTargetSchema, parseFlock, type ShardFlock } from '@wildshard/format/crowds';
 
-/** Trusted perception sampled in the owning clock; threat identities remain native references. */
+/** Host-owned perception sampled in the owning clock; threat identities remain native references. */
 export interface CrowdObservation {
   player: Vector3; playerSpeed: number; wolves: readonly FlockThreat[]; dog: FlockThreat | null;
 }

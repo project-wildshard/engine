@@ -36,7 +36,7 @@ import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
 import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
 import { installCellLoot } from '@wildshard/engine/game/loot/personal';
-import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../headlessRuntime';
+import { createNativeHeadlessResident, type HeadlessRuntimeInput, type NativeHeadlessResident } from '../headlessRuntime';
 import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
 import { folderHeadlessSections } from '@wildshard/engine/host/headlessSections';
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
@@ -61,8 +61,8 @@ export interface CellWorld extends GridResident {
   readonly fallFloor: () => FallFloor;
   /** The first seat's. */
   readonly fall: FallFloor;
-  /** HS1: a native world's trusted resident, which a tick adapter steps with the lead's own commands. A data cell has none. */
-  readonly resident?: TrustedHeadlessResident;
+  /** HS1: a native world's native resident, which a tick adapter steps with the lead's own commands. A data cell has none. */
+  readonly resident?: NativeHeadlessResident;
 }
 /** What a host lends a cell it opens. */
 export interface CellWorldOptions {
@@ -160,7 +160,7 @@ export async function dataCellPlaces(input: Pick<HeadlessRuntimeInput, 'shard' |
   return (input.shard.manifest?.pois ?? []).filter(poi => poi.respawn !== false).map(poi => ({ id: poi.id, label: poi.name, x: poi.x, z: poi.z, r: poi.r ?? PLACE_RADIUS }));
 }
 
-/** Whether this output runs on the trusted headless owner. */
+/** Whether this output runs on the host-owned headless owner. */
 export const nativeCell = (input: HeadlessRuntimeInput): boolean => input.product !== undefined && (hasNativeAssembly(input.product) || input.product.has('sim/runtime-plan'));
 
 /** Open `cell`'s world from `input`, at `snapshot` if there is one. */
@@ -173,13 +173,13 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     // J68: a native assembly keeps its ground whole and its solids as data. A saved world holds none of them, so a throwaway fresh one lists them.
     const near = options.wholeSolids !== true && input.product !== undefined && hasNativeAssembly(input.product) ? new NearColliders() : undefined;
     const around = { room: true, grid: true, ...(near === undefined ? {} : { near }) };
-    if (near !== undefined && snapshot !== undefined) (await bootTask('server:restore-collision-inventory', () => createTrustedHeadlessResident(input, undefined, around))).dispose();
+    if (near !== undefined && snapshot !== undefined) (await bootTask('server:restore-collision-inventory', () => createNativeHeadlessResident(input, undefined, around))).dispose();
     // A world with no save of its own takes the page's: the flags and records its fights read as they install.
     const seeded = snapshot === undefined && options.pageless !== true;
     const page = seeded ? { flags: [...new Set([...new Set([input.shard.identity.slug, cell.instance])].flatMap(level => pageSavedFlags(level)).concat(refused?.flags ?? []))], state: pageRuntimeState(options.saves, cell.instance) } : undefined;
     const chapters = await prepareServerChapters(input.product, input.shard);
     const installed = chapters === undefined ? around : { ...around, install: (host: SimHost, record: (name: string, entity: string) => void): void => { chapters(host, record); } };
-    const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createTrustedHeadlessResident(input, snapshot, page === undefined ? installed : { ...installed, page })), { host } = resident;
+    const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createNativeHeadlessResident(input, snapshot, page === undefined ? installed : { ...installed, page })), { host } = resident;
     if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
     bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined, snapshot !== undefined);
     host.respawn.served = true; actRoutes(host).introLocks = true;

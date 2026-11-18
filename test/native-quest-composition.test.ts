@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { expect,test } from 'vitest';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { creditNativeInventory,debitNativeInventory } from '../src/shared/game/inventoryLaw';
@@ -12,13 +12,13 @@ test('a published quest restores its earned pack and physical props without gran
   const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory);
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier };
-  const first = await createTrustedHeadlessResident(input);
-  let next: Awaited<ReturnType<typeof createTrustedHeadlessResident>> | undefined;
+  const first = await createNativeHeadlessResident(input);
+  let next: Awaited<ReturnType<typeof createNativeHeadlessResident>> | undefined;
   try {
     expect(creditNativeInventory(first.host, 'pack', { item: 'doubloon', count: 4 })).toBe(true);
     first.step([]);
     const bodies = first.host.physics.world.bodies.len(), ids = [...first.host.entities.keys()];
-    next = await createTrustedHeadlessResident(input, snapshotSimHost(first.host));
+    next = await createNativeHeadlessResident(input, snapshotSimHost(first.host));
     expect(next.effects).toEqual([]);
     expect(next.host.physics.world.bodies.len()).toBe(bodies);
     expect([...next.host.entities.keys()]).toEqual(ids);

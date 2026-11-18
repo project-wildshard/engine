@@ -28,11 +28,11 @@ test('a candidate with no runtime keeps the inline path and reads nothing', asyn
 test('a page that does not own its inline candidate still refuses any runtime before a read', async () => {
   const read = vi.fn();
   await expect(inlineHybridArrival(candidate(declared), { base: BASE, firstParty: false }, read, discover))
-    .rejects.toThrow('Custom runtime requires trusted hybrid composition');
+    .rejects.toThrow('Custom runtime requires native hybrid composition');
   expect(read).not.toHaveBeenCalled();
 });
 
-test('the owner enters a trusted candidate by its own same-origin client-plan discovery, as the catalogue does', async () => {
+test('the owner enters a native candidate by its own same-origin client-plan discovery, as the catalogue does', async () => {
   const read = vi.fn((_url: string) => Promise.resolve(discovery(PLAN_ENTRY, GRID)));
   const manifest = await inlineHybridArrival(candidate(declared), OWNER, read, discover);
   expect(read).toHaveBeenCalledWith('http://127.0.0.1:4173/shardfiles/nine-dragon-stack/discovery.json');

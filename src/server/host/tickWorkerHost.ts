@@ -22,7 +22,7 @@ export class HeadlessDeadlineError extends Error {
   readonly elapsedMicros: number;
   constructor(checkpoint: HeadlessTickCommit | undefined, elapsedMicros: number) { super(`Headless tick deadline exceeded at ${elapsedMicros.toFixed(0)} us; worker quarantined`); this.name = 'HeadlessDeadlineError'; this.checkpoint = checkpoint === undefined ? undefined : structuredClone(checkpoint); this.elapsedMicros = elapsedMicros; }
 }
-/** Internal parent-side runner; its module URL is selected only by trusted platform code. */
+/** Internal parent-side runner; its module URL is selected only by platform code. */
 export class TickWorkerHost {
   private readonly worker: Worker;
   private readonly clock = new BigInt64Array(new SharedArrayBuffer(24));
@@ -39,7 +39,7 @@ export class TickWorkerHost {
   private readonly ready: Promise<Reply>;
   private readonly budget: { tickMicros: number; commandsPerTick: number };
   private readonly deadline: 'runtime' | 'advisory';
-  /** preparePayload overlaps trusted module imports with parent admission. The
+  /** preparePayload overlaps native module imports with parent admission. The
    * worker receives no payload until it succeeds; the original request clock
    * starts before both operations and is never reset by payload delivery. */
   constructor(url: URL, payload: unknown, budget: { tickMicros: number; commandsPerTick: number }, execArgv: string[] = [], deadline: 'runtime' | 'advisory' = 'runtime', preparePayload?: () => Promise<unknown>) {
@@ -104,7 +104,7 @@ export class TickWorkerHost {
   }
   /** Fixed terminal offline observation; only initial/final continuations escape. */
   async observe(): Promise<HeadlessObservationReport> {
-    if (this.deadline !== 'advisory') throw new Error('Observation requires trusted offline timing');
+    if (this.deadline !== 'advisory') throw new Error('Observation requires advisory offline timing');
     if (this.finished) throw new Error('Headless validation already finished');
     await this.initialized(); if (this.closed || this.pending !== undefined || this.streamStarted!==0n||this.parts!==undefined) throw new Error('Headless worker unavailable or busy');
     this.finished = true; const result = this.wait();
@@ -116,7 +116,7 @@ export class TickWorkerHost {
   /** Terminal offline route; retains the original request watchdog and entry checkpoint. */
   async journey(input:HeadlessJourneyPlan):Promise<HeadlessJourneyReport> {
     const plan=v.parse(HeadlessJourneyPlanSchema,input);
-    if(this.deadline!=='advisory')throw new Error('Journey requires trusted offline timing');
+    if(this.deadline!=='advisory')throw new Error('Journey requires advisory offline timing');
     if(this.budget.commandsPerTick<1)throw new Error('Journey needs one player command per tick');
     if(this.finished)throw new Error('Headless validation already finished');
     await this.initialized();if(this.closed||this.pending!==undefined||this.streamStarted!==0n||this.parts!==undefined)throw new Error('Headless worker unavailable or busy');
@@ -128,7 +128,7 @@ export class TickWorkerHost {
   /** One bounded native physics leg, with a full checked continuation for the next leg. */
   async walkLeg(input:HeadlessJourneyPlan):Promise<HeadlessJourneyReport> {
     const plan=v.parse(HeadlessJourneyPlanSchema,input);
-    if(this.deadline!=='advisory')throw new Error('Walk requires trusted offline timing');
+    if(this.deadline!=='advisory')throw new Error('Walk requires advisory offline timing');
     if(this.budget.commandsPerTick<1)throw new Error('Walk needs one player command per tick');
     if(this.finished)throw new Error('Headless validation already finished');
     await this.initialized();if(this.closed||this.pending!==undefined||this.streamStarted!==0n||this.parts!==undefined)throw new Error('Headless worker unavailable or busy');
@@ -140,7 +140,7 @@ export class TickWorkerHost {
   /** Terminal native command tape; its observations never replace the last committed checkpoint. */
   async verbTape(input:HeadlessTapePlan):Promise<HeadlessTapeReport>{
     const plan=v.parse(HeadlessTapePlanSchema,input);
-    if(this.deadline!=='advisory')throw new Error('Verb tape requires trusted offline timing');
+    if(this.deadline!=='advisory')throw new Error('Verb tape requires advisory offline timing');
     for(const segment of plan.segments){
       for(const commands of segment.frames??[segment.commands]){
         tickCommands([{source:'verb-tape',commands}],this.budget.commandsPerTick);
@@ -158,7 +158,7 @@ export class TickWorkerHost {
    * The first part pins this worker to the tape until finish or disposal. */
   async verbTapePart(input:HeadlessTapePlan):Promise<HeadlessTapePartReport>{
     const plan=v.parse(HeadlessTapePlanSchema,input);
-    if(this.deadline!=='advisory')throw new Error('Verb tape requires trusted offline timing');
+    if(this.deadline!=='advisory')throw new Error('Verb tape requires advisory offline timing');
     for(const segment of plan.segments)for(const commands of segment.frames??[segment.commands]){
       tickCommands([{source:'verb-tape',commands}],this.budget.commandsPerTick);
       if(commands.length+(segment.route===undefined?0:1)>this.budget.commandsPerTick)throw new Error('Aggregate commandsPerTick exceeded');
@@ -178,7 +178,7 @@ export class TickWorkerHost {
   /** Terminal bounded tape produced incrementally. Prefetch only the next
    * recorded segment while the same fresh worker executes its predecessor. */
   async streamVerbTape(observe:readonly string[],source:AsyncIterable<HeadlessTapeSegment>):Promise<HeadlessTapeReport>{
-    if(this.deadline!=='advisory')throw new Error('Verb tape requires trusted offline timing');
+    if(this.deadline!=='advisory')throw new Error('Verb tape requires advisory offline timing');
     if(this.finished)throw new Error('Headless validation already finished');
     await this.initialized();if(this.closed||this.pending!==undefined||this.streamStarted!==0n||this.parts!==undefined)throw new Error('Headless worker unavailable or busy');
     const iterator=source[Symbol.asyncIterator]();

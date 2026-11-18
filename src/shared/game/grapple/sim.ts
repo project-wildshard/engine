@@ -44,7 +44,7 @@ export interface GrappleView {
 export interface GrappleTarget { hook: Vector3; landing: Vector3; approach: Vector3; lifts: boolean }
 /** Native traversal phase name. */
 export type GrapplePhase = 'idle' | 'fire' | 'bite' | 'lift' | 'zip' | 'vault' | 'settle' | 'miss' | 'reel' | 'dock';
-/** Native observations are drained by trusted presentation or tick owners. */
+/** Native observations are drained by native presentation or tick owners. */
 export type GrappleEvent = { readonly kind: 'fire' | 'miss' | 'bite' | 'zip' | 'reel' | 'dock' } | { readonly kind: 'release'; readonly active: boolean };
 
 /** Native clearance tests operate on the declared obstacle, never a shard callback. */

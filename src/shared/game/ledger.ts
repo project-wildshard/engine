@@ -53,7 +53,7 @@ export function carryRetiredLedger(state: LedgerState, retired: readonly (readon
 
 /** A placement identity remains stable when its cell changes; several instances may use one package. */
 export interface LedgerInstance { id: string; shard: string; cell?: readonly [number, number] }
-/** Only the trusted platform defines reward identity, quantity and an optional durable repeat allowance. */
+/** Only the platform defines reward identity, quantity and an optional durable repeat allowance. */
 export interface LedgerRewardPolicy { id: string; quantity: number; repeat?: { everyTicks: number; maxGrants: number } }
 /** Catalogue grants default to one item, once per stable instance and shard, independent of author facts or revisions. */
 export interface LedgerCatalogueItem { id: string; maxTier: number; reward?: LedgerRewardPolicy }

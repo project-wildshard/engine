@@ -20,7 +20,7 @@ export function simDecisionRow<T extends { id: string; side: 'sim' | 'view' }>(r
 }
 /** Stable, numeric binding identity and its actor ownership. Instance seeds a fresh encounter stream. */
 export interface DecisionBinding { id: number; script: string; self: number; actors: readonly number[]; instance: number }
-/** Every query and transaction knows the trusted binding, not caller-supplied actor ownership. */
+/** Every query and transaction knows the host-owned binding, not caller-supplied actor ownership. */
 export interface DecisionContext { tick: number; binding: DecisionBinding; script: DecisionScript; observed: ReadonlySet<number> }
 /** Validation is read-only; commit cannot fail and is invoked only after the complete call validates. */
 export interface DecisionCommit { commit: () => void }
@@ -29,7 +29,7 @@ export interface DecisionCommit { commit: () => void }
 export type DecisionExternalCommand = readonly [number,number,number,number,number,number];
 /** Engine adapters only. Shard-authored callbacks never cross this boundary. */
 export interface DecisionWorld {
-  /** Trusted observed player for bindings granted requested movement; never an owned actor. */
+  /** Host-owned observed player for bindings granted requested movement; never an owned actor. */
   readonly player?: number;
   read: (op: number, a: number, b: number, context: DecisionContext) => number;
   list: (op: number, a: number, b: number, output: Float64Array, context: DecisionContext) => number;

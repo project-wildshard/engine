@@ -2,7 +2,7 @@ import { Bow as PlatformBow, type BowOptions as PlatformBowOptions, type BowWorl
 import type { Targets } from '@wildshard/engine/combat/types';
 import type { BowStyle } from '../../../shared/game/weapons/starterBowProfile';
 
-/** Starter host ports for the trusted platform bow family. */
+/** Starter host ports for the platform bow family. */
 export type BowWorld = PlatformBowWorld;
 /** Starter callers retain their row/profile options; the bridge supplies current input and style defaults. */
 export type BowOptions = Omit<PlatformBowOptions<BowStyle>, 'inputContext' | 'initialStyle'>;

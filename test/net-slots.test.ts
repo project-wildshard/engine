@@ -13,15 +13,15 @@ import { slotAwakeRows } from '../src/shared/game/boss/slotLaw';
 import { prepareServerChapters } from '../src/server/game/quest/serverChapters';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
-async function nalati(snapshot?: Parameters<typeof createTrustedHeadlessResident>[1]) {
+async function nalati(snapshot?: Parameters<typeof createNativeHeadlessResident>[1]) {
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const chapters = await prepareServerChapters(product, product.shardfile);
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, { room: true, ...(chapters === undefined ? {} : { install: (host, fact) => { chapters(host, fact); } }) });
+  const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, { room: true, ...(chapters === undefined ? {} : { install: (host, fact) => { chapters(host, fact); } }) });
   return live;
 }
 const awakeRows = (host: Parameters<typeof shardRows>[0]): number => (shardRows(host).world.get('slots')?.() ?? []).reduce((sum, row) => sum + row.value, 0);

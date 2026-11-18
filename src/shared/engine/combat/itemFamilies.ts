@@ -8,11 +8,11 @@ import type { Tool } from './Tool';
 
 /** Renderer-neutral parameters selecting a registered kit view recipe. */
 export interface ItemViewRecipe { asset?: string; recipe: string; colour: string; position: readonly [number, number, number]; rotation: readonly [number, number, number] }
-/** A trusted session binds standard input and one authoritative runtime to each kit family. */
+/** A native session binds standard input and one authoritative runtime to each kit family. */
 export interface ItemFamilyPorts { scope: Scope; runtime: ItemRuntime; input: Pick<InputService, 'bind' | 'held'>; aim: () => AimCommand; view: ItemViewRecipe;
   /** Validated numeric author data, supplied only to a family that explicitly admits its profile kind. */
   profile?: unknown;
-  /** Admitted contact data and action selection supplied by the trusted loader. */
+  /** Admitted contact data and action selection supplied by the native loader. */
   contacts?: unknown;
   /** Omit code for a direct secondary contact; a code requires its actor-bound script hook. */
   secondary?: { readonly action: string; readonly code?: 3 | 4; readonly move: number };
@@ -20,7 +20,7 @@ export interface ItemFamilyPorts { scope: Scope; runtime: ItemRuntime; input: Pi
   /** An admitted static equipment model; the asset lease owns its shared geometry and materials. */
   model?: unknown;
 }
-/** Trusted family presentation; declared identity, slot, input context, name, icon and swap glyph remain authoritative. */
+/** Native family presentation; declared identity, slot, input context, name, icon and swap glyph remain authoritative. */
 export type ItemFamilyPresentation = Pick<EquipmentRow, 'cues' | 'hitStop' | 'rangedFeel'> & {
   ui?: Partial<Omit<WeaponUi, 'name' | 'icon' | 'inputContext' | 'swapIcon'>>;
 };

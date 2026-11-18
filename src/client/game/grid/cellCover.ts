@@ -4,7 +4,7 @@
  *
  * Every neighbour cell has a coarse root in the page scene (the session's `grid-cell:<instance>` group): its far proxy
  * and the shardfile's L1 / L0 ring tiles, its neighbour life and copy marks. That is what a cell shows from outside. An
- * admitted trusted runtime (a regional view) draws the cell's own native terrain, forest, buildings and creatures under a
+ * admitted native runtime (a regional view) draws the cell's own native terrain, forest, buildings and creatures under a
  * separate root, visible only while the runtime is entered. Both at once is wrong: the far proxy is a decimated shell of
  * the same ground, and from inside it encloses the camera (Pine's canyon read as a smooth tan groove over its real
  * forest). So while any entry of a regional view lives, the cell's coarse root is hidden, and it comes back when the last

@@ -209,7 +209,7 @@ export class ShaderFamily<P extends string = string> {
 }
 
 /**
- * A trusted look's successor to its shader family: its own `look.materials` graphs (`ids`) compiled under `scope` before the
+ * A native look's successor to its shader family: its own `look.materials` graphs (`ids`) compiled under `scope` before the
  * world stage, for a look built first (a sky backdrop), through the runtime look catalogue (`runtimeLookMaterials`; its
  * compiler and catalogue load lazily here). They compile on the page renderer the engine hands the backdrop
  * (`SkyBackdropContext.renderer`), read here and never by the shard, which passes its whole context. `setParam` writes a

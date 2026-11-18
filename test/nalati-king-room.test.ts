@@ -7,7 +7,7 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { arenaEntryOf } from '../src/server/game/boss/arenaRoomEntry';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // The Golden King from Nalati's product, for a room. A tape's resident has no such fight, so its saves keep their adapters.
@@ -15,11 +15,11 @@ const KING_ORIGIN = { x: -40, y: 140, z: -95 }, ROOM_REWARD = [-40, 0, -103.3];
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
-async function nalati(room: boolean): Promise<TrustedHeadlessResident> {
+async function nalati(room: boolean): Promise<NativeHeadlessResident> {
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room });
 }
 
 test('a tape\'s world has no room fight', async () => {

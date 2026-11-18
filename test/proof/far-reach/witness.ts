@@ -23,10 +23,10 @@ import { ROC_STEP, ROC_ID } from '../../../src/shards/far-reach/generators/rows/
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /**
- * Sky Reach's whole-shard witness (E435 §C / SF72) on its trusted renderer-free entry, `runtime/headless.ts`, composed
- * exactly as the platform's trusted adapter composes it (`createTrustedHeadlessAdapter`: the plan's level and ports, one
+ * Sky Reach's whole-shard witness (E435 §C / SF72) on its native renderer-free entry, `runtime/headless.ts`, composed
+ * exactly as the platform's native adapter composes it (`createNativeHeadlessAdapter`: the plan's level and ports, one
  * install, the tick's commands lent to the runtime, its effects buffered per tick), and cross-checked against the shipping
- * worker (`HeadlessSimulation` + the same real `trustedRuntime` under portable math) from the gale-wall checkpoint. The player's tape is tick commands only
+ * worker (`HeadlessSimulation` + the same real `nativeRuntime` under portable math) from the gale-wall checkpoint. The player's tape is tick commands only
  * (`player` moves, fan swings and HOVER presses; `script` prompts, GUSTs and the fan's aim), chosen each tick from what a
  * player sees: from the spawn on Sunrest to the keeper, over the grove rope bridge, on the board over the hover bridges to
  * the keeper's isle and the roost, on foot to the ruin, each vane GUSTed, the roost's rays felled by the fan, on the board
@@ -76,7 +76,7 @@ function restore(plan: HeadlessRuntimePlan, rapier: Rapier, saved: string): Sess
   if (session.tick.length > 0) throw new Error('Restore emitted gameplay effects');
   return Object.assign(session, { host });
 }
-/** One tick as the trusted adapter runs it (its last `player` command steps the host); only a completed tick commits its effects. */
+/** One tick as the native adapter runs it (its last `player` command steps the host); only a completed tick commits its effects. */
 function step(session: Session, commands: readonly HeadlessCommand[]): HeadlessEffect[] {
   session.tape = commands; session.tick = [];
   try {
@@ -85,7 +85,7 @@ function step(session: Session, commands: readonly HeadlessCommand[]): HeadlessE
     session.host.step(leadCommands(session.host, player?.kind === 'player' ? { moveX: player.moveX, moveZ: player.moveZ, yaw: player.yaw,
       ...(player.attack === undefined ? {} : { attack: player.attack }), ...(player.hover === undefined ? {} : { hover: player.hover }) } : undefined));
   } finally { session.tape = []; }
-  if (![leadPlayer(session.host).position, ...[...session.host.entities.values()].map(entity => entity.position)].every(point => [point.x, point.y, point.z].every(Number.isFinite))) throw new Error('Nonfinite trusted simulation state');
+  if (![leadPlayer(session.host).position, ...[...session.host.entities.values()].map(entity => entity.position)].every(point => [point.x, point.y, point.z].every(Number.isFinite))) throw new Error('Nonfinite native simulation state');
   session.effects.push(...session.tick); return session.tick;
 }
 

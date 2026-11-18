@@ -20,7 +20,7 @@ type Physics = NonNullable<Parameters<typeof pickInteractable>[2]>;
  * home's prompts at their local coordinates in another frame.
  */
 export interface EnteredRuntimeState {
-  /** the hybrid session's active runtime and whether its trusted hooks completed */
+  /** the hybrid session's active runtime and whether its native hooks completed */
   readonly hybrid: Readonly<{ instance: string | null; ready: boolean }>;
   /** the live frame the traveller stands in (null: the road) */
   readonly current: string | null;

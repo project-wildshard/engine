@@ -7,7 +7,7 @@ const BOW_STYLES = ['recurve', 'golden', 'sky-wolf'] as const;
 export type BowStyle = typeof BOW_STYLES[number];
 /** Whether a declared row names one of those repaint styles. */
 export function isBowStyle(value: string): value is BowStyle { return BOW_STYLES.some(entry => entry === value); }
-/** The starter bow profile accepts those same trusted view strategies. */
+/** The starter bow profile accepts those same native view strategies. */
 export type BowProfile = PlatformBowProfile<BowStyle>;
 
 /** The default bow's numbers. SF54: its view (the recurve's poses, arrow line, build and arrow) moved with the recurve into

@@ -6,7 +6,7 @@ import * as v from 'valibot';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { HeadlessSimulation } from '../src/server/host/headless';
 import { openWorldAdapter, type WorldAdapter } from '../src/server/host/openWorld';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
@@ -27,21 +27,21 @@ async function shipped() {
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  return { directory, product, shard, assets, descriptor, rapier, resident: (snapshot?: string) => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
+  return { directory, product, shard, assets, descriptor, rapier, resident: (snapshot?: string) => createNativeHeadlessResident({ shard, assets, rapier, product }, snapshot) };
 }
-const kill = (resident: TrustedHeadlessResident, id: string): void => {
+const kill = (resident: NativeHeadlessResident, id: string): void => {
   const actor = resident.host.entities.get(id);
   if (actor === undefined || !actor.alive) throw new Error(`No live creature ${id}`);
   const dealt = resident.host.combat.hit({ source: 'env', sourceTags: ['dmg.legacy', 'cover.checked'], target: actor.combatActor(),
     amount: actor.maxHp * 10, point: actor.position.clone(), dir: new Vector3(0, 0, 1) });
   if (dealt?.killed !== true) throw new Error(`Creature ${id} did not fall`);
 };
-const steps = (resident: TrustedHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
+const steps = (resident: NativeHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
 
 test('Driftwood spawns, moves, kills and returns its mixed population headless, and its census round-trips a snapshot', async () => {
   const { product, resident } = await shipped(), keeper = v.parse(Keeper, await product.json('server/keeper.json'));
   const live = await resident();
-  let restored: TrustedHeadlessResident | undefined;
+  let restored: NativeHeadlessResident | undefined;
   try {
     // spawning: every keeper row stands in the world, with the kinds and variants the product declares
     const born = populationCensus(live.host), rows = [...keeper.bodies].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);

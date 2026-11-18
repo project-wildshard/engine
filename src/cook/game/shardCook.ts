@@ -180,7 +180,7 @@ export interface CookTiers {readonly phone?: boolean; readonly encode?: Astc6Enc
 
 /** S12d: the phone tier is on by default, 6×6 by basisu's WebAssembly build: no child process, nothing to install, so
  *  the box's cook job and CI's bake cook what `cook --phone-astc6` did. `cacheDir` keeps encodes between cooks; a cook
- *  job passes none (its files can't be trusted by the next job). */
+ *  job passes none (its files can't be relied on by the next job). */
 export async function defaultCookTiers(cacheDir?: string): Promise<CookTiers> {
   const lanes = process.env['COOK_CPU_SLOTS'] === undefined ? undefined : Math.max(1, Number(process.env['COOK_CPU_SLOTS']) - 1);
   const astc6 = await wasmAstc6({...(cacheDir === undefined ? {} : {cacheDir}), ...(lanes === undefined || !Number.isSafeInteger(lanes) ? {} : {lanes})});

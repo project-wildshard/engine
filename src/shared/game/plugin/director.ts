@@ -51,7 +51,7 @@ export class DirectorLane {
     if (!Number.isSafeInteger(seed)) throw new Error('Invalid director seed');
     this.host = new ScriptHost({ world: new DirectorWorld(this.data), query: (kind, request, self) => {
       if (kind !== SCRIPT_PARAMETER_QUERY) return query(kind, request, self);
-      if (self !== this.data.entity || request.length !== 8 || request.some((value) => value !== 0)) throw new Error('Director parameters require trusted self');
+      if (self !== this.data.entity || request.length !== 8 || request.some((value) => value !== 0)) throw new Error('Director parameters require a bound self');
       return [...this.data.parameters];
     } });
     this.host.install(this.data.module, bytes, seed | 0, Math.floor(seed / 4294967296) | 0);
@@ -73,7 +73,7 @@ export class DirectorLane {
     this.currentTick = tick;
     return this.call(input, dt);
   }
-  /** Deliver an immediate trusted request at zero elapsed time, sharing this tick's remaining allowances. */
+  /** Deliver an immediate host-owned request at zero elapsed time, sharing this tick's remaining allowances. */
   dispatch(observation: Readonly<Record<string, number>>): readonly DirectorEvent[] {
     if (this.currentTick < 0) throw new Error('Director is not initialized');
     return this.call(this.observation(observation, 0), 0);

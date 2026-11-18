@@ -89,7 +89,7 @@ export const GATES: readonly Gate[] = [
     harm: 'Opened, any shard could compile unbounded GPU shader graphs (nodes, samplers, passes) on every player\'s device.',
     budget: 'OF10c: the shard\'s tier GPU limits (graph nodes, textures, passes).',
     snippets: [{ file: DANGEROUS_GATES, text: 'export function dangerousUnbudgetedMaterialGraph(' },
-      { file: 'src/client/game/grid/session.ts', text: 'trustedGraphs: dangerousUnbudgetedMaterialGraph(source)' }],
+      { file: 'src/client/game/grid/session.ts', text: 'declaredGraphCeilings: dangerousUnbudgetedMaterialGraph(source)' }],
   },
 ];
 

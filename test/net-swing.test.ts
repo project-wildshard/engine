@@ -16,7 +16,7 @@ import { readNativeRangedItem } from '../src/server/game/plugin/nativeItems';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { STARTER_MELEE_PROFILE } from '../src/shared/game/weapons/starterCombat';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -24,14 +24,14 @@ import { builtFolder } from '../src/test/game/builtFolder';
 // P1-E5.3-E1, E4 (J47): what the client predicts of an attack against what the server ran, in a real room on a real shard.
 const DT = 1 / 60;
 
-async function shard(slug: string): Promise<TrustedHeadlessResident> {
+async function shard(slug: string): Promise<NativeHeadlessResident> {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product });
 }
-const hold = (live: TrustedHeadlessResident): void => { for (const actor of live.host.entities.values()) actor.harnessHold = true; };
+const hold = (live: NativeHeadlessResident): void => { for (const actor of live.host.entities.values()) actor.harnessHold = true; };
 const FREE = { aim: { origin: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: -1 } } };
 
 /** A three-swing chain, played by the server and by a client's own clock from one command stream. */

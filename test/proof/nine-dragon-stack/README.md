@@ -2,7 +2,7 @@
 
 The committed fragment has one Neon Jian and one Fei Zhua. Its quests, fauna, encounters and mutable shard state are empty (its two ledger feats came later, G285, below); this conversion does not create new gameplay or migrations for absent state.
 
-`shard.config.ts` declares both items and binds `items` to the trusted runtime. The runtime adopts the existing prebuilt Sword and constructs the grapple at the original play-stage point, then installs it once. The Jian retains its native `sword` compatibility slot; the grapple retains `tool.fei-zhua`, LOCK/JUMP input and its native offhand policy. The runtime-owned tool has `action: null`, so the data installer creates no second toggle binding.
+`shard.config.ts` declares both items and binds `items` to the host-owned runtime. The runtime adopts the existing prebuilt Sword and constructs the grapple at the original play-stage point, then installs it once. The Jian retains its native `sword` compatibility slot; the grapple retains `tool.fei-zhua`, LOCK/JUMP input and its native offhand policy. The runtime-owned tool has `action: null`, so the data installer creates no second toggle binding.
 
 G51 recipes retained: native Sword contacts/viewmodel; Fei Zhua targeting, rope, pull and traversal; checked deck portals; fragment geometry, decorative crowd and light/renderer/FX controllers. No decorative object is represented as an Animal spawn.
 
@@ -20,9 +20,9 @@ Map: rebuilt after the Nine map-style commit `f9a2e7493`, using the official `sc
 
 ## SF72 witness (parts 2–5): what `compatible: true` covers, and what it does not
 
-`run.mjs` runs the generated renderer-free map `tmp/headless-modules/nine-dragon-stack/modules.mjs` through the platform's own trusted adapter
-(`createTrustedHeadlessAdapter`). The result is **compatible** (`transitional: false` in `compatibility.json`): no
-renderer-bound system decides a gameplay outcome. Decorative crowd, light and view controllers remain trusted
+`run.mjs` runs the generated renderer-free map `tmp/headless-modules/nine-dragon-stack/modules.mjs` through the platform's own native adapter
+(`createNativeHeadlessAdapter`). The result is **compatible** (`transitional: false` in `compatibility.json`): no
+renderer-bound system decides a gameplay outcome. Decorative crowd, light and view controllers remain native
 runtime presentation.
 
 The ordered calls now come from `data/headlessAssembly.json` and the checked
@@ -107,7 +107,7 @@ the in-process canonical state and committed effects. No native transcendental-d
 is used as a cross-platform oracle. The aggregate replay steps **408 ticks**, down from 1,768 (77% fewer); headless
 coverage is unchanged. Separate tests keep the portal / sword and Well continuation assertions, each with a 60 s budget.
 
-`checkpoints/manifest.json` records the SHA256 of every loaded repository module (including the command tape, trusted
+`checkpoints/manifest.json` records the SHA256 of every loaded repository module (including the command tape, native
 entry, engine simulation / snapshot / player / physics closure and imported physics bake) plus Rapier WASM. The native
 CLI admits the same closure in each mode; `fresh` and every replay refuse stale inputs before restoring. The checkpoint
 wire is strictly parsed and the engine validates the packed snapshot. Regenerate explicitly from a clean candidate:

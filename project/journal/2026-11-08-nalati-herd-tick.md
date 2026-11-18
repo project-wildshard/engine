@@ -1,7 +1,7 @@
 # Profile the actual Nalati server near a herd
 
 J201: plain Node, normal portable math and physics, the admitted full
-Nalati product and createTrustedHeadlessResident. No page or renderer,
+Nalati product and createNativeHeadlessResident. No page or renderer,
 VPS deployment, population reduction, clock change or live workspace
 activation. The physical horse-plains route earned 3,857 input ticks,
 then actual steering reached 11.427 m from a living horse.

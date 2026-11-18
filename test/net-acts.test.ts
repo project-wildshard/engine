@@ -12,7 +12,7 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
 import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
@@ -22,14 +22,14 @@ import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
-async function resident(slug: string): Promise<TrustedHeadlessResident> {
+async function resident(slug: string): Promise<NativeHeadlessResident> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = runtimeAssets(product, directory);
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product });
 }
 /** The room's step on a resident: the lead's input as tick commands, everyone else's by name. */
-function stepper(live: TrustedHeadlessResident): (inputs: readonly NetTickInput[]) => void {
+function stepper(live: NativeHeadlessResident): (inputs: readonly NetTickInput[]) => void {
   const { host } = live, lead = leadPlayer(host).id;
   return inputs => {
     const own = inputs.find(row => row.player === lead), others = new Map<string, NetCommand>();
@@ -38,7 +38,7 @@ function stepper(live: TrustedHeadlessResident): (inputs: readonly NetTickInput[
   };
 }
 interface Seat { readonly client: NetClient; readonly link: DirectLoopback }
-function seats(live: TrustedHeadlessResident, ids: readonly string[]): { room: NetRoom; world: SimNetWorld; seated: Seat[]; run: (ticks: number) => void } {
+function seats(live: NativeHeadlessResident, ids: readonly string[]): { room: NetRoom; world: SimNetWorld; seated: Seat[]; run: (ticks: number) => void } {
   const world = new SimNetWorld(live.host), room = new NetRoom({ world, step: stepper(live) });
   const seated = ids.map(id => { const link = directLoopback(), client = new NetClient(link.client); room.join(link.server, world.playerOf(id)); client.hello(); link.pump(); return { client, link }; });
   room.open(); for (const seat of seated) seat.link.pump();
@@ -50,7 +50,7 @@ function seats(live: TrustedHeadlessResident, ids: readonly string[]): { room: N
   };
   return { room, world, seated, run };
 }
-const stand = (live: TrustedHeadlessResident, id: string, x: number, z: number): void => {
+const stand = (live: NativeHeadlessResident, id: string, x: number, z: number): void => {
   const player = live.host.players.get(id); if (player === undefined) throw new Error('No player');
   player.position.set(x, live.host.groundHeightAt(x, z), z); player.motor.resetAt(player.position);
 };

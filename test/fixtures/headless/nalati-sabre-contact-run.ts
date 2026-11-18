@@ -4,7 +4,7 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
 import {nativeGroupCollection} from '../../../src/server/game/shardfile/groupRuntime';
-import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
+import {runNativeHeadlessTape} from '../../../src/shared/host/headlessTape';
 import {snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {earnNalatiPasture} from './nalati-pasture-session';
@@ -43,7 +43,7 @@ try{
   const middle=serializeSimSnapshot(snapshotSimHost(resident.host)),middleTick=frames.length;
   const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();
   const observed=['nalati.predators','nalati.weapons'];
-  const mark=()=>runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
+  const mark=()=>runNativeHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
     {version:1,observe:observed,segments:[{id:'after-sabre-contact',ticks:1,commands:[]}]});
   // Stay in this same swing, with no second attack. A restored struck set must
   // suppress the same body's overlapping rays, just as the uninterrupted one.

@@ -28,7 +28,7 @@ const SeatSaved = v.strictObject(SeatRows);
 const Saved = v.strictObject({ version: v.literal(1), ...SeatRows, poses: v.pipe(v.array(v.tuple([v.string(), v.string()])), v.maxLength(64)),
   others: v.exactOptional(v.record(v.string(), SeatSaved)) });
 
-/** Trusted physical rider, not a presentation/taming stand-in. Mountable identities come from the page's actual camp roster. */
+/** Host-owned physical rider, not a presentation/taming stand-in. Mountable identities come from the page's actual camp roster. */
 export interface NativeMountedPlayer {
   readonly player: PlayerSim;
   readonly body: MountedBody; readonly rider: MountedRider;

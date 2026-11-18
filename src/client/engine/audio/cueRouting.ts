@@ -19,7 +19,7 @@ export interface CueRoute {
   bus?: 'audio' | 'combat' | undefined;
   when: readonly CueCondition[]; actions: readonly CueAction[];
 }
-/** Voice recipes are trusted platform implementations. A false result preserves the original fallback boundary. Delayed actions use the supplied scope-owned scheduler. */
+/** Voice recipes are platform implementations. A false result preserves the original fallback boundary. Delayed actions use the supplied scope-owned scheduler. */
 export interface CueRoutingPorts {
   voices: ReadonlyMap<string, (opts: CombatCueOpts) => boolean | undefined>;
   bindings?:AudioVoiceBindings|undefined; owners?:ReadonlyMap<string,object>|undefined;

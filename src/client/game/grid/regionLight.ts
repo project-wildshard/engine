@@ -1,6 +1,6 @@
 /**
  * A live region's light on the page's one sky (SHARD-PLATFORM G223 / SF48-g, E435). There is one sun, one fill, one
- * sky rig, one set of fog and painterly uniforms and one colour chain on a grid page (SF19a). A trusted runtime admitted
+ * sky rig, one set of fog and painterly uniforms and one colour chain on a grid page (SF19a). A native runtime admitted
  * as a neighbour region lights them the way it lights its own standalone page: its day clock, weather and look rig write
  * the key light, the fill, the sun disc, the shadow maps, the painterly and fog uniforms, the volumetric light and the
  * engine grade every frame, and a few of those once at build.

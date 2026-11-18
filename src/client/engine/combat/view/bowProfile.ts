@@ -8,7 +8,7 @@ import type { SkyRig as Sky } from '../../world/skyRig';
 
 /** Authored grip position and aim for a bow view. */
 export interface GripPose { pos: THREE.Vector3; aim: THREE.Vector3; cant: number; pitch: number }
-/** Trusted bow view strategy supplied by the owning content recipe. */
+/** Native bow view strategy supplied by the owning content recipe. */
 export interface BowView<Style extends string = string> {
   mat: THREE.Material; mesh: { geometry: THREE.BufferGeometry; nock: THREE.Vector3; shape: (draw: number, nock: number) => void; repaint?: (style: Style) => void };
   nocked: THREE.Mesh; rHand: THREE.Mesh; lSleeve: THREE.Mesh; rSleeve: THREE.Mesh;

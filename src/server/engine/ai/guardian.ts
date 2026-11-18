@@ -19,6 +19,6 @@ export class GuardianBrain<A extends AnimalSim> {
   provoke(retarget = false): boolean { return this.policy.provokeInterior(retarget); }
   /** Rearm only this policy's actor memory after a home return. */
   reset(): void { this.policy.resetInterior(); }
-  /** Preserve the trusted observation API and the host's vertical/contact recipe. */
+  /** Preserve the host observation API and the host's vertical/contact recipe. */
   think(c: GuardianPorts<A>): void { this.policy.think({ ...c, pattern: 'interior' }); }
 }

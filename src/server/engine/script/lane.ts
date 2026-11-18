@@ -5,7 +5,7 @@ import { ScriptHost, type ScriptCall, type ScriptHostOptions } from '../../../sh
 import type { ScriptEntity, ScriptEvent } from '../../../shared/engine/script/effects';
 import type { ScriptRole, ScriptSchedule } from './composition';
 
-/** A content binding; the actor id is supplied by the trusted host, never an effect or script input. */
+/** A content binding; the actor id is supplied by the host, never an effect or script input. */
 export interface ScriptBinding { module: string; entity: number; actorId: string | null; kind: 'server' | 'entity' }
 /** Admitted bytecode and its stable module identity and initialization seed. */
 export interface ScriptModule { name: string; bytes: Uint8Array; seedLo: number; seedHi: number }
@@ -44,7 +44,7 @@ interface SeatedBinding extends ScriptBinding { readonly divisor: number }
 const NO_COMMANDS: ReadonlyMap<string, number> = new Map(), NO_EVENT_ROWS: readonly number[] = Object.freeze([]);
 /** Numeric-state scheduler dependencies; construction never installs a module or starts a host tick. */
 export type ScriptDriverOptions = Pick<ScriptLaneOptions, 'world' | 'modules' | 'bindings' | 'divisor' | 'query' | 'seatsFor'>;
-/** Declared numeric state is validated in its own trusted role, separate from creature motion intentions. */
+/** Declared numeric state is validated in its own host-owned role, separate from creature motion intentions. */
 export class ScriptDriver {
   readonly world: DeclaredScriptWorld;
   readonly divisor: number;

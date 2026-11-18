@@ -19,7 +19,7 @@ export function runtimeBinds(source: Pick<Shardfile, 'runtime'>): ReadonlySet<Ru
 }
 
 export function requireBound(source: Pick<Shardfile, 'runtime'>, section: RuntimeBoundSection): void {
-  if (source.runtime === null) throw new Error(`Runtime-bound ${section} needs a trusted runtime declaration`);
+  if (source.runtime === null) throw new Error(`Runtime-bound ${section} needs a native runtime declaration`);
   if (!runtimeBinds(source).has(section)) throw new Error(`Shardfile ${section} are not bound by its runtime (runtime.binds)`);
 }
 

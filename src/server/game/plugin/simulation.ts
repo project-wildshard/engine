@@ -131,10 +131,10 @@ export function addBakedPieces(physics: Physics, pieces: unknown): AddedPiece['c
 /** The host's player strike where declared items own every damaging contact: a zero-damage probe. */
 export const HOST_PROBE: Readonly<SimStrike> = { id: 'host.probe', shape: { kind: 'point', radius: 1 }, windup: 0.1, active: 0.1, recover: 0.2, cooldown: 0.3, range: 1, damage: 0, tags: [] };
 /**
- * A trusted runtime's native level (SF72): the shard's identity, the player at the runtime's own stand and speed (capped
+ * A native runtime's native level (SF72): the shard's identity, the player at the runtime's own stand and speed (capped
  * by the shard's author speed), no declared entities or quests (the runtime installs its own owners), and `HOST_PROBE`.
  */
-export function trustedLevel(shard: Pick<Shardfile, 'identity' | 'authorCaps'>, player: SimLevel['player'], ground: SimLevel['ground']): SimLevel {
+export function shardLevel(shard: Pick<Shardfile, 'identity' | 'authorCaps'>, player: SimLevel['player'], ground: SimLevel['ground']): SimLevel {
   return { version: SIM_API_VERSION, id: shard.identity.slug, seed: shard.identity.seed, ground,
     player: { at: player.at, yaw: player.yaw, speed: Math.min(player.speed, shard.authorCaps.speed) }, entities: [], quests: [], weapon: HOST_PROBE };
 }
@@ -156,7 +156,7 @@ export function admittedTerrain(shard: Pick<Shardfile, 'terrain'>, assets: Reado
   return { bytes, heightAt: tileHeightAt(terrain) };
 }
 /**
- * Register a Node-baked world into a fresh trusted host (a restore brings it back with the physics): the admitted terrain
+ * Register a Node-baked world into a fresh host (a restore brings it back with the physics): the admitted terrain
  * collider when given, then the baked pieces (`addBakedPieces`), whose board-only colliders join the host's board mode.
  */
 export function addBakedWorld(host: SimHost, pieces: unknown, terrain?: Uint8Array): void {
@@ -196,7 +196,7 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
   const policy = recipe.population;
   const actors = policy.sources === 'actors+bosses' ? (() => { const rows = readRuntimeWorldMetadata(baked, true); return [...rows.actors, ...rows.bosses]; })() : readRuntimeWorldMetadata(baked).actors;
   const population = prepareNativePopulation(policy.seed === 'identity' ? { ...policy.rows, seed: shard.identity.seed } : policy.rows, actors, policy.owner);
-  return { level: trustedLevel(shard, player, recipe.ground), ports: { ground: false, heightAt }, install: (host, context) => {
+  return { level: shardLevel(shard, player, recipe.ground), ports: { ground: false, heightAt }, install: (host, context) => {
   const seats = scriptSeats(host), { first } = seats;
     if(sections.has('actors/return-scripts')){
       const returns=serverReturnRows(sections.get('actors/return-scripts'));
@@ -317,7 +317,7 @@ export function weaponRow(shard: Pick<Shardfile, 'items'>, id: string): Extract<
   if (row?.kind !== 'weapon') throw new Error(`Missing declared weapon ${id}`);
   return row;
 }
-/** The fact and coin ports every declared owner takes, emitted into a trusted runtime's tick effects. */
+/** The fact and coin ports every declared owner takes, emitted into a native runtime's tick effects. */
 export function ledgerPorts(emit: (effect: { kind: 'fact'; name: string; actorId: string } | { kind: 'coins'; amount: number; actorId: string }) => void): {
   readonly fact: (name: string, actorId: string) => void; readonly coins: (amount: number, actorId: string) => void;
 } {
@@ -328,7 +328,7 @@ const MAX_TICK_COMMANDS = 1024;
 /** Metres past a prompt's radius a press still counts: the server has feet below the eye a page picks from, and a command behind it. */
 const PROMPT_SLACK = 2.5;
 /**
- * One owner's view of a trusted runtime's tick commands: each lent command in tape order through `pick` (undefined skips
+ * One owner's view of a native runtime's tick commands: each lent command in tape order through `pick` (undefined skips
  * it) into one reused list, so a step allocates no list; a tick past the protocol's allowance refuses.
  */
 export function pickCommands<C, T>(commands: () => readonly C[], pick: (command: C) => T | undefined): () => readonly T[] {
@@ -359,15 +359,15 @@ export interface ShardfileSimPorts extends SimHostPorts {
   weapon?: SimStrike; quest?: QuestDataPorts; hooks?: QuestScriptBindings; scriptRules?: EffectRules;
   encounters?: Parameters<typeof installDeclaredEncounters>[2]; hud?: Parameters<typeof installDeclaredEncounters>[3];
   water?: WaterBodies; colliders?: ReadonlyMap<string, PropColliderPort>;
-  /** Trusted native actor recipes; a declaration without its required family port refuses boot. */
+  /** Native actor recipes; a declaration without its required family port refuses boot. */
   brains?: DeclaredBrainPorts;
   /** Embedded data hosts lend their real player impulse owner; Node uses its owned serialized impulse. */
   creatureImpulse?: (velocity: Vector3) => void;
-  /** Trusted perception, prey/taming and body recipes for one controller per ordered pack/herd group. */
+  /** Host-owned perception, prey/taming and body recipes for one controller per ordered pack/herd group. */
   groups?: DeclaredGroupPorts;
-  /** Trusted terrain, observation and presentation recipes; every crowd is preflighted before setup. */
+  /** Host-owned terrain, observation and presentation recipes; every crowd is preflighted before setup. */
   crowds?: (host: SimHost) => DeclaredCrowdPorts;
-  /** Trusted custom-policy observations and strike execution; aliases and actors belong to this factory. */
+  /** Host-owned custom-policy observations and strike execution; aliases and actors belong to this factory. */
   scriptBrains?: (host: SimHost) => Pick<DeclaredScriptBrainPorts, 'ports'> & Partial<Pick<DeclaredScriptBrainPorts, 'query'>>;
   scriptEntities?: { entities: readonly ScriptEntity[]; actors: ReadonlyMap<number, string> };
   /** Tick-admitted numeric command values; the existing authoritative lane samples them once per fixed step. */
@@ -400,7 +400,7 @@ export interface ShardfileSimulation {
 }
 /** One declared simulation core, used by the normal browser loader and the headless author validator. */
 function shardfileSimInput(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): {level: SimLevel; ports: SimHostPorts} {
-  if (shard.nativeGround !== null) throw new Error('Native ground retains its trusted runtime simulation; a flat declared proxy is forbidden');
+  if (shard.nativeGround !== null) throw new Error('Native ground retains its native runtime simulation; a flat declared proxy is forbidden');
   const portals = portalLinkEntries(shard.entryways), portalErrors = portalLinkRules(portals, shard);
   if (portalErrors.length > 0) throw new Error(portalErrors.join('; '));
   validatePortalFloors(portals, shard, assets);
@@ -450,7 +450,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       body.capExempt = species?.capExempt;
     }
   }
-  if (shard.nativeGround !== null) throw new Error('Native ground retains its trusted runtime simulation; a flat declared proxy is forbidden');
+  if (shard.nativeGround !== null) throw new Error('Native ground retains its native runtime simulation; a flat declared proxy is forbidden');
   const levelId = shard.identity.slug;
   if (host.level.id !== levelId || host.level.seed !== shard.identity.seed || host.entities.size !== shard.creatures.spawns.length || shard.creatures.spawns.some((row) => !host.entities.has(row.id))) throw new Error('Shardfile simulation host mismatch');
   try {
@@ -555,12 +555,12 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
         if (position === undefined) throw new Error('Missing host actor');
         entities.set(handle, { id: handle, name: id, position: [position.x, position.y, position.z], fields: {}, frozen: false, interactive: true });
       }
-      const trusted = ports.scriptEntities ?? declaredItemScriptBindings(shard.items, first.id);
-      for (const entity of trusted.entities) {
-        if (entities.has(entity.id)) throw new Error('Duplicate trusted script entity'); entities.set(entity.id, entity);
+      const owned = ports.scriptEntities ?? declaredItemScriptBindings(shard.items, first.id);
+      for (const entity of owned.entities) {
+        if (entities.has(entity.id)) throw new Error('Duplicate native script entity'); entities.set(entity.id, entity);
       }
-      for (const [handle, actor] of trusted.actors) {
-        if (reverse.has(handle) || !entities.has(handle) || !actors.has(actor)) throw new Error('Invalid trusted owned-entity actor'); reverse.set(handle, actor);
+      for (const [handle, actor] of owned.actors) {
+        if (reverse.has(handle) || !entities.has(handle) || !actors.has(actor)) throw new Error('Invalid native owned-entity actor'); reverse.set(handle, actor);
       }
       for (const binding of shard.sim.bindings) {
         if (binding.actorId !== null) {
@@ -587,9 +587,9 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       const moverDriver = shard.movers.length === 0 ? undefined : new MoverScriptDriver(shard.movers, options.query, [...resetMovers]);
       if (brainBindings.length > 0) {
         if (ports.scriptBrains === undefined) throw new Error('Missing custom brain port');
-        const trustedBrains = ports.scriptBrains(host);
-        if (typeof trustedBrains.ports.observe !== 'function' || typeof trustedBrains.ports.mayAttack !== 'function' || typeof trustedBrains.ports.strike !== 'function') throw new Error('Missing custom brain observation or strike recipe');
-        const brainPorts = { ...trustedBrains, query: trustedBrains.query ?? options.query, actors: host.entities, bindings: brainBindings };
+        const scriptBrainPorts = ports.scriptBrains(host);
+        if (typeof scriptBrainPorts.ports.observe !== 'function' || typeof scriptBrainPorts.ports.mayAttack !== 'function' || typeof scriptBrainPorts.ports.strike !== 'function') throw new Error('Missing custom brain observation or strike recipe');
+        const brainPorts = { ...scriptBrainPorts, query: scriptBrainPorts.query ?? options.query, actors: host.entities, bindings: brainBindings };
         lane = moverDriver === undefined ? createShardfileComposedLane(shard, assets, options, brainPorts) : moverDriver.compose(shard, assets, options, brainPorts);
       } else lane = moverDriver === undefined ? createShardfileScriptLane(shard, assets, options) : moverDriver.compose(shard, assets, options);
       if (moverDriver !== undefined) {
@@ -1655,7 +1655,7 @@ export function nativeVolumeContact(origin: Vector3, direction: Vector3 | null, 
 }
 
 
-/** Trusted posed-volume reader; a roster can lend its last synchronized pose. */
+/** Host-owned posed-volume reader; a roster can lend its last synchronized pose. */
 export interface NativeTargetPose {
   readonly headWorld: (out: Vector3) => Vector3;
   readonly bodyCapsule: (rear: Vector3, front: Vector3) => void;

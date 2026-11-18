@@ -10,7 +10,7 @@ type InputDefinition = Parameters<ShardContext['inputContext']>[0];
 const residentInputs = new WeakMap<ShardContext, (definition: InputDefinition) => void>();
 const playerBindings = new WeakSet<ShardContext>();
 
-/** Whether this trusted context retains its home resources while entered services are independently scoped. */
+/** Whether this native context retains its home resources while entered services are independently scoped. */
 export function retainsRuntimeServices(context: ShardContext): boolean { return enteredServices.has(context); }
 
 /** Keep status movement and damage attached to a retained home's player while shard callbacks come and go. */
@@ -32,7 +32,7 @@ export function installRetainedPlayerEffects(context: ShardContext, player: {
 
 /** Install a transient service for each home entry; ordinary staged contexts keep their original level scope. */
 export function installEnteredRuntimeService(context: ShardContext, install: (scope: Scope) => void): void { installEnteredService(context, install); }
-/** The same for a level-facing host that holds the trusted context as its LevelContext (riding, page owners). */
+/** The same for a level-facing host that holds the native context as its LevelContext (riding, page owners). */
 export function installEnteredLevelService(context: { readonly scope: Scope }, install: (scope: Scope) => void): void { installEnteredService(context, install); }
 
 /** Resolve a retained kit's input definition during construction; enable actions and binding labels only on entry. */
@@ -70,7 +70,7 @@ export function installEnteredRuntimeAttachment(context: ShardContext, root: HTM
   });
 }
 
-/** Publish a trusted browser debug observer only during its cell entry, restoring the exact borrowed descriptor. */
+/** Publish a host-owned browser debug observer only during its cell entry, restoring the exact borrowed descriptor. */
 export function installEnteredRuntimeObserver(context: ShardContext, name: string, observer: object): void {
   installEnteredRuntimeService(context, (scope) => {
     if (typeof window === 'undefined') throw new Error('Browser debug observer needs a window');
@@ -105,7 +105,7 @@ export class RetainedRuntimeHooks {
       // Existing callbacks re-enter their new owner. A yielded old hook has no such owner and cannot publish here. The owner
       // is read only for that check (SF57: a read on every registration counted as a stray read during owned builds).
       if (base.scope.disposed || entered === undefined || (generation !== this.generation
-        && !ownerBelongsTo(currentOwner(), entered))) throw new Error('Trusted callback registration left its cell');
+        && !ownerBelongsTo(currentOwner(), entered))) throw new Error('Native callback registration left its cell');
       const nested = this.installing > 0;
       this.install(install, entered);
       // A replayed service owns its nested registrations; replaying them separately would duplicate callbacks.

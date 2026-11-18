@@ -44,7 +44,7 @@ export interface CircleGrazerSpec {
   farPreferenceRadius: number; farWeight: number; nearWeight: number; closeWeight: number;
   windupField: string; recoveryField: string;
 }
-/** Trusted current home, target, contact and random stream for wandering grazers. */
+/** Host-owned current home, target, contact and random stream for wandering grazers. */
 export interface WanderGrazerPorts<A extends AnimalSim> {
   dt: number; player: A['position']; calm: boolean; rng: Pick<Rng, 'range'>;
   home: { x: number; z: number; r: number; y: number };
@@ -52,7 +52,7 @@ export interface WanderGrazerPorts<A extends AnimalSim> {
   /** Optional exact selected-strike filing; absent preserves the legacy damage-only callback. */
   strikeHit?: (strike: StrikeSpec) => void;
 }
-/** Trusted stable circle phase, target, navigation and contact for challenging grazers. */
+/** Host-owned stable circle phase, target, navigation and contact for challenging grazers. */
 export interface CircleGrazerPorts<A extends AnimalSim> {
   dt: number; t: number; player: A['position']; calm: boolean; phaseOffset: number;
   reach: (actor: A) => boolean; claim: (actor: A) => boolean; hurt: (damage: number) => void;

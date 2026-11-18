@@ -253,7 +253,7 @@ export class SpawnScript {
       return resolvePhysicsQueriesV2(requests,worlds);
     });
   }
-  /** Trusted native registration over already constructed actor modules. All
+  /** Native registration over already constructed actor modules. All
    * query continuations stay in those modules' original snapshot adapters. */
   static installQueries(host: SimHost,runners: readonly SpawnScript[]): () => void {
     if (runners.length === 0 || runners.length > 64 || new Set(runners).size !== runners.length || new Set(runners.map(runner => runner.rows.step)).size !== runners.length

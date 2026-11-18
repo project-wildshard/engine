@@ -6,7 +6,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { HeadlessJourneyPlanSchema } from '../src/shared/host/headlessJourney';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import type { TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import type { NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { createNativeProofResident, prepareFolderPlan } from '../src/test/game/headlessNative';
 import { installNativeWalkBounds } from '../src/test/game/headless/nativeBounds';
@@ -25,7 +25,7 @@ test('a Driftwood journey replays on the client step', async () => {
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   /** The world test/physics-headless.test.ts walks: the shipped plan, with the ruler's rope bodies and walk bounds. */
-  const walkingResident = async (): Promise<TrustedHeadlessResident & { retire: () => void }> => {
+  const walkingResident = async (): Promise<NativeHeadlessResident & { retire: () => void }> => {
     const resident = await createNativeProofResident({ shard, assets, rapier, product }, prepareFolderPlan), retire = installWalkRopeBodies(resident.host, product);
     installNativeWalkBounds(resident.host);
     return Object.assign(resident, { retire });

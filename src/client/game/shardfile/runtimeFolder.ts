@@ -38,7 +38,7 @@ import { currentSpawnDownload, releaseSpawnMembers } from '../boot/spawnDownload
 import { contentURL } from '@wildshard/engine/boot/contentBase';
 
 /**
- * The trusted runtime's product reader (SHARD-PLATFORM M3 tiles-swap, G227, E435): the same `ClientAssets` in both modes,
+ * The native runtime's product reader (SHARD-PLATFORM M3 tiles-swap, G227, E435): the same `ClientAssets` in both modes,
  * so a hybrid whose `runtime.binds` names `terrain` streams its compiled tiles whether it boots standalone or as a grid cell.
  *
  * - **Grid**: the cell's admission already holds the verified product (`liveSession.admitRuntime`); the regional world hands
@@ -80,7 +80,7 @@ let folderControlsReady = false, observesFolderControl = false;
 /** ZE10a3: a same-page entry's next session boots before control again (its parser, revalidation and pacing as a fresh page's). */
 export function resetFolderControl(): void { folderControlsReady = false; }
 /** Browser connectivity and visited-product storage feed the same admission path as headless validation. */
-export function browserShardfileOptions(base: string, trusted = false): FolderOptions {
+export function browserShardfileOptions(base: string, granted = false): FolderOptions {
   const spawn = currentSpawnDownload(), resolve = (url: string): string => spawn?.resolve(url) ?? url;
   if (typeof document !== 'undefined' && !observesFolderControl) {
     observesFolderControl = true;
@@ -99,7 +99,7 @@ export function browserShardfileOptions(base: string, trusted = false): FolderOp
     return result;
   };
   const quality = Object.fromEntries(Object.entries(TIER_CONFIG).filter((entry): entry is [string, number | boolean] => entry[0].includes('.') && (typeof entry[1] === 'number' || typeof entry[1] === 'boolean')));
-  const readable = trusted || builtIndexHash(new URL('shard.json', new URL('.', base)).pathname) !== null;
+  const readable = granted || builtIndexHash(new URL('shard.json', new URL('.', base)).pathname) !== null;
   const firstPartyRead: NonNullable<FolderOptions['firstPartyRead']> = async (url, bytes, read, hash, priority) => {
     const address = new URL(resolve(url), base).href;
     const storage = typeof caches === 'undefined' ? undefined : caches;
@@ -117,7 +117,7 @@ export function browserShardfileOptions(base: string, trusted = false): FolderOp
     }, navigator.serviceWorker?.controller === null || navigator.serviceWorker?.controller === undefined ? storage : undefined), 'file', address);
     entryTransport()?.expand(); return result;
   };
-  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...dangerousTrust(trusted), ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
+  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...dangerousTrust(granted), ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
     // OF10a4: the build reader serves a product the host trusts or one the build's verdict table lists (its catalogue and the
     // placed uploads' cook rows); an unlisted product has no browser reader and fails closed, as before
     ...(readable ? { firstPartyRead } : {}),
@@ -190,7 +190,7 @@ export function admittedRuntimeFolder(slug: string): RuntimeFolder | null {
 const declared = new Map<string, Shardfile>();
 
 /**
- * A trusted hybrid's own declaration, recorded when its page prepares it (`prepareHybridShard`), so a session reader that
+ * A native hybrid's own declaration, recorded when its page prepares it (`prepareHybridShard`), so a session reader that
  * knows only the shard's slug (the baked-samples reader, `installFolderSampling`) reaches the same product reader as its
  * runtime (`runtimeFolder`). The declaration is its module's own constant, so recording it retains nothing new.
  */
@@ -350,7 +350,7 @@ export function slugRuntimeFolder(slug: string): RuntimeFolder | null {
   return source === undefined ? admittedRuntimeFolder(slug) : runtimeFolder(source);
 }
 
-/** The reader for a trusted runtime's own declaration: its grid cell's admitted product while one is resident, else standalone. */
+/** The reader for a native runtime's own declaration: its grid cell's admitted product while one is resident, else standalone. */
 export function runtimeFolder(source: Shardfile): RuntimeFolder {
   const slug = source.identity.slug, admitted = admittedRuntimeFolder(slug);
   if (admitted !== null) return admitted;
@@ -361,7 +361,7 @@ export function runtimeFolder(source: Shardfile): RuntimeFolder {
 }
 
 /**
- * A trusted runtime's own look materials (`look.materials`, graph entries included) compiled on its world's renderer under
+ * A native runtime's own look materials (`look.materials`, graph entries included) compiled on its world's renderer under
  * its scope, from its product reader (`runtimeFolder`), for the meshes it still builds itself (read from its world stage).
  * `graphs` is the shard's switch (G387): true compiles its graphs whatever the Debug row says; absent, the row decides
  * (off: each graph's family preset). `ids` compiles only those catalogue entries (no props, curves or terrain maps), so a
@@ -389,7 +389,7 @@ export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'ga
     return files;
   });
   if (ctx.scope.disposed) throw new Error('Runtime look scope unloaded while reading materials');
-  return bootTask(`look:material-compile ${source.identity.slug}`, () => clientMaterials(shard, assets, renderer, ctx.scope, { trustedGraphs: true, ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) }));
+  return bootTask(`look:material-compile ${source.identity.slug}`, () => clientMaterials(shard, assets, renderer, ctx.scope, { declaredGraphCeilings: true, ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) }));
 }
 
 /** Prepare the requested original graph materials for resident effects and boss storms. */

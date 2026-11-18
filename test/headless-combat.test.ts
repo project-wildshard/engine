@@ -34,7 +34,7 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands, type HeadlessCommand } from '../src/shared/host/tickProtocol';
 import { canonicalSimDigest } from '../src/test/engine/simState';
@@ -44,7 +44,7 @@ import { parseShardfileField } from '@wildshard/format/shardSchema';
 import originalNativeItems from './fixtures/native-explicit-combat-items.json' with {type: 'json'};
 const nativeSwordItems = parseShardfileField('items', originalNativeItems.items);
 
-// P1-E3.2: hits and damage settled by the shipped headless host (`createTrustedHeadlessResident`, what the standalone
+// P1-E3.2: hits and damage settled by the shipped headless host (`createNativeHeadlessResident`, what the standalone
 // worker runs) on real shards: Driftwood's swept swords, Pine's bow and lever rifle. Each is held against the browser's own
 // weapon classes (`SweptMelee`, `Projectiles`, `hitscan`) over the same bodies, so a law can't drift between the two.
 
@@ -65,20 +65,20 @@ async function load(slug: string) {
   if (descriptor === undefined) throw new Error(`Missing admitted ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier: Rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  return { product, resident: (snapshot?: string): Promise<TrustedHeadlessResident> => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
+  return { product, resident: (snapshot?: string): Promise<NativeHeadlessResident> => createNativeHeadlessResident({ shard, assets, rapier, product }, snapshot) };
 }
-const body = (resident: TrustedHeadlessResident, id: string): AnimalSim => {
+const body = (resident: NativeHeadlessResident, id: string): AnimalSim => {
   const actor = resident.host.entities.get(id); if (actor === undefined) throw new Error(`No creature ${id}`); return actor;
 };
-const nearest = (resident: TrustedHeadlessResident, kind: string): AnimalSim => {
+const nearest = (resident: NativeHeadlessResident, kind: string): AnimalSim => {
   const p = leadPlayer(resident.host).position, rows = [...resident.host.entities.values()].filter(row => row.kind === kind && row.alive);
   const best = rows.sort((a, b) => a.position.distanceTo(p) - b.position.distanceTo(p))[0];
   if (best === undefined) throw new Error(`No ${kind}`); return best;
 };
 /** Hold every creature where it stands: the fight is about the player's blows. */
-const hold = (resident: TrustedHeadlessResident): void => { for (const actor of resident.host.entities.values()) actor.harnessHold = true; };
+const hold = (resident: NativeHeadlessResident): void => { for (const actor of resident.host.entities.values()) actor.harnessHold = true; };
 /** The player's feet and yaw at `gap` metres short of a body, facing it. */
-const facing = (resident: TrustedHeadlessResident, target: AnimalSim, gap: number): void => {
+const facing = (resident: NativeHeadlessResident, target: AnimalSim, gap: number): void => {
   const { host } = resident, p = leadPlayer(host).position, dx = target.position.x - p.x, dz = target.position.z - p.z, span = Math.hypot(dx, dz), yaw = Math.atan2(-dx, -dz);
   const x = target.position.x - dx / span * gap, z = target.position.z - dz / span * gap;
   leadPlayer(host).resetPose({ x, y: host.groundHeightAt(x, z), z }, yaw);
@@ -86,13 +86,13 @@ const facing = (resident: TrustedHeadlessResident, target: AnimalSim, gap: numbe
 /** A body's chest, where a page crosshair and `nativeRangedAim`'s default rest. */
 const chest = (target: AnimalSim): Vector3 => { const rear = new Vector3(), front = new Vector3(); target.bodyCapsule(rear, front); return rear.add(front).multiplyScalar(0.5); };
 const triple = v.tuple([v.number(), v.number(), v.number()]);
-const stand = (resident: TrustedHeadlessResident): StandCommand => ({ kind: 'player', moveX: 0, moveZ: 0, yaw: leadPlayer(resident.host).yaw });
-const tick = (resident: TrustedHeadlessResident, count: number, commands: readonly HeadlessCommand[] = [stand(resident)]): void => {
+const stand = (resident: NativeHeadlessResident): StandCommand => ({ kind: 'player', moveX: 0, moveZ: 0, yaw: leadPlayer(resident.host).yaw });
+const tick = (resident: NativeHeadlessResident, count: number, commands: readonly HeadlessCommand[] = [stand(resident)]): void => {
   for (let at = 0; at < count; at++) { hold(resident); resident.step(commands); }
 };
 
 /** The page's target query: the real hit volumes `AnimalManager.raycast` casts, posed from this world's bodies. */
-function pageTargets(resident: TrustedHeadlessResident): Targets {
+function pageTargets(resident: NativeHeadlessResident): Targets {
   const { host } = resident, bodies = new CreatureBodies<Creature & { readonly sim: AnimalSim }>(host.physics);
   bodies.sync([...host.entities.values()].map(sim => ({ sim, position: sim.position, get alive() { return sim.alive; }, hidden: false, scale: sim.scale, dims: sim.dims,
     headWorld: (out: Vector3) => sim.headWorld(out), bodyCapsule: (a: Vector3, b: Vector3) => { sim.bodyCapsule(a, b); }, motor: null, driven: false, simulationBound: true })), leadPlayer(host).position);
@@ -103,7 +103,7 @@ function pageTargets(resident: TrustedHeadlessResident): Targets {
   } };
 }
 /** The browser's world for one resident: its physics, and the player the page would hold at the same pose. */
-function pageWorld(resident: TrustedHeadlessResident, aimAt: Vector3) {
+function pageWorld(resident: NativeHeadlessResident, aimAt: Vector3) {
   const was = app.physics, aimed = app.aimTargets, { host } = resident, game = new FakeGame().asGame();
   app.physics = host.physics; app.aimTargets = legacyDouble<typeof app.aimTargets>([...host.entities.values()]);
   restore = () => { app.physics = was; app.aimTargets = aimed; };
@@ -124,7 +124,7 @@ function pageSword(page: ReturnType<typeof pageWorld>, targets: Targets, profile
 }
 
 /** Step idle ticks until `done`, answering how many it took. */
-function countUntil(resident: TrustedHeadlessResident, done: () => boolean, limit: number): number {
+function countUntil(resident: NativeHeadlessResident, done: () => boolean, limit: number): number {
   for (let at = 0; at < limit; at++) { if (done()) return at; tick(resident, 1); }
   throw new Error('The fight never settled');
 }
@@ -346,7 +346,7 @@ test('Sunscar: a free whip crack lands what a named one does', async () => {
   const { resident } = await shipped('sunscar-dunes');
   const named = await resident(), free = await resident();
   try {
-    const crack = (live: TrustedHeadlessResident, command: StandCommand): CombatEvent | undefined => {
+    const crack = (live: NativeHeadlessResident, command: StandCommand): CombatEvent | undefined => {
       const wire = new CombatWire(live.host), target = nearest(live, 'sandSkitterer');
       hold(live); facing(live, target, 2); tick(live, 2); wire.drain();
       tick(live, 1, [{ ...command, yaw: leadPlayer(live.host).yaw }]); tick(live, 40);
@@ -396,7 +396,7 @@ test('hit and died reach a client over the loopback, in order, confirming the sw
 const thumb = (seq: number, yaw: number, pitch = 0): NetCommand => ({ seq, viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw, pitch, buttons: 0 });
 const freeAim = { aim: { origin: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: -1 } } };
 /** A second player `gap` metres short of `target`, facing it; answers its yaw. */
-function joinFacing(live: TrustedHeadlessResident, id: string, target: AnimalSim, gap: number): number {
+function joinFacing(live: NativeHeadlessResident, id: string, target: AnimalSim, gap: number): number {
   const { host } = live, spawn = leadPlayer(host).position, dx = target.position.x - spawn.x, dz = target.position.z - spawn.z, span = Math.hypot(dx, dz), yaw = Math.atan2(-dx, -dz);
   const x = target.position.x - dx / span * gap, z = target.position.z - dz / span * gap;
   host.addPlayer(id, { x, y: host.groundHeightAt(x, z), z }, yaw);

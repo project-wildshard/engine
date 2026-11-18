@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import type { RigidBody } from '@dimforge/rapier3d-simd';
@@ -13,7 +13,7 @@ import { tagOf } from '../src/shared/engine/physics/surface';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // NET-LAG NL5 (Jake, 2026-11-12: "i fucking clipped through the rope bridge because of the lag lol"). The room's own resident
-// (`createTrustedHeadlessResident`, what `cellWorld` runs) walks Driftwood's rope bridge. Before NL5 it built no rope chain:
+// (`createNativeHeadlessResident`, what `cellWorld` runs) walks Driftwood's rope bridge. Before NL5 it built no rope chain:
 // its player walked on air over the gully and fell to the gully floor (y -0.89 at the span's middle), and the page, which
 // stands on its own planks, was corrected down through them. Test walks installed the chain from a fixture; the room did not.
 
@@ -38,7 +38,7 @@ test('the room stands a walker on Driftwood\'s rope bridge, and a restore keeps 
   const assets = new Map(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), input = { shard, assets, rapier, product };
-  const resident = await createTrustedHeadlessResident(input, undefined, { room: true });
+  const resident = await createNativeHeadlessResident(input, undefined, { room: true });
   let lowest = Infinity, saved: ReturnType<typeof snapshotSimHostBytes>, bodies: number;
   try {
     bodies = planks(resident.host);
@@ -53,14 +53,14 @@ test('the room stands a walker on Driftwood\'s rope bridge, and a restore keeps 
     expect(lowest).toBeGreaterThan(3); // the planks stay over 5 m; the gully floor is under 0
     saved = snapshotSimHostBytes(resident.host);
   } finally { resident.dispose(); }
-  const restored = await createTrustedHeadlessResident(input, saved, { room: true });
+  const restored = await createNativeHeadlessResident(input, saved, { room: true });
   try {
     expect(planks(restored.host)).toBe(bodies);
     // the saved planks, lent back to the motor, carry a walker
     expect(runHeadlessJourney(restored.host, commands => { restored.step(commands); }, { ticks: 900, start: BRIDGE.start, points: BRIDGE.points, once: true }).complete).toBe(true);
   } finally { restored.dispose(); }
   // a room saved with no planks in its world (as before NL5; its adapter row is there, which `joined` makes optional) builds them
-  const old = await createTrustedHeadlessResident(input, undefined, { room: true });
+  const old = await createNativeHeadlessResident(input, undefined, { room: true });
   try {
     const { world } = old.host.physics, chain = new Set<RigidBody>();
     world.forEachCollider(collider => { const body = collider.parent(), owner = tagOf(collider)?.owner; if (body?.isDynamic() === true && owner !== null && typeof owner === 'object' && 'id' in owner && owner.id === 'bridge') chain.add(body); });
@@ -68,7 +68,7 @@ test('the room stands a walker on Driftwood\'s rope bridge, and a restore keeps 
     expect(planks(old.host)).toBe(0);
     saved = snapshotSimHostBytes(old.host);
   } finally { old.dispose(); }
-  const upgraded = await createTrustedHeadlessResident(input, saved, { room: true });
+  const upgraded = await createNativeHeadlessResident(input, saved, { room: true });
   try {
     expect(planks(upgraded.host)).toBe(bodies);
     expect(runHeadlessJourney(upgraded.host, commands => { upgraded.step(commands); }, { ticks: 900, start: BRIDGE.start, points: BRIDGE.points, once: true }).complete).toBe(true);

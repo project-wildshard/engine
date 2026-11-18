@@ -18,7 +18,7 @@ import { ConditionedTransport, directLoopback } from '../src/test/engine/netLoop
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -30,13 +30,13 @@ import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
-async function sunscar(): Promise<TrustedHeadlessResident> {
+async function sunscar(): Promise<NativeHeadlessResident> {
   const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing Sunscar output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product });
 }
-function roomOver(resident: TrustedHeadlessResident): NetRoom {
+function roomOver(resident: NativeHeadlessResident): NetRoom {
   return new NetRoom({ world: new SimNetWorld(resident.host), step: inputs => {
     const own = inputs[0];
     resident.step(tickCommands([{ source: 'test', commands: netTickCommands(own?.command ?? null, own?.acts ?? []) }], 8));
@@ -50,9 +50,9 @@ const creatureCount = (client: NetClient): number => [...client.entities.keys()]
 /** A row past the near band is on its tier (§3.3): it may be the frame before, and only the frame before. */
 const NEAR_BAND = 60;
 type Positions = ReadonlyMap<string, Vector3>;
-const positions = (resident: TrustedHeadlessResident): Positions => new Map([...resident.host.entities].map(([id, sim]) => [id, sim.position.clone()]));
+const positions = (resident: NativeHeadlessResident): Positions => new Map([...resident.host.entities].map(([id, sim]) => [id, sim.position.clone()]));
 const within = (fields: Readonly<Record<string, unknown>>, at: Vector3 | undefined, step: number): boolean => at !== undefined && (['x', 'y', 'z'] as const).every(axis => Math.abs(Number(fields[axis]) - at[axis]) <= step);
-function checkRows(resident: TrustedHeadlessResident, client: NetClient, before: Positions): number {
+function checkRows(resident: NativeHeadlessResident, client: NetClient, before: Positions): number {
   const frame = client.latest;
   if (frame === null) throw new Error('No frame');
   expect(frame.tick).toBe(resident.host.state.tick);

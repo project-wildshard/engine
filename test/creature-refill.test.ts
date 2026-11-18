@@ -13,7 +13,7 @@ import { populationCensus } from '../src/shared/game/population/census';
 import { RespawnQueue } from '../src/shared/game/population/respawn';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { installBoarWorldFixture } from './fixtures/boar-world';
@@ -139,7 +139,7 @@ test('a shipped host runs a home twice as fast with two players near, and one pl
   if (descriptor === undefined) throw new Error('Missing Sunscar output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${builtFolder('sunscar-dunes')}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const resident = (): ReturnType<typeof createTrustedHeadlessResident> => createTrustedHeadlessResident({ shard: product, assets, rapier, product: shard });
+  const resident = (): ReturnType<typeof createNativeHeadlessResident> => createNativeHeadlessResident({ shard: product, assets, rapier, product: shard });
   const solo = await resident(), room = await resident();
   try {
     const wait = (host: typeof solo.host): number => populationCensus(host).homes.find(row => row.id === 'sunscar.home:4')?.wait ?? Number.NaN;
@@ -159,7 +159,7 @@ test('a shipped host runs a home twice as fast with two players near, and one pl
     expect(wait(solo.host)).toBeCloseTo(45, 4);
     expect(wait(room.host)).toBeCloseTo(40, 4);
     // the room save restores what the room owes: the home's clock is in the keeper's own row
-    const restored = await createTrustedHeadlessResident({ shard: product, assets, rapier, product: shard }, serializeSimSnapshot(snapshotSimHostBytes(solo.host)));
+    const restored = await createNativeHeadlessResident({ shard: product, assets, rapier, product: shard }, serializeSimSnapshot(snapshotSimHostBytes(solo.host)));
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(solo.host)));
     restored.dispose();
   } finally { solo.dispose(); room.dispose(); }
@@ -170,7 +170,7 @@ test('a shipped room refills a fallen herd animal through a save, and its solo t
   if (descriptor === undefined) throw new Error('Missing Pine output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const open = (snapshot?: string): ReturnType<typeof createTrustedHeadlessResident> => createTrustedHeadlessResident({ shard: product, assets, rapier, product: shard }, snapshot);
+  const open = (snapshot?: string): ReturnType<typeof createNativeHeadlessResident> => createNativeHeadlessResident({ shard: product, assets, rapier, product: shard }, snapshot);
   const solo = await open(), room = await open();
   const rows = (host: typeof solo.host): string[] => [...host.adapters.keys()].filter(id => id.endsWith('.refill'));
   const victim = [...room.host.entities.values()].find(actor => actor.herd >= 0);

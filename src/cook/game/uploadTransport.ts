@@ -1,4 +1,4 @@
-/** SP20: trusted parent-only transport. The child receives bytes and never this key or client. */
+/** SP20: host-owned parent-only transport. The child receives bytes and never this key or client. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The parent signs exact request bytes.
 import {createHash, createHmac} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verdicts survive process restart before any POST.
@@ -197,7 +197,7 @@ export function uploadDelivery(options: UploadDeliveryOptions): {readonly sweep:
 }
 
 export interface GameActivationClient {readonly activate: (notice: ActivationNotice, channel: 'staging' | 'production') => Promise<void>}
-/** The trusted parent talks to loopback game ports; redirects never receive a local bearer credential. */
+/** The host-owned parent talks to loopback game ports; redirects never receive a local bearer credential. */
 export function gameActivationClient(receivers: Readonly<Partial<Record<'staging' | 'production', {readonly url: string; readonly token: string}>>>, build: string, read: typeof fetch = fetch): GameActivationClient {
   return {activate: async (notice, channel) => {
     const receiver = receivers[channel]; if (receiver === undefined) throw new Error('No local game receiver for activation');

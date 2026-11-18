@@ -14,7 +14,7 @@ import { ConditionedTransport, directLoopback } from '../src/test/engine/netLoop
 import { readNativeRangedItem } from '../src/server/game/plugin/nativeItems';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands, type HeadlessCommand } from '../src/shared/host/tickProtocol';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -30,22 +30,22 @@ const INTERP_TICKS = 6;
 const ROUNDS = 7;
 const FREE_SHOT = { aim: { origin: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: -1 } } };
 
-async function shard(slug: string): Promise<TrustedHeadlessResident> {
+async function shard(slug: string): Promise<NativeHeadlessResident> {
   const rapier: Rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  return createNativeHeadlessResident({ shard: product.shardfile, assets, rapier, product });
 }
-const pine = (): Promise<TrustedHeadlessResident> => shard('pine-hollow');
-const hold = (live: TrustedHeadlessResident): void => { for (const actor of live.host.entities.values()) actor.harnessHold = true; };
+const pine = (): Promise<NativeHeadlessResident> => shard('pine-hollow');
+const hold = (live: NativeHeadlessResident): void => { for (const actor of live.host.entities.values()) actor.harnessHold = true; };
 /** A seeded stream, so a link's run repeats. */
 function seeded(seed: number): () => number {
   let state = seed;
   return () => { state = (state * 1664525 + 1013904223) % 4294967296; return state / 4294967296; };
 }
 /** A boar on open ground, a player `RANGE` off to its side with the lever rifle up. */
-function range(live: TrustedHeadlessResident): { boar: AnimalSim; centre: Vector3 } {
+function range(live: NativeHeadlessResident): { boar: AnimalSim; centre: Vector3 } {
   const { host } = live, player = leadPlayer(host), feet = player.position;
   const boar = [...host.entities.values()].filter(row => row.kind === 'boar' && row.alive).sort((a, b) => a.position.distanceTo(feet) - b.position.distanceTo(feet))[0];
   if (boar === undefined) throw new Error('No boar');
@@ -61,7 +61,7 @@ function range(live: TrustedHeadlessResident): { boar: AnimalSim; centre: Vector
 interface Shots { fired: number; landed: number; farthest: number; lost: readonly number[] }
 
 /** One link's run: `shots` free rifle rounds at the boar this client has been shown. */
-function fire(live: TrustedHeadlessResident, rttMs: number, claimView: boolean, shots: number, seed: number): Shots {
+function fire(live: NativeHeadlessResident, rttMs: number, claimView: boolean, shots: number, seed: number): Shots {
   const { boar, centre } = range(live), link = directLoopback(), { host } = live;
   const random = seeded(seed), conditions = { latencyMs: rttMs / 2, jitterMs: 30, lossPct: 2, reorderPct: 0, random };
   const server = new ConditionedTransport(link.server, conditions), up = new ConditionedTransport(link.client, conditions);
@@ -120,7 +120,7 @@ test('the two links of J127: a hit lands at 100 ms RTT and misses at 300 ms, and
 const stillCommand = (seq: number, yaw: number, pitch: number, viewTick: number, extra: Partial<NetCommand>): NetCommand =>
   ({ seq, viewTick: viewTick & 0xffff, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw, pitch, buttons: 0, ...extra });
 /** The nearest body of `kind`, with the lead `gap` short of it and looking at its chest, then held there long enough to fill the history. */
-function faced(live: TrustedHeadlessResident, kind: string, gap: number): { body: AnimalSim; yaw: number; pitch: number } {
+function faced(live: NativeHeadlessResident, kind: string, gap: number): { body: AnimalSim; yaw: number; pitch: number } {
   const { host } = live, player = leadPlayer(host), feet = player.position;
   const body = [...host.entities.values()].filter(row => row.kind === kind && row.alive).sort((a, b) => a.position.distanceTo(feet) - b.position.distanceTo(feet))[0];
   if (body === undefined) throw new Error(`No ${kind}`);
@@ -132,7 +132,7 @@ function faced(live: TrustedHeadlessResident, kind: string, gap: number): { body
   return { body, yaw: 0, pitch };
 }
 /** Run `ticks` of a player standing and looking with `command`'s, the body gone three metres aside from the first; the hits, as settled. */
-function struck(live: TrustedHeadlessResident, body: AnimalSim, first: (seq: number) => NetCommand, then: (seq: number) => NetCommand, ticks: number): CombatEvent[] {
+function struck(live: NativeHeadlessResident, body: AnimalSim, first: (seq: number) => NetCommand, then: (seq: number) => NetCommand, ticks: number): CombatEvent[] {
   const wire = new CombatWire(live.host), headAt = body.headWorld.bind(body), capsuleAt = body.bodyCapsule.bind(body), was = headAt(new Vector3()).x;
   body.position.x += 3;
   // a held body publishes no pose, so a posed one needs the jump carried to its volumes

@@ -9,7 +9,7 @@ export const paidSave = (variant = 'ghost') => JSON.parse(execFileSync(process.e
   import { resolve } from 'node:path';
   import { readBuiltShardfile } from './scripts/built-folder.mjs';
   import { loadHeadlessFolder } from './src/server/host/headlessFolder.ts';
-  import { createTrustedHeadlessResident } from './src/server/host/headlessRuntime.ts';
+  import { createNativeHeadlessResident } from './src/server/host/headlessRuntime.ts';
   import { outputDescriptor } from './src/shared/game/shardfile/outputDescriptor.ts';
   import { creditNativeInventory } from './src/shared/game/inventoryLaw.ts';
   import { populationRoster } from './src/server/game/population/roster.ts';
@@ -17,7 +17,7 @@ export const paidSave = (variant = 'ghost') => JSON.parse(execFileSync(process.e
   import { serializeSimSnapshot, snapshotSimHostBytes } from './src/shared/engine/sim/snapshot.ts';
   const directory = process.env.PINE_PROOF_PRODUCT || readBuiltShardfile(resolve('.'), 'pine-hollow'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? 'commons:' + file.hash : file.hash, Uint8Array.from(readFileSync(directory + '/' + file.path))]));
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) }, undefined, { room: true });
+  const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) }, undefined, { room: true });
   creditNativeInventory(live.host, 'pack', { item: 'amber-resin', count: 30 });
   creditNativeInventory(live.host, 'pack', { item: 'bear-pelt', count: 2 });
   const roster = await product.json('actors/roster.json');

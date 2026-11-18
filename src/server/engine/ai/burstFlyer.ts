@@ -24,7 +24,7 @@ export class BurstFlyerBrain<A extends AnimalSim> {
   snapshot(): SimValue { return this.policy.snapshot(); }
   /** Validate atomically through the admitted shared policy. */
   restore(saved: SimValue): void { this.policy.restore(saved); }
-  /** Select this pattern while preserving the trusted observation API. */
+  /** Select this pattern while preserving the host observation API. */
   think(c: BurstFlyerPorts<A>): void { this.policy.think({ ...c, pattern: 'burst' }); }
   /** Execute the unchanged native body and contact laws. */
   act(c: BurstFlyerPorts<A>): void { this.policy.act({ ...c, pattern: 'burst' }); }

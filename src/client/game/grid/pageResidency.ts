@@ -38,7 +38,7 @@ export function composerReservation(bytes: number, tier: ComposerTier): number {
  * SF18b / G144: construct before manifest hydration, then inject this allocator into the home loader and GridSession.
  * The composition root owns disposal, including failed or cancelled boots. Admission precedes world allocation; the
  * borrowed home remains needed for the page lifetime; an owned grid home takes the boot reference with handoff().
- * Trusted runtime homes supply reviewed resident-cost metadata rather than
+ * Native runtime homes supply reviewed resident-cost metadata rather than
  * the empty transitional shardfile's budget. This owner installs no service by import and creates no world or timer.
  */
 export class PageResidency {

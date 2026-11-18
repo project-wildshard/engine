@@ -15,7 +15,7 @@ import {beginFolderSession} from '@wildshard/engine/test/headless/folderSession'
 test('a consumer prepare URL owns an isolated native world and its exact continuation', async()=>{
   await loadRapier(readFileSync(createRequire(import.meta.url).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm')));
   const shard=emptyShardfile({slug:'consumer-proof',name:'Consumer',author:'Test',revision:1,seed:7});
-  const prepare=new URL('./fixtures/headless/trustedRuntime.ts',import.meta.url);
+  const prepare=new URL('./fixtures/headless/nativeRuntime.ts',import.meta.url);
   const worker=await createNativeProofWorker(shard,new Map(),prepare);
   let restored:Awaited<ReturnType<typeof createNativeProofWorker>>|undefined;
   try{
@@ -37,12 +37,12 @@ test('the worker refuses non-file prepare URLs and modules without the prepare e
   const shard=emptyShardfile({slug:'refused-proof',name:'Refused',author:'Test',revision:1,seed:1});
   await expect(createNativeProofWorker(shard,new Map(),new URL('https://example.invalid/proof.ts'))).rejects.toThrow('file URL');
   await expect(createNativeProofWorker(shard,new Map(),new URL('../src/test/game/headless/checkedReplayPipeline.ts',import.meta.url))).rejects.toThrow('needs prepareHeadlessRuntime');
-  await expect(createNativeProofWorker(shard,new Map(),new URL('./fixtures/headless/trustedRuntime.ts',import.meta.url),{snapshot:'not-a-native-save'})).rejects.toThrow();
+  await expect(createNativeProofWorker(shard,new Map(),new URL('./fixtures/headless/nativeRuntime.ts',import.meta.url),{snapshot:'not-a-native-save'})).rejects.toThrow();
   expect(()=>builtFolder('../foreign')).toThrow('Invalid built product name');
 });
 
 test('the exported session reads a consumer output and refuses corrupt admitted bytes',async()=>{
-  const root=process.cwd(),product=builtFolder('_template'),prepare=new URL('./fixtures/headless/trustedRuntime.ts',import.meta.url);
+  const root=process.cwd(),product=builtFolder('_template'),prepare=new URL('./fixtures/headless/nativeRuntime.ts',import.meta.url);
   mkdirSync('tmp/codex-tc48',{recursive:true});
   const consumer=mkdtempSync(resolve('tmp/codex-tc48/consumer-'));
   let sim:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;

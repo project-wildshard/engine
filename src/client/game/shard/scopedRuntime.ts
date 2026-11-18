@@ -4,7 +4,7 @@ import type { ShardRuntime } from '../../../shared/game/shard/runtime';
 const bound = new WeakMap<ShardRuntime, Scope>();
 function read(object: object, key: PropertyKey): unknown { const value: unknown = Reflect.get(object, key); return value; }
 
-/** Retain a trusted home's handoff while unbinding every page slot during its road visits. */
+/** Retain a native home's handoff while unbinding every page slot during its road visits. */
 export interface ScopedRuntimeBinding {
   /** The retained home state; inactive writes never reach the parent. */
   readonly runtime: ShardRuntime;
@@ -26,7 +26,7 @@ export function createScopedRuntimeBinding(parent: ShardRuntime, scope: Scope): 
     writable: true, value: read(parent, key),
   });
   // The staged shell fills these borrowed services after world/kit. Its writes must remain visible on entry and exit;
-  // a trusted hook's writes stay private to its local handoff instead of replacing the shell's current services.
+  // a native hook's writes stay private to its local handoff instead of replacing the shell's current services.
   const borrowed = new Set<PropertyKey>(['world', 'step', 'play', 'viewer', 'horizonVeil']);
   const overrides = new Map<PropertyKey, unknown>();
   for (const key of borrowed) Object.defineProperty(local, key, { configurable: true, enumerable: true,

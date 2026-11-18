@@ -64,7 +64,7 @@ function occluder(g: THREE.BufferGeometry, part: number): Occluder | null {
     b.divideScalar(length);
     planes.push(b.x, b.y, b.z, b.dot(a));
   }
-  // inward-wound (or inside-out) parts are not trusted as solids
+  // inward-wound (or inside-out) parts are not taken as solids
   return volume > 0 ? { part, min, max, planes: Float64Array.from(planes), faces } : null;
 }
 

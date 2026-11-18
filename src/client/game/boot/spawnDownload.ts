@@ -682,7 +682,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 if (done.has(index)) continue;
                 // DL13: a member is a view into its part (no copy): page reads and the keep share the part's bytes
                 const member = body.subarray(offset, offset + file.bytes);
-                // The part's bytes are only trusted per member: each must match its manifest row before it is kept or read.
+                // The part's bytes are only accepted per member: each must match its manifest row before it is kept or read.
                 if (await sha256(member) !== file.hash) throw new Error(`Spawn part member differs: ${part.url}`);
                 // a cancelled job keeps nothing more: neither before a member's store nor after an unabortable one (sp-x1)
                 controller.signal.throwIfAborted();

@@ -34,7 +34,7 @@ import type { BowProfile, BowView } from './bowProfile';
 
 /** View strategy ports supplied by the host world. */
 export interface BowWorld { game: Game; sky: Sky; player: Player; forest: Forest }
-/** Authored row, profile and unlock policy for the trusted bow family. */
+/** Authored row, profile and unlock policy for the native bow family. */
 export interface BowOptions<Style extends string = string> { row: EquipmentRow; profile: BowProfile<Style>; allowUnlocked?: boolean; inputContext: string; initialStyle: Style }
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const _v1 = V(0,0,0), _v2 = V(0,0,0), _v3 = V(0,0,0), _fwd = V(0,0,0), _dir = V(0,0,0), _rDir = V(0,0,0);

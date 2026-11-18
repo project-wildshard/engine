@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import type { TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
+import type { NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
@@ -23,7 +23,7 @@ let titanSpent: ReturnType<typeof snapshotSimHostBytes> | undefined, titanFireCe
 // Each bounded continuation consumes the preceding actual save, never a
 // hand-built phase. Bow damage and fire contact/burning/spent checkpoints
 // bound the native work per case without changing simulation speed or caps.
-function earnTitanPhase(live: TrustedHeadlessResident, goal: number, health?: number): void {
+function earnTitanPhase(live: NativeHeadlessResident, goal: number, health?: number): void {
   const host = live.host, player = leadPlayer(host), mount = mountedPlayerOf(host), arena = openArenaOf(host);
   if (mount === undefined || arena === undefined) throw new Error('Missing actual Titan continuation');
   host.combat.playerRules(host.scope, { bossGod: true });
