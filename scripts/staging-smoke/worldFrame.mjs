@@ -20,6 +20,9 @@ export const BG_SD = 12;
 
 /** @typedef {{ mean: number, sd: number, pageBg: number, pixels: number }} WorldStats */
 
+/** @param {number} v @param {number} [places] */
+const round = (v, places = 1) => Number(v.toFixed(places));
+
 /**
  * Luminance mean, spread and page-background share of the world region of an RGB(A) frame.
  * @param {Uint8Array | Uint8ClampedArray | Buffer} data @param {number} width @param {number} height @param {number} channels
@@ -40,9 +43,6 @@ export function worldStats(data, width, height, channels) {
   const mean = n === 0 ? 0 : sum / n;
   return { mean: round(mean), sd: round(Math.sqrt(Math.max(0, n === 0 ? 0 : sq / n - mean * mean))), pageBg: round(n === 0 ? 0 : bg / n, 3), pixels: n };
 }
-
-/** @param {number} v @param {number} [places] */
-const round = (v, places = 1) => Number(v.toFixed(places));
 
 /**
  * Why a frame's world is not drawn, or null when it is.

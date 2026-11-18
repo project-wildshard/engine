@@ -19,3 +19,4 @@
 - The Load step Jake read as "Worker boot" on his iPhone is renamed for what it does: "Joining the world" on a build with a
   world (staging, prod), "Starting the in-page server" only on a build with no world (the preview), one rule
   (`serverRoute.ts` `serverStepLabel`) for both the step row and its counted card.
+- Lint fix for the smoke check: K6's budgets and worldFrame's `round` defined before use, live cells in a Set; same behaviour.

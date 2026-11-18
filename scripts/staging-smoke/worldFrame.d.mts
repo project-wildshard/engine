@@ -1,5 +1,5 @@
 // Generated from the JSDoc in the .mjs beside it (meta STAGING-SMOKE): npx tsc --ignoreConfig <the .mjs files> --allowJs --declaration --emitDeclarationOnly
-/* oxlint-disable typescript/consistent-type-definitions, typescript/consistent-type-imports -- tsc's declaration output */
+/* oxlint-disable typescript/consistent-type-definitions -- tsc's declaration output */
 /** @typedef {{ mean: number, sd: number, pageBg: number, pixels: number }} WorldStats */
 /**
  * Luminance mean, spread and page-background share of the world region of an RGB(A) frame.

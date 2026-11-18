@@ -245,6 +245,46 @@ export async function oldProfileTitle(page, { onDrop = () => undefined, onRecove
   throw new Error('Old profile did not return to title through its controls');
 }
 
+/** K6's whole budget and each cell's: past it, the cells left are named as not entered (SM8 (d)). */
+export const K6_BUDGET_MS = 240_000, CELL_BUDGET_MS = 60_000;
+/** How long a cell plays before its world frame (the arrival reveal is 3 s on the grid; play has held 1.5 s by then). */
+export const CELL_SETTLE_MS = 2500;
+/** The frames whose world is judged (SB48): 10 s into play, and each K6 cell 4 s in (play1 can still be under the grid reveal). */
+export const WORLD_FRAME = /^(?:play10|cell-.+)$/u;
+
+/** Judge every play frame's world (worldFrame.mjs). @param {Record<string, string>} frames
+ * @returns {Promise<Record<string, { stats: WorldStats, black: string | null }>>} */
+export async function judgeWorldFrames(frames) {
+  /** @type {Record<string, { stats: WorldStats, black: string | null }>} */
+  const world = {};
+  for (const [name, path] of Object.entries(frames)) {
+    if (!WORLD_FRAME.test(name) || !existsSync(path)) continue;
+    try { world[name] = await judgeFrame(path); } catch { /* an unreadable frame is no verdict */ }
+  }
+  return world;
+}
+
+/** The Shard Select cards a player can enter on this title, as slugs (the title's rows matched to the cards by name).
+ * Leaves the page on Shard Select: the caller reopens the title. @param {Page} page @returns {Promise<string[]>} */
+export async function liveCells(page) {
+  await page.locator(SEL.titleSelect).tap();
+  await page.locator('#ws-name-box, .ws-title-stack[data-screen="select"]').first().waitFor({ timeout: 15_000 });
+  if (await page.locator(SEL.skip).isVisible()) await page.locator(SEL.skip).tap();
+  await page.locator('.ws-title-stack[data-screen="select"]').waitFor({ timeout: 15_000 });
+  /** @type {unknown} */
+  const rows = JSON.parse((await page.locator('#ws-title-rows').textContent()) ?? '[]');
+  // a card a player can enter (titleDeck.ts marks it data-enters); an upgrade or closed card is not a live cell
+  const names = (await page.locator('.ws-menu-card[data-enters="1"] > b').allTextContents()).map((n) => n.toLowerCase());
+  const enterable = new Set(names);
+  /** @type {Set<string>} */
+  const slugs = new Set();
+  if (Array.isArray(rows)) for (const r of rows) {
+    if (typeof r !== 'object' || r === null || typeof r.slug !== 'string' || typeof r.name !== 'string') continue;
+    if (enterable.has(r.name.toLowerCase())) slugs.add(r.slug);
+  }
+  return [...slugs];
+}
+
 /**
  * One scenario, start to finish, in its own persistent profile.
  * @param {{ id: ScenarioId, title: string, browser: BrowserName }} scenario
@@ -402,7 +442,8 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
           const path = join(dir, 'frames', `cell-${slug}.jpg`);
           try { await page.screenshot({ path, type: 'jpeg', quality: 75, scale: 'css', timeout: 5000 }); result.frames[`cell-${slug}`] = path; } catch { /* a navigation ate it */ }
         }
-        if (result.frames['play1'] === undefined && result.frames[`cell-${slug}`] !== undefined) result.frames['play1'] = String(result.frames[`cell-${slug}`]);
+        const cellFrame = result.frames[`cell-${slug}`];
+        if (result.frames.play1 === undefined && cellFrame !== undefined) result.frames.play1 = cellFrame;
         // back to the title the player's way; a cell that never played reopens the page
         const back = leg.playAt !== null && await page.locator(SEL.pause).tap({ timeout: 5000 }).then(() => page.locator(SEL.exit).tap({ timeout: 5000 })).then(() => page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 30_000 })).then(() => true, () => false);
         if (!back) { await open('/'); await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined); }
@@ -445,45 +486,6 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
   }
   result.world = await judgeWorldFrames(result.frames);
   return result;
-}
-
-/** K6's whole budget and each cell's: past it, the cells left are named as not entered (SM8 (d)). */
-export const K6_BUDGET_MS = 240_000, CELL_BUDGET_MS = 60_000;
-/** How long a cell plays before its world frame (the arrival reveal is 3 s on the grid; play has held 1.5 s by then). */
-export const CELL_SETTLE_MS = 2500;
-/** The frames whose world is judged (SB48): 10 s into play, and each K6 cell 4 s in (play1 can still be under the grid reveal). */
-export const WORLD_FRAME = /^(?:play10|cell-.+)$/u;
-
-/** Judge every play frame's world (worldFrame.mjs). @param {Record<string, string>} frames
- * @returns {Promise<Record<string, { stats: WorldStats, black: string | null }>>} */
-export async function judgeWorldFrames(frames) {
-  /** @type {Record<string, { stats: WorldStats, black: string | null }>} */
-  const world = {};
-  for (const [name, path] of Object.entries(frames)) {
-    if (!WORLD_FRAME.test(name) || !existsSync(path)) continue;
-    try { world[name] = await judgeFrame(path); } catch { /* an unreadable frame is no verdict */ }
-  }
-  return world;
-}
-
-/** The Shard Select cards a player can enter on this title, as slugs (the title's rows matched to the cards by name).
- * Leaves the page on Shard Select: the caller reopens the title. @param {Page} page @returns {Promise<string[]>} */
-export async function liveCells(page) {
-  await page.locator(SEL.titleSelect).tap();
-  await page.locator('#ws-name-box, .ws-title-stack[data-screen="select"]').first().waitFor({ timeout: 15_000 });
-  if (await page.locator(SEL.skip).isVisible()) await page.locator(SEL.skip).tap();
-  await page.locator('.ws-title-stack[data-screen="select"]').waitFor({ timeout: 15_000 });
-  /** @type {unknown} */
-  const rows = JSON.parse((await page.locator('#ws-title-rows').textContent()) ?? '[]');
-  // a card a player can enter (titleDeck.ts marks it data-enters); an upgrade or closed card is not a live cell
-  const names = (await page.locator('.ws-menu-card[data-enters="1"] > b').allTextContents()).map((n) => n.toLowerCase());
-  /** @type {string[]} */
-  const slugs = [];
-  if (Array.isArray(rows)) for (const r of rows) {
-    if (typeof r !== 'object' || r === null || typeof r.slug !== 'string' || typeof r.name !== 'string') continue;
-    if (names.includes(r.name.toLowerCase()) && !slugs.includes(r.slug)) slugs.push(r.slug);
-  }
-  return slugs;
 }
 
 /** The recorded clip as an .mp4 (H.264, 15 fps), or the .webm when ffmpeg is missing.
