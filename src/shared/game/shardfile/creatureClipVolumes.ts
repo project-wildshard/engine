@@ -4,6 +4,7 @@ import { CREATURE_SKELETONS, MIN_VOLUME_RADIUS } from '@wildshard/format/creatur
 import type { CreatureVolume } from '@wildshard/format/creatureVolumes';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { CreatureVolumeFrame, CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { CreatureClipSampler } from './creatureClipSampler';
 import type { CreatureRestJoint } from './creatureVolumes';
 
@@ -71,7 +72,8 @@ export class ClipCreatureVolumes implements CreatureVolumePose {
     this.refresh(); return this.sampler.joint(name, position, quaternion, scale);
   }
   capture(): CreatureVolumeFrame {
-    const volumes = this.volumes.map(row => ({ ...row })), points = new Float32Array(volumes.length * 6), rear = new Vector3(), front = new Vector3();
+    const volumes = this.volumes.map(row => ({ ...row })), rear = new Vector3(), front = new Vector3();
+    const points = ownedArray(Float32Array, volumes.length * 6, { owner: 'creature clip volumes', asset: 'collision frame', kind: 'physics' });
     volumes.forEach((_row, index) => { this.segment(index, rear, front); points.set(rear.toArray(), index * 6); points.set(front.toArray(), index * 6 + 3); });
     return { volumes, points };
   }

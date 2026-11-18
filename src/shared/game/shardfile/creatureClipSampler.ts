@@ -2,6 +2,7 @@ import { LinearInterpolant, Matrix4, Quaternion, Vector3 } from 'three';
 import * as v from 'valibot';
 import { parseGlbData } from '@wildshard/format/glbCost';
 import { glbBuffers } from '@wildshard/format/glbBuffers';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { CollisionPose } from '../plugin/animation';
 import type { CreatureRestJoint } from './creatureVolumes';
 
@@ -16,8 +17,11 @@ interface Clip { readonly duration: number; readonly tracks: readonly Track[] }
 
 /** Same quaternion primitive as Three's clip interpolant; STEP retains the previous key. */
 function sampleTrack(times: Float32Array, values: Float32Array, width: number, rotation: boolean, step: boolean): Track['sample'] {
-  if (!rotation && !step) { const interpolant = new LinearInterpolant(times, values, width); return time => interpolant.evaluate(time); }
-  const result = new Float32Array(width);
+  const result = ownedArray(Float32Array, width, { owner: 'creature clip sampler', asset: 'sample result', kind: 'scratch' });
+  if (!rotation && !step) {
+    const interpolant = new LinearInterpolant(times, values, width, result);
+    return time => interpolant.evaluate(time);
+  }
   const quaternionResult = [0, 0, 0, 1];
   const quaternionValues = rotation ? Array.from(values) : [];
   return time => {
@@ -45,8 +49,9 @@ export class CreatureClipSampler {
     const read = (index: number, width: number): Float32Array => {
       const accessor = v.parse(Accessor, doc.accessors[index]), view = v.parse(View, data.views[accessor.bufferView]);
       if (accessor.type !== (width === 1 ? 'SCALAR' : width === 4 ? 'VEC4' : 'VEC3')) throw new Error('Invalid creature clip accessor');
-      const stride = view.byteStride ?? width * 4, values = new Float32Array(accessor.count * width);
+      const stride = view.byteStride ?? width * 4;
       if (stride < width * 4 || accessor.byteOffset + (accessor.count - 1) * stride + width * 4 > view.byteLength) throw new Error('Invalid creature clip buffer');
+      const values = ownedArray(Float32Array, accessor.count * width, { owner: 'creature clip sampler', asset: 'keyframe track', kind: 'decode' });
       for (let row = 0; row < accessor.count; row++) for (let field = 0; field < width; field++) values[row * width + field] = binary.getFloat32(view.byteOffset + accessor.byteOffset + row * stride + field * 4, true);
       return values;
     };
