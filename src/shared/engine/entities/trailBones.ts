@@ -4,7 +4,8 @@
  * `TRAIL_SAMPLE_TICKS` (10 Hz), a cadence every wire band carries, so a page fed those samples holds the server's ring
  * point for point. Bone 0 is the live root; bone i sits i × spacing back along the path root → newest point → … →
  * oldest, so a leap's body rises and falls through the arc the head drew. Only + - * / and sqrt run per pose, so two
- * runs over the same samples are bit-identical. No scene objects, no clocks, no allocation per pose. */
+ * runs over the same samples are bit-identical; the rest-trail seed uses sin and cos, so a seed matches only on one JS
+ * engine, and the first real samples replace it. No scene objects, no clocks, no allocation per pose. */
 
 export interface TrailPoint { readonly x: number; readonly y: number; readonly z: number }
 /** `count` bones including bone 0 at the root, `spacing` metres apart along the path. */
@@ -30,11 +31,16 @@ const SAME_POINT = 1e-3;
 
 /** A ring that keeps every 10 Hz sample of a body moving at `slowest` m/s for the whole body; a slower body's tail runs
  * straight off the oldest point. 14 bones at 1.6 m and 0.25 m/s: 834 points, 20 KB. */
+/** The most points one ring holds (a 64-bone, 1 m-spaced serpent at its slowest needs about 2,500). */
+export const TRAIL_MAX_POINTS = 4096;
+
 export function trailRing(spec: TrailSpec, slowest = 0.25): TrailRing {
-  if (!(spec.count >= 2) || !Number.isInteger(spec.count) || !(spec.spacing > 0) || !(slowest > 0) || !Number.isFinite(slowest)) {
-    throw new Error('Trail needs at least 2 bones, a positive spacing and a positive slowest speed');
+  if (!(spec.count >= 2) || !Number.isInteger(spec.count) || !(spec.spacing > 0) || !Number.isFinite(spec.spacing) || !(slowest > 0) || !Number.isFinite(slowest)) {
+    throw new Error('Trail needs at least 2 bones, a finite positive spacing and a positive slowest speed');
   }
-  const capacity = Math.ceil(((spec.count - 1) * spec.spacing) / ((slowest * TRAIL_SAMPLE_TICKS) / 60)) + 2;
+  // room for the rest-trail seed (4 points a spacing) too, so a seed never wraps; capped so a tiny slowest cannot run away
+  const seeded = 4 * (spec.count - 1) + 2;
+  const capacity = Math.min(TRAIL_MAX_POINTS, Math.max(seeded, Math.ceil(((spec.count - 1) * spec.spacing) / ((slowest * TRAIL_SAMPLE_TICKS) / 60)) + 2));
   return { capacity, points: new Float64Array(capacity * 3), head: -1, size: 0 };
 }
 

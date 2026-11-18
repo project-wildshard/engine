@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { TRAIL_SAMPLE_TICKS, trailPose, trailPush, trailRing, trailSampleDue, trailSeed, type TrailPoint, type TrailSpec } from './trailBones';
+import { TRAIL_MAX_POINTS, TRAIL_SAMPLE_TICKS, trailPose, trailPush, trailRing, trailSampleDue, trailSeed, type TrailPoint, type TrailSpec } from './trailBones';
 
 /** Checked index: a missing element is a test bug, not a pass. */
 function el<T>(xs: ArrayLike<T>, i: number): T {
@@ -151,4 +151,12 @@ describe('CC22 trail bones', () => {
     expect(() => trailRing({ count: 1, spacing: 1 })).toThrow();
     expect(() => trailPose(ring, root, SERPENT, new Float64Array(3))).toThrow('too short');
   });
+});
+
+test('a ring refuses an infinite spacing, never outgrows its cap, and holds a whole seed', () => {
+  expect(() => trailRing({ count: 4, spacing: Number.POSITIVE_INFINITY })).toThrow('finite positive spacing');
+  expect(trailRing({ count: 4, spacing: 1 }, 1e-9).capacity).toBe(TRAIL_MAX_POINTS);
+  const spec = { count: 8, spacing: 0.05 }, ring = trailRing(spec);
+  trailSeed(ring, spec, { x: 0, y: 0, z: 0 }, 0);
+  expect(ring.size).toBe(4 * (spec.count - 1) + 1);
 });
