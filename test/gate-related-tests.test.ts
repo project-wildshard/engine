@@ -185,7 +185,8 @@ it('browser, timing and slow files go to hosted CI; an unmeasured file stays loc
 });
 
 it('every Vitest file that launches a real browser is on the browser list', () => {
-  const launches = execFileSync('git', ['grep', '-l', '-E', String.raw`\.launch\(|launchPersistentContext|connectOverCDP`, '--', '*.test.ts', '*.test.mjs'], {encoding: 'utf8'}).trim().split('\n');
+  // A browser launch names its Playwright browser type; a projectile's `.launch(from, velocity)` is not one.
+  const launches = execFileSync('git', ['grep', '-l', '-E', String.raw`(chromium|webkit|firefox)\.launch\(|launchPersistentContext|connectOverCDP`, '--', '*.test.ts', '*.test.mjs'], {encoding: 'utf8'}).trim().split('\n');
   // boot-dist-transfer only names a launch in a refusal message; this file only names the pattern.
   for (const file of launches.filter(path => path !== 'test/boot-dist-transfer.test.ts' && path !== 'test/gate-related-tests.test.ts')) expect(BROWSER_TESTS).toContain(file);
 });
