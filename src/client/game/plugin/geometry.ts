@@ -1956,11 +1956,13 @@ export async function readWholeGeometry(scope: ResourceScope, source: Shardfile 
   };
   // Transport refills on completion, independently of ordered parsing and
   // assembly. A slow decoder no longer holds back later phase files.
-  const reads = new PreparationReads(hashes, hash => product.assets.read(hash), () => !scope.disposed && !scope.disposing);
+  const sizes = new Map(product.source.files.map(file => [file.hash, file.compressed]));
+  const reads = new PreparationReads(hashes, hash => product.assets.read(hash), () => !scope.disposed && !scope.disposing, hash => sizes.get(hash) ?? 0);
   try {
     for (const [index, hash] of hashes.entries()) {
       assertLive();
-      const pending = reads.take(index);
+      // EM23: the file stays charged to the boot's byte window through its decode and assembly (`reads.done`)
+      const pending = reads.take(index, true);
       const bytes = timing === undefined ? await pending : await timing.run('read-wait', () => pending);
       const gltf = timing === undefined ? await (await prepareRigLoader()).createRigLoader().parseBytesAsync(bytes, '')
         : await timing.run('decode', async () => (await prepareRigLoader()).createRigLoader().parseBytesAsync(bytes, ''));
@@ -1985,6 +1987,7 @@ export async function readWholeGeometry(scope: ResourceScope, source: Shardfile 
         if (scope.disposed) throw new Error('Whole geometry unloaded while reading');
       } finally { for (const dispose of cleanup) dispose(); }
       await (timing === undefined ? product.releaseTransport([hash]) : timing.run('release', () => product.releaseTransport([hash])));
+      reads.done(index);
     }
     const steps = assembler.finishSteps();
     let finished = timing === undefined ? steps.next() : timing.sync('finalize', () => steps.next());

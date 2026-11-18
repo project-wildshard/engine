@@ -1,3 +1,4 @@
+import { loadWindow } from '../boot/loadWindow';
 import { pageScope, resourceScope } from '../../../shared/engine/app/resources';
 import { pageEnvironments } from './drawnEnvironment';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -1850,7 +1851,13 @@ export async function precompileLevel(game: Pick<Game, 'renderer' | 'camera' | '
       completed = done; total = count; onProgress?.(done, count + warm.length, detail);
     };
     if (live) { await setup.yield(); if (options.current?.() === false) throw new Error('Shader warm-up owner left'); }
-    const report = await runPrecompile(game.renderer, game.camera, jobs, materials, progress, collectTextures(jobs), options.current, options.isolateImageUploads, options.pause, options.uploadBudget, options.onStage, options.sliceMs);
+    // EM23: a boot compile (not the live, paced warm-ups) admits no decode burst beside it, one part per pipeline
+    const bootCompile = options.nearest !== true && options.isolateImageUploads !== true && options.pause === undefined;
+    const endCompile = bootCompile ? loadWindow.compiling() : undefined;
+    let report: PrecompileReport;
+    try {
+      report = await runPrecompile(game.renderer, game.camera, jobs, materials, progress, collectTextures(jobs), options.current, options.isolateImageUploads, options.pause, options.uploadBudget, options.onStage, options.sliceMs);
+    } finally { endCompile?.(); }
     if (warm.length > 0) {
       // LS11: on a serial GPU each post draw's pipeline lands before the next (the last one draws to the canvas)
       const serial = serialLoading(game.renderer, options.isolateImageUploads === true);

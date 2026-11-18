@@ -93,6 +93,7 @@
     "src/client/engine/boot/leaveAfterPaint.ts": "client",
     "src/client/engine/boot/liveJsonParser.ts": "client",
     "src/client/engine/boot/liveJsonParser.worker.ts": "client",
+    "src/client/engine/boot/loadWindow.ts": "client",
     "src/client/engine/boot/diagnostics.ts": "client",
     "src/client/engine/boot/loadingDownloadText.ts": "client",
     "src/client/engine/boot/loadingPacks.ts": "client",
