@@ -115,27 +115,9 @@ function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     // WIRE-STABILITY WR6: the bound wire's lock is current against v0, under 1 s (release rules come with a newer pin).
     {name:'check:wire',commands:[['pnpm','run','--silent','check:wire']]},
     // WIRE-STABILITY WR7: saves.lock.json, every save key's version, shape and migrations (test/saves-lock.test.ts).
-    // One focused Vitest file; its script drops the push cohort's profile so land's carried push (LS3, no lease) runs it.
+    // One focused Vitest file; its script drops the push cohort's profile.
     {name:'check:saves',commands:[['pnpm','run','--silent','check:saves']]},
   ];
-}
-
-/** Lint workers on land's carried main push: 6 took lint:game from 27 s to 11.5 s on the Mac (2026-11-11). Never
- * more than the CPU broker grants one request (all cores but two, scripts/cpu-admission.py). */
-const LAND_LINT_THREADS=Math.max(1,Math.min(6,availableParallelism()-2));
-
-/** LAND-SIMPLIFY LS3 (J258): land's main push after a clean rebase. Lint, TypeScript and the static checks, in
- * parallel under the CPU broker; no Vitest, no heavy lane. Branch CI ran the suite on the same diff.
- * @param {NodeJS.ProcessEnv} env @returns {Promise<number>} the exit code */
-export async function landMainChecks(env){
-  const began=Date.now();
-  // Lint is the long pole (type-aware, 27 s on one thread); with no tests beside it, it gets LAND_LINT_THREADS,
-  // and the broker meters that many slots.
-  const lint={...env,WS_PUSH_LINT_THREADS:String(LAND_LINT_THREADS),GOMAXPROCS:String(LAND_LINT_THREADS)};
-  const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
-  const result=generated.ok?await parallelChecks(staticChecks(LAND_LINT_THREADS),{env:lint}):generated;
-  console.error(`  - land main push (carried, LS3): static lane ${result.ok?'green':'RED'} in ${((Date.now()-began)/1000).toFixed(1)} s; no Vitest (branch CI ran it)`);
-  return result.ok?0:1;
 }
 
 async function main(){

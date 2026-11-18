@@ -1,4 +1,5 @@
-// J240: both landing suites use isolated real Git repositories, hooks and a fake Actions CLI.
+// J240: the landing suites use isolated real Git repositories, hooks and a fake Actions CLI (the local and push
+// modes must never ask it anything; pin-provenance tests still answer from it).
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture drives real Git and runs the land CLI.
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Create and clean owned fixture repositories.
@@ -106,7 +107,7 @@ export function fixture() {
     WS_LAND_REPO: 'project-wildshard/fixture', WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
     WS_SESSION_KEEP_ROOT: join(root, 'session-keep'),
     // MF12: never mint a real reader App token from a fixture, even on a machine that has the App's key.
-    WS_GH_READER: '0', WS_LAND_MODE: 'hosted',
+    WS_GH_READER: '0', WS_LAND_MODE: 'push',
     WS_STORE_USERS: join(root, 'store-users'), WS_STORE_RESERVATION: join(root, 'store-maintenance.lock'),
     WS_FULL_GATE_ROOT: join(root, 'full-gate'),
   };
@@ -152,11 +153,11 @@ export function fixture() {
     return script;
   };
   const state = (extra: Record<string, unknown>) => writeFileSync(files.state, JSON.stringify({ log: files.gh, pushed: files.pushed, ...extra }));
-  // Most tests look at the worktree after landing, so they keep it (the LS5 tests pass no flags).
+  // Most tests look at the worktree after landing, so they keep it (the LS5 tests pass --done).
   const KEPT = ['--keep'];
-  const land = (cwd: string, args: readonly string[] = KEPT) => spawnSync(process.execPath, [LAND, '--poll=0.05', '--appear=0.05', ...args], { cwd, env, encoding: 'utf8', timeout: 60_000 });
+  const land = (cwd: string, args: readonly string[] = KEPT) => spawnSync(process.execPath, [LAND, ...args], { cwd, env, encoding: 'utf8', timeout: 60_000 });
   const landAsync = (cwd: string) => new Promise<{ code: number | null; stdout: string }>(done => {
-    const child = execFile(process.execPath, [LAND, '--poll=0.05', '--appear=0.05', ...KEPT], { cwd, env, encoding: 'utf8', timeout: 60_000 }, (error, stdout) => { done({ code: error === null ? 0 : (typeof error.code === 'number' ? error.code : 1), stdout }); });
+    const child = execFile(process.execPath, [LAND, ...KEPT], { cwd, env, encoding: 'utf8', timeout: 60_000 }, (error, stdout) => { done({ code: error === null ? 0 : (typeof error.code === 'number' ? error.code : 1), stdout }); });
     child.stdin?.end();
   });
   const remoteMain = () => git(remote, ['rev-parse', 'main']);

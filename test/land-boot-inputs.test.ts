@@ -75,7 +75,7 @@ ${publish}
   if (mode === 'complete' || mode === 'stale manifest') {
     expect(result.status, result.stdout).toBe(0);
     expect(f.git(f.remote, ['show', `main:${STAMP}`])).toContain(JSON.stringify([tracked, mount]));
-    expect(prepushLines(f)).toHaveLength(2);
+    expect(prepushLines(f)).toHaveLength(1);
   } else {
     expect(result.status, result.stdout).toBe(1);
     expect(result.stdout).toContain('cannot regenerate boot stamps');

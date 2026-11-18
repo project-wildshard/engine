@@ -203,17 +203,6 @@ describe('land (J400): local gates and proof reuse', () => {
     } finally { if (child.exitCode === null) child.kill('SIGTERM'); }
   }, 20_000);
 
-  test('J400: an additional workflow gate is authoritative without a job-name allowlist', () => {
-    const f = fixture(), wt = f.worktree('future-gate');
-    const before = f.remoteMain();
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: extra gate');
-    f.state({ red: { 'plan/future-gate': { ci: 'future-independent-gate' } } });
-    const result = f.land(wt);
-    expect(result.status).toBe(1);
-    expect(result.stdout).toContain('future-independent-gate');
-    expect(f.remoteMain()).toBe(before);
-  }, 60_000);
-
   test('J400: a red gate stays red when a peer also moves main', () => {
     const f = fixture();
     f.env['WS_LAND_MODE'] = 'local';

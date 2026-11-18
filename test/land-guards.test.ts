@@ -1,15 +1,17 @@
 // J240 / DEV-SPEED DS21: scripts/land.mjs against real git. A bare repo stands
 // in for GitHub (with protect-main's no-force, no-delete rule as an update
-// hook), a post-receive hook records every pushed tip, and a fake `gh` on PATH
-// answers Actions queries only for SHAs that were really pushed.
+// hook) and a post-receive hook records every pushed tip. The guards land
+// keeps in J422 push mode: pins and boot stamps before the gate, a clean tree,
+// the pre-push's cause, the rebase install and Git ref-lock retries (meta
+// FLOW-SIMPLE FS5 deleted the hosted land's preflight and plan push).
 // oxlint-disable-next-line import/no-nodejs-modules -- Real git repositories, hooks and the land CLI.
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture repositories stay in the repository scratch root.
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { CHECK_CSS, failureLine, PINS_LEDGER, preflightSteps, prePushCause, REF_LOCK, STAMPS } from '../scripts/land.mjs';
+import { failureLine, PINS_LEDGER, prePushCause, REF_LOCK, STAMPS } from '../scripts/land.mjs';
 import { cleanLandFixtures, fixture, prepushLines, type Fixture } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -21,59 +23,12 @@ const GEN_STAMPS = "import {mkdirSync,readdirSync,statSync,writeFileSync} from '
   + "const rows=readdirSync('src').filter(name=>name.endsWith('.ts')).sort().map(name=>name+':'+statSync('src/'+name).size);"
   + "mkdirSync('src/client/game/boot',{recursive:true});writeFileSync('src/client/game/boot/bytes.generated.ts','export const bytes = '+JSON.stringify(rows)+';\\n');";
 
-describe('land (J240): preflight, branch ownership and Git retries', () => {
+describe('land (J422): the guards around the main push, and Git retries', () => {
   const plantPnpm = (f: Fixture, red: string | null) => {
     const log = join(f.root, 'pnpm.log');
     writeFileSync(join(f.root, 'bin/pnpm'), `#!/bin/sh\necho "$*" >> '${log}'\n${red === null ? '' : `[ "$1" = ${red} ] && { echo 'planted ${red} error'; exit 2; }\n`}exit 0\n`);
     return () => f.read(log).trim().split('\n').filter(Boolean);
   };
-
-  test('preflight: lint:game, typecheck, then the Vitest files related to the changed code, before the plan push', () => {
-    const f = fixture(), calls = plantPnpm(f, null);
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    f.commit(wt, 'docs/feature.md', '# Feature\n', 'docs: feature');
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(calls().filter(line => !line.startsWith('install'))).toEqual(['lint:game', 'typecheck', 'exec vitest related --run --passWithNoTests src/feature.ts']);
-    expect(result.stdout.indexOf('preflight vitest green')).toBeLessThan(result.stdout.indexOf('pushing'));
-  }, 60_000);
-
-  test('preflight: a red check stops land before any push or CI wait, naming its log; --no-preflight skips it', () => {
-    const f = fixture(), calls = plantPnpm(f, 'typecheck');
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    const result = f.land(wt);
-    expect(result.status).toBe(1);
-    const log = /Log: (\S+)/u.exec(result.stdout)?.[1] ?? '';
-    expect(result.stdout).toContain('land STOP preflight typecheck is red');
-    expect(readFileSync(log, 'utf8')).toContain('planted typecheck error');
-    expect(log.startsWith(wt), 'the log stays out of the tree').toBe(false);
-    expect(calls()).toEqual(['lint:game', 'typecheck']);
-    expect([f.read(f.files.prepush), f.read(f.files.gh)]).toEqual(['', '']);
-    expect(f.read(f.files.receipts)).toContain(`STOP preflight typecheck red on ${f.git(wt, ['rev-parse', 'HEAD']).slice(0, 10)}, nothing pushed: ${log}`);
-    const skipped = f.land(wt, ['--keep', '--no-preflight']);
-    expect(skipped.status, skipped.stdout).toBe(0);
-    expect(skipped.stdout).toContain('preflight skipped (--no-preflight)');
-  }, 60_000);
-
-  test('preflightSteps: CI\'s check-css always; Vitest only when code changed, on that code alone', () => {
-    expect(preflightSteps(['docs/a.md', 'package.json'])).toEqual([['lint:game', ['pnpm', 'lint:game']], ['check-css', ['node', CHECK_CSS]], ['typecheck', ['pnpm', 'typecheck']]]);
-    expect(preflightSteps(['docs/a.md', 'src/a.ts', 'test/a.test.ts', 'scripts/b.mjs']).at(-1)).toEqual(['vitest', ['pnpm', 'exec', 'vitest', 'related', '--run', '--passWithNoTests', 'src/a.ts', 'test/a.test.ts', 'scripts/b.mjs']]);
-  });
-
-  // opus-gcm11, 2026-11-15: check-css is red only on CI's static job (a 27-minute re-run); the preflight runs it here.
-  test('preflight: the tree\'s own check-css runs after lint:game, and a red one stops land before any push', () => {
-    const f = fixture(), calls = plantPnpm(f, null);
-    const wt = f.worktree('foo');
-    f.commit(wt, CHECK_CSS, "console.log('planted css violation'); process.exit(1);\n", 'chore: a check-css that fails');
-    const result = f.land(wt);
-    expect(result.status).toBe(1);
-    expect(result.stdout).toContain('land STOP preflight check-css is red');
-    expect(readFileSync(/Log: (\S+)/u.exec(result.stdout)?.[1] ?? '', 'utf8')).toMatch(/^\$ node scripts\/check-css\.mjs\nplanted css violation/u);
-    expect(calls()).toEqual(['lint:game']);
-    expect(f.read(f.files.prepush)).toBe('');
-  }, 60_000);
 
   // 2026-11-16 (codex-netlag, opus-publish1): a worktree rebased past a pin bump holds the old revision under out/, and
   // gen:inputs refuses it; the stop showed only the stack's tail. Land runs pins first, and a stop names the thrown error.
@@ -117,22 +72,24 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
       }
       const result = f.land(wt);
       expect(result.status, result.stdout).toBe(0);
-      expect(calls()[0], String(ran)).toBe(ran ? 'lint:game' : '--silent pins');
+      expect(calls()[0], String(ran)).toBe(ran ? undefined : '--silent pins');
       expect(result.stdout.includes('never ran pnpm pins'), String(ran)).toBe(!ran);
     }
   }, 90_000);
 
-  test('a red pre-push on the plan push stops before any CI wait', () => {
+  test('a red push gate stops land with its cause; main is unchanged', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    const before = f.remoteMain();
     writeFileSync(f.files.fail, '');
     const result = f.land(wt);
     expect(result.status).toBe(1);
-    expect(result.stdout).toContain('push of plan/foo');
+    expect(result.stdout).toMatch(/land STOP main push of [0-9a-f]{10} refused: pre-push: planted red check\nFix forward and run land again\./u);
+    expect(f.remoteMain()).toBe(before);
     expect(f.read(f.files.gh)).toBe('');
     // DS22: the receipt names the pre-push's own cause, not a bare "pre-push red".
-    expect(f.read(f.files.receipts)).toMatch(/STOP plan push [0-9a-f]{10} refused by the pre-push: pre-push: planted red check$/mu);
+    expect(f.read(f.files.receipts)).toMatch(/STOP main push of [0-9a-f]{10} refused: pre-push: planted red check$/mu);
   }, 60_000);
 
   test('DS22: a dirty bytes.generated.ts is regenerated after the rebase, committed on the plan branch, and lands', () => {
@@ -162,8 +119,8 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     expect(stamp).toContain('feature.ts:');
     expect(stamp).toContain('other.ts:');
     expect(f.git(wt, ['status', '--porcelain'])).toBe('');
-    // One plan push and one main push: no refusal on the way.
-    expect(prepushLines(f)).toHaveLength(2);
+    // One main push: no refusal on the way.
+    expect(prepushLines(f)).toHaveLength(1);
     expect(f.read(f.files.receipts)).toMatch(/plan\/foo stamps committed [0-9a-f]{10}: src\/client\/game\/boot\/bytes\.generated\.ts/u);
     expect(STAMPS).toContain(STAMP);
   }, 60_000);
@@ -184,7 +141,6 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     // The gate never ran and nothing left this machine.
     expect(f.read(f.files.prepush)).toBe('');
     expect(f.read(f.files.gh)).toBe('');
-    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], { cwd: f.remote, env: f.env }).status).not.toBe(0);
     expect(f.read(f.files.receipts)).toMatch(/STOP tree not clean before the gate: src\/a\.ts, stray\.txt$/mu);
     expect(readFileSync(join(wt, 'stray.txt'), 'utf8')).toBe('mine');
   }, 60_000);
@@ -216,125 +172,6 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     expect(f.land(join(f.repo, '.worktrees', 'x')).stdout).toContain('this checkout is on feature/x');
   }, 60_000);
 
-  test('a commit made while hosted CI runs stops the landing; it never rides along unchecked', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    const before = f.remoteMain();
-    f.state({ once: { marker: join(f.root, 'once'), command: ['git', '-C', wt, 'commit', '--quiet', '--allow-empty', '-m', 'sneaky'] } });
-    const result = f.land(wt);
-    expect(result.status).toBe(1);
-    expect(result.stdout).toContain('HEAD moved while hosted CI ran');
-    expect(f.remoteMain()).toBe(before);
-  }, 60_000);
-
-  // LAND-SIMPLIFY LS4 (J258): the local branch's reflog decides who may rewrite the plan branch, and the push
-  // carries an explicit lease. No record of land's own is read or written.
-  test('a plan branch someone else pushed is refused by git, fetched or not', () => {
-    for (const fetched of [false, true]) {
-      const f = fixture();
-      const wt = f.worktree('foo');
-      f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-      f.git(f.peer, ['commit', '--quiet', '--allow-empty', '-m', 'someone else']);
-      f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
-      const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
-      if (fetched) f.git(wt, ['fetch', '--quiet', 'origin']);
-      const result = f.land(wt);
-      expect(result.status, `fetched=${fetched}: ${result.stdout}`).toBe(1);
-      expect(result.stdout).toContain("which this worktree's branch never reached");
-      expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
-      expect(f.read(f.files.receipts)).toMatch(/STOP plan push [0-9a-f]{10} refused \(origin has commits this worktree never had\)/u);
-    }
-  }, 90_000);
-
-  test('the worktree\'s own hand push, then a local rebase, rewrites cleanly and lands', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
-    f.git(wt, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
-    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: add feature, amended']);
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/replaces its own [0-9a-f]{10} under a lease/u);
-    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature, amended');
-    expect(existsSync(join(f.git(wt, ['rev-parse', '--path-format=absolute', '--git-dir']), 'wildshard-land-tip'))).toBe(false);
-  }, 60_000);
-
-  test('a hand push by URL leaves the tracking ref stale; land refreshes it and still lands its own rewrite', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
-    f.git(wt, ['push', '--quiet', f.remote, 'HEAD:refs/heads/plan/foo']);
-    // Some git versions update the tracking ref for a URL that matches origin's; drop it so the stale case is real.
-    spawnSync('git', ['update-ref', '-d', 'refs/remotes/origin/plan/foo'], { cwd: wt, env: f.env });
-    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: add feature, amended']);
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature, amended');
-  }, 60_000);
-
-  test('a foreign push fetched from a sibling worktree (shared refs) is still refused', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    const sibling = f.worktree('bar');
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    f.git(f.peer, ['commit', '--quiet', '--allow-empty', '-m', 'someone else']);
-    f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
-    const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
-    f.git(sibling, ['fetch', '--quiet', 'origin']);
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(1);
-    expect(result.stdout).toContain("which this worktree's branch never reached");
-    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
-  }, 60_000);
-
-  test('land\'s own earlier push, then a rebase after a red, rewrites under the lease', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
-    f.state({ red: { 'plan/foo': { ci: 'tests (1)' } } });
-    expect(f.land(wt).status).toBe(1);
-    f.state({});
-    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: add feature, fixed']);
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature, fixed');
-  }, 60_000);
-
-  test('the reflog rule: a foreign tip the local branch once held counts as seen, so land may replace it', () => {
-    // As with --force-if-includes, a tip reachable from the local branch's reflog was seen: the agent reset onto their
-    // commit, so discarding it is the agent's call. Recorded here so the rule is deliberate (LS4 swapped records for it).
-    const f = fixture();
-    const wt = f.worktree('foo');
-    const base = f.git(wt, ['rev-parse', 'HEAD']);
-    f.git(f.peer, ['commit', '--quiet', '--allow-empty', '-m', 'someone else']);
-    f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
-    const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
-    f.git(wt, ['fetch', '--quiet', 'origin']);
-    f.git(wt, ['reset', '--quiet', '--hard', theirs]);
-    f.git(wt, ['reset', '--quiet', '--hard', base]);
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).not.toBe(theirs);
-  }, 60_000);
-
-  test('LS1: land runs no generator after the rebase, so a plan\'s gen.mjs can\'t slip a commit onto main', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    // Before LS1 land ran this plan's gen.mjs after the rebase to regenerate the stamps; this one would commit a file. It
-    // sneaks only once hosted CI has been asked (the marker), so DS22's up-front gen:inputs, before the gate, is clean.
-    const marker = join(f.root, 'once');
-    f.commit(wt, 'scripts/gen.mjs', `import {execSync} from 'node:child_process';import {existsSync,writeFileSync} from 'node:fs';if(existsSync(${JSON.stringify(marker)})){writeFileSync('src/sneak.ts','export {};\\n');execSync('git add src/sneak.ts && git commit -q -m sneak');}`, 'build: a generator');
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    const main = f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/']).split('\n');
-    expect(main).toEqual(expect.arrayContaining(['src/other.ts', 'src/feature.ts']));
-    expect(main).not.toContain('src/sneak.ts');
-  }, 60_000);
-
   test('DS22: a gen:inputs that commits on its own stops land before the gate; land commits only the stamps', () => {
     const f = fixture();
     const wt = f.worktree('foo');
@@ -347,30 +184,15 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     expect(f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/'])).not.toMatch(/sneak|feature/u);
   }, 60_000);
 
-  test('J206 review: a commit that slips in during the rebase never rides to main (verifyReplay)', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    const tested = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    // git runs post-rewrite after land's rebase: this one commits a file of its own on top of the rebased plan.
-    writeFileSync(join(f.root, 'hooks/post-rewrite'), '#!/bin/sh\n[ "$1" = rebase ] || exit 0\nprintf "export {};\\n" > src/sneak.ts\ngit add src/sneak.ts\ngit commit -q -m sneak\n');
-    chmodSync(join(f.root, 'hooks/post-rewrite'), 0o755);
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(1);
-    expect(result.stdout).toMatch(/is not main [0-9a-f]{10} plus the hosted-green [0-9a-f]{10}: a commit or edit came in/u);
-    expect(f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/'])).not.toMatch(/sneak|feature/u);
-    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
-    expect(f.read(f.files.receipts)).toMatch(/STOP rebased [0-9a-f]{10} is not main/u);
-  }, 60_000);
-
   test('GVS G9: a fixture resolves pnpm to its own fake, never the real one that would reinstall this checkout', () => {
     const f = fixture();
     const found = execFileSync('sh', ['-c', 'command -v pnpm'], { cwd: f.repo, env: f.env, encoding: 'utf8' }).trim();
     expect(found).toBe(join(f.root, 'bin/pnpm'));
   });
 
-  // These two are about the rebase install alone; the preflight's own pnpm calls are tested above.
-  const NO_PREFLIGHT = ['--keep', '--no-preflight'];
+  // These two are about the rebase install alone. Main moves before land starts, so land's own rebase brings it in.
+  const KEEP = ['--keep'];
+  const peerLands = (f: Fixture, path: string, text: string) => execFileSync('sh', [f.peerScript(path, null, text)], { env: f.env });
   test('a rebase that brings in a lockfile change installs before the pushes; one that does not, does not', () => {
     const f = fixture();
     // A fake pnpm on the fixture's PATH logs each call, so the test sees exactly what land runs.
@@ -379,8 +201,8 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     chmodSync(join(f.root, 'bin/pnpm'), 0o755);
     const wt = f.worktree('foo');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
-    const result = f.land(wt, NO_PREFLIGHT);
+    peerLands(f, 'pnpm-lock.yaml', 'lockfile with wire');
+    const result = f.land(wt, KEEP);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/install\s+pnpm-lock\.yaml changed in the rebase; pnpm install --frozen-lockfile/u);
     expect(f.read(calls).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false']);
@@ -389,8 +211,8 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     chmodSync(join(g.root, 'bin/pnpm'), 0o755);
     const plain = g.worktree('bar');
     g.commit(plain, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    g.state({ once: { marker: join(g.root, 'once'), command: ['sh', g.peerScript('src/other.ts', null, 'export const other = 2;')] } });
-    const quiet = g.land(plain, NO_PREFLIGHT);
+    peerLands(g, 'src/other.ts', 'export const other = 2;');
+    const quiet = g.land(plain, KEEP);
     expect(quiet.status, quiet.stdout).toBe(0);
     expect(quiet.stdout).not.toMatch(/frozen-lockfile/u);
     expect(existsSync(`${calls}.g`)).toBe(false);
@@ -404,8 +226,8 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     chmodSync(join(f.root, 'bin/pnpm'), 0o755);
     const wt = f.worktree('foo');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
-    const result = f.land(wt, NO_PREFLIGHT);
+    peerLands(f, 'pnpm-lock.yaml', 'lockfile with wire');
+    const result = f.land(wt, KEEP);
     expect(result.status, result.stdout).toBe(0);
     expect(f.read(calls).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false users=1']);
     expect(readdirSync(users)).toEqual([]);
@@ -418,15 +240,15 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     try {
       const plain = g.worktree('bar');
       g.commit(plain, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-      g.state({ once: { marker: join(g.root, 'once'), command: ['sh', g.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
-      const stopped = g.land(plain, NO_PREFLIGHT);
+      peerLands(g, 'pnpm-lock.yaml', 'lockfile with wire');
+      const stopped = g.land(plain, KEEP);
       expect(stopped.status).not.toBe(0);
       expect(stopped.stdout + stopped.stderr).toMatch(/store prune is running/u);
       expect(existsSync(`${calls}.g`)).toBe(false);
       // J206 review: the rebase already moved HEAD, so the next land must still owe and run the install first.
       prune.kill();
       await new Promise(gone => prune.once('exit', gone));
-      const again = g.land(plain, NO_PREFLIGHT);
+      const again = g.land(plain, KEEP);
       expect(again.status, again.stdout + again.stderr).toBe(0);
       expect(g.read(`${calls}.g`).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false']);
     } finally { prune.kill(); }
@@ -440,34 +262,12 @@ describe('land (J240): preflight, branch ownership and Git retries', () => {
     // Ignored as engine's .gitignore does (no trailing slash, so the link matches too): DS22's preflight passes it.
     writeFileSync(join(h.repo, '.git/info/exclude'), 'node_modules\n');
     symlinkSync(join(h.root, 'canonical-modules'), join(linked, 'node_modules'));
-    h.state({ once: { marker: join(h.root, 'once'), command: ['sh', h.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
-    const refused = h.land(linked, NO_PREFLIGHT);
+    peerLands(h, 'pnpm-lock.yaml', 'lockfile with wire');
+    const refused = h.land(linked, KEEP);
     expect(refused.status).not.toBe(0);
     expect(refused.stdout + refused.stderr).toMatch(/node_modules is a symlink/u);
     expect(existsSync(`${calls}.h`)).toBe(false);
   }, 180_000);
-
-  test('a harness change carries too: J249 has no harness rule, main\'s own run checks it', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, 'vitest.config.ts', 'export default {};', 'test: add a vitest config');
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1;/u);
-  }, 60_000);
-
-  test('a plan that changes hosted CI carries after a clean rebase too (J249)', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, '.github/workflows/x.yml', 'name: x', 'ci: add x');
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1;/u);
-  }, 60_000);
 
   test('two worktrees land at once with no shared lock; both reach main', async () => {
     const f = fixture();

@@ -66,40 +66,30 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   const {capturePushTree,readPushProof}=await import('../scripts/push-proof-cache.mjs');
   const {landMainMode,mainPushed,planBaseRefs,splitRequested}=await import('../scripts/push-local-split.mjs');
   const env = pushEnvironment(Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))));
-  // LAND-SIMPLIFY LS3 (J249, J258): land marks its own main push. History, secrets, size, the changelog and
-  // AGENTS.md already ran above in pre-push. `exact` is the SHA branch CI proved: nothing more runs. `carried` is
-  // a clean rebase of it: lint, TypeScript and the static checks run, never Vitest (Jake: "we run all the fast and
-  // cheap stuff, ignoring vitest, but still run lint & typescript"). Any other main push keeps the full gate.
+  // Land marks its own main push. History, secrets, size, the changelog and AGENTS.md already ran above in
+  // pre-push. J422's `push` takes the ordinary split gate below, like any main push; J400's `local` (the Mac mini,
+  // J388) runs the full local gate. FLOW-SIMPLE FS5 deleted the hosted land's `exact` and `carried` pushes.
   // The marker is read from the hook's own environment: the gate's environment keeps only its allowlist.
   const landMain=landMainMode({...env,WS_LAND_MAIN_PUSH:process.env.WS_LAND_MAIN_PUSH},env.WS_PUSH_REFS);
-  // J422: land's `push` main push takes the ordinary split gate below, like any main push.
-  if(landMain!==null&&landMain!=='push'){
-    if(landMain==='local'){
-      // Land owns main-watch after this main-only push. Release/tag
-      // observations cannot use this exact single-main-ref marker.
-      // No push refs keeps full selection unless push-checks authenticates a
-      // prior full proof and disjoint incoming delta. Never DS9's split or
-      // known-red allowance. Keep WL22's real lease; no patch-id-only carry.
-      /** @type {NodeJS.ProcessEnv} */
-      const full={...env,WS_LOCAL_LAND_HEAD:process.env.WS_LAND_MAIN_PUSH?.slice(6)??'',WS_LANE_NAME:(process.env.WS_LANE_NAME===''?undefined:process.env.WS_LANE_NAME)??'local-land'};Reflect.deleteProperty(full,'WS_PUSH_REFS');
-      Reflect.deleteProperty(full,'WS_LAND_HOOK_ACK');
-      if(process.env.WS_LOCAL_LAND_DELTA!==undefined)full.WS_LOCAL_LAND_DELTA=process.env.WS_LOCAL_LAND_DELTA;
-      if(process.env.WS_LOCAL_LAND_BASE_MAIN!==undefined)full.WS_LOCAL_LAND_BASE_MAIN=process.env.WS_LOCAL_LAND_BASE_MAIN;
-      const ran=spawn('python3',['scripts/heavy-lane.py','full-test','--checkout-scope','--',process.execPath,'scripts/land-local-gate.mjs'],{cwd:root,env:full,stdio:'inherit'});
-      process.on('SIGINT',()=>ran.kill('SIGINT'));process.on('SIGTERM',()=>ran.kill('SIGTERM'));
-      const code=await new Promise(done=>{ran.once('error',()=>done(1));ran.once('close',value=>done(value??1));});
-      if(code===0){
-        const {completeLocalHook}=await import('../scripts/land-hook-ack.mjs');
-        completeLocalHook(root,full.WS_LOCAL_LAND_HEAD??'',process.env.WS_LAND_HOOK_ACK);
-      }
-      process.exit(code);
+  if(landMain==='local'){
+    // Land owns main-watch after this main-only push. Release/tag
+    // observations cannot use this exact single-main-ref marker.
+    // No push refs keeps full selection unless push-checks authenticates a
+    // prior full proof and disjoint incoming delta. Never DS9's split or
+    // known-red allowance. Keep WL22's real lease; no patch-id-only carry.
+    /** @type {NodeJS.ProcessEnv} */
+    const full={...env,WS_LOCAL_LAND_HEAD:process.env.WS_LAND_MAIN_PUSH?.slice(6)??'',WS_LANE_NAME:(process.env.WS_LANE_NAME===''?undefined:process.env.WS_LANE_NAME)??'local-land'};Reflect.deleteProperty(full,'WS_PUSH_REFS');
+    Reflect.deleteProperty(full,'WS_LAND_HOOK_ACK');
+    if(process.env.WS_LOCAL_LAND_DELTA!==undefined)full.WS_LOCAL_LAND_DELTA=process.env.WS_LOCAL_LAND_DELTA;
+    if(process.env.WS_LOCAL_LAND_BASE_MAIN!==undefined)full.WS_LOCAL_LAND_BASE_MAIN=process.env.WS_LOCAL_LAND_BASE_MAIN;
+    const ran=spawn('python3',['scripts/heavy-lane.py','full-test','--checkout-scope','--',process.execPath,'scripts/land-local-gate.mjs'],{cwd:root,env:full,stdio:'inherit'});
+    process.on('SIGINT',()=>ran.kill('SIGINT'));process.on('SIGTERM',()=>ran.kill('SIGTERM'));
+    const code=await new Promise(done=>{ran.once('error',()=>done(1));ran.once('close',value=>done(value??1));});
+    if(code===0){
+      const {completeLocalHook}=await import('../scripts/land-hook-ack.mjs');
+      completeLocalHook(root,full.WS_LOCAL_LAND_HEAD??'',process.env.WS_LAND_HOOK_ACK);
     }
-    if(landMain==='exact'){
-      console.error('  - land main push (exact, LS3): the SHA branch CI proved; no local gate');
-      process.exit(0);
-    }
-    const {landMainChecks}=await import('./push-checks.mjs');
-    process.exit(await landMainChecks(env));
+    process.exit(code);
   }
   // BUILD-MAX EV2 (J288, WL13): a main push from the canonical checkout runs the split gate too
   // (scripts/push-local-split.mjs MAIN_PUSH_SPLIT); main's own CI runs the full suite and main-watch reports it.

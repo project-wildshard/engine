@@ -121,21 +121,21 @@ it('plan branch pushes and, with EV2\'s switch, main pushes ask for the split', 
   expect(splitRequested({GITHUB_ACTIONS: 'true'}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(false);
 });
 
-it('only land\'s marked main push gets the land lane; a hand main push keeps the full gate (LS3)', () => {
+it('only land\'s marked main push gets the land lane; a hand main push keeps the full gate (LS3, J422)', () => {
   const main = `refs/heads/main ${a} refs/heads/main ${b}`;
-  expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`}, main)).toBe('carried');
-  expect(landMainMode({WS_LAND_MAIN_PUSH: `exact:${a}`}, main)).toBe('exact');
   expect(landMainMode({WS_LAND_MAIN_PUSH: `push:${a}`}, main)).toBe('push');
-  // The marker binds the SHA land proved: another SHA, no SHA or an unknown kind keeps the full gate.
-  expect(landMainMode({WS_LAND_MAIN_PUSH: `exact:${b}`}, main)).toBeNull();
-  expect(landMainMode({WS_LAND_MAIN_PUSH: 'exact'}, main)).toBeNull();
-  expect(landMainMode({WS_LAND_MAIN_PUSH: `skip:${a}`}, main)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `local:${a}`}, main)).toBe('local');
+  // The marker binds the SHA land pushes: another SHA, no SHA or an unknown kind keeps the full gate. FLOW-SIMPLE FS5
+  // deleted the hosted land's `exact` and `carried` kinds: they are unknown now.
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `push:${b}`}, main)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: 'push'}, main)).toBeNull();
+  for (const kind of ['skip', 'exact', 'carried']) expect(landMainMode({WS_LAND_MAIN_PUSH: `${kind}:${a}`}, main)).toBeNull();
   // No marker, another ref alongside, a plan branch or hosted CI: the normal gate.
   expect(landMainMode({}, main)).toBeNull();
-  expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`}, `${main}\nrefs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBeNull();
-  expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}`)).toBeNull();
-  expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`, CI: 'true'}, main)).toBeNull();
-  expect(landMainMode({WS_LAND_MAIN_PUSH: `exact:${a}`}, undefined)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `push:${a}`}, `${main}\nrefs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `push:${a}`}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}`)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `push:${a}`, CI: 'true'}, main)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `push:${a}`}, undefined)).toBeNull();
 });
 
 it('a first plan push selects against its merge-base with origin/main', () => {

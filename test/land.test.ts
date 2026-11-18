@@ -15,20 +15,10 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
-import { failedJobs, shaVerdict } from '../scripts/land.mjs';
+import { shaVerdict } from '../scripts/land.mjs';
 import { cleanLandFixtures, trackLandFixtureRoot } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
-
-describe('failedJobs', () => {
-  test('splits non-blocking quarantine jobs from blocking reds', () => {
-    const jobs = [['tests (4)', 'failure'], ['quarantine (1)', 'failure'], ['quarantine', 'timed_out'], ['static', 'success'], ['e2e', 'cancelled'], ['quarantine-check', 'failure'], ['boundaries', 'failure']]
-      .map(([name, conclusion]) => ({ name, conclusion }));
-    // TS15: the soaked boundaries job now blocks; quarantine alone remains report-only.
-    expect(failedJobs({ jobs })).toEqual({ blocking: ['tests (4) (failure)', 'e2e (cancelled)', 'quarantine-check (failure)', 'boundaries (failure)'], nonblocking: ['quarantine (1) (failure)', 'quarantine (timed_out)'] });
-    expect(failedJobs(null)).toEqual({ blocking: [], nonblocking: [] });
-  });
-});
 
 describe('shaVerdict', () => {
   const sha = 'a'.repeat(40);

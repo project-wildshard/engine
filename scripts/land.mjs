@@ -4,10 +4,9 @@
 // hosted full suite. No plan-branch push, no full suite in the lane, no
 // queue. The worktree stays for the next row; --done removes it. A red
 // main is fixed forward by the push main-watch names (J422 wave 2).
-// --local (J400's full local gate) and --hosted stay only until
-// FLOW-SIMPLE FS5, so lands already in flight finish.
-// --hosted retains J249/J258's branch-CI fallback: preflight, plan push,
-// exact CI, then exact/carried main push. --no-preflight affects only it.
+// --local (J400's full local gate) stays for the Mac mini (J388), the
+// default on a host named like it. FLOW-SIMPLE FS5 deleted --hosted (the
+// branch-CI land: plan push, CI wait, exact/carried main push).
 // Both modes preserve pin provenance, canonical sync, main-watch and
 // owned-worktree cleanup. A red main is fixed forward at once (J249).
 // J381 exception: SKIP_CHECK=1 plus WS_LAND_J381_REASON explicitly audits a
@@ -21,13 +20,12 @@ import {pathToFileURL} from 'node:url';
 import {MANIFEST as PINS_MANIFEST,stalePinFolders,verifiedPinsOutputs} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
-import {GitHubLimitError,backoffMs,ghFailure,readerEnv} from './gh-limit.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 import {assertNoLocalCandidates} from './local-candidates.ts';
 import {beginLocalHook} from './land-hook-ack.mjs';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
 
-/** The hosted workflows a landing needs green, by workflow name (J195, J240). */
+/** The hosted workflows a green SHA needs, by workflow name (J195, J240); pin-provenance.mjs reads it. */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
 export const LAND_WORKFLOWS=Object.freeze(['ci']);
 const PLAN_BRANCH=/^plan\/[a-z0-9][a-z0-9._-]*$/u;
@@ -49,7 +47,7 @@ export function localGateHatch(env){
 /** DEV-SPEED DS22: the boot stamps the pre-push's gen:inputs rewrites from the tree (scripts/app-build/gen.ts). After a
  * rebase they go stale whenever main changed public/assets, and the pre-push's clean-tree check then refused the push
  * minutes in (58 `pre-push red` receipts in a day). Land runs the same generator first and commits these, and only
- * these, on the plan branch, so they ride the plan push and its pre-push like any commit. Hosted CI regenerates them
+ * these, on the plan branch, so they ride the main push and its pre-push like any commit. Hosted CI regenerates them
  * itself (ci.yml runs gen:inputs before the tests) and doesn't yet diff them against the commit (DS22 follow-up). */
 export const STAMPS=Object.freeze(['src/client/game/boot/audio.generated.ts','src/client/game/boot/bytes.generated.ts','src/client/game/boot/versions.generated.ts']);
 /** package.json `gen:inputs`, run directly: pnpm adds nothing here and a fixture's pnpm is a stub. */
@@ -205,21 +203,8 @@ const isAncestor=(cwd,ancestor,descendant)=>tryGit(cwd,['merge-base','--is-ances
 /** @param {string} cwd @param {string} from @param {string} to */
 const short=(/** @type {string} */ sha)=>sha.slice(0,10);
 
-/** CI's `check css` (scripts/ci-static.sh). A tree without it (a fixture, another repo's land) skips the step. */
-export const CHECK_CSS='scripts/check-css.mjs';
 /** What `pnpm pins` leaves (scripts/pins.ts LEDGER). Without it gen.mjs --inputs-only fails, so land runs pins first. */
 export const PINS_LEDGER='out/.pins.json';
-
-/** The preflight's checks, in order, as [name, argv], for a branch whose diff from main is `files` (BUILD-MAX 2026-11-15).
- * check-css is a check CI's static job runs and the pre-push does not (it cost opus-gcm11 a 27-minute re-run). Vitest
- * runs only when code changed, on the tests related to that code (`vitest related`, which includes a changed test itself).
- * @param {string[]} files @returns {[string,string[]][]} */
-export function preflightSteps(files){
- const code=files.filter(file=>/^(?:src|test|scripts)\/.+\.[cm]?[jt]sx?$/u.test(file));
- /** @type {[string,string[]][]} */const steps=[['lint:game',['pnpm','lint:game']],['check-css',['node',CHECK_CSS]],['typecheck',['pnpm','typecheck']]];
- if(code.length>0)steps.push(['vitest',['pnpm','exec','vitest','related','--run','--passWithNoTests',...code]]);
- return steps;
-}
 
 /** The line that says why a child failed: its last thrown `Error:` line (a stack's tail names only Node's internals, as two
  * gen:inputs stops did on 2026-11-16), else its last three lines, else the spawn error.
@@ -238,31 +223,28 @@ export function githubSlug(remote){
 }
 
 /** J422 is MacBook only for now (wave 2): the Mac mini keeps J388's local full gate by default.
- * @param {NodeJS.ProcessEnv} env @param {string} host */
+ * @param {NodeJS.ProcessEnv} env @param {string} host @returns {'push'|'local'} */
 export function defaultMode(env,host){
- if(env.WS_LAND_MODE==='hosted'||env.WS_LAND_MODE==='local'||env.WS_LAND_MODE==='push')return env.WS_LAND_MODE;
+ if(env.WS_LAND_MODE==='local'||env.WS_LAND_MODE==='push')return env.WS_LAND_MODE;
  return /mac-?mini/iu.test(host)?'local':'push';
 }
 
 /** Refuse anything but the known options. Any spelling of force is refused by name.
  * @param {string[]} argv @param {NodeJS.ProcessEnv} [env] @param {string} [host] */
 export function parseArgs(argv,env=process.env,host=hostname()){
- const options={mode:defaultMode(env,host),pollSeconds:60,timeoutMinutes:60,appearMinutes:5,rounds:5,keep:false,done:false,preflight:true};
+ const options={mode:defaultMode(env,host),rounds:5,keep:false,done:false};
  for(const arg of argv){
   if(/^-f$|force/iu.test(arg))throw new StopError(`refused ${arg}: land never force-pushes main (J240: fast-forward only). If main moved, land rebases and retries by itself`);
   const [name,value]=arg.split('=',2);
   const number=Number(value);
-  // --no-watch-main is accepted for old callers: land never watches main now (LS8).
-  if(name==='--no-watch-main'&&value===undefined)continue;
-  if((name==='--hosted'||name==='--local'||name==='--push')&&value===undefined)options.mode=name.slice(2);
+  // Accepted for old callers, and no-ops: land never watches main (LS8) and has no preflight (FS5).
+  if((name==='--no-watch-main'||name==='--no-preflight')&&value===undefined)continue;
+  if(name==='--hosted')throw new StopError('--hosted is gone (J422, meta FLOW-SIMPLE FS5): land pushes main through the push gate; run node scripts/land.mjs');
+  if((name==='--local'||name==='--push')&&value===undefined)options.mode=name.slice(2);
   else if(name==='--keep'&&value===undefined)options.keep=true;
   else if(name==='--done'&&value===undefined)options.done=true;
-  else if(name==='--no-preflight'&&value===undefined)options.preflight=false;
-  else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--poll')options.pollSeconds=number;
-  else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--timeout')options.timeoutMinutes=number;
-  else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--appear')options.appearMinutes=number;
   else if(value!==undefined&&Number.isSafeInteger(number)&&number>0&&name==='--rounds')options.rounds=number;
-  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--done] [--push|--local|--hosted] [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--keep] [--no-preflight]`);
+  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--done] [--push|--local] [--rounds=N] [--keep]`);
  }
  // J422: push mode keeps the plan worktree for the next row unless this is the last one.
  if(options.mode==='push'&&!options.done)options.keep=true;
@@ -285,40 +267,6 @@ export function shaVerdict(data,sha){
  return {state,runs:latest,summary:rows.map(row=>`${row.name} ${row.run===undefined?'none':row.run.status==='completed'?row.run.conclusion:row.run.status}`).join(', ')};
 }
 
-/** @param {string} repo @param {string} path */
-function ghApi(repo,path){
- const result=spawnSync('gh',['api',`repos/${repo}/${path}`],{encoding:'utf8',env:readerEnv(),timeout:30_000,maxBuffer:64<<20});
- if(result.error!==undefined||result.status!==0)throw ghFailure(`gh api ${path}`,`${result.stderr}${result.error?.message??''}`);
- return /** @type {unknown} */(JSON.parse(result.stdout));
-}
-
-/** J193/J200: `quarantine (n)` jobs run quarantined files with their ordinary exit code and are continue-on-error;
- * they are red by design until rewritten and never block a landing. Boundaries blocks after TS15's green soak. */
-const NONBLOCKING_JOB=/^quarantine(?: \(\d+\))?$/u;
-const FAILED=new Set(['failure','timed_out','cancelled','startup_failure']);
-
-/** A run's failed jobs, split into the blocking ones and the non-blocking quarantine ones.
- * @param {unknown} data the Actions `runs/<id>/jobs` response
- * @returns {{blocking:string[],nonblocking:string[]}} */
-export function failedJobs(data){
- const jobs=data!==null&&typeof data==='object'&&'jobs'in data&&Array.isArray(data.jobs)?data.jobs:[];
- /** @type {{blocking:string[],nonblocking:string[]}} */const split={blocking:[],nonblocking:[]};
- for(const job of jobs){
-  if(job===null||typeof job!=='object'||!FAILED.has(String(job.conclusion)))continue;
-  const name=String(job.name);
-  (NONBLOCKING_JOB.test(name)?split.nonblocking:split.blocking).push(`${name} (${String(job.conclusion)})`);
- }
- return split;
-}
-
-/** @param {string} repo @param {number} id @returns {{blocking:string[],nonblocking:string[]}} */
-function runFailures(repo,id){
- try{return failedJobs(ghApi(repo,`actions/runs/${id}/jobs?filter=latest&per_page=100`));}
- catch{return {blocking:['(job list unavailable)'],nonblocking:[]};}
-}
-
-const sleep=(/** @type {number} */ ms)=>new Promise(_resolve=>{setTimeout(_resolve,ms);});
-
 /** One landing, start to finish, for the worktree at `cwd`. */
 class Landing{
  /** @param {string} cwd @param {ReturnType<typeof parseArgs>} options @param {NodeJS.ProcessEnv} env */
@@ -335,10 +283,8 @@ class Landing{
   if(gitDir===common)throw new StopError('land runs in a linked plan worktree (<repo>/.worktrees/<plan>), never in the canonical checkout');
   this.remote=git(this.root,['remote','get-url','origin']);
   const repo=env.WS_LAND_REPO??githubSlug(this.remote);
-  if(repo===null||!/^[-\w.]+\/[-\w.]+$/u.test(repo))throw new StopError(`origin ${this.remote} is not a GitHub repo; land polls GitHub Actions`);
+  if(repo===null||!/^[-\w.]+\/[-\w.]+$/u.test(repo))throw new StopError(`origin ${this.remote} is not a GitHub repo; main-watch reads its Actions`);
   this.repo=repo;
-  /** @type {number[]} */this.runs=[];
-  /** @type {string|null} */this.planTip=null;
   this.expected='';
   /** @type {string|null} */this.landedSha=null;
   /** @type {string|null} */this.sizeWarning=null;
@@ -429,7 +375,7 @@ class Landing{
  }
 
  /** DS22: before the gate, run gen:inputs (the pre-push's own first step) and commit the boot stamps it rewrote, on
-  * the plan branch, so branch CI checks them. The generator may not commit, and may not touch anything else.
+  * the plan branch, so they ride the main push. The generator may not commit, and may not touch anything else.
   * @param {boolean} pinsRefreshed whether this preflight already ran pnpm pins */
  regenerate(pinsRefreshed){
   if(!existsSync(join(this.root,GEN[0])))return;
@@ -538,132 +484,21 @@ class Landing{
   throw new StopError(`pnpm install --frozen-lockfile failed after the rebase (${moved.join(', ')} changed): ${`${installed.stderr}${installed.stdout}`.trim().split('\n').slice(-3).join(' ')}\nRun it by hand in the worktree, then run land again.`);
  }
 
- /** J249 provenance: what goes to main on the branch's green run must be exactly main plus that run's SHA. Git's own
-  * three-way merge of the two is computed apart from the rebase, and the rebased HEAD must match it file for file; a
-  * commit made during the rebase, or anything else, stops land (J206 review).
-  * @param {string} main @param {string} tested */
- verifyReplay(main,tested){
-  const merged=tryGit(this.root,['merge-tree','--write-tree','--name-only','--no-messages',main,tested]);
-  const [tree='',...conflicted]=merged.stdout.split('\n').map(line=>line.trim()).filter(Boolean);
-  const same=SHA.test(tree)&&merged.status===0&&conflicted.length===0&&tryGit(this.root,['diff','--quiet',tree,'HEAD']).status===0;
-  if(same)return;
-  this.receipt(`STOP rebased ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)}`);
-  throw new StopError(`after the rebase, ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)}: a commit or edit came in during the land. Check git log, keep what you meant, and run land again; a new commit gets its own branch CI.`);
- }
-
- /** Push the exact SHA to this worktree's own plan branch (LAND-SIMPLIFY LS4, J258). Land reads origin's real tip
-  * (refreshing the remote-tracking ref, which a hand push by URL leaves stale) and rewrites it only when the local
-  * branch's reflog reached it: a tip this worktree pushed, by land or by hand, or once held. Anything else is
-  * someone else's push and stops land before any push. The push itself carries an explicit lease on that tip, so a
-  * push landing in between is refused by git. This is `--force-if-includes`'s rule without its timestamp window,
-  * which made git refuse a fresh fetch of the worktree's own tip (J206 review). No record files.
-  * @param {string} sha */
- async pushPlan(sha){
-  const ref=`refs/heads/${this.branch}`,tracking=`refs/remotes/origin/${this.branch}`;
-  if(git(this.root,['rev-parse',ref])!==sha)throw new StopError(`${this.branch} is not at ${short(sha)}; run land again`);
-  const fetched=tryGitLocked(this.root,['fetch','--quiet','origin',`+${ref}:${tracking}`],process.env,this.retry);
-  if(fetched.status!==0){
-   // Only a branch origin lacks clears the tracking ref (a lease on "absent"); any other failure, the network or a
-   // lock still held after the retries, stops here instead of passing for someone else's push.
-   if(!/couldn't find remote ref/u.test(fetched.stderr))throw new StopError(`git fetch origin ${this.branch} failed: ${fetched.stderr.trim()}`);
-   tryGitLocked(this.root,['update-ref','-d',tracking],process.env,this.retry);
-  }
-  const tipOut=tryGit(this.root,['rev-parse','--verify','--quiet',`${tracking}^{commit}`]).stdout.trim();
-  const tip=tipOut===''?null:tipOut;
-  if(tip===sha){this.say('pushed',`${this.branch} already at ${short(sha)}`);this.planTip=sha;return;}
-  const rewrite=tip!==null&&!isAncestor(this.root,tip,sha);
-  if(rewrite&&!this.reached(tip)){
-   this.receipt(`STOP plan push ${short(sha)} refused (origin has commits this worktree never had)`);
-   throw new StopError(`origin ${this.branch} is at ${short(tip)}, which this worktree's branch never reached: someone else pushed it. Fetch and integrate their commits (git rebase origin/${this.branch}), then run land again; or start a new worktree with a new slug. Never force over it.`);
-  }
-  const args=['push','--porcelain',`--force-with-lease=${ref}:${tip??''}`,'origin',`${ref}:${ref}`];
-  this.say('pushing',`${this.branch} ${short(sha)}${rewrite?` (rebased; replaces its own ${short(tip)} under a lease)`:''}; the pre-push runs`);
-  const result=await gitTee(this.root,args,this.env);
-  if(result.status!==0){
-   const leased=/\[rejected\].*\((?:stale info|fetch first)\)/u.test(result.stdout);
-    this.receipt(`STOP plan push ${short(sha)} ${leased?'refused (origin moved during the push)':`refused by the pre-push: ${prePushCause(result.stderr,result.stdout)}`}`);
-   throw new StopError(leased
-    ?`origin ${this.branch} moved while land pushed, so git refused the lease: someone else pushed it. Fetch and integrate their commits, then run land again. Never force over it.`
-    :`push of ${this.branch} ${short(sha)} failed: ${result.stdout.trim()}\nA red pre-push names its failing check above; fix forward and run land again.`);
-  }
-  this.planTip=sha;
- }
-
- /** Refresh the hosted proof's remote tip immediately before pushing main. A narrow origin fetch config does not
-  * update origin/plan/* on push; the provenance hook must see the tested SHA, never an earlier red tip. A replaced
-  * or deleted remote branch stops the land rather than authorizing main from stale local provenance.
-  * @param {string} tested */
- refreshPlanTip(tested){
-  const tracking=`refs/remotes/origin/${this.branch}`;
-  const fetched=tryGitLocked(this.root,['fetch','--quiet','origin',`+refs/heads/${this.branch}:${tracking}`],process.env,this.retry);
-  const tip=fetched.status===0?git(this.root,['rev-parse',tracking]):'';
-  const why=fetched.status!==0?`git fetch origin ${this.branch} failed: ${fetched.stderr.trim()}`
-   :tip!==tested?`origin ${this.branch} changed after hosted CI: tested ${short(tested)}, remote ${short(tip)}; run land again`:'';
-  if(why!==''){this.receipt(`STOP ${why}`);throw new StopError(why);}
- }
-
- /** The local branch reached `tip`: some reflog entry of it is `tip` or a descendant (the newest 200).
-  * @param {string} tip */
- reached(tip){
-  const entries=tryGit(this.root,['reflog','show','--format=%H','-n','200',`refs/heads/${this.branch}`]).stdout.split('\n').filter(line=>SHA.test(line));
-  return [...new Set(entries)].some(entry=>entry===tip||isAncestor(this.root,tip,entry));
- }
-
- /** Poll the exact SHA until both landing workflows are complete.
-  * @param {string} sha @param {string} what */
- async waitCI(sha,what){
-  // MF12: only an answered lookup counts toward `appear`; a quota stop moves both deadlines by its wait.
-  let deadline=Date.now()+this.options.timeoutMinutes*60_000,appear=Date.now()+this.options.appearMinutes*60_000;
-  let last='';
-  const pollMs=this.options.pollSeconds*1000;
-  for(;;){
-   /** @type {ReturnType<typeof shaVerdict>} */let verdict;
-   try{verdict=shaVerdict(ghApi(this.repo,`actions/runs?head_sha=${sha}&event=push&per_page=100`),sha);}
-   catch(error){
-    if(error instanceof GitHubLimitError){const wait=this.quotaWait(error,`${what} ${short(sha)}`);deadline+=wait;appear+=wait;last='';await sleep(wait);continue;}
-    appear+=pollMs;
-    verdict={state:'pending',runs:{},summary:`lookup failed (${error instanceof Error?error.message:String(error)}); retrying`};
-   }
-   if(verdict.summary!==last){this.say('ci',`${what} ${short(sha)}: ${verdict.summary}`);last=verdict.summary;}
-   if(verdict.state==='green'){for(const run of Object.values(verdict.runs))this.runs.push(run.id);return verdict;}
-   if(verdict.state==='red'){
-    // The run conclusion decides, never a job list: quarantine jobs are continue-on-error, so they can't make a run
-    // red on their own, and a list (paged, re-run, cancelled) can't prove the blocking jobs passed. The stop line
-    // names the blocking failures and sets the quarantine reds apart, so nobody chases a non-blocking job.
-    const reds=Object.entries(verdict.runs).filter(([,run])=>run.conclusion!=='success').map(([name,run])=>({name,run,jobs:runFailures(this.repo,run.id)}));
-    const failed=reds.map(({name,run,jobs})=>`${name} run ${run.id} ${run.conclusion}: ${jobs.blocking.join('; ')||'no blocking failed job listed'}${jobs.nonblocking.length===0?'':` (non-blocking: ${jobs.nonblocking.join('; ')})`}${run.url===''?'':` ${run.url}`}`);
-    return {...verdict,failed};
-   }
-   if(Object.keys(verdict.runs).length===0&&Date.now()>appear)throw new StopError(`no hosted ci run for ${short(sha)} after ${this.options.appearMinutes} min; is ci.yml triggered on plan/** pushes?`);
-   if(Date.now()>deadline)throw new StopError(`hosted CI for ${short(sha)} not finished after ${this.options.timeoutMinutes} min (${verdict.summary}); run land again to keep waiting`);
-   await sleep(pollMs);
-  }
- }
-
- /** MF12: say that GitHub's quota is spent (not that CI is missing) and how long land waits for it.
-  * @param {GitHubLimitError} error @param {string} what @returns {number} the wait in ms */
- quotaWait(error,what){
-  const wait=backoffMs(error,this.options.pollSeconds*1000),span=wait<120_000?`${String(Math.ceil(wait/1000))} s`:`${String(Math.ceil(wait/60_000))} min`;
-  this.say('ci',`${what}: GitHub API quota spent (${error.message.split('\n')[0].slice(0,120)}); waiting ${span} for it to reset, then resuming. Not a CI failure; the CI deadlines move by the wait`);
-  return wait;
- }
-
  /** Fast-forward main to HEAD. Refuses before pushing unless origin/main is
   * an ancestor; the refspec has no `+` and no force flag ever.
-  * @param {boolean} carried @param {boolean} [local]
+  * @param {boolean} local J400's full local gate (the mini); otherwise J422's push gate (lint, types, related tests)
   * @param {{baseMain:string,testedHead:string,incomingMain:string,head:string}|null} [delta]
-  * @param {boolean} [push] J422: the ordinary split pre-push gates this main push
   * @returns {Promise<'landed'|'moved'>} */
- async pushMain(carried,local=false,delta=null,push=false){
+ async pushMain(local,delta=null){
   const head=this.holds('before the merge'),main=this.fetchMain();
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
   const args=mainPushArgs(head);
   const hatch=local?this.localHatch:undefined;
-  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${push?'; push gate: lint, types, related tests (J422)':hatch===undefined?local?'; full local gate (J400)':carried?'; static pre-push on the rebased tree, no Vitest (LS3)':'; the hosted-green SHA, no local gate':`; J381 SKIP_CHECK=1: ${hatch}; no full proof`}`);
-  // LS3 (J258): the pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
+  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${!local?'; push gate: lint, types, related tests (J422)':hatch===undefined?'; full local gate (J400)':`; J381 SKIP_CHECK=1: ${hatch}; no full proof`}`);
+  // The pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
   /** @type {NodeJS.ProcessEnv} */
-  const env={...this.env,WS_LAND_MAIN_PUSH:`${push?'push':local?'local':carried?'carried':'exact'}:${head}`};
+  const env={...this.env,WS_LAND_MAIN_PUSH:`${local?'local':'push'}:${head}`};
   // The outer queue authenticates this controller, never a hook or proof.
   for(const key of Object.keys(env))if(key.startsWith('WS_FULL_GATE_'))Reflect.deleteProperty(env,key);
   Reflect.deleteProperty(env,'WS_LOCAL_LAND_DELTA');
@@ -689,32 +524,9 @@ class Landing{
   throw new StopError(`main push of ${short(head)} refused: ${cause}\n${fix}`);
  }
 
- /** lint:game, typecheck and the related Vitest files, here, before anything is pushed; the first red stops land with
-  * its log. The logs live in this worktree's git dir, so they never dirty the tree and go when the worktree does.
-  * @param {string} main */
- localChecks(main){
-  if(!this.options.preflight){this.say('preflight','skipped (--no-preflight)');return;}
-  const head=this.head(),files=git(this.root,['diff','--name-only','--no-renames',`${main}...${head}`]).split('\n').filter(Boolean);
-  const dir=resolve(this.root,git(this.root,['rev-parse','--git-path','land-preflight']));
-  mkdirSync(dir,{recursive:true});
-  for(const [name,[command,...args]] of preflightSteps(files)){
-   if(command==='node'&&!existsSync(join(this.root,args[0]??''))){this.say('preflight',`${name} skipped: no ${args[0]} here`);continue;}
-   const log=join(dir,`${short(head)}-${name.replace(':','-')}.log`),began=Date.now();
-   this.say('preflight',`${name} on ${short(head)}`);
-   const ran=spawnSync(command==='node'?process.execPath:command??'pnpm',args,{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
-   writeFileSync(log,`$ ${command} ${args.join(' ')}\n${ran.stdout??''}${ran.stderr??''}${ran.error===undefined?'':`\n${String(ran.error)}\n`}`);
-   if(ran.status!==0){
-    this.receipt(`STOP preflight ${name} red on ${short(head)}, nothing pushed: ${log}`);
-    throw new StopError(`preflight ${name} is red on ${short(head)}; nothing was pushed. Log: ${log}\nFix it on ${this.branch} and run land again (--no-preflight skips the preflight).`);
-   }
-   this.say('preflight',`${name} green in ${String(Math.round((Date.now()-began)/1000))} s`);
-  }
- }
-
  /** gen:inputs refuses a tree whose `out/` lacks the pins' outputs: a worktree that never ran `pnpm pins` has no PINS_LEDGER
   * (opus-gcm11, 2026-11-15), and one rebased past a pin bump holds the old revision (`stalePinFolders`; codex-netlag and
-  * opus-publish1, 2026-11-16). Either way `pnpm pins` runs before gen:inputs; with or without --no-preflight, since
-  * gen:inputs needs it either way.
+  * opus-publish1, 2026-11-16). Either way `pnpm pins` runs before gen:inputs.
   * @param {boolean} [refreshPublication] whether the boot check found no current full publication
   * @returns {boolean} whether pnpm pins ran successfully */
  pinsOnce(refreshPublication=false){
@@ -736,11 +548,12 @@ class Landing{
   return true;
  }
 
- async run(){
+ /** @returns {Promise<number>} */
+ run(){
   const stamps=this.clean();
   const start=this.head();this.expected=start;
-  let main=this.fetchMain();
-  if(start===main||isAncestor(this.root,start,main)){this.say('nothing',`${this.branch} ${short(start)} has nothing main lacks`);return 0;}
+  const main=this.fetchMain();
+  if(start===main||isAncestor(this.root,start,main)){this.say('nothing',`${this.branch} ${short(start)} has nothing main lacks`);return Promise.resolve(0);}
   this.say('start',`${this.branch} ${short(start)} -> main ${short(main)} (repo ${this.repo})`);
   this.sizeWarning=this.options.mode==='push'?null:smallPlanWarning(this.root,this.branch);
   if(this.sizeWarning!==null){this.say('warning',this.sizeWarning);this.receipt(`small-plan warning: ${this.sizeWarning}`);}
@@ -754,44 +567,10 @@ class Landing{
   }
   if(!isAncestor(this.root,main,start)){
    this.rebase(main);
-   if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return 0;}
+   if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return Promise.resolve(0);}
   }
   this.regenerate(this.pinsOnce());
-  if(this.options.mode==='push')return this.runPush(main);
-  if(this.options.mode==='local')return this.runLocal(main);
-  this.localChecks(main);
-  /** @type {{sha:string,base:string}|null} */let tested=null;
-  let needHosted=true,rule='exact',why='main had not moved since the hosted run';
-  for(let round=1;round<=this.options.rounds;round++){
-   if(needHosted){
-    const sha=this.holds('before the branch push');
-    await this.pushPlan(sha);
-    const verdict=await this.waitCI(sha,this.branch);
-    this.holds('while hosted CI ran');
-    if(verdict.state!=='green'){
-     const failed='failed'in verdict?verdict.failed:[];
-     this.receipt(`STOP hosted CI red for ${short(sha)}: ${failed.join(' | ')}`);
-     throw new StopError(`hosted CI is red for ${short(sha)}; main is unchanged.\n  ${failed.join('\n  ')}\nFix forward on ${this.branch} and run land again.`);
-    }
-    tested={sha,base:git(this.root,['merge-base',sha,'refs/remotes/origin/main'])};
-    needHosted=false;rule='exact';why='main had not moved since the hosted run';
-   }
-   if(tested===null)throw new Error('unreachable: no hosted-tested SHA');
-   main=this.fetchMain();
-   if(!isAncestor(this.root,main,this.holds('before the rebase'))){
-    this.say('moved',`main moved to ${short(main)}; rebasing (round ${round})`);
-    this.rebase(main);
-    this.verifyReplay(main,tested.sha);
-    rule='carried';why=`clean rebase onto ${short(main)}: the branch's green run ${short(tested.sha)} carries (J249)`;
-    this.say('carried',why);
-   }
-   this.refreshPlanTip(tested.sha);
-   const outcome=await this.pushMain(rule==='carried');
-   if(outcome==='moved'){this.say('moved','main moved during the merge; rebasing and retrying');continue;}
-   return this.landed(rule,why,round,main);
-  }
-  this.receipt(`STOP gave up after ${this.options.rounds} tries; main kept moving`);
-  throw new StopError(`main kept moving: ${this.options.rounds} tries each lost the race to another push (J258 stops at 5). Nothing landed; run land again when main is quieter`);
+  return this.options.mode==='local'?this.runLocal(main):this.runPush(main);
  }
 
  /** J422: the ordinary split pre-push gates the main push (lint, types, related tests); main's hosted ci runs the
@@ -800,7 +579,7 @@ class Landing{
  async runPush(base){
   let main=base;
   for(let round=1;round<=this.options.rounds;round++){
-   if(await this.pushMain(false,false,null,true)==='landed'){
+   if(await this.pushMain(false)==='landed'){
     return this.landed('push','push gate (lint, types, related tests); main ci runs the full suite',round,main);
    }
    main=this.fetchMain();
@@ -823,7 +602,7 @@ class Landing{
   /** @type {{baseMain:string,testedHead:string,incomingMain:string,head:string}|null} */let delta=null;
   for(let round=1;round<=this.options.rounds;round++){
    const testedHead=this.head(),baseMain=main;
-   if(await this.pushMain(false,true,delta)==='landed'){
+   if(await this.pushMain(true,delta)==='landed'){
     const hatch=this.localHatch;
     return this.landed(hatch===undefined?'local':'local-hatch',hatch===undefined?'local full proof plus verified delta when disjoint; no hosted branch run':`J381 SKIP_CHECK=1: ${hatch}; no full proof`,round,main);
    }
@@ -879,18 +658,14 @@ class Landing{
   }catch(error){this.say('watch',`main-watch not started (${error instanceof Error?error.message:String(error)}); run node scripts/main-watch.mjs by hand`);}
  }
 
- /** LS5 (J258, Jake: "Yes, land cleans up its own"): after landing, delete origin's plan branch (under a lease on the
-  * SHA land pushed) and remove this worktree with its local branch, from the canonical checkout. A worktree with
+ /** LS5 (J258, Jake: "Yes, land cleans up its own"): after landing, remove this worktree with its local branch, from
+  * the canonical checkout. A worktree with
   * uncommitted or untracked work is kept and named. The reaper stays only for abandoned worktrees.
   * @returns {string} what happened */
  cleanUp(){
   const head=this.landedSha;
   if(head===null)return 'nothing landed';
-  const canonical=canonicalRoot(this.root),parts=[];
-  if(this.planTip!==null){
-   const deleted=tryGit(this.root,['push','--quiet',`--force-with-lease=refs/heads/${this.branch}:${this.planTip}`,'origin','--delete',this.branch]);
-   parts.push(deleted.status===0?`origin ${this.branch} deleted`:`origin ${this.branch} kept (${deleted.stderr.trim().split('\n').at(-1)??'push refused'})`);
-  }
+  const canonical=canonicalRoot(this.root),/** @type {string[]} */parts=[];
   const dirtyResult=tryGit(this.root,['status','--porcelain','--untracked-files=all']);
   const dirty=dirtyResult.stdout.trimEnd();
   const generatedOnly=dirty!==''&&dirty.split('\n').every(line=>/^[ MAD?]{2} (?:[^"\n]+\.generated\.ts|public\/assets\/gpu\/[^"\n]+)$/u.test(line));
@@ -947,9 +722,9 @@ class Landing{
   this.landedSha=head;
   this.followCanonical();
   this.startWatcher(head);
-  this.say('rule',rule==='push'?`main's own CI runs the full suite on ${short(head)} now. If main-watch names this push on red, fix it forward at once (J422); otherwise keep going`:`main's own CI runs on ${short(head)} now. If it goes red, the lane that landed last fixes it forward or reverts it, at once (J249)`);
+  this.say('rule',`main's own CI runs the full suite on ${short(head)} now. If main-watch names this push on red, fix it forward at once (J422); otherwise keep going`);
   const seconds=Math.round((Date.now()-this.started)/1000);
-  this.receipt(`landed ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; branch ci ${this.runs.join(', ')||'none'}; main ci ${rule==='exact'?'reuses the branch run':'followed by main-watch'}${this.sizeWarning===null?'':'; one-row'}${rule==='local'||rule==='push'?`; finished=${new Date().toISOString()}`:''}; ${seconds} s`);
+  this.receipt(`landed ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; main ci followed by main-watch${this.sizeWarning===null?'':'; one-row'}; finished=${new Date().toISOString()}; ${seconds} s`);
   return 0;
  }
 }
