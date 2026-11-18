@@ -475,26 +475,6 @@
     "why": "Left with sharddev or a shard at P3"
   },
   {
-    "path": "test/manifest-declarations.test.ts",
-    "file": "scripts/live-prepush.py",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sdk/",
-    "file": "scripts/live-prepush.py",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/",
-    "file": "scripts/live-prepush.py",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "test/schema-reference.test.ts",
-    "file": "scripts/live-prepush.py",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
     "path": "src/shards",
     "file": "scripts/manifest-declaration.mjs",
     "why": "Left with sharddev or a shard at P3"

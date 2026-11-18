@@ -729,7 +729,7 @@ export function renameProof(root, plan, { env, commit }) {
   return { ...count, worst: worst ?? null, lostFiles };
 }
 
-/** One phase as scripts/push-loop.py runs it on a tip: its checker, its path list. A rename is a delete plus an add there.
+/** One gate phase on a tip: its checker, its path list. A rename is a delete plus an add there.
  * A candidate lives in a private object store, so `env` is what lets git find it.
  * @returns {string[]} */
 export function gatePhaseCommand(root, base, tip, phase, env) {

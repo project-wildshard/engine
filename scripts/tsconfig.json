@@ -372,8 +372,6 @@
     "vitest-ci.config.ts",
     "vitest-fixture-snapshots.config.ts",
     "vitest-native-escape.config.ts",
-    "vitest-push-guards.config.ts",
-    "vitest-push.config.ts",
     "webkit-mem-reading.mjs",
     "webkit-render-smoke.mjs",
     "worker-client-fights.mjs",

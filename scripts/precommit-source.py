@@ -155,8 +155,6 @@ def required_sources(blobs, specification, tree=None, executable=None, staged_pa
         if name.startswith('lint/') or name == 'src/tsconfig.test.json' or re.fullmatch(r'src/[^/]+/(?:package|tsconfig(?:\.test)?)\.json', name):
             selected.add(name)
     roots = ['scripts/precommit-checks.mjs', 'scripts/precommit-source.py', 'scripts/push_input_cache.py', 'scripts/git-source-view.mjs', *specification.get('files', []), *specification.get('guards', [])]
-    if specification.get('guards'):
-        roots.append('scripts/vitest-push-guards.config.ts')
     if specification.get('deleted'):
         # Every active tracked reader is an input to the deleted-path grep.
         selected.update(name for name in blobs if name.split('/')[0] in ROOTS)

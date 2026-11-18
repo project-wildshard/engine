@@ -449,7 +449,6 @@
  "test/javelin-flight.test.ts",
  "test/joint-targets.test.ts",
  "test/ktx2-table-ownership.test.ts",
- "test/lane-watchdog.test.ts",
  "test/last-cell-retention.test.ts",
  "test/lift-riders-room.test.ts",
  "test/link-node-modules.test.ts",

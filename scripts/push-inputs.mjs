@@ -71,7 +71,7 @@ export function sourceInputs(root, files) { return sourceWalker(root)(files); }
 // Importing a module which mentions spawn is not a reason to skip a test.
 const EXTERNAL_JOBS = new Set([
   'test/build-mirror.test.ts', 'test/heavy-lane.test.ts',
-  'test/push-loop.test.ts', 'test/catalog-build.test.ts',
+  'test/catalog-build.test.ts',
   'test/product-report-failure.test.ts',
 ]);
 
