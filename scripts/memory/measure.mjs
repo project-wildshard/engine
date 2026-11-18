@@ -222,10 +222,10 @@ export function sameInspectorSession(page, session) { return page?._connection?.
 
 /** Wait for control or the error card. @param {any} page @param {number} timeoutMs @param {boolean} [requireLedger] */
 export async function untilControl(page, timeoutMs, requireLedger = false) {
-  await page.waitForFunction((/** @type {boolean} */ requireLedger) => (
+  await page.waitForFunction((/** @type {boolean} */ needCheckpoint) => (
     Boolean(document.querySelector('#wserr .msg')?.textContent)
     || (!document.querySelector('.ws-load') && Boolean(Reflect.get(window, '__wildshard')?.world?.game)
-      && (!requireLedger || Reflect.get(window, '__memoryRun')?.steps.some((/** @type {StepRow} */ row) => row[1] === 'control' && row[2])))
+      && (!needCheckpoint || Reflect.get(window, '__memoryRun')?.steps.some((/** @type {StepRow} */ row) => row[1] === 'control' && row[2])))
   ), requireLedger, { timeout: timeoutMs, polling: 250 });
   return /** @type {string | null} */ (await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null));
 }
