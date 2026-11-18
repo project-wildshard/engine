@@ -5,6 +5,7 @@
 // set for its tier loads images. Both boot sites now admit the images-first reading beside the claim, and the handoff settles on
 // it; any other cost is still refused. The phone (KTX2) keeps the boot reading. Driftwood has no images-first reading.
 import { afterEach, expect, test } from 'vitest';
+import { parseDeclaredQuestPage } from '@wildshard/format/declaredQuestPage';
 import { runtimeAccountedBytes, type RuntimeCost } from '@wildshard/format/runtimeCost';
 import { preparePageResidency } from '../shardfile/clientSource';
 import { clientResidency } from '../shardfile/clientResidency';
@@ -41,7 +42,8 @@ function runtimePage(slug: string, cost: RuntimeCost): Parameters<typeof regiona
 }
 /** The entry's admitted product for a declared client page home (Sky Reach). */
 function declaredPage(slug: string): Parameters<typeof regionalRuntimeAccountedBytes>[0] {
-  return { source: { identity: { slug }, runtime: null, budgets: SKY_BUDGETS, questHost: { page: { version: 1 } } } } as unknown as Parameters<typeof regionalRuntimeAccountedBytes>[0];
+  const page = parseDeclaredQuestPage({ version: 1, quest: 'walk', prompts: [], actions: [] });
+  return { source: { identity: { slug }, runtime: null, budgets: SKY_BUDGETS, questHost: { page } } } as unknown as Parameters<typeof regionalRuntimeAccountedBytes>[0];
 }
 
 /** The grid page's boot, as entry.ts runs it: a Shard Select intent for the cell, then `preparePageResidency`. */

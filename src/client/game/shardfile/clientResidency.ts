@@ -2,9 +2,10 @@ import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { PageResidency, HomeResidencyClaim } from '../grid/pageResidency';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { pageFeatureBudget } from '../../../shared/game/shardfile/pageFeatureTier';
 
 /** Resolve the shared page budget before the ordinary level bootstrap; runtime homes must already be accounted. */
-export function clientResidency(source: Pick<Shardfile, 'budgets' | 'runtime'>, bindings: {
+export function clientResidency(source: Pick<Shardfile, 'budgets' | 'runtime'> & Partial<Pick<Shardfile, 'questHost'>>, bindings: {
   instance: string; allocator?: ResidencyAllocator; residency?: PageResidency;
 }): { allocator: ResidencyAllocator; home?: HomeResidencyClaim } {
   const owner = bindings.residency;
@@ -15,10 +16,11 @@ export function clientResidency(source: Pick<Shardfile, 'budgets' | 'runtime'>, 
   const preclaimed = source.runtime !== null || owner.allocator.has(`sim:${bindings.instance}`);
   // The boot cannot resolve the texture mode yet; a reviewed images-first figure rides beside the claim for the grid entry's
   // handoff (`regionalRuntimeAccountedBytes` charges the mode it loads: images on a desktop with no KTX2 set, GC21 row 53).
-  const images = source.budgets.client?.imagesFirst === undefined ? undefined : { bytes: clientHomeBytes(source.budgets, 'img'), measuredPage: false };
-  const home = preclaimed ? owner.home() : owner.admitHome(bindings.instance, clientHomeBytes(source.budgets), false, images);
+  const featureBytes = pageFeatureBudget(source)?.bytes ?? 0;
+  const images = source.budgets.client?.imagesFirst === undefined ? undefined : { bytes: Math.max(featureBytes, clientHomeBytes(source.budgets, 'img')), measuredPage: false };
+  const home = preclaimed ? owner.home() : owner.admitHome(bindings.instance, Math.max(featureBytes, clientHomeBytes(source.budgets)), false, images);
   if (home.instance !== bindings.instance || home.allocator !== owner.allocator) throw new Error('Shardfile home residency identity mismatch');
-  if (home.bytes < source.budgets.sim.resident) throw new Error('Home residency understates the declared simulation budget');
+  if (home.bytes < Math.max(source.budgets.sim.resident, featureBytes)) throw new Error('Home residency understates the declared simulation budget');
   return { allocator: owner.allocator, home };
 }
 

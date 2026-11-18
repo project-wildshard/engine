@@ -1901,6 +1901,7 @@
     "src/shared/game/shardfile/outputChecksNode.ts": "shared",
     "src/shared/game/shardfile/outputDescriptor.ts": "shared",
     "src/shared/game/shardfile/outputIndexChecks.ts": "shared",
+    "src/shared/game/shardfile/pageFeatureTier.ts": "shared",
     "src/shared/game/shardfile/packReads.ts": "shared",
     "src/shared/game/shardfile/playArea.ts": "shared",
     "src/shared/game/shardfile/portalRide.ts": "shared",

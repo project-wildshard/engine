@@ -27,6 +27,7 @@ import type { RuntimeDeclaration } from '@wildshard/format/runtime';
 import type { AudioData } from '@wildshard/format/audio';
 import { dangerousRuntimeOwnership, type DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
 import { runtimeTierLimits } from '../../../shared/game/shardfile/runtimeTier';
+import { pageFeatureBudget } from '../../../shared/game/shardfile/pageFeatureTier';
 
 async function runtimeClientPhase(ctx: ShardContext, phase: ClientPhase, resident: Scope, lifetime?: 'entered'): Promise<void> {
   if (!ctx.product.has('client/plan')) return;
@@ -133,7 +134,8 @@ export class RuntimePageResidentWorld<T> {
 /** Reuse the ordinary registration verbs with a child owner; changing ctx.scope alone would retain parent registrations. */
 export function runtimePageInstallation(base: ShardContext, scope: Scope, runtime: ShardRuntime): LevelInstallation & { context: ShardContext } {
   bindResidentWorldScope(scope, base.scope);
-  if (base.product.shardfile.runtime !== null) base.app.cpu.setLimit(scope, runtimeTierLimits(base.product.shardfile).cpuMicrosPerFrame);
+  const source = base.product.shardfile, tier = source.runtime === null ? pageFeatureBudget(source) : runtimeTierLimits(source);
+  if (tier !== undefined) base.app.cpu.setLimit(scope, tier.cpuMicrosPerFrame);
   const installation = createLevelInstallation(base.app, scope, base.app.levelAdapters, () => base.progress);
   base.root.add(installation.context.root);
   // A captured callback may register after an await, when the ambient owner has already returned to the page.

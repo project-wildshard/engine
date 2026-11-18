@@ -32,7 +32,6 @@ export interface Gate {
   readonly snippets?: readonly { readonly file: string; readonly text: string }[];
 }
 
-const FOLDER = 'src/client/game/shardfile/folder.ts';
 const CLIENT_SOURCE = 'src/client/game/shardfile/clientSource.ts';
 // OF15 renames this file; until then its path is the one place the ledger names the retired word.
 const PLAN_PAGE = 'src/client/game/shardfile/runtimePage.ts';
@@ -41,23 +40,14 @@ export const DANGEROUS_GATES = 'src/shared/game/shardfile/dangerousGates.ts';
 
 export const GATES: readonly Gate[] = [
   {
-    id: 'declared-page', verdict: 'dangerous', name: 'dangerousUnbudgetedPageFeatures',
-    what: 'A shard with a declared client page (native page features) is admitted only as our own.',
-    harm: 'Native page features run engine page code paths the shard selects (stages, owners, plan features), outside the '
-      + 'cost its admission charged.',
-    budget: 'OF10c: the shard\'s tier CPU and memory limits, charged per page feature.',
-    // Includes the grant interface and its constructor shared by the remaining gates.
-    refs: { [DANGEROUS_GATES]: 3 },
-    snippets: [{ file: FOLDER, text: 'if (hasDeclaredClientPage(source) && !dangerousUnbudgetedPageFeatures(options)) throw' }],
-  },
-  {
     id: 'runtime-ownership', verdict: 'dangerous', name: 'dangerousRuntimeOwnership',
     what: 'Only our own runtime may own the page\'s world, audio or stages, run an empty client-plan policy, or keep a '
       + 'data resident (`clientSource.ts` bindings and the client-plan page module).',
     harm: 'An owning runtime replaces the engine\'s admitted world, audio or stage owners, so its frame and memory cost '
       + 'escape admission entirely.',
     budget: 'OF10c: the shard\'s tier CPU and memory limits, with the owned stages metered as the runtime\'s.',
-    refs: { [DANGEROUS_GATES]: 1 },
+    // Includes the grant interface and its constructor until the last reader goes.
+    refs: { [DANGEROUS_GATES]: 3 },
     snippets: [
       { file: CLIENT_SOURCE, text: "=== true && (!dangerousRuntimeOwnership(options)" },
       { file: CLIENT_SOURCE, text: "if (bindings.audioOwner === 'runtime' && (!dangerousRuntimeOwnership(options)" },

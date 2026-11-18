@@ -1,5 +1,5 @@
-import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { dangerousUnbudgetedPageFeatures, type DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
+import type { DangerousProvenance } from '../../../shared/game/shardfile/dangerousGates';
+import { reportPageFeatures } from '../../../shared/game/shardfile/pageFeatureTier';
 import { reportRuntimeTier } from '../../../shared/game/shardfile/runtimeTier';
 
 import { waitFor } from '@wildshard/engine/boot/waits';
@@ -402,6 +402,7 @@ async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNulla
   if(!isBuildValidatedOutput(source))throw new Error('Built-in reader did not assemble its build output');
   const instance=await admittedShardInstance(options.base,source.identity.slug,options.hash);
   reportRuntimeTier(source);
+  reportPageFeatures(source);
   await options.reserve?.(source);
   const selected=options.tier===undefined?source.files:await tierFolderFilesPaced(source,options.tier,options.pause,options.splatTier);
   const control=options.tier==='phone'?controlFiles(await playLibrarySourcePaced(source,options.pause),selected):selected;
@@ -509,8 +510,6 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
     ? readValidationReceipt(visited?.validation, sourceHash) ?? builtValidationReceipt(sourceHash) : null;
   const worst = receipt?.worst ?? await checkedFolderCosts(source, options.memory);
   if (receipt !== null) acceptValidatedCost(source, worst, options.memory);
-  // oxlint-disable-next-line typescript/no-deprecated -- ONE-FORMAT OF10b: a dangerous gate until its OF10c row
-  if (hasDeclaredClientPage(source) && !dangerousUnbudgetedPageFeatures(options)) throw new Error('Native page features require a native shard');
   if (!options.offline && visited !== null && visited !== undefined && isOutputIndex(visited.source) && compatibleShardfileVersion(version(visited.source))) {
     let previous: unknown;
     // Only its identity and state are compared: an older build's sections can fail this build's schemas (G531 retired
@@ -526,6 +525,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   }
   await options.pause?.();
   reportRuntimeTier(source);
+  reportPageFeatures(source);
   await options.reserve?.(source);
   await options.pause?.();
   // Only an exact validation receipt (the build's, or this device's own from a

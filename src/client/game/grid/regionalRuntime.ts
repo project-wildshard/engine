@@ -35,6 +35,7 @@ import type { RegionShell } from './regionShell';
 import type { GridLoadout } from '../../../shared/game/grid/wallet';
 import { runtimeAccountedBytes, type RuntimeCost } from '@wildshard/format/runtimeCost';
 import { runtimeTierLimits } from '../../../shared/game/shardfile/runtimeTier';
+import { pageFeatureBudget } from '../../../shared/game/shardfile/pageFeatureTier';
 import { createRegionalView, type RegionalView } from './regionalView';
 import { installEnteredRuntimeService } from "../shard/retainedHooks";
 import { Progress } from '../Progress';
@@ -64,7 +65,7 @@ export function regionalRuntimeAccountedBytes(admitted: Pick<AdmittedFolder, 'so
   const { source } = admitted;
   const { slug: declaredIdentity } = source.identity, { slug: registeredIdentity } = manifest;
   if (declaredIdentity !== registeredIdentity) throw new Error('Regional runtime identity differs from its native manifest');
-  if (hasDeclaredClientPage(source)) return clientHomeBytes(source.budgets, textureMode);
+  if (hasDeclaredClientPage(source)) return Math.max(pageFeatureBudget(source)?.bytes ?? 0, clientHomeBytes(source.budgets, textureMode));
   const declared = source.runtime?.cost, measured = manifest.runtimeCost;
   if (declared === undefined || measured === undefined) throw new Error('Regional runtime requires reviewed whole-runtime measurements');
   const bytes = runtimeAccountedBytes(declared);
@@ -221,7 +222,8 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
       const app = request.page.context.app, parent = request.page.context.game.runtime, pageScope = request.page.world.game.levelScope;
       if (parent === undefined) throw new Error('Regional factory requires the page runtime');
       app.cpu.bind(scope, request.cell.instance);
-      if (declaration !== null) app.cpu.setLimit(scope, runtimeTierLimits(request.admitted.source).cpuMicrosPerFrame);
+      const tier = declaration === null ? pageFeatureBudget(request.admitted.source) : runtimeTierLimits(request.admitted.source);
+      if (tier !== undefined) app.cpu.setLimit(scope, tier.cpuMicrosPerFrame);
       const view = createRegionalView({ cell: request.cell, home: ports.home, scene: request.page.world.game.rootScene,
         physics: host.physics, slot: app, assets: app.assets, allocator: request.allocator, claim: request.claim,
         scope, ground: foundation.ground, ownGround: request.manifest.cellGround === 'world',

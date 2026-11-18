@@ -13,10 +13,6 @@ type Provenance = DangerousProvenance;
 /** The host's grant of the dangerous capabilities (runtime, page features, ownership) until OF10c budgets them. */
 export function dangerousTrust(granted = true): DangerousProvenance { return granted ? { dangerousGrant: true } : {}; }
 
-/** @deprecated ONE-FORMAT OF10c2: native page features run page code paths outside the cost admission charged; the
- * shard's tier CPU and memory limits, charged per page feature, replace this provenance check. */
-export function dangerousUnbudgetedPageFeatures(reader: Provenance): boolean { return reader.dangerousGrant === true; }
-
 /** @deprecated ONE-FORMAT OF10c3: a runtime that owns the page's world, audio or stages escapes admission; the shard's
  * tier CPU and memory limits, with the owned stages metered as the runtime's, replace this provenance check. */
 export function dangerousRuntimeOwnership(reader: Provenance): boolean { return reader.dangerousGrant === true; }
