@@ -30,7 +30,8 @@ export function memoryWarningLines(row: MemoryAdmissionWarning): readonly string
     `PLAYING ${mb(row.playingBytes)} / ${mb(row.playingCap)} · OVER ${mb(row.playingOverBytes)}`,
     `LOADING ${mb(row.loadingBytes)} / ${mb(row.loadingCap)} · OVER ${mb(row.loadingOverBytes)}`,
     `CLAIM ${mb(row.claimedBytes)} · TOTAL ACCOUNTED ${mb(row.accountedBytes)}`,
-    ...(row.categories === undefined ? [] : Object.entries(row.categories).map(([key, bytes]) => `${key.toUpperCase()} ${mb(bytes)}`)),
+    // format 0.23+: `boot` is the cold-boot cost breakdown, not a byte count; the numeric categories list as before.
+    ...(row.categories === undefined ? [] : Object.entries(row.categories).flatMap(([key, bytes]) => typeof bytes === 'number' ? [`${key.toUpperCase()} ${mb(bytes)}`] : [])),
     ...(row.measured === undefined ? [] : [`MEASURED WEBCONTENT ${mb(row.measured.webContentBytes)} + GL ${mb(row.measured.glBytes)}`,
       `CALIBRATED BASE ${mb(row.measured.engineBaseBytes)} · ${row.measured.rev}`, `${row.measured.device} · ${row.measured.evidence}`]),
   ];

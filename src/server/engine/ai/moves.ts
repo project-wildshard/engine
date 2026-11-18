@@ -183,6 +183,8 @@ export class ActorMoveRunner {
         const value = clamp(from + (row.kind === 'burrow' ? 1 : -1) * row.rate / 60, 0, 1);
         return { field: { id: row.field, value }, ...(value === (row.kind === 'burrow' ? 1 : 0) ? this.finish(true) : {}) };
       }
+      // format 0.28 admits `leap` (ONE-FORMAT CC17a); its runner is CC17b. Until then a leap refuses by name (a fault, no motion).
+      case 'leap': throw new Error('Move leap has no engine runner yet (ONE-FORMAT CC17b)');
       default: { const unreachable: never = row; throw new Error(`Unknown move ${String(unreachable)}`); }
     }
   }

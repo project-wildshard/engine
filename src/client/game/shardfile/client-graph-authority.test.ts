@@ -7,7 +7,7 @@ import { dangerousUnbudgetedMaterialGraph } from '../../../shared/game/shardfile
 
 const nodes = Object.fromEntries(Array.from({ length: 268 }, (_, i) => [`n${String(i)}`, { op: 'float', value: i }]));
 const graph = { version: 1, kind: 'material', budget: { nodes: 300, samplers: 1, instructions: 600 }, nodes };
-const refusal = (trustedBudget: boolean): readonly string[] => { const checked = validateGraph(graph, { trustedBudget }); return checked.ok ? [] : checked.errors; };
+const refusal = (declaredBudget: boolean): readonly string[] => { const checked = validateGraph(graph, { declaredBudget }); return checked.ok ? [] : checked.errors; };
 
 test('a shard with a runtime or a declared page keeps its declared graph ceilings', () => {
   const runtime = { runtime: {}, questHost: null } as unknown as Parameters<typeof dangerousUnbudgetedMaterialGraph>[0];

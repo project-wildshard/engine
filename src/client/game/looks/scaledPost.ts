@@ -52,9 +52,9 @@ type CompiledPost = PostGraph;
 /** programs compiled ahead (`precompileScaledPost`), by their graph row, each copy taken once */
 const ahead = new WeakMap<Renderer, Map<object, CompiledPost[]>>();
 function compilePost(compiler: PostGraphCompiler, pass: string, name: string, p: ScaledPostRow['programs'][string]): CompiledPost {
-  const checked = validateGraph(p.graph, { trustedBudget: true });
+  const checked = validateGraph(p.graph, { declaredBudget: true });
   if (!checked.ok || p.graph.kind !== 'post') throw new Error(`Invalid scaled post graph ${name}`);
-  const graph = compiler.compileGraph(p.graph, { trustedBudget: true });
+  const graph = compiler.compileGraph(p.graph, { declaredBudget: true });
   graph.material.name = `${pass}.${name}`;
   if (p.blend === 'addKeepAlpha') Object.assign(graph.material, { transparent: true, ...BLEND_ADD_KEEP_ALPHA });
   return graph;

@@ -15,7 +15,7 @@ it('compiles a declared larger graph only with trusted authority and never subst
   const graph: GraphIr = { version: 1, kind: 'material', model: 'unlit', budget: { nodes: 256, samplers: 4, instructions: 1024 }, nodes, stages: { surface: { colour: 'row199' } } };
   expect(v.safeParse(MaterialsSchema, { meadow: { family: 'graph', graph } }).success).toBe(true);
   expect(validateGraph(graph).ok).toBe(false);
-  const admitted = validateGraph(graph, { trustedBudget: true });
+  const admitted = validateGraph(graph, { declaredBudget: true });
   if (!admitted.ok) throw new Error(admitted.errors.join('; '));
   expect(admitted.graph.budget).toEqual(graph.budget);
   expect(() => compileClassicGraph(graph)).toThrow();

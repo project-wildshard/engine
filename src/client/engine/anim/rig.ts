@@ -6,8 +6,11 @@ import type * as RigParser from './rigParser';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { rigAtlasReader } from './rigAtlas';
 import { labelObjectTree } from '../render/gpuLabels';
+import type { CreatureSkinClipName } from '@wildshard/format/skinData';
 
-export type ClipName = `${'idle' | 'walk' | 'run' | 'attack' | 'hit' | 'die' | 'turn' | 'swim' | 'fly'}${'' | `.${string}`}`;
+/** A clip family with an optional action suffix, or (format 0.27) a creature author's validated named clip. Binding is by
+ *  name, so a named clip binds like a family clip; game code still spells family clips, which the literal checks. */
+export type ClipName = `${'idle' | 'walk' | 'run' | 'attack' | 'hit' | 'die' | 'turn' | 'swim' | 'fly'}${'' | `.${string}`}` | CreatureSkinClipName;
 export type SocketName = string;
 export interface RigContract { skeleton: string; clips: readonly ClipName[]; sockets: readonly SocketName[] }
 /** Canonical → authored names. Metadata renames clips; the GLB and its tracks remain untouched. */

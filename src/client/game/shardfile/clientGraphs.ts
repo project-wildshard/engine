@@ -264,7 +264,7 @@ export function clientGraphs(source:Pick<Shardfile, 'identity' | 'look' | 'state
     // a preset reference while the row is off draws its own family: the preset is held to parity with it
     if (resolved.family !== null && lookCompiler === null) { readout.fallback++; readout.reasons.push('graph materials row off'); return options.fallback(resolved.family); }
     // validation with the admitted lists first: a refusal (an unknown binding, a bad program) throws, row on or off
-    const checked = known ?? validateGraph(graph, { dayKeys, stateFields, budget, trustedBudget: options.declaredGraphCeilings === true });
+    const checked = known ?? validateGraph(graph, { dayKeys, stateFields, budget, declaredBudget: options.declaredGraphCeilings === true });
     if (known === undefined && fileKey !== null && checked.ok) keepValidatedFile(fileKey, checked);
     if (!checked.ok) {
       if (typeof graph === 'object' && graph !== null && Reflect.has(graph, 'budget')) throw new Error(`material graph refused: ${checked.errors.join('; ')}`);
@@ -283,7 +283,7 @@ export function clientGraphs(source:Pick<Shardfile, 'identity' | 'look' | 'state
       return ir.primitive === 'points' ? pointFallback() : options.fallback(graphFallbackEntry(ir));
     }
     // a toon preset leaves the environment's diffuse out, as its family does (the tone-parity harness, scripts/tone-parity)
-    const compiler = lookCompiler, compiled = compiler.compileGraph(ir, { ...(options.toon === undefined ? {} : { toon: options.toon }), ...(resolved.family?.['family'] === 'toon' ? { replaceEnvironmentDiffuse: true } : {}), dayKeys, stateFields, budget, trustedBudget: options.declaredGraphCeilings === true, textures: options.textures, fog: fogFor, validated: checked });
+    const compiler = lookCompiler, compiled = compiler.compileGraph(ir, { ...(options.toon === undefined ? {} : { toon: options.toon }), ...(resolved.family?.['family'] === 'toon' ? { replaceEnvironmentDiffuse: true } : {}), dayKeys, stateFields, budget, declaredBudget: options.declaredGraphCeilings === true, textures: options.textures, fog: fogFor, validated: checked });
     if (compiled.fog !== null) { fogPatches.set(compiled.material, compiled.fog); fogCarriers.set(entry, compiled.material); }
     if (resolved.preset) for (const name of PRESET_CLOCK_PARAMS) if (ir.params?.[name] !== undefined) { compiled.setParam(name, elapsed); clocks.push(() => { compiled.setParam(name, elapsed); }); }
     setters.set(compiled.material, compiled.setParam);

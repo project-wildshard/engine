@@ -25,45 +25,45 @@ function withoutReports(graph:GraphGlsl):unknown {
 
 test('an explicit scalar output preserves ordinary RGB lowering and avoids two reconstructed fog calls',()=>{
  const source=fog(),colour=source.stages.fog?.colour;if(colour===undefined)throw new Error('Missing fixture colour');
- const original=emitGraphGlsl({...source,stages:{fog:{colour}}},{trustedBudget:true});
- const packed=emitGraphGlsl(source,{trustedBudget:true});
+ const original=emitGraphGlsl({...source,stages:{fog:{colour}}},{declaredBudget:true});
+ const packed=emitGraphGlsl(source,{declaredBudget:true});
  expect(packed.fog).toBe(original.fog);expect(original.fogSample).toBeUndefined();
  expect(packed.fogSample).toContain('vec4 wsGraphFogSample(');expect(packed.fogSample).not.toContain('wsGraphFog(');
  expect(packed.cost).toEqual(original.cost);
- const checked=validateGraph(source,{trustedBudget:true});expect(checked.ok).toBe(true);
+ const checked=validateGraph(source,{declaredBudget:true});expect(checked.ok).toBe(true);
  if(!checked.ok)throw new Error(checked.errors.join('; '));
  expect(checked.graph.stages.fog?.transmission).toBe('density');
 });
 
 test('nested rows retain inert JSON, named dependency, scalar and stage refusals',()=>{
  const source=fog(),input=post(source),{postFog:removed,...without}=input;void removed;
- expect(validateGraph(without,{trustedBudget:true}).ok).toBe(false);
- expect(validateGraph({...input,nodes:{...input.nodes,sample:{...input.nodes['sample'],name:'another'}}},{trustedBudget:true}).ok).toBe(false);
- expect(validateGraph({...input,postFog:{name:'haze',graph:{...source,stages:{fog:{colour:'colour'}}}}},{trustedBudget:true}).ok).toBe(false);
- for(const transmission of ['missing','input','cycle'])expect(validateGraph({...source,nodes:{...source.nodes,cycle:{op:'add',in:['cycle',1]}},stages:{fog:{colour:'colour',transmission}}},{trustedBudget:true}).ok).toBe(false);
- expect(validateGraph({...source,postFog:{name:'haze',graph:source}},{trustedBudget:true}).ok).toBe(false);
- expect(validateGraph({...input,params:{density:{type:'float',value:.5}}},{trustedBudget:true}).ok).toBe(false);
+ expect(validateGraph(without,{declaredBudget:true}).ok).toBe(false);
+ expect(validateGraph({...input,nodes:{...input.nodes,sample:{...input.nodes['sample'],name:'another'}}},{declaredBudget:true}).ok).toBe(false);
+ expect(validateGraph({...input,postFog:{name:'haze',graph:{...source,stages:{fog:{colour:'colour'}}}}},{declaredBudget:true}).ok).toBe(false);
+ for(const transmission of ['missing','input','cycle'])expect(validateGraph({...source,nodes:{...source.nodes,cycle:{op:'add',in:['cycle',1]}},stages:{fog:{colour:'colour',transmission}}},{declaredBudget:true}).ok).toBe(false);
+ expect(validateGraph({...source,postFog:{name:'haze',graph:source}},{declaredBudget:true}).ok).toBe(false);
+ expect(validateGraph({...input,params:{density:{type:'float',value:.5}}},{declaredBudget:true}).ok).toBe(false);
  let reads=0;const executable={...source};Object.defineProperty(executable,'nodes',{get:()=>{reads++;return source.nodes;},enumerable:true});
- expect(validateGraph({...input,postFog:{name:'haze',graph:executable}},{trustedBudget:true}).ok).toBe(false);expect(reads).toBe(0);
+ expect(validateGraph({...input,postFog:{name:'haze',graph:executable}},{declaredBudget:true}).ok).toBe(false);expect(reads).toBe(0);
 });
 
 test('calls spend their full instruction cost and combined array capacity under the original caps',()=>{
- const dependency=heavyFog(),input=post(dependency),checked=validateGraph(input,{trustedBudget:true});
+ const dependency=heavyFog(),input=post(dependency),checked=validateGraph(input,{declaredBudget:true});
  expect(checked.ok).toBe(true);if(!checked.ok)throw new Error(checked.errors.join('; '));
  const second:GraphNode={op:'fogSample',name:'haze',in:[[.3,.4,.5],[0,0,0],[2,3,4],[0,0,0],1]};
- expect(validateGraph({...input,nodes:{...input.nodes,second,secondRgb:{op:'swizzle',in:['second'],mask:'xyz'},sum:{op:'add',in:['rgb','secondRgb']}},stages:{post:{colour:'sum'}}},{trustedBudget:true}).ok).toBe(false);
- expect(validateGraph({...input,budget:{...MAX_GRAPH_BUDGET,instructions:checked.cost.instructions-1}},{trustedBudget:true}).ok).toBe(false);
+ expect(validateGraph({...input,nodes:{...input.nodes,second,secondRgb:{op:'swizzle',in:['second'],mask:'xyz'},sum:{op:'add',in:['rgb','secondRgb']}},stages:{post:{colour:'sum'}}},{declaredBudget:true}).ok).toBe(false);
+ expect(validateGraph({...input,budget:{...MAX_GRAPH_BUDGET,instructions:checked.cost.instructions-1}},{declaredBudget:true}).ok).toBe(false);
  const values=Array.from({length:GRAPH_ARRAY_MAX},()=>0),small=fog();
  const arrays={...small,arrays:{first:{type:'float',value:values},last:{type:'float',value:[0]}}} satisfies GraphIr;
- expect(validateGraph({...post(arrays),arrays:{own:{type:'float',value:values}}},{trustedBudget:true}).ok).toBe(false);
+ expect(validateGraph({...post(arrays),arrays:{own:{type:'float',value:values}}},{declaredBudget:true}).ok).toBe(false);
  const fitting={...small,arrays:{first:{type:'float',value:values}}} satisfies GraphIr;
- expect(validateGraph({...post(fitting),arrays:{own:{type:'float',value:values}}},{trustedBudget:true}).ok).toBe(true);
+ expect(validateGraph({...post(fitting),arrays:{own:{type:'float',value:values}}},{declaredBudget:true}).ok).toBe(true);
 });
 
 test('one shared colour/transmission call stays inside its private line branch and reports actual work',()=>{
  const input=post(heavyFog());
  const graph={...input,nodes:{...input.nodes,t:{op:'swizzle',in:['sample'],mask:'w'},half:{op:'mul',in:['t',.5]},line:{op:'combine',in:['rgb','half']},on:{op:'gt',in:[1,0]},pick:{op:'select',in:['on','line',[0,0,0,0]]},out:{op:'swizzle',in:['pick'],mask:'xyz'}},stages:{post:{colour:'out'}}};
- const plain=emitGraphGlsl(graph,{trustedBudget:true}),out=emitGraphGlsl(graph,{trustedBudget:true,reportExecutionCost:true});
+ const plain=emitGraphGlsl(graph,{declaredBudget:true}),out=emitGraphGlsl(graph,{declaredBudget:true,reportExecutionCost:true});
  expect(withoutReports(out)).toEqual(withoutReports(plain));
  expect(out.program?.selects.branch).toBe(1);
  const body=out.program?.fragment.body;if(body===undefined)throw new Error('Missing emitted body');
@@ -75,7 +75,7 @@ test('one shared colour/transmission call stays inside its private line branch a
 test('a constant loop cannot hide a costly call from its containing select',()=>{
  const input=post(heavyFog()),call=input.nodes['sample'];if(call===undefined)throw new Error('Missing fixture call');
  const graph={...input,nodes:{loop:{op:'loop',count:1,in:[[0,0,0,0]],body:{nodes:{call},out:'call'}},on:{op:'gt',in:[1,0]},pick:{op:'select',in:['on','loop',[0,0,0,0]]},out:{op:'swizzle',in:['pick'],mask:'xyz'}},stages:{post:{colour:'out'}}};
- const out=emitGraphGlsl(graph,{trustedBudget:true,reportExecutionCost:true});
+ const out=emitGraphGlsl(graph,{declaredBudget:true,reportExecutionCost:true});
  expect(out.program?.selects.branch).toBe(1);expect(out.executionCost?.main?.fragment.unconditionalLoops).toBe(0);
  expect(out.executionCost?.main?.fragment.conditionalLoops).toBeGreaterThan(0);
 });
@@ -83,14 +83,14 @@ test('a constant loop cannot hide a costly call from its containing select',()=>
 test('an outside reader retains the actual function call outside the branch',()=>{
  const input=post(heavyFog());
  const graph={...input,nodes:{...input.nodes,t:{op:'swizzle',in:['sample'],mask:'w'},on:{op:'gt',in:[1,0]},pick:{op:'select',in:['on','rgb',[0,0,0]]}},stages:{post:{colour:'pick',alpha:'t'}}};
- const out=emitGraphGlsl(graph,{trustedBudget:true,reportExecutionCost:true});
+ const out=emitGraphGlsl(graph,{declaredBudget:true,reportExecutionCost:true});
  expect(out.executionCost?.main?.fragment.unconditionalLoops).toBeGreaterThan(0);expect(out.executionCost?.main?.fragment.conditionalLoops).toBe(0);
 });
 
 test('independent row owners share only their own clone uniforms and retain numeric/borrowed texture laws',()=>{
  const source=fog();
  const graph={...source,params:{...source.params,ramp:{type:'texture',value:'ramp',role:'lent'}},arrays:{strength:{type:'float',value:[.7]}},nodes:{...source.nodes,strength:{op:'arrayElement',param:'strength',in:[0]},t:{op:'mul',in:['density','strength']},scaled:{op:'mul',in:['input','t']},tex:{op:'texture',param:'ramp',in:[[.2,.2]]},texRgb:{op:'swizzle',in:['tex'],mask:'xyz'},colour:{op:'add',in:['scaled','texRgb']}},stages:{fog:{colour:'colour',transmission:'t'}}} satisfies GraphIr;
- const a=compileClassicGraph(post(graph,'mist.one'),{trustedBudget:true}),b=compileClassicGraph(post(graph,'mist.two'),{trustedBudget:true}),copy=a.material.clone(),texture=new Texture();let disposed=false;
+ const a=compileClassicGraph(post(graph,'mist.one'),{declaredBudget:true}),b=compileClassicGraph(post(graph,'mist.two'),{declaredBudget:true}),copy=a.material.clone(),texture=new Texture();let disposed=false;
  texture.addEventListener('dispose',()=>{disposed=true;});
  try{
   expect(a.material.fragmentShader.match(/vec4 wsGraphFogSample\(/gu)).toHaveLength(1);expect(a.material.fragmentShader.match(/wsGraphFogSample\(/gu)).toHaveLength(2);

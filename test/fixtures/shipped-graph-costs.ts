@@ -48,7 +48,7 @@ export async function shippedGraphCosts(directory:string):Promise<readonly Shipp
  const add=(input:unknown,key:string,names:readonly string[],budget?:GraphBudget):void=>{
   const prior=rows.get(key);
   if(prior!==undefined){rows.set(key,{...prior,aliases:[...new Set([...prior.aliases,...names])]});return;}
-  const options={toonLook,trustedBudget:true,...(budget===undefined?{}:{budget})};
+  const options={toonLook,declaredBudget:true,...(budget===undefined?{}:{budget})};
   const plain=emitClassicGraph(input,options),{executionCost,...emitted}=emitClassicGraph(input,{...options,reportExecutionCost:true});
   if(executionCost===undefined||JSON.stringify(emitted)!==JSON.stringify(plain))throw new Error('Graph reporting changed emitted code or admission');
   lowered.set(key,plain);
