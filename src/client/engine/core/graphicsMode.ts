@@ -22,6 +22,9 @@ export type GraphicsMode = 'low' | 'high';
 export const LOW_PIXEL_RATIO = 1;
 /** Long edge of shard textures prepared for phone Low. */
 export const LOW_TEXTURE_EDGE = 512;
+/** Edge of a repeat-wrapped layered (array) texture prepared for phone Low: at 1 drawing pixel per CSS pixel a 2-3 m
+ * paint repeat at 256 texels still out-resolves a wall at arm's length (MG10: Nine's 9-layer paint array 12.6 -> 3.1 MB). */
+export const LOW_LAYER_EDGE = 256;
 /** the page hears this when a pick that sizes the drawing buffer changes (Game applies it in its next drawn frame) */
 export const PIXELS_EVENT = 'ws:pixels';
 

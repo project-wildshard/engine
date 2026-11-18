@@ -145,3 +145,14 @@ converted copy. 6 alternating cold WebKit [K] pairs (machine load 8-25 from othe
 454) -> 445-449 (447) MB, WebContent 752 -> 749, GPU peak median 612 -> 594, WebContent peak 1,192 -> 1,152 (noise);
 EM11 playing 0.98 -> 0.97 GB (upper 1.10 -> 1.09), loading 1.49 -> 1.44 (upper 1.68 -> 1.67). Spawn shots differ in 3.3%
 of pixels (rain, crowd).
+
+## Cut 5: the paint array at 256 on phone Low (mini-ninecontent)
+
+Nine lends its painted kinds one 9-layer RGBA8 array (`data/paint.json`, phone 512²): 12.6 MB of GPU with mips, the
+largest texture Nine holds at phone Low. Low draws 1 pixel per CSS pixel, so at a 2-3 m paint repeat 256 texels still
+out-resolve a wall at arm's length; `layerEdge` (worldSceneTextures.ts) prepares a layered array at most
+`LOW_LAYER_EDGE` (256) on phone Low (the layer decode already scales to the asked size): 3.1 MB. 7 alternating cold
+WebKit [K] pairs on 3dd6de2f: settled GPU 445 (443-448) -> 435 (432-436) MB, ledger GPU 162 -> 153 MB [L], WebContent
+748 -> 756 (722-769 both, noise); EM11 playing 0.973 -> 0.976 GB (upper 1.093 -> 1.084), loading 1.451 -> 1.468
+(upper 1.650 -> 1.646, not raised; WebContent peak 1,166 -> 1,182, ranges 1,064-1,224 overlap). Square and stair
+nine-view boards at phone Low: the paint reads the same; differences are rain, crowd and a camera settle.

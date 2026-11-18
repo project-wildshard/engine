@@ -10,6 +10,7 @@ import { gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 import { fetchDeflatedBytes } from '@wildshard/engine/core/deflate';
 import { TIER } from '@wildshard/engine/core/tier';
+import { graphicsMode, LOW_LAYER_EDGE } from '@wildshard/engine/core/graphicsMode';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { WorldSceneLentTexture } from '@wildshard/format/worldScenes';
 import { prepareLentLooks, setLentParam, setLentTexture } from './lentLooks';
@@ -113,11 +114,14 @@ function pixels(image: ImageBitmap, size: number): Uint8ClampedArray {
   return c2.getImageData(0, 0, size, size).data;
 }
 
+/** A layered array's edge: the row's for its tier, at most LOW_LAYER_EDGE on phone Low (MG10). */
+export function layerEdge(declared: number, phoneLow: boolean): number { return phoneLow ? Math.min(declared, LOW_LAYER_EDGE) : declared; }
+
 /** The compressed downloads overlap; each layer decodes and reads back alone, so the peak decoded memory stays one layer.
  *  NB2: in the page's image worker (`decodeLayerTexels`), so the main thread only copies texels; here as before when the
  *  worker cannot. */
 async function loadLayers(row: Extract<WorldSceneLentTexture, { kind: 'layers' }>): Promise<Texture> {
-  const size = row.size[TIER], data = new Uint8Array(size * size * 4 * row.layers.length), slice = workSlice();
+  const size = layerEdge(row.size[TIER], TIER === 'phone' && graphicsMode() === 'low'), data = new Uint8Array(size * size * 4 * row.layers.length), slice = workSlice();
   const files = await Promise.all(row.layers.map(layer => Promise.all([blob(`${row.base}/${layer.name}.jpg`), layer.alpha ? blob(`${row.base}/${layer.name}-a.jpg`) : null])));
   for (const [i, [rgb, alpha]] of files.entries()) {
     if (slice.due()) await slice.yield();
