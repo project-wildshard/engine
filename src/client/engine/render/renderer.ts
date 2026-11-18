@@ -21,6 +21,7 @@ import { isDev, onDev } from '../core/devMode';
 import { installShadowMaterialOwnership } from './shadowMaterialOwnership';
 import { installProvokingVertex } from './drawHooks';
 import { installPassSplit, passSplitLimit, PASS_SPLIT_VERTICES } from './passSplit';
+import { installByteTriples } from './byteTriples';
 import { gltfOpaqueSort } from './gltfMaterialOrder';
 import type { AssetService } from '../app/assets';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -56,6 +57,8 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   installProvokingVertex(renderer); // MG10: Metal's own convention, so ANGLE rewrites no index data per draw
   // MG10: no Metal pass bins more than 400 k vertices (`debug.passSplit` overrides, 0 off); MG9: still on under a loading card
   installPassSplit(context, undefined, passSplitLimit(), PASS_SPLIT_VERTICES);
+  // MG10: tight three-byte vertex channels upload at stride 4 (byteTriples.ts); before the Memory saver's upload watch
+  installByteTriples(context);
   const stopLabels = installDeveloperLabels(renderer);
   const dispose = renderer.dispose.bind(renderer);
   renderer.dispose = () => { try { dispose(); } finally { stopLabels(); stopJournal(); stopCounters(); } };

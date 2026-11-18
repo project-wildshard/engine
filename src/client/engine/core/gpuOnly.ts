@@ -10,6 +10,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import { geometryBoundsSteps } from '../world/geometryBounds';
 import { onceTextureUploaded } from '../render/textureUploadEvents';
 import { registerCompressedMipmaps } from '../render/compressedMipmaps';
+import { markByteTriples } from '../render/byteTriples';
 
 const labels = new Set<string>();
 /** marks made outside any shard (at module load: KTX2 mode drops every texture's mips once uploaded) — the page's, never reset */
@@ -94,6 +95,8 @@ export function gpuOnlyAttributes(g: BufferGeometry, label: string, keep: readon
   for (const [name, a] of Object.entries(g.attributes)) {
     if (keep.includes(name) || !(a instanceof BufferAttribute) || a.usage !== StaticDrawUsage) continue;
     bytes += a.array.byteLength;
+    // MG10: a tight three-byte channel (quantized normals, colours) goes up at stride 4, so ANGLE keeps no converted copy
+    if (a.itemSize === 3 && a.array.length === a.count * 3) markByteTriples(a.array);
     releasedAs.set(a, `${label}.${name}`);
     a.onUpload(releaseCpuCopy);
   }

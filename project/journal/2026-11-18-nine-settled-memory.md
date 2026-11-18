@@ -110,3 +110,38 @@ textures 47 and programs 26. "Owned (graphics)" 128 is mostly the browser's: a b
 Read back from the GPU (`getBufferSubData`), aMisc, position, aSpill and aOff are not float16-exact (14.5, 14.1, 11.3
 and 7.0 MB inexact); only the float32 aFace/aPat/aMat/aUv copies (~6 MB) are, so a lossless half repack saves ~3 MB.
 A Metal pipeline (a new program, vertex layout or blend state) costs ~0.13 MB of IOAccelerator on a blank page.
+
+## Cut 4: three-byte vertex channels at stride 4; and what else the GPU process holds (mini-ninesteady4)
+
+Engine 89652d01, Nine at control (WebKit [K], `footprint -j` categories). GPU process 452 MB = IOAccelerator (graphics) 201,
+owned unmapped (graphics) 128, owned unmapped 57, IOSurface 33, Malloc Small 17.
+
+- **Owned unmapped (graphics) is the active WebGL context, not Nine.** A blank page with one WebGL2 context that clears
+  every rAF holds 91-108 MB there (64x64 or 1206x2622 canvas, any context attribute; two contexts 120); it goes ~1-2 s
+  after drawing stops. Nine's 128 survives `loseContext`, deleting every GL object, hiding all DOM and WebKit's
+  `org.WebKit.lowMemory` (-3 MB). Programs (25 of Nine's, compiled and drawn on a blank page) add none of it.
+- **The parameter buffer (owned unmapped, 57) drops to 4 after ~15 s with no frames** (rAF stopped); while playing it
+  stays. Split at 100 k: 40 MB, but IOAccelerator +23 (ANGLE's per-command-buffer pools), so no net gain over 400 k.
+- **Varying dedupe is not a memory lever.** Metal strips vertex outputs the fragment never reads (blank page, 1.25 M
+  big triangles: 8 vec4 written, 1 read = 463 MB; all 8 read = 1,148; 8 identical values read = 1,148). Aliasing Nine's
+  read duplicates through a shaderSource hook (`vFogWorldPos`/`wsVFogWorld`/`wsVPositionWorld` are one world position;
+  facade's `wsV7`/`wsV8` are both `aMisc`) linked all 65 programs and moved owned unmapped 56-58 -> 55: noise.
+- No GL buffer duplicates by content (1,270 buffers, 112.8 MB, 0.3 MB repeated). WebKit's root layer is 12.65 MB in
+  every page setup (transparent, hidden root, canvas background): not removable.
+- GL buffers by channel [L via vertexAttribPointer]: slab aMisc f32x4 19.0 MB, aSpill f32x3 15.0, aOff f32x2 9.5,
+  aPat/aFace f16x4 9.4 each, position i16x4 9.2, normal i8x3 3.7, colour u8x3 3.5. aMisc.w is a bit field (decoded
+  with floor and powers of two, ints to 24,335) and xyz hold 15-22 distinct values; aSpill is a 0-5 light spill where
+  half precision is far under one 8-bit step. Both are bake-format leads (sharddev: aSpill half, aMisc.w apart as uint16,
+  ~15 MB), not engine cuts.
+- Textures ~49 MB real (deleting them freed 49 of IOAccelerator): the 9-layer 512² RGBA8 paint array 12.6, light
+  volumes 5.6 + 0.6, three sign atlases 2.8 each, render targets 10.5 (three 402x874 RGBA16F).
+
+**Cut 4.** Metal reads a vertex attribute only at a 4-byte stride, so ANGLE keeps a tight three-byte channel (stride 3)
+as given and builds a stride-4 copy beside it: on a blank page 4 M vertices hold 28.1 MB (12 + 16) against 16 MB padded.
+`render/byteTriples.ts` (WebKit only): `gpuOnlyAttributes` marks each released tight Int8/Uint8 itemSize-3 array, the
+context uploads it padded to 4 bytes a vertex and reads it at stride 4; sub-range writes are padded and read-backs come
+back tight, so the attribute's CPU shape does not change. Nine's slab normals and colours (8.6 MB padded) now carry no
+converted copy. 6 alternating cold WebKit [K] pairs (machine load 8-25 from other lanes): settled GPU 451-455 (median
+454) -> 445-449 (447) MB, WebContent 752 -> 749, GPU peak median 612 -> 594, WebContent peak 1,192 -> 1,152 (noise);
+EM11 playing 0.98 -> 0.97 GB (upper 1.10 -> 1.09), loading 1.49 -> 1.44 (upper 1.68 -> 1.67). Spawn shots differ in 3.3%
+of pixels (rain, crowd).
