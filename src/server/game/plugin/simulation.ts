@@ -105,6 +105,7 @@ import { registerInstalled } from '../shardfile/installedSides';
 import { installDeclaredRiding, type DeclaredRiding } from '../shardfile/declaredRiding';
 import { installDeclaredHostPortalRide } from '../shardfile/declaredPortalRide';
 import { installDeclaredSpawnWhen } from '../shardfile/declaredSpawnWhen';
+import { installEncounterAdds } from '../shardfile/encounterAdds';
 import { countedShard, countSlots } from '../shardfile/declaredSpawnCount';
 import type { PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
@@ -737,7 +738,8 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     const decisionActors = new Set(decisionRows.flatMap(row => Object.values(row.actors)));
     const decisionEncounters = new Set(shard.encounters.filter(row => decisionActors.has(row.entity)).map(row => row.id));
     const encounters = installDeclaredEncounters(host, shard.encounters, ports.encounters ?? (() => ({ saved: { defeated: false, rewardTaken: false, kills: 0 }, persist: () => undefined, reward: () => undefined })), ports.hud, decisionEncounters);
-    const decisions = decisionRows.length === 0 ? undefined : new ShardDecisions(decisionRuntime(host, sceneFields(lane)), shard, assets, ports.sections ?? new Map(), encounters, quest, movers, ports.quest?.fact, ports.restoring ?? false, ports.navigation, ports.scriptDisabled);
+    const adds = installEncounterAdds(host, shard.encounters, creatures.spawns, encounters, ports.restoring === true); // CC59c: phase adds wait for their phase
+    const decisions = decisionRows.length === 0 ? undefined : new ShardDecisions(decisionRuntime(host, sceneFields(lane), adds ?? undefined), shard, assets, ports.sections ?? new Map(), encounters, quest, movers, ports.quest?.fact, ports.restoring ?? false, ports.navigation, ports.scriptDisabled);
     // All individual/custom aliases and encounter recipes have admitted successfully before setup draws or group work.
     const groups = preparedGroups.install(ports.restoring ?? false);
     if (!host.embedded && !ports.restoring) host.physics.step();

@@ -25,6 +25,7 @@ import type { ShardScriptPorts } from './scripts';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { Actor } from '@wildshard/engine/combat/pipeline';
 import { installStatusEffects } from './statusEffects';
+import type { EncounterAdds } from './encounterAdds';
 import { SCRIPT_LIMITS } from '@wildshard/format/scriptLimits';
 
 interface Motion { move: number; target: number; runner: ActorMoveRunner; binding: number }
@@ -53,6 +54,8 @@ export interface DecisionRuntime extends Pick<SimHost, 'scope' | 'events' | 'phy
   readonly scene?: { readonly write: (field: number, value: number) => void };
   /** CC32: a decision's pull and root on a player this host moves. Absent where the page owns the player's motion
    *  (an embedded host): there the commands refuse. */
+  /** CC59c: the encounter adds a decision's `spawn` may call out early; absent when no phase lists adds. */
+  readonly adds?: EncounterAdds;
   readonly playerVerbs?: {
     /** Draw `player` up to `metres` toward (x, z), never past it: a knockback aimed at the creature. */
     readonly pull: (player: string, x: number, z: number, metres: number) => void;
@@ -66,12 +69,12 @@ export function focusPlayer(host: SimHost): DecisionRuntime['player'] {
   return { id, position: host.playerFocus, get yaw() { return host.focusedPlayer.yaw; }, get health() { return host.focusedPlayer.health; }, get motor() { return host.focusedPlayer.motor; } };
 }
 /** A host's decision runtime: its scripts deal with the player nearest the body that runs them. */
-export function decisionRuntime(host: SimHost, scene?: DecisionRuntime['scene']): DecisionRuntime {
+export function decisionRuntime(host: SimHost, scene?: DecisionRuntime['scene'], adds?: EncounterAdds): DecisionRuntime {
   const playerVerbs: DecisionRuntime['playerVerbs'] = host.embedded ? undefined : {
     pull: (id, x, z, metres) => { host.players.get(id)?.pullToward(x, z, metres); },
     root: (id, seconds, source) => { const player = host.players.get(id); if (player !== undefined) installStatusEffects(host).apply(player.health, 'effect.root', source, seconds); },
   };
-  return { ...(scene === undefined ? {} : { scene }), ...(playerVerbs === undefined ? {} : { playerVerbs }), scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, groundHeightAt: (x, z) => host.groundHeightAt(x, z), player: focusPlayer(host),
+  return { ...(scene === undefined ? {} : { scene }), ...(playerVerbs === undefined ? {} : { playerVerbs }), ...(adds === undefined ? {} : { adds }), scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, groundHeightAt: (x, z) => host.groundHeightAt(x, z), player: focusPlayer(host),
     state: host.state, slots: host.slots, entities: host.entities, strikes: host.strikes,
     registerStrikeCatalogue: (id, specs) => { host.registerStrikeCatalogue(id, specs); }, startDeclaredStrike: (source, target, strike) => host.startDeclaredStrike(source, target, strike),
     onStep: (id, run, adapter, phase) => host.onStep(id, run, adapter, phase) };
@@ -196,7 +199,7 @@ export class ShardDecisions {
         bodies.add(body);
         owners.add(name); this.fieldActors.add(handle); sim.registerStrikeCatalogue(name, [...this.strikes.values()]);
       }
-      if (row.commands.some(name => ['spawn', 'despawn', 'impulse', 'weather'].includes(name))) throw new Error('Decision mechanic has no admitted platform row owner');
+      if (row.commands.some(name => ['despawn', 'impulse', 'weather'].includes(name)) || (row.commands.includes('spawn') && sim.adds === undefined)) throw new Error('Decision mechanic has no admitted platform row owner');
       if ((Object.keys(row.bodies ?? {}).length > 0 || Object.keys(row.colliders ?? {}).length > 0) && bodyOps === undefined) throw new Error('Decision body requires its body authority');
       if (row.commands.some(name => name === 'grant' || name === 'reward') && facts === undefined) throw new Error('Decision grant requires the authoritative ledger fact port');
       const binding = row.binding;
@@ -414,6 +417,11 @@ export class ShardDecisions {
       } else if (op === SCRIPT_V1_COMMANDS.lockable) {
         const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'lockable actor');
         apply.push(() => { this.locks.set(target, a === 1); actor.lockOverride = a === 1; });
+      } else if (op === SCRIPT_V1_COMMANDS.spawn) {
+        // CC59c: `spawn` calls a phase's adds (one row, or every member of a group) out before their phase
+        const adds = requireValue(this.sim.adds, 'encounter adds'), name = this.name('spawns', a), members = this.spawnGroups.get(name) ?? [name];
+        if (!members.every(id => adds.has(id))) throw new Error('Decision spawn names only encounter adds');
+        apply.push(() => { for (const id of members) adds.call(id); });
       } else if (op === SCRIPT_V1_COMMANDS.ability) {
         const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'ability actor'), strike = this.name('strikes', a);
         apply.push(() => { actor.nextAbility = strike; });

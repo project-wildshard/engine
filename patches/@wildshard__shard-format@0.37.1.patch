@@ -845,3 +845,37 @@ index 1eb1e8d..9b73c8c 100644
  });
  /** Scalar reads; timer and random are answered by the host's own binding state. */
  export const SCRIPT_V1_READS: Readonly<{ x: 1; y: 2; z: 3; yaw: 4; hpShare: 5; alive: 6; field: 7; distance: 8; nearestPlayer: 9; flag: 10; timerLeft: 11; random: 12; actorInZone: 13; playersInZone: 14; moving: 15; strikeState: 16; playerFlag: 17; spawnGroupAlive: 18; bearing: 19; bodyX: 20; bodyY: 21; bodyZ: 22; bodyAlive: 23; bodyYaw: 24; bodyVisible: 25; playerIntent: 26; }> = Object.freeze({
+diff --git a/src/format/encounters.ts b/src/format/encounters.ts
+--- a/src/format/encounters.ts
++++ b/src/format/encounters.ts
+@@ -7,7 +7,10 @@
+ const point = v.tuple([coord, coord, coord]);
+ const positive = v.pipe(finite, v.minValue(0.001), v.maxValue(500));
+ const duration = v.pipe(finite, v.minValue(0), v.maxValue(60));
+-const phase = v.strictObject({ at: v.pipe(finite, v.minValue(0.001), v.maxValue(1)), name: label, caption: label, speed: v.pipe(finite, v.minValue(0), v.maxValue(15)), stopDistance: v.pipe(finite, v.minValue(0), v.maxValue(50)), turnRate: v.pipe(finite, v.minValue(0), v.maxValue(30)) });
++// ONE-FORMAT CC59: a phase's `adds` are spawn rows that wait out of the world until the fight reaches that phase.
++const MAX_ADDS = 8;
++const adds = v.exactOptional(v.pipe(v.array(id), v.nonEmpty(), v.maxLength(MAX_ADDS)));
++const phase = v.strictObject({ at: v.pipe(finite, v.minValue(0.001), v.maxValue(1)), name: label, caption: label, speed: v.pipe(finite, v.minValue(0), v.maxValue(15)), stopDistance: v.pipe(finite, v.minValue(0), v.maxValue(50)), turnRate: v.pipe(finite, v.minValue(0), v.maxValue(30)), adds });
+ const encounter = v.pipe(v.strictObject({ id, entity: id, kind: v.picklist(['elite', 'boss']), panel: v.nullable(id), name: label, title: label, retry: label,
+   arena: v.strictObject({ at: point, radius: positive }), intro: duration, introShort: duration,
+   respawn: v.strictObject({ at: point, yaw: finite }), phases: v.pipe(v.array(phase), v.minLength(1), v.maxLength(16)) }),
+@@ -22,6 +25,11 @@
+   for (const row of rows) {
+     if (!entities.includes(row.entity)) errors.push('declared encounter actor');
+     if (row.panel !== null && !panels.some((p) => p.id === row.panel && p.encounter === row.id)) errors.push('declared matching boss panel');
++    for (const step of row.phases) {
++      for (const add of step.adds ?? []) {
++        if (add === row.entity || !entities.includes(add)) { errors.push('phase adds name other declared spawns'); }
++      }
++    }
+   }
+   return [...new Set(errors)];
+ }
+@@ -61,5 +69,6 @@
+         speed: number;
+         stopDistance: number;
+         turnRate: number;
++        adds?: string[];
+     })[];
+ })[];
