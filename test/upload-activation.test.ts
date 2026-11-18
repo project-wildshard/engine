@@ -10,12 +10,12 @@ const token = ['fixture', 'game', 'activation', 'test', 'key', '32', 'bytes'].jo
 const notice: UploadActivation = {uploadId: '11111111-1111-1111-1111-111111111111', hash: 'a'.repeat(64), slug: 'activation-fixture', channel: 'staging'};
 const published: ActivationNotice = {...notice, channels: ['staging']};
 const placed: PlacementFile = {kind: 'placement', channel: 'staging', serial: 1, cells: [{slug: notice.slug, instance: notice.slug, cell: [1, 1], hash: notice.hash}]};
-const ports = (overrides: Partial<UploadActivationPorts> = {}): UploadActivationPorts => ({channel: 'staging', build: 'b1', read: () => Promise.resolve(placed), preload: () => Promise.resolve(), place: () => undefined, open: cells => Promise.resolve(cells), opened: () => true, ...overrides});
+const ports = (overrides: Partial<UploadActivationPorts> = {}): UploadActivationPorts => ({channel: 'staging', build: 'b1', read: () => Promise.resolve(placed), preload: () => Promise.resolve(undefined), place: () => undefined, open: cells => Promise.resolve(cells), opened: () => true, ...overrides});
 
 describe('the real game activation gate', () => {
   it('preloads exact bytes before placing and waits for actual opening', async () => {
     const order: string[] = [];
-    const activate = uploadActivator(ports({preload: (slug, hash) => {expect({slug, hash}).toEqual({slug: notice.slug, hash: notice.hash}); order.push('pack'); return Promise.resolve();}, place: () => {order.push('place');}, open: cells => {order.push('open'); return Promise.resolve(cells);}}));
+    const activate = uploadActivator(ports({preload: (slug, hash) => {expect({slug, hash}).toEqual({slug: notice.slug, hash: notice.hash}); order.push('pack'); return Promise.resolve(undefined);}, place: () => {order.push('place');}, open: cells => {order.push('open'); return Promise.resolve(cells);}}));
     expect(await activate(notice)).toEqual({...notice, build: 'b1', preloaded: true, instances: [notice.slug]});
     expect(order).toEqual(['pack', 'place', 'open']);
   });
@@ -30,7 +30,7 @@ describe('the real game activation gate', () => {
   });
 
   it('honours a recorded placement opt-out only after exact pack preload', async () => {
-    const preload = vi.fn(() => Promise.resolve());
+    const preload = vi.fn(() => Promise.resolve(undefined));
     const activate = uploadActivator(ports({read: () => Promise.resolve({...placed, cells: []}), preload}));
     await expect(activate(notice)).rejects.toThrow('does not publish');
     expect(await activate({...notice, place: false})).toMatchObject({preloaded: true, instances: [], place: false});
@@ -71,5 +71,21 @@ describe('the real game activation gate', () => {
     const wrong: typeof fetch = () => Promise.resolve(Response.json({...notice, hash: 'b'.repeat(64), build: 'b1', preloaded: true, instances: [notice.slug]}));
     await expect(gameActivationClient({staging: {url: 'http://127.0.0.1:8791', token}}, 'b1', wrong).activate(published, 'staging')).rejects.toThrow('another activation');
     await expect(gameActivationClient({staging: {url: 'https://external.example', token}}, 'b1', read).activate(published, 'staging')).rejects.toThrow('loopback');
+  });
+
+  // ONE-FORMAT OF18c: a plain upload to production may not hand the page's objects to the window.
+  const debugPlan = {clientPlan: {features: [{kind: 'debug.expose', name: 'fixture.debug'}, {kind: 'world.scenes'}]}};
+  const onProduction = {channel: 'production', read: () => Promise.resolve({...placed, channel: 'production' as const})};
+  it('refuses a production upload whose client plan exposes debug objects, by name, before placing it', async () => {
+    const place = vi.fn();
+    const activate = uploadActivator(ports({...onProduction, preload: () => Promise.resolve(debugPlan), place}));
+    await expect(activate({...notice, channel: 'production'})).rejects.toThrow('debug.expose is refused on production: fixture.debug');
+    expect(place).not.toHaveBeenCalled();
+  });
+
+  it('places the same upload on staging, and a production upload without debug.expose', async () => {
+    await expect(uploadActivator(ports({preload: () => Promise.resolve(debugPlan)}))(notice)).resolves.toMatchObject({preloaded: true});
+    const plain = uploadActivator(ports({...onProduction, preload: () => Promise.resolve({clientPlan: {features: [{kind: 'world.scenes'}]}})}));
+    await expect(plain({...notice, channel: 'production'})).resolves.toMatchObject({preloaded: true});
   });
 });

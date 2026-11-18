@@ -190,7 +190,10 @@ if (activationToken !== undefined) {
   if (placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID) throw new Error('Upload activation needs a whole-grid placement receiver');
   activationReceiver = uploadActivationReceiver(activationToken, uploadActivator({channel: release.channel, build,
     read: () => fetchPlacementFile(placementAt, placementKey),
-    preload: async (slug, hash) => {await readPackFolder(slug, build, await rapier(), {origin, cache}, reads, hash, catalogue, true);},
+    preload: async (slug, hash) => {
+      const input = await readPackFolder(slug, build, await rapier(), {origin, cache}, reads, hash, catalogue, true);
+      return {clientPlan: input.sections?.get('client/plan') ?? (input.product?.has('client/plan') === true ? input.product.section('client/plan') : undefined)};
+    },
     place: row => {placeCell(row);}, open: instances => world.activateCells(instances),
     opened: instance => Object.hasOwn(world.health().table, instance),
   }));
