@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.46 (2026-11-18)
+
+- Load the skin rigs used by spawned creatures.
+- Predict motion while steering the land-sail.
+- Release a parked vehicle when its rider steps off.
+
 ## v0.1.42 (2026-11-18)
 
 - Show the race clock in Mirror Salt when starting a race from its grid cell.
