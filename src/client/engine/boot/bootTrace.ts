@@ -16,7 +16,7 @@ const HISTORY_LIMIT = 32;
  *  boot wrote it on almost every paint: ~195 MB of JS garbage (a quarter of the boot's main-thread allocation), most of it
  *  under `loadout` and `shaders`, where WebKit's WebContent malloc jumped ~300 MB. The record in memory always holds the
  *  newest detail, and the next write of any kind (a stage, a checkpoint, a status) carries it. */
-export const PROGRESS_WRITE_MS = 1000;
+const PROGRESS_WRITE_MS = 1000;
 const REPORT_KEY = 'boot.reports'; // diagnostic evidence is not part of the native save mirror
 const REPORT_LIMIT = 4;
 const REPORT_MAX_AGE = 7 * 24 * 60 * 60_000;

@@ -3,10 +3,13 @@
 // a page the phone killed says what the engine held at its last step.
 import { beforeEach, expect, test, vi } from 'vitest';
 import { saveStorage } from '../saves/slots';
-import { createBootTrace, ledgerTotals, PROGRESS_WRITE_MS, type BootTraceTransports } from './bootTrace';
+import { createBootTrace, ledgerTotals, type BootTraceTransports } from './bootTrace';
+
 import type { ProgressView } from './plan';
 
 const MB = 1e6;
+/** bootTrace.ts's PROGRESS_WRITE_MS (module-internal: the page alias list pins bootTrace's exports) */
+const PROGRESS_WRITE_MS = 1000;
 
 beforeEach(() => { localStorage.clear(); saveStorage('device').removeItem('boot.trace'); saveStorage('device').removeItem('boot.reports'); vi.stubGlobal('__BUILD_ID__', 'test-build'); });
 
@@ -52,7 +55,7 @@ test('a ledger that throws leaves the checkpoint without one', () => {
   expect(stored.checkpoints[0]).toEqual({ atMs: expect.any(Number), operation: 'world:data', facts: {} });
 });
 
-test('MG10: a detail-only change persists at most once per PROGRESS_WRITE_MS; a stage or checkpoint writes at once', () => {
+test('MG10: a detail-only change persists at most once a second; a stage or checkpoint writes at once', () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   try {
     vi.setSystemTime(1_000_000);
