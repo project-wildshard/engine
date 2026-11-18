@@ -19,6 +19,7 @@ import { bindShardfileSim, createShardfileSim, type ShardfileSimPorts, type Shar
 import { installRoomRespawn } from '@wildshard/engine/game/roomRespawn';
 import { hasNativeAssembly } from '@wildshard/engine/game/shardfile/nativeAssembly';
 import { installDeclaredClimate } from '@wildshard/engine/game/shardfile/declaredClimate';
+import { planPortalRide } from '@wildshard/engine/game/shardfile/declaredPortalRide';
 import { installPlayerOwned, type OwnedBook, type OwnedStores, type CreatureRewardStore } from '@wildshard/engine/game/loot/playerOwned';
 import { QUEST_OWNED } from '@wildshard/engine/game/quest/nativeComposition';
 import { shardRows } from '@wildshard/engine/sim/shardRows';
@@ -112,7 +113,9 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
   // A shard's decisions, moves and targets ride its product sections (TE-ENG1's boss rows): without them the
   // encounter runs no decision and the boss falls back to its native phase chase.
   const sections = input.sections ?? (input.product === undefined ? undefined : folderHeadlessSections(input.product));
-  const ports: ShardfileSimPorts = { rapier, ...(sections === undefined ? {} : { sections }),
+  // OF41b: a plain upload's portal rides from its `client/plan` `portal.ride` rows, as the page does.
+  const portalRide = input.product?.has('client/plan') === true ? planPortalRide(input.product.section('client/plan').features) : null;
+  const ports: ShardfileSimPorts = { rapier, ...(sections === undefined ? {} : { sections }), portalRide,
     quest: { fact: (name, actorId) => { effects.push({ kind: 'fact', name, actorId }); }, coins: (amount, actorId) => { effects.push({ kind: 'coins', amount, actorId }); } } };
   // SR11: the kit items install with the simulation, so a restore finds their seats where the save put them.
   const kitOf = (sim: ShardfileSimulation): DeclaredKitItems | null => installDeclaredKitItems(sim.host, shard, sim.itemHooks);

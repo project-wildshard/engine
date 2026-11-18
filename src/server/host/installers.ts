@@ -24,7 +24,7 @@ export const SERVER_INSTALLERS: Readonly<Record<ServerInstallerKey, string>> = O
   melee: 'the runtime-plan held melee',
   movers: 'headlessRuntime.ts carried and moored movers, or the plan\'s own mover motion',
   places: 'headlessRuntime.ts room respawn places, standalone/cellWorld.ts discoveries',
-  portalRide: 'native assembly `portal.ride`',
+  portalRide: 'native assembly `portal.ride`, game/shardfile/declaredPortalRide.ts (a plain upload\'s `client/plan` rows, OF41b)',
   // one key for every `view.program` row: a page-only pose (Driftwood's bridge sway, Nine Dragon's movers) stays a KNOWN line until HS6
   poseViews: 'native assembly `encounter.patrol` slots and `boss.open-arena`',
   questComposition: 'native assembly `quest.composition`',

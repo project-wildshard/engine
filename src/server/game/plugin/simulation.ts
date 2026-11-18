@@ -103,6 +103,8 @@ import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 import { scriptSeats, type ScriptSeats } from './scriptSeats';
 import { registerInstalled } from '../shardfile/installedSides';
 import { installDeclaredRiding, type DeclaredRiding } from '../shardfile/declaredRiding';
+import { installDeclaredHostPortalRide } from '../shardfile/declaredPortalRide';
+import type { PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
 
 type Physics = SimHost['physics'];
@@ -392,6 +394,8 @@ export interface ShardfileSimPorts extends SimHostPorts {
   lookClock?: () => Pick<DayCycle, 'hour' | 'snapshot' | 'restore'>;
   /** G168: a declared module crossed its failure limit and stays off (the client tells the player; Node ignores it). */
   scriptDisabled?: ShardScriptPorts['onDisabled'];
+  /** OF41b: a plain upload's `client/plan` `portal.ride` rows; the server rides its portal links under their director. */
+  portalRide?: PortalRideRows | null;
 }
 /** Authoritative handles for UI, quests and the existing client fixed-step driver. */
 export interface ShardfileSimulation {
@@ -681,7 +685,9 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
         day = () => clock.hour;
       }
     }
+    const portalRide = portals.length > 0 ? ports.portalRide ?? null : null;
     for (const data of shard.directors ?? []) {
+      if (data.id === portalRide?.director) continue; // OF41b: the portal ride runs its own director's stages
       const bindingIssues = directorDataHostIssues(data);
       if (bindingIssues.length > 0) throw new Error(`Director rows require native bindings for their observations and actions: ${bindingIssues.join('; ')}`);
       if (Object.values(data.inputs).some(binding => binding.startsWith('flag:') && !shard.quests.flags.includes(binding.slice(5)))
@@ -752,6 +758,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       seats.step(); createQuestScriptPorts(lane, hooks, actors).scene(row.scene, player); return true;
     };
     const riding = installDeclaredRiding(host, shard);
+    installDeclaredHostPortalRide(host, shard, portalRide, ports.quest?.fact ?? (() => undefined)); // OF41b: the `portal` primitive
     recordPrimitives(host, shard); // OF17b1: the list comes from the sections, never a host list
     return { riding, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
   } catch (error) { host.dispose(); throw error; }
