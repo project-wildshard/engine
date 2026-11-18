@@ -94,6 +94,17 @@ test('44139343442: an unassigned advisory street runner preserves the twelve pas
   expect(blockingRun(red, [...jobs, { ...street, name: 'nine-ring1 (unknown, macos-15)' }]).conclusion).toBe('failure');
 });
 
+test('44358473370: a footprint guard hosted macOS never ran is advisory while nothing it reads is armed (J424)', () => {
+  const red = run(44358473370, '3701945a', 'failure', 50);
+  const jobs = ['tests (1)', 'boundaries', 'nine-ring1-build', 'memory-ledger-guard']
+    .map(name => ({ name, conclusion: 'success' as string | null }));
+  for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
+    expect(blockingRun(red, [...jobs, { name: 'memory-footprint-guard', conclusion }]).conclusion).toBe('success');
+  }
+  const ledgerRed = [{ name: 'tests (1)', conclusion: 'success' }, { name: 'memory-ledger-guard', conclusion: 'failure' }];
+  expect(blockingRun(red, [...ledgerRed, { name: 'memory-footprint-guard', conclusion: 'success' }]).conclusion).toBe('failure');
+});
+
 test('replaying runs 42965336189 and 42966114949: cancelled by newer pushes is superseded, never MAIN RED', () => {
   const verdicts = judge(replay, { judged: [42965108264], dispatched: [] }, sha('652afa6c'));
   expect(verdicts.map(row => [row.kind, row.run.id])).toEqual([

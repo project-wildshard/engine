@@ -1,4 +1,7 @@
+// oxlint-disable-next-line import/no-nodejs-modules -- the test reads the committed baselines and ci.yml.
+import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
+import { blockingRun } from '../scripts/main-watch.mjs';
 import { compareFootprint, compareLedger, confirmFootprint, footprintOverLine, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, ledgerBudget, guardZones, guardFootprint } from '../scripts/memory/ratchet.mjs';
 
 const MB = 1e6;
@@ -121,4 +124,21 @@ test('the Template footprint blocks only when its anchor is armed', () => {
   expect(guardFootprint(anchor, () => inside)).toEqual({ anchor, report: null });
   expect(guardFootprint({ ...anchor, armed: true }, () => inside)).toEqual({ anchor: { ...anchor, armed: true }, report: null });
   expect(() => guardFootprint({ ...anchor, armed: true }, () => over)).toThrow(/1 of 1 batches over the line/u);
+});
+
+interface Armed { armed?: boolean }
+
+// J424: the native footprint job is advisory only while nothing it reads is armed. Arming the Template anchor or Nine's
+// WebKit zone must also make the job blocking again: drop its continue-on-error and its main-watch advisory entry.
+test('the footprint job stops being advisory the day anything it reads is armed', () => {
+  const footprint = JSON.parse(readFileSync('scripts/memory/footprint-ratchet.json', 'utf8')) as { anchor: Armed };
+  const webkit = JSON.parse(readFileSync('scripts/memory/webkit-ledger-ratchet.json', 'utf8')) as { zones: Record<string, Armed> };
+  const armed = footprint.anchor.armed === true || Object.values(webkit.zones).some(zone => zone.armed === true);
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const job = ci.slice(ci.indexOf('\n  memory-footprint-guard:'), ci.indexOf('\n    steps:', ci.indexOf('\n  memory-footprint-guard:')));
+  expect(job).toContain('runs-on: macos-15');
+  expect(job.includes('continue-on-error: true')).toBe(!armed);
+  const red = { id: 1, head_sha: 'a', status: 'completed', conclusion: 'failure', created_at: '2026-11-18T00:00:00Z', event: 'push' };
+  const verdict = blockingRun(red, [{ name: 'tests (1)', conclusion: 'success' }, { name: 'memory-footprint-guard', conclusion: 'cancelled' }]);
+  expect(verdict.conclusion).toBe(armed ? 'failure' : 'success');
 });

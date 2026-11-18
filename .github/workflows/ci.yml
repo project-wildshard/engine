@@ -596,11 +596,14 @@ jobs:
 
   memory-footprint-guard:
     # J424: report-only until the Template anchor or Nine's zone says "armed": true (scripts/memory/ratchet.mjs).
+    # Hosted macOS sometimes never assigns this job a runner (run 44358473370), so while nothing here is armed the job
+    # itself cannot fail the run either; memory-ratchet.test.ts drops this line the day a zone here is armed.
     # EM36 reads native processes on the same hosted macOS runner as EM12.
     needs: nine-ring1-build
     if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' && (inputs.pins_channel == '' || inputs.pins_channel == 'production') }}
     runs-on: macos-15
     timeout-minutes: 20
+    continue-on-error: true
     env:
       WS_LANE_NAME: memory-footprint
     steps:
