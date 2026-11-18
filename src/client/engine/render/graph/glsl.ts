@@ -259,27 +259,48 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
     const known = memo.get(id);
     if (known !== undefined) return known;
     memo.set(id, false);
-    type Chain = readonly Readonly<Record<string, GraphNode>>[];
-    function reads(chain: Chain, n: GraphNode): boolean {
-      if (LATE_OPS.has(n.op) || (n.in ?? []).some(r => refReads(chain, r))) return true;
-      const body = n.body;
-      if (body === undefined) return false;
-      const inner = [...chain, body.nodes];
-      return Object.values(body.nodes).some(b => reads(inner, b)) || refReads(inner, body.out);
-    }
-    function refReads(chain: Chain, r: GraphRef | undefined): boolean {
-      if (typeof r !== 'string') return false;
-      for (let i = chain.length - 1; i >= 0; i--) {
-        const hit = chain[i]?.[r];
-        if (hit !== undefined) return i === 0 ? late(nodes, r) : reads(chain.slice(0, i + 1), hit);
-      }
-      return false;
-    }
     const n = nodes[id];
-    const v = n !== undefined && reads([nodes], n);
+    const v = n !== undefined && lateReads(nodes, [nodes], 1, n);
     memo.set(id, v);
     return v;
   }
+  // MG10 / EM18: the walk below allocated ~40 MB on Nine's boot (a closure per node and input, a chain copy per loop body
+  // and per lookup). It reads the scope chain as the first `depth` entries of one array instead: entering a body writes
+  // its slot and restores it on the way out, so a deeper frame's chain is whole again when a nested walk returns.
+  /** whether node `n`, in the scope chain's first `depth` entries (root `nodes` first), reads a late input */
+  function lateReads(nodes: Readonly<Record<string, GraphNode>>, chain: Readonly<Record<string, GraphNode>>[], depth: number, n: GraphNode): boolean {
+    if (LATE_OPS.has(n.op)) return true;
+    const inputs = n.in;
+    if (inputs !== undefined) for (let index = 0; index < inputs.length; index++) if (lateRef(nodes, chain, depth, inputs[index])) return true;
+    const body = n.body;
+    if (body === undefined) return false;
+    const saved = chain[depth];
+    chain[depth] = body.nodes;
+    try {
+      for (const key in body.nodes) {
+        if (!Object.hasOwn(body.nodes, key)) continue;
+        const inner = body.nodes[key];
+        if (inner !== undefined && lateReads(nodes, chain, depth + 1, inner)) return true;
+      }
+      return lateRef(nodes, chain, depth + 1, body.out);
+    } finally { if (saved === undefined) chain.length = depth; else chain[depth] = saved; }
+  }
+  function lateRef(nodes: Readonly<Record<string, GraphNode>>, chain: Readonly<Record<string, GraphNode>>[], depth: number, r: GraphRef | undefined): boolean {
+    if (typeof r !== 'string') return false;
+    for (let i = depth - 1; i >= 0; i--) {
+      const hit = chain[i]?.[r];
+      if (hit !== undefined) return i === 0 ? late(nodes, r) : lateReads(nodes, chain, i + 1, hit);
+    }
+    return false;
+  }
+
+  // MG10 / EM18: what a scope's nodes alone decide (readers, selects, arm reach, sampling), kept across the graph's
+  // programs: an outlined material built each of them twice
+  const readersOf = new WeakMap<Readonly<Record<string, GraphNode>>, ReadonlyMap<string, number>>();
+  const armsOf = new WeakMap<Readonly<Record<string, GraphNode>>, Map<string, ReadonlySet<string>>>();
+  const backOf = new WeakMap<Readonly<Record<string, GraphNode>>, ReadonlyMap<string, readonly string[]>>();
+  const selectsOf = new WeakMap<Readonly<Record<string, GraphNode>>, ReadonlyMap<string, readonly (readonly [string, GraphNode])[]>>();
+  const samplesOf = new WeakMap<Readonly<Record<string, GraphNode>>, Map<string, boolean>>();
 
   /** one program's emission (the main draw or the outline), sharing the graph's uniforms and attributes */
   function emitProgram(which: 'main' | 'outline' | 'fog' | 'fogSample'): { program: GraphGlslProgram; fogFunction: string | null; fogSample: string | null; execution: GraphGlslExecutionCost | null } {
@@ -371,7 +392,6 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
     }
 
     // how many places read each node of a scope (a select side read elsewhere costs a branch nothing)
-    const readersOf = new WeakMap<Readonly<Record<string, GraphNode>>, ReadonlyMap<string, number>>();
     const readers = (scope: Scope): ReadonlyMap<string, number> => {
       let known = readersOf.get(scope.nodes);
       if (known !== undefined) return known;
@@ -421,43 +441,38 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       return (spec?.cost ?? 0) + (n.op === 'fogSample' ? postFog?.cost.instructions ?? 0 : 0) + body + (n.in ?? []).reduce<number>((sum, x) => sum + ownCost(x, scope, seen), 0);
     };
     /** whether a reference samples a texture (implicit derivatives), through its inputs and a loop's output */
-    const samplesOf = new WeakMap<Scope, Map<string, boolean>>();
-    const samples = (r: GraphRef | undefined, scope: Scope, seen?: Set<GraphNode>): boolean => {
+    // MG10 / EM18: one answer per node, kept by the scope that declares it (it depends on nothing else). A walk with its
+    // own seen-set per query re-walked each select's whole cone: ~28 MB [S] of sets and closures on Nine's boot
+    const samples = (r: GraphRef | undefined, scope: Scope): boolean => {
       if (typeof r !== 'string') return false;
-      // DL21 (Nine's Props): a top-level answer depends on the scope chain alone, so each scope keeps it
-      if (seen === undefined) {
-        let memo = samplesOf.get(scope);
-        if (memo === undefined) { memo = new Map(); samplesOf.set(scope, memo); }
-        const known = memo.get(r); if (known !== undefined) return known;
-        const found = samples(r, scope, new Set());
-        memo.set(r, found); return found;
-      }
-      for (let s: Scope | null = scope; s !== null; s = s.parent) {
-        const node = s.nodes[r];
-        if (node === undefined) continue;
-        if (seen.has(node)) return false;
-        seen.add(node);
-        if (SAMPLE_OPS.has(node.op) || (node.op === 'fogSample' && (postFog?.cost.samplers ?? 0) > 0)) return true;
-        const inner = s;
-        if ((node.in ?? []).some(argument => samples(argument, inner, seen))) return true;
-        if (node.body !== undefined) return samples(node.body.out, { ...inner, path: `${inner.path}.${r}.body`, nodes: node.body.nodes, parent: inner, home: null }, seen);
-        return false;
-      }
-      return false;
+      let s: Scope | null = scope, node: GraphNode | undefined;
+      while (s !== null && (node = s.nodes[r]) === undefined) s = s.parent;
+      if (s === null || node === undefined) return false;
+      let memo = samplesOf.get(s.nodes);
+      if (memo === undefined) { memo = new Map(); samplesOf.set(s.nodes, memo); }
+      const known = memo.get(r); if (known !== undefined) return known;
+      memo.set(r, false);
+      let found = SAMPLE_OPS.has(node.op) || (node.op === 'fogSample' && (postFog?.cost.samplers ?? 0) > 0);
+      const inputs = node.in;
+      if (inputs !== undefined) for (let index = 0; !found && index < inputs.length; index++) found = samples(inputs[index], s);
+      if (!found && node.body !== undefined) found = samples(node.body.out, { ...s, path: `${s.path}.${r}.body`, nodes: node.body.nodes, parent: s, home: null });
+      memo.set(r, found); return found;
     };
     /** every node `from` reads in `scope`, itself included (a varying ends the walk: its input is the vertex stage's) */
     const reach = (scope: Scope, from: readonly (GraphRef | undefined)[]): Set<string> => {
-      const out = new Set<string>(), stack = [...from];
+      const out = new Set<string>(), stack: (GraphRef | undefined)[] = [];
+      for (let index = 0; index < from.length; index++) stack.push(from[index]);
       while (stack.length > 0) {
         const r = stack.pop();
         if (typeof r !== 'string' || out.has(r)) continue;
         const node = scope.nodes[r]; if (node === undefined) continue;
-        out.add(r); if (node.op !== 'varying') stack.push(...(node.in ?? []));
+        out.add(r);
+        const inputs = node.in;
+        if (node.op !== 'varying' && inputs !== undefined) for (let index = 0; index < inputs.length; index++) stack.push(inputs[index]);
       }
       return out;
     };
     // DL21: Nine's ~2,100-node kit graphs carry ~90 selects; each select re-derived these per call (O(selects × nodes))
-    const armsOf = new WeakMap<Readonly<Record<string, GraphNode>>, Map<string, ReadonlySet<string>>>();
     /** reach of a select's two arms, by its id (read-only; a pure function of its scope's nodes) */
     const armReach = (scope: Scope, id: string, m: GraphNode): ReadonlySet<string> => {
       let memo = armsOf.get(scope.nodes);
@@ -466,7 +481,6 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       if (known === undefined) { known = reach(scope, [m.in?.[1], m.in?.[2]]); memo.set(id, known); }
       return known;
     };
-    const backOf = new WeakMap<Readonly<Record<string, GraphNode>>, ReadonlyMap<string, readonly string[]>>();
     /** each node's readers in a scope, in declaration order (one entry per input slot) */
     const backReaders = (scope: Scope): ReadonlyMap<string, readonly string[]> => {
       const known = backOf.get(scope.nodes); if (known !== undefined) return known;
@@ -476,7 +490,6 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       }
       backOf.set(scope.nodes, back); return back;
     };
-    const selectsOf = new WeakMap<Readonly<Record<string, GraphNode>>, ReadonlyMap<string, readonly (readonly [string, GraphNode])[]>>();
     /** a scope's selects by their condition node, in declaration order */
     const selectsOn = (scope: Scope, cond: string): readonly (readonly [string, GraphNode])[] => {
       let known = selectsOf.get(scope.nodes);
@@ -495,15 +508,31 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
     const branchShared = (members: readonly (readonly [string, GraphNode])[], scope: Scope): string[] => {
       const back = backReaders(scope);
       const own = members.map(([id, m]) => armReach(scope, id, m)), ids = new Set(members.map(([id]) => id));
-      const x = reach(scope, members.map(([, m]) => m.in?.[1])), y = reach(scope, members.map(([, m]) => m.in?.[2])), arms = new Set([...x, ...y]), uses = readers(scope);
-      const frontier = [...arms].filter(k => {
-        const node = scope.nodes[k]; if (node === undefined || node.op === 'varying' || (node.in ?? []).length === 0) return false;
-        if (x.has(k) && y.has(k)) return true;
-        if (members.length > 1 && (DERIVATIVE_OPS.has(node.op) || (SAMPLE_OPS.has(node.op) && own.filter(set => set.has(k)).length > 1))) return true;
-        const inside = (back.get(k) ?? []).filter(reader => ids.has(reader) || arms.has(reader)).length;
-        return (uses.get(k) ?? 0) > inside;
-      });
-      const below = reach(scope, frontier.flatMap(k => scope.nodes[k]?.in ?? []));
+      const x = reach(scope, members.map(([, m]) => m.in?.[1])), y = reach(scope, members.map(([, m]) => m.in?.[2])), arms = new Set(x), uses = readers(scope);
+      for (const k of y) arms.add(k);
+      // MG10 / EM18: counted in loops (the filters' arrays and closures were ~24 MB [S] on Nine's boot); order is kept
+      const frontier: string[] = [], frontierInputs: GraphRef[] = [];
+      for (const k of arms) {
+        const node = scope.nodes[k], inputs = node?.in;
+        if (node === undefined || node.op === 'varying' || inputs === undefined || inputs.length === 0) continue;
+        let keep = x.has(k) && y.has(k);
+        if (!keep && members.length > 1 && DERIVATIVE_OPS.has(node.op)) keep = true;
+        if (!keep && members.length > 1 && SAMPLE_OPS.has(node.op)) {
+          let holders = 0;
+          for (let index = 0; index < own.length; index++) if (own[index]?.has(k) === true) holders++;
+          keep = holders > 1;
+        }
+        if (!keep) {
+          const readersOfK = back.get(k);
+          let inside = 0;
+          if (readersOfK !== undefined) for (let index = 0; index < readersOfK.length; index++) { const reader = readersOfK[index]; if (reader !== undefined && (ids.has(reader) || arms.has(reader))) inside++; }
+          keep = (uses.get(k) ?? 0) > inside;
+        }
+        if (!keep) continue;
+        frontier.push(k);
+        for (let index = 0; index < inputs.length; index++) { const operand = inputs[index]; if (operand !== undefined) frontierInputs.push(operand); }
+      }
+      const below = reach(scope, frontierInputs);
       return frontier.filter(k => !below.has(k));
     };
     /** the estimated instructions a group's branch would hold: its arms' nodes that nothing outside the group reads */

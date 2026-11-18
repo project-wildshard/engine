@@ -41,3 +41,19 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
 - Placement pages now go through `placementPageText.ts`: plain exact pages are used as `JSON.parse` made them, the rest
   through format's schema. Placement parsing 110 -> 47 MB of allocation (the rest is the parse itself). It is a copy of
   shard-format `b960e0e1` `placement-page-text.ts` because MG8 holds this engine on format 0.21.0.
+- A/B of the placement cut (4 alternating runs each, same build otherwise, phone Low): loading renderer peak median
+  1014 -> 1098 MB (old 951-1024, new 1029-1136), heap at the peak 614 -> 725 MB. Live heap after a forced GC at ready is
+  275 -> 269 MB and the parsed pages hold 16.1 -> 13.3 MB, so the cut is smaller in every real sense; the peak moved because
+  less allocation means fewer major GCs before `finish`, and what waits for one is mostly ArrayBuffer backing stores:
+  `Runtime.getHeapUsage` at ready+2 s is 560-725 MB (backing 420-580) and 270 MB (backing 142) after a forced GC. Cutting
+  JS garbage alone does not lower this metric; the dead buffers are the lever.
+- Main-thread buffer census (`tmp/mini-ninemem3/abcensus.mjs`, ArrayBuffer ctor, slices and `Response.arrayBuffer`; typed
+  array constructors and worker replies not yet counted, wrapping those stalls the boot): 163 MB to ready, of which
+  `spawnDownload` fetches 72, `rigParser` slices 31, `ownedGeometry` slices 16, `slabLibrary` facedTree slices 17.
+- GLSL emission (`glsl.ts`): `late`'s walk shares one scope-chain array instead of a closure and a chain copy per node,
+  `samples` keeps one answer per node in its declaring scope instead of a seen-set walk per query, the per-nodes memos
+  (readers, selects, arm reach, sampling) live for the graph instead of per program, and `reach`/`branchShared` count in
+  loops. One emission of each of Nine's 46 non-toon graphs in node: 190 -> 117 MB allocated. Output is byte-identical:
+  `test/glsl-identity.test.ts` checks all 211 graphs of the installed pins against hashes recorded from the old emitter
+  (`GLSL_IDENTITY=write` rewrites them when a change means to alter shaders). EM18's 20 MB is not reachable by trimming:
+  `build`'s per-node closures and the source strings themselves are most of what is left (~60 MB).
