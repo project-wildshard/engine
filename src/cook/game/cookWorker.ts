@@ -120,8 +120,8 @@ export interface CookLimits {
   /** Host CPU grant, including the job's coordinating thread. */
   readonly cpuSlots?: number;
 }
-/** 16 cores and 30 GB on the VPS; Pine's 300 MB ceiling cooks in under two minutes with its proof. */
-export const DEFAULT_LIMITS: CookLimits = {seconds: 600, memoryMB: 6144, heapMB: 4096};
+/** The shared VPS CPU grant can put a cold large cook near ten minutes (QA29 Nalati). */
+export const DEFAULT_LIMITS: CookLimits = {seconds: 900, memoryMB: 6144, heapMB: 4096};
 
 export interface JobOutcomeOk {readonly kind: 'cooked'; readonly report: CookJobReport; readonly peakMB: number}
 export interface JobOutcomeRefused {readonly kind: 'refused'; readonly reason: string; readonly check?: CookJobReport['check']}
