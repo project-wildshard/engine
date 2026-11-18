@@ -42,3 +42,10 @@ standalone Ubuntu smoke reached control in 134.137 seconds under
 its own fixture. The explicit qualification also runs a separate
 bounded microscope diagnostic and keeps the last observed checkpoint.
 [480-second run](https://github.com/project-wildshard/engine/actions/runs/44246104563).
+
+The diagnostic captured the checkpoint sequence through props to gap.
+It now exits successfully after recording a readiness timeout with
+a checkpoint. Regular measurements still fail on that timeout. The
+26-zone qualification also retries a failed install once and reuses the
+full production pin cache after a socket closed during the first attempt.
+[Split qualification](https://github.com/project-wildshard/engine/actions/runs/44255220814).

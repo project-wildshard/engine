@@ -67,7 +67,7 @@ if (phase !== 'build') {
     }
     if (phase === 'diagnose-ledger-nine') {
       await run([process.execPath,'scripts/memory/measure.mjs',`--url=${preview.url}`,'--chunk=nine-dragon-stack',
-        '--ledger-only','--timeout=180',`--out=${resolvePath(out,'ledger-nine-diagnostic.json')}`]);
+        '--ledger-only','--observe-timeout','--timeout=180',`--out=${resolvePath(out,'ledger-nine-diagnostic.json')}`]);
     }
     if (phase === 'ledger') {
       await run([process.execPath,'scripts/memory/measure.mjs',`--url=${preview.url}`,'--chunk=_template','--ledger-only','--timeout=480',

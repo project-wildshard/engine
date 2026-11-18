@@ -610,6 +610,7 @@ async function main(argv) {
   const limits = { maxLoad: Number(args['max-load'] ?? cpus().length), maxLanes: Number(args['max-lanes'] ?? 2), waitMs: Number(args.wait ?? 10) * 60_000 };
   if (args.ladder) return ladder(args, { runs: Number(args.runs ?? 5), settleMs, timeoutMs, gcs, reads, limits, instrument });
   if (args['plant-retained-buffer'] && !args['ledger-only']) throw new Error('The retained buffer control requires --ledger-only');
+  if (args['observe-timeout'] && (!args['ledger-only'] || !args.out)) throw new Error('Observing a timeout requires --ledger-only and --out');
   const runs = args['ledger-only'] ? 0 : Number(args.runs ?? 1);
   const urls = args.url2 ? [args.url, args.url2] : [args.url];
   /** @type {Awaited<ReturnType<typeof webkitBoot>>[]} */
@@ -651,6 +652,8 @@ async function main(argv) {
     const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, `${JSON.stringify({ protocol: PROTOCOL, instrument: runs > 0 ? instrument : null, url: args.url, chunk: args.chunk, date: new Date().toISOString(), webkit, summary, microscope }, null, 1)}\n`);
   }
+  if (args['observe-timeout'] && microscope?.failure?.startsWith('page.waitForFunction: Timeout')
+      && microscope.checkpoints.length > 0) return 0;
   return good.length === webkit.length && (!args['ledger-only'] || microscope?.ready === true) ? 0 : 1;
 }
 

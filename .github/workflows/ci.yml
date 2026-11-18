@@ -476,12 +476,15 @@ jobs:
       - if: steps.baseline.outputs.selected == 'true'
         uses: ./.github/actions/ring-setup
         with:
-          pins-cache-scope: memory-ledger
+          pins-cache-scope: full
       - if: steps.baseline.outputs.selected == 'true'
         name: Build every production pin
         run: |
           node scripts/scratch-dir.mjs memory-ledger 'EM35 full pinned ledger'
-          node scripts/pins.ts install
+          if ! node scripts/pins.ts install; then
+            echo 'Pinned input install failed. Retrying once.' >&2
+            node scripts/pins.ts install
+          fi
           node scripts/gen.mjs --inputs-only
           python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs --outDir tmp/memory-ledger/preview/dist
           bash scripts/ci-playwright-install.sh chromium
