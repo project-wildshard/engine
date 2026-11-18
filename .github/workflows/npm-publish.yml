@@ -4,7 +4,9 @@
 # that already exists, so the first version is published by hand (plan row NP4); until then this job skips with a
 # notice. A manual run with placeholder=true publishes a README-only 0.0.x from this same file, so it proves the
 # trusted publisher end to end without a release (NPM-PUBLISH smoke row).
+# After staging qualification, dispatch staging_build to publish that exact build on npm next.
 name: npm-publish
+run-name: ${{ inputs.staging_build && format('npm next {0}', inputs.staging_build) || 'npm-publish' }}
 
 on:
   push:
@@ -19,9 +21,18 @@ on:
         description: The placeholder version, always 0.0.x
         type: string
         default: 0.0.1
+      staging_build:
+        description: Full SHA of the qualified staging release to publish on npm next
+        type: string
+        default: ''
+      staging_qualification:
+        description: JSON from the exact build's completed staging qualification
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
   id-token: write
 
 concurrency:
@@ -30,23 +41,100 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main' &&
+       !inputs.placeholder && inputs.staging_build != '' && inputs.staging_qualification != '')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      RELEASE_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.staging_build || github.sha }}
+      RELEASE_TAG: ${{ github.ref_name }}
     steps:
+      - name: Validate the staging build input
+        if: github.event_name == 'workflow_dispatch'
+        run: '[[ "$RELEASE_BUILD" =~ ^[a-f0-9]{40}$ ]]'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ env.RELEASE_BUILD }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          package_json_file: package.json
+      - uses: ./.github/actions/org-deps
+        if: github.event_name == 'workflow_dispatch'
+      - name: Install the staging signature verifier's dependencies
+        if: github.event_name == 'workflow_dispatch'
+        run: pnpm install --frozen-lockfile --config.ci=false
+      - name: Admit the exact staging release for npm next
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          E7_RELEASE_PUBLIC_KEY: ${{ vars.E7_RELEASE_PUBLIC_KEY }}
+          STAGING_QUALIFICATION: ${{ inputs.staging_qualification }}
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(git rev-parse HEAD)" = "$RELEASE_BUILD"
+          branch="release/v$version"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --jq .object.sha)" = "$RELEASE_BUILD"
+          run=$(gh run list --workflow ci --branch "$branch" --commit "$RELEASE_BUILD" \
+            --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          test -n "$run"
+          gh run view "$run" --json headSha,jobs | node -e '
+            const ci = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+            if (ci.headSha !== process.env.RELEASE_BUILD || ci.jobs.length === 0 ||
+                ci.jobs.some(job => job.conclusion !== "success")) {
+              throw new Error("The exact release branch CI must pass");
+            }
+          '
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {readPublication} from './scripts/server-release/sign.mjs';
+
+          const packageInfo = JSON.parse(readFileSync('package.json', 'utf8'));
+          assert.equal(packageInfo.name, '@wildshard/engine');
+          const proof = JSON.parse(process.env.STAGING_QUALIFICATION);
+          assert.equal(proof.build, process.env.RELEASE_BUILD);
+          assert.equal(proof.stagingQualified, true);
+          assert.deepEqual(proof.browsers.map(row => row.browser).sort(), ['chromium', 'webkit']);
+          assert.ok(proof.browsers.every(row => row.pass === true &&
+            row.zoneSweep.total > 0 && row.zoneSweep.opened === row.zoneSweep.total));
+          assert.equal(proof.smoke.pass, true);
+          assert.equal(proof.smoke.hold, false);
+          assert.deepEqual(proof.smoke.ran, ['K1', 'K2', 'K3', 'K4', 'K5']);
+          const read = async url => {
+            const response = await fetch(url, {cache: 'no-store', signal: AbortSignal.timeout(15_000)});
+            assert.equal(response.status, 200);
+            return response.text();
+          };
+          const [pageJson, signedJson] = await Promise.all([
+            read('https://staging.wildshard.io/version.json'),
+            read('https://packs.wildshard.io/releases/staging.json'),
+          ]);
+          const page = JSON.parse(pageJson);
+          const release = readPublication(signedJson, process.env.E7_RELEASE_PUBLIC_KEY);
+          assert.equal(release.channel, 'staging');
+          assert.equal(release.engineBuild, process.env.RELEASE_BUILD);
+          assert.equal(page.build, release.engineBuild);
+          assert.equal(page.clientVersion, packageInfo.version);
+          assert.equal(release.serial, proof.serial);
+          console.log('Exact signed staging build admitted for npm next', page.clientVersion, release.serial);
+          JS
+          printf 'RELEASE_TAG=v%s\n' "$version" >> "$GITHUB_ENV"
       # Trusted publishing needs npm 11.5.1 or later.
       - name: Use an npm that can publish by OIDC
         run: |
           node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$(npm --version)" ||
             npm install --global npm@11.16.0
           npm --version
-      - name: The tag matches package.json, and every bin and export is in the tarball
+      - name: Check package version, bins and exports
         run: |
           # shellcheck disable=SC2016 # the quoted script is JavaScript with template literals
           node -e '
@@ -77,11 +165,11 @@ jobs:
           const missing = [...new Set(targets)].filter((target) => !target.includes("*")).map((target) => target.replace(/^\.\//, "")).filter((target) => !files.has(target));
           if (missing.length > 0) throw new Error(`not in the tarball: ${missing.join(", ")}`);
           console.log(`${pkg.name}@${pkg.version}: ${files.size} files, ${packed.size} bytes packed, every bin and export inside`);
-          ' "$GITHUB_REF_NAME"
+          ' "$RELEASE_TAG"
       # Every engine version carries a changelog (Jake, 2026-11-10); changelog-tag.yml checks the same, but a
       # separate workflow cannot stop this one.
-      - name: Require the tag's changelog section at its commit
-        run: node scripts/changelog.mjs check "$GITHUB_REF_NAME" --at="$GITHUB_SHA"
+      - name: Require the release changelog section at its commit
+        run: node scripts/changelog.mjs check "$RELEASE_TAG" --at="$RELEASE_BUILD"
       - name: Publish, unless this is the package's first version or it is already out
         run: |
           name=$(node -p 'require("./package.json").name')
@@ -91,14 +179,28 @@ jobs:
             exit 0
           fi
           if npm view "$name@$version" version >/dev/null 2>&1; then
+            if [[ "$GITHUB_EVENT_NAME" = push ]]; then
+              tags=$(npm view "$name" dist-tags --json)
+              if ! printf '%s' "$tags" | node -e '
+                const tags = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+                process.exit(tags.next === process.argv[1] && tags.latest !== process.argv[1] ? 1 : 0);
+              ' "$version"; then
+                echo "::error::$name@$version needs an authorized npm latest dist-tag promotion."
+                exit 1
+              fi
+            fi
             echo "::notice::$name@$version is already on npm."
             exit 0
           fi
-          npm publish --provenance --access public --ignore-scripts
+          args=(--provenance --access public --ignore-scripts)
+          if [[ "$GITHUB_EVENT_NAME" = workflow_dispatch ]]; then args+=(--tag next); fi
+          npm publish "${args[@]}"
 
   placeholder:
     # Only main's copy of this file: the trusted publisher is bound to the file name, not the branch.
-    if: github.event_name == 'workflow_dispatch' && inputs.placeholder && github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.placeholder &&
+      inputs.staging_build == '' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
