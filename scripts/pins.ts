@@ -132,7 +132,13 @@ async function refresh(drop: readonly string[]): Promise<void> {
 async function fetched(url: string, slug: string, hash: string, options?: RequestInit): Promise<Uint8Array | undefined> {
   const response = await fetch(url, options).catch(() => undefined);
   if (response?.ok !== true) return undefined;
-  const bytes = new Uint8Array(await response.arrayBuffer());
+  // A connection can close after headers, before the immutable body is complete.
+  const body = await response.arrayBuffer().catch(() => {
+    console.warn(`${slug}: could not finish reading a pin source`);
+    return undefined;
+  });
+  if (body === undefined) return undefined;
+  const bytes = new Uint8Array(body);
   if (sha256(bytes) !== hash) throw new Error(`${slug}: ${url} is not the pin`);
   return bytes;
 }

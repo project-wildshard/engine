@@ -27,11 +27,10 @@ import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
-// NB6's hosted street job is explicitly report-only in ci.yml. Its runner
-// can also be cancelled before starting; neither outcome fails the tests.
-const ADVISORY_VERSION=2;
+// NB6's street job and EM35's Chromium checkpoint are report-only.
+const ADVISORY_VERSION=3;
 /** @param {{name:string}} job */
-const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)';
+const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic';
 /** @param {{conclusion:string|null}} job */
 const unsuccessful=job=>['failure','timed_out','cancelled'].includes(job.conclusion??'');
 

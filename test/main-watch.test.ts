@@ -38,7 +38,7 @@ const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
 const world = (runs: ReturnType<typeof run>[], log = ''): World => ({ runs, receipts: [], sent: [], dispatched: 0, log, tip: runs.at(-1)?.head_sha ?? '' });
 
 test('advisory failures preserve green blocking tests in both sweeps and follows', () => {
-  for (const name of ['timings', 'quarantine']) {
+  for (const name of ['timings', 'quarantine', 'nine-ledger-diagnostic']) {
     const red = run(42970000021, 'aaaa1111', 'failure', 50);
     const normalized = blockingRun(red, [{ name: 'tests (1)', conclusion: 'success' }, { name, conclusion: 'failure' }]);
     const w = world(replay), io = fake(`advisory-${name}`, w);
@@ -56,6 +56,10 @@ test('advisories never hide failed, unknown, incomplete or cancelled blocking wo
     expect(blockingRun(red, [{ name: 'tests (1)', conclusion }, { name: 'timings', conclusion: 'failure' }]).conclusion).toBe('failure');
   }
   expect(blockingRun(red, [{ name: 'timings', conclusion: 'failure' }]).conclusion).toBe('failure');
+  expect(blockingRun(red, [
+    { name: 'memory-ledger-guard', conclusion: 'failure' },
+    { name: 'nine-ledger-diagnostic', conclusion: 'failure' },
+  ]).conclusion).toBe('failure');
   expect(blockingRun(red, []).conclusion).toBe('failure');
   for (const conclusion of [null, 'action_required', 'startup_failure']) {
     const unknown = run(42970000025, 'aaaa1111', conclusion, 50);

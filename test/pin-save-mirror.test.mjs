@@ -7,7 +7,7 @@ import {join,resolve} from 'node:path';
 import {brotliCompressSync} from 'node:zlib';
 
 const cli=resolve('scripts/pins.ts');
-for(const mode of ['explicit','fallback','corrupt','missing','api','api-fallback','api-corrupt'])test(`real save install preserves its identity through ${mode} mirror responses`,async()=>{
+for(const mode of ['explicit','fallback','truncated','corrupt','missing','api','api-fallback','api-corrupt'])test(`real save install preserves its identity through ${mode} mirror responses`,async()=>{
   mkdirSync(resolve('tmp'),{recursive:true});
   const root=mkdtempSync(resolve('tmp/pin-save-mirror-'));
   const body=brotliCompressSync(Buffer.from('{"realTransportFixture":true}'));
@@ -20,6 +20,10 @@ for(const mode of ['explicit','fallback','corrupt','missing','api','api-fallback
     if(url==='/7'&&request.headers.accept!=='application/octet-stream'){response.writeHead(406);response.end();return;}
     if(mode==='corrupt'||mode==='api-corrupt'){response.end('not the declared immutable bytes');return;}
     if(mode==='api-fallback'&&url==='/7'){response.writeHead(504);response.end();return;}
+    if(mode==='truncated'&&url.includes('?download=1')){
+      response.writeHead(200,{'Content-Length':body.length,Connection:'close'});
+      response.end(body.subarray(0,1));return;
+    }
     if(mode==='missing'||mode==='fallback'&&url.includes('?download=1')){response.writeHead(mode==='missing'?404:504);response.end();return;}
     response.end(body);
   });
@@ -31,7 +35,7 @@ for(const mode of ['explicit','fallback','corrupt','missing','api','api-fallback
     /** @type {Promise<number|null>} */
     const completed=new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>resolve(code));});
     const result=await completed;
-    if(['explicit','fallback','api','api-fallback'].includes(mode)){
+    if(['explicit','fallback','truncated','api','api-fallback'].includes(mode)){
       expect(result,output).toBe(0);
       expect(readFileSync(join(root,'cache',file))).toEqual(body);
       expect(requests).toEqual(mode==='api'?['/7']:mode==='api-fallback'?['/7',`/${file}?download=1`]:mode==='explicit'?[`/${file}?download=1`]:[`/${file}?download=1`,`/${file}`]);
