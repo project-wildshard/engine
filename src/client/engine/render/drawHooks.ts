@@ -1,8 +1,9 @@
-import { BatchedMesh, BufferGeometry, CompressedTexture, InstancedMesh, Material, MeshDepthMaterial, MeshDistanceMaterial, RenderTarget, Texture } from 'three';
+import { BatchedMesh, type BufferAttribute, BufferGeometry, CompressedTexture, InstancedMesh, Material, Mesh, MeshDepthMaterial, MeshDistanceMaterial, RenderTarget, StaticDrawUsage, Texture } from 'three';
 import type { Renderer } from './renderer';
 import { renderCounter } from './frameCounter';
 import { emitFault } from '../../../shared/engine/core/faults';
 import { LIGHT_UNIFORMS } from './lightUniforms';
+import { arrayReleased } from './releasedArrays';
 
 type Draw = Renderer['renderBufferDirect'];
 type ShadowDraw = (draw: Draw, camera: Parameters<Draw>[0], scene: Parameters<Draw>[1], geometry: Parameters<Draw>[2],
@@ -20,6 +21,8 @@ interface DrawHooks {
   ownerToken: symbol | null;
   retire?: ((complete: boolean) => void) | undefined;
   labels?: Draw | undefined;
+  /** MG10: the provoking-vertex convention of this draw (installProvokingVertex below), before three uploads its index */
+  provoking?: ((geometry: Parameters<Draw>[2], object: Parameters<Draw>[4]) => void) | undefined;
   material?: (...args: Parameters<Draw>) => Parameters<Draw>[3] | null;
   ownership?: (draw: Draw, ...args: Parameters<Draw>) => void;
   memory?: Draw;
@@ -66,6 +69,7 @@ export function drawHooks(renderer: DrawTarget): DrawHooks {
     hooks.depth++; pipeline.epoch++;
     let complete = false, submitted = false;
     try {
+      hooks.provoking?.(geometry, object);
       hooks.labels?.(camera, scene, geometry, material, object, group);
       const selected = hooks.material === undefined ? material : hooks.material(camera, scene, geometry, material, object, group);
       if (selected !== null) {
@@ -262,4 +266,75 @@ export function propertyHooks(renderer: PropertyTarget): PropertyHooks {
     return value;
   };
   return hooks;
+}
+
+/*
+ * MEMORY-GATES MG10 (Nine on the phone): draw in the first-vertex convention, as Metal does natively.
+ *
+ * GL's default convention takes a flat varying from a triangle's last vertex; Metal takes it from the first. ANGLE on Metal
+ * (WebKit's WebGL on every iPhone, and Chromium's on a Mac) keeps GL's answer by rewriting the index data of every draw
+ * whose program has a flat varying, into buffers it allocates per draw. Nine's architecture materials have flat varyings and
+ * draw through the slab multi-draw (slabRanges.ts): WebKit's GPU process held 904.89 MB of those rewritten index buffers
+ * at control (codex-memgates EM16, Metal System Trace [X]), and the first-vertex convention alone took the GPU process
+ * 1,581.96 -> 589.07 MB [K] at equal GL bytes (meta docs/plans/engine-memory/nine-native-2026-11-17.md).
+ *
+ * The look stays: each indexed mesh's triangles are rotated once, `a b c` -> `c a b` (the same triangle, the same winding),
+ * before three first uploads its index, so the vertex that was last, the one every flat varying read, is now first. On Nine
+ * 2.4% of the slab triangles carry flat values that differ by vertex, so without the rotation those would change. Draws
+ * the rotation does not cover keep the last-vertex convention: a mesh with no index, a line, a point, an index another
+ * writer changes after its upload (dynamic usage or a newer version than the one rotated), or one the Memory saver
+ * already took off the CPU. The extension is absent: nothing changes.
+ *
+ * WebKit only (every iPhone browser): in Chromium on Metal merely enabling the extension held Nine's load ~10 s
+ * (sky -> props 0.5 -> 10.3 s, main thread idle, the GPU process busy; 4 of 4 runs, mini-ninemem4 2026-11-17), so Blink
+ * keeps GL's convention and its rewrite.
+ */
+interface ProvokingVertexExtension {
+  readonly FIRST_VERTEX_CONVENTION_WEBGL: number;
+  readonly LAST_VERTEX_CONVENTION_WEBGL: number;
+  readonly provokingVertexWEBGL: (mode: number) => void;
+}
+
+/** index attribute -> its version once rotated (a later version was rewritten by its owner, unrotated) */
+const rotated = new WeakMap<BufferAttribute, number>();
+/** arrays already rotated, whichever attribute holds them (one array behind two attributes turns once) */
+const rotatedArrays = new WeakSet();
+
+/** Rotate every triangle of `index` so its last vertex comes first. False: it cannot be (and draws in GL's convention). */
+export function rotateTriangles(index: BufferAttribute): boolean {
+  const done = rotated.get(index);
+  if (done !== undefined) return done === index.version;
+  if (index.usage !== StaticDrawUsage || index.updateRanges.length > 0 || arrayReleased(index)) return false;
+  const array = index.array;
+  if (!(array instanceof Uint16Array || array instanceof Uint32Array) || array.length % 3 !== 0) return false;
+  if (!rotatedArrays.has(array)) {
+    for (let i = 0; i < array.length; i += 3) {
+      const a = array[i] ?? 0, b = array[i + 1] ?? 0, c = array[i + 2] ?? 0;
+      array[i] = c; array[i + 1] = a; array[i + 2] = b;
+    }
+    rotatedArrays.add(array);
+    // an index three uploaded already goes up again, rotated, before this draw (three compares versions at the draw)
+    index.needsUpdate = true;
+  }
+  rotated.set(index, index.version);
+  return true;
+}
+
+/** Whether `userAgent` is WebKit's engine (Safari, and every iOS browser: CriOS, FxiOS), not Blink's. */
+export function webKitEngine(userAgent: string): boolean {
+  return /AppleWebKit\//u.test(userAgent) && !/(?:Chrome|Chromium|Edg|OPR|SamsungBrowser)\//u.test(userAgent);
+}
+
+/** The renderer draws in the first-vertex convention wherever the rotation keeps the look (see the file comment). */
+export function installProvokingVertex(renderer: Renderer, userAgent: string = globalThis.navigator?.userAgent ?? ''): void {
+  if (!webKitEngine(userAgent)) return;
+  const extension: ProvokingVertexExtension | null = renderer.getContext().getExtension('WEBGL_provoking_vertex');
+  if (extension === null) return;
+  const first = extension.FIRST_VERTEX_CONVENTION_WEBGL, last = extension.LAST_VERTEX_CONVENTION_WEBGL;
+  let mode = last;
+  drawHooks(renderer).provoking = (geometry, object) => {
+    const index = geometry.index;
+    const want = object instanceof Mesh && index !== null && rotateTriangles(index) ? first : last;
+    if (want !== mode) { extension.provokingVertexWEBGL(want); mode = want; }
+  };
 }

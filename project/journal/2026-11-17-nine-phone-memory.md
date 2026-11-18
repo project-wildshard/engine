@@ -78,3 +78,13 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
   (spawn parts, `contentRead`, texture packs, `readContentResponse`); `halfAttribute` wraps half-float words where three's
   constructor copied them. Census: chunk buffers 233 -> 11 MB, half copies 37 -> 0. Peak did not move by itself (WebContent
   peak 1,844 -> 1,832 MB [K], noise): the buffers it removes were garbage, not the peak's owner on WebKit.
+- Cut B, provoking vertex (in `drawHooks.ts`; codex-memgates EM16 named the owner): ANGLE on Metal rewrote the index data
+  of every draw of a program with flat varyings to emulate GL's last-vertex convention, 905 MB of pool buffers under the
+  slab multi-draw. On WebKit the renderer now draws in the first-vertex convention and rotates each static indexed
+  mesh's triangles once before upload (`a b c` -> `c a b`, same triangle and winding), so flat varyings read the same
+  vertex (2.4% of Nine's slab triangles have per-vertex flat values). WebKit, 4 alternating cold runs each: GPU process
+  peak 1,719 -> 802 MB, settled 1,617 -> 689 MB [K]; WebContent unchanged; ready time unchanged. Spawn shots at phone
+  Low match within the rain's own noise (architecture crop 9.3% base-vs-base, 10.7% base-vs-after, >8 levels).
+- Blink is left out: merely enabling `WEBGL_provoking_vertex` in Chromium on Metal held Nine's load ~10 s (`sky` ->
+  `props` 0.5 -> 10.3 s, main thread idle; with the calls dropped too, so the extension itself). Gated on the WebKit
+  user agent (iOS Chrome and Firefox are WebKit).
