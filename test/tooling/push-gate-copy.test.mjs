@@ -98,6 +98,26 @@ describe('push gate copy (EV1)', () => {
     red.remove();
   });
 
+  test('FL12: the local land copy cannot load mutable packages from the publishing checkout', () => {
+    const root = canonical(), head = git(root, ['rev-parse', 'HEAD']);
+    const directory = mkdtempSync(resolve('tmp/isolated-gate-'));
+    roots.push(directory);
+    const copy = makeGateCopy(root, head, {directory, installIsolated: true, say: () => {}});
+    try {
+      expect(copy.path.startsWith(`${directory}/`)).toBe(true);
+      expect(existsSync(join(copy.path, 'node_modules/dep'))).toBe(false);
+      const run = spawnSync(process.execPath, ['-e', 'console.log(require.resolve.paths("dep").includes(process.argv[1]))',
+        join(root, 'node_modules')], {cwd: copy.path, encoding: 'utf8'});
+      expect(run.status).toBe(0);
+      expect(run.stdout.trim()).toBe('false');
+      expect(git(copy.path, ['rev-parse', 'HEAD'])).toBe(head);
+    } finally {
+      copy.remove();
+    }
+    expect(git(root, ['worktree', 'list', '--porcelain'])).not.toContain(copy.path);
+    expect(existsSync(join(root, 'node_modules/dep'))).toBe(true);
+  });
+
   test('a clean plan worktree gates in place; dirt, a pushed non-HEAD tree or the switch decide', () => {
     const root = canonical();
     const base = git(root, ['rev-parse', 'HEAD']);

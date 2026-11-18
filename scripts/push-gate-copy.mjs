@@ -22,7 +22,7 @@ import {dirname,join,resolve} from 'node:path';
 import {clonePaths} from './apfs-clone.mjs';
 import {verifiedPinsOutputs} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
-import {cloneTrackedFiles} from './worktree.mjs';
+import {cloneTrackedFiles,withStoreUse} from './worktree.mjs';
 
 /** The switch (EV1). false gates in place again, refusing a dirty checkout as before. */
 export const CLEAN_COPY=true;
@@ -80,16 +80,16 @@ export function brokenLink(modules){
 }
 
 /** Remove copies a killed gate left behind: their pid (the name's suffix) is gone. A live gate's copy is never touched.
- * @param {string} root @returns {number} removed */
-export function sweepDeadCopies(root){
+ * @param {string} root @param {string} [directory] @returns {number} removed */
+export function sweepDeadCopies(root,directory=join(root,GATE_DIR)){
  let removed=0;
  /** @type {string[]} */let names=[];
- try{names=readdirSync(join(root,GATE_DIR));}catch{return 0;}
+ try{names=readdirSync(directory);}catch{return 0;}
  for(const name of names){
   const pid=Number(/-(\d+)$/u.exec(name)?.[1]??'0');
   if(!Number.isInteger(pid)||pid<=0||pid===process.pid)continue;
   try{process.kill(pid,0);continue;}catch(error){if(!(error instanceof Error)||!('code' in error)||error.code!=='ESRCH')continue;}
-  const path=join(root,GATE_DIR,name);
+  const path=join(directory,name);
   try{git(root,['worktree','remove','--force',path]);}catch{/* Not registered. */}
   rmSync(path,{recursive:true,force:true});removed++;
  }
@@ -99,9 +99,10 @@ export function sweepDeadCopies(root){
 
 /** Make the clean copy of `sha`. Returns its path and a remover; on failure removes what it made and throws.
  * @param {string} root the pushing checkout @param {string} sha
- * @param {{say?:(line:string)=>void,env?:NodeJS.ProcessEnv}} [options] */
-export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n`),env=process.env}={}){
- const path=join(root,GATE_DIR,`${sha.slice(0,12)}-${process.pid}`),began=performance.now();
+ * An isolated J400 copy uses its own pnpm layout and keeps only verified pin and build outputs.
+ * @param {{say?:(line:string)=>void,env?:NodeJS.ProcessEnv,directory?:string,installIsolated?:boolean}} [options] */
+export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n`),env=process.env,directory=join(root,GATE_DIR),installIsolated=false}={}){
+ const path=join(directory,`${sha.slice(0,12)}-${process.pid}`),began=performance.now();
  /** @type {string[]} */const steps=[];
  /** @param {string} step @param {() => (string|void)} work */
  const timed=(step,work)=>{const at=performance.now(),detail=work();steps.push(`${step} ${((performance.now()-at)/1000).toFixed(1)} s${typeof detail==='string'?` (${detail})`:''}`);};
@@ -113,7 +114,7 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
   try{git(root,['worktree','prune']);}catch{/* Prune is housekeeping only. */}
  };
  mkdirSync(dirname(path),{recursive:true});
- sweepDeadCopies(root);
+ sweepDeadCopies(root,directory);
  // A leftover registration of this very path (a reused pid) would make `worktree add` refuse: clear both.
  remove();
  try{
@@ -132,7 +133,7 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
   });
   timed('state',()=>{
    const pairs=/** @type {[string,string][]} */([]);
-   for(const dir of BUILD_STATE)if(existsSync(join(root,dir))&&!existsSync(join(path,dir))){mkdirSync(dirname(join(path,dir)),{recursive:true});pairs.push([join(root,dir),join(path,dir)]);}
+   for(const dir of installIsolated?['out']:BUILD_STATE)if(existsSync(join(root,dir))&&!existsSync(join(path,dir))){mkdirSync(dirname(join(path,dir)),{recursive:true});pairs.push([join(root,dir),join(path,dir)]);}
    // The pins mounts this checkout's own install published (verified against its manifest), file by file.
    for(const mount of verifiedPinsOutputs(root).paths)if(!existsSync(join(path,mount))){mkdirSync(dirname(join(path,mount)),{recursive:true});pairs.push([join(root,mount),join(path,mount)]);}
    return `${pairs.length} paths, ${clonePaths(pairs)}`;
@@ -141,7 +142,13 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
   // copy installs its own (offline, from the store) whenever the pushed lockfile is not the one installed (J206 review).
   const lock=join(path,'pnpm-lock.yaml'),installed=join(path,'node_modules/.pnpm/lock.yaml');
   const lockMoved=existsSync(lock)&&(!existsSync(installed)||!readFileSync(lock).equals(readFileSync(installed)));
-  if(existsSync(lock)&&existsSync(join(path,'node_modules'))&&(lockMoved||brokenLink(join(path,'node_modules')))){
+  if(installIsolated&&existsSync(lock)){
+   timed('isolated install',()=>{
+    const args=['install','--frozen-lockfile','--offline','--config.enableGlobalVirtualStore=false','--config.packageImportMethod=clone-or-copy'];
+    const child=withStoreUse(env,'isolated land install',()=>spawnSync('pnpm',args,{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','pipe','pipe'],encoding:'utf8',maxBuffer:64<<20}));
+    if(child.status!==0)throw new Error(`pnpm install in the isolated land gate failed: ${(child.error?.message??`${child.stderr}${child.stdout}`).trim().split('\n').slice(-3).join(' | ')}`);
+   });
+  }else if(existsSync(lock)&&existsSync(join(path,'node_modules'))&&(lockMoved||brokenLink(join(path,'node_modules')))){
    timed('install',()=>{
     const child=spawnSync('pnpm',['install','--frozen-lockfile','--offline'],{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','ignore','pipe'],encoding:'utf8'});
     if(child.status!==0)throw new Error(`pnpm install in the gate copy exited ${String(child.status)}: ${child.stderr.trim().split('\n').slice(-3).join(' | ')}`);
@@ -163,6 +170,6 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
   }
   if(dirt.length>0)throw new Error(`the gate copy of ${sha.slice(0,10)} is not clean:\n${dirt.slice(0,10).join('\n')}`);
  }catch(error){remove();throw error;}
- say(`  - push-gate copy (EV1): ${sha.slice(0,10)} at ${GATE_DIR}/${path.split('/').at(-1)} in ${((performance.now()-began)/1000).toFixed(1)} s; ${steps.join(', ')}`);
+ say(`  - push-gate copy (${installIsolated?'FL12':'EV1'}): ${sha.slice(0,10)} at ${installIsolated?path:`${GATE_DIR}/${path.split('/').at(-1)}`} in ${((performance.now()-began)/1000).toFixed(1)} s; ${steps.join(', ')}`);
  return {path,remove};
 }

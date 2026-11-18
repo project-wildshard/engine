@@ -77,6 +77,11 @@ test('a managed-global full proof survives a real separate rebase',()=>{
  f.git('switch','--quiet','plan/managed');f.git('rebase','--quiet','main');
  const plan=discoverLocalDeltaPlan(capturePushTree('managed-fixture',f.env,f.root),incoming);
  expect(plan.eligible).toBe(true);expect(plan.proof.commit).toBe(tested);expect(plan.selection.files).toEqual(['src/b.ts']);
+ const current=capturePushTree('managed-fixture',f.env,f.root);
+ f.git('switch','--quiet','--detach','HEAD');
+ expect(discoverLocalDeltaPlan(current,incoming).eligible).toBe(false);
+ expect(discoverLocalDeltaPlan(current,incoming,'refs/heads/main').eligible).toBe(false);
+ expect(discoverLocalDeltaPlan(current,incoming,'refs/heads/plan/managed').proof?.run).toBe(plan.proof?.run);
 },30000);
 
 test('one passed full proof carries four consecutive disjoint main rebases',()=>{

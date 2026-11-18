@@ -18,6 +18,10 @@ export function pushEnvironment(environment=process.env){
   const env={...gateEnvironment(environment),PWD:process.cwd(),WS_PUSH_GATE_PROFILE:PUSH_PROFILE,WS_VITEST_MAX_WORKERS:String(PUSH_BUDGET.workers),
     WS_PUSH_LINT_THREADS:String(PUSH_BUDGET.lintThreads),GOMAXPROCS:String(PUSH_BUDGET.lintGo),UV_THREADPOOL_SIZE:'1',WS_CPU_ADMISSION:'1',
     WS_HEAVY_SCHEDULER_ROOT:resolve(environment.WS_HEAVY_SCHEDULER_ROOT??environment.WS_HEAVY_ROOT??resolve(homedir(),'.wildshard-heavy-lanes'))};
+  if(environment.WS_LOCAL_LAND_SOURCE_REF!==undefined){
+    env.npm_config_enable_global_virtual_store='false';
+    env.npm_config_package_import_method='clone-or-copy';
+  }
   // Git prepends its exec directory when it invokes a hook. Execute both gate
   // entries with that same effective search order; duplicate entries add no tool.
   if(environment.PATH!==undefined){
@@ -148,7 +152,7 @@ async function main(){
   const planDelta=current=>{
     const planned=localDeltaPlan(current,basis);
     return !planned.eligible&&process.env.WS_LOCAL_LAND_HEAD===current?.commit
-      ?discoverLocalDeltaPlan(current,process.env.WS_LOCAL_LAND_BASE_MAIN):planned;
+      ?discoverLocalDeltaPlan(current,process.env.WS_LOCAL_LAND_BASE_MAIN,process.env.WS_LOCAL_LAND_SOURCE_REF):planned;
   };
   const delta=planDelta(context);
   if(delta.eligible&&delta.selection!==null){

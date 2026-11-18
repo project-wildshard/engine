@@ -11,15 +11,15 @@ const basisSchema=v.object({baseMain:sha,testedHead:sha,incomingMain:sha,head:sh
  * Reflog entries are candidates only; the receipt and complete replay still
  * authenticate every selected candidate with the current runtime.
  * @param {NonNullable<ReturnType<typeof import('./push-proof-cache.mjs').capturePushTree>>|null} context
- * @param {string|undefined} incomingMain */
-export function discoverLocalDeltaPlan(context,incomingMain){
+ * @param {string|undefined} incomingMain @param {string} [sourceRef] exact plan ref when the check runs detached */
+export function discoverLocalDeltaPlan(context,incomingMain,sourceRef){
  const fallback=localDeltaPlan(context,null);
  if(context===null||!v.safeParse(sha,incomingMain).success)return fallback;
  /** @param {string[]} args */
  const git=args=>execFileSync('git',args,{cwd:context.root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
  try{
-  const branch=git(['symbolic-ref','--quiet','HEAD']);
-  if(!branch.startsWith('refs/heads/plan/'))return fallback;
+  const branch=sourceRef??git(['symbolic-ref','--quiet','HEAD']);
+  if(!branch.startsWith('refs/heads/plan/')||git(['rev-parse','--verify',branch])!==context.commit)return fallback;
   const candidates=new Set(git(['reflog','show','--format=%H','-n','64',branch]).split('\n'));
   for(const testedHead of candidates){
    if(testedHead===context.commit||!v.safeParse(sha,testedHead).success)continue;

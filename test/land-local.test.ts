@@ -287,7 +287,7 @@ describe('land (J400): local gates and proof reuse', () => {
       'scripts/heavy-lane.py': `import os, sys\nos.execv(sys.executable, [sys.executable, ${JSON.stringify(resolve('scripts/heavy-lane.py'))}, *sys.argv[1:]])\n`,
       'scripts/land-local-gate.mjs': `import ${JSON.stringify(resolve('scripts/land-local-gate.mjs'))};\n`,
       'scripts/check-css.mjs': cssChecker,
-      '.githooks/push-checks.mjs': `import { assertHeavyLease } from ${JSON.stringify(resolve('scripts/heavy-lane-lease.mjs'))};\nassertHeavyLease('full-test');\nconsole.error('fixture full checks ran inside lease');\n`,
+      '.githooks/push-checks.mjs': `import { createRequire } from 'node:module';\nimport { assertHeavyLease } from ${JSON.stringify(resolve('scripts/heavy-lane-lease.mjs'))};\nassertHeavyLease('full-test');\nif(requirePath().includes(${JSON.stringify(join(f.repo, 'node_modules'))}))throw new Error('gate can still resolve publishing checkout packages');\nfunction requirePath(){return createRequire(import.meta.url).resolve.paths('fixture-dep')??[];}\nconsole.error('fixture full checks ran inside lease');\n`,
     };
     for (const match of cssChecker.matchAll(/file: join\(ROOT, '([^']+)'\)/gu)) {
       const path = match[1] ?? '';
