@@ -78,3 +78,8 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   not its own responsible process, so its XPC services do not name it. They now match when they share the app's
   responsible pid, sit in the app's own bundle and started after it; a shared Mac keeps the stricter rule. When nothing
   matches, measure.mjs lists the ms-playwright processes it saw, so a second miss explains itself.
+- EM11 refit at the device's own line (mini-em1d). CRASH_LINE became ActiveHard 2048 MiB (2,147 MB, codex-memgates
+  `af35ba46`), so the anchor's 2,050 MB low line lost its source: both lines are now 2,147 MB and the zones were
+  re-measured on main `d740b00a`. alpha 0.20-0.47, scale 0.61-0.82. Phone loading / playing: Template 0.85 / 0.63 GB,
+  Dunes 0.98 / 0.69, Pine 1.43 (1.13-1.52) / 1.14, Nine 2.06 (1.59-2.18) / 1.25. Nine's settled GPU process fell from
+  1,586 to 747 MB since `c4397636`, so its loading central is under the line, but the bar still crosses it.

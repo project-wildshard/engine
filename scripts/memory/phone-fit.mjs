@@ -78,7 +78,7 @@ function main(argv) {
   for (const f of (args.chromium ?? '').split(',').filter(Boolean)) { const run = read(f); const r = run.verdict?.rendererPeak?.bytes; if (typeof r === 'number') (chromium[run.chunk] ??= []).push(r); }
   const calibration = read(new URL('calibration.json', import.meta.url).pathname).hosts.webkit;
   const fitted = fitPhoneModel({ anchor: read(args.anchor).webkit, last: args.last ?? 'compile:after', zones: args.zones.split(',').map((f) => read(f).webkit), chromium,
-    limitMB: Number(args.limit ?? 2050), limitHighMB: Number(args['limit-high'] ?? 2147), gpuFloorMB: calibration.baselineMB.gpu });
+    limitMB: Number(args.limit ?? 2147), limitHighMB: Number(args['limit-high'] ?? args.limit ?? 2147), gpuFloorMB: calibration.baselineMB.gpu });
   const out = args.out ?? new URL('phone-model.json', import.meta.url).pathname;
   const previous = (() => { try { return read(out); } catch { return {}; } })();
   writeFileSync(out, `${JSON.stringify({ version: 1, note: previous.note ?? '', measured: args.measured ?? new Date().toISOString().slice(0, 10), host: previous.host ?? '', ...fitted }, null, 1)}\n`);

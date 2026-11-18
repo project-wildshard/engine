@@ -2,39 +2,39 @@
  "version": 1,
  "note": "ENGINE-MEMORY EM11: the iPhone 17 Pro's WebContent [K] from Mac readings (scripts/memory/phoneModel.mjs says how; scripts/memory/phone-fit.mjs refits). alpha and scale: the anchor's bounds (v0.1.36 Nine rev 2 died on the phone after its last compile:after, lived through every boot trace window before). ledger: settled WebKit [K] on the ledger [L] over the four zones, missPct the worst leave-one-out miss. chromium.loadingPerRenderer: the phone's loading peak over boot-memory-peak's renderer peak under the card. zones: the fit's data and each zone's phone prediction, MB decimal.",
  "measured": "2026-11-17",
- "host": "Mac mini (Apple M5 Pro, macOS 27.0), Playwright WebKit 27.2 headless, phone view 402x874 @3, phone tier, Low; engine c4397636 (zones) and 6f53e748 (anchor); Chromium probe on the same zone build",
- "limitMB": 2050,
+ "host": "Mac mini (Apple M5 Pro, macOS 27.0), Playwright WebKit 27.2 headless, phone view 402x874 @3, phone tier, Low; engine d740b00a (zones, 3 runs each, and one Chromium probe each) and 6f53e748 (anchor); both lines at CRASH_LINE, 2048 MiB",
+ "limitMB": 2147,
  "limitHighMB": 2147,
  "gpuFloorMB": 17.6,
  "alpha": {
-  "low": 0.143,
+  "low": 0.199,
   "high": 0.474
  },
  "scale": {
-  "low": 0.579,
+  "low": 0.606,
   "high": 0.816
  },
  "ledger": {
   "webcontent": {
-   "floorMB": 231.8,
-   "perMB": 5.76
+   "floorMB": -47.5,
+   "perMB": 10.851
   },
   "gpu": {
-   "floorMB": 117.4,
-   "perMB": 5.065
+   "floorMB": 262.7,
+   "perMB": 2.587
   },
-  "missPct": 46.9
+  "missPct": 32.3
  },
  "peakOverSettled": {
-  "low": 1.231,
-  "central": 1.361,
-  "high": 1.618
+  "low": 1.257,
+  "central": 1.375,
+  "high": 1.643
  },
  "chromium": {
   "loadingPerRenderer": {
-   "low": 1.143,
-   "central": 2.248,
-   "high": 2.855
+   "low": 1.178,
+   "central": 2.03,
+   "high": 2.937
   }
  },
  "anchor": {
@@ -78,96 +78,96 @@
  },
  "zones": {
   "_template": {
-   "build": "c439763-mwli2rll",
+   "build": "d740b00a-mwll2ktb",
    "runs": 3,
    "settledMB": {
-    "webcontent": 529,
-    "gpu": 355
+    "webcontent": 522,
+    "gpu": 347
    },
    "ledgerMB": {
     "ram": 47.5,
-    "gpu": 36.3
+    "gpu": 28
    },
    "phonePlayingMB": {
-    "low": 502,
+    "low": 516,
     "central": 633,
-    "high": 707
+    "high": 695
    },
    "phoneLoadingMB": {
-    "low": 685,
-    "central": 821,
-    "high": 965
+    "low": 720,
+    "central": 846,
+    "high": 969
    },
-   "chromiumLoadingRendererMB": 347
+   "chromiumLoadingRendererMB": 330
   },
   "sunscar-dunes": {
-   "build": "c439763-mwli2rll",
+   "build": "d740b00a-mwll2ktb",
    "runs": 3,
    "settledMB": {
-    "webcontent": 515,
-    "gpu": 497
+    "webcontent": 530,
+    "gpu": 501
    },
    "ledgerMB": {
     "ram": 64.1,
-    "gpu": 97.6
+    "gpu": 89.2
    },
    "phonePlayingMB": {
-    "low": 576,
-    "central": 663,
-    "high": 812
+    "low": 614,
+    "central": 693,
+    "high": 827
    },
    "phoneLoadingMB": {
-    "low": 785,
-    "central": 945,
-    "high": 1106
+    "low": 847,
+    "central": 979,
+    "high": 1141
    },
-   "chromiumLoadingRendererMB": 444
+   "chromiumLoadingRendererMB": 451
   },
   "pine-hollow": {
-   "build": "c439763-mwli2rll",
+   "build": "d740b00a-mwll2ktb",
    "runs": 3,
    "settledMB": {
-    "webcontent": 992,
-    "gpu": 617
+    "webcontent": 961,
+    "gpu": 542
    },
    "ledgerMB": {
-    "ram": 145.1,
-    "gpu": 190.6
+    "ram": 97.7,
+    "gpu": 128.2
    },
    "phonePlayingMB": {
-    "low": 922,
-    "central": 1177,
-    "high": 1299
+    "low": 900,
+    "central": 1138,
+    "high": 1212
    },
    "phoneLoadingMB": {
-    "low": 1146,
-    "central": 1449,
-    "high": 1615
+    "low": 1127,
+    "central": 1430,
+    "high": 1519
    },
-   "chromiumLoadingRendererMB": 1003
+   "chromiumLoadingRendererMB": 956
   },
   "nine-dragon-stack": {
-   "build": "c439763-mwli2rll",
+   "build": "d740b00a-mwll2ktb",
    "runs": 3,
    "settledMB": {
-    "webcontent": 1011,
-    "gpu": 1586
+    "webcontent": 1010,
+    "gpu": 747
    },
    "ledgerMB": {
-    "ram": 111.4,
-    "gpu": 186
+    "ram": 86.8,
+    "gpu": 174.4
    },
    "phonePlayingMB": {
-    "low": 1235,
-    "central": 1495,
-    "high": 2105
+    "low": 1054,
+    "central": 1255,
+    "high": 1419
    },
    "phoneLoadingMB": {
-    "low": 2064,
-    "central": 2418,
-    "high": 2909
+    "low": 1586,
+    "central": 2062,
+    "high": 2177
    },
-   "chromiumLoadingRendererMB": 1019
+   "chromiumLoadingRendererMB": 1091
   }
  }
 }

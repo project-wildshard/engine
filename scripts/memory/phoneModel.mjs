@@ -20,8 +20,8 @@
 //     zones' fit of WebKit [K] on the ledger, settled at control, and the measured peak over settled for loading;
 //   - phoneFromChromium: the Chromium renderer [R] peak under the loading card (scripts/boot-memory-peak.mjs), times
 //     the zones' fitted ratio of the phone's loading peak to that renderer peak.
-// Each returns {low, central, high} in bytes. The limit is CRASH_LINE (src/client/game/grid/budgetOverlay.ts, 2,048 MiB);
-// public device logs say 2,147 MB (ActiveHard 2048 MiB), which `limitHighMB` carries until EM34 settles it.
+// Each returns {low, central, high} in bytes. The limit is CRASH_LINE (src/client/game/grid/budgetOverlay.ts): ActiveHard
+// 2048 MiB, 2,147 MB decimal. `limitMB` and `limitHighMB` both carry it; the fit keeps two so a disputed line can be bracketed.
 import { readFileSync } from 'node:fs';
 import { phoneFromWebKit } from '../../src/shared/engine/core/phoneMemoryModel.ts';
 
