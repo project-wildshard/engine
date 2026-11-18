@@ -12,21 +12,21 @@ import type { CreatureSkinClipName } from '@wildshard/format/skinData';
  *  name, so a named clip binds like a family clip; game code still spells family clips, which the literal checks. */
 export type ClipName = `${'idle' | 'walk' | 'run' | 'attack' | 'hit' | 'die' | 'turn' | 'swim' | 'fly'}${'' | `.${string}`}` | CreatureSkinClipName;
 export type SocketName = string;
-export interface RigContract { skeleton: string; clips: readonly ClipName[]; sockets: readonly SocketName[] }
+export interface RigContract<Name extends string = ClipName> { skeleton: string; clips: readonly Name[]; sockets: readonly SocketName[] }
 /** Canonical → authored names. Metadata renames clips; the GLB and its tracks remain untouched. */
-export interface RigBake {
+export interface RigBake<Name extends string = ClipName> {
   skeleton: string;
-  clips?: Readonly<Partial<Record<ClipName, string>>>;
+  clips?: Readonly<Partial<Record<Name, string>>>;
   sockets?: Readonly<Record<SocketName, string>>;
   /** Ordered joints per skin, as exported by the bake (never traversal order). */
   joints?: readonly (readonly string[])[];
   /** Procedural poses are declarations, not fabricated AnimationClips. */
-  procedural?: readonly ClipName[];
+  procedural?: readonly Name[];
 }
-export interface RigInstance {
+export interface RigInstance<Name extends string = ClipName> {
   readonly root: Object3D;
-  readonly contract: RigContract;
-  readonly clips: ReadonlyMap<ClipName, AnimationClip>;
+  readonly contract: RigContract<Name>;
+  readonly clips: ReadonlyMap<Name, AnimationClip>;
   readonly sockets: ReadonlyMap<SocketName, Object3D>;
 }
 export interface RigRef { url: string; contract: RigContract; bake: RigBake }
@@ -98,10 +98,10 @@ export async function loadRigAtlas(url: string): Promise<Texture | null> {
 export function rigRoot(file: Pick<GLTF, 'scene'>): GLTF['scene'] { return file.scene; }
 
 /** Check authored metadata against the actual loaded scene, without posing or rebinding it. */
-export function bindRig(root: Object3D, animations: readonly AnimationClip[], contract: RigContract, bake: RigBake): RigInstance {
+export function bindRig<Name extends string>(root: Object3D, animations: readonly AnimationClip[], contract: RigContract<Name>, bake: RigBake<NoInfer<Name>>): RigInstance<Name> {
   const fail = (detail: string): never => { throw new Error(`[anim] ${contract.skeleton}: ${detail}`); };
   if (contract.skeleton === '' || bake.skeleton !== contract.skeleton) fail(`skeleton mismatch (${bake.skeleton})`);
-  const clips = new Map<ClipName, AnimationClip>();
+  const clips = new Map<Name, AnimationClip>();
   for (const name of contract.clips) {
     const source = bake.clips?.[name] ?? name;
     const clip = animations.find((candidate) => candidate.name === source);

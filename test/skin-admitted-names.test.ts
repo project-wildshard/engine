@@ -1,15 +1,33 @@
 import { createHash } from 'node:crypto';
-import { Bone, MeshStandardMaterial } from 'three';
+import { AnimationClip, Bone, Group, MeshStandardMaterial } from 'three';
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { parseGlbData, prepareGlbCost } from '@wildshard/format/glbCost';
 import type { SkinRow, SkinBinding } from '@wildshard/format/skinData';
 import { Scope } from '@wildshard/engine/app/scope';
+import { AnimMachine } from '@wildshard/engine/anim/machine';
+import { bindRig } from '@wildshard/engine/anim/rig';
 import { loadSkin } from '../src/client/game/shardfile/skinPlayback';
 import { loadClientSkins, SkinDriver } from '../src/client/game/shardfile/clientSkins';
 import { creatureVolumeFixture, creatureVolumeGlb } from './fixtures/creature-volume-skin';
 
 const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+
+test('a loaded rig can bind and play a named creature clip by its exact identity', () => {
+  const attack = new AnimationClip('attack', 1, []), swing = new AnimationClip('swing', 1, []);
+  const rig = bindRig(new Group(), [attack, swing], { skeleton: 'fixture.named', clips: ['attack', 'swing'], sockets: [] },
+    { skeleton: 'fixture.named' });
+  const machine = new AnimMachine({ states: { ability: { clip: 'swing', fade: 0 } } }, rig);
+  try {
+    machine.base('attack');
+    machine.transition('ability');
+    machine.update(.25);
+    expect(machine.state).toBe('ability');
+    expect(machine.action('swing').getClip()).toBe(swing);
+    expect(machine.action('swing').time).toBeCloseTo(.25);
+  } finally { machine.dispose(); }
+});
+
 const Doc = v.looseObject({ nodes: v.array(v.looseObject({ name: v.string() })), animations: v.array(v.looseObject({
   channels: v.array(v.looseObject({ sampler: v.number(), target: v.object({ node: v.number(), path: v.string() }) })),
 })) });

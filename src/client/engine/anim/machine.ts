@@ -3,23 +3,23 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import { ClipChannel } from './channel';
 import type { ClipName, RigInstance, RigRef } from './rig';
 
-export interface AnimState { clip: ClipName; fade: number; hold?: boolean }
-export interface AnimMachineDef {
-  states: Readonly<Record<string, AnimState>>;
-  loops?: readonly ClipName[];
+export interface AnimState<Name extends string = ClipName> { clip: Name; fade: number; hold?: boolean }
+export interface AnimMachineDef<Name extends string = ClipName> {
+  states: Readonly<Record<string, AnimState<Name>>>;
+  loops?: readonly Name[];
 }
 /** Visual only: HFSMs/viewmodel blocks supply states; animation never dispatches a gameplay hit. */
-export class AnimMachine {
+export class AnimMachine<Name extends string = ClipName> {
   private readonly mixer: AnimationMixer;
-  private readonly actions = new Map<ClipName, AnimationAction>();
+  private readonly actions = new Map<Name, AnimationAction>();
   private readonly channels: ClipChannel[] = [];
   private live = true;
   private current: string | null = null;
   private stateChannel: ClipChannel | undefined;
   private forgetScope: (() => void) | undefined;
-  readonly def: AnimMachineDef;
-  readonly rig: RigInstance;
-  constructor(def: AnimMachineDef, rig: RigInstance, scope?: Scope) {
+  readonly def: AnimMachineDef<Name>;
+  readonly rig: RigInstance<Name>;
+  constructor(def: AnimMachineDef<NoInfer<Name>>, rig: RigInstance<Name>, scope?: Scope) {
     this.def = def; this.rig = rig;
     this.mixer = new AnimationMixer(rig.root);
     for (const [name, clip] of rig.clips) {
@@ -34,18 +34,18 @@ export class AnimMachine {
     else forget?.();
   }
   get state(): string | null { return this.current; }
-  action(name: ClipName): AnimationAction {
+  action(name: Name): AnimationAction {
     const action = this.actions.get(name);
     if (action === undefined) throw new Error(`[anim] ${this.rig.contract.skeleton}: no playable clip ${name}`);
     return action;
   }
-  channel(base: ClipName, walk?: ClipName): ClipChannel {
+  channel(base: Name, walk?: Name): ClipChannel {
     const channel = new ClipChannel(this.action(base), walk === undefined ? null : this.action(walk));
     this.channels.push(channel);
     return channel;
   }
   /** Supply a base for the state channel; named transition rows carry authored crossfade times. */
-  base(clip: ClipName, walk?: ClipName): ClipChannel {
+  base(clip: Name, walk?: Name): ClipChannel {
     if (this.stateChannel !== undefined) throw new Error('[anim] state channel already bound');
     this.stateChannel = this.channel(clip, walk);
     return this.stateChannel;
