@@ -455,7 +455,9 @@ jobs:
     needs: nine-ring1-build
     if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' && (inputs.pins_channel == '' || inputs.pins_channel == 'production') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Qualification builds the full client and takes repeated readings for each pin.
+    # Keep the 30-minute limit for the single-reading comparison.
+    timeout-minutes: ${{ inputs.memory_record && 120 || 30 }}
     env:
       WS_LANE_NAME: memory-ledger
       WILDSHARD_CATALOGUE: test/pins/catalogue.json
