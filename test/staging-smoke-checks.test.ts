@@ -5,6 +5,7 @@ import {createTempRepo} from '../src/test/helpers/git';
 import {engineRelease} from '../scripts/changelog.mjs';
 import { checkScenario, holds, olderVersion, verdictOf } from '../scripts/staging-smoke/checks.mjs';
 import type { ScenarioResult } from '../scripts/staging-smoke/scenarios.mjs';
+import { PAGE_BG, blackWorld, worldStats } from '../scripts/staging-smoke/worldFrame.mjs';
 
 const BUILD = 'b'.repeat(40);
 const ctx = { release: 'v0.1.34', build: BUILD, version: { build: BUILD, describe: 'v0.1.34', clientVersion: '0.1.34', minClient: '0.1.31' }, lastTimeToPlay: { K3: 10_000 } };
@@ -36,6 +37,7 @@ test.each([
   ['a RECONNECTING strip 12 s into play', clean({ events: [{ kind: 'strip', shown: true, at: 23_000 }, { kind: 'wsclose', code: 1006, reason: '', at: 22_900 }] }), 'P2 strip'],
   ['time to play 40% slower', clean({ legs: [leg({ playAt: 15_000 })] }), 'P2 slow-play'],
   ['a 2.4 s long task after arrival', clean({ events: [{ kind: 'longtask', ms: 2400, at: 20_000 }] }), 'P2 long-task'],
+  ['SB48: the world is not drawn 10 s into play', clean({ frames: { play10: 'p10.jpg' }, world: { play10: { stats: { mean: 8, sd: 4.7, pageBg: 0.999, pixels: 9000 }, black: 'the page background shows through 100% of the world region' } } }), 'P0 black-world'],
 ])('%s', (_name, scenario, expected) => {
   expect(failed(scenario)).toEqual([expected]);
   expect(verdictOf([scenario], ctx).hold).toBe(expected.startsWith('P0') || expected.startsWith('P1'));
@@ -104,4 +106,23 @@ test.each([
   {clientVersion:'0.1.33'},
 ])('a repaired label never excuses a mismatched version or SHA: %j', patch => {
   expect(failed(clean(),{...ctx,version:{...ctx.version,...patch}})).toEqual(['P1 version']);
+});
+
+/** a w x h RGB frame: `world` paints the world region, the rest is the HUD's dark edge */
+function frame(w: number, h: number, world: (x: number, y: number) => readonly [number, number, number]): Uint8Array {
+  const data = new Uint8Array(w * h * 3);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) data.set(world(x, y), (y * w + x) * 3);
+  return data;
+}
+
+test('SB48: the world region of a play frame, with no golden image', () => {
+  const W = 134, H = 291; // a 402x874 phone frame at a third
+  // Jake's iPhone, v0.1.43: the page background through the canvas
+  const jake = worldStats(frame(W, H, () => [PAGE_BG[0] ?? 0, PAGE_BG[1] ?? 0, PAGE_BG[2] ?? 0]), W, H, 3);
+  expect(blackWorld(jake)).toContain('page background');
+  // a canvas drawn opaque black
+  expect(blackWorld(worldStats(frame(W, H, () => [0, 0, 0]), W, H, 3))).toContain('flat dark');
+  // Driftwood's sky over sea, and a dark textured night: drawn
+  expect(blackWorld(worldStats(frame(W, H, (_x, y) => (y < H / 2 ? [120, 190, 240] : [30, 90, 120])), W, H, 3))).toBeNull();
+  expect(blackWorld(worldStats(frame(W, H, (x, y) => ((x + y) % 4 < 2 ? [4, 6, 12] : [40, 46, 60])), W, H, 3))).toBeNull();
 });

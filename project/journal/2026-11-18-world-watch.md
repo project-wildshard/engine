@@ -11,3 +11,8 @@
   (a 48 px copy in the frame's task, `Game.captureFrame`); a canvas left hidden comes back and is reported once; a
   transparent or flat black world is reported (tier, graphics, pass split, drawing buffer, programs) and, still so at the
   next look, opens the error card's RELOAD. Never while hidden, held, lost, or under the grid reveal.
+- The staging smoke now looks at the world too (brief step 3): `staging-smoke/worldFrame.mjs` judges the middle of a play
+  frame (no golden image) and fails P0 `black-world` when the page background shows through a flat region or the region
+  is a flat dark fill. Jake's frame: mean 8, sd 4.7, 99.9 % page background, flagged. New scenario K6 enters every
+  Shard Select card a player can enter at phone Low on WebKit (Low Power's mode, which K1-K5 never reach) and judges each
+  cell's frame 4 s into play. First run on staging v0.1.42: six cells, 129 s, all drawn (mean 65 to 133, sd 34 to 61).

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Meta STAGING-SMOKE (J398, Jake 2026-11-17: "we should do this kind of stuff in an automated e2e test fashion for like every
 // staging release of the engine"): every staging engine release replays the phone QA session of the "Game Right Now" board,
-// cut by the SM0 audit to five scenarios (K1 to K5, scenarios.mjs), about 6 minutes a run.
+// cut by the SM0 audit to five scenarios (K1 to K5, scenarios.mjs), about 6 minutes a run; SB48 added K6, every live cell
+// at phone Low on WebKit, its world frame judged (staging-smoke/worldFrame.mjs), up to 4 minutes more.
 //
 //   node scripts/staging-smoke.mjs --url <candidate> --release vX.Y.Z [--only K3[,K4]] [--out <dir>] [--card <slug>]
 //        [--deeplink <slug>] [--watch <s>] [--store <dir>] [--changelog <CHANGELOG.md>] [--no-vision]

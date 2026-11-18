@@ -58,6 +58,15 @@ export function runScenario(scenario: {
     candidateBuild?: string;
     pw: typeof import("playwright");
 }): Promise<ScenarioResult>;
+/** Judge every play frame's world (worldFrame.mjs). @param {Record<string, string>} frames
+ * @returns {Promise<Record<string, { stats: WorldStats, black: string | null }>>} */
+export function judgeWorldFrames(frames: Record<string, string>): Promise<Record<string, {
+    stats: WorldStats;
+    black: string | null;
+}>>;
+/** The Shard Select cards a player can enter on this title, as slugs (the title's rows matched to the cards by name).
+ * Leaves the page on Shard Select: the caller reopens the title. @param {Page} page @returns {Promise<string[]>} */
+export function liveCells(page: Page): Promise<string[]>;
 /** The recorded clip as an .mp4 (H.264, 15 fps), or the .webm when ffmpeg is missing.
  * @param {string} webm @param {string} mp4 @returns {string} */
 export function toMp4(webm: string, mp4: string): string;
@@ -66,7 +75,8 @@ export function toMp4(webm: string, mp4: string): string;
 /** @typedef {import('../journey-proof.mjs').Sample} Sample */
 /** @typedef {import('../journey-proof.mjs').Problem} Problem */
 /** @typedef {'chromium' | 'webkit'} BrowserName */
-/** @typedef {'K1' | 'K2' | 'K3' | 'K4' | 'K5'} ScenarioId */
+/** @typedef {'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6'} ScenarioId */
+/** @typedef {import('./worldFrame.mjs').WorldStats} WorldStats */
 /** @typedef {{ kind: string, at: number, [key: string]: unknown }} ProbeEvent */
 /** @typedef {{ name: string, at: number, samples: Sample[], problems: Problem[], path: string, tapAt: number, playAt: number | null, stick?: boolean, modals?: string[] }} Leg */
 /** @typedef {{ build?: string, caches: string[], databases: string[], clientVersion?: string }} StorageState */
@@ -77,6 +87,7 @@ export function toMp4(webm: string, mp4: string): string;
  *   seconds: number, legs: Leg[], errors: string[], events: ProbeEvent[], log: string[], frames: Record<string, string>,
  *   video?: string, settings?: { opened: boolean, closed: boolean }, quietTitle?: { drop: boolean, left: boolean }, drops?: number,
  *   oldCache?: { before: StorageState, after: StorageState, minClient?: string }, profile?: string, endState?: StorageState,
+ *   world?: Record<string, { stats: WorldStats, black: string | null }>,
  * }} ScenarioResult
  */
 /** The kept set (plan SM0), in run order: one browser at a time (SB31: two headless browsers at once fake a RECONNECTING strip). */
@@ -100,6 +111,10 @@ export const SCENARIOS: readonly [{
     readonly id: "K5";
     readonly title: "Infinite Wildshard (WebKit)";
     readonly browser: "webkit";
+}, {
+    readonly id: "K6";
+    readonly title: "every live cell at phone Low (WebKit)";
+    readonly browser: "webkit";
 }];
 /** The six keyframes SM3 keeps per scenario, in contact-sheet order. */
 export const KEYFRAMES: readonly string[];
@@ -118,13 +133,20 @@ export const SEL: Readonly<{
     drop: "#wsdrop";
     dropDismiss: "#wsdrop .dismiss";
 }>;
+export const K6_BUDGET_MS: 240000;
+export const CELL_BUDGET_MS: 60000;
+/** How long a cell plays before its world frame (the arrival reveal is 3 s on the grid; play has held 1.5 s by then). */
+export const CELL_SETTLE_MS: 2500;
+/** The frames whose world is judged (SB48): 10 s into play, and each K6 cell 4 s in (play1 can still be under the grid reveal). */
+export const WORLD_FRAME: RegExp;
 export function filesIn(dir: string): string[];
 export type Page = import("playwright").Page;
 export type BrowserContext = import("playwright").BrowserContext;
 export type Sample = import("../journey-proof.mjs").Sample;
 export type Problem = import("../journey-proof.mjs").Problem;
 export type BrowserName = "chromium" | "webkit";
-export type ScenarioId = "K1" | "K2" | "K3" | "K4" | "K5";
+export type ScenarioId = "K1" | "K2" | "K3" | "K4" | "K5" | "K6";
+export type WorldStats = import("./worldFrame.mjs").WorldStats;
 export type ProbeEvent = {
     kind: string;
     at: number;
@@ -179,4 +201,8 @@ export type ScenarioResult = {
     };
     profile?: string;
     endState?: StorageState;
+    world?: Record<string, {
+        stats: WorldStats;
+        black: string | null;
+    }>;
 };

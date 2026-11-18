@@ -35,6 +35,7 @@ export type Check = {
     severity: Severity;
     ok: boolean;
     text: string;
+    frame?: string;
 };
 export type Finding = {
     scenario: string;

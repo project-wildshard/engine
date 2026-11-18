@@ -1,7 +1,7 @@
 // Meta STAGING-SMOKE SM2: the hard checks, each with a severity (STAGING-BUGBASH's scale). P0 blocks play, P1 looks broken,
 // P2 is polish. A P0 or P1 holds prod (J398); the rest become STAGING-BUGBASH rows (SM6) and the train goes on.
 /** @typedef {'P0' | 'P1' | 'P2'} Severity */
-/** @typedef {{ key: string, severity: Severity, ok: boolean, text: string }} Check */
+/** @typedef {{ key: string, severity: Severity, ok: boolean, text: string, frame?: string }} Check */
 /** @typedef {{ scenario: string, key: string, severity: Severity, text: string, source: 'check' | 'vision', frame?: string, video?: string }} Finding */
 /** @typedef {import('./scenarios.mjs').ScenarioResult} ScenarioResult */
 /** @typedef {{ build?: string, describe?: string, clientVersion?: string, minClient?: string }} Version */
@@ -43,6 +43,11 @@ export function checkScenario(s, ctx) {
   add('error-card', 'P0', !errorCard, 'an error card (#wserr, .ws-fail) opened');
   const stuck = s.legs.filter((leg) => leg.stick === false).map((leg) => leg.name);
   add('stick', 'P0', stuck.length === 0, `the move stick did not move the player (${stuck.join(', ')})`);
+  // SB48 (Jake's iPhone, v0.1.43: the HUD over a black world): a play frame whose world is not drawn
+  const black = Object.entries(s.world ?? {}).filter(([, w]) => w.black !== null);
+  add('black-world', 'P0', black.length === 0, `the world is not drawn in play: ${black.map(([name, w]) => `${name}: ${w.black ?? ''}`).join('; ')}`);
+  const blackFrame = black[0] === undefined ? undefined : s.frames[black[0][0]];
+  if (blackFrame !== undefined) { const c = checks.at(-1); if (c !== undefined) c.frame = blackFrame; }
   // P1
   const journey = problems.filter((p) => !NOT_P1.test(p.text));
   add('journey', 'P1', journey.length === 0, journey.map((p) => `${p.leg}: ${p.text} at ${String(p.at)} ms`).join('; ') || 'journey');
@@ -99,7 +104,7 @@ const TITLE_CHECKS = new Set(['settings', 'version', 'old-cache-first-page']);
 /** The failed checks as findings, worst first. @param {ScenarioResult} s @param {Check[]} checks @returns {Finding[]} */
 export function findingsOf(s, checks) {
   return checks.filter((c) => !c.ok).map((c) => {
-    const frame = (TITLE_CHECKS.has(c.key) ? s.frames.title : undefined) ?? s.frames.last ?? s.frames.play10 ?? s.frames.play1;
+    const frame = c.frame ?? (TITLE_CHECKS.has(c.key) ? s.frames.title : undefined) ?? s.frames.last ?? s.frames.play10 ?? s.frames.play1;
     /** @type {Finding} */
     const f = { scenario: s.id, key: c.key, severity: c.severity, text: c.text, source: 'check' };
     if (frame !== undefined) f.frame = frame;

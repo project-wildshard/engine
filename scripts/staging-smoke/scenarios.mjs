@@ -7,13 +7,16 @@ import { execFileSync } from 'node:child_process';
 import { judge, label, PHONE, screenNow, stickMoves } from '../journey-proof.mjs';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { modalKind } from './checks.mjs';
+import { judgeFrame } from './worldFrame.mjs';
+import { saveFixture } from '../debug-settings.mjs';
 
 /** @typedef {import('playwright').Page} Page */
 /** @typedef {import('playwright').BrowserContext} BrowserContext */
 /** @typedef {import('../journey-proof.mjs').Sample} Sample */
 /** @typedef {import('../journey-proof.mjs').Problem} Problem */
 /** @typedef {'chromium' | 'webkit'} BrowserName */
-/** @typedef {'K1' | 'K2' | 'K3' | 'K4' | 'K5'} ScenarioId */
+/** @typedef {'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6'} ScenarioId */
+/** @typedef {import('./worldFrame.mjs').WorldStats} WorldStats */
 /** @typedef {{ kind: string, at: number, [key: string]: unknown }} ProbeEvent */
 /** @typedef {{ name: string, at: number, samples: Sample[], problems: Problem[], path: string, tapAt: number, playAt: number | null, stick?: boolean, modals?: string[] }} Leg */
 /** @typedef {{ build?: string, caches: string[], databases: string[], clientVersion?: string }} StorageState */
@@ -24,6 +27,7 @@ import { modalKind } from './checks.mjs';
  *   seconds: number, legs: Leg[], errors: string[], events: ProbeEvent[], log: string[], frames: Record<string, string>,
  *   video?: string, settings?: { opened: boolean, closed: boolean }, quietTitle?: { drop: boolean, left: boolean }, drops?: number,
  *   oldCache?: { before: StorageState, after: StorageState, minClient?: string }, profile?: string, endState?: StorageState,
+ *   world?: Record<string, { stats: WorldStats, black: string | null }>,
  * }} ScenarioResult
  */
 
@@ -34,6 +38,8 @@ export const SCENARIOS = Object.freeze(/** @type {const} */ ([
   { id: 'K3', title: 'Driftwood chain (WebKit)', browser: 'webkit' },
   { id: 'K4', title: 'deep link (WebKit)', browser: 'webkit' },
   { id: 'K5', title: 'Infinite Wildshard (WebKit)', browser: 'webkit' },
+  // SB48 (P0, Jake's iPhone on v0.1.43: the HUD over a black world): every live cell at phone Low, Jake's Low Power mode
+  { id: 'K6', title: 'every live cell at phone Low (WebKit)', browser: 'webkit' },
 ]));
 
 /** The six keyframes SM3 keeps per scenario, in contact-sheet order. */
@@ -268,6 +274,8 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
   // only GETs leave the page, as in journey-proof.mjs
   await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
   await context.addInitScript(smokeProbes);
+  // K6 plays at phone Low, the mode Low Power forces on a phone (graphicsMode.ts), which K1-K5 never reach
+  if (scenario.id === 'K6') await saveFixture(context, { scope: 'device', key: 'graphics', data: 'low' });
   const page = context.pages()[0] ?? await context.newPage();
   /** @param {Page} p */
   const watch = (p) => {
@@ -374,6 +382,31 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
       result.legs.push(leg);
       say(`deep link: ${leg.path}`);
       await hold(leg, watchMs ?? 30_000);
+    } else if (scenario.id === 'K6') {
+      // SB48: each Shard Select card a player sees, entered at phone Low; its world frame is judged after the run (worldFrame.mjs)
+      await open('/');
+      await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 });
+      await shoot('title');
+      const cells = await liveCells(page);
+      say(`live cells: ${cells.join(', ')}`);
+      await open('/');
+      for (const slug of cells) {
+        if (Date.now() - started > K6_BUDGET_MS) { say(`K6 budget spent: ${slug} and after not entered`); break; }
+        let leg;
+        try { leg = await watchLeg(page, { name: slug, tap: await toShardSelect(page, slug, onDrop), budgetMs: CELL_BUDGET_MS, holdMs: 1500 }); }
+        catch (error) { say(`${slug}: ${error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error)}`); await open('/'); await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined); continue; }
+        result.legs.push(leg);
+        say(`${slug}: ${leg.path}`);
+        if (leg.playAt !== null) {
+          await page.waitForTimeout(CELL_SETTLE_MS);
+          const path = join(dir, 'frames', `cell-${slug}.jpg`);
+          try { await page.screenshot({ path, type: 'jpeg', quality: 75, scale: 'css', timeout: 5000 }); result.frames[`cell-${slug}`] = path; } catch { /* a navigation ate it */ }
+        }
+        if (result.frames['play1'] === undefined && result.frames[`cell-${slug}`] !== undefined) result.frames['play1'] = String(result.frames[`cell-${slug}`]);
+        // back to the title the player's way; a cell that never played reopens the page
+        const back = leg.playAt !== null && await page.locator(SEL.pause).tap({ timeout: 5000 }).then(() => page.locator(SEL.exit).tap({ timeout: 5000 })).then(() => page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 30_000 })).then(() => true, () => false);
+        if (!back) { await open('/'); await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined); }
+      }
     } else {
       await open('/');
       await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 });
@@ -410,7 +443,47 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
     // K1 and K2 keep their profile for SM4; the rest are throwaway
     if (old) result.profile = profile; else rmSync(profile, { recursive: true, force: true });
   }
+  result.world = await judgeWorldFrames(result.frames);
   return result;
+}
+
+/** K6's whole budget and each cell's: past it, the cells left are named as not entered (SM8 (d)). */
+export const K6_BUDGET_MS = 240_000, CELL_BUDGET_MS = 60_000;
+/** How long a cell plays before its world frame (the arrival reveal is 3 s on the grid; play has held 1.5 s by then). */
+export const CELL_SETTLE_MS = 2500;
+/** The frames whose world is judged (SB48): 10 s into play, and each K6 cell 4 s in (play1 can still be under the grid reveal). */
+export const WORLD_FRAME = /^(?:play10|cell-.+)$/u;
+
+/** Judge every play frame's world (worldFrame.mjs). @param {Record<string, string>} frames
+ * @returns {Promise<Record<string, { stats: WorldStats, black: string | null }>>} */
+export async function judgeWorldFrames(frames) {
+  /** @type {Record<string, { stats: WorldStats, black: string | null }>} */
+  const world = {};
+  for (const [name, path] of Object.entries(frames)) {
+    if (!WORLD_FRAME.test(name) || !existsSync(path)) continue;
+    try { world[name] = await judgeFrame(path); } catch { /* an unreadable frame is no verdict */ }
+  }
+  return world;
+}
+
+/** The Shard Select cards a player can enter on this title, as slugs (the title's rows matched to the cards by name).
+ * Leaves the page on Shard Select: the caller reopens the title. @param {Page} page @returns {Promise<string[]>} */
+export async function liveCells(page) {
+  await page.locator(SEL.titleSelect).tap();
+  await page.locator('#ws-name-box, .ws-title-stack[data-screen="select"]').first().waitFor({ timeout: 15_000 });
+  if (await page.locator(SEL.skip).isVisible()) await page.locator(SEL.skip).tap();
+  await page.locator('.ws-title-stack[data-screen="select"]').waitFor({ timeout: 15_000 });
+  /** @type {unknown} */
+  const rows = JSON.parse((await page.locator('#ws-title-rows').textContent()) ?? '[]');
+  // a card a player can enter (titleDeck.ts marks it data-enters); an upgrade or closed card is not a live cell
+  const names = (await page.locator('.ws-menu-card[data-enters="1"] > b').allTextContents()).map((n) => n.toLowerCase());
+  /** @type {string[]} */
+  const slugs = [];
+  if (Array.isArray(rows)) for (const r of rows) {
+    if (typeof r !== 'object' || r === null || typeof r.slug !== 'string' || typeof r.name !== 'string') continue;
+    if (names.includes(r.name.toLowerCase()) && !slugs.includes(r.slug)) slugs.push(r.slug);
+  }
+  return slugs;
 }
 
 /** The recorded clip as an .mp4 (H.264, 15 fps), or the .webm when ffmpeg is missing.
