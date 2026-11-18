@@ -111,7 +111,7 @@ try {
           if (!baseline.zones?.[chunk]) throw new Error('Missing committed native WebKit subsystem ceilings');
           compareLedger(baseline.zones[chunk], nativeLedger, chunk);
         } else {
-          comparePhoneFootprint(footprint, policy.lines);
+          comparePhoneFootprint(footprint, policy.lines, policy.readings.get(chunk));
           if (chunk === '_template') {
             footprintInstrument([data], baseline);
             footprintBoot([data], baseline);

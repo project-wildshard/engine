@@ -15,14 +15,17 @@ export function parseArmedMemory(value) {
   const { lines, zones } = value ?? {};
   if (!bytes(lines?.playingBytes) || !bytes(lines?.loadingBytes) || lines.playingBytes > lines.loadingBytes
     || !zones || typeof zones !== 'object' || Array.isArray(zones)) throw new Error('Invalid armed memory list');
+  /** @type {Map<string, {playingBytes:number,loadingBytes:number}>} */
+  const readings = new Map();
   for (const [slug, row] of Object.entries(zones)) {
     if (!SLUG.test(slug) || !row || typeof row !== 'object' || Array.isArray(row)
       || !bytes(row.playingBytes) || !bytes(row.loadingBytes)
       || typeof row.armed !== 'string' || typeof row.by !== 'string' || typeof row.evidence !== 'string') {
       throw new Error(`Invalid armed memory entry: ${slug}`);
     }
+    readings.set(slug === 'template' ? '_template' : slug, { playingBytes: row.playingBytes, loadingBytes: row.loadingBytes });
   }
-  return { lines, zones: new Set(Object.keys(zones).map(slug => slug === 'template' ? '_template' : slug)) };
+  return { lines, zones: new Set(readings.keys()), readings };
 }
 
 export function armedMemory() {
@@ -73,9 +76,17 @@ export function phoneFootprint(zone, runs, model, boot) {
   return { playing: Math.ceil(result.playing.upper), loading: Math.ceil(result.loading.upper) };
 }
 
-/** @param {{playing:number,loading:number}} reading @param {{playingBytes:number,loadingBytes:number}} lines */
-export function comparePhoneFootprint({ playing, loading }, lines) {
+/** @param {{playing:number,loading:number}} reading @param {{playingBytes:number,loadingBytes:number}} lines
+ * @param {{playingBytes:number,loadingBytes:number}} [armed] */
+export function comparePhoneFootprint({ playing, loading }, lines, armed) {
   if (playing > lines.playingBytes || loading > lines.loadingBytes) {
     throw new Error(`EM11 upper playing ${playing} B (line ${lines.playingBytes} B), loading ${loading} B (line ${lines.loadingBytes} B)`);
+  }
+  if (armed) {
+    const playingCeiling = armed.playingBytes + Math.floor(armed.playingBytes / 200);
+    const loadingCeiling = armed.loadingBytes + Math.floor(armed.loadingBytes / 200);
+    if (playing > playingCeiling || loading > loadingCeiling) {
+      throw new Error(`EM11 upper playing ${playing} B, loading ${loading} B exceeds armed reading + 0.5% (playing ${playingCeiling} B, loading ${loadingCeiling} B)`);
+    }
   }
 }

@@ -11,6 +11,7 @@ const policy = parseArmedMemory({ lines, zones: { 'driftwood-isle': arm } });
 
 test('arming comes from zone presence and refuses invalid policy data', () => {
   expect(policy.zones).toEqual(new Set(['driftwood-isle']));
+  expect(policy.readings.get('driftwood-isle')).toEqual({ playingBytes: 900_000_000, loadingBytes: 1_300_000_000 });
   expect(parseArmedMemory({ lines, zones: { 'driftwood-isle': { ...arm, playingBytes: 1_010_000_000 } } }).zones.has('driftwood-isle')).toBe(true);
   expect(parseArmedMemory({ lines, zones: {} }).zones.size).toBe(0);
   expect(() => parseArmedMemory({ zones: {} })).toThrow('Invalid armed memory list');
@@ -68,9 +69,20 @@ test('an armed zone must finish a comparable native boot and stay within both li
   }
 });
 
-// J424 + Coordinator 2026-11-18 (run 44375696856): the Ubuntu ledger blocks an armed zone; the native footprint job
-// reports one and never fails main's run.
-test('CI keeps the armed ledger blocking and the native footprint job advisory', () => {
+test('a measured footprint must pass the armed reading and the shared line', async () => {
+  const armed = policy.readings.get('driftwood-isle');
+  expect(armed).toBeDefined();
+  expect(() => comparePhoneFootprint({ playing: 904_500_000, loading: 1_306_500_000 }, lines, armed)).not.toThrow();
+  const report = vi.fn<(line: string) => void>();
+  for (const reading of [{ playing: 904_500_001, loading: 1 }, { playing: 1, loading: 1_306_500_001 }]) {
+    const compare = async () => { comparePhoneFootprint(reading, lines, armed); };
+    await expect(guardZone('driftwood-isle', policy.zones, compare, report)).rejects.toThrow('armed reading + 0.5%');
+  }
+  expect(() => comparePhoneFootprint({ playing: lines.playingBytes + 1, loading: 1 }, lines,
+    { playingBytes: 1_010_000_000, loadingBytes: 1_300_000_000 })).toThrow(`line ${lines.playingBytes} B`);
+});
+
+test('CI runs both armed measurement jobs without a job-level bypass', () => {
   const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
   const section = (job: string): string => {
     const body = workflow.split(`\n  ${job}:\n`)[1]?.split(/\n {2}[a-z-]+:\n/u)[0];
@@ -86,7 +98,7 @@ test('CI keeps the armed ledger blocking and the native footprint job advisory',
   expect(ledger).toMatch(/\n {4}runs-on:/u);
   expect(native).toContain('runs-on: xcode-27');
   expect(ledger).not.toMatch(/\n {4}continue-on-error:/u);
-  expect(native).toMatch(/\n {4}continue-on-error: true\n/u);
+  expect(native).not.toContain('continue-on-error');
 });
 
 test('both native baselines require an online boot', () => {

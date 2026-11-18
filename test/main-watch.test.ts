@@ -94,15 +94,40 @@ test('44139343442: an unassigned advisory street runner preserves the twelve pas
   expect(blockingRun(red, [...jobs, { ...street, name: 'nine-ring1 (unknown, macos-15)' }]).conclusion).toBe('failure');
 });
 
-test('44375696856: an armed footprint over its line is reported and never turns main red (J424)', () => {
+test('J426 makes an armed footprint measurement failure red, including after a runner cancellation', () => {
   const red = run(44375696856, '4026d299', 'failure', 50);
-  const jobs = ['tests (1)', 'boundaries', 'nine-ring1-build', 'memory-ledger-guard']
-    .map(name => ({ name, conclusion: 'success' as string | null }));
+  const jobs = [{ name: 'tests (1)', conclusion: 'success' }, { name: 'memory-ledger-guard', conclusion: 'success' }];
+  const steps = [{ name: 'Check armed native footprints and report Template', conclusion: 'failure' }];
   for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
-    expect(blockingRun(red, [...jobs, { name: 'memory-footprint-guard', conclusion }]).conclusion).toBe('success');
+    const measured = blockingRun(red, [...jobs, { name: 'memory-footprint-guard', conclusion, steps }]);
+    expect(measured.conclusion).toBe('failure');
+    expect(measured.nativeInfra).toBeUndefined();
   }
-  const ledgerRed = [{ name: 'tests (1)', conclusion: 'success' }, { name: 'memory-ledger-guard', conclusion: 'failure' }];
-  expect(blockingRun(red, [...ledgerRed, { name: 'memory-footprint-guard', conclusion: 'success' }]).conclusion).toBe('failure');
+  expect(blockingRun(red, [...jobs, { name: 'memory-footprint-guard', conclusion: 'failure', runner_id: 42 }]).conclusion).toBe('failure');
+});
+
+test('J426 reports native runner infrastructure interruptions without hiding other reds', () => {
+  const jobs = [{ name: 'tests (1)', conclusion: 'success' }, { name: 'memory-ledger-guard', conclusion: 'success' }];
+  const cases = [
+    { conclusion: 'timed_out', runner_id: 42, reason: 'runner timed out' },
+    { conclusion: 'cancelled', runner_id: 42, reason: 'runner was canceled' },
+    { conclusion: 'failure', runner_id: null, steps: [], reason: 'no xcode-27 runner assigned' },
+    { conclusion: 'startup_failure', runner_id: 42, reason: 'runner failed to start' },
+  ];
+  for (const { reason, ...metadata } of cases) {
+    const red = run(44375696856, 'aaaa1111', metadata.conclusion, 50);
+    const native = { name: 'memory-footprint-guard', ...metadata };
+    const normalized = blockingRun(red, [...jobs, native]);
+    expect(normalized.conclusion).toBe('success');
+    const w = world(replay), io = fake(`native-infra-${metadata.conclusion}`, w);
+    sweep(io); w.runs = [...replay, normalized]; w.tip = red.head_sha;
+    expect(sweep(io).map(row => row.kind)).toEqual(['green']);
+    expect(w.receipts).toContain(`main advisory aaaa111100 memory-footprint-guard: ${reason} (run ${red.id})`);
+    expect(w.sent).toEqual([]);
+    const ledgerRed = blockingRun({ ...red, conclusion: 'failure' }, [{ name: 'memory-ledger-guard', conclusion: 'failure' }, native]);
+    expect(ledgerRed.conclusion).toBe('failure');
+    expect(ledgerRed.nativeInfra).toBe(reason);
+  }
 });
 
 test('replaying runs 42965336189 and 42966114949: cancelled by newer pushes is superseded, never MAIN RED', () => {

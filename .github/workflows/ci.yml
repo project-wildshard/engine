@@ -626,13 +626,11 @@ jobs:
     # With an empty policy, ci-reports owns the advisory native readings.
     # EM11 was fitted on macOS 27 WebKit. macOS 15 charged significantly more
     # of the same Nalati build to WebContent (44375696856).
-    # J424 + Coordinator 2026-11-18: this job never fails main's run. An
-    # armed zone over its line or a runner never assigned still shows red
-    # here; main-watch lists the job as advisory too.
+    # J426: armed measurements fail the job. Main-watch reports runner
+    # infrastructure interruptions as advisory.
     needs: memory-client-build
     if: ${{ !cancelled() && needs.memory-client-build.result == 'success' && needs.memory-client-build.outputs.armed != 'false' }}
     runs-on: xcode-27
-    continue-on-error: true
     timeout-minutes: 90 # Full 26-zone sweep, five cold boots per zone.
     env:
       WS_LANE_NAME: memory-footprint

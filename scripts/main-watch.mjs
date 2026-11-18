@@ -28,17 +28,30 @@ import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
-// NB6's street and EM35's Chromium diagnostic jobs are advisory. So is the native footprint job (J424, Coordinator
-// 2026-11-18): an armed zone over its phone line (run 44375696856) or a macOS runner never assigned (44358473370) is
-// reported there and never turns main red.
-const ADVISORY_VERSION=6;
-/** @param {{name:string}} job */
-const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic'
-  ||job.name==='memory-footprint-guard';
-/** @param {{conclusion:string|null}} job */
-const unsuccessful=job=>['failure','timed_out','cancelled'].includes(job.conclusion??'');
+// NB6's street and EM35's Chromium diagnostic jobs are advisory.
+const ADVISORY_VERSION=7;
+const NATIVE_FOOTPRINT='memory-footprint-guard';
+const NATIVE_CHECKS=new Set(['Check armed native footprints and report Template', "Check or report Nine's online native WebKit ledger"]);
+/** @typedef {{name:string,conclusion:string|null,started_at?:string|null,runner_id?:number|null,steps?:readonly {name:string,conclusion:string|null}[]}} Job */
 
-/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean}} Run */
+/** J426: keep a completed failed check even if the runner is later canceled.
+ * @param {Job} job @returns {string|undefined} */
+function nativeInfrastructure(job){
+  if(job.name!==NATIVE_FOOTPRINT||job.steps?.some(step=>NATIVE_CHECKS.has(step.name)&&step.conclusion==='failure'))return;
+  if(job.conclusion==='startup_failure')return 'runner failed to start';
+  if(!unsuccessful(job))return;
+  if((job.runner_id===null||job.runner_id===0)&&job.steps?.length===0)return 'no xcode-27 runner assigned';
+  if(job.conclusion==='timed_out')return 'runner timed out';
+  if(job.conclusion==='cancelled')return 'runner was canceled';
+}
+
+/** @param {Job} job */
+const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic'
+  ||nativeInfrastructure(job)!==undefined;
+/** @param {{conclusion:string|null}} job */
+const unsuccessful=job=>['failure','timed_out','cancelled','startup_failure'].includes(job.conclusion??'');
+
+/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
 /** @typedef {{judged:number[],dispatched:string[]}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
@@ -50,15 +63,17 @@ const finished=(/** @type {Run} */run)=>run.status==='completed';
 const cancelled=(/** @type {Run} */run)=>(run.conclusion==='cancelled'||run.conclusion==='skipped')&&run.blockingFailed!==true;
 const byCreated=(/** @type {Run} */a,/** @type {Run} */b)=>Date.parse(a.created_at)-Date.parse(b.created_at)||a.id-b.id;
 
-/** Completed advisory failures cannot turn green blocking jobs red. Unknown,
- * incomplete and cancelled blocking jobs retain the workflow's verdict.
- * @param {Run} run @param {readonly {name:string,conclusion:string|null}[]} jobs @returns {Run} */
+/** Preserve the workflow verdict until every required job is clear.
+ * @param {Run} run @param {readonly Job[]} jobs @returns {Run} */
 export function blockingRun(run,jobs){
-  if(!finished(run)||(run.conclusion!=='failure'&&run.conclusion!=='timed_out'))return run;
+  if(!finished(run))return run;
+  const native=jobs.find(job=>job.name===NATIVE_FOOTPRINT);
+  const nativeInfra=native===undefined?undefined:nativeInfrastructure(native);
+  if(nativeInfra===undefined&&run.conclusion!=='failure'&&run.conclusion!=='timed_out')return run;
   const required=jobs.filter(job=>!advisory(job));
-  const clear=required.length>0&&required.every(job=>['success','skipped','neutral'].includes(job.conclusion??''));
+  const clear=required.some(job=>job.conclusion==='success')&&required.every(job=>['success','skipped','neutral'].includes(job.conclusion??''));
   const advisoryFailure=jobs.some(job=>advisory(job)&&unsuccessful(job));
-  return {...run,conclusion:clear&&advisoryFailure?'success':run.conclusion,blockingChecked:true,advisoryVersion:ADVISORY_VERSION};
+  return {...run,conclusion:clear&&advisoryFailure?'success':run.conclusion,blockingChecked:true,advisoryVersion:ADVISORY_VERSION,nativeInfra};
 }
 
 /** What each newly finished run means, oldest first. Pure: `runs` is main's ci runs, newest or oldest first.
@@ -171,6 +186,8 @@ export function liveIo(env=process.env){
   const read=(/** @type {string[]} */args)=>execFileSync('gh',args,{cwd:root,encoding:'utf8',env:readerEnv(env),stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
   const runsCache=resolve(env.WS_MAIN_WATCH_RUNS_CACHE??join(homedir(),'.cache/wildshard/main-watch-runs.json'));
   const state=resolve(env.WS_MAIN_WATCH_STATE??join(homedir(),'.cache/wildshard/main-watch.json'));
+  /** @param {number} id @returns {Job[]} */
+  const jobsFor=id=>JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs;
   return {
     repo,
     quotaReset:()=>quotaReset(),
@@ -183,25 +200,22 @@ export function liveIo(env=process.env){
       return /** @type {Run[]} */(JSON.parse(read(['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs)
         .filter(row=>row.event==='push'||row.event==='workflow_dispatch').map(row=>{
           if(!finished(row)||row.conclusion==='success')return row;
-          if(cancelled(row)){
-            if(judged.has(row.id))return row;
-            const kept=prior.find(old=>old.id===row.id&&typeof old.started==='boolean'&&typeof old.blockingFailed==='boolean'&&(old.run_attempt??1)===(row.run_attempt??1));
-            if(kept!==undefined)return kept;
-            // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
-            // the jobs, rather than that workflow timestamp, say whether any work actually started.
-            const jobs=/** @type {{name:string,conclusion:string|null,started_at:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
-            row.started=jobs.some(job=>job.started_at!==null);
-            row.blockingFailed=row.started&&jobs.some(job=>!advisory(job)&&unsuccessful(job));
-            return row;
-          }
           const kept=prior.find(old=>old.id===row.id&&old.blockingChecked===true&&old.advisoryVersion===ADVISORY_VERSION&&(old.run_attempt??1)===(row.run_attempt??1));
           if(kept!==undefined)return kept;
-          const jobs=/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
+          if(cancelled(row)&&judged.has(row.id))return row;
+          const jobs=jobsFor(row.id);
+          if(cancelled(row)){
+            // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
+            // the jobs, rather than that workflow timestamp, say whether any work actually started.
+            row.started=jobs.some(job=>job.started_at!=null);
+            row.blockingFailed=jobs.some(job=>!advisory(job)&&unsuccessful(job))&&row.started;
+            row.blockingChecked=true;
+            row.advisoryVersion=ADVISORY_VERSION;
+          }
           return blockingRun(row,jobs);
         });
     }),
-    failed:(/** @type {number} */id)=>/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
-      .filter(job=>!advisory(job)&&unsuccessful(job)).map(job=>job.name),
+    failed:(/** @type {number} */id)=>jobsFor(id).filter(job=>!advisory(job)&&unsuccessful(job)).map(job=>job.name),
     // Blocking tests own AMBER evidence. The advisory timings collector only repeats it;
     // its annotations cannot change main's verdict. Quarantine reports separately (J193).
     annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
@@ -255,6 +269,7 @@ export function sweep(io,hint={}){
       // read leaves the run for the next sweep, and a report is never sent twice.
       /** @type {string[]} */const lines=[];/** @type {{lane:string,pane:string|undefined,text:string,lander?:true}[]} */const messages=[];
       /** @type {string|undefined} */let buddyAlert;
+      if(run.nativeInfra!==undefined)lines.push(`main advisory ${short(run.head_sha)} ${NATIVE_FOOTPRINT}: ${run.nativeInfra} (run ${run.id})`);
       if(verdict.kind==='superseded')lines.push(run.started===false
         ?`main ${short(run.head_sha)} skipped (pending, replaced) by ${short(verdict.by)} (run ${run.id}; never started; never red)`
         :`main ${short(run.head_sha)} superseded by ${short(verdict.by)} (run ${run.id} cancelled; never red)`);

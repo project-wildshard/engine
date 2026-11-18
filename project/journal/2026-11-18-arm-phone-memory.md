@@ -118,3 +118,15 @@ three-boot online cohort with the committed ceilings.
 
 The raw pairs and Nine cohort are in the lane's `j426-2026-11-18/str9`
 receipt directory.
+
+## Restore the main gate after the v0.1.45 cut
+
+J426 restores the blocking native job and supersedes `0817234f`.
+Each armed footprint must meet the shared playing and loading
+lines and each armed reading plus 0.5%. Replaying both strict
+hosted artifacts passed all 52 armed batches against both ceilings.
+Main-watch reports runner timeouts, cancellations and unavailable
+runners as advisory. A completed measured failure stays blocking
+when the runner is later interrupted.
+[Strict fix-forward CI](https://github.com/project-wildshard/engine/actions/runs/44383961018).
+[Strict STR9 CI](https://github.com/project-wildshard/engine/actions/runs/44385800353).
