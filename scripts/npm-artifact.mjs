@@ -25,7 +25,7 @@ try {
     cpSync(join(root, 'node_modules', name), join(unpacked, 'node_modules', name), { recursive: true, dereference: true });
   }
   pkg.bundleDependencies = ['@wildshard/format'];
-  writeFileSync(manifest, JSON.stringify(pkg, null, 2) + '\n');
+  writeFileSync(manifest, `${JSON.stringify(pkg, null, 2)}\n`);
   const archive = pack(unpacked, output);
   console.log(JSON.stringify({ ...archive, filename: join(output, archive.filename) }));
 } finally {
