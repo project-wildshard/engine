@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "30e9450f75982cf74f3a51085831940eeafbd70de9b4c5555a2d3baad9c3abc7",
+  "catalogueHash": "5f0b1de0ef089bfd97de2c0fd1ca31812f6ac64599e73a3874e55c89ffc1a887",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -790,8 +790,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 3,
-        "hash": "79d71535ef84351dcca74abd7322049a779127f59d82d4afa74cbad526458dbd"
+        "revision": 4,
+        "hash": "9c3773e19c4910d0cdab132ad878b8f6e32a0c74a20174b686693c70d64c9869"
       },
       {
         "slug": "driftwood-isle",
@@ -808,8 +808,8 @@
       {
         "slug": "glowfen",
         "name": "Glowfen",
-        "revision": 1,
-        "hash": "9dc1c4bc9300c90aefebf8dd693d6582f7eeea26a98aa84fc721ffc72ac088b9"
+        "revision": 2,
+        "hash": "bd3580a0f8b7ddc532718bba7f0c819a4ab26eed39b2a62924f234e7c8e595cc"
       },
       {
         "slug": "ink-cel-valley",
@@ -826,8 +826,8 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "revision": 2,
-        "hash": "c97266026e66bcd39ba1645a7e15b3543e0fe2a4903aaf5259eede9308a169a6"
+        "revision": 3,
+        "hash": "9685906d2166b350c6251bfe6b44399b7a8692ae0d730716ad85a7156959c3d9"
       },
       {
         "slug": "mu9-auto-20261116",
@@ -979,8 +979,8 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 3,
-      "hash": "79d71535ef84351dcca74abd7322049a779127f59d82d4afa74cbad526458dbd",
+      "revision": 4,
+      "hash": "9c3773e19c4910d0cdab132ad878b8f6e32a0c74a20174b686693c70d64c9869",
       "bytes": 21882880
     },
     {
@@ -997,9 +997,9 @@
     },
     {
       "slug": "glowfen",
-      "revision": 1,
-      "hash": "9dc1c4bc9300c90aefebf8dd693d6582f7eeea26a98aa84fc721ffc72ac088b9",
-      "bytes": 19496960
+      "revision": 2,
+      "hash": "bd3580a0f8b7ddc532718bba7f0c819a4ab26eed39b2a62924f234e7c8e595cc",
+      "bytes": 19683840
     },
     {
       "slug": "ink-cel-valley",
@@ -1015,9 +1015,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 2,
-      "hash": "c97266026e66bcd39ba1645a7e15b3543e0fe2a4903aaf5259eede9308a169a6",
-      "bytes": 19338752
+      "revision": 3,
+      "hash": "9685906d2166b350c6251bfe6b44399b7a8692ae0d730716ad85a7156959c3d9",
+      "bytes": 19700224
     },
     {
       "slug": "mu9-auto-20261116",
