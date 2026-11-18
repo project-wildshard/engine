@@ -14,7 +14,8 @@ export function certificateSpki(certificate) {
  * Pin only the preview's certificate so Chromium still validates the packs, API and rooms.
  * @param {readonly string[]} args @param {string|undefined} spki */
 export function chromiumCandidateArgs(args, spki) {
-  if (spki === undefined || !/^[A-Za-z0-9+/]{43}=$/u.test(spki) || Buffer.from(spki, 'base64').toString('base64') !== spki) {
+  // A 32-byte digest leaves four data bits in the final padded character.
+  if (spki === undefined || !/^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$/u.test(spki)) {
     throw new Error('Candidate Chromium requires the staging preview certificate pin');
   }
   if (args.some(arg => arg.startsWith('--ignore-certificate-errors'))) {
@@ -42,8 +43,8 @@ export function bindCandidateBrowser({ server, preview, chromiumSPKI }) {
     return originalFetch(url === VERSION ? `${preview}/version.json` : input, options);
   };
   const undo = [chromium, webkit].map(engine => {
-    const persistent = engine.launchPersistentContext;
-    const launch = engine.launch;
+    const originalPersistent = engine.launchPersistentContext.bind(engine);
+    const originalLaunch = engine.launch.bind(engine);
     const isChromium = engine === chromium;
     /** @param {import('playwright').LaunchOptions} options */
     const local = options => {
@@ -51,18 +52,18 @@ export function bindCandidateBrowser({ server, preview, chromiumSPKI }) {
       const args = isChromium ? chromiumCandidateArgs(options.args ?? [], chromiumSPKI) : options.args;
       return { ...options, ...(args === undefined ? {} : { args }), proxy: { server } };
     };
-    engine.launchPersistentContext = function (profile, options) {
-      return persistent.call(this, profile, { ...options, ...local(options ?? {}), ignoreHTTPSErrors: !isChromium });
+    engine.launchPersistentContext = function launchPersistentContext(profile, options) {
+      return originalPersistent(profile, { ...options, ...local(options ?? {}), ignoreHTTPSErrors: !isChromium });
     };
-    engine.launch = async function (options) {
-      const browser = await launch.call(this, local(options ?? {}));
-      const newContext = browser.newContext;
-      browser.newContext = options => newContext.call(browser, { ...options, ignoreHTTPSErrors: !isChromium });
+    engine.launch = async function launch(options) {
+      const browser = await originalLaunch(local(options ?? {}));
+      const newContext = browser.newContext.bind(browser);
+      browser.newContext = contextOptions => newContext({ ...contextOptions, ignoreHTTPSErrors: !isChromium });
       return browser;
     };
     return () => {
-      engine.launchPersistentContext = persistent;
-      engine.launch = launch;
+      engine.launchPersistentContext = originalPersistent;
+      engine.launch = originalLaunch;
     };
   });
   return () => {
