@@ -83,3 +83,6 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   re-measured on main `d740b00a`. alpha 0.20-0.47, scale 0.61-0.82. Phone loading / playing: Template 0.85 / 0.63 GB,
   Dunes 0.98 / 0.69, Pine 1.43 (1.13-1.52) / 1.14, Nine 2.06 (1.59-2.18) / 1.25. Nine's settled GPU process fell from
   1,586 to 747 MB since `c4397636`, so its loading central is under the line, but the bar still crosses it.
+- EM12's second hosted run (ci-reports 44233775878, source `d740b00a`): macOS read real WebKit numbers at last (Template
+  settled WebContent 606 / 640 / 641 MB [K], GPU process 266-296), but the ubuntu ledger job died on "Invalid memory
+  browser endpoint": Chromium can write DevToolsActivePort after launchServer resolves. The launcher now polls it.

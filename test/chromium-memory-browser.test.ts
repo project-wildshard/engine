@@ -1,5 +1,7 @@
 import {expect,it} from 'vitest';
-import {memoryNetworkCommand} from '../scripts/chromium-memory-browser.mjs';
+import {mkdirSync, writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {devToolsEndpoint, memoryNetworkCommand} from '../scripts/chromium-memory-browser.mjs';
 
 it('caps every Inspector session without mutating events or cache controls',()=>{
   const original={id:7,sessionId:'playwright-page',method:'Network.enable',params:{maxTotalBufferSize:200000000,reportDirectSocketTraffic:true}};
@@ -11,4 +13,15 @@ it('caps every Inspector session without mutating events or cache controls',()=>
     expect(memoryNetworkCommand(command)).toBe(command);
   }
   expect(()=>memoryNetworkCommand({method:'Network.enable',params:42})).toThrow();
+});
+
+it('waits for Chromium to finish writing DevToolsActivePort, and refuses one that never completes', async () => {
+  const directory = join('tmp', 'vitest', `devtools-port-${process.pid}`);
+  mkdirSync(directory, {recursive: true});
+  const file = join(directory, 'DevToolsActivePort');
+  writeFileSync(file, '');
+  setTimeout(() => { writeFileSync(file, '41234\n/devtools/browser/abc\n'); }, 120);
+  expect(await devToolsEndpoint(file, 2000)).toEqual(['41234', '/devtools/browser/abc']);
+  writeFileSync(file, '41234\n');
+  await expect(devToolsEndpoint(file, 150)).rejects.toThrow('Invalid memory browser endpoint');
 });
