@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SHADOW_LAYER } from '../core/shadowLayer';
 import { markGpuOnly } from '../core/gpuOnly';
 import { presenting } from '../../../shared/engine/core/framePacing';
+import { releaseOwned } from '../../../shared/engine/core/ownedBuffer';
 import { trackSkeletonTextureUploads } from '../render/changedTextureUploads';
 
 /**
@@ -59,6 +60,13 @@ export interface FarMember {
  * `getBoneMatrix( aSlotData )` (three's skinning lookup).
  */
 export const FAR_SLOT_DATA = 'aSlotData';
+
+interface FarHerdOptions<M> {
+  shadow?: boolean;
+  keyOf?: (member: M) => object;
+  pageSlots?: () => number;
+  allocateOnFirstDraw?: boolean;
+}
 
 /**
  * The attributes the shadow herd keeps: the depth pass's (position, skinning) and the ones its program is keyed on — the
@@ -291,9 +299,11 @@ class FarBatch {
 
 const _dir = new THREE.Vector3();
 
-/** BufferAttribute.onUpload: drop the CPU copy (the count stays; nothing reads it again) */
+/** The page owns each static source until upload, after which only the GPU copy is used. */
 function release(this: THREE.BufferAttribute): void {
-  const Ctor = this.array.constructor as new (length: number) => THREE.TypedArray;
+  const array = this.array;
+  const Ctor = array.constructor as new (length: number) => THREE.TypedArray;
+  releaseOwned(array);
   this.array = new Ctor(0);
 }
 
@@ -312,7 +322,7 @@ export class FarHerd<M extends FarMember = FarMember> {
   private readonly eye = new THREE.Vector3();
 
   private readonly materialFor: (m: M) => THREE.Material | null;
-  private readonly opts: { shadow?: boolean; keyOf?: (m: M) => object; pageSlots?: () => number };
+  private readonly opts: FarHerdOptions<M>;
   /**
    * `materialFor(m)` is m's model's white fur (AnimalFactory.farMaterial), made once per model; null = never batched
    */
@@ -321,7 +331,7 @@ export class FarHerd<M extends FarMember = FarMember> {
    * geometry the species' other variants share), the shadow herd's the geometry (depth is the same whatever the coat)
    */
   /** `opts.pageSlots`: a paced page's slots, read as a page opens (default PAGE_SLOTS; the phone's are smaller, PF7b) */
-  constructor(materialFor: (m: M) => THREE.Material | null, opts: { shadow?: boolean; keyOf?: (m: M) => object; pageSlots?: () => number } = {}) {
+  constructor(materialFor: (m: M) => THREE.Material | null, opts: FarHerdOptions<M> = {}) {
     this.materialFor = materialFor;
     this.opts = opts;
     this.group.name = opts.shadow === true ? 'herd-shadow' : 'far-herd';
@@ -358,6 +368,9 @@ export class FarHerd<M extends FarMember = FarMember> {
   reserve(m: M): void {
     const b = this.pagesOf(m);
     if (b === null || b.reserved.has(m)) return;
+    // Phone pages can hold several MB even when none of their members ever
+    // draw. Let the real view admit a page after its bearing cull.
+    if (this.opts.allocateOnFirstDraw === true) return;
     b.reserved.add(m); b.reservedCount++;
     const slots = this.pageSlots();
     const wanted = Math.ceil(b.reservedCount / slots);

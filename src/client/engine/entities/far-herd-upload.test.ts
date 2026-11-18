@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { Bone, BufferAttribute, BufferGeometry, Color, Float32BufferAttribute, Frustum, Matrix4, MeshBasicMaterial, PerspectiveCamera, Skeleton, SkinnedMesh, Vector3, type Object3D } from 'three';
 import { FAR_SLOT_DATA, FarHerd } from './farHerd';
+import { memoryAttribution } from '../../../shared/engine/core/memoryAttribution';
 import { noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 
 function isSkinnedMesh(object: Object3D | undefined): object is SkinnedMesh { return object instanceof SkinnedMesh; }
@@ -108,4 +109,69 @@ test('members gather on the earliest pages, one a frame, and the emptied page st
     for (let s = 0; s < 10; s++) drawn.add(color.getX(s * 64).toFixed(3));
     expect(drawn).toEqual(new Set(stay.map(rig => (rig.tint.r).toFixed(3))));
   } finally { herd.dispose(); for (const rig of rigs) rig.mesh.skeleton.dispose(); source.dispose(); material.dispose(); noteFrameDrawn(Number.NEGATIVE_INFINITY); }
+});
+
+test('demand pages wait for a visible rig and honour the per-frame page cap', () => {
+  noteFrameDrawn(performance.now());
+  const source = geometry(4, true), material = new MeshBasicMaterial();
+  const herd = new FarHerd(() => material, { allocateOnFirstDraw: true, pageSlots: () => 1 });
+  const rigs = [0, 1].map(() => {
+    const mesh = new SkinnedMesh(source, material);
+    mesh.bind(new Skeleton([new Bone()]));
+    return { mesh, tint: new Color() };
+  });
+  const [first, second] = rigs;
+  if (first === undefined || second === undefined) throw new Error('Missing rigs');
+  const camera = new PerspectiveCamera(60, 1, 0.1, 500);
+  const behind = new Vector3(0, 0, 60), ahead = new Vector3(0, 0, -60);
+  try {
+    for (const rig of rigs) herd.reserve(rig);
+    herd.begin(camera);
+    expect(herd.take(first, behind, 2)).toBe(true);
+    herd.end();
+    expect(herd.pageCount()).toBe(0);
+    herd.begin(camera);
+    expect(herd.take(first, ahead, 2)).toBe(true);
+    expect(herd.take(second, ahead, 2)).toBe(false);
+    herd.end();
+    expect(herd.pageCount()).toBe(1);
+    herd.begin(camera);
+    expect(herd.take(first, ahead, 2)).toBe(true);
+    expect(herd.take(second, ahead, 2)).toBe(true);
+    herd.end();
+    expect(herd.pageCount()).toBe(2);
+  } finally {
+    herd.dispose();
+    for (const rig of rigs) rig.mesh.skeleton.dispose();
+    source.dispose(); material.dispose(); noteFrameDrawn(Number.NEGATIVE_INFINITY);
+  }
+});
+
+test('far page uploads retire their ledger sources and keep the mutable tint', () => {
+  const material = new MeshBasicMaterial(), source = geometry(4, true);
+  const mesh = new SkinnedMesh(source, material), herd = new FarHerd(() => material);
+  mesh.bind(new Skeleton([new Bone()]));
+  try {
+    herd.begin(null);
+    expect(herd.take({ mesh, tint: new Color() }, new Vector3(), 1)).toBe(true);
+    herd.end();
+    const page = herd.group.children[0];
+    if (!isSkinnedMesh(page)) throw new Error('Missing page');
+    const draw = page.geometry, index = draw.getIndex();
+    if (index === null) throw new Error('Missing page index');
+    const tint = draw.getAttribute('color'), shared = tint.array.buffer;
+    memoryAttribution.buffer(shared, { owner: 'test/far-page', asset: 'color' });
+    for (const attribute of [draw.getAttribute('position'), draw.getAttribute('skinWeight'), index]) {
+      if (!(attribute instanceof BufferAttribute)) throw new Error('Unexpected interleaving');
+      const backing = attribute.array.buffer, count = attribute.count;
+      memoryAttribution.buffer(backing, { owner: 'test/far-page', asset: 'static' });
+      attribute.onUploadCallback();
+      expect(attribute.array.byteLength).toBe(0);
+      expect(attribute.count).toBe(count);
+      expect(memoryAttribution.ownerOf(backing, 'ram')).toBe(null);
+    }
+    expect(tint.array.buffer).toBe(shared);
+    expect(memoryAttribution.ownerOf(shared, 'ram')).toBe('test/far-page');
+    memoryAttribution.release(shared, 'ram');
+  } finally { herd.dispose(); mesh.skeleton.dispose(); source.dispose(); material.dispose(); }
 });

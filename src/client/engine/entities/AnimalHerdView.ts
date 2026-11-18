@@ -196,7 +196,7 @@ export class AnimalHerdView implements RowBodiesDraw {
   /** PH-P2: the far animals drawn per model (farHerd.ts), desktop past TIER_CONFIG.animalFarBatchDist; each rig's entry.
    *  PF7b: a hull's coat variants whose coats are one layer array draw as one batch (AnimalFactory.farKey) */
   private readonly farHerd = new FarHerd<FarRig>((m) => this.factory.farMaterial(m.model), { keyOf: (m) => this.factory.farKey(m.model),
-    pageSlots: () => TIER_CONFIG.animalFarPageSlots });
+    pageSlots: () => TIER_CONFIG.animalFarPageSlots, allocateOnFirstDraw: TIER === 'phone' });
   private readonly farRigs = new Map<Animal, FarRig>();
   /** ONE-FORMAT CC54b / CC55b: the baked herds and cards past the live rigs (creatureLods.ts) */
   private readonly lods = new CreatureLods<AnimalModel>({

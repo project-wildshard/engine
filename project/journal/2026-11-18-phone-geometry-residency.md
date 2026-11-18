@@ -55,3 +55,34 @@ The full production-pin build on `1ec827b8` stayed within the session cap
 at 4,367,347 raw bytes. The covering Chromium boots reproduced the table
 and passed the same interactions. Raw identity rows, captures and harness sources
 are in the mini's `plan-artifacts/engine-memory/em27-geometry-2026-11-18`.
+
+## Hosted loading ledger
+
+Run 44306822172 passed the Open Plot checks after the prop GLB loan fix at
+`1ec827b8`. Pine's hosted loading reading at control rose from 118,432,431
+to 127,151,812 B on both cold boots. Every extra byte was in ArrayBuffers.
+The scene kind fell by 6,682,832 B, and loading peak stayed inside its
+ceiling. The macOS job was canceled before it ran a step. Engine
+`0f741196` reverted the geometry cut while the Pine bisect ran.
+
+Three alternating Chromium Metal triplets compared `b33ab4bb`,
+`1ec827b8` and `ad52cc05` on Pine rev 5. Each GLB-fix build had 28
+far-herd ArrayBuffers totaling 11,246,016 B at control that disappeared
+after two collections. The same 28 sizes with the same multiplicities
+were unattributed at control after the geometry cut and disappeared
+after the same collections. The after-GC ArrayBuffer totals on
+`1ec827b8` were 57.07–57.09 MB. The geometry cut read 46.21–51.13 MB.
+
+Three matched minimal WebKit triplets gave median settled WebContent [K]
+of 761.51, 757.57 and 760.43 MB for the three revisions. The paired median
+from the GLB fix to the geometry cut was −7.41 MB at settle and −5.52 MB
+at loading peak. Both measures fell in two of three pairs.
+
+Each far-herd page writes its own static attribute and index backing
+stores. Their WebGL upload callbacks already discard the CPU copy.
+Those callbacks now retire the RAM ledger entries at the same point.
+On `66f3f506` the candidate removed exactly 11,246,016 B from the
+unattributed control bucket (16,847,840 → 5,601,824). The mutable tint
+buffer kept its 1,972,224 B. The unit test covers upload retirement of
+position, skin weights and index, as well as the live tint. The Pine
+comparison keeps the existing 120,801,079 B ceiling.
