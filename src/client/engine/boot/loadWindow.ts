@@ -48,11 +48,17 @@ export class LoadWindow {
   /** Admit `bytes`, at once when it fits, else when earlier parts are released. `alone` says the caller has nothing of its
    *  own in flight: such a part is admitted even past the window (progress). FIFO among parts that wait. */
   admit(bytes: number, alone: () => boolean = () => false): Promise<LoadLease> {
-    if (!Number.isFinite(bytes) || bytes < 0) throw new RangeError('Invalid load window bytes');
-    // a pipeline with nothing in flight never queues: what it would wait behind may be waiting on it
-    if (alone() || (this.waiting.length === 0 && this.fits(bytes, alone))) return Promise.resolve(this.lease(bytes));
+    const now = this.tryAdmit(bytes, alone);
+    if (now !== null) return Promise.resolve(now);
     this.waitedParts++;
     return new Promise<LoadLease>(resolve => { this.waiting.push({ bytes, alone, grant: () => { resolve(this.lease(bytes)); } }); });
+  }
+  /** `admit` without waiting: the lease when the part may start now, else null (the caller then `admit`s). A part that
+   *  fits starts in the same task, so a pipeline that never waits keeps its synchronous start. */
+  tryAdmit(bytes: number, alone: () => boolean = () => false): LoadLease | null {
+    if (!Number.isFinite(bytes) || bytes < 0) throw new RangeError('Invalid load window bytes');
+    // a pipeline with nothing in flight never queues: what it would wait behind may be waiting on it
+    return alone() || (this.waiting.length === 0 && this.fits(bytes, alone)) ? this.lease(bytes) : null;
   }
   /** A boot shader or wasm compile: until the returned function runs, only progress reads are admitted. */
   compiling(): () => void {
@@ -70,6 +76,7 @@ export class LoadWindow {
   private fits(bytes: number, alone: () => boolean): boolean {
     if (alone()) return true;
     const window = this.compiles > 0 ? 0 : this.budget();
+    if (window === Number.POSITIVE_INFINITY) return true; // desktop: counting only, never a wait
     if (bytes > 0) return this.inFlight + bytes <= window;
     // A part of unknown size reserves the largest part seen so far until its bytes arrive (`charge`); before any part
     // has a size, unknown parts go one at a time.

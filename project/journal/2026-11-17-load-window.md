@@ -20,3 +20,8 @@ open 6.13 / 6.40 / 6.27 / 5.86 s: no change. What the same boot does hold is the
 
 The window is installed now so the next materializing path is bounded when it moves onto it, and so a run can read the
 in-flight kind (`__wsLoadWindow().peak`).
+
+**Forward fix (main red 44210593927).** The first version admitted every read through a promise, so a phase's reads
+started a microtask late, and a read of unknown size waited for the first charge even with the window open: world-scene
+geometry stalled behind pending reads in its tests. `tryAdmit` now starts a read that fits in the same task, and an open
+window (desktop, tests) never waits. The tests had it right; the window was wrong.

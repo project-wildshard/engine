@@ -45,27 +45,33 @@ export class PreparationReads<T> {
     if (!this.active()) this.stop(new Error('Preparation read owner is disposed or retiring'));
     if (this.stopped || this.next >= this.rows.length) return;
     if (this.admitting) return; // re-queued once the window admits its waiting read
-    // The slot is held while the window decides, so a waiting phase never lets
-    // another take its turn's transport out of order.
+    const upcoming = this.rows[this.next], bytes = upcoming === undefined ? 0 : this.size?.(upcoming) ?? 0, alone = (): boolean => this.reading === 0;
+    // A read that fits starts in this task, as before the window; one that must wait holds its slot while the window
+    // decides, so a waiting phase never lets another take its turn's transport out of order.
+    const now = this.window.tryAdmit(bytes, alone);
+    if (now !== null) { running++; this.begin(now); return; }
     running++; this.admitting = true;
-    const upcoming = this.rows[this.next];
-    void this.window.admit(upcoming === undefined ? 0 : this.size?.(upcoming) ?? 0, () => this.reading === 0).then((lease: LoadLease) => {
+    void this.window.admit(bytes, alone).then((lease: LoadLease) => {
       this.admitting = false;
       if (!this.active()) this.stop(new Error('Preparation read owner is disposed or retiring'));
       if (this.stopped || this.next >= this.rows.length) { lease.release(); running--; pump(); return undefined; }
-      const index = this.next++, row = this.rows[index], slot = this.results.get(index);
-      if (row === undefined || slot === undefined) { lease.release(); throw new Error('Missing preparation read row'); }
-      slot.lease = lease; this.reading++;
-      void (async (): Promise<void> => {
-        try { const value = await this.load(row); lease.charge(value.byteLength); slot.settle({ status: 'fulfilled', value }); }
-        catch (reason: unknown) { lease.release(); slot.settle({ status: 'rejected', reason }); this.stop(reason); }
-        finally { this.reading--; running--; pump(); }
-      })();
-      // Put this phase at the back so an overlapping phase gets the next slot.
-      if (!this.stopped && this.next < this.rows.length) { queued.add(this.start); pump(); }
+      this.begin(lease); pump();
       return undefined;
     });
   };
+  /** Start the next row's read under its admitted lease (its transport slot already counted in `running`). */
+  private begin(lease: LoadLease): void {
+    const index = this.next++, row = this.rows[index], slot = this.results.get(index);
+    if (row === undefined || slot === undefined) { lease.release(); throw new Error('Missing preparation read row'); }
+    slot.lease = lease; this.reading++;
+    void (async (): Promise<void> => {
+      try { const value = await this.load(row); lease.charge(value.byteLength); slot.settle({ status: 'fulfilled', value }); }
+      catch (reason: unknown) { lease.release(); slot.settle({ status: 'rejected', reason }); this.stop(reason); }
+      finally { this.reading--; running--; pump(); }
+    })();
+    // Put this phase at the back so an overlapping phase gets the next slot.
+    if (!this.stopped && this.next < this.rows.length) queued.add(this.start);
+  }
   /** `hold`: the bytes stay charged to the window until `done(index)` (the taker's decode and upload). */
   async take(index: number, hold = false): Promise<Uint8Array> {
     const slot = this.results.get(index);

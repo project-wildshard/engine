@@ -84,7 +84,7 @@ test('the overlapping census constructs only scene jobs; final preparation still
   const selectorStart = source.indexOf('function drawnFrom('), selectorEnd = source.indexOf('\n/**', selectorStart);
   if (selectorStart === -1 || selectorEnd < selectorStart) throw new Error('First-view selector missing');
   const method: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(selectorStart, selectorEnd)}\n${source.slice(start).replace('export async', 'async')}\nprecompileLevel`), {
-    THREE, performance, pageScope: owner, resourceScope: () => owner, bootTraceActive: () => false,
+    THREE, performance, pageScope: owner, resourceScope: () => owner, bootTraceActive: () => false, loadWindow: {compiling: () => (): void => undefined},
     // DL10: the early scene-only pass runs before buildComposer() and draws to a stand-in target
     earlyTarget: () => { standIns += 1; return null; },
     prepareSceneResources: (): Promise<void> => Promise.resolve(), shadowDepthResolver: () => undefined,
@@ -144,7 +144,7 @@ test('DL23: a boot census reaches scene discovery as its include, in place of th
   const scene = new THREE.Scene(), owner = {onDispose: (): void => undefined}, includes: unknown[] = [];
   const none = (): never[] => [];
   const method: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(selectorStart, selectorEnd)}\n${source.slice(start).replace('export async', 'async')}\nprecompileLevel`), {
-    THREE, performance, pageScope: owner, resourceScope: () => owner, bootTraceActive: () => false, earlyTarget: () => null,
+    THREE, performance, pageScope: owner, resourceScope: () => owner, bootTraceActive: () => false, loadWindow: {compiling: () => (): void => undefined}, earlyTarget: () => null,
     prepareSceneResources: (): Promise<void> => Promise.resolve(), shadowDepthResolver: () => undefined,
     entryFrameExclusions: () => new Set(), workSlice: () => ({due: () => false, yield: (): Promise<void> => Promise.resolve()}),
     materialsOf: () => [], sceneJobs: () => ({jobs: [], materials: 0}),
