@@ -220,9 +220,13 @@ export async function minimiseInspector(page) {
 /** Is the page still on the session minimiseInspector turned down? @param {any} page @param {any} session */
 export function sameInspectorSession(page, session) { return page?._connection?.toImpl?.(page)?.delegate?._session === session; }
 
-/** Wait for control or the error card. @param {any} page @param {number} timeoutMs */
-export async function untilControl(page, timeoutMs) {
-  await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(Reflect.get(window, '__wildshard')?.world?.game)), undefined, { timeout: timeoutMs, polling: 250 });
+/** Wait for control or the error card. @param {any} page @param {number} timeoutMs @param {boolean} [requireLedger] */
+export async function untilControl(page, timeoutMs, requireLedger = false) {
+  await page.waitForFunction((/** @type {boolean} */ requireLedger) => (
+    Boolean(document.querySelector('#wserr .msg')?.textContent)
+    || (!document.querySelector('.ws-load') && Boolean(Reflect.get(window, '__wildshard')?.world?.game)
+      && (!requireLedger || Reflect.get(window, '__memoryRun')?.steps.some((/** @type {StepRow} */ row) => row[1] === 'control' && row[2])))
+  ), requireLedger, { timeout: timeoutMs, polling: 250 });
   return /** @type {string | null} */ (await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null));
 }
 
@@ -399,9 +403,31 @@ export function phoneLine(run, model = loadPhoneModel()) {
 /** EM1's native-WebKit calibration. */
 export function webkitCalibration() { return JSON.parse(readFileSync(new URL('calibration.json', import.meta.url), 'utf8')).hosts.webkit; }
 
-/** The microscope: the same boot in Chromium, a detailed memory-infra dump at each checkpoint.
- * @param {{url:string, chunk:string, timeoutMs?:number, depth?:number, plantRetainedBuffer?:boolean}} options */
-export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, depth = 3, plantRetainedBuffer = false }) {
+/** Read the page's checkpoint ledger without requesting browser process dumps during boot.
+ * @param {import('playwright').Page} page @param {string} url @param {number} timeoutMs */
+async function chromiumLedger(page, url, timeoutMs) {
+  let failure = null;
+  try {
+    await page.goto(url, { waitUntil: 'commit' });
+    failure = await untilControl(page, timeoutMs, true);
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
+    failure = error.message;
+  }
+  const { steps, gpuDetail } = await page.evaluate(() => ({
+    steps: /** @type {StepRow[]} */ (Reflect.get(window, '__memoryRun')?.steps ?? []),
+    gpuDetail: Reflect.get(globalThis, '__wildshardMemory')?.gpu?.() ?? null,
+  }));
+  const checkpoints = steps.map(([, step, ledger]) => ({ step, ledger, processes: [] }));
+  if (failure === null && !checkpoints.some(row => row.step === 'control' && row.ledger)) {
+    failure = 'Boot did not record a control ledger';
+  }
+  return { host: 'chromium', ready: failure === null, failure, gpuDetail, checkpoints };
+}
+
+/** Chromium boot with detailed process dumps for diagnostics.
+ * @param {{url:string, chunk:string, timeoutMs?:number, depth?:number, plantRetainedBuffer?:boolean, captureDumps?:boolean}} options */
+export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, depth = 3, plantRetainedBuffer = false, captureDumps = true }) {
   const { launchMemoryBrowser } = await import('../chromium-memory-browser.mjs');
   const gpu = process.platform === 'darwin' ? ['--use-angle=metal'] : [];
   const owned = await launchMemoryBrowser([...gpu, '--ignore-gpu-blocklist', '--enable-precise-memory-info']);
@@ -425,6 +451,7 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
       });
     });
     const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);
+    if (!captureDumps) return await chromiumLedger(page, bootURL(url, chunk), timeoutMs);
     const tracing = await owned.browser.newBrowserCDPSession();
     /** @type {any[]} */ const events = [];
     tracing.on('Tracing.dataCollected', (event) => { events.push(...event.value); });
@@ -662,7 +689,13 @@ async function main(argv) {
     const z = zoneOverRuns(/** @type {any} */ (good), loadPhoneModel()), gb = (/** @type {number} */ b) => (b / 1e9).toFixed(2);
     console.log(`phone over ${z.runs} runs [EM11, iPhone 17 Pro]: playing ${gb(z.playing.central)} GB (upper ${gb(z.playing.upper)}), loading ${gb(z.loading.central)} GB (upper ${gb(z.loading.upper)}); upper = 90% prediction bound on one more cold boot`);
   }
-  const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({ url: args.url, chunk: args.chunk, timeoutMs, plantRetainedBuffer: Boolean(args['plant-retained-buffer']) }) : null;
+  const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({
+    url: args.url, chunk: args.chunk, timeoutMs, plantRetainedBuffer: Boolean(args['plant-retained-buffer']),
+    captureDumps: Boolean(args.microscope || args['observe-timeout']),
+  }) : null;
+  if (microscope?.failure && args['ledger-only']) {
+    console.error(`${args.chunk}: ${microscope.failure}. Last checkpoint: ${microscope.checkpoints.at(-1)?.step ?? 'before page'}`);
+  }
   if (microscope && !args['ledger-only']) for (const line of microscopeLines(microscope)) console.log(line);
   const ledger = microscope?.ready ? ledgerPeak(microscope.checkpoints) : null;
   if (ledger) for (const line of ledgerPeakLines(args.chunk, ledger)) console.log(line);

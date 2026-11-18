@@ -27,7 +27,7 @@ export interface WebkitRun {
 }
 export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean;instrument?:Instrument;probe?:(page:unknown,procs:BrowserProcess[])=>Promise<unknown>}):Promise<WebkitRun>;
 export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;gpuDetail:{kinds:Record<string,number>;formats:Record<string,number>;owners:Record<string,number>}|null;checkpoints:{step:string;ledger:Record<string,Record<string,number>>|null;processes:DumpProcess[]}[]}
-export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number;plantRetainedBuffer?:boolean}):Promise<MicroscopeRun>;
+export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number;plantRetainedBuffer?:boolean;captureDumps?:boolean}):Promise<MicroscopeRun>;
 export function webkitLines(run:WebkitRun):string[];
 export function microscopeLines(run:MicroscopeRun):string[];
 export function settledReading(page:unknown,procs:readonly BrowserProcess[],options?:{settleMs?:number;gcs?:number;reads?:number}):Promise<Pair&{reads:Pair[]}>;
@@ -44,7 +44,7 @@ export function ladderParts(rounds:readonly Record<string,{k:number;l:number;pea
 export function ladderLines(result:LadderParts&{rungs:Record<string,{k:Stats;wc:Stats;gpu:Stats;l:Stats;peak?:Stats}>;runs:number}):string[];
 export function ledgerParity(checkpoint:{ledger?:Record<string,Record<string,number>>|null;processes:{role:string;alloc:Record<string,number>}[]}):{ledgerGpu:number;ledgerBuffers:number;angleMetal:number;webglBuffers:number}|null;
 export function phoneContext(context:unknown,options?:{route?:boolean}):Promise<void>;
-export function untilControl(page:unknown,timeoutMs:number):Promise<string|null>;
+export function untilControl(page:unknown,timeoutMs:number,requireLedger?:boolean):Promise<string|null>;
 export interface Counters {gpu?:Record<string,number>;ram?:Record<string,number>;workers?:Record<string,number>}
 export interface CalibrationHost {baselineMB:{webcontent:number;gpu:number};kinds:Record<string,{slope:number;interceptMB:number;lands:string;roles?:Record<string,{slope:number;interceptMB:number}>}>}
 export interface ClosureTerm {process:'webcontent'|'gpu';term:string;category:string;bytes:number}

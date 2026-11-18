@@ -69,3 +69,12 @@ from the first hosted minimal run. The next batch passed at 581.33 MB.
 Production jobs now require the files.
 [Ubuntu sweep](https://github.com/project-wildshard/engine/actions/runs/44255220814/attempts/2).
 [Refill and controls](https://github.com/project-wildshard/engine/actions/runs/44268975659).
+
+In the first regular comparison, Driftwood stopped at props with
+the game's 61-second no-progress card. The ledger job had been
+requesting detailed native-process dumps even for counters already
+recorded in the page. Ledger-only now reads those checkpoints after
+boot, and keeps the error card and last checkpoint on failures.
+Explicit microscopes and the Nine diagnostic keep their dumps.
+The comparison still requires real control for all 26 zones.
+[First regular run](https://github.com/project-wildshard/engine/actions/runs/44276449981).
