@@ -33,7 +33,7 @@ client.on('data', chunk => { answer += chunk; });
 client.once('end', () => process.exit(answer === 'touch received' ? 0 : 1));
 client.once('error', () => process.exit(1));
 `, {mode: 0o700});
-  vi.stubEnv('PATH', `${dir}:${process.env.PATH ?? ''}`);
+  vi.stubEnv('PATH', `${dir}:${process.env['PATH'] ?? ''}`);
   vi.stubEnv('WS_HID_TEST_TRACE', trace);
   const hid = ownSimulatorHid('owned-fixture-device');
   try {
