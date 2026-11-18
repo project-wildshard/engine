@@ -36,6 +36,11 @@
 }
 .ws-quest-race.show { opacity: 1; transform: translate(-50%, 0); }
 #hud.intro .ws-quest-race { display: none; }
+/* phone: the top row is full (PAUSE, the 34vw minimap), and the centred clock ran under the minimap ("best 0:58." on staging
+   v0.1.42, SS-MS1b): it sits under the minimap instead, centred, as the boss bar does (boss.css), and never wider than the screen */
+@media (max-width: 700px) {
+  .ws-quest-race { top: calc(var(--ws-top) + 34vw + 58px); max-width: calc(100vw - 24px); box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+}
 
 /* ── SS-MS2a3: a steer ride's chip, bottom centre: the speed bar, BOOST lit while it boosts ── */
 .ws-quest-steer {
