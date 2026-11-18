@@ -1,5 +1,6 @@
 import { pageScope } from '../../../shared/engine/app/resources';
 import type { Scope } from '../../../shared/engine/app/scope';
+import { decoderIdleMs } from '../core/workerIdle';
 
 interface Pending { scope: Scope; resolve: (reply: ImageBitmap | Uint8ClampedArray) => void; reject: (error: Error) => void; layer: boolean }
 let worker: Worker | null = null, scope: Scope | null = null, idle: Scope | null = null;
@@ -40,7 +41,7 @@ function receive(event: MessageEvent<unknown>): void {
   }
   if (pending.size === 0 && scope !== null) {
     idle?.dispose(); const owner = scope.child('idle'); idle = owner;
-    owner.timeout(30_000, () => { if (pending.size === 0) stop(new Error('Image decoder idle'), false); });
+    owner.timeout(decoderIdleMs(), () => { if (pending.size === 0) stop(new Error('Image decoder idle'), false); }); // EM19: 2 s on the phone
   }
 }
 function start(): Worker {

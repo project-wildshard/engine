@@ -9,6 +9,7 @@
 import { pageScope } from '../../../shared/engine/app/resources';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { waitFor } from '../../../shared/engine/boot/waits';
+import { decoderIdleMs } from './workerIdle';
 
 const HEADER = 80, LEVEL = 24, SCHEME_ZSTD = 2;
 /** level data starts at a multiple of this in the rewritten file (the spec's lcm(texel block size, 4) for every format) */
@@ -41,11 +42,11 @@ function receive(event: MessageEvent<unknown>): void {
   }
   armIdle();
 }
-/** With nothing pending the worker stops after 30 s */
+/** With nothing pending the worker stops after 30 s, 2 s on the phone tier (EM19: its Wasm heap never shrinks) */
 function armIdle(): void {
   if (pending.size > 0 || scope === null) return;
   idle?.dispose(); const owner = scope.child('idle'); idle = owner;
-  owner.timeout(30_000, () => { if (pending.size === 0) stop(new Error('zstd decoder idle'), false); });
+  owner.timeout(decoderIdleMs(), () => { if (pending.size === 0) stop(new Error('zstd decoder idle'), false); });
 }
 function start(): Worker {
   if (worker !== null) return worker;
@@ -72,7 +73,29 @@ export function prepareKtx2Zstd(files: Iterable<Uint8Array | undefined>): void {
     armIdle(); return;
   }
 }
-function decodeLevels(levels: { data: Uint8Array; size: number }[]): Promise<Uint8Array[]> {
+/** ENGINE-MEMORY EM19: at most this many files' levels are copied out and posted at once. The worker decodes one file at a
+ *  time, so every further file's copies only waited in its queue (Pine's worker held 25.35 MB [H] of them at its peak); now
+ *  they wait on the page as the views into their own file they already were. Two keep the worker busy between replies. */
+const IN_FLIGHT = 2;
+let inFlight = 0;
+const waiting: (() => void)[] = [];
+/** A turn to copy and post; the release hands it straight to the next waiter, so no caller can slip in between. */
+async function turn(): Promise<() => void> {
+  if (inFlight < IN_FLIGHT) inFlight++;
+  else await new Promise<void>(resolve => { waiting.push(resolve); });
+  let held = true;
+  return () => {
+    if (!held) return; held = false;
+    const next = waiting.shift();
+    if (next === undefined) inFlight--; else next();
+  };
+}
+/** Decode the levels `read` copies out, once this file has a turn (its copies are made only then). */
+async function decodeLevels(read: () => { data: Uint8Array; size: number }[]): Promise<Uint8Array[]> {
+  const release = await turn();
+  try { return await post(read()); } finally { release(); }
+}
+function post(levels: { data: Uint8Array; size: number }[]): Promise<Uint8Array[]> {
   const decoder = start(), owner = scope;
   if (owner === null) return Promise.reject(new Error('zstd decoder missing'));
   idle?.dispose(); idle = null;
@@ -90,7 +113,7 @@ export async function decodeZstdBlock(bytes: Uint8Array, expectedBytes: number):
   if (!Number.isSafeInteger(expectedBytes) || expectedBytes < 0 || expectedBytes > 64 * 1024 * 1024
     || bytes.length > 64 * 1024 * 1024) throw new Error('Zstd byte block exceeds limit');
   if (failed) throw new Error('Zstd decode worker unavailable');
-  const decoded = await decodeLevels([{ data: bytes.slice(), size: expectedBytes }]);
+  const decoded = await decodeLevels(() => [{ data: bytes.slice(), size: expectedBytes }]);
   const result = decoded[0];
   if (decoded.length !== 1 || result === undefined || result.byteLength !== expectedBytes) throw new Error('Zstd output byte count differs');
   return result;
@@ -144,7 +167,7 @@ export async function unsupercompressKtx2(buffer: ArrayBuffer): Promise<ArrayBuf
   const bytes = new Uint8Array(buffer), levels = zstdLevels(bytes);
   if (levels === null) return buffer;
   try {
-    const decoded = await waitFor('Preparing texture data', decodeLevels(levels.map(level => ({ data: bytes.slice(level.offset, level.offset + level.length), size: level.size }))), 'worker');
+    const decoded = await waitFor('Preparing texture data', decodeLevels(() => levels.map(level => ({ data: bytes.slice(level.offset, level.offset + level.length), size: level.size }))), 'worker');
     if (decoded.length !== levels.length || decoded.some((data, i) => data.byteLength !== levels[i]?.size)) return buffer;
     const plain = plainKtx2(bytes, levels, decoded);
     return plain.buffer instanceof ArrayBuffer ? plain.buffer : buffer;

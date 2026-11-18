@@ -440,6 +440,7 @@
     "./core/rng": "./src/shared/engine/core/rng.ts",
     "./core/shadowLayer": "./src/client/engine/core/shadowLayer.ts",
     "./core/tier": "./src/client/engine/core/tier.ts",
+    "./core/workerIdle": "./src/client/engine/core/workerIdle.ts",
     "./core/time": "./src/shared/engine/core/time.ts",
     "./debug/probe": "./src/client/engine/debug/probe.ts",
     "./entities/AnimalFactory": "./src/client/engine/entities/AnimalFactory.ts",

@@ -170,6 +170,7 @@
     "src/client/engine/core/renderBudget.ts": "client",
     "src/client/engine/core/sustainedFrames.ts": "client",
     "src/client/engine/core/tier.ts": "client",
+    "src/client/engine/core/workerIdle.ts": "client",
     "src/client/engine/core/Tour.ts": "client",
     "src/client/engine/core/viewport.ts": "client",
     "src/client/engine/core/Volumetrics.ts": "client",

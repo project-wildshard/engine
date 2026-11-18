@@ -1,11 +1,12 @@
 import { WorkerPool } from 'three/examples/jsm/utils/WorkerPool.js';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { waitFor } from '../../../shared/engine/boot/waits';
+import { decoderIdleMs } from './workerIdle';
 
 const completedReply = (): undefined => undefined;
 
 /** Keep Three's queue and concurrency, with explicit ownership of its worker message subscriptions.
- * Fully idle workers retire after 30 seconds; the original factory recreates them for later jobs. */
+ * Fully idle workers retire after 30 seconds (2 s on the phone tier, EM19); the original factory recreates them for later jobs. */
 export class ScopedWorkerPool extends WorkerPool {
   // r186 initializes `queue`; @types/three still spells this field `quene`.
   declare readonly queue: readonly unknown[];
@@ -31,7 +32,7 @@ export class ScopedWorkerPool extends WorkerPool {
     if ((this.workerStatus & (1 << workerId)) === 0) this.workersResolve[workerId] = completedReply;
     if (this.workerStatus === 0 && this.queue.length === 0 && !this.scope.disposed) {
       this.scope.cancelTimer(this.idle);
-      this.idle = this.scope.timeout(30_000, () => {
+      this.idle = this.scope.timeout(decoderIdleMs(), () => {
         this.idle = undefined;
         if (this.workerStatus === 0 && this.queue.length === 0) this.dispose();
       });

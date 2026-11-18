@@ -5,6 +5,7 @@
  */
 import { decodeTerrainTile, type TerrainTileData } from '@wildshard/format/terrainTileBytes';
 import { Scope } from '@wildshard/engine/app/scope';
+import { decodePoolSize, decoderIdleMs } from '@wildshard/engine/core/workerIdle';
 
 /** Main thread → worker; the bytes are transferred. */
 export interface TileDecodeRequest { id: number; bytes: ArrayBuffer }
@@ -12,7 +13,8 @@ export interface TileDecodeRequest { id: number; bytes: ArrayBuffer }
 export type TileDecodeReply = { id: number; data: TerrainTileData; error?: undefined } | { id: number; error: string; data?: undefined };
 
 /** A small round-robin pool, started by the first decode. Thirty seconds without
- * queued/active work retires its contexts; the next decode recreates the same capacity. Disposal stays final. */
+ * queued/active work retires its contexts; the next decode recreates the same capacity. Disposal stays final.
+ * EM19: on the phone tier the pool is one worker and retires after 2 s idle (`workerIdle.ts`). */
 export class TileDecoder {
   private readonly scope = new Scope('tile-decoder');
   private readonly workers: Worker[] = [];
@@ -24,7 +26,7 @@ export class TileDecoder {
   private jobs = 0;
   private idle: ReturnType<Scope['timeout']> | undefined;
   private held = false;
-  constructor(private readonly size = 2) {}
+  constructor(private readonly size = decodePoolSize(2)) {}
   private start(): void {
     if (this.disposed || this.workers.length > 0) return;
     if (typeof Worker === 'undefined') return;
@@ -46,7 +48,7 @@ export class TileDecoder {
   hold(): void { this.held = true; this.start(); }
   private watchIdle(): void {
     if (this.held) return;
-    if (this.jobs === 0 && !this.disposed && this.workers.length > 0) this.idle = this.scope.timeout(30_000, () => {
+    if (this.jobs === 0 && !this.disposed && this.workers.length > 0) this.idle = this.scope.timeout(decoderIdleMs(), () => {
       this.idle = undefined; this.retire();
     });
   }
