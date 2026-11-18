@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.45 (2026-11-18)
+
+- Keep Enter Zone responsive and show the world on the first frame.
+- Shorten phone loading and keep late placements in their grid slots.
+- Keep collision hulls with the vehicles and restore the respawned Wyrm body.
+- Upgrade the engine wire package to 1.1.0.
+- Read the control memory ledger after garbage collection.
+
 ## v0.1.42 (2026-11-18)
 
 - Show the race clock in Mirror Salt when starting a race from its grid cell.
