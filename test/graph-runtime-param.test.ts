@@ -94,7 +94,7 @@ test('NB2: a graph file validates once per admitted lists and every compile keep
     expect(a.uniforms['wsP_tint']?.value.toArray()).toEqual([0.9, 0.9, 0.9]);
     expect(b.uniforms['wsP_tint']?.value.toArray()).toEqual([0.2, 0.3, 0.4]);
     // other admitted lists are another validation: the file is read again
-    clientGraphs(source, { ...port, declaredGraphCeilings: true }).compile({ family: 'graph', file: hash }).dispose();
+    clientGraphs({ ...source, budgets: { ...source.budgets, tier: 'medium' } }, port).compile({ family: 'graph', file: hash }).dispose();
     expect(reads).toBe(2);
   } finally { a.dispose(); b.dispose(); forgetValidatedGraphFiles(); }
 });

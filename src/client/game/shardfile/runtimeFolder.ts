@@ -388,7 +388,7 @@ export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'ga
     return files;
   });
   if (ctx.scope.disposed) throw new Error('Runtime look scope unloaded while reading materials');
-  return bootTask(`look:material-compile ${source.identity.slug}`, () => clientMaterials(shard, assets, renderer, ctx.scope, { declaredGraphCeilings: true, ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) }));
+  return bootTask(`look:material-compile ${source.identity.slug}`, () => clientMaterials(shard, assets, renderer, ctx.scope, { ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) }));
 }
 
 /** Prepare the requested original graph materials for resident effects and boss storms. */

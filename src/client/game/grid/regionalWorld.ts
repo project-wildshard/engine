@@ -154,7 +154,7 @@ async function prepareRegionalPresentation(admitted: AdmittedFolder, renderer: P
   const assets = runtimeFolder(full).assets, terrain = full.terrain;
   const collider = terrain === null ? undefined : await assets.read(terrain.collider);
   if (scope.disposed || scope.disposing) throw new Error('Regional world left while reading its presentation collider');
-  const presentation = await clientMaterials({ ...full, state: full.state }, assets.retained, renderer, scope, { declaredGraphCeilings: true });
+  const presentation = await clientMaterials({ ...full, state: full.state }, assets.retained, renderer, scope);
   if (scope.disposed || scope.disposing) throw new Error('Regional world left while preparing its presentation materials');
   return { collider, presentation };
 }

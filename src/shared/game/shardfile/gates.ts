@@ -32,26 +32,13 @@ export interface Gate {
   readonly snippets?: readonly { readonly file: string; readonly text: string }[];
 }
 
-/** OF10b: each dangerous gate is one deprecated function here; its sites call it by name. */
-export const DANGEROUS_GATES = 'src/shared/game/shardfile/dangerousGates.ts';
-
-export const GATES: readonly Gate[] = [
-  {
-    id: 'graph-authority', verdict: 'dangerous', name: 'dangerousUnbudgetedMaterialGraph',
-    what: 'Material graphs keep their declared ceilings only for a shard with a runtime or a declared page; any other '
-      + 'shard\'s graphs are clamped.',
-    harm: 'Opened, any shard could compile unbounded GPU shader graphs (nodes, samplers, passes) on every player\'s device.',
-    budget: 'OF10c: the shard\'s tier GPU limits (graph nodes, textures, passes).',
-    snippets: [{ file: DANGEROUS_GATES, text: 'export function dangerousUnbudgetedMaterialGraph(' },
-      { file: 'src/client/game/grid/session.ts', text: 'declaredGraphCeilings: dangerousUnbudgetedMaterialGraph(source)' }],
-  },
-];
+export const GATES: readonly Gate[] = [];
 
 /** Lines the OF10 audit named that are not gates: they treat every shard alike. */
 export const NOT_GATES: readonly string[] = [
   'Server-class files (shard-format `outputIndex.ts`, J91): an admission class every product may use; not provenance.',
   '`hasDeclaredClientPage` branches in `clientSource.ts`, `client.ts`, `clientPlan.ts`, `clientGround.ts` and '
-    + '`regionalRuntime.ts`: they follow the shard\'s data once it is admitted; only the admission refusal is a gate (declared-page).',
+    + '`regionalRuntime.ts`: they follow the shard\'s data once it is admitted.',
   '`runtime !== null` in the headless proofs (`checkShardfile.ts`, `headless.ts`, `simulation.ts`): author tooling, not admission.',
 ];
 

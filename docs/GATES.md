@@ -7,14 +7,13 @@ A gate is engine code that treats one shard differently from another by where it
 **delete** gates are not dangerous and go with the provenance option (OF10a). **dangerous** gates are renamed
 `dangerousX` (OF10b) and replaced by a budget tier (OF10c).
 
-1 gates: 0 delete (0 provenance references), 1 dangerous (0).
+0 gates: 0 delete (0 provenance references), 0 dangerous (0).
 
 | Gate | Verdict | What it does | Harm | Replaced by | Where |
 |---|---|---|---|---|---|
-| graph-authority (`dangerousUnbudgetedMaterialGraph`) | dangerous | Material graphs keep their declared ceilings only for a shard with a runtime or a declared page; any other shard's graphs are clamped. | Opened, any shard could compile unbounded GPU shader graphs (nodes, samplers, passes) on every player's device. | OF10c: the shard's tier GPU limits (graph nodes, textures, passes). | 2 named lines |
 
 ## Not gates
 
 - Server-class files (shard-format `outputIndex.ts`, J91): an admission class every product may use; not provenance.
-- `hasDeclaredClientPage` branches in `clientSource.ts`, `client.ts`, `clientPlan.ts`, `clientGround.ts` and `regionalRuntime.ts`: they follow the shard's data once it is admitted; only the admission refusal is a gate (declared-page).
+- `hasDeclaredClientPage` branches in `clientSource.ts`, `client.ts`, `clientPlan.ts`, `clientGround.ts` and `regionalRuntime.ts`: they follow the shard's data once it is admitted.
 - `runtime !== null` in the headless proofs (`checkShardfile.ts`, `headless.ts`, `simulation.ts`): author tooling, not admission.

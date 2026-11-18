@@ -213,7 +213,6 @@
  "src/client/game/shard/page-mode-boot.test.ts",
  "src/client/game/shardfile/asset-cache.test.ts",
  "src/client/game/shardfile/baked-tile-contents.test.ts",
- "src/client/game/shardfile/client-graph-authority.test.ts",
  "src/client/game/shardfile/creature-ring.test.ts",
  "src/client/game/shardfile/dressing-texture-await.test.ts",
  "src/client/game/shardfile/entered-tile-readout.test.ts",
