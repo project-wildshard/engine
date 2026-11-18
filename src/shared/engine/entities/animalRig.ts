@@ -19,6 +19,52 @@ const P_EARL_P=9,P_EARL_Y=10,P_EARR_P=11,P_EARR_Y=12,P_TAIL_P=13,P_TAIL_Y=14,P_L
 const smooth01=(t:number):number=>t*t*(3-2*t);
 type Quad=Record<'body'|'neck1'|'neck2'|'head'|'tail',AnimalRigJoint>&Record<'earL'|'earR'|'belly',AnimalRigJoint|undefined>;
 type Leg=readonly[AnimalRigJoint,AnimalRigJoint,AnimalRigJoint];
+
+/** A kit biped uses the existing gait phase and its own unit bind. */
+export class BipedRigPose {
+  private readonly rest: readonly { joint: AnimalRigJoint; at: Vector3 }[];
+  private readonly left: Leg;
+  private readonly right: Leg;
+  private readonly leftArm: AnimalRigJoint;
+  private readonly rightArm: AnimalRigJoint;
+
+  constructor(bones: Readonly<Record<string, AnimalRigJoint>>) {
+    const joint = (name: string): AnimalRigJoint => {
+      const found = bones[name];
+      if (found === undefined) throw new Error(`Missing biped pose joint: ${name}`);
+      return found;
+    };
+    this.rest = Object.values(bones).map(value => ({ joint: value, at: value.position.clone() }));
+    this.left = [joint('thigh.L'), joint('shin.L'), joint('foot.L')];
+    this.right = [joint('thigh.R'), joint('shin.R'), joint('foot.R')];
+    this.leftArm = joint('upperArm.L');
+    this.rightArm = joint('upperArm.R');
+  }
+
+  reset(): void {
+    for (const { joint, at } of this.rest) {
+      joint.position.copy(at);
+      joint.rotation.set(0, 0, 0);
+      joint.scale.setScalar(1);
+    }
+  }
+
+  walk(phase: number, speed: number): void {
+    const weight = Math.min(1, Math.max(0, (speed - .15) / .85));
+    const swing = Math.sin(phase * 2 * Math.PI);
+    this.leg(this.left, swing, weight);
+    this.leg(this.right, -swing, weight);
+    this.leftArm.rotation.x = -.3 * swing * weight;
+    this.rightArm.rotation.x = .3 * swing * weight;
+  }
+
+  private leg([thigh, shin, foot]: Leg, swing: number, weight: number): void {
+    thigh.rotation.x = .55 * swing * weight;
+    shin.rotation.x = .6 * Math.max(0, -swing) * weight;
+    foot.rotation.x = -(thigh.rotation.x + shin.rotation.x) * .4;
+  }
+}
+
 /** The shipping scalar-to-joint expressions, without a skeleton, geometry, renderer or scheduler. */
 export class QuadrupedRigPose {
   private readonly quad:Quad;

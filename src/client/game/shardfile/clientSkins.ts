@@ -15,12 +15,15 @@ import { InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, 
 import type { ClipName } from '@wildshard/engine/anim/rig';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
+import { BipedRigPose } from '@wildshard/engine/entities/animalRig';
 import type { AnimalSpecies, BoneDef, RigAnimCtx } from '@wildshard/engine/entities/species/registry';
 import { NO_FUR } from '@wildshard/engine/entities/species/rigs';
 import { loadSkin } from './skinPlayback';
 import { compileSkinPoseLayers, bindSkinPoseLayers, type CompiledSkinPoseLayers } from './skinLayerPlayback';
 import { resolveSkinLookFiles, skinLookParameters } from '@wildshard/format/skinAssets';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
+import { CREATURE_SKELETONS, skeletonBones } from '@wildshard/format/creatureSkeletons';
+import type { CreatureBody } from '@wildshard/format/creatureLayers';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 
@@ -130,10 +133,12 @@ async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLoo
 /** The part of the engine's per-frame rig context a skin's clip choice reads. */
 export type SkinDriveState = Pick<RigAnimCtx, 'dt' | 't' | 'alive' | 'flinch' | 'attack' | 'speed' | 'strafe' | 'scale' | 'phase' | 'state'>;
 const _q = new Quaternion();
+const BIPED_BONES = skeletonBones(CREATURE_SKELETONS.biped);
 /** One creature's playback (one per rig's bone record): which clip, from when, and its pose layers bound to this instance's bones. */
 export class SkinDriver {
   private readonly skin: ClientSkin;
   private readonly bones: Record<string, Bone>;
+  private readonly biped: BipedRigPose | undefined;
   private readonly layers = new Map<ClipName, ReturnType<typeof bindSkinPoseLayers>>();
   private active: ReturnType<typeof bindSkinPoseLayers> | undefined;
   private clip: ClipName | null = null;
@@ -142,8 +147,9 @@ export class SkinDriver {
   private flinch = 0;
   /** seconds into the hit reaction, -1 when none is playing */
   private hitT = -1;
-  constructor(skin: ClientSkin, bones: Record<string, Bone>) {
+  constructor(skin: ClientSkin, bones: Record<string, Bone>, skeleton?: CreatureBody['skeleton']) {
     this.skin = skin; this.bones = bones;
+    this.biped = skeleton === 'biped' && BIPED_BONES.every(name => Object.hasOwn(bones, name)) ? new BipedRigPose(bones) : undefined;
     const ordered = skin.bones.map((def) => { const bone = bones[def.name]; if (bone === undefined) throw new Error(`skin ${skin.id}: missing joint ${def.name}`); return bone; });
     for (const [name, clip] of skin.clips) if (clip.layers !== null) this.layers.set(name, bindSkinPoseLayers(clip.layers, ordered));
   }
@@ -162,7 +168,12 @@ export class SkinDriver {
   }
   /** Pose this instance's bones for the frame. */
   step(c: SkinDriveState, freshBase = false): void {
-    const name = this.choose(c); if (name === null) return;
+    this.biped?.reset();
+    const name = this.choose(c);
+    if (name === null) {
+      if (this.biped !== undefined && c.alive) this.biped.walk(c.phase, Math.hypot(c.speed, c.strafe) / c.scale);
+      return;
+    }
     const clip = this.skin.clips.get(name); if (clip === undefined) return;
     this.since = name === this.clip ? this.since + c.dt : 0; this.clip = name;
     // one-shots from their trigger (the export sampled each from it), the walk from the gait phase, idles on the clock
@@ -170,7 +181,7 @@ export class SkinDriver {
     const looping = name === 'walk' || name.startsWith('idle'), at = looping ? time % clip.duration : Math.min(time, clip.duration);
     // A native poser already rebuilt this frame's base; restoring last frame's
     // cached layer base here would freeze its otherwise untracked gait joints.
-    if (!freshBase) this.active?.restore();
+    if (!freshBase && this.biped === undefined) this.active?.restore();
     const tracks = clip.tracks;
     for (let index = 0; index < tracks.length; index++) {
       const track = tracks[index]; if (track === undefined) throw new Error('Missing skin track');
@@ -204,7 +215,12 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
       for (const [name, bone] of Object.entries(c.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative skin joint ${name}`);
       return;
     }
-    let driver = drivers.get(c.bones); if (driver === undefined) { driver = new SkinDriver(select(c.animal.variant), c.bones); drivers.set(c.bones, driver); } driver.step(c, quadruped);
+    let driver = drivers.get(c.bones);
+    if (driver === undefined) {
+      driver = new SkinDriver(select(c.animal.variant), c.bones, species.body?.skeleton);
+      drivers.set(c.bones, driver);
+    }
+    driver.step(c, quadruped);
   };
   return { id: row.id, species: species.id, kind: species.kind, rig: quadruped ? 'quadruped' : 'custom', fur: NO_FUR,
     rigContract: { skeleton: quadruped ? 'kit.quadruped' : skin.skeleton, sockets: [...skin.sockets], clips: [...skin.clips.keys()] },

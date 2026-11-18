@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { Box3, MeshStandardMaterial, Vector3 } from 'three';
+import { Box3, Group, MeshStandardMaterial, SkinnedMesh, Vector3 } from 'three';
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { CREATURE_SKELETONS, MIN_VOLUME_RADIUS } from '@wildshard/format/creatureSkeletons';
@@ -11,8 +11,10 @@ import { Animal } from '../src/client/engine/entities/AnimalView';
 import type { SkyRig as Sky } from '@wildshard/engine/world/skyRig';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
+import { NeighbourLife } from '../src/client/game/grid/neighbourLife';
 import { loadClientSkins, skinSpeciesLook } from '../src/client/game/shardfile/clientSkins';
 import { creatureVolumeFixture } from './fixtures/creature-volume-skin';
+import { kitView } from './fixtures/kit-view';
 
 const rapier = loadRapier(readFileSync('public/assets/physics/rapier.wasm')), hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const original = new Uint8Array(readFileSync(new URL('./fixtures/kit-humanoid.glb', import.meta.url)));
@@ -20,12 +22,14 @@ const Doc = v.object({ nodes: v.array(v.object({ name: v.optional(v.string()) })
 const length = new DataView(original.buffer).getUint32(12, true), doc = v.parse(Doc, JSON.parse(new TextDecoder().decode(original.subarray(20, 20 + length))));
 const joints = doc.skins[0]?.joints.map(index => doc.nodes[index]?.name);
 const sockets = ['head', 'hand.L', 'hand.R', 'chest', 'back'];
+const humanoidDims = { bodyY: .84, bodyHalfLen: .12, bodyRadius: .25, headRadius: .3082207035326514,
+  legLen: .84, halfWidth: .25, feet: [[.14, .1], [-.14, .1]] as [number, number][] };
 
 test.each([.5, 1, 2].flatMap(scale => sockets.map(socket => ({ scale, socket }))))('actual Kit humanoid loads at $scale through socket $socket', async ({ scale, socket }) => {
   const { source } = await creatureVolumeFixture(), species = source.rows.species[0], look = source.rows.looks[0];
   if (species === undefined || look === undefined) throw new Error('Missing normal fixture rows');
   species.body = { skeleton: 'biped', size: 'medium', scale, look: look.id, lock: [socket] };
-  species.dims = { bodyY: .84, bodyHalfLen: .12, bodyRadius: .25, headRadius: .3082207035326514, legLen: .84, halfWidth: .25, feet: [[.14, .1], [-.14, .1]] };
+  species.dims = humanoidDims;
   const glb = original.slice(), file = hash(glb), cost = parseGlbData(glb);
   expect(file).toBe('2aeff55167b63543bb4215842fafd439b89dc4fc5e3a4e42c3be4c1cbc955ddb');
   const metadata = new TextEncoder().encode(JSON.stringify({ row: { id: 'fixture.humanoid', file, family: 'pbr', cost,
@@ -82,4 +86,78 @@ test.each([.5, 1, 2].flatMap(scale => sockets.map(socket => ({ scale, socket }))
     }
     expect(sim.host.entities.size).toBe(1); expect(glb).toEqual(original);
   } finally { view?.mesh.skeleton.dispose(); view?.mesh.removeFromParent(); sim.dispose(); scope.dispose(); }
+});
+
+test('the actual clipless biped swings alternating legs and returns to bind on idle', async () => {
+  const f = await kitView(original, 'biped', humanoidDims, await rapier);
+  try {
+    const left = f.rig.bones['thigh.L'], right = f.rig.bones['thigh.R'];
+    if (left === undefined || right === undefined) throw new Error('Missing canonical thighs');
+    f.actor.levelGround = true;
+    f.actor.speed = 1.5;
+    f.actor.state = 'flee';
+    const before = f.actor.snapshot();
+    const swing: number[] = [];
+    for (let frame = 0; frame < 120; frame++) {
+      f.view.update(1 / 60, frame / 60, true);
+      swing.push(left.rotation.x);
+      expect(left.rotation.x + right.rotation.x).toBeCloseTo(0, 6);
+    }
+    expect(Math.min(...swing)).toBeLessThan(-.25);
+    expect(Math.max(...swing)).toBeGreaterThan(.25);
+    expect(f.actor.snapshot()).toEqual(before);
+    f.actor.speed = 0;
+    f.actor.state = 'idle';
+    f.view.update(1 / 60, 2, true);
+    expect(left.rotation.x).toBeCloseTo(0, 6);
+    expect(right.rotation.x).toBeCloseTo(0, 6);
+  } finally { f.dispose(); }
+});
+
+test('an owned biped walk clip takes the whole pose and returns to bind at the next idle', async () => {
+  const walk = new Uint8Array(readFileSync(new URL('./fixtures/kit-biped-walk.glb', import.meta.url)));
+  const f = await kitView(walk, 'biped', humanoidDims, await rapier);
+  try {
+    const left = f.rig.bones['thigh.L'], right = f.rig.bones['thigh.R'];
+    if (left === undefined || right === undefined) throw new Error('Missing canonical thighs');
+    f.actor.levelGround = true;
+    f.actor.speed = 1.5;
+    f.actor.state = 'flee';
+    for (let frame = 0; frame < 120; frame++) {
+      f.view.update(1 / 60, frame / 60, true);
+      expect(left.rotation.x).toBeCloseTo(.42, 6);
+      expect(right.rotation.x).toBe(0);
+    }
+    f.actor.speed = 0;
+    f.actor.state = 'idle';
+    f.view.update(1 / 60, 2, true);
+    expect(left.rotation.x).toBe(0);
+  } finally { f.dispose(); }
+});
+
+test('an entered cell uses the same clipless biped fallback on the published actor row', async () => {
+  const f = await kitView(original, 'biped', humanoidDims, await rapier);
+  const scope = new Scope('kit-neighbour'), root = new Group();
+  try {
+    const actor = f.actor, slug = f.source.identity.slug;
+    const life = new NeighbourLife({ scope, active: () => true, simulation: () => ({ host: { entities: {
+      get: id => id === actor.entityId ? { position: actor.position, yaw: actor.yaw, scale: actor.scale, speed: actor.speed,
+        strafe: actor.strafe, alive: actor.alive, attackPhase: actor.attackPhase, state: actor.state, hp: actor.hp, flinch: 0 } : undefined,
+    } } }) });
+    await life.admit({ instance: slug, slug, cell: [0, 0], origin: { x: 0, y: 0, z: 0 } }, root, f.source, f.assets,
+      () => new MeshStandardMaterial(), new Map());
+    const mesh = root.children.find(node => node instanceof SkinnedMesh);
+    if (!(mesh instanceof SkinnedMesh)) throw new Error('Missing entered-cell biped');
+    const thigh = mesh.skeleton.bones.find(bone => bone.name === 'thigh.L');
+    if (thigh === undefined) throw new Error('Missing entered-cell thigh');
+    f.actor.speed = 1.5;
+    f.actor.state = 'flee';
+    const swing: number[] = [];
+    for (let frame = 0; frame < 120; frame++) {
+      life.late(1 / 60);
+      swing.push(thigh.rotation.x);
+    }
+    expect(Math.min(...swing)).toBeLessThan(-.25);
+    expect(Math.max(...swing)).toBeGreaterThan(.25);
+  } finally { scope.dispose(); f.dispose(); }
 });

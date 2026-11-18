@@ -123,7 +123,7 @@ export class NeighbourLife {
       const skin = look === undefined ? undefined : skins.get(look.id);
       if (spawn === undefined || species === undefined || skin === undefined) continue; // a non-skin look has no neighbour view yet
       const selected = clientVariantSkin(skin, spawn.variant);
-      const { mesh, bones } = skinMesh(selected), driver = new SkinDriver(selected, bones);
+      const { mesh, bones } = skinMesh(selected), driver = new SkinDriver(selected, bones, species.body?.skeleton);
       const scale = creatureScale(species.body, spawn.scale);
       // a hand-made row (a test's) may carry no variants or head size: the bar then reads the row's own hp as its full
       const variants: readonly { id: string; label: string; hp: number }[] = Array.isArray(species.variants) ? species.variants : [];
