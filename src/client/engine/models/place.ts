@@ -565,7 +565,7 @@ function* drawMergedSteps<P extends object>(def: ModelDef<P>, pls: readonly Plac
   let cull: ((camera: THREE.Camera) => void) | null = null, cullWith: Drawn['cullWith'] = null;
   if (levels > 1 || o.cull?.far !== undefined) {
     const c = new CellCull(cellLevels, Float32Array.from(centres), levelsOf(def), o.cull ?? {});
-    cull = (camera) => { c.update(camera); }; cullWith = (f, e) => { c.updateWith(f, e); };
+    ({ cull, cullWith } = cullersOf(c));
   }
   return { object: wrap(objects, def.id), drawnAs: 'merged', colliders, boxes, cull, cullWith };
 }
@@ -592,6 +592,18 @@ function envelopeOf(boxes: Float32Array, indices: Iterable<number>): THREE.Box3 
   const box = new THREE.Box3();
   for (const i of indices) box.union(_envelopeCopy.set(_envelopeMin.fromArray(boxes, i * 6), _envelopeMax.fromArray(boxes, i * 6 + 3)));
   return box;
+}
+
+/** A culler's two entry points (MEMORY-GATES MG9). Made here, their closures hold the culler alone; made inside a draw,
+ *  they held that draw's whole frame for the placed model's life, every copy's placement and pose among it (Pine Hollow's
+ *  22,250 floor-cover copies and 918 trees: 44,000 matrices and their numbers, about 20 MB of JS heap at control). */
+function cullersOf(c: { update: (camera: THREE.Camera) => void; updateWith: (frustum: THREE.Frustum, eye: THREE.Vector3) => void }): { cull: NonNullable<Drawn['cull']>; cullWith: NonNullable<Drawn['cullWith']> } {
+  return { cull: (camera) => { c.update(camera); }, cullWith: (f, e) => { c.updateWith(f, e); } };
+}
+
+/** Each copy's culling bounds: posed part spheres, or the spheres of its world boxes. */
+function copyBounds(kind: string | undefined, built: readonly (readonly (readonly ModelPart[])[])[], of: ArrayLike<number>, poses: readonly Pose[], boxes: Float32Array): Float32Array {
+  return kind === 'sphere' ? posedSpheres((i) => built[of[i] ?? 0]?.[0] ?? [], poses) : spheresOf(boxes);
 }
 
 /** The instanced draw, pausing (`yield`) after every variant level built and every copy's colliders (op-hitch29: `placeSliced`). */
@@ -694,20 +706,21 @@ function* drawInstancedSteps<P extends object>(def: ModelDef<P>, pls: readonly P
    *  variants sharing a level's shape share the same buffers */
   const groups = keyAt.map((key) => made.get(key) ?? []);
   let cull: ((camera: THREE.Camera) => void) | null = null, cullWith: Drawn['cullWith'] = null;
-  const bounds = (): Float32Array => (o.cull?.bounds === 'sphere' ? posedSpheres((i) => built[of[i] ?? 0]?.[0] ?? [], poses) : spheresOf(boxes));
+  // computed here, not in a closure: the cullers' closures share this frame, and one naming `poses` kept every copy's pose
+  const bounds = setMode || (culls && o.cull?.cells === undefined) ? copyBounds(o.cull?.bounds, built, of, poses, boxes) : null;
   const cells = o.cull?.cells;
-  if (setMode) {
-    const c = new SetCull(byLevel, n, bounds(), levelsOf(def), o.cull ?? {}, originsOf(pls, o));
-    cull = (camera) => { c.update(camera); }; cullWith = (f, e) => { c.updateWith(f, e); };
+  if (setMode && bounds !== null) {
+    const c = new SetCull(byLevel, n, bounds, levelsOf(def), o.cull ?? {}, originsOf(pls, o));
+    ({ cull, cullWith } = cullersOf(c));
   } else if (culls && cells !== undefined) {
     const c = new CelledCopiesCull(groups, levels, of, matrices, colors, pointsOf(pls), levelsOf(def), { ...o.cull, cells });
-    cull = (camera) => { c.update(camera); }; cullWith = (f, e) => { c.updateWith(f, e); };
-  } else if (culls) {
+    ({ cull, cullWith } = cullersOf(c));
+  } else if (culls && bounds !== null) {
     // `casters`: each choice reads the casting cascades' frusta (a cascade's getFrustum rebuilds its footprint: once a choice)
     const casting = o.cull?.casters === undefined ? undefined : (): THREE.Frustum[] => o.ctx.sky.csm.lights.filter((l) => l.castShadow).map((l) => l.shadow.getFrustum());
-    const c = new InstancedCull(groups, levels, of, matrices, colors, bounds(), levelsOf(def), o.cull ?? {}, originsOf(pls, o), fadesOf(def), casting,
+    const c = new InstancedCull(groups, levels, of, matrices, colors, bounds, levelsOf(def), o.cull ?? {}, originsOf(pls, o), fadesOf(def), casting,
       scales.some((k) => k !== 1) ? scales : null);
-    cull = (camera) => { c.update(camera); }; cullWith = (f, e) => { c.updateWith(f, e); };
+    ({ cull, cullWith } = cullersOf(c));
   }
   return { object: wrap(objects, def.id), drawnAs: 'instanced', colliders, boxes, cull, cullWith };
 }
@@ -891,7 +904,7 @@ function drawBatched<P extends object>(def: ModelDef<P>, pls: readonly Placement
   if (o.cull !== undefined || levels > 1) {
     const bounds = o.cull?.bounds === 'sphere' ? posedSpheres((i) => built[of[i] ?? 0]?.[0] ?? [], poses) : spheresOf(boxes);
     const c = new BatchedCull(slots, start, bounds, levelsOf(def), o.cull ?? {}, originsOf(pls, o), fadesOf(def));
-    cull = (camera) => { c.update(camera); }; cullWith = (f, e) => { c.updateWith(f, e); };
+    ({ cull, cullWith } = cullersOf(c));
   }
   return { object: wrap([...new Set(batches.map((b) => b.bm))], def.id), drawnAs: 'batched', colliders, boxes, cull, cullWith };
 }
@@ -1348,13 +1361,16 @@ function* placeSteps<P extends object>(def: ModelDef<P>, placements: readonly Pl
   const { boxes } = drawn;
   const extra = o.piece?.colliders;
   if (extra !== undefined) drawn.colliders = [...drawn.colliders, ...extra];
-  // where each copy stands, for `nearest` (float64: exact) — the placements themselves are not kept alive
-  const points = new Float64Array(placements.length * 3);
+  // where each copy stands, for `nearest` (float64: exact) — the placements themselves are not kept alive: no closure
+  // below names `placements`, `poses` or `params` (MG9: a closure that did held every copy's placement and pose for the
+  // life of the record, 22,250 floor-cover copies on Pine)
+  const copies = placements.length, firstParams = params[0];
+  const points = new Float64Array(copies * 3);
   placements.forEach((pl, i) => { points[i * 3] = pl.x; points[i * 3 + 1] = pl.y; points[i * 3 + 2] = pl.z; });
   let registered: Promise<void> = Promise.resolve();
   const placed: Placed = {
     get registered(): Promise<void> { return registered; },
-    model: def.id, object: drawn.object, colliders: drawn.colliders, copies: placements.length, drawnAs: drawn.drawnAs,
+    model: def.id, object: drawn.object, colliders: drawn.colliders, copies, drawnAs: drawn.drawnAs,
     cull: drawn.cull ?? ((): void => undefined),
     copyBox: (i, target) => {
       target.min.set(boxes[i * 6] ?? 0, boxes[i * 6 + 1] ?? 0, boxes[i * 6 + 2] ?? 0);
@@ -1403,7 +1419,7 @@ function* placeSteps<P extends object>(def: ModelDef<P>, placements: readonly Pl
       });
     }
     const pc = o.piece ?? {};
-    if (pc.follows === 'copy') followCopy(def, placements.length, params[0], o, drawn);
+    if (pc.follows === 'copy') followCopy(def, copies, firstParams, o, drawn);
     const pieceId = pc.id ?? (first ? def.id : `${def.id}#${rec.groups.length}`), split = pc.split;
     // OP4: in play (a grid cell built on the road) a split piece registers LIVE_SPLIT_EVERY colliders at a time and
     // yields once the frame's shared build budget is spent: the loading budget's 90-150 hulls a task (Rapier's
