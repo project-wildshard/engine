@@ -33,6 +33,8 @@ import {lendFrozenPasture as lendNalatiRiding} from '../frozen/runtimePrograms';
 // the corrected law is re-recorded with the same seeds, mode coverage, tick counts and repeat-run checks.
 // NL13b4 (J280): a grounded sideways move on flat static support starts 0.5 mm clear of the floor; with that lift switched
 // off all eight old chains match, and the new law is re-recorded the same way.
+// NL14b2 (J280): grounded feet on a terrain bank against a wall start the move two skins off the bank (`slideOffBank`); with
+// that retry switched off all eight old chains match, and the new law is re-recorded the same way.
 
 const TICKS = 40_000, HASH_EVERY = 500, SEGMENT = 900;
 const BASELINE = 'test/fixtures/motion-trace/seven-traces.json', RECORDING = process.env['MOTION_TRACE_RECORD'] === '1';

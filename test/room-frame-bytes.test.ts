@@ -78,12 +78,14 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
  *  GC36 (J322, no walls): Nalati's bake holds untagged chunk-edge walls, which no world stands now. Re-taken for
  *  NET-LAG NL13 (J280): partial stalls retry, and grounded flat support starts from its measured skin plane. Re-taken for
  *  NL13b4 (J280): a grounded sideways move on flat static support starts 0.5 mm clear of the floor (old law: 53c0f3a2). Re-taken
- *  for ONE-FORMAT CC28a (wire 1.1): every animal row carries four actor channels and its lock answer (old: ec2c462e). */
-const EXPECTED = '3c1af4b645a18e97553bd8851e983c860506362fbfe600154d1950f0613773b0';
+ *  for ONE-FORMAT CC28a (wire 1.1): every animal row carries four actor channels and its lock answer (old: ec2c462e). Re-taken
+ *  for NL14b2 (J280): grounded feet on a terrain bank against a wall start two skins off the bank (old law: 3c1af4b6). */
+const EXPECTED = 'ba1c11874f2806b95ab322fd3c4f9de9b3c82e1e96d100d273423fe83ff91e10';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
  *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. Re-taken
  *  for RP6 as above. Re-taken for GC36 and NL13 as above. Re-taken for Nalati continuation af0adf3f:
  *  the King now owns its native contact pose, and adapter state retains it and the view guest clocks/globals.
  *  The unarmed wire/body oracle above remains unchanged. Previous armed digest: b891e9d2451520250c7540b96103e86fea17bf710418e784519058e4ea2c829a.
- *  Re-taken for NL13b4 as above (old law: cd2d9048). Re-taken for CC28a as above (old: f231d52d). */
-const EXPECTED_ROOM = '9b5c9aad8d0460f6de9246609b8e735b713b57c84a0bcb06b02ae37fa8c0f03e';
+ *  Re-taken for NL13b4 as above (old law: cd2d9048). Re-taken for CC28a as above (old: f231d52d). Re-taken for NL14b2 as
+ *  above (old law: 9b5c9aad). */
+const EXPECTED_ROOM = '620028c677c7c4a6d2a9d17f9c474197ea50e110d4a4464a8007e0e825aaeb4b';

@@ -73,7 +73,7 @@ const DECK_REACH = 0.1;
  */
 const REST_LIFT = 0.0005;
 const UP = { x: 0, y: 1, z: 0 } as const;
-const SLOPE_CONTACT = 1, WALL_CONTACT = 2;
+const SLOPE_CONTACT = 1, WALL_CONTACT = 2, BANK_CONTACT = 4;
 
 export interface MoveResult {
   grounded: boolean;
@@ -281,12 +281,49 @@ export class CharacterMotor {
       const hit = this.kcc.computedCollision(i, scratch);
       if (hit === null || hit.collider === null) return null;
       const { collider, normal1, toi } = hit, parent = collider.parent();
-      if (isTerrainCollider(collider) || (parent !== null && !parent.isFixed())
-          || ((collider.collisionGroups() >>> 16) & GROUP.WORLD) === 0) return null;
+      if ((parent !== null && !parent.isFixed()) || ((collider.collisionGroups() >>> 16) & GROUP.WORLD) === 0) return null;
+      // NL14b2: terrain beside a wall is a bank (`slideOffBank`)
+      if (isTerrainCollider(collider)) {
+        if (toi <= reach && normal1.y >= 0.1) contacts |= BANK_CONTACT;
+        continue;
+      }
       if (toi <= reach && normal1.y >= climb && normal1.y < 0.999999) contacts |= SLOPE_CONTACT;
       if (Math.abs(normal1.y) < 0.1) contacts |= WALL_CONTACT;
     }
     return contacts;
+  }
+
+  /**
+   * NET-LAG NL14b2: feet on a terrain bank against a wall meet both inside the skin at time 0, and the controller slides off
+   * whichever its query tree visits first. The page's world and the room's never build that tree alike, so the same step
+   * from the same state parted: on Driftwood's ramp under the cove cliff the two alternated 3 to 5 cm out of step every tick
+   * and corrected sprints. Start the move high enough that the bank is two skins away (a wall stands as close as before, so
+   * only the wall is at time 0), and fall back onto the bank inside the move. The bank is measured from the capsule, not
+   * from the tie's contacts. On a bank too steep to climb, what pushes into it is dropped, so it is not climbed.
+   */
+  private slideOffBank(feet: Vec3, want: Vec3, predicate: ((collider: Collider) => boolean) | undefined): Vec3 | null {
+    const { R, world } = this.physics, start = this.translation, skin = this.kcc.offset(), flags = R.QueryFilterFlags.EXCLUDE_SENSORS;
+    // the bank the feet lean on: the terrain point nearest the capsule's lower sphere. The contacts' normals came from the tie
+    // itself, and a ray under the feet finds the floor below them, not the bank at their side.
+    const centre = this.probe; centre.x = feet.x; centre.y = feet.y + this.opts.radius; centre.z = feet.z;
+    const near = world.projectPoint(centre, true, flags, this.filter, this.collider, undefined, isTerrainCollider);
+    if (near === null || near.isInside) return null;
+    const bank = this.bank, nx = centre.x - near.point.x, ny = centre.y - near.point.y, nz = centre.z - near.point.z, gap = Math.hypot(nx, ny, nz);
+    if (gap < 1e-6 || gap > this.opts.radius + 2 * skin) return null;
+    bank.x = nx / gap; bank.y = ny / gap; bank.z = nz / gap;
+    if (bank.y < 0.1) return null;
+    const lift = 2 * skin / bank.y;
+    if (world.castShape(start, this.rot, UP, this.collider.shape, 0, lift, false, flags, this.filter, this.collider, undefined, predicate) !== null) return null;
+    start.y += lift;
+    this.collider.setTranslation(start);
+    const move = this.droppedWant(want, lift, bank.y < Math.cos(this.kcc.maxSlopeClimbAngle()));
+    const impulses = this.kcc.applyImpulsesToDynamicBodies();
+    this.kcc.setApplyImpulsesToDynamicBodies(false);
+    try { this.kcc.computeColliderMovement(this.collider, move, flags, this.filter, predicate); }
+    finally { this.kcc.setApplyImpulsesToDynamicBodies(impulses); }
+    const retry = this.kcc.computedMovement(this.retryMovement ??= { x: 0, y: 0, z: 0 });
+    retry.y += lift;
+    return retry;
   }
 
   /** Re-run a slide from one skin higher, with gravity left to the snap.
@@ -428,8 +465,10 @@ export class CharacterMotor {
     }
     let grounded = this.kcc.computedGrounded();
     if (!ignoreGround && this.opts.group === 'PLAYER' && this.opts.length === undefined && lifted === 0 && r.grounded
-        && want.y < 0 && movedH < wantH * 0.99 && this.staticContacts() === (SLOPE_CONTACT | WALL_CONTACT)) {
-      const retry = this.slideAboveSlope(want, pred);
+        && want.y < 0) {
+      const contacts = this.staticContacts();
+      const retry = contacts === (SLOPE_CONTACT | WALL_CONTACT) && movedH < wantH * 0.99 ? this.slideAboveSlope(want, pred)
+        : contacts === (BANK_CONTACT | WALL_CONTACT) ? this.slideOffBank(feet, want, pred) : null;
       if (retry !== null) { m = retry; grounded = true; }
     }
     feet.x += m.x; feet.y += m.y + lifted; feet.z += m.z;
@@ -482,6 +521,15 @@ export class CharacterMotor {
 
   private readonly flatScratch: Vec3 = { x: 0, y: 0, z: 0 };
   private flatWant(want: Vec3): Vec3 { this.flatScratch.x = want.x; this.flatScratch.y = 0; this.flatScratch.z = want.z; return this.flatScratch; }
+  /** The move with its fall and the fall back from `lift` (no snap holds feet on a bank too steep to climb); a `steep` bank
+   *  takes no part of the move that pushes into it. */
+  private droppedWant(want: Vec3, lift: number, steep: boolean): Vec3 {
+    const { bank } = this, h = Math.hypot(bank.x, bank.z) || 1, ux = bank.x / h, uz = bank.z / h, into = steep ? Math.min(0, want.x * ux + want.z * uz) : 0;
+    this.flatScratch.x = want.x - into * ux; this.flatScratch.y = want.y - lift; this.flatScratch.z = want.z - into * uz;
+    return this.flatScratch;
+  }
+  /** the bank `slideOffBank` measured: its outward normal */
+  private readonly bank: Vec3 = { x: 0, y: 1, z: 0 };
 
   /** let go of whatever the feet ride (a teleport) */
   release(): void { this.anchorBody = null; }
