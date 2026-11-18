@@ -26,3 +26,6 @@ Land fix: the isolated full gate gave corepack an empty home, so npr's tool
 install ran pnpm 12.21.0 (no `packageManager` above its cache), which ignores
 `pnpm.overrides` and refused the bin-deps lock. `land-local-gate.mjs` now seeds
 corepack's last-known-good with the repo's own pnpm.
+
+The client-plan fixture runtime cost now names memory epoch 3: format 0.34+
+refuses an epoch-1 reading as stale (`shardfile-full-check` J370 test).
