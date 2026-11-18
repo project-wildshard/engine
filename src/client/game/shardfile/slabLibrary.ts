@@ -413,8 +413,15 @@ export class SlabLibrary {
     // soon as its last one is read, so the bank holds at most one key's copy at a time beside what it has read
     const rows = chunksOf(entry), merged = this.mergedKeys(entry), lastOf = new Map<string, number>();
     for (const [index, chunk] of rows.entries()) if (merged.has(chunk.key)) lastOf.set(chunk.key, index);
+    // a chunk left unmerged takes the leaf tree an unmerged key's chunk takes on its read (`readSlabChunks`)
     const keepChunks = (parts: readonly BufferGeometry[]): void => {
-      for (const part of parts) { ownSceneResource(part, scope); if (TIER_CONFIG.slabRanges) { LATE.add(part); facedTree(part); } }
+      for (const part of parts) {
+        ownSceneResource(part, scope);
+        if (!TIER_CONFIG.slabRanges) continue;
+        if (tilesSettling()) LATE.add(part);
+        else { const ranges = spatialSlabRanges(part); if (ranges !== null) RANGES.set(part, ranges); }
+        facedTree(part);
+      }
     };
     const mergeRun = (at: readonly number[]): void => {
       const parts = at.map(index => chunks[index] ?? null).filter(part => part !== null);
