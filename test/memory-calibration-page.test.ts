@@ -24,8 +24,9 @@ const server = createServer((request, response) => {
   response.writeHead(200, { 'content-type': 'text/html' }).end(PAGE);
 });
 const useWebkit = process.env['WS_CALIB_CHROMIUM'] !== '1' && existsSync(webkit.executablePath());
-// a CI job whose share has no Playwright browser installed skips; the Mac pre-push runs it (BROWSER_TESTS)
-const noBrowser = !useWebkit && !existsSync(chromium.executablePath());
+// Hosted shares can cache full Chromium without Playwright's separate headless shell.
+const chromiumExecutable = chromium.executablePath();
+const noBrowser = !useWebkit && !existsSync(chromiumExecutable);
 type Browser = Awaited<ReturnType<typeof chromium.launch>>;
 let browser: Browser | undefined;
 let base = '';
@@ -34,9 +35,17 @@ beforeAll(async () => {
   if (noBrowser) return;
   await new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve); });
   base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/memory-calibration.html`;
-  browser = useWebkit ? await webkit.launch({ headless: true }) : await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS] });
+  browser = useWebkit
+    ? await webkit.launch({ headless: true })
+    : await chromium.launch({ executablePath: chromiumExecutable, headless: true, args: [...KEYCHAIN_ARGS] });
 });
-afterAll(async () => { if (browser) { await browser.close(); server.close(); } });
+afterAll(async () => {
+  try {
+    await browser?.close();
+  } finally {
+    if (server.listening) server.close();
+  }
+});
 
 interface Calib { done: boolean; got: number; tour: { at: number; kind: string | null; got: number; results: Record<string, { got: number; ended: string }> } | null }
 const calib = async (page: Awaited<ReturnType<Browser['newPage']>>): Promise<Calib | null> => {
