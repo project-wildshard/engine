@@ -264,6 +264,8 @@ export interface ClassicGraphOptions extends Omit<EmitGraphGlslOptions, 'toon'> 
 }
 
 /** a program that reads a model-space position or offsets one decodes a tile primitive's grid (RM8.1e) */
+/** the codec terms of a graph's vertex position output and object origin (`glsl.ts`, OF-EM28b3) */
+const POSITION_DECODE = /(?: - wsCodecOrigin\) \/ wsCodecStep\)| - wsCodecOrigin \/ wsCodecStep, 1\.0\))/gu;
 const readsCodec = (vertexShader: string): boolean => /\bwsCodec(Step|Origin)\b/.test(vertexShader.slice(vertexShader.indexOf('void main()')));
 /** a mesh without a declared attribute reads its default, else TSL's attribute() constant (three's generateConst: zeros,
  *  a vec4 as a new Vector4, 0, 0, 0, 1), never the generic value the last draw left at that location */
@@ -303,7 +305,9 @@ function shaderMaterial(glsl: GraphGlsl, opts: GraphShaderOptions): GraphShaderM
   m.gateCascades();
   m.name = outline ? 'graph:outline' : `graph:${ir.kind}`;
   if (readsCodec(shaders.vertexShader)) m.codec = new ClassicCodec();
-  m.positionGridCompatible = m.codec === null && !readsObjectOrigin(ir.nodes);
+  // OF-EM28b3: a vertex position or object origin decodes through the codec too, but a normalized draw grid (the phone's
+  // packed static parts) reads step 1 and origin 0 there, as before: only the other codec reads keep a graph off it
+  m.positionGridCompatible = !readsCodec(shaders.vertexShader.replaceAll(POSITION_DECODE, '')) && !readsObjectOrigin(ir.nodes);
   m.instanceColour = readsInstanceColour(ir.nodes);
   m.readsVertexColour = readsVertexColour(ir.nodes);
   m.defaultAttributeValues = attributeDefaults(glsl, m);

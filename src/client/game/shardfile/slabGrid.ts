@@ -17,6 +17,8 @@ export interface SlabGrid { readonly origin: readonly [number, number, number]; 
 
 /** the finest grid step (m): 3.9 mm, so a vertex moves at most 2 mm; a chunk up to 256 m across keeps it */
 export const SLAB_GRID_STEP: number = 2 ** -8;
+/** the coarsest (a vertex within 7.8 mm, under the 1 cm parity line; a chunk up to 1 km across): a wider one stays float */
+export const SLAB_GRID_COARSEST: number = 2 ** -6;
 const MOST = 32767;
 /** the gridded positions (kept on the CPU for the leaf trees, far levels and picking) and the worker's widened copy */
 const GRID_POSITIONS: OwnedLabel = { owner: 'engine/slab-grid', asset: 'slab-position', kind: 'geometry-cpu' };
@@ -30,14 +32,15 @@ export function slabGrid(geometry: BufferGeometry): SlabGrid | undefined { retur
  *  merge, so only chunks on one grid merge (`mergeSlabChunks`) */
 export function markSlabGrid(geometry: BufferGeometry, grid: SlabGrid): void { GRIDS.set(geometry, grid); }
 
-/** the coarsest-needed grid holding the box `min`..`max`: the finest power-of-two step at least `SLAB_GRID_STEP` whose
- *  16-bit range about the snapped middle covers it */
-export function slabGridFor(min: readonly number[], max: readonly number[]): SlabGrid {
-  for (let step = SLAB_GRID_STEP; ; step *= 2) {
+/** the grid holding the box `min`..`max`: the finest power-of-two step at least `SLAB_GRID_STEP` whose 16-bit range
+ *  about the snapped middle covers it; null past `SLAB_GRID_COARSEST` */
+export function slabGridFor(min: readonly number[], max: readonly number[]): SlabGrid | null {
+  for (let step = SLAB_GRID_STEP; step <= SLAB_GRID_COARSEST; step *= 2) {
     const at = (axis: number): number => Math.round(((min[axis] ?? 0) + (max[axis] ?? 0)) / 2 / step) * step;
     const origin: [number, number, number] = [at(0), at(1), at(2)];
     if ([0, 1, 2].every(axis => Math.max((origin[axis] ?? 0) - (min[axis] ?? 0), (max[axis] ?? 0) - (origin[axis] ?? 0)) / step <= MOST)) return { origin, step };
   }
+  return null;
 }
 
 /**
@@ -63,7 +66,9 @@ export function gridSlabPositions(geometry: BufferGeometry): SlabGrid | null {
     const xyz = position.array, min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
     for (let at = 0; at < xyz.length; at++) { const value = xyz[at] ?? 0, axis = at % 3; if (value < (min[axis] ?? 0)) min[axis] = value; if (value > (max[axis] ?? 0)) max[axis] = value; }
     if (![...min, ...max].every(Number.isFinite)) return null;
-    grid = slabGridFor(min, max); words = ownedArray(Int16Array, position.count * 4, GRID_POSITIONS);
+    const fits = slabGridFor(min, max);
+    if (fits === null) return null;
+    grid = fits; words = ownedArray(Int16Array, position.count * 4, GRID_POSITIONS);
     const { origin: [ox, oy, oz], step } = grid;
     for (let v = 0; v < position.count; v++) {
       words[v * 4] = Math.round(((xyz[v * 3] ?? 0) - ox) / step); words[v * 4 + 1] = Math.round(((xyz[v * 3 + 1] ?? 0) - oy) / step);

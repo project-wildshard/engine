@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { BufferAttribute, BufferGeometry, InstancedMesh, Matrix4, MeshBasicMaterial, PerspectiveCamera, Raycaster, Vector3 } from 'three';
-import { gridSlabPositions, markSlabGrid, placeSlabPart, SLAB_GRID_STEP, slabFarCells, slabGrid, slabGridFor, slabXyz } from './slabGrid';
+import { gridSlabPositions, markSlabGrid, placeSlabPart, SLAB_GRID_STEP, slabFarCells, slabGrid, slabGridFor, slabXyz, type SlabGrid } from './slabGrid';
 import { mergeSlabChunks } from './slabMerge';
 import { slabFarLevels, spatialSlabRanges, visibleSlabDraws, SLAB_LEAF_TRIANGLES, type SlabDraws } from './slabRanges';
 
@@ -54,14 +54,19 @@ test('positions decode within half a step (2 mm), under 1 cm; a chunk past 256 m
   for (let at = 0; at < metres.length; at++) worst = Math.max(worst, Math.abs((decoded[at] ?? 0) - (metres[at] ?? 0)));
   expect(worst).toBeLessThanOrEqual(SLAB_GRID_STEP / 2 + 1e-5); expect(worst).toBeLessThan(0.01);
   const wide = slabGridFor([-150, 0, 0], [150, 10, 10]);
-  expect(wide.step).toBe(SLAB_GRID_STEP * 2);
-  expect(slabGridFor([-400, 0, 0], [400, 0, 0]).step).toBe(SLAB_GRID_STEP * 4);
+  expect(wide?.step).toBe(SLAB_GRID_STEP * 2);
+  expect(slabGridFor([-400, 0, 0], [400, 0, 0])?.step).toBe(SLAB_GRID_STEP * 4);
+  // past a kilometre a vertex would move over 1 cm: the chunk stays float
+  expect(slabGridFor([-600, 0, 0], [600, 0, 0])).toBeNull();
+  const huge = new BufferGeometry(); huge.setAttribute('position', new BufferAttribute(Float32Array.of(-600, 0, 0, 600, 0, 0, 0, 1, 0), 3));
+  expect(gridSlabPositions(huge)).toBeNull(); expect(huge.getAttribute('position').array).toBeInstanceOf(Float32Array);
 });
 
 test('two chunks on one step share a lattice: a vertex on their seam decodes to one point in both', () => {
   const a = slabGridFor([-95, 120, 40], [95, 130, 42]), b = slabGridFor([60, 118, 41], [250, 129, 45]);
+  if (a === null || b === null) throw new Error('expected grids');
   expect(a.step).toBe(b.step); expect(a.origin).not.toEqual(b.origin);
-  const on = (grid: typeof a, value: number, axis: number): number => Math.round((value - (grid.origin[axis] ?? 0)) / grid.step) * grid.step + (grid.origin[axis] ?? 0);
+  const on = (grid: SlabGrid, value: number, axis: number): number => Math.round((value - (grid.origin[axis] ?? 0)) / grid.step) * grid.step + (grid.origin[axis] ?? 0);
   for (const point of [[60.123456, 121.987654, 41.333333], [94.99, 129.01, 41.9], [77.7, 125.25, 41.0001]]) {
     expect(point.map((value, axis) => on(a, value, axis))).toEqual(point.map((value, axis) => on(b, value, axis)));
   }
