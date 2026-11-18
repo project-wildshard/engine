@@ -63,6 +63,8 @@ function prepareAbilities(host: SimHost, actor: AnimalSim, abilities: ResolvedCr
       ability: ability.clip === undefined ? {} : { clip: ability.clip },
       motion: { speed: ability.speed ?? speed },
       ...(ability.from === undefined ? {} : { from: ability.from }),
+      ...(ability.effect === 'knockback' && ability.strength !== undefined ? { knockbackDistance: ability.strength } : {}),
+      ...(ability.projectile === undefined ? {} : { projectile: ability.projectile }),
     };
     return { min, max, ability, spec };
   });
