@@ -140,6 +140,8 @@ const git=(cwd,args,env=process.env)=>execFileSync('git',args,{cwd,env,encoding:
 /** @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} [env] */
 const tryGit=(cwd,args,env=process.env)=>spawnSync('git',args,{cwd,env,encoding:'utf8',maxBuffer:64<<20});
 
+const NO_CURRENT_PIN_PUBLICATION='no current full pin publication. Run pnpm pins in this worktree and retry';
+
 /** DS22 may commit only after the tracked assets and the full pin publication are present.
  * @param {string} root @param {NodeJS.ProcessEnv} env @returns {string|undefined} */
 function bootStampInputProblem(root,env){
@@ -151,7 +153,7 @@ function bootStampInputProblem(root,env){
  }
  if(!tracked.has(assetPins))return undefined;
  const {paths,key}=verifiedPinsOutputs(root);
- if(key==='')return 'no current full pin publication. Run pnpm pins in this worktree and retry';
+ if(key==='')return NO_CURRENT_PIN_PUBLICATION;
  // verifiedPinsOutputs already validates the manifest and verifies the ledger's mounts by hash.
  // Check completeness too: an old ledger can exist after files under public/assets are removed.
  const manifest=JSON.parse(readFileSync(join(root,PINS_MANIFEST),'utf8'));
@@ -516,11 +518,17 @@ class Landing{
  }
 
  /** DS22: before the gate, run gen:inputs (the pre-push's own first step) and commit the boot stamps it rewrote, on
-  * the plan branch, so branch CI checks them. The generator may not commit, and may not touch anything else. */
- regenerate(){
+  * the plan branch, so branch CI checks them. The generator may not commit, and may not touch anything else.
+  * @param {boolean} pinsRefreshed whether this preflight already ran pnpm pins */
+ regenerate(pinsRefreshed){
   if(!existsSync(join(this.root,GEN[0])))return;
   const before=this.holds('before gen:inputs');
-  const problem=bootStampInputProblem(this.root,this.env);
+  let problem=bootStampInputProblem(this.root,this.env);
+  // A rebase can change the pin key through the validator or installer with every pinned revision unchanged.
+  if(problem===NO_CURRENT_PIN_PUBLICATION&&!pinsRefreshed&&this.pinsOnce(true)){
+   this.holds('after refreshing the pin publication');
+   problem=bootStampInputProblem(this.root,this.env);
+  }
   if(problem!==undefined){
    this.receipt(`STOP boot stamps: ${problem}`);
    throw new StopError(`cannot regenerate boot stamps: ${problem}`);
@@ -909,14 +917,17 @@ class Landing{
  /** gen:inputs refuses a tree whose `out/` lacks the pins' outputs: a worktree that never ran `pnpm pins` has no PINS_LEDGER
   * (opus-gcm11, 2026-11-15), and one rebased past a pin bump holds the old revision (`stalePinFolders`; codex-netlag and
   * opus-publish1, 2026-11-16). Either way `pnpm pins` runs before gen:inputs; with or without --no-preflight, since
-  * gen:inputs needs it either way. */
- pinsOnce(){
+  * gen:inputs needs it either way.
+  * @param {boolean} [refreshPublication] whether the boot check found no current full publication
+  * @returns {boolean} whether pnpm pins ran successfully */
+ pinsOnce(refreshPublication=false){
   /** @type {{pins?:string}} */let scripts={};
-  try{scripts=JSON.parse(readFileSync(join(this.root,'package.json'),'utf8')).scripts??{};}catch{return;}
-  if(scripts.pins===undefined)return;
+  try{scripts=JSON.parse(readFileSync(join(this.root,'package.json'),'utf8')).scripts??{};}catch{return false;}
+  if(scripts.pins===undefined)return false;
   const stale=stalePinFolders(this.root);
-  if(existsSync(join(this.root,PINS_LEDGER))&&stale.length===0)return;
-  this.say('pins',stale.length===0?`no ${PINS_LEDGER}: this worktree never ran pnpm pins; running it before gen:inputs`
+  if(!refreshPublication&&existsSync(join(this.root,PINS_LEDGER))&&stale.length===0)return false;
+  this.say('pins',refreshPublication?'full pin publication is stale or missing; running pnpm pins before gen:inputs'
+   :stale.length===0?`no ${PINS_LEDGER}: this worktree never ran pnpm pins; running it before gen:inputs`
    :`out/ holds pins main no longer names (${stale.map(row=>`${row.folder} revision ${String(row.revision)}`).join(', ')}); running pnpm pins before gen:inputs`);
   const ran=spawnSync('pnpm',['--silent','pins'],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
   if(ran.status!==0){
@@ -925,6 +936,7 @@ class Landing{
    throw new StopError(`pnpm pins failed in ${this.root} (gen:inputs needs its outputs); nothing was pushed: ${why}`);
   }
   this.say('pins',`pnpm pins done; ${PINS_LEDGER} written`);
+  return true;
  }
 
  async run(){
@@ -947,8 +959,7 @@ class Landing{
    this.rebase(main);
    if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return 0;}
   }
-  this.pinsOnce();
-  this.regenerate();
+  this.regenerate(this.pinsOnce());
   if(this.options.mode==='local')return this.runLocal(main);
   this.localChecks(main);
   /** @type {{sha:string,base:string}|null} */let tested=null;
@@ -1008,8 +1019,7 @@ class Landing{
    main=this.fetchMain();
    this.say('moved',`main moved to ${short(main)}; rebase, then verify the prior full proof and incoming delta`);
    this.rebase(main);
-   this.pinsOnce();
-   this.regenerate();
+   this.regenerate(this.pinsOnce());
    // Reuse the directly completed full basis and check the cumulative main
    // delta on later races; never turn a composed receipt into a full basis.
    delta={baseMain:delta?.baseMain??baseMain,testedHead:delta?.testedHead??testedHead,incomingMain:main,head:this.head()};
