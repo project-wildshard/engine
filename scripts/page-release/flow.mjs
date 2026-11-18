@@ -113,87 +113,15 @@ export function pinnedReleaseKey(configured) {
  * @property {boolean} [dryRun]
  * @property {number} [waitMs]  How long `check` waits for the signed serial and /health (default 45 minutes).
  * @property {number} [pollMs]
- * @property {boolean} [afterStagingProofs]  Production go-live: the strict staging proofs passed on this build.
- * @property {readonly JourneyRow[]} [journeys]  Production go-live (SB3): the staging journey runs found for the release
- *   (page-release.mjs reads the journey and sweep reports from `tmp/verify-staging/<browser>/`).
- * @property {SmokeVerdict} [smoke]  Production go-live (meta STAGING-SMOKE SM5, J398): the staging smoke's verdict.json
- *   (`page-release.mjs --smoke=<file>`; `{problem}` when it could not be read).
+ * @property {QaVerdict} [qa]  Production go-live (meta STAGING-QA SQ15, J426-J428): one `staging-qa.mjs` verdict.json for this build,
+ *   the candidate's or live staging's (`page-release.mjs --qa=<file>`; `{problem}` when it could not be read). It replaces
+ *   --after-staging-proofs, verify-staging.sh's journeys and sweeps, and --smoke.
  * @property {string} [releaseKey]  Defaults to RELEASE_PUBLIC_KEY; tests sign with their own.
  * @property {string} [catalogue]  Preview only (SA35): the catalogue the page bakes, staging's borrowed grid (scripts/preview-grid.ts);
  *   default the pinned `test/pins/catalogue.json`.
  */
 
 const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(bytes).digest('hex');
-
-/**
- * One tapped journey run on staging (scripts/journey-proof.mjs): the card, the browser, cold or warm, the build staging
- * served through the whole run (absent when it changed mid-run or could not be read), whether it passed, and when.
- * A card or cold link sweep (scripts/zone-sweep.mjs) names the zones that failed in its own row.
- * @typedef {{card: string, browser: string, run: string, build?: string, ok: boolean, at: string, failed?: readonly string[]}} JourneyRow
- */
-
-/** SB3 (meta STAGING-BUGBASH, J386): production go-live needs the tapped journey passing on staging, on this exact build,
- * for each of these cards in each browser, cold and warm: the journey Jake's phone takes. */
-export const JOURNEY_GATE = Object.freeze({cards: ['driftwood-isle', 'pine-hollow'], browsers: ['chromium', 'webkit'], runs: ['cold', 'warm']});
-
-/** Meta QA-FEEDBACK-2026-11-17 row 21 (Jake: "i have no confidence that each one of the zones in zone select will open"): production
- * go-live also needs every Zone select card and cold link opening on staging on this exact build. */
-export const ZONE_SWEEP_GATE = Object.freeze({browsers: ['chromium']});
-
-/**
- * The row of one zone-sweep `results.json`: ok only when it opened at least one zone and every zone it tried passed.
- * @param {unknown} report @returns {JourneyRow[]}
- */
-export function zoneSweepRows(report) {
-  if (report === null || typeof report !== 'object') return [];
-  const {browser, build, at, results, entry} = /** @type {{browser?: unknown, build?: unknown, at?: unknown, results?: unknown, entry?: unknown}} */ (report);
-  if (typeof browser !== 'string' || typeof at !== 'string' || !Array.isArray(results)) return [];
-  if (entry !== undefined && entry !== 'card' && entry !== 'chunk') return [];
-  const failed = results.flatMap(row => {
-    const {slug, pass} = /** @type {{slug?: unknown, pass?: unknown}} */ (row ?? {});
-    return pass === true ? [] : [typeof slug === 'string' ? slug : '?'];
-  });
-  return [{card: entry === 'chunk' ? 'zone-sweep-chunk' : 'zone-sweep', browser, run: 'sweep', ok: results.length > 0 && failed.length === 0, at, failed, ...(typeof build === 'string' ? {build} : {})}];
-}
-
-/**
- * The rows of one journey-proof `report.json`. A report that is not one gives none.
- * @param {unknown} report @returns {JourneyRow[]}
- */
-export function journeyRows(report) {
-  if (report === null || typeof report !== 'object') return [];
-  const {card, build, at, prime, report: runs} = /** @type {{card?: unknown, build?: unknown, at?: unknown, prime?: unknown, report?: unknown}} */ (report);
-  if (typeof card !== 'string' || typeof at !== 'string' || !Array.isArray(runs)) return [];
-  return runs.flatMap(row => {
-    const {browser, run, ok} = /** @type {{browser?: unknown, run?: unknown, ok?: unknown}} */ (row ?? {});
-    if (typeof browser !== 'string' || typeof run !== 'string') return [];
-    // a run from a primed profile (--prime, an old shell) is its own row: it is neither cold nor warm
-    return [{card, browser, run: prime === undefined ? run : `primed-${run}`, ok: ok === true, at, ...(typeof build === 'string' ? {build} : {})}];
-  });
-}
-
-/**
- * What the journey gate still lacks for `build`: each card, browser and run whose newest row on this build is missing or
- * failed. Empty when go-live may go.
- * @param {readonly JourneyRow[] | undefined} journeys @param {string} build @returns {string[]}
- */
-export function journeyGaps(journeys, build) {
-  /** @type {string[]} */
-  const gaps = [];
-  for (const card of JOURNEY_GATE.cards) for (const browser of JOURNEY_GATE.browsers) for (const run of JOURNEY_GATE.runs) {
-    const newest = (journeys ?? []).filter(row => row.card === card && row.browser === browser && row.run === run && row.build === build)
-      .sort((a, b) => b.at.localeCompare(a.at))[0];
-    if (newest === undefined) gaps.push(`${card} ${browser} ${run} not run on this build`);
-    else if (!newest.ok) gaps.push(`${card} ${browser} ${run} FAIL`);
-  }
-  for (const [card, label] of [['zone-sweep', 'zone sweep'], ['zone-sweep-chunk', 'cold link sweep']]) for (const browser of ZONE_SWEEP_GATE.browsers) {
-    const newest = (journeys ?? []).filter(row => row.card === card && row.browser === browser && row.build === build)
-      .sort((a, b) => b.at.localeCompare(a.at))[0];
-    if (newest === undefined) gaps.push(`${label} ${browser} not run on this build`);
-    else if (!newest.ok) gaps.push(`${label} ${browser} FAIL${(newest.failed ?? []).length === 0 ? '' : `: ${(newest.failed ?? []).join(', ')}`}`);
-  }
-  return gaps;
-}
 
 /**
  * Run one phase. A refusal throws `RefusedError`; under --dry-run it is logged as `would refuse` and the phase goes on
@@ -436,37 +364,42 @@ async function productionGates(phase, deps, refuse) {
   if (tagged !== deps.build) refuse(`origin tag ${tag} is ${tagged ?? 'missing'}, not ${deps.build} (release.sh ${tag} --finish first)`);
   const staging = /** @type {{build?: string}} */ (await deps.fetchJSON(`${CHANNELS.staging.origin}/version.json`).catch(() => ({})));
   if (staging.build !== deps.build) refuse(`staging serves ${staging.build ?? 'nothing'}, not ${deps.build}: staging goes live first`);
-  if (phase === 'go-live' && deps.afterStagingProofs !== true) refuse('production go-live needs --after-staging-proofs: Doctor 7/7 and the live proof on Chromium and WebKit over staging');
-  const gaps = phase === 'go-live' ? journeyGaps(deps.journeys, deps.build) : [];
-  if (gaps.length > 0) refuse(`production go-live needs the staging journey on this build (bash scripts/verify-staging.sh chromium|webkit): ${gaps.join(', ')}`);
-  const smoke = phase === 'go-live' ? smokeGap(deps.smoke, deps.build) : undefined;
-  if (smoke !== undefined) refuse(`production go-live needs a clean staging smoke on this build (node scripts/staging-smoke.mjs --url ${CHANNELS.staging.origin} --release ${tag}, then --smoke=<its verdict.json>): ${smoke}`);
+  const qa = phase === 'go-live' ? qaGap(deps.qa, deps.build) : undefined;
+  if (qa !== undefined) refuse(`production go-live needs a clean staging QA verdict on this build (node scripts/staging-qa.mjs --candidate <url> or --release ${tag} on staging, then --qa=<its verdict.json>): ${qa}`);
 }
 
 /**
- * @typedef {{ build?: string, url?: string, hold?: boolean, scenarios?: readonly { id?: string, status?: string }[],
- *   findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string }} SmokeVerdict
+ * @typedef {{ qa?: boolean, kind?: string, full?: boolean, build?: string, url?: string, hold?: boolean,
+ *   scenarios?: readonly { id?: string, status?: string }[],
+ *   findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string }} QaVerdict
  */
 
-/** The staging smoke's five kept scenarios (meta STAGING-SMOKE SM0). */
+/** The staging smoke's five kept scenarios (meta STAGING-SMOKE SM0); staging-qa.mjs adds K6. */
 export const SMOKE_SCENARIOS = Object.freeze(['K1', 'K2', 'K3', 'K4', 'K5']);
 
+/** STAGING-QA SQ15: the legs production reads, and the scenarios each must have run (staging-qa-budget.mjs LEGS). */
+export const QA_LEGS = Object.freeze({candidate: ['K1', 'K2', 'K5', 'K6'], staging: ['K3', 'K5']});
+
 /**
- * STAGING-SMOKE SM5 (J398: a P0 or P1 holds prod): why a staging smoke verdict does not let `build` go live, or undefined.
- * @param {SmokeVerdict | undefined} smoke @param {string} build @returns {string | undefined}
+ * SQ15 (J398's hold, J426): why a staging-qa verdict does not let `build` go live, or undefined. It must be the full default
+ * leg of the candidate or of live staging, on this build and on the staging origin, every scenario run (K1 and K2 may skip:
+ * they seed the old cache on a first run), and not held.
+ * @param {QaVerdict | undefined} qa @param {string} build @returns {string | undefined}
  */
-export function smokeGap(smoke, build) {
-  if (smoke === undefined) return 'no --smoke verdict';
-  if (smoke.problem !== undefined) return smoke.problem;
-  if (smoke.build !== build) return `the verdict is for ${smoke.build?.slice(0, 8) ?? 'no build'}, not ${build.slice(0, 8)}`;
-  // a full run on staging: not a local build of the same commit, not `--only`, no crashed scenario; only K1 and K2 may skip
-  // (they seed the old-cache profile on a first run)
-  if (smoke.url !== CHANNELS.staging.origin) return `the verdict ran on ${smoke.url ?? 'no url'}, not ${CHANNELS.staging.origin}`;
-  const ran = new Map((smoke.scenarios ?? []).map(s => [s.id, s.status]));
-  const missing = SMOKE_SCENARIOS.filter(id => ran.get(id) !== 'ran' && !(ran.get(id) === 'skip' && (id === 'K1' || id === 'K2')));
+export function qaGap(qa, build) {
+  if (qa === undefined) return 'no --qa verdict';
+  if (qa.problem !== undefined) return qa.problem;
+  if (qa.qa !== true) return 'not a staging-qa.mjs verdict';
+  if (qa.build !== build) return `the verdict is for ${qa.build?.slice(0, 8) ?? 'no build'}, not ${build.slice(0, 8)}`;
+  const steps = qa.kind === 'candidate' || qa.kind === 'staging' ? QA_LEGS[qa.kind] : undefined;
+  if (steps === undefined) return `a ${qa.kind ?? 'unnamed'} leg: production reads the candidate's or live staging's`;
+  if (qa.full !== true) return 'a partial run (--only): run the whole leg';
+  if (qa.url !== CHANNELS.staging.origin) return `the verdict ran on ${qa.url ?? 'no url'}, not ${CHANNELS.staging.origin}`;
+  const ran = new Map((qa.scenarios ?? []).map(s => [s.id, s.status]));
+  const missing = steps.filter(id => ran.get(id) !== 'ran' && !(ran.get(id) === 'skip' && (id === 'K1' || id === 'K2')));
   if (missing.length > 0) return `scenarios not run cleanly: ${missing.map(id => `${id} ${ran.get(id) ?? 'missing'}`).join(', ')}`;
-  if (smoke.hold !== false) {
-    const held = (smoke.findings ?? []).filter(f => f.severity === 'P0' || f.severity === 'P1').map(f => `${f.severity ?? ''} ${f.scenario ?? ''} ${f.text ?? ''}`.trim());
+  if (qa.hold !== false) {
+    const held = (qa.findings ?? []).filter(f => f.severity === 'P0' || f.severity === 'P1').map(f => `${f.severity ?? ''} ${f.scenario ?? ''} ${f.text ?? ''}`.trim());
     return `it holds: ${held.join('; ') || 'hold is not false'}`;
   }
   return undefined;

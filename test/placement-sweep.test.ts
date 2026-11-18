@@ -18,22 +18,24 @@ test('a moved serial sweeps the slugs that are new or carry a new hash; an unmov
   expect(changedPlacements(before, file(34, [['mossgate', 'a']]))).toEqual({ serial: 34, slugs: [], seed: false });
 });
 
-test('each swept slug gets pass, fail or no card (an upload with no cooked content shows none, SA48)', () => {
-  const results = { build: 'baa235a5', results: [{ slug: 'mossgate', pass: true, enterMs: 9000, thrown: '' }, { slug: 'glowfen', pass: false, enterMs: null, thrown: 'boot refused' }], missing: ['no-cook'] };
-  expect(placementOutcomes(['mossgate', 'glowfen', 'no-cook', 'vanished'], results)).toEqual([
+test('each swept slug is PASS, FAIL or NOCARD from its K6 card', () => {
+  const leg = (name: string, playAt: number | null, over: Record<string, unknown> = {}) => ({ name, tapAt: 1000, playAt, problems: [], stick: true, ...over });
+  const k6 = { status: 'ran', legs: [leg('mossgate', 10_000), leg('glowfen', null, { problems: [{ text: 'never reached play within 60000 ms' }] }),
+    leg('mirror-salt', 9000, { blackWorld: 'world is black or empty in three play frames' })] };
+  expect(placementOutcomes(['mossgate', 'glowfen', 'mirror-salt', 'no-cook'], k6)).toEqual([
     { slug: 'mossgate', outcome: 'PASS', detail: 'in the world in 9000 ms' },
-    { slug: 'glowfen', outcome: 'FAIL', detail: 'never in the world, boot refused' },
-    { slug: 'no-cook', outcome: 'NOCARD', detail: 'no Zone select card' },
-    { slug: 'vanished', outcome: 'NOCARD', detail: 'no Zone select card' },
+    { slug: 'glowfen', outcome: 'FAIL', detail: 'never in the world, never reached play within 60000 ms' },
+    { slug: 'mirror-salt', outcome: 'FAIL', detail: 'in the world in 8000 ms, world is black or empty in three play frames' },
+    { slug: 'no-cook', outcome: 'NOCARD', detail: 'no Shard Select card' },
   ]);
   expect(placementOutcomes(['mossgate'], null)).toEqual([{ slug: 'mossgate', outcome: 'FAIL', detail: 'the sweep wrote no results' }]);
 });
 
 test('one receipt line per slug names the serial, the build and the outcome', () => {
   expect(sweepLine(33, 'baa235a5c', { slug: 'glowfen', outcome: 'FAIL', detail: 'never in the world' }))
-    .toBe('placement-sweep FAIL staging serial 33 glowfen (build baa235a5, ?chunk= cold load): never in the world');
+    .toBe('placement-sweep FAIL staging serial 33 glowfen (build baa235a5, Shard Select on WebKit iPhone): never in the world');
   expect(sweepLine(33, undefined, { slug: 'mossgate', outcome: 'PASS', detail: 'in the world in 9000 ms' }))
-    .toBe('placement-sweep PASS staging serial 33 mossgate (build moved, ?chunk= cold load): in the world in 9000 ms');
+    .toBe('placement-sweep PASS staging serial 33 mossgate (build moved, Shard Select on WebKit iPhone): in the world in 9000 ms');
 });
 
 test('main-watch starts a sweep only where the machine opted in (the mini runs no browser work unsigned, J356)', () => {

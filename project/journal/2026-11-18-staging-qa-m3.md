@@ -9,3 +9,7 @@
   through the route). Load budget: K2 over 20 s is a P1, a leg over 125% of the last release's a P2, K6 per card. The
   vision judge only reports, skips held scenarios, 12 calls at most, 4 at a time (K6 one sheet, a column per card). The
   store keeps each release's newest row per scenario, so the candidate's K6 survives the live leg's K3.
+- SQ15: production go-live reads one staging-qa verdict (--qa), the candidate's or live staging's full leg, in place of
+  --after-staging-proofs, verify-staging.sh's journeys and sweeps, and --smoke. verify-staging.sh is a thin call into
+  staging-qa.mjs; verify-staging.yml and zone-sweep.mjs are gone (K6 is the card sweep); placement-sweep.mjs enters the
+  touched slugs through K6. The catalogue's 23 engine dead tests are deleted: none had a caller, only comments.

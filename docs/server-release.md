@@ -59,7 +59,7 @@ with untracked pins, never the canonical checkout):
 
 ```
 node scripts/page-release.mjs staging build|upload|check|go-live
-node scripts/page-release.mjs production build|upload|check|go-live --after-staging-proofs
+node scripts/page-release.mjs production build|upload|check|go-live --qa=<verdict.json>
 node scripts/page-release.mjs preview build,upload,check,go-live
 ```
 
@@ -118,19 +118,14 @@ Each phase refuses until the one before it has run for the same SHA
 (results in `<clone>/tmp/page-release/<channel>-<sha>.json`). Production
 `check` and `go-live` also need the `v<version>` tag on origin at this
 SHA and `staging.wildshard.io` already serving it; `go-live` needs
-`--after-staging-proofs`, which says the strict staging proofs passed:
-`e7-doctor-proof.mjs` 7/7 and `e7-live-staging-proof.mjs` on Chromium
-and WebKit. It also reads the tapped journey (J386, STAGING-BUGBASH
-SB3): `bash scripts/verify-staging.sh chromium` and `... webkit` on the
-release clone run `journey-proof.mjs` on Driftwood and Pine Hollow,
-cold and warm, and each `report.json` names the build staging served.
-Go-live refuses until all eight passed on this exact build, and names
-any that are missing or failed (`--journeys=<dir>` reads them from
-elsewhere; default `<root>/tmp/verify-staging`). It also needs
-`--smoke=<verdict.json>` (meta STAGING-SMOKE SM5, J398): run
-`node scripts/staging-smoke.mjs --url https://staging.wildshard.io
---release v<version>` on the release clone; go-live refuses without a
-verdict, for another build, or when it holds (a P0 or P1 finding). `journey-proof.mjs
+`--qa=<verdict.json>` (meta STAGING-QA SQ15, J426 to J428): one
+`staging-qa.mjs` verdict for this exact build, the candidate's full leg
+(K1, K2, K5, K6) or live staging's (K3, K5), on the staging origin, not
+held. It replaced `--after-staging-proofs` (Doctor and the live
+two-player proof), `verify-staging.sh`'s eight journeys and two zone
+sweeps, and `--smoke`: about 42 minutes a release (J427). Go-live
+refuses without a verdict, for another build, a local or partial leg,
+a scenario that did not run, or a P0 or P1. `journey-proof.mjs
 --prime <dir>` starts from saved profiles (`<dir>/chromium`,
 `<dir>/webkit`), an old shell as a returning phone holds one, and
 `--throttle 4` slows Chromium's CPU like a Low Power phone; primed runs
@@ -176,8 +171,8 @@ staging QA. The live page stays in place (J426).
 starts npm OIDC publishing. `--published` waits for npm's listing;
 never rerun the publish job while npm processes it. Production build
 and upload may run once the build is green. Run `production check`,
-`verify-staging.sh` in both browsers, `staging-smoke.mjs`, `production go-live --after-staging-proofs --smoke=<verdict.json>`, then the static Doctor
-with `--human-static` (J205).
+then `production go-live --qa=<the candidate's staging-qa verdict.json>`,
+then the static Doctor with `--human-static` (J205).
 
 The cook follows production: `node scripts/release-cook.mjs vX.Y.Z`
 moves it through `wildshard-agent` and `wildshard-config cook` (J355).

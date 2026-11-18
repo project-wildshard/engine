@@ -47,23 +47,15 @@ export interface Deps {
   dryRun?: boolean;
   waitMs?: number;
   pollMs?: number;
-  afterStagingProofs?: boolean;
-  journeys?: readonly JourneyRow[];
-  smoke?: SmokeVerdict;
+  qa?: QaVerdict;
   releaseKey?: string;
   catalogue?: string;
 }
-export interface JourneyRow { card: string; browser: string; run: string; build?: string; ok: boolean; at: string; failed?: readonly string[] }
-export const JOURNEY_GATE: Readonly<{ cards: string[]; browsers: string[]; runs: string[] }>;
-export function journeyRows(report: unknown): JourneyRow[];
-/** Browsers in which production go-live needs clean card and cold link sweeps. */
-export const ZONE_SWEEP_GATE: Readonly<{ browsers: string[] }>;
-/** The one row of a zone-sweep results.json: ok only when it tried a zone and every zone passed. */
-export function zoneSweepRows(report: unknown): JourneyRow[];
-export function journeyGaps(journeys: readonly JourneyRow[] | undefined, build: string): string[];
 export const SMOKE_SCENARIOS: readonly string[];
-export interface SmokeVerdict { build?: string; url?: string; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }
-export function smokeGap(smoke: SmokeVerdict | undefined, build: string): string | undefined;
+/** STAGING-QA SQ15: one staging-qa.mjs verdict, the candidate's or live staging's. */
+export interface QaVerdict { qa?: boolean; kind?: string; full?: boolean; build?: string; url?: string; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }
+export const QA_LEGS: Readonly<{ candidate: readonly string[]; staging: readonly string[] }>;
+export function qaGap(qa: QaVerdict | undefined, build: string): string | undefined;
 export const PACKS_ORIGIN: string;
 export const API_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;

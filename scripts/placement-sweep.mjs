@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // Meta STAGING-BUGBASH SB45: every upload rewrites staging's placement file (J379 GRID_AUTOPLACE), which adds or changes a Zone
 // select card between releases, and no release gate opens it. One call reads the signed file; when its serial moved since the
-// last call, it opens each slug the move added or re-hashed with `zone-sweep.mjs --chunk --only <slugs>` (the cold `?chunk=` link
-// that ONE-FORMAT OF8 broke, OF8b) and appends one receipt line per slug: `placement-sweep PASS|FAIL|NOCARD ...`. A FAIL is an SB
-// row for the coordinator; NOCARD is an upload with no cooked content (SA48), which shows no card rather than a failed one.
+// last call, it enters each slug the move added or re-hashed by its Shard Select card with the staging smoke's K6 on WebKit
+// iPhone and the deploy checks (STAGING-QA SQ15 folded zone-sweep.mjs into SQ9: play, error card, the stick, a drawn world), and
+// appends one receipt line per slug: `placement-sweep PASS|FAIL|NOCARD ...`. A FAIL is an SB row for the coordinator; NOCARD is
+// an upload with no cooked content (SA48), which shows no card rather than a failed one.
 // main-watch.mjs starts it after each pass on a machine that opted in (~/.config/wildshard/placement-sweep), so a staging upload
 // gets its line within the hour engine main keeps moving.
-//   node scripts/placement-sweep.mjs [--dry-run] [--browser=chromium|webkit]
+//   node scripts/placement-sweep.mjs [--dry-run]
 // State (the last serial and each slug's hash) is ~/.cache/wildshard/placement-sweep.json; output under <checkout>/tmp/placement-sweep/.
-import { spawnSync } from 'node:child_process';
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -30,23 +30,24 @@ export function changedPlacements(state, file) {
   return { serial: file.serial, slugs, seed: false };
 }
 
-/** Each swept slug's outcome from the zone sweep's results.json (null: it wrote none).
+/** Each swept slug's outcome from K6's legs, one per card it entered (null: K6 did not run).
  * @param {readonly string[]} slugs
- * @param {{ results: readonly { slug: string, pass: boolean, enterMs: number | null, thrown: string }[], missing?: readonly string[] } | null} sweep
+ * @param {{ status: string, reason?: string, legs: readonly { name: string, tapAt: number, playAt: number | null, problems: readonly { text: string }[], stick?: boolean, blackWorld?: string }[] } | null} k6
  * @returns {Outcome[]} */
-export function placementOutcomes(slugs, sweep) {
+export function placementOutcomes(slugs, k6) {
   return slugs.map((slug) => {
-    if (sweep === null) return { slug, outcome: 'FAIL', detail: 'the sweep wrote no results' };
-    const row = sweep.results.find((r) => r.slug === slug);
-    if (row === undefined) return { slug, outcome: 'NOCARD', detail: 'no Zone select card' };
-    const entered = row.enterMs === null ? 'never in the world' : `in the world in ${String(row.enterMs)} ms`;
-    return { slug, outcome: row.pass ? 'PASS' : 'FAIL', detail: row.thrown === '' ? entered : `${entered}, ${row.thrown}` };
+    if (k6 === null || k6.status === 'crashed') return { slug, outcome: 'FAIL', detail: k6?.reason ?? 'the sweep wrote no results' };
+    const leg = k6.legs.find((row) => row.name === slug);
+    if (leg === undefined) return { slug, outcome: 'NOCARD', detail: 'no Shard Select card' };
+    const entered = leg.playAt === null ? 'never in the world' : `in the world in ${String(leg.playAt - leg.tapAt)} ms`;
+    const problems = [...leg.problems.map((p) => p.text), ...(leg.stick === false ? ['the stick did not move the player'] : []), ...(leg.blackWorld === undefined ? [] : [leg.blackWorld])];
+    return { slug, outcome: leg.playAt !== null && problems.length === 0 ? 'PASS' : 'FAIL', detail: problems.length === 0 ? entered : `${entered}, ${problems.join('; ')}` };
   });
 }
 
 /** @param {number} serial @param {string | undefined} build @param {Outcome} outcome @returns {string} */
 export function sweepLine(serial, build, outcome) {
-  return `placement-sweep ${outcome.outcome} staging serial ${String(serial)} ${outcome.slug} (build ${build === undefined ? 'moved' : build.slice(0, 8)}, ?chunk= cold load): ${outcome.detail}`;
+  return `placement-sweep ${outcome.outcome} staging serial ${String(serial)} ${outcome.slug} (build ${build === undefined ? 'moved' : build.slice(0, 8)}, Shard Select on WebKit iPhone): ${outcome.detail}`;
 }
 
 /** main-watch starts a sweep only on a machine that opted in: WS_PLACEMENT_SWEEP=1, or ~/.config/wildshard/placement-sweep
@@ -64,8 +65,7 @@ function claim(file) {
 }
 
 async function cli() {
-  const flag = (/** @type {string} */ name) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
-  const dry = process.argv.includes('--dry-run'), browser = flag('browser') ?? 'chromium';
+  const dry = process.argv.includes('--dry-run');
   const cache = join(homedir(), '.cache/wildshard'), statePath = join(cache, 'placement-sweep.json');
   const receipts = process.env.WS_LANE_RECEIPTS ?? join(cache, 'lane-receipts.log');
   const here = resolve(import.meta.dirname, '..');
@@ -87,14 +87,18 @@ async function cli() {
     renameSync(`${statePath}.next`, statePath);
     if (due.slugs.length === 0) return;
     // the newest sweep's shots stay as its evidence until the next move replaces them
-    const out = join(here, 'tmp/placement-sweep', browser);
+    const out = join(here, 'tmp/placement-sweep', 'k6');
     rmSync(out, { recursive: true, force: true });
-    spawnSync(process.execPath, [join(here, 'scripts/zone-sweep.mjs'), '--url', STAGING, '--browser', browser, '--chunk', '--only', due.slugs.join(','), '--out', out],
-      { cwd: here, stdio: 'inherit', timeout: 30 * 60_000, env: { ...process.env, WS_LANE_NAME: process.env.WS_LANE_NAME ?? 'placement-sweep' } });
-    const resultsPath = join(out, 'results.json');
-    const sweep = existsSync(resultsPath) ? JSON.parse(readFileSync(resultsPath, 'utf8')) : null;
-    for (const outcome of placementOutcomes(due.slugs, sweep)) {
-      const line = sweepLine(file.serial, sweep?.build, outcome);
+    const { runSmoke, served } = await import('./staging-smoke.mjs');
+    const version = await served(STAGING);
+    /** @type {Awaited<ReturnType<typeof runSmoke>> | null} */
+    let verdict = null;
+    try {
+      verdict = await runSmoke({ url: STAGING, release: `v${version.clientVersion ?? '0.0.0'}`, out, only: ['K6'], cells: due.slugs, deploy: true, vision: false });
+    } catch (error) { console.log(`placement-sweep: K6 stopped: ${error instanceof Error ? error.message : String(error)}`); }
+    const k6 = verdict?.scenarios.find((row) => row.id === 'K6') ?? null;
+    for (const outcome of placementOutcomes(due.slugs, k6)) {
+      const line = sweepLine(file.serial, verdict?.build, outcome);
       console.log(line);
       appendFileSync(receipts, `${new Date().toISOString().slice(11, 16)} UTC ${line}\n`);
     }

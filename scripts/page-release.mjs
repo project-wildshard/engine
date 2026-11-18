@@ -9,11 +9,9 @@
 //   --root=<dir>             the release clone (default: this checkout's top level); one clean clone per channel
 //   --dry-run                print every step and read the live gate; build, upload and alias nothing
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
-//   --after-staging-proofs   production go-live: the strict staging proofs passed on this exact build
-//   --journeys=<dir>         production go-live (SB3): where verify-staging.sh wrote its journey reports, read as
-//                            <dir>/<browser>/{journey-<card>,zone-sweep,zone-sweep-chunk}/ (default <root>/tmp/verify-staging)
-//   --smoke=<verdict.json>   production go-live (meta STAGING-SMOKE SM5, J398): the staging smoke's verdict for this build;
-//                            go-live refuses without one, for another build, or when it holds (a P0 or P1)
+//   --qa=<verdict.json>      production go-live (meta STAGING-QA SQ15): one staging-qa.mjs verdict for this build, the
+//                            candidate's or live staging's full leg; go-live refuses without one, for another build, or when
+//                            it holds (a P0 or P1). It replaced --after-staging-proofs, --journeys and --smoke.
 //   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
 //                            dist-content/ to packs.wildshard.io first (PAGE-SIZE PZ2,
 //                            page-release/content.mjs); preview.yml passes it (PZ6), staging and production with PZ8
@@ -29,32 +27,15 @@
 // Phase results go to <root>/tmp/page-release/<channel>-<sha>.json, which the next phase reads.
 import {execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
-import {existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, journeyRows, runPhase, zoneSweepRows} from './page-release/flow.mjs';
+import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 
-/** SB3: every journey row verify-staging.sh left under `dir` (journey reports and both sweep results); none when absent.
- * @param {string} dir */
-function readJourneys(dir) {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir).flatMap(browser => {
-    /** @type {string[]} */
-    let names = [];
-    try { names = readdirSync(join(dir, browser)); } catch { return []; }
-    return names.flatMap(name => {
-      try {
-        if (name === 'zone-sweep' || name === 'zone-sweep-chunk') return zoneSweepRows(JSON.parse(readFileSync(join(dir, browser, name, 'results.json'), 'utf8')));
-        return name.startsWith('journey-') ? journeyRows(JSON.parse(readFileSync(join(dir, browser, name, 'report.json'), 'utf8'))) : [];
-      } catch { return []; }
-    });
-  });
-}
-
-/** SM5: the staging smoke's verdict.json, or why it could not be read. @param {string} file */
-function readSmoke(file) {
+/** SQ15: the staging-qa verdict.json, or why it could not be read. @param {string} file */
+function readQa(file) {
   try { return JSON.parse(readFileSync(file, 'utf8')); } catch (error) { return {problem: `${file}: ${error instanceof Error ? error.message : String(error)}`}; }
 }
 
@@ -82,7 +63,7 @@ if (flag('print-env') !== undefined) {
   process.exit(0);
 }
 if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
-  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--journeys=<dir>] [--smoke=<verdict.json>] [--content] [--catalogue=<file>]');
+  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--qa=<verdict.json>] [--content] [--catalogue=<file>]');
   process.exit(2);
 }
 const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFileSync('git', argv, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
@@ -147,9 +128,7 @@ try {
       log, now: () => Date.now(), sleep: delay,
       dryRun: flag('dry-run') !== undefined,
       waitMs: Number(value('wait') ?? 45) * 60_000,
-      afterStagingProofs: flag('after-staging-proofs') !== undefined,
-      journeys: readJourneys(resolve(value('journeys') ?? join(root, 'tmp/verify-staging'))),
-      ...(value('smoke') === undefined ? {} : {smoke: readSmoke(resolve(value('smoke') ?? ''))}),
+      ...(value('qa') === undefined ? {} : {qa: readQa(resolve(value('qa') ?? ''))}),
       // the build runs in `root`, so a relative path is the caller's
       ...(value('catalogue') === undefined ? {} : {catalogue: resolve(value('catalogue') ?? '')}),
     });

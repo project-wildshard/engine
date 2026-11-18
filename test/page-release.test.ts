@@ -8,20 +8,16 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {CHANNELS, CHECKED_DOCUMENTS, JOURNEY_GATE, PHASES, RELEASE_PUBLIC_KEY, journeyGaps, journeyRows, smokeGap, ZONE_SWEEP_GATE, zoneSweepRows, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
+import {CHANNELS, CHECKED_DOCUMENTS, PHASES, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
 
 const build = 'a'.repeat(40);
-/** SB3: the eight staging journeys production go-live reads (two cards, two browsers, cold and warm), all passing on `on`. */
-const journeysOn = (on: string = build) => [...JOURNEY_GATE.cards.flatMap(card => JOURNEY_GATE.browsers.flatMap(browser =>
-  JOURNEY_GATE.runs.map(run => ({card, browser, run, build: on, ok: true, at: '2026-11-17T05:00:00.000Z'})))),
-  // QA 11-17 row 21: and a clean zone sweep (every Zone select card) per gated browser
-  ...ZONE_SWEEP_GATE.browsers.flatMap(browser => ['zone-sweep', 'zone-sweep-chunk'].map(card =>
-    ({card, browser, run: 'sweep', build: on, ok: true, at: '2026-11-17T05:00:00.000Z', failed: []})))];
-/** STAGING-SMOKE SM5: a staging smoke verdict for `on`, clean unless `hold`. */
-const smokeOn = (on: string = build, hold = false) => ({build: on, url: CHANNELS.staging.origin, scenarios: ['K1', 'K2', 'K3', 'K4', 'K5'].map(id => ({id, status: id === 'K1' ? 'skip' : 'ran'})), hold, findings: hold ? [{scenario: 'K3', key: 'journey', severity: 'P1', text: 'the main menu came back after Enter World'}] : []});
+/** STAGING-QA SQ15: one staging-qa verdict for `on`, the candidate's full leg, clean unless `hold`. */
+const qaOn = (on: string = build, hold = false) => ({qa: true, kind: 'candidate', full: true, build: on, url: CHANNELS.staging.origin,
+  scenarios: QA_LEGS.candidate.map(id => ({id, status: id === 'K1' ? 'skip' : 'ran'})), hold,
+  findings: hold ? [{scenario: 'K6', key: 'black-world', severity: 'P0', text: 'the world is black or empty'}] : []});
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
 const key = publicKey.export({format: 'der', type: 'spki'}).toString('hex');
 const token = ['host', 'credential', 'marker'].join('-');
@@ -202,9 +198,7 @@ test('go-live refuses when the signed release names another build or does not ve
 test('production go-live holds a candidate the world does not run, with the reason, and never moves play', async () => {
   const {deps, calls, live} = rig('production');
   await through(deps, 'check');
-  deps.afterStagingProofs = true;
-  deps.journeys = journeysOn();
-  deps.smoke = smokeOn();
+  deps.qa = qaOn();
   live.release = signed('production', 8, 'd'.repeat(40));
   await expect(runPhase('go-live', deps)).rejects.toThrow(/production\.json serial 8 signs d+, not /u);
   live.release = signed('production', 7);
@@ -253,115 +247,40 @@ test('production needs its tag, staging live on the build and the strict staging
   await expect(runPhase('check', deps)).rejects.toThrow(/staging goes live first/);
   live.stagingVersion = {build, saveEpoch: 1};
   await runPhase('check', deps);
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/--after-staging-proofs/);
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging QA verdict.*no --qa verdict/u);
   expect(calls).not.toContain('goLive');
-  deps.afterStagingProofs = true;
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging journey on this build/u);
-  deps.journeys = journeysOn();
-  deps.smoke = smokeOn();
+  deps.qa = qaOn();
   await runPhase('go-live', deps);
   expect(fetched(calls).at(-2)).toBe('goLive');
 });
 
-// SB3 (meta STAGING-BUGBASH, J386): go-live waits for the tapped journey on staging, Driftwood and Pine Hollow, Chromium and
-// WebKit, cold and warm, on this exact build; a missing, failed or other-build run holds it and names what is missing.
-test('production go-live needs the staging journey passing on this build', async () => {
+// STAGING-QA SQ15 (J426-J428): production go-live reads one staging-qa verdict, the candidate's or live staging's full leg, in
+// place of --after-staging-proofs, verify-staging.sh's journeys and sweeps, and --smoke. A P0 or P1 holds it (J398).
+test('production go-live needs one clean staging QA verdict for this build', async () => {
   const {deps, calls} = rig('production');
   await through(deps, 'check');
-  deps.afterStagingProofs = true;
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging journey on this build.*driftwood-isle chromium cold not run on this build/u);
-  deps.journeys = journeysOn('b'.repeat(40));
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/pine-hollow webkit warm not run on this build/u);
-  const failed = journeysOn().map(row => row.card === 'pine-hollow' && row.browser === 'webkit' && row.run === 'cold' ? {...row, ok: false} : row);
-  deps.journeys = failed;
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/pine-hollow webkit cold FAIL/u);
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging QA verdict.*no --qa verdict/u);
+  deps.qa = qaOn('b'.repeat(40));
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging QA verdict.*verdict is for bbbbbbbb, not aaaaaaaa/u);
+  deps.qa = qaOn(build, true);
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging QA verdict.*holds: P0 K6 the world is black or empty/u);
+  deps.qa = {...qaOn(), kind: 'local'};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/a local leg/u);
+  deps.qa = {...qaOn(), full: false};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/partial run/u);
+  deps.qa = {...qaOn(), qa: false};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/not a staging-qa\.mjs verdict/u);
+  deps.qa = {...qaOn(), url: 'http://127.0.0.1:4400'};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/ran on http:\/\/127\.0\.0\.1:4400/u);
+  deps.qa = {...qaOn(), scenarios: [{id: 'K1', status: 'ran'}, {id: 'K6', status: 'crashed'}]};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/K2 missing, K5 missing, K6 crashed/u);
+  deps.qa = {problem: 'tmp/qa/verdict.json: ENOENT'};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/ENOENT/u);
   expect(calls).not.toContain('goLive');
-  // a newer passing rerun of the same journey clears it
-  deps.journeys = [...failed, {card: 'pine-hollow', browser: 'webkit', run: 'cold', build, ok: true, at: '2026-11-17T06:00:00.000Z'}];
-  deps.smoke = smokeOn();
+  expect(qaGap({...qaOn(), kind: 'staging', scenarios: QA_LEGS.staging.map(id => ({id, status: 'ran'}))}, build)).toBeUndefined();
+  deps.qa = qaOn();
   await runPhase('go-live', deps);
   expect(fetched(calls).at(-2)).toBe('goLive');
-});
-
-// STAGING-SMOKE SM5 (J398): a P0 or P1 from the staging smoke holds production. Go-live refuses with no verdict, a verdict for
-// another build, or a held one, naming the findings; a clean verdict for this build goes on.
-test('production go-live needs a clean staging smoke verdict for this build', async () => {
-  const {deps, calls} = rig('production');
-  await through(deps, 'check');
-  deps.afterStagingProofs = true;
-  deps.journeys = journeysOn();
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*no --smoke verdict/u);
-  deps.smoke = smokeOn('b'.repeat(40));
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*verdict is for bbbbbbbb, not aaaaaaaa/u);
-  deps.smoke = smokeOn(build, true);
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*holds: P1 K3 the main menu came back after Enter World/u);
-  deps.smoke = {...smokeOn(), url: 'http://127.0.0.1:4400'};
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*ran on http:\/\/127\.0\.0\.1:4400/u);
-  deps.smoke = {...smokeOn(), scenarios: [{id: 'K3', status: 'ran'}]};
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*K4 missing, K5 missing/u);
-  deps.smoke = {...smokeOn(), scenarios: smokeOn().scenarios.map(s => s.id === 'K4' ? {...s, status: 'crashed'} : s)};
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*K4 crashed/u);
-  deps.smoke = {problem: 'tmp/smoke/verdict.json: ENOENT'};
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/staging smoke.*ENOENT/u);
-  expect(calls).not.toContain('goLive');
-  deps.smoke = smokeOn();
-  await runPhase('go-live', deps);
-  expect(fetched(calls).at(-2)).toBe('goLive');
-  expect(smokeGap(smokeOn(), build)).toBeUndefined();
-});
-
-test('a journey report gives one row per run; a primed run is neither cold nor warm, and a moved build names none', () => {
-  const report = {url: 'https://staging.wildshard.io', card: 'pine-hollow', build, at: '2026-11-17T05:00:00.000Z',
-    report: [{browser: 'chromium', run: 'cold', ok: true, problems: []}, {browser: 'webkit', run: 'warm', ok: false, problems: []}]};
-  expect(journeyRows(report)).toEqual([
-    {card: 'pine-hollow', browser: 'chromium', run: 'cold', build, ok: true, at: '2026-11-17T05:00:00.000Z'},
-    {card: 'pine-hollow', browser: 'webkit', run: 'warm', build, ok: false, at: '2026-11-17T05:00:00.000Z'},
-  ]);
-  expect(journeyRows({...report, prime: 'tmp/profiles'}).map(row => row.run)).toEqual(['primed-cold', 'primed-warm']);
-  const {build: _moved, ...moved} = report;
-  expect(journeyGaps(journeyRows(moved), build)).toContain('pine-hollow chromium cold not run on this build');
-  expect(journeyRows('not a report')).toEqual([]);
-});
-
-test('production go-live needs every Zone select card opening on staging, on this build (QA 11-17 row 21)', async () => {
-  const sweep = {url: CHANNELS.staging.origin, build, browser: 'chromium', at: '2026-11-17T20:00:00.000Z',
-    results: [{slug: 'driftwood-isle', pass: true}, {slug: 'glowfen', pass: false}]};
-  expect(zoneSweepRows(sweep)).toEqual([{card: 'zone-sweep', browser: 'chromium', run: 'sweep', build, ok: false, at: sweep.at, failed: ['glowfen']}]);
-  expect(zoneSweepRows({...sweep, results: []})[0]?.ok).toBe(false);
-  expect(zoneSweepRows('not a sweep')).toEqual([]);
-  const others = journeysOn().filter(row => row.card !== 'zone-sweep');
-  expect(journeyGaps(others, build)).toEqual(['zone sweep chromium not run on this build']);
-  expect(journeyGaps([...others, ...zoneSweepRows(sweep)], build)).toEqual(['zone sweep chromium FAIL: glowfen']);
-  const {build: _moved, ...moved} = sweep;
-  expect(journeyGaps([...others, ...zoneSweepRows({...moved, results: [{slug: 'glowfen', pass: true}]})], build)).toEqual(['zone sweep chromium not run on this build']);
-  // the newest sweep on the build wins: a rerun that opens Glowfen clears the gate
-  expect(journeyGaps([...others, ...zoneSweepRows(sweep), ...zoneSweepRows({...sweep, at: '2026-11-17T21:00:00.000Z', results: [{slug: 'glowfen', pass: true}]})], build)).toEqual([]);
-  const {deps, calls} = rig('production');
-  await through(deps, 'check');
-  deps.afterStagingProofs = true;
-  deps.smoke = smokeOn();
-  deps.journeys = [...others, ...zoneSweepRows(sweep)];
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/zone sweep chromium FAIL: glowfen/u);
-  expect(calls).not.toContain('goLive');
-});
-
-test('cold link results independently gate go-live on the exact staging build', async () => {
-  const report = {entry: 'chunk', build, browser: 'chromium', at: '2026-11-17T20:00:00.000Z',
-    results: [{slug: 'pine-hollow', pass: false}]};
-  const cards = journeysOn().filter(row => row.card !== 'zone-sweep-chunk');
-  const {deps, calls} = rig('production');
-  await through(deps, 'check');
-  deps.afterStagingProofs = true;
-  deps.smoke = smokeOn();
-  deps.journeys = cards;
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/cold link sweep chromium not run on this build/u);
-  deps.journeys = [...cards, ...zoneSweepRows(report)];
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/cold link sweep chromium FAIL: pine-hollow/u);
-  expect(calls).not.toContain('goLive');
-  const passed = {...report, results: [{slug: 'pine-hollow', pass: true}]};
-  expect(journeyGaps([...cards, ...zoneSweepRows({...passed, build: 'b'.repeat(40)})], build))
-    .toEqual(['cold link sweep chromium not run on this build']);
-  expect(journeyGaps([...cards, ...zoneSweepRows(passed)], build)).toEqual([]);
 });
 
 test('a dirty tree or another HEAD refuses before the host is touched', async () => {
@@ -581,9 +500,7 @@ test('the Workers host uploads a version, checks it, gates and deploys it last, 
 
 test('the Workers host names production --env \'\' and preview --env preview', async () => {
   const production = workersRig('production');
-  production.deps.afterStagingProofs = true;
-  production.deps.journeys = journeysOn();
-  production.deps.smoke = smokeOn();
+  production.deps.qa = qaOn();
   await through(production.deps, 'go-live');
   expect(production.wrangler.every(call => call.args.slice(-2).join('|') === '--env|')).toBe(true);
   expect(verbs(production.wrangler).at(-1)).toBe('versions deploy');
