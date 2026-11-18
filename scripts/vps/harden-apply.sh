@@ -183,10 +183,17 @@ fi
 # home, so the account cannot add a key of its own (Codex J206). sudo and SSH sessions report to Sentry
 # through the same PAM lines as raynos's (VH14). Off in one command: usermod --expiredate 1 wildshard-agent.
 AGENT=wildshard-agent
+BOX_GATE_OPTIONS='restrict,command="/usr/local/sbin/wildshard-box-gate"'
 if ! id "$AGENT" >/dev/null 2>&1; then useradd --create-home --shell /bin/bash "$AGENT"; say doing J266 "create $AGENT"; fi
 if [ "$(passwd -S "$AGENT" | awk '{print $2}')" != L ]; then passwd -l "$AGENT" >/dev/null; say doing J266 "$AGENT has no password"; fi
 install -d -m 755 -o root -g root /etc/ssh/authorized_keys
-if put "/etc/ssh/authorized_keys/$AGENT" 644 root:root J266 < "$HERE/wildshard-agent.pub"; then :; fi
+# MINI-AUTONOMY MA7c: the box workflows' own key (wildshard-ci.pub, its private half only in engine's environment `box`)
+# sits on a second line, forced to wildshard-box-gate: a loopback probe and the staging restart, nothing else, no tty and
+# no forwarding. The gate goes in first, so the line never names a missing file.
+if ! cmp -s "$HERE/wildshard-box-gate" /usr/local/sbin/wildshard-box-gate; then
+  install -m 755 -o root -g root "$HERE/wildshard-box-gate" /usr/local/sbin/wildshard-box-gate; say doing MA7c 'install /usr/local/sbin/wildshard-box-gate'
+fi
+if put "/etc/ssh/authorized_keys/$AGENT" 644 root:root J266 < <(cat "$HERE/wildshard-agent.pub"; printf '%s %s\n' "$BOX_GATE_OPTIONS" "$(cat "$HERE/wildshard-ci.pub")"); then :; fi
 if ! id -nG "$AGENT" | tr ' ' '\n' | grep -qx systemd-journal; then usermod -aG systemd-journal "$AGENT"; say doing J266 "$AGENT reads the journal by group"; fi
 
 # Shutting public SSH before the box is on the tailnet would lock everyone out of a fresh Rebuild, so VH3 and VH4 wait for it.

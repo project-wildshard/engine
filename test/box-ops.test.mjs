@@ -1,6 +1,10 @@
-// Meta MINI-AUTONOMY MA7a: the box workflows' guards and the probe's arithmetic, with no box and no ssh.
-import {expect, test} from 'vitest';
-import {main, probeQueries, promCommand, restartCommand, shq, summarize} from '../scripts/box-ops.mjs';
+// Meta MINI-AUTONOMY MA7a/MA7c: the box workflows' guards, the probe's arithmetic and the box gate, with no box and no ssh.
+import {Buffer} from 'node:buffer';
+import {spawnSync} from 'node:child_process';
+import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {join, resolve} from 'node:path';
+import {afterAll, expect, test} from 'vitest';
+import {GATE, GATE_MISSING, gateProbeCommand, gateRestartCommand, main, probeQueries, promCommand, restartCommand, shq, summarize, throughGate} from '../scripts/box-ops.mjs';
 
 const ok = result => ({status: 'success', data: {resultType: 'vector', result}});
 const sample = (labels, value) => ({metric: labels, value: [1, String(value)]});
@@ -47,7 +51,7 @@ test('queries stay inside one known channel and quote safely for the remote shel
   expect(promCommand('up{a="b"}')).toBe(`curl -s -m 15 --get --data-urlencode 'query=up{a="b"}' 127.0.0.1:9090/api/v1/query`);
 });
 
-test('probe runs one read-only loopback curl per query', () => {
+test('probe sends each query to the gate as one hex word', () => {
   const calls = [];
   const replies = [answers.tick, answers.rss, answers.heapSlope];
   const summary = main(['probe', 'staging'], command => {
@@ -56,5 +60,62 @@ test('probe runs one read-only loopback curl per query', () => {
   });
   expect(summary.channel).toBe('staging');
   expect(calls).toHaveLength(3);
-  for (const command of calls) expect(command).toMatch(/^curl -s -m 15 --get .* 127\.0\.0\.1:9090\/api\/v1\/query$/u);
+  const queries = Object.values(probeQueries('staging'));
+  calls.forEach((command, index) => {
+    const [gate, verb, word, ...rest] = command.split(' ');
+    expect([gate, verb, rest]).toEqual([GATE, 'probe', []]);
+    expect(word).toMatch(/^(?:[0-9a-f]{2})+$/u);
+    expect(Buffer.from(word, 'hex').toString('utf8')).toBe(queries[index]);
+  });
+});
+
+test('a box with no gate yet falls back to the plain command; a refusal never does', () => {
+  const missing = Object.assign(new Error('ssh exited 127'), {status: GATE_MISSING});
+  const calls = [];
+  expect(main(['restart', 'staging'], command => {
+    calls.push(command);
+    if (command.startsWith(GATE)) throw missing;
+    return 'active\n';
+  })).toEqual({channel: 'staging', restarted: true, state: 'active'});
+  expect(calls).toEqual([`${GATE} restart-staging`, restartCommand('staging')]);
+  const refused = Object.assign(new Error('ssh exited 2'), {status: 2});
+  expect(() => throughGate(command => { calls.push(command); throw refused; }, 'gated', 'plain')).toThrow(/exited 2/u);
+  expect(calls.at(-1)).toBe('gated');
+  expect(() => gateRestartCommand('production')).toThrow(/refused/u);
+});
+
+// The gate itself, run by bash with curl, sudo, systemctl and sleep stubbed to print their argv.
+mkdirSync('tmp/box-gate', {recursive: true});
+const scratch = mkdtempSync(resolve('tmp/box-gate/run-'));
+afterAll(() => rmSync(scratch, {recursive: true, force: true}));
+for (const name of ['curl', 'sudo', 'systemctl', 'sleep']) {
+  writeFileSync(join(scratch, name), `#!/bin/sh\nprintf '%s\\n' "${name} $*"\n`, {mode: 0o755});
+}
+/** @param {string | undefined} ask @param {string[]} [args] */
+function gate(ask, args = []) {
+  const env = {PATH: `${scratch}:/usr/bin:/bin`, ...(ask === undefined ? {} : {SSH_ORIGINAL_COMMAND: ask})};
+  const done = spawnSync('bash', [resolve('scripts/vps/wildshard-box-gate'), ...args], {encoding: 'utf8', env});
+  return {status: done.status, out: done.stdout.trim(), err: done.stderr};
+}
+
+test('the gate runs a probe as one loopback curl and restarts only staging', () => {
+  const query = probeQueries('production').rss;
+  const word = gateProbeCommand(query).split(' ').at(-1);
+  expect(gate(`probe ${word}`)).toMatchObject({status: 0, out: `curl -s -m 15 --get --data-urlencode query=${query} http://127.0.0.1:9090/api/v1/query`});
+  expect(gate(gateProbeCommand(query)).out).toBe(gate(`probe ${word}`).out);
+  expect(gate(undefined, ['wildshard-box-gate', 'probe', word]).status).toBe(0);
+  const shelly = 'up{a="$(id)"} or `x` \\x41 \'q\'';
+  expect(gate(gateProbeCommand(shelly)).out, 'the query reaches curl as bytes, never read by a shell').toBe(`curl -s -m 15 --get --data-urlencode query=${shelly} http://127.0.0.1:9090/api/v1/query`);
+  expect(gate(gateRestartCommand('staging'))).toMatchObject({status: 0, out: 'sudo -n /usr/bin/systemctl restart wildshard-server@staging\nsleep 20\nsystemctl is-active wildshard-server@staging'});
+});
+
+test('the gate refuses a production restart, a shell line and anything else before running it', () => {
+  const word = gateProbeCommand('up').split(' ').at(-1);
+  for (const ask of ['sudo -n /usr/bin/systemctl restart wildshard-server@production', 'systemctl restart wildshard-server@production',
+    'restart-production', 'restart-staging now', `probe ${word}; reboot`, `probe ${word} extra`, 'probe $(id)', 'probe abc', 'id', '', 'bash']) {
+    const result = gate(ask);
+    expect(result.status, ask).toBe(2);
+    expect(result.out, ask).toBe('');
+    expect(result.err, ask).toMatch(/^refused: /u);
+  }
 });

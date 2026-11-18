@@ -1,0 +1,34 @@
+#!/bin/bash
+# Meta MINI-AUTONOMY MA7c: the only thing the box workflows' key may run. Its line in root's
+# /etc/ssh/authorized_keys/wildshard-agent is `restrict,command="/usr/local/sbin/wildshard-box-gate" <wildshard-ci.pub>`,
+# so sshd runs this whatever the client asked, with the ask in SSH_ORIGINAL_COMMAND, and no tty or forwarding. Two verbs:
+#   probe <hex PromQL>      one loopback Prometheus instant query (read-only); the query reaches curl as one argv word
+#   restart-staging         `sudo -n systemctl restart wildshard-server@staging` from the agents' allowlist, then its state
+# Anything else, a production restart or a shell line included, is refused before anything runs. The agents' own key may
+# call it with arguments (`wildshard-box-gate probe ...`), so box-ops.mjs sends the same words with either key.
+# Installed root-owned as /usr/local/sbin/wildshard-box-gate by harden-apply.sh.
+set -euo pipefail
+refuse() { printf 'refused: %s; the box workflows key runs only probe <hex> and restart-staging (MA7c)\n' "$1" >&2; exit 2; }
+if [ "$#" -eq 0 ]; then
+  ask=${SSH_ORIGINAL_COMMAND:-}
+  case "$ask" in *[!A-Za-z0-9/\ -]*) refuse 'a character outside the gate alphabet' ;; esac
+  read -r -a words <<< "$ask"
+  set -- ${words[@]+"${words[@]}"}
+fi
+case "${1:-}" in /usr/local/sbin/wildshard-box-gate | wildshard-box-gate) shift ;; esac
+case "${1:-}:$#" in
+  probe:2)
+    [ "${#2}" -le 8192 ] && [[ $2 =~ ^([0-9a-f][0-9a-f])+$ ]] || refuse 'probe wants one hex query'
+    # python3 decodes the bytes once (harden.sh needs it too); the query is never read by a shell.
+    query=$(python3 -I -c 'import sys; sys.stdout.write(bytes.fromhex(sys.argv[1]).decode("utf-8"))' "$2" 2>/dev/null) || refuse 'the probe query is not UTF-8'
+    [ -n "$query" ] || refuse 'an empty probe query'
+    exec curl -s -m 15 --get --data-urlencode "query=$query" http://127.0.0.1:9090/api/v1/query
+    ;;
+  restart-staging:1)
+    sudo -n /usr/bin/systemctl restart wildshard-server@staging
+    # Type=simple with Restart=always returns at fork: wait out a crash loop, then print the state even when not active.
+    sleep 20
+    systemctl is-active wildshard-server@staging || true
+    ;;
+  *) refuse "'${1:-}' with $(($# > 0 ? $# - 1 : 0)) arguments" ;;
+esac

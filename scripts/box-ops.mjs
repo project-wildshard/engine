@@ -5,6 +5,10 @@
 //   node scripts/box-ops.mjs probe staging|production
 //   node scripts/box-ops.mjs restart staging
 // The host is the ssh alias `wildshard-agent` (this Mac's ~/.ssh/config, or the one box-probe.yml writes from secrets).
+// MA7c: both verbs go through the box's gate (scripts/vps/wildshard-box-gate), the only command the workflows' own key
+// may run (its authorized_keys line forces it). Until a signed release has put the gate on the box, a box without it
+// answers 127 and the same read or restart runs as the plain command over the agents' key, as before.
+import {Buffer} from 'node:buffer';
 import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 
@@ -16,6 +20,9 @@ export const RSS_CAP_BYTES = {staging: 6 * 2 ** 30, production: 18 * 2 ** 30};
 export const RSS_SHARE = 0.6;
 const WINDOW = '10m';
 export const SETTLE_S = 20;
+export const GATE = '/usr/local/sbin/wildshard-box-gate';
+/** The exit status a shell gives a missing command: the box has no gate yet. */
+export const GATE_MISSING = 127;
 
 /** @typedef {'staging' | 'production'} Channel */
 /** @typedef {{status?: string, data?: {result?: unknown}}} PromAnswer */
@@ -46,11 +53,27 @@ export function promCommand(query) {
   return `curl -s -m 15 --get --data-urlencode ${shq(`query=${query}`)} 127.0.0.1:9090/api/v1/query`;
 }
 
-/** Staging only: production is read-only from every workflow (MA7a). @param {string} channel */
-export function restartCommand(channel) {
+/** The gate's probe: the query as one hex word, so nothing in it reaches a shell. @param {string} query */
+export function gateProbeCommand(query) {
+  return `${GATE} probe ${Buffer.from(query, 'utf8').toString('hex')}`;
+}
+
+/** @param {string} channel */
+function stagingOnly(channel) {
   if (channel !== 'staging') {
     throw new Error(`refused: only the staging server restarts from a workflow; '${channel}' is read-only (MA7a)`);
   }
+}
+
+/** The gate's restart, staging only. @param {string} channel */
+export function gateRestartCommand(channel) {
+  stagingOnly(channel);
+  return `${GATE} restart-staging`;
+}
+
+/** Staging only: production is read-only from every workflow (MA7a). @param {string} channel */
+export function restartCommand(channel) {
+  stagingOnly(channel);
   // The unit is Type=simple with Restart=always, so `restart` returns at fork: wait out a crash loop before reading the
   // state, and print it even when not active (is-active exits non-zero) so the caller names it.
   return `sudo -n /usr/bin/systemctl restart wildshard-server@staging && sleep ${SETTLE_S} && { systemctl is-active wildshard-server@staging || true; }`;
@@ -99,8 +122,22 @@ function round(value) {
 /** @param {string} command @returns {string} */
 function ssh(command) {
   const done = spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', HOST, command], {encoding: 'utf8', maxBuffer: 1 << 24});
-  if (done.status !== 0) throw new Error(`ssh ${HOST} exited ${done.status ?? done.signal}`);
+  if (done.status !== 0) {
+    if (done.stderr) process.stderr.write(done.stderr);
+    throw Object.assign(new Error(`ssh ${HOST} exited ${done.status ?? done.signal}`), {status: done.status});
+  }
   return done.stdout;
+}
+
+/** The gate first; the plain command only when the box has no gate yet (MA7c).
+ * @param {(command: string) => string} run @param {string} gated @param {string} plain */
+export function throughGate(run, gated, plain) {
+  try {
+    return run(gated);
+  } catch (error) {
+    if (/** @type {{status?: unknown}} */ (error)?.status !== GATE_MISSING) throw error;
+    return run(plain);
+  }
 }
 
 /** @param {string[]} argv @param {(command: string) => string} run */
@@ -109,13 +146,12 @@ export function main(argv, run = ssh) {
   if (verb === 'probe') {
     const queries = probeQueries(channel);
     /** @param {string} query @returns {unknown} */
-    const read = query => JSON.parse(run(promCommand(query)));
+    const read = query => JSON.parse(throughGate(run, gateProbeCommand(query), promCommand(query)));
     const answers = {tick: read(queries.tick), rss: read(queries.rss), heapSlope: read(queries.heapSlope)};
     return summarize(channel, answers);
   }
   if (verb === 'restart') {
-    const command = restartCommand(channel);
-    const state = run(command).trim().split('\n').at(-1);
+    const state = throughGate(run, gateRestartCommand(channel), restartCommand(channel)).trim().split('\n').at(-1);
     if (state !== 'active') throw new Error(`staging server is '${state}' after the restart`);
     return {channel, restarted: true, state};
   }

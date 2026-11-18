@@ -97,6 +97,12 @@ if [ "$LISTENERS_OK" = 1 ] && wildcard_on 22; then info VH3 'sshd listens on eve
 if id wildshard-agent >/dev/null 2>&1; then
   keys="$R/etc/ssh/authorized_keys/wildshard-agent"
   if [ "$(stat -c '%U %a' "$keys" 2>/dev/null)" = 'root 644' ]; then ok J266 'wildshard-agent key is root'"'"'s copy'; else bad J266 'no root-owned /etc/ssh/authorized_keys/wildshard-agent'; fi
+  # MA7c: every key after the agents' own is the workflows' key, forced to the root-owned gate.
+  if [ -r "$keys" ] && [ "$(wc -l < "$keys")" -gt 1 ]; then
+    if awk 'NR > 1 && $0 !~ /^restrict,command="\/usr\/local\/sbin\/wildshard-box-gate" ssh-ed25519 / { loose = 1 } END { exit loose }' "$keys" \
+      && [ "$(stat -c '%U %a' "$R/usr/local/sbin/wildshard-box-gate" 2>/dev/null)" = 'root 755' ]; then ok MA7c 'the workflows key runs only the root-owned wildshard-box-gate'
+    else bad MA7c 'a second key in the agent key file is not forced to a root-owned /usr/local/sbin/wildshard-box-gate'; fi
+  fi
   if [ "$ROOT" = 1 ] && has sshd; then
     agent_keys=$(sshd -T -C user=wildshard-agent,host=wildshard,addr=100.64.0.1 2>/dev/null | awk 'tolower($1)=="authorizedkeysfile" {$1=""; sub(/^ /,""); print}')
     if [ "$agent_keys" = /etc/ssh/authorized_keys/wildshard-agent ]; then ok J266 'sshd reads the agent'"'"'s key from root'"'"'s file alone'

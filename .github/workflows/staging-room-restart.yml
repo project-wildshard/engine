@@ -3,7 +3,8 @@
 # Staging only. `channel` exists so a production ask is refused on the record: the guard and
 # `node scripts/box-ops.mjs restart` both refuse anything but staging before the job joins the tailnet or reads a key.
 # The restart is `sudo -n systemctl restart wildshard-server@staging` from the agents' allowlist (MS3.5, J266) and must
-# end `active`. OPEN QUESTION (Jake's Tailscale admin): see box-probe.yml; without TS_OAUTH_CLIENT_ID the job stops.
+# end `active`. MA7c: once a signed release puts the gate on the box, BOX_SSH_KEY becomes the workflows' own key, which the box forces to wildshard-box-gate (probe and
+# restart-staging only), so even a changed workflow on main cannot restart production with it. Tailscale: see box-probe.yml.
 name: staging-room-restart
 on:
   workflow_dispatch:

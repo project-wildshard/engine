@@ -371,15 +371,21 @@ test("the agent logs in by root's copy of its key only, and sshd lets in raynos 
   expect(drop.split('\n').filter(row => row.startsWith('AllowUsers'))).toEqual(['AllowUsers raynos wildshard-agent']);
   for (const want of ['PasswordAuthentication no', 'PermitRootLogin no', 'AllowTcpForwarding no', 'AllowAgentForwarding no', 'MaxSessions 2', 'LogLevel VERBOSE']) expect(drop).toContain(want);
   expect(harden).toContain('passwd -l "$AGENT"');
-  expect(harden).toContain('put "/etc/ssh/authorized_keys/$AGENT" 644 root:root J266 < "$HERE/wildshard-agent.pub"');
+  expect(harden).toContain('if put "/etc/ssh/authorized_keys/$AGENT" 644 root:root J266 < <(cat "$HERE/wildshard-agent.pub"; printf \'%s %s\\n\' "$BOX_GATE_OPTIONS" "$(cat "$HERE/wildshard-ci.pub")"); then :; fi');
+  // MA7c: the workflows' key is forced to the gate, with every forwarding and the tty off, and the gate is installed first.
+  expect(harden).toContain(`BOX_GATE_OPTIONS='restrict,command="/usr/local/sbin/wildshard-box-gate"'`);
+  expect(harden.indexOf('install -m 755 -o root -g root "$HERE/wildshard-box-gate" /usr/local/sbin/wildshard-box-gate')).toBeLessThan(harden.indexOf('put "/etc/ssh/authorized_keys/$AGENT"'));
   // The Match is the file's last block, so nothing after it is scoped to the agent by accident.
   expect(drop.trimEnd().split('\n').slice(-2)).toEqual(['Match User wildshard-agent', '    AuthorizedKeysFile /etc/ssh/authorized_keys/wildshard-agent']);
   expect(harden).not.toMatch(/\/home\/\$AGENT/u);
   expect(harden).not.toMatch(/usermod[^\n]*\bsudo\b[^\n]*wildshard-agent|-aG sudo "\$AGENT"/u);
-  const key = readFileSync('scripts/vps/wildshard-agent.pub', 'utf8').trim().split('\n');
-  expect(key).toHaveLength(1);
-  expect(key[0]).toMatch(/^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5[A-Za-z0-9+/]+=* \S/u);
-  expect(key[0]).not.toContain('PRIVATE');
+  for (const file of ['wildshard-agent.pub', 'wildshard-ci.pub']) {
+    const key = readFileSync(`scripts/vps/${file}`, 'utf8').trim().split('\n');
+    expect(key).toHaveLength(1);
+    expect(key[0]).toMatch(/^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5[A-Za-z0-9+/]+=* \S/u);
+    expect(key[0]).not.toContain('PRIVATE');
+  }
+  expect(readFileSync('scripts/vps/wildshard-ci.pub', 'utf8')).not.toBe(readFileSync('scripts/vps/wildshard-agent.pub', 'utf8'));
   // sudo and SSH sessions reach Sentry through PAM for every account, the agent's too (VH14).
   expect(harden).toMatch(/for service in sshd sudo login; do/u);
 });
