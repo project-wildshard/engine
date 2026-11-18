@@ -40,6 +40,13 @@ test('one draw over the limit draws whole, and a new draw framebuffer starts the
   expect(calls).toEqual(['drawElements 4,500,5123,0', 'bind 36160 fb', 'drawElements 4,90,5123,0', 'bind 36008 screen', 'flush', 'drawElements 4,20,5123,0']);
 });
 
+test('a limit of 0 (the default slot) leaves the draws unwrapped', () => {
+  const { gl } = fakeContext();
+  const before = gl.drawElements;
+  expect(installPassSplit(gl, SAFARI, 0)).toBe(false);
+  expect(gl.drawElements).toBe(before);
+});
+
 test('Blink keeps its draws unwrapped', () => {
   const { gl } = fakeContext();
   const before = gl.drawElements;

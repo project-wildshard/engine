@@ -20,7 +20,7 @@ import { installSkinnedSortSpheres } from './skinnedSpheres';
 import { isDev, onDev } from '../core/devMode';
 import { installShadowMaterialOwnership } from './shadowMaterialOwnership';
 import { installProvokingVertex } from './drawHooks';
-import { installPassSplit } from './passSplit';
+import { installPassSplit, passSplitLimit } from './passSplit';
 import { gltfOpaqueSort } from './gltfMaterialOrder';
 import type { AssetService } from '../app/assets';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -54,7 +54,7 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   installShadowMaterialOwnership(renderer, ownership.assets, ownership.scope);
   installCompileShadowSkip(renderer);
   installProvokingVertex(renderer); // MG10: Metal's own convention, so ANGLE rewrites no index data per draw
-  installPassSplit(context); // MG10: no Metal pass bins more than 400 k vertices, so the GPU's parameter buffer stays small
+  installPassSplit(context, undefined, passSplitLimit()); // MG10: off unless `debug.passSplit` (passSplit.ts: a Simulator fps step)
   const stopLabels = installDeveloperLabels(renderer);
   const dispose = renderer.dispose.bind(renderer);
   renderer.dispose = () => { try { dispose(); } finally { stopLabels(); stopJournal(); stopCounters(); } };

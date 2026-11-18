@@ -12,14 +12,28 @@
  * Counted per draw: `count x instances` (multi-draw is not counted). A framebuffer change ends the pass by itself, so the
  * count restarts there. WebKit only (every iPhone browser): Blink's flush is a shallow IPC flush whose effect on its
  * GPU process was not measured.
+ *
+ * **Off by default** (coordinator, 2026-11-18): in the iOS Simulator the explorer's end point read 30 fps with the split
+ * against 60 without, in 3 of 3 pairs, so it waits for a phone frame-time read. The device Debug slot
+ * `debug.passSplit` (a vertex count; `--device-save=debug.passSplit=400000` in the Simulator harness) turns it on.
  */
 import { webKitEngine } from './drawHooks';
+import { jsonSlot } from '../saves/slots';
 
 /** WebGL2's READ_FRAMEBUFFER: binding one moves no draw */
 const READ_FRAMEBUFFER = 0x8ca8;
 
-/** the vertex invocations one pass may carry before the next draw opens a new one */
+/** the vertex invocations one pass may carry before the next draw opens a new one, when the split is on */
 export const PASS_SPLIT_VERTICES = 400_000;
+/** the device Debug slot that turns the split on: its vertex count (a number or a numeric string); absent, it is off */
+export const PASS_SPLIT_SLOT = 'debug.passSplit';
+
+/** The split's vertex limit from `debug.passSplit`, or 0 (off). */
+export function passSplitLimit(): number {
+  const value = jsonSlot(PASS_SPLIT_SLOT, 'device').read();
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : 0;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
 
 const DRAWS = ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'drawRangeElements'] as const;
 type DrawName = typeof DRAWS[number];
@@ -45,7 +59,7 @@ export interface PassSplitContext {
 
 /** Wrap `gl`'s draws so a pass flushes before the draw that would carry it past `limit`. False: not installed. */
 export function installPassSplit(gl: PassSplitContext, userAgent: string = globalThis.navigator?.userAgent ?? '', limit: number = PASS_SPLIT_VERTICES): boolean {
-  if (!webKitEngine(userAgent)) return false;
+  if (limit <= 0 || !webKitEngine(userAgent)) return false;
   let carried = 0, bound: WebGLFramebuffer | null | undefined;
   const flush = gl.flush.bind(gl);
   const bind = gl.bindFramebuffer.bind(gl);
