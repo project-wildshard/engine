@@ -110,7 +110,8 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
   const ownedBindings = { ...bindings,
     ...(bindings.allocator === undefined && bindings.residency === undefined && options.memory !== undefined ? { allocator: new ResidencyAllocator({ memory: options.memory, playing: pagePlayingBytes() }) } : {}),
-    ...(admitted.instance === undefined ? {} : { instance: admitted.instance }) };
+    // OF10a5: the caller's admitted home (the page's residency) keeps its instance; admission's own names one only when it has none
+    ...(admitted.instance === undefined || bindings.instance !== undefined ? {} : { instance: admitted.instance }) };
   const residency = clientResidency(source, ownedBindings);
   const assets = new ClientAssets(source, admitted.assets, options);
   const manifest = sourceManifest(source, admitted.assets, bindings.imageOwner);
