@@ -1,5 +1,7 @@
 import { parseWorldScenePlacementPage, type WorldScenePlacementPage } from '@wildshard/format/worldScenePlacement';
 
+// Not wired (MG10, 2026-11-17): on Nine it cut allocation and live heap but raised the Chromium loading peak (fewer
+// major GCs left dead ArrayBuffers alive longer; engine journal 2026-11-17-nine-phone-memory.md). Rewire after that.
 // MG10 / ENGINE-MEMORY EM17: a scene placement page admitted straight from its JSON text. Nine's boot allocated about
 // 110 MB parsing 6 MB of pages through `parseWorldScenePlacementPage`: a property descriptor per key for the JSON guard,
 // entry and item copies, valibot's rebuilt output and the failed branch of the pose union for every yxz pose.

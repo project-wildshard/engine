@@ -57,3 +57,7 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
   `test/glsl-identity.test.ts` checks all 211 graphs of the installed pins against hashes recorded from the old emitter
   (`GLSL_IDENTITY=write` rewrites them when a change means to alter shaders). EM18's 20 MB is not reachable by trimming:
   `build`'s per-node closures and the source strings themselves are most of what is left (~60 MB).
+- Clean worktree builds of main 6f97dc82, phone Low, 4 alternating runs (one base run dropped, mislabelled at
+  `selected-discovery`): Nine loading renderer peak median 1058 (base, placement wiring removed, old glsl) -> 1141 MB with
+  both cuts (phone x2 2116 -> 2282); Sky Reach 489 -> 499 (noise). The placement wiring is undone (`placementPageText.ts`
+  stays, unwired, with its fuzz test) until the dead buffers are cut; the GLSL cut stays (byte-identical, not isolated).

@@ -1,5 +1,4 @@
-import type { WorldScenePlacementPage } from '@wildshard/format/worldScenePlacement';
-import { parseWorldScenePlacementPageText } from './placementPageText';
+import { parseWorldScenePlacementPage, type WorldScenePlacementPage } from '@wildshard/format/worldScenePlacement';
 import type { WorldSceneReads } from './worldSceneReads';
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { WORK_SLICE_MS } from '@wildshard/engine/core/workSlice';
@@ -47,7 +46,7 @@ export class WorldScenePlacementPages {
   private async prepare(reads: Pick<WorldSceneReads, 'file'>, name: string): Promise<Prepared> {
     try {
       const bytes = await reads.file(name);
-      return { ok: true, bytes, page: await pageSlices.run(() => parseWorldScenePlacementPageText(decoder.decode(bytes))) };
+      return { ok: true, bytes, page: await pageSlices.run(() => parseWorldScenePlacementPage(JSON.parse(decoder.decode(bytes)))) };
     } catch (error) { return { ok: false, error }; }
   }
   async read(name: string, bytes: Uint8Array): Promise<WorldScenePlacementPage> {
