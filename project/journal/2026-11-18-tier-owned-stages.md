@@ -8,3 +8,6 @@ installation while a frame is presenting.
 The tile and folder readers retain the build's independent content
 verdict. Removing the publisher grant leaves those readers unchanged.
 An oversized world-set fixture refuses at small and passes at large.
+
+The grid seam baker uses the ordinary checked reader too. Its old
+option needed to go with the rest of the grant.

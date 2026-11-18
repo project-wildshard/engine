@@ -55,7 +55,7 @@ for (const developer of modes) for (const devserver of modes) for (const nineDra
         let pending = products.get(slug);
         if (pending === undefined) {
           const url = new URL(descriptor, base).href;
-          pending = readGridFolderEdges(url, slug, { base, dangerousGrant: true, offline: false, fetch: fetchFile,
+          pending = readGridFolderEdges(url, slug, { base, offline: false, fetch: fetchFile,
             hash: bytes => Promise.resolve(createHash('sha256').update(bytes).digest('hex')) });
           products.set(slug, pending);
         }
