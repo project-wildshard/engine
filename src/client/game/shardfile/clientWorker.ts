@@ -119,6 +119,8 @@ export interface WorkerClientPorts {
   readonly system: (system: SystemSpec) => void;
   /** Link what the first rows' bodies draw, under the card. A page that reveals nothing yet has no such step. */
   readonly linkBodies?: () => Promise<void>;
+  /** NET-LAG NL15: link these roots' road (exterior) variants in play, paced (the other-player warm body's, once filled). */
+  readonly warmRoad?: (roots: readonly Object3D[]) => void;
 }
 interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell;
   readonly prespawnStandalone?: (held?: (url: string) => Promise<ArrayBuffer | null>) => void }
@@ -605,7 +607,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   if (unseated) { bootMark('server:unseated'); net.playUnseated(); }
   // E7.6: only a world has anyone else in it.
   let others: OtherPlayers | null = null;
-  if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope, player.position);
+  if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope, player.position, ports.warmRoad);
   if (new URLSearchParams(location.search).has('bossGod')) shell.bossGod();
   bootMark('server:ready-send'); shell.ready();
   const heard: Record<string, number> = {};

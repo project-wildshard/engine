@@ -49,3 +49,28 @@ test('a page in the world draws a warm body from the start: under the world, nev
   scope.dispose();
   expect(scene.getObjectByName('other-player-warm')).toBeUndefined();
 });
+
+// NET-LAG NL15 (opus-netlag7, staging v0.1.45, Driftwood boost to the road at z 250): the warm body's held sword drew on the
+// road with no environment and linked its opaque road program there, 289 to 427 ms of one Chromium frame (`fp-iron`, three's
+// key differing from the cell's only in envMap). Its items arrive a slot a frame, after the boot's road-variant warm-up has
+// taken its inventory, so once a kit's slots are filled the body asks for its own road (exterior) variants.
+test('the warm body asks for its road variants once a kit has filled its hand, and again for a new kit', () => {
+  const scene = new THREE.Scene(), scope = new Scope('test'), asked: THREE.Object3D[][] = [];
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.8, 0.012), new THREE.MeshStandardMaterial()), sword = new THREE.Group();
+  blade.name = 'sword_iron'; sword.add(blade);
+  const kit = slotKit(() => kitSlots(new Map(), ['weapon.sword']), row => ({ row, model: sword, bow: false }));
+  unlend = heldOnOthers.lend(kit);
+  const others = new OtherPlayers(client, scene, scope, null, roots => { asked.push([...roots]); });
+  others.frame(0, 1 / 60);
+  expect(asked).toHaveLength(0); // the hand is still filling
+  for (let at = 1; at < 40; at++) others.frame(at, 1 / 60);
+  expect(asked).toHaveLength(1);
+  const warm = scene.getObjectByName('other-player-warm');
+  expect(asked[0]).toHaveLength(1);
+  expect(asked[0]?.[0]).toBe(warm);
+  expect(warm?.getObjectByName('sword_iron')).toBeDefined(); // the road variants cover the held item
+  unlend(); unlend = heldOnOthers.lend(kit); // a crossing lends its kit again
+  for (let at = 0; at < 40; at++) others.frame(at, 1 / 60);
+  expect(asked).toHaveLength(2);
+  scope.dispose();
+});

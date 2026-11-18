@@ -196,7 +196,8 @@ class WarmBody {
   private readonly hand: THREE.Object3D | null;
   private readonly items = new THREE.Group();
   private kit = -1;
-  constructor() {
+  constructor(onFilled?: (group: THREE.Group) => void) {
+    this.onFilled = onFilled;
     this.group.name = 'other-player-warm'; this.group.position.y = WARM_DEPTH;
     const model = castawayBody(), board = new BoardUnder();
     board.deck.visible = true; // a rider's deck, shown here so its programs warm too
@@ -206,12 +207,17 @@ class WarmBody {
     this.unculled();
   }
   private slot = WARM_SLOTS;
-  /** Each frame: a newly lent kit's items replace the last's, one slot a frame (each first copy clones a first-person model). */
+  /** NET-LAG NL15: asked for the body's road (exterior) variants once a kit's items are all in its hand. */
+  private readonly onFilled: ((group: THREE.Group) => void) | undefined;
+  /** Each frame: a newly lent kit's items replace the last's, one slot a frame (each first copy clones a first-person model).
+   *  Filled, the body asks for its road variants: the items came after the boot's road warm-up took its inventory, and on the
+   *  road (no environment) the held sword linked its opaque program inside one frame (283 to 450 ms, Driftwood's boost). */
   frame(): void {
     if (this.kit !== heldOnOthers.lent) { this.kit = heldOnOthers.lent; this.items.clear(); this.slot = 0; }
     if (this.slot >= WARM_SLOTS) return;
     const held = heldOnOthers.prop(this.slot++);
     if (held !== null) { const item = held.prop.clone(); item.traverse(node => { node.frustumCulled = false; }); this.items.add(item); }
+    if (this.slot === WARM_SLOTS) this.onFilled?.(this.group);
   }
   /** Drawn wherever the camera looks, so the warm-up and every frame count its programs as used. */
   private unculled(): void { this.group.traverse(node => { node.frustumCulled = false; }); }
@@ -226,10 +232,13 @@ export class OtherPlayers {
   private readonly row = new Float64Array(PLAYER_CLASS.row.length);
   /** Where this page's own player stands, for voice's distances (VOICE-POLISH V7); without it voice can't measure. */
   private readonly me: Readonly<THREE.Vector3> | null;
-  constructor(client: NetClient, scene: THREE.Object3D, scope: Scope, me: Readonly<THREE.Vector3> | null = null) {
+  /** `warmRoad`: link these roots' road (exterior) variants in play, paced (Game.warmExteriorRoots); the warm body asks once
+   *  its hand holds the lent kit. */
+  constructor(client: NetClient, scene: THREE.Object3D, scope: Scope, me: Readonly<THREE.Vector3> | null = null,
+    warmRoad?: (roots: readonly THREE.Object3D[]) => void) {
     this.client = client; this.scene = scene; this.me = me;
     scope.onDispose(() => { for (const handle of this.bodies.keys()) this.drop(handle); });
-    try { const warm = new WarmBody(); scene.add(warm.group); this.warm = warm; scope.onDispose(() => { warm.dispose(); }); }
+    try { const warm = new WarmBody(warmRoad === undefined ? undefined : group => { warmRoad([group]); }); scene.add(warm.group); this.warm = warm; scope.onDispose(() => { warm.dispose(); }); }
     catch (error) { console.error('[other players] warm body', error); }
     if (me !== null) scope.onDispose(voiceNear.lend({ distanceTo: talker => this.distanceTo(talker) }));
   }
