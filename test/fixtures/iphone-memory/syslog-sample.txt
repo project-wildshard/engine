@@ -1,0 +1,4 @@
+2026-11-10 21:13:58.112430 com.apple.WebKit.WebContent{WebKit}[1888] <NOTICE>: WebProcess::initializeWebProcess: Memory Limits: active 1228 inactive 1228
+2026-11-10 21:14:01.002311 com.apple.WebKit.WebContent{WebKit}[1888] <NOTICE>: [webPageID=6] WebPage::didFinishLoadForFrame
+2026-11-10 21:14:03.402981 kernel[0] <NOTICE>: EXC_RESOURCE -> com.apple.WebKit.WebContent[1888] exceeded mem limit: ActiveHard 1228 MB (fatal)
+2026-11-10 21:14:03.410077 kernel[0] <NOTICE>: memorystatus: killing_specific_process pid 1888 [com.apple.WebKit.WebContent] (per-process-limit 10) 1258336KB - memorystatus_available_pages: 4012

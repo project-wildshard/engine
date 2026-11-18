@@ -54,3 +54,7 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   the kill line in `localStorage`; one that does not reaches `max` and reloads by itself. And each boot checkpoint now
   carries the ledger's totals by kind in MB, so the "Abrupt previous page" report of a killed boot says what the engine
   held at its last step, not only which step it was.
+- EM10 (mini-em1b), the real-device readers, written before any phone was plugged in: `scripts/memory/iphone-footprint.sh`
+  runs pymobiledevice3 through uvx for the WebContent and GPU processes' `physFootprint` every 500 ms, the syslog lines
+  that state the limit and its crossing, and afterwards the newest JetsamEvent report as a table. The parsers are tested
+  on a synthetic JetsamEvent and syslog sample; the first real phone run will say whether the field names hold.

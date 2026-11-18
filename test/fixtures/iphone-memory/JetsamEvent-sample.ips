@@ -1,0 +1,19 @@
+{"bug_type":"298","timestamp":"2026-11-10 21:14:03.00 -0500","os_version":"iPhone OS 26.1 (23B85)","roots_installed":0,"incident_id":"5C0E1D6A-0000-4000-8000-000000000000"}
+{
+  "crashReporterKey" : "synthetic-sample-for-tests",
+  "kernel" : "Darwin Kernel Version 25.1.0",
+  "product" : "iPhone18,1",
+  "incident" : "5C0E1D6A-0000-4000-8000-000000000000",
+  "date" : "2026-11-10 21:14:03.41 -0500",
+  "build" : "iPhone OS 26.1 (23B85)",
+  "timeDelta" : 4,
+  "memoryStatus" : { "compressorSize" : 51234, "compressions" : 812345, "decompressions" : 312345, "busyBufferCount" : 0, "memoryPages" : { "active" : 120034, "throttled" : 0, "fileBacked" : 40321, "wired" : 61234, "purgeable" : 512, "inactive" : 50123, "free" : 4012, "speculative" : 2210 }, "pageSize" : 16384 },
+  "largestProcess" : "com.apple.WebKit.WebContent",
+  "genCounter" : 7,
+  "processes" : [
+    { "uuid" : "00000000-0000-4000-8000-000000000001", "states" : ["frontmost"], "lifetimeMax" : 6200, "killDelta" : 1, "age" : 312000000, "purgeable" : 0, "fds" : 50, "coalition" : 412, "rpages" : 2000, "priority" : 10, "physicalPages" : { "internal" : [1800, 120] }, "pid" : 401, "cpuTime" : 12.5, "name" : "MobileSafari" },
+    { "uuid" : "00000000-0000-4000-8000-000000000002", "states" : ["frontmost"], "lifetimeMax" : 78700, "killDelta" : 1, "age" : 98000000, "purgeable" : 0, "fds" : 120, "coalition" : 412, "rpages" : 78643, "reason" : "per-process-limit", "priority" : 10, "physicalPages" : { "internal" : [70000, 6000] }, "pid" : 1888, "cpuTime" : 61.2, "name" : "com.apple.WebKit.WebContent" },
+    { "uuid" : "00000000-0000-4000-8000-000000000003", "states" : ["daemon"], "lifetimeMax" : 31000, "killDelta" : 1, "age" : 98000000, "purgeable" : 0, "fds" : 80, "coalition" : 412, "rpages" : 30500, "priority" : 10, "physicalPages" : { "internal" : [29000, 1500] }, "pid" : 1886, "cpuTime" : 40.1, "name" : "com.apple.WebKit.GPU" },
+    { "uuid" : "00000000-0000-4000-8000-000000000004", "states" : ["daemon"], "lifetimeMax" : 900, "killDelta" : 1, "age" : 98000000, "purgeable" : 0, "fds" : 30, "coalition" : 412, "rpages" : 610, "priority" : 10, "physicalPages" : { "internal" : [600, 10] }, "pid" : 1887, "cpuTime" : 2.1, "name" : "com.apple.WebKit.Networking" }
+  ]
+}
