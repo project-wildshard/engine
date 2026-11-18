@@ -409,18 +409,27 @@ test('FM4b modes 21 and 22: a quality chip waits while the link is down, and an 
 });
 
 test('FM8m mode 41: a banned end shows the removed card from the server\'s fact: a known end time, or none claimed; Title only', () => {
-  const until = new Date(2026, 10, 18, 14, 2).getTime();
-  for (const [ended, says] of [[{ code: 'banned', untilMs: until } as const, /until .*14:02/u], [{ code: 'banned' } as const, /for now/u]] as const) {
-    const { scope, screens, calls, set } = harness();
-    set({ ended });
-    screens.link('ended', 'refused');
-    const card = shown('banned');
-    expect(card?.textContent).toContain('You were removed from the world');
-    expect(card?.textContent).toMatch(says);
-    expect(shown('refused'), 'not the generic turned-away card').toBeNull();
-    expect([...card?.querySelectorAll('button') ?? []].map(button => button.textContent)).not.toContain('Play again');
-    click(card, 'Title screen');
-    expect(calls).toEqual(['title']);
-    scope.dispose(); document.body.replaceChildren();
-  }
+  const now = new Date(2026, 10, 18, 14).getTime();
+  const cases = [
+    [{ code: 'banned', untilMs: now + 120_000 }, /until .*14:02/u],
+    [{ code: 'banned', untilMs: now - 1 }, /for now/u],
+    [{ code: 'banned' }, /for now/u],
+  ] as const;
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    vi.setSystemTime(now);
+    for (const [ended, says] of cases) {
+      const { scope, screens, calls, set } = harness();
+      set({ ended });
+      screens.link('ended', 'refused');
+      const card = shown('banned');
+      expect(card?.textContent).toContain('You were removed from the world');
+      expect(card?.textContent).toMatch(says);
+      expect(shown('refused'), 'not the generic turned-away card').toBeNull();
+      expect([...card?.querySelectorAll('button') ?? []].map(button => button.textContent)).not.toContain('Play again');
+      click(card, 'Title screen');
+      expect(calls).toEqual(['title']);
+      scope.dispose(); document.body.replaceChildren();
+    }
+  } finally { vi.useRealTimers(); }
 });
