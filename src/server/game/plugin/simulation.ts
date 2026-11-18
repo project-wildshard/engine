@@ -104,6 +104,7 @@ import { scriptSeats, type ScriptSeats } from './scriptSeats';
 import { registerInstalled } from '../shardfile/installedSides';
 import { installDeclaredRiding, type DeclaredRiding } from '../shardfile/declaredRiding';
 import { installDeclaredHostPortalRide } from '../shardfile/declaredPortalRide';
+import { installDeclaredSpawnWhen } from '../shardfile/declaredSpawnWhen';
 import type { PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
 
@@ -725,6 +726,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       } });
     }
     installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataBrains, resolveCreatureLayers(shard.rows, creatures.brains));
+    installDeclaredSpawnWhen(host, creatures.spawns, ports.restoring === true); // OF29a: a `when` row stands only while it holds
     installDataRespawns(host, creatures.spawns);
     installLayerHunts(host, shard.rows, creatures);
     dataPorts?.install();

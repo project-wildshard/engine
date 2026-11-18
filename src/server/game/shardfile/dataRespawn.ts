@@ -5,6 +5,7 @@
 import * as v from 'valibot';
 import type { SimHost } from '@wildshard/engine/sim';
 import { CREDIT_PREFIX } from '@wildshard/engine/quest/players';
+import { spawnAbsent } from './declaredSpawnWhen';
 
 /** One spawn row's revive inputs (the format's `creatures.spawns` row). */
 export interface RespawnRow { readonly id: string; readonly at: readonly [number, number, number]; readonly yaw: number; readonly respawn?: number | undefined }
@@ -37,6 +38,7 @@ export function installDataRespawns(host: SimHost, rows: readonly RespawnRow[]):
     // Reconcile after restore, never during installation (exact restore still supplies its remaining wait).
     for (const [id, row] of timed) {
       const body = host.entities.get(id);
+      if (body !== undefined && spawnAbsent(body)) { waits.delete(id); continue; } // OF29a: an absent body waits for its `when`, not a timer
       if (body?.alive === false && !waits.has(id) && row.respawn !== undefined) waits.set(id, row.respawn);
       else if (body?.alive === true) host.flags.clear(`dead:${id}`);
     }

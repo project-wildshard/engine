@@ -1381,6 +1381,7 @@
     "src/server/game/shardfile/declaredKitItems.ts": "server",
     "src/server/game/shardfile/declaredPortalRide.ts": "server",
     "src/server/game/shardfile/declaredRiding.ts": "server",
+    "src/server/game/shardfile/declaredSpawnWhen.ts": "server",
     "src/server/game/shardfile/declaredTalks.ts": "server",
     "src/server/game/shardfile/talkPress.ts": "server",
     "src/server/game/shardfile/groupRuntime.ts": "server",
