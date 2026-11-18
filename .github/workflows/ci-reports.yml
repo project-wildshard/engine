@@ -14,7 +14,8 @@ jobs:
   nine-street:
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: macos-15
-    timeout-minutes: 12
+    # 12 for the street and the probe; EM12's six native WebKit boots add up to ~12 more
+    timeout-minutes: 25
     continue-on-error: true
     env:
       WS_LANE_NAME: nine-ring1
@@ -77,6 +78,17 @@ jobs:
         run: |
           node scripts/nine-ring1.mjs memory 2>&1 | tee tmp/nine-ring1/memory.log
           grep '^BOOT MEMORY' tmp/nine-ring1/memory.log >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Install WebKit for the memory meter (ENGINE-MEMORY EM12)
+        id: webkit
+        if: steps.source.outputs.artifact == 'true'
+        continue-on-error: true
+        run: bash scripts/ci-playwright-install.sh webkit
+      - name: Read native WebKit footprints, Template and Nine, 3 runs (ENGINE-MEMORY EM12 b)
+        id: measure
+        if: steps.source.outputs.artifact == 'true' && steps.webkit.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: node scripts/nine-ring1.mjs measure 2>&1 | tee tmp/nine-ring1/measure.log
       - name: Keep Nine street measurements and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -87,6 +99,66 @@ jobs:
             tmp/nine-ring1/street.log
             tmp/nine-ring1/memory.json
             tmp/nine-ring1/memory.log
+            tmp/nine-ring1/measure.log
+            tmp/nine-ring1/measure-*.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+  memory-ledger:
+    # ENGINE-MEMORY EM12 (a), report-only (J400 keeps it out of ci): Template's engine ledger [L] at control and at its
+    # peak, in Chromium on SwiftShader, from the exact client ci built. Exact, so a later ratchet (EM35) can hold it.
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    continue-on-error: true
+    env:
+      WS_LANE_NAME: nine-ring1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+      - name: Select the exact client source run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+        run: node scripts/nine-street-source.mjs
+      - if: steps.source.outputs.artifact == 'true'
+        uses: ./.github/actions/ring-setup
+      - name: Own the scratch folder
+        if: steps.source.outputs.artifact == 'true'
+        run: node scripts/scratch-dir.mjs nine-ring1 'EM12 report-only ledger read'
+      - if: steps.source.outputs.artifact == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.source.outputs.run }}
+          name: nine-ring1-client
+          path: tmp/nine-ring1
+      - name: Restore the exact client and install Chromium
+        if: steps.source.outputs.artifact == 'true'
+        run: |
+          mkdir -p tmp/nine-ring1/preview
+          tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
+          rm tmp/nine-ring1/client.tar
+          bash scripts/ci-playwright-install.sh chromium
+      - name: Read Template's ledger at control and at its peak
+        if: steps.source.outputs.artifact == 'true'
+        shell: bash
+        run: node scripts/nine-ring1.mjs ledger 2>&1 | tee tmp/nine-ring1/ledger.log
+      - name: Keep the ledger read
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-ledger
+          path: |
+            tmp/nine-ring1/ledger.log
+            tmp/nine-ring1/ledger-_template.json
           retention-days: 7
           if-no-files-found: ignore
 

@@ -53,3 +53,7 @@ export function closureLines(run:unknown,host:CalibrationHost):string[];
 export function webkitCalibration():CalibrationHost;
 export function traceToControl(trace:readonly StepRow[],steps:readonly StepRow[]):StepRow[];
 export function phoneLine(run:{checkpoints:readonly {peak:{webcontent:number;gpu:number}}[];settled:{webcontent:number;gpu:number}|null},model?:PhoneModel):string|null;
+export interface LedgerRow {step:string;ram:number;gpu:number}
+export function ledgerPeak(checkpoints:readonly {step:string;ledger:Record<string,Record<string,number>>|null}[]):{rows:LedgerRow[];peak:LedgerRow;control:LedgerRow}|null;
+export function ledgerPeakLines(chunk:string,ledger:{peak:LedgerRow;control:LedgerRow}):string[];
+export function summaryMarkdown(chunk:string,webkit:readonly unknown[],summary:unknown,ledger:{peak:LedgerRow;control:LedgerRow}|null):string;

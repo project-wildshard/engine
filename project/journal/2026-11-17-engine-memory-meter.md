@@ -68,3 +68,8 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   what Mac ANGLE Metal holds (1.7-1.8 GB). On main `c4397636`, phone loading peak / playing: Template 0.82 / 0.63 GB, Dunes
   0.95 / 0.66, Pine 1.45 / 1.18, Nine 2.42 (2.06-2.91) / 1.50: Nine still crosses the line while loading. The probe's
   factor is the fitted 2.25 (1.14-2.86) of its renderer peak.
+- EM12, the meter in CI, report-only (J400: ci-reports, never ci's verdict). The macOS `nine-street` job installs Playwright
+  WebKit and runs `nine-ring1.mjs measure`: three cold native-WebKit boots each of Template and pinned Nine on the exact
+  client ci built, the kernel footprints, the ledger and EM11's phone chain as a table in the step summary. A new ubuntu
+  `memory-ledger` job runs `nine-ring1.mjs ledger`: Template's ledger [L] in Chromium on SwiftShader at control and at its
+  peak, exact bytes for a later ratchet. `measure.mjs --ledger-only` and `--summary=<file>` are the two new switches.

@@ -19,7 +19,7 @@ async function run(command, env = process.env) {
   if (code !== 0) throw new Error(`Nine ring-1 command exited ${String(code)}: ${command.join(' ')}`);
 }
 const phase = process.argv[2] ?? 'all';
-if (!['build','boot','bench','memory','all'].includes(phase)) throw new Error('Usage: nine-ring1.mjs build|boot|bench|memory|all');
+if (!['build','boot','bench','memory','measure','ledger','all'].includes(phase)) throw new Error('Usage: nine-ring1.mjs build|boot|bench|memory|measure|ledger|all');
 if (phase === 'build' || phase === 'all') {
   await run([process.execPath, 'scripts/pins.ts', 'install', 'template', 'nine-dragon-stack']);
   const catalogue = JSON.parse(readFileSync('test/pins/catalogue.json','utf8'));
@@ -51,6 +51,23 @@ if (phase !== 'build') {
     if (phase === 'memory' || phase === 'all') {
       const probe = [process.execPath,'scripts/boot-memory-peak.mjs',`--url=${preview.url}`,'--chunk=nine-dragon-stack',`--out=${resolvePath(out,'memory.json')}`];
       await run(process.platform === 'darwin' ? ['bash','scripts/browser-lane.sh',...probe] : probe);
+    }
+    // ENGINE-MEMORY EM12, report-only (ci-reports): (b) native WebKit kernel footprints for Template and Nine, three
+    // cold runs each, with EM11's phone chain; (a) the ledger [L] at control and at its peak for Template in Chromium.
+    // Each appends its table to the step summary when GITHUB_STEP_SUMMARY is set.
+    const summary = process.env.GITHUB_STEP_SUMMARY ? [`--summary=${process.env.GITHUB_STEP_SUMMARY}`] : [];
+    if (phase === 'measure') {
+      /** @type {string[]} */ const failed = [];
+      for (const chunk of ['_template','nine-dragon-stack']) {
+        const measure = [process.execPath,'scripts/memory/measure.mjs',`--url=${preview.url}`,`--chunk=${chunk}`,'--runs=3','--timeout=480',
+          `--out=${resolvePath(out,`measure-${chunk}.json`)}`,...summary];
+        try {await run(process.platform === 'darwin' ? ['bash','scripts/browser-lane.sh',...measure] : measure);} catch (error) {failed.push(String(error));}
+      }
+      if (failed.length > 0) throw new Error(failed.join('; '));
+    }
+    if (phase === 'ledger') {
+      await run([process.execPath,'scripts/memory/measure.mjs',`--url=${preview.url}`,'--chunk=_template','--ledger-only','--timeout=480',
+        `--out=${resolvePath(out,'ledger-_template.json')}`,...summary]);
     }
   } finally {preview.close();await preview.closed;}
 }

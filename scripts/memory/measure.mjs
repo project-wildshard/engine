@@ -36,13 +36,13 @@
 //     the median of its per-round differences, and floor + engine + zone must close on the whole within 2%.
 //   - A busy machine is waited out (up to --wait minutes, 10), then refused: the 1-minute load average over --max-load
 //     (the CPU count) or more than --max-lanes other scripts/browser-lane.sh runs (2). Both are written with each round.
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
-import { loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText } from './phoneModel.mjs';
+import { ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText } from './phoneModel.mjs';
 
 export const PROTOCOL = 'memory-run/1';
 export const PHONE_VIEW = Object.freeze({ viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
@@ -539,12 +539,12 @@ export function microscopeLines(run) {
 async function main(argv) {
   /** @type {Record<string, string>} */
   const args = Object.fromEntries(argv.map((a) => /^--([^=]+)(?:=(.*))?$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2] ?? '1']));
-  if (!args.url || (args.chunk === undefined && !args.ladder)) { console.error('usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--out=<file>] | --ladder [--zones=a,b]'); return 64; }
+  if (!args.url || (args.chunk === undefined && !args.ladder)) { console.error('usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--ledger-only] [--summary=<file>] [--out=<file>] | --ladder [--zones=a,b]'); return 64; }
   const settleMs = Number(args.settle ?? 2000), timeoutMs = Number(args.timeout ?? 240) * 1000;
   const gcs = Number(args.gcs ?? 2), reads = Number(args.reads ?? 5);
   const limits = { maxLoad: Number(args['max-load'] ?? cpus().length), maxLanes: Number(args['max-lanes'] ?? 2), waitMs: Number(args.wait ?? 10) * 60_000 };
   if (args.ladder) return ladder(args, { runs: Number(args.runs ?? 5), settleMs, timeoutMs, gcs, reads, limits });
-  const runs = Number(args.runs ?? 1);
+  const runs = args['ledger-only'] ? 0 : Number(args.runs ?? 1);
   const urls = args.url2 ? [args.url, args.url2] : [args.url];
   /** @type {Awaited<ReturnType<typeof webkitBoot>>[]} */
   const webkit = [];
@@ -574,13 +574,49 @@ async function main(argv) {
     refused: webkit.length - good.length,
   };
   if (summary && runs > 1) for (const [name, s] of Object.entries(summary)) if (typeof s === 'object') console.log(`${name.padEnd(18)} median ${mb(s.median)} MB  min ${mb(s.min)}  max ${mb(s.max)}  spread ${s.spreadPct}%  (n ${s.n}) [K]`);
-  const microscope = args.microscope ? await chromiumMicroscope({ url: args.url, chunk: args.chunk, timeoutMs }) : null;
-  if (microscope) for (const line of microscopeLines(microscope)) console.log(line);
+  const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({ url: args.url, chunk: args.chunk, timeoutMs }) : null;
+  if (microscope && !args['ledger-only']) for (const line of microscopeLines(microscope)) console.log(line);
+  const ledger = microscope ? ledgerPeak(microscope.checkpoints) : null;
+  if (ledger) for (const line of ledgerPeakLines(args.chunk, ledger)) console.log(line);
+  if (args.summary) appendFileSync(args.summary, summaryMarkdown(args.chunk, webkit, summary, ledger));
   if (args.out) {
     const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, `${JSON.stringify({ protocol: PROTOCOL, url: args.url, chunk: args.chunk, date: new Date().toISOString(), webkit, summary, microscope }, null, 1)}\n`);
   }
-  return good.length === webkit.length ? 0 : 1;
+  return good.length === webkit.length && (!args['ledger-only'] || microscope?.ready === true) ? 0 : 1;
+}
+
+/** EM12 (a): the ledger [L] at each checkpoint of one boot (the counters the page publishes), its largest total and its
+ * total at control. Exact, so CI can hold it to bytes; capacity, not footprint. @param {readonly {step:string, ledger:Record<string, Record<string, number>> | null}[]} checkpoints */
+export function ledgerPeak(checkpoints) {
+  const rows = checkpoints.filter((c) => c.ledger).map((c) => { const row = /** @type {{step:string, ram:number, gpu:number}} */ (/** @type {unknown} */ (ledgerSplit(c.ledger))); row.step = c.step; return row; });
+  if (rows.length === 0) return null;
+  const total = (/** @type {{ram:number, gpu:number}} */ r) => r.ram + r.gpu;
+  return { rows, peak: rows.reduce((best, r) => (total(r) > total(best) ? r : best)), control: rows.findLast((r) => r.step === 'control') ?? rows.at(-1) };
+}
+/** @param {string} chunk @param {NonNullable<ReturnType<typeof ledgerPeak>>} ledger */
+export function ledgerPeakLines(chunk, ledger) {
+  const row = (/** @type {{step:string, ram:number, gpu:number}} */ r) => `ram ${mb(r.ram)} + gpu ${mb(r.gpu)} = ${mb(r.ram + r.gpu)} MB [L] at ${r.step}`;
+  return [`LEDGER ${chunk}: control ${row(ledger.control)}; peak ${row(ledger.peak)}`];
+}
+
+/** EM12: the step summary's table (GitHub Markdown) for one zone's runs. @param {string} chunk @param {readonly any[]} webkit
+ * @param {any} summary @param {ReturnType<typeof ledgerPeak>} ledger */
+export function summaryMarkdown(chunk, webkit, summary, ledger) {
+  const m = (/** @type {number} */ b) => (b / MB).toFixed(0);
+  const lines = [`### Memory: ${chunk}`, ''];
+  if (webkit.length > 0) {
+    lines.push('| run | build | settled WebContent [K] | settled GPU process [K] | peak WebContent [K] | ledger ram / gpu [L] | phone playing | phone loading peak |', '|---|---|---|---|---|---|---|---|');
+    let model = null; try { model = loadPhoneModel(); } catch { /* no model: no phone columns */ }
+    webkit.forEach((r, i) => {
+      const ok = r.settled && !r.refused, l = ledgerSplit(r.counters);
+      const playing = ok && model ? rangeText(phoneFromWebKit(r.settled, model)) : '-', loading = ok && model ? rangeText(phonePeakFromWebKit(r.checkpoints, model)) : '-';
+      lines.push(`| ${i + 1} | ${String(r.build).slice(0, 8)} | ${ok ? m(r.settled.webcontent) : r.refused ?? '-'} | ${ok ? m(r.settled.gpu) : '-'} | ${m(Math.max(0, ...r.checkpoints.map((/** @type {any} */ c) => c.peak.webcontent)))} | ${m(l.ram)} / ${m(l.gpu)} | ${playing} | ${loading} |`);
+    });
+    if (summary) lines.push('', `Settled WebContent median ${m(summary.settledWebContent.median)} MB, spread ${summary.settledWebContent.spreadPct}% (n ${summary.settledWebContent.n}); GPU process ${m(summary.settledGpu.median)} MB, spread ${summary.settledGpu.spreadPct}%. MB decimal; native Playwright WebKit, phone view, Low.`);
+  }
+  if (ledger) lines.push(...(webkit.length > 0 ? [''] : []), `Ledger [L] in Chromium: control ${m(ledger.control.ram)} ram + ${m(ledger.control.gpu)} gpu MB; peak ${m(ledger.peak.ram + ledger.peak.gpu)} MB at ${ledger.peak.step}.`);
+  return `${lines.join('\n')}\n\n`;
 }
 
 /** The differential ladder (EM4): blank, WebGL, title, Template at control and each zone at control, every rung a cold
