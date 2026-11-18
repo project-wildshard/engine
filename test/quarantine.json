@@ -2,5 +2,13 @@
   "schema": 1,
   "policy": "J193: execute and report; failures are non-blocking until deadline. Expired entries return to the blocking cohort.",
   "createdAt": "2026-11-08T11:13:28.000Z",
-  "entries": []
+  "entries": [
+    {
+      "file": "test/cook-validation.test.ts",
+      "owner": "opus-testspeed-lane",
+      "addedAt": "2026-11-18T02:22:06.000Z",
+      "deadline": "2026-11-20T02:22:06.000Z",
+      "reason": "TS10 (J255): flaky on hosted CI, red then green on its re-run, with strikes from plan/hwb-ev and plan/hwb-fl12 within 24 h (last: ci run 44219468446); J200 deadline"
+    }
+  ]
 }
