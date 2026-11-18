@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.41 (2026-11-18)
+
+- Keep the title steady while Enter the MMO is opening.
+- Resume in the same spot after a graphics reset.
+- Hide the gray-box Template prototype from player Zone Select.
+
 ## v0.1.40 (2026-11-17)
 
 - Updates are faster for players with older cached builds.
