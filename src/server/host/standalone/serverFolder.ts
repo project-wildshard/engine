@@ -5,6 +5,7 @@ import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
 import { contentHash } from '@wildshard/engine/game/shardfile/contentHash';
 import { nodeNamedJsonCheck, nodeOutputDescriptorChecks } from '@wildshard/engine/game/shardfile/outputChecksNode';
+import { serverSkinRigs } from '@wildshard/engine/game/shardfile/serverSkinRigs';
 import { carryOutputDescriptor, isBuildValidatedOutput, outputDescriptor, resolveOutputDescriptor, serverReadsFile } from '@wildshard/engine/game/shardfile/outputDescriptor';
 import { shardFolderData } from '@wildshard/engine/game/shardfile/folderData';
 import { GRID_COLLISION_BODY, GRID_COLLISION_HEADER, readGridCollision, type GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
@@ -183,5 +184,11 @@ export async function readServerFolder(root: string, build: () => string, source
   // E5.2b: only what a server reads, and of that only what it asks for by hash: a named file is fetched when the product is asked
   // for it. Everything else is the page's, and every byte here would be a phone's.
   await Promise.all(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile')).map(async file => { const ref = file.commons === true ? `commons:${file.hash}` : file.hash; assets.set(ref, await verified(ref)); }));
+  // AP36c: a spawned creature's skin rig (its hit volumes and height). A pack cooked before the cook carried rigs has none: the
+  // world then says which species misses its rig, as it did before.
+  await Promise.all([...serverSkinRigs(shard)].filter(ref => !assets.has(ref) && files.has(ref)).map(async ref => {
+    const bytes = await verified(ref).catch(() => undefined);
+    if (bytes !== undefined) assets.set(ref, bytes);
+  }));
   return { shard, assets, rapier, product };
 }

@@ -22,6 +22,7 @@ import type {Shardfile} from '@wildshard/format/shardSchema';
 import {readTar} from '@wildshard/format/tar';
 import type {ServerPack, ServerPackPart} from '../../shared/game/shardfile/serverPack';
 import {serverReadsFile} from '../../shared/game/shardfile/outputDescriptor';
+import {serverSkinRigs} from '../../shared/game/shardfile/serverSkinRigs';
 import {entryReadSet} from './entryReadSet';
 import {phoneTier, type Astc6Encode} from './tierTextures';
 import {wasmAstc6} from './astc6Wasm';
@@ -291,7 +292,8 @@ export function serverRows(shard: OpenShardfile): readonly ServerRow[] {
   const add = (row: ServerRow): void => { if (!rows.has(row.path)) rows.set(row.path, row); };
   add({path: 'shard.json', hash: sha256(shard.header), bytes: shard.header.length});
   for (const row of [...index.sections, ...index.schemas, ...index.admission.server ?? []]) add({path: row.path, hash: row.hash, bytes: row.bytes});
-  for (const row of index.files) if (serverReadsFile(row, source.terrain?.collider)) add({path: row.path, hash: row.hash, bytes: row.compressed, name: row.name});
+  const rigs = serverSkinRigs(source); // AP36c: a spawned creature's skin rig, for its hit volumes and height
+  for (const row of index.files) if (serverReadsFile(row, source.terrain?.collider) || rigs.has(row.commons === true ? `commons:${row.hash}` : row.hash)) add({path: row.path, hash: row.hash, bytes: row.compressed, name: row.name});
   return [...rows.values()];
 }
 

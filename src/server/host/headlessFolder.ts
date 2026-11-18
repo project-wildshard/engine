@@ -9,9 +9,8 @@ import { pathToFileURL } from 'node:url';
 import { SHARDFILE_ADMISSION_LIMITS } from '@wildshard/format/admissionLimits';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { parseShardfile } from '@wildshard/format/shardSchema';
-import { resolveSkinLookFiles } from '@wildshard/format/skinAssets';
-import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import { carryOutputDescriptor, resolveOutputDescriptor, outputDescriptor, serverReadsFile } from '@wildshard/engine/game/shardfile/outputDescriptor';
+import { serverSkinRigs } from '@wildshard/engine/game/shardfile/serverSkinRigs';
 import { nodeOutputDescriptorChecks, nodeNamedJsonCheck } from '@wildshard/engine/game/shardfile/outputChecksNode';
 import { shardFolderData } from '@wildshard/engine/game/shardfile/folderData';
 import { folderClosureFile, type ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
@@ -68,19 +67,12 @@ export async function loadCookedFolder(directory: string, rapier: Rapier, author
     return [ref, await folderClosureFile(product, ref)] as const;
   }));
   const assets = new Map(entries);
-  if (authorSlug !== undefined) {
-    // Native creature height and hit volumes need the selected skin rigs.
-    // Static GLBs, materials and textures still belong to the page.
-    const spawned = new Set(shard.creatures.spawns.map(spawn => spawn.species));
-    const looks = new Set(shard.rows.species.filter(species => spawned.has(species.id)).map(species => species.body?.look));
-    const needed = new Set<string>();
-    for (const look of shard.rows.looks) {
-      if (!looks.has(look.id) || look.recipe !== SKIN_LOOK_RECIPE) continue;
-      const { skin, variants } = resolveSkinLookFiles(shard, look, assets);
-      needed.add(skin.row.file);
-      for (const variant of variants?.values() ?? []) needed.add(variant.row.file);
-    }
-    await Promise.all([...needed].map(async ref => { assets.set(ref, await folderClosureFile(product, ref)); }));
-  }
+  // Native creature height and hit volumes need the selected skin rigs (AP36c: `serverSkinRigs`, the worker's and the cook's
+  // too). Static GLBs, materials and textures still belong to the page. An author's own product must hold them; a room's
+  // pack cooked before the cook carried rigs has none, and its world says which species misses one, as it did before.
+  await Promise.all([...serverSkinRigs(shard)].filter(ref => !assets.has(ref)).map(async ref => {
+    const bytes = authorSlug !== undefined ? await folderClosureFile(product, ref) : await folderClosureFile(product, ref).catch(() => undefined);
+    if (bytes !== undefined) assets.set(ref, bytes);
+  }));
   return { shard, assets, product, rapier };
 }
