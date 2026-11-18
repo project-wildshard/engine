@@ -459,8 +459,11 @@ jobs:
           persist-credentials: false
       - name: Select the committed or qualification ledger
         id: baseline
-        if: ${{ inputs.memory_record || hashFiles('scripts/memory/ledger-ratchet.json') != '' }}
-        run: echo "selected=true" >> "$GITHUB_OUTPUT"
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        # a file test, not hashFiles: until the qualification run commits the ratchet there is no file to hash, and a
+        # hashFiles of a missing source is refused (test-build-tools: workflow cache keys hash only committed sources)
+        run: if [[ "$MEMORY_RECORD" == true || -f scripts/memory/ledger-ratchet.json ]]; then echo "selected=true" >> "$GITHUB_OUTPUT"; fi
       - if: steps.baseline.outputs.selected == 'true'
         uses: ./.github/actions/ring-setup
         with:
@@ -503,8 +506,10 @@ jobs:
           persist-credentials: false
       - name: Select the committed or qualification footprint
         id: baseline
-        if: ${{ inputs.memory_record || hashFiles('scripts/memory/footprint-ratchet.json') != '' }}
-        run: echo "selected=true" >> "$GITHUB_OUTPUT"
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        # a file test, not hashFiles, as the ledger guard above: the ratchet is absent until its qualification run
+        run: if [[ "$MEMORY_RECORD" == true || -f scripts/memory/footprint-ratchet.json ]]; then echo "selected=true" >> "$GITHUB_OUTPUT"; fi
       - if: steps.baseline.outputs.selected == 'true'
         uses: ./.github/actions/ring-setup
       - if: steps.baseline.outputs.selected == 'true'
