@@ -1,6 +1,6 @@
 // LAND-SIMPLIFY LS5 (J258): main's CI verdict, reported by a small watcher instead of by land. Jake, 2026-11-11:
 // land returns as soon as main is pushed; "a receipt line + a direct message to that agent" on red, and the
-// coordinator assigns the fix if the lander is gone.
+// buddy-engine gets the red if a lander is unreachable.
 //
 //   node scripts/main-watch.mjs                     judge every finished main ci run not judged yet (tick or by hand)
 //   node scripts/main-watch.mjs --follow=<sha> [--lane=<name>] [--pane=<herdr pane>] [--after-push=<s>]
@@ -246,7 +246,8 @@ export function sweep(io,hint={}){
       const {run}=verdict;
       // Everything a report needs is read first; the run is recorded; only then does the report go out. A failed
       // read leaves the run for the next sweep, and a report is never sent twice.
-      /** @type {string[]} */const lines=[];/** @type {{lane:string,pane:string|undefined,text:string}[]} */const messages=[];
+      /** @type {string[]} */const lines=[];/** @type {{lane:string,pane:string|undefined,text:string,lander?:true}[]} */const messages=[];
+      /** @type {string|undefined} */let buddyAlert;
       if(verdict.kind==='superseded')lines.push(run.started===false
         ?`main ${short(run.head_sha)} skipped (pending, replaced) by ${short(verdict.by)} (run ${run.id}; never started; never red)`
         :`main ${short(run.head_sha)} superseded by ${short(verdict.by)} (run ${run.id} cancelled; never red)`);
@@ -268,19 +269,28 @@ export function sweep(io,hint={}){
         else{
           const failed=io.failed(run.id).join(' | ')||'see the run',url=`https://github.com/${io.repo}/actions/runs/${run.id}`,panes=io.panes();
           lines.push(`MAIN RED ${range} run ${run.id}: landers ${named}; failed: ${failed}`);
-          for(const row of found)if(row.lander!==undefined)messages.push({lane:row.lander.lane,pane:row.lander.pane??(row.lander.slug===''?undefined:paneFor(panes,row.lander.slug)),
+          for(const row of found)if(row.lander!==undefined)messages.push({lane:row.lander.lane,lander:true,pane:row.lander.pane??(row.lander.slug===''?undefined:paneFor(panes,row.lander.slug)),
             text:`main-watch: MAIN RED on engine main ${range} (${url}); failed: ${failed}. You landed ${short(row.sha)}: fix forward now (J249).`});
-          for(const fixer of io.fixers())messages.push({lane:fixer,pane:undefined,
+          buddyAlert=`main-watch: MAIN RED on engine main ${range} (${url}); landers ${named}; failed: ${failed}. A lander could not be reached. Please fix forward now (J249).`;
+          for(const fixer of new Set(io.fixers()))messages.push({lane:fixer,pane:undefined,
             text:`main-watch: MAIN RED on engine main ${range} (${url}); landers ${named}; failed: ${failed}. You are the forward fixer (M2): fix forward now, or confirm a lander has it.`});
         }
       }
       state.judged.push(run.id);if(verdict.kind==='dispatch')state.dispatched.push(run.head_sha);writeState(io.state,state);
       if(verdict.kind==='dispatch')io.dispatch();
       for(const line of lines)io.receipt(line);
+      let needsBuddy=!messages.some(message=>message.lander);
+      let buddyAttempted=false;
       for(const message of messages){
         const how=message.pane!==undefined&&io.send(message.pane,message.text)?`sent to pane ${message.pane}`
           :io.prompt(message.lane,message.text)?`prompted herdr agent ${message.lane}`:'';
-        io.receipt(`MAIN RED message to ${message.lane} ${how===''?'not delivered (no pane, no herdr agent by that name): the coordinator assigns the fix':how}`);
+        if(message.lander&&how==='')needsBuddy=true;
+        if(message.lane==='buddy-engine')buddyAttempted=true;
+        io.receipt(`MAIN RED message to ${message.lane} ${how===''?'not delivered (no reachable pane or herdr agent)':how}`);
+      }
+      if(needsBuddy&&!buddyAttempted&&buddyAlert!==undefined){
+        const delivered=io.prompt('buddy-engine',buddyAlert);
+        io.receipt(`main red fallback to buddy-engine ${delivered?'prompted herdr agent buddy-engine':'not delivered (herdr agent unreachable)'}`);
       }
     }
     return verdicts;

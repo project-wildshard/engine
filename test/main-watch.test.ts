@@ -299,3 +299,19 @@ test('M2: a red also prompts the forward fixer by herdr agent name; a lander wit
   expect(w.receipts).toContain('MAIN RED message to codex-tc48 prompted herdr agent codex-tc48');
   expect(w.receipts).toContain('MAIN RED message to codex-pins prompted herdr agent codex-pins');
 });
+
+test.each(['missing lander', 'unrecorded lander', 'configured buddy'])('A2: a red with %s reaches buddy-engine once', mode => {
+  const w = world(replay), io = fake(mode, w);
+  sweep(io);
+  w.agents = ['buddy-engine'];
+  if (mode === 'configured buddy') w.fixers = ['buddy-engine'];
+  w.runs = [...replay, run(42970000008, 'aaaa1111', 'failure', 50)];
+  w.tip = sha('aaaa1111');
+  const hint = mode === 'unrecorded lander' ? {} : { sha: w.tip, lane: 'gone-lander' };
+  sweep(io, hint);
+  sweep(io, hint);
+  expect(w.sent).toEqual([]);
+  expect(w.prompted?.map(([agent]) => agent)).toEqual(['buddy-engine']);
+  expect(w.prompted?.[0]?.[1]).toContain('fix forward now');
+  expect(w.prompted?.[0]?.[1]).toContain('tests (3)');
+});
