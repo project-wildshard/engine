@@ -101,7 +101,7 @@ test('collapsed strip reads current totals and expands with full allocation deta
 });
 
 test('phone rows use the live ledger, show the model range and flag a subsystem above budget', async () => {
-  vi.stubGlobal('__wildshardMemory', { counters: () => ({ gpu: { buffer: 200e6, texture: 10e6 }, workers: { 'decoder/wasm': 2e6 } }) });
+  vi.stubGlobal('__wildshardMemory', { counters: () => ({ gpu: { buffer: 300e6, texture: 10e6 }, workers: { 'decoder/wasm': 2e6 } }) });
   try {
     setDev(true);
     const scope = owner(), input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: 0, commons: 0, overlap: 0 };
@@ -113,7 +113,7 @@ test('phone rows use the live ledger, show the model range and flag a subsystem 
     expect(document.querySelector('.ws-grid-budget-x')?.textContent).toContain('PHONE');
     expect(document.querySelector('.ws-grid-budget-x')?.getAttribute('title')).toContain('Predicted phone range');
     const geometry = document.querySelector<HTMLElement>('[data-subsystem="geometry"]');
-    expect(geometry?.dataset).toMatchObject({ liveBytes: '200000000', budgetBytes: '150000000', tone: 'red' });
+    expect(geometry?.dataset).toMatchObject({ liveBytes: '300000000', budgetBytes: '150000000', tone: 'red' });
     expect(geometry?.querySelector('meter')?.getAttribute('max')).toBe('150000000');
     expect(document.querySelector<HTMLElement>('[data-subsystem="workers"]')?.dataset['liveBytes']).toBe('2000000');
   } finally { vi.unstubAllGlobals(); }

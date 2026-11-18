@@ -1,173 +1,253 @@
 {
  "version": 1,
- "note": "ENGINE-MEMORY EM11: the iPhone 17 Pro's WebContent [K] from Mac readings (scripts/memory/phoneModel.mjs says how; scripts/memory/phone-fit.mjs refits). alpha and scale: the anchor's bounds (v0.1.36 Nine rev 2 died on the phone after its last compile:after, lived through every boot trace window before). ledger: settled WebKit [K] on the ledger [L] over the four zones, missPct the worst leave-one-out miss. chromium.loadingPerRenderer: the phone's loading peak over boot-memory-peak's renderer peak under the card. zones: the fit's data and each zone's phone prediction, MB decimal.",
- "measured": "2026-11-17",
- "host": "Mac mini (Apple M5 Pro, macOS 27.0), Playwright WebKit 27.2 headless, phone view 402x874 @3, phone tier, Low; engine d740b00a (zones, 3 runs each, and one Chromium probe each) and 6f53e748 (anchor); both lines at CRASH_LINE, 2048 MiB",
+ "note": "ENGINE-MEMORY EM11: the iPhone 17 Pro's WebContent [K] from Mac readings (scripts/memory/phoneModel.mjs says how; scripts/memory/phone-fit.mjs refits). alpha and scale: the anchor's bounds (v0.1.36 Nine rev 2 died on the phone after its last compile:after, lived through every boot trace window before). ledger: settled WebKit [K] on the ledger [L] over the seven zones, missPct the worst leave-one-out miss. chromium.loadingPerRenderer: the phone's loading peak over boot-memory-peak's renderer peak under the card. zones: the fit's data and each zone's phone prediction, MB decimal. instrument: every reading had the Web Inspector's Network and Console domains off (measure.mjs --instrument=minimal, EM11b); a full-mode reading reads 60-290 MB high and does not fit this model.",
+ "measured": "2026-11-18",
+ "host": "Mac mini (Apple M5 Pro, macOS 27.0), Playwright WebKit 27.2 headless, phone view 402x874 @3, phone tier, Low, instrument minimal; engine 037d9f15 (zones, 3 runs each, and one Chromium probe each, Driftwood's probe stalled at gameplay) and 6f53e748 (anchor, 4 runs); both lines at CRASH_LINE, 2048 MiB",
  "limitMB": 2147,
  "limitHighMB": 2147,
  "gpuFloorMB": 17.6,
  "alpha": {
-  "low": 0.199,
-  "high": 0.474
+  "low": 0.309,
+  "high": 0.744
  },
  "scale": {
-  "low": 0.606,
-  "high": 0.816
+  "low": 0.648,
+  "high": 0.911
  },
+ "instrument": "minimal",
  "ledger": {
   "webcontent": {
-   "floorMB": -47.5,
-   "perMB": 10.851
+   "floorMB": 381.3,
+   "perMB": 3.328
   },
   "gpu": {
-   "floorMB": 262.7,
-   "perMB": 2.587
+   "floorMB": 331.3,
+   "perMB": 1.255
   },
-  "missPct": 32.3
+  "missPct": 30.8
  },
  "peakOverSettled": {
-  "low": 1.257,
-  "central": 1.375,
-  "high": 1.643
+  "low": 1.195,
+  "central": 1.337,
+  "high": 1.74
  },
  "chromium": {
   "loadingPerRenderer": {
-   "low": 1.178,
-   "central": 2.03,
-   "high": 2.937
+   "low": 1.183,
+   "central": 2.086,
+   "high": 2.599
   }
  },
  "anchor": {
   "last": "compile:after",
-  "runs": 3,
+  "runs": 4,
   "died": [
    {
     "step": "compile:after",
-    "webcontentMB": 1787.005544,
-    "gpuMB": 878.659168
+    "webcontentMB": 1641.54832,
+    "gpuMB": 837.322312
    },
    {
     "step": "compile:after",
-    "webcontentMB": 1800.850048,
-    "gpuMB": 1758.201512
+    "webcontentMB": 1622.968792,
+    "gpuMB": 1713.948256
    },
    {
     "step": "compile:after",
-    "webcontentMB": 1843.432088,
-    "gpuMB": 1839.1876
+    "webcontentMB": 1625.934344,
+    "gpuMB": 1702.561376
+   },
+   {
+    "step": "compile:after",
+    "webcontentMB": 1630.783984,
+    "gpuMB": 1740.359288
    }
   ],
   "lived": [
    {
     "step": "compile:before",
-    "webcontentMB": 1686.653472,
-    "gpuMB": 826.68912
+    "webcontentMB": 1550.289368,
+    "gpuMB": 830.932528
    },
    {
     "step": "compile:before",
-    "webcontentMB": 1785.432704,
-    "gpuMB": 879.98632
+    "webcontentMB": 1538.476432,
+    "gpuMB": 825.787952
    },
    {
     "step": "compile:before",
-    "webcontentMB": 1711.704632,
-    "gpuMB": 936.232544
+    "webcontentMB": 1541.753256,
+    "gpuMB": 835.601968
+   },
+   {
+    "step": "compile:before",
+    "webcontentMB": 1537.903016,
+    "gpuMB": 831.04724
    }
   ],
   "consistent": true
  },
  "zones": {
   "_template": {
-   "build": "d740b00a-mwll2ktb",
+   "build": "037d9f15-mwlpyl0u",
    "runs": 3,
    "settledMB": {
-    "webcontent": 522,
-    "gpu": 347
+    "webcontent": 469,
+    "gpu": 291
    },
    "ledgerMB": {
     "ram": 47.5,
     "gpu": 28
    },
    "phonePlayingMB": {
-    "low": 516,
-    "central": 633,
-    "high": 695
+    "low": 481,
+    "central": 613,
+    "high": 677
    },
    "phoneLoadingMB": {
-    "low": 720,
-    "central": 846,
-    "high": 969
+    "low": 667,
+    "central": 820,
+    "high": 938
    },
-   "chromiumLoadingRendererMB": 330
+   "chromiumLoadingRendererMB": 415
   },
   "sunscar-dunes": {
-   "build": "d740b00a-mwll2ktb",
+   "build": "037d9f15-mwlpyl0u",
    "runs": 3,
    "settledMB": {
-    "webcontent": 530,
-    "gpu": 501
+    "webcontent": 480,
+    "gpu": 443
    },
    "ledgerMB": {
     "ram": 64.1,
     "gpu": 89.2
    },
    "phonePlayingMB": {
-    "low": 614,
-    "central": 693,
-    "high": 827
+    "low": 587,
+    "central": 704,
+    "high": 825
    },
    "phoneLoadingMB": {
-    "low": 847,
-    "central": 979,
-    "high": 1141
+    "low": 832,
+    "central": 1017,
+    "high": 1169
    },
-   "chromiumLoadingRendererMB": 451
+   "chromiumLoadingRendererMB": 450
   },
   "pine-hollow": {
-   "build": "d740b00a-mwll2ktb",
+   "build": "037d9f15-mwlpyl0u",
    "runs": 3,
    "settledMB": {
-    "webcontent": 961,
-    "gpu": 542
+    "webcontent": 742,
+    "gpu": 487
    },
    "ledgerMB": {
-    "ram": 97.7,
+    "ram": 97.9,
     "gpu": 128.2
    },
    "phonePlayingMB": {
-    "low": 900,
-    "central": 1138,
-    "high": 1212
+    "low": 785,
+    "central": 989,
+    "high": 1103
    },
    "phoneLoadingMB": {
-    "low": 1127,
-    "central": 1430,
-    "high": 1519
+    "low": 1001,
+    "central": 1247,
+    "high": 1407
    },
-   "chromiumLoadingRendererMB": 956
+   "chromiumLoadingRendererMB": 846
   },
   "nine-dragon-stack": {
-   "build": "d740b00a-mwll2ktb",
+   "build": "037d9f15-mwlpyl0u",
    "runs": 3,
    "settledMB": {
-    "webcontent": 1010,
-    "gpu": 747
+    "webcontent": 737,
+    "gpu": 520
    },
    "ledgerMB": {
-    "ram": 86.8,
+    "ram": 54.4,
     "gpu": 174.4
    },
    "phonePlayingMB": {
-    "low": 1054,
-    "central": 1255,
-    "high": 1419
+    "low": 803,
+    "central": 1001,
+    "high": 1129
    },
    "phoneLoadingMB": {
-    "low": 1586,
-    "central": 2062,
-    "high": 2177
+    "low": 1334,
+    "central": 1743,
+    "high": 1888
    },
-   "chromiumLoadingRendererMB": 1091
+   "chromiumLoadingRendererMB": 926
+  },
+  "nalati-grasslands": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 738,
+    "gpu": 537
+   },
+   "ledgerMB": {
+    "ram": 123.2,
+    "gpu": 125
+   },
+   "phonePlayingMB": {
+    "low": 814,
+    "central": 1011,
+    "high": 1145
+   },
+   "phoneLoadingMB": {
+    "low": 1075,
+    "central": 1338,
+    "high": 1511
+   },
+   "chromiumLoadingRendererMB": 870
+  },
+  "driftwood-isle": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 734,
+    "gpu": 523
+   },
+   "ledgerMB": {
+    "ram": 85.5,
+    "gpu": 78.3
+   },
+   "phonePlayingMB": {
+    "low": 803,
+    "central": 1000,
+    "high": 1129
+   },
+   "phoneLoadingMB": {
+    "low": 983,
+    "central": 1194,
+    "high": 1382
+   },
+   "chromiumLoadingRendererMB": null
+  },
+  "far-reach": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 464,
+    "gpu": 519
+   },
+   "ledgerMB": {
+    "ram": 36.9,
+    "gpu": 173.7
+   },
+   "phonePlayingMB": {
+    "low": 619,
+    "central": 729,
+    "high": 880
+   },
+   "phoneLoadingMB": {
+    "low": 807,
+    "central": 993,
+    "high": 1134
+   },
+   "chromiumLoadingRendererMB": 518
   }
  }
 }

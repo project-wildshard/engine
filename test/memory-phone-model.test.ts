@@ -1,16 +1,19 @@
 // ENGINE-MEMORY EM11: the phone chain that replaced "Chromium renderer x 2.0". The one phone anchor is staging v0.1.36
 // with Nine rev 2, which Jake's iPhone 17 Pro killed right after the boot trace's last `compile:after` (mini QA 19).
+// EM11b: the anchor and the zones are read with measure.mjs's instrument minimal (no Web Inspector Network retention);
+// the first anchor reading (instrument full) is kept beside it to pin what that changed.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { CRASH_LINE } from '../src/client/game/grid/budgetOverlay';
 import { anchorBounds, ledgerSplit, loadPhoneModel, phoneFromChromium, phoneFromLedger, phoneFromWebKit, phonePeakFromWebKit, rangeText } from '../scripts/memory/phoneModel.mjs';
-import { fitPhoneModel, lineFit } from '../scripts/memory/phone-fit.mjs';
+import { ANCHOR_RENDERER_MB, fitPhoneModel, lineFit } from '../scripts/memory/phone-fit.mjs';
 import { traceToControl } from '../scripts/memory/measure.mjs';
 
 const MB = 1e6;
 interface Window { step: string; peak: { webcontent: number; gpu: number } }
-const anchor = JSON.parse(readFileSync(new URL('fixtures/memory/phone-anchor-v0136-nine.json', import.meta.url), 'utf8')) as { runs: Window[][] };
-const model = loadPhoneModel() as { limitMB: number; limitHighMB: number; gpuFloorMB: number; alpha: { low: number; high: number }; scale: { low: number; high: number };
+const anchor = JSON.parse(readFileSync(new URL('fixtures/memory/phone-anchor-v0136-nine.json', import.meta.url), 'utf8')) as { instrument: string; runs: Window[][] };
+const anchorFull = JSON.parse(readFileSync(new URL('fixtures/memory/phone-anchor-v0136-nine-full.json', import.meta.url), 'utf8')) as { instrument: string; runs: Window[][] };
+const model = loadPhoneModel() as { instrument: string; limitMB: number; limitHighMB: number; gpuFloorMB: number; alpha: { low: number; high: number }; scale: { low: number; high: number };
   chromium: { loadingPerRenderer: { low: number; central: number; high: number } }; zones: Record<string, { phoneLoadingMB: { low: number; central: number; high: number }; phonePlayingMB: { central: number } }> };
 
 test('the chip and the calibration use the one device limit, ActiveHard 2048 MiB', () => {
@@ -20,8 +23,8 @@ test('the chip and the calibration use the one device limit, ActiveHard 2048 MiB
 });
 
 test('v0.1.36 Nine, the boot the phone died in: the chain puts its last compile:after window at or over the line, and every window before it under the higher line', () => {
-  // On the exact line one of the three Mac runs needs alpha over 0.42 for its death window, so its central figure sits
-  // just under the line (2.08 GB); the median run and every high end are over it.
+  // The committed range is the runs' median bounds: the run whose death window held the least GPU (837 MB, where the
+  // other three held 1.7 GB) needs alpha over 0.62, so its central figure sits under the line; every high end is over it.
   const centrals: number[] = [];
   for (const windows of anchor.runs) {
     const at = windows.map((w) => w.step).lastIndexOf('compile:after');
@@ -31,9 +34,25 @@ test('v0.1.36 Nine, the boot the phone died in: the chain puts its last compile:
     for (const lived of windows.slice(0, at)) expect(phoneFromWebKit(lived.peak, model).central).toBeLessThan(model.limitHighMB * MB);
   }
   // the committed range is the runs' median bounds, so it holds for the median run at least at its low end
-  expect(centrals.sort((a, b) => a - b)[1]).toBeGreaterThanOrEqual(model.limitMB * MB);
+  expect(centrals.sort((a, b) => a - b)[Math.floor(centrals.length / 2)]).toBeGreaterThanOrEqual(model.limitMB * MB);
   const lows = anchor.runs.map((windows) => phoneFromWebKit(windows[windows.map((w) => w.step).lastIndexOf('compile:after')]!.peak, model).low).sort((a, b) => a - b);
   expect(lows[1]).toBeGreaterThanOrEqual(model.limitMB * MB * 0.99);
+});
+
+test('EM11b: the model, its anchor and its zones are all read without the inspector\'s Network retention', () => {
+  expect(anchor.instrument).toBe('minimal');
+  expect(model.instrument).toBe('minimal');
+  expect(anchorFull.instrument).toBe('full');
+});
+
+test('EM11b: the inspector inflated the anchor\'s death window, and the anchor absorbed it into the GPU share', () => {
+  const died = (runs: Window[][]) => runs.map((w) => w[w.map((x) => x.step).lastIndexOf('compile:after')]!.peak.webcontent).sort((a, b) => a - b);
+  const clean = died(anchor.runs), full = died(anchorFull.runs);
+  // WebContent in the window the phone died in: ~1.63 GB clean against ~1.80 GB with the Network domain on
+  expect(full[1]! - clean[1]!).toBeGreaterThan(120 * MB);
+  // the same phone death on lower WebContent needs a larger share of the GPU process: alpha rose (was 0.20-0.47)
+  const before = anchorFull.runs.map((w) => anchorBounds(w, 'compile:after', model).alpha.low).sort((a, b) => a - b);
+  expect(model.alpha.low).toBeGreaterThan(before[1]!);
 });
 
 test('the anchor bounds both families from both sides and agrees with itself', () => {
@@ -93,6 +112,11 @@ test('the fit reproduces the committed alpha and scale from the committed anchor
   expect(fitted.scale).toEqual(model.scale);
   expect(fitted.anchor.consistent).toBe(true);
   expect(fitted.chromium?.loadingPerRenderer.central).toBeGreaterThan(0);
+  // the zones' ratio here is ~2.7; held to the anchor's floor, a light ratio still puts v0.1.36's lowest renderer at the line
+  const light = fitPhoneModel({ anchor: anchor.runs.map((traceCheckpoints) => ({ traceCheckpoints })), last: 'compile:after', zones: [[zone], [zone2], [zone3]], chromium: { z: [3000 * MB] },
+    limitMB: model.limitMB, limitHighMB: model.limitHighMB, gpuFloorMB: model.gpuFloorMB });
+  expect(light.chromium!.loadingPerRenderer.central * Math.min(...ANCHOR_RENDERER_MB)).toBeGreaterThanOrEqual(model.limitMB - 1);
+  expect(light.chromium!.loadingPerRenderer.high).toBeGreaterThanOrEqual(light.chromium!.loadingPerRenderer.central);
 });
 
 test('Template, Dunes, Pine and Nine each carry a prediction with its error bar', () => {
@@ -101,7 +125,8 @@ test('Template, Dunes, Pine and Nine each carry a prediction with its error bar'
     expect(row.phoneLoadingMB.low).toBeLessThanOrEqual(row.phoneLoadingMB.central);
     expect(row.phoneLoadingMB.central).toBeLessThanOrEqual(row.phoneLoadingMB.high);
   }
-  // Nine on d740b00a: its loading peak's central figure is under the line (2.06 GB), but the bar still crosses it
-  expect(model.zones['nine-dragon-stack']!.phoneLoadingMB.high).toBeGreaterThan(model.limitMB);
+  // Nine on 037d9f15: its loading peak's upper bound is under the crash line but over J410's 1.5 GB loading line
+  expect(model.zones['nine-dragon-stack']!.phoneLoadingMB.high).toBeLessThan(model.limitMB);
+  expect(model.zones['nine-dragon-stack']!.phoneLoadingMB.high).toBeGreaterThan(1500);
   expect(model.chromium.loadingPerRenderer.low).toBeLessThan(model.chromium.loadingPerRenderer.high);
 });

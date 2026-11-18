@@ -13,6 +13,10 @@ import { stats } from './measure.mjs';
 
 const MB = 1e6;
 const median = (/** @type {number[]} */ xs) => stats(xs).median;
+/** The anchor's own Chromium renderer loading peaks, MB (mini-memcal 2026-11-17: v0.1.36 + Nine rev 2, Low, at "boot plan
+ *  complete / compile:after"). The phone died there, so the Chromium reader's central factor never puts the lowest of
+ *  them under the limit, whatever the zones' ratio (EM11b: clean zone peaks put that ratio at 1.9, the anchor at 2.09). */
+export const ANCHOR_RENDERER_MB = Object.freeze([1029, 1061, 1063]);
 
 /** Least squares y = floor + perMB x. @param {readonly [number, number][]} points MB pairs */
 export function lineFit(points) {
@@ -33,8 +37,8 @@ export function zoneSummary(runs) {
     checkpoints: ok.map((r) => r.checkpoints) };
 }
 
-/** Fit the model. @param {{anchor:any[], last:string, zones:any[][], chromium:Record<string, number[]>, limitMB:number, limitHighMB:number, gpuFloorMB:number}} input */
-export function fitPhoneModel({ anchor, last, zones, chromium, limitMB, limitHighMB, gpuFloorMB }) {
+/** Fit the model. @param {{anchor:any[], last:string, zones:any[][], chromium:Record<string, number[]>, limitMB:number, limitHighMB:number, gpuFloorMB:number, anchorRendererMB?:readonly number[]}} input */
+export function fitPhoneModel({ anchor, last, zones, chromium, limitMB, limitHighMB, gpuFloorMB, anchorRendererMB = ANCHOR_RENDERER_MB }) {
   // EM11b: every run read with one inspector mode (a run before measure.mjs named it is `full`)
   const modes = [...new Set([...anchor, ...zones.flat()].map((r) => r.instrument ?? 'full'))];
   if (modes.length !== 1) throw new Error(`the runs mix inspector modes (${modes.join(', ')}): refit on one`);
@@ -64,13 +68,21 @@ export function fitPhoneModel({ anchor, last, zones, chromium, limitMB, limitHig
   return { ...model, instrument: modes[0],
     ledger: { webcontent: { floorMB: round(wc.floorMB, 1), perMB: round(wc.perMB) }, gpu: { floorMB: round(gp.floorMB, 1), perMB: round(gp.perMB) }, missPct: round(Math.max(...misses) * 100, 1) },
     peakOverSettled: { low: round(Math.min(...ratios)), central: round(median(ratios)), high: round(Math.max(...ratios)) },
-    chromium: withR.length === 0 ? null : { loadingPerRenderer: { low: round(Math.min(...withR.map((r) => r.peakPhone.low / r.rendererLoadingPeak))), central: round(median(withR.map((r) => r.peakPhone.central / r.rendererLoadingPeak))), high: round(Math.max(...withR.map((r) => r.peakPhone.high / r.rendererLoadingPeak))) } },
+    chromium: withR.length === 0 ? null : chromiumBar(withR, limitMB / Math.min(...anchorRendererMB), round),
     anchor: { last, runs: bounds.length, died: bounds.map((b) => b.died), lived: bounds.map((b) => b.lived), consistent: bounds.every((b) => b.consistent) },
     zones: Object.fromEntries(rows.map((r) => [r.chunk, { build: r.build, runs: r.runs, settledMB: { webcontent: round(r.settled.webcontent / MB, 0), gpu: round(r.settled.gpu / MB, 0) },
       ledgerMB: { ram: round(r.ledger.ram / MB, 1), gpu: round(r.ledger.gpu / MB, 1) },
       phonePlayingMB: Object.fromEntries(Object.entries(r.settledPhone).map(([k, v]) => [k, round(v / MB, 0)])),
       phoneLoadingMB: Object.fromEntries(Object.entries(r.peakPhone).map(([k, v]) => [k, round(v / MB, 0)])),
       chromiumLoadingRendererMB: r.rendererLoadingPeak === null ? null : round(r.rendererLoadingPeak / MB, 0) }])) };
+}
+
+/** The Chromium reader's bar: the zones' phone loading peak over their renderer peak, its central held at or over the
+ *  anchor's floor. @param {any[]} rows @param {number} floor @param {(x: number) => number} round */
+function chromiumBar(rows, floor, round) {
+  const central = Math.max(median(rows.map((r) => r.peakPhone.central / r.rendererLoadingPeak)), floor);
+  const high = Math.max(Math.max(...rows.map((r) => r.peakPhone.high / r.rendererLoadingPeak)), central);
+  return { loadingPerRenderer: { low: round(Math.min(...rows.map((r) => r.peakPhone.low / r.rendererLoadingPeak))), central: round(central), high: round(high) } };
 }
 
 /** @param {string[]} argv */
