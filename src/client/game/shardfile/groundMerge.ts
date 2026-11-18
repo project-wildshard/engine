@@ -21,6 +21,10 @@
 import { Box3, BufferAttribute, BufferGeometry, InterleavedBufferAttribute, Matrix3, Matrix4, Mesh, Sphere, Vector3, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { MERGED_COPY, MERGED_VIEW, SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
+import { ownedArray, ownedCopy, type OwnedLabel } from '@wildshard/engine/core/ownedBuffer';
+
+/** EM6: each member's transformed arrays, kept so a rebuild only rewrites what moved */
+const MERGE_ARRAYS: OwnedLabel = { owner: 'engine/ground-merge', asset: 'member-arrays', kind: 'geometry-cpu' };
 
 const HALF = 250, COARSE = 125, BLOCK = 250;
 /** an attribute's change count (an interleaved one counts on its buffer) */
@@ -149,7 +153,7 @@ export class GroundMerge {
         const directed = turned && (name === 'normal' || name === 'tangent') && attribute.itemSize >= 3;
         const key = name === 'position' || directed ? transform : '', known = member.attributes.get(name);
         if (known !== undefined && known.key === key && known.version === versionOf(attribute)) return known.values;
-        const size = attribute.itemSize, out = new Float32Array(attribute.count * size);
+        const size = attribute.itemSize, out = ownedArray(Float32Array, attribute.count * size, MERGE_ARRAYS);
         if (name === 'position') {
           // Vector3.applyMatrix4, inlined
           const e = toParent.elements, plain = plainFloats(position);
@@ -235,7 +239,7 @@ export class GroundMerge {
       }
       kept[written++] = a; kept[written++] = b; kept[written++] = c;
     }
-    const values = kept.slice(0, written);
+    const values = ownedCopy(kept.subarray(0, written), MERGE_ARRAYS);
     member.triangles = { key, version, values };
     return values;
   }

@@ -568,6 +568,7 @@
     "./render/displayColour": "./src/client/engine/render/displayColour.ts",
     "./render/textureBytes": "./src/client/engine/render/textureBytes.ts",
     "./core/memoryAttribution": "./src/shared/engine/core/memoryAttribution.ts",
+    "./core/ownedBuffer": "./src/shared/engine/core/ownedBuffer.ts",
     "./core/practiceRoomState": "./src/shared/engine/core/practiceRoomState.ts",
     "./render/viewmodelFeel": "./src/client/engine/render/viewmodelFeel.ts",
     "./saves/runtime": "./src/shared/engine/saves/runtime.ts",

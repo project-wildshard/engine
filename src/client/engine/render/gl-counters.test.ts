@@ -85,10 +85,10 @@ test("an owner label moves a resource's bytes; Developer's journal stacks on the
   expect(Object.hasOwn(gl, 'bufferData')).toBe(false);
 });
 
-test('the harness read-out names GPU and RAM kinds', () => {
+test('the harness read-out names GPU, RAM and worker kinds', () => {
   publishMemoryCounters();
   const hook: unknown = Reflect.get(globalThis, '__wildshardMemory');
   expect(typeof Reflect.get(hook as object, 'counters')).toBe('function');
   const read = memoryCounters();
-  expect(Object.keys(read).sort()).toEqual(['gpu', 'ram']);
+  expect(Object.keys(read).sort()).toEqual(['gpu', 'ram', 'workers']);
 });

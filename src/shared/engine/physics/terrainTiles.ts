@@ -4,6 +4,7 @@ import { withOwner } from '../app/ownership';
 import { decodeTerrainTile, type TerrainTileData } from '@wildshard/format/terrainTileBytes';
 import type { Physics } from './Physics';
 import { groups } from './groups';
+import { ownedArray } from '../core/ownedBuffer';
 import { isTerrainCollider, tagCollider } from './surface';
 
 /** Install the baked critical heightfield in the local physics world; the owning scope removes it on unload. */
@@ -15,7 +16,7 @@ export function addBakedTerrainCollider(physics: Physics, bytes: Uint8Array, sco
 
 /** A heights lattice (row-major, as the wire carries it) as the world's ground heightfield, owned by `scope`. */
 export function addTerrainTileCollider(physics: Physics, data: Pick<TerrainTileData, 'resolution' | 'x' | 'z' | 'size' | 'heights'>, scope: Scope): Collider {
-  const r = data.resolution, heights = new Float32Array(r * r);
+  const r = data.resolution, heights = ownedArray(Float32Array, r * r, { owner: 'engine/physics', asset: 'terrain-heightfield', kind: 'physics' });
   for (let z = 0; z < r; z++) for (let x = 0; x < r; x++) heights[x * r + z] = data.heights[z * r + x] ?? 0;
   const collider = withOwner(scope, () => physics.world.createCollider(physics.R.ColliderDesc.heightfield(r - 1, r - 1, heights, { x: data.size, y: 1, z: data.size })
     .setTranslation(data.x + data.size / 2, 0, data.z + data.size / 2).setCollisionGroups(groups('WORLD')).setFriction(0.9)));

@@ -1,5 +1,6 @@
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { bootTask, bootProgress, bootTiming } from '@wildshard/engine/boot/timing';
+import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
 import { contentHash } from '@wildshard/engine/game/shardfile/contentHash';
@@ -175,7 +176,7 @@ export async function readServerFolder(root: string, build: () => string, source
     const bytes = await read(file.path);
     if (bytes.length !== file.bytes || await contentHash(bytes) !== file.hash) throw new Error('Server input hash or size mismatch');
     bootProgress('server:verified-input-bytes', bytes.byteLength, null, 'verified-input-bytes');
-    return bytes;
+    return adoptBuffer(bytes, { owner: 'server/inputs', asset: file.path, kind: 'wire' });
   });
   const product = shardFolderData(shard, root, verified, !built, built, nodeNamedJsonCheck, { files: true });
   const assets = new Map<string, Uint8Array>();

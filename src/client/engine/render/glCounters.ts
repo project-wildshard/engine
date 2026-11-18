@@ -1,5 +1,6 @@
 import { installAllocationJournal, type JournalSink } from './allocationJournal';
 import { memoryAttribution, type MemoryDomain, type MemoryLabel } from '../../../shared/engine/core/memoryAttribution';
+import { workerMemory } from '../../../shared/engine/core/workerMemory';
 
 /** ENGINE-MEMORY EM5: the WebGL ledger is always on. Developer's journal keeps one row per resource for the memory card;
  * this one keeps only counters (bytes by kind, by format and by owner), on every page, from the renderer's first call.
@@ -78,15 +79,17 @@ export class GlCounters implements JournalSink {
 /** The page's counters. */
 export const glCounters: GlCounters = new GlCounters();
 
-/** The ledger's read-out for harnesses (scripts/memory/measure.mjs reads it at each boot checkpoint): GPU counters and
- * the RAM kinds the attribution ledger observes, both in bytes. No Developer mode needed. */
-export function memoryCounters(): Record<MemoryDomain, Record<string, number>> {
-  return { gpu: glCounters.kinds(), ram: memoryAttribution.kinds('ram') };
+/** The ledger's read-out for harnesses (scripts/memory/measure.mjs reads it at each boot checkpoint): GPU counters, the
+ * RAM kinds the page's attribution ledger observes, and each worker isolate's RAM kinds as `<worker>/<kind>` (EM7), all
+ * in bytes. No Developer mode needed. */
+export function memoryCounters(): Record<MemoryDomain | 'workers', Record<string, number>> {
+  return { gpu: glCounters.kinds(), ram: memoryAttribution.kinds('ram'), workers: workerMemory.kinds() };
 }
 /** Publish `globalThis.__wildshardMemory` once. */
 export function publishMemoryCounters(): void {
   if (Reflect.get(globalThis, '__wildshardMemory') !== undefined) return;
-  Reflect.set(globalThis, '__wildshardMemory', Object.freeze({ counters: memoryCounters, gpu: () => glCounters.detail() }));
+  workerMemory.listen();
+  Reflect.set(globalThis, '__wildshardMemory', Object.freeze({ counters: memoryCounters, gpu: () => glCounters.detail(), owner: (buffer: object) => memoryAttribution.ownerOf(buffer, 'ram') }));
 }
 
 /** Counters on this context, from before its first storage call until the renderer is disposed. */

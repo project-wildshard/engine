@@ -1,5 +1,6 @@
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
+import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { parseNativeLoadoutRow, type NativeLoadoutRowSchema } from '@wildshard/format/nativeItems';
 import { borrowedDecisionAuthority } from '../shardfile/borrowedDecisions';
 import { decisionRuntime, focusPlayer, ShardDecisions, type DecisionRuntime } from '../shardfile/decisions';
@@ -137,6 +138,13 @@ export function trustedLevel(shard: Pick<Shardfile, 'identity' | 'authorCaps'>, 
   return { version: SIM_API_VERSION, id: shard.identity.slug, seed: shard.identity.seed, ground,
     player: { at: player.at, yaw: player.yaw, speed: Math.min(player.speed, shard.authorCaps.speed) }, entities: [], quests: [], weapon: HOST_PROBE };
 }
+/** EM6: the server's decoded terrain lattice, owned in the worker's ledger */
+function serverTerrain(bytes: Uint8Array): TerrainTileData {
+  const terrain: TerrainTileData = decodeTerrainTile(bytes);
+  adoptBuffer(terrain.heights, { owner: 'server/terrain', asset: 'terrain-heights', kind: 'physics' });
+  return terrain;
+}
+
 /** A cell's height for a body anywhere: a player on a road stands past its tile, and reads the tile's edge. Inside the tile this is the plain sample. */
 export const tileHeightAt = (terrain: TerrainTileData) => (x: number, z: number): number => terrainTileHeight(terrain, x, z, { boundary: 'clamp' });
 
@@ -144,7 +152,7 @@ export const tileHeightAt = (terrain: TerrainTileData) => (x: number, z: number)
 export function admittedTerrain(shard: Pick<Shardfile, 'terrain'>, assets: ReadonlyMap<string, Uint8Array>): { readonly bytes: Uint8Array; readonly heightAt: (x: number, z: number) => number } {
   const bytes = shard.terrain === null ? undefined : assets.get(shard.terrain.collider);
   if (bytes === undefined) throw new Error('Missing admitted terrain collider');
-  const terrain = decodeTerrainTile(bytes);
+  const terrain = serverTerrain(bytes);
   return { bytes, heightAt: tileHeightAt(terrain) };
 }
 /**
@@ -400,7 +408,7 @@ function shardfileSimInput(shard: Shardfile, assets: ReadonlyMap<string, Uint8Ar
   validateMeshEntryways(shard, assets);
   const bytes = shard.terrain === null ? undefined : assets.get(shard.terrain.collider);
   if (shard.terrain !== null && bytes === undefined) throw new Error('Missing admitted terrain collider');
-  const terrain = bytes === undefined ? undefined : decodeTerrainTile(bytes);
+  const terrain = bytes === undefined ? undefined : serverTerrain(bytes);
   const heightAt = shard.meshCollision === null ? terrain === undefined ? () => 0 : tileHeightAt(terrain)
     : clientGround(shard, assets).heightAt;
   const weapon = ports.weapon ?? HOST_PROBE;
@@ -455,7 +463,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     validateMeshEntryways(shard, assets);
     const bytes = shard.terrain === null ? undefined : assets.get(shard.terrain.collider);
     if (shard.terrain !== null && bytes === undefined) throw new Error('Missing admitted terrain collider');
-    const terrain = bytes === undefined ? undefined : decodeTerrainTile(bytes);
+    const terrain = bytes === undefined ? undefined : serverTerrain(bytes);
     if (terrain !== undefined) host.setHeightQuery(tileHeightAt(terrain));
     if (!ports.restoring && bytes !== undefined) addBakedTerrainCollider(host.physics, bytes, host.scope);
     const liftEntries = socketLiftEntries(shard.entryways), resetMovers = new Set(liftEntries.flatMap(entry => [entry.lift.mover, entry.lift.gate]));

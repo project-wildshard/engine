@@ -28,3 +28,13 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   exactly (15.30 MB). Its WebGL total (33.5 MB) does not match `gpu/angle/metal` (110 MB): ANGLE Metal holds 36 MB before
   the engine's first allocation and ~41 MB more than the API asked for by control; that gap is EM8's to name. NB1 on Nine,
   three alternating pairs: frame p95 42.6 ms with counters off, 41.3 ms on.
+- EM6 and EM7 (mini-em1b), one owner per buffer and workers that report in. `ownedBuffer.ts` makes, copies or adopts a
+  CPU buffer and counts it in the RAM ledger under an owner and kind, whatever its size: on Template the kept geometry
+  arrays average 26 KB, so a 64 KB floor would have left most of them out. A new census (`scripts/memory/census.mjs`)
+  wraps every way a page or worker makes an ArrayBuffer, holds each weakly, and at control lists the live ones by site and
+  ledger owner. Its first finding: Template's `partition_alloc/allocated_objects/partitions/array_buffer` (35.8 MB) is the
+  census's 32.5 MB rounded up to PartitionAlloc slots (35.4 MB in four buckets an order), so no capacity ledger can sit
+  within 10% of the partition itself; against what the page asked for, the ledger is at 93% (30.4 MB). The ground merge's
+  member arrays (13.4 MB) were the largest holder the ledger did not see. A typed view over a wasm memory names the
+  memory's own buffer, so the census leaves those out. Workers post their ledgers on a BroadcastChannel from
+  `installWorkerBootTiming`, so every engine worker reports without touching its message protocol.

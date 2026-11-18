@@ -1,6 +1,7 @@
 import { diagnosticNow } from '../core/clock';
 import { Scope } from '../app/scope';
 import type { BootTiming, BootTimingEntry } from './timing';
+import { reportWorkerMemory } from '../core/workerMemory';
 
 interface TimingScope {
   postMessage?: (value: unknown) => void;
@@ -19,6 +20,7 @@ export function plainEntry(entry: { toJSON: () => unknown }): unknown {
 export function installWorkerBootTiming(purpose: string): void {
   const scope = globalThis as typeof globalThis & TimingScope;
   if (typeof scope.postMessage !== 'function' || 'document' in globalThis) return;
+  reportWorkerMemory(purpose); // ENGINE-MEMORY EM7: every engine worker's ledger reaches the page
   const post = scope.postMessage.bind(globalThis);
   const origin = performance.timeOrigin, started = diagnosticNow(), owner = new Scope('worker boot timing');
   let observer: PerformanceObserver | undefined;

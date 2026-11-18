@@ -154,7 +154,7 @@ export function bootURL(url, chunk) {
 
 /** The phone boot's saved state: phone tier, Low graphics, muted, Developer on, first play done.
  * @param {{addInitScript: Function, route: Function}} context */
-async function phoneContext(context) {
+export async function phoneContext(context) {
   const { saveFixture } = await import('../debug-settings.mjs');
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
@@ -165,7 +165,7 @@ async function phoneContext(context) {
 }
 
 /** Wait for control or the error card. @param {any} page @param {number} timeoutMs */
-async function untilControl(page, timeoutMs) {
+export async function untilControl(page, timeoutMs) {
   await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(Reflect.get(window, '__wildshard')?.world?.game)), undefined, { timeout: timeoutMs, polling: 250 });
   return /** @type {string | null} */ (await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null));
 }
@@ -377,9 +377,9 @@ export function ladderParts(rounds, zones) {
 /** The per-checkpoint lines of one WebKit run. @param {Awaited<ReturnType<typeof webkitBoot>>} run */
 export function webkitLines(run) {
   const lines = [`[K] WebKit ${run.chunk} build ${String(run.build).slice(0, 8)}: ready ${run.ready} in ${(run.readyMs / 1000).toFixed(1)} s, load ${run.loadAverage}${run.refused ? `, REFUSED: ${run.refused}` : ''}`,
-    '  checkpoint                    WebContent peak / last [K]   GPU process peak / last [K]   ledger gpu / ram [L]'];
+    '  checkpoint                    WebContent peak / last [K]   GPU process peak / last [K]   ledger gpu / ram + workers [L]'];
   for (const c of run.checkpoints) {
-    const l = c.ledger ? `${mb(Object.values(c.ledger.gpu ?? {}).reduce((a, b) => a + b, 0))} / ${mb(Object.values(c.ledger.ram ?? {}).reduce((a, b) => a + b, 0))}` : '    - /     -';
+    const l = c.ledger ? `${mb(Object.values(c.ledger.gpu ?? {}).reduce((a, b) => a + b, 0))} / ${mb([...Object.values(c.ledger.ram ?? {}), ...Object.values(c.ledger.workers ?? {})].reduce((a, b) => a + b, 0))}` : '    - /     -';
     if (c.samples > 0) lines.push(`  ${c.step.slice(0, 28).padEnd(28)} ${mb(c.peak.webcontent)} / ${mb(c.last.webcontent)} MB          ${mb(c.peak.gpu)} / ${mb(c.last.gpu)} MB          ${l} MB`);
   }
   if (run.settled) lines.push(`  control settled (GC + idle)  WebContent ${mb(run.settled.webcontent)} MB [K]   GPU process ${mb(run.settled.gpu)} MB [K]${run.ledger ? `   ledger gpu ${mb(run.ledger.totals.gpu)} ram ${mb(run.ledger.totals.ram)} MB [L]` : ''}`);

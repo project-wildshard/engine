@@ -6,6 +6,7 @@
  */
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import * as schema from 'valibot';
+import { ownedArray, type OwnedLabel } from '@wildshard/engine/core/ownedBuffer';
 
 const SIZE = 256;
 const TEXEL = 0.5;
@@ -91,9 +92,12 @@ export function installTrampleTrail(host: SimHost, map: TrampleField, rows: { id
  * follows the player, the pushes that stamp it, the tracked movers and the recovery at 10 Hz. GrassTrample (the page's)
  * adds the live-mover uniforms and the RG8 texture over it; a renderer-free host keeps its own.
  */
+/** EM6: the trample window's state (256 x 256 texels) */
+const TRAMPLE_STATE: OwnedLabel = { owner: 'game/trample', asset: 'trample-field' };
+
 export class TrampleField {
-  private amount = new Float32Array(SIZE * SIZE);
-  private angle = new Float32Array(SIZE * SIZE);
+  private amount = ownedArray(Float32Array, SIZE * SIZE, TRAMPLE_STATE);
+  private angle = ownedArray(Float32Array, SIZE * SIZE, TRAMPLE_STATE);
   private ox = 0x7fffffff;  // window origin, texel units
   private oz = 0x7fffffff;
   private anyFlat = false;
@@ -102,7 +106,7 @@ export class TrampleField {
   // texel at rest (128, 128), so the recovery walks the list, not all 65,536; a restore or a whole-window clear asks for
   // one full walk, which rebuilds the list
   private readonly active: number[] = [];
-  private readonly listed = new Uint8Array(SIZE * SIZE);
+  private readonly listed = ownedArray(Uint8Array, SIZE * SIZE, TRAMPLE_STATE);
   private full = true;
   private tick = 0;
   /** the window centre: the player at the last update */

@@ -73,13 +73,21 @@ export class MemoryAttribution {
     return this.observe(resource, domain, kind, () => size, precision);
   }
   /** Typed views share their entire backing buffer; detached or transferred storage reports zero. */
-  buffer(view: ArrayBufferView | ArrayBufferLike, label?: MemoryLabel): string {
+  buffer(view: ArrayBufferView | ArrayBufferLike, label?: MemoryLabel, kind = 'array-buffer'): string {
     const buffer = ArrayBuffer.isView(view) ? view.buffer : view;
     if (label !== undefined) this.label(buffer, label);
-    return this.observe(buffer, 'ram', 'array-buffer', value => {
+    return this.observe(buffer, 'ram', kind, value => {
       if (value instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer)) return value.byteLength;
       throw new TypeError('Memory buffer identity changed type');
     });
+  }
+  /** Who the ledger says owns a resource (EM6's census asks this of every live buffer): its label's owner, `unattributed`
+   * when it is observed without one, or null when the ledger does not count it at all. */
+  ownerOf(resource: object, domain: MemoryDomain): string | null {
+    const id = this.identities.get(resource)?.get(domain);
+    if (id === undefined || !this.entries.has(id)) return null;
+    const source = this.sources.get(resource)?.deref();
+    return (this.labels.get(resource) ?? (source === undefined ? undefined : this.labels.get(source)) ?? UNATTRIBUTED).owner;
   }
   release(resource: object, domain: MemoryDomain): void {
     const id = this.identities.get(resource)?.get(domain);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { grassBaseHeightAt } from '../../../../shared/game/systems/looks/grassField';
 import { TRAMPLE_SPAN, TRAMPLE_SIZE, TrampleField } from '../../../../shared/game/systems/looks/trampleField';
 
@@ -42,7 +43,7 @@ uTrampleWin: { value: THREE.Vector4; }; uMovers: { value: THREE.Vector4[]; }; uM
     uMoverCount: { value: 0 },
   };
 
-  private data = new Uint8Array(SIZE * SIZE * 2).fill(128);
+  private data = ownedArray(Uint8Array, SIZE * SIZE * 2, { owner: 'game/trample', asset: 'trample-texture' }).fill(128);
   private live: { x: number; z: number; r: number; s: number; d: number }[] = [];
   private liveN = 0;
 

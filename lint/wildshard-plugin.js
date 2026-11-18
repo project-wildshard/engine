@@ -3,6 +3,7 @@ import { noGeneratedImportRule, noGeneratedJsonImportRule } from './no-generated
 import { execMaxBufferRule } from './exec-max-buffer.mjs';
 import { recordedDebtRule } from './recorded-debt.mjs';
 import { BASE64_POLICY, noBase64Rule } from './no-base64.mjs';
+import { OWNED_BUFFER_POLICY, ownedBufferRule } from './owned-buffer.mjs';
 import { SIDES_FILE, SIDE_EDGES_FILE, engineSidesRule } from './engine-sides.mjs';
 import { clientPlanSchemaViolations } from './client-plan-boundary.mjs';
 import { explicitSchemaTypes } from './schema-types.mjs';
@@ -1163,6 +1164,8 @@ const plugin = {
     'no-client-plan-reflection': clientPlanReflection,
     'explicit-schema-types': explicitSchemaTypes(shardfileDebt,pathOf),
     'no-base64': noBase64Rule(process.env.WILDSHARD_BASE64_FILE ?? BASE64_POLICY),
+    // ENGINE-MEMORY EM6: big CPU buffers are made through ownedBuffer.ts; per-file debt in lint/owned-buffer-debt.json only shrinks
+    'owned-buffer': ownedBufferRule(process.env.WILDSHARD_OWNED_BUFFER_FILE ?? OWNED_BUFFER_POLICY),
     // P1-E2: the engine ownership map (lint/engine-sides.json) and its shrink-only edge counts (lint/engine-side-edges.json)
     'engine-sides': engineSidesRule(process.env.WILDSHARD_ENGINE_SIDES_FILE ?? SIDES_FILE, process.env.WILDSHARD_ENGINE_SIDE_EDGES_FILE ?? SIDE_EDGES_FILE),
     'no-generated-import': noGeneratedImportRule(REPO, resolve(import.meta.dirname,'generated-import-debt.json')),

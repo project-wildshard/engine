@@ -1509,6 +1509,8 @@
     "src/shared/engine/core/harnessTap.ts": "shared",
     "src/shared/engine/core/memoryAttribution.ts": "shared",
     "src/shared/engine/core/memoryResources.ts": "shared",
+    "src/shared/engine/core/ownedBuffer.ts": "shared",
+    "src/shared/engine/core/workerMemory.ts": "shared",
     "src/shared/engine/core/noise.ts": "shared",
     "src/shared/engine/core/perfLap.ts": "shared",
     "src/shared/engine/core/portableMath.ts": "shared",

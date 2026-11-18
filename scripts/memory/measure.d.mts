@@ -37,3 +37,5 @@ export interface LadderParts {
 export function ladderParts(rounds:readonly Record<string,{k:number;l:number;peak?:number}>[],zones:readonly string[]):LadderParts;
 export function ladderLines(result:LadderParts&{rungs:Record<string,{k:Stats;wc:Stats;gpu:Stats;l:Stats;peak?:Stats}>;runs:number}):string[];
 export function ledgerParity(checkpoint:{ledger?:Record<string,Record<string,number>>|null;processes:{role:string;alloc:Record<string,number>}[]}):{ledgerGpu:number;ledgerBuffers:number;angleMetal:number;webglBuffers:number}|null;
+export function phoneContext(context:unknown):Promise<void>;
+export function untilControl(page:unknown,timeoutMs:number):Promise<string|null>;

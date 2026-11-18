@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ChangedBatchedMesh } from '../../render/changedTextureUploads';
 import type { ColliderDesc } from '../registry';
+import { adoptBuffer } from '../../../../shared/engine/core/ownedBuffer';
 import { canopyMapOf, placeForestSteps, TreeGrid, treeGridOf, type TreeInstance } from '../../../../shared/engine/world/forest/placement';
 import { type TreeFactory, forestFade } from '../TreeFactory';
 import { updateWind } from '../wind';
@@ -231,7 +232,7 @@ export class Forest {
 
   /** where the trees go: src/shared/engine/world/forest/placement.ts (pure, shared with the build's placement bake) */
   private buildCanopyMap() {
-    const N = 256, data = canopyMapOf(this.trees, N);
+    const N = 256, data = adoptBuffer(canopyMapOf(this.trees, N), { owner: 'engine/forest', asset: 'canopy-map' });
     const tex = new THREE.DataTexture(data, N, N, THREE.RedFormat, THREE.FloatType);
     tex.magFilter = tex.minFilter = THREE.LinearFilter;
     tex.needsUpdate = true;

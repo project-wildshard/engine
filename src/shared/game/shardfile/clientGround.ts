@@ -4,6 +4,7 @@ import type { TerrainField } from '@wildshard/engine/level/data';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { decodeMeshCollision, lowestMeshHeight } from '@wildshard/format/meshCollisionBytes';
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
+import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { splatTerrainOf } from '@wildshard/format/splatTerrain';
 import { outputDescriptor } from './outputDescriptor';
@@ -29,6 +30,7 @@ export function clientGround(source: Shardfile, assets: ReadonlyMap<string, Uint
   const bytes = source.terrain === null ? undefined : assets.get(source.terrain.collider);
   if (source.terrain !== null && bytes === undefined) throw new Error('Missing admitted terrain queries');
   const data = bytes === undefined || (source.terrain?.form === 'query' && source.terrain.collider === source.terrain.sampling.file) ? null : decodeTerrainTile(bytes);
+  if (data !== null) adoptBuffer(data.heights, { owner: 'game/ground', asset: 'terrain-heights', kind: 'physics' });
   const profile = source.terrain?.sampling;
   const queries = profile === undefined ? null : samplingQueries(profile, assets, nativeDatum);
   const mesh = source.meshCollision === null ? undefined : meshQueries(source.meshCollision.tiles, assets);

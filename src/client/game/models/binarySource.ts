@@ -1,5 +1,6 @@
 import * as v from 'valibot';
 import type { Scope } from '@wildshard/engine/app/scope';
+import { ownedCopy } from '@wildshard/engine/core/ownedBuffer';
 import { isJsonData } from '@wildshard/format/json';
 import { BinarySourceSchema, BinarySourceBanksSchema, type BinarySourceRows, type BinarySourceBank } from '@wildshard/format/binarySource';
 
@@ -64,7 +65,7 @@ export async function prepareBinarySources(product:BinaryFileReader,input:unknow
     if(bank===undefined){files.set(file,body);continue;}
     const member=bank.members.find(row=>row.file===file);
     if(member===undefined)throw new Error('Missing binary bank member');
-    const bytes=new Uint8Array(body.subarray(member.offset,member.offset+member.bytes));
+    const bytes=ownedCopy(body.subarray(member.offset,member.offset+member.bytes),{owner:'game/models',asset:file,kind:'wire'});
     const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(value=>value.toString(16).padStart(2,'0')).join('');
     live();if(hash!==member.sha256)throw new Error(`Binary bank member hash differs: ${file}`);
     files.set(file,bytes);
