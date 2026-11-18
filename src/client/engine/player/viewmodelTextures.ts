@@ -79,8 +79,8 @@ export function normalPixels(h: Float32Array, w: number, hgt: number, strength: 
 }
 
 /** Dark walnut: fine ring bands, streaks along the grain, oil smudges. Grain runs along U. 1 UV unit ≈ 1 m × 0.25 m. */
-function walnut(seed: number): Pixels {
-  const W = 1024, H = 256;
+function walnut(seed: number, maxSize: number): Pixels {
+  const W = Math.min(1024, maxSize), H = W / 4;
   const { fbm, hash } = makeNoise(seed);
   const col = new Uint8Array(W * H * 4), arm = new Uint8Array(W * H * 4), hgt = new Float32Array(W * H);
   const dark = [22, 12, 6], light = [72, 46, 26];
@@ -101,7 +101,7 @@ function walnut(seed: number): Pixels {
     arm[i] = (1 - band * 0.1) * 255; arm[i + 1] = rough * 255; arm[i + 2] = 0; arm[i + 3] = 255;
     hgt[y * W + x] = (1 - band) * 0.45 + fine * 0.3 + fleck * 0.02;
   }
-  return { w: W, h: H, col, nrm: normalPixels(hgt, W, H, 1.6), arm };
+  return { w: W, h: H, col, nrm: normalPixels(hgt, W, H, 1.6 * W / 1024), arm };
 }
 
 /** Forged steel: mottled grey, brushed scratches, pits with a rust tint. */
@@ -252,9 +252,9 @@ function polymer(seed: number): Pixels {
 }
 
 /** One named set, drawn here and now (`canvas2d` only for the steel sets' scratches and pits). */
-export function makePixels(name: SetName, canvas2d: (w: number, h: number) => Ctx2D): Pixels {
+export function makePixels(name: SetName, canvas2d: (w: number, h: number) => Ctx2D, maxSize?: number): Pixels {
   const make: Record<SetName, () => Pixels> = {
-    'walnut': () => walnut(11), 'brushed-steel': () => steel(23, canvas2d), 'leather': () => leather(31), 'cord': () => cord(), 'bolt': () => bolt(41),
+    'walnut': () => walnut(11, maxSize ?? 1024), 'brushed-steel': () => steel(23, canvas2d), 'leather': () => leather(31), 'cord': () => cord(), 'bolt': () => bolt(41),
     'anodised': () => anodised(53), 'polymer': () => polymer(59), 'gunmetal': () => steel(61, canvas2d),
   };
   return make[name]();

@@ -16,6 +16,8 @@ import { activeLevel } from '../../../../shared/engine/level/selection';
 import { PATCH_ORDER, patchShader } from '../../render/shaderPatches';
 import { ParticlePool, pointScale } from '../../fx/ParticlePool';
 import { ViewmodelSources } from '../../player/viewmodelSources';
+import { TIER } from '../../core/tier';
+import { graphicsMode, LOW_TEXTURE_EDGE } from '../../core/graphicsMode';
 
 export interface RangedWorld { game: Game; sky: Sky; player: Player; forest: Forest }
 export interface RangedOptions { row: EquipmentRow; allowUnlocked?: boolean }
@@ -72,6 +74,7 @@ const pixelCache = new Map<SetName, Pixels>();
 const bakedSets = new Map<SetName, TexSet>();
 let texturesReady: Promise<void> = Promise.resolve();
 const WORKER_TIMEOUT_MS = 20000;
+const viewmodelTextureEdge = (): number => TIER === 'phone' && graphicsMode() === 'low' ? LOW_TEXTURE_EDGE : Infinity;
 
 /**
  * G187 cut 3 (E435): on the KTX2 path a level may carry a set's three planes baked offline (scripts/bake-viewmodel-sets.mjs
@@ -79,11 +82,11 @@ const WORKER_TIMEOUT_MS = 20000;
  * compressed instead of drawn (a quarter of the RGBA8 DataTextures' GPU bytes, and no worker time). Returns the sets left
  * to draw: every one on the images path, or with no stand-in.
  */
-async function adoptBakedSets(sets: readonly SetName[]): Promise<SetName[]> {
+async function adoptBakedSets(sets: readonly SetName[], maxSize: number): Promise<SetName[]> {
   const slug = levelBakedId(activeLevel());
   const planes = ['col', 'nrm', 'arm'] as const;
   await Promise.all(sets.map(async (name) => {
-    const [map, normalMap, armMap] = await Promise.all(planes.map((plane) => ktx2Texture(viewmodelBakeUrl(slug, name, plane)).catch(() => null)));
+    const [map, normalMap, armMap] = await Promise.all(planes.map((plane) => ktx2Texture(viewmodelBakeUrl(slug, name, plane), maxSize).catch(() => null)));
     if (!map || !normalMap || !armMap) return;
     const maps = { map: viewmodelSampling(map, true), normalMap: viewmodelSampling(normalMap, false), armMap: viewmodelSampling(armMap, false) };
     // Consumers still finalize their sampler (makeBoltAtlas changes Repeat to Clamp).
@@ -101,8 +104,9 @@ export function startViewmodelTextures(requested: boolean | readonly SetName[]):
   const names = typeof requested === 'boolean' ? (requested ? [...CLASSIC_SETS, ...MODERN_SETS] : [...MODERN_SETS]) : requested;
   const wanted = names.filter((n) => !pixelCache.has(n) && !bakedSets.has(n));
   if (wanted.length === 0) { texturesReady = Promise.resolve(); return texturesReady; }
+  const maxSize = viewmodelTextureEdge();
   texturesReady = (async () => {
-  const sets = await adoptBakedSets(wanted);
+  const sets = await adoptBakedSets(wanted, maxSize);
   if (sets.length === 0) return;
   let worker: Worker;
   try {
@@ -121,7 +125,7 @@ export function startViewmodelTextures(requested: boolean | readonly SetName[]):
       if (--left === 0) finish();
     };
     worker.onerror = (e) => { e.preventDefault(); console.warn(`[viewmodel textures] worker failed: ${e.message}`); finish(); };
-    worker.postMessage({ sets }, []);
+    worker.postMessage({ sets, maxSize }, []);
   });
   })();
   return texturesReady;
@@ -138,7 +142,7 @@ const mainCanvas2d = (w: number, h: number): Ctx2D => {
 function takePixels(name: SetName): Pixels {
   const px = pixelCache.get(name);
   if (px) { pixelCache.delete(name); return px; } // each set is wrapped once (its buffers become the DataTextures')
-  return makePixels(name, mainCanvas2d);
+  return makePixels(name, mainCanvas2d, viewmodelTextureEdge());
 }
 
 // Eight named, immutable seeded sets. Only live consumers retain the pixels; the memo keeps no texture or array alive.

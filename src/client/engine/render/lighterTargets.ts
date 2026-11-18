@@ -36,12 +36,16 @@ export function quarterBloom(bloom: BloomEffect): void {
   blur.setSize = (width: number, height: number): void => { setSize(Math.max(1, Math.round(width / 2)), Math.max(1, Math.round(height / 2))); };
 }
 
-/** the god rays' light mask at half the frame (postprocessing sizes it to the full frame on every resize) */
-export function halfGodRaysMask(rays: GodRaysEffect): void {
+/** The rays put a unit-range light mask and intensity in their private targets. The scene still needs HDR before grading. */
+export function halfGodRaysMask(rays: GodRaysEffect, byteTargets = false): void {
   const setSize = rays.setSize.bind(rays);
   rays.setSize = (width: number, height: number): void => {
     setSize(width, height);
     const light: unknown = Reflect.get(rays, 'renderTargetLight');
     if (light instanceof THREE.WebGLRenderTarget) light.setSize(Math.max(1, Math.round(width / 2)), Math.max(1, Math.round(height / 2)));
   };
+  if (byteTargets) {
+    const initialize = rays.initialize.bind(rays);
+    rays.initialize = (renderer, alpha): void => { initialize(renderer, alpha, THREE.UnsignedByteType); };
+  }
 }

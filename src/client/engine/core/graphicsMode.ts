@@ -7,7 +7,7 @@ import { engineString } from '../../../shared/engine/strings';
  * or High, saved per device:
  *
  *   High  today's phone tier: the drawing buffer at min(devicePixelRatio, the tier's cap, 2)
- *   Low   the same tier at 1 drawing pixel per CSS pixel (nothing else changes, for now)
+ *   Low   1 drawing pixel per CSS pixel, smaller textures and light-mask targets prepared at load
  *
  * MG3 (Jake: "You can block the toggle from low to high graphics behind low power mode"): while the page reads Low Power Mode as
  * likely (boot/lowPower.ts, the idle title's rAF cadence), a phone runs Low and High is refused (lowPowerRefusal); the
@@ -20,6 +20,8 @@ import { engineString } from '../../../shared/engine/strings';
 export type GraphicsMode = 'low' | 'high';
 /** Low's drawing pixels per CSS pixel */
 export const LOW_PIXEL_RATIO = 1;
+/** Long edge of shard textures prepared for phone Low. */
+export const LOW_TEXTURE_EDGE = 512;
 /** the page hears this when a pick that sizes the drawing buffer changes (Game applies it in its next drawn frame) */
 export const PIXELS_EVENT = 'ws:pixels';
 

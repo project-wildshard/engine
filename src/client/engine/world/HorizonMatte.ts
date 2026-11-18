@@ -31,6 +31,10 @@ import type { SkyRig as Sky } from './skyRig';
 import { fogUniforms } from './Atmosphere';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { TIER } from '../core/tier';
+import { graphicsMode } from '../core/graphicsMode';
+
+// This strip spans the whole azimuth and needs more horizontal samples than a surface map.
+const PHONE_HORIZON_WIDTH = 1200;
 
 /** the band's radius (m): inside the camera's far plane (2600) even at the top edge (R / cos 24° ≈ 2520) */
 const RADIUS = CONTENT_HORIZON_RADIUS;
@@ -202,7 +206,22 @@ async function loadImageTexture(url: string): Promise<THREE.Texture> {
   const response = await fetch(tierUrl(url));
   if (!response.ok) throw new Error(`${String(response.status)} ${url}`);
   const local = URL.createObjectURL(await response.blob());
-  try { return await new THREE.TextureLoader().loadAsync(local); } finally { URL.revokeObjectURL(local); }
+  try {
+    const texture = await new THREE.TextureLoader().loadAsync(local);
+    const image = texture.image;
+    if (TIER === 'phone' && graphicsMode() === 'low' && image.width > PHONE_HORIZON_WIDTH) {
+      const canvas = document.createElement('canvas');
+      canvas.width = PHONE_HORIZON_WIDTH;
+      canvas.height = Math.max(1, Math.round(image.height * canvas.width / image.width));
+      const ctx = canvas.getContext('2d');
+      if (ctx !== null) {
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        return new THREE.CanvasTexture(canvas);
+      }
+    }
+    return texture;
+  } finally { URL.revokeObjectURL(local); }
 }
 
 async function loadTexture(url: string): Promise<THREE.Texture> {

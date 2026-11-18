@@ -4,6 +4,7 @@ import { shaderPatchTextures } from '../render/shaderPatches';
 import { pageScope } from '../../../shared/engine/app/resources';
 import type { TickRate } from '../../../shared/engine/app/scheduler';
 import { TIER, TIER_CONFIG } from '../core/tier';
+import { graphicsMode } from '../core/graphicsMode';
 import { worldTime } from '../../../shared/engine/core/time';
 import { practiceRoom } from '../core/practiceRoom';
 import { ParticlePool } from '../fx/ParticlePool';
@@ -363,7 +364,8 @@ export class AnimalHerdView implements RowBodiesDraw {
     const rig = this.factory.instantiate(model, 0.5), fur = rig.materials[0];
     const plain = new THREE.MeshStandardMaterial({ map: fur !== undefined && 'map' in fur ? fur.map : null, color: fur?.color ?? 0xffffff, roughness: 0.9 });
     rig.mesh.material = plain;
-    try { return shootViews(rig.mesh, { views: 8, size: 128 }); } finally { plain.dispose(); rig.mesh.skeleton.dispose(); }
+    const size = TIER === 'phone' && graphicsMode() === 'low' ? 64 : 128;
+    try { return shootViews(rig.mesh, { views: 8, size }); } finally { plain.dispose(); rig.mesh.skeleton.dispose(); }
   }
 
   /** the far draw shows `a` (true) or its rig does (false): the rig's layers go to 0 and back */

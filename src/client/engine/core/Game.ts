@@ -557,7 +557,10 @@ export class Game {
     const repixel = (): void => { const ratio = this.wantedRatio(); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; this.applyQuality(); };
     this.engineScope.listen(document, PIXELS_EVENT, repixel);
     // MG8 prototype: the player has control, so the boot's shadow draws are done: a no-shadows mode clears the maps once more
-    this.engineScope.listen(document, 'ws:control-ready', () => { this.qualityClearedMaps = new WeakSet(); });
+    this.engineScope.listen(document, 'ws:control-ready', () => {
+      this.qualityClearedMaps = new WeakSet();
+      this.qualityAtControl = true;
+    });
     // MG12 prototype: the phone's cap follows the preset and Low Power live (60 only on exactly Low with Low Power off); read
     // off a cached value, refreshed on every PIXELS_EVENT (a control, a preset, a Low Power flip) and the 2 s mode check
     if (this.phoneGraphics) this.engineScope.onDispose(setMobileFrameCap(() => this.qualityCap));
@@ -610,19 +613,31 @@ export class Game {
     let passLights: ShadowArgs[0] | null = null, passScene: ShadowArgs[1] | null = null, passCamera: ShadowArgs[2] | null = null;
     const drawShadows = (): void => { if (passLights !== null && passScene !== null && passCamera !== null) renderShadows(passLights, passScene, passCamera); };
     const dropColour = (rt: THREE.WebGLRenderTarget): void => { dropShadowColour(this.renderer, rt); };
+    const standbySize = new THREE.Vector2(1, 1);
     shadowMap.render = (lights, scene, camera) => {
       // MG8 prototype: Settings ▸ Graphics ▸ Shadows off clears each cascade once (a pass that draws nothing) and then draws
       // none: nothing is shadowed and the shadow pass costs nothing
       if (this.qualityShadowsOff) {
         // Codex review: track the maps cleared, not the calls (a parked draw's stand-in map, or a map three made anew, is not
         // the one a clear covered)
-        const shadows: { needsUpdate: boolean; map: object | null }[] = [];
-        for (const light of lights) { const shadow: unknown = Reflect.get(light, 'shadow'); if (shadow instanceof THREE.LightShadow) shadows.push(shadow as { needsUpdate: boolean; map: object | null }); }
+        const shadows: Pick<THREE.LightShadow, 'map' | 'needsUpdate'>[] = [];
+        for (const light of lights) { const shadow: unknown = Reflect.get(light, 'shadow'); if (shadow instanceof THREE.LightShadow) shadows.push(shadow); }
         if (shadows.every((shadow) => shadow.map !== null && this.qualityClearedMaps.has(shadow.map))) return;
         const held = camera.layers.mask;
+        const sizes = new Map<THREE.LightShadow, THREE.Vector2>();
+        if (this.qualityAtControl && this.qualityLow) for (const light of lights) {
+          if (!(light instanceof THREE.DirectionalLight || light instanceof THREE.SpotLight)) continue;
+          sizes.set(light.shadow, light.shadow.mapSize);
+          light.shadow.mapSize = standbySize;
+          this.qualityStandbyShadows.add(light.shadow);
+        }
         for (const shadow of shadows) shadow.needsUpdate = true;
+        shadowMap.needsUpdate = true;
         camera.layers.disableAll();
-        try { renderShadows(lights, scene, camera); } finally { camera.layers.mask = held; }
+        try { renderShadows(lights, scene, camera); } finally {
+          camera.layers.mask = held;
+          for (const [shadow, size] of sizes) shadow.mapSize = size;
+        }
         for (const shadow of shadows) if (shadow.map !== null) this.qualityClearedMaps.add(shadow.map);
         return;
       }
@@ -804,7 +819,7 @@ export class Game {
         exposure: 0.4, samples: TIER_CONFIG.godRaysSamples, clampMax: 1.0, resolutionScale: TIER_CONFIG.godRaysScale,
       });
       if (knobs.skipRaysOffscreen === true) skipRaysOffscreen(godRays, this.camera, this.sky.sunDisc); // the disc off screen = no rays to draw (E142, E189)
-      halfGodRaysMask(godRays); // G749: the rays' light mask at half the frame (lighterTargets.ts)
+      halfGodRaysMask(godRays, this.phoneGraphics && graphicsMode() === 'low');
       const tuning = ENGINE_CHAIN_TUNING[clean ? 'clean' : 'cinematic'];
       const bloom = new BloomEffect({ intensity: G.bloomIntensity, luminanceThreshold: G.bloomThreshold, luminanceSmoothing: tuning.bloomSmoothing, mipmapBlur: true, radius: 0.6, levels: TIER_CONFIG.bloomLevels });
       quarterBloom(bloom); // G749: luminance at a quarter of the frame, its mip chain one level smaller (lighterTargets.ts)
@@ -867,7 +882,10 @@ export class Game {
   private qualityCap: 30 | 60 = 30;
   /** MG8 prototype: the shadows-off state (the shadow pass wrapper) and the cascade maps it has cleared */
   private qualityShadowsOff = false;
+  private qualityAtControl = false;
+  private qualityLow = false;
   private qualityClearedMaps = new WeakSet();
+  private readonly qualityStandbyShadows = new Set<THREE.LightShadow>();
   /** what the level ships (bloom, rays, edges), and what the chain was last built with */
   private qualityShipped: ShippedLook = { bloom: TIER !== 'phone', rays: true, aa: false };
   private qualityChainBuilt: { bloom: boolean; rays: boolean; fxaa: boolean } | null = null;
@@ -888,9 +906,15 @@ export class Game {
     if (!this.phoneGraphics) return;
     this.qualityCap = frameCapFor(presetLabel(), lowPowerOn());
     const mode = graphicsMode();
+    this.qualityLow = mode === 'low';
     // cleared again on every apply: the boot's own shadow draws (the loading card's parted map, the warm turns) fill the maps
     // outside this wrapper's frames, so a clear made before them would not hold (and control-ready clears once more)
     this.qualityShadowsOff = !flagOn('shadows', mode, true); this.qualityClearedMaps = new WeakSet();
+    if (!this.qualityShadowsOff && this.qualityStandbyShadows.size > 0) {
+      for (const shadow of this.qualityStandbyShadows) shadow.needsUpdate = true;
+      this.renderer.shadowMap.needsUpdate = true;
+      this.qualityStandbyShadows.clear();
+    }
     const composer = this._composer;
     if (composer === null) return;
     const want = this.qualityChainWanted(), built = this.qualityChainBuilt;

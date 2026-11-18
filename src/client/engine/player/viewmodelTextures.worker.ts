@@ -1,6 +1,6 @@
 /**
  * Draws the viewmodels' procedural texture sets off the main thread (viewmodelTextures.ts; started by
- * Crossbow.ts `startViewmodelTextures`). In: `{ sets: SetName[] }`. Out, one message per set as it finishes:
+ * Crossbow.ts `startViewmodelTextures`). Out, one message per set as it finishes:
  * `{ name, px }` with the planes' buffers transferred, or `{ name, error }` (e.g. no OffscreenCanvas for the steel's
  * scratches) — the main thread then draws that set itself.
  */
@@ -15,10 +15,10 @@ const canvas2d = (w: number, h: number): Ctx2D => {
   return ctx;
 };
 
-self.onmessage = (e: MessageEvent<{ sets: SetName[] }>) => {
+self.onmessage = (e: MessageEvent<{ sets: SetName[]; maxSize: number }>) => {
   for (const name of e.data.sets) {
     try {
-      const px = makePixels(name, canvas2d);
+      const px = makePixels(name, canvas2d, e.data.maxSize);
       const transfer = [px.col.buffer, px.nrm.buffer, ...(px.arm ? [px.arm.buffer] : [])];
       self.postMessage({ name, px }, { transfer });
     } catch (err) {

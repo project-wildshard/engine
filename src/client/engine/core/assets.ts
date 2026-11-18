@@ -7,7 +7,8 @@ import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { fetchImage, tierUrl } from '../boot/bytes';
 import type { ContentReadOptions } from '../boot/contentRead';
 import { cacheHolds, heldForm, initKtx2, ktx2Layers, ktx2Texture, linearKtx2Texture, prepareCompressedTexture, readHeldForm, releaseAfterUpload } from './ktx2';
-import { TIER_CONFIG } from './tier';
+import { TIER, TIER_CONFIG } from './tier';
+import { graphicsMode, LOW_TEXTURE_EDGE } from './graphicsMode';
 import { workSlice } from '../../../shared/engine/core/workSlice';
 import type { Renderer } from '../render/renderer';
 import { labelAsset, labelObjectTree } from '../render/gpuLabels';
@@ -136,8 +137,9 @@ function loadTextureSource(url: string, srgb: boolean, maxSize: number, instead?
  * for less (Pine Hollow's 512² building sets, G180); a KTX2 stand-in drops its top mips, an image decodes smaller.
  * Configure a custom sampler before its compressed upload fence, while its mip chain still exists.
  */
-export async function loadTexture(url: string, srgb = false, repeat = 1, maxSize: number = TIER_CONFIG.maxTexture,
+export async function loadTexture(url: string, srgb = false, repeat = 1, requestedMaxSize: number = TIER_CONFIG.maxTexture,
   configure?: (texture: THREE.Texture) => void): Promise<THREE.Texture> {
+  const maxSize = TIER === 'phone' && graphicsMode() === 'low' ? Math.min(requestedMaxSize, LOW_TEXTURE_EDGE) : requestedMaxSize;
   const served = tierUrl(url);
   const compressed = (k: THREE.CompressedTexture): Promise<THREE.Texture> => {
     k.wrapS = k.wrapT = THREE.RepeatWrapping;

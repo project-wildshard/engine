@@ -22,8 +22,8 @@ export function shadowBytes(size: number, cascades: number, ghosts: number): num
 }
 
 
-/** the targets whose colour texture is gone (a second detach would free a deleted texture) */
-const depthOnly = new WeakSet();
+/** A resized target gets a new framebuffer and must drop its fresh colour attachment. */
+const depthOnly = new WeakMap<THREE.RenderTarget, { readonly framebuffer: WebGLFramebuffer; readonly dropped: boolean }>();
 
 /**
  * Detach a shadow map's colour texture from its framebuffer and free it: the depth texture is all the shaders read. For
@@ -31,18 +31,18 @@ const depthOnly = new WeakSet();
  * the target is set up (initRenderTarget, or after its first shadow draw).
  */
 export function dropShadowColour(renderer: Renderer, rt: THREE.WebGLRenderTarget): void {
-  if (depthOnly.has(rt)) return;
   const gl = renderer.getContext();
   if (!(gl instanceof WebGL2RenderingContext)) return;
   const rtProps: unknown = renderer.properties.get(rt), texProps: unknown = renderer.properties.get(rt.texture);
   const fb: unknown = typeof rtProps === 'object' && rtProps !== null ? Reflect.get(rtProps, '__webglFramebuffer') : null;
   const tex: unknown = typeof texProps === 'object' && texProps !== null ? Reflect.get(texProps, '__webglTexture') : null;
   if (!(fb instanceof WebGLFramebuffer) || !(tex instanceof WebGLTexture)) return;
-  depthOnly.add(rt);
+  if (depthOnly.get(rt)?.framebuffer === fb) return;
   const state = renderer.state;
   state.bindFramebuffer(gl.FRAMEBUFFER, fb);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0);
   const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  depthOnly.set(rt, { framebuffer: fb, dropped: ok });
   if (!ok) gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0); // keep three's shape
   state.bindFramebuffer(gl.FRAMEBUFFER, null);
   if (ok) gl.deleteTexture(tex);
@@ -52,7 +52,7 @@ export function dropShadowColour(renderer: Renderer, rt: THREE.WebGLRenderTarget
 /** Whether `rt`'s colour texture was let go (`dropShadowColour`): a stand-in for it must drop its own too (op-hitch33,
  *  render/parkedDraws.ts), or its depth draws build pipelines with a colour attachment the real map does not have. */
 export function shadowColourDropped(rt: THREE.RenderTarget): boolean {
-  return depthOnly.has(rt);
+  return depthOnly.get(rt)?.dropped === true;
 }
 
 export class ShadowMaps {

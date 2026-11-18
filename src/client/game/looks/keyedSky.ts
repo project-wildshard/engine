@@ -21,6 +21,7 @@ import { graphDaySkyBackdrop, graphParamRoots, type DaySkyBody, type DaySkyGraph
 import { overcastOver } from '@wildshard/engine/game/looks/overcast';
 import * as THREE from 'three';
 import type { KeyedSkyStyle, SkyKeyRow } from '@wildshard/format/keyedSky';
+import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 
 import { keyedSkyDay, type KeyedSkyDay, type SkyPreset } from '../../../shared/game/looks/keyedSkyClock';
 
@@ -80,6 +81,8 @@ export interface KeyedSkyOptions {
   readonly envSteps: boolean;
   /** decoded keys as RGB9_E5 (half the GPU bytes) */
   readonly packKeys: boolean;
+  /** downsample decoded linear sky light after the gain map has been applied */
+  readonly trimKeys: boolean;
   /** a 512×256 environment equirect (a 128 cube) instead of 1024×512 */
   readonly smallEnv: boolean;
 }
@@ -249,7 +252,24 @@ class KeyedSky {
     }
     const { color, gain } = await this.blobsOf(k);
     const urls = { color: URL.createObjectURL(color), gain: URL.createObjectURL(gain) };
-    try { const tex = await loadBakedSky(urls); return { tex, horizon: skyHorizonColor(tex) }; }
+    try {
+      const tex = await loadBakedSky(urls);
+      const horizon = skyHorizonColor(tex);
+      if (this.opts.trimKeys) {
+        const { width, height, data } = tex.image;
+        if (width === 2048 && height === 1024 && data instanceof Uint16Array) {
+          let dst = 0;
+          // Compact in place. The destination moves by one texel for every four read.
+          for (let y = 2; y < height; y += 4) for (let x = 2; x < width; x += 4) {
+            const src = (y * width + x) * 4;
+            data.copyWithin(dst, src, src + 4);
+            dst += 4;
+          }
+          tex.image = { data: data.subarray(0, dst), width: width / 4, height: height / 4 };
+        }
+      }
+      return { tex, horizon };
+    }
     finally { URL.revokeObjectURL(urls.color); URL.revokeObjectURL(urls.gain); }
   }
 
@@ -382,7 +402,9 @@ export function keyedSkyBackdrop(input: unknown, options: { readonly packKeys: b
   // the dome first of the opaque pass, depth untouched: everything draws over it
   return graphDaySkyBackdrop({ name: 'keyed sky', source: looks.product.shardfile, ids: [looks.dome, looks.env], dome: { graph: looks.dome, radius: dome.radius, segments: dome.segments, order: -1000, name: dome.name }, channels: options.channels, build: async (context, g: DaySkyGraphs, mesh): Promise<DaySkyBody<SkyPreset>> => {
     const { sky, scene, renderer, level, tier, look } = context;
-    const opts: KeyedSkyOptions = { envSteps: level.tiers?.[tier]?.envSteps === true, packKeys: options.packKeys, smallEnv: tier === 'phone' && options.smallEnv };
+    const phone = tier === 'phone', low = phone && graphicsMode() === 'low';
+    const opts: KeyedSkyOptions = { envSteps: level.tiers?.[tier]?.envSteps === true, packKeys: options.packKeys,
+      trimKeys: low, smallEnv: phone && (options.smallEnv || low) };
     const keyed = new KeyedSky(looks.product, day, renderer, scene, opts, mesh, g.material(looks.env), {
       lend: (name, texture) => { g.setTexture(looks.dome, name, texture); g.setTexture(looks.env, name, texture); } });
     await keyed.prepare();
