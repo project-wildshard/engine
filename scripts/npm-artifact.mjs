@@ -10,6 +10,7 @@ if (destination === undefined) throw new Error('Usage: node scripts/npm-artifact
 const root = process.cwd(), output = resolve(destination);
 mkdirSync(output, { recursive: true });
 const stage = mkdtempSync(join(output, '.engine-npm-'));
+/** @param {string} cwd @param {string} target */
 const pack = (cwd, target) => JSON.parse(execFileSync('npm', [
   'pack', '--ignore-scripts', '--json', '--pack-destination', target,
 ], { cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }))[0];
