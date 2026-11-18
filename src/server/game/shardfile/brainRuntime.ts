@@ -61,6 +61,7 @@ function prepareAbilities(host: SimHost, actor: AnimalSim, abilities: ResolvedCr
       cooldown: ability.cooldown,
       independentCooldown: true,
       motion: { speed: ability.speed ?? speed },
+      ...(ability.from === undefined ? {} : { from: ability.from }),
     };
     return { min, max, ability, spec };
   });

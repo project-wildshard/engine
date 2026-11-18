@@ -12,7 +12,7 @@
  * creatures stay hidden, so a neighbour shows only its tiles.
  */
 import { Bone, Skeleton, SkinnedMesh, Vector3, type Group, type Object3D } from 'three';
-import { RestCreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
+import { CreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
 import type { CreatureLockPoints, CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
 import { creatureScale } from '@wildshard/format/creatureSizes';
 import { addCombatTargets, reportCombatHit, type CombatTarget } from '@wildshard/engine/ui/Combat';
@@ -135,7 +135,7 @@ export class NeighbourLife {
           const parent = def.parent === null ? -1 : selected.bones.findIndex(row => row.name === def.parent), previous = selected.bones[parent];
           return { name: def.name, parent, position: [def.pos[0] - (previous?.pos[0] ?? 0), def.pos[1] - (previous?.pos[1] ?? 0), def.pos[2] - (previous?.pos[2] ?? 0)] as const };
         });
-        const body = species.body, points = new RestCreatureSockets(body, joints, { position: mesh.position,
+        const body = species.body, points = new CreatureSockets(body, joints, { position: mesh.position,
           get yaw() { return mesh.rotation.y; }, get scale() { return mesh.scale.x; } });
         target.lockPoints = { names: points.names, point: (index, out) => { root.updateWorldMatrix(true, false); return points.point(index, out).applyMatrix4(root.matrixWorld); } };
       }

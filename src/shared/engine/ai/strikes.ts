@@ -32,6 +32,7 @@ export interface StrikeSpec {
   debris?: StrikeDebrisPolicy;
   id: string; shape: StrikeShape; windup: number; active: number; recover: number; cooldown: number;
   independentCooldown?: true;
+  from?: string;
   range: number; damage: number; tags: readonly CombatTag[];
   weight: (ctx: StrikeContext) => number;
   units?: 'world' | 'actor';
@@ -188,9 +189,11 @@ export class StrikeRunner {
     if (shape.kind === 'lane') {
       if (d >= spec.range * scale) return false;
       const dx = this.x1 - this.x0, dz = this.z1 - this.z0, len2 = dx * dx + dz * dz;
-      if (len2 < 1e-9) return Math.hypot(p.x - this.x0, p.z - this.z0) <= shape.width * 0.5 + 0.4;
-      const t = ((p.x - this.x0) * dx + (p.z - this.z0) * dz) / len2;
-      return t >= 0 && t <= 1 && Math.hypot(p.x - (this.x0 + dx * t), p.z - (this.z0 + dz * t)) <= shape.width * 0.5 + 0.4;
+      const x0 = ctx.origin === undefined ? this.x0 : this.x0 + origin.x - a.position.x;
+      const z0 = ctx.origin === undefined ? this.z0 : this.z0 + origin.z - a.position.z;
+      if (len2 < 1e-9) return Math.hypot(p.x - x0, p.z - z0) <= shape.width * 0.5 + 0.4;
+      const t = ((p.x - x0) * dx + (p.z - z0) * dz) / len2;
+      return t >= 0 && t <= 1 && Math.hypot(p.x - (x0 + dx * t), p.z - (z0 + dz * t)) <= shape.width * 0.5 + 0.4;
     }
     if (shape.kind === 'point') return shape.exclusive === true ? d < shape.radius * scale : d <= shape.radius * scale;
     if (shape.kind === 'ring') {

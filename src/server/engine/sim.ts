@@ -784,9 +784,16 @@ export class SimHost {
       }
       return;
     }
-    runner.update(FIXED_STEP, { actor, target: position, canReach: () => source === undefined ? true : canReach(source, position, this.physics), hit: (spec) => {
-      this.direction.subVectors(position, actor.position).normalize();
-      this.hitOrigin.copy(actor.position); this.hitOrigin.y += source === undefined ? 1.2 : source.dims.bodyY * source.scale;
+    const from = runner.state === 'active' ? runner.spec?.from : undefined;
+    const origin = from === undefined ? undefined : source?.strikePoint(from, this.hitOrigin);
+    if (from !== undefined && origin === undefined) throw new Error(`Missing installed strike socket ${from} on ${id}`);
+    if (origin !== undefined) { this.hitPoint.copy(position); this.hitPoint.y += target === undefined ? 1.2 : target.dims.bodyY * target.scale; }
+    runner.update(FIXED_STEP, { actor, target: origin === undefined ? position : this.hitPoint, ...(origin === undefined ? {} : { origin }),
+      canReach: () => source === undefined ? true : canReach(source, position, this.physics, origin), hit: (spec) => {
+      this.direction.subVectors(origin === undefined ? position : this.hitPoint, origin ?? actor.position).normalize();
+      if (origin === undefined) {
+        this.hitOrigin.copy(actor.position); this.hitOrigin.y += source === undefined ? 1.2 : source.dims.bodyY * source.scale;
+      }
       this.hitPoint.copy(position); this.hitPoint.y += target === undefined ? 1.2 : target.dims.bodyY * target.scale;
       this.combat.hit({ source: source?.combatActor() ?? striker?.health ?? 'env', sourceTags: spec.tags, target: health,
         amount: spec.damage, point: this.hitPoint, dir: this.direction, from: this.hitOrigin, moveId: spec.id, attackSeq: this.strikeSeqs.get(id) ?? 0,

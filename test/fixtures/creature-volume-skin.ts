@@ -5,7 +5,7 @@ import { parseGlbData, prepareGlbCost } from '@wildshard/format/glbCost';
 import { groundFixture } from './plain-ground';
 
 export const volumeJoints = ['body', 'chest', 'head', 'hand.L'];
-export function creatureVolumeGlb(path: 'translation' | 'rotation' | 'scale' = 'translation', headHeight = 2, meshHeight = .1): Uint8Array {
+export function creatureVolumeGlb(path: 'translation' | 'rotation' | 'scale' = 'translation', headHeight = 2, meshHeight = .1, hand = 'hand.L', namedAttack = false): Uint8Array {
   const chunks: Buffer[] = [], views: object[] = [], accessors: object[] = [];
   let at = 0;
   const add = (data: ArrayBufferView, type: string, count: number, componentType = 5126): number => {
@@ -20,12 +20,22 @@ export function creatureVolumeGlb(path: 'translation' | 'rotation' | 'scale' = '
   const binds = add(new Float32Array([[0, 0, 0], [0, 1, 0], [0, headHeight, 0], [1, 1, 0]].flatMap(([x = 0, y = 0, z = 0]) => new Matrix4().makeTranslation(x, y, z).invert().elements)), 'MAT4', 4);
   const values = path === 'rotation' ? [0, 0, 0, 1, 0, 0, Math.SQRT1_2, Math.SQRT1_2] : path === 'scale' ? [1, 1, 1, 2, 2, 2] : [0, headHeight - 1, 0, 1, headHeight - 1, 0];
   const times = add(new Float32Array([0, 1]), 'SCALAR', 2), moves = add(new Float32Array(values), path === 'rotation' ? 'VEC4' : 'VEC3', 2);
+  const animation = (name: string, node: number, output: number, property: typeof path) => ({
+    name, channels: [{ sampler: 0, target: { node, path: property } }],
+    samplers: [{ input: times, output, interpolation: 'LINEAR' }],
+  });
+  const animations = [animation('idle', 3, moves, path)];
+  if (namedAttack) {
+    const backswing = add(new Float32Array([1, 0, 0, 0, 0, 0]), 'VEC3', 2);
+    const swing = add(new Float32Array([1, 0, 0, 3, 0, 0]), 'VEC3', 2);
+    animations.push(animation('attack', 4, backswing, 'translation'), animation('swing', 4, swing, 'translation'));
+  }
   const doc = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0, 1] }],
     nodes: [{ name: 'fixture.mesh', mesh: 0, skin: 0 }, { name: 'body', children: [2] },
-      { name: 'chest', translation: [0, 1, 0], children: [3, 4] }, { name: 'head', translation: [0, headHeight - 1, 0] }, { name: 'hand.L', translation: [1, 0, 0] }],
+      { name: 'chest', translation: [0, 1, 0], children: [3, 4] }, { name: 'head', translation: [0, headHeight - 1, 0] }, { name: hand, translation: [1, 0, 0] }],
     skins: [{ joints: [1, 2, 3, 4], inverseBindMatrices: binds }], materials: [{ name: 'Body' }],
     meshes: [{ primitives: [{ attributes: { POSITION: position, NORMAL: normal, JOINTS_0: joints, WEIGHTS_0: weights }, indices, material: 0 }] }],
-    animations: [{ name: 'idle', channels: [{ sampler: 0, target: { node: 3, path } }], samplers: [{ input: times, output: moves, interpolation: 'LINEAR' }] }],
+    animations,
     accessors, bufferViews: views, buffers: [{ byteLength: at }] };
   const json = Buffer.from(JSON.stringify(doc)), text = Buffer.concat([json, Buffer.alloc((4 - json.length % 4) % 4, 0x20)]), bin = Buffer.concat(chunks);
   const header = Buffer.alloc(20); header.writeUInt32LE(0x46546c67); header.writeUInt32LE(2, 4); header.writeUInt32LE(28 + text.length + bin.length, 8);
@@ -33,17 +43,18 @@ export function creatureVolumeGlb(path: 'translation' | 'rotation' | 'scale' = '
   const binary = Buffer.alloc(8); binary.writeUInt32LE(bin.length); binary.writeUInt32LE(0x004e4942, 4);
   return Uint8Array.from(Buffer.concat([header, text, binary, bin]));
 }
-export async function creatureVolumeFixture(path: 'translation' | 'rotation' | 'scale' = 'translation', headHeight = 2, meshHeight = .1) {
+export async function creatureVolumeFixture(path: 'translation' | 'rotation' | 'scale' = 'translation', headHeight = 2, meshHeight = .1, hand = 'hand.L', namedAttack = false) {
   await prepareGlbCost();
   const source = groundFixture(true), species = source.rows.species[0], spawn = source.creatures.spawns[0];
   if (species === undefined || spawn === undefined) throw new Error('Missing actual volume fixture');
   species.temperament = { brain: 'none', reaction: 'neutral', leash: 25, assist: 0, home: { speed: 1, stop: 1 } };
   species.body = { skeleton: 'biped', size: 'medium', scale: 1, look: 'fixture.look', volumes: [
-    { part: 'shield', bone: 'hand.L', shape: 'sphere', radius: .4, halfLength: 0, axis: 'y', multiplier: 0 }] };
+    { part: 'shield', bone: hand, shape: 'sphere', radius: .4, halfLength: 0, axis: 'y', multiplier: 0 }] };
   spawn.yaw = 0;
-  const glb = creatureVolumeGlb(path, headHeight, meshHeight), cost = parseGlbData(glb), sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex'), file = sha(glb);
+  const glb = creatureVolumeGlb(path, headHeight, meshHeight, hand, namedAttack), cost = parseGlbData(glb), sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex'), file = sha(glb);
+  const joints = volumeJoints.map(name => name === 'hand.L' ? hand : name);
   const metadata = new TextEncoder().encode(JSON.stringify({ row: { id: 'fixture.skin', file, family: 'toon',
-    rig: { skeleton: 'fixture.biped', joints: [volumeJoints], clips: ['idle'], sockets: volumeJoints }, cost },
+    rig: { skeleton: 'fixture.biped', joints: [joints], clips: namedAttack ? ['idle', 'attack', 'swing'] : ['idle'], sockets: joints }, cost },
     binding: { skin: 'fixture.skin', material: { family: 'pbr', vertexColours: false }, loops: ['idle'] } }));
   const skin = sha(metadata), assets = new Map([[file, glb], [skin, metadata]]);
   source.rows.looks.push({ id: 'fixture.look', species: species.id, recipe: 'platform.skin', material: null,

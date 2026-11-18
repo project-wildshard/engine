@@ -13,27 +13,27 @@ import { Float32BufferAttribute, PropertyBinding, type BufferGeometry, type Mate
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as v from 'valibot';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { bindRig, prepareRigLoader, type ClipName, type RigInstance } from '@wildshard/engine/anim/rig';
+import { bindRig, prepareRigLoader, type RigInstance } from '@wildshard/engine/anim/rig';
 import { AnimMachine } from '@wildshard/engine/anim/machine';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { AssetCost } from '@wildshard/format/shardfileAssets';
 import { parseGlbData, prepareGlbCost } from '@wildshard/format/glbCost';
 import { skinLayerDecoded } from '@wildshard/format/skinLayers';
-import { parseSkinBindings, type SkinRow, type SkinBinding } from '@wildshard/format/skinData';
+import { parseSkinBindings, type CreatureSkinClipName, type SkinRow, type SkinBinding } from '@wildshard/format/skinData';
 import { skinPoseLayers } from './skinLayerPlayback';
 
 /** A loaded exported skin: its scene root, its one skinned mesh, the bound rig and the engine's clip player. */
 export interface SkinPlayer {
   readonly root: Object3D;
   readonly mesh: SkinnedMesh;
-  readonly rig: RigInstance;
-  readonly machine: AnimMachine;
+  readonly rig: RigInstance<CreatureSkinClipName>;
+  readonly machine: AnimMachine<CreatureSkinClipName>;
   /** the admitted cost (the parser's, never the row's claim) */
   readonly cost: AssetCost;
   /** the clip now playing, or null before the first `play` */
-  readonly clip: ClipName | null;
+  readonly clip: CreatureSkinClipName | null;
   /** play one clip alone from its first frame (a looping clip repeats, a one-shot holds its last frame) */
-  play: (name: ClipName) => void;
+  play: (name: CreatureSkinClipName) => void;
   /** advance the clip by `dt` seconds (the engine's per-frame update) */
   update: (dt: number) => void;
   /** release the geometry, skeleton and mixer (the material belongs to the caller) */
@@ -114,7 +114,7 @@ function mergePrimitives(meshes: readonly SkinnedMesh[], parts: readonly string[
 }
 
 /** Scope teardown needs the owned resources, not a player's private playback tables. */
-function skinDisposer(mesh: SkinnedMesh, machine: AnimMachine): () => void {
+function skinDisposer(mesh: SkinnedMesh, machine: AnimMachine<CreatureSkinClipName>): () => void {
   let live = true;
   return () => {
     if (!live) return;
@@ -146,10 +146,10 @@ export async function loadSkin(glb: Uint8Array, row: SkinRow, binding: SkinBindi
   const extras: unknown = (node ?? mesh).userData['castShadow'];
   mesh.castShadow = extras === true; mesh.receiveShadow = true;
   const rig = bindRig(file.scene, file.animations, { skeleton: row.rig.skeleton, clips: row.rig.clips, sockets: row.rig.sockets }, { skeleton: row.rig.skeleton, joints: row.rig.joints });
-  const states: Record<string, { clip: ClipName; fade: number }> = {};
+  const states: Record<string, { clip: CreatureSkinClipName; fade: number }> = {};
   for (const name of row.rig.clips) states[name] = { clip: name, fade: 0 };
   const machine = new AnimMachine({ states, loops: binding.loops }, rig);
-  let current: ClipName | null = null, time = 0;
+  let current: CreatureSkinClipName | null = null, time = 0;
   const dispose = skinDisposer(mesh, machine);
   const layers = new Map(Object.entries(binding.poseLayers ?? {}).filter((entry): entry is [string, NonNullable<typeof entry[1]>] => entry[1] !== undefined).map(([name, data]) => [name, skinPoseLayers(mesh, data)]));
   let activeLayers: ReturnType<typeof skinPoseLayers> | undefined;

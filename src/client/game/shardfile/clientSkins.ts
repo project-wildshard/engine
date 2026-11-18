@@ -12,6 +12,7 @@
  */
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
+import { is } from 'valibot';
 import type { ClipName } from '@wildshard/engine/anim/rig';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
@@ -21,11 +22,13 @@ import { NO_FUR } from '@wildshard/engine/entities/species/rigs';
 import { loadSkin } from './skinPlayback';
 import { compileSkinPoseLayers, bindSkinPoseLayers, type CompiledSkinPoseLayers } from './skinLayerPlayback';
 import { resolveSkinLookFiles, skinLookParameters } from '@wildshard/format/skinAssets';
-import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
+import { SkinClipNameSchema, type CreatureSkinClipName } from '@wildshard/format/skinData';
+import { SKIN_LOOK_RECIPE, type SkinClipMap, type SkinClipState } from '@wildshard/format/skins';
 import { CREATURE_SKELETONS, skeletonBones } from '@wildshard/format/creatureSkeletons';
 import type { CreatureBody } from '@wildshard/format/creatureLayers';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { creatureClipName } from '../../../shared/game/shardfile/creatureClipChoice';
 
 interface SampledTrack { bone: string; property: 'position' | 'quaternion' | 'scale'; interpolant: Interpolant }
 interface SampledClip { duration: number; tracks: readonly SampledTrack[]; layers: CompiledSkinPoseLayers | null }
@@ -38,10 +41,11 @@ export interface ClientSkin {
   readonly material: () => MeshStandardMaterial | MeshLambertMaterial;
   /** TE-ENG10: one fresh look material per mapped GLB material (geometry groups 1..n), per rig; none without a map */
   readonly parts: readonly (() => Material)[];
-  readonly clips: ReadonlyMap<ClipName, SampledClip>;
+  readonly clips: ReadonlyMap<CreatureSkinClipName, SampledClip>;
   readonly skeleton: string;
   readonly sockets: readonly string[];
   readonly attackSpan: number;
+  readonly clipMap?: SkinClipMap;
   /** Exact authored variant ids; entries share the admitted rig/material contract. */
   readonly variants?: ReadonlyMap<string, ClientSkin>;
 }
@@ -90,7 +94,10 @@ export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' |
     const parameters = skinLookParameters(look), resolved = resolveSkinLookFiles(source, look, assets);
     const loaded = new Map<string, ClientSkin>();
     for (const file of [resolved.skin, ...(resolved.variants?.values() ?? [])]) {
-      if (!loaded.has(file.hash)) loaded.set(file.hash, await loadClientSkin(file, { source, assets, compile, scope, lookId: look.id, attackSpan: parameters.attackSpan }));
+      if (!loaded.has(file.hash)) loaded.set(file.hash, await loadClientSkin(file, {
+        source, assets, compile, scope, lookId: look.id, attackSpan: parameters.attackSpan,
+        ...(parameters.clipMap === undefined ? {} : { clipMap: parameters.clipMap }),
+      }));
     }
     const skin = loaded.get(resolved.skin.hash); if (skin === undefined) throw new Error(`skin look ${look.id}: unloaded default`);
     const variants = resolved.variants === undefined ? undefined : new Map([...resolved.variants].map(([id, file]) => {
@@ -102,8 +109,8 @@ export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' |
   return skins;
 }
 
-interface SkinLoadContext { source: Pick<Shardfile, 'look'>; assets: ReadonlyMap<string, Uint8Array>; compile: (entry: unknown) => Material; scope: Scope; lookId: string; attackSpan: number }
-async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLookFiles>['skin'], { source, assets, compile, scope, lookId, attackSpan }: SkinLoadContext): Promise<ClientSkin> {
+interface SkinLoadContext { source: Pick<Shardfile, 'look'>; assets: ReadonlyMap<string, Uint8Array>; compile: (entry: unknown) => Material; scope: Scope; lookId: string; attackSpan: number; clipMap?: SkinClipMap }
+async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLookFiles>['skin'], { source, assets, compile, scope, lookId, attackSpan, clipMap }: SkinLoadContext): Promise<ClientSkin> {
     const glb = assets.get(row.file); if (glb === undefined) throw new Error(`skin look ${lookId}: missing admitted skin GLB`);
     const material = materialFactory(compile, binding.material);
     // TE-ENG10: the binding's GLB material name -> look.materials id, as props.materials maps a prop's; each mapped part
@@ -119,7 +126,7 @@ async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLoo
     if (parts.length === 0) { geometry.clearGroups(); geometry.addGroup(0, geometry.index?.count ?? geometry.getAttribute('position').count, 0); }
     // animated limbs and the corpse never leave this (the factory's margin for procedural creatures)
     geometry.computeBoundingSphere(); if (geometry.boundingSphere !== null) geometry.boundingSphere.radius += 0.6;
-    const clips = new Map<ClipName, SampledClip>();
+    const clips = new Map<CreatureSkinClipName, SampledClip>();
     for (const [name, clip] of player.rig.clips) {
       const layers = binding.poseLayers?.[name];
       clips.set(name, { duration: clip.duration, tracks: sampled(clip, joints), layers: layers === undefined ? null : compileSkinPoseLayers(layers, joints.map((bone) => bone.name)) });
@@ -127,7 +134,8 @@ async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLoo
     // Instances use sampled tracks; the temporary player's mixer never plays.
     // Keep its mesh/skeleton scope-owned, but release unused actions/bindings.
     player.machine.dispose();
-    return { id: row.id, geometry, bones: restBones(joints, player.mesh.skeleton.boneInverses, row.id), material, parts, clips, skeleton: row.rig.skeleton, sockets: row.rig.sockets, attackSpan };
+    return { id: row.id, geometry, bones: restBones(joints, player.mesh.skeleton.boneInverses, row.id), material, parts, clips,
+      skeleton: row.rig.skeleton, sockets: row.rig.sockets, attackSpan, ...(clipMap === undefined ? {} : { clipMap }) };
 }
 
 /** The part of the engine's per-frame rig context a skin's clip choice reads. */
@@ -139,9 +147,9 @@ export class SkinDriver {
   private readonly skin: ClientSkin;
   private readonly bones: Record<string, Bone>;
   private readonly biped: BipedRigPose | undefined;
-  private readonly layers = new Map<ClipName, ReturnType<typeof bindSkinPoseLayers>>();
+  private readonly layers = new Map<CreatureSkinClipName, ReturnType<typeof bindSkinPoseLayers>>();
   private active: ReturnType<typeof bindSkinPoseLayers> | undefined;
-  private clip: ClipName | null = null;
+  private state: SkinClipState | null = null;
   /** seconds since the current clip began */
   private since = 0;
   private flinch = 0;
@@ -154,31 +162,34 @@ export class SkinDriver {
     for (const [name, clip] of skin.clips) if (clip.layers !== null) this.layers.set(name, bindSkinPoseLayers(clip.layers, ordered));
   }
   /** The clip the creature's state asks for: death, then the attack, the hit reaction, the gait, idle (grazing when it grazes). */
-  private choose(c: SkinDriveState): ClipName | null {
+  private choose(c: SkinDriveState): SkinClipState | null {
     // a new blow raises the flinch (Animal.stagger / applyDamage); the reaction plays once from its start
     if (c.alive && c.flinch > this.flinch + 0.05) this.hitT = 0; else if (this.hitT >= 0) this.hitT += c.dt;
     this.flinch = c.flinch;
-    if (this.hitT >= (this.skin.clips.get('hit')?.duration ?? 0)) this.hitT = -1;
-    if (!c.alive) return this.skin.clips.has('die') ? 'die' : null;
-    if (c.attack >= 0 && this.skin.clips.has('attack')) return 'attack';
-    if (this.hitT >= 0 && this.skin.clips.has('hit')) return 'hit';
-    if (Math.hypot(c.speed, c.strafe) / c.scale > 0.15 && this.skin.clips.has('walk')) return 'walk';
-    if (c.state === 'graze' && this.skin.clips.has('idle.graze')) return 'idle.graze';
-    return this.skin.clips.has('idle') ? 'idle' : null;
+    if (this.hitT >= (this.skin.clips.get(this.name('hit'))?.duration ?? 0)) this.hitT = -1;
+    if (!c.alive) return this.skin.clips.has(this.name('die')) ? 'die' : null;
+    if (c.attack >= 0 && this.skin.clips.has(this.name('attack'))) return 'attack';
+    if (this.hitT >= 0 && this.skin.clips.has(this.name('hit'))) return 'hit';
+    if (Math.hypot(c.speed, c.strafe) / c.scale > 0.15 && this.skin.clips.has(this.name('walk'))) return 'walk';
+    if (c.state === 'graze' && this.skin.clips.has(this.name('idle.graze'))) return 'idle.graze';
+    return this.skin.clips.has(this.name('idle')) ? 'idle' : null;
+  }
+  private name(state: SkinClipState): CreatureSkinClipName {
+    return creatureClipName(state, this.skin.clipMap, this.skin.clips);
   }
   /** Pose this instance's bones for the frame. */
   step(c: SkinDriveState, freshBase = false): void {
     this.biped?.reset();
-    const name = this.choose(c);
-    if (name === null) {
+    const state = this.choose(c);
+    if (state === null) {
       if (this.biped !== undefined && c.alive) this.biped.walk(c.phase, Math.hypot(c.speed, c.strafe) / c.scale);
       return;
     }
-    const clip = this.skin.clips.get(name); if (clip === undefined) return;
-    this.since = name === this.clip ? this.since + c.dt : 0; this.clip = name;
+    const name = this.name(state), clip = this.skin.clips.get(name); if (clip === undefined) return;
+    this.since = state === this.state ? this.since + c.dt : 0; this.state = state;
     // one-shots from their trigger (the export sampled each from it), the walk from the gait phase, idles on the clock
-    const time = name === 'die' ? this.since : name === 'attack' ? c.attack * this.skin.attackSpan : name === 'hit' ? this.hitT : name === 'walk' ? c.phase * clip.duration : c.t;
-    const looping = name === 'walk' || name.startsWith('idle'), at = looping ? time % clip.duration : Math.min(time, clip.duration);
+    const time = state === 'die' ? this.since : state === 'attack' ? c.attack * this.skin.attackSpan : state === 'hit' ? this.hitT : state === 'walk' ? c.phase * clip.duration : c.t;
+    const looping = state === 'walk' || state.startsWith('idle'), at = looping ? time % clip.duration : Math.min(time, clip.duration);
     // A native poser already rebuilt this frame's base; restoring last frame's
     // cached layer base here would freeze its otherwise untracked gait joints.
     if (!freshBase && this.biped === undefined) this.active?.restore();
@@ -223,7 +234,8 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
     driver.step(c, quadruped);
   };
   return { id: row.id, species: species.id, kind: species.kind, rig: quadruped ? 'quadruped' : 'custom', fur: NO_FUR,
-    rigContract: { skeleton: quadruped ? 'kit.quadruped' : skin.skeleton, sockets: [...skin.sockets], clips: [...skin.clips.keys()] },
+    rigContract: { skeleton: quadruped ? 'kit.quadruped' : skin.skeleton, sockets: [...skin.sockets],
+      clips: [...skin.clips.keys()].filter((name): name is ClipName => is(SkinClipNameSchema, name)) },
     // the procedural stand-in is the hull itself (the factory swaps in `skin`'s shared geometry before any rig is made)
     build: (variant) => { const selected = select(variant.id); return { bones: bones(selected), furParts: [], hardParts: [selected.geometry.clone()], eyeParts: [], dims: dims() }; },
     material: () => skin.material(),

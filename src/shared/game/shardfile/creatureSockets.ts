@@ -5,25 +5,34 @@ import type { CreatureLockPoints } from '@wildshard/engine/physics/creatureVolum
 import { CollisionPose } from '../plugin/animation';
 import type { CreatureRestJoint } from './creatureVolumes';
 
-/** Immutable rest sockets, moved by the actual root. No scene, clock or controller. */
-export class RestCreatureSockets implements CreatureLockPoints {
+/** Admitted sockets, positioned by the actual root or the existing collision pose. */
+export class CreatureSockets implements CreatureLockPoints {
   readonly names: readonly string[];
-  private readonly rest: readonly Vector3[];
+  private readonly sockets: readonly { index: number; at: readonly [number, number, number]; rest: Vector3 }[];
   constructor(body: CreatureBody, joints: readonly CreatureRestJoint[],
-    private readonly root: { readonly position: Vector3; readonly yaw: number; readonly scale: number }) {
+    private readonly root: { readonly position: Vector3; readonly yaw: number; readonly scale: number },
+    private readonly strike?: { readonly names: readonly string[];
+      readonly posed?: (index: number, at: readonly [number, number, number], out: Vector3) => Vector3 }) {
     const skeleton = body.skeleton === undefined ? undefined : CREATURE_SKELETONS[body.skeleton];
-    this.names = body.lock ?? (skeleton === undefined ? [] : [skeleton.lock]);
-    if (this.names.length === 0 || this.names.length > 16 || new Set(this.names).size !== this.names.length) throw new Error('Invalid creature lock sockets');
+    this.names = strike?.names ?? body.lock ?? (skeleton === undefined ? [] : [skeleton.lock]);
+    if (this.names.length === 0 || this.names.length > (strike === undefined ? 16 : 32) || new Set(this.names).size !== this.names.length) {
+      throw new Error(`Invalid creature ${strike === undefined ? 'lock' : 'strike'} sockets`);
+    }
     const pose = new CollisionPose(joints); pose.solve(new Matrix4());
-    this.rest = this.names.map(name => {
+    this.sockets = this.names.map(name => {
       const socket = skeleton?.sockets[name], bone = socket?.bone ?? name, index = joints.findIndex(row => row.name === bone);
-      if (index === -1) throw new Error(`Missing creature lock socket ${name} (bone ${bone})`);
-      const out = new Vector3(); pose.point(index, socket?.at ?? [0, 0, 0], out); return out;
+      if (index === -1) throw new Error(`Missing creature ${strike === undefined ? 'lock' : 'strike'} socket ${name} (bone ${bone})`);
+      const at = socket?.at ?? [0, 0, 0] as const;
+      return { index, at, rest: pose.point(index, at, new Vector3()) };
     });
   }
   point(index: number, out: Vector3): Vector3 {
-    const at = this.rest[index], { position: p, yaw, scale } = this.root;
-    if (at === undefined || !Number.isFinite(scale) || scale <= 0) throw new Error('Invalid creature lock frame');
+    const socket = this.sockets[index], { position: p, yaw, scale } = this.root;
+    if (socket === undefined || !Number.isFinite(scale) || scale <= 0) {
+      throw new Error(`Invalid creature ${this.strike === undefined ? 'lock' : 'strike'} frame`);
+    }
+    if (this.strike?.posed !== undefined) return this.strike.posed(socket.index, socket.at, out);
+    const at = socket.rest;
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
     return out.set(p.x + scale * (at.x * cos + at.z * sin), p.y + scale * at.y, p.z + scale * (-at.x * sin + at.z * cos));
   }

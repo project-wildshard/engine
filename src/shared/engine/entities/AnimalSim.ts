@@ -127,6 +127,15 @@ export class AnimalSim {
     if (this.authoredLockPoints !== undefined || points.names.length === 0 || points.names.length > 16) throw new Error('Incompatible creature lock points');
     this.authoredLockPoints = points;
   }
+  private strikePoints: CreatureLockPoints | undefined;
+  bindStrikePoints(points: CreatureLockPoints): void {
+    if (this.strikePoints !== undefined || points.names.length === 0) throw new Error('Incompatible creature strike points');
+    this.strikePoints = points;
+  }
+  strikePoint(name: string, out: Vector3): Vector3 | undefined {
+    const index = this.strikePoints?.names.indexOf(name) ?? -1;
+    return index < 0 ? undefined : this.strikePoints?.point(index, out);
+  }
   private elapsed = 0;
   private readonly moveWant = { x: 0, y: 0, z: 0 };
 

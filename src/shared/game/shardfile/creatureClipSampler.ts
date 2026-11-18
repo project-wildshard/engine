@@ -73,6 +73,7 @@ export class CreatureClipSampler {
     this.locals = joints.map(() => ({ position: new Vector3(), quaternion: new Quaternion(), scale: new Vector3(1, 1, 1) }));
   }
   has(name: string): boolean { return this.clips.has(name); }
+  point(index: number, at: readonly [number, number, number], out: Vector3): Vector3 { return this.pose.point(index, at, out); }
   duration(name: string): number { const clip = this.clips.get(name); if (clip === undefined) throw new Error(`Missing creature clip ${name}`); return clip.duration; }
   joint(name: string, position: Vector3, quaternion: Quaternion, scale: Vector3): boolean {
     const index = this.joints.findIndex(row => row.name === name), local = this.locals[index];
