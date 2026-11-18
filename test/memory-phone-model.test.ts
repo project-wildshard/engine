@@ -13,22 +13,23 @@ const anchor = JSON.parse(readFileSync(new URL('fixtures/memory/phone-anchor-v01
 const model = loadPhoneModel() as { limitMB: number; limitHighMB: number; gpuFloorMB: number; alpha: { low: number; high: number }; scale: { low: number; high: number };
   chromium: { loadingPerRenderer: { low: number; central: number; high: number } }; zones: Record<string, { phoneLoadingMB: { low: number; central: number; high: number }; phonePlayingMB: { central: number } }> };
 
-test('the limit is the chip\'s crash line, and the published 2,147 MB is the high end', () => {
-  expect(model.limitMB * MB).toBe(CRASH_LINE);
-  expect(model.limitHighMB).toBe(2147);
+test('the chip uses the exact device limit and the calibration keeps its fitted bounds', () => {
+  expect(CRASH_LINE).toBe(2048 * 1024 ** 2);
+  expect(model.limitMB).toBe(2050);
+  expect(model.limitHighMB).toBe(Math.round(CRASH_LINE / MB));
 });
 
 test('v0.1.36 Nine, the boot the phone died in: the chain puts its last compile:after window at or over the line, and every window before it under the higher line', () => {
   for (const windows of anchor.runs) {
     const at = windows.map((w) => w.step).lastIndexOf('compile:after');
     const died = phoneFromWebKit(windows[at]!.peak, model);
-    expect(died.central).toBeGreaterThanOrEqual(CRASH_LINE);
-    expect(died.high).toBeGreaterThanOrEqual(CRASH_LINE);
+    expect(died.central).toBeGreaterThanOrEqual(model.limitMB * MB);
+    expect(died.high).toBeGreaterThanOrEqual(model.limitMB * MB);
     for (const lived of windows.slice(0, at)) expect(phoneFromWebKit(lived.peak, model).central).toBeLessThan(model.limitHighMB * MB);
   }
   // the committed range is the runs' median bounds, so it holds for the median run at least at its low end
   const lows = anchor.runs.map((windows) => phoneFromWebKit(windows[windows.map((w) => w.step).lastIndexOf('compile:after')]!.peak, model).low).sort((a, b) => a - b);
-  expect(lows[1]).toBeGreaterThanOrEqual(CRASH_LINE * 0.99);
+  expect(lows[1]).toBeGreaterThanOrEqual(model.limitMB * MB * 0.99);
 });
 
 test('the anchor bounds both families from both sides and agrees with itself', () => {

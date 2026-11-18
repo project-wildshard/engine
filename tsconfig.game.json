@@ -19,6 +19,7 @@
     }
   ],
   "include": [
+    "scripts/memory/phone-model.json",
     "src/client/game",
     "src/shared/game",
     "src/server/game",

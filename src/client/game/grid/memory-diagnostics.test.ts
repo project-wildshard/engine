@@ -24,7 +24,7 @@ test('G628 M1/M3: one line, the page headline in its danger band; the shard limi
   const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Driftwood Isle', memory: () => observed(0, 0),
     allocator: { entries: () => [sim('dw', bytes)], cost: () => ({ ...contentCost(input), input }) } }));
   const line = hud.querySelector<HTMLElement>('.ws-grid-budget-x');
-  expect(line?.textContent).toBe(`MEM ≈${(contentCost(input).playing / 1e9).toFixed(2)} GB / 2.05 · 1 WORLD`);
+  expect(line?.textContent).toBe(`MEM ≈${(contentCost(input).playing / 1e9).toFixed(2)} GB / 2.15 · 1 WORLD`);
   expect(line?.dataset['tone']).toBe('green');
   // A14: the card on the Developer dock reads "mem 0.70", toned; the headline above waits in its panel
   const card = document.querySelector<HTMLElement>('.ws-perf-dock .ws-grid-budget');
@@ -73,7 +73,7 @@ test('hidden Developer strip skips snapshots while entry trends keep their origi
   } finally { vi.useRealTimers(); }
 });
 
-test('collapsed strip reads current totals and expands with full allocation details', () => {
+test('collapsed strip reads current totals and expands with full allocation details', async () => {
   vi.useFakeTimers();
   try {
     setDev(true);
@@ -85,17 +85,38 @@ test('collapsed strip reads current totals and expands with full allocation deta
     expect(summary).toHaveBeenCalledTimes(1); expect(snapshot).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1000);
     expect(summary).toHaveBeenCalledTimes(2); expect(snapshot).not.toHaveBeenCalled();
+    await vi.dynamicImportSettled();
+    summary.mockClear();
     overlay.toggle();
     expect(snapshot).toHaveBeenCalledTimes(1);
     expect(hud.querySelector('[data-memory="observed"]')).not.toBeNull();
     const head = overlay.headline();
     overlay.crossed(); vi.advanceTimersByTime(0);
-    expect(summary).toHaveBeenCalledTimes(3); expect(snapshot).toHaveBeenCalledTimes(2);
+    expect(summary).toHaveBeenCalledTimes(1); expect(snapshot).toHaveBeenCalledTimes(2);
     expect(overlay.headline()).toEqual(head);
     overlay.toggle(); vi.advanceTimersByTime(1000);
-    expect(summary).toHaveBeenCalledTimes(5); expect(snapshot).toHaveBeenCalledTimes(2);
+    expect(summary).toHaveBeenCalledTimes(3); expect(snapshot).toHaveBeenCalledTimes(2);
     scope.dispose();
   } finally { vi.useRealTimers(); }
+});
+
+test('phone rows use the live ledger, show the model range and flag a subsystem above budget', async () => {
+  vi.stubGlobal('__wildshardMemory', { counters: () => ({ gpu: { buffer: 120e6, texture: 10e6 }, workers: { 'decoder/wasm': 2e6 } }) });
+  try {
+    setDev(true);
+    const scope = owner(), input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: 0, commons: 0, overlap: 0 };
+    const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: id => id,
+      allocator: { entries: () => [], cost: () => ({ ...contentCost(input), input }) } }));
+    await vi.dynamicImportSettled();
+    overlay.toggle();
+    expect(overlay.headline()?.source).toBe('predicted');
+    expect(document.querySelector('.ws-grid-budget-x')?.textContent).toContain('PHONE');
+    expect(document.querySelector('.ws-grid-budget-x')?.getAttribute('title')).toContain('Predicted phone range');
+    const geometry = document.querySelector<HTMLElement>('[data-subsystem="geometry"]');
+    expect(geometry?.dataset).toMatchObject({ liveBytes: '120000000', budgetBytes: '150000000', tone: 'red' });
+    expect(geometry?.querySelector('meter')?.getAttribute('max')).toBe('150000000');
+    expect(document.querySelector<HTMLElement>('[data-subsystem="workers"]')?.dataset['liveBytes']).toBe('2000000');
+  } finally { vi.unstubAllGlobals(); }
 });
 
 test('G628 M4/M7: a red line per shard over its limit; the trend keeps the first entry and the last six', async () => {

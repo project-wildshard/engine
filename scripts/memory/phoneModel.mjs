@@ -20,9 +20,11 @@
 //     zones' fit of WebKit [K] on the ledger, settled at control, and the measured peak over settled for loading;
 //   - phoneFromChromium: the Chromium renderer [R] peak under the loading card (scripts/boot-memory-peak.mjs), times
 //     the zones' fitted ratio of the phone's loading peak to that renderer peak.
-// Each returns {low, central, high} in bytes. The limit is CRASH_LINE (src/client/game/grid/budgetOverlay.ts, 2.05 GB);
+// Each returns {low, central, high} in bytes. The limit is CRASH_LINE (src/client/game/grid/budgetOverlay.ts, 2,048 MiB);
 // public device logs say 2,147 MB (ActiveHard 2048 MiB), which `limitHighMB` carries until EM34 settles it.
 import { readFileSync } from 'node:fs';
+import { phoneFromWebKit } from '../../src/shared/engine/core/phoneMemoryModel.ts';
+export { phoneFromWebKit, ledgerSplit, phoneFromLedger } from '../../src/shared/engine/core/phoneMemoryModel.ts';
 
 const MB = 1e6;
 
@@ -56,37 +58,11 @@ export function anchorBounds(windows, lastOperation, { limitMB, limitHighMB, gpu
     lived: { step: binding.step, webcontentMB: mb(binding.peak.webcontent), gpuMB: mb(binding.peak.gpu) }, consistent: alphaLow <= alphaHigh && scaleLow <= scaleHigh };
 }
 
-/** The phone from WebKit [K] of the two processes at one moment (settled, or a checkpoint's peaks). @param {{webcontent:number, gpu:number}} k
- * @param {any} model @returns {Range} */
-export function phoneFromWebKit(k, model) {
-  const g = Math.max(0, k.gpu - model.gpuFloorMB * MB);
-  const { alpha, scale } = model;
-  const a = (/** @type {number} */ x) => k.webcontent + x * g, s = (/** @type {number} */ x) => x * (k.webcontent + g);
-  return { low: Math.min(a(alpha.low), s(scale.low)), central: a((alpha.low + alpha.high) / 2), high: Math.max(a(alpha.high), s(scale.high)) };
-}
-
 /** The phone's loading peak from a WebKit boot's checkpoints: each checkpoint through the chain, the largest of each end.
  * Peaks of the two processes inside one checkpoint need not coincide, so this leans high. @param {readonly {peak:{webcontent:number, gpu:number}}[]} checkpoints @param {any} model @returns {Range} */
 export function phonePeakFromWebKit(checkpoints, model) {
   const rows = checkpoints.map((c) => phoneFromWebKit(c.peak, model));
   return { low: Math.max(...rows.map((r) => r.low)), central: Math.max(...rows.map((r) => r.central)), high: Math.max(...rows.map((r) => r.high)) };
-}
-
-/** Ledger bytes [L] by domain, for the fit: RAM (page and workers) and WebGL. @param {Record<string, Record<string, number>> | null | undefined} counters */
-export function ledgerSplit(counters) {
-  const sum = (/** @type {Record<string, number> | undefined} */ kinds) => Object.values(kinds ?? {}).reduce((a, b) => a + b, 0);
-  return { ram: sum(counters?.ram) + sum(counters?.workers), gpu: sum(counters?.gpu) };
-}
-
-/** The phone from the ledger alone: WebContent and GPU process [K] from their fits on the ledger, through the chain; the
- * fit's worst leave-one-out miss widens each end. `loading` multiplies by the measured peak over settled.
- * @param {Record<string, Record<string, number>> | null | undefined} counters @param {any} model @param {'playing'|'loading'} [phase] @returns {Range} */
-export function phoneFromLedger(counters, model, phase = 'playing') {
-  const { ram, gpu } = ledgerSplit(counters), fit = model.ledger;
-  const k = { webcontent: (fit.webcontent.floorMB + fit.webcontent.perMB * (ram / MB)) * MB, gpu: (fit.gpu.floorMB + fit.gpu.perMB * (gpu / MB)) * MB };
-  const p = phoneFromWebKit(k, model), miss = fit.missPct / 100;
-  const ratio = phase === 'loading' ? model.peakOverSettled : { low: 1, central: 1, high: 1 };
-  return { low: p.low * (1 - miss) * ratio.low, central: p.central * ratio.central, high: p.high * (1 + miss) * ratio.high };
 }
 
 /** The phone's loading peak from Chromium's renderer peak under the loading card [R]. @param {number} rendererBytes @param {any} model @returns {Range} */
