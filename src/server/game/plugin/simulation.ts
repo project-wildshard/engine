@@ -106,6 +106,7 @@ import { installDeclaredRiding, type DeclaredRiding } from '../shardfile/declare
 import { installDeclaredHostPortalRide } from '../shardfile/declaredPortalRide';
 import { installDeclaredSpawnWhen } from '../shardfile/declaredSpawnWhen';
 import { installEncounterAdds } from '../shardfile/encounterAdds';
+import { dataScriptBrains } from '../shardfile/dataScriptBrains';
 import { countedShard, countSlots } from '../shardfile/declaredSpawnCount';
 import type { PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
@@ -565,7 +566,9 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
       const brain = spawn.brain === null ? undefined : custom.get(spawn.brain);
       return brain === undefined ? [] : [{ actorId: spawn.id, entity: numericScriptEntityId(`brain:${spawn.id}`), brain }];
     });
-    if (brainBindings.length > 0 && ports.scriptBrains === undefined) throw new Error('Missing custom brain port');
+    // CC60 (C-Q2): a data-only upload's script brains run on the engine's own port; a native runtime brings its own
+    const scriptBrains = ports.scriptBrains ?? (shard.runtime === null ? dataScriptBrains(shard.rows, creatures.spawns, creatures.brains) : undefined);
+    if (brainBindings.length > 0 && scriptBrains === undefined) throw new Error('Missing custom brain port');
     const dataSpecies = new Map(shard.rows.species.map(row => [row.id, row]));
     const dataSpawns = new Map(creatures.spawns.map(row => [row.id, row]));
     const dataPorts = shard.runtime === null ? dataCreaturePorts(host, shard.rows, creatures.spawns, ports.creatureImpulse, actor => {
@@ -621,8 +624,8 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
       };
       const moverDriver = shard.movers.length === 0 ? undefined : new MoverScriptDriver(shard.movers, options.query, [...resetMovers]);
       if (brainBindings.length > 0) {
-        if (ports.scriptBrains === undefined) throw new Error('Missing custom brain port');
-        const scriptBrainPorts = ports.scriptBrains(host);
+        if (scriptBrains === undefined) throw new Error('Missing custom brain port');
+        const scriptBrainPorts = scriptBrains(host);
         if (typeof scriptBrainPorts.ports.observe !== 'function' || typeof scriptBrainPorts.ports.mayAttack !== 'function' || typeof scriptBrainPorts.ports.strike !== 'function') throw new Error('Missing custom brain observation or strike recipe');
         const brainPorts = { ...scriptBrainPorts, query: scriptBrainPorts.query ?? options.query, actors: host.entities, bindings: brainBindings };
         lane = moverDriver === undefined ? createShardfileComposedLane(shard, assets, options, brainPorts) : moverDriver.compose(shard, assets, options, brainPorts);

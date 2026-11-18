@@ -115,14 +115,23 @@ test("the defining eleven entries and complete declared names have explicit nati
   expect(original.decision).toBe("sim/scripts"); // not a new creatures.brains callback or kind
 });
 
-test("a plain script upload cannot supply its own trusted observation, body or damage port", async () => {
+// ONE-FORMAT CC60 (C-Q2): a data-only upload's script brain runs on the engine's own port (observations, the
+// attack-permission owner and the strike runner); the upload still supplies no port of its own.
+test("a plain script upload runs its whole-creature brain on the engine's data port", async () => {
   const f = fixture(),
     bytes = JSON.stringify(f.source);
-  const R = await rapier;
-  expect(() => createShardfileSim(f.source, f.assets, { rapier: R })).toThrow(
-    "Missing custom brain port",
-  );
-  expect(JSON.stringify(f.source)).toBe(bytes);
+  const sim = createShardfileSim(f.source, f.assets, { rapier: await rapier });
+  try {
+    const actor = sim.host.entities.get("fixture.actor");
+    if (actor === undefined) throw new Error("Missing script roster actor");
+    const player = sim.host.nearestPlayer(actor.position);
+    expect(sim.host.hasStep("brain.fixture.actor")).toBe(false);
+    for (let tick = 0; tick < 30; tick++) sim.host.step();
+    expect(player.health.attributes.health).toBe(93);
+    expect(JSON.stringify(f.source)).toBe(bytes);
+  } finally {
+    sim.dispose();
+  }
 });
 
 test("the existing composed script owner advances one body and requests actual once-owned strikes", async () => {
@@ -198,7 +207,7 @@ test("an admitted script cannot bypass the actual attack permission owner", asyn
   }
 });
 
-test("authored senses cannot grant custom-script observations or replace their trusted owner", async () => {
+test("authored senses feed the data port and cannot replace a trusted owner", async () => {
   const f = fixture(),
     species = f.source.rows.species[0];
   if (species === undefined) throw new Error("Missing custom sensing source");
@@ -217,9 +226,8 @@ test("authored senses cannot grant custom-script observations or replace their t
   f.source.rows = parseRows(f.source.rows);
   const R = await rapier,
     bytes = JSON.stringify(f.source);
-  expect(() => createShardfileSim(f.source, f.assets, { rapier: R })).toThrow(
-    "Missing custom brain port",
-  );
+  // CC60: authored senses admit on the engine's data port (its `noticed` slot); a trusted port still replaces it
+  createShardfileSim(f.source, f.assets, { rapier: R }).dispose();
   const observations: boolean[] = [],
     replayed: boolean[] = [];
   const trusted =

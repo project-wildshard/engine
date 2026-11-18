@@ -52,7 +52,10 @@ return i32(load<f64>(${scratch}));}`;
 
 /** The pinned bytes of one guest; pins it first under WS_FREEZE_GUESTS=1. */
 export async function decisionGuest(body: string, shape: { states?: number; params?: number } = {}): Promise<Uint8Array> {
-  const source = guestSource(body, shape), options = { abi: 1 };
+  return pinnedGuest(guestSource(body, shape), { abi: 1 });
+}
+/** Any `compileScript` guest's pinned bytes (a legacy whole-creature brain, say); pins it first under WS_FREEZE_GUESTS=1. */
+export async function pinnedGuest(source: string, options: Readonly<Record<string, unknown>>): Promise<Uint8Array> {
   try { return await frozenLegacyGuest(source, options); } catch (error) {
     if (process.env['WS_FREEZE_GUESTS'] !== '1') throw new Error(`Unpinned decision guest: rerun with WS_FREEZE_GUESTS=1 WS_SHARDDEV=<sharddev> to pin it (${String(error)})`);
     execFileSync(process.execPath, ['scripts/freeze-script-guest.mjs'], { input: JSON.stringify(['compileScript', [source, options]]), stdio: ['pipe', 'pipe', 'inherit'] });

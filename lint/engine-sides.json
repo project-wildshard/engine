@@ -1378,6 +1378,7 @@
     "src/server/game/shardfile/layerHunts.ts": "server",
     "src/server/game/shardfile/dataRespawn.ts": "server",
     "src/server/game/shardfile/decisions.ts": "server",
+    "src/server/game/shardfile/dataScriptBrains.ts": "server",
     "src/server/game/shardfile/declaredClimate.ts": "server",
     "src/server/game/shardfile/declaredKitItems.ts": "server",
     "src/server/game/shardfile/declaredPortalRide.ts": "server",
