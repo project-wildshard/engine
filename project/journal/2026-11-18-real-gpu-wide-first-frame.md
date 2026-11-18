@@ -18,3 +18,8 @@
   0.4 s in the iOS Simulator. It now reserves the standalone bank there
   (its one home cell) and tops up after `ws:control-ready`, a reserve an
   idle turn; a miss still allocates in place.
+- Then the server step: a CPU profile of the load (Chromium, Metal,
+  4x) had it 959 of 1479 ms idle, waiting on the world door's welcome.
+  A phone now starts the server's launch beside the world program
+  links (finish.ts `launchServer`), and the server step awaits the same
+  promise, so its failures stay that step's.

@@ -318,6 +318,12 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // A boot that lands on the title reveals nothing yet: it draws no frame before ENTER (CI's 0.3 fps runner spent ~70 s
   // of Nine's 150 s title budget on these 20+ frames), and the title's own warm-up below links the world meanwhile.
   const entersAtReveal = hud.entered || arrival?.mode === 'enter' || arrival?.mode === 'arena' || ctx.continuingGridEntry;
+  // DL17, DL21: the server's boot (the world's door on a world build), adopted by the server step below. STAGING-BUGBASH SB47:
+  // that step mostly waited on the door's welcome (959 of 1479 ms idle at 4x CPU), so a phone starts it beside the world
+  // program links and the step waits only for what is left (headless WebKit 4x: links 2.0 s, server 1.7 s; Jake's iPhone
+  // 5.1 s and 3.5 s). A failure is still the server step's: it awaits the same promise.
+  let serverLaunch: Promise<void> | null = null;
+  const launchServer = (): Promise<void> => { serverLaunch ??= loadWorkerClient().then(worker => worker.launchWorkerClient({ ...(TIER === 'phone' && entersAtReveal ? { linkBodies: () => linkWorldUnderLoader(game, true) } : {}), slug: ctx.grid?.home.slug ?? slug, player, physics: world.physics, scene: game.rootScene, animals, weapons, health: playerHealth, died: ctx.serverDied, hurt: ctx.serverHurt, items: ctx.grid === null ? ctx.product.shardfile.items.rows : [], dims: kind => { const species = app.species.get(kind), variant = species?.variants[0]; return variant === undefined ? null : species?.build(variant, new Rng(1)).dims ?? null; }, tools: () => app.equipment?.tools ?? [], day: () => app.dayCycle, grid: workerGrid(ctx), scope: game.levelScope, system: spec => { app.addSystem(spec, game.levelScope); } })); return serverLaunch; };
   if (TIER === 'phone' && entersAtReveal) {
     // FC2: no world frames under the loader; the spawn view warms with counted offscreen draws (settlePrograms.ts)
     await loadingStage('spawnPrograms', () => settleEntryPrograms(game));
@@ -326,7 +332,10 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     // spawn view does not draw (Driftwood's off-screen graph materials, the loot coin) linked one a frame in play cost
     // an iPhone ~8 s at 7-11 fps (366 ms frames) right after PLAY. They link here, under the loader, paced the same way
     // and capped; what the cap leaves still links in play (warmRest).
-    if (queuedLinks()) { await loadingStage('worldPrograms', () => linkWorldUnderLoader(game)); releaseDrawn('worldPrograms'); }
+    if (queuedLinks()) {
+      void launchServer().catch(() => undefined);
+      await loadingStage('worldPrograms', () => linkWorldUnderLoader(game)); releaseDrawn('worldPrograms');
+    }
   }
   // DL11: setup overlapped the spawn download; control still waits for the whole set
   // FM6 modes 36 and 44: a part out of its reads refuses the job (a broken or unreachable pack). The load runs the same download
@@ -350,7 +359,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // DL17, DL21: the server boots under the card, a counted line on it, so its reads land before control and the player's first
   // press reaches a server that is up. Before the flip this moves only J130's row.
   try {
-    await loadingStage('server', () => loadWorkerClient().then(worker => worker.launchWorkerClient({ ...(TIER === 'phone' && entersAtReveal ? { linkBodies: () => linkWorldUnderLoader(game, true) } : {}), slug: ctx.grid?.home.slug ?? slug, player, physics: world.physics, scene: game.rootScene, animals, weapons, health: playerHealth, died: ctx.serverDied, hurt: ctx.serverHurt, items: ctx.grid === null ? ctx.product.shardfile.items.rows : [], dims: kind => { const species = app.species.get(kind), variant = species?.variants[0]; return variant === undefined ? null : species?.build(variant, new Rng(1)).dims ?? null; }, tools: () => app.equipment?.tools ?? [], day: () => app.dayCycle, grid: workerGrid(ctx), scope: game.levelScope, system: spec => { app.addSystem(spec, game.levelScope); } })));
+    await loadingStage('server', launchServer);
   } catch (error) {
     plan.fail(error instanceof Error ? error.message : String(error));
     throw error;
