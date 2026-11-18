@@ -780,7 +780,8 @@ export interface AuthoredGridProof {
  */
 export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts,
   plan: { ticks: number; checkpointTick: number; requiredFacts: readonly string[]; requiredItems?: Readonly<Record<string, number>> },
-  inputAt: (tick: number, sim: ShardfileSimulation) => SimCommand | undefined): Promise<AuthoredGridProof> {
+  inputAt: (tick: number, sim: ShardfileSimulation) => SimCommand | undefined,
+  kitOf?: (sim: ShardfileSimulation) => { scene: (player: string, id: string) => boolean } | null): Promise<AuthoredGridProof> {
   if (source.runtime !== null || !Number.isInteger(plan.ticks) || plan.ticks < 1 || plan.ticks > 4096
     || !Number.isInteger(plan.checkpointTick) || plan.checkpointTick < 1 || plan.checkpointTick > plan.ticks) throw new Error('Invalid author proof');
   const insist = (ok: boolean, message: string): void => { if (!ok) throw new Error(`Author proof: ${message}`); };
@@ -794,6 +795,16 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
   // MU6: what a scene or data shard pays its player, as a data cell pays it (cellWorld): quest coins and each kill's own
   // rolls off the shard's loot tables, by item, `coins` for coins. A native pack registers itself (`nativeInventories`).
   const goods: Record<string, number> = {}, baselineGoods: Record<string, number> = {};
+  // SHARD-SOURCE SS-GF1a1c: a tape's E on a pickup (an item scene that takes a tool off its stand, `world.pickup`) runs
+  // the kit as a data cell's page does (cellWorld): the take and the quest flag it raises. Without the kit the press ran
+  // only the prompt's script scene, so Glowfen's lanterns filed no flag and its proof could never finish. The caller
+  // installs it (`installDeclaredKitItems`; this module cannot import it: the kit's native items import this one).
+  const takes = (sim: ShardfileSimulation): void => {
+    const kit = kitOf?.(sim) ?? null;
+    if (kit === null) return;
+    const scene = sim.interact, lead = (): string | undefined => sim.host.players.keys().next().value;
+    sim.interact = (id, player = lead()) => (player !== undefined && kit.scene(player, id)) || scene(id, player);
+  };
   const make = (record: Fact[], paid: Record<string, number>, saved?: SimSnapshot): ShardfileSimulation => {
     let current: ShardfileSimulation | undefined;
     const pay = (item: string, count: number): void => { if (count > 0) paid[item] = (paid[item] ?? 0) + count; };
@@ -803,11 +814,12 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     }, coins: (amount: number) => { pay('coins', amount); } } };
     const loot = (host: SimHost): void => { installCellLoot(host, source, { coins: (_player, amount) => { pay('coins', amount); }, item: (_player, item, count) => { pay(item, count); } }, true); };
     current = createShardfileSim(source, assets, native);
-    if (saved === undefined) loot(current.host);
+    if (saved === undefined) { loot(current.host); takes(current); }
     else {
       const level = current.host.level; current.dispose(); current = undefined;
       const installed: { value?: ShardfileSimulation } = {};
-      const host = restoreSimHost(level, { rapier: ports.rapier }, saved, fresh => { installed.value = bindShardfileSim(fresh, source, assets, { ...native, restoring: true }); loot(fresh); });
+      // SR11, as cellWorld: the kit installs with the restored simulation, so its seats are where the save put them
+      const host = restoreSimHost(level, { rapier: ports.rapier }, saved, fresh => { installed.value = bindShardfileSim(fresh, source, assets, { ...native, restoring: true }); takes(installed.value); loot(fresh); });
       current = installed.value;
       if (current === undefined) { host.dispose(); throw new Error('Missing restored author owner'); }
     }

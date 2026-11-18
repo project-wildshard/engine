@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import * as v from 'valibot';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import { proveAuthoredGrid, createShardfileSim, bindShardfileSim, type ShardfileSimulation } from '@wildshard/engine/game/plugin/simulation';
+import { installDeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
 import { createSimSnapshotSerializer, snapshotSimHostBytes, decodeSimSnapshot, checkSimSnapshotWire } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 
@@ -132,7 +133,7 @@ await runTickWorker(async raw => {
         const script = resident.lane?.host.checkpoint();
         if (script?.modules.some(module => module.failures > 0 || module.disabled)) throw new Error('Author script failed');
         commands = numeric; return player;
-      }),
+      }, proofSim => installDeclaredKitItems(proofSim.host, shard, proofSim.itemHooks)),
     finish: () => ({ ticks: sim.host.state.tick, ...proveShardfileEntries(shard, sim, payload.assets, ports) }),
     dispose: () => { try { sim.dispose(); } finally { serializer.dispose(); } },
   };
