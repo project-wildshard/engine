@@ -1,3 +1,4 @@
+import { graphFileCandidate } from './graphFileCandidate';
 import { sceneVectors, sceneScalarValue } from './sceneInputs';
 /**
  * The shardfile loader's materials (SHARD-PLATFORM SF15a): the look's material catalogue (`look.materials`, SF10a's
@@ -204,7 +205,9 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   if (compiler !== null) units(++unitsDone, 'graph compiler loaded');
   // Lazy catalogue/skin graph compiles need JSON, never the preparation's GLB,
   // texture or Wasm Map. Grid input leases retain and charge this same subset.
-  const graphFiles = new Map(shard.files.filter(file => file.kind === 'json').flatMap(file => {
+  // EM24: only JSON a graph file can be (`graphFileCandidate`); the session no longer
+  // keeps a zone's layout and placement documents for a compile (Pine 6.0, Nine 11.4 MB [L] at control).
+  const graphFiles = new Map(shard.files.filter(graphFileCandidate).flatMap(file => {
     const bytes = assets.get(file.hash); return bytes === undefined ? [] : [[file.hash, bytes] as const];
   }));
   assets = graphFiles; // Escaping closures must not keep an outer-context slot containing the full input Map.

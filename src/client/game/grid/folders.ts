@@ -3,6 +3,7 @@
  * the live host's regional sims (`liveSession.ts`) and the neighbours' render tiles (`session.ts`). The six template copies
  * share one product's immutable bytes; a failed admission is forgotten so a later request retries.
  */
+import { graphFileCandidate } from '../shardfile/graphFileCandidate';
 import { findShard } from '../shard/registry';
 import { findTitleManifest } from '../shard/titleList';
 import { admitFolder, boundedResponse, checkBuiltIndex, readIndexBytes, readFolderDescriptor, type AdmittedFolder, type FolderOptions } from '../shardfile/folder';
@@ -385,7 +386,7 @@ export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode?:
     let generation = 0;
     // Lazy graph-file compilation still has a synchronous JSON contract. Its
     // bounded JSON subset remains charged; meshes, textures and Wasm rehydrate.
-    const keep = new Set(admitted.source.files.filter(file => file.kind === 'json').map(file => file.hash));
+    const keep = new Set(admitted.source.files.filter(graphFileCandidate).map(file => file.hash));
     const inputs = new FolderInputs(admitted, options, (bytes, speculative) => {
       if (owner.scope.disposed) throw new Error('Grid product page disposed');
       const request = { id: `product-input:grid:${slug}:${++generation}`, category: 'product' as const, owner: 'grid', bytes, distance: 0, needed: true };

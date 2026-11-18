@@ -183,3 +183,22 @@ test(flightGc, async () => {
     expect((await assets.read(f.ref)).byteLength).toBe(1024 * 1024);
   });
 });
+
+test('EM24: released wire rereads from the content cache with the network off', async () => {
+  const f = fixture(), copy = new Uint8Array(f.bytes), asset = vi.fn(() => Promise.resolve(copy));
+  const assets = new ClientAssets(f.source, new Map([[f.ref, f.bytes]]), { ...f.options, cache: {
+    product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), asset, putAsset: () => Promise.resolve(true),
+  } });
+  expect(await assets.read(f.ref)).toBe(f.bytes);
+  assets.releaseAll();
+  expect(assets.retained.size).toBe(0);
+  expect(await assets.read(f.ref)).toEqual(f.bytes);
+  expect(asset).toHaveBeenCalledTimes(1);
+  expect(f.fetch).not.toHaveBeenCalled();
+  const gone = new ClientAssets(f.source, new Map([[f.ref, f.bytes]]), { ...f.options, cache: {
+    product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), asset: () => Promise.resolve(null), putAsset: () => Promise.resolve(true),
+  } });
+  gone.releaseAll();
+  await expect(gone.read(f.ref)).rejects.toThrow('Missing cached resident tile');
+  expect(f.fetch).not.toHaveBeenCalled();
+});
