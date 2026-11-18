@@ -88,3 +88,15 @@ moves 850-1030 MB of renderer between runs of one build, so a cut is judged on 3
 - Blink is left out: merely enabling `WEBGL_provoking_vertex` in Chromium on Metal held Nine's load ~10 s (`sky` ->
   `props` 0.5 -> 10.3 s, main thread idle; with the calls dropped too, so the extension itself). Gated on the WebKit
   user agent (iOS Chrome and Firefox are WebKit).
+
+## mini-ninemem5 (relay), 2026-11-17 night
+
+- Where WebContent malloc grows in WebKit (`footprint -j` categories in a loop beside the 20 ms kernel sampler, in-page
+  hooks on GL calls, body reads and JSON.parse): not shader compiles. Replaying Nine's 135 captured programs on a blank
+  WebKit page compiled and linked them all for +13 MB settled, 69 MB peak. The jumps at `sky`/`props` and `shaders` are
+  JS heap. Chromium allocation sampling split by card step (ordinals read at each step change): 1,256 MB on the main
+  thread before control, of which the boot trace's progress writes were 195 MB (`recordBootProgress` -> save store
+  validation on almost every card paint), placement pages 112, graph validation 126, GLSL 70, `isJsonData` 72.
+- Cut 1: a detail-only boot trace change persists at most once a second (`PROGRESS_WRITE_MS`); stages, checkpoints and
+  statuses still write at once. WebKit [K], 4 alternating cold runs each: WebContent peak median 1,906 -> 1,717 MB,
+  settled 992 -> 970; EM11 phone loading peak 2.17 -> 1.99 GB.

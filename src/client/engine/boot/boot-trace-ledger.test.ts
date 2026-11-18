@@ -3,7 +3,8 @@
 // a page the phone killed says what the engine held at its last step.
 import { beforeEach, expect, test, vi } from 'vitest';
 import { saveStorage } from '../saves/slots';
-import { createBootTrace, ledgerTotals, type BootTraceTransports } from './bootTrace';
+import { createBootTrace, ledgerTotals, PROGRESS_WRITE_MS, type BootTraceTransports } from './bootTrace';
+import type { ProgressView } from './plan';
 
 const MB = 1e6;
 
@@ -49,4 +50,29 @@ test('a ledger that throws leaves the checkpoint without one', () => {
   trace.recordBootCheckpoint('world:data');
   const stored = JSON.parse(saveStorage('device').getItem('boot.trace') ?? 'null') as { checkpoints: Record<string, unknown>[] };
   expect(stored.checkpoints[0]).toEqual({ atMs: expect.any(Number), operation: 'world:data', facts: {} });
+});
+
+test('MG10: a detail-only change persists at most once per PROGRESS_WRITE_MS; a stage or checkpoint writes at once', () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    vi.setSystemTime(1_000_000);
+    const trace = createBootTrace({ inbox: () => Promise.resolve('ok'), deliver: () => Promise.resolve(true) });
+    trace.startBoot({ id: 'nine-dragon-stack', name: 'Nine Dragon Stack' });
+    const view = (step: string, detail: string): ProgressView => ({ download: 0.5, setup: 0.5, done: false, error: null, step: step as ProgressView['step'], label: step, detail,
+      bytes: null, bytesRead: 0, bytesTotal: 0, filesDone: 0, filesTotal: 0, worldBytesReady: true, doneCount: 0, rows: [], gaps: [] });
+    const stored = (): { stage: string; detail: string } => JSON.parse(saveStorage('device').getItem('boot.trace') ?? 'null') as { stage: string; detail: string };
+    trace.recordBootProgress(view('shaders', 'Shaders · 1 of 60'));
+    expect(stored()).toMatchObject({ stage: 'shaders', detail: 'Shaders · 1 of 60' });
+    vi.setSystemTime(1_000_000 + PROGRESS_WRITE_MS / 2);
+    trace.recordBootProgress(view('shaders', 'Shaders · 2 of 60'));
+    expect(stored().detail).toBe('Shaders · 1 of 60');
+    trace.recordBootCheckpoint('compile:before');
+    expect(stored().detail).toBe('Shaders · 2 of 60');
+    trace.recordBootProgress(view('shaders', 'Shaders · 3 of 60'));
+    vi.setSystemTime(1_000_000 + PROGRESS_WRITE_MS);
+    trace.recordBootProgress(view('shaders', 'Shaders · 4 of 60'));
+    expect(stored().detail).toBe('Shaders · 4 of 60');
+    trace.recordBootProgress(view('firstFrame', 'First frame'));
+    expect(stored()).toMatchObject({ stage: 'firstFrame', detail: 'First frame' });
+  } finally { vi.useRealTimers(); }
 });

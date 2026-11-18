@@ -11,6 +11,12 @@ declare const __BUILD_ID__: string;
 const KEY = 'boot.trace';
 const RECENT_MS = 5 * 60_000;
 const HISTORY_LIMIT = 32;
+/** MG10 (J410): a change of only the card's detail (its counters move on every fetch chunk and every linked program) is
+ *  persisted at most this often. Every write parses and validates the whole record through the save store, and Nine's
+ *  boot wrote it on almost every paint: ~195 MB of JS garbage (a quarter of the boot's main-thread allocation), most of it
+ *  under `loadout` and `shaders`, where WebKit's WebContent malloc jumped ~300 MB. The record in memory always holds the
+ *  newest detail, and the next write of any kind (a stage, a checkpoint, a status) carries it. */
+export const PROGRESS_WRITE_MS = 1000;
 const REPORT_KEY = 'boot.reports'; // diagnostic evidence is not part of the native save mirror
 const REPORT_LIMIT = 4;
 const REPORT_MAX_AGE = 7 * 24 * 60 * 60_000;
@@ -98,6 +104,8 @@ export interface BootTrace {
  */
 export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORTS): BootTrace {
   let current: BootRecord | null = null;
+  /** when recordBootProgress last persisted the record (PROGRESS_WRITE_MS) */
+  let progressWrittenAt = -Infinity;
   let previousLine = '';
   let previousLevelId = '';
   function bootTraceActive(): boolean { return current?.status === 'in_progress'; }
@@ -261,8 +269,12 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
     const download = Math.floor(view.download * 100);
     const firstFrameCheckpoint = stage === 'firstFrame' && Math.floor(setup / 5) > Math.floor(current.setup / 5);
     const detail = view.detail.slice(0, 200);
-    if (stage === current.stage && detail === current.detail && !firstFrameCheckpoint && !view.error) return;
-    current = { ...current, stage, detail, setup, download, updatedAt: Date.now(), visibility: document.visibilityState };
+    const stageMoved = stage !== current.stage;
+    if (!stageMoved && detail === current.detail && !firstFrameCheckpoint && !view.error) return;
+    const now = Date.now();
+    current = { ...current, stage, detail, setup, download, updatedAt: now, visibility: document.visibilityState };
+    if (!stageMoved && !firstFrameCheckpoint && !view.error && now - progressWrittenAt < PROGRESS_WRITE_MS) return;
+    progressWrittenAt = now;
     write(KEY, current);
     if (view.error) update('handled_error');
   }
