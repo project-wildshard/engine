@@ -21,3 +21,8 @@ The 0.34 check gate refused the engine's pinned Driftwood, Nalati, Nine and Pine
 moves to format 0.35.0 instead. Its `memory-ratchet.ts` holds those four zones at their
 epoch-7 baselines and reports the lines; every other zone still refuses. All 27 pins admit and
 `cook-built-shards` passes unchanged.
+
+Land fix: the isolated full gate gave corepack an empty home, so npr's tool
+install ran pnpm 12.21.0 (no `packageManager` above its cache), which ignores
+`pnpm.overrides` and refused the bin-deps lock. `land-local-gate.mjs` now seeds
+corepack's last-known-good with the repo's own pnpm.

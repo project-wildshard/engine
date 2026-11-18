@@ -1,7 +1,7 @@
 // J400: the complete ordinary local gate, plus CSS, inside its real lease.
 import {execFileSync,spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {existsSync,mkdirSync,realpathSync} from 'node:fs';
+import {existsSync,mkdirSync,readFileSync,realpathSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {delimiter,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
@@ -48,6 +48,16 @@ const source=spawnSync('git',['symbolic-ref','--quiet','HEAD'],{cwd:root,encodin
 const env={...process.env,XDG_CACHE_HOME:join(directory,'tools'),npm_config_enable_global_virtual_store:'false',
  npm_config_package_import_method:'clone-or-copy',WS_LOCAL_LAND_SOURCE_REF:source.stdout?.trim()??'',
  WS_LOCAL_LAND_REPORT_ROOT:root};
+// The isolated XDG cache gives corepack an empty home. Outside a manifest that
+// names pnpm (npr's tool cache), corepack then takes the newest pnpm (12.21.0
+// on 2026-11-18), which ignores package.json "pnpm.overrides" and refuses the
+// bin-deps lock. Seed its last-known-good with the repo's own pnpm.
+const pinnedPnpm=/^pnpm@([^+]+)/u.exec(JSON.parse(readFileSync(join(root,'package.json'),'utf8')).packageManager??'')?.[1];
+if(pinnedPnpm!==undefined){
+ const corepackHome=process.env.COREPACK_HOME??join(env.XDG_CACHE_HOME,'node','corepack');
+ mkdirSync(corepackHome,{recursive:true});
+ writeFileSync(join(corepackHome,'lastKnownGood.json'),`${JSON.stringify({pnpm:pinnedPnpm},null,2)}\n`);
+}
 if(process.platform==='linux')Reflect.set(env,'PLAYWRIGHT_BROWSERS_PATH',join(process.env.XDG_CACHE_HOME??join(homedir(),'.cache'),'ms-playwright'));
 Reflect.deleteProperty(env,'WS_PUSH_REFS');
 const copy=makeGateCopy(root,expected,{env,directory,installIsolated:true});
