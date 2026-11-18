@@ -19,7 +19,7 @@ async function run(command, env = process.env) {
   if (code !== 0) throw new Error(`Nine ring-1 command exited ${String(code)}: ${command.join(' ')}`);
 }
 const phase = process.argv[2] ?? 'all';
-if (!['build','boot','bench','memory','measure','ledger','all'].includes(phase)) throw new Error('Usage: nine-ring1.mjs build|boot|bench|memory|measure|ledger|all');
+if (!['build','boot','bench','memory','measure','ledger','diagnose-ledger-nine','all'].includes(phase)) throw new Error('Usage: nine-ring1.mjs build|boot|bench|memory|measure|ledger|diagnose-ledger-nine|all');
 if (phase === 'build' || phase === 'all') {
   await run([process.execPath, 'scripts/pins.ts', 'install', 'template', 'nine-dragon-stack']);
   const catalogue = JSON.parse(readFileSync('test/pins/catalogue.json','utf8'));
@@ -64,6 +64,10 @@ if (phase !== 'build') {
         try {await run(process.platform === 'darwin' ? ['bash','scripts/browser-lane.sh',...measure] : measure);} catch (error) {failed.push(String(error));}
       }
       if (failed.length > 0) throw new Error(failed.join('; '));
+    }
+    if (phase === 'diagnose-ledger-nine') {
+      await run([process.execPath,'scripts/memory/measure.mjs',`--url=${preview.url}`,'--chunk=nine-dragon-stack',
+        '--ledger-only','--timeout=180',`--out=${resolvePath(out,'ledger-nine-diagnostic.json')}`]);
     }
     if (phase === 'ledger') {
       await run([process.execPath,'scripts/memory/measure.mjs',`--url=${preview.url}`,'--chunk=_template','--ledger-only','--timeout=480',

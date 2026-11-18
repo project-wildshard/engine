@@ -33,3 +33,12 @@ boots across six zones. The first Nine boot timed out waiting for
 control at 180 seconds. The hosted ledger now gives Nine the existing
 480-second memory-probe deadline. Other zones keep 180 seconds.
 [First extended run](https://github.com/project-wildshard/engine/actions/runs/44239650390/job/134585981330).
+
+The 480-second retry also stopped before Nine reached control.
+Ubuntu now measures 26 pinned zones. macOS measures Nine with its
+native WebKit ledger and stores that baseline separately. Both
+comparators use the same subsystem map and 2% tolerance. The
+standalone Ubuntu smoke reached control in 134.137 seconds under
+its own fixture. The explicit qualification also runs a separate
+bounded microscope diagnostic and keeps the last observed checkpoint.
+[480-second run](https://github.com/project-wildshard/engine/actions/runs/44246104563).

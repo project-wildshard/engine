@@ -432,12 +432,14 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
     await tracing.send('Tracing.start', { transferMode: 'ReportEvents', traceConfig });
     /** @type {{step:string, ledger:any}[]} */ const requested = [];
     const run = { on: true };
+    let lastStep = 'before page';
     const dumper = (async () => {
       let seen = 0;
       while (run.on) {
         const steps = /** @type {StepRow[]} */ (await page.evaluate(() => Reflect.get(window, '__memoryRun')?.steps ?? []).catch(() => []));
         for (; seen < steps.length; seen++) {
           const [, step, ledger] = steps[seen];
+          lastStep = step;
           if (step === 'page') continue;
           const r = await tracing.send('Tracing.requestMemoryDump', { levelOfDetail: 'detailed', deterministic: step === 'control' }).catch(() => null);
           if (r?.success) requested.push({ step, ledger: ledger ?? null });
@@ -451,6 +453,10 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
       failure = await untilControl(page, timeoutMs);
       await sleep(1500);
       gpuDetail = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.gpu?.() ?? null; } catch { return null; } });
+    } catch (error) {
+      if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
+      failure = `${error.message} Last observed checkpoint: ${lastStep}`;
+      console.error(`${chunk}: ${failure}`);
     } finally {
       run.on = false; await dumper;
       const ended = new Promise((resolve) => { tracing.once('Tracing.tracingComplete', resolve); });
@@ -637,7 +643,7 @@ async function main(argv) {
   if (summary && runs > 1) for (const [name, s] of Object.entries(summary)) if (typeof s === 'object') console.log(`${name.padEnd(18)} median ${mb(s.median)} MB  min ${mb(s.min)}  max ${mb(s.max)}  spread ${s.spreadPct}%  (n ${s.n}) [K]`);
   const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({ url: args.url, chunk: args.chunk, timeoutMs, plantRetainedBuffer: Boolean(args['plant-retained-buffer']) }) : null;
   if (microscope && !args['ledger-only']) for (const line of microscopeLines(microscope)) console.log(line);
-  const ledger = microscope ? ledgerPeak(microscope.checkpoints) : null;
+  const ledger = microscope?.ready ? ledgerPeak(microscope.checkpoints) : null;
   if (ledger) for (const line of ledgerPeakLines(args.chunk, ledger)) console.log(line);
   if (args.summary) appendFileSync(args.summary, summaryMarkdown(args.chunk, webkit, summary, ledger));
   if (runs > 0) console.log(`instrument ${instrument}: ${instrument === 'minimal' ? 'Web Inspector Network and Console domains off, no routes' : 'Playwright default session (Network domain keeps response bodies)'}`);

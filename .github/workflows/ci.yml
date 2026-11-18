@@ -450,14 +450,15 @@ jobs:
           retention-days: 7
 
   memory-ledger-guard:
-    # EM35 exercises the full production catalogue. Ring 1's slices omit
-    # vertex and texture storage, so this is a separate pinned client.
+    # EM35 uses a full production client. Nine stalled on hosted SwiftShader
+    # at 180 s and 480 s (44239650390, 44246104563). Its ledger uses the
+    # native WebKit job below.
     needs: nine-ring1-build
     if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' && (inputs.pins_channel == '' || inputs.pins_channel == 'production') }}
     runs-on: ubuntu-latest
-    # Qualification builds the full client and takes repeated readings for each pin.
-    # Keep the 30-minute limit for the single-reading comparison.
-    timeout-minutes: ${{ inputs.memory_record && 120 || 30 }}
+    # The full build took about 21 minutes and the first 20 boots about 18.
+    # Regular comparisons boot each included zone once, inside 60 minutes.
+    timeout-minutes: ${{ inputs.memory_record && 120 || 60 }}
     env:
       WS_LANE_NAME: memory-ledger
       WILDSHARD_CATALOGUE: test/pins/catalogue.json
@@ -500,6 +501,40 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  nine-ledger-diagnostic:
+    # This bounded experiment runs only on an explicit memory qualification.
+    # It uses the standalone full Nine artifact from the same source run.
+    needs: nine-ring1-build
+    if: ${{ inputs.memory_record && !cancelled() && needs.nine-ring1-build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    env:
+      WS_LANE_NAME: nine-ring1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: node scripts/scratch-dir.mjs nine-ring1 'EM35 Nine SwiftShader checkpoint'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: nine-ring1-client
+          path: tmp/nine-ring1
+      - name: Observe the last Chromium boot checkpoint
+        run: |
+          mkdir -p tmp/nine-ring1/preview
+          tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
+          bash scripts/ci-playwright-install.sh chromium
+          node scripts/nine-ring1.mjs diagnose-ledger-nine
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nine-ledger-diagnostic
+          path: tmp/nine-ring1/ledger-nine-diagnostic.json
+          retention-days: 7
+          if-no-files-found: ignore
+
   memory-footprint-guard:
     # EM36 reads native processes on the same hosted macOS runner as EM12.
     needs: nine-ring1-build
@@ -528,6 +563,16 @@ jobs:
           baseline=()
           if [[ "$MEMORY_RECORD" != true ]]; then baseline+=(scripts/memory/footprint-ratchet.json); fi
           node scripts/memory/ci.mjs footprint tmp/memory-footprint/preview tmp/memory-footprint/readings "${baseline[@]}"
+      - name: Read or block on Nine's native WebKit ledger
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        run: |
+          baseline=()
+          if [[ "$MEMORY_RECORD" != true ]]; then
+            [[ -f scripts/memory/webkit-ledger-ratchet.json ]] || exit 0
+            baseline+=(scripts/memory/webkit-ledger-ratchet.json)
+          fi
+          node scripts/memory/ci.mjs webkit-ledger tmp/memory-footprint/preview tmp/memory-footprint/readings "${baseline[@]}"
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

@@ -111,20 +111,29 @@ export function main(argv) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true,
     options: { mode: { type: 'string' }, baseline: { type: 'string' }, out: { type: 'string' } } });
   const mode = values.mode;
-  if (!['ledger', 'footprint'].includes(mode ?? '') || positionals.length === 0 || (!values.baseline && !values.out)) {
-    throw new Error('Usage: ratchet.mjs --mode=ledger|footprint [--baseline=file] [--out=file] <measure.json>...');
+  if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode ?? '') || positionals.length === 0 || (!values.baseline && !values.out)) {
+    throw new Error('Usage: ratchet.mjs --mode=ledger|webkit-ledger|footprint [--baseline=file] [--out=file] <measure.json>...');
   }
   const baseline = values.baseline ? json(values.baseline) : null;
   if (baseline !== null && (baseline.version !== 1 || baseline.mode !== mode)) throw new Error('Incompatible memory baseline');
   const measurements = positionals.map(json);
   for (const doc of measurements) if (doc.protocol !== 'memory-run/1' || typeof doc.chunk !== 'string') throw new Error('Expected measure.mjs output');
-  if (mode === 'ledger') {
+  if (mode === 'ledger' || mode === 'webkit-ledger') {
+    const instrument = mode === 'webkit-ledger' ? footprintInstrument(measurements, baseline) : undefined;
     /** @type {Map<string, LedgerBudget[]>} */
     const readings = new Map();
     for (const doc of measurements) {
-      if (doc.microscope?.ready !== true) throw new Error(`${doc.chunk}: Chromium did not reach control`);
       const rows = readings.get(doc.chunk) ?? [];
-      rows.push(ledgerBudget(doc.microscope.checkpoints));
+      if (mode === 'ledger') {
+        if (doc.microscope?.ready !== true) throw new Error(`${doc.chunk}: Chromium did not reach control`);
+        rows.push(ledgerBudget(doc.microscope.checkpoints));
+      } else {
+        if (doc.chunk !== 'nine-dragon-stack' || !Array.isArray(doc.webkit) || doc.webkit.length === 0) throw new Error('Expected native WebKit Nine runs');
+        for (const run of doc.webkit) {
+          if (run.host !== 'webkit' || run.refused !== null || run.ready !== true) throw new Error('Nine did not reach control in native WebKit');
+          rows.push(ledgerBudget(run.checkpoints));
+        }
+      }
       readings.set(doc.chunk, rows);
     }
     if (baseline !== null && !isDeepStrictEqual([...readings.keys()].sort(), Object.keys(baseline.zones).sort())) {
@@ -132,7 +141,7 @@ export function main(argv) {
     }
     const zones = Object.fromEntries([...readings.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([zone, runs]) =>
       [zone, baseline === null ? highWater(runs) : compareLedger(baseline.zones[zone], runs, zone)]));
-    if (values.out) write(values.out, { version: 1, mode, zones });
+    if (values.out) write(values.out, { version: 1, mode, instrument, zones });
     console.log(`Ledger ${baseline === null ? 'recorded' : 'passed'} for ${readings.size} zones`);
   } else {
     const readings = measurements.flatMap(doc => {

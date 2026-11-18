@@ -6,8 +6,8 @@ import { serve } from '../parity/serve.mjs';
 import { compareLedger, ledgerBudget, main as ratchet } from './ratchet.mjs';
 
 const [mode, root, output, baseline] = process.argv.slice(2);
-if (!['ledger', 'footprint'].includes(mode) || !root || !output) {
-  throw new Error('Usage: memory/ci.mjs ledger|footprint <preview root> <output> [baseline]');
+if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode) || !root || !output) {
+  throw new Error('Usage: memory/ci.mjs ledger|webkit-ledger|footprint <preview root> <output> [baseline]');
 }
 const directory = absolute(output);
 mkdirSync(directory, { recursive: true });
@@ -24,22 +24,23 @@ async function measure(args) {
 const preview = await serve(absolute(root), '', true, { telemetryDir: join(directory, 'telemetry') });
 const files = [];
 try {
-  const readings = mode === 'footprint' ? ['_template'] :
-    readdirSync(join(root, 'dist', 'shardfiles'), { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
+  let readings = mode === 'footprint' ? ['_template'] : ['nine-dragon-stack'];
   if (mode === 'ledger') {
+    const built = readdirSync(join(root, 'dist', 'shardfiles'), { withFileTypes: true })
+      .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
     const catalogue = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8'));
     const expected = catalogue.shards.map((/** @type {{slug:string}} */ { slug }) => slug === 'template' ? '_template' : slug).sort();
-    if (JSON.stringify(readings) !== JSON.stringify(expected)) throw new Error('Prepared preview must contain every catalogue pin');
+    if (JSON.stringify(built) !== JSON.stringify(expected)) throw new Error('Prepared preview must contain every catalogue pin');
+    // Nine timed out on hosted SwiftShader at 180 and 480 seconds (EM35).
+    // The macOS job reads its native WebKit ledger from the pinned Nine build.
+    readings = built.filter(chunk => chunk !== 'nine-dragon-stack');
   }
   for (const chunk of readings) {
     const rounds = mode === 'ledger' && !baseline ? (chunk === '_template' ? 5 : 3) : 1;
-    // Nine's phone boot on hosted SwiftShader exceeded the generic deadline.
-    // Use the same deadline as the existing hosted Nine memory probe.
-    const timeout = chunk === 'nine-dragon-stack' ? 480 : 180;
     for (let i = 0; i < rounds; i++) {
       const file = join(directory, `measure-${chunk}-${i + 1}.json`);
-      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, `--timeout=${timeout}`, `--out=${file}`,
-        ...(mode === 'ledger' ? ['--ledger-only'] : ['--runs=5'])]);
+      await measure([`--url=${preview.url}`, `--chunk=${chunk}`, '--timeout=180', `--out=${file}`,
+        ...(mode === 'ledger' ? ['--ledger-only'] : [mode === 'footprint' ? '--runs=5' : '--runs=3'])]);
       files.push(file);
     }
   }
