@@ -410,3 +410,274 @@ index 0014c43..296ec0a 100644
  }
  type SkinLookParametersRows = { [Key in keyof SkinLookParametersRowsFields]: SkinLookParametersRowsFields[Key] };
  interface SkinClipParametersRowsInputFields {
+diff --git a/src/format/creature-body.ts b/src/format/creature-body.ts
+index 2a453ad..8c0ca3b 100644
+--- a/src/format/creature-body.ts
++++ b/src/format/creature-body.ts
+@@ -2,6 +2,7 @@ import {
+   check,
+   exactOptional,
+   finite,
++  integer,
+   maxLength,
+   maxValue,
+   minValue,
+@@ -13,7 +14,7 @@ import {
+   string,
+ } from 'valibot'
+ 
+-import { CREATURE_SKELETONS } from './creature-skeletons.ts'
++import { creatureContract } from './creature-skeletons.ts'
+ import {
+   CreatureVolumesSchema,
+   CreatureLockSchema,
+@@ -21,17 +22,24 @@ import {
+ } from './creature-volumes.ts'
+ 
+ import type { CreatureSkeleton, CreatureSize } from './creature-layers.ts'
++import type { CreatureTrail } from './creature-skeletons.ts'
+ import type { CreatureVolume } from './creature-volumes.ts'
+ import type { GenericSchema } from 'valibot'
+ 
+ const ONE = 1
+ const MAX_SCALE = 10
+ const MAX_ID = 128
++const MIN_TRAIL = 3
++/** The head ball plus one volume per segment fit `MAX_VOLUMES`. */
++const MAX_TRAIL = MAX_VOLUMES
++const MAX_SPACING = 10
+ const id = pipe(string(), regex(/^[a-z][a-zA-Z0-9.:-]*$/u), maxLength(MAX_ID))
+ const scalar = pipe(number(), finite())
+ interface CreatureBody {
+   /** Omit for a GLB with its own rig; a kit poser names its contract explicitly. */
+   skeleton?: CreatureSkeleton
++  /** A serpent's trail bones (ONE-FORMAT CC23); only a serpent has one. */
++  trail?: CreatureTrail
+   size: CreatureSize
+   scale: number
+   look: string
+@@ -39,10 +47,23 @@ interface CreatureBody {
+   lock?: string[]
+   hits?: 'rest' | 'clip'
+ }
++const trailCount = pipe(
++  number(),
++  integer(),
++  minValue(MIN_TRAIL),
++  maxValue(MAX_TRAIL),
++)
++const trailSpacing = pipe(
++  scalar,
++  minValue(Number.MIN_VALUE),
++  maxValue(MAX_SPACING),
++)
++const trailObject = strictObject({ count: trailCount, spacing: trailSpacing })
+ const bodyObject = strictObject({
+   skeleton: exactOptional(
+-    picklist(['quadruped', 'biped'], 'Unknown creature skeleton'),
++    picklist(['quadruped', 'biped', 'serpent'], 'Unknown creature skeleton'),
+   ),
++  trail: exactOptional(trailObject),
+   size: picklist(
+     ['tiny', 'small', 'medium', 'large', 'giant'],
+     'Unknown creature size',
+@@ -65,15 +86,28 @@ const CreatureBodySchema: GenericSchema<CreatureBody> = pipe(
+       ((body.lock?.length ?? ONE) <= ONE && body.hits !== 'clip'),
+     'Only giants have multiple lock points or clip hits',
+   ),
++  check<CreatureBody, 'A serpent has a trail row and only a serpent has one'>(
++    (body: {
++      readonly skeleton?: CreatureSkeleton
++      readonly trail?: CreatureTrail
++    }): boolean => (body.skeleton === 'serpent') === (body.trail !== undefined),
++    'A serpent has a trail row and only a serpent has one',
++  ),
+   check<CreatureBody, 'Too many resolved creature volumes'>(
+     (body: {
+       readonly skeleton?: CreatureSkeleton
++      readonly trail?: CreatureTrail
+       readonly volumes?: readonly { readonly part: string }[]
+     }): boolean => {
++      // A serpent without its trail is the check above's refusal
+       const defaults =
+-        body.skeleton === undefined
++        body.skeleton === undefined ||
++        (body.skeleton === 'serpent' && body.trail === undefined)
+           ? []
+-          : CREATURE_SKELETONS[body.skeleton].volumes
++          : creatureContract({
++              skeleton: body.skeleton,
++              ...(body.trail === undefined ? {} : { trail: body.trail }),
++            }).volumes
+       return (
+         new Set(
+           [...defaults, ...(body.volumes ?? [])].map(
+diff --git a/src/format/creature-layers.ts b/src/format/creature-layers.ts
+index ac5b0e7..07db3de 100644
+--- a/src/format/creature-layers.ts
++++ b/src/format/creature-layers.ts
+@@ -48,7 +48,7 @@ type CreatureType =
+   | 'aquatic'
+   | 'critter'
+   | 'aberration'
+-type CreatureSkeleton = 'quadruped' | 'biped'
++type CreatureSkeleton = 'quadruped' | 'biped' | 'serpent'
+ type CreatureSize = 'tiny' | 'small' | 'medium' | 'large' | 'giant'
+ type CreatureReaction = 'passive' | 'skittish' | 'neutral' | 'aggressive'
+ type CreatureTuningScalar = number | boolean | string
+diff --git a/src/format/creature-mount.ts b/src/format/creature-mount.ts
+index d96b13d..e854701 100644
+--- a/src/format/creature-mount.ts
++++ b/src/format/creature-mount.ts
+@@ -10,10 +10,11 @@ import {
+   strictObject,
+ } from 'valibot'
+ 
+-import { CREATURE_SKELETONS } from './creature-skeletons.ts'
++import { creatureContract } from './creature-skeletons.ts'
+ import { CreatureSocketNameSchema } from './creature-volumes.ts'
+ 
+ import type { CreatureSkeleton } from './creature-layers.ts'
++import type { CreatureTrail } from './creature-skeletons.ts'
+ import type { GenericSchema } from 'valibot'
+ 
+ /** The seat socket both kit skeletons name. */
+@@ -78,6 +79,7 @@ interface MountedSpecies {
+   readonly flight?: unknown
+   readonly body?: {
+     readonly skeleton?: CreatureSkeleton
++    readonly trail?: CreatureTrail
+     readonly volumes?: readonly { readonly part: string }[]
+   }
+ }
+@@ -92,7 +94,13 @@ function seatKnown(seat: string, body: MountedSpecies['body']): boolean {
+   // A GLB with its own rig names its sockets in its skin; admission checks the seat there.
+   return (
+     body?.skeleton === undefined ||
+-    Object.hasOwn(CREATURE_SKELETONS[body.skeleton].sockets, seat)
++    Object.hasOwn(
++      creatureContract({
++        skeleton: body.skeleton,
++        ...(body.trail === undefined ? {} : { trail: body.trail }),
++      }).sockets,
++      seat,
++    )
+   )
+ }
+ 
+diff --git a/src/format/creature-skeletons.ts b/src/format/creature-skeletons.ts
+index 4f52e86..d68027e 100644
+--- a/src/format/creature-skeletons.ts
++++ b/src/format/creature-skeletons.ts
+@@ -1,5 +1,8 @@
+ import type { CreatureSkeleton } from './creature-layers.ts'
+ 
++/** The skeletons whose bones never change with the body; a serpent's count comes from its `trail` row. */
++type FixedSkeleton = Exclude<CreatureSkeleton, 'serpent'>
++
+ interface SkeletonChain {
+   readonly parent: string
+   readonly bones: readonly string[]
+@@ -115,11 +118,76 @@ const BIPED: SkeletonContract = {
+   volumes: [bodyVolume('chest', 'y'), HEAD],
+   clips: CLIPS,
+ }
+-const CREATURE_SKELETONS: Readonly<Record<CreatureSkeleton, SkeletonContract>> =
+-  {
+-    quadruped: QUADRUPED,
+-    biped: BIPED,
++const CREATURE_SKELETONS: Readonly<Record<FixedSkeleton, SkeletonContract>> = {
++  quadruped: QUADRUPED,
++  biped: BIPED,
++}
++
++/** A serpent's trail row (ONE-FORMAT CC23): `count` bones `spacing` metres apart along the root's path. */
++interface CreatureTrail {
++  readonly count: number
++  readonly spacing: number
++}
++const SEGMENT_MULTIPLIER = 0.5
++const SEGMENT_RADIUS = 0.6
++const HALF = 2
++/** Trail bone names, head first: `head`, `seg1` … `seg<count-2>`, `tail`. */
++function trailBoneName(index: number, count: number): string {
++  if (index === ZERO) {
++    return 'head'
+   }
++  return index === count - ONE ? 'tail' : `seg${String(index)}`
++}
++function trailBoneNames(count: number): readonly string[] {
++  return Array.from(
++    { length: count },
++    (_unused: unknown, index: number): string => trailBoneName(index, count),
++  )
++}
++/**
++ * The serpent (ONE-FORMAT CC23): every bone is a trail bone following the head's path, so the chain is the whole
++ * body. Sockets `head`, `mouth`, `core` (the middle bone) and `tail`; one capsule per segment at x0.5 and the head
++ * ball at x2. Buried segments' volumes are off (the engine's poser); the lock stays on the head.
++ */
++function serpentContract(trail: CreatureTrail): SkeletonContract {
++  const bones = trailBoneNames(trail.count)
++  const core = bones[Math.floor(trail.count / HALF)] ?? 'head'
++  const segments = bones.slice(ONE).map((bone: string): SkeletonVolume => ({
++    part: bone,
++    bone,
++    shape: 'capsule',
++    radius: SEGMENT_RADIUS,
++    halfLength: trail.spacing / HALF,
++    axis: 'z',
++    multiplier: SEGMENT_MULTIPLIER,
++  }))
++  return {
++    root: 'head',
++    chains: { spine: { parent: 'head', bones: bones.slice(ONE) } },
++    sockets: {
++      head: socket('head'),
++      mouth: { bone: 'head', at: [ZERO, ZERO, MOUTH_FORWARD] },
++      core: socket(core),
++      tail: socket('tail'),
++    },
++    lock: 'head',
++    volumes: [HEAD, ...segments],
++    clips: CLIPS,
++  }
++}
++/** The one contract a body declares: a fixed skeleton's, or a serpent's built from its trail row. */
++function creatureContract(body: {
++  readonly skeleton: CreatureSkeleton
++  readonly trail?: CreatureTrail
++}): SkeletonContract {
++  if (body.skeleton !== 'serpent') {
++    return CREATURE_SKELETONS[body.skeleton]
++  }
++  if (body.trail === undefined) {
++    throw new Error('A serpent needs its trail row')
++  }
++  return serpentContract(body.trail)
++}
+ 
+ /** Importers and posers share this list, rather than inferring a creature kind. */
+ function skeletonBones(
+@@ -133,5 +201,19 @@ function skeletonBones(
+   ]
+ }
+ 
+-export { CREATURE_SKELETONS, MIN_VOLUME_RADIUS, skeletonBones }
+-export type { SkeletonChain, SkeletonSocket, SkeletonVolume, SkeletonContract }
++export {
++  CREATURE_SKELETONS,
++  MIN_VOLUME_RADIUS,
++  creatureContract,
++  serpentContract,
++  skeletonBones,
++  trailBoneNames,
++}
++export type {
++  CreatureTrail,
++  FixedSkeleton,
++  SkeletonChain,
++  SkeletonSocket,
++  SkeletonVolume,
++  SkeletonContract,
++}

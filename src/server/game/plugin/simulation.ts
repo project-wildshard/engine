@@ -1762,6 +1762,7 @@ export function createNativeTargetQueries<T extends NativeTargetBody>(ports: {
         if (authored !== undefined) {
           for (let index = 0; index < authored.volumes.length; index++) {
             const volume = authored.volumes[index]; if (volume === undefined) break;
+            if (authored.off?.(index) === true) continue;
             authored.segment(index, rear, front);
             const distance = contactCapsuleRay(origin, direction, rear, front, volume.radius, best);
             if (distance < best) {
@@ -1789,6 +1790,7 @@ export function createNativeTargetQueries<T extends NativeTargetBody>(ports: {
       let best = Infinity;
       for (let index = 0; index < authored.volumes.length; index++) {
         const volume = authored.volumes[index]; if (volume === undefined) break;
+        if (authored.off?.(index) === true) continue;
         authored.segment(index, rear, front);
         const distance = contactCapsuleSkin(origin, rear, front, volume.radius, best, out);
         if (distance < best) { best = distance; out.part = volume.part; out.multiplier = volume.multiplier; out.head = volume.part === 'head'; }

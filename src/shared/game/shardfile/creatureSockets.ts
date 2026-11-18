@@ -1,6 +1,6 @@
 import { Matrix4, Vector3 } from 'three';
 import type { CreatureBody } from '@wildshard/format/creatureLayers';
-import { CREATURE_SKELETONS } from '@wildshard/format/creatureSkeletons';
+import { bodyContract } from './creatureContract';
 import type { CreatureLockPoints } from '@wildshard/engine/physics/creatureVolumes';
 import { CollisionPose } from '../plugin/animation';
 import type { CreatureRestJoint } from './creatureVolumes';
@@ -13,7 +13,7 @@ export class CreatureSockets implements CreatureLockPoints {
     private readonly root: { readonly position: Vector3; readonly yaw: number; readonly scale: number },
     private readonly strike?: { readonly names: readonly string[];
       readonly posed?: (index: number, at: readonly [number, number, number], out: Vector3) => Vector3 }) {
-    const skeleton = body.skeleton === undefined ? undefined : CREATURE_SKELETONS[body.skeleton];
+    const skeleton = bodyContract(body);
     this.names = strike?.names ?? body.lock ?? (skeleton === undefined ? [] : [skeleton.lock]);
     if (this.names.length === 0 || this.names.length > (strike === undefined ? 16 : 32) || new Set(this.names).size !== this.names.length) {
       throw new Error(`Invalid creature ${strike === undefined ? 'lock' : 'strike'} sockets`);

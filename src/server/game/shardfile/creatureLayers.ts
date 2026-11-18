@@ -1,7 +1,8 @@
 import { parse, strictObject, pipe, number, finite, minValue, maxValue, type InferOutput, type GenericSchema } from 'valibot';
 import { CreatureBodySchema, CreatureTemperamentSchema, CreatureSensesSchema, CreatureAbilitySchema, CreaturePresentationSchema,
   type CreatureBody, type CreatureTemperament, type CreatureSenses, type CreatureAbility, type CreaturePresentation } from '@wildshard/format/creatureLayers';
-import { CREATURE_SKELETONS, type SkeletonContract } from '@wildshard/format/creatureSkeletons';
+import type { SkeletonContract } from '@wildshard/format/creatureSkeletons';
+import { bodyContract } from '../../../shared/game/shardfile/creatureContract';
 import { CreaturesSchema, type ShardCreatures } from '@wildshard/format/creatures';
 import { HuntTuningSchema } from '@wildshard/format/speciesPrograms';
 import type { ShardRows, StrikeRows } from '@wildshard/format/rows';
@@ -85,7 +86,7 @@ export function resolveCreatureLayers(rows: ShardRows, brains: readonly BrainRow
       const body = row.body === undefined ? undefined : parse(CreatureBodySchema, row.body);
       const look = body === undefined ? undefined : looks.get(body.look);
       if (body !== undefined && (look === undefined || look.species !== row.id)) throw new Error(`unknown body look ${body.look} for this species`);
-      const skeleton = body?.skeleton === undefined ? undefined : CREATURE_SKELETONS[body.skeleton];
+      const skeleton = body === undefined ? undefined : bodyContract(body);
       const senses = row.senses === undefined ? undefined : parse(CreatureSensesSchema, row.senses);
       const presentation = row.presentation === undefined ? undefined : parse(CreaturePresentationSchema, row.presentation);
       const abilities = (row.abilities ?? []).map(input => {

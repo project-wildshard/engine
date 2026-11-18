@@ -36,7 +36,7 @@ export class RewoundBody {
         const frame = this.frame;
         if (frame !== undefined) { rear.fromArray(frame.points, index * 6); front.fromArray(frame.points, index * 6 + 3); }
         else { authored.segment(index, rear, front); this.past(rear); this.past(front); }
-      } };
+      }, ...(authored.off === undefined ? {} : { off: (index: number) => authored.off?.(index) === true }) };
   }
   get entityId(): string { return this.body.entityId; }
   get alive(): boolean { return this.body.alive; }

@@ -1979,6 +1979,8 @@
     "src/shared/game/shardfile/creatureClipSampler.ts": "shared",
     "src/shared/game/shardfile/creatureClipChoice.ts": "shared",
     "src/shared/game/shardfile/creatureClipVolumes.ts": "shared",
-    "src/shared/game/shardfile/creatureVolumes.ts": "shared"
+    "src/shared/game/shardfile/creatureVolumes.ts": "shared",
+    "src/shared/game/shardfile/creatureContract.ts": "shared",
+    "src/shared/game/shardfile/trailCreatureVolumes.ts": "shared"
   }
 }

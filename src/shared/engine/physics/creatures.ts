@@ -55,7 +55,7 @@ interface Boxes { head: Collider; body: Collider; fore: Collider | null; bodyHal
   /** Exact pre-normalization body / fore segment directions at the last projection. */
   readonly directions: Float64Array }
 interface VolumeBoxes {
-  readonly volumes: readonly { readonly collider: Collider; readonly pose: Float64Array; readonly directions: Float64Array; radius: number; halfLength: number }[];
+  readonly volumes: readonly { readonly collider: Collider; readonly pose: Float64Array; readonly directions: Float64Array; radius: number; halfLength: number; off: boolean }[];
   on: boolean; slept: boolean;
 }
 /**
@@ -123,7 +123,7 @@ export class CreatureBodies<C extends Creature = Creature> {
           const collider = world.createCollider(shape.setCollisionGroups(groups('HITBOX')));
           const owner: HitboxOwner<C> = { creature: c, part: row.part, multiplier: row.multiplier };
           tagCollider(collider, 'flesh', owner); this.owners.set(collider.handle, owner);
-          return { collider, radius, halfLength: row.halfLength, pose: new Float64Array(7).fill(Number.NaN), directions: new Float64Array(3).fill(Number.NaN) };
+          return { collider, radius, halfLength: row.halfLength, pose: new Float64Array(7).fill(Number.NaN), directions: new Float64Array(3).fill(Number.NaN), off: false };
         });
         b = { volumes, on: true, slept: false }; this.boxes.set(c, b);
       }
@@ -147,7 +147,7 @@ export class CreatureBodies<C extends Creature = Creature> {
       const wasLive = b.on, sleeping = live && asleep?.(c) === true;
       if (live !== b.on) {
         b.on = live;
-        if ('volumes' in b) { for (const box of b.volumes) box.collider.setEnabled(live); }
+        if ('volumes' in b) { for (const box of b.volumes) { box.collider.setEnabled(live); box.off = false; } }
         else { b.head.setEnabled(live); b.body.setEnabled(live); b.fore?.setEnabled(live); }
       }
       const held = sleeping && b.slept && wasLive;
@@ -164,6 +164,10 @@ export class CreatureBodies<C extends Creature = Creature> {
               box.collider.setShape(shape.halfLength === 0 ? new R.Ball(shape.radius) : new R.Capsule(shape.halfLength, shape.radius));
               box.radius = shape.radius; box.halfLength = shape.halfLength;
             }
+            // ONE-FORMAT CC23b: a buried serpent segment drops out of the hitboxes until it surfaces
+            const off = pose.off?.(index) === true;
+            if (off !== box.off) { box.off = off; box.collider.setEnabled(!off); }
+            if (off) continue;
             pose.segment(index, _a, _b);
             _d.subVectors(_b, _a); turnAlong(box.collider, box.pose, 3, box.directions, 0);
             moveTo(box.collider, box.pose, 0, (_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2);
@@ -185,7 +189,7 @@ export class CreatureBodies<C extends Creature = Creature> {
       }
       // the creature physics LOD
       if (c.simulationBound === true) continue;
-      const keep = keepsCreatureBody(c.motor !== null, live, c.driven, creatureBodyDistance(c.position, player));
+      const keep = c.hitVolumes?.motorless !== true && keepsCreatureBody(c.motor !== null, live, c.driven, creatureBodyDistance(c.position, player));
       if (c.motor === null && keep) c.motor = this.motorFor(c);
       else if (c.motor !== null && !keep) { c.motor.dispose(); c.motor = null; }
       if (c.motor !== null) bodies++;

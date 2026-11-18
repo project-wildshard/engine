@@ -389,6 +389,7 @@ export class ShardDecisions {
     this.motions.delete(actor);
     const name = this.actors.get(actor), body = name === undefined ? undefined : this.sim.entities.get(name);
     body?.setMotion(body.yaw, 0);
+    if (body !== undefined) body.airborne = false;
     const runner = name === undefined ? undefined : this.sim.strikes.get(name);
     if (reset || runner?.state === 'windup') { this.striking.delete(actor); body?.cancelAttack(); runner?.cancel(); }
   }
@@ -430,6 +431,8 @@ export class ShardDecisions {
       const result = motion.runner.step({ body: actor, ...(perch === undefined ? {} : { perch }), ...(target === undefined ? {} : { target, reach: canReach(actor, target, this.sim.physics) }), ...(strike === undefined ? {} : { range: strike.range }),
         ...(field === undefined ? {} : { field: this.fieldValue(handle, field) }), ...(destination === undefined ? {} : { destination }), ...(controls === undefined ? {} : { controls }) });
       if (result.placement !== undefined) { const placement = result.placement; actor.place(placement.x, placement.z, placement.yaw, placement.y); }
+      // CC17b: a leap owns the body's height while it flies; its landing hands it back to the ground follow
+      if (row.kind === 'leap') actor.airborne = result.placement !== undefined && result.done === undefined;
       if (result.steering !== undefined) { const steer = result.steering; if (steer.ground) actor.setMotion(steer.yaw, steer.speed, steer.turn); else actor.fly(steer.yaw, steer.speed, steer.altitude, steer.turn); }
       const control = this.sim.borrowedControls?.get(requireValue(this.rows[motion.binding - 1], 'move binding').id);
       if (control?.leanField !== undefined) actor.mem[control.leanField] = result.bank ?? 0;

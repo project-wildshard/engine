@@ -577,7 +577,7 @@ export class SimHost {
   /** CreatureBodies.sync's physics body LOD, before the tick's decisions as on the page. */
   private syncBodies(): void {
     for (const entity of this.entities.values()) {
-      const keep = this.bands?.present?.(entity) !== false
+      const keep = this.bands?.present?.(entity) !== false && entity.hitVolumes?.motorless !== true
         && keepsCreatureBody(entity.motor !== null, entity.alive, entity.driven, creatureBodyDistance(entity.position, this.nearestPlayer(entity.position).position));
       if (entity.motor === null && keep) {
         const motor = new CharacterMotor(this.physics, this.creatureMotorOptions(entity));

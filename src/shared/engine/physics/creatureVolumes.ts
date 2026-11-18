@@ -16,6 +16,10 @@ export interface CreatureVolumePose {
   joint?: (name: string, position: Vector3, quaternion: Quaternion, scale: Vector3) => boolean;
   /** Only animated authority needs historical joint endpoints beyond the old root history. */
   capture?: () => CreatureVolumeFrame;
+  /** ONE-FORMAT CC23b: a volume that is off now (a serpent's buried segment) is neither hit nor collided with. */
+  off?: (index: number) => boolean;
+  /** ONE-FORMAT CC23b: a trail body (a serpent) has no walking capsule and no ground follow: moves place it (motor `none`). */
+  readonly motorless?: boolean;
 }
 
 export interface CreatureVolumeFrame { readonly volumes: readonly CreatureHitVolume[]; readonly points: Float32Array }

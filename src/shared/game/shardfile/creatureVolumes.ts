@@ -1,7 +1,8 @@
 import { Matrix4, Vector3 } from 'three';
 import { parse } from 'valibot';
 import { CreatureBodySchema, type CreatureBody } from '@wildshard/format/creatureLayers';
-import { CREATURE_SKELETONS, MIN_VOLUME_RADIUS } from '@wildshard/format/creatureSkeletons';
+import { MIN_VOLUME_RADIUS } from '@wildshard/format/creatureSkeletons';
+import { bodyContract } from './creatureContract';
 import type { CreatureVolume } from '@wildshard/format/creatureVolumes';
 import type { CreatureVolumePose, CreatureHitVolume } from '@wildshard/engine/physics/creatureVolumes';
 import { CollisionPose, type CollisionJoint } from '../plugin/animation';
@@ -23,7 +24,7 @@ export class RestCreatureVolumes implements CreatureVolumePose {
     if (body.hits === 'clip') throw new Error('Clip hits require a published clip-volume pose');
     if (!Number.isFinite(root.scale) || root.scale <= 0) throw new Error('Invalid creature volume scale');
     this.root = root; this.scale = root.scale;
-    const defaults = body.skeleton === undefined ? [] : CREATURE_SKELETONS[body.skeleton].volumes;
+    const defaults = bodyContract(body)?.volumes ?? [];
     const definitions = new Map<string, CreatureVolume>(defaults.map(row => [row.part, row]));
     for (const row of body.volumes ?? []) definitions.set(row.part, row);
     if (definitions.size === 0) throw new Error('Creature volumes need a skeleton or authored volumes');

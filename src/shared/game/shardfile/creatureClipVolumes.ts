@@ -1,6 +1,7 @@
 import { Vector3, type Quaternion } from 'three';
 import type { CreatureBody } from '@wildshard/format/creatureLayers';
-import { CREATURE_SKELETONS, MIN_VOLUME_RADIUS } from '@wildshard/format/creatureSkeletons';
+import { MIN_VOLUME_RADIUS } from '@wildshard/format/creatureSkeletons';
+import { bodyContract } from './creatureContract';
 import type { CreatureVolume } from '@wildshard/format/creatureVolumes';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { CreatureVolumeFrame, CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
@@ -24,7 +25,7 @@ export class ClipCreatureVolumes implements CreatureVolumePose {
     if (body.size !== 'giant' || body.hits !== 'clip') throw new Error('Clip hit authority needs an opted-in giant');
     this.sampler = new CreatureClipSampler(bytes, joints);
     if (!this.sampler.has(creatureClipName('idle', clipMap, this.sampler))) throw new Error('Clip hit authority needs an idle clip');
-    const defaults = body.skeleton === undefined ? [] : CREATURE_SKELETONS[body.skeleton].volumes;
+    const defaults = bodyContract(body)?.volumes ?? [];
     const rows = new Map<string, CreatureVolume>(defaults.map(row => [row.part, row]));
     for (const row of body.volumes ?? []) rows.set(row.part, row);
     if (rows.size === 0 || rows.size > 16) throw new Error('Invalid clip creature volumes');

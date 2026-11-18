@@ -104,6 +104,9 @@ export class AnimalSim {
   protected groundY = 0;
   protected tiltRollT = 0;
   scripted = false;
+  /** ONE-FORMAT CC17b: a move (a leap) owns this body's height this tick, so the ground follow leaves it. Its owner sets it
+   * before the bodies step on every tick it holds; not saved, since the owner's own continuation sets it again. */
+  airborne = false;
   motor: AnimalMotor | null = null;
   /** Optional physics-owned horizontal constraint, including far creatures and fliers; the mounted driver suspends it. */
   motionConstraint: ((from: Readonly<{ x: number; y: number; z: number }>, to: { x: number; y: number; z: number }) => void) | null = null;
@@ -431,7 +434,7 @@ export class AnimalSim {
     if (this.flight !== null) {
       this.flight.step(dt, this.position, this.alive, (x, z, fromY, maxDrop) => this.simPorts.floorBelow === undefined ? this.simPorts.heightAt(x, z) : this.simPorts.floorBelow(x, z, fromY, maxDrop));
       this.groundY = this.position.y;
-    } else if (!this.driven) {
+    } else if (!this.driven && !this.airborne && this.authoredHitVolumes?.motorless !== true) {
       const gy = this.groundHeight?.(this.position.x, this.position.z, this.groundY + 1) ?? this.simPorts.heightAt(this.position.x, this.position.z);
       // A WORLD deck ending is a fall, not a heightfield bump. Legacy analytic bodies keep their exact smoothing.
       if (this.groundHeight !== undefined && (this.falling || this.groundY - gy > 1)) {

@@ -292,6 +292,7 @@
     "./physics/navmesh": "./src/shared/engine/physics/navmesh.ts",
     "./physics/navmeshLoad": "./src/client/engine/physics/navmeshLoad.ts",
     "./entities/ids": "./src/shared/engine/entities/ids.ts",
+    "./entities/trailBones": "./src/shared/engine/entities/trailBones.ts",
     "./ai/flock": "./src/shared/engine/ai/flock.ts",
     "./ai/orbitDiver": "./src/server/engine/ai/orbitDiver.ts",
     "./ai/patrolDiver": "./src/server/engine/ai/patrolDiver.ts",
