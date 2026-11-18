@@ -25,8 +25,9 @@ export function gridSessionBudgetErrors(modules, budgets) {
 const titleRoots = ['src/client/app/entry.ts', 'src/client/engine/ui/StartTitle.ts', 'src/client/game/mainMenu.ts', 'src/client/game/grid/pageEntry.ts', 'src/client/game/travel/travel.ts'];
 const titleFormat = new Set(['accent.ts', 'admissionLimits.ts', 'builtIndexes.ts', 'contentBounds.ts', 'outputDownload.ts']);
 /** One entry's static closure (its roots' chunks and their static imports, a shared chunk counted once) against its
- *  raw / gzip ceilings in lint/ratchet.json budgets (js/<label>/raw and js/<label>/gzip) and a forbidden-module rule. */
-function closureBudgetErrors(modules, budgets, label, roots, forbidden) {
+ *  raw / gzip ceilings in lint/ratchet.json budgets (js/<label>/raw and js/<label>/gzip) and a forbidden-module rule.
+ * @param {(unit: string, bytes: number, cap: number) => void} [measure] */
+function closureBudgetErrors(modules, budgets, label, roots, forbidden, measure) {
   const entries = Object.entries(modules), clean = id => id.replaceAll('\\', '/').split('?')[0];
   if (!Object.hasOwn(budgets, `js/${label}/gzip`) && !entries.some(([, row]) => row.moduleIds.some(id => clean(id) === roots[0]))) return [];
   const errors = [], selected = new Set();
@@ -47,13 +48,17 @@ function closureBudgetErrors(modules, budgets, label, roots, forbidden) {
     const id = clean(raw);
     if (forbidden(id)) errors.push(`forbidden ${label} module ${id} (${file})`);
   }
+  const closureComplete = errors.length === 0;
   for (const [unit, field] of [['raw', 'rawBytes'], ['gzip', 'gzBytes']]) {
-    const cap = budgets[`js/${label}/${unit}`]; let total = 0;
+    const cap = budgets[`js/${label}/${unit}`];
     if (!Number.isSafeInteger(cap) || cap <= 0) { errors.push(`missing ${label} ${unit} ceiling`); continue; }
+    const before = errors.length;
+    let total = 0;
     for (const file of selected) {
       const bytes = modules[file]?.[field];
       if (!Number.isSafeInteger(bytes) || bytes < 0) errors.push(`missing ${label} ${unit} bytes (${file})`); else total += bytes;
     }
+    if (closureComplete && errors.length === before) measure?.(unit, total, cap);
     if (total > cap) errors.push(`${label} ${unit} ${total} exceeds ${cap}`);
   }
   return errors;
@@ -70,8 +75,9 @@ export function titleClosureBudgetErrors(modules, budgets) {
 }
 /** js-payload J10: the shard session entry's static closure (what every shardfile or grid entry loads before its shard):
  *  gzip / raw ceilings, and no shard folder's code (each shard, LEGACY included, stays behind its own dynamic root). */
-export function sessionClosureBudgetErrors(modules, budgets) {
-  return closureBudgetErrors(modules, budgets, 'session', ['src/client/game/session/session.ts'], id => /^src\/shards\/.*\.[cm]?[jt]sx?$/u.test(id));
+export function sessionClosureBudgetErrors(modules, budgets, measure) {
+  return closureBudgetErrors(modules, budgets, 'session', ['src/client/game/session/session.ts'],
+    id => /^src\/shards\/.*\.[cm]?[jt]sx?$/u.test(id), measure);
 }
 
 export function checkChunks(manifest, modules, closures, budgets = {}) {

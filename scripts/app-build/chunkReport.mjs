@@ -21,7 +21,10 @@ export function writeChunkReport(outDir, root) {
       imports: (row.imports ?? []).map(key => manifest[key]?.file ?? key) };
   }
   const policy = JSON.parse(readFileSync(resolve(root, 'lint/ratchet.json'), 'utf8'));
-  const errors = [...gridSessionBudgetErrors(report, policy.budgets), ...titleClosureBudgetErrors(report, policy.budgets), ...sessionClosureBudgetErrors(report, policy.budgets)];
+  const sessionErrors = sessionClosureBudgetErrors(report, policy.budgets, (unit, bytes, cap) => {
+    console.log(`session ${unit}: ${bytes}/${cap} bytes (${cap - bytes} bytes headroom)`);
+  });
+  const errors = [...gridSessionBudgetErrors(report, policy.budgets), ...titleClosureBudgetErrors(report, policy.budgets), ...sessionErrors];
   if (errors.length > 0) throw new Error(errors.join('\n'));
   mkdirSync(resolve(outDir, '.vite'), { recursive: true });
   writeFileSync(resolve(outDir, '.vite/chunk-modules.json'), JSON.stringify(report, null, 2));

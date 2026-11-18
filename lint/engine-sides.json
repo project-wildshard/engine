@@ -178,6 +178,7 @@
     "src/client/engine/core/worldDepth.ts": "client",
     "src/client/engine/core/zstdFrame.ts": "client",
     "src/client/engine/debug/probe.ts": "client",
+    "src/client/engine/debug/probeWalkLeg.ts": "client",
     "src/client/engine/debug/timerBaseline.ts": "client",
     "src/client/engine/entities/AnimalFactory.ts": "client",
     "src/client/engine/entities/AnimalHerdView.ts": "client",

@@ -10,7 +10,11 @@ function fixture(shared: string): Record<string, ChunkModuleReport> {
   };
 }
 test('the session closure counts its static imports against both ceilings', () => {
-  expect(sessionClosureBudgetErrors(fixture('src/client/game/shardfile/client.ts'), caps)).toEqual([]);
+  const measurements: [string, number, number][] = [];
+  expect(sessionClosureBudgetErrors(fixture('src/client/game/shardfile/client.ts'), caps, (unit, bytes, cap) => {
+    measurements.push([unit, bytes, cap]);
+  })).toEqual([]);
+  expect(measurements).toEqual([['raw', 120, 120], ['gzip', 60, 60]]);
   expect(sessionClosureBudgetErrors(fixture('src/client/game/shardfile/client.ts'), { ...caps, 'js/session/gzip': 59 })).toContain('session gzip 60 exceeds 59');
   expect(sessionClosureBudgetErrors(fixture('src/client/game/shardfile/client.ts'), { 'js/session/raw': 120 })).toContain('missing session gzip ceiling');
 });
