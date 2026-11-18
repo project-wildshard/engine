@@ -13,6 +13,9 @@
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { watchFaults } from './proof-faults.mjs';
+// a static import: the module cycle is safe (scenarios.mjs reads these exports only inside functions), while a dynamic one
+// inside cli() deadlocks on this module's own top-level await
+import { smokeProbes } from './staging-smoke/scenarios.mjs';
 
 /** @typedef {import('playwright').Page} Page */
 /** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string }} Screen */
@@ -346,6 +349,8 @@ async function cli() {
       ...(args.has('video') ? { recordVideo: { dir: join(out, `video-${name}`), size: PHONE.viewport } } : {}),
       ...(name === 'webkit' ? {} : { args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }),
     });
+    // rAF capped at 60 fps, as the smoke and the zone sweep run: the GPU is Jake's (lane rules, opus-deskperf)
+    await context.addInitScript(smokeProbes);
     await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
     // SB42: the lane's door pass, so a proof's joins never spend the address Jake's phone shares
     const pass = (await import('./door-pass.mjs')).doorPassInit(process.env.WS_LANE_NAME ?? 'journey-proof'); if (pass !== null) await context.addInitScript(pass);
