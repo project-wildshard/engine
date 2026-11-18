@@ -354,6 +354,7 @@
     "./boot": "./src/client/engine/boot.ts",
     "./boot/audioFiles": "./src/client/engine/boot/audioFiles.ts",
     "./boot/bakedUrls": "./src/shared/engine/boot/bakedUrls.ts",
+    "./boot/splatLayerRows": "./src/shared/engine/boot/splatLayerRows.ts",
     "./boot/bakedApi": "./src/client/engine/boot/bakedApi.ts",
     "./boot/bootTrace": "./src/client/engine/boot/bootTrace.ts",
     "./boot/browserChunkRecovery": "./src/client/engine/boot/browserChunkRecovery.ts",

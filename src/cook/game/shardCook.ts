@@ -24,7 +24,8 @@ import type {ServerPack, ServerPackPart} from '../../shared/game/shardfile/serve
 import {serverReadsFile} from '../../shared/game/shardfile/outputDescriptor';
 import {serverSkinRigs} from '../../shared/game/shardfile/serverSkinRigs';
 import {entryReadSet} from './entryReadSet';
-import {phoneTier, type Astc6Encode} from './tierTextures';
+import {phoneTier, splatPhoneTier, type Astc6Encode, type SplatPhoneLayer} from './tierTextures';
+import {splatTerrainOf} from '@wildshard/format/splatTerrain';
 import {wasmAstc6} from './astc6Wasm';
 import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type PartEncoder} from './spawnParts';
 
@@ -227,9 +228,12 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
   // S12b: the phone tier's files, made from the KTX2 table's own targets; the discovery document names them.
   const onTier = mountTiers(new Set(mounts.map(row => row.url))), mountByURL = new Map(mounts.map(row => [row.url, row])), mountOf = (url: string): Uint8Array | undefined => { const row = mountByURL.get(url); return row === undefined ? undefined : shard.read(row.path); };
   const phone = tiers.phone === true && document !== undefined ? phoneTier(shard.read(document.path), mountOf, undefined, tiers.encode) : undefined;
-  const documentBytes = phone?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
+  const tieredBytes = phone?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
+  // S12f2b1: a splat ground's own phone layers (product blobs) get 6×6 files too, named in the same table
+  const layers = tiers.phone === true && tiers.encode !== undefined && tieredBytes !== undefined ? splatPhoneTier(tieredBytes, folder, splatPhoneLayers(shard, prefix), tiers.encode) : undefined;
+  const documentBytes = layers?.discovery ?? tieredBytes;
   const discovery: readonly SpawnFile[] = document === undefined || documentBytes === undefined ? [] : [(() => {
-    const hash = phone === undefined ? document.hash : sha256(documentBytes);
+    const hash = phone === undefined && layers === undefined ? document.hash : sha256(documentBytes);
     return {url: `${document.url}?v=${hash.slice(0, 8)}`, bytes: documentBytes.length, hash, wireBytes: wireBytes(document.url, documentBytes, hash)};
   })()];
   for (const row of discovery) if (documentBytes !== undefined) sources.set(row.url, () => documentBytes);
@@ -243,9 +247,15 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
     sources.set(file.url, () => file.bytes);
     return {url: file.url, bytes: file.bytes.length, hash, wireBytes: wireBytes(file.url, file.bytes, hash)};
   })]));
+  // S12f2b1: the phone lists each cooked layer as a mount (the page reads it by URL) and never its blob
+  const layerRows = new Map([...layers?.files ?? []].map(([hash, file]) => {
+    const sum = sha256(file.bytes);
+    sources.set(file.url, () => file.bytes);
+    return [hash, {url: file.url, bytes: file.bytes.length, hash: sum, wireBytes: wireBytes(file.url, file.bytes, sum)}] as const;
+  }));
   /** A phone list names each trimmed target's phone files in its place, and the target too while a kept row still reads it. */
   const tiered = (tier: CookTier, url: string): readonly string[] => tier !== 'phone' || !tierRows.has(url) ? [url] : phone?.kept.has(url) === true ? [url, `tier:${url}`] : [`tier:${url}`];
-  return {shard, header, tierFiles: [...tierRows.values()].flat(), discovery: discovery[0] === undefined || documentBytes === undefined ? undefined : {row: discovery[0], bytes: documentBytes},
+  return {shard, header, tierFiles: [...[...tierRows.values()].flat(), ...layerRows.values()], discovery: discovery[0] === undefined || documentBytes === undefined ? undefined : {row: discovery[0], bytes: documentBytes},
     read: url => { const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read(); },
     stableKey: url => stableKeys.get(url),
     mountBytes: row => (row.url === document?.url && documentBytes !== undefined ? documentBytes : shard.read(row.path)),
@@ -254,7 +264,7 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
       for (const row of index.sections) selected.push(folderFile(row.path, row.bytes, row.hash, `section:${row.name}`));
       for (const row of index.schemas) selected.push(folderFile(row.path, row.bytes, row.hash, `schema:${row.path}`));
       const wanted = entryReadSet(source, tier, index, sections, wholeSet(tier, set), fence.hashes);
-      for (const row of index.files) if (wanted.has(row.hash) || row.name?.startsWith('ui/images/card-') === true) selected.push(folderFile(row.path, row.compressed, row.hash, row.name));
+      for (const row of index.files) if ((wanted.has(row.hash) || row.name?.startsWith('ui/images/card-') === true) && (tier !== 'phone' || !layerRows.has(row.hash))) selected.push(folderFile(row.path, row.compressed, row.hash, row.name));
       return selected;
     },
     mountRows: (tier, set) => {
@@ -262,11 +272,24 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
       // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
       const listed = new Set(urls), unlisted = tier === 'phone' && set === 'whole' ? [...tierRows.keys()].filter(url => !listed.has(url)).map(url => `tier:${url}`) : [];
-      return [...urls.flatMap(url => tiered(tier, url)), ...unlisted].flatMap(url => {
+      return [...[...urls.flatMap(url => tiered(tier, url)), ...unlisted].flatMap(url => {
         if (url.startsWith('tier:')) return tierRows.get(url.slice(5)) ?? [];
         const row = mountRow.get(url); return row === undefined ? [] : [row()];
-      });
+      }), ...tier === 'phone' ? layerRows.values() : []];
     }};
+}
+
+/** S12f2b1: the splat ground's phone colour and normal layers (`splat.phone`), as product blobs; a file the desktop set names
+ *  too (Pine's phone masters are its desktop layers) is one a phone reads cooked and a desktop reads as it is. Its ARM
+ *  layers stay as they are, as the hand-made 6×6 set had them. */
+function splatPhoneLayers(shard: OpenShardfile, prefix: string): readonly SplatPhoneLayer[] {
+  const splat = shard.source.props === null ? undefined : splatTerrainOf(shard.source.props);
+  if (splat?.phone === undefined) return [];
+  const byHash = new Map(shard.index.files.map(row => [row.hash, row]));
+  return (['colour', 'normal'] as const).flatMap(role => [...new Set(splat.phone?.[role])].flatMap(hash => {
+    const row = byHash.get(hash);
+    return row === undefined || !row.path.endsWith('.ktx2') ? [] : [{hash, url: `${prefix}${row.path}`, bytes: shard.read(row.path), role}];
+  }));
 }
 
 /** Cook the parts of a set of manifests and say where each packable URL landed, for the app build's own parts table. */

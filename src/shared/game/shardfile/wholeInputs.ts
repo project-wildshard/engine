@@ -16,3 +16,10 @@ export function otherTierSplatFiles(source: Pick<Shardfile, 'props'>, tier: 'pho
   const drawn = new Set(splatTextureRefs(splat, typeof tier === 'function' ? tier() : tier));
   return new Set(splatTextureRefs(splat).filter(hash => !drawn.has(hash)));
 }
+/** S12f2b2: the phone layers a device drawing the phone set reads as the cook's own 6×6 file (`layer` names one), never as
+ *  their blobs. None on a device drawing the desktop set, or without a cooked row (an older cook): the blob is read. */
+export function cookedSplatLayers(source: Pick<Shardfile, 'props'>, tier: () => 'phone' | 'desktop', layer: ((hash: string) => string | undefined) | undefined): ReadonlySet<string> {
+  const splat = source.props === null || layer === undefined ? undefined : splatTerrainOf(source.props);
+  if (splat?.phone === undefined || layer === undefined || tier() !== 'phone') return new Set();
+  return new Set(splatTextureRefs(splat, 'phone').filter(hash => layer(hash) !== undefined));
+}

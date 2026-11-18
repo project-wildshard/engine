@@ -13,7 +13,7 @@ import { frameBudgetSpent } from '@wildshard/engine/core/framePacing';
 import { preflightShardfile, preflightShardfileSteps } from '@wildshard/format/preflight';
 import { jsonDataHeapBytes } from '@wildshard/format/json';
 import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/shardfile/outputDescriptor';
-import { otherTierSplatFiles } from '../../../shared/game/shardfile/wholeInputs';
+import { cookedSplatLayers, otherTierSplatFiles } from '../../../shared/game/shardfile/wholeInputs';
 import {builtShardfilePostCost} from '@wildshard/format/validationReceipt';
 import {postStackCost,type PostStackCost} from '@wildshard/format/postStack';
 import { isPlatformDataSection } from '@wildshard/format/outputFields';
@@ -199,11 +199,13 @@ export function tierLibrarySourcePaced(source: Shardfile, tier: 'phone' | 'deskt
 /** Typed alternatives which no critical, shared or dependency reader needs can
  * stay on disk. The full descriptor remains available for verified late reads.
  * The boot compiler and runtime use this same selection before declaring bytes. */
-export async function tierFolderFilesPaced(source: Shardfile, tier: 'phone' | 'desktop', pause?: () => Promise<void>, splatTier: () => 'phone' | 'desktop' = () => tier): Promise<Shardfile['files']> {
+export async function tierFolderFilesPaced(source: Shardfile, tier: 'phone' | 'desktop', pause?: () => Promise<void>, splatTier: () => 'phone' | 'desktop' = () => tier,
+  splatLayer?: (hash: string) => string | undefined): Promise<Shardfile['files']> {
   const descriptor = outputDescriptor(source);
   if (descriptor === undefined) return source.files;
   const inactive = await paced(entryFileSteps(source, tier, descriptor), pause ?? (() => Promise.resolve()));
-  const splat = otherTierSplatFiles(source, splatTier);
+  // S12f2b2: a phone layer the cook made its own 6×6 file for is read by URL (`clientMaterials`), never as its blob
+  const splat = new Set([...otherTierSplatFiles(source, splatTier), ...cookedSplatLayers(source, splatTier, splatLayer)]);
   return inactive.size === 0 && splat.size === 0 ? source.files : source.files.filter(file => !inactive.has(file.hash) && !splat.has(file.hash));
 }
 function* tierLibrarySourceSteps(source: Shardfile, tier: 'phone' | 'desktop', assets?: ReadonlyMap<string, Uint8Array>): Generator<void, Shardfile> {

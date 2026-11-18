@@ -2,7 +2,8 @@
 // largest size. No re-encode: every level the phone keeps is the master's own bytes, so the look is the master's at
 // any distance the phone draws.
 import {describe, expect, it} from 'vitest';
-import {glbImages, ktx2Info, phoneTier, phoneTierSize, tierGlb, tierKtx2, trimKtx2, type TextureRole} from '../src/cook/game/tierTextures';
+import {glbImages, ktx2Info, phoneTier, phoneTierSize, splatPhoneTier, tierGlb, tierKtx2, trimKtx2, type TextureRole} from '../src/cook/game/tierTextures';
+import {splatLayerFiles} from '../src/shared/engine/boot/splatLayerRows';
 import {phoneOverlay} from '../src/cook/game/entryTotals';
 
 const LEVEL_INDEX = 80;
@@ -268,4 +269,46 @@ it('S12d: the phone overlay is the tiered table\'s stand-ins: the cook\'s phone 
     '/assets/far-reach/rock.jpg': '/assets/far-reach/astc6/rock-11112222.ktx2', '/assets/models/bird.glb': '/assets/gpu/models/bird.t512-55556666.glb'});
   expect(phoneOverlay(undefined)).toEqual({});
   expect(phoneOverlay(new TextEncoder().encode('{"native": {}}'))).toEqual({});
+});
+
+describe('S12f2b1: a splat ground\'s phone layers as ASTC 6×6', () => {
+  const blob = (hash: string): string => `/shardfiles/pine-hollow/blobs/ktx2/${hash}.ktx2`;
+  const [uastc, normal, astc] = ['a', 'b', 'c'].map(c => c.repeat(64)) as [string, string, string];
+  const document = (): Uint8Array => new TextEncoder().encode(JSON.stringify({version: 1, slug: 'pine-hollow', rows: {}, native: {ktx2: {$call: 'pageModeKtx2',
+    args: [{shard: {phone: {'/assets/a.png': '/assets/gpu/a-11111111.ktx2'}, desktop: {}}, grid: {phone: {}, desktop: {}}}]}}}));
+  type Tables = {shard: {phone: Record<string, string>}; grid: {phone: Record<string, string>}};
+  const tablesOf = (bytes: Uint8Array): Tables | undefined => (JSON.parse(new TextDecoder().decode(bytes)) as {native: {ktx2: {args: Tables[]}}}).native.ktx2.args[0];
+
+  it('encodes each UASTC layer at its own size and names it in every phone table under the blob\'s URL', () => {
+    const calls: {width: number; role: TextureRole}[] = [];
+    const encode = (bytes: Uint8Array, role: TextureRole): Uint8Array => { calls.push({width: ktx2Info(bytes).width, role}); return bytes.subarray(0, 96); };
+    const tier = splatPhoneTier(document(), 'pine-hollow', [
+      {hash: uastc, url: blob(uastc), bytes: ktx2(1024), role: 'colour'},
+      {hash: normal, url: blob(normal), bytes: ktx2(1024), role: 'normal'},
+      // today's hand-made raw 6×6 set has no UASTC to encode: the phone keeps reading the blob
+      {hash: astc, url: blob(astc), bytes: ktx2(1024, {vkFormat: 166}), role: 'arm'},
+    ], encode);
+    expect(calls).toEqual([{width: 1024, role: 'linear'}, {width: 1024, role: 'normal'}]);
+    expect([...tier?.files.keys() ?? []]).toEqual([uastc, normal]);
+    const file = tier?.files.get(uastc);
+    expect(file?.url).toMatch(new RegExp(`^/assets/pine-hollow/splat/${uastc}\\.t16384-[a-f0-9]{8}\\.ktx2$`, 'u'));
+    expect(file?.bytes).toHaveLength(96);
+    const tables = tablesOf(tier?.discovery ?? new Uint8Array());
+    for (const phone of [tables?.shard.phone, tables?.grid.phone]) {
+      expect(phone?.[`${blob(uastc)}#layer`]).toBe(file?.url);
+      // the page finds each cooked layer by its blob's hash, and the blob with no row is read as before
+      expect(splatLayerFiles(phone ?? {})).toEqual(new Map([[uastc, file?.url], [normal, tier?.files.get(normal)?.url]]));
+    }
+    expect(tables?.shard.phone['/assets/a.png']).toBe('/assets/gpu/a-11111111.ktx2');
+  });
+
+  it('cooks nothing without a UASTC layer or a phone table to name it in', () => {
+    const encode = (bytes: Uint8Array): Uint8Array => bytes.subarray(0, 96);
+    expect(splatPhoneTier(document(), 'pine-hollow', [{hash: astc, url: blob(astc), bytes: ktx2(512, {vkFormat: 166}), role: 'colour'}], encode)).toBeUndefined();
+    // one array takes one format: a role with a layer that can't be encoded keeps all its blobs
+    expect(splatPhoneTier(document(), 'pine-hollow', [{hash: uastc, url: blob(uastc), bytes: ktx2(512), role: 'colour'},
+      {hash: astc, url: blob(astc), bytes: ktx2(512, {vkFormat: 166}), role: 'colour'}], encode)).toBeUndefined();
+    const bare = new TextEncoder().encode(JSON.stringify({version: 1, slug: 'x', rows: {}, native: {}}));
+    expect(splatPhoneTier(bare, 'x', [{hash: uastc, url: blob(uastc), bytes: ktx2(512), role: 'colour'}], encode)).toBeUndefined();
+  });
 });

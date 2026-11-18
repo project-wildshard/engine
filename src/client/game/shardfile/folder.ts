@@ -67,6 +67,9 @@ export interface FolderOptions {
   buildRead?: (url:string,expectedBytes:number|undefined,read?:(bytes:number)=>void,hash?:string,priority?:'low')=>Promise<Uint8Array>;
   /** S4: the tier whose splat layers this device draws, when it isn't `tier`. Asked only of a shard with a phone set. */
   splatTier?: () => 'phone' | 'desktop';
+  /** S12f2b2: the cook's own file for a splat phone layer (`splatLayerFile`): a phone drawing the phone set reads it by URL,
+   *  so its blob is never admitted. */
+  splatLayer?: (hash: string) => string | undefined;
   /** The spawn manifest names individual files, never transport envelopes. */
   directFiles?: boolean;
   /** Optional live parser; boot and receipts stay on the page. Hashes/validators retain admission. */
@@ -402,7 +405,7 @@ async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNulla
   reportRuntimeTier(source);
   reportPageFeatures(source);
   await options.reserve?.(source);
-  const selected=options.tier===undefined?source.files:await tierFolderFilesPaced(source,options.tier,options.pause,options.splatTier);
+  const selected=options.tier===undefined?source.files:await tierFolderFilesPaced(source,options.tier,options.pause,options.splatTier,options.splatLayer);
   const control=options.tier==='phone'?controlFiles(await playLibrarySourcePaced(source,options.pause),selected):selected;
   const deferred=options.deferred===undefined?undefined:new Set(await options.deferred(source));
   const initial=deferred===undefined?control:control.filter(file=>!deferred.has(file.hash));
@@ -531,7 +534,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   // alternatives; every product with one gets its tier (ONE-FORMAT OF10a2). Keep the
   // complete descriptor for verified late reads and a later device tier.
   const selected = receipt !== null && options.tier !== undefined
-    ? await tierFolderFilesPaced(source, options.tier, options.pause, options.splatTier) : source.files;
+    ? await tierFolderFilesPaced(source, options.tier, options.pause, options.splatTier, options.splatLayer) : source.files;
   // Unreceipted products retain complete byte validation. An exact phone
   // receipt permits lazy tile reads through ClientAssets.
   const files = receipt !== null && options.tier === 'phone'

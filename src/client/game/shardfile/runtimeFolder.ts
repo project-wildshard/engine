@@ -19,7 +19,7 @@ import { absentShardFolder, type ShardFolder } from '../../../shared/game/shardf
 import { prepareManifestScalarBlocks,type ShardManifest } from '../shard/manifest';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { ktx2TranscodeSupport } from '@wildshard/engine/core/ktx2';
-import { splatDrawTier } from '@wildshard/engine/boot/gpuFiles';
+import { splatDrawTier, splatLayerFile } from '@wildshard/engine/boot/gpuFiles';
 import { TIER, TIER_CONFIG } from '@wildshard/engine/core/tier';
 import { readFolderDescriptor, browserContentHash, type AdmittedFolder, type FolderOptions } from './folder';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -116,7 +116,7 @@ export function browserShardfileOptions(base: string, granted = false): FolderOp
     }, navigator.serviceWorker?.controller === null || navigator.serviceWorker?.controller === undefined ? storage : undefined), 'file', address);
     entryTransport()?.expand(); return result;
   };
-  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
+  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, splatLayer: splatLayerFile, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
     // OF10a4: the build reader serves a product the host trusts or one the build's verdict table lists (its catalogue and the
     // placed uploads' cook rows); an unlisted product has no browser reader and fails closed, as before
     ...(readable ? { buildRead } : {}),
@@ -244,7 +244,7 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
           let prepared: Promise<ReturnType<typeof folderCacheCompletion>> | undefined;
           const receipt = descriptor.receipt;
           folderCompletions.set(entry.product, async owner => {
-            prepared ??= tierFolderFilesPaced(source, 'phone', options.pause, options.splatTier).then(selected => folderCacheCompletion(source, options, selected, lateFiles(source, selected), { source: descriptor.index,
+            prepared ??= tierFolderFilesPaced(source, 'phone', options.pause, options.splatTier, options.splatLayer).then(selected => folderCacheCompletion(source, options, selected, lateFiles(source, selected), { source: descriptor.index,
               validation: { revision: receipt.revision, sourceHash: receipt.sourceHash, indexHash: descriptor.indexHash, worst: receipt.worst } }));
             const complete = await prepared; await complete?.(owner);
           });

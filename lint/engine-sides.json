@@ -1510,6 +1510,7 @@
     "src/shared/engine/audio/audioProfiles.ts": "shared",
     "src/shared/engine/audio/bootAudio.ts": "shared",
     "src/shared/engine/boot/bakedUrls.ts": "shared",
+    "src/shared/engine/boot/splatLayerRows.ts": "shared",
     "src/shared/engine/boot/loadingWaits.ts": "shared",
     "src/shared/engine/boot/steps.ts": "shared",
     "src/shared/engine/boot/tables.ts": "shared",

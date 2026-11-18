@@ -12,6 +12,7 @@
  * files, which `shardHalf` lists in the phone manifests. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';
+import {splatLayerKey} from '@wildshard/engine/boot/splatLayerRows';
 
 const KTX2_ID = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a];
 const LEVEL_INDEX = 80;
@@ -348,4 +349,47 @@ export function phoneTier(discovery: Uint8Array, read: (url: string) => Uint8Arr
   }
   if (files.size === 0) return undefined;
   return {discovery: new TextEncoder().encode(JSON.stringify(document)), files, kept};
+}
+
+/** S12f2b1: one splat-ground phone layer, a product blob: its URL in the product (`/shardfiles/<folder>/blobs/ktx2/<hash>.ktx2`),
+ *  its bytes and the texture array it fills. */
+export interface SplatPhoneLayer {readonly hash: string; readonly url: string; readonly bytes: Uint8Array; readonly role: 'colour' | 'normal' | 'arm'}
+/** S12f2b1: the phone tier of a splat ground's own layer set. Each UASTC layer is encoded ASTC 6×6 at its own size
+ *  (`tierKtx2` under `KEPT_ENCODE_MAX`, as a kept `#layer` row is) to `/assets/<folder>/splat/<hash>.t<max>-<hash8>.ktx2`,
+ *  and every phone table of the discovery document (a one-shard page's and a grid page's) names it under the blob's URL plus `#layer` (`splatLayerKey`). A layer
+ *  that is not UASTC (today's hand-made 6×6 set) is left alone, and so is every layer of a role one of whose layers can't be
+ *  encoded: an array takes one format (`splatTerrain.ts`). Undefined when none is encoded or the document has no
+ *  phone table to name it in, so the phone reads the blobs as before. `files` is keyed by the blob's hash. */
+export function splatPhoneTier(discovery: Uint8Array, folder: string, layers: readonly SplatPhoneLayer[], encode: Astc6Encode): {readonly discovery: Uint8Array; readonly files: ReadonlyMap<string, TierFile>} | undefined {
+  const document = JSON.parse(new TextDecoder().decode(discovery)) as Json;
+  const native = isMap(document) && isMap(document['native']) ? document['native'] : undefined;
+  const tables: Record<string, unknown>[] = [];
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) { for (const item of value) walk(item); return; }
+    if (!isMap(value)) return;
+    for (const [key, item] of Object.entries(value)) {
+      if (key === 'phone' && isMap(item) && Object.values(item).every(target => typeof target === 'string')) tables.push(item);
+      else walk(item);
+    }
+  };
+  walk(native?.['ktx2']);
+  if (tables.length === 0) return undefined;
+  const files = new Map<string, TierFile>();
+  for (const role of ['colour', 'normal', 'arm'] as const) {
+    const made: TierFile[] = [], own = layers.filter(layer => layer.role === role);
+    for (const layer of own) {
+      let encoded = false;
+      const counted: Astc6Encode = (bytes, as) => { const out = encode(bytes, as); encoded ||= out !== undefined; return out; };
+      let bytes: Uint8Array | undefined;
+      try { bytes = tierKtx2(layer.bytes, KEPT_ENCODE_MAX, counted, role === 'normal'); } catch { bytes = undefined; }
+      if (bytes !== undefined && encoded) made.push({from: layer.url, url: `/assets/${folder}/splat/${layer.hash}.t${KEPT_ENCODE_MAX}-${hex8(bytes)}.ktx2`, bytes});
+    }
+    if (made.length === 0 || made.length !== own.length) continue;
+    for (const [at, file] of made.entries()) {
+      const layer = own[at]; if (layer === undefined) continue;
+      for (const table of tables) table[splatLayerKey(layer.url)] = file.url;
+      files.set(layer.hash, file);
+    }
+  }
+  return files.size === 0 ? undefined : {discovery: new TextEncoder().encode(JSON.stringify(document)), files};
 }

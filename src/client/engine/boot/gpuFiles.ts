@@ -47,14 +47,26 @@ import { pageURL } from './contentBase';
 import { PAGE_LEVEL, PHONE_PLAYING_BYTES } from '../../../shared/engine/core/config';
 import { harnessPins } from '../../../shared/engine/app/identity';
 import { ktx2Probe, ktx2ProbeResult, type Ktx2Probe } from '../render/ktx2Probe';
+import { splatLayerFiles } from '../../../shared/engine/boot/splatLayerRows';
 
 export interface Ktx2Table { readonly phone: Readonly<Record<string, string>>; readonly desktop: Readonly<Record<string, string>> }
 const GPU_FILES = { phone: { ...ENGINE_GPU_FILES.phone }, desktop: { ...ENGINE_GPU_FILES.desktop } };
+/** S12f2b2: the registered phone tables' cooked splat layers by blob hash (`splatLayerFile`), read again after a registration. */
+let splatLayers: ReadonlyMap<string, string> | null = null;
 let registered = { phone: new Set(Object.values(GPU_FILES.phone)), desktop: new Set(Object.values(GPU_FILES.desktop)) };
 export function registerGpuFiles(table: Ktx2Table): void {
   Object.assign(GPU_FILES.phone, table.phone);
   Object.assign(GPU_FILES.desktop, table.desktop);
   registered = { phone: new Set(Object.values(GPU_FILES.phone)), desktop: new Set(Object.values(GPU_FILES.desktop)) };
+  splatLayers = null;
+}
+/** SHARD-SOURCE S12f2b2: the cook's 6×6 file a registered phone table names for a splat ground's phone layer blob (by its
+ *  hash), which a phone drawing the phone set reads in the blob's place; undefined off the phone tier or with no row (an
+ *  older cook), and the blob is read as before. A table registers before its shard's admission (`prepareShardAssets`). */
+export function splatLayerFile(hash: string): string | undefined {
+  if (TIER !== 'phone') return undefined;
+  splatLayers ??= splatLayerFiles(GPU_FILES.phone);
+  return splatLayers.get(hash);
 }
 
 /** Whether this tier's registered KTX2 mappings name a URL, including shard overlays outside /assets/gpu/. */
