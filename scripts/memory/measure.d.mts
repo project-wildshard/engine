@@ -20,13 +20,18 @@ export function stats(values:readonly number[]):{n:number;median:number;min:numb
 export interface DumpProcess {pid:number;role:string;footprint:number;alloc:Record<string,number>}
 export function dumpsInOrder(events:readonly unknown[]):{id:string;processes:DumpProcess[]}[];
 export function bootURL(url:string,chunk:string):string;
+export type Boot = 'online'|'standalone';
+export interface WorldStamp {release:string;key:string}
+export function isServerWorker(url:string):boolean;
+export function bootOf(runs:readonly {boot?:string}[]):string;
+export function openOnlineBoot(options:{dist:string;chunk:string;scratch:string}):Promise<{url:string;stamp:WorldStamp;close:()=>Promise<void>}>;
 export interface WebkitRun {
-  host:'webkit';instrument:Instrument|'minimal-lost';chunk:string;url:string;build:string|null;ready:boolean;failure:string|null;errors:string[];readyMs:number;loadAverage:number;
+  host:'webkit';instrument:Instrument|'minimal-lost';boot:Boot;serverWorker:boolean;workers:string[];chunk:string;url:string;build:string|null;ready:boolean;failure:string|null;errors:string[];readyMs:number;loadAverage:number;
   processes:(BrowserProcess&{lifetimeMaxBytes:number|null})[];checkpoints:Checkpoint[];traceCheckpoints:Checkpoint[];settled:(Pair&{reads:Pair[]})|null;
   ledger:{totals:Record<string,number>;unattributed:Record<string,number>;byKind:Ledger|null}|null;refused:string|null;samples:number;
   counters:Counters|null;categories:Record<'webcontent'|'gpu',Record<string,number>>|null;probe?:unknown;
 }
-export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean;instrument?:Instrument;probe?:(page:unknown,procs:BrowserProcess[])=>Promise<unknown>}):Promise<WebkitRun>;
+export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean;instrument?:Instrument;probe?:(page:unknown,procs:BrowserProcess[])=>Promise<unknown>;world?:WorldStamp|null}):Promise<WebkitRun>;
 export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;gpuDetail:{kinds:Record<string,number>;formats:Record<string,number>;owners:Record<string,number>}|null;checkpoints:{step:string;ledger:Record<string,Record<string,number>>|null;processes:DumpProcess[]}[];timeline?:StallEntry[]|null}
 export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number;plantRetainedBuffer?:boolean;captureDumps?:boolean}):Promise<MicroscopeRun>;
 export function webkitLines(run:WebkitRun):string[];

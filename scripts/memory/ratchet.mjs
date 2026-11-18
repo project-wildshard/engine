@@ -213,6 +213,18 @@ export function footprintInstrument(measurements, baseline) {
   return mode;
 }
 
+/** STR1 (J415): which boot the runs were read on (measure.mjs `boot`: `online`, or `standalone` for a run before STR1). An
+ * online boot carries no in-page server worker (99 to 139 MB [K]), so runs of different boots, a pair's mixed document
+ * (`online+standalone`) or a baseline of the other boot are never compared: re-record the baseline.
+ * @param {readonly any[]} measurements @param {any} baseline @returns {string} */
+export function footprintBoot(measurements, baseline) {
+  const boots = [...new Set(measurements.map(doc => doc.boot ?? 'standalone'))];
+  if (boots.length !== 1 || boots[0].includes('+')) throw new Error(`runs mix boots: ${boots.join(', ')}`);
+  const boot = /** @type {string} */ (boots[0]), stored = baseline?.boot ?? 'standalone';
+  if (baseline !== null && stored !== boot) throw new Error(`baseline was read on the ${stored} boot, these runs on the ${boot} boot: re-record it (ci.yml memory_record)`);
+  return boot;
+}
+
 /** @param {readonly LedgerBudget[]} runs @returns {LedgerBudget} */
 function highWater(runs) {
   if (runs.length === 0) throw new Error('No ledger boots');
@@ -243,6 +255,7 @@ export function main(argv) {
   for (const doc of measurements) if (doc.protocol !== 'memory-run/1' || typeof doc.chunk !== 'string') throw new Error('Expected measure.mjs output');
   if (mode === 'ledger' || mode === 'webkit-ledger') {
     const instrument = mode === 'webkit-ledger' ? footprintInstrument(measurements, baseline) : undefined;
+    const boot = mode === 'webkit-ledger' ? footprintBoot(measurements, baseline) : undefined;
     /** @type {Map<string, LedgerBudget[]>} */
     const readings = new Map();
     for (const doc of measurements) {
@@ -261,12 +274,12 @@ export function main(argv) {
     }
     if (baseline === null) {
       const zones = Object.fromEntries([...readings.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([zone, runs]) => [zone, highWater(runs)]));
-      if (values.out) write(values.out, { version: 1, mode, instrument, zones });
+      if (values.out) write(values.out, { version: 1, mode, instrument, boot, zones });
       console.log(`Ledger recorded for ${readings.size} zones`);
       return;
     }
     const verdict = guardZones(baseline.zones, readings, mode === 'ledger' ? confirmLedger : compareLedger);
-    if (values.out) write(values.out, { version: 1, mode, instrument, zones: verdict.zones });
+    if (values.out) write(values.out, { version: 1, mode, instrument, boot, zones: verdict.zones });
     announce(verdict.reports, verdict.eligible, values.baseline ?? 'the baseline');
     const armed = Object.keys(baseline.zones).filter(zone => baseline.zones[zone].armed === true);
     console.log(`Ledger read for ${readings.size} zones; armed: ${armed.length === 0 ? 'none' : armed.join(', ')}`);
@@ -280,9 +293,10 @@ export function main(argv) {
       });
     });
     const instrument = footprintInstrument(measurements, baseline);
+    const boot = footprintBoot(measurements, baseline);
     const verdict = baseline === null ? { anchor: footprintBudget(batches().flat()), report: null } : guardFootprint(baseline.anchor, batches);
     const anchor = verdict.anchor;
-    if (values.out) write(values.out, { version: 1, mode, instrument, anchor });
+    if (values.out) write(values.out, { version: 1, mode, instrument, boot, anchor });
     if (verdict.report !== null) announce([verdict.report], [], '');
     else if (baseline !== null && anchor.armed !== true) announce([], ['anchor'], values.baseline ?? 'the baseline');
     let medians = 'unread';

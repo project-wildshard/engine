@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories} from '../scripts/memory/measure.mjs';
+import {stepCheckpoints,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories} from '../scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -100,4 +100,13 @@ test('the remainder is split by footprint category, Metal-owned categories toget
   const terms=[{process:'gpu' as const,term:'gpu texture',category:'graphics',bytes:15*MB},{process:'webcontent' as const,term:'ram array-buffer',category:'WebKit Malloc',bytes:12*MB}];
   expect(categoryRemainder(measured,terms,'gpu')).toEqual([{category:'WebKit Malloc',measured:32*MB,ledger:0,unexplained:32*MB},{category:'graphics',measured:25*MB,ledger:15*MB,unexplained:10*MB}]);
   expect(categoryRemainder(measured,terms,'webcontent')[0]).toMatchObject({category:'WebKit Malloc',ledger:12*MB,unexplained:20*MB});
+});
+
+test('STR1: a run names its boot and the in-page server worker by its chunk',()=>{
+  expect(bootOf([{boot:'online'},{boot:'online'}])).toBe('online');
+  expect(bootOf([{}])).toBe('standalone');
+  expect(bootOf([{boot:'standalone'},{boot:'online'}])).toBe('online+standalone');
+  expect(isServerWorker('http://127.0.0.1:4400/assets/serverWorker-1a2b3c.js')).toBe(true);
+  expect(isServerWorker('http://127.0.0.1:4400/assets/ktx2Zstd-1a2b3c.js')).toBe(false);
+  expect(isServerWorker('blob:http://127.0.0.1:4400/0b1c')).toBe(false);
 });

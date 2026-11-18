@@ -26,6 +26,14 @@
 //
 // A run whose WebContent peak falls before the loading card is refused, not reported. The JSON is `memory-run/1`.
 //
+// The boot (--online, MEMORY-STRUCTURE STR1, J415): J410's lines are judged on the online boot. `--online --dist=<built
+// client folder>` opens online-rig.mjs's signed dedicated server on loopback for that folder (memory saves, one cell, the
+// zone) and stamps the page with its world (`__WS_WORLD__`, as src/e2e/t1/online-fixtures.ts does), so the page joins it
+// and starts no in-page server worker. `--online=pair` alternates online and standalone boots of the same build and page
+// origin, the order flipped each round. Every run names its boot; an online run that starts the in-page server worker
+// (`standalone-server`) is refused, as is a standalone run that starts none. `--round=k` starts the round count at k, so a
+// shell loop can take one pair per command, each inside the measure lock, with the order still flipping. ratchet.mjs and phone-fit.mjs refuse runs that mix boots, as they do instruments.
+//
 // The instrument (--instrument, EM11b): `minimal`, the default, turns off the Web Inspector's Network and Console domains on
 // the page before the boot and registers no route, so WebKit neither keeps every fetched response body (1.34 x the bytes, up
 // to ~200 MB of WebContent that no collection frees; meta engine-memory/inspector-retention-2026-11-17.md) nor runs with its
@@ -42,10 +50,11 @@
 //     the median of its per-round differences, and floor + engine + zone must close on the whole within 2%.
 //   - A busy machine is waited out (up to --wait minutes, 10), then refused: the 1-minute load average over --max-load
 //     (the CPU count) or more than --max-lanes other scripts/browser-lane.sh runs (2). Both are written with each round.
-import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { generateKeyPairSync } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
-import { dirname, resolve as resolvePath } from 'node:path';
+import { dirname, join, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { bootTimelineEntries } from '../loading-flow/stalls.mjs';
 import { listProcesses, readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
@@ -192,6 +201,64 @@ export function bootURL(url, chunk) {
   return page.href;
 }
 
+/** Init script: every `new Worker` URL the page makes, in `window.__workersMade` (mini-pinemem6). */
+const WORKER_LOG = `(() => { const W = window.Worker; if (!W) return; const made = []; Reflect.set(window, '__workersMade', made);
+  window.Worker = new Proxy(W, { construct(target, args, next) { made.push(String(args[0])); return Reflect.construct(target, args, next); } }); })()`;
+
+/** An online page's Name prompt (`#ws-name-box`), answered as a player would until `stop`: skip it, else type a name.
+ *  @param {any} page */
+function answerName(page) {
+  let stopped = false;
+  const loop = (async () => {
+    while (!stopped) {
+      try {
+        const skip = page.locator('#ws-name-box [data-name=skip]');
+        if (await skip.count() > 0) await skip.click({ timeout: 2000 });
+        else if (await page.locator('#ws-name-box input').count() > 0) {
+          await page.locator('#ws-name-box input').fill(`Meter ${String(Date.now() % 1e5)}`);
+          await page.locator('#ws-name-box button[type=submit]').click({ timeout: 2000 });
+        }
+      } catch { /* the prompt moved */ }
+      await sleep(250);
+    }
+  })();
+  return { stop: async () => { stopped = true; await loop; } };
+}
+
+/** A worker URL that is the in-page server (`src/server/host/standalone/serverWorker.ts`, Worker name `standalone-server`).
+ *  @param {string} url */
+export function isServerWorker(url) { return /serverWorker/u.test(new URL(url, 'http://x/').pathname); }
+
+/** The boot a set of runs was read on: `online`, `standalone` (a run before STR1 named none), or both joined by `+` (a pair).
+ *  @param {readonly {boot?: string}[]} runs */
+export function bootOf(runs) { return [...new Set(runs.map((r) => r.boot ?? 'standalone'))].sort().join('+'); }
+
+/** STR1 (J415): the online boot's world. online-rig.mjs's signed dedicated server for the built client folder `dist` (memory
+ *  saves, one cell, `chunk`) on loopback, with a fresh fixture key under `scratch`; `url` is its page origin and `stamp` the
+ *  `__WS_WORLD__` a page carries to join it. The same origin serves a standalone boot when the page has no stamp.
+ *  @param {{dist: string, chunk: string, scratch: string}} options
+ *  @returns {Promise<{url: string, stamp: {release: string, key: string}, close: () => Promise<void>}>} */
+export async function openOnlineBoot({ dist, chunk, scratch }) {
+  const { openRig } = await import('../online-rig.mjs');
+  mkdirSync(scratch, { recursive: true });
+  const dir = mkdtempSync(join(scratch, 'online-'));
+  const pair = generateKeyPairSync('ed25519');
+  const key = pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
+  const keyFile = join(dir, 'key.json');
+  writeFileSync(keyFile, JSON.stringify({ public: key, private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }) }), { mode: 0o600 });
+  const rig = await openRig({ port: 0, dist: resolvePath(dist), work: join(dir, 'rig'), keyFile, saves: 'memory', shard: chunk, workers: 1 });
+  const close = async () => { try { await rig.close(); } finally { rmSync(dir, { recursive: true, force: true }); } };
+  try {
+    for (let attempt = 0; attempt < 300; attempt++) {
+      if (await fetch(`${rig.worldOrigin}/health`).then((response) => response.ok).catch(() => false)) {
+        return { url: `${rig.base}/`, stamp: { release: `${rig.releaseOrigin}/release.json`, key }, close };
+      }
+      await sleep(100);
+    }
+    throw new Error(`the ${chunk} world server did not become healthy`);
+  } catch (error) { await close(); throw error; }
+}
+
 /** The phone boot's saved state: phone tier, Low graphics, muted, Developer on, first play done. `route` false (instrument
  * minimal) leaves the error reports unrouted: a route turns on request interception, which disables WebKit's memory cache.
  * @param {{addInitScript: Function, route: Function}} context @param {{route?: boolean}} [options] */
@@ -253,13 +320,17 @@ export async function settledReading(page, procs, { settleMs = 2000, gcs = 2, re
 /** One cold phone boot in native WebKit, read by the kernel.
  * @param {{url:string, chunk:string, settleMs?:number, timeoutMs?:number, everyMs?:number, gcs?:number, reads?:number, closure?:boolean, instrument?:'minimal'|'full', probe?:(page:any, procs:BrowserProcess[]) => Promise<unknown>}} options
  * `probe` runs at control after the settled reading (a probe script's own reading, kept as `probe` in the run). */
-export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false, instrument = 'minimal', probe }) {
+export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false, instrument = 'minimal', probe, world = null }) {
   const { webkit } = await import('../browser-playwright.mjs');
   const browser = await webkit.launch({ headless: true });
   const load = loadavg()[0];
   try {
     const context = await browser.newContext({ ...PHONE_VIEW });
     await phoneContext(context, { route: instrument === 'full' });
+    // STR1 (mini-pinemem6's driver): every `new Worker` URL is recorded, and an online boot's page carries its world stamp,
+    // as a staging or prod build does
+    await context.addInitScript(WORKER_LOG);
+    if (world !== null) await context.addInitScript((stamp) => { Reflect.set(globalThis, '__WS_WORLD__', stamp); }, world);
     const page = await context.newPage();
     page.setDefaultTimeout(timeoutMs);
     /** @type {string[]} */ const errors = [];
@@ -278,7 +349,9 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     const started = Date.now();
     try {
       await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
-      failure = await untilControl(page, timeoutMs);
+      // an online page asks for the player's Name before it joins: answer it as a player would
+      const named = world === null ? null : answerName(page);
+      try { failure = await untilControl(page, timeoutMs); } finally { await named?.stop(); }
       const readyMs = Date.now() - started;
       if (failure === null) {
         sampler.mark('settling');
@@ -300,9 +373,13 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
       const checkpoints = stepCheckpoints(stream.samples, steps, all);
       const lifetime = readFootprints(all.map((p) => p.pid));
       const kept = inspector === null || sameInspectorSession(page, inspector);
-      return { host: 'webkit', instrument: kept ? instrument : 'minimal-lost', chunk, url, build, ready: failure === null, failure, errors: errors.slice(0, 5), readyMs, loadAverage: Math.round(load * 100) / 100,
+      const workers = /** @type {string[]} */ (await page.evaluate(() => Reflect.get(window, '__workersMade') ?? []).catch(() => []));
+      const boot = world === null ? 'standalone' : 'online', serverWorker = workers.some(isServerWorker);
+      const wrongBoot = boot === 'online' && serverWorker ? `the online boot started the in-page server worker (${workers.join(', ')})`
+        : boot === 'standalone' && !serverWorker ? `the standalone boot started no in-page server worker (${workers.join(', ')})` : null;
+      return { host: 'webkit', instrument: kept ? instrument : 'minimal-lost', boot, serverWorker, workers, chunk, url, build, ready: failure === null, failure, errors: errors.slice(0, 5), readyMs, loadAverage: Math.round(load * 100) / 100,
         processes: all.map((p) => ({ pid: p.pid, role: p.role, name: p.name, path: p.path, lifetimeMaxBytes: /** @type {any} */ (lifetime[String(p.pid)])?.lifetimeMaxPhysicalFootprintBytes ?? null })),
-        checkpoints, traceCheckpoints: trace.length > 0 ? stepCheckpoints(stream.samples, traceToControl(trace, steps), all) : [], settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, ...(probe ? { probe: probed } : {}), refused: failure ?? (kept ? refusal(checkpoints) : 'the page moved to a new inspector session mid-boot (Network domain on again)'), samples: stream.samples.length };
+        checkpoints, traceCheckpoints: trace.length > 0 ? stepCheckpoints(stream.samples, traceToControl(trace, steps), all) : [], settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, ...(probe ? { probe: probed } : {}), refused: failure ?? wrongBoot ?? (kept ? refusal(checkpoints) : 'the page moved to a new inspector session mid-boot (Network domain on again)'), samples: stream.samples.length };
     } finally { clearInterval(watch); await sampler.stop().catch(() => undefined); }
   } finally { await browser.close(); }
 }
@@ -649,7 +726,10 @@ export function microscopeLines(run) {
 async function main(argv) {
   /** @type {Record<string, string>} */
   const args = Object.fromEntries(argv.map((a) => /^--([^=]+)(?:=(.*))?$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2] ?? '1']));
-  if (!args.url || (args.chunk === undefined && !args.ladder)) { console.error('usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--ledger-only] [--summary=<file>] [--out=<file>] | --ladder [--zones=a,b]'); return 64; }
+  const online = args.online === undefined ? null : args.online === 'pair' ? 'pair' : 'online';
+  const usage = 'usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--ledger-only] [--summary=<file>] [--out=<file>] | --online[=pair] --dist=<built client folder> --chunk=<slug> [--runs=N] [--round=k] | --ladder [--zones=a,b]';
+  if (online !== null && (!args.dist || !args.chunk || args.url2 || args.ladder || args.microscope || args['ledger-only'])) { console.error(`--online takes --dist and --chunk, and no --url2, --ladder, --microscope or --ledger-only\n${usage}`); return 64; }
+  if ((online === null && !args.url) || (args.chunk === undefined && !args.ladder)) { console.error(usage); return 64; }
   const settleMs = Number(args.settle ?? 2000), timeoutMs = Number(args.timeout ?? 240) * 1000;
   const gcs = Number(args.gcs ?? 2), reads = Number(args.reads ?? 5);
   const instrument = /** @type {'minimal'|'full'} */ (args.instrument ?? 'minimal');
@@ -659,24 +739,41 @@ async function main(argv) {
   if (args['plant-retained-buffer'] && !args['ledger-only']) throw new Error('The retained buffer control requires --ledger-only');
   if (args['observe-timeout'] && (!args['ledger-only'] || !args.out)) throw new Error('Observing a timeout requires --ledger-only and --out');
   const runs = args['ledger-only'] ? 0 : Number(args.runs ?? 1);
-  const urls = args.url2 ? [args.url, args.url2] : [args.url];
+  // STR1: the online boot's world, on loopback for this build (closed when the runs end)
+  const world = online === null || runs === 0 ? null : await openOnlineBoot({ dist: args.dist, chunk: args.chunk, scratch: resolvePath(args.scratch ?? 'tmp/measure-online') });
+  if (world !== null) args.url = world.url;
+  /** Each arm a round boots: two builds (--url2), online and standalone (--online=pair), or one. @type {{url: string, world: {release: string, key: string} | null, name: string}[]} */
+  const arms = args.url2 ? [{ url: args.url, world: null, name: args.url }, { url: args.url2, world: null, name: args.url2 }]
+    : world === null ? [{ url: args.url, world: null, name: args.url }]
+      : online === 'pair' ? [{ url: world.url, world: world.stamp, name: 'online' }, { url: world.url, world: null, name: 'standalone' }]
+        : [{ url: world.url, world: world.stamp, name: 'online' }];
   /** @type {Awaited<ReturnType<typeof webkitBoot>>[]} */
   const webkit = [];
-  for (let i = 0; i < runs; i++) {
-    // two builds alternate inside each round, and the order flips each round, so drift lands on both
-    for (const url of i % 2 === 0 ? urls : [...urls].reverse()) {
-      const run = await webkitBoot({ url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure), instrument });
-      webkit.push(run);
-      for (const line of webkitLines(run)) console.log(line);
-      if (args.closure) for (const line of closureLines(run, webkitCalibration())) console.log(line);
-      const phone = phoneLine(run); if (phone) console.log(phone);
+  try {
+    // --round=k: the first round's index, so one pair per command (each under the measure lock) keeps the flipped order
+    const first = Number(args.round ?? 0);
+    for (let i = first; i < first + runs; i++) {
+      // two arms alternate inside each round, and the order flips each round, so drift lands on both
+      for (const arm of i % 2 === 0 ? arms : [...arms].reverse()) {
+        const run = await webkitBoot({ url: arm.url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure), instrument, world: arm.world });
+        webkit.push(run);
+        for (const line of webkitLines(run)) console.log(line);
+        if (args.closure) for (const line of closureLines(run, webkitCalibration())) console.log(line);
+        const phone = phoneLine(run); if (phone) console.log(phone);
+      }
     }
-  }
-  if (args.url2) {
-    for (const url of urls) {
-      const good = webkit.filter((r) => r.url === url && r.settled && !r.refused);
+  } finally { await world?.close(); }
+  const armOf = (/** @type {Awaited<ReturnType<typeof webkitBoot>>} */ r) => arms.find((arm) => arm.url === r.url && (arm.world === null) === (r.boot === 'standalone'));
+  if (arms.length > 1) {
+    for (const arm of arms) {
+      const good = webkit.filter((r) => armOf(r) === arm && r.settled && !r.refused);
       const s = stats(good.map((r) => /** @type {Pair} */ (r.settled).webcontent)), p = stats(good.map((r) => Math.max(...r.checkpoints.map((c) => c.peak.webcontent))));
-      console.log(`${url}: settled WebContent median ${mb(s.median)} MB (${mb(s.min)}-${mb(s.max)}), peak WebContent median ${mb(p.median)} MB (${mb(p.min)}-${mb(p.max)}) [K], n ${s.n}`);
+      const g = stats(good.map((r) => /** @type {Pair} */ (r.settled).gpu));
+      console.log(`${arm.name}: settled WebContent median ${mb(s.median)} MB (${mb(s.min)}-${mb(s.max)}), GPU ${mb(g.median)} MB (${mb(g.min)}-${mb(g.max)}), peak WebContent median ${mb(p.median)} MB (${mb(p.min)}-${mb(p.max)}) [K], n ${s.n}`);
+      if (good.length > 1 && good.every((r) => r.checkpoints.length > 0)) {
+        const z = zoneOverRuns(/** @type {any} */ (good), loadPhoneModel()), gb = (/** @type {number} */ b) => (b / 1e9).toFixed(3);
+        console.log(`${arm.name}: phone over ${z.runs} runs [EM11]: playing ${gb(z.playing.central)} GB (upper ${gb(z.playing.upper)}), loading ${gb(z.loading.central)} GB (upper ${gb(z.loading.upper)})`);
+      }
     }
   }
   const good = webkit.filter((r) => r.settled && !r.refused);
@@ -687,9 +784,10 @@ async function main(argv) {
     peakGpu: stats(good.map((r) => Math.max(...r.checkpoints.map((c) => c.peak.gpu)))),
     refused: webkit.length - good.length,
     instrument,
+    boot: bootOf(webkit),
   };
   if (summary && runs > 1) for (const [name, s] of Object.entries(summary)) if (typeof s === 'object') console.log(`${name.padEnd(18)} median ${mb(s.median)} MB  min ${mb(s.min)}  max ${mb(s.max)}  spread ${s.spreadPct}%  (n ${s.n}) [K]`);
-  if (summary && runs > 1 && !args.url2 && good.every((r) => r.checkpoints.length > 0)) {
+  if (summary && runs > 1 && arms.length === 1 && good.every((r) => r.checkpoints.length > 0)) {
     // EM11c: the zone's EM11 figure over its runs, the median run's central and the 90% bound on one more cold boot
     const z = zoneOverRuns(/** @type {any} */ (good), loadPhoneModel()), gb = (/** @type {number} */ b) => (b / 1e9).toFixed(2);
     console.log(`phone over ${z.runs} runs [EM11, iPhone 17 Pro]: playing ${gb(z.playing.central)} GB (upper ${gb(z.playing.upper)}), loading ${gb(z.loading.central)} GB (upper ${gb(z.loading.upper)}); upper = 90% prediction bound on one more cold boot`);
@@ -705,10 +803,11 @@ async function main(argv) {
   const ledger = microscope?.ready ? ledgerPeak(microscope.checkpoints) : null;
   if (ledger) for (const line of ledgerPeakLines(args.chunk, ledger)) console.log(line);
   if (args.summary) appendFileSync(args.summary, summaryMarkdown(args.chunk, webkit, summary, ledger));
+  if (runs > 0) console.log(`boot ${bootOf(webkit)}${world === null ? '' : ` (world on loopback for ${args.dist})`}`);
   if (runs > 0) console.log(`instrument ${instrument}: ${instrument === 'minimal' ? 'Web Inspector Network and Console domains off, no routes' : 'Playwright default session (Network domain keeps response bodies)'}`);
   if (args.out) {
     const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, `${JSON.stringify({ protocol: PROTOCOL, instrument: runs > 0 ? instrument : null, url: args.url, chunk: args.chunk, date: new Date().toISOString(), webkit, summary, microscope }, null, 1)}\n`);
+    writeFileSync(out, `${JSON.stringify({ protocol: PROTOCOL, instrument: runs > 0 ? instrument : null, boot: runs > 0 ? bootOf(webkit) : null, url: args.url, chunk: args.chunk, date: new Date().toISOString(), webkit, summary, microscope }, null, 1)}\n`);
   }
   if (args['observe-timeout'] && microscope?.failure?.startsWith('page.waitForFunction: Timeout')
       && microscope.checkpoints.length > 0) return 0;

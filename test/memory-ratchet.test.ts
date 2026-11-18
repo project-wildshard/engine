@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { blockingRun } from '../scripts/main-watch.mjs';
-import { compareFootprint, compareLedger, confirmFootprint, footprintOverLine, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, ledgerBudget, guardZones, guardFootprint } from '../scripts/memory/ratchet.mjs';
+import { compareFootprint, compareLedger, confirmFootprint, footprintOverLine, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, footprintBoot, ledgerBudget, guardZones, guardFootprint } from '../scripts/memory/ratchet.mjs';
 
 const MB = 1e6;
 const points = (held: number): Parameters<typeof ledgerBudget>[0] => [
@@ -95,6 +95,14 @@ test('a footprint baseline and its runs share one inspector mode (EM11b)', () =>
   expect(footprintInstrument([{}], null)).toBe('full');
   expect(() => footprintInstrument([{ instrument: 'minimal' }], {})).toThrow(/instrument full, these runs with minimal/u);
   expect(() => footprintInstrument([{ instrument: 'minimal' }, {}], null)).toThrow('mix inspector modes');
+});
+
+test('a footprint baseline and its runs share one boot (STR1)', () => {
+  expect(footprintBoot([{ boot: 'online' }, { boot: 'online' }], { boot: 'online' })).toBe('online');
+  expect(footprintBoot([{}], null)).toBe('standalone');
+  expect(() => footprintBoot([{ boot: 'online' }], {})).toThrow(/standalone boot, these runs on the online boot/u);
+  expect(() => footprintBoot([{ boot: 'online' }, {}], null)).toThrow('mix boots');
+  expect(() => footprintBoot([{ boot: 'online+standalone' }], null)).toThrow('mix boots');
 });
 
 // J424 (Jake 2026-11-18): a memory gate blocks only where an agent armed it, after getting that zone under its line.

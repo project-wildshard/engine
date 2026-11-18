@@ -42,6 +42,9 @@ export function fitPhoneModel({ anchor, last, zones, chromium, limitMB, limitHig
   // EM11b: every run read with one inspector mode (a run before measure.mjs named it is `full`)
   const modes = [...new Set([...anchor, ...zones.flat()].map((r) => r.instrument ?? 'full'))];
   if (modes.length !== 1) throw new Error(`the runs mix inspector modes (${modes.join(', ')}): refit on one`);
+  // STR1: and on one boot (a run before STR1 is `standalone`)
+  const boots = [...new Set([...anchor, ...zones.flat()].map((r) => r.boot ?? 'standalone'))];
+  if (boots.length !== 1) throw new Error(`the runs mix boots (${boots.join(', ')}): refit on one`);
   const bounds = anchor.filter((r) => (r.traceCheckpoints ?? []).length > 0).map((r) => anchorBounds(r.traceCheckpoints, last, { limitMB, limitHighMB, gpuFloorMB }));
   if (bounds.length === 0) throw new Error('the anchor has no run with boot trace windows');
   const pick = (/** @type {(b: ReturnType<typeof anchorBounds>) => number} */ f) => Math.round(median(bounds.map(f)) * 1000) / 1000;
@@ -65,7 +68,7 @@ export function fitPhoneModel({ anchor, last, zones, chromium, limitMB, limitHig
   const ratios = rows.map((r) => r.peakPhone.central / r.settledPhone.central);
   const withR = rows.filter((r) => r.rendererLoadingPeak !== null);
   const round = (/** @type {number} */ x, d = 3) => Math.round(x * 10 ** d) / 10 ** d;
-  return { ...model, instrument: modes[0],
+  return { ...model, instrument: modes[0], boot: boots[0],
     ledger: { webcontent: { floorMB: round(wc.floorMB, 1), perMB: round(wc.perMB) }, gpu: { floorMB: round(gp.floorMB, 1), perMB: round(gp.perMB) }, missPct: round(Math.max(...misses) * 100, 1) },
     peakOverSettled: { low: round(Math.min(...ratios)), central: round(median(ratios)), high: round(Math.max(...ratios)) },
     chromium: withR.length === 0 ? null : chromiumBar(withR, limitMB / Math.min(...anchorRendererMB), round),
