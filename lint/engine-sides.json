@@ -667,6 +667,8 @@
     "src/client/game/grid/dataCellKit.ts": "client",
     "src/client/game/grid/dataCellRaces.ts": "client",
     "src/client/game/grid/dataCellQuests.ts": "client",
+    "src/client/game/grid/dataCellFacts.ts": "client",
+    "src/client/game/shardfile/wireFacts.ts": "client",
     "src/client/game/grid/stayContext.ts": "client",
     "src/client/game/shardfile/declaredQuests.ts": "client",
     "src/client/game/grid/dataCellRides.ts": "client",

@@ -83,6 +83,8 @@ import { enterDataCellRaces, hasRaces } from './dataCellRaces';
 import { cellRidePrompts, enterDataCellRides } from './dataCellRides';
 import { enterDataCellQuests } from './dataCellQuests';
 import { hasQuests } from '../shardfile/declaredQuests';
+import { enterDataCellFacts } from './dataCellFacts';
+import { hasLedger } from '../shardfile/wireFacts';
 import { yieldGridAdmission, yieldGridConstruction } from './admissionYield';
 import { RuntimePageSession, type RuntimePageResident } from '../shardfile/runtimePage';
 
@@ -261,7 +263,9 @@ export class LiveGridSession {
     /** SS-MS1b: the copy's source when it declares races, their clock installed on entry */
     readonly races: Shardfile | null;
     /** SS-GP1: the copy's source when it declares quests, their state and views installed on entry */
-    readonly quests: Shardfile | null }>();
+    readonly quests: Shardfile | null;
+    /** SS-GP2: the copy's source when it maps facts to rewards, its granted facts recorded on entry */
+    readonly facts: Shardfile | null }>();
   /** AU20: the entered data cell's own audio scene (an Open Plot's score, bed and loops), live while the feet are in it. */
   private plotAudio: { readonly instance: string; readonly scope: Scope } | null = null;
   /** TC-E1b: the entered data cell's held kit, disposed when the feet leave it */
@@ -272,7 +276,7 @@ export class LiveGridSession {
   private dataRaces: { readonly instance: string; readonly scope: Scope } | null = null;
   /** SS-MS2a3b: the entered data cell's steer ride, live while the feet are in it */
   private dataRides: { readonly instance: string; readonly scope: Scope } | null = null;
-  /** SS-GP1 on: the entered data cell's other play installs by kind (`quests`), each live while the feet are in it */
+  /** SS-GP1 on: the entered data cell's other play installs by kind (`quests`, `facts`), each live while the feet are in it */
   private readonly dataStays = new Map<string, { readonly instance: string; readonly scope: Scope }>();
   private readonly plotBanks = new Map<string, ReturnType<PlotAudioPorts['bank']>>();
   private readonly runtimeScope: Scope;
@@ -767,7 +771,7 @@ export class LiveGridSession {
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);
         this.regions.set(cell.instance, { spawn: { x: start.at.x, y: undefined, z: start.at.z, yaw: start.yaw },
           // the admitted terrain inside the cell (one source of truth); its strips are road level (the terrain tile ends at the cell edge)
-          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: [...copyPrompts(copySource, copySpent(copySource)), ...cellRidePrompts(movers)], kit: holdsItems(copySource) ? { source: copySource, assets } : null, talks: hasTalks(copySource) ? copySource : null, races: hasRaces(copySource) ? copySource : null, quests: hasQuests(copySource) ? copySource : null,
+          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: [...copyPrompts(copySource, copySpent(copySource)), ...cellRidePrompts(movers)], kit: holdsItems(copySource) ? { source: copySource, assets } : null, talks: hasTalks(copySource) ? copySource : null, races: hasRaces(copySource) ? copySource : null, quests: hasQuests(copySource) ? copySource : null, facts: hasLedger(copySource) ? copySource : null,
           // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
           audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(shardFolderFromAdmission(retained.admitted, shell.scope))) : null });
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });
@@ -980,12 +984,13 @@ export class LiveGridSession {
     };
     void enter();
   }
-  /** SS-GP1 on: the feet entered a data cell; its quests install until they leave. */
+  /** SS-GP1 on: the feet entered a data cell; its quests and ledger facts install until they leave. */
   private enterDataPlay(instance: string): void {
     const region = this.regions.get(instance), page = this.page.runtimePage?.() ?? null;
     if (region === undefined || page === null) return;
-    const { quests } = region;
+    const { quests, facts } = region;
     if (quests !== null) this.enterDataStay('quests', instance, (stay, here) => enterDataCellQuests(quests, page, stay, instance, here));
+    if (facts !== null) this.enterDataStay('facts', instance, (stay, here) => { enterDataCellFacts(facts, { saves: this.page.saves, catalogue: this.page.catalogue, progress: () => page.play.progress }, stay, instance, here); });
   }
   /** One play install of the entered cell, by kind: its stay scope ends when the feet leave. `here` says whether the wire is this cell's. */
   private enterDataStay(kind: string, instance: string, install: (stay: Scope, here: () => boolean) => Promise<void> | void): void {

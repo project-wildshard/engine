@@ -36,6 +36,7 @@ import { macrotask } from '@wildshard/engine/boot/plan';
 import { loadingUnits } from '@wildshard/engine/boot/waits';
 import { Mesh, Object3D, Vector3 } from 'three';
 import { installDeclaredQuests } from './declaredQuests';
+import { placementLedger, recordWireFacts } from './wireFacts';
 import { Flags } from '@wildshard/engine/world/interact/flags';
 import type { Actor, CombatTarget } from '@wildshard/engine/combat/pipeline';
 import { fovForAspect } from '@wildshard/engine/combat/blocks/melee';
@@ -44,7 +45,7 @@ import type { ItemFamily } from '@wildshard/engine/combat/itemFamilies';
 import type { EquipmentIcon } from '@wildshard/engine/combat/Equipment';
 import { installDeclaredAudio, type DeclaredAudioPorts } from '@wildshard/engine/audio/declared';
 import { TIER } from '@wildshard/engine/core/tier';
-import type { ShardContext } from "../plugin/context";
+import { pageGridInstance, type ShardContext } from "../plugin/context";
 import type { ShardPlayHost } from '../../../shared/game/shard/runtime';
 import { installDeclaredPlumbing } from '../shard/declaredPlumbing';
 import { declaredFolderCompendium, declaredDay, declaredWeather } from '../../../shared/game/shard/declaredRows';
@@ -54,7 +55,7 @@ import { installDeclaredTalks } from './declaredTalks';
 import { mountDeclaredUi } from '../shard/declaredUi';
 import type { ClientScriptViewTarget } from "../plugin/ui";
 import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
-import { Ledger, type LedgerCatalogueItem } from '../../../shared/game/ledger';
+import type { LedgerCatalogueItem } from '../../../shared/game/ledger';
 import { EmptyEquipment } from './emptyEquipment';
 import { BossRowBar } from '../boss/barFeed';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
@@ -538,17 +539,14 @@ export class ShardfileClient {
       // a retained (grid) context's journal lives in its entered scope (installRetainedCompendium)
       if (journal !== null && !retainsRuntimeServices(ctx)) ctx.scope.onDispose(() => { journal.journal.scope.dispose(); });
     }
-    const ledger = new Ledger(ctx.app.saves, [{ id: identity.instance, shard: identity.shard }], [{ shard: identity.shard, revision: identity.revision, rules: source.ledger }], this.bindings.catalogue);
-    // The server's ledger decides, and a page keeps its word where Progress reads: a feat counts and tells once, off its receipt.
+    const ledger = placementLedger(ctx.app.saves, source, identity, this.bindings.catalogue);
     // SHARD-SOURCE SS-MS1a3: a declared race's clock, off this player's race lines
     const races = source.quests.races ?? [];
     if (races.length > 0) installRaceClock(races, { system: ctx.system, line: name => wirePage.line(name), tick: () => wirePage.tick(), view: new RaceClockChip(ctx.scope) });
-    wirePage.facts(ctx.scope, (name, id) => {
-      const rule = source.ledger.find(row => row.fact === name);
-      if (rule === undefined) return;
-      ledger.record({ ...identity, origin: rule.origin, tick: 0, ordinal: 0, name, entity: id });
-      play.progress.refreshLedger();
-    });
+    // SS-GP2: one function with a grid data cell's (`grid/dataCellFacts.ts`). On a grid page a fact filed while the feet stand
+    // in another cell is that cell's (its copy records it), never this placement's.
+    recordWireFacts(source, identity, ledger, ctx.scope, { here: () => { const entered = pageGridInstance(); return entered === null || entered === identity.instance; },
+      refresh: () => { play.progress.refreshLedger(); } });
     // A field a player may see, on this page: the server's row where it sends one. Only public shared fields have rows, so a player's own stands
     // at its authored default: no such row, and none invented here (RETIRE-FEED A6).
     // SR11 (C9): an item's field is an owned line once a wire is up; a line at zero is dropped from `owned`, so absent is zero.
