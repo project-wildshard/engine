@@ -185,6 +185,9 @@ export class GameMenu {
     };
     app.input.bind('pause', () => { toggle('settings'); }, this.scope);
     app.input.bind('map', () => { toggle('map'); }, this.scope);
+    app.input.bind('tab', () => {
+      if (app.input.consume('tab')) this.close();
+    }, this.scope, () => this.layer?.top === true && groupOf(this._tab) === 'play');
     for (const [action, tab] of Object.entries(opts.keys ?? {}) as [Action, MenuTab | undefined][]) if (tab !== undefined) app.input.bind(action, () => { toggle(tab); }, this.scope);
     this.scope.listen(window, 'resize', () => { if (this._open && this._tab === 'map') opts.fullMap.fit(); });
     this.select('settings');

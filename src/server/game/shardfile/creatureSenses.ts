@@ -16,7 +16,7 @@ export function installCreatureSensesContract(host: SimHost, rows: ShardRows, sp
   const bindings = spawns.flatMap(spawn => {
     const input = species.get(spawn.species);
     return input === undefined ? [] : [{ actor: spawn.id, species: spawn.species, senses: parse(CreatureSensesSchema, input) }];
-  }).sort((a, b) => a.actor.localeCompare(b.actor));
+  }).sort((a, b) => a.actor < b.actor ? -1 : a.actor > b.actor ? 1 : 0);
   if (bindings.length === 0) return;
   const id = 'creatures.senses', contract = JSON.stringify({ version: 1, bindings });
   if (host.adapters.has(id)) throw new Error('Creature senses already installed');

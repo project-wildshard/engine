@@ -138,6 +138,31 @@ test("near native decisions retain exact original actor, contact and RNG continu
   }
 });
 
+test("a distant legacy brain keeps its cadence in a shard with a layered creature", async () => {
+  const source = groundFixture();
+  const layered = groundFixture(true).rows.species[0];
+  const spawn = source.creatures.spawns[0];
+  if (layered === undefined || spawn === undefined) throw new Error("Missing mixed cadence fixture");
+  source.spawn.z = 220;
+  const baseline = createShardfileSim(source, new Map(), { rapier: await rapier });
+  source.rows.species.push({ ...layered, id: "fixture.layered", kind: "fixture.layered" });
+  source.creatures.spawns.push({ ...spawn, id: "fixture.layered", species: "fixture.layered", brain: null });
+  const mixed = createShardfileSim(source, new Map(), { rapier: await rapier });
+  const think = vi.spyOn(SkirmisherBrain.prototype, "think");
+  try {
+    for (let tick = 0; tick < 12; tick++) baseline.host.step();
+    expect(think).toHaveBeenCalledTimes(4);
+    think.mockClear();
+    for (let tick = 0; tick < 12; tick++) mixed.host.step();
+    expect(think).toHaveBeenCalledTimes(4);
+    expect(mixed.host.entities.get(spawn.id)?.snapshot()).toEqual(baseline.host.entities.get(spawn.id)?.snapshot());
+  } finally {
+    think.mockRestore();
+    mixed.dispose();
+    baseline.dispose();
+  }
+});
+
 test("the actual pursuit path decision uses the far clock while keeping its fixed cooldown owner", async () => {
   const source = groundFixture(),
     declaration = nativeRows.find((row) => row.kind === "pursue");

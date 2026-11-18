@@ -63,6 +63,21 @@ test('closing never reopens the menu or changes the resumed app state',()=>{
   expect(menu.isOpen).toBe(false);expect(app.state).toBe('play');
 });
 
+test('Tab closes the Bag and consumes the press before returning to the world',()=>{
+  const {menu}=fixture();
+  app.setState('play');
+  menu.openBag();
+  app.input.press('tab');
+  expect(menu.isOpen).toBe(false);
+  expect(app.input.consume('tab')).toBe(false);
+  expect(app.state).toBe('play');
+  menu.open('settings');
+  app.input.press('tab');
+  expect(menu.isOpen).toBe(true);
+  menu.close();
+  app.input.consume('tab');
+});
+
 test('retiring removes the synchronously mounted settings pane',()=>{
   const {owner,menu}=fixture();menu.open('settings');
   const pane=menu.root.querySelector('.ws-gmenu-sv');expect(pane?.isConnected).toBe(true);
