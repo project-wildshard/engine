@@ -14,7 +14,7 @@ import { DecisionHost, simDecisionRow, type DecisionWorld, type DecisionContext,
 import { ActorMoveRunner } from '@wildshard/engine/ai/moves';
 import { canReach } from '@wildshard/engine/ai/reach';
 import type { PhaseEncounter } from '@wildshard/engine/ai/phases';
-import type { SimHost, SimValue, SimStateAdapter } from '@wildshard/engine/sim';
+import type { SimHost, SimStrike, SimValue, SimStateAdapter } from '@wildshard/engine/sim';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { StrikeRunner, StrikeSpec, StrikePhase } from '@wildshard/engine/ai/strikes';
 import type { Navmesh } from '@wildshard/engine/physics/navmesh';
@@ -25,15 +25,31 @@ import type { ShardScriptPorts } from './scripts';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { Actor } from '@wildshard/engine/combat/pipeline';
 import { installStatusEffects } from './statusEffects';
+import { ABSENT_Y } from './declaredSpawnWhen';
 import type { EncounterAdds } from './encounterAdds';
 import { SCRIPT_LIMITS } from '@wildshard/format/scriptLimits';
 
 interface Motion { move: number; target: number; runner: ActorMoveRunner; binding: number }
 interface Strike { strike: number; target: number; binding: number; hit: boolean }
+/** AC6: a scripted strike its species also lists as an ability keeps that ability's knockback and projectile, as the same
+ * strike does under a brain (`brainRuntime` `prepareAbilities`). */
+function abilityStrikes(strikes: ReadonlyMap<string, SimStrike>, abilities: Shardfile['rows']['species'][number]['abilities']): SimStrike[] {
+  const rows: SimStrike[] = [];
+  for (const spec of strikes.values()) {
+    const ability = abilities?.find(row => row.use === spec.id);
+    if (ability === undefined) { rows.push(spec); continue; }
+    const row: SimStrike = structuredClone(spec);
+    if (ability.effect === 'knockback' && ability.strength !== undefined) row.knockbackDistance = ability.strength;
+    if (ability.projectile !== undefined) row.projectile = ability.projectile;
+    rows.push(row);
+  }
+  return rows;
+}
 /** Actual game-owned authorities lent to a decision binding. The default SimHost implements this directly.
  * A retained-body adapter lends the existing bodies, strike runners and fixed-step registrations; it must not
  * spawn or step another body, or advance another clock. This is an internal game port, never a shard callback API.
  */
+
 export interface DecisionRuntime extends Pick<SimHost, 'scope' | 'events' | 'physics' | 'groundHeightAt'
   | 'registerStrikeCatalogue' | 'startDeclaredStrike'> {
   readonly flags: Pick<SimHost['flags'], 'has' | 'set' | 'onChange'>;
@@ -101,6 +117,8 @@ const continuation = v.strictObject({ contract: v.string(), decision: v.custom<D
   actorChannels: v.optional(v.array(v.tuple([natural, v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(3)), v.pipe(v.number(), v.minValue(0), v.maxValue(1))])), []),
   // CC59: a brain hook's pending `ability` (actor handle, strike handle); absent in a save without one.
   abilities: v.optional(v.array(v.tuple([natural, natural])), []),
+  // AC6: the forms a `despawn` holds out of the world (actor handles); absent in a save that never despawned one.
+  absent: v.optional(v.array(natural), []),
 });
 function requireValue<T>(value: T | undefined, reason: string): T { if (value === undefined) throw new Error(`Decision world: ${reason}`); return value; }
 function inverse(registry: ReadonlyMap<string, number> | undefined): ReadonlyMap<number, string> { return new Map([...registry ?? []].map(([name, id]) => [id, name])); }
@@ -132,6 +150,8 @@ export class ShardDecisions {
   private readonly channels = new Map<number, number>();
   /** CC32: each creature's `Do.lockable` answer, by actor handle. */
   private readonly locks = new Map<number, boolean>();
+  /** AC6: the actors a `despawn` holds out of the world. */
+  private readonly absent = new Set<number>();
   /** CC28: each creature's `actorChannel` values, by actor handle then channel index. */
   private readonly actorChannels = new Map<number, Map<number, number>>();
   private readonly playerFlags = new Set<number>();
@@ -201,9 +221,9 @@ export class ShardDecisions {
         const body = requireValue(sim.entities.get(name), 'absent actor');
         if (bodies.has(body)) throw new Error('Decision body has two controllers');
         bodies.add(body);
-        owners.add(name); this.fieldActors.add(handle); sim.registerStrikeCatalogue(name, [...this.strikes.values()]);
+        owners.add(name); this.fieldActors.add(handle); sim.registerStrikeCatalogue(name, abilityStrikes(this.strikes, source.rows.species.find(value => value.id === spawn?.species)?.abilities));
       }
-      if (row.commands.some(name => ['despawn', 'impulse', 'weather'].includes(name)) || (row.commands.includes('spawn') && sim.adds === undefined)) throw new Error('Decision mechanic has no admitted platform row owner');
+      if (row.commands.some(name => ['impulse', 'weather'].includes(name)) || (row.commands.includes('spawn') && sim.adds === undefined)) throw new Error('Decision mechanic has no admitted platform row owner');
       if ((Object.keys(row.bodies ?? {}).length > 0 || Object.keys(row.colliders ?? {}).length > 0) && bodyOps === undefined) throw new Error('Decision body requires its body authority');
       if (row.commands.some(name => name === 'grant' || name === 'reward') && facts === undefined) throw new Error('Decision grant requires the authoritative ledger fact port');
       const binding = row.binding;
@@ -433,6 +453,12 @@ export class ShardDecisions {
       } else if (op === SCRIPT_V1_COMMANDS.ability) {
         const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'ability actor'), strike = this.name('strikes', a);
         apply.push(() => { actor.nextAbility = strike; });
+      } else if (op === SCRIPT_V1_COMMANDS.despawn) {
+        // AC6 (Q-CC48): `despawn` [own actor, the owned actor that takes its place or 0]; the arrival keeps the hp %
+        const form = requireValue(this.sim.entities.get(this.owned(target, context)), 'despawn actor');
+        const next = a === 0 ? undefined : requireValue(this.sim.entities.get(this.owned(a, context)), 'despawn form');
+        if (next === form) throw new Error('Decision despawn names its own form');
+        apply.push(() => { this.despawn(target, form, a, next); });
       } else if (op === SCRIPT_V1_COMMANDS.heal) {
         const actor = requireValue(this.sim.entities.get(this.owned(target, context)), 'heal actor');
         apply.push(() => { if (actor.alive) actor.hp = Math.min(actor.maxHp, actor.hp + a); });
@@ -456,6 +482,20 @@ export class ShardDecisions {
       } else throw new Error('Decision command has no admitted mechanic');
     }
     return { commit: () => { for (const commit of apply) commit(); } };
+  }
+  /** AC6: `body` leaves the world (no death, credit or loot, as an absent spawn); `next`, when named, stands where it
+   *  stood, facing its way, at the same share of its own max hp. A body already out, or dead, swaps nothing. */
+  private despawn(handle: number, body: AnimalSim, nextHandle: number, next: AnimalSim | undefined): void {
+    if (this.absent.has(handle) || !body.alive) return;
+    if (next !== undefined) {
+      const share = body.hp / body.maxHp;
+      next.place(body.position.x, body.position.z, body.yaw, body.position.y); next.alive = false; next.revive();
+      next.hp = Math.max(1, Math.round(share * next.maxHp)); Object.assign(next, { hidden: false }); next.motor?.resetAt?.(next.position);
+      this.absent.delete(nextHandle);
+    }
+    this.stop(handle, true);
+    Object.assign(body, { hidden: true }); body.alive = false; body.place(body.position.x, body.position.z, body.yaw, ABSENT_Y); body.motor?.resetAt?.(body.position);
+    this.absent.add(handle);
   }
   private stop(actor: number, reset = false): void {
     this.motions.delete(actor);
@@ -614,7 +654,7 @@ export class ShardDecisions {
     moves: [...this.motions].map(([actor, motion]) => ({ actor, move: motion.move, target: motion.target, binding: motion.binding, state: motion.runner.snapshot() })),
     strikes: this.savedStrikes(), ...(this.locks.size === 0 ? {} : { locks: [...this.locks] }),
     ...(this.actorChannels.size === 0 ? {} : { actorChannels: [...this.actorChannels].flatMap(([actor, values]) => [...values].map(([index, value]) => [actor, index, value])) }),
-    ...this.pendingAbilities() }); }
+    ...this.pendingAbilities(), ...(this.absent.size === 0 ? {} : { absent: [...this.absent].sort((x, y) => x - y) }) }); }
   private pendingAbilities(): { abilities?: [number, number][] } {
     const rows: [number, number][] = [];
     for (const handle of this.fieldActors) {
@@ -670,6 +710,7 @@ export class ShardDecisions {
       const runner = new ActorMoveRunner(row, actor); runner.restore(motion.state); motions.set(motion.actor, { ...motion, runner }); }
     if (new Set(saved.strikes.map(row => row.actor)).size !== saved.strikes.length) throw new Error('Duplicate decision strike');
     for (const [actor, strike] of saved.abilities) { if (!this.fieldActors.has(actor)) throw new Error('Invalid decision ability'); this.name('strikes', strike); }
+    if (new Set(saved.absent).size !== saved.absent.length || saved.absent.some(actor => !this.fieldActors.has(actor))) throw new Error('Invalid decision absent form');
     if (new Set(saved.locks.map(([actor]) => actor)).size !== saved.locks.length || saved.locks.some(([actor]) => !this.fieldActors.has(actor))) throw new Error('Invalid decision lock');
     if (new Set(saved.actorChannels.map(([actor, index]) => `${actor}:${index}`)).size !== saved.actorChannels.length || saved.actorChannels.some(([actor]) => !this.fieldActors.has(actor))) throw new Error('Invalid decision actor channel');
     for (const strike of saved.strikes) {
@@ -697,5 +738,7 @@ export class ShardDecisions {
     }
     for (const handle of this.fieldActors) { const body = this.actor(handle); if (body !== undefined) body.nextAbility = null; }
     for (const [actor, strike] of saved.abilities) { const body = this.actor(actor); if (body !== undefined) body.nextAbility = this.name('strikes', strike); }
+    for (const handle of this.absent) { const body = this.actor(handle); if (body !== undefined) Object.assign(body, { hidden: false }); }
+    this.absent.clear(); for (const handle of saved.absent) { this.absent.add(handle); const body = this.actor(handle); if (body !== undefined) Object.assign(body, { hidden: true }); }
   }
 }
