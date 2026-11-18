@@ -9,3 +9,10 @@ and Chromium allocator dumps attribution only. Milestone 1 builds that meter.
   started last. The kernel's responsible pid (`responsibility_get_pid_responsible_for_pid`) ties each one to the Playwright
   app this Node process launched. The sampler resets the interval high-water after every read, so a 20 ms sample carries
   the true peak since the previous one. The watchdog, sim phases and load-mem-probe now read through it.
+- EM3/EM4, the harness (`scripts/memory/measure.mjs`) and its protocol. Kernel samples are split into the loading card's
+  steps by wall-clock time after the run, so a long task cannot hide a sample. One GC and one read left Template's settled
+  WebContent 4% apart over five cold runs (one run 20 MB low); two GCs 1 s apart and the median of five reads 200 ms apart
+  brought it to 2.8% (545 MB, 540-555), Nine to 2.3% (1,079 MB). Nine's WebKit GPU process sits at 1.70 GB settled (one run
+  2.54 GB). The microscope joins memory-infra dumps by order: the returned guid is one higher than the event's id.
+  The ladder on one build: blank 46 MB, engine fixed (Template over blank) 852 MB [K] of which the ledger names 61; the
+  title alone is 98 MB over blank; Nine's zone over Template 1,853 MB, most of it in the GPU process.

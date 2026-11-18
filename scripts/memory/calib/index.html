@@ -1,0 +1,94 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>memory calibration</title>
+<body style="font:14px monospace;background:#111;color:#ddd;margin:16px">
+<canvas id="c" width="64" height="64"></canvas><pre id="log"></pre>
+<script>
+// Known-allocation calibration page (ENGINE-MEMORY EM1; from meta docs/plans/engine-memory/calib-prototype.html).
+// It allocates a stated number of decimal MB of one kind, writes to every page of it (an untouched buffer is not
+// footprint) and holds it, so a meter outside the page can be checked against a known size.
+//
+//   ?kind=<kind>&mb=<n>        allocate n MB of one kind, keep it alive, set window.__calib (done: true when held)
+//   &report=1                  also POST window.__calib as JSON to /__calib/report on this origin when done
+//   ?kind=<kind>&stair=1&stepmb=64&every=1500&max=6000
+//                              staircase: add stepmb every `every` ms until the page dies; the last step survives in
+//                              localStorage (and a beacon to ?beacon=<url>) so a reload reads the kill line
+//
+// kinds and their true size (window.__calib.got is the bytes really held, in the kind's unit):
+//   none         nothing (a WebGL context only for the GL kinds below)
+//   arraybuffer  Uint8Array backing stores, 16 MB each, filled with noise
+//   jsheap       plain objects {x, y, z}: the unit is objects x 48 bytes, an assumption. The real cost per object
+//                depends on the JS engine (the 2026-11-17 probe read about 60 bytes in V8 and 91 in JavaScriptCore),
+//                which is what the calibration slope reports: true bytes per object = 48 x slope
+//   wasm         one WebAssembly.Memory, every 4 KB page written
+//   worker       Uint8Array backing stores held inside a dedicated worker
+//   texrgba      2048x2048 RGBA8 textures, 16.8 MB each, uploaded and drawn once
+//   texcomp      2048x2048 compressed textures (ASTC 4x4, else ETC2, else DXT5), 4.2 MB each
+//   glbuffer     WebGL ARRAY_BUFFERs, 16 MB each
+//   msaa         2048x2048 RGBA8 4x multisample renderbuffers, 67.1 MB each, cleared once
+//   canvas2d     2048x2048 2D canvases in the document, 16.8 MB each
+//   imagebitmap  2048x2048 ImageBitmaps from noise ImageData, 16.8 MB each
+//   audio        stereo 48 kHz AudioBuffers of 40 s, 15.4 MB each
+const q = new URLSearchParams(location.search), kind = q.get('kind') || 'none';
+const MB = 1e6, CH = 16 * 1024 * 1024, keep = [], log = document.getElementById('log');
+const say = (s) => { log.textContent += s + '\n'; };
+const canvas = document.getElementById('c');
+const gl = /tex|glbuffer|msaa/.test(kind) ? canvas.getContext('webgl2', { antialias: false, powerPreference: 'high-performance' }) : null;
+function noise(n) { const a = new Uint8Array(n); for (let o = 0; o < n; o += 65536) crypto.getRandomValues(a.subarray(o, Math.min(n, o + 65536))); return a; }
+let prog = null, vbo = null;
+function glInit() {
+  if (prog) return; const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
+  prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 p;out vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0,1);}'));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, '#version 300 es\nprecision mediump float;uniform sampler2D t;in vec2 uv;out vec4 o;void main(){o=texture(t,uv);}'));
+  gl.linkProgram(prog); vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+}
+function drawWith(tex) { glInit(); gl.useProgram(prog); gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.bindTexture(gl.TEXTURE_2D, tex); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+let compFormat = null, compName = '';
+function pickComp() {
+  const astc = gl.getExtension('WEBGL_compressed_texture_astc'), etc = gl.getExtension('WEBGL_compressed_texture_etc'), s3 = gl.getExtension('WEBGL_compressed_texture_s3tc');
+  if (astc) { compFormat = astc.COMPRESSED_RGBA_ASTC_4x4_KHR; compName = 'astc4x4'; } else if (etc) { compFormat = etc.COMPRESSED_RGBA8_ETC2_EAC; compName = 'etc2'; }
+  else if (s3) { compFormat = s3.COMPRESSED_RGBA_S3TC_DXT5_EXT; compName = 'dxt5'; } else throw new Error('no compressed format');
+}
+let worker = null;
+// each allocator adds about `b` bytes of its kind and returns the bytes it really holds
+const alloc = {
+  none: async () => 0,
+  arraybuffer: async (b) => { let got = 0; while (got < b) { const n = Math.min(CH, b - got); keep.push(noise(n)); got += n; } return got; },
+  jsheap: async (b) => { const n = Math.floor(b / 48), a = new Array(n); for (let i = 0; i < n; i++) a[i] = { x: i, y: i + 0.5, z: 'k' + (i & 1023) }; keep.push(a); state.objects += n; return n * 48; },
+  wasm: async (b) => { if (b === 0) return 0; const pages = Math.ceil(b / 65536), m = new WebAssembly.Memory({ initial: pages }); const u = new Uint8Array(m.buffer); for (let o = 0; o < u.length; o += 4096) u[o] = o & 255 | 1; keep.push(m); return pages * 65536; },
+  worker: async (b) => { worker ??= new Worker(URL.createObjectURL(new Blob(['const k=[];onmessage=(e)=>{let got=0;while(got<e.data){const n=Math.min(16777216,e.data-got),a=new Uint8Array(n);for(let o=0;o<n;o+=65536)crypto.getRandomValues(a.subarray(o,Math.min(n,o+65536)));k.push(a);got+=n;}postMessage(got);}'])));
+    return new Promise((r) => { worker.onmessage = (e) => r(e.data); worker.postMessage(b); }); },
+  texrgba: async (b) => { const side = 2048, per = side * side * 4; let got = 0; while (got < b) { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, side, side, 0, gl.RGBA, gl.UNSIGNED_BYTE, noise(per)); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); drawWith(t); keep.push(t); got += per; } gl.finish(); return got; },
+  texcomp: async (b) => { if (!compFormat) pickComp(); const side = 2048, per = (side / 4) * (side / 4) * 16; let got = 0; while (got < b) { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.compressedTexImage2D(gl.TEXTURE_2D, 0, compFormat, side, side, 0, noise(per)); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); drawWith(t); keep.push(t); got += per; } gl.finish(); return got; },
+  glbuffer: async (b) => { let got = 0; glInit(); while (got < b) { const n = Math.min(CH, b - got), buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, noise(n), gl.STATIC_DRAW);
+      gl.useProgram(prog); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); gl.drawArrays(gl.POINTS, 0, 1); keep.push(buf); got += n; } gl.finish(); return got; },
+  msaa: async (b) => { const side = 2048, per = side * side * 4 * 4; let got = 0; while (got < b) { const rb = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, rb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, 4, gl.RGBA8, side, side);
+      const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, rb); gl.clearColor(Math.random(), 0.5, 0.5, 1); gl.clear(gl.COLOR_BUFFER_BIT); gl.bindFramebuffer(gl.FRAMEBUFFER, null); keep.push(rb, fb); got += per; } gl.finish(); return got; },
+  canvas2d: async (b) => { const side = 2048, per = side * side * 4; let got = 0; while (got < b) { const c = document.createElement('canvas'); c.width = c.height = side; c.style.cssText = 'width:8px;height:8px'; const x = c.getContext('2d'); x.fillStyle = '#' + (Math.random() * 0xffffff | 0).toString(16).padStart(6, '0'); x.fillRect(0, 0, side, side); x.putImageData(new ImageData(new Uint8ClampedArray(noise(256 * 256 * 4).buffer), 256, 256), 0, 0); document.body.appendChild(c); keep.push(c); got += per; } return got; },
+  imagebitmap: async (b) => { const side = 2048, per = side * side * 4; let got = 0; while (got < b) { keep.push(await createImageBitmap(new ImageData(new Uint8ClampedArray(noise(per).buffer), side, side))); got += per; } return got; },
+  audio: async (b) => { const ctx = keep.ctx ??= new (window.AudioContext || window.webkitAudioContext)(); let got = 0; while (got < b) { const frames = 48000 * 40, buf = ctx.createBuffer(2, frames, 48000); for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < frames; i += 7) d[i] = Math.random(); } keep.push(buf); got += frames * 2 * 4; } return got; },
+};
+const UNIT = { jsheap: 'objects x 48 B (assumed)' };
+const state = { kind, unit: UNIT[kind] ?? 'bytes', asked: 0, got: 0, objects: 0, done: false, error: null, comp: '', ua: navigator.userAgent, dpr: devicePixelRatio, last: null };
+try { state.last = localStorage.getItem('calib:' + kind); } catch {}
+window.__calib = state;
+function record() { try { localStorage.setItem('calib:' + kind, String(state.got)); } catch {} const b = q.get('beacon'); if (b) navigator.sendBeacon(b, JSON.stringify({ kind, got: state.got, t: Date.now() })); }
+(async () => {
+  try {
+    if (!(kind in alloc)) throw new Error('unknown kind ' + kind);
+    if (state.last) say('previous run of ' + kind + ' reached ' + (state.last / MB).toFixed(0) + ' MB before the page went away');
+    if (q.get('stair')) {
+      const step = Number(q.get('stepmb') || 64) * MB, every = Number(q.get('every') || 1500), max = Number(q.get('max') || 6000) * MB;
+      while (state.got < max) { state.asked += step; state.got += await alloc[kind](step); state.comp = compName; record(); say(kind + ' ' + (state.got / MB).toFixed(0) + ' MB'); await new Promise((r) => setTimeout(r, every)); }
+    } else { const b = Number(q.get('mb') || 0) * MB; state.asked = b; state.got = await alloc[kind](b); state.comp = compName; say(kind + ' holds ' + (state.got / MB).toFixed(1) + ' MB ' + compName); }
+  } catch (e) { state.error = String(e); say('ERROR ' + e); }
+  state.done = true;
+  if (q.get('report')) fetch('/__calib/report', { method: 'POST', body: JSON.stringify({ ...state, href: location.href }), keepalive: true }).catch(() => {});
+  // keep GL resources referenced by drawing a frame now and then
+  if (gl) setInterval(() => { for (const k of keep) if (k instanceof WebGLTexture) { drawWith(k); break; } }, 1000);
+})();
+</script></body>

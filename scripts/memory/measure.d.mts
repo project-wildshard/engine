@@ -1,0 +1,37 @@
+import type {Sample,BrowserProcess} from './footprint.mjs';
+export const PROTOCOL: 'memory-run/1';
+export const PHONE_VIEW: {viewport:{width:number;height:number};screen:{width:number;height:number};deviceScaleFactor:number;isMobile:boolean;hasTouch:boolean};
+export const STEP_LOG: string;
+export type Ledger = Record<string,Record<string,number>>;
+export type StepRow = [number,string,Ledger|null];
+export interface Pair {webcontent:number;gpu:number}
+export interface Checkpoint {step:string;from:number;to:number;samples:number;peak:Pair;last:Pair;ledger:Ledger|null}
+export function stepCheckpoints(samples:readonly Sample[],steps:readonly StepRow[],procs:readonly BrowserProcess[]):Checkpoint[];
+export function refusal(checkpoints:readonly Checkpoint[]):string|null;
+export function ledgerByKind(snapshot:{allocations?:readonly {domain:string;kind:string;bytes:number}[]}|null|undefined):Ledger|null;
+export function stats(values:readonly number[]):{n:number;median:number;min:number;max:number;spreadPct:number};
+export interface DumpProcess {pid:number;role:string;footprint:number;alloc:Record<string,number>}
+export function dumpsInOrder(events:readonly unknown[]):{id:string;processes:DumpProcess[]}[];
+export function bootURL(url:string,chunk:string):string;
+export interface WebkitRun {
+  host:'webkit';chunk:string;url:string;build:string|null;ready:boolean;failure:string|null;errors:string[];readyMs:number;loadAverage:number;
+  processes:(BrowserProcess&{lifetimeMaxBytes:number|null})[];checkpoints:Checkpoint[];settled:(Pair&{reads:Pair[]})|null;
+  ledger:{totals:Record<string,number>;unattributed:Record<string,number>;byKind:Ledger|null}|null;refused:string|null;samples:number;
+}
+export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number}):Promise<WebkitRun>;
+export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;checkpoints:{step:string;processes:DumpProcess[]}[]}
+export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number}):Promise<MicroscopeRun>;
+export function webkitLines(run:WebkitRun):string[];
+export function microscopeLines(run:MicroscopeRun):string[];
+export function settledReading(page:unknown,procs:readonly BrowserProcess[],options?:{settleMs?:number;gcs?:number;reads?:number}):Promise<Pair&{reads:Pair[]}>;
+export function serveCalibrationPage():Promise<{url:string;close:()=>void}>;
+export function webkitRung(options:{rung:'blank'|'webgl'|'title';calibUrl:string;gameUrl:string;settleMs?:number;gcs?:number;reads?:number;timeoutMs?:number}):Promise<{rung:string;settled:Pair&{reads:Pair[]};ledger:Ledger|null}>;
+export function ledgerTotal(ledger:Ledger|null|undefined):number;
+export function quietMachine(limits:{maxLoad:number;maxLanes:number;waitMs:number}):Promise<{load:number;otherLanes:number}>;
+type Stats = ReturnType<typeof stats>;
+export interface LadderParts {
+  parts:{browserFloor:{k:number;l:number};webglContext:{k:number;l:number};title:{k:number;l:number};engineFixed:{k:number;l:number}};
+  byZone:Record<string,{zone:{k:number;l:number};transient:{k:number};whole:{k:number;l:number};sumK:number;closesWithin2Pct:boolean}>;
+}
+export function ladderParts(rounds:readonly Record<string,{k:number;l:number;peak?:number}>[],zones:readonly string[]):LadderParts;
+export function ladderLines(result:LadderParts&{rungs:Record<string,{k:Stats;wc:Stats;gpu:Stats;l:Stats;peak?:Stats}>;runs:number}):string[];
