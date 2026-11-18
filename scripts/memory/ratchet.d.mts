@@ -1,6 +1,6 @@
-import type { BudgetLedger } from '../../src/shared/engine/core/memoryBudget.ts';
+import type { BudgetLedger, MemorySubsystem } from '../../src/shared/engine/core/memoryBudget.ts';
 
-export interface LedgerBudget { control: Record<string, number>; peak: Record<string, number> }
+export interface LedgerBudget { control: Record<MemorySubsystem, number>; peak: Record<MemorySubsystem, number> }
 export interface FootprintBudget { settled: number; spread: number }
 
 export function ledgerBudget(checkpoints: readonly { step: string; ledger: BudgetLedger | null }[]): LedgerBudget;
