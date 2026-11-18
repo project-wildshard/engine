@@ -321,6 +321,15 @@ export function gotoSocket(socket: string, cell: string | undefined): string {
   return url.href;
 }
 
+/** FM4b modes 5 to 8: how long the game's own site gets to answer. */
+const SITE_ANSWER_MS = 5000;
+/** FM4b modes 5 to 8: does this page's own origin answer a fresh read now? Any HTTP status is an answer; no reply in time is none. */
+async function siteAnswers(scope: Scope): Promise<boolean> {
+  const asking = scope.child('online.site'), abort = new AbortController();
+  asking.timeout(SITE_ANSWER_MS, () => { abort.abort(); });
+  try { await fetch(new URL('/version.json', location.origin), { cache: 'no-store', signal: abort.signal }); return true; } catch { return false; } finally { asking.dispose(); }
+}
+
 /** This page's read of each release's word: under way, or done (`done` when). */
 const asking = new Map<string, { word: Promise<unknown>; done: number | null }>();
 /** How long a page answers from a read that heard nothing before it dials again. */
@@ -431,7 +440,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   let dialing = socket;
   // MP2.4: the page asked for the Name before it got here (namePrompt.ts, once per device); Skip keeps the device's own (Guest)
   const named = identity();
-  let shellNow: OnlineShell | null = null, waitingForSeat = false;
+  let shellNow: OnlineShell | null = null, waitingForSeat = false, recheck = (): void => undefined;
   scope.interval(SEAT_WAIT_BEAT_MS, () => { if (waitingForSeat) seatWaitBeat(); });
   // FM4: the banner, the Reconnected notice, the cards and the hold cards (meta MMO-FAILURE-MODES-PLAN)
   const screens = linkScreens(scope, {
@@ -443,6 +452,8 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',
     // FM4b modes 21 and 22: the Slow and Unstable chips read the link's own measurements
     stats: () => shellNow?.client.stats,
+    // FM4b modes 5 to 8: whether the game's own site answers (any HTTP reply is an answer), and the signed release file read again
+    reach: () => siteAnswers(scope), recheck: () => { recheck(); },
   });
   // FM8s: the server's own save facts (late, failing) and the hold on Leave the world while a save isn't confirmed
   const saves = saveScreens(scope);
@@ -483,13 +494,22 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   // the fresh read behind a kept copy: another build reloads into it, as a fresh read before the dial would (two reloads share one
   // durable claim, chunkRecovery.ts); another address takes the next dial: now if the link is down and waiting, else after the dial
   // under way, or the player's Retry once the link has given up
-  void fresh?.then(read => {
+  const takeRead = (read: Awaited<ReturnType<typeof fetchSignedRelease>> | null): unknown => {
     if (read === null || scope.disposed) return undefined;
     // SB44: a world that already seated this page keeps it; the newer build waits for the next visit (no reload out of play)
     if (read.engineBuild !== link.build) return freshAfterDial(read, link.build, seated) === 'reload' ? stale() : undefined;
     if (read.socket !== undefined && read.socket !== dialing) { dialing = read.socket; shell.dialNow(); }
     return undefined;
-  });
+  };
+  void fresh?.then(takeRead);
+  // FM4b modes 5 to 8: a page that can't reach the world reads its signed release file again (one read at a time): a new address
+  // takes the next dial, another build reloads as a fresh read would. A read that fails changes nothing.
+  let rechecking = false;
+  recheck = () => {
+    if (rechecking || scope.disposed) return;
+    rechecking = true;
+    void fetchSignedRelease(at, key).then(takeRead, () => undefined).finally(() => { rechecking = false; });
+  };
   // a tap the world must hear waits for the link: the hold card says so, and the tap is never sent late
   shell.client.gateActions(what => screens.allow(what));
   void settled(shell.booted, leaving);

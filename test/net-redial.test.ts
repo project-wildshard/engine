@@ -28,7 +28,7 @@ function harness(random = 0.5, online: () => boolean = () => true, mayDial?: () 
   return { client, redial, links, states, causes, dialTimes, now: () => clock, heard: () => { for (const fn of frames) fn(frame); }, failDials: reason => { failing = reason; },
     // the page suspended: the clock moves on and no timer runs (an iPhone in the background, a laptop asleep)
     away: ms => { clock += ms; },
-    run: ms => { for (let left = ms; left > 0; left -= 50) { clock += 50; vi.advanceTimersByTime(50); if (failing !== null) links.at(-1)?.fail(failing); } } };
+    run: ms => { for (let left = ms; left > 0; left -= 50) { clock += 50; vi.advanceTimersByTime(50); if (failing !== null && failing !== '') links.at(-1)?.fail(failing); } } };
 }
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
@@ -183,7 +183,7 @@ test('the reason rides onState for reconnecting and resuming', () => {
 
 test('progress counts dials, the wait to the next, and the time down', () => {
   const { heard, run, links, redial, failDials } = harness();
-  expect(redial.progress).toEqual({ dials: 0, nextDialMs: null, downMs: 0 });
+  expect(redial.progress, 'before any frame, the page has never heard the world').toEqual({ dials: 0, nextDialMs: null, downMs: 0, neverHeard: true });
   heard(); failDials('lost'); links[0]?.fail('lost');
   run(100);
   const early = redial.progress;
@@ -399,5 +399,26 @@ test('SB31: after a freeze, a link that does not come back still shows the strip
   failDials('lost'); links[0]?.fail('stalled');
   run(1100);
   expect(states).toEqual(['reconnecting']);
+  redial.dispose();
+});
+
+test('FM4b modes 5 to 8: a page that never heard the world says so in its progress; one frame ends that for good', () => {
+  const { heard, run, links, redial, failDials } = harness();
+  // the first socket never reached the world (refused upgrade, no DNS answer, a bad certificate): a 1006 close
+  failDials('lost'); links[0]?.fail('lost');
+  run(10_500);
+  expect(redial.told).toBe('reconnecting');
+  expect(redial.progress.neverHeard).toBe(true);
+  expect(redial.progress.downMs).toBeGreaterThanOrEqual(10_000);
+  expect(redial.attempts).toBeGreaterThan(2);
+  // a dial that reaches it: heard once, never `neverHeard` again, even down later
+  failDials(''); const dialled = links.length;
+  for (let waited = 0; links.length === dialled && waited < 6000; waited += 50) run(50);
+  expect(links.length).toBeGreaterThan(dialled);
+  heard(); run(100);
+  expect(redial.progress.neverHeard).toBeUndefined();
+  links.at(-1)?.fail('lost'); run(500);
+  expect(redial.told).toBe('reconnecting');
+  expect(redial.progress.neverHeard).toBeUndefined();
   redial.dispose();
 });

@@ -34,6 +34,10 @@ const SLOW_RTT_MS = 250, UNSTABLE_SPAN_MS = 250;
 const UNSTABLE_LOSS_PCT = 5;
 /** A quality chip shows after this many bad seconds in a row, clears after this many good ones, and shows at most once a minute. */
 const QUALITY_SUSTAIN_S = 5, QUALITY_CLEAR_S = 10, QUALITY_GAP_S = 60;
+/** FM4b modes 5 to 8: a link that never reached the world, down this long while the device is online, is Can't reach the world. */
+const UNREACHABLE_MS = 10_000;
+/** While Can't reach the world shows, the signed release file is read again this often, for a world that moved. */
+const RECHECK_MS = 30_000;
 /** After Keep waiting, a blocked tap pulses the banner instead of opening the card again, for this long. */
 const QUIET_MS = 10_000;
 
@@ -112,6 +116,10 @@ export interface LinkScreenHooks {
   readonly leaveLine?: () => void;
   /** FM4b modes 21 and 22: the link's measured pong RTT and the server's reported frame skips (`NetClient.stats`) */
   readonly stats?: () => TransportStats | undefined;
+  /** FM4b modes 5 to 8: does the game's own site answer now (a same-origin read)? Measured, never a DNS or TLS diagnosis. Absent: unasked. */
+  readonly reach?: () => Promise<boolean>;
+  /** FM4b modes 5 to 8: ask the signed release file for the world's address again (the world may have moved). Absent: no re-read. */
+  readonly recheck?: () => void;
   /** S13: where a failed link's stop card reports (the browser error tracker; a test observes its own) */
   readonly report?: typeof captureBrowserError;
 }
@@ -186,9 +194,16 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   parent.append(banner, deploy);
 
   let state: LinkState = 'live', reason: string | undefined, wasDown = false, quietUntil = 0, deployLeft = 0, deployTicking = false;
-  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline' | 'away'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
+  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline' | 'away' | 'reach'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
   const held: { text: string; send: (text: string) => void; drop: () => void }[] = [];
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
+  /** FM4b modes 5 to 8: down, online, and no dial on this page ever reached the world, for 10 s. A restart or an old server's cut
+   *  (`updating`) is the world's own word, and a link that was ever live stays FM4's banner (15, 19, then 20's card). */
+  const unreachable = (): boolean => {
+    if (!down()) return false;
+    const why = hooks.why(), progress = hooks.progress();
+    return progress.neverHeard === true && (why === 'closed' || why === 'silent') && progress.downMs >= UNREACHABLE_MS;
+  };
 
   // focus goes back where it was before the first card opened (the chat box, the canvas) when the last one closes
   let returnTo: HTMLElement | null = null;
@@ -199,7 +214,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const freePointer = (): void => { if ('exitPointerLock' in document && document.pointerLockElement instanceof Element) document.exitPointerLock(); };
   const paintBanner = (): void => {
     // offline (FM4b mode 2) or back from away (modes 4 and 45), the card is the screen: no banner under it
-    const shown = down() && hooks.why() !== 'offline' && hooks.progress().away === undefined;
+    const shown = down() && hooks.why() !== 'offline' && hooks.progress().away === undefined && !unreachable();
     banner.hidden = !shown;
     // a link that is down takes the top band from the deploy countdown; the countdown comes back with the link
     deploy.hidden = down() || deployLeft <= 0;
@@ -226,7 +241,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   /** The hold card: the banner opened up, on a tap it can't carry. It repaints each second from the dial's progress. */
   const hold = (what: string, chat: boolean): void => {
     // the offline card already says why nothing goes out; a held chat line still waits for the link
-    if (open?.kind === 'stop' || open?.kind === 'offline' || open?.kind === 'away') return;
+    if (open?.kind === 'stop' || open?.kind === 'offline' || open?.kind === 'away' || open?.kind === 'reach') return;
     remember(); disposeOpen('replaced');
     const own = scope.child('online.hold'), said = bannerFor(state, hooks.why(), hooks.progress().dials);
     const title = chat ? 'Your message will send when you\'re back' : state === 'resuming' ? 'Still reconnecting' : hooks.why() === 'restart' ? 'The world is restarting' : 'Not connected yet';
@@ -326,6 +341,57 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   };
 
   /**
+   * FM4b modes 5 (`unreachable`), 6 (`dns`), 7 (`tls`) and 8 (`upgrade-refused`): the page's link never reached the world and its dials
+   * have failed for 10 s while the device says it is online. A browser gives one 1006 close for a refused upgrade, no DNS answer, a bad
+   * certificate and a reset, so the card names none of them: it says what the page measured (its dials, the next one, whether the game's
+   * own site answers) and offers the date-and-time check as help, not a diagnosis. It closes by itself when the world answers.
+   */
+  const reachCard = (): void => {
+    if (open?.kind === 'reach') { open.paint(); return; }
+    remember(); disposeOpen('replaced');
+    const own = scope.child('online.reach'), { root, box } = card(own, 'unreachable', 'warn', 'No answer', 'Can\'t reach the world');
+    box.append(make('p', 'ws-link-body', 'The world server hasn\'t answered since the game opened. We\'re dialling again by ourselves.'));
+    const status = make('ul', 'ws-link-facts'), tries = make('li'), next = make('li'), site = make('li');
+    status.setAttribute('role', 'status'); status.append(tries, next, site);
+    let siteSaid = 'site unchecked', asking = 0;
+    const detail = make('p');
+    const paintDetail = (): void => { const { dials } = hooks.progress(); detail.textContent = `online · ${String(dials)} dials, none reached the world · ${siteSaid}`; };
+    const askSite = (): void => {
+      if (hooks.reach === undefined) { site.remove(); return; }
+      const ask = ++asking;
+      site.textContent = 'Checking the game\'s site…';
+      void hooks.reach().then(answers => {
+        if (ask !== asking || own.disposed) return undefined;
+        site.textContent = answers ? 'The game\'s site answers' : 'The game\'s site doesn\'t answer either';
+        siteSaid = answers ? 'site answers' : 'site silent';
+        paintDetail();
+        return undefined;
+      }, () => undefined);
+    };
+    const paint = (): void => {
+      const { dials, nextDialMs } = hooks.progress();
+      tries.replaceChildren(ring(), dials > 0 ? `Try ${String(dials + 1)}` : 'Dialling');
+      next.textContent = nextDialMs !== null ? `Next dial in ${String(Math.ceil(nextDialMs / 1000))} s` : 'Dialling now';
+      paintDetail();
+    };
+    paint(); askSite(); own.interval(1000, paint);
+    // the address may be what's wrong (the world moved, a bad name): the signed release file is read again now and every 30 s
+    hooks.recheck?.(); own.interval(RECHECK_MS, () => { hooks.recheck?.(); });
+    const title = hooks.title === undefined ? [] : [{ label: 'Title screen', busy: 'Leaving…', act: () => { hooks.title?.(); } }];
+    box.append(status, make('p', 'ws-link-auto', 'This closes by itself when the world answers. If it keeps up, check this device\'s connection, and that its date and time are set automatically.'),
+      buttons(own, [{ label: 'Try now', primary: true, act: () => { hooks.dialNow(); hooks.recheck?.(); askSite(); paint(); } }, ...doctor('unreachable'), ...title]));
+    const details = make('details'); details.append(make('summary', '', 'Details'), detail); box.append(details);
+    parent.append(root); freePointer();
+    open = { scope: own, root, kind: 'reach', paint };
+    root.querySelector('button')?.focus();
+  };
+  /** The 10 s mark comes by itself, with no state change: checked each second. */
+  scope.interval(1000, () => {
+    if (unreachable()) { if (open?.kind !== 'reach' && open?.kind !== 'stop') { reachCard(); paintBanner(); } }
+    else if (open?.kind === 'reach') { close(state === 'live' ? 'recovered' : 'replaced'); paintBanner(); }
+  });
+
+  /**
    * FM4b modes 21 (`slow`) and 22 (`lossy`): a notice chip in the top band while the link is live and measurably slow or unstable.
    * Only what the page measured: the pong RTT, the spread of the last five, the server's `lossPct`. Never a guessed cause or a made-up
    * percentage. A chip waits while a banner is up (it is the bottom layer) and comes back, if still due, with the link.
@@ -373,6 +439,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       const away = hooks.progress().away;
       if (away !== undefined) { awayCard(away); return; }
       if (open?.kind === 'away') close('recovered');
+      if (unreachable()) { reachCard(); return; }
+      if (open?.kind === 'reach') close('replaced');
       // a hold card follows its banner: a new cause (silent to restart) or 35 s down redraws it, else it just ticks
       if (open?.kind === 'hold' && open.key !== `${state}:${hooks.why()}` && open.what !== undefined) hold(open.what, open.chat === true); else open?.paint();
       return;

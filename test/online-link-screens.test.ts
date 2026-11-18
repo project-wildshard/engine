@@ -433,3 +433,94 @@ test('FM8m mode 41: a banned end shows the removed card from the server\'s fact:
     }
   } finally { vi.useRealTimers(); }
 });
+
+/** FM4b modes 5 to 8: a page whose link never reached the world, on fake timers, with the game's own site answering or not. */
+type ReachSet = Partial<Omit<LinkProgress, 'neverHeard'>> & { why?: LinkCause; neverHeard?: boolean };
+function reachHarness(siteAnswers: boolean): { scope: Scope; screens: ReturnType<typeof linkScreens>; calls: string[]; set: (next: ReachSet) => void; run: (seconds: number) => Promise<void> } {
+  const scope = new Scope('test.reach'), calls: string[] = [];
+  let progress: LinkProgress = { dials: 3, nextDialMs: 1800, downMs: 4000, neverHeard: true }, why: LinkCause = 'closed';
+  const screens = linkScreens(scope, { retry: () => { calls.push('retry'); }, dialNow: () => { calls.push('dialNow'); }, reload: () => { calls.push('reload'); }, title: () => { calls.push('title'); },
+    doctor: from => { calls.push(`doctor:${from}`); }, progress: () => progress, why: () => why,
+    reach: () => { calls.push('reach'); return Promise.resolve(siteAnswers); }, recheck: () => { calls.push('recheck'); } });
+  return { scope, screens, calls, set: ({ why: cause, neverHeard, ...next }) => {
+    const { neverHeard: _was, ...rest } = { ...progress, ...next };
+    progress = neverHeard === false || (neverHeard === undefined && progress.neverHeard === undefined) ? rest : { ...rest, neverHeard: true };
+    if (cause !== undefined) why = cause;
+  },
+    run: async seconds => { await vi.advanceTimersByTimeAsync(seconds * 1000); } };
+}
+const reachCard = (): HTMLElement | null => document.querySelector<HTMLElement>('.ws-link-scrim[data-failmode="unreachable"]');
+
+test('FM4b modes 5 to 8: a link that never reached the world shows Can\'t reach the world after 10 s down, with what the page measured', async () => {
+  vi.useFakeTimers();
+  try {
+    const { scope, screens, calls, set, run } = reachHarness(true);
+    screens.link('reconnecting', 'closed');
+    await run(1);
+    expect(reachCard(), 'under 10 s down it is the banner').toBeNull();
+    expect(shown('drop')).not.toBeNull();
+    set({ downMs: 10_000 }); await run(1);
+    const card = reachCard();
+    expect(card?.textContent).toContain('Can\'t reach the world');
+    expect(card?.textContent).toContain('hasn\'t answered');
+    expect(card?.textContent).toContain('Try 4');
+    expect(card?.textContent).toContain('Next dial in 2 s');
+    // measured, never guessed: the game's own site answered, so this device reaches the internet; no DNS, TLS or status is claimed
+    expect(card?.textContent).toContain('The game\'s site answers');
+    expect(card?.textContent).not.toMatch(/DNS|certificate|TLS|50\d|refused/u);
+    expect(card?.textContent).toContain('date and time');
+    expect(shown('drop'), 'the card is the screen: no banner under it').toBeNull();
+    // a tap the world must hear waits under the card: no hold card on top of it
+    expect(screens.allow('Talk')).toBe(false);
+    expect(shown('drop-blocked')).toBeNull();
+    calls.length = 0;
+    click(card, 'Try now');
+    expect(calls, 'Try now dials at once and asks the signed release file for the address again').toEqual(['dialNow', 'recheck', 'reach']);
+    click(card, 'Check connection');
+    expect(calls).toContain('doctor:unreachable');
+    expect(card?.querySelector('details')?.textContent).toContain('3 dials');
+    // it closes by itself with the world
+    set({ neverHeard: false, downMs: 0, dials: 0 }); screens.link('live'); await run(1);
+    expect(reachCard()).toBeNull();
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('FM4b mode 5: the game\'s own site silent too is said as measured; Title screen leaves', async () => {
+  vi.useFakeTimers();
+  try {
+    const { scope, screens, calls, set, run } = reachHarness(false);
+    set({ downMs: 12_000 }); screens.link('reconnecting', 'closed'); await run(1);
+    expect(reachCard()?.textContent).toContain('The game\'s site doesn\'t answer either');
+    click(reachCard(), 'Title screen');
+    expect(calls).toContain('title');
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('FM4b mode 5 negative controls: a link that was live, a restart, an old server and offline never show Can\'t reach the world', async () => {
+  vi.useFakeTimers();
+  try {
+    const { scope, screens, set, run } = reachHarness(true);
+    // heard before: a drop past 10 s stays FM4's banner (modes 15 and 19), up to Still reconnecting
+    set({ neverHeard: false, downMs: 20_000 }); screens.link('reconnecting', 'closed'); await run(2);
+    expect(reachCard()).toBeNull();
+    expect(shown('drop')).not.toBeNull();
+    for (const why of ['restart', 'updating'] as const) {
+      set({ neverHeard: true, why }); screens.link('reconnecting', why); await run(2);
+      expect(reachCard(), why).toBeNull();
+    }
+    set({ why: 'offline' }); screens.link('reconnecting', 'offline'); await run(2);
+    expect(reachCard()).toBeNull();
+    expect(shown('offline-play')).not.toBeNull();
+    // the network back and still nothing from the world: now it is the world that doesn't answer
+    set({ why: 'closed' }); screens.link('reconnecting', 'closed'); await run(1);
+    expect(shown('offline-play')).toBeNull();
+    expect(reachCard()).not.toBeNull();
+    // gave up at 2 minutes: the lost card replaces it
+    screens.link('lost'); await run(1);
+    expect(reachCard()).toBeNull();
+    expect(shown('lost')).not.toBeNull();
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
+});

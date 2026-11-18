@@ -16,7 +16,9 @@ export interface LinkProgress { readonly dials: number; readonly nextDialMs: num
   /** FM8m: the server's coded fact on a final close (FM7b1's close reason, e.g. `banned` with an optional end time); absent is no fact */
   readonly ended?: SocketCloseInfo;
   /** FM7b2/FM4 mode 25: a full world's place in line and estimated wait, as the door last said them (never counted down); absent: no facts */
-  readonly queue?: LinkQueue }
+  readonly queue?: LinkQueue;
+  /** FM4b modes 5 to 8: this page has never heard a frame from the world (no dial ever reached it); absent once one has */
+  readonly neverHeard?: true }
 /** The door's waiting line (FM7b2, `queue` close facts): its position, and an estimate only when the door measured one. */
 export interface LinkQueue { readonly position?: number; readonly etaMs?: number }
 /** FM4b modes 4 and 45: the page was away for `ms` and came back to a quiet or closed link. `hidden` is time out of view the page
@@ -124,8 +126,8 @@ export class Redial {
   /** The dial's progress now. */
   get progress(): LinkProgress {
     const now = this.now(), down = this.phase !== 'up';
-    const away = this.awayFor === null ? {} : { away: this.awayFor }, ended = this.endedWith === null ? {} : { ended: this.endedWith }, queue = this.queued === null ? {} : { queue: this.queued };
-    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0, ...away, ...ended, ...queue };
+    const away = this.awayFor === null ? {} : { away: this.awayFor }, never = this.heardAt === null ? { neverHeard: true as const } : {}, ended = this.endedWith === null ? {} : { ended: this.endedWith }, queue = this.queued === null ? {} : { queue: this.queued };
+    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0, ...away, ...ended, ...queue, ...never };
   }
   /** The page came back into view (an iPhone returning to Safari): a link that went quiet while hidden redials at once.
    *  `hiddenMs` is how long the page measured itself out of view (FM4b mode 4). */
