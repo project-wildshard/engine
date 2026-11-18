@@ -1,6 +1,6 @@
-import { BatchedMesh, BufferAttribute, BufferGeometry, DataTexture, Sphere, TextureSource, type Skeleton } from 'three';
+import { BatchedMesh, BufferAttribute, DataTexture, Sphere, TextureSource, type Skeleton } from 'three';
 import { onceTextureUploaded } from './textureUploadEvents';
-import { markFixedBatchGeometry, releasedArrayType } from './releasedArrays';
+import { markFixedBatchGeometry } from './releasedArrays';
 
 interface PaletteImage { data: Float32Array | Uint32Array; width: number; height: number }
 interface UploadState {
@@ -15,7 +15,6 @@ interface UploadState {
 }
 const sources = new WeakMap<TextureSource<unknown>, UploadState>();
 const textures = new WeakSet<DataTexture>(), skeletons = new WeakSet<Skeleton>();
-const batchDrawLayouts = new WeakMap<BufferAttribute, BufferGeometry>();
 
 function paletteImage(value: unknown): value is PaletteImage {
   if (value === null || typeof value !== 'object') return false;
@@ -89,29 +88,12 @@ export function trackPaletteTexture(texture: DataTexture): void {
 export function prepareBatchGeometryRetirement(batch: Pick<BatchedMesh, 'geometry' | 'getBoundingSphereAt'>, parts: Iterable<number>): void {
   const sphere = new Sphere();
   for (const part of parts) batch.getBoundingSphereAt(part, sphere);
-  batch.geometry.index?.clearUpdateRanges();
   // The first upload copies the entire arrays. The ranges from construction
   // would otherwise stay pending until a subsequent edit and upload.
   for (const attribute of Object.values(batch.geometry.attributes)) {
     if (attribute instanceof BufferAttribute) attribute.clearUpdateRanges();
   }
   markFixedBatchGeometry(batch.geometry);
-}
-
-// Three r186's native batch planner needs the index width for byte offsets.
-// Pass it a layout-only view; the renderer and CPU readers use the real geometry.
-function nativeDrawGeometry(geometry: BufferGeometry): BufferGeometry {
-  const index = geometry.index;
-  const type = index === null ? undefined : releasedArrayType(index);
-  if (index === null || (type !== 'Uint16Array' && type !== 'Uint32Array')) return geometry;
-  let view = batchDrawLayouts.get(index);
-  if (view === undefined) {
-    view = new BufferGeometry();
-    view.setIndex(new BufferAttribute(type === 'Uint32Array' ? new Uint32Array(0) : new Uint16Array(0), 1));
-    batchDrawLayouts.set(index, view);
-  }
-  view.attributes = geometry.attributes;
-  return view;
 }
 
 /** Native culling/sorting still writes every pass, including shadows. Inspect
@@ -124,7 +106,7 @@ export class ChangedBatchedMesh extends BatchedMesh {
     const indirect: unknown = Reflect.get(this, '_indirectTexture');
     if (!(indirect instanceof DataTexture)) throw new Error('Missing native batch indirect texture');
     trackPaletteTexture(indirect);
-    super.onBeforeRender(renderer, scene, camera, nativeDrawGeometry(geometry), material, group);
+    super.onBeforeRender(renderer, scene, camera, geometry, material, group);
   }
 
   /** PF13: a shadow map keeps each texel's nearest depth whatever the draw order, so a sorted batch (Pine's needles) culls

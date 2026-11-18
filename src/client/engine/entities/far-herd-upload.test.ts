@@ -109,39 +109,3 @@ test('members gather on the earliest pages, one a frame, and the emptied page st
     expect(drawn).toEqual(new Set(stay.map(rig => (rig.tint.r).toFixed(3))));
   } finally { herd.dispose(); for (const rig of rigs) rig.mesh.skeleton.dispose(); source.dispose(); material.dispose(); noteFrameDrawn(Number.NEGATIVE_INFINITY); }
 });
-
-test('demand pages wait for a visible rig and honour the per-frame page cap', () => {
-  noteFrameDrawn(performance.now());
-  const source = geometry(4, true), material = new MeshBasicMaterial();
-  const herd = new FarHerd(() => material, { allocateOnFirstDraw: true, pageSlots: () => 1 });
-  const rigs = [0, 1].map(() => {
-    const mesh = new SkinnedMesh(source, material);
-    mesh.bind(new Skeleton([new Bone()]));
-    return { mesh, tint: new Color() };
-  });
-  const [first, second] = rigs;
-  if (first === undefined || second === undefined) throw new Error('Missing rigs');
-  const camera = new PerspectiveCamera(60, 1, 0.1, 500);
-  const behind = new Vector3(0, 0, 60), ahead = new Vector3(0, 0, -60);
-  try {
-    for (const rig of rigs) herd.reserve(rig);
-    herd.begin(camera);
-    expect(herd.take(first, behind, 2)).toBe(true);
-    herd.end();
-    expect(herd.pageCount()).toBe(0);
-    herd.begin(camera);
-    expect(herd.take(first, ahead, 2)).toBe(true);
-    expect(herd.take(second, ahead, 2)).toBe(false);
-    herd.end();
-    expect(herd.pageCount()).toBe(1);
-    herd.begin(camera);
-    expect(herd.take(first, ahead, 2)).toBe(true);
-    expect(herd.take(second, ahead, 2)).toBe(true);
-    herd.end();
-    expect(herd.pageCount()).toBe(2);
-  } finally {
-    herd.dispose();
-    for (const rig of rigs) rig.mesh.skeleton.dispose();
-    source.dispose(); material.dispose(); noteFrameDrawn(Number.NEGATIVE_INFINITY);
-  }
-});

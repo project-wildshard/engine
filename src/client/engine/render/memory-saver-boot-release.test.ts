@@ -1,10 +1,11 @@
 import { afterAll, expect, test, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Sphere, Sprite, SpriteMaterial, Vector3, WebGLRenderer } from 'three';
+import { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Sphere, Sprite, SpriteMaterial, Vector3 } from 'three';
 import { textureUploadRenderer } from '../../../test/engine/textureUploadRenderer';
 import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from './changedTextureUploads';
 import { installMemorySaver, releaseDrawnGeometry } from './memorySaver';
 import { arrayReleased, retainGeometryForCpuReads } from './releasedArrays';
 import { installFrameCounter } from './frameCounter';
+import { noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 
 // Mini QA 2026-11-17 row 19: the boot draws the world a handful of times, never the 240 renders a geometry waits before its
 // CPU copy goes, so Nine's phone boot held 88-147 MB of attribute arrays beside their GPU copies through its peak.
@@ -119,7 +120,7 @@ test('phone keeps the sprite quad readable for the next renderer', () => {
   } finally { material.dispose(); }
 });
 
-test('fixed batches retire uploaded geometry at boot and keep native byte offsets', () => {
+test('a prepared fixed batch retires vertex arrays and keeps the multi-draw index', () => {
   vi.stubGlobal('WebGL2RenderingContext', FakeGL);
   vi.stubGlobal('WebGLBuffer', FakeBuffer);
   const gl = new FakeGL(), renderer = Object.assign(textureUploadRenderer(), { getContext: () => gl });
@@ -128,8 +129,8 @@ test('fixed batches retire uploaded geometry at boot and keep native byte offset
   const material = new MeshBasicMaterial(), scene = new Scene(), camera = new PerspectiveCamera();
   const triangle = new BufferGeometry().setIndex([0, 1, 2])
     .setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]), 3));
-  const draw = (fixed: boolean, wide = false): ChangedBatchedMesh => {
-    const batch = new ChangedBatchedMesh(1, wide ? 65536 : 6, 6, material);
+  const draw = (fixed: boolean): ChangedBatchedMesh => {
+    const batch = new ChangedBatchedMesh(1, 6, 6, material);
     const near = batch.addGeometry(triangle), far = batch.addGeometry(triangle);
     batch.addInstance(near);
     if (fixed) prepareBatchGeometryRetirement(batch, [near, far]);
@@ -140,28 +141,25 @@ test('fixed batches retire uploaded geometry at boot and keep native byte offset
     renderer.renderBufferDirect(camera, scene, batch.geometry, material, batch, { start: 0, count: 3, materialIndex: 0 });
     return batch;
   };
-  const changing = draw(false), narrow = draw(true), wide = draw(true, true);
-  expect(releaseDrawnGeometry(renderer)).toBeGreaterThan(0);
+  const changing = draw(false), fixed = draw(true);
+  expect(releaseDrawnGeometry(renderer)).toBe(0);
+  expect(arrayReleased(fixed.geometry.getAttribute('position'))).toBe(false);
+  try {
+    for (let frame = 0; frame < 240; frame++) renderer.render(scene, camera);
+    noteFrameDrawn();
+    renderer.renderBufferDirect(camera, scene, fixed.geometry, material, fixed, { start: 0, count: 3, materialIndex: 0 });
+  } finally {
+    noteFrameDrawn(Number.NEGATIVE_INFINITY);
+  }
   expect(arrayReleased(changing.geometry.getAttribute('position'))).toBe(false);
   expect(arrayReleased(changing.geometry.index ?? {})).toBe(false);
-  const native: unknown = Object.create(WebGLRenderer.prototype);
-  if (!(native instanceof WebGLRenderer)) throw new Error('Missing native renderer port');
-  for (const [batch, offset] of [[narrow, 6], [wide, 12]] as const) {
-    const index = batch.geometry.getIndex();
-    if (index === null) throw new Error('Fixed batch lost its index');
-    batch.setGeometryIdAt(0, 1);
-    batch.computeBoundingSphere();
-    expect(batch.getBoundingSphereAt(1, new Sphere())?.radius).toBeCloseTo(Math.sqrt(2));
-    expect(arrayReleased(batch.geometry.getAttribute('position'))).toBe(true);
-    expect(arrayReleased(index)).toBe(true);
-    batch.perObjectFrustumCulled = false;
-    batch.sortObjects = false;
-    batch.onBeforeRender(native, scene, camera, batch.geometry, material, new Group());
-    expect(Reflect.get(batch, '_multiDrawStarts')).toMatchObject({ 0: offset });
-    expect(arrayReleased(index)).toBe(true);
-    const ray = new Raycaster(new Vector3(0, 0, 1), new Vector3(0, 0, -1));
-    expect(ray.intersectObject(batch)[0]?.distance).toBe(1);
-    expect(Array.from(index.array)).toEqual([0, 1, 2, 3, 4, 5]);
-  }
-  changing.dispose(); narrow.dispose(); wide.dispose(); triangle.dispose(); material.dispose();
+  fixed.setGeometryIdAt(0, 1);
+  fixed.computeBoundingSphere();
+  expect(fixed.getBoundingSphereAt(1, new Sphere())?.radius).toBeCloseTo(Math.sqrt(2));
+  expect(arrayReleased(fixed.geometry.getAttribute('position'))).toBe(true);
+  expect(arrayReleased(fixed.geometry.index ?? {})).toBe(false);
+  const ray = new Raycaster(new Vector3(0, 0, 1), new Vector3(0, 0, -1));
+  expect(ray.intersectObject(fixed)[0]?.distance).toBe(1);
+  expect(Array.from(fixed.geometry.index?.array ?? [])).toEqual([0, 1, 2, 3, 4, 5]);
+  changing.dispose(); fixed.dispose(); triangle.dispose(); material.dispose();
 });
