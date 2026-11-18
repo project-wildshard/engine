@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "5f0b1de0ef089bfd97de2c0fd1ca31812f6ac64599e73a3874e55c89ffc1a887",
+  "catalogueHash": "33bf05282300c454c6d5804897512aadbaff65f48b8eb82cb00eebbe3fc6da35",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -790,8 +790,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 4,
-        "hash": "9c3773e19c4910d0cdab132ad878b8f6e32a0c74a20174b686693c70d64c9869"
+        "revision": 6,
+        "hash": "f42fe0449a9393c090d9c72ca3790dfed7befd88b92407e17ea49aa6076d204b"
       },
       {
         "slug": "driftwood-isle",
@@ -808,8 +808,8 @@
       {
         "slug": "glowfen",
         "name": "Glowfen",
-        "revision": 2,
-        "hash": "bd3580a0f8b7ddc532718bba7f0c819a4ab26eed39b2a62924f234e7c8e595cc"
+        "revision": 3,
+        "hash": "f55a0c8404ea7d609730cc0f931b5477464295a10ee9867581ff8f2c4abccfaa"
       },
       {
         "slug": "ink-cel-valley",
@@ -820,8 +820,8 @@
       {
         "slug": "mirror-salt",
         "name": "Mirror Salt",
-        "revision": 1,
-        "hash": "00b73750093d626e1a12dfa44749825363e3d988fe9430afbe53e43431f24eb9"
+        "revision": 2,
+        "hash": "991fb9f6705bf9ed0438b65f575ea9feeb6a6f27195b67f00203e72bd83a8bb8"
       },
       {
         "slug": "mossgate",
@@ -979,9 +979,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 4,
-      "hash": "9c3773e19c4910d0cdab132ad878b8f6e32a0c74a20174b686693c70d64c9869",
-      "bytes": 21882880
+      "revision": 6,
+      "hash": "f42fe0449a9393c090d9c72ca3790dfed7befd88b92407e17ea49aa6076d204b",
+      "bytes": 21884928
     },
     {
       "slug": "driftwood-isle",
@@ -997,9 +997,9 @@
     },
     {
       "slug": "glowfen",
-      "revision": 2,
-      "hash": "bd3580a0f8b7ddc532718bba7f0c819a4ab26eed39b2a62924f234e7c8e595cc",
-      "bytes": 19683840
+      "revision": 3,
+      "hash": "f55a0c8404ea7d609730cc0f931b5477464295a10ee9867581ff8f2c4abccfaa",
+      "bytes": 19695616
     },
     {
       "slug": "ink-cel-valley",
@@ -1009,9 +1009,9 @@
     },
     {
       "slug": "mirror-salt",
-      "revision": 1,
-      "hash": "00b73750093d626e1a12dfa44749825363e3d988fe9430afbe53e43431f24eb9",
-      "bytes": 16314368
+      "revision": 2,
+      "hash": "991fb9f6705bf9ed0438b65f575ea9feeb6a6f27195b67f00203e72bd83a8bb8",
+      "bytes": 16299520
     },
     {
       "slug": "mossgate",
