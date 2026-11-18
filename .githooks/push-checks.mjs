@@ -21,6 +21,7 @@ export function pushEnvironment(environment=process.env){
   if(environment.WS_LOCAL_LAND_SOURCE_REF!==undefined){
     env.npm_config_enable_global_virtual_store='false';
     env.npm_config_package_import_method='clone-or-copy';
+    if(environment.PLAYWRIGHT_BROWSERS_PATH!==undefined)env.PLAYWRIGHT_BROWSERS_PATH=environment.PLAYWRIGHT_BROWSERS_PATH;
   }
   // Git prepends its exec directory when it invokes a hook. Execute both gate
   // entries with that same effective search order; duplicate entries add no tool.

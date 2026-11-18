@@ -3,7 +3,7 @@
 // a canonical checkout where lane A has a type-broken tracked edit and a type-broken untracked file, and lane B
 // commits one file by pathspec. The "gate" here is `node --check` over every .mjs file in the gated tree.
 import {spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
 import {GATE_DIR, brokenLink, copyReason, makeGateCopy, pushedCommit, sweepDeadCopies} from '../../scripts/push-gate-copy.mjs';
@@ -99,13 +99,36 @@ describe('push gate copy (EV1)', () => {
   });
 
   test('FL12: the local land copy cannot load mutable packages from the publishing checkout', () => {
-    const root = canonical(), head = git(root, ['rev-parse', 'HEAD']);
+    const root = canonical();
     const directory = mkdtempSync(resolve('tmp/isolated-gate-'));
     roots.push(directory);
-    const copy = makeGateCopy(root, head, {directory, installIsolated: true, say: () => {}});
+    const env = {...ENV, npm_config_store_dir: join(directory, 'store')};
+    const pack = join(root, 'tmp/tool');
+    mkdirSync(pack, {recursive: true});
+    writeFileSync(join(pack, 'package.json'), JSON.stringify({name: 'fl12-test-tool', version: '1.0.0', bin: {'fl12-test-tool': 'cli.cjs'}}));
+    writeFileSync(join(pack, 'cli.cjs'), '#!/usr/bin/env node\nconsole.log(42);\n', {mode: 0o755});
+    writeFileSync(join(root, 'package.json'), JSON.stringify({name: 'fl12-fixture', private: true, packageManager: 'pnpm@10.34.9', dependencies: {'fl12-test-tool': 'file:fl12-test-tool-1.0.0.tgz'}}));
+    writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages:\n  - .\nenableGlobalVirtualStore: true\n');
+    /** @type {[string, string[]][]} */
+    const setup = [[pack, ['pack', '--pack-destination', root]], [root, ['install', '--offline']]];
+    for (const [cwd, args] of setup) {
+      const result=spawnSync('pnpm',args,{cwd,env,encoding:'utf8'});
+      expect(result.status,result.stderr+result.stdout).toBe(0);
+    }
+    git(root, ['add', 'package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml', 'fl12-test-tool-1.0.0.tgz']);
+    git(root, ['commit', '-m', 'local locked fixture']);
+    const head = git(root, ['rev-parse', 'HEAD']);
+    const shared = realpathSync(join(root, 'node_modules/fl12-test-tool'));
+    expect(shared.startsWith(join(directory,'store'))).toBe(true);
+    const copy = makeGateCopy(root, head, {directory, env, installIsolated: true, say: () => {}});
     try {
       expect(copy.path.startsWith(`${directory}/`)).toBe(true);
       expect(existsSync(join(copy.path, 'node_modules/dep'))).toBe(false);
+      const installed=realpathSync(join(copy.path,'node_modules/fl12-test-tool'));
+      expect(installed.startsWith(join(copy.path,'node_modules'))).toBe(true);
+      const bin=spawnSync(join(copy.path,'node_modules/.bin/fl12-test-tool'),[],{cwd:copy.path,env,encoding:'utf8'});
+      expect(bin.status,bin.stderr).toBe(0);
+      expect(bin.stdout.trim()).toBe('42');
       const run = spawnSync(process.execPath, ['-e', 'console.log(require.resolve.paths("dep").includes(process.argv[1]))',
         join(root, 'node_modules')], {cwd: copy.path, encoding: 'utf8'});
       expect(run.status).toBe(0);
@@ -115,7 +138,7 @@ describe('push gate copy (EV1)', () => {
       copy.remove();
     }
     expect(git(root, ['worktree', 'list', '--porcelain'])).not.toContain(copy.path);
-    expect(existsSync(join(root, 'node_modules/dep'))).toBe(true);
+    expect(realpathSync(join(root, 'node_modules/fl12-test-tool'))).toBe(shared);
   });
 
   test('a clean plan worktree gates in place; dirt, a pushed non-HEAD tree or the switch decide', () => {

@@ -14,3 +14,8 @@ main rebase, including after a restart.
 The original gate could resolve ancestor packages in a real Git push.
 The isolated gate must pass that boundary test and still refuse a
 privately modified executable.
+
+The offline regression installs and runs a real pinned package in the
+copy. Two independent full engine installs produced the same input hash
+and shared proof. Changing an isolated executable refused the proof. The
+copies took 7.4–10.1 seconds each, including 2.0–2.6 seconds for pnpm.

@@ -279,6 +279,9 @@ describe('land (J400): local gates and proof reuse', () => {
     for (const key of ['CI', 'GITHUB_ACTIONS', 'WS_FULL_SUITE', 'WS_HEAVY_ROOT', 'WS_HEAVY_TOKEN']) delete f.env[key];
     f.env['WS_HEAVY_SCHEDULER_ROOT'] = join(f.root, 'full-test');
     const wt = f.worktree(`live-j400-${mode}`);
+    const publishingBin = join(f.repo, 'node_modules/.bin');
+    f.env['PATH'] = `${publishingBin}:${f.env['PATH']}`;
+    f.env['NODE_PATH'] = join(f.repo, 'node_modules');
     const cssPath = 'src/client/engine/ui/styles/quest.css';
     const cssChecker = readFileSync(resolve('scripts/check-css.mjs'), 'utf8');
     const files = {
@@ -287,7 +290,7 @@ describe('land (J400): local gates and proof reuse', () => {
       'scripts/heavy-lane.py': `import os, sys\nos.execv(sys.executable, [sys.executable, ${JSON.stringify(resolve('scripts/heavy-lane.py'))}, *sys.argv[1:]])\n`,
       'scripts/land-local-gate.mjs': `import ${JSON.stringify(resolve('scripts/land-local-gate.mjs'))};\n`,
       'scripts/check-css.mjs': cssChecker,
-      '.githooks/push-checks.mjs': `import { createRequire } from 'node:module';\nimport { assertHeavyLease } from ${JSON.stringify(resolve('scripts/heavy-lane-lease.mjs'))};\nassertHeavyLease('full-test');\nif(requirePath().includes(${JSON.stringify(join(f.repo, 'node_modules'))}))throw new Error('gate can still resolve publishing checkout packages');\nfunction requirePath(){return createRequire(import.meta.url).resolve.paths('fixture-dep')??[];}\nconsole.error('fixture full checks ran inside lease');\n`,
+      '.githooks/push-checks.mjs': `import { createRequire } from 'node:module';\nimport { assertHeavyLease } from ${JSON.stringify(resolve('scripts/heavy-lane-lease.mjs'))};\nassertHeavyLease('full-test');\nif(requirePath().includes(${JSON.stringify(join(f.repo, 'node_modules'))}))throw new Error('gate can still resolve publishing checkout packages');\nif(process.env.PATH?.split(':').includes(${JSON.stringify(publishingBin)}))throw new Error('gate inherited publishing executable path');\nfunction requirePath(){return createRequire(import.meta.url).resolve.paths('fixture-dep')??[];}\nconsole.error('fixture full checks ran inside lease');\n`,
     };
     for (const match of cssChecker.matchAll(/file: join\(ROOT, '([^']+)'\)/gu)) {
       const path = match[1] ?? '';

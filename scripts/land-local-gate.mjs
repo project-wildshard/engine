@@ -3,18 +3,29 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {existsSync,mkdirSync,realpathSync} from 'node:fs';
 import {homedir} from 'node:os';
-import {dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
+import {delimiter,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
 import {makeGateCopy} from './push-gate-copy.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
 
+// Git and pnpm can export caller paths before they invoke a hook. The copy
+// gets its own lookup roots before any command observes the checked tree.
+for(const key of Object.keys(process.env)){
+ if(key.startsWith('GIT_')||key==='NODE_PATH'||key==='NODE_OPTIONS')Reflect.deleteProperty(process.env,key);
+}
+if(process.env.PATH!==undefined)process.env.PATH=process.env.PATH.split(delimiter).filter(entry=>{
+ if(!isAbsolute(entry))return false;
+ const path=existsSync(entry)?realpathSync(entry):entry;
+ return !path.split(sep).includes('node_modules');
+}).join(delimiter);
 assertHeavyLease('full-test');
 const root=process.cwd(),expected=process.env.WS_LOCAL_LAND_HEAD??'';
 /** @param {string} cwd @param {string[]} args */
 const git=(cwd,args)=>execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 /** @param {string} cwd */
 function verify(cwd){
- if(!/^[a-f0-9]{40}$/u.test(expected)||git(cwd,['rev-parse','HEAD'])!==expected||checkedTreeDirt(cwd).length>0){
+ if(!/^[a-f0-9]{40}$/u.test(expected)||git(cwd,['rev-parse','--show-toplevel'])!==cwd
+   ||git(cwd,['rev-parse','HEAD'])!==expected||checkedTreeDirt(cwd).length>0){
   throw new Error('Local land HEAD or checked tree changed; nothing may be pushed');
  }
 }
@@ -25,13 +36,18 @@ const scheduler=process.env.WS_HEAVY_SCHEDULER_ROOT??join(homedir(),'.wildshard-
 const plannedDirectory=resolve(scheduler,'local-land-checkouts',key);
 mkdirSync(plannedDirectory,{recursive:true,mode:0o700});
 const directory=realpathSync(plannedDirectory);
-const fromSource=relative(dirname(common),directory);
-if(!isAbsolute(fromSource)&&fromSource!=='..'&&!fromSource.startsWith(`..${sep}`)){
+/** @param {string} base */
+const inside=base=>{
+ const fromBase=relative(base,directory);
+ return !isAbsolute(fromBase)&&fromBase!=='..'&&!fromBase.startsWith(`..${sep}`);
+};
+if(inside(dirname(common))||inside(root)){
  throw new Error('The isolated local land checkout must be outside the publishing repository');
 }
 const source=spawnSync('git',['symbolic-ref','--quiet','HEAD'],{cwd:root,encoding:'utf8'});
 const env={...process.env,XDG_CACHE_HOME:join(directory,'tools'),npm_config_enable_global_virtual_store:'false',
  npm_config_package_import_method:'clone-or-copy',WS_LOCAL_LAND_SOURCE_REF:source.stdout?.trim()??''};
+if(process.platform==='linux')Reflect.set(env,'PLAYWRIGHT_BROWSERS_PATH',join(process.env.XDG_CACHE_HOME??join(homedir(),'.cache'),'ms-playwright'));
 Reflect.deleteProperty(env,'WS_PUSH_REFS');
 const copy=makeGateCopy(root,expected,{env,directory,installIsolated:true});
 try{
