@@ -146,7 +146,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     }},
     '@wildshard/engine/core/workSlice': {yieldTask: () => { reserveClock.turns++; return resolved(); }},
     '@wildshard/engine/core/clock': {diagnosticNow: () => reserveClock.now},
-    './assetTables': {prepareAssetPackRead: () => ({ready: resolved})},
+    './assetTables': {prepareAssetPackRead: () => ({ready: resolved}), adoptInlineMounts: () => Promise.resolve(0)},
     '@wildshard/engine/game/shardfile/folder': {},
     '@wildshard/engine/boot/tables': {publicBytes: () => ({})},
     '@wildshard/engine/boot/contentRead': {readContent: () => Promise.reject(new Error('no pickup reads here'))},
