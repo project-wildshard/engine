@@ -89,14 +89,14 @@ const OWNER_FLAGS: Readonly<Record<string, (s: PlayerMotionState, value: boolean
 };
 
 /** The owner block's columns as the predictor reads them, resolved once. */
-interface OwnerTable { readonly x: number; readonly y: number; readonly z: number; readonly grounded: number; readonly board: number; readonly swim: number; readonly led: number; readonly resets: number; readonly freedom: number }
+interface OwnerTable { readonly x: number; readonly y: number; readonly z: number; readonly grounded: number; readonly board: number; readonly swim: number; readonly led: number; readonly resets: number; readonly freedom: number; readonly shove: number }
 function ownerTable(columns: readonly NetColumn<never>[]): OwnerTable {
   const at = (name: string): number => {
     const index = columns.findIndex(column => column.name === name);
     if (index === -1) throw new Error(`Owner block has no ${name}`);
     return index;
   };
-  return { x: at('px'), y: at('py'), z: at('pz'), grounded: at('grounded'), board: at('board'), swim: at('swim'), led: at('led'), resets: at('resets'), freedom: at('freedom') };
+  return { x: at('px'), y: at('py'), z: at('pz'), grounded: at('grounded'), board: at('board'), swim: at('swim'), led: at('led'), resets: at('resets'), freedom: at('freedom'), shove: at('shoveT') };
 }
 
 /** One player's prediction. */
@@ -104,7 +104,9 @@ export class Predictor {
   /** Corrections taken, and steps replayed for them: what a proof page reports. */
   corrections = 0; replays = 0;
   /** Server-owned transitions, kept separate from a failed local prediction in proof output. */
-  readonly authoritative = { leadEnds: 0, resets: 0 };
+  readonly authoritative = { leadEnds: 0, resets: 0, shoves: 0 };
+  /** The render offset gliding now came from a server-owned take (a lead's end, a reset, a knock), not a wrong guess (NL12 f). */
+  authoritativeGlide = false;
   /** What each correction disagreed on, and the widest gap at the acknowledged step. */
   readonly missed = { position: 0, grounded: 0, board: 0, swim: 0, ride: 0, gap: 0 };
   readonly misses: number[][] = [];
@@ -176,7 +178,10 @@ export class Predictor {
     this.acked = lastSeq;
     const saved = offset >= 0 && offset < count, slot = (head + offset) % PREDICTION_RING, at = slot * SAVED_WORDS; // else older than the ring, or nothing saved
     if (saved) { this.head = (slot + 1) % PREDICTION_RING; this.count = count - offset - 1; }
-    if (!forced && (!saved || this.matches(slot, owner, ridden))) return false;
+    // NET-LAG NL12 (f): a creature's blow knocks the body back in the room at the tick it lands, which the page hears only
+    // a round trip later; the room's shove clock running where this step had none is the server's word, not a wrong guess.
+    const shoved = saved && !forced && this.value(table.shove, owner) > 0 && (this.states[at + CAPTURED.shove] ?? 0) === 0;
+    if (!forced && !shoved && (!saved || this.matches(slot, owner, ridden))) return false;
     // NL12 (c): the write below can take feet under a deck only if the server's world lacks the deck; NL5 gave the room the same
     // rope planks (`server/host/ropeDecks.ts`), and `test/net-predict-deck.test.ts` replays a correction 0.3 to 1 m low back onto them
     const s = body.motionState, { ride } = body, feet = ride?.feet ?? s.position, x = feet.x + body.renderOffset.x, y = feet.y + body.renderOffset.y, z = feet.z + body.renderOffset.z, { yaw } = s;
@@ -195,10 +200,12 @@ export class Predictor {
     // page predicted a command incorrectly. Counting them as corrections made Far Reach's boost report a false B2 miss.
     if (leadEnded) this.authoritative.leadEnds++;
     if (reset) this.authoritative.resets++;
-    const corrected = !forced && !led && !boarded;
+    if (shoved) this.authoritative.shoves++;
+    const corrected = !forced && !led && !boarded && !shoved;
     if (corrected) this.corrections++;
     const offsetX = x - feet.x, offsetY = y - feet.y, offsetZ = z - feet.z, far = offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ > PREDICTION_SNAP * PREDICTION_SNAP;
     body.renderOffset.set(far ? 0 : offsetX, far ? 0 : offsetY, far ? 0 : offsetZ);
+    this.authoritativeGlide = !corrected;
     this.glide = glidePace(body.renderOffset.length());
     if(corrected)this.corrected?.({tick:tick??s.tick,mode:ride!==null?'ride':s.board.on?'board':s.swim.on?'swim':'foot',offset:Math.hypot(offsetX,offsetY,offsetZ),snapped:far});
     return corrected;

@@ -59,5 +59,5 @@ test('a lead ending or a server reset is authoritative, not a failed prediction'
   predictor.step({ seq: 3, viewTick: 0, steer: standing, yaw: 0, pitch: 0, buttons: 0 });
   expect(predictor.reconcile(3, owner)).toBe(false);
   expect(predictor.corrections).toBe(0);
-  expect(predictor.authoritative).toEqual({ leadEnds: 1, resets: 1 });
+  expect(predictor.authoritative).toEqual({ leadEnds: 1, resets: 1, shoves: 0 });
 });

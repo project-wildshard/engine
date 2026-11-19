@@ -48,9 +48,10 @@ function pageProbe(delay) {
   const W = /** @type {any} */ (window), S = W.__netLag = { on: false, drawn: /** @type {number[]} */ ([]), last: /** @type {number|null} */ (null), frameNow: 0, slowMs: 0, slowFrames: 0, rendered: false, worst: 0 };
   // a drawn frame is a page frame that rendered at least once (a frame may render offscreen passes too; a capped one renders none)
   // B2's worst render offset, over the window the proof opens (the client's own `worstOffset` runs from entry)
+  // NL12 (f): a glide the server owns (a lead's end, a reset, a creature's knock) is not a wrong guess, so it is not B2's
   // Installed before boot, this callback precedes the game's RAF. Record that
   // RAF's timestamp at render, not the variable delay to our next callback.
-  const frame = (/** @type {number} */ now) => { S.frameNow = now; S.rendered = false; const offset = W.__wildshard?.world?.player?.renderOffset; if (S.on && offset !== undefined) S.worst = Math.max(S.worst, offset.length()); requestAnimationFrame(frame); };
+  const frame = (/** @type {number} */ now) => { S.frameNow = now; S.rendered = false; const player = W.__wildshard?.world?.player, offset = player?.renderOffset; if (S.on && offset !== undefined && player?.link?.predictor?.authoritativeGlide !== true) S.worst = Math.max(S.worst, offset.length()); requestAnimationFrame(frame); };
   requestAnimationFrame(frame);
   const hook = () => {
     const renderer = W.__wildshard?.world?.game?.renderer;

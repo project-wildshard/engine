@@ -16,10 +16,10 @@ import type { BoardState } from './board';
 import type { PlayerMotionState } from './motion';
 
 const STATE_WORDS = 36;
-/** The words a predictor compares (`matches`). */
+/** The words a predictor compares (`matches`), and the shove's clock it reads for a knock the room started (NL12 f). */
 export const CAPTURED: {
-  readonly x: 0; readonly y: 1; readonly z: 2; readonly yaw: 9; readonly grounded: 11; readonly board: 22; readonly swim: 25; readonly freedom: number; readonly carried: number;
-} = { x: 0, y: 1, z: 2, yaw: 9, grounded: 11, board: 22, swim: 25, freedom: STATE_WORDS + 8, carried: STATE_WORDS + 10 };
+  readonly x: 0; readonly y: 1; readonly z: 2; readonly yaw: 9; readonly grounded: 11; readonly shove: 12; readonly board: 22; readonly swim: 25; readonly freedom: number; readonly carried: number;
+} = { x: 0, y: 1, z: 2, yaw: 9, grounded: 11, shove: 12, board: 22, swim: 25, freedom: STATE_WORDS + 8, carried: STATE_WORDS + 10 };
 /** The length of one capture. */
 export const MOTION_WORDS: number = STATE_WORDS + MOTOR_WORDS;
 
