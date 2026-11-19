@@ -7,6 +7,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { emptyShardfile } from '../src/shared/host/author';
 import { createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
+import { primitivesOf } from '../src/server/game/shardfile/hostPrimitives';
 import type { SimCommand } from '../src/server/engine/sim';
 
 // ONE-FORMAT OF34b (J420 (1), Jake 2026-11-18: bosses are three parts): the declared encounter runs each `start` from a
@@ -136,4 +137,23 @@ test('OF34b: open bounds reset the fight once the boss is drawn past its radius,
     expect(body.hp).toBe(body.maxHp);
     expect(body.position.distanceTo(new Vector3(...HOME))).toBeLessThan(1);
   } finally { sim.dispose(); }
+});
+
+// ONE-FORMAT OF17b2 (J365 (6)): the boss primitive comes from the boss section alone. The fixture names no host and ships
+// no native-assembly list; its one boss encounter row switches `boss` on, its arena bounds `boss.arena`, and the same
+// product without the row runs neither.
+test('OF17b2: a boss section alone switches the boss primitive on, and taking it out switches it off', () => {
+  const runs = (shard: ReturnType<typeof bossShard>): readonly string[] => {
+    const sim = createShardfileSim(shard, new Map(), { rapier });
+    try { return primitivesOf(sim.host); } finally { sim.dispose(); }
+  };
+  for (const start of ['placed', 'spawned', 'resident'] as const) {
+    const on = runs(bossShard({ start }));
+    expect(on, start).toContain('boss');
+    expect(on, start).not.toContain('boss.arena');
+  }
+  expect(runs(bossShard({ bounds: 'room' }))).toEqual(expect.arrayContaining(['boss', 'boss.arena']));
+  const off = runs({ ...bossShard(), encounters: [] });
+  expect(off).not.toContain('boss');
+  expect(off).not.toContain('boss.arena');
 });
