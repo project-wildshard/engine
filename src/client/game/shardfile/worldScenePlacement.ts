@@ -189,11 +189,15 @@ export class WorldScenePlacement {
   /** FC12: the culler's resident filter over the copies: a copy draws while any tile its footprint touches is held (NT6) */
   private residentCopies(): NonNullable<CullOptions['resident']> {
     const tiles = this.copyTiles();
-    return { has: (i: number) => {
+    // STR19: by index (the culler asks once per copy each time it re-chooses; an iterator each ask was its largest garbage)
+    const holders = this.holders;
+    /** @frame */
+    const has = (i: number): boolean => {
       const own = tiles[i]; if (own === undefined) return false;
-      for (const tile of own) if (this.holders.has(tile)) return true;
+      for (let k = 0; k < own.length; k++) if (holders.has(own[k] as number)) return true;
       return false;
-    }, version: () => this.residentVersion };
+    };
+    return { has, version: () => this.residentVersion };
   }
   /** NT6: a culled ranged placement holds each copy by its body, not its origin: a bridge whose origin is outside the ring
    *  draws while any tile its span touches is resident (and its coarse stand-in hides then) */

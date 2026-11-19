@@ -124,13 +124,11 @@ let lastPosed: THREE.Camera | null = null, lastPose: Pose | null = null;
  * The pose version of `camera` in this pass, compared once a pass however many cullers ask: a view that saw the same version
  * last time sees exactly the inputs it last decided on, and stays unchanged without comparing them again (Nine: the placed
  * cullers re-compared the held camera's matrices every frame, 0.17 ms at P5 phone 4x).
+ * @frame
  */
 function poseVersion(camera: THREE.Camera): number {
   let pose = camera === lastPosed ? lastPose : poses.get(camera);
-  if (pose === undefined || pose === null) {
-    pose = { pass: -1, version: 0, world: new Float64Array(16), projection: new Float64Array(16) };
-    poses.set(camera, pose);
-  }
+  pose ??= firstPose(camera);
   lastPosed = camera; lastPose = pose;
   if (pose.pass === passStamp) return pose.version;
   const w = camera.matrixWorld.elements, p = camera.projectionMatrix.elements;
@@ -140,6 +138,12 @@ function poseVersion(camera: THREE.Camera): number {
   pose.pass = passStamp;
   return pose.version;
 }
+/** a camera's pose record, made the first time a pass sees it and kept for its life */
+function firstPose(camera: THREE.Camera): Pose {
+  const pose = { pass: -1, version: 0, world: new Float64Array(16), projection: new Float64Array(16) };
+  poses.set(camera, pose);
+  return pose;
+}
 /**
  * The eye and turn of `camera` at pose `version`, derived once a pass however many cullers ask (Nine P5, phone 4x: the
  * standing camera's sway bumps the version every frame, and each placed culler re-derived both from the same matrix,
@@ -147,6 +151,7 @@ function poseVersion(camera: THREE.Camera): number {
  */
 const derivedEye = new THREE.Vector3(), derivedTurn = new THREE.Quaternion(), _eyeScratch = new THREE.Vector3();
 let derivedCamera: THREE.Camera | null = null, derivedVersion = -1, derivedTurned = false;
+/** @frame */
 function eyeAt(camera: THREE.Camera, version: number, out: THREE.Vector3): THREE.Vector3 {
   if (version === -1 || camera !== derivedCamera || version !== derivedVersion) {
     derivedCamera = version === -1 ? null : camera; derivedVersion = version; derivedTurned = false;
@@ -154,13 +159,48 @@ function eyeAt(camera: THREE.Camera, version: number, out: THREE.Vector3): THREE
   }
   return out.copy(derivedEye);
 }
+/** @frame */
 function turnAt(camera: THREE.Camera, version: number, out: THREE.Quaternion): THREE.Quaternion {
   eyeAt(camera, version, _eyeScratch);
   if (!derivedTurned || version === -1) { derivedTurn.setFromRotationMatrix(camera.matrixWorld); derivedTurned = version !== -1; }
   return out.copy(derivedTurn);
 }
 
-/** the two world matrices' rotation-and-scale parts are exactly equal */
+/**
+ * STR19: the camera's view-projection and frustum at pose `version` (plain, and widened by VIEW_MARGIN for the padded
+ * views), derived once a pass for every culler that asks. Each culler re-derived both itself: an invert, a product and six
+ * planes per culler per moved frame, the culler's largest allocation after the choice (Nine's walk). -1: for the caller.
+ */
+const sharedInv = new THREE.Matrix4(), sharedPv = new THREE.Matrix4(), sharedWide = new THREE.Matrix4(), sharedWidePv = new THREE.Matrix4();
+const sharedFrustum = new THREE.Frustum(), sharedWideFrustum = new THREE.Frustum();
+let viewCamera: THREE.Camera | null = null, viewVersion = -1, viewPlain = false, viewWide = false;
+/** @frame */
+function viewAt(camera: THREE.Camera, version: number, widened: boolean): THREE.Frustum {
+  if (version === -1 || camera !== viewCamera || version !== viewVersion) {
+    viewCamera = version === -1 ? null : camera; viewVersion = version; viewPlain = false; viewWide = false;
+    sharedInv.copy(camera.matrixWorld).invert();
+  }
+  if (widened) {
+    if (!viewWide) {
+      sharedWide.copy(camera.projectionMatrix);
+      const e = sharedWide.elements;
+      e[0] = 1 / Math.tan(Math.min(1.5, Math.atan(1 / e[0]) + VIEW_MARGIN));
+      e[5] = 1 / Math.tan(Math.min(85 * Math.PI / 180, Math.atan(1 / e[5]) + VIEW_MARGIN));
+      sharedWidePv.multiplyMatrices(sharedWide, sharedInv);
+      sharedWideFrustum.setFromProjectionMatrix(sharedWidePv);
+      viewWide = version !== -1;
+    }
+    return sharedWideFrustum;
+  }
+  if (!viewPlain) {
+    sharedPv.multiplyMatrices(camera.projectionMatrix, sharedInv);
+    sharedFrustum.setFromProjectionMatrix(sharedPv);
+    viewPlain = version !== -1;
+  }
+  return sharedFrustum;
+}
+
+/** the two world matrices' rotation-and-scale parts are exactly equal @frame */
 function sameTurn(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
   return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[4] === b[4] && a[5] === b[5] && a[6] === b[6] && a[8] === b[8] && a[9] === b[9] && a[10] === b[10];
 }
@@ -169,9 +209,7 @@ function sameTurn(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
 class View {
   readonly frustum = new THREE.Frustum();
   readonly eye = new THREE.Vector3();
-  private readonly pv = new THREE.Matrix4();
   private readonly last = new THREE.Matrix4();
-  private readonly inv = new THREE.Matrix4();
   private primed = false;
   /** the camera's world matrix and projection the copies were last chosen for */
   private readonly held = new THREE.Matrix4();
@@ -181,7 +219,6 @@ class View {
   private readonly buffered: boolean;
   private readonly turn = new THREE.Quaternion();
   private readonly lastTurn = new THREE.Quaternion();
-  private readonly widened = new THREE.Matrix4();
   private readonly expanded = new THREE.Sphere();
   private margin = 0;
   /** this view's move (metres) and turn (cos of half its angle) thresholds when padded (VIEW_SPREAD) */
@@ -198,6 +235,7 @@ class View {
     this.move = VIEW_MOVE * spread;
     this.turnLimit = Math.cos(VIEW_TURN * spread);
   }
+  /** @frame */
   changed(camera: THREE.Camera): boolean {
     // the camera's own world matrix only: `updateMatrixWorld` also walked its children (the held weapon's whole viewmodel)
     // once per culler per frame (G639: ~1.4 ms a Signal Dunes drive frame at phone 4x); the render updates them itself
@@ -225,13 +263,7 @@ class View {
         && Math.abs(this.turn.dot(this.lastTurn)) >= this.turnLimit) return false;
       this.primed = true; this.lastEye.copy(this.eye); this.lastTurn.copy(this.turn);
       this.held.copy(camera.matrixWorld); this.projection.copy(camera.projectionMatrix);
-      this.widened.copy(camera.projectionMatrix);
-      const e = this.widened.elements;
-      e[0] = 1 / Math.tan(Math.min(1.5, Math.atan(1 / e[0]) + VIEW_MARGIN));
-      e[5] = 1 / Math.tan(Math.min(85 * Math.PI / 180, Math.atan(1 / e[5]) + VIEW_MARGIN));
-      this.inv.copy(camera.matrixWorld).invert();
-      this.pv.multiplyMatrices(this.widened, this.inv);
-      this.frustum.setFromProjectionMatrix(this.pv); this.margin = this.move;
+      this.frustum.copy(viewAt(camera, version, true)); this.margin = this.move;
       return true;
     }
     this.margin = 0;
@@ -243,14 +275,13 @@ class View {
       const dx = m[12] - held[12], dy = m[13] - held[13], dz = m[14] - held[14];
       if (dx * dx + dy * dy + dz * dz <= EYE_JITTER * EYE_JITTER) return false;
     }
-    this.inv.copy(camera.matrixWorld).invert();
-    this.pv.multiplyMatrices(camera.projectionMatrix, this.inv);
-    if (this.primed && this.pv.equals(this.last)) return false;
+    const frustum = viewAt(camera, version, false);
+    if (this.primed && sharedPv.equals(this.last)) return false;
     this.primed = true;
-    this.last.copy(this.pv);
+    this.last.copy(sharedPv);
     this.held.copy(camera.matrixWorld);
     this.projection.copy(camera.projectionMatrix);
-    this.frustum.setFromProjectionMatrix(this.pv);
+    this.frustum.copy(frustum);
     this.eye.setFromMatrixPosition(camera.matrixWorld);
     return true;
   }
@@ -262,10 +293,13 @@ class View {
   }
   /** the casting cascades' frusta for this choice (`CullOptions.casters`) */
   readonly shadows: THREE.Frustum[] = [];
-  /** the sphere is in the camera's view or a casting cascade's */
+  /** the sphere is in the camera's view or a casting cascade's @frame */
   sees(sphere: THREE.Sphere): boolean {
     this.expanded.copy(sphere); this.expanded.radius += this.margin;
-    return this.frustum.intersectsSphere(this.expanded) || this.shadows.some((f) => f.intersectsSphere(sphere));
+    if (this.frustum.intersectsSphere(this.expanded)) return true;
+    // STR19: a loop, not `some` and an arrow (a closure per copy tested, each frame the view moved)
+    for (let k = 0; k < this.shadows.length; k++) if (this.shadows[k]?.intersectsSphere(sphere) === true) return true;
+    return false;
   }
 }
 
@@ -310,13 +344,13 @@ class Chooser {
     this.frustum = o.frustum !== false;
     this.pad = o.casters ?? 0;
   }
-  /** copy i's distance² from the eye (on the ground when `flat`) */
+  /** copy i's distance² from the eye (on the ground when `flat`) @frame */
   dist2(i: number, eye: THREE.Vector3): number {
     const c = this.origins ?? this.bounds, k = this.origins ? 3 : 4;
     const dx = (c[i * k] ?? 0) - eye.x, dy = this.flat ? 0 : (c[i * k + 1] ?? 0) - eye.y, dz = (c[i * k + 2] ?? 0) - eye.z;
     return dx * dx + dy * dy + dz * dz;
   }
-  /** the level at a distance² (the copy's own radius for `radiusBias`); -1 past the range */
+  /** the level at a distance² (the copy's own radius for `radiusBias`); -1 past the range @frame */
   levelAt(d2: number, r: number): number {
     if (this.bias !== 0) {
       const d = Math.sqrt(d2) - r * this.bias;
@@ -344,6 +378,7 @@ class Chooser {
   private cellPoints = new Float64Array(0);
   private skip = new Uint8Array(0);
   private readonly cellSphere = new THREE.Sphere();
+  /** @frame */
   begin(view: View): void {
     const count = this.bounds.length / 4;
     if (this.test !== null || this.bias !== 0 || count < CELL_MIN) return;
@@ -377,11 +412,13 @@ class Chooser {
     this.runEnd = new Uint32Array(count);
     for (let i = count - 1; i >= 0; i--) this.runEnd[i] = cellOf[i] === cellOf[i + 1] ? this.runEnd[i + 1] ?? count : i + 1;
   }
+  /** @frame */
   next(first: number): number {
     let i = first;
     while (this.cellOf !== null && i < this.cellOf.length && this.skip[this.cellOf[i] ?? 0] === 1) i = this.runEnd[i] ?? i + 1;
     return i;
   }
+  /** @frame */
   level(i: number, view: View): number {
     if (this.resident !== null && !this.resident(i)) return -1;
     if (this.cellOf !== null && this.skip[this.cellOf[i] ?? 0] === 1) return -1;
@@ -395,16 +432,26 @@ class Chooser {
       this.sphere.center.set(x, y, z); this.sphere.radius = r + this.pad;
       if (!view.sees(this.sphere)) return -1;
     }
-    return this.levelAt(d2, r);
+    // STR19: `levelAt` written out here (a call that is not inlined takes the distance and radius as two boxed numbers)
+    if (this.bias !== 0) {
+      const d = Math.sqrt(d2) - r * this.bias;
+      if (d > this.far) return -1;
+      let l = this.from.length - 1;
+      while (l > 0 && d < (this.from[l] ?? 0)) l--;
+      return l;
+    }
+    let l = this.from2.length - 1;
+    while (l > 0 && d2 < (this.from2[l] ?? 0)) l--;
+    return l;
   }
-  /** the next level when the last copy chosen stands in its dissolve band (drawn with level `l`), else -1 */
+  /** the next level when the last copy chosen stands in its dissolve band (drawn with level `l`), else -1 @frame */
   also(l: number): number {
     const n = l + 1;
     return this.bias === 0 && n < this.fade2.length && this.d2 >= (this.fade2[n] ?? Number.POSITIVE_INFINITY) ? n : -1;
   }
 }
 
-/** mark a buffer's drawn prefix for upload with a reused range object (three clears `updateRanges` after the upload) */
+/** mark a buffer's drawn prefix for upload with a reused range object (three clears `updateRanges` after the upload) @frame */
 function upload(a: THREE.InstancedBufferAttribute, range: { start: number; count: number }, start: number, end: number): void {
   if (a.updateRanges.includes(range)) {
     const last = Math.max(range.start + range.count, end);
@@ -466,13 +513,16 @@ class Sinks {
     this.until2 = Float64Array.from(this.flat, (x) => (x.until === undefined ? Number.POSITIVE_INFINITY : x.until * x.until));
     this.ranges = this.flat.map(() => ({ matrix: { start: 0, count: 0 }, color: { start: 0, count: 0 } }));
   }
+  /** @frame */
   reset(): void {
     this.counts.fill(0); this.changed.fill(-1); this.changedEnd.fill(0);
     this.colorChanged.fill(-1); this.colorEnd.fill(0);
   }
-  /** copy i, at distance² d2, into group g's sinks */
-  put(i: number, g: number, d2: number): void {
-    const m = this.matrices, c = this.colors, k = this.scales?.[g] ?? 1;
+  /** the distance² of the copy the next `put` writes (STR19: a field, where an argument was a boxed number per copy) */
+  d2 = 0;
+  /** copy i, at distance² `d2`, into group g's sinks @frame */
+  put(i: number, g: number): void {
+    const m = this.matrices, c = this.colors, k = this.scales?.[g] ?? 1, d2 = this.d2;
     for (let at = this.first[g] ?? 0; at < (this.first[g + 1] ?? 0); at++) {
       const s = this.members[at] ?? 0;
       if (d2 >= (this.until2[s] ?? Number.POSITIVE_INFINITY)) continue;
@@ -498,12 +548,13 @@ class Sinks {
       this.counts[s] = n + 1;
     }
   }
+  /** @frame */
   commit(): void {
     for (let s = 0; s < this.flat.length; s++) {
       const sink = this.flat[s];
       if (!sink) continue;
       const n = this.counts[s] ?? 0;
-      for (const mesh of sink.meshes) { mesh.count = n; mesh.visible = n > 0; }
+      for (let k = 0; k < sink.meshes.length; k++) { const mesh = sink.meshes[k]; if (mesh) { mesh.count = n; mesh.visible = n > 0; } }
       if (n === 0) continue;
       const r = this.ranges[s];
       if (r) {
@@ -514,6 +565,11 @@ class Sinks {
     }
   }
 }
+
+/** STR19: a culler with no casting cascades reads this one empty list, not a new one each choice */
+const NO_CASTERS: readonly THREE.Frustum[] = Object.freeze([]);
+const NO_OBJECTS: readonly THREE.Object3D[] = Object.freeze([]);
+const noCasters = (): readonly THREE.Frustum[] => NO_CASTERS;
 
 /** the view a culler reads: the camera's (re-chosen when it changed, or moved past `step`) or one handed in */
 const viewFor = (o: CullOptions, buffered = false): View => new View(o.frustum === false ? o.step ?? 0 : 0, buffered && o.frustum !== false);
@@ -541,7 +597,7 @@ export class InstancedCull {
   constructor(
     groups: readonly (readonly InstancedSink[])[], levels: number, variantOf: Uint16Array,
     matrices: Float32Array, colors: Float32Array | null, bounds: Float32Array, from: readonly number[], o: CullOptions,
-    origins: Float32Array | Float64Array | null = null, fades: readonly number[] = [], casting: () => readonly THREE.Frustum[] = () => [],
+    origins: Float32Array | Float64Array | null = null, fades: readonly number[] = [], casting: () => readonly THREE.Frustum[] = noCasters,
     scales: Float32Array | null = null,
   ) {
     this.casting = casting;
@@ -554,6 +610,7 @@ export class InstancedCull {
     this.viewDriven = o.view !== undefined;
   }
 
+  /** @frame */
   update(camera: THREE.Camera): void {
     const version = this.resident?.() ?? 0;
     // FC12: a handed-in view's culler re-chooses here only when its resident tiles changed, from the view it was last given
@@ -562,24 +619,29 @@ export class InstancedCull {
     if (moved || version !== this.chosen) { this.chosen = version; this.choose(); }
   }
 
-  /** a view handed in (`CullOptions.view`) */
+  /** a view handed in (`CullOptions.view`) @frame */
   updateWith(frustum: THREE.Frustum, eye: THREE.Vector3): void {
     this.view.use(frustum, eye);
     this.handed = true; this.chosen = this.resident?.() ?? 0;
     this.choose();
   }
 
+  /** @frame */
   private choose(): void {
     const ch = this.chooser, sinks = this.sinks;
-    this.view.shadows.length = 0; this.view.shadows.push(...this.casting());
+    // STR19: copied by index (a spread built an argument list every choice)
+    const casters = this.casting(), shadows = this.view.shadows;
+    shadows.length = casters.length;
+    for (let k = 0; k < casters.length; k++) shadows[k] = casters[k] as THREE.Frustum;
     ch.begin(this.view);
     sinks.reset();
     for (let i = ch.next(0); i < this.variantOf.length; i = ch.next(i + 1)) {
       const l = ch.level(i, this.view);
       if (l < 0) continue;
       const base = (this.variantOf[i] ?? 0) * this.levels, a = ch.also(l);
-      sinks.put(i, base + l, ch.d2);
-      if (a >= 0) sinks.put(i, base + a, ch.d2);
+      sinks.d2 = ch.d2;
+      sinks.put(i, base + l);
+      if (a >= 0) sinks.put(i, base + a);
     }
     sinks.commit();
   }
@@ -644,16 +706,18 @@ export class CelledCopiesCull {
     this.start[c] = at;
   }
 
+  /** @frame */
   update(camera: THREE.Camera): void {
     if (this.view.changed(camera)) this.choose();
   }
 
-  /** a view handed in (`CullOptions.view`) */
+  /** a view handed in (`CullOptions.view`) @frame */
   updateWith(frustum: THREE.Frustum, eye: THREE.Vector3): void {
     this.view.use(frustum, eye);
     this.choose();
   }
 
+  /** @frame */
   private choose(): void {
     const sinks = this.sinks, p = this.origins, e = this.view.eye;
     const far = this.far, max2 = far * far, cells = this.cells, from2 = this.from2;
@@ -670,7 +734,7 @@ export class CelledCopiesCull {
         if (d2 > max2 || (this.test !== null && !this.test(i, d2))) continue;
         let l = from2.length - 1;
         while (l > 0 && d2 < (from2[l] ?? 0)) l--;
-        sinks.put(i, (this.variantOf[i] ?? 0) * this.levels + l, d2);
+        sinks.d2 = d2; sinks.put(i, (this.variantOf[i] ?? 0) * this.levels + l);
       }
     }
     sinks.commit();
@@ -711,11 +775,12 @@ export class BatchedCull {
     this.shown = new Int8Array(slots.length).fill(-2);
   }
 
+  /** @frame */
   update(camera: THREE.Camera): void {
     if (this.view.changed(camera)) this.choose();
   }
 
-  /** a view handed in (`CullOptions.view`) */
+  /** a view handed in (`CullOptions.view`) @frame */
   updateWith(frustum: THREE.Frustum, eye: THREE.Vector3): void {
     this.view.use(frustum, eye);
     this.choose();
@@ -727,6 +792,7 @@ export class BatchedCull {
     return g >= 0 && slot.until2 !== null && d2 >= (slot.until2[l] ?? Number.POSITIVE_INFINITY) ? -1 : g;
   }
 
+  /** @frame */
   private choose(): void {
     const ch = this.chooser;
     for (let i = 0; i + 1 < this.start.length; i++) {
@@ -764,16 +830,18 @@ export class CellCull {
     this.far2 = o.far === undefined ? Number.POSITIVE_INFINITY : o.far * o.far;
   }
 
+  /** @frame */
   update(camera: THREE.Camera): void {
     if (this.view.changed(camera)) this.choose();
   }
 
-  /** a view handed in (`CullOptions.view`) */
+  /** a view handed in (`CullOptions.view`) @frame */
   updateWith(frustum: THREE.Frustum, eye: THREE.Vector3): void {
     this.view.use(frustum, eye);
     this.choose();
   }
 
+  /** @frame */
   private choose(): void {
     const e = this.view.eye;
     for (let c = 0; c < this.cells.length; c++) {
@@ -783,8 +851,8 @@ export class CellCull {
       if (d2 <= this.far2) { l = this.from2.length - 1; while (l > 0 && d2 < (this.from2[l] ?? 0)) l--; }
       if (this.shown[c] === l) continue;
       this.shown[c] = l;
-      const levels = this.cells[c] ?? [];
-      for (let k = 0; k < levels.length; k++) { const o = levels[k]; if (o) o.visible = k === l; }
+      const levels = this.cells[c];
+      if (levels !== undefined) for (let k = 0; k < levels.length; k++) { const o = levels[k]; if (o) o.visible = k === l; }
     }
   }
 }
@@ -809,26 +877,29 @@ export class SetCull {
     this.show(0); // as built: the full model, until the first view says otherwise
   }
 
+  /** @frame */
   update(camera: THREE.Camera): void {
     if (this.view.changed(camera)) this.choose();
   }
 
-  /** a view handed in (`CullOptions.view`) */
+  /** a view handed in (`CullOptions.view`) @frame */
   updateWith(frustum: THREE.Frustum, eye: THREE.Vector3): void {
     this.view.use(frustum, eye);
     this.choose();
   }
 
+  /** @frame */
   private choose(): void {
     let best = Number.POSITIVE_INFINITY, at = -1;
     for (let i = 0; i < this.n; i++) { const d2 = this.chooser.dist2(i, this.view.eye); if (d2 < best) { best = d2; at = i; } }
     this.show(at < 0 ? -1 : this.chooser.levelAt(best, 0));
   }
 
+  /** @frame */
   private show(l: number): void {
     if (l === this.shown) return;
     this.shown = l;
-    this.levels.forEach((meshes, k) => { for (const m of meshes) m.visible = k === l; });
+    for (let k = 0; k < this.levels.length; k++) { const meshes = this.levels[k] ?? NO_OBJECTS; for (let j = 0; j < meshes.length; j++) { const m = meshes[j]; if (m) m.visible = k === l; } }
   }
 }
 
@@ -853,6 +924,7 @@ export class UntilCull {
     this.shown = new Int8Array(parts.length).fill(-1);
   }
 
+  /** @frame */
   update(camera: THREE.Camera): void {
     if (!this.view.changed(camera)) return;
     const e = this.view.eye, o = this.origins;
@@ -923,6 +995,7 @@ export class WeldCull {
     return dx * dx + dy * dy + dz * dz;
   }
 
+  /** @frame */
   update(camera: THREE.Camera): void {
     const changed = this.view.changed(camera);
     if (!changed && !this.pending) return;
@@ -941,13 +1014,16 @@ export class WeldCull {
       const on = this.d2(this.units[u] ?? 0) < (this.detail2[u] ?? 0) ? 1 : 0;
       if (this.unitOn[u] !== on) { this.unitOn[u] = on; flipped = true; }
     }
-    for (const h of this.hosted) {
-      if (!flipped && !h.dirty) continue;
+    for (let k = 0; k < this.hosted.length; k++) {
+      const h = this.hosted[k];
+      if (h === undefined || !flipped && !h.dirty) continue;
       h.dirty = false;
-      for (const im of h.set.meshes) {
-        const dst = im.instanceMatrix.array as Float32Array;
+      for (let m = 0; m < h.set.meshes.length; m++) {
+        const im = h.set.meshes[m];
+        if (im === undefined) continue;
+        const dst = im.instanceMatrix.array as Float32Array, lists = h.set.lists;
         let n = 0;
-        for (const l of h.set.lists) if (this.unitOn[l.unit] === 1) { dst.set(l.matrices, n * 16); n += l.matrices.length / 16; }
+        for (let j = 0; j < lists.length; j++) { const l = lists[j]; if (l !== undefined && this.unitOn[l.unit] === 1) { dst.set(l.matrices, n * 16); n += l.matrices.length / 16; } }
         im.count = n; im.visible = n > 0;
         if (n === 0) continue;
         im.instanceMatrix.needsUpdate = true;

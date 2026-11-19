@@ -10,3 +10,12 @@
   forward key re-set once a second): the first driver allocated ~0.6 MB/s of its own and those readings were discarded.
 - The sampler charges a function's start line, and inlined callees to their caller: `--js-flags=--no-turbo-inlining`
   splits them but boxes every double a non-inlined call returns (Nine read 29 MB/s that way), so it names sites only.
+- STR19, the placed culler: Nine's culler owned 6.1 MB/s of the walk's 15.2 [S] (5a8d0e52, one run). The big one was
+  `Chooser.level` (4.8 MB/s): `View.sees` tested the casting cascades with `.some` and an arrow, a closure per copy tested.
+  Then the casters spread into an argument list per choice, `forEach` loops in the set and weld cullers, the residency
+  test's closure per call, and two boxed numbers per copy where a call that V8 does not inline took the distance and
+  radius (`levelAt` is written out in `level`; `Sinks.put` reads the distance from a field). Last, every culler re-derived
+  the camera's inverse, view-projection and six planes itself on every moved frame: `viewAt` derives them once a pass per
+  camera pose (plain and widened) and each view copies the frustum. One walk on the finished build: culler 0.08 MB/s.
+- The culler meter counts every function of cull.ts plus place.ts's frame pass and the scene's residency test; placing
+  a streamed tile's copies (place.ts's builders, `posed`) is loading, not the frame, and is left out of it.

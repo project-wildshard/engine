@@ -280,18 +280,26 @@ function eachLife(fn: (life: Life) => void): void {
   for (const life of lives.values()) fn(life);
 }
 
+/** STR19: the camera of the pass `cullPlaced` runs (the pass is made once: an arrow there was a closure a frame) */
+let passCamera: THREE.Camera | null = null;
 /**
  * Per-copy culling and LODs of everything the live shards placed — once a frame, after the camera is posed. A world whose
  * registry stands in a frame of its own (a grid region's root, SF63) culls against the camera seen from that frame.
+ * @frame
  */
 export function cullPlaced(camera: THREE.Camera): void {
   cullStamp = (cullStamp + 1) % 0x40000000;
-  cullFresh(camera, () => {
-    for (let i = 0; i < cullers.length; i++) {
-      const frame = cullerLives[i]?.frame ?? null;
-      cullers[i]?.(frame === null ? camera : frame.of(camera, cullStamp), camera);
-    }
-  });
+  passCamera = camera;
+  try { cullFresh(camera, cullPass); } finally { passCamera = null; }
+}
+/** STR19: the pass `cullPlaced` runs, made once, reading the frame's camera from `passCamera` @frame */
+function cullPass(): void {
+  const camera = passCamera;
+  if (camera === null) return;
+  for (let i = 0; i < cullers.length; i++) {
+    const frame = cullerLives[i]?.frame ?? null;
+    cullers[i]?.(frame === null ? camera : frame.of(camera, cullStamp), camera);
+  }
 }
 
 
@@ -728,7 +736,14 @@ function* drawInstancedSteps<P extends object>(def: ModelDef<P>, pls: readonly P
 /** The casting cascades' frusta, read by a culler. Made outside the generator: JavaScriptCore keeps a generator's
  *  parameters (every copy's placement, pose and params) alive in each closure made in its body (MG9). */
 function castingFrusta(ctx: BuildOptions<object>['ctx']): () => THREE.Frustum[] {
-  return () => ctx.sky.csm.lights.filter((l) => l.castShadow).map((l) => l.shadow.getFrustum());
+  // STR19: one list per culler, refilled each choice (filter and map made two arrays and two closures a choice)
+  const frusta: THREE.Frustum[] = [];
+  return () => {
+    const lights = ctx.sky.csm.lights;
+    frusta.length = 0;
+    for (let k = 0; k < lights.length; k++) { const light = lights[k]; if (light?.castShadow === true) frusta.push(light.shadow.getFrustum()); }
+    return frusta;
+  };
 }
 
 // ── instanced, culled by the shard (`PlaceOptions.culler`): per part, level 0 with every copy, each LOD its own mesh ──
