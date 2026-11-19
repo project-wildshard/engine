@@ -74,6 +74,11 @@ const DECK_REACH = 0.1;
 const REST_LIFT = 0.0005;
 const UP = { x: 0, y: 1, z: 0 } as const;
 const SLOPE_CONTACT = 1, WALL_CONTACT = 2, BANK_CONTACT = 4;
+/** NL14b1: half the span `smoothBank` measures the terrain's slope over, and how far over and under the feet it looks. */
+const BANK_SPAN = 0.15, BANK_RAY_UP = 1, BANK_RAY_DOWN = 2;
+/** How much of the push into a bank is dropped: none below the climb limit, all a little past it, a ramp between, so a
+ *  bank at the limit gives a move that changes smoothly with it (NL14b1). */
+function steepShare(normalY: number, climb: number): number { return Math.min(1, Math.max(0, (climb - normalY) / 0.02 + 0.5)); }
 
 export interface MoveResult {
   grounded: boolean;
@@ -312,11 +317,12 @@ export class CharacterMotor {
     if (gap < 1e-6 || gap > this.opts.radius + 2 * skin) return null;
     bank.x = nx / gap; bank.y = ny / gap; bank.z = nz / gap;
     if (bank.y < 0.1) return null;
+    this.smoothBank(near.point);
     const lift = 2 * skin / bank.y;
     if (world.castShape(start, this.rot, UP, this.collider.shape, 0, lift, false, flags, this.filter, this.collider, undefined, predicate) !== null) return null;
     start.y += lift;
     this.collider.setTranslation(start);
-    const move = this.droppedWant(want, lift, bank.y < Math.cos(this.kcc.maxSlopeClimbAngle()));
+    const move = this.droppedWant(want, lift, steepShare(bank.y, Math.cos(this.kcc.maxSlopeClimbAngle())));
     const impulses = this.kcc.applyImpulsesToDynamicBodies();
     this.kcc.setApplyImpulsesToDynamicBodies(false);
     try { this.kcc.computeColliderMovement(this.collider, move, flags, this.filter, predicate); }
@@ -523,11 +529,34 @@ export class CharacterMotor {
   private flatWant(want: Vec3): Vec3 { this.flatScratch.x = want.x; this.flatScratch.y = 0; this.flatScratch.z = want.z; return this.flatScratch; }
   /** The move with its fall and the fall back from `lift` (no snap holds feet on a bank too steep to climb); a `steep` bank
    *  takes no part of the move that pushes into it. */
-  private droppedWant(want: Vec3, lift: number, steep: boolean): Vec3 {
-    const { bank } = this, h = Math.hypot(bank.x, bank.z) || 1, ux = bank.x / h, uz = bank.z / h, into = steep ? Math.min(0, want.x * ux + want.z * uz) : 0;
+  private droppedWant(want: Vec3, lift: number, steep: number): Vec3 {
+    const { bank } = this, h = Math.hypot(bank.x, bank.z) || 1, ux = bank.x / h, uz = bank.z / h, into = steep * Math.min(0, want.x * ux + want.z * uz);
     this.flatScratch.x = want.x - into * ux; this.flatScratch.y = want.y - lift; this.flatScratch.z = want.z - into * uz;
     return this.flatScratch;
   }
+  /**
+   * NET-LAG NL14b1: the bank as the terrain's slope across the feet, not the nearest face's normal. In a fold between two
+   * faces either side of the climb limit (Nalati's bank by a boulder, 41 and 34 degrees) the nearest face flips with a
+   * millimetre, and the move with it: steep, the push into it is dropped and the feet slide along; climbable, they climb back.
+   * They chattered there every 3 or 4 ticks, offline too, and the page and the room never chattered in step. Central
+   * differences of the terrain's heights a step either side of the nearest point change little when it jumps faces, so
+   * the move does too.
+   */
+  private smoothBank(at: Vec3): void {
+    const d = BANK_SPAN, east = this.terrainHeight(at.x + d, at.z, at.y), west = this.terrainHeight(at.x - d, at.z, at.y);
+    const north = this.terrainHeight(at.x, at.z + d, at.y), south = this.terrainHeight(at.x, at.z - d, at.y);
+    if (east === null || west === null || north === null || south === null) return;
+    const gx = (east - west) / (2 * d), gz = (north - south) / (2 * d), n = Math.hypot(gx, 1, gz), { bank } = this;
+    bank.x = -gx / n; bank.y = 1 / n; bank.z = -gz / n;
+  }
+  /** The terrain's height under (x, z), looking down from a little over the feet; null off the terrain. */
+  private terrainHeight(x: number, z: number, from: number): number | null {
+    const ray = this.bankRay ??= new this.physics.R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+    ray.origin.x = x; ray.origin.y = from + BANK_RAY_UP; ray.origin.z = z;
+    const hit = this.physics.world.castRay(ray, BANK_RAY_UP + BANK_RAY_DOWN, true, this.physics.R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, this.collider, undefined, isTerrainCollider);
+    return hit === null ? null : ray.origin.y - hit.timeOfImpact;
+  }
+  private bankRay: Ray | null = null;
   /** the bank `slideOffBank` measured: its outward normal */
   private readonly bank: Vec3 = { x: 0, y: 1, z: 0 };
 

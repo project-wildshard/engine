@@ -83,8 +83,10 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
  *  for MMO-PLAN MP1.5b (wire 1.2): every player row for others carries roadX and roadZ, zero in a cell (old: ba1c1187). Re-taken
  *  for MP5.2b (wire 1.3): every creature row carries roadX and roadZ, zero in a cell (old: b7a04dc8).
  *  Restored cell positions and distance tiers by recognizing the decoded wire zero (old: fa844910). Re-taken for ONE-FORMAT
- *  CC11a2c (wire 1.4): every creature row carries its running ability and how far through, zero when none (old: cdbcfce3). */
-const EXPECTED = '388e1517215669b9d41b23956f915db43d840c6ccdc0d91cfd0de55e8c7dca6e';
+ *  CC11a2c (wire 1.4): every creature row carries its running ability and how far through, zero when none (old: cdbcfce3).
+ *  Re-taken for NL14b1 (J280): `slideOffBank` measures the bank as the terrain's slope across the nearest point and drops
+ *  the push into it on a ramp across the climb limit (old law: 388e1517). */
+const EXPECTED = '8e8f6a3a88ef27c5b76046243e473dda58a584d806ea474f772aedf877d6ad0c';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
  *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. Re-taken
  *  for RP6 as above. Re-taken for GC36 and NL13 as above. Re-taken for Nalati continuation af0adf3f:
@@ -92,5 +94,6 @@ const EXPECTED = '388e1517215669b9d41b23956f915db43d840c6ccdc0d91cfd0de55e8c7dca
  *  The unarmed wire/body oracle above remains unchanged. Previous armed digest: b891e9d2451520250c7540b96103e86fea17bf710418e784519058e4ea2c829a.
  *  Re-taken for NL13b4 as above (old law: cd2d9048). Re-taken for CC28a as above (old: f231d52d). Re-taken for NL14b2 as
  *  above (old law: 9b5c9aad). Re-taken for MP1.5b as above (old: 620028c6), and for MP5.2b as above (old: 8dd4d5a6).
- *  Restored cell positions and distance tiers as above (old: 3c9036b7). Re-taken for CC11a2c as above (old: e8e25c9d). */
-const EXPECTED_ROOM = 'c1823a4464d7224693140e872f04fda681cd46b346c21c0f2ea255c9e4e04102';
+ *  Restored cell positions and distance tiers as above (old: 3c9036b7). Re-taken for CC11a2c as above (old: e8e25c9d).
+ *  Re-taken for NL14b1 as above (old law: c1823a44). */
+const EXPECTED_ROOM = '35acd7ed03365af8c9e33413c1e2cb690764428a852a39af4d6e9acf20848c52';

@@ -35,6 +35,8 @@ import {lendFrozenPasture as lendNalatiRiding} from '../frozen/runtimePrograms';
 // off all eight old chains match, and the new law is re-recorded the same way.
 // NL14b2 (J280): grounded feet on a terrain bank against a wall start the move two skins off the bank (`slideOffBank`); with
 // that retry switched off all eight old chains match, and the new law is re-recorded the same way.
+// NL14b1 (J280): `slideOffBank` takes the bank as the terrain's slope across the nearest point, not the nearest face, and drops
+// the push into it on a ramp across the climb limit; on the old motor all eight old chains match, re-recorded the same way.
 
 const TICKS = 40_000, HASH_EVERY = 500, SEGMENT = 900;
 const BASELINE = 'test/fixtures/motion-trace/seven-traces.json', RECORDING = process.env['MOTION_TRACE_RECORD'] === '1';
