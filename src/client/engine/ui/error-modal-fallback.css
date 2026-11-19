@@ -1,0 +1,7 @@
+#wserr { position: fixed; inset: 0; z-index: 2147482500; display: grid; place-items: center; padding: 16px; background: #0d1b26; color: white; }
+#wserr .box { width: min(440px, 100%); max-height: 100%; overflow: auto; }
+#wserr button { min-height: 48px; }
+#wserr button[hidden] { display: none; }
+#wserr pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#wserr-chip { position: fixed; top: 20%; left: 16px; z-index: 2147482400; background: #0d1b26; color: white; }
+#wserr-chip.out { opacity: 0; pointer-events: none; }

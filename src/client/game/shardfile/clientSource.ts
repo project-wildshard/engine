@@ -41,12 +41,12 @@ import { clientResidency } from './clientResidency';
 import { PageMemoryAdmission } from './phoneMemoryLine';
 
 /** The composition root passes this selection to hydration and startSession; its grid intent has already been consumed. */
-export interface PageResidencyBoot {
+export interface PageResidencyBoot<Admission extends MemoryAdmission = MemoryAdmission> {
   readonly mode: PageMode;
   readonly instance: string | null;
   readonly residency?: PageResidency;
   /** G216: one native page policy also reaches data-only SHARD SELECT validation and its warning surface. */
-  readonly memory: MemoryAdmission;
+  readonly memory: Admission;
   /** Validated recovery uses the ordinary owner, then returns to the road. */
   readonly recovery?: NonNullable<GridRecoveryRecord>;
 }
@@ -60,7 +60,10 @@ export interface PageResidencyBoot {
 /** GC13: the page's playing envelope: the phone tier's 1.0 GB (G65), else the shared caps' */
 export function pagePlayingBytes(tier: Tier = TIER): number { return tier === 'phone' ? PHONE_PLAYING_BYTES : CONTENT_CAPS.playing; }
 
-export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'shardfile' | 'gridShardfile' | 'clientPlanRuntime' | 'runtimeCost'>, configuredSlug?: string, memory: MemoryAdmission = new PageMemoryAdmission()): PageResidencyBoot {
+type PageManifest = Pick<ShardManifest, 'slug' | 'shardfile' | 'gridShardfile' | 'clientPlanRuntime' | 'runtimeCost'>;
+export function preparePageResidency(manifest: PageManifest, configuredSlug?: string): PageResidencyBoot<PageMemoryAdmission>;
+export function preparePageResidency(manifest: PageManifest, configuredSlug: string | undefined, memory: MemoryAdmission): PageResidencyBoot;
+export function preparePageResidency(manifest: PageManifest, configuredSlug?: string, memory: MemoryAdmission = new PageMemoryAdmission()): PageResidencyBoot {
   const mode = bootPageMode(configuredSlug ?? manifest.slug);
   const measuredHome = configuredSlug === undefined && dataPointer(manifest) === undefined;
   if (mode !== 'grid' && (!measuredHome || manifest.runtimeCost === undefined)) return { mode, instance: null, memory };

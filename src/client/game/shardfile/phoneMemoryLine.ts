@@ -3,40 +3,43 @@ import { MEMORY_GATES } from '@wildshard/format/contentBounds';
 import { isDev } from '@wildshard/engine/core/devMode';
 import { TIER, type Tier } from '@wildshard/engine/core/tier';
 
-/**
- * MEMORY-GATES MG3 (J408, Jake 2026-11-17, after Nine crashed his iPhone 17 Pro at boot): the phone's hard line, engine's
- * MEMORY_AMBER (src/client/game/grid/budgetOverlay.ts; a test holds them equal). Decimal bytes.
- */
+/** MG3 / J431: estimates over engine's MEMORY_AMBER show a phone warning. Decimal bytes. */
 export const PHONE_MEMORY_LINE_BYTES = 1.5e9;
 
-/** A phone boot refused for memory: the message is the card the player reads, before any world is built. */
-export class ShardMemoryRefusalError extends Error {
-  readonly owner: string; readonly playingBytes: number; readonly lineBytes: number;
-  constructor(owner: string, playingBytes: number, lineBytes: number) {
-    const gb = (bytes: number): string => (bytes / 1e9).toFixed(2);
-    super(`This world needs about ${gb(playingBytes)} GB of memory and a phone has ${gb(lineBytes)} GB to give it. Pick another world, or play it on a computer.`);
-    this.name = 'ShardMemoryRefusalError'; this.owner = owner; this.playingBytes = playingBytes; this.lineBytes = lineBytes;
-  }
+interface PhoneMemoryEstimate { playing: number; loading: number }
+
+/** Read the cook estimate stamped into the page for its selected catalogue pin. */
+export function cookedPhoneEstimate(slug: string): PhoneMemoryEstimate | undefined {
+  const verdicts: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__');
+  if (!Array.isArray(verdicts)) return undefined;
+  const path = `/shardfiles/${slug}/shard.json`;
+  const row: unknown = verdicts.find((candidate: unknown) =>
+    typeof candidate === 'object' && candidate !== null && 'path' in candidate && candidate.path === path);
+  const cost = typeof row === 'object' && row !== null && 'worst' in row ? row.worst : undefined;
+  return typeof cost === 'object' && cost !== null && 'playing' in cost && 'loading' in cost
+    && typeof cost.playing === 'number' && typeof cost.loading === 'number'
+    ? { playing: cost.playing, loading: cost.loading } : undefined;
 }
 
-/**
- * The page's memory admission. On the phone tier a claim whose playing estimate passes the line is refused whatever
- * `memoryGates.json` says: a shard's own admission throws ShardMemoryRefusalError, a grid residency claim is declined; a Developer page keeps its override (G216) so it can still load
- * and measure an over-line shard. Under the line, and on other tiers, admission is unchanged: report-only accepts.
- */
 export class PageMemoryAdmission extends MemoryAdmission {
-  private readonly tier: Tier; private readonly developerPage: () => boolean;
-  constructor(tier: Tier = TIER, developerPage: () => boolean = isDev, reportOnly: boolean = MEMORY_GATES.reportOnly) {
-    super(() => reportOnly || developerPage());
-    this.tier = tier; this.developerPage = developerPage;
+  private estimate = 0;
+  private acknowledgement: Promise<void> | undefined;
+
+  constructor(private readonly tier: Tier = TIER, private readonly developerPage: () => boolean = isDev, reportOnly: boolean = MEMORY_GATES.reportOnly) {
+    super(() => tier === 'phone' || reportOnly || developerPage());
   }
+
   override accept(request: MemoryAdmissionRequest): boolean {
-    if (this.tier === 'phone' && request.playingBytes > PHONE_MEMORY_LINE_BYTES && !this.developerPage()) {
-      // A live grid's residency claim is refused the ordinary way (the allocator keeps what it has); a shard's own
-      // admission (its runtime home, its declared and actual costs) stops the boot with the card.
-      if (request.stage === 'resident') return false;
-      throw new ShardMemoryRefusalError(request.owner, request.playingBytes, PHONE_MEMORY_LINE_BYTES);
-    }
-    return super.accept(request);
+    const accepted = super.accept(request);
+    if (request.stage !== 'resident') this.estimate = Math.max(this.estimate, request.playingBytes, request.loadingBytes);
+    return accepted;
+  }
+
+  /** One warning per entry, even when both its declared and actual estimates cross. */
+  waitForWarning(show: () => Promise<void>, entry?: string): Promise<void> | undefined {
+    const cooked = entry === undefined ? undefined : cookedPhoneEstimate(entry);
+    if (this.tier === 'phone' && Math.max(this.estimate, cooked?.playing ?? 0, cooked?.loading ?? 0) > PHONE_MEMORY_LINE_BYTES
+      && !this.developerPage()) this.acknowledgement ??= show();
+    return this.acknowledgement;
   }
 }

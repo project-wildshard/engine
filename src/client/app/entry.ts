@@ -435,8 +435,7 @@ async function startPage(): Promise<void> {
       // Admission can refuse before startSession installs its fatal-load boundary. main starts asynchronously;
       // paint the same fatal card here, naming the step it died on, instead of leaving a rejected boot behind the loader.
       const { showError } = await import('@wildshard/engine/ui/ErrorModal');
-      const refusal = error instanceof Error && error.name === 'ShardMemoryRefusalError' ? error.message : undefined;
-      showError(stuckMessage(progressOfCard(card()).step, { error }), error instanceof Error ? error.stack ?? '' : '', stall(), refusal);
+      showError(stuckMessage(progressOfCard(card()).step, { error }), error instanceof Error ? error.stack ?? '' : '', stall());
       return;
     }
     clearGridRecovery();
@@ -511,6 +510,11 @@ async function readJson(url: string): Promise<unknown> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Inline runtime discovery answered ${response.status}`);
   return JSON.parse(await response.text());
+}
+
+async function askPhoneMemory(root: HTMLElement, scope: Scope): Promise<void> {
+  const { confirmPhoneMemory } = await import('./phoneMemoryWarning');
+  await confirmPhoneMemory(root, scope);
 }
 
 async function startSelected(): Promise<void> {
@@ -608,7 +612,11 @@ async function startSelected(): Promise<void> {
     // client-plan entry on the page that owns this inline candidate. A bare inline arrival has no runtime composition.
     const runtimePage = inline === null || !inlineOwner ? null : await inlineRuntimeArrival(inline, { base: document.baseURI }, readJson);
     const source = runtimePage === null ? inline : null, admitted = runtimePage ?? arrival;
-    page = preparePageResidency(admitted, source?.identity.slug);
+    const selectedPage = preparePageResidency(admitted, source?.identity.slug);
+    page = selectedPage;
+    const waitForMemoryWarning = (slug?: string): Promise<void> | undefined =>
+      selectedPage.memory.waitForWarning(() => askPhoneMemory(loading.root, loading.scope), slug);
+    await waitForMemoryWarning(admitted.slug);
     // The script memory bank (scriptMemoryPlan.ts): each reserve can cost JSC a full GC (e472f34069). NINE-DRAGON-BENCHMAX NB4:
     // Nine's standalone page took 1 of a 45 bank by control, while the 45 cost Jake's Low Power iPhone 1.1 s of modules.
     // SB47: a grid page reserves the standalone bank under the loader too (its one home cell), and tops up the full-ALL
@@ -655,9 +663,14 @@ async function startSelected(): Promise<void> {
     imports.check();
     // DL11: setup overlaps the download (each read waits for its own file); control waits for the whole set (finish.ts)
     if (spawnJob !== null) await waitFor('Spawn download', spawnJob.listed ?? spawnJob.ready, 'file');
+    const folderOptions: Parameters<typeof installShardfileFolder>[1] = {
+      ...browserShardfileOptions(document.baseURI, source === null || inlineOwner), memory: page.memory,
+      progress: progress => { loading.paintAdmission(progress); },
+    };
     const manifest = await bootAwait('app:product-admission', source === null
-      ? installManifestShardfile(admitted, { ...browserShardfileOptions(document.baseURI, true), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready)
-      : installShardfileFolder(source, { ...browserShardfileOptions(document.baseURI, inlineOwner), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready));
+      ? installManifestShardfile(admitted, folderOptions, bindings, imports.ready)
+      : installShardfileFolder(source, folderOptions, bindings, imports.ready));
+    await waitForMemoryWarning();
     // Keep the seam out of code and descriptor admission; world construction
     // can overlap this read and retains its original full-geometry barrier.
     if (page.mode === 'grid') gridSelection.startGridEntryContent(page.instance ?? pageGridRecovery()?.instance ?? gridSelection.gridHome().instance);
