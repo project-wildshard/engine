@@ -25,3 +25,14 @@ Peaks now count live bytes, so they read at or under the recorded
 baselines, which were taken with garbage in them. Re-recording the
 ledger baselines would tighten the line again; that is codex-memgates'
 call.
+
+## Follow-up: the GC hangs the boot
+
+A local boot of run 44418154411's pinned client through the new path
+stalled at `modules` three times out of three, with every Read Model,
+Program, Texture and Product data wait still open. The same client with
+the pre-fix script, or with only `--expose-gc` and no gc() call, boots
+to control. So a full GC during `modules` loses in-flight reads: a real
+engine bug, since a phone collects whenever it likes. The per-step GC
+comes out again so the gate does not hang; the peaks keep their noise
+until the hang is fixed.

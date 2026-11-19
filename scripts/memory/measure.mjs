@@ -72,19 +72,17 @@ const MB = 1e6;
 
 /** In the page before its scripts: every change of the loading card's step, stamped on the wall clock the kernel sampler
  * uses, with the ledger's counters when the page publishes them. The card gone and a world up is `control`.
- * The ledger counts a buffer until a GC clears its weak reference, so a run that sets `__memoryRun.settle` (the hosted
- * ledger gate, launched with --expose-gc) collects garbage before each step's read. Without it brasscap-mesa's peak
- * loading read 37.8 to 47.1 MB on the same code (main runs 44405336243..44418154411) and failed its line by 0.3 MB. */
+ * Steps read as is: a gc() before each read (f0ae8ced) hung brasscap-mesa's boot at `modules` with its Read data waits
+ * open, so the peaks keep whatever garbage the GC has not reached (37.8 to 47.1 MB on the same code). */
 export const STEP_LOG = String.raw`(() => {
-  const steps = []; window.__memoryRun = { steps, settle: false };
+  const steps = []; window.__memoryRun = { steps };
   const ledger = () => { try { return globalThis.__wildshardMemory?.counters?.() ?? null; } catch { return null; } };
-  const settled = () => { if (window.__memoryRun.settle && typeof globalThis.gc === 'function') globalThis.gc(); return ledger(); };
   const read = () => {
     const root = document.querySelector('.ws-load');
     if (!root) return window.__wildshard?.world?.game ? 'control' : (steps.length === 0 ? 'page' : null);
     return root.getAttribute('data-step') || root.querySelector('[data-step]')?.getAttribute('data-step') || 'loading';
   };
-  const on = () => { const step = read(); if (step && step !== steps.at(-1)?.[1]) { const at = performance.timeOrigin + performance.now(); steps.push([at, step, settled()]); } };
+  const on = () => { const step = read(); if (step && step !== steps.at(-1)?.[1]) steps.push([performance.timeOrigin + performance.now(), step, ledger()]); };
   const go = () => { new MutationObserver(on).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-step'] }); on(); setInterval(on, 100); };
   if (document.documentElement) go(); else document.addEventListener('DOMContentLoaded', go);
   // the page's own errors: with the inspector's Console domain off (instrument minimal) Playwright sees none
@@ -573,12 +571,10 @@ async function chromiumLedger(page, url, timeoutMs) {
 export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, depth = 3, plantRetainedBuffer = false, captureDumps = true }) {
   const { launchMemoryBrowser } = await import('../chromium-memory-browser.mjs');
   const gpu = process.platform === 'darwin' ? ['--use-angle=metal'] : [];
-  // The ledger-only boot (the hosted gate) reads each step after a GC (STEP_LOG); the dump boot keeps its own timing.
-  const owned = await launchMemoryBrowser([...gpu, '--ignore-gpu-blocklist', '--enable-precise-memory-info', ...(captureDumps ? [] : ['--js-flags=--expose-gc'])]);
+  const owned = await launchMemoryBrowser([...gpu, '--ignore-gpu-blocklist', '--enable-precise-memory-info']);
   try {
     const context = await owned.browser.newContext({ ...PHONE_VIEW });
     await phoneContext(context);
-    if (!captureDumps) await context.addInitScript(() => { Reflect.get(window, '__memoryRun').settle = true; });
     if (plantRetainedBuffer) await context.addInitScript(() => {
       // Only the negative-control browser holds and charges this allocation.
       // Publishing happens before the first WebGL upload.
