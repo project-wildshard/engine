@@ -81,3 +81,28 @@ test('far-reach: a walk glancing off the windmill is the same in any collider or
   }
   expect(worst, `a walk along the windmill parts by ${worst.toExponential(2)} m with the colliders' order`).toBe(0);
 });
+
+/**
+ * Nine Dragon: staging v0.1.37 corrected a Chromium sprint 114 times a minute (worst 2.76 m) along the square's balustrade.
+ * The drawn stone had no collider under the square's cap (it starts 1.12 m up), so the feet slid past the slab's edge and
+ * hung on it under the cap, a capsule on an edge and a cap at once: the page and the room parted by up to a metre. Along the
+ * street, with no cap, the walk went through the drawn stone into the Well. A walk pressed against either run keeps its feet
+ * on the floor, inside the stone, and steps the same in any collider order.
+ */
+test('nine-dragon-stack: a walk pressed along the balustrade stays on the floor in any collider order', () => {
+  interface Placed { readonly id: string; readonly name: string; readonly file: string; readonly category?: string; readonly surface: string; readonly colliderOwner?: string; readonly when?: { readonly variant?: string }; readonly colliders: readonly { readonly kind: string }[] }
+  const scene = JSON.parse(readFileSync('out/nine-dragon-stack/sections/world/scenes.json', 'utf8')) as { entry: { blocks: { pieces: Placed[] } } };
+  const nine = scene.entry.blocks.pieces.filter(piece => piece.when?.variant !== 'open').map(piece => ({ id: piece.id, name: piece.name, file: piece.file, active: true,
+    ...(piece.category === undefined ? {} : { category: piece.category }), surface: piece.surface, ...(piece.colliderOwner === undefined ? {} : { owner: piece.colliderOwner }),
+    colliders: piece.colliders.filter(collider => collider.kind === 'box') })) as unknown as Piece[];
+  const pressed: Step = () => ({ x: -1 / 60, y: -22 / 3600, z: -7 / 60 });
+  // the stone's inner face (squareParts WELL_RUNS: x = 0.2 by the square, 0.7 by the street, a 0.62 m plinth) plus the radius
+  for (const [run, start, face] of [['square', { x: 0.95, y: 125.02, z: 7.5 }, 0.2 + 0.31], ['street', { x: 1.6, y: 125.02, z: -28 }, 0.7 + 0.31]] as const) {
+    const a = walk(nine, start, true, pressed), b = walk([...nine].reverse(), start, false, pressed);
+    const worst = a.reduce((most, value, i) => Math.max(most, Math.abs(value - (b[i] ?? Number.NaN))), 0);
+    const west = Math.min(...a.filter((_, i) => i % 3 === 0)), low = Math.min(...a.filter((_, i) => i % 3 === 1));
+    expect(west, `${run}: the feet reach x ${west.toFixed(3)}, past the stone's face`).toBeGreaterThan(face + PLAYER_CAPSULE.radius - 0.02);
+    expect(low, `${run}: the feet drop to y ${low.toFixed(3)}`).toBeGreaterThan(124.9);
+    expect(worst, `${run}: the walk parts by ${worst.toExponential(2)} m with the colliders' order`).toBe(0);
+  }
+});
