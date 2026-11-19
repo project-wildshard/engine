@@ -4,14 +4,14 @@ import { floorGridPortalPlan, gridFloorWitnessFailures, readFloorGridEntryways, 
 test('cold home entry selects its return after the outward retirement leg', () => {
   const state = { home: 'home', cells: [
     { instance: 'home', slug: 'driftwood-isle', cell: [0, 0] as const },
-    { instance: 'template-2', slug: '_template', cell: [-1, -1] as const },
+    { instance: 'brasscap', slug: 'brasscap-mesa', cell: [-1, -1] as const },
   ] };
   const plans = gridFloorPlans(state, 'cell', { cell: 'home', roadApproach: true });
   const route = floorGridEntryRoute(plans, 'home');
   expect(route.setup).toHaveLength(1);
-  expect(route.setup[0]).toMatchObject({ from: 'home', to: 'template-2', retiredResidents: ['home'] });
-  expect(route.entry).toMatchObject({ name: 'driftwood-isle-road-entry', from: 'template-2', to: 'home', requiredResidents: ['home'] });
-  expect(floorGridEntryRoute(plans, 'template-2')).toEqual({ setup: [], entry: plans[0] });
+  expect(route.setup[0]).toMatchObject({ from: 'home', to: 'brasscap', retiredResidents: ['home'] });
+  expect(route.entry).toMatchObject({ name: 'driftwood-isle-road-entry', from: 'brasscap', to: 'home', requiredResidents: ['home'] });
+  expect(floorGridEntryRoute(plans, 'brasscap')).toEqual({ setup: [], entry: plans[0] });
   expect(() => floorGridEntryRoute(plans, 'missing')).toThrow('Missing grid entry');
 });
 

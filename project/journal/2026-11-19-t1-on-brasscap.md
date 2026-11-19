@@ -45,3 +45,5 @@ found three real bugs, each fixed in its own commit:
   TR-8 (its "engine fixed" part needs the simplest shard, not Brasscap).
 - Frame floor: the peer route is 'brasscap' (Brasscap's road cell at
   (-1,-1)); the public walk enters Sunscar Dunes (Brasscap is Developer).
+  The cold-home-entry fixture uses the same Brasscap corner cell. Its
+  outward leg still retires home before the return leg demands it again.
