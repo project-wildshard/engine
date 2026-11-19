@@ -63,6 +63,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { bootTimelineEntries } from '../loading-flow/stalls.mjs';
 import { listProcesses, readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
 import { ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText, zoneOverRuns } from './phoneModel.mjs';
+import { allocationSites, CULLER, symbolizer, walkPeak, walkRoute } from './walk.mjs';
 
 export const PROTOCOL = 'memory-run/1';
 /** The inspector modes (see the header). @type {readonly ['minimal', 'full']} */
@@ -362,8 +363,9 @@ export async function settledReading(page, procs, { settleMs = 2000, gcs = 2, re
 
 /** One cold phone boot in native WebKit, read by the kernel.
  * @param {{url:string, chunk:string, settleMs?:number, timeoutMs?:number, everyMs?:number, gcs?:number, reads?:number, closure?:boolean, instrument?:'minimal'|'full', probe?:(page:any, procs:BrowserProcess[]) => Promise<unknown>}} options
- * `probe` runs at control after the settled reading (a probe script's own reading, kept as `probe` in the run). */
-export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false, instrument = 'minimal', probe, world = null }) {
+ * `probe` runs at control after the settled reading (a probe script's own reading, kept as `probe` in the run). `walk`
+ * (seconds, STR18) then walks the zone's route (walk.mjs) with no forced GC and keeps its peak above settled as `walk`. */
+export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false, instrument = 'minimal', probe, world = null, walk = 0 }) {
   const { webkit } = await import('../browser-playwright.mjs');
   const browser = await webkit.launch({ headless: true });
   const load = loadavg()[0];
@@ -387,7 +389,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     const sampler = startSampler([...procs.keys()], { everyMs });
     const discover = () => { for (const p of webkitProcesses()) if (!procs.has(p.pid)) { procs.set(p.pid, p); sampler.add(p.pid); } };
     const watch = setInterval(discover, 500);
-    let failure = null, settled = null, ledger = null, counters = null, categories = null, /** @type {unknown} */ probed = null;
+    let failure = null, settled = null, ledger = null, counters = null, categories = null, /** @type {unknown} */ probed = null, /** @type {any} */ walked = null;
     /** @type {StepRow[]} */ let steps = [], trace = [];
     const started = Date.now();
     try {
@@ -403,6 +405,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
         counters = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.counters?.() ?? null; } catch { return null; } });
         if (closure) categories = footprintCategories([...procs.values()]);
         if (probe) probed = await probe(page, [...procs.values()]);
+        if (walk > 0) { sampler.mark('walk'); walked = await walkRoute(page, chunk, walk); sampler.mark('walked'); }
       }
       steps = await page.evaluate(() => Reflect.get(window, '__memoryRun')?.steps ?? []);
       if (inspector) errors.push(...await page.evaluate(() => Reflect.get(window, '__memoryRun')?.errors ?? []));
@@ -413,7 +416,9 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
       // No WebContent found: say what the kernel listed under ms-playwright, so a host that ties WebKit's services to its
       // app another way (EM12's hosted runner) can be read from one log
       if (!all.some((p) => p.role === 'webcontent')) for (const row of listProcesses().filter((r) => r.path.includes('ms-playwright'))) console.error(`  no WebContent matched; ms-playwright process ${row.pid} ppid ${row.ppid} rpid ${row.rpid} ${row.name} (this node ${process.pid})`);
-      const checkpoints = stepCheckpoints(stream.samples, steps, all);
+      // a walk's samples are the walk's, not the boot's: the boot checkpoints end where the walk starts
+      const walkFrom = stream.marks.find((m) => m.mark === 'walk')?.t ?? Infinity, bootSamples = stream.samples.filter((s) => s.t < walkFrom);
+      const checkpoints = stepCheckpoints(bootSamples, steps, all);
       const lifetime = readFootprints(all.map((p) => p.pid));
       const kept = inspector === null || sameInspectorSession(page, inspector);
       const workers = /** @type {string[]} */ (await page.evaluate(() => Reflect.get(window, '__workersMade') ?? []).catch(() => []));
@@ -422,7 +427,9 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
         : boot === 'standalone' && !serverWorker ? `the standalone boot started no in-page server worker (${workers.join(', ')})` : null;
       return { host: 'webkit', instrument: kept ? instrument : 'minimal-lost', boot, serverWorker, workers, chunk, url, build, ready: failure === null, failure, errors: errors.slice(0, 5), readyMs, loadAverage: Math.round(load * 100) / 100,
         processes: all.map((p) => ({ pid: p.pid, role: p.role, name: p.name, path: p.path, lifetimeMaxBytes: /** @type {any} */ (lifetime[String(p.pid)])?.lifetimeMaxPhysicalFootprintBytes ?? null })),
-        checkpoints, traceCheckpoints: trace.length > 0 ? stepCheckpoints(stream.samples, traceToControl(trace, steps), all) : [], settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, ...(probe ? { probe: probed } : {}), refused: failure ?? wrongBoot ?? (kept ? refusal(checkpoints) : 'the page moved to a new inspector session mid-boot (Network domain on again)'), samples: stream.samples.length };
+        checkpoints, traceCheckpoints: trace.length > 0 ? stepCheckpoints(bootSamples, traceToControl(trace, steps), all) : [], settled, counters, categories, ledger: ledger ? { totals: ledger.totals, unattributed: ledger.unattributed, byKind: ledgerByKind(ledger) } : null, ...(probe ? { probe: probed } : {}),
+        ...(walk > 0 ? { walk: walked === null || settled === null ? null : { route: walked, ...walkPeak(stream.segments, all, settled) } } : {}),
+        refused: failure ?? wrongBoot ?? (kept ? refusal(checkpoints) : 'the page moved to a new inspector session mid-boot (Network domain on again)'), samples: stream.samples.length };
     } finally { clearInterval(watch); await sampler.stop().catch(() => undefined); }
   } finally { await browser.close(); }
 }
@@ -564,6 +571,51 @@ async function chromiumLedger(page, url, timeoutMs) {
     sleep(2000, null, { ref: false }),
   ]);
   return { host: 'chromium', ready: failure === null, failure, gpuDetail, checkpoints, timeline };
+}
+
+/** STR18 [S]: one cold online phone boot in headless Chromium (ANGLE Metal), settled (a GC, `settleMs` idle), then the zone's
+ * walk (walk.mjs) for `seconds` under V8's sampling heap profiler with objects collected by minor and major GCs kept:
+ * the walk's allocation traffic in bytes per second and its largest stacks. Traffic, never a peak; the WebKit walk carries
+ * the [K] reading. @param {{url:string, chunk:string, world:{release:string, key:string} | null, seconds:number,
+ * timeoutMs?:number, settleMs?:number, intervalBytes?:number, top?:number, dist?:string, profileOut?:string, jsFlags?:string}} options
+ * `dist` (the built client) resolves frames through its hidden source maps; `profileOut` keeps the raw profile. `jsFlags`
+ * (diagnostic only: `--no-turbo-inlining` charges an inlined callee's allocations to itself, not its caller) goes to V8. */
+export async function chromiumWalk({ url, chunk, world, seconds, timeoutMs = 240_000, settleMs = 2000, intervalBytes = 16384, top = 10, dist, profileOut, jsFlags }) {
+  const { launchMemoryBrowser } = await import('../chromium-memory-browser.mjs');
+  const gpu = process.platform === 'darwin' ? ['--use-angle=metal'] : [];
+  const owned = await launchMemoryBrowser([...gpu, '--ignore-gpu-blocklist', '--mute-audio', ...(jsFlags ? [`--js-flags=${jsFlags}`] : [])]);
+  try {
+    const context = await owned.browser.newContext({ ...PHONE_VIEW });
+    await phoneContext(context, { route: false });
+    await context.addInitScript(WORKER_LOG);
+    if (world !== null) await context.addInitScript((stamp) => { Reflect.set(globalThis, '__WS_WORLD__', stamp); }, world);
+    const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);
+    /** @type {string[]} */ const errors = [];
+    page.on('pageerror', (error) => { errors.push(error.message); });
+    await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
+    const named = world === null ? null : answerName(page);
+    let failure;
+    try { failure = await untilControl(page, timeoutMs); } finally { await named?.stop(); }
+    const workers = /** @type {string[]} */ (await page.evaluate(() => Reflect.get(window, '__workersMade') ?? []).catch(() => []));
+    const boot = world === null ? 'standalone' : 'online', serverWorker = workers.some(isServerWorker);
+    if (failure === null && boot === 'online' && serverWorker) failure = `the online boot started the in-page server worker (${workers.join(', ')})`;
+    if (failure !== null) return { host: 'chromium', boot, chunk, ready: false, failure, errors: errors.slice(0, 5) };
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('HeapProfiler.enable');
+    await cdp.send('HeapProfiler.collectGarbage');
+    await sleep(settleMs);
+    await cdp.send('HeapProfiler.startSampling', { samplingInterval: intervalBytes, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+    const started = performance.now();
+    const route = await walkRoute(page, chunk, seconds);
+    const { profile } = await cdp.send('HeapProfiler.stopSampling');
+    const elapsed = (performance.now() - started) / 1000;
+    if (profileOut !== undefined) { mkdirSync(dirname(profileOut), { recursive: true }); writeFileSync(profileOut, JSON.stringify(profile)); }
+    const sites = allocationSites(profile, { top, symbol: dist === undefined ? undefined : await symbolizer(dist) });
+    const culler = sites.allOwners.filter((row) => CULLER.test(row.site)).reduce((total, row) => total + row.bytes, 0);
+    return { host: 'chromium', boot, chunk, ready: true, failure: null, errors: errors.slice(0, 5), seconds: elapsed, route,
+      bytesPerSecond: sites.total / elapsed, cullerBytesPerSecond: culler / elapsed, sampledBytes: sites.total,
+      owners: sites.owners, stacks: sites.stacks, sites: sites.sites };
+  } finally { await owned.close(); }
 }
 
 /** Chromium boot with detailed process dumps for diagnostics.
@@ -786,7 +838,7 @@ async function main(argv) {
   /** @type {Record<string, string>} */
   const args = Object.fromEntries(argv.map((a) => /^--([^=]+)(?:=(.*))?$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2] ?? '1']));
   const online = args.online === undefined ? null : args.online === 'pair' ? 'pair' : 'online';
-  const usage = 'usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--ledger-only] [--summary=<file>] [--out=<file>] | --online[=pair] --dist=<built client folder> --chunk=<slug> [--runs=N] [--round=k] | --ladder [--zones=a,b] | --place=<slug,...> --out=<catalogue file>';
+  const usage = 'usage: measure.mjs --url=<served client> --chunk=<slug> [--runs=N] [--url2=<second build>] [--microscope] [--closure] [--ledger-only] [--summary=<file>] [--out=<file>] | --online[=pair] --dist=<built client folder> --chunk=<slug> [--runs=N] [--round=k] | --online --walk[=seconds] --dist=<built client folder> --chunk=<slug> [--runs=N] [--profiles=<dir>] | --ladder [--zones=a,b] | --place=<slug,...> --out=<catalogue file>';
   if (args.place) {
     if (!args.out) { console.error('--place=<slug,...> takes --out=<catalogue file> (and --catalogue=<file>, default test/pins/catalogue.json)'); return 64; }
     const placed = placeOffGrid(JSON.parse(readFileSync(args.catalogue ?? 'test/pins/catalogue.json', 'utf8')), args.place.split(','));
@@ -795,6 +847,9 @@ async function main(argv) {
     for (const slug of args.place.split(',')) console.log(`${slug} at (${placed.grid.cells.find((row) => row.slug === slug)?.cell.join(',')}) in ${args.out}`);
     return 0;
   }
+  // STR18: --walk[=seconds] (60) walks the zone's route after control on the online boot, in WebKit [K] and Chromium [S]
+  const walk = args.walk === undefined ? 0 : args.walk === '1' ? 60 : Number(args.walk);
+  if (args.walk !== undefined && (online !== 'online' || !(walk > 0))) { console.error(`--walk takes --online (not pair) and a walk of more than 0 s\n${usage}`); return 64; }
   if (online !== null && (!args.dist || !args.chunk || args.url2 || args.ladder || args.microscope || args['ledger-only'])) { console.error(`--online takes --dist and --chunk, and no --url2, --ladder, --microscope or --ledger-only\n${usage}`); return 64; }
   if (online !== null && builtGridCell(readFileSync(join(args.dist, 'index.html'), 'utf8'), args.chunk) === null) {
     console.error(`--online: ${args.chunk} has no grid cell in ${args.dist}'s catalogue (off the grid, J305), so the online page lands on the title (OF3).\n`
@@ -821,17 +876,25 @@ async function main(argv) {
         : [{ url: world.url, world: world.stamp, name: 'online' }];
   /** @type {Awaited<ReturnType<typeof webkitBoot>>[]} */
   const webkit = [];
+  /** @type {Awaited<ReturnType<typeof chromiumWalk>>[]} */
+  const walks = [];
   try {
     // --round=k: the first round's index, so one pair per command (each under the measure lock) keeps the flipped order
     const first = Number(args.round ?? 0);
     for (let i = first; i < first + runs; i++) {
       // two arms alternate inside each round, and the order flips each round, so drift lands on both
       for (const arm of i % 2 === 0 ? arms : [...arms].reverse()) {
-        const run = await webkitBoot({ url: arm.url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure), instrument, world: arm.world });
+        const run = await webkitBoot({ url: arm.url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure), instrument, world: arm.world, walk });
         webkit.push(run);
         for (const line of webkitLines(run)) console.log(line);
         if (args.closure) for (const line of closureLines(run, webkitCalibration())) console.log(line);
         const phone = phoneLine(run); if (phone) console.log(phone);
+        if (walk > 0) {
+          const sampled = await chromiumWalk({ url: arm.url, chunk: args.chunk, world: arm.world, seconds: walk, timeoutMs, settleMs, dist: resolvePath(args.dist), ...(args['js-flags'] ? { jsFlags: args['js-flags'] } : {}),
+            ...(args.profiles ? { profileOut: resolvePath(args.profiles, `${args.chunk}-${String(i)}.heapprofile`) } : {}) });
+          walks.push(sampled);
+          for (const line of walkLines(run, sampled)) console.log(line);
+        }
       }
     }
   } finally { await world?.close(); }
@@ -864,6 +927,8 @@ async function main(argv) {
     const z = zoneOverRuns(/** @type {any} */ (good), loadPhoneModel()), gb = (/** @type {number} */ b) => (b / 1e9).toFixed(2);
     console.log(`phone over ${z.runs} runs [EM11, iPhone 17 Pro]: playing ${gb(z.playing.central)} GB (upper ${gb(z.playing.upper)}), loading ${gb(z.loading.central)} GB (upper ${gb(z.loading.upper)}); upper = 90% prediction bound on one more cold boot`);
   }
+  const walked = walk > 0 ? walkSummary(webkit, walks) : null;
+  if (walked) for (const line of walkSummaryLines(walked)) console.log(line);
   const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({
     url: args.url, chunk: args.chunk, timeoutMs, plantRetainedBuffer: Boolean(args['plant-retained-buffer']),
     captureDumps: Boolean(args.microscope || args['observe-timeout']),
@@ -879,11 +944,45 @@ async function main(argv) {
   if (runs > 0) console.log(`instrument ${instrument}: ${instrument === 'minimal' ? 'Web Inspector Network and Console domains off, no routes' : 'Playwright default session (Network domain keeps response bodies)'}`);
   if (args.out) {
     const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, `${JSON.stringify({ protocol: PROTOCOL, instrument: runs > 0 ? instrument : null, boot: runs > 0 ? bootOf(webkit) : null, url: args.url, chunk: args.chunk, date: new Date().toISOString(), webkit, summary, microscope }, null, 1)}\n`);
+    writeFileSync(out, `${JSON.stringify({ protocol: PROTOCOL, instrument: runs > 0 ? instrument : null, boot: runs > 0 ? bootOf(webkit) : null, url: args.url, chunk: args.chunk, date: new Date().toISOString(), webkit, summary, microscope, ...(walk > 0 ? { walkSeconds: walk, walk: walked, walks } : {}) }, null, 1)}\n`);
   }
   if (args['observe-timeout'] && microscope?.failure?.startsWith('page.waitForFunction: Timeout')
       && microscope.checkpoints.length > 0) return 0;
-  return good.length === webkit.length && (!args['ledger-only'] || microscope?.ready === true) ? 0 : 1;
+  return good.length === webkit.length && (!args['ledger-only'] || microscope?.ready === true) && (walked === null || walked.complete) ? 0 : 1;
+}
+
+/** STR18: one round's walk lines: WebKit [K] peak above settled, Chromium [S] traffic and its top owners.
+ * @param {any} run @param {any} sampled */
+export function walkLines(run, sampled) {
+  const w = run.walk, lines = [];
+  lines.push(w ? `[K] walk ${w.route.name} ${w.route.metres} m (${w.route.reached} waypoints, ${w.route.stuck.length} stuck): WebContent peak ${mb(w.peak.webcontent)} MB, ${mb(w.aboveSettled.webcontent)} above settled; GPU peak ${mb(w.peak.gpu)} MB, ${mb(w.aboveSettled.gpu)} above`
+    : `[K] walk: none (${run.refused ?? 'no reading'})`);
+  if (!sampled.ready) { lines.push(`[S] walk: ${sampled.failure}`); return lines; }
+  lines.push(`[S] walk ${sampled.route.name} ${sampled.route.metres} m: ${(sampled.bytesPerSecond / MB).toFixed(2)} MB/s allocated (culler ${(sampled.cullerBytesPerSecond / MB).toFixed(3)} MB/s)`);
+  for (const row of sampled.owners.slice(0, 5)) lines.push(`    ${(row.bytes / sampled.seconds / MB).toFixed(2).padStart(6)} MB/s  ${row.site}`);
+  return lines;
+}
+
+/** STR18: the walk over its runs: the median, range and spread of each reading. A run with no reading makes it incomplete.
+ * @param {readonly any[]} webkit @param {readonly any[]} walks */
+export function walkSummary(webkit, walks) {
+  const kernel = webkit.filter((r) => !r.refused && r.walk?.aboveSettled), sampled = walks.filter((w) => w.ready);
+  return {
+    complete: kernel.length === webkit.length && sampled.length === walks.length && webkit.length > 0,
+    peakAboveSettled: stats(kernel.map((r) => r.walk.aboveSettled.webcontent)),
+    gpuPeakAboveSettled: stats(kernel.map((r) => r.walk.aboveSettled.gpu)),
+    walkPeak: stats(kernel.map((r) => r.walk.peak.webcontent)),
+    bytesPerSecond: stats(sampled.map((w) => w.bytesPerSecond)),
+    cullerBytesPerSecond: stats(sampled.map((w) => w.cullerBytesPerSecond)),
+    stuck: kernel.map((r) => r.walk.route.stuck.length).concat(sampled.map((w) => w.route.stuck.length)),
+  };
+}
+
+/** @param {ReturnType<typeof walkSummary>} s */
+export function walkSummaryLines(s) {
+  const r = (/** @type {{median:number,min:number,max:number,n:number}} */ v) => `${(v.median / MB).toFixed(0)} (${(v.min / MB).toFixed(0)}-${(v.max / MB).toFixed(0)}), n ${v.n}`;
+  return [`walk WebContent peak above settled median ${r(s.peakAboveSettled)} MB [K]; GPU ${r(s.gpuPeakAboveSettled)} MB [K]`,
+    `walk allocation median ${(s.bytesPerSecond.median / MB).toFixed(2)} MB/s (${(s.bytesPerSecond.min / MB).toFixed(2)}-${(s.bytesPerSecond.max / MB).toFixed(2)}), culler ${(s.cullerBytesPerSecond.median / MB).toFixed(3)} MB/s, n ${s.bytesPerSecond.n} [S]${s.complete ? '' : ' INCOMPLETE'}`];
 }
 
 /** EM12 (a): the ledger [L] at each checkpoint of one boot (the counters the page publishes), its largest total and its

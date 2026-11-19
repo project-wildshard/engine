@@ -1,6 +1,7 @@
 import type {Sample,BrowserProcess} from './footprint.mjs';
 import type { PhoneModel } from './phoneModel.mjs';
 import type { StallEntry } from '../loading-flow/stalls.mjs';
+import type { SiteRow, WalkRecord } from './walk.mjs';
 
 export const PROTOCOL: 'memory-run/1';
 export type Instrument = 'minimal'|'full';
@@ -35,7 +36,7 @@ export interface WebkitRun {
   ledger:{totals:Record<string,number>;unattributed:Record<string,number>;byKind:Ledger|null}|null;refused:string|null;samples:number;
   counters:Counters|null;categories:Record<'webcontent'|'gpu',Record<string,number>>|null;probe?:unknown;
 }
-export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean;instrument?:Instrument;probe?:(page:unknown,procs:BrowserProcess[])=>Promise<unknown>;world?:WorldStamp|null}):Promise<WebkitRun>;
+export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean;instrument?:Instrument;probe?:(page:unknown,procs:BrowserProcess[])=>Promise<unknown>;world?:WorldStamp|null;walk?:number}):Promise<WebkitRun>;
 export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;gpuDetail:{kinds:Record<string,number>;formats:Record<string,number>;owners:Record<string,number>}|null;checkpoints:{step:string;ledger:Record<string,Record<string,number>>|null;processes:DumpProcess[]}[];timeline?:StallEntry[]|null}
 export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number;plantRetainedBuffer?:boolean;captureDumps?:boolean}):Promise<MicroscopeRun>;
 export function webkitLines(run:WebkitRun):string[];
@@ -71,3 +72,10 @@ export interface LedgerRow {step:string;ram:number;gpu:number}
 export function ledgerPeak(checkpoints:readonly {step:string;ledger:Record<string,Record<string,number>>|null}[]):{rows:LedgerRow[];peak:LedgerRow;control:LedgerRow}|null;
 export function ledgerPeakLines(chunk:string,ledger:{peak:LedgerRow;control:LedgerRow}):string[];
 export function summaryMarkdown(chunk:string,webkit:readonly unknown[],summary:unknown,ledger:{peak:LedgerRow;control:LedgerRow}|null):string;
+export interface WalkSampled {host:'chromium';boot:Boot;chunk:string;ready:boolean;failure:string|null;errors:string[];seconds?:number;route?:WalkRecord;
+  bytesPerSecond?:number;cullerBytesPerSecond?:number;sampledBytes?:number;owners?:SiteRow[];stacks?:{bytes:number;stack:string[]}[];sites?:SiteRow[]}
+export function chromiumWalk(options:{url:string;chunk:string;world:WorldStamp|null;seconds:number;timeoutMs?:number;settleMs?:number;intervalBytes?:number;top?:number;dist?:string;profileOut?:string;jsFlags?:string}):Promise<WalkSampled>;
+export interface WalkSummary {complete:boolean;peakAboveSettled:Stats;gpuPeakAboveSettled:Stats;walkPeak:Stats;bytesPerSecond:Stats;cullerBytesPerSecond:Stats;stuck:number[]}
+export function walkSummary(webkit:readonly unknown[],walks:readonly unknown[]):WalkSummary;
+export function walkSummaryLines(summary:WalkSummary):string[];
+export function walkLines(run:unknown,sampled:unknown):string[];
