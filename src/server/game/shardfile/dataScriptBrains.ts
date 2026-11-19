@@ -1,5 +1,5 @@
 // ONE-FORMAT CC60 (C-Q2): a whole-creature WASM brain (`creatures.brains` kind `script`) from any upload. A native
-// runtime still brings its own trusted port; a data-only shard gets this one, built from its own rows, so the guest
+// runtime still brings its own native port; a data-only shard gets this one, built from its own rows, so the guest
 // still cannot write positions, spawn or deal damage: it reads the observations below, asks for motion inside its
 // declared bounds and requests strikes from its declared list, which run on the engine's strike runner only when the
 // attack-permission owner (`ai.mayAttack`) says yes. Fuel is the shared script host's: a module whose `init` runs past a
