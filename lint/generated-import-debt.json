@@ -3,8 +3,6 @@
   "source": "ec81a1683e4f6bccd41f19a6d5b8a5c8d93feb8e",
   "sources": [
     "src/client/engine/boot/ktx2.generated.ts",
-    "src/shards/_template/discovery.generated.ts",
-    "src/shards/blender-template/discovery.generated.ts",
     "src/shards/driftwood-isle/discovery.generated.ts",
     "src/shards/driftwood-isle/ktx2.generated.ts",
     "src/shards/far-reach/discovery.generated.ts",

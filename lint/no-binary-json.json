@@ -106,10 +106,6 @@
       "base64Chars": 133512,
       "dataUris": 0
     },
-    "public/shardfiles/_template/shard.json": {
-      "base64Chars": 0,
-      "dataUris": 1
-    },
     "public/shardfiles/ink-cel-valley/shard.json": {
       "base64Chars": 0,
       "dataUris": 1
@@ -117,18 +113,6 @@
     "public/shardfiles/pastel-plain/shard.json": {
       "base64Chars": 0,
       "dataUris": 1
-    },
-    "src/shards/_template/data/card.json": {
-      "base64Chars": 0,
-      "dataUris": 7
-    },
-    "src/shards/_template/data/rows.json": {
-      "base64Chars": 0,
-      "dataUris": 1
-    },
-    "src/shards/_template/manifest.json": {
-      "base64Chars": 0,
-      "dataUris": 7
     },
     "src/shards/ink-cel-valley/data/rows.json": {
       "base64Chars": 0,

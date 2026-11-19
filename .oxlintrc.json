@@ -228,12 +228,12 @@
         "wildshard/no-shard-runtime": "error",
         "wildshard/runtime-commons": "error",
         // G450/Z1: closed boundaries are hard errors; other paths remain shrink-only.
-        "wildshard/runtime-standalone": ["error", { "closedShards": ["_template", "blender-template", "ink-cel-valley", "open-plots", "pastel-plain"] }],
+        "wildshard/runtime-standalone": ["error", { "closedShards": ["ink-cel-valley", "open-plots", "pastel-plain"] }],
         "wildshard/no-shard-host-callback": "error",
         "wildshard/shard-services": "error",
         "wildshard/no-client-plan-reflection": "error",
-        "wildshard/no-build-time-import": ["error", { "closedShards": ["_template", "blender-template", "ink-cel-valley", "pastel-plain"] }],
-        "wildshard/no-runtime-in-build": ["error", { "closedShards": ["_template", "blender-template", "ink-cel-valley", "pastel-plain"] }],
+        "wildshard/no-build-time-import": ["error", { "closedShards": ["ink-cel-valley", "pastel-plain"] }],
+        "wildshard/no-runtime-in-build": ["error", { "closedShards": ["ink-cel-valley", "pastel-plain"] }],
         // E405 AG28: imports point down; the engine knows no game, kit, shard or app module
         "wildshard/layer": "error",
         // LT1: composition roots use defining workspace exports; zero stays zero.
