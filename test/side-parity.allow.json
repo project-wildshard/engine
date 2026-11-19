@@ -25,11 +25,52 @@
    "known": []
   },
   "nalati-grasslands": {
-   "row": "SERVER-PARITY SS10b (trunks closed: the bake's spruce capsules are the page's 146, re-captured by shard-nalati scripts/forest-trunks.mjs; tags: shard-nalati eb64606 names every bake solid's piece and material and this engine reads it, so both untagged lines leave on the re-pin of the Nalati upload that carries it, SHARD-SIZE S12d's)",
-   "known": [
-    "(untagged server): 35 server-side match(es) where the server collider has no owner or material",
-    "(untagged server): 526 page-side match(es) where the server collider has no owner or material"
-   ]
+   "row": "SERVER-PARITY SS10b: Nalati r3 tags the baked solids. Chunk copies and model-variant names below are matched against the page.",
+   "same": {
+    "nalati-grasslands/boulder#2": {
+     "page": "nalati-grasslands/boulder",
+     "why": "The bake names this boulder variant separately. The page uses the placement family, with the same solids."
+    },
+    "nalati-grasslands/boulder#2-2": {
+     "page": "nalati-grasslands/boulder",
+     "why": "The bake names this boulder variant separately. The page uses the placement family, with the same solids."
+    },
+    "nalati-grasslands/boulder-2": {
+     "page": "nalati-grasslands/boulder",
+     "why": "The bake names this boulder variant separately. The page uses the placement family, with the same solids."
+    },
+    "nalati-grasslands/boulder-3": {
+     "page": "nalati-grasslands/boulder",
+     "why": "The bake names this boulder variant separately. The page uses the placement family, with the same solids."
+    },
+    "nalati-grasslands/fence#2": {
+     "page": "nalati-grasslands/fence",
+     "why": "The bake names this fence variant separately. The page uses the placement family, with the same solids."
+    },
+    "nalati-grasslands/slab-2": {
+     "page": "nalati-grasslands/slab",
+     "why": "The bake names this slab variant separately. The page uses the placement family, with the same solids."
+    },
+    "nalati-grasslands/slab-3": {
+     "page": "nalati-grasslands/slab",
+     "why": "The bake names this slab variant separately. The page uses the placement family, with the same solids."
+    },
+    "nalati-grasslands/slab-4": {
+     "page": "nalati-grasslands/slab",
+     "why": "The bake names this slab variant separately. The page uses the placement family, with the same solids."
+    },
+    "nalati-grasslands/slab-5": {
+     "page": "nalati-grasslands/slab",
+     "why": "The bake names this slab variant separately. The page uses the placement family, with the same solids."
+    }
+   },
+   "chunked": {
+    "nalati-grasslands/boulder": "The same dressing placement is registered in both chunks it spans.",
+    "nalati-grasslands/fence": "Road placement 0 registers the same fence solids in c59 and c60.",
+    "nalati-grasslands/kunes-bridge": "Bridge placement 0 registers the same plank and wood solids in c51 and c52.",
+    "nalati-grasslands/slab": "The dressing placement registers the same slab solids in c52 and c53."
+   },
+   "known": []
   },
   "nine-dragon-stack": {
    "row": "SERVER-PARITY SS10, GRID-CROSSING GC36 (J322: no edge walls, so the page's standalone deck caps at the edge, 1 m slivers at |x| or |z| 249 to 250 that stood inside the server's walls, have no server twin; a re-recorded page half (scripts/side-parity.mjs --record) drops them once the bake does)",

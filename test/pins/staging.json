@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "fdee5762139946a1f65a0afc049af671f559eae4f388f25540e41176c6e2a8e1",
+  "catalogueHash": "2055a4a64e5fcd34907543b3c05efd8b6653c9ffefcc0997b5fbd0f32a0a5e1d",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -765,6 +765,22 @@
             3,
             2
           ]
+        },
+        {
+          "instance": "cinder-orchard",
+          "slug": "cinder-orchard",
+          "cell": [
+            3,
+            1
+          ]
+        },
+        {
+          "instance": "stranger",
+          "slug": "stranger",
+          "cell": [
+            3,
+            0
+          ]
         }
       ],
       "emptyNeighbour": {
@@ -790,8 +806,14 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 7,
-        "hash": "cc491ce08c64b3f06f5ef9c51c548cf9f437cf1fa10e8cd253c8a8cb3ec81810"
+        "revision": 9,
+        "hash": "56414c674e620c5cd96c3ef28b1203d5dca4b120a8dbe10215d8638294e70ccd"
+      },
+      {
+        "slug": "cinder-orchard",
+        "name": "Cinder Orchard",
+        "revision": 2,
+        "hash": "17bd5ad1757f833e1253ecc1ebdd2330fda49587111d1018e632adb03c314966"
       },
       {
         "slug": "driftwood-isle",
@@ -802,14 +824,14 @@
       {
         "slug": "far-reach",
         "name": "Sky Reach",
-        "revision": 4,
-        "hash": "5bc5adcf764acfd601d41fcea8c405ddca8ca4e98986f4944edfddea59b1356b"
+        "revision": 5,
+        "hash": "b8e14693e9ed2b0ae59e53c997717fd45f5aeaaa7b8c392680855cfd27fea132"
       },
       {
         "slug": "glowfen",
         "name": "Glowfen",
-        "revision": 3,
-        "hash": "f55a0c8404ea7d609730cc0f931b5477464295a10ee9867581ff8f2c4abccfaa"
+        "revision": 4,
+        "hash": "266c40c8e16abde75871e03fc311ad1d4460e9dbe9b4e5e62a9c8df26842cbe8"
       },
       {
         "slug": "ink-cel-valley",
@@ -820,8 +842,8 @@
       {
         "slug": "mirror-salt",
         "name": "Mirror Salt",
-        "revision": 3,
-        "hash": "e141c104dab0eba1907b163811cb5070855b3b60a7ef4dad227b6933cf2fb023"
+        "revision": 4,
+        "hash": "fe79c9485b9b3026d058c75da365400f7be54327c9fdf48fc9eb46a6b35e3f3a"
       },
       {
         "slug": "mossgate",
@@ -838,8 +860,8 @@
       {
         "slug": "nalati-grasslands",
         "name": "Nalati Grasslands",
-        "revision": 2,
-        "hash": "77b77fcc2174d6485c11db79f0327a219d2a450cd5b7af3b7bb7649823912e69"
+        "revision": 3,
+        "hash": "1a1c8a4fdd2ce4b7d6598eb0490e454ff2fc607fa34041f064eadd6e5ea3bcfb"
       },
       {
         "slug": "nine-dragon-stack",
@@ -850,104 +872,104 @@
       {
         "slug": "open-plot-alien-plain",
         "name": "Open Plot · Pastel Alien Plain",
-        "revision": 1,
-        "hash": "c32cd9fb9229b56be36fbf1d9834b963f547b962cb2e53d37afb71cfe198704e"
+        "revision": 2,
+        "hash": "c1ed1cacbfc41423c16b2196833d342f56906674eaf583a711a89bc26e38d392"
       },
       {
         "slug": "open-plot-clockwork-canyon",
         "name": "Open Plot · Clockwork Canyon",
-        "revision": 1,
-        "hash": "3b322eccd99e209f98bbe59e16f79de77375b6075bc91f379d67cefff7bcf740"
+        "revision": 2,
+        "hash": "f9289f29a788c7f878474f1c93ef4926aebbf4869d534b972a2dda49b18f52cd"
       },
       {
         "slug": "open-plot-coral-drift",
         "name": "Open Plot · Coral Drift",
-        "revision": 1,
-        "hash": "87841749dc3f7310559514f44986b5e5aa9b59d44584123584da3143eca75037"
+        "revision": 2,
+        "hash": "c90659dba8b4b0a66d7d14c20bbb3a7b48dbd5b265bb8d8a8462fdc4149df3c3"
       },
       {
         "slug": "open-plot-desert-ruin",
         "name": "Open Plot · Desert Ruin",
-        "revision": 1,
-        "hash": "3b65bfef7275d5baf721b334c5ef68b3dc057f9fcd30699f89a314c46967b76d"
+        "revision": 2,
+        "hash": "cc8fb5c1c4f0a6f5e5b67b70834e90212fb63d917b5f5436197d98205ac17f4a"
       },
       {
         "slug": "open-plot-ember-forge",
         "name": "Open Plot · Ember Forge",
-        "revision": 1,
-        "hash": "e1a3a9325e8e98543b19f7c7b1017a2a1761af3954b017ff732ccf20ac89b4c0"
+        "revision": 2,
+        "hash": "2446b25b5ce539b312362ea28710e05a62deb0f50a8bfa266caaed0690b2adf1"
       },
       {
         "slug": "open-plot-fossil-badlands",
         "name": "Open Plot · Fossil Badlands",
-        "revision": 1,
-        "hash": "5bbdd51b8db97dc1ec8244e79638e45143e5532ba57d3447cb90d77e48a3d5b1"
+        "revision": 2,
+        "hash": "8e2e32c379801ad9c8b5afadbc2c492eacb40eb99ced1ee09fbac38e7120fa34"
       },
       {
         "slug": "open-plot-frostline-peaks",
         "name": "Open Plot · Frostline Peaks",
-        "revision": 1,
-        "hash": "ec7b8879a343eadcb5ca51313097d2c91883b47dba63c753d8516a698c6c0985"
+        "revision": 2,
+        "hash": "38ac04eff6eef167119d7ad61d530b632acd4160620768cb004c46710ac8a4ea"
       },
       {
         "slug": "open-plot-jungle-ziggurat",
         "name": "Open Plot · Jungle Ziggurat",
-        "revision": 1,
-        "hash": "62fdb3cc7e4153ffc738fff5196666d180504bc0d625fd46446a5f1c85d3292d"
+        "revision": 2,
+        "hash": "6f0176f016e576db7ff56d01fde35445d23cd566473057ac5de11d197e0bd4da"
       },
       {
         "slug": "open-plot-lantern-bayou",
         "name": "Open Plot · Lantern Bayou",
-        "revision": 1,
-        "hash": "1f9fb1cba098c85bfc5a7175258f3f273d336a67c36001edce295e02ef7c752f"
+        "revision": 2,
+        "hash": "1ca9a3bd1e08053440541bb5268e5faab0353af14c1b92237ad904cb4a621b43"
       },
       {
         "slug": "open-plot-mosslight-ruins",
         "name": "Open Plot · Mosslight Ruins",
-        "revision": 1,
-        "hash": "19840339238bab41994463ca485a47f5ffe766bc4cf6ec33c5499151eddf74fc"
+        "revision": 2,
+        "hash": "672bf7dec416fb365a0b5ecb6d9c09ed2206af803e80e3776275275c5b023763"
       },
       {
         "slug": "open-plot-night-market",
         "name": "Open Plot · Night Market",
-        "revision": 1,
-        "hash": "d8fe11c2db67b199111e25e5ecbb86e59e3063c46a913317ba9e71dc9cc98210"
+        "revision": 2,
+        "hash": "01bb846e3823e41cf337671718f091b092697da5b688752fc7b7219e32e188a3"
       },
       {
         "slug": "open-plot-patchwork-fairground",
         "name": "Open Plot · Patchwork Fairground",
-        "revision": 1,
-        "hash": "e517f4814ef624fa6122ac3611d39cf59a56c54e4ecb126d2de983064ae2caa8"
+        "revision": 2,
+        "hash": "6712b4fadc5371a1bd45dd9222274f6661cc6a78301f351037a875e3a39b102d"
       },
       {
         "slug": "open-plot-saltwind-lighthouse",
         "name": "Open Plot · Saltwind Lighthouse",
-        "revision": 1,
-        "hash": "2e37a04b0c9e7f6c0463f12b5cfce96d7e7c2f83868bc6341948d779dcbe5207"
+        "revision": 2,
+        "hash": "c046746b9e6cdb307ab8d34ccc81b582453669759ee17ee5070aade591dfd8b0"
       },
       {
         "slug": "open-plot-sky-harbor",
         "name": "Open Plot · Sky Harbor",
-        "revision": 1,
-        "hash": "9aa4a98390153c9e63ec79d1a9ca7c3c221b03a5017664206a34001b242df112"
+        "revision": 2,
+        "hash": "db8b26e4ecd2210da244b5314b5b35241b3c0df93ca67314fb3b81f72699450c"
       },
       {
         "slug": "open-plot-sky-race",
         "name": "Open Plot · Floating Island Race",
-        "revision": 1,
-        "hash": "a5633d8eee7f7e453b459fa3d4c3db3d60bddd07ad39036ba437ccd44655058a"
+        "revision": 2,
+        "hash": "4c3a05f77f66fa23f32d0fd36563bd4aa0a6108b8fdd6f69df9684c77302308a"
       },
       {
         "slug": "open-plot-starfall-observatory",
         "name": "Open Plot · Starfall Observatory",
-        "revision": 1,
-        "hash": "25331b613be193d8a1e67e72da521a56e431c19fa0de2fa3431df42a13941802"
+        "revision": 2,
+        "hash": "1cc2a9a9efdb7861627746c577ef6285b8d0ac7e8105046dc1655fe19fbed123"
       },
       {
         "slug": "open-plot-thin-ice",
         "name": "Open Plot · Thin Ice",
-        "revision": 1,
-        "hash": "4546f70ddac2dd08771fb315cb8a9156a0e21503ea72c120af73e31f90e64ead"
+        "revision": 2,
+        "hash": "367f3d682186738571ed5598d8aee7f5e4172490564db505b7e0c556dcd23894"
       },
       {
         "slug": "pastel-plain",
@@ -962,10 +984,16 @@
         "hash": "2afc6270c9534acc9d6578686bf87479c63872ac58799cef416d13b3b8b0281b"
       },
       {
+        "slug": "stranger",
+        "name": "Stranger",
+        "revision": 2,
+        "hash": "2acb7420dc38a97b16cf045b8750d5ce10d2da524617b1942f4be4f2984332ee"
+      },
+      {
         "slug": "sunscar-dunes",
         "name": "Signal Dunes",
-        "revision": 2,
-        "hash": "f4a1d611ccccb29e8b277d43b2ccca5fa574913410426065e5ee0e312e508538"
+        "revision": 3,
+        "hash": "f5fd3db978dac4a3590c1d67dc39bdc0c98fb776e52aa25fabfe004e0552a78e"
       },
       {
         "slug": "template",
@@ -979,9 +1007,15 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 7,
-      "hash": "cc491ce08c64b3f06f5ef9c51c548cf9f437cf1fa10e8cd253c8a8cb3ec81810",
-      "bytes": 21884928
+      "revision": 9,
+      "hash": "56414c674e620c5cd96c3ef28b1203d5dca4b120a8dbe10215d8638294e70ccd",
+      "bytes": 21989888
+    },
+    {
+      "slug": "cinder-orchard",
+      "revision": 2,
+      "hash": "17bd5ad1757f833e1253ecc1ebdd2330fda49587111d1018e632adb03c314966",
+      "bytes": 11980800
     },
     {
       "slug": "driftwood-isle",
@@ -991,15 +1025,15 @@
     },
     {
       "slug": "far-reach",
-      "revision": 4,
-      "hash": "5bc5adcf764acfd601d41fcea8c405ddca8ca4e98986f4944edfddea59b1356b",
-      "bytes": 47172096
+      "revision": 5,
+      "hash": "b8e14693e9ed2b0ae59e53c997717fd45f5aeaaa7b8c392680855cfd27fea132",
+      "bytes": 52606976
     },
     {
       "slug": "glowfen",
-      "revision": 3,
-      "hash": "f55a0c8404ea7d609730cc0f931b5477464295a10ee9867581ff8f2c4abccfaa",
-      "bytes": 19695616
+      "revision": 4,
+      "hash": "266c40c8e16abde75871e03fc311ad1d4460e9dbe9b4e5e62a9c8df26842cbe8",
+      "bytes": 19928064
     },
     {
       "slug": "ink-cel-valley",
@@ -1009,8 +1043,8 @@
     },
     {
       "slug": "mirror-salt",
-      "revision": 3,
-      "hash": "e141c104dab0eba1907b163811cb5070855b3b60a7ef4dad227b6933cf2fb023",
+      "revision": 4,
+      "hash": "fe79c9485b9b3026d058c75da365400f7be54327c9fdf48fc9eb46a6b35e3f3a",
       "bytes": 16299520
     },
     {
@@ -1027,9 +1061,9 @@
     },
     {
       "slug": "nalati-grasslands",
-      "revision": 2,
-      "hash": "77b77fcc2174d6485c11db79f0327a219d2a450cd5b7af3b7bb7649823912e69",
-      "bytes": 144178176
+      "revision": 3,
+      "hash": "1a1c8a4fdd2ce4b7d6598eb0490e454ff2fc607fa34041f064eadd6e5ea3bcfb",
+      "bytes": 198787072
     },
     {
       "slug": "nine-dragon-stack",
@@ -1039,105 +1073,105 @@
     },
     {
       "slug": "open-plot-alien-plain",
-      "revision": 1,
-      "hash": "c32cd9fb9229b56be36fbf1d9834b963f547b962cb2e53d37afb71cfe198704e",
-      "bytes": 8756224
+      "revision": 2,
+      "hash": "c1ed1cacbfc41423c16b2196833d342f56906674eaf583a711a89bc26e38d392",
+      "bytes": 8543232
     },
     {
       "slug": "open-plot-clockwork-canyon",
-      "revision": 1,
-      "hash": "3b322eccd99e209f98bbe59e16f79de77375b6075bc91f379d67cefff7bcf740",
-      "bytes": 12332032
+      "revision": 2,
+      "hash": "f9289f29a788c7f878474f1c93ef4926aebbf4869d534b972a2dda49b18f52cd",
+      "bytes": 12070400
     },
     {
       "slug": "open-plot-coral-drift",
-      "revision": 1,
-      "hash": "87841749dc3f7310559514f44986b5e5aa9b59d44584123584da3143eca75037",
-      "bytes": 14862336
+      "revision": 2,
+      "hash": "c90659dba8b4b0a66d7d14c20bbb3a7b48dbd5b265bb8d8a8462fdc4149df3c3",
+      "bytes": 14657536
     },
     {
       "slug": "open-plot-desert-ruin",
-      "revision": 1,
-      "hash": "3b65bfef7275d5baf721b334c5ef68b3dc057f9fcd30699f89a314c46967b76d",
-      "bytes": 14441984
+      "revision": 2,
+      "hash": "cc8fb5c1c4f0a6f5e5b67b70834e90212fb63d917b5f5436197d98205ac17f4a",
+      "bytes": 14199808
     },
     {
       "slug": "open-plot-ember-forge",
-      "revision": 1,
-      "hash": "e1a3a9325e8e98543b19f7c7b1017a2a1761af3954b017ff732ccf20ac89b4c0",
-      "bytes": 11407360
+      "revision": 2,
+      "hash": "2446b25b5ce539b312362ea28710e05a62deb0f50a8bfa266caaed0690b2adf1",
+      "bytes": 11195392
     },
     {
       "slug": "open-plot-fossil-badlands",
-      "revision": 1,
-      "hash": "5bbdd51b8db97dc1ec8244e79638e45143e5532ba57d3447cb90d77e48a3d5b1",
-      "bytes": 10731008
+      "revision": 2,
+      "hash": "8e2e32c379801ad9c8b5afadbc2c492eacb40eb99ced1ee09fbac38e7120fa34",
+      "bytes": 10495488
     },
     {
       "slug": "open-plot-frostline-peaks",
-      "revision": 1,
-      "hash": "ec7b8879a343eadcb5ca51313097d2c91883b47dba63c753d8516a698c6c0985",
-      "bytes": 13398016
+      "revision": 2,
+      "hash": "38ac04eff6eef167119d7ad61d530b632acd4160620768cb004c46710ac8a4ea",
+      "bytes": 13210112
     },
     {
       "slug": "open-plot-jungle-ziggurat",
-      "revision": 1,
-      "hash": "62fdb3cc7e4153ffc738fff5196666d180504bc0d625fd46446a5f1c85d3292d",
-      "bytes": 13255680
+      "revision": 2,
+      "hash": "6f0176f016e576db7ff56d01fde35445d23cd566473057ac5de11d197e0bd4da",
+      "bytes": 13036032
     },
     {
       "slug": "open-plot-lantern-bayou",
-      "revision": 1,
-      "hash": "1f9fb1cba098c85bfc5a7175258f3f273d336a67c36001edce295e02ef7c752f",
-      "bytes": 14660096
+      "revision": 2,
+      "hash": "1ca9a3bd1e08053440541bb5268e5faab0353af14c1b92237ad904cb4a621b43",
+      "bytes": 14462976
     },
     {
       "slug": "open-plot-mosslight-ruins",
-      "revision": 1,
-      "hash": "19840339238bab41994463ca485a47f5ffe766bc4cf6ec33c5499151eddf74fc",
-      "bytes": 16719872
+      "revision": 2,
+      "hash": "672bf7dec416fb365a0b5ecb6d9c09ed2206af803e80e3776275275c5b023763",
+      "bytes": 16520704
     },
     {
       "slug": "open-plot-night-market",
-      "revision": 1,
-      "hash": "d8fe11c2db67b199111e25e5ecbb86e59e3063c46a913317ba9e71dc9cc98210",
-      "bytes": 18138112
+      "revision": 2,
+      "hash": "01bb846e3823e41cf337671718f091b092697da5b688752fc7b7219e32e188a3",
+      "bytes": 17896448
     },
     {
       "slug": "open-plot-patchwork-fairground",
-      "revision": 1,
-      "hash": "e517f4814ef624fa6122ac3611d39cf59a56c54e4ecb126d2de983064ae2caa8",
-      "bytes": 9830400
+      "revision": 2,
+      "hash": "6712b4fadc5371a1bd45dd9222274f6661cc6a78301f351037a875e3a39b102d",
+      "bytes": 9632256
     },
     {
       "slug": "open-plot-saltwind-lighthouse",
-      "revision": 1,
-      "hash": "2e37a04b0c9e7f6c0463f12b5cfce96d7e7c2f83868bc6341948d779dcbe5207",
-      "bytes": 5573632
+      "revision": 2,
+      "hash": "c046746b9e6cdb307ab8d34ccc81b582453669759ee17ee5070aade591dfd8b0",
+      "bytes": 5286400
     },
     {
       "slug": "open-plot-sky-harbor",
-      "revision": 1,
-      "hash": "9aa4a98390153c9e63ec79d1a9ca7c3c221b03a5017664206a34001b242df112",
-      "bytes": 10700800
+      "revision": 2,
+      "hash": "db8b26e4ecd2210da244b5314b5b35241b3c0df93ca67314fb3b81f72699450c",
+      "bytes": 10488320
     },
     {
       "slug": "open-plot-sky-race",
-      "revision": 1,
-      "hash": "a5633d8eee7f7e453b459fa3d4c3db3d60bddd07ad39036ba437ccd44655058a",
-      "bytes": 11087872
+      "revision": 2,
+      "hash": "4c3a05f77f66fa23f32d0fd36563bd4aa0a6108b8fdd6f69df9684c77302308a",
+      "bytes": 10854400
     },
     {
       "slug": "open-plot-starfall-observatory",
-      "revision": 1,
-      "hash": "25331b613be193d8a1e67e72da521a56e431c19fa0de2fa3431df42a13941802",
-      "bytes": 11625984
+      "revision": 2,
+      "hash": "1cc2a9a9efdb7861627746c577ef6285b8d0ac7e8105046dc1655fe19fbed123",
+      "bytes": 11383808
     },
     {
       "slug": "open-plot-thin-ice",
-      "revision": 1,
-      "hash": "4546f70ddac2dd08771fb315cb8a9156a0e21503ea72c120af73e31f90e64ead",
-      "bytes": 6465536
+      "revision": 2,
+      "hash": "367f3d682186738571ed5598d8aee7f5e4172490564db505b7e0c556dcd23894",
+      "bytes": 6237184
     },
     {
       "slug": "pastel-plain",
@@ -1152,10 +1186,16 @@
       "bytes": 337219584
     },
     {
-      "slug": "sunscar-dunes",
+      "slug": "stranger",
       "revision": 2,
-      "hash": "f4a1d611ccccb29e8b277d43b2ccca5fa574913410426065e5ee0e312e508538",
-      "bytes": 11470848
+      "hash": "2acb7420dc38a97b16cf045b8750d5ce10d2da524617b1942f4be4f2984332ee",
+      "bytes": 4952064
+    },
+    {
+      "slug": "sunscar-dunes",
+      "revision": 3,
+      "hash": "f5fd3db978dac4a3590c1d67dc39bdc0c98fb776e52aa25fabfe004e0552a78e",
+      "bytes": 11386368
     },
     {
       "slug": "template",
