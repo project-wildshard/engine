@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "6df2edeefc171e099d82060695e5b30de98d703a685763c1ff8d10736bdedd38",
+  "catalogueHash": "c1a18c9b5e80c08dbf55270f21c5681fb57238e7a8b219c966643e4eedaeec03",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -750,8 +750,8 @@
       {
         "slug": "nalati-grasslands",
         "name": "Nalati Grasslands",
-        "revision": 3,
-        "hash": "1a1c8a4fdd2ce4b7d6598eb0490e454ff2fc607fa34041f064eadd6e5ea3bcfb"
+        "revision": 4,
+        "hash": "5c1f9b8d3a622c5e3d7b7e4252fbcc27aab2ae8bf52b7c35317c8cbdef7f8913"
       },
       {
         "slug": "nine-dragon-stack",
@@ -876,8 +876,8 @@
       {
         "slug": "stranger",
         "name": "Stranger",
-        "revision": 2,
-        "hash": "2acb7420dc38a97b16cf045b8750d5ce10d2da524617b1942f4be4f2984332ee"
+        "revision": 5,
+        "hash": "1e40f4c09089745d23eb05893a6cc149ce747bec10dc8dac634de2da7d96ac80"
       },
       {
         "slug": "sunscar-dunes",
@@ -945,9 +945,9 @@
     },
     {
       "slug": "nalati-grasslands",
-      "revision": 3,
-      "hash": "1a1c8a4fdd2ce4b7d6598eb0490e454ff2fc607fa34041f064eadd6e5ea3bcfb",
-      "bytes": 198787072
+      "revision": 4,
+      "hash": "5c1f9b8d3a622c5e3d7b7e4252fbcc27aab2ae8bf52b7c35317c8cbdef7f8913",
+      "bytes": 197836800
     },
     {
       "slug": "nine-dragon-stack",
@@ -1071,9 +1071,9 @@
     },
     {
       "slug": "stranger",
-      "revision": 2,
-      "hash": "2acb7420dc38a97b16cf045b8750d5ce10d2da524617b1942f4be4f2984332ee",
-      "bytes": 4952064
+      "revision": 5,
+      "hash": "1e40f4c09089745d23eb05893a6cc149ce747bec10dc8dac634de2da7d96ac80",
+      "bytes": 4965888
     },
     {
       "slug": "sunscar-dunes",
