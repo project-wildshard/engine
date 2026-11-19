@@ -23,6 +23,8 @@ import { parseShardfile } from '@wildshard/format/shardSchema';
 import { runTickWorker } from '../tickWorkerLoop';
 import { simPlayerCommand, MAX_TICK_SNAPSHOT_CHARS, type HeadlessEffect, type HeadlessCommand } from '../../../shared/host/tickProtocol';
 import { headlessSections } from '@wildshard/format/headlessSections';
+import { parseClientPlan } from '@wildshard/format/clientPlan';
+import { planPortalRide } from '@wildshard/engine/game/shardfile/declaredPortalRide';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
@@ -46,7 +48,9 @@ await runTickWorker(async raw => {
   if (sections.has('sim/runtime-plan')) return createNativeHeadlessAdapter({ shard, assets: payload.assets, rapier, sections }, payload.snapshot);
   let commands: ReadonlyMap<string, number> = new Map();
   let effects: HeadlessEffect[] = [];
-  const ports = { rapier, sections, commands: () => commands, quest: {
+  const clientPlan = sections.get('client/plan');
+  const portalRide = clientPlan === undefined ? null : planPortalRide(parseClientPlan(clientPlan).features);
+  const ports = { rapier, sections, portalRide, commands: () => commands, quest: {
     fact: (name: string, actorId: string) => { effects.push({ kind: 'fact', name, actorId }); },
     coins: (amount: number, actorId: string) => { effects.push({ kind: 'coins', amount, actorId }); },
   } };

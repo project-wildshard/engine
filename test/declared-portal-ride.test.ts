@@ -10,6 +10,7 @@ import { emptyShardfile } from '../src/shared/host/author';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { planPortalRide } from '../src/server/game/shardfile/declaredPortalRide';
 import { installedKeys } from '../src/server/game/shardfile/installedSides';
+import { HeadlessSimulation } from '../src/server/host/headless';
 
 // ONE-FORMAT OF41b (Q-S9, J367 (4)): the `portal` primitive from a plain upload. A shard with no native host declares a
 // `portalLink` entryway, its floors as plain box colliders, the ride's director and the `client/plan` `portal.ride` rows;
@@ -31,7 +32,7 @@ const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'
 function portalShard(linked: boolean): Shardfile {
   const base = emptyShardfile({ slug: 'portal-fixture', name: 'Portal fixture', author: 'Test', revision: 1, seed: 7 });
   const entryways = v.parse(EntrywaysSchema, base.entryways.map(row => row.edge === 'north' && linked ? { ...row, kind: 'portalLink', portal } : row));
-  const props = v.parse(PropsSchema, { version: 1, family: 'fixture', tiles: [], panels: [], models: [], far: null, textures: [],
+  const props = v.parse(PropsSchema, { version: 1, family: 'toon', tiles: [], panels: [], models: [], far: null, textures: [],
     colliders: [{ id: 'deck', panel: null, initialActive: true, shapes: [box(0, 0, 235, 10, 15)] },
       { id: 'plaza', panel: null, initialActive: true, shapes: [box(50, 10, 52, 10, 10)] }] });
   return { ...base, entryways, props, directors: v.parse(DirectorsSchema, [stages]) };
@@ -59,3 +60,16 @@ test('OF41b: a shard with no portal link installs no ride', () => {
   const shard = { ...portalShard(false), directors: [] }, sim = createShardfileSim(shard, new Map(), { rapier, portalRide: ride });
   try { expect(installedKeys(sim.host).has('portalRide')).toBe(false); } finally { sim.dispose(); }
 });
+
+test('the author simulation runs the ordinary portal declared in the plan', async () => {
+  const sections = new Map([['client/plan', { version: 1, features: [{ kind: 'portal.ride', rows: ride }] }]]);
+  const shard = { ...portalShard(true), spawn: { x: 0, y: 0, z: 240, yaw: Math.PI } };
+  const sim = await HeadlessSimulation.create(shard, new Map(), undefined, { sections, deadline: 'advisory' });
+  const facts: string[] = [];
+  try {
+    for (let tick = 0; tick < 120; tick++) {
+      for (const effect of (await sim.step()).effects) if (effect.kind === 'fact') facts.push(effect.name);
+    }
+    expect(facts).toEqual(['portal-fixture.plaza']);
+  } finally { await sim.dispose(); }
+}, 30_000);
