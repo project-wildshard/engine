@@ -10,6 +10,15 @@ if (!Number.isInteger(E2E_PORT) || E2E_PORT < 1 || E2E_PORT > 65_535) {
   throw new Error('Run pnpm test:t1 to allocate a port')
 }
 const BASE_URL = `http://127.0.0.1:${String(E2E_PORT)}`
+/** WS_T1_ANGLE=swiftshader replays the hosted runners' software GL on a Mac (their stalls, their boot times). */
+function glArgs(): readonly string[] {
+  if (process.env['WS_T1_ANGLE'] === 'swiftshader') {
+    return ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+  }
+  return process.platform === 'darwin'
+    ? ['--use-angle=metal', '--ignore-gpu-blocklist']
+    : []
+}
 export default defineConfig({
   testDir: '.',
   outputDir: path.resolve(
@@ -36,13 +45,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     ...devices['Desktop Chrome'],
     launchOptions: {
-      args: [
-        ...KEYCHAIN_ARGS,
-        '--mute-audio',
-        ...(process.platform === 'darwin'
-          ? ['--use-angle=metal', '--ignore-gpu-blocklist']
-          : []),
-      ],
+      args: [...KEYCHAIN_ARGS, '--mute-audio', ...glArgs()],
     },
   },
   webServer:
