@@ -10,10 +10,11 @@ import { CharacterMotor, PLAYER_BODY, PLAYER_CAPSULE } from '../src/shared/engin
 import { Physics } from '../src/shared/engine/physics/Physics';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { tagCollider } from '../src/shared/engine/physics/surface';
+import { builtFolder } from './fixtures/engine-lift/folder';
 
 interface Bin { readonly file: string; readonly byteOffset: number; readonly byteLength: number }
 interface Solid { readonly at: readonly number[]; readonly rot: readonly number[]; readonly shape: number; readonly half?: readonly number[]; readonly vertices?: Bin; readonly friction: number; readonly groups: number }
-const root = 'out/nalati-grasslands';
+const root = builtFolder('nalati-grasslands');
 const read = (file: string): unknown => JSON.parse(readFileSync(`${root}/${file}`, 'utf8'));
 const shard = read('shard.json') as { files: { name: string; path: string }[]; admission: { server: { name: string; path: string }[] } };
 const files = new Map(shard.files.map(row => [row.name, row.path]));

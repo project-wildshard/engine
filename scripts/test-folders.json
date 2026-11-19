@@ -203,6 +203,7 @@
   ],
   "test/physics-headless.test.ts": ["driftwood-isle"],
   "test/motion-replay.test.ts": ["driftwood-isle"],
+  "test/net-predict-pocket.test.ts": ["nalati-grasslands"],
   "test/physics-shards-headless.test.ts": ["pine-hollow", "nine-dragon-stack", "sunscar-dunes", "far-reach"],
   "test/physics-brasscap-mesa-headless.test.ts": ["brasscap-mesa"],
   "test/physics-nalati-headless.test.ts": ["nalati-grasslands"],
