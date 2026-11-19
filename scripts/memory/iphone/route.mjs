@@ -10,7 +10,8 @@
 // field: out to the altar and back on the west path (sprinting back), then the centre, the wreck and the boars.
 
 /** @typedef {{ name: string, kind: 'stand'|'walk'|'fight', seconds: number, points?: [number, number][], sprint?: boolean,
- *   turn?: number, prey?: string, reach?: number }} RouteLeg */
+ *   turn?: number, prey?: string, reach?: number, grid?: boolean, fixed?: boolean,
+ *   dwell?: { point: number, seconds: number, face?: [number, number], road?: boolean }, face?: [number, number] }} RouteLeg */
 
 /** @type {Readonly<Record<string, readonly RouteLeg[]>>} */
 export const ROUTES = Object.freeze({
@@ -27,6 +28,19 @@ export const ROUTES = Object.freeze({
     { name: 'boar field', kind: 'walk', seconds: 50, points: [[118, -34], [100, -80], [86, -118], [76, -132]] },
     { name: 'boar fight', kind: 'fight', seconds: 20, prey: 'boar', points: [[74, -140]] },
   ]),
+  // DF2. Coordinates are local to Driftwood, even when the grid seats it away from the origin.
+  'driftwood-fps': Object.freeze([
+    { name: 'dock spawn', kind: 'stand', seconds: 30, turn: 0.4, grid: true, fixed: true },
+    { name: 'beach', kind: 'walk', seconds: 40, points: [[0, -186], [-6, -172], [-18, -150], [-30, -142], [-30, -124]], grid: true, fixed: true },
+    { name: 'village', kind: 'walk', seconds: 60, points: [[-30, -120], [-30, -104], [-24, -80], [-20, -68]],
+      dwell: { point: 3, seconds: 20 }, turn: 0.4, grid: true, fixed: true },
+    // questSteps has no completion steps. The camp's lit fire is at hut + (0.7, -9.8) in questPageComposition.
+    { name: 'quest fire', kind: 'walk', seconds: 30, points: [[-21, -70], [-24, -80], [-30, -104], [-30, -120]],
+      dwell: { point: 0, seconds: 20, face: [-21.3, -73.8] }, sprint: true, reach: 1.5, grid: true, fixed: true },
+    { name: 'road crossing', kind: 'walk', seconds: 40, sprint: true, reach: 2, grid: true, fixed: true,
+      points: [[-30, -142], [0, -152], [0, -205], [0, -263], [0, -248]],
+      dwell: { point: 3, seconds: 10, face: [0, -194], road: true } },
+  ]),
 });
 
 /** The route for a zone, or a refusal naming the zones that have one. @param {string} slug */
@@ -42,6 +56,14 @@ export function routeLegOnPage(leg) {
   const api = /** @type {any} */ (window).__wildshard, w = api?.world;
   if (!w || !w.hud.entered || w.hud.paused || !w.game.frameGate()) return Promise.resolve({ error: 'cannot run a route leg before control' });
   const game = w.game, input = game.app.input, p = w.player, renderer = game.renderer;
+  const grid = api?.shard?.grid, state = leg.grid ? grid?.state?.() : undefined;
+  const cell = state?.cells.find((/** @type {{slug:string,instance:string}} */ row) => row.slug === 'driftwood-isle' && row.instance === state.home);
+  if (leg.grid && (!cell || !Number.isFinite(state.pitch) || game.level.id !== 'platform.grid')) return Promise.resolve({ error: 'Driftwood grid home required' });
+  const [originX, originZ] = cell ? [cell.cell[0] * state.pitch - (state.feet.x - p.position.x),
+    cell.cell[1] * state.pitch - (state.feet.z - p.position.z)] : [0, 0];
+  if (leg.grid && leg.kind === 'stand' && Math.hypot(p.position.x - originX, p.position.z - originZ + 194) > 8)
+    return Promise.resolve({ error: 'the route starts at the Driftwood dock' });
+  const inside = () => typeof grid.travelState === 'function' ? grid.travelState().inside : grid.state().inside;
   // the cap: Game re-reads qualityCap every 2 s from the preset and Low Power; held here for the whole leg
   if (leg.cap !== null) {
     try { Object.defineProperty(game, 'qualityCap', { get: () => leg.cap, set: () => { /* held */ }, configurable: true }); } catch { /* read-only */ }
@@ -52,8 +74,10 @@ export function routeLegOnPage(leg) {
   let detours = 0, detourUntil = 0, detourYaw = 0, pressedLock = 0, checkX = prevX, checkZ = prevZ, still = 0, swings = 0, target = /** @type {any} */ (null), engaged = false;
   /** @type {any[]} */ const samples = [];
   const nav = { reached: 0, stuck: /** @type {number[][]} */ ([]), skipped: 0, metres: 0, path: /** @type {number[][]} */ ([]),
+    expected: leg.points?.length ?? 0, road: false, returned: false, dwellMs: 0, lostFrames: 0,
     target: /** @type {unknown} */ (null), engagedAt: /** @type {number|null} */ (null) };
   const points = leg.points ?? [], reach = leg.reach ?? 3;
+  let dwellStart = 0, dwelled = false, navAt = t0;
   // the game's own lock-on finds the prey (AimTargets lockOn: the candidate in view, then the locked target), as a player does
   const preyNear = () => {
     const lock = w.lockState;
@@ -70,16 +94,20 @@ export function routeLegOnPage(leg) {
   /** @type {(value: unknown) => void} */ let finish = () => undefined;
   const done = new Promise((resolve) => { finish = resolve; });
   let ended = false;
+  /** @type {ReturnType<typeof setTimeout> | undefined} */ let timeout;
   const end = (/** @type {string|null} */ error) => {
     if (ended) return;
     ended = true;
+    clearTimeout(timeout);
     input.setHeld('move.forward', false); input.setHeld('sprint', false); input.setHeld('attack', false);
+    if (leg.fixed && performance.now() > previous) sample(performance.now());
     nav.metres = Math.round(metres);
     finish({ error, samples, nav, frames: game.frameCount - frames0, ms: performance.now() - t0, cap: leg.cap,
       programs: renderer.info?.programs?.length ?? null });
   };
   const sample = (/** @type {number} */ now) => {
     const frames = game.frameCount - seen, ring = game.frameMs.length;
+    nav.lostFrames += Math.max(0, frames - ring);
     const frameMs = [], updateMs = [], renderMs = [], gpuApproxMs = [];
     seen = game.frameCount;
     for (let k = Math.min(frames, ring); k >= 1; k--) {
@@ -90,7 +118,7 @@ export function routeLegOnPage(leg) {
     samples.push({ tMs: now - t0, seconds: (now - previous) / 1000, frames, frameMs, updateMs, renderMs, gpuApproxMs,
       draws: game.lastFrame.calls, triangles: game.lastFrame.triangles, programs: renderer.info?.programs?.length ?? null,
       delayMs: clock?.delayMs ?? null, jitterMs: clock?.jitterMs ?? null,
-      at: [Math.round(p.position.x * 10) / 10, Math.round(p.position.z * 10) / 10] });
+      at: [Math.round((p.position.x - originX) * 10) / 10, Math.round((p.position.z - originZ) * 10) / 10] });
     previous = now;
   };
   const step = () => {
@@ -98,14 +126,17 @@ export function routeLegOnPage(leg) {
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000), s = (now - t0) / 1000;
     last = now;
     if (w !== /** @type {any} */ (window).__wildshard?.world || document.visibilityState !== 'visible') { end('the page lost the controlled world during the leg'); return; }
-    const x = p.position.x, z = p.position.z;
-    metres += Math.hypot(x - prevX, z - prevZ); prevX = x; prevZ = z;
-    if (now - previous >= 1000) {
-      sample(now);
+    const x = p.position.x - originX, z = p.position.z - originZ;
+    const movedSinceFrame = Math.hypot(p.position.x - prevX, p.position.z - prevZ);
+    if (leg.fixed && movedSinceFrame > 18) { end('position jumped during the route'); return; }
+    metres += movedSinceFrame; prevX = p.position.x; prevZ = p.position.z;
+    if (now - previous >= (leg.fixed ? 150 : 1000)) sample(now);
+    if (now - navAt >= 1000) {
+      navAt = now;
       nav.path.push([Math.round(s), Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
-      const moved = Math.hypot(x - checkX, z - checkZ);
-      checkX = x; checkZ = z;
-      if (leg.kind !== 'stand' && !engaged && at < points.length && moved < 1) {
+      const moved = Math.hypot(p.position.x - checkX, p.position.z - checkZ);
+      checkX = p.position.x; checkZ = p.position.z;
+      if (leg.kind !== 'stand' && !engaged && at < points.length && moved < 1 && (dwellStart === 0 || dwelled)) {
         still++;
         nav.stuck.push([Math.round(s), Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
         input.setHeld('jump', true); setTimeout(() => { input.setHeld('jump', false); }, 150);
@@ -115,6 +146,39 @@ export function routeLegOnPage(leg) {
       } else still = 0;
     }
     const over = s >= leg.seconds;
+    if (leg.fixed && leg.kind === 'walk') {
+      if (nav.road && !nav.returned && inside() === state.home) nav.returned = true;
+      const point = points[at];
+      const dwelling = leg.dwell !== undefined && at === leg.dwell.point + 1 && !dwelled;
+      if (dwelling) {
+        if (dwellStart === 0) dwellStart = now;
+        nav.dwellMs = now - dwellStart;
+        const look = leg.dwell?.face ?? leg.face;
+        if (look !== undefined) steer(look[0] - x, look[1] - z, dt);
+        else if (leg.turn !== undefined) p.yaw += leg.turn * dt;
+        if (leg.dwell?.road && !nav.road && z < -250 && inside() === null) nav.road = true;
+        if (nav.dwellMs >= (leg.dwell?.seconds ?? 0) * 1000) {
+          dwelled = true;
+          navAt = now;
+          checkX = p.position.x; checkZ = p.position.z;
+        }
+      }
+      if (!dwelling && point !== undefined && Math.hypot(point[0] - x, point[1] - z) < reach) { at++; nav.reached++; detours = 0; }
+      const next = !dwelling && (leg.dwell === undefined || at !== leg.dwell.point + 1 || dwelled) ? points[at] : undefined;
+      input.setHeld('move.forward', next !== undefined); input.setHeld('sprint', next !== undefined && leg.sprint === true);
+      if (next !== undefined) {
+        const [nextX, nextZ] = next;
+        if (now < detourUntil) p.yaw = detourYaw;
+        else steer(nextX - x, nextZ - z, dt);
+      } else if (!dwelling && leg.face !== undefined) steer(leg.face[0] - x, leg.face[1] - z, dt);
+      if (over) {
+        end(nav.reached !== points.length || nav.stuck.length > 0 || (leg.dwell !== undefined && !dwelled)
+          || (leg.dwell?.road && !(nav.road && nav.returned)) ? 'incomplete waypoint, dwell or road return' : null);
+        return;
+      }
+      requestAnimationFrame(step);
+      return;
+    }
     if (leg.kind === 'stand') {
       if (leg.turn !== undefined) p.yaw += leg.turn * dt;
       if (over) { end(null); return; }
@@ -151,7 +215,7 @@ export function routeLegOnPage(leg) {
     }
     requestAnimationFrame(step);
   };
-  setTimeout(() => { end('leg overran its time'); }, (leg.seconds + 30) * 1000);
+  timeout = setTimeout(() => { end('leg overran its time'); }, (leg.seconds + 30) * 1000);
   requestAnimationFrame(step);
   return done;
 }

@@ -1,5 +1,6 @@
 export interface RouteLeg { name: string; kind: 'stand' | 'walk' | 'fight'; seconds: number; points?: [number, number][]; sprint?: boolean;
-  turn?: number; prey?: string; reach?: number }
+  turn?: number; prey?: string; reach?: number; grid?: boolean; fixed?: boolean; face?: [number, number];
+  dwell?: { point: number; seconds: number; face?: [number, number]; road?: boolean } }
 export interface LegSample { seconds: number; frames: number; frameMs: number[]; updateMs: number[]; renderMs: number[]; gpuApproxMs: number[];
   draws: number; triangles: number; programs: number | null; delayMs: number | null; jitterMs: number | null }
 export interface LegSummary { seconds: number | null; fps: number | null; p50Ms: number | null; p95Ms: number | null; maxMs: number | null;
