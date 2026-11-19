@@ -146,7 +146,9 @@ describe('the bake', () => {
     } finally { rmSync(out, {recursive: true, force: true}); }
   });
 
-  it.each(['test-shard', '_test-shard'])('names a cooked shard in the tables a page reads (discovery folder %s)', discoverySlug => {
+  // SA48 (4de1e703e): a stored cook's shardfiles live only in its upload's loose folder, so its title row reads them there.
+  const LOOSE = `loose/${'c'.repeat(64)}/`;
+  it.each([['test-shard', ''], ['_test-shard', ''], ['test-shard', LOOSE]])('names a cooked shard in the tables a page reads (discovery folder %s, loose %s)', (discoverySlug, loose) => {
     const out = folder();
     try {
       const manifest = {version: 1, shard: 'test-shard', tier: 'phone', flow: 'client', files: [], totalBytes: 0, wireBytes: 0};
@@ -166,14 +168,15 @@ describe('the bake', () => {
       const discovery = new TextEncoder().encode(JSON.stringify({data: {...title(discoverySlug), shardfile: `/shardfiles/${discoverySlug}/shard.json`,
         card: {thumb: `/shardfiles/${discoverySlug}/blobs/image/thumb.jpg`, portrait: 'portrait', landscape: 'landscape'}}}));
       addCookedShards(out, [{slug: 'test-shard', hash: fresh.hash, header: '', verdict: verdict('test-shard'), discovery, manifests: [row('/assets/spawn/entry.json', 'entry'), row('/assets/spawn/whole.json', 'whole')]}], out,
-        {base: 'https://packs.example/', shards: ['test-shard']});
+        {base: 'https://packs.example/', shards: ['test-shard'], ...(loose === '' ? {} : {loose: {'test-shard': loose}})});
       const html = readFileSync(join(out, 'index.html'), 'utf8');
       expect(html).toContain('"spawnManifests":{"client":{"test-shard":{"phone":{"url":"/assets/spawn/entry.json"');
       expect(html).toContain('__WS_SHARDFILE_VERDICTS__=[{"path":"/shardfiles/a/shard.json"},{"path":"/shardfiles/test-shard/shard.json"}]');
       expect(html).toContain(`globalThis.__WS_WORLD__=${JSON.stringify(world)};globalThis.__WS_BUILD_LABEL__="staging";</script>`);
       const titles = JSON.parse(/id="ws-title-rows">([^<]*)<\/script>/u.exec(html)?.[1] ?? '[]') as TitleManifest[];
-      expect(titles[0]).toMatchObject({slug: discoverySlug, shardfile: 'https://packs.example/shardfiles/test-shard/shard.json', card: {thumb: 'https://packs.example/shardfiles/test-shard/blobs/image/thumb.jpg'}});
-      expect(titles[0]?.discovery).toContain(`https://packs.example/shardfiles/${discoverySlug}/discovery.json?v=`);
+      const at = `https://packs.example/${loose}`;
+      expect(titles[0]).toMatchObject({slug: discoverySlug, shardfile: `${at}shardfiles/test-shard/shard.json`, card: {thumb: `${at}shardfiles/test-shard/blobs/image/thumb.jpg`}});
+      expect(titles[0]?.discovery).toContain(`${at}shardfiles/${discoverySlug}/discovery.json?v=`);
       expect(JSON.parse(readFileSync(book, 'utf8'))).toMatchObject({client: {'test-shard': {phone: {url: '/assets/spawn/whole.json'}}}});
     } finally { rmSync(out, {recursive: true, force: true}); }
   });
