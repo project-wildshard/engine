@@ -7,6 +7,6 @@ export function netCreatureCount(client: NetClient, kind: string): number {
   const frame = client.latest;
   let count = 0;
   if (frame === null) return count;
-  for (const [handle, info] of client.entities) if (info.cls.cls === ANIMAL_CLASS.cls && info.initial['kind'] === kind && client.fields(frame, handle)?.['alive'] === true) count++;
+  for (const [handle, info] of client.entities) if (info.cls.cls === ANIMAL_CLASS.cls && info.initial['kind'] === kind && client.field(frame, handle, 'alive') === true) count++;
   return count;
 }

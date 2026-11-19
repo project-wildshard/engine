@@ -49,7 +49,7 @@ test('another player enters dressed as the castaway body, at a player\'s height,
   expect(contact).toBeDefined();
   // one pass, so three never flips its side and rebuilds its program parameters twice a frame (STR20)
   const contactMaterial: unknown = contact instanceof THREE.Mesh ? contact.material : undefined;
-    expect(contactMaterial instanceof THREE.Material && contactMaterial.forceSinglePass).toBe(true);
+  expect(contactMaterial instanceof THREE.Material && contactMaterial.forceSinglePass).toBe(true);
   // A body that leaves frees its own skeleton, never the mesh every other body shares.
   const freed: string[] = [];
   mesh.geometry.addEventListener('dispose', () => { freed.push('geometry'); });

@@ -28,6 +28,10 @@ after the AAC fix) and Pine (16.10 MB/s), named these:
 - **The owner block.** `NetClient.owner(frame)` decoded a fresh object
   per call, and several systems call it every frame; it is decoded once
   per frame (frames are immutable once held).
+- **One field, not a row.** `NetClient.field(frame, handle, name)`
+  decodes one column in place. The creature census (`netCreatureCount`,
+  once a server frame for every animal row) and a mover's pose read it
+  instead of decoding a whole row object.
 
 Rates before and after: meta
 `docs/plans/engine-memory/walk-peak-2026-11-18.md` and the STR20 row.

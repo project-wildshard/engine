@@ -85,9 +85,9 @@ export class WirePage {
     if (client === null || frame === null || frame === undefined) return null;
     const handle = client.handle(`script:${id}`);
     if (handle === undefined || !frame.fresh.has(handle)) return null;
-    const row = client.fields(frame, handle), x = row?.['x'], y = row?.['y'], z = row?.['z'], pitch = row?.['pitch'], yaw = row?.['yaw'], roll = row?.['roll'];
+    const x = client.field(frame, handle, 'x'), y = client.field(frame, handle, 'y'), z = client.field(frame, handle, 'z'), pitch = client.field(frame, handle, 'pitch'), yaw = client.field(frame, handle, 'yaw'), roll = client.field(frame, handle, 'roll');
     if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number' || typeof pitch !== 'number' || typeof yaw !== 'number' || typeof roll !== 'number') return null;
-    return { tick: frame.tick, pose: { position: { x, y, z }, euler: { x: pitch, y: yaw, z: roll }, enabled: row?.['enabled'] === true } };
+    return { tick: frame.tick, pose: { position: { x, y, z }, euler: { x: pitch, y: yaw, z: roll }, enabled: client.field(frame, handle, 'enabled') === true } };
   }
   /** How many poses rows have set: what a proof reads. */
   posed = 0;

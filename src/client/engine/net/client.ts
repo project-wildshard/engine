@@ -187,6 +187,15 @@ export class NetClient {
     const row = frame.rows.get(handle), cls = this.entities.get(handle)?.cls;
     return row === undefined || cls === undefined ? null : decodeColumns(cls.row, row);
   }
+  /** One field of an entity's row in a frame, decoded in place: no row object. STR20: what a per-frame reader of one or two
+   *  fields asks (the creature census once a server frame per creature, a mover's pose). @frame */
+  field(frame: DecodedFrame, handle: number, name: string): NetValue | undefined {
+    const row = frame.rows.get(handle), cls = this.entities.get(handle)?.cls;
+    if (row === undefined || cls === undefined) return undefined;
+    const columns = cls.row;
+    for (let k = 0; k < columns.length; k++) { const column = columns[k]; if (column?.name === name) return column.value(row[k] ?? 0); }
+    return undefined;
+  }
   /** The flags set in the shard, by name: a flag's entity exists while it is set (P1-E3.10). */
   flags(): ReadonlySet<string> {
     const out = new Set<string>();
