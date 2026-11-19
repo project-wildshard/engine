@@ -20,6 +20,7 @@ import { ownRoadMesh, type RoadMapShare } from './roadResources';
 import type { RoadTileBacking } from './roadTileBacking';
 import type { RoadGrainSource } from './roadGrain';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { waitFor } from '@wildshard/engine/boot/waits';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { LookScope, RoadLayout } from '../../../shared/game/grid/roadLayout';
 import { allocateRenderSteps, type PlatformRenderAdmission } from './renderResidency';
@@ -92,11 +93,12 @@ export async function installPlatformRoadSliced(input: PlatformRoadInput, pause:
   try {
     for (;;) {
       const next = steps.next();
-      const flush = input.tileBacking?.flush(); if (flush !== undefined && flush !== null) await flush;
+      // TR-4b: named waits, so a road step that stops (hosted T1 I's second boot, 60 s with no reads) says which one
+      const flush = input.tileBacking?.flush(); if (flush !== undefined && flush !== null) await waitFor('Road tile archive writes', flush, 'work');
       if (next.done === true) {
         if (next.value === undefined) throw new Error('Road construction cancelled');
         // DL11: the road lands (and control waits for it) only once its worker-captured tiles are archived
-        await input.tileBacking?.joinCapture();
+        const capture = input.tileBacking?.joinCapture(); if (capture !== undefined) await waitFor('Road tile capture worker', capture, 'worker');
         completed = true; return next.value;
       }
       if (now() - start >= budget) { await pause(); start = now(); }

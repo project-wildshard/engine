@@ -175,8 +175,11 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     const url = `${pageOrigin}/`;
     return { url, stamp, socket, database, port: bound,
       get build() { return build; }, get revision() { return revision; },
-      /** The world down and up again on the same client build, its server bundle rebuilt from this checkout. */
-      restart: async () => { await stopWorld(); serverFor(build); await startWorld(); },
+      /** The world down and up again on the same client build, its server bundle rebuilt from this checkout. The bundle builds
+       *  while the old world still runs (as `move` does), so the world is down only for its drain and start: rebuilding it
+       *  down took 7 s of a hosted T1 J run's 10 s redial window (TR-4b), and a bundle that fails to build leaves it up.
+       *  Resolves to the time (`Date.now()`) the old world was told to stop. */
+      restart: async () => { serverFor(build); const down = Date.now(); await stopWorld(); await startWorld(); return down; },
       /** A new client build: pages, release and world move to it; open pages open it again. @param {string} built */
       move: open,
       close };

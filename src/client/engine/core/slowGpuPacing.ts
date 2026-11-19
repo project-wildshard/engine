@@ -64,6 +64,8 @@ export const MAX_GAP_MS = 1000;
 export const MAX_PRESENT_GAP_MS: number = 2 * MAX_GAP_MS;
 /** Pixel ratios snap to eighths, so a resize is never a rounding change. */
 const SNAP = 8;
+/** TR-4b: a starved page (`SlowGpuPacing.starved`) redraws its shadow maps on one drawn frame in this many. */
+export const STARVED_SHADOW_EVERY = 4;
 
 /** One page's pacing state; pure, so it is driven by measured costs alone. */
 export class SlowGpuPacing {
@@ -77,6 +79,11 @@ export class SlowGpuPacing {
   private pending: number | null = null;
   /** The longest gap after a drawn frame not yet counted (`presented`). */
   private presentedGap = 0;
+  /** TR-4b: the last window still cost over the target at the lowest scale. A software rasterizer's frame is then bound
+   *  by its triangles, not its pixels (a hosted runner's Brasscap: 2 fps at 0.5, about the same at 0.25), so the loop
+   *  redraws the shadow maps on one drawn frame in STARVED_SHADOW_EVERY (a 1024 map of 87k triangles: a third of the
+   *  frame, measured on a 4-core Linux SwiftShader). Cleared by the first window under the target. */
+  starved = false;
   constructor(maxRatio: number) { this.maxRatio = maxRatio; this.ratio = maxRatio; }
 
   /** The pixel ratio to set right before the next frame actually draws, once. A resize clears the canvas, so it waits for
@@ -84,7 +91,7 @@ export class SlowGpuPacing {
   takeRatio(): number | null { const next = this.pending; this.pending = null; return next; }
 
   /** Back to the tier's own scale (a capture): from the next drawn frame. */
-  restore(): void { if (this.ratio !== this.maxRatio) { this.ratio = this.maxRatio; this.pending = this.maxRatio; } this.calm = 0; this.costs.length = 0; this.presentedGap = 0; }
+  restore(): void { if (this.ratio !== this.maxRatio) { this.ratio = this.maxRatio; this.pending = this.maxRatio; } this.calm = 0; this.costs.length = 0; this.presentedGap = 0; this.starved = false; }
 
   /** The gap from a drawn frame's animation frame to the next animation frame (ms): a software GPU process still
    *  rastering the frame holds that next one back while the main thread sits idle. The next `measured` frame counts it. */
@@ -102,6 +109,7 @@ export class SlowGpuPacing {
     const median = [...this.costs].sort((a, b) => a - b)[Math.floor(PACING_WINDOW / 2)] ?? 0;
     this.costs.length = 0;
     let next = this.ratio;
+    this.starved = median > FRAME_COST_TARGET_MS && this.ratio <= Math.min(MIN_PIXEL_RATIO, this.maxRatio);
     if (median > FRAME_COST_TARGET_MS) {
       next = this.ratio * Math.min(STEP_DOWN_MAX, Math.max(STEP_DOWN_MIN, Math.sqrt(FRAME_COST_TARGET_MS / median)));
       next = Math.max(Math.min(MIN_PIXEL_RATIO, this.ratio), Math.floor(next * SNAP) / SNAP);

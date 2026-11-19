@@ -37,7 +37,7 @@ import type { BackdropLayer } from '../world/backdropLayer';
 import { GradeEffect } from './Grade';
 import { VolumetricsEffect, makeNoiseTexture } from './Volumetrics';
 import { TIER, TIER_CONFIG, frameCapFps, gfxPrefs, setMobileFrameCap, type Tier } from './tier';
-import { pacedSkip, slowGpuPacingFor, webglRendererName, type SlowGpuPacing } from './slowGpuPacing';
+import { pacedSkip, slowGpuPacingFor, STARVED_SHADOW_EVERY, webglRendererName, type SlowGpuPacing } from './slowGpuPacing';
 import { worldTime } from '../../../shared/engine/core/time';
 import { installViewport, viewportHeight } from './viewport';
 import { FIXED_STEP, MAX_FIXED_STEPS } from '../../../shared/engine/core/fixedStep';
@@ -1739,6 +1739,8 @@ export class Game {
   private pacedProbe: MessageChannel | null = null;
   /** TR-4b: the animation frame of the last paced frame drawn, until the next animation frame reads its gap (`presented`). */
   private pacedDrawnAt: number | null = null;
+  /** TR-4b: the shadow maps redraw on one drawn frame in STARVED_SHADOW_EVERY while the pacing reads `starved`. */
+  private starvedShadows = false;
   /** The pacing state on a slow software rasterizer, for proofs; null on any other GPU. */
   get pacing(): Readonly<SlowGpuPacing> | null { return this.slowPacing; }
   /** RT3: pace this page's frames to a slow software rasterizer (finish.ts, after its shaders step measured the GPU slow).
@@ -1880,6 +1882,12 @@ export class Game {
         const budgeted = this.stepOnly || picked !== null || paced !== null ? null : this.budget?.takeRatio() ?? null;
         const ratio = picked ?? (paced !== null && activeDevPixels() === null ? paced : null) ?? (this.budgetOn() ? budgeted : null);
         if (ratio !== null) { this.renderer.setPixelRatio(ratio); this.fitSize(); }
+        // TR-4b: a software rasterizer still over its frame target at the lowest scale redraws its shadow maps on one drawn
+        // frame in STARVED_SHADOW_EVERY (slowGpuPacing.ts `starved`); a capture or a calmer window draws them every frame again
+        const starved = pacing?.starved === true, shadowMap = this.renderer.shadowMap;
+        if (starved) { shadowMap.autoUpdate = false; if (this.frameCount % STARVED_SHADOW_EVERY === 0) shadowMap.needsUpdate = true; }
+        else if (this.starvedShadows) { shadowMap.autoUpdate = true; shadowMap.needsUpdate = true; }
+        this.starvedShadows = starved;
         sky.update(realDt);
         // planet + sun disc travel with the camera so they stay "infinitely" far
         sky.clouds?.position.copy(this.camera.position); sky.planet.position.copy(this.camera.position).addScaledVector(sky.planetDir, 1700); sky.sunDisc.position.copy(this.camera.position).addScaledVector(sky.raysDir, 1500);

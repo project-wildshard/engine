@@ -71,63 +71,6 @@ async function seated(world: DevWorld): Promise<number> {
     : -1
 }
 
-test('the dev page plays on the local Node server, a restart keeps its save and its page', async ({
-  browser,
-  dev,
-}): Promise<void> => {
-  const context = await browser.newContext({ ...devices['Desktop Chrome'] })
-  try {
-    await saveFixture(context, { scope: 'device', key: 'devMode', data: true })
-    await saveFixture(context, {
-      scope: 'device',
-      key: 'firstPlayDone',
-      data: true,
-    })
-    await harnessPins(context, { seed: 357 })
-    const page = await context.newPage()
-    const workers: string[] = []
-    page.on('worker', (worker): void => {
-      workers.push(new URL(worker.url()).pathname)
-    })
-    // No init script: the dev port stamps the document itself.
-    await page.goto(`${dev.url}?mute=1&nolock=1&fps=30`)
-    await enterBrasscap(page, 'Dev Alice')
-    expect(
-      await page.evaluate(
-        (): boolean => Reflect.get(globalThis, '__WS_WORLD__') !== undefined,
-      ),
-    ).toBe(true)
-    expect(
-      workers.filter((path): boolean => /serverWorker/u.test(path)),
-      'no in-page server worker',
-    ).toEqual([])
-    expect(await seated(dev)).toBe(1)
-
-    // STR3: the world goes down (saves written to disk) and comes back; the page redials and is in play within 10 s
-    const started = Date.now()
-    await dev.restart()
-    expect(
-      await saveRows(dev),
-      'the drain wrote the player to disk',
-    ).toBeGreaterThan(0)
-    await expect
-      .poll(async (): Promise<number> => await seated(dev), {
-        timeout: Math.max(1, 10_000 - (Date.now() - started)),
-      })
-      .toBe(1)
-    expect(
-      await page.evaluate(
-        (): string | undefined => globalThis.__wildshard?.app.state,
-      ),
-    ).toBe('play')
-    expect(
-      workers.filter((path): boolean => /serverWorker/u.test(path)),
-    ).toEqual([])
-  } finally {
-    await context.close()
-  }
-})
-
 /** STR4: a control on the dev server's channel, as a loopback tool sends it. */
 async function control(
   world: DevWorld,
@@ -161,7 +104,7 @@ async function seatsOf(world: DevWorld): Promise<readonly string[]> {
     : []
 }
 
-test('the harness verbs reach the dev server for a seated page', async ({
+test('the dev page plays on the local Node server, a restart keeps its save and its page, the harness verbs reach it', async ({
   browser,
   dev,
 }): Promise<void> => {
@@ -175,12 +118,48 @@ test('the harness verbs reach the dev server for a seated page', async ({
     })
     await harnessPins(context, { seed: 357 })
     const page = await context.newPage()
-    const before = await seatsOf(dev)
+    const workers: string[] = []
+    page.on('worker', (worker): void => {
+      workers.push(new URL(worker.url()).pathname)
+    })
+    // No init script: the dev port stamps the document itself.
     await page.goto(`${dev.url}?mute=1&nolock=1&fps=30`)
-    await enterBrasscap(page, 'Dev Bob')
-    // The page's own device: the seat that is new (an earlier test's body may still be held)
-    const after = await seatsOf(dev)
-    const seats = after.filter((seat): boolean => !before.includes(seat))
+    await enterBrasscap(page, 'Dev Alice')
+    expect(
+      await page.evaluate(
+        (): boolean => Reflect.get(globalThis, '__WS_WORLD__') !== undefined,
+      ),
+    ).toBe(true)
+    expect(
+      workers.filter((path): boolean => /serverWorker/u.test(path)),
+      'no in-page server worker',
+    ).toEqual([])
+    expect(await seated(dev)).toBe(1)
+
+    // STR3: the world goes down (saves written to disk) and comes back; the page redials and is in play within 10 s of
+    // the world going down (its server bundle rebuilds before that, while the world still runs)
+    const started = await dev.restart()
+    expect(
+      await saveRows(dev),
+      'the drain wrote the player to disk',
+    ).toBeGreaterThan(0)
+    await expect
+      .poll(async (): Promise<number> => await seated(dev), {
+        timeout: Math.max(1, 10_000 - (Date.now() - started)),
+      })
+      .toBe(1)
+    expect(
+      await page.evaluate(
+        (): string | undefined => globalThis.__wildshard?.app.state,
+      ),
+    ).toBe('play')
+    expect(
+      workers.filter((path): boolean => /serverWorker/u.test(path)),
+    ).toEqual([])
+
+    // STR4: the harness verbs reach the dev server for the seated page. The same page as above, not a second boot: a
+    // hosted software-GL boot is about a minute, and two of them with the dev world's start overran J's 120 s (TR-4b)
+    const seats = await seatsOf(dev)
     expect(seats).toHaveLength(1)
     const device = seats[0] ?? ''
     const refused = await control(dev, { device: 'nobody', flag: 'x' })

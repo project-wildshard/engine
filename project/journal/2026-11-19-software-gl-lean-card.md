@@ -83,3 +83,32 @@ the wait. With three Metal seeds (home 1.75 s, packDecode 0), the
 planted fault (`WS_T1_FAULT=decode-delay`: 3 s inside the first
 GLTF decode) printed `flagged: packDecode 3000 ms (week median 18
 ms of 3)` and nothing else; unplanted runs flag none and pass.
+
+## Triangles, not pixels, and J's one boot (opus-tr4b5)
+
+Run 44554928066 (`6b447fb19`) passed A, C to H, K and L; B (two
+boots, 129 s), I and J did not. A Linux Playwright container held to
+four CPUs (`docker run --cpus=4`, the browser reached over
+`PW_TEST_CONNECT_WS_ENDPOINT` with the loopback exposed) reproduces
+the hosted shape at about 2.5 times its speed: Brasscap draws 6 fps
+after control at render scale 0.5. Its frame is triangles: 0.25
+scale changed nothing, hiding the deck changed nothing, hiding
+Brasscap's own cell gave 28 fps, a camera far plane of 100 m only
+6.0. The one 1024 shadow map (87k triangles in 45 draws) was about a
+third of the frame: 6.0 fps with it redrawn each frame, 8.3 without.
+So once a window still costs over the target at the lowest scale,
+the pacing reads `starved` and the loop redraws the shadow maps on
+one drawn frame in four. In one page (the Mac was loaded, so noisy):
+3.7 to 5.4 fps each frame, 5.4 to 6.4 one in four, 7.4 none.
+
+J booted twice (one per test) beside a dev world that takes 15 to
+18 s to start: 18 + 68 + 68 s cannot fit 120. The harness verbs now
+run on the restarted page. The restart rebuilt the server bundle
+with the world down, 7 s of the page's 10 s redial window; it now
+builds first and the window starts when the world is told to stop.
+
+I's second boot (after a save import and reload) sat in `road` for
+60 s twice hosted (44542508555, 44554928066) and never in the
+container. The card's footer named no wait. The road's tile archive
+writes and capture-worker join are named waits now, and the stall
+report lists every pending named wait.

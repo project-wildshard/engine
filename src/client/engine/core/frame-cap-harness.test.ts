@@ -91,6 +91,22 @@ test('TR-4b: a GPU still rastering (the next animation frame held back) counts a
   expect(fresh.ratio).toBe(1); // a hidden tab's or long task's gap is not the frame's
 });
 
+test('TR-4b: a window still over the target at the lowest scale reads starved; the first calm window clears it', () => {
+  const pacing = new SlowGpuPacing(1);
+  const window = (cost: number): void => { for (let i = 0; i < PACING_WINDOW; i++) pacing.measured(i * 1000, cost); };
+  window(400);
+  expect(pacing.ratio).toBe(MIN_PIXEL_RATIO);
+  expect(pacing.starved).toBe(false); // that window was drawn at 1: the lower scale may be enough
+  window(400);
+  expect(pacing.starved).toBe(true);
+  window(20);
+  expect(pacing.starved).toBe(false);
+  window(400);
+  expect(pacing.starved).toBe(true);
+  pacing.restore();
+  expect(pacing.starved).toBe(false);
+});
+
 test('RT3: a new scale waits for the next drawn frame, once; a capture restores the tier scale the same way', () => {
   const pacing = new SlowGpuPacing(2);
   for (let i = 0; i < PACING_WINDOW; i++) pacing.measured(i * 1000, 200);

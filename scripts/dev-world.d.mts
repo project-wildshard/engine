@@ -17,7 +17,8 @@ export interface DevWorld {
   readonly database: string
   readonly build: string
   readonly revision: number
-  readonly restart: () => Promise<void>
+  /** Resolves to the time (`Date.now()`) the old world was told to stop. */
+  readonly restart: () => Promise<number>
   readonly move: (built: string) => Promise<void>
   readonly close: () => Promise<void>
 }

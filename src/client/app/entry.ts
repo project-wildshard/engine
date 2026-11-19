@@ -9,7 +9,7 @@ import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
 import { startPageServices } from './pageServices';
 import { persistHomeScreen, saves } from '@wildshard/engine/saves/runtime';
 import { definePageSaveKeys } from '@wildshard/engine/game/pageSaveKeys';
-import { waitFor } from '@wildshard/engine/boot/waits';
+import { bootWaits, waitFor } from '@wildshard/engine/boot/waits';
 import { runtimePacksOn } from '@wildshard/engine/boot/loadingPacks';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { preloadModuleFiles, readModuleFiles } from '@wildshard/engine/boot/download';
@@ -429,8 +429,10 @@ async function startPage(): Promise<void> {
       // stopped in "home" and "road" with no reads and no named wait), in the report and in the console a trace keeps
       const now = Number(document.timeline.currentTime ?? 0), open = (bootTiming()?.entries ?? []).filter(row => row.end === null).slice(-12)
         .map(row => `${row.operation} ${((now - row.start) / 1000).toFixed(1)}s`);
+      // and every named wait still pending (a step's inner await: the road's tile writes and capture worker)
+      const waits = bootWaits().map(wait => `${wait.label} ${(wait.ageMs / 1000).toFixed(1)}s`);
       const why = { ...stuckContext(reportCardOf(card()), {
-        connection: (navigator as Navigator & { connection?: { effectiveType?: string } }).connection?.effectiveType, visibility: document.visibilityState }), open };
+        connection: (navigator as Navigator & { connection?: { effectiveType?: string } }).connection?.effectiveType, visibility: document.visibilityState }), open, waits };
       console.warn('[boot] stalled', JSON.stringify(why));
       return why;
     } catch { return { unreadable: true }; }
