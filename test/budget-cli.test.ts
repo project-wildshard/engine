@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { runCli } from '../scripts/budgets/cli.mjs';
+import type { BudgetBaselines } from '../scripts/budgets/files.mjs';
 
 // BUDGET-CAPS BC3: check, record and declare on fixture files.
 const roots: string[] = [];
@@ -25,8 +26,8 @@ function fixture(measures: unknown) {
   } }));
   writeFileSync(join(root, 'measures.json'), JSON.stringify(measures));
   const lines: string[] = [], errors: string[] = [], summary = join(root, 'summary.md');
-  const run = (...argv: string[]) => runCli(argv.map(arg => arg === 'M' ? join(root, 'measures.json') : arg), { root, env: { GITHUB_STEP_SUMMARY: summary }, out: line => lines.push(line), err: line => errors.push(line) });
-  const baselines = () => JSON.parse(readFileSync(join(root, 'budgets/baselines.json'), 'utf8')).baselines;
+  const run = (...argv: string[]) => runCli(argv.map(arg => arg === 'M' ? join(root, 'measures.json') : arg), { root, env: { GITHUB_STEP_SUMMARY: summary }, out: line => { lines.push(line); }, err: line => { errors.push(line); } });
+  const baselines = (): BudgetBaselines['baselines'] => (JSON.parse(readFileSync(join(root, 'budgets/baselines.json'), 'utf8')) as BudgetBaselines).baselines;
   return { run, lines, errors, summary, baselines };
 }
 
@@ -59,7 +60,7 @@ test('a measure with no cap entry fails the check', () => {
 test('record writes the baselines with their content keys and clears declared; it refuses a value over the hard cap', () => {
   const f = fixture({ commit: 'c1', measures: { 'download/phone/a': { value: 70, contentKey: 'a@2' }, 'ledger/a/peak': { reads: [44, 43, 90], contentKey: 'a@2' } } });
   expect(f.run('declare', 'download/phone/a', '--why', 'audio set moves to download')).toBe(0);
-  expect(f.baselines()['download/phone/a'].declared).toBe('audio set moves to download');
+  expect(f.baselines()['download/phone/a']?.declared).toBe('audio set moves to download');
   expect(f.run('record', 'M')).toBe(0);
   expect(f.baselines()['download/phone/a']).toEqual({ value: 70, contentKey: 'a@2', commit: 'c1' });
   expect(f.baselines()['ledger/a/peak']).toEqual({ value: 44, contentKey: 'a@2', commit: 'c1' });
@@ -67,7 +68,7 @@ test('record writes the baselines with their content keys and clears declared; i
   const over = fixture({ measures: { 'download/phone/a': { value: 101, contentKey: 'a@2' } } });
   expect(over.run('record', 'M')).toBe(1);
   expect(over.errors[0]).toContain('hard cap');
-  expect(over.baselines()['download/phone/a'].value).toBe(50);
+  expect(over.baselines()['download/phone/a']?.value).toBe(50);
 });
 
 test('declare needs a reason, and a declared key is judged as new content', () => {

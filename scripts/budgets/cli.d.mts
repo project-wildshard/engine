@@ -1,6 +1,7 @@
 /** BUDGET-CAPS BC3: check, record and declare. */
 import type { BudgetBaselines, BudgetCaps } from './files.mjs';
 import type { BudgetStatus } from './verdict.mjs';
+
 export interface BudgetMeasure { value?: number; reads?: readonly number[]; contentKey: string; detail?: Record<string, number> }
 export interface BudgetMeasures { commit?: string; measures: Record<string, BudgetMeasure> }
 export interface BudgetRow { key: string; status: BudgetStatus | 'unknown'; value: number | null; baseline: number | null; line: number | null; hard: number | null; target: number | null; ratio: number | null; unit: string; contentKey: string; previousKey?: string | null; detail?: Record<string, number> }

@@ -21,3 +21,6 @@
   over-hard), `record` (writes baselines with content keys, clears
   `declared`, refuses past a hard cap) and `declare <key> --why`. A measure
   with no cap entry fails the check.
+- BC3 lint, fixed forward: `judgeAll` builds rows with `Object.assign`
+  (no-map-spread), the CLI finds its one positional (prefer-array-find), and
+  `cli.d.mts` gets its blank line. It had refused main-push from this clone.

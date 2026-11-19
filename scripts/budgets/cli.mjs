@@ -29,14 +29,19 @@ function show(value, unit) {
  * @param {import('./files.mjs').BudgetCaps} caps @param {import('./files.mjs').BudgetBaselines} baselines
  * @param {{ measures: Record<string, { value?: number, reads?: number[], contentKey: string, detail?: Record<string, number> }> }} measures */
 export function judgeAll(caps, baselines, measures) {
-  return Object.entries(measures.measures).map(([key, measure]) => {
+  const rows = [];
+  for (const [key, measure] of Object.entries(measures.measures)) {
     const cap = capFor(caps, key);
-    if (cap === undefined) return { key, status: /** @type {const} */ ('unknown'), unit: 'bytes', value: null, baseline: null, line: null, hard: null, target: null, ratio: null, contentKey: measure.contentKey, detail: measure.detail };
+    if (cap === undefined) {
+      rows.push({ key, status: /** @type {const} */ ('unknown'), unit: 'bytes', value: null, baseline: null, line: null, hard: null, target: null, ratio: null, delta: null, previousKey: null, contentKey: measure.contentKey, detail: measure.detail });
+      continue;
+    }
     const recorded = baselines.baselines[key];
     const result = verdict({ measure: measure.reads ?? /** @type {number} */ (measure.value), baseline: recorded, hard: cap.hard, contentKey: measure.contentKey,
       declared: recorded?.declared !== undefined, kind: cap.kind, floor: cap.floor ?? 0 });
-    return { key, ...result, unit: cap.unit, baseline: recorded?.value ?? null, previousKey: recorded?.contentKey ?? null, hard: cap.hard, target: cap.target ?? null, contentKey: measure.contentKey, detail: measure.detail };
-  });
+    rows.push(Object.assign(result, { key, unit: cap.unit, baseline: recorded?.value ?? null, previousKey: recorded?.contentKey ?? null, hard: cap.hard, target: cap.target ?? null, contentKey: measure.contentKey, detail: measure.detail }));
+  }
+  return rows;
 }
 
 /** One table, one line a budget. Nothing else is printed: no ::warning (BC7).
@@ -93,9 +98,9 @@ export function runCli(argv, { root, env = process.env, out = line => console.in
   const [command, ...rest] = argv;
   const flag = name => { const at = rest.indexOf(name); return at === -1 ? undefined : rest[at + 1]; };
   const valued = new Set(['--why', '--run']);
-  const positional = rest.filter((arg, index) => !arg.startsWith('--') && !valued.has(rest[index - 1]));
+  const target = rest.find((arg, index) => !arg.startsWith('--') && !valued.has(rest[index - 1]));
   const caps = readCaps(root), baselines = readBaselines(root);
-  const readMeasures = () => JSON.parse(readFileSync(resolve(positional[0]), 'utf8'));
+  const readMeasures = () => JSON.parse(readFileSync(resolve(target ?? ''), 'utf8'));
   if (command === 'check') {
     const rows = judgeAll(caps, baselines, readMeasures()), table = budgetTable(rows);
     out(table);
@@ -111,11 +116,11 @@ export function runCli(argv, { root, env = process.env, out = line => console.in
     return 0;
   }
   if (command === 'declare') {
-    const result = declareRaise(caps, baselines, positional[0], flag('--why'));
+    const result = declareRaise(caps, baselines, target ?? '', flag('--why'));
     for (const error of result.errors) err(error);
     if (result.errors.length > 0) return 1;
     if (result.note !== undefined) out(result.note);
-    else { writeBaselines(result.baselines, root); out(`budget: ${positional[0]} declared; commit budgets/baselines.json with the feature`); }
+    else { writeBaselines(result.baselines, root); out(`budget: ${target} declared; commit budgets/baselines.json with the feature`); }
     return 0;
   }
   err('usage: cli.mjs check <measures.json> [--hard-only] | record <measures.json> [--why <why>] | declare <key> --why <why>');
