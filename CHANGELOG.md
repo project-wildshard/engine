@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.51 (2026-11-19)
+
+- Sky Reach and other runtime-plan shards stand declared creatures on their own ground.
+- Declared encounters bind their owner hooks and show their runtime-plan interface.
+- Opening a different shard during the seat hold no longer shows the previous shard’s creatures or crashes the page.
+
 ## v0.1.50 (2026-11-19)
 
 - Brasscap Mesa uses revision 9, with the current Dust Wyrm.
