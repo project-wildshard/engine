@@ -29,3 +29,10 @@ test('a cook that published no programs file asks for none, under either spellin
   bank({spawnManifests: {home: {shards: ['proto'], base: 'https://home.test/'}}});
   expect(entryProgramsURL('_proto')).toBe('https://home.test/programs/proto.json');
 });
+
+test('a baked cook reads recorded programs from its exact upload', () => {
+  const loose = `loose/${'a'.repeat(64)}/`;
+  bank({entryPrograms: {proto: true}, spawnManifests: {home: {shards: ['proto'], base: CDN, loose: {proto: loose}}}});
+  expect(entryProgramsURL('_proto')).toBe(`${CDN}${loose}programs/proto.json`);
+  expect(entryProgramsURL('pine-hollow')).toBe(new URL('programs/pine-hollow.json', document.baseURI).href);
+});
