@@ -232,8 +232,10 @@ export class Loading {
   private readonly timeLeft = new TimeLeftClock();
   private slowGpu = false;
   private timeLeftShown = false;
-  /** IP33: one 4 Hz paint for the clock and the facts (leanLoadingCard) */
-  private readonly lean: boolean;
+  /** IP33: one 4 Hz paint for the clock and the facts (leanLoadingCard, or a software rasterizer: `leanForSoftwareGl`) */
+  private lean: boolean;
+  /** the clock's tick, re-armed when the card turns lean mid-boot */
+  private tickScope: ReturnType<typeof uiScope> | null = null;
 
   /** QA 2026-11-13 (Jake: "make it look the same as the one for Shard Select"): `inset`, a scoped card drawn over the live
    *  world (a grid cell's preparation): the same panel, no backdrop, head or foot; it never covers the world or takes input. */
@@ -324,7 +326,7 @@ export class Loading {
     set(this.els.suFact, engineString('s_loading_waiting'));
     this.paintPhases();
     this.tickClock();
-    this.clockScope.interval(this.lean ? LEAN_MS : CLOCK_MS, () => { this.tickClock(); });
+    this.armClock();
     const unsubscribe = bootTiming()?.subscribe?.(() => { this.readServerProgress(); });
     if (unsubscribe !== undefined) this.clockScope.onDispose(unsubscribe);
   }
@@ -639,6 +641,27 @@ export class Loading {
       setData(this.root, 'serverFiles', String(progress.files));
       setData(this.root, 'serverBytes', String(progress.bytes));
     }
+  }
+
+  private armClock(): void {
+    this.tickScope?.dispose();
+    const tick = this.clockScope.child('tick');
+    this.tickScope = tick;
+    tick.interval(this.lean ? LEAN_MS : CLOCK_MS, () => { this.tickClock(); });
+  }
+
+  /**
+   * TEMPLATE-E2E TR-4b: on a software rasterizer (SwiftShader, llvmpipe: `softwareRasterizer`) every repaint of the full
+   * card is rastered on the CPU in the GPU process, in the same queue as the world's own GL work, and the first frame's
+   * fenced units each wait a painted frame behind it. Brasscap's desktop boot under SwiftShader, two alternating pairs
+   * (2026-11-19): the full card 40.6 and 33.7 s to control (first frame 22.4 and 18.9 s), the lean card 26.6 and 24.8 s
+   * (13.4 and 12.5 s). So from the renderer step on, such a page paints the lean card. A real GPU never takes this path.
+   */
+  leanForSoftwareGl(): void {
+    if (this.lean || this.root.dataset['inset'] !== undefined || this.scope.disposed || this.scope.disposing) return;
+    this.lean = true;
+    this.root.dataset['lean'] = '';
+    if (!this.clockScope.disposed && !this.clockScope.disposing) this.armClock();
   }
 
   private tickClock(): void {

@@ -1,0 +1,7 @@
+# Software GL paints the lean loading card
+
+TR-4b. Hosted T1 boots of Brasscap took 55 to 65 seconds on SwiftShader, so every suite with two boots (G, H, J, K) ran past its 120-second budget. A trace of a SwiftShader boot showed the GPU process's main thread busy most of the time rastering the full loading card: the 10 Hz clock, the 5 Hz facts and each bar's width transition repainted it, and with software raster each repaint costs about 16 ms in the same queue as the world's GL work. One synchronous `getExtension` sat 1.3 seconds behind it, and each fenced first-frame unit waited a painted frame.
+
+The lean card (IP33, behind `debug.leanCard`) paints at 4 Hz with stepped bars and no blur. Two alternating desktop pairs on SwiftShader: the full card took 40.6 and 33.7 seconds to control, the lean card 26.6 and 24.8 seconds; the first frame fell from 22.4 and 18.9 seconds to 13.4 and 12.5. So a page whose WebGL renderer is a software rasterizer turns its card lean from the renderer step on. A real GPU never takes this path, and the debug slot still decides for everyone else.
+
+The second-world stall is the same queue: a second live world beside the worker's world on SwiftShader never left its shaders or road-grain wait while the first world drew. Navigating the first world away resumed the second within about two seconds and it reached play. That is starvation of the one software GPU process, not a lock or a lost wakeup, so G's `about:blank` release stays the fix.

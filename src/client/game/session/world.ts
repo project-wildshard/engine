@@ -29,6 +29,7 @@ import { markBootContextLost, markBootHandledError } from '@wildshard/engine/boo
 import { macrotask, type Plan, type StepRunner } from '@wildshard/engine/boot/plan';
 import { bootstrap, type World } from '@wildshard/engine/core/bootstrap';
 import { earlyProgramsOn, queueBakedPrograms, type BakedPrograms } from '@wildshard/engine/boot/earlyPrograms';
+import { softwareRasterizer, webglRendererName } from '@wildshard/engine/core/slowGpuPacing';
 import { TIER } from '@wildshard/engine/core/tier';
 import { cachedResourceAllocations } from '@wildshard/engine/render/textureBytes';
 import { entryProgramsURL } from '../boot/spawnDownload';
@@ -65,6 +66,9 @@ async function buildWorld(ctx: Awaited<ReturnType<typeof dataStage>>, level: Lev
   if (earlyProgramsOn()) queueBakedPrograms(bakedEntryPrograms(ctx.slug));
   const world = Object.assign(await bootstrap(step, session.ownedGridHome ? gridPageShellLevel(selected) : gridLevel(toLevelSpec(selected, product)), INPUT_CONTEXTS), { chunk: manifest });
   const { game, sky, player, forest, params, chunk, registry } = world;
+  // TR-4b: a software rasterizer paints the lean loading card from here on (Loading.leanForSoftwareGl): the full card's repaints
+  // shared its GPU queue with the boot's GL work and held each first-frame unit a painted frame behind them
+  if (softwareRasterizer(webglRendererName(game.renderer.getContext()))) ctx.loading.leanForSoftwareGl();
   session.residency?.bindAssets(app.assets, game.engineScope, session.ownedGridHome ? null : game.levelScope, () => app.levelScope, cachedResourceAllocations);
   if (!session.ownedGridHome) installEntrySockets(world.physics, game.levelScope, [{ x: 0, z: 0 }]);
   app.params = params;

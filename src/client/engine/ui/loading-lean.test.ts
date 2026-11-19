@@ -39,3 +39,22 @@ test('the switch: the slot wins, else phone Low follows the default and desktop 
   resetLeanLoadingCard();saveGraphicsMode('high');expect(leanLoadingCard()).toBe(false);
   resetLeanLoadingCard();initializeTier('desktop');saveGraphicsMode('low');expect(leanLoadingCard()).toBe(false);
 });
+
+test('TR-4b: a software rasterizer turns a full card lean mid-boot, its clock to 4 Hz; an inset card stays as it is',()=>{
+  slot.write(false);
+  const loading=new Loading({id:'lean-software',name:'Lean software'},{scoped:true});
+  const clock=loading.root.querySelector<HTMLElement>('[data-el="clock"]');
+  if(clock===null)throw new Error('Missing real loader clock');
+  const inset=new Loading({id:'lean-software-inset',name:'Lean software inset'},{inset:true});
+  try{
+    expect(loading.root.dataset['lean']).toBeUndefined();
+    const full=vi.spyOn(clock,'textContent','set');
+    vi.advanceTimersByTime(1000);expect(full).toHaveBeenCalledTimes(10);full.mockRestore();
+    loading.leanForSoftwareGl();loading.leanForSoftwareGl();
+    expect(loading.root.dataset['lean']).toBe('');
+    const writes=vi.spyOn(clock,'textContent','set');
+    vi.advanceTimersByTime(1000);
+    expect(writes).toHaveBeenCalledTimes(4);expect(clock.textContent).toBe('00:02.0');
+    inset.leanForSoftwareGl();expect(inset.root.dataset['lean']).toBeUndefined();
+  }finally{loading.scope.dispose();inset.scope.dispose();}
+});
