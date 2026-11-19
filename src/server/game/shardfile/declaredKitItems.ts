@@ -18,10 +18,12 @@ import { shotRandom, shotSpread } from '@wildshard/engine/combat/shotSpread';
 import type { AimCommand } from '@wildshard/engine/input/commands';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
+import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
 import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, rackMeleeRows, rackToolRows, SERVER_KIT_FAMILIES, standScenes, takenLine, type LeverProfile } from '../../../shared/game/shardfile/items';
 import { playerSeats, type PlayerSeat } from '../plugin/playerSeats';
 import { nativeRangedHit } from '../plugin/nativeItems';
+import { createNativeTargetQueries, type NativeVolumeContact } from '../plugin/simulation';
 import { installStatusEffects } from './statusEffects';
 import { questBooks } from '@wildshard/engine/quest/players';
 
@@ -108,11 +110,21 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
     const field = shard.state.player.find(entry => entry.id === row.fieldId);
     return field === undefined || field.privacy === 'host' ? [] : [{ item: row.item, name: field.name, property: row.property }];
   });
+  // OF25c: a body with authored volumes (a mech's plate) names the part a blow meets, as the native blade and the lever do: the
+  // first volume along the blow's line, else the nearest one to its origin. Its hp wears and its multiplier applies.
+  const volumes = createNativeTargetQueries<AnimalSim>(), contact: NativeVolumeContact = { distance: 0, point: new Vector3(), head: false };
+  const partOf = (actor: AnimalSim): NonNullable<ItemTarget['part']> => (origin, direction, limit) => {
+    const ray = volumes.ray([actor], origin, direction, limit);
+    if (ray?.part !== undefined) return { part: ray.part, multiplier: ray.multiplier ?? 1, point: ray.point.clone() };
+    if (!volumes.closest(actor, origin, Infinity, contact) || contact.part === undefined) return null;
+    return { part: contact.part, multiplier: contact.multiplier ?? 1, point: contact.point.clone() };
+  };
   const targets = (): readonly ItemTarget[] => [...host.entities.values()].flatMap(actor => {
     if (!actor.alive) return [];
     const target = host.combat.targetPort(actor.combatActor(), actor, velocity => { actor.impulse(velocity); });
     return [{ actor: target.actor, position: target.position, target: target.target, hittable: target.hittable, hurt: target.hurt,
-      aimPoint: new Vector3(actor.position.x, actor.position.y + actor.dims.bodyY * actor.scale, actor.position.z), reach: actor.dims.bodyRadius * actor.scale }];
+      aimPoint: new Vector3(actor.position.x, actor.position.y + actor.dims.bodyY * actor.scale, actor.position.z), reach: actor.dims.bodyRadius * actor.scale,
+      ...(actor.hitVolumes === undefined ? {} : { part: partOf(actor) }) }];
   });
   // The command a blow answers: the page confirms its own hits by it, as it does a native swing's (`attackSeq`).
   const pressed = new Map<string, number>();

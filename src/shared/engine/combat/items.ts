@@ -18,7 +18,13 @@ export type ItemHook = (input: { tick: number; dt: number; action: ItemAction; f
 /** `reach`: how far round its aim point the body stands (its horizontal radius), so a blow meets its surface, not only its
  *  middle (a scale-3 Barrow Warden is 2.25 m round: a player who runs into it stands farther from its middle than a sword's
  *  2.2 m, TEMPLATE-E2E TC-SHIP-e2). */
-export interface ItemTarget extends CombatTarget { readonly aimPoint: Vector3; readonly reach?: number }
+/** `part` (ONE-FORMAT OF25c): the authored volume a blow from `origin` along `direction` meets, and where; a body with no
+ *  authored volumes leaves it out, and its blows land on its middle with no part, as before. Without it a kit melee blow could
+ *  never wear a part's hp, so a mech's plate never broke. */
+export interface ItemTarget extends CombatTarget {
+  readonly aimPoint: Vector3; readonly reach?: number;
+  readonly part?: (origin: Vector3, direction: Vector3, limit: number) => { readonly part: string; readonly multiplier: number; readonly point: Vector3 } | null;
+}
 /** Existing actor/contact/effect ports; no renderer or active app participates in item simulation. */
 export interface ItemPorts {
   active?: () => boolean;
@@ -134,8 +140,10 @@ export class ItemRuntime {
       return along >= 0 && along <= attack.range + reach && lateral <= attack.width / 2 + reach;
     }).sort((a, b) => a.aimPoint.distanceToSquared(this.origin) - b.aimPoint.distanceToSquared(this.origin))[0];
     if (target === undefined) return;
+    const met = target.part?.(this.origin, this.direction, attack.range + (target.reach ?? 0)) ?? null;
     const hit = this.ports.combat.hit({ source: this.ports.actor, sourceTags: attack.tags, target: target.actor,
-      amount: attack.damage, from: this.origin, point: target.aimPoint, dir: this.direction, weaponId: this.spec.id, moveId: attack.id, headshot: false });
+      amount: attack.damage, from: this.origin, point: met?.point ?? target.aimPoint, dir: this.direction, weaponId: this.spec.id, moveId: attack.id, headshot: false,
+      ...(met === null ? {} : { part: met.part, partMultiplier: met.multiplier }) });
     if (hit === null) return;
     if (attack.effect !== null && target.actor.alive) this.ports.effect(target.actor, attack.effect, this.ports.actor);
     target.target.hitFlash?.(1); this.notify('hit', { kind: target.target.kind, headshot: false, killed: hit.killed });
