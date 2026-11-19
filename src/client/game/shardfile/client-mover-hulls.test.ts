@@ -22,7 +22,7 @@ test('a client plan\'s steer vehicle enters with its hull', async () => {
   bindResidentWorldScope(scope, resident);
   publishEntryOwner(scope, 'object', 'sail', new Group());
   const ctx = { scope, game: { runtime: { world: {} } },
-    product: { section: () => ({ movers: [SAIL] }), shardfile: { look: { materials: {} }, movers: [SAIL], props: { colliders: [HULL] } } } } as unknown as ShardContext;
+    product: { has: () => false, section: () => ({ movers: [SAIL] }), shardfile: { look: { materials: {} }, movers: [SAIL], props: { colliders: [HULL] } } } } as unknown as ShardContext;
   let options: Parameters<typeof installFollowedMovers>[2] | undefined;
   const install = ((_ctx, _world, given) => { options = given; return {} as ReturnType<typeof installFollowedMovers>; }) as typeof installFollowedMovers;
   await installClientMoverOwners(ctx, { system: 'salt', bindings: [{ id: SAIL.id, kind: 'object', owner: 'sail' }] }, install);

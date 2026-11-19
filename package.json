@@ -1075,6 +1075,7 @@
     "./game/shardfile/props": "./src/shared/game/shardfile/props.ts",
     "./game/shardfile/runtimePage": "./src/client/game/shardfile/runtimePage.ts",
     "./game/shardfile/movers": "./src/shared/game/shardfile/movers.ts",
+    "./game/shardfile/shardVehicles": "./src/shared/game/shardfile/shardVehicles.ts",
     "./game/shardfile/vehicleHulls": "./src/shared/game/shardfile/vehicleHulls.ts",
     "./game/shardfile/moverRuntime": "./src/server/game/plugin/mover.ts",
     "./game/shardfile/crowdRuntime": "./src/shared/game/shardfile/crowdRuntime.ts",

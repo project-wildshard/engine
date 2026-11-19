@@ -1973,6 +1973,7 @@
     "src/shared/game/shardfile/spawnManifest.ts": "shared",
     "src/shared/game/shardfile/targets.ts": "shared",
     "src/shared/game/shardfile/tileOrder.ts": "shared",
+    "src/shared/game/shardfile/shardVehicles.ts": "shared",
     "src/shared/game/shardfile/vehicleHulls.ts": "shared",
     "src/shared/game/shardfile/walkInPortalRide.ts": "shared",
     "src/shared/game/shardfile/wholeInputs.ts": "shared",

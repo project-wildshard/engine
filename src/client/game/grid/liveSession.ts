@@ -67,6 +67,7 @@ import { gridRecovery, type GridRecoveryReason, type GridRecoveryRecord } from '
 import { RoadRecovery, onRoad, type RoadPoint, type RoadRecoveryCell } from '../../../shared/game/grid/roadRecovery';
 import { GridCellWaitingError } from './refusal';
 import { withCopyLayout } from './copyLayout';
+import { dockedShard } from '../../../shared/game/shardfile/shardVehicles';
 import { dataCellWorld, type RegionShell } from './regionShell';
 import { installDataCellMovers, type DataCellMovers } from './dataCellMovers';
 import { enterCellLooks, followCellLooks } from './dataCellLooks';
@@ -773,7 +774,8 @@ export class LiveGridSession {
     if (metadata) return finish({ bytes, isolatedPreparation: true, tilePreparation: source.tiles.some(tile => tile.lod === 0), cancel: retained.release });
     const groundResolution = source.edge.north.heights.length === 256 ? 256 : 257;
     // G220 pass 2: a shared product's copy collides with its own landmarks (copyLayout.ts); every other cell gets its source unchanged
-    const copySource = withCopyLayout(source, cell.identity);
+    // MIRROR-SALT-ZONE MSZ6: and its `world/vehicles` docks join its movers, for the cell's movers, ride prompts and play list
+    const copySource = dockedShard(withCopyLayout(source, cell.identity));
     const rapier = this.ports.physics.R, duplicates = this.ports.strips.flatMap((strip) => strip.duplicates.filter((row) => row.instance === cell.instance).map((row) => row.mesh));
     const build = (): LiveGridRegion & { readonly shell: RegionShell } => {
       const { shell, water, heightAt, colliders } = dataCellWorld(copySource, assets, rapier, groundResolution);

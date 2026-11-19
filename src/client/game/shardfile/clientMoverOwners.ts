@@ -8,6 +8,7 @@ import { hasLentLook, lentLooksOf, setLentParam, type LentLooks } from './lentLo
 import { folderClosureFile } from '../../../shared/game/shardfile/shardFolder';
 import { materialGraphIr } from '@wildshard/format/materials';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
+import { dockedMovers, folderVehicles } from '../../../shared/game/shardfile/shardVehicles';
 
 export interface MoverMoorRows {readonly look:string;readonly water:number;readonly cleats:readonly [number,number]}
 export type MoverOwnerBinding =
@@ -77,6 +78,8 @@ export async function installClientMoverOwners(ctx:ShardContext,rows:MoverOwnerR
   current();installed.add(scope);scope.onDispose(()=>{installed.delete(scope);});
   for(const row of rows.bindings)if(row.kind==='object')scope.expose(entryOwner(scope,'object',row.owner).userData,'declaredMotion',true);
   // SS-GP5: a steer vehicle's hull rides it here too, as on a data page (`dataPageMovers.ts`) and a grid data cell
-  const result=install(ctx,world,{data,views,systemId:rows.system,restoreFlags:new Set(),hulls:vehicleHulls({movers:data,props:ctx.product.shardfile.props})});
+  // MIRROR-SALT-ZONE MSZ6: the product's `world/vehicles` docks follow the bound movers as steer carries, with no owner view
+  const vehicles=folderVehicles(ctx.product),docked=dockedMovers(data,vehicles);
+  const result=install(ctx,world,{data:docked,views,systemId:rows.system,restoreFlags:new Set(),hulls:vehicleHulls({movers:docked,props:ctx.product.shardfile.props},vehicles)});
   current();return result;
 }

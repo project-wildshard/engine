@@ -85,6 +85,7 @@ import { prepareDeclaredGroupBrains, type DeclaredGroupPorts, type DeclaredGroup
 import { prepareDeclaredCrowds, type DeclaredCrowdPorts, type PreparedCrowds } from "../../../shared/game/shardfile/crowdRuntime";
 import { installLadders, type LadderClientPorts } from '../../../shared/game/shardfile/ladder';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
+import { dockedShard, shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
 import { MoverScriptDriver, playerGrounds, verifiedMoverModules, proveTerrainEntries, type TerrainEntryWalk, type DeclaredMoverComposition, type MoverRuntime } from "./mover";
 import { socketLiftEntries } from "@wildshard/format/socketLiftAssets";
 import { createClientChannels } from "../../../shared/game/plugin/channels";
@@ -447,7 +448,8 @@ export interface ShardfileSimulation {
 }
 /** One declared simulation core, used by the normal browser loader and the headless author validator. */
 function shardfileSimInput(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): {level: SimLevel; ports: SimHostPorts} {
-  const shard = countedShard(source); // OF29b: a counted row runs as its row and its copies
+  // OF29b: a counted row runs as its row and its copies; MIRROR-SALT-ZONE MSZ6: a `world/vehicles` dock as a steer carry
+  const shard = countedShard(dockedShard(source, shardVehicles(source, ports.sections)));
   if (shard.nativeGround !== null) throw new Error('Native ground retains its native runtime simulation; a flat declared proxy is forbidden');
   preflightPlainPerches(shard, assets, ports);
   const portals = portalLinkEntries(shard.entryways), portalErrors = portalLinkRules(portals, shard);
@@ -487,7 +489,8 @@ function observationValue(entry: [string, unknown], value: boolean): asserts ent
 
 /** Reinstall matching adapters into a fresh standalone restore host; restoring skips collider allocation and stepping. */
 export function bindShardfileSim(host: SimHost, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): ShardfileSimulation {
-  const shard = countedShard(source); // OF29b: the same expanded rows the level was built from
+  const vehicles = shardVehicles(source, ports.sections);
+  const shard = countedShard(dockedShard(source, vehicles)); // OF29b, MSZ6: the same expanded rows and docks the level was built from
   const seats = scriptSeats(host), { first } = seats;
   // TE-ENG7: each declared body names its species on the wire. Set here, on create and on restore alike, and never in
   // the level's spec, so a save keeps its level fingerprint.
@@ -651,7 +654,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
       } else lane = moverDriver === undefined ? createShardfileScriptLane(shard, assets, options) : moverDriver.compose(shard, assets, options);
       if (moverDriver !== undefined) {
         const stateWorld = lane.world;
-        const runtime = moverDriver.install(host, lane, { id: 'movers.declared', restoreFlags: new Set(host.flags.all), hulls: vehicleHulls(shard),
+        const runtime = moverDriver.install(host, lane, { id: 'movers.declared', restoreFlags: new Set(host.flags.all), hulls: vehicleHulls(shard, vehicles),
           activation: { ground: () => playerGrounds(host), shared: id => {
             const field = shard.state.shared.find(row => row.id === id);
             const value = field === undefined ? undefined : stateWorld.publicField(field.name);

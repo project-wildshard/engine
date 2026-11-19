@@ -14,6 +14,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { FollowedMovers, type MoverView } from '../plugin/followedMovers';
 import { moverLookKey, wirePage } from '../shardfile/wirePage';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
+import { dockedShard } from '../../../shared/game/shardfile/shardVehicles';
 
 /** One cell's movers on this page. */
 export interface DataCellMovers {
@@ -23,7 +24,8 @@ export interface DataCellMovers {
 }
 
 /** Install a data cell's movers in its region's physics; they leave with `scope`, and take the wire only once claimed. */
-export function installDataCellMovers(source: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>, region: { readonly physics: Physics; readonly scope: Scope }, instance: string): DataCellMovers | null {
+export function installDataCellMovers(declared: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>, region: { readonly physics: Physics; readonly scope: Scope }, instance: string): DataCellMovers | null {
+  const source = dockedShard(declared); // MIRROR-SALT-ZONE MSZ6: its `world/vehicles` docks ride as steer carries
   if (source.movers.length === 0) return null;
   // a saved end stands where the wire's first row puts it: the page holds no flags of its own here
   const movers = new FollowedMovers(source.movers, { physics: region.physics, scope: region.scope, restoreFlags: new Set(), hulls: vehicleHulls(source) });

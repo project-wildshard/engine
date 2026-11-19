@@ -94,6 +94,7 @@ import { declaredLever } from '../plugin/weaponFamily';
 import { runtimeBoundWorldFiles, withoutRuntimeRows } from "../../../shared/game/plugin/runtimeRows";
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { nearPlaceholderRoots } from '@wildshard/format/nearPlaceholder';
+import { dockedShard } from '../../../shared/game/shardfile/shardVehicles';
 
 function isProofMesh(value: Object3D): value is Mesh { return value instanceof Mesh; }
 
@@ -559,7 +560,8 @@ export class ShardfileClient {
     const runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play, items = this.items, tiles = this.worldTiles;
     const health = ctx.app.player;
     if (runtime === undefined || world === null || world === undefined || play === null || play === undefined || items === undefined || tiles === undefined || health === null) throw new Error('Shardfile requires the normal play stage');
-    const source = this.source, identity = { instance: this.bindings.instance, shard: source.identity.slug, revision: source.identity.revision };
+    // MIRROR-SALT-ZONE MSZ6: `world/vehicles` docks join the movers, so the play list's ride and the page's movers see them
+    const source = dockedShard(this.source), identity = { instance: this.bindings.instance, shard: source.identity.slug, revision: source.identity.revision };
     yield;
     const equipmentHost = ctx.app.equipmentHost;
     if (equipmentHost === null) throw new Error('Declared items require the normal equipment view host');
