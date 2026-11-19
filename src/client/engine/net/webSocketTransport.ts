@@ -1,9 +1,10 @@
 import { Scope } from '../../../shared/engine/app/scope';
-import { doorPassLane } from '../../../shared/engine/app/actor';
+import { AGENT_QUERY, doorPassLane } from '../../../shared/engine/app/actor';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { channelPrefix, closeCode, closeReason, COMMAND_SKIP_BYTES, controlPrefix, decodePong, encodePing, framed, PING_MS, SOCKET_ARRIVE, SOCKET_COUNTDOWN, SOCKET_ENTER, SOCKET_PLAYTEST, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME, SOCKET_UNRELIABLE, SOCKET_VOICE, SOCKET_WORLD, type SocketControl } from '../../../shared/engine/net/socketFrames';
 import { decodeSocketCloseInfo, type SocketCloseInfo } from '../../../shared/engine/net/socketClose';
 import type { NetChannel, Transport, TransportStats } from '../../../shared/engine/net/transport';
+import { pageActor } from '../telemetry/pageActor';
 
 /** The code a browser reports for a link that died with no close frame. */
 const ABNORMAL_CLOSE = 1006;
@@ -48,7 +49,10 @@ export class WebSocketTransport implements Transport {
   private recvBytes = 0;
   constructor(url: string, options: WebSocketOptions = {}) {
     this.now = options.now ?? diagnosticNow;
-    this.socket = new (options.socket ?? WebSocket)(url, doorPassProtocols());
+    const { actor, lane } = pageActor();
+    const address = actor === 'agent' ? new URL(url, window.location.href) : null;
+    address?.searchParams.set(AGENT_QUERY, lane ?? '1');
+    this.socket = new (options.socket ?? WebSocket)(address?.href ?? url, doorPassProtocols());
     this.socket.binaryType = 'arraybuffer';
     this.scope.listen(this.socket, 'open', () => { this.opened(); });
     this.scope.listen(this.socket, 'message', (event: MessageEvent<unknown>) => { if (event.data instanceof ArrayBuffer) this.receive(event.data); });

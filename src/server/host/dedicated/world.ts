@@ -19,6 +19,7 @@ import { decodeFirstMessage, encodeHello, type Hello } from '@wildshard/wire/han
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { decodeEnter, encodeArrive, encodeCountdown, encodeEnter, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
+import { AGENT_HEADER, classifyActor, type ActorMark, type ActorTags } from '@wildshard/engine/app/actor';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
@@ -39,6 +40,7 @@ import {checkpointWord,type CheckpointCertificate} from './checkpointWitness';
 import type { PersistenceStatus } from './saves/persistenceStatus';
 import { persistenceEnvelope } from '@wildshard/engine/net/persistenceWord';
 import { SeatQueue } from './seatQueue';
+import type { ZoneEntryStore } from './saves/zoneEntries';
 
 /** J174: what a deploy gives everyone before they move together. */
 export const GRACE_MS = 60_000;
@@ -135,6 +137,7 @@ export interface PlayerSaves {
   drain: (ms: number) => Promise<boolean>;
   /** How writes are going: E7.8's numbers. */
   stats?: () => Readonly<Record<string, number>>;
+  readonly zoneEntries?: ZoneEntryStore;
 }
 /** How the world is built. */
 export interface WorldOptions {
@@ -159,6 +162,8 @@ export interface WorldOptions {
   readonly booted?: (index: number, slug: string, ms: number) => void;
   /** SC1: a crossing's time from its source's ask to its worker's answer, and whether the seat moved. */
   readonly crossed?: (ms: number, moved: boolean) => void;
+  /** METRICS MT4: a confirmed Zone Select or walking arrival. The seat id stays inside the world process. */
+  readonly entered?: (seat: string, slug: string, actor: ActorTags) => void;
   readonly playtest?:(row:PlaytestRow)=>void;
   /** J218: the ICE servers voice chat hands a player who joins; public STUN when absent. */
   readonly voiceIce?: () => Promise<readonly VoiceIceServer[]>;
@@ -211,6 +216,8 @@ export class World {
   private readonly queue = new SeatQueue();
   /** DEVICE-TELEMETRY DT4: each socket's device word and the player its hello named, until the one `client.device` line is written. */
   private readonly devices = new WeakMap<SocketTransport, { said?: DeviceSnapshot; who?: DeviceWho; done: boolean }>();
+  private readonly actors = new WeakMap<SocketTransport, { mark: ActorMark }>();
+  private readonly seatActors = new Map<string, { mark: ActorMark }>();
   /** Clients loading: each holds a seat, and has no body yet. */
   private readonly pending = new Map<string, PendingSeat>();
   /** Who has a body, by link or by hold, and in which cell. */
@@ -233,7 +240,7 @@ export class World {
   /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered, and when it began (SC1). */
   private readonly crossings = new Map<string, number>();
   /** GC15 (3): each seated device's socket and a copy of the hello it was seated with, so a crossing onto another worker can move both. */
-  private readonly seatSockets = new Map<string, { readonly end: SocketTransport; readonly hello: ArrayBuffer; readonly admission:number }>();
+  private readonly seatSockets = new Map<string, { readonly end: SocketTransport; readonly hello: ArrayBuffer; readonly admission: number; entering: boolean }>();
   private admission=0;
   /** GC15 (3): a crossing onto another worker, between the source's `handOut` and the socket's `out`: where it arrives and with what save. */
   private readonly outs = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt; readonly entry: SeatEntry }>();
@@ -389,13 +396,17 @@ export class World {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
     // GO7: a late `left` from the cell a goto moved them out of must not unseat them (or free their Name) in the new one.
     // GC15: a crossing's source lets the seat go before `crossed` says where it went: the seat stays counted until then.
-    else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from !== undefined && this.crossings.has(news.device)) { if (this.seated.get(news.device) === from) this.leftCrossing.add(news.device); return; } if (from === undefined || this.seated.get(news.device) === from) { this.seated.delete(news.device); this.names.delete(news.device); } }
+    else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from !== undefined && this.crossings.has(news.device)) { if (this.seated.get(news.device) === from) this.leftCrossing.add(news.device); return; } if (from === undefined || this.seated.get(news.device) === from) this.forgetSeat(news.device); }
     // A voice is named for the body its cell seated (a room's first seat is its lead body), from the cell they now stand in.
     else if (news.kind === 'seated') {
       const {device,body,slug:from}=news;
       if(this.seated.get(device)===from){
         this.voiceBodies.get(device)?.(body);
         const socket=this.seatSockets.get(device);
+        if (socket?.entering === true && socket.admission === news.admission) {
+          socket.entering = false;
+          this.countEntry(device, from);
+        }
         if(news.checkpoint!==undefined&&socket!==undefined&&socket.admission===news.admission){
           const bytes=checkpointWord(this.discovery(),news.checkpoint);
           if(bytes!==undefined)socket.end.control('world',bytes);
@@ -427,13 +438,23 @@ export class World {
       this.crossings.delete(news.device); this.leftCrossing.delete(news.device);
       // A moved seat stands in the target, on the same link; one the target refused after the source let it go is in neither.
       if (this.seated.get(news.device) === news.from) {
-        if (news.moved) { this.seated.set(news.device, news.to); this.names.set(news.device, news.name); this.voiceBodies.get(news.device)?.(news.body); }
-        else if (!news.stays) { this.seated.delete(news.device); this.names.delete(news.device); }
+        if (news.moved) {
+          this.seated.set(news.device, news.to); this.names.set(news.device, news.name); this.voiceBodies.get(news.device)?.(news.body);
+          if (news.from !== news.to) this.countEntry(news.device, news.to);
+        }
+        else if (!news.stays) this.forgetSeat(news.device);
         else this.thaw(news.from, news.device, this.moving.get(news.device), 'refused');
       }
       this.moving.delete(news.device);
       this.options.log({ at: 'cell.crossed', index, device: news.device, from: news.from, to: news.to, moved: news.moved });
     }
+  }
+  private forgetSeat(device: string): void {
+    this.seated.delete(device); this.names.delete(device); this.seatActors.delete(device);
+  }
+  private countEntry(device: string, cell: string): void {
+    const actor = this.seatActors.get(device)?.mark;
+    if (actor !== undefined && roadHome(cell) === null) this.options.entered?.(device, cellShard(cell), actor);
   }
   private refuse(reason: string): void { this.refusals[reason] = (this.refusals[reason] ?? 0) + 1; }
   private async recover(device: string, slug: string, seq: number): Promise<void> {
@@ -457,7 +478,13 @@ export class World {
     const attempt = this.attempt(key, passed);
     if (attempt === null) { this.refuse('connections'); socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
     const goto = gotoCell(request.url), spawn = gotoSpawn(request.url);
-    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, key, attempt, goto, spawn); });
+    const queryAt = request.url?.indexOf('?') ?? -1;
+    const header = request.headers[AGENT_HEADER];
+    const actor = classifyActor({ userAgent: request.headers['user-agent'] ?? '',
+      header: (Array.isArray(header) ? header[0] : header) ?? null,
+      query: queryAt < 0 ? null : new URLSearchParams(request.url?.slice(queryAt + 1)).get('agent'),
+      doorPass: passed ? passText(request.headers['sec-websocket-protocol']) : undefined });
+    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, key, attempt, goto, spawn, actor); });
   }
   /** SB42: the budget a live proof pass draws on (`pass:<lane>`), or null: no pass, a bad one, or an address past its bad passes. */
   private async passKey(text: string, ip: string): Promise<string | null> {
@@ -509,8 +536,9 @@ export class World {
     if (!this.words.has(key) && this.words.size >= MAX_TRACKED_IPS) { const oldest = this.words.keys().next().value; if (oldest !== undefined) this.words.delete(oldest); }
     words.push(now); this.words.set(key, words); this.refund(key, attempt);
   }
-  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt, goto: string | null, spawn = false): void {
+  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt, goto: string | null, spawn: boolean, actor: ActorMark): void {
     const end = new SocketTransport(socket);
+    this.actors.set(end, { mark: actor });
     this.sockets.set(ip, (this.sockets.get(ip) ?? 0) + 1); this.ends.add(end);
     // SB42: whether a hello came, and whether the door closed it for want of one
     let spoke = false, timedOut = false;
@@ -542,6 +570,8 @@ export class World {
     if (seen.said !== undefined || seen.done) return;
     const said = readDeviceWord(bytes);
     if (said === null) { this.refuse('device-word'); this.options.log({ at: 'client.device-refused', bytes: bytes.byteLength }); seen.done = true; this.devices.set(end, seen); return; }
+    const actor = this.actors.get(end);
+    if (actor !== undefined && actor.mark.actor === 'human') actor.mark = classifyActor({ userAgent: said.ua });
     seen.said = said; this.devices.set(end, seen); this.deviceSeen(end);
   }
   /** DT4: the hello named this socket's player. */
@@ -737,7 +767,7 @@ export class World {
     });
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     this.pending.delete(device);
-    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.checkpoint===undefined?{}:{checkpoint:saved.checkpoint}), ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }), ...(at === undefined ? {} : { arrival: at }), ...(fresh ? { spawn: true } : {}) }, bytes);
+    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.checkpoint===undefined?{}:{checkpoint:saved.checkpoint}), ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }), ...(at === undefined ? {} : { arrival: at }), ...(fresh ? { spawn: true } : {}) }, bytes, fresh || arrival !== undefined);
   }
   /**
    * GC15: a seat's feet left cell `from` for `to`. On the same worker the door reads their save on `to`'s shard and orders the move, which
@@ -828,7 +858,7 @@ export class World {
   /** A crossing that never reached its worker: a `left` the source said meanwhile counts now. */
   private abandon(device: string, from: string): void {
     this.crossings.delete(device);
-    if (this.leftCrossing.delete(device) && this.seated.get(device) === from) { this.seated.delete(device); this.names.delete(device); }
+    if (this.leftCrossing.delete(device) && this.seated.get(device) === from) this.forgetSeat(device);
   }
   /** GO7: a page Shard select sent to a cell this world opens is seated there; otherwise where the player last stood, else the first. */
   private cellFor(last: string | null, goto: string | null = null): string {
@@ -840,10 +870,12 @@ export class World {
     return cell !== null && this.links.has(cell) ? cell : first;
   }
   private discovery():Pick<WorldWord,'cells'|'shards'>{return {cells:this.links.size,shards:[...new Set([...this.links.keys()].map(cellShard))]};}
-  private seat(slug: string, end: SocketTransport, entry: SeatEntry, hello: ArrayBuffer): void {
+  private seat(slug: string, end: SocketTransport, entry: SeatEntry, hello: ArrayBuffer, entering = false): void {
     if (!end.isOpen || this.draining) return;
     const { port1, port2 } = new MessageChannel();
     this.seated.set(entry.device, slug); this.names.set(entry.device, entry.name);
+    const actor = this.actors.get(end);
+    if (actor !== undefined) this.seatActors.set(entry.device, actor);
     if(this.options.playtest!==undefined){
       const off=end.onControl((control,bytes)=>{
         if(control!=='playtest')return;
@@ -853,7 +885,7 @@ export class World {
       end.onClose(off);end.control('playtest');
     }
     const admission=++this.admission;
-    this.seatSockets.set(entry.device, { end, hello: hello.slice(0),admission });
+    this.seatSockets.set(entry.device, { end, hello: hello.slice(0), admission, entering });
     // Only a road can admit an enter. A cell must answer instead of leaving
     // the page waiting for its ten-second silent-peer fallback.
     const refusedEnter = end.onControl((control, bytes) => {

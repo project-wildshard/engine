@@ -13,6 +13,7 @@ import type { Database } from './saves/database';
 import type { PlayerSaves, SavedPlayer } from './world';
 import { admitDoc } from './playerDoc';
 import { PersistenceFeed } from './saves/persistenceStatus';
+import { memoryZoneEntryStore, zoneEntryStore } from './saves/zoneEntries';
 
 const WRITE_REPORT = 'insert into chat_report (reporter, speaker, name, channel, typed, shown, shard, tick, delivery_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (delivery_id) do nothing';
 
@@ -52,7 +53,7 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
       const certificate=witness && saved?.source === 'doc' && doc !== null && recovery.length === 0 ? checkpointCertificate(doc,saved.seq,shard) : undefined;
       return { doc, seq: saved?.seq ?? 0, recovery, ...(certificate===undefined?{}:{checkpoint:certificate}), ...(previous === undefined ? {} : { previous: { doc: previous, recovery: receipts.filter(row => row.serial > previous.ledger.serial) } }) };
     };
-  return { queue, reports, onSave: listener => persistence.listen(listener), write: write => { queue.post(write); }, drain: async ms => (await Promise.all([queue.drain(ms), reports.drain(ms)])).every(Boolean), stats: () => ({ ...queue.stats, waiting: queue.waiting, p95Ms: Number(queue.p95.toFixed(2)), reportsWaiting: reports.waiting, reportsWritten: reports.stats.written, reportsFailed: reports.stats.failed, reportsRefused: reports.stats.refused }),
+  return { queue, reports, zoneEntries: zoneEntryStore(db), onSave: listener => persistence.listen(listener), write: write => { queue.post(write); }, drain: async ms => (await Promise.all([queue.drain(ms), reports.drain(ms)])).every(Boolean), stats: () => ({ ...queue.stats, waiting: queue.waiting, p95Ms: Number(queue.p95.toFixed(2)), reportsWaiting: reports.waiting, reportsWritten: reports.stats.written, reportsFailed: reports.stats.failed, reportsRefused: reports.stats.refused }),
     where: async device => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return await placeOf(db, epoch, device) ?? await lastCell(db, epoch, device); },
     read:(device,shard)=>read(device,shard), readWitness:(device,shard)=>read(device,shard,true),
     recover: (device, shard, seq) => healSave(db, epoch, device, shard, seq),
@@ -74,7 +75,7 @@ export async function openPlayerSaves(url: string, migrations: URL, epoch: numbe
 /** Saves that end with the process: a soak's, or a proof's. `DATABASE_URL=memory:` asks for it by name, so no server runs on it by accident. */
 export function memoryPlayerSaves(): PlayerSaves {
   const held = new Map<string, SaveWrite>();
-  return { where: device => { const last = [...held.values()].reverse().find(row => row.player === device); return Promise.resolve(last === undefined ? null : last.cell ?? last.shard); }, read: (device, shard) => { try { const row = held.get(`${device}\0${shard}`); return Promise.resolve({ doc: row === undefined ? null : admitDoc(row.doc, row.saveVersion, shard), seq: row?.seq ?? 0 }); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); } },
+  return { zoneEntries: memoryZoneEntryStore(), where: device => { const last = [...held.values()].reverse().find(row => row.player === device); return Promise.resolve(last === undefined ? null : last.cell ?? last.shard); }, read: (device, shard) => { try { const row = held.get(`${device}\0${shard}`); return Promise.resolve({ doc: row === undefined ? null : admitDoc(row.doc, row.saveVersion, shard), seq: row?.seq ?? 0 }); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); } },
     // WR7: as Postgres does, an older server's doc never lands on a newer one.
     write: write => { const key = `${write.player}\0${write.shard}`, prior = held.get(key); if (prior === undefined || prior.saveVersion <= write.saveVersion) held.set(key, write); }, report: () => true, drain: () => Promise.resolve(true),
     // MP2.2d, as `saves/claim.ts`: the device's rows move to an account with none.

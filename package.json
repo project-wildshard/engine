@@ -321,6 +321,7 @@
     "./app/app": "./src/client/engine/app/app.ts",
     "./app/cachedAssets": "./src/client/engine/app/cachedAssets.ts",
     "./app/disposalCache": "./src/client/engine/app/disposalCache.ts",
+    "./app/actor": "./src/shared/engine/app/actor.ts",
     "./app/identity": "./src/shared/engine/app/identity.ts",
     "./app/ownership": "./src/shared/engine/app/ownership.ts",
     "./app/pageSeat": "./src/shared/engine/app/pageSeat.ts",

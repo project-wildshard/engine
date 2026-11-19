@@ -23,6 +23,8 @@ import { Scope } from '@wildshard/engine/app/scope';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, readPulledReleaseCells, servingRelease, ReleaseWatch } from './releaseFile';
 import { savesUrl } from './saves/pgDatabase';
+import { within } from './saves/saveStore';
+import { ZoneEntries, ZONE_ENTRY_MINUTE_MS } from './zoneEntries';
 import { ServerReports } from './serverReports';
 import { ServerMetrics, metricsPort } from './serverMetrics';
 import { sendSentryTest, serverSentry } from './serverSentry';
@@ -75,6 +77,10 @@ const setting = (name: string): string | undefined => { const value = process.en
 const sentry = serverSentry({ dsn: setting('SENTRY_DSN'), version: engineVersion, build, channel: release.channel });
 const reports = new ServerReports({ build, channel: release.channel, telemetryUrl: setting('TELEMETRY_URL'), errorsUrl: setting('ERRORS_URL'), tag: setting('RECORD_TAG'), log, sentry, ...(recordEvery === undefined ? {} : { everyMs: Number(recordEvery) }) });
 const url = process.env['DATABASE_URL'] ?? savesUrl(release.channel), saves: PlayerSaves = url === 'memory:' ? memoryPlayerSaves() : await openPlayerSaves(url, new URL('migrations/', import.meta.url), release.saveEpoch, log, issue => { reports.contract(issue); });
+const seatSecret = need('SEAT_SECRET');
+const arrivals = saves.zoneEntries === undefined ? undefined : new ZoneEntries(saves.zoneEntries, release.channel, seatSecret, log);
+const arrivalScope = new Scope('dedicated.zone-entries');
+if (arrivals !== undefined) arrivalScope.interval(ZONE_ENTRY_MINUTE_MS, () => { void arrivals.flush(); });
 const recordTag=setting('RECORD_TAG');
 const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD_TURN_KEY_TOKEN');
 // J353: zone entry is the only implementation. Old box files may retain this row during rollout.
@@ -118,7 +124,8 @@ const trust = doorTrust(process.env);
 // are root's (`wildshard-config`), and the boot log says when the pin is overridden.
 const ticketKey = setting('PLAYER_TICKET_PUBLIC_KEY');
 if (ticketKey !== undefined) log({ at: 'tickets.key', pinned: false, key: ticketKey.slice(-16) });
-const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, ...(ticketKey === undefined ? {} : { ticketKey }), secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
+const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, ...(ticketKey === undefined ? {} : { ticketKey }), secret: seatSecret, saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
+  ...(arrivals === undefined ? {} : { entered: (seat, slug, actor) => { arrivals.entered(seat, slug, actor); } }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
   crashed: failed, reading: (index, row) => { reports.heard(index, row); metrics?.reading(index, row); },
   ...(metrics === undefined ? {} : { booted: (_index: number, _slug: string, ms: number) => { metrics.booted(ms); }, crossed: (ms: number, moved: boolean) => { metrics.crossed(ms, moved); } }),
@@ -147,6 +154,9 @@ stop = (code): void => { if (draining) return; draining = true; void (async (): 
   const written = await world.drain().catch(() => false);
   log({ at: 'server.drained', written, saves: saves.stats?.() });
   server.close();
+  arrivalScope.dispose();
+  if (arrivals !== undefined) await within(3000, async () => { await arrivals.flush(); await arrivals.flush(); })
+    .catch(() => { log({ at: 'zone-entries.drain-timeout', channel: release.channel }); });
   await reports.settled();
   const recorded=await playtest?.close();if(recorded===false)log({at:'playtest.incomplete'});
   process.exit(written ? code : 1);
