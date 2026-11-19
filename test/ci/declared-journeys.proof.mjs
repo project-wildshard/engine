@@ -26,7 +26,8 @@ timed(
       f.idle(20);
       assert.equal(blob.hp, initialHealth, "The blob must survive without weapon input");
       let hit = false;
-      for (let i = 0; i < 240 && blob.alive; i++) {
+      // Template rev 10's blob backs off between strikes, so the walker follows it into reach (AP36c)
+      for (let i = 0; i < 600 && blob.alive; i++) {
         const p = leadPlayer(f.host).position,
           at = blob.position;
         const origin = { x: p.x, y: p.y + 1.68, z: p.z };
@@ -34,7 +35,8 @@ timed(
           dy = at.y + blob.dims.bodyY * blob.scale - origin.y,
           dz = at.z - origin.z;
         const distance = Math.hypot(dx, dy, dz);
-        f.tick(0, 0, [], {
+        const far = Math.hypot(dx, dz) > 3;
+        f.tick(far ? Math.atan2(-dx, -dz) : 0, far ? 1 : 0, [], {
           aim: { origin, direction: { x: dx / distance, y: dy / distance, z: dz / distance } },
         });
         if (blob.alive && blob.hp < initialHealth) hit = true;

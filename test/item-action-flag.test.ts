@@ -4,7 +4,8 @@ import { expect, test } from 'vitest';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { questBooks } from '../src/shared/engine/quest/players';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { installDeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
@@ -18,15 +19,14 @@ const PLAYER = 'actor.player', BOT = 'actor.bot', GHOST = 'actor.ghost', CHEST =
 async function mossgate(): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array> }> {
   const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const shard = product.shardfile, actions = shard.targets.itemActions ?? [];
   expect(actions.some(row => row.scene === CHEST)).toBe(true);
-  // the shard this row lets Mossgate write: its chest's item action names the chest's quest flag, and the walk-up region
-  // trigger that raised it before is gone
-  expect(shard.quests.triggers.some(row => row.kind === 'region' && row.flag === FLAG)).toBe(true);
-  const flagged: Shardfile = { ...shard, targets: { ...shard.targets, itemActions: actions.map(row => row.scene === CHEST ? { ...row, setsFlag: FLAG } : row) },
-    quests: { ...shard.quests, triggers: shard.quests.triggers.filter(row => !(row.kind === 'region' && row.flag === FLAG)) } };
-  return { shard: flagged, assets: new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))])) };
+  // Template rev 10 ships this row's shape itself (AP36c): the chest's item action names the chest's quest flag, and no
+  // walk-up region trigger raises it any more
+  expect(actions.some(row => row.scene === CHEST && row.setsFlag === FLAG)).toBe(true);
+  expect(shard.quests.triggers.some(row => row.kind === 'region' && row.flag === FLAG)).toBe(false);
+  return { shard, assets: new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))])) };
 }
 
 test("a use of Mossgate's chest prompt raises its flag for that player only, and only at the prompt", async () => {
