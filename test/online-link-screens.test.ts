@@ -84,7 +84,8 @@ test('the banner names the cause: a restart, a silent link, a return to the tab,
   set({ why: 'silent' }); screens.link('reconnecting', 'silent');
   expect(shown('half-open')).not.toBeNull();
   screens.link('live');
-  set({ why: 'hidden' }); screens.link('reconnecting', 'hidden');
+  // J449 (QA-FEEDBACK 11-19 row 14): a return from the background says nothing until the redial has stalled play
+  set({ why: 'hidden', downMs: 6000 }); screens.link('reconnecting', 'hidden');
   expect(shown('background-short')?.textContent).toContain('welcome back');
   set({ downMs: 41_000 }); screens.link('resuming', 'hidden');
   expect(shown('resuming')?.textContent).toContain('Still reconnecting');
@@ -575,5 +576,43 @@ test('FM8b mode 27: a page without sign-in hooks offers only what it has', () =>
   const { scope, screens } = harness();
   screens.signedOut();
   expect([...shown('auth-expired')?.querySelectorAll('button') ?? []].map(button => button.textContent)).toEqual(['Title screen']);
+  scope.dispose();
+});
+
+// QA-FEEDBACK 11-19 row 14, J449 (Jake, iPhone home-screen app): coming back from another app showed "RECONNECTED · you're back
+// online". The socket quietly reconnecting after the background shows nothing; only an outage that stalls play shows.
+test('back from the background, a quiet reconnect shows no banner and no Reconnected toast', () => {
+  const { scope, screens, set } = harness();
+  const hiddenPage = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  document.dispatchEvent(new Event('visibilitychange'));
+  set({ why: 'hidden', downMs: 0 }); screens.link('reconnecting', 'hidden');
+  hiddenPage.mockRestore(); document.dispatchEvent(new Event('visibilitychange')); screens.visible();
+  set({ downMs: 1200 }); screens.link('reconnecting', 'hidden');
+  expect(shown('background-short')).toBeNull();
+  screens.link('live');
+  expect(shown('reconnected')).toBeNull();
+  expect(document.querySelector('.ws-link-notice')).toBeNull();
+  scope.dispose();
+});
+
+test('back from the background, a reconnect that stalls play shows its banner, then Reconnected', () => {
+  const { scope, screens, set } = harness();
+  set({ why: 'hidden', downMs: 1000 }); screens.link('reconnecting', 'hidden');
+  expect(shown('background-short')).toBeNull();
+  set({ downMs: 6000 }); screens.link('reconnecting', 'hidden');
+  expect(shown('background-short')?.textContent).toContain('welcome back');
+  screens.link('live');
+  expect(shown('reconnected')?.textContent).toContain('Reconnected');
+  scope.dispose();
+});
+
+test('a quiet background drop still gives a tap its hold card, and the offline card still shows', () => {
+  const { scope, screens, set } = harness();
+  set({ why: 'hidden', downMs: 500 }); screens.link('reconnecting', 'hidden');
+  expect(screens.allow('Talk')).toBe(false);
+  expect(shown('background-short-blocked')).not.toBeNull();
+  screens.link('live');
+  set({ why: 'offline', downMs: 500 }); screens.link('reconnecting', 'offline');
+  expect(shown('offline-play')).not.toBeNull();
   scope.dispose();
 });

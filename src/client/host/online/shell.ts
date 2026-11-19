@@ -19,7 +19,7 @@ import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
 import { FRESH_WAIT_MS, fetchSignedRelease, freshAfterDial, releaseToDial, type ReleaseKeep } from './release';
-import { releaseScreens, stagingMark } from './releaseScreens';
+import { releaseScreens } from './releaseScreens';
 import { beginRelease, takeRelease } from './earlyRelease';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
@@ -463,8 +463,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   if (fresh === null && release.engineBuild !== link.build && await stale()) await new Promise<never>(() => { /* settles never: the page reloads */ });
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
-  // FM5 mode 46: the staging world says so for the session (the release file's own verified channel)
-  if (release.channel === 'staging') stagingMark(scope);
+  // QA-FEEDBACK 11-19 row 37 (Jake): no STAGING badge on any screen; the version chip says which build this is
   let dialing = socket;
   // MP2.4: the page asked for the Name before it got here (namePrompt.ts, once per device); Skip keeps the device's own (Guest)
   const named = identity();

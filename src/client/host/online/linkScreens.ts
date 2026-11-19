@@ -28,6 +28,9 @@ function reportStop(screen: 'link-lost' | 'link-refused', detail: string, report
 const GIVE_UP_S = 120;
 /** The Reconnected notice stays this long. */
 const NOTICE_MS = 2500;
+/** QA-FEEDBACK 11-19 row 14, J449: a link dropped behind the background (cause `hidden`) reconnects quietly: no banner for
+ *  this long, and no Reconnected notice unless the player saw the outage (a banner or a card) because it stalled play. */
+const RETURN_QUIET_MS = 5_000;
 /** FM4b modes 21 and 22, sampled once a second while live: a pong RTT over this is slow; five in a row spanning this much are unstable. */
 const SLOW_RTT_MS = 250, UNSTABLE_SPAN_MS = 250;
 /** Mode 22: the share of frames the server says it skipped for this client (`lossPct`), not measured TCP loss. */
@@ -77,9 +80,6 @@ const CSS = `
 @keyframes ws-link-fade{from{opacity:0}}@keyframes ws-link-rise{from{opacity:0;transform:translateY(8px)}}
 .ws-link-notice{animation-name:ws-link-fade}
 .ws-link-page{background:#05101a;animation:ws-link-fade .2s ease-out}.ws-link-page .ws-link-box{animation:none}
-.ws-link-mark{position:fixed;left:calc(12px + env(safe-area-inset-left,0px));top:calc(36px + env(safe-area-inset-top,0px));z-index:2147482200;padding:2px 8px;pointer-events:none;white-space:nowrap;background:rgba(13,27,38,.78);border:1px solid rgba(255,181,71,.5);font-size:9px;line-height:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--a)}
-body:has(.ws-gmenu.show) .ws-link-mark{top:calc(8px + env(safe-area-inset-top,0px))}
-body:has(.ws-link-mark) .ws-touch .ws-touch-status{top:calc(var(--ws-top) + 52px)}body:has(.ws-link-mark) .ws-touch>.ws-loot-chip{top:calc(var(--ws-top) + 78px)}
 @media (max-width:420px){.ws-link-banner{max-width:calc(100% - 220px);padding-left:12px;padding-right:12px}.ws-link-banner b{letter-spacing:.08em}}
 @media (min-width:700px){.ws-link-banner{max-width:min(620px,calc(100% - 440px))}.ws-link-box{padding:28px 26px 20px}.ws-link h1{font-size:28px}}
 @media (prefers-reduced-motion:reduce){.ws-link,.ws-link *{animation:none!important;transition:none!important}}
@@ -200,10 +200,12 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   deploy.append(make('b', '', 'World update'), deployLine);
   parent.append(banner, deploy);
 
-  let state: LinkState = 'live', reason: string | undefined, wasDown = false, quietUntil = 0, deployLeft = 0, deployTicking = false;
+  let state: LinkState = 'live', reason: string | undefined, wasDown = false, seen = false, quietUntil = 0, deployLeft = 0, deployTicking = false;
   let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline' | 'away' | 'reach' | 'auth'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
   const held: { text: string; send: (text: string) => void; drop: () => void }[] = [];
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
+  /** J449: back from the background, the socket's own redial, not yet long enough to stall play */
+  const quietBack = (): boolean => down() && hooks.why() === 'hidden' && hooks.progress().downMs < RETURN_QUIET_MS;
   /** FM4b modes 5 to 8: down, online, and no dial on this page ever reached the world, for 10 s. A restart or an old server's cut
    *  (`updating`) is the world's own word, and a link that was ever live stays FM4's banner (15, 19, then 20's card). */
   const unreachable = (): boolean => {
@@ -221,7 +223,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const freePointer = (): void => { if ('exitPointerLock' in document && document.pointerLockElement instanceof Element) document.exitPointerLock(); };
   const paintBanner = (): void => {
     // offline (FM4b mode 2) or back from away (modes 4 and 45), the card is the screen: no banner under it
-    const shown = down() && hooks.why() !== 'offline' && hooks.progress().away === undefined && !unreachable();
+    const shown = down() && hooks.why() !== 'offline' && hooks.progress().away === undefined && !unreachable() && !quietBack();
+    if (shown) seen = true;
     banner.hidden = !shown;
     // a link that is down takes the top band from the deploy countdown; the countdown comes back with the link
     deploy.hidden = down() || deployLeft <= 0;
@@ -450,6 +453,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     if (due !== null && sinceChip >= QUALITY_GAP_S) showQuality(due, rtt);
   };
   scope.interval(1000, sampleQuality);
+  // J449: a quiet return that outlasts RETURN_QUIET_MS has stalled play: its banner shows then
+  scope.interval(1000, () => { if (banner.hidden === true && down() && hooks.why() === 'hidden' && !quietBack() && open?.kind !== 'auth') paintBanner(); });
   const link = (next: LinkState, why?: string): void => {
     state = next; reason = why;
     if (state !== 'live') hideQuality('replaced');
@@ -472,9 +477,10 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       return;
     }
     if (state === 'live') {
+      if (open !== null) seen = true;
       close('recovered');
-      if (wasDown) notice();
-      wasDown = false;
+      if (wasDown && seen) notice(); // J449: a reconnect nobody saw says nothing
+      wasDown = false; seen = false;
       for (const kept of held.splice(0)) kept.send(kept.text);
       return;
     }

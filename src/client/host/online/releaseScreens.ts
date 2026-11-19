@@ -5,7 +5,7 @@
 import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { captureBrowserError } from '@wildshard/engine/telemetry/browserErrors';
-import { showFailure, clearFailure } from '@wildshard/engine/telemetry/runtime';
+import { clearFailure } from '@wildshard/engine/telemetry/runtime';
 import type { FailureClear } from '@wildshard/engine/telemetry/model';
 import { buttons, card, linkStyle, make, ring } from './linkScreens';
 import { releaseScreen, type ReleaseFault, type ReleaseScreen, type ReleaseWait } from './release';
@@ -100,20 +100,4 @@ export function releaseScreens(scope: Scope, hooks: ReleaseScreenHooks, parent: 
       if (id === 'release-unsigned' && !reported) { reported = true; try { report(new Error(`Release file failed its signature: ${detail}`), { system: 'link', build: '', shard: '', bootStage: 'loading', fatal: false, screen: 'release-unsigned', diagnostic: { detail } }); } catch { /* telemetry never stops the page */ } }
     }),
   };
-}
-
-/** What the staging mark means, said in full to a screen reader and on hover. */
-export const STAGING_SENTENCE = 'Staging · not the live world';
-
-/** FM5 mode 46: a page on the staging world says so, for the whole session. Returns its node (owned by `scope`).
- *  STAGING-BUGBASH SB10: one short word at the top left, under the HUD's Settings button (in the strip above an open menu
- *  sheet), never over the stick, ATTACK or a menu's last row; the full sentence is its accessible name. */
-export function stagingMark(scope: Scope, parent: HTMLElement = document.body): HTMLElement {
-  linkStyle();
-  const mark = scope.ownNode(make('div', 'ws-link ws-link-mark', 'Staging'));
-  mark.dataset['failmode'] = 'staging'; mark.dataset['tone'] = 'warn'; mark.setAttribute('role', 'status');
-  mark.setAttribute('aria-label', STAGING_SENTENCE); mark.title = STAGING_SENTENCE;
-  showFailure(scope, mark, 'staging');
-  parent.append(mark);
-  return mark;
 }

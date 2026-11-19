@@ -2,8 +2,10 @@
 import { afterEach, expect, test, vi } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- A real signed release exercises verification and retry.
 import { generateKeyPairSync, sign } from 'node:crypto';
+// oxlint-disable-next-line import/no-nodejs-modules -- Row 37 reads the online page's sources for the retired mark.
+import { readFileSync } from 'node:fs';
 import { Scope } from '../src/shared/engine/app/scope';
-import { releaseScreens, stagingMark } from '../src/client/host/online/releaseScreens';
+import { releaseScreens } from '../src/client/host/online/releaseScreens';
 import { progressOfCard, watchStuckStep, STUCK_STEP_MS } from '../src/client/engine/boot/stuckStep';
 import { keptRelease, releaseToDial, RELEASE_DEADLINE_MS, type ReleaseFault } from '../src/client/host/online/release';
 
@@ -66,13 +68,12 @@ test('404 and a bad signature: Try again reads once; Title screen stops the load
   wait.done(); scope.dispose();
 });
 
-test('staging says so for the session', () => {
-  const scope = new Scope('test'), mark = stagingMark(scope);
-  expect(mark.dataset['failmode']).toBe('staging');
-  expect(mark.textContent).toBe('Staging');
-  expect(mark.getAttribute('aria-label')).toBe('Staging · not the live world');
-  scope.dispose();
-  expect(document.querySelector('[data-failmode="staging"]')).toBeNull();
+// QA-FEEDBACK 11-19 row 37 (Jake): no STAGING badge on any screen (title, loading, HUD, Settings); the version chip stays
+test('no screen draws a staging badge', async () => {
+  const screens: Record<string, unknown> = await import('../src/client/host/online/releaseScreens');
+  expect(Object.keys(screens).filter(name => /staging/iu.test(name))).toEqual([]);
+  const sources = ['shell.ts', 'linkScreens.ts', 'releaseScreens.ts'].map(file => readFileSync(`src/client/host/online/${file}`, 'utf8'));
+  for (const source of sources) expect(source).not.toMatch(/ws-link-mark|stagingMark/u);
 });
 
 test.each(['fetch', 'body', 'signature'] as const)('SB29: a stalled %s shows the connection screen at its deadline and Try now recovers', async stage => {
@@ -147,20 +148,6 @@ test('SB29: an actionable connection page owns the wait; after recovery a genuin
     await vi.advanceTimersByTimeAsync(STUCK_STEP_MS - 1);
     expect(stalled).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
-    expect(stalled).toHaveBeenCalledExactlyOnceWith('server', STUCK_STEP_MS);
-  } finally { stop(); scope.dispose(); }
-});
-
-test('SB29: the staging badge never suppresses a genuinely stuck server stage', async () => {
-  vi.useFakeTimers();
-  const scope = new Scope('staging-watch'), card = document.createElement('div'), stalled = vi.fn();
-  card.dataset['step'] = 'server'; stagingMark(scope);
-  const stop = watchStuckStep(new Promise<void>(() => { /* A genuine stalled start. */ }), {
-    progress: () => progressOfCard(card, document), now: Date.now, stalled,
-    every: (ms, run) => { const timer = setInterval(run, ms); return () => { clearInterval(timer); }; },
-  });
-  try {
-    await vi.advanceTimersByTimeAsync(STUCK_STEP_MS);
     expect(stalled).toHaveBeenCalledExactlyOnceWith('server', STUCK_STEP_MS);
   } finally { stop(); scope.dispose(); }
 });

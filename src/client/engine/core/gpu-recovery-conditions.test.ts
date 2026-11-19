@@ -60,6 +60,8 @@ function fixture(stored = false, leaveSaved: (go: () => void) => void = go => { 
   return { owner, game, compile, firstFrame, storage, navigations, faults, rebuild, beforeReload, lose, restore,
     wipe: () => { wiped = true; },
     hide: () => { doc.visibilityState = 'hidden'; doc.dispatchEvent(new Event('visibilitychange')); },
+    show: () => { doc.visibilityState = 'visible'; doc.dispatchEvent(new Event('visibilitychange')); },
+    doc, win,
   };
 }
 
@@ -114,4 +116,29 @@ test('retiring an in-flight restore prevents rebuild and publication', async () 
   f.compile.resolve(); await restored;
   expect(f.rebuild).not.toHaveBeenCalled(); expect(f.navigations).toEqual([]);
   expect(f.owner.census.listeners).toBe(0); expect(f.owner.census.timers).toBe(0);
+});
+
+// QA-FEEDBACK 11-19 row 14, J449: an app switch hides the page; it must not pause into the Settings menu (ws:background).
+// A context really lost still does (the frame loop holds under the menu).
+test('hiding and showing the page with a live context does not pause the game', () => {
+  const page = fixture();
+  let paused = 0;
+  page.doc.addEventListener('ws:background', () => { paused++; });
+  page.hide(); page.win.dispatchEvent(new Event('pagehide')); page.show();
+  expect(paused).toBe(0);
+  page.lose();
+  expect(paused).toBe(1);
+});
+
+test('a context the system dropped behind an app switch restores without the pause menu (J449)', async () => {
+  const page = fixture();
+  let paused = 0;
+  page.doc.addEventListener('ws:background', () => { paused++; });
+  page.hide(); page.lose(); page.show();
+  expect(paused).toBe(0);
+  expect(page.game.hold).toBe(true);
+  page.compile.resolve(); page.firstFrame.resolve();
+  await page.restore();
+  expect(page.game.hold).toBe(false);
+  expect(paused).toBe(0);
 });

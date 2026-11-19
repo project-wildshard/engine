@@ -13,9 +13,10 @@ import { terrainDatum } from '../../../shared/engine/world/terrainHeight';
  * blank textures. That was Jake's "blue and orange, completely broken", then "a still frame of the spawn, can't play".
  *
  * So:
- *   hide (visibilitychange / pagehide)   → `ws:background` pauses into the menu
+ *   hide (visibilitychange / pagehide)   → noted; no pause (J449, QA-FEEDBACK 11-19 row 14: an MMO does not pause on an
+ *                                          app switch, and coming back never opens the pause or Settings menu)
  *   show                                 → the context is live: restart the loop if it died
- *   (RL5, Jake: "delete 90% of it": no resume screen; the paused menu and the world are what the switch back shows)
+ *   (RL5, Jake: "delete 90% of it": no resume screen; the world is what the switch back shows)
  *   webglcontextlost                     → preventDefault (restorable), the loop holds (no tick, no draw); the canvases
  *                                          are already wiped (the GPU process died, the iOS case) → reload at once,
  *                                          without waiting for the restore
@@ -125,12 +126,14 @@ export function installGpuRecovery(host: RecoveryHost): void {
     leaveSaved(() => { markReload(`graphics recovery: ${why}`, 'gpu'); location.replace(to); });
   };
 
-  const lose = (why: string): void => {
+  const lose = (why: string, behind = hidden): void => {
     epoch++;
     if (phase === 'reloading' || phase === 'stuck') return;
     phase = 'lost';
     game.hold = true;
-    document.dispatchEvent(new Event('ws:background'));
+    // J449: a context the system dropped behind an app switch restores and plays on (restore ends the hold) with no
+    // pause menu on the way back; one lost in front of the player pauses into the menu while it restores
+    if (!behind) document.dispatchEvent(new Event('ws:background'));
     console.warn(`[gl] ${why}: holding the frame loop`);
     // QA 2026-11-13 row 6 (Android Chrome: the world went black after a jump): a loss in front of the player reaches
     // Sentry with the GPU that lost it (one behind a hidden page is the iOS app switch: routine, not reported). Time
@@ -175,15 +178,14 @@ export function installGpuRecovery(host: RecoveryHost): void {
   const hide = (): void => {
     if (hidden) return; // visibilitychange and pagehide both land here
     hidden = true;
-    epoch++;
-    document.dispatchEvent(new Event('ws:background')); // the HUD pauses into the menu (a no-op on the title / already paused)
+    epoch++; // J449: no ws:background here; a context really lost still pauses (lose / reload)
   };
   const show = (): void => {
     if (!hidden) return;
     hidden = false;
     repaint(scope);
     if (phase !== 'ok') return; // lost / restoring / reloading: that path ends it
-    if (gl.isContextLost()) { lose('context lost while hidden (no event)'); return; }
+    if (gl.isContextLost()) { lose('context lost while hidden (no event)', true); return; }
     game.kickLoop(); // the frame loop, if the browser dropped its animation frame across the switch
   };
   scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') hide(); else show(); });
