@@ -2,10 +2,13 @@
 // `respawn` (seconds, 1 to 3600, shard-format 0.5.8) brings its body back at its `at`, whole, that long after it dies: the
 // declared brain and group skip a dead actor and resume once it is alive again, so reviving the body restores them. The
 // waits are the host's state (one adapter), so a save keeps the clock; a cell asleep spends it (SC10, as declared homes do).
+// In a room each clock runs at the speed of the players near its spawn (J109, as the keeper's homes; OF19c1 found Dunes
+// rev 4's declared homes without it).
 import * as v from 'valibot';
 import type { SimHost } from '@wildshard/engine/sim';
 import { CREDIT_PREFIX } from '@wildshard/engine/quest/players';
 import { spawnAbsent } from './declaredSpawnWhen';
+import { roomRefillRate } from '@wildshard/engine/entities/creatureRefill';
 
 /** One spawn row's revive inputs (the format's `creatures.spawns` row). */
 export interface RespawnRow { readonly id: string; readonly at: readonly [number, number, number]; readonly yaw: number; readonly respawn?: number | undefined }
@@ -43,7 +46,8 @@ export function installDataRespawns(host: SimHost, rows: readonly RespawnRow[]):
       else if (body?.alive === true) host.flags.clear(`dead:${id}`);
     }
     for (const [id, left] of waits) {
-      const next = left - dt;
+      // J109, as a keeper's home: a room's clock runs at the speed of the players near the spawn; one player's is plain dt
+      const at = timed.get(id)?.at, next = left - dt * (at === undefined ? 1 : roomRefillRate(host.players, at[0], at[2], host.parked));
       if (next > 0) { waits.set(id, next); continue; }
       waits.delete(id);
       const row = timed.get(id); if (row !== undefined) revive(row);

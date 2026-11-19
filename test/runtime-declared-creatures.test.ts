@@ -18,7 +18,7 @@ import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { createSimHost, type SimHost } from '../src/server/engine/sim';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { prepareRuntimeWorld } from '../src/server/game/plugin/simulation';
+import { prepareRuntimePlan, prepareRuntimeWorld } from '../src/server/game/plugin/simulation';
 import { seedSlot, type BrainedSpecies } from '../src/server/game/plugin/brain';
 import { createNativeHeadlessResident, type HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
@@ -60,8 +60,9 @@ function declaring(source: Shardfile, species: ShardRows['species'], spawns: rea
     parameters: {}, animation: { recipe: 'sunscar.clips', parameters: {} } }));
   const parsed = parseShardfile({ ...base, rows: { ...base.rows, species, strikes: rows.rows.strikes, looks },
     creatures: { ...base.creatures, brains: rows.rows.brains, spawns } });
-  return { ...source, rows: { ...source.rows, species: parsed.rows.species, strikes: [...source.rows.strikes, ...parsed.rows.strikes],
-    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: parsed.creatures };
+  // Dunes r4 already ships its converted strikes and looks: the parsed rows replace theirs
+  return { ...source, rows: { ...source.rows, species: parsed.rows.species, strikes: [...source.rows.strikes.filter(row => !parsed.rows.strikes.some(strike => strike.id === row.id)), ...parsed.rows.strikes],
+    looks: [...source.rows.looks.filter(row => !parsed.rows.looks.some(look => look.id === row.id)), ...parsed.rows.looks] }, creatures: parsed.creatures };
 }
 /** The cell's input: the shard, its assets and its sections with this runtime plan and decision rows. */
 function input(fixture: Dunes, shard: Shardfile, plan: Plan, scripts?: (sections: ReadonlyMap<string, unknown>) => unknown): HeadlessRuntimeInput {
@@ -94,48 +95,31 @@ function run(host: SimHost, step: () => void, ids: readonly string[], from = 0, 
   for (; tick < from + ticks; tick++) { hold(host, tick); step(); frames.push(ids.map(id => frame(host, id))); }
   return { frames, hits };
 }
-/** The keeper's ray and strider as declared spawns: each body the keeper drew (scale, pose, circle phase). */
-function spawnsFrom(host: SimHost): Spawn[] {
+/** The ray and the strider as declared spawns at OF11b's stands, in the player's near band, on the dune's ground. */
+async function standing(fixture: Dunes): Promise<Spawn[]> {
+  const probe = await prepareRuntimePlan(fixture.shard, fixture.assets, fixture.plan.baked, fixture.plan.recipe, fixture.sections);
+  const stands: [number, number][] = [[8, -75], [10, -50]];
   return [RAY, STRIDER].map((id, index) => {
-    const actor = host.entities.get(id), species = rows.rows.species.find(row => row.kind === actor?.kind);
-    const brain = rows.program.species.find(row => row.kind === actor?.kind)?.brain;
-    if (actor === undefined || species === undefined) throw new Error(`Missing keeper body ${id}`);
-    return { id, species: species.id, variant: 'dusk', brain: species.temperament?.brain ?? null, strike: null, seed: 11 + index,
-      scale: actor.scale, at: [actor.position.x, actor.position.y, actor.position.z], yaw: actor.yaw,
-      ...(brain !== undefined && 'phaseSlots' in brain ? { phaseOffset: seedSlot(actor.seed, brain.phaseSlots) } : {}) } as Spawn;
+    const species = rows.rows.species[index], [x, z] = stands[index] ?? [0, 0]; if (species === undefined) throw new Error('Missing converted species');
+    const brain = rows.program.species.find(row => row.kind === species.kind)?.brain;
+    return { id, species: species.id, variant: 'dusk', brain: species.temperament?.brain ?? null, strike: null, seed: 11 + index, scale: 1,
+      at: [x, probe.ports.heightAt(x, z), z], yaw: 0, ...(brain !== undefined && 'phaseSlots' in brain ? { phaseOffset: seedSlot(11 + index, brain.phaseSlots) } : {}) } as Spawn;
   });
 }
 
-test('Dunes ray and strider run on the native resident as declared rows tick for tick as its keeper, and save and restore', async () => {
+// Dunes rev 4 (OF19b) ships its homes as declared spawns, so the keeper this proof once ran them beside tick for tick
+// stands none: the declared ray and strider are proven on the resident alone (they move, they strike), and its save.
+test('Dunes ray and strider run on the native resident as declared rows, and save and restore', async () => {
   const fixture = await dunes();
-  // the keeper: the plan's own population with the ray and strider homes and the boss, one step before it installs (the
-  // keeper decides on ticks 1 mod 6, the declared brains on 0 mod 6, as in the OF11b parity)
-  // at OF11b's stands, in the player's near band: the declared host thinks a far body at its banded rate (`installDataCreatureBands`)
-  const kept = keeping(fixture.plan, [RAY, STRIDER]), stands = new Map<string, [number, number]>([[RAY, [8, -75]], [STRIDER, [10, -50]]]);
-  const program = { ...kept, recipe: { ...kept.recipe, population: { ...kept.recipe.population, rows: { ...kept.recipe.population.rows,
-    homes: kept.recipe.population.rows.homes.map(home => ({ ...home, at: stands.get(home.id) ?? home.at })) } } } };
-  const world = await prepareRuntimeWorld(fixture.shard, fixture.assets, program.baked, program.recipe, fixture.sections);
-  const keeper = createSimHost(world.level, { ...world.ports, rapier: fixture.rapier });
-  keeper.step(); world.install(keeper, { restoring: false, emit: () => undefined }).keeper.settle();
-  // the resident: the keeper cut to its boss, the ray and strider as declared spawns
-  const cell = input(fixture, declaring(fixture.shard, rows.rows.species, spawnsFrom(keeper)), keeping(fixture.plan, []), MATRIARCH);
+  const cell = input(fixture, declaring(fixture.shard, rows.rows.species, await standing(fixture)), keeping(fixture.plan, []), MATRIARCH);
   const resident = await createNativeHeadlessResident(cell);
   let restored: Awaited<ReturnType<typeof createNativeHeadlessResident>> | undefined;
   try {
-    for (const id of [RAY, STRIDER]) expect(frame(resident.host, id)).toEqual(frame(keeper, id));
     expect(resident.host.entities.get(RAY)?.species).toBe('sunscar.creature.duneRay');
-    const a = run(keeper, () => { keeper.step(); }, [RAY, STRIDER]), b = run(resident.host, () => { resident.step([]); }, [RAY, STRIDER]);
-    const moved = (i: number): number => { const s = a.frames[0]?.[i], e = a.frames[TICKS - 1]?.[i]; return s === undefined || e === undefined ? 0 : Math.hypot(e.x - s.x, e.z - s.z); };
+    const b = run(resident.host, () => { resident.step([]); }, [RAY, STRIDER]);
+    const moved = (i: number): number => { const s = b.frames[0]?.[i], e = b.frames[TICKS - 1]?.[i]; return s === undefined || e === undefined ? 0 : Math.hypot(e.x - s.x, e.z - s.z); };
     expect(moved(0)).toBeGreaterThan(5); expect(moved(1)).toBeGreaterThan(2);
-    expect(a.hits.length).toBeGreaterThan(0);
-    let worst = { d: 0, tick: -1, body: -1 };
-    for (let tick = 0; tick < TICKS; tick++) for (let i = 0; i < 2; i++) {
-      const p = a.frames[tick]?.[i], q = b.frames[tick]?.[i]; if (p === undefined || q === undefined) throw new Error('Missing frame');
-      const d = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z); if (d > worst.d) worst = { d, tick, body: i };
-    }
-    expect(worst.d, JSON.stringify(worst)).toBeLessThan(0.01);
-    expect(b.frames.map(row => row.map(f => [f.attack, f.state]))).toEqual(a.frames.map(row => row.map(f => [f.attack, f.state])));
-    expect(b.hits.map(({ tick, amount }) => ({ tick, amount }))).toEqual(a.hits.map(({ tick, amount }) => ({ tick, amount })));
+    expect(b.hits.length).toBeGreaterThan(0);
     // a save mid-fight restores the declared bodies, their brains and clocks exactly, and both go on the same
     restored = await createNativeHeadlessResident(cell, serializeSimSnapshot(snapshotSimHostBytes(resident.host)));
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(resident.host)));
@@ -143,7 +127,7 @@ test('Dunes ray and strider run on the native resident as declared rows tick for
     const c = run(live.host, () => { live.step([]); }, [RAY, STRIDER], TICKS, 300), d = run(again.host, () => { again.step([]); }, [RAY, STRIDER], TICKS, 300);
     expect(d).toEqual(c);
     expect(canonicalSimDigest(snapshotSimHost(again.host))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));
-  } finally { restored?.dispose(); resident.dispose(); keeper.dispose(); }
+  } finally { restored?.dispose(); resident.dispose(); }
 }, 120_000);
 
 const savedPolicy = v.object({ phase: v.number(), fighting: v.boolean() });
@@ -169,16 +153,17 @@ test('the Matriarch stays the keeper\'s beside declared spawns, and a body or de
     expect(host.entities.get('sunscar.matriarch')?.position.y).toBeGreaterThan(4);
     expect([RAY, STRIDER].map(id => host.entities.get(id)?.alive)).toEqual([true, true]);
   } finally { host.dispose(); }
-  // the keeper standing the ray's home claims that body; standing a skitterer home claims the pack's decision row, which
-  // names a declared body
-  await expect(createNativeHeadlessResident(input(fixture, shard, keeping(fixture.plan, [RAY]), MATRIARCH))).rejects.toThrow(/one body, one owner/u);
-  const pack = declaring(fixture.shard, rows.rows.species, spawns.map((row, index) => index === 0 ? { ...row, id: 'sunscar.home:2' } : row));
-  await expect(createNativeHeadlessResident(input(fixture, pack, keeping(fixture.plan, ['sunscar.home:1'])))).rejects.toThrow(/one decision row, one owner/u);
+  // a declared spawn on the keeper's own body (its boss) claims that body twice. (Dunes rev 4's keeper stands no home, so
+  // the home and pack-row claims this once proved on its homes have no shipped keeper to stand them.)
+  const twice = declaring(fixture.shard, rows.rows.species, spawns.map((row, index) => index === 0 ? { ...row, id: 'sunscar.matriarch' } : row));
+  await expect(createNativeHeadlessResident(input(fixture, twice, boss, MATRIARCH))).rejects.toThrow(/one body, one owner/u);
 }, 120_000);
 
 test('a runtime plan with no declared spawn stands no body and installs no declared step', async () => {
-  const fixture = await dunes();
-  const world = await prepareRuntimeWorld(fixture.shard, fixture.assets, fixture.plan.baked, fixture.plan.recipe, fixture.sections);
+  const fixture = await dunes(), sections = new Map(fixture.sections);
+  // Dunes r4 declares its homes: here it declares none, and keeps only the keeper's decision row
+  sections.set('sim/scripts', MATRIARCH(fixture.sections));
+  const world = await prepareRuntimeWorld({ ...fixture.shard, creatures: { ...fixture.shard.creatures, spawns: [] } }, fixture.assets, fixture.plan.baked, fixture.plan.recipe, sections);
   expect(world.level.entities).toEqual([]);
   const host = createSimHost(world.level, { ...world.ports, rapier: fixture.rapier });
   try {

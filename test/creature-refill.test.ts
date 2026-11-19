@@ -9,7 +9,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import type { SimStateAdapter } from '../src/server/engine/sim';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
-import { populationCensus } from '../src/shared/game/population/census';
+import { DATA_RESPAWN_STEP } from '../src/server/game/shardfile/dataRespawn';
 import { RespawnQueue } from '../src/shared/game/population/respawn';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
@@ -142,7 +142,11 @@ test('a shipped host runs a home twice as fast with two players near, and one pl
   const resident = (): ReturnType<typeof createNativeHeadlessResident> => createNativeHeadlessResident({ shard: product, assets, rapier, product: shard });
   const solo = await resident(), room = await resident();
   try {
-    const wait = (host: typeof solo.host): number => populationCensus(host).homes.find(row => row.id === 'sunscar.home:4')?.wait ?? Number.NaN;
+    // Dunes rev 4: the home is a declared spawn, its clock the data respawn step's (J109 runs it as the keeper ran its homes)
+    const wait = (host: typeof solo.host): number => {
+      const state = snapshotSimHost(host).adapters.find(row => row.id === DATA_RESPAWN_STEP)?.state as { waits?: [string, number][] } | undefined;
+      return state?.waits?.find(([id]) => id === 'sunscar.home:4')?.[1] ?? Number.NaN;
+    };
     const kill = (host: typeof solo.host): void => {
       const actor = host.entities.get('sunscar.home:4');
       if (actor === undefined) throw new Error('Missing home body');
@@ -158,7 +162,7 @@ test('a shipped host runs a home twice as fast with two players near, and one pl
     for (let tick = 0; tick < 300; tick++) { solo.step([]); room.step([]); }
     expect(wait(solo.host)).toBeCloseTo(45, 4);
     expect(wait(room.host)).toBeCloseTo(40, 4);
-    // the room save restores what the room owes: the home's clock is in the keeper's own row
+    // the room save restores what the room owes: the spawn's clock is in the respawn step's own row
     const restored = await createNativeHeadlessResident({ shard: product, assets, rapier, product: shard }, serializeSimSnapshot(snapshotSimHostBytes(solo.host)));
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(solo.host)));
     restored.dispose();

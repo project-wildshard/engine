@@ -15,7 +15,7 @@ import {HeadlessSimulation} from '../src/server/host/headless';
 import {createNativeHeadlessResident} from '../src/server/host/headlessRuntime';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
-import {decodeSimSnapshot,leadSnapshot,SIM_SNAPSHOT_VERSION} from '../src/shared/engine/sim/snapshot';
+import {decodeSimSnapshot,leadSnapshot,serializeSimSnapshot,snapshotSimHostBytes,SIM_SNAPSHOT_VERSION} from '../src/shared/engine/sim/snapshot';
 import {SIM_API_VERSION} from '../src/shared/engine/sim/apiVersion';
 import {openCellWorld} from '../src/server/host/standalone/cellWorld';
 import {leadPlayer} from '../src/shared/engine/sim/leadPlayer';
@@ -52,18 +52,29 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refu
   // omit client GLBs/images; eagerly reading those prevented any save restore.
   const assets=declared?new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)])):runtimeAssets(product,directory);
   if(fixture.refused!==undefined) {
-    // Only a declared (data) shard has been refused so far; a native one needs its own carry proof before it can be.
-    expect(fixture.pin).toBeUndefined();expect(declared).toBe(true);
+    // A declared (data) shard refuses through its data host; a native one (Dunes rev 4, whose creatures left its keeper for
+    // declared spawns, so its level lists them) through its resident, and the grid carries it the same way (OF19c1).
+    expect(fixture.pin).toBeUndefined();
     // Every other clause of validateSnapshot holds, so the level fingerprint is the one that refuses.
     const old=decodeSimSnapshot(saved);
     // TC-SHIP-a: a save made under a retired slug (`formerSlug`) names that slug's level; the new slug's world refuses it the same way.
     expect([old.version,old.apiVersion,old.levelId,old.state.tick]).toEqual([SIM_SNAPSHOT_VERSION,SIM_API_VERSION,fixture.formerSlug??slug,fixture.tick]);
-    const fresh=await HeadlessSimulation.create(shard,assets,undefined,{deadline:'advisory'});
-    try {
-      const now=decodeSimSnapshot((await fresh.step([{source:'released-save',commands:[]}])).snapshot);
-      expect(now.levelId).toBe(slug);expect(now.levelFingerprint).not.toBe(old.levelFingerprint);
-    } finally {await fresh.dispose();}
-    await expect(HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'})).rejects.toThrow('Incompatible simulation snapshot');
+    if(declared) {
+      const fresh=await HeadlessSimulation.create(shard,assets,undefined,{deadline:'advisory'});
+      try {
+        const now=decodeSimSnapshot((await fresh.step([{source:'released-save',commands:[]}])).snapshot);
+        expect(now.levelId).toBe(slug);expect(now.levelFingerprint).not.toBe(old.levelFingerprint);
+      } finally {await fresh.dispose();}
+      await expect(HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'})).rejects.toThrow('Incompatible simulation snapshot');
+    } else {
+      const input={shard,product,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))};
+      const fresh=await createNativeHeadlessResident(input);
+      try {
+        const now=decodeSimSnapshot(serializeSimSnapshot(snapshotSimHostBytes(fresh.host)));
+        expect(now.levelId).toBe(slug);expect(now.levelFingerprint).not.toBe(old.levelFingerprint);
+      } finally {fresh.dispose();}
+      await expect(createNativeHeadlessResident(input,saved)).rejects.toThrow('Incompatible simulation snapshot');
+    }
     // The standalone grid then opens a fresh world and adopts the refused save's progress (gridServer `open`). The released
     // save holds no flags, so a probe flag makes the carry below prove something (ENG-3b).
     old.flags.push('released-save.probe');

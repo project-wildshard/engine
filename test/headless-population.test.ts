@@ -16,7 +16,7 @@ import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { pagePopulationRows } from '../src/shared/game/population/pageRows';
 import { bindPageHomes } from '../src/shared/game/population/pageHomes';
 import { installPageReturns } from '../src/client/game/population/pageReturns';
-import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
+import { populationCensus } from '../src/shared/game/population/census';
 import { Scope } from '../src/shared/engine/app/scope';
 import { legacyDouble } from '../src/test/engine/FakeGame';
 import type { ShardContext } from '../src/client/game/plugin/context';
@@ -45,22 +45,22 @@ const kill = (resident: NativeHeadlessResident, id: string): void => {
   if (dealt?.killed !== true) throw new Error(`Creature ${id} did not fall`);
 };
 const steps = (resident: NativeHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
-const home = (census: PopulationCensus, id: string): PopulationCensus['homes'][number] => {
-  const row = census.homes.find(entry => entry.id === id); if (row === undefined) throw new Error(`Missing census home ${id}`); return row;
-};
 
+// ONE-FORMAT OF19b (Dunes rev 4): the homes left the keeper for declared spawns, which refill by their spawn rows'
+// `respawn`; the census counts them as bodies (the keeper's `homes` are the page's, now none).
 test('Sunscar spawns, moves, kills and refills its creatures headless, and its census round-trips a snapshot', async () => {
   const { product, resident } = await shipped('sunscar-dunes');
   const browser = pagePopulationRows(parseNativeRuntimePlan(product.section('sim/runtime-plan')));
+  const spawns = product.shardfile.creatures.spawns;
   const live = await resident();
   let restored: NativeHeadlessResident | undefined;
   try {
-    // spawning: the install draws every declared home, exactly the rows the browser's page population spawns
+    // spawning: the install stands every declared spawn; the keeper, like the browser's page population, keeps no home
     const born = populationCensus(live.host);
     expect(born.homes.map(row => [row.id, row.kind])).toEqual(browser.homes.map(row => [row.id, row.kind]));
-    expect(born.bodies.map(body => body.id).sort()).toEqual(browser.homes.map(row => row.id).sort());
+    expect(born.homes).toEqual([]);
+    expect(born.bodies.map(body => body.id).sort()).toEqual(spawns.map(row => row.id).sort());
     expect(born.kinds).toEqual({ duneRay: { alive: 1, fallen: 0 }, sandSkitterer: { alive: 10, fallen: 0 }, duneStrider: { alive: 2, fallen: 0 } });
-    expect(born.homes.every(row => row.body === row.id && row.wait === 0)).toBe(true);
     const wire = JSON.stringify(born); // plain JSON: no live body, vector or clock
     expect(JSON.parse(wire)).toEqual(born);
 
@@ -71,29 +71,25 @@ test('Sunscar spawns, moves, kills and refills its creatures headless, and its c
     const moved = walked.bodies.filter(body => { const before = was.get(body.id); return before !== undefined
       && Math.hypot(body.position[0] - before.position[0], body.position[2] - before.position[2]) > 1; }).map(body => body.id);
     expect(moved.length).toBeGreaterThanOrEqual(3);
-    // the nest's skitterers come at the player; the ray and the striders keep their own rounds
-    expect(moved).toEqual(expect.arrayContaining(['sunscar.home:1', 'sunscar.home:3', 'sunscar.home:0', 'sunscar.home:11']));
 
-    // respawn: a fallen skitterer's home waits its 50 s, then a fresh body stands in it
+    // respawn: a fallen skitterer's spawn row waits its 50 s, then a fresh body stands in it
+    const respawn = spawns.find(row => row.id === 'sunscar.home:4')?.respawn;
+    expect(respawn).toBe(50);
     kill(live, 'sunscar.home:4');
-    // the host queues `actor.died` to its fixed.post drain: the keeper's clock starts at the end of the next tick
-    expect(home(populationCensus(live.host), 'sunscar.home:4').wait).toBe(0);
     steps(live, 1);
     const fallen = populationCensus(live.host);
     expect(fallen.kinds['sandSkitterer']?.fallen).toBe(1);
-    expect(home(fallen, 'sunscar.home:4').wait).toBe(50);
     steps(live, 600);
     const waiting = populationCensus(live.host);
-    expect(home(waiting, 'sunscar.home:4').wait).toBeCloseTo(40, 6);
+    expect(waiting.bodies.find(body => body.id === 'sunscar.home:4')?.alive).toBe(false);
 
-    // snapshot → restore mid-countdown: the census (bodies, poses, clocks) and the canonical state come back exactly
+    // snapshot → restore mid-countdown: the census (bodies, poses) and the canonical state come back exactly
     restored = await resident(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
     expect(populationCensus(restored.host)).toEqual(waiting);
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));
-    for (let tick = 0; tick < 2460; tick++) { live.step([]); restored.step([]); }
+    for (let tick = 0; tick < 2520; tick++) { live.step([]); restored.step([]); }
     const refilled = populationCensus(live.host);
     expect(populationCensus(restored.host)).toEqual(refilled);
-    expect(home(refilled, 'sunscar.home:4')).toEqual({ id: 'sunscar.home:4', kind: 'sandSkitterer', body: 'sunscar.home:4', wait: 0 });
     expect(refilled.bodies.find(body => body.id === 'sunscar.home:4')?.alive).toBe(true);
   } finally { restored?.dispose(); live.dispose(); }
 }, 120_000);
