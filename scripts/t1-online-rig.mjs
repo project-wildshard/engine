@@ -1,15 +1,18 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { rigFront } from './rig-listeners.mjs';
 import { openChaosProxy } from './chaos-proxy-core.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
-/** Start the real signed Template server from the existing client build.
+/** Start the real signed Brasscap server from the existing client build.
  * @param {string} dist @param {string} scratch @param {{gridRoot?: string}} [options] */
 export async function openT1OnlineRig(dist, scratch, { gridRoot } = {}) {
   const { openRig } = await import('./online-rig.mjs');
   const work = resolvePath(scratch, 't1/online');
+  // The rig claims fresh folders. A worker Playwright restarts after a failed test reopens this group's rig over the last
+  // one's, so the group's own scratch starts empty (every rig in it has closed with its worker).
+  rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
   const pair = generateKeyPairSync('ed25519');
   const key = pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
@@ -26,7 +29,10 @@ export async function openT1OnlineRig(dist, scratch, { gridRoot } = {}) {
     // Sign the final public socket on the initial release. Publishing a new
     // serial merely to discover a proxy port would drain this same world.
     world = await rigFront();
-    rig = await openRig({ port: 0, socket: `ws://127.0.0.1:${String(world.port)}/`, dist, work: join(work, 'rig'), keyFile, saves: 'memory', shard: '_template', workers: 1, gridRoot, origins: [pageOrigin] });
+    rig = await openRig({ port: 0, socket: `ws://127.0.0.1:${String(world.port)}/`, dist, work: join(work, 'rig'), keyFile, saves: 'memory', shard: 'brasscap-mesa', workers: 1, gridRoot, origins: [pageOrigin] });
+    // A deployed page carries its signed /code-retention.json (page-release signs it); without one the page's read is a
+    // console 404, which every T1 online test counts as an error. Serve the deploy's file: the current build kept.
+    rig.retain({ keptBuilds: [rig.build] });
     proxy = await openChaosProxy({ work: join(work, 'proxy'), pageUpstream: rig.base, releaseUpstream: rig.releaseOrigin, worldUpstream: rig.worldOrigin, pagePort: 0, worldPort: 0 });
     page.point(Number(new URL(proxy.ready.pageOrigin).port));
     world.point(Number(new URL(proxy.ready.worldOrigin).port));
@@ -47,7 +53,7 @@ export async function openT1OnlineRig(dist, scratch, { gridRoot } = {}) {
       }
       await delay(100);
     }
-    throw new Error('The Template memory server did not become healthy');
+    throw new Error('The Brasscap memory server did not become healthy');
   } catch (error) {
     try { await close(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'T1 rig setup and cleanup failed', { cause: cleanup }); }
     throw error;
