@@ -21,10 +21,13 @@ describe('clientPlan.ts read statically', () => {
     expect(plan.shared.some(row => row.module === 'src/client/engine/world/painterly.ts')).toBe(true);
     expect(plan.shared.some(row => row.module.startsWith('@wildshard/format/src/format/'))).toBe(true);
     expect(unresolvedRoots(plan.shared)).toEqual([]);
-    // Type-only imports (ShardContext, Scope, PlatformSectionName) are not runtime roots; mixed imports drop their types.
-    expect(plan.shared.filter(row => row.typeOnly).map(row => row.module).sort())
-      .toEqual(['@wildshard/format/src/format/sections.ts', 'src/client/game/plugin/context.ts', 'src/shared/engine/app/scope.ts']);
-    expect(plan.shared.find(row => row.module === '@wildshard/format/src/format/clientPlan.ts')?.bindings).toEqual(['parseClientPlan']);
+    // Client plan types stay out of the runtime roots. The cooked reader owns admission.
+    expect(plan.shared.filter(row => row.typeOnly).map(row => row.module).sort()).toEqual([
+      '@wildshard/format/src/format/clientPlan.ts', '@wildshard/format/src/format/sections.ts',
+      'src/client/game/plugin/context.ts', 'src/shared/engine/app/scope.ts',
+    ]);
+    expect(plan.shared.find(row => row.module === 'src/client/game/shardfile/cookedDocument.ts'))
+      .toMatchObject({ bindings: ['readClientPlan'], typeOnly: false });
   });
   test('a kind roots only its own entry: hooks sharing a target merge, other kinds keep their bindings', () => {
     expect(plan.kinds.get('world.forest-page')).toEqual([{ module: 'src/client/game/shardfile/clientForestPage.ts', bindings: ['enterClientForestPage', 'installClientForestPage'] }]);
@@ -67,7 +70,8 @@ describe('product roots', () => {
       ['kind:world.scenes', 'src/client/game/shardfile/worldScenes.ts', ['installWorldScenes']],
       ['kind:world.dressing', 'src/client/game/shardfile/sceneDressing.ts', ['SceneDressing']],
     ]);
-    expect(roots.roots.filter(root => root.from === '@client-plan')).toHaveLength(plan.shared.length - 3);
+    expect(roots.roots.filter(root => root.from === '@client-plan').map(({ module, bindings }) => ({ module, bindings })))
+      .toEqual(plan.shared.filter(root => !root.typeOnly).map(({ module, bindings }) => ({ module, bindings })));
     // world.meadow is the loadFeature member shape, world.forest-page inline destructuring, world.scenes Promise.all.
     expect(['world.meadow', 'world.forest-page', 'world.scenes', 'world.dressing'].map(kind => plan.kindShapes.get(kind)))
       .toEqual([['member'], ['destructure'], ['all'], ['destructure']]);
