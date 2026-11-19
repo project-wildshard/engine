@@ -1,7 +1,7 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry, Sphere } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
-import { decodeRoadTile, encodeRoadTile, loadRoadTile, persistRoadTile, type RoadTileStore } from './roadTileArchive';
+import { decodeRoadTile, encodeRoadTile, loadRoadTile, persistRoadTile, STORED_READ_DEADLINE_MS, type RoadTileStore } from './roadTileArchive';
 import type { RoadTileGeometry } from './roadTileGeometry';
 
 function fixture(): RoadTileGeometry {
@@ -130,4 +130,23 @@ test('invalid current geometry cannot borrow a valid archive', async () => {
     put: () => { writes++; return Promise.resolve(true); } };
   await expect(persistRoadTile(scope, store, { ...original, bytes: { jsBytes: 0, gpuBytes: 0 } })).rejects.toThrow('byte plan mismatch');
   expect(reads).toBe(0); expect(writes).toBe(0); scope.dispose(); original.geometry.dispose();
+});
+
+test('QA 11-19 row 13: a stored-tile read that never answers writes the tile again by the deadline', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    const scope = new Scope('road lost read'), original = fixture(); let writes = 0;
+    let ask = (): void => undefined;
+    const asked = new Promise<void>(resolve => { ask = resolve; });
+    const store: RoadTileStore = { get: () => { ask(); return new Promise<Uint8Array | null>(() => { /* never answers */ }); }, put: () => { writes++; return Promise.resolve(true); } };
+    let done = false;
+    const result = persistRoadTile(scope, store, original).then(ref => { done = true; return ref; });
+    await asked; // the content hash before it is a real async digest
+    await vi.advanceTimersByTimeAsync(STORED_READ_DEADLINE_MS - 1);
+    expect({ done, writes }).toEqual({ done: false, writes: 0 });
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await result).wireBytes).toBeGreaterThan(0);
+    expect(writes).toBe(1);
+    scope.dispose(); original.geometry.dispose();
+  } finally { vi.useRealTimers(); }
 });

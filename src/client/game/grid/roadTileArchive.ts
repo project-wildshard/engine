@@ -190,6 +190,18 @@ async function storedRoadTile(store: RoadTileStore, hash: string, length: number
     return bytes !== null && bytes.length === length && await contentHash(bytes) === hash;
   } catch { return false; }
 }
+/** QA 11-19 row 13: how long the "already stored?" read may take before the tile is written again. A return visit sat in
+ *  `road` for good (staging v0.1.50, Chromium: 'Road system' no progress for 54 s; local preview: 11 of 300 reads never
+ *  answered while the same page's Cache Storage still matched and put), and on hosted T1 the worker's copy of that wait
+ *  is the 8 s capture deadline a warm second boot hit (I and H, `road` 7.4 to 7.7 s). The read is only a shortcut: a
+ *  tile it can't confirm in time is put again, as on a first visit. */
+export const STORED_READ_DEADLINE_MS = 3000;
+function storedWithin(scope: Scope, store: RoadTileStore, hash: string, length: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const timer = scope.timeout(STORED_READ_DEADLINE_MS, () => { resolve(false); });
+    void (async (): Promise<void> => { const stored = await storedRoadTile(store, hash, length); scope.cancelTimer(timer); resolve(stored); })();
+  });
+}
 /** Pin before durable publication. A refusal leaves the caller's original geometry
  * owned and usable; only the caller may retire it after this reference returns. */
 export function persistRoadTile(scope: Scope, store: RoadTileStore, tile: RoadTileGeometry): Promise<RoadTileReference> {
@@ -214,7 +226,7 @@ async function persistEncodedRoadTile(scope: Scope, store: RoadTileStore, bytes:
     const turn = hashTurn(store, hash); finishHash = turn.release;
     if (turn.before !== undefined) await turn.before;
     live(scope);
-    const stored = await storedRoadTile(store, hash, wireBytes); live(scope);
+    const stored = await storedWithin(scope, store, hash, wireBytes); live(scope);
     if (!stored && !await store.put(hash, bytes)) throw new Error('Road tile archive storage refused');
     live(scope);
     return { hash, wireBytes, ...reference };
