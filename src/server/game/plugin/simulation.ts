@@ -220,6 +220,9 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
   // OF19b0: the declared spawns stand in the native level as in an ordinary upload's, and the declared host drives them
   const counted = countedShard(shard), keeper = keeperOwnership(policy.rows);
   admitRuntimeCreatures(counted, sections, keeper);
+  // OF20b: the plan's floor and death plane hold its declared bodies as its keeper's
+  const world = { ...(recipe.floor === 'solids' ? { floor: { fallback: policy.rows.placement?.fallback ?? recipe.ground.height } } : {}),
+    ...(policy.rows.killY === undefined ? {} : { killY: policy.rows.killY }) };
   // OF19c0: the spawns the quest page's director stages summon; their declared encounters wait for it
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   return { level: { ...shardLevel(shard, player, recipe.ground), entities: declaredSpawnEntities(counted) }, ports: { ground: false, heightAt }, install: (host, context) => {
@@ -250,7 +253,7 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
       scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, player: focusPlayer(host), groundHeightAt: host.groundHeightAt.bind(host),
       live: actor => host.entities.get(actor.entityId) === actor, fixed: (id, run, scope) => { scope.onDispose(host.onStep(id, run)); }, say: (name, args) => { sayFightView(host, name, args); },
     }));
-    const declared = installRuntimeCreatures(host, counted, assets, sections, { restoring, keeper, fact: ledger.fact, summoned });
+    const declared = installRuntimeCreatures(host, counted, assets, sections, { restoring, keeper, fact: ledger.fact, summoned, world });
     return { ...environment, ledger, ...installed, declared };
   } };
 }

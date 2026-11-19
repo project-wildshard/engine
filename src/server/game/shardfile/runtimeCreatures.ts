@@ -31,6 +31,8 @@ import { decisionRuntime, ShardDecisions } from './decisions';
 import { installDeclaredEncounters } from '../shard/declaredEncounters';
 import { installEncounterAdds } from './encounterAdds';
 import type { NativePopulationRows } from './bossRow';
+import { creatureFloor } from './homeKeeper';
+import { killBelowWorld } from '@wildshard/engine/entities/killHeight';
 
 /** The declared spawns as a level stands them: platform bodies, sized by their species, ranked. `shard` is counted. */
 export function declaredSpawnEntities(shard: Shardfile): SimSpawn[] {
@@ -81,6 +83,30 @@ export interface RuntimeCreaturePorts {
   readonly fact: (name: string, actorId: string) => void;
   /** OF19c0: the spawns the quest page summons (`{ spawn }`): their encounters wait, dormant, for `summon`. */
   readonly summoned: ReadonlySet<string>;
+  /** OF20b: the plan's world as its keeper's bodies meet it. `floor`: a plan that stands creatures on its solids (Sky
+   *  Reach's isles, `floor: 'solids'`) stands declared bodies there too, over `fallback` where none is below; `killY`:
+   *  a declared body under the plan's death plane dies by the fall, as a keeper home does. */
+  readonly world?: { readonly floor?: { readonly fallback: number }; readonly killY?: number };
+}
+export const DECLARED_KILL_STEP = 'runtime.declared-kill';
+
+/** OF20b: a declared body beside a runtime plan stands on the plan's solids and dies under its death plane, as the keeper's
+ *  homes do (`installSpeciesHomes` placement, `installHomeKeeper` killY). Nothing when the plan declares neither. */
+function installDeclaredWorld(host: SimHost, shard: Shardfile, world: RuntimeCreaturePorts['world']): void {
+  const bodies = shard.creatures.spawns.map(row => row.id);
+  if (world?.floor !== undefined) {
+    const floor = creatureFloor(host, () => world.floor?.fallback ?? 0);
+    for (const id of bodies) {
+      const actor = host.entities.get(id); if (actor === undefined) continue;
+      actor.groundHeight = (x, z, fromY) => { const at = floor(x, z, fromY); actor.levelGround = at.structure; return at.y; };
+    }
+  }
+  const killY = world?.killY;
+  if (killY === undefined) return;
+  const plane = { killY };
+  host.onStep(DECLARED_KILL_STEP, () => {
+    for (const id of bodies) { const actor = host.entities.get(id); if (actor?.alive === true) killBelowWorld(actor, plane, host.combat); }
+  });
 }
 /** A declared encounter beside a runtime plan, as the quest page's summon and the plan's loadout lock read it. */
 export interface RuntimeEncounter { readonly summon: () => void; readonly locked: () => boolean }
@@ -99,6 +125,7 @@ export function installRuntimeCreatures(host: SimHost, shard: Shardfile, assets:
   admitRuntimeCreatures(shard, sections, ports.keeper);
   const scripts = decisionScriptsFromSections(sections);
   nameDeclaredBodies(host, shard);
+  installDeclaredWorld(host, shard, ports.world);
   preflightPlainPerches(shard, assets);
   const creatures = prepareCreaturePolicies(shard.rows, shard.creatures);
   installCreatureSensesContract(host, shard.rows, creatures.spawns);

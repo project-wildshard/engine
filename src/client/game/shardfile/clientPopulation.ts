@@ -19,7 +19,8 @@ export async function installClientPopulation(ctx: ShardContext, input: unknown)
     throw new Error('Population requires its actual catalogue and saved page');
   const declared = pagePopulationRows(ctx.product.section('sim/runtime-plan'));
   const materialScope = ctx.product.section('look/painted').look.lightScope === 'material';
-  const addresses = new Set([...declared.homes, ...declared.bosses, ...declared.actors ?? []].map(body => body.id));
+  // OF20b: a group may name a declared spawn beside the plan (Sky Reach's ray wake); the server's row is its body
+  const addresses = new Set([...declared.homes, ...declared.bosses, ...declared.actors ?? [], ...ctx.product.shardfile.creatures.spawns].map(body => body.id));
   const rowBodies = ctx.game.runtime?.play?.animals; // herdless on the wire: its population spawns nothing, and the rows' bodies take the same light
   if (materialScope && rowBodies !== undefined) wirePage.dressRows(rowBodies, ctx.scope, body => { folderPainterLight(ctx.product, body.mesh, ctx.scope); });
   for (const ids of Object.values(row.groups)) if (ids.some(id => !addresses.has(id))) throw new Error('Population group requires actual native bodies');
@@ -40,7 +41,8 @@ export function clientPopulationActor(ctx: ShardContext, id: string): ReturnType
 /** A group member's body as a presentation feature draws on it: the keeper's where this page spawns its own, else the server's
  *  row of the same name (J130). A row arrives after entry and may come back as another body, so a caller asks each frame. */
 export type ClientPopulationBody = () => Animal | null;
-/** Every member of a declared group, by address. Group rows contain addresses only; the keeper or the rows own every body. */
+/** Every member of a declared group, by address. Group rows contain addresses only; the keeper or the rows own every body
+ *  (a declared spawn's body is always its row's). */
 export function clientPopulationBodies(ctx: ShardContext, group: string): readonly ClientPopulationBody[] {
   const population = ctx.product.section('client/plan').features.find(row => row.kind === 'population.homes');
   const ids = population?.kind === 'population.homes' ? population.groups[group] : undefined;
