@@ -158,7 +158,9 @@ export function addCookedShards(outDir: string, shards: readonly CookedShard[], 
   const added = shards.flatMap(row => {
     if (row.discovery === undefined) return [];
     const stored = home?.shards.includes(row.slug) === true;
-    return [titleRowOf(row.discovery, stored ? home.base : '', stored ? row.slug : undefined)];
+    // SA48: a stored cook's shardfiles live only in its upload's loose folder, so its title row reads them there.
+    const loose = stored ? home.loose?.[bareSlug(row.slug)] ?? '' : '';
+    return [titleRowOf(row.discovery, stored ? `${home.base.replace(/\/$/u, '')}/${loose}` : '', stored ? row.slug : undefined)];
   });
   if (added.length > 0) writeTitleRows(outDir, [...readTitleRows(outDir).filter(row => !added.some(next => next.slug === row.slug)), ...added]);
 }
