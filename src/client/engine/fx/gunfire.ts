@@ -68,14 +68,16 @@ export class Gunfire {
       const mesh = new THREE.Mesh(streak, material); mesh.visible = false; mesh.frustumCulled = false; mesh.renderOrder = 11;
       this.root.add(mesh); this.tracers.push({ mesh, from: new THREE.Vector3(), to: new THREE.Vector3(), length: 0, t: 0, live: false });
     }
+    // fog: false, like every engine sprite: Atmosphere's fog_vertex reads `transformed`, which three's sprite shader never
+    // declares (with fog on, the program fails to link and T1's page-error check reds)
     const flashMap = makeFlashTexture();
     for (let i = 0; i < FLASHES; i++) {
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashMap, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashMap, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false , fog: false }));
       sprite.visible = false; sprite.renderOrder = 12; this.root.add(sprite); this.flashes.push({ sprite, t: 0, size: 0, live: false });
     }
     const puff = cloudTexture();
     for (let i = 0; i < CLOUDS; i++) {
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: 0xd8b98a, transparent: true, depthWrite: false, opacity: 0 }));
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: 0xd8b98a, transparent: true, depthWrite: false, opacity: 0 , fog: false }));
       sprite.visible = false; sprite.renderOrder = 10; this.root.add(sprite);
       this.clouds.push({ sprite, velocity: new THREE.Vector3(), t: 0, life: 1, size: 1, grow: 1, live: false });
     }
