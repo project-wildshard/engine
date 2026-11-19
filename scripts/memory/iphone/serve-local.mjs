@@ -70,8 +70,8 @@ async function servePublic(shard, port, socketPort, dryRun) {
   }
 
   const started = performance.now(), stop = new AbortController();
-  /** @type {Set<import('node:child_process').ChildProcess>} */
-  const children = new Set();
+  /** @type {Map<import('node:child_process').ChildProcess, Promise<void>>} */
+  const children = new Map();
   const interrupt = () => { stop.abort(); };
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', interrupt);
@@ -79,7 +79,7 @@ async function servePublic(shard, port, socketPort, dryRun) {
   const start = (bin, args) => {
     stop.signal.throwIfAborted();
     const child = spawn(bin, args, { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
-    children.add(child);
+    /** @type {Promise<void>} */
     const ended = new Promise(resolve => {
       child.once('error', error => { stop.abort(error); resolve(undefined); });
       child.once('exit', (code, signal) => {
@@ -88,7 +88,14 @@ async function servePublic(shard, port, socketPort, dryRun) {
         resolve(undefined);
       });
     });
+    children.set(child, ended);
     return { child, ended };
+  };
+  /** Stop an owned group, including subprocesses of the Node build.
+   * @param {import('node:child_process').ChildProcess} child @param {NodeJS.Signals} signal */
+  const signalGroup = (child, signal) => {
+    if (child.pid === undefined) return;
+    try { process.kill(-child.pid, signal); } catch { /* Already exited. */ }
   };
   /** @param {number} target */
   const tunnel = async target => {
@@ -141,11 +148,13 @@ async function servePublic(shard, port, socketPort, dryRun) {
     stop.abort();
     process.off('SIGINT', interrupt);
     process.off('SIGTERM', interrupt);
-    for (const child of children) {
-      if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) continue;
-      // Each child owns a process group. A signal during a build also stops its subprocesses.
-      try { process.kill(-child.pid, 'SIGTERM'); } catch { /* Already exited. */ }
+    for (const child of children.keys()) signalGroup(child, 'SIGTERM');
+    const reaped = Promise.all(children.values());
+    await Promise.race([reaped, delay(5000, undefined, { ref: false })]);
+    for (const child of children.keys()) {
+      if (child.exitCode === null && child.signalCode === null) signalGroup(child, 'SIGKILL');
     }
+    await reaped;
   }
 }
 

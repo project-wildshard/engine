@@ -15,3 +15,6 @@ The proof served all 32 staging shards through Cloudflare. Chromium
 reached control with a live seat in Nine and Brasscap. A source
 update took 37.1 seconds to reach the public URL. A child failure
 or an interrupt closes the tunnel pair.
+
+A startup failure and SIGTERM each wait for both owned tunnel
+processes to exit. The existing tailnet and its tunnel stayed up.
