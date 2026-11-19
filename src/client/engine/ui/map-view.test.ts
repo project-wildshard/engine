@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-// J455 (QA 2026-11-19 row 31): the Bag map opens on you at about 3.5 by 3.5 cells, zoom 1 shows the whole 7 by 7, and the
+// J455 (QA 2026-11-19 rows 31 and 57): the Bag map opens on you with your zone filling 72% of the short side and a rim of
+// every neighbour around it, zoom 1 shows the whole 7 by 7, and the
 // pan is clamped so a whole grid cell always stays in view.
 import { afterEach, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
@@ -7,7 +8,7 @@ import { withOwner } from '../../../shared/engine/app/ownership';
 import { legacyDouble } from '../../../test/engine/FakeGame';
 import { FullMap } from './Map';
 import type { MapExtras, Minimap } from './Minimap';
-import { GRID_ZOOMS, OPEN_CELLS, cellAt, clampView, gridPpm, openZoom, wholeCellsIn, type MapGrid } from './mapView';
+import { GRID_ZOOMS, OPEN_ZONE_FILL, cellAt, clampView, gridPpm, openZoom, wholeCellsIn, type MapGrid } from './mapView';
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -15,12 +16,18 @@ const PITCH = 562.5;
 /** the format's 7 by 7 (GRID_RADIUS 3) seen from the centre cell's frame */
 const GRID: MapGrid = { x0: -3.5 * PITCH, z0: -3.5 * PITCH, pitch: PITCH, cells: 7 };
 
-test('the opening zoom is 3.5 cells across the short side, the chips reach the whole 7 by 7', () => {
-  expect(openZoom(GRID)).toBe(2);
-  expect(GRID_ZOOMS).toContain(1);
-  expect(GRID_ZOOMS).toContain(openZoom(GRID));
-  const short = 1000;
-  expect(short / gridPpm(GRID, short, openZoom(GRID)) / PITCH).toBeCloseTo(OPEN_CELLS);
+/** the zone's walled square (the chunk) inside its pitch */
+const ZONE = 500;
+
+test('the map opens with the zone at 72% of the short side and a rim of road and next zone around it', () => {
+  expect(OPEN_ZONE_FILL).toBe(0.72);
+  expect(GRID_ZOOMS).toEqual([1, 2, 4]); // the chips stay until Jake picks their labels
+  const short = 1000, across = short / gridPpm(GRID, short, openZoom(GRID));
+  expect(ZONE / across).toBeCloseTo(0.72);
+  // each side shows the zone's whole road (its half and the neighbour's) and a slice of the next zone past it
+  const rim = (across - ZONE) / 2, road = PITCH - ZONE;
+  expect(rim).toBeGreaterThan(road + 20);
+  expect(rim).toBeLessThan(road + ZONE / 4);
   expect(short / gridPpm(GRID, short, 1) / PITCH).toBeCloseTo(7);
 });
 
@@ -77,16 +84,16 @@ function fixture(extras: MapExtras | null) {
 const gridExtras: MapExtras = { rects: [], images: [], labels: [], grid: GRID };
 const cellsAcross = (box: { x0: number; x1: number; z0: number; z1: number }): number => Math.min(box.x1 - box.x0, box.z1 - box.z0) / PITCH;
 
-test('the Bag map opens centred on you at 3.5 cells, in a corner cell too', () => {
+test('the Bag map opens centred on you with the zone at 72%, in a corner cell too', () => {
   const { map, scope } = fixture(gridExtras);
   try {
     const you = { x: -3 * PITCH + 40, z: 3 * PITCH - 60 };
     map.update(you, 0); map.show();
-    expect(map.zoom).toBe(2);
+    expect(map.zoom).toBeCloseTo(openZoom(GRID));
     const box = map.viewBox();
     expect((box.x0 + box.x1) / 2).toBeCloseTo(you.x);
     expect((box.z0 + box.z1) / 2).toBeCloseTo(you.z);
-    expect(cellsAcross(box)).toBeCloseTo(OPEN_CELLS);
+    expect(ZONE / (cellsAcross(box) * PITCH)).toBeCloseTo(0.72);
     map.hide();
     map.update({ x: 0, z: 0 }, 0); map.show();
     expect(map.viewBox().x0).toBeCloseTo(-map.viewBox().x1);

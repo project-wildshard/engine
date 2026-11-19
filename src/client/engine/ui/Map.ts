@@ -16,7 +16,8 @@ import { engineString } from '../../../shared/engine/strings';
  * frame over the stretched layer, cached (E97: the 2 px/m layer alone went to mush at 4–6×). A baked map is drawn as it is.
  * Around the chunk, `setExtras` lays out more ground as data (the grid: every cell's baked map at its cell, the road network
  * and each shard's name; SF66), and the view then spans all of it.
- * On the grid (the extras carry a `grid`, J455) the map opens centred on you at 3.5 cells across (2×), 1× fits the whole
+ * On the grid (the extras carry a `grid`, J455) the map opens centred on you with your zone filling 72% of the frame (QA 11-19
+ * row 57), 1× fits the whole
  * 7 by 7, and the pan is clamped so a whole grid cell always stays in view (mapView.ts).
  * Drag to pan, pinch or wheel to zoom (1× = the chunk fitted to the frame, up to 6×). The world
  * keeps running underneath; the canvas swallows touch so the pads don't move you.
@@ -177,7 +178,7 @@ export class FullMap {
     this.root.style.display = 'block';
     this.preparePainter();
     const extras = this.extrasSource?.() ?? null, grid = extras?.grid ?? null, b = this.bounds(extras);
-    // J455: on the grid the map opens on you at 3.5 cells across; a one-shard map opens on its whole chunk
+    // J455: on the grid the map opens on you, your zone 72% of the frame (row 57); a one-shard map opens on its whole chunk
     if (grid !== null) { this.cx = this.pose.x; this.cz = this.pose.z; this._zoom = openZoom(grid); }
     else { this.cx = (b.x0 + b.x1) / 2; this.cz = (b.z0 + b.z1) / 2; this._zoom = 1; }
     this.fit();
