@@ -38,6 +38,33 @@ test('a grid cell reports its door panel standing until its row opens it', async
   expect(panels.targets('ink-cel-valley')).toEqual([]);
 });
 
+test.each([false, true])('warm-up restores authored NPC panels with a target panel present: %s', async (withDoor) => {
+  const scope = new Scope('grid-panel-warmup'), root = new Group();
+  const sheriff = new Group(), hidden = new Group(), door = new Group();
+  hidden.visible = false;
+  const loaded = new Map([['sheriff', sheriff], ['hidden', hidden], ...(withDoor ? [['blender.door', door] as const] : [])]);
+  const source = {
+    ...SOURCE,
+    props: { panels: [...loaded].map(([id, view]) => ({ id, visible: view.visible })) },
+    targets: { panels: withDoor ? SOURCE.targets.panels : [] },
+  } as Shardfile;
+  const panels = new NeighbourPanels({
+    scope: scope as Parameters<ClientTileViews['panels']>[3],
+    region: () => ({ colliders: new Map(), field: () => 1 }),
+    prepare: view => { expect(view.visible).toBe(false); return Promise.resolve(); },
+  });
+  const views = { panels: () => { root.add(...loaded.values()); return Promise.resolve(loaded); } } as unknown as ClientTileViews;
+  const cell = { instance: 'brasscap-mesa', slug: 'brasscap-mesa' } as unknown as GridCell;
+  try {
+    await panels.admit(cell, root, source, new Map(), views);
+    panels.late();
+    expect(sheriff.parent).toBe(root);
+    expect(sheriff.visible).toBe(true);
+    expect(hidden.visible).toBe(false);
+    if (withDoor) expect(door.visible).toBe(false);
+  } finally { scope.dispose(); }
+});
+
 // SHARD-SOURCE SS-GF1a2 (staging, opus-ss10l): Glowfen's socket glow is a panel shown by a player field a script writes. On a
 // grid page that field is this player's owned line, not a shared row, so the cell reads the line: the socket lights for its
 // owner. Before, a grid cell read only rows, and the glow stayed at its default on staging.

@@ -64,7 +64,7 @@ export function moverPanelPose(panel: Object3D, rest: { readonly at: { x: number
   };
 }
 
-/** The page's neighbour panels: one set per shardfile neighbour whose targets show or hide a panel; disposed with the scope. */
+/** The page's neighbour panels, including static figures with no target or mover; disposed with the scope. */
 export class NeighbourPanels {
   private readonly ports: NeighbourPanelPorts;
   private readonly cells = new Map<string, CellPanels>();
@@ -73,14 +73,17 @@ export class NeighbourPanels {
   /** Draw one neighbour's declared panels in its cell root (the session's shared per-slug load supplies views and bytes). */
   async admit(cell: GridCell, root: Group, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, views: ClientTileViews): Promise<void> {
     const props = source.props;
-    if (props === null || props.panels.length === 0 || source.targets.panels.length === 0 && source.movers.length === 0 && (props.bodies ?? []).length === 0 || this.cells.has(cell.instance)) return;
+    if (props === null || props.panels.length === 0 || this.cells.has(cell.instance)) return;
     const panels = await views.panels(props, assets, root, this.ports.scope);
     if (this.ports.scope.disposed) return;
-    // a panel's programs compile in the page's warm-up, off the drive's frames: hidden until then, then shown by sync
+    // Hide during warm-up, then restore the authored visibility. Only bound panels take their state from the wire.
     const prepare = this.ports.prepare;
     if (prepare !== undefined) {
-      for (const panel of panels.values()) panel.visible = false;
-      for (const panel of panels.values()) await prepare(panel, () => !this.ports.scope.disposed && panel.parent !== null);
+      const visibility = [...panels.values()].map(panel => ({ panel, visible: panel.visible }));
+      for (const { panel } of visibility) panel.visible = false;
+      for (const { panel } of visibility) await prepare(panel, () => !this.ports.scope.disposed && panel.parent !== null);
+      if (this.ports.scope.disposed) return;
+      for (const { panel, visible } of visibility) panel.visible = visible;
     }
     const bindings = source.targets.panels.map((row): Binding => {
       const panel = panels.get(row.panel); if (panel === undefined) throw new Error('Missing admitted target panel');
