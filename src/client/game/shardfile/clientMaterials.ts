@@ -34,7 +34,6 @@ import type { PropSurfaceBinding } from '@wildshard/engine/world/declaredProps';
 import { propMaterialTextureRefs, propMaterialsOf } from '@wildshard/format/propMaterials';
 import { ownedGraph, propSurfaces } from './clientPropMaterials';
 import { splatDrawTier, splatLayerFile } from '@wildshard/engine/boot/gpuFiles';
-import { splatSurface, withSplatSurface } from './clientSplatTerrain';
 import { splatTerrainOf, splatTextureRefs } from '@wildshard/format/splatTerrain';
 
 
@@ -151,7 +150,9 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   const textures = new Map<string, Texture>(), uses = new Map<string, 'colour' | 'data'>();
   const named = shard.props === null ? undefined : propMaterialsOf(shard.props);
   const splat = shard.props === null ? undefined : splatTerrainOf(shard.props);
-  const splatRefs = new Set(splat === undefined ? [] : splatTextureRefs(splat, splatDrawTier()));
+  const groundLayers = splat === undefined ? undefined : await import('./clientSplatLayers');
+  const splatTier = splatDrawTier();
+  const splatRefs = new Set(splat === undefined ? [] : splatTextureRefs(splat, splatTier));
   const refs = new Set([...materialTextureRefs(sampledMaterials), ...keptGraphFileTextureRefs(sampledMaterials, (hash) => assets.get(hash)), ...(shard.props?.textures.map((entry) => entry.colour) ?? []), ...propMaterialTextureRefs(named), ...splatRefs]);
   // LS8 (J204): a caller's loading step (a sky backdrop's looks: 1.5 s of Driftwood's sky at 4x CPU) may count each
   // texture transcoded and the graph compiler loaded, so it moves while they land
@@ -159,25 +160,25 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   const units = options.units?.(refs.size + (loadsCompiler ? 1 : 0)) ?? ((): void => undefined);
   let unitsDone = 0;
   if (refs.size > 0) {
+    // S12f2b2: only phone splats need the cooked file reader. Finish its reads
+    // before owning a decoder, so a refused file cannot strand one.
+    const cooked = splat?.phone !== undefined && splatTier === 'phone'
+      ? await groundLayers?.cookedSplatBytes(splat, splatRefs, splatTier, options.splatLayer ?? splatLayerFile)
+      : undefined;
+    if (scope.disposed) throw new Error('Material scope unloaded before transcode');
+    const bytesOf = (ref: string): Uint8Array | undefined => cooked?.get(ref) ?? assets.get(ref);
     const loader = detectKtx2Support(new KTX2Loader().setTranscoderPath(BASIS_PATH), renderer);
     let retired = false;
     const retire = (): void => { if (retired) return;retired = true;loader.dispose(); };
     const forget = scope.capture('disposers', retire);
-    // S12f2b2: a phone layer the cook encoded 6×6 is read from its own file; its blob was never admitted on this device.
-    // Only a phone drawing a phone set loads the reader and waits on it: every other shard starts its transcodes on the caller's
-    // stack (DL17), and the reader stays out of the session bundle.
-    const cooked = splat?.phone === undefined || splatDrawTier() !== 'phone' ? new Map<string, Uint8Array>()
-      : await (await import('./splatLayerRead')).cookedSplatBytes(splat, splatRefs, 'phone', options.splatLayer ?? splatLayerFile);
-    const bytesOf = (ref: string): Uint8Array | undefined => cooked.get(ref) ?? assets.get(ref);
-    // DL17: the zstd decoder starts here, on the caller's stack (a grid neighbour's admission, the home's boot)
-    prepareKtx2Decode([...refs].map(bytesOf));
     try {
+      prepareKtx2Decode([...refs].map(bytesOf));
     for (const ref of refs) {
       const bytes = bytesOf(ref); if (bytes === undefined) throw new Error(`Missing admitted material texture ${ref} (${shard.identity.slug})`);
       // NB6: a named wait, so the boot timeline (and the props stall ratchet) knows the page waits on the transcoder
       const texture = await waitFor('Material texture transcode', new Promise<Texture>((resolve, reject) => { loader.parse(Uint8Array.from(bytes).buffer, resolve, reject); }), 'worker');
       if (scope.disposed) { texture.dispose(); throw new Error('Material scope unloaded during transcode'); }
-      // a splat layer is copied into its array, never uploaded itself (clientSplatTerrain)
+      // a splat layer is copied into its array, never uploaded itself (clientSplatLayers)
       texture.flipY = false; texture.name = `shardfile:${ref}`;
       const sampler = shard.look.samplers?.[ref]; if (sampler !== undefined) applyTextureSampler(texture, sampler);
       if (texture instanceof CompressedTexture && !splatRefs.has(ref)) releaseAfterUpload(texture);
@@ -265,8 +266,13 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
     check: workSlice(undefined, scope).check });
   if (scope.disposed) throw new Error('Material scope unloaded during the prop materials');
   // G227: the splat terrain's tile primitives draw with the live terrain's splat material, every other name as before
-  const splatDrawn = splat === undefined ? null : splatSurface(splat, { scope, anisotropy: Math.min(16, renderer.capabilities.getMaxAnisotropy()), texture: (ref) => { const texture = textures.get(ref); if (texture === undefined) throw new Error('Unresolved admitted splat layer'); return texture; } });
-  const surfaces = splat === undefined || splatDrawn === null ? propNamed : withSplatSurface({ name: splat.material, binding: splatDrawn.binding }, propNamed);
+  let ground: Material | null = null;
+  let surfaces: ((name: string) => PropSurfaceBinding | null) | null = propNamed;
+  if (splat !== undefined && groundLayers !== undefined) {
+    const drawn = groundLayers.splatSurface(splat, { scope, anisotropy: Math.min(16, renderer.capabilities.getMaxAnisotropy()), texture: (ref) => { const texture = textures.get(ref); if (texture === undefined) throw new Error('Unresolved admitted splat layer'); return texture; } });
+    ground = drawn.material;
+    surfaces = groundLayers.withSplatSurface({ name: splat.material, binding: drawn.binding }, propNamed);
+  }
   // a further entry (an exported skin's binding, SF16) compiles on the same looks, compiler and admitted textures, scope-owned
   const bindMeshMap = (id: string, map: Texture | Material): Material => {
     const material = materials.get(id);
@@ -300,6 +306,5 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   }, prepare: async ids => {
     for (const id of new Set(ids)) { if (!materials.pending(id)) continue; await buildYield(scope); materials.get(id); }
   }, swings, materials, textures, compile, bindMeshMap, instance, outline: graphOutlineHook(graphs.outline), tick: (dt) => { toon.tick(dt); painterly.tick(dt); emissive.tick(dt); graphs.tick(dt); moveCurves(); },
-    graphs: { bind: (sources) => { if (sources.state !== undefined) stateOf = sources.state; graphs.bind(sources); moveCurves(); }, readout: graphs.readout }, surfaces,
-    ground: splatDrawn !== null && 'material' in splatDrawn ? splatDrawn.material : null };
+    graphs: { bind: (sources) => { if (sources.state !== undefined) stateOf = sources.state; graphs.bind(sources); moveCurves(); }, readout: graphs.readout }, surfaces, ground };
 }

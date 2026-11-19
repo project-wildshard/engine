@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { SplatTerrain } from '@wildshard/format/splatTerrain';
-import { cookedSplatBytes, readSplatLayer } from '../src/client/game/shardfile/splatLayerRead';
+import { cookedSplatBytes, readSplatLayer } from '../src/client/game/shardfile/clientSplatLayers';
 import { splatLayerFiles, splatLayerKey } from '../src/shared/engine/boot/splatLayerRows';
 
 const hash = (c: string): string => c.repeat(64);

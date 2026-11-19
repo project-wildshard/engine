@@ -4,7 +4,7 @@ import * as v from 'valibot';
 import { Scope } from '../src/shared/engine/app/scope';
 import { installDeclaredProps } from '../src/client/engine/world/declaredProps';
 import { staticGlb } from './fixtures/frozen/glb';
-import { splatSurface, withSplatSurface } from '../src/client/game/shardfile/clientSplatTerrain';
+import { splatSurface, withSplatSurface } from '../src/client/game/shardfile/clientSplatLayers';
 import { SplatTerrainSchema, checkTileMaterialNames, splatTextureRefs, type SplatTerrain } from '@wildshard/format/splatTerrain';
 
 // Tile streaming P1 (G227): a splat ground joins a shard's props tiles beside props that draw with the family (Pine's timber
