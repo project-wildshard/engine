@@ -4,7 +4,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import type { NetClient } from '@wildshard/engine/net/client';
 import { CHAT_FADE_MS, CHAT_FRESH_MS, PEEK_MS, badgeText, cornerOpen, cornerShown, lineLook } from './chatCorner';
 import { chatDock, chatLines } from './chatLines';
-import { VOICE_GIVE_UP_MS, VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
+import { FIRST_TIP_SHOWINGS, VOICE_GIVE_UP_MS, VoiceChat, voicePrefs, type VoiceHeard, type VoicePeer } from './voice';
 import { voiceUi } from './voiceUi';
 import { voiceSettings } from '@wildshard/engine/ui/voiceSettings';
 
@@ -71,6 +71,32 @@ test('QA 2026-11-11: the mic tip\'s first 15 s start when the corner first shows
   expect(tip()).toBe('Press B (or click the mic) to talk with players here.');
   press();
   expect(voice.toggles).toBe(1);
+});
+
+test('J473 row 9: the first mic tip shows on 3 visits at most, then never again', async () => {
+  localStorage.clear();
+  marks['wsState'] = 'play'; delete marks['wsCovered'];
+  const visit = async (): Promise<string | null> => {
+    const { tip } = voiceCorner('off'); await settle(); vi.advanceTimersByTime(1000);
+    const said = tip(); for (const scope of owners.splice(0)) scope.dispose(); document.body.replaceChildren(); return said;
+  };
+  for (let i = 0; i < FIRST_TIP_SHOWINGS; i++) expect(await visit()).toBe('Press B (or click the mic) to talk with players here.');
+  expect(await visit()).toBeNull();
+  expect(voicePrefs.read()).toMatchObject({ seen: true, shown: FIRST_TIP_SHOWINGS });
+});
+
+test('J473 row 9: the first mic tap ends the tip for good', async () => {
+  localStorage.clear();
+  marks['wsState'] = 'play'; delete marks['wsCovered'];
+  const { tip, press } = voiceCorner('off'); await settle(); vi.advanceTimersByTime(1000);
+  expect(tip()).not.toBeNull();
+  press();
+  expect(voicePrefs.read().seen).toBe(true);
+});
+
+test('J473 row 9: on a phone the closed corner\'s mic tip sits beside the mic', () => {
+  voiceCorner('off');
+  expect(document.head.textContent).toContain('#ws-chat[data-touch]:not([data-open])>#ws-voice-tip{position:absolute;left:44px;bottom:42px;');
 });
 
 test('QA row 43: a line is fresh for 5 s, fades, then is gone from the calm corner', () => {

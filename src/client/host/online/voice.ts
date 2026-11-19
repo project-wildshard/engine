@@ -90,9 +90,14 @@ const keyboardFirst = (): boolean => typeof matchMedia !== 'function' || matchMe
 /** Who a peer is, for their body. */
 const talker = (peer: VoicePeer): { readonly body: string | null; readonly name: string } => ({ body: peer.body ?? null, name: peer.name });
 
-/** This device's voice choices: on when it last left (so a grid crossing keeps it on), and whether the first tip was seen. */
-export interface VoicePrefs { readonly wanted: boolean; readonly seen: boolean }
-const prefsSlot = saves.define({ key: 'voice', scope: 'device', version: 1, schema: v.object({ wanted: v.boolean(), seen: v.boolean() }), initial: (): VoicePrefs => ({ wanted: false, seen: false }) });
+/** This device's voice choices: on when it last left (so a grid crossing keeps it on), whether the first tip is done with, and
+ *  how many visits showed it (J473 row 9: "gone after the first mic tap or 3 showings"). */
+export interface VoicePrefs { readonly wanted: boolean; readonly seen: boolean; readonly shown?: number | undefined }
+/** J473 row 9: the first-time mic tip shows on this many visits at most */
+export const FIRST_TIP_SHOWINGS = 3;
+const prefsSlot = saves.define({ key: 'voice', scope: 'device', version: 2, schema: v.object({ wanted: v.boolean(), seen: v.boolean(), shown: v.optional(v.number()) }),
+  // J473 row 9: v2 adds the optional `shown`; a v1 save is a v2 one that has not counted yet
+  migrate: { 1: (old: unknown) => old }, initial: (): VoicePrefs => ({ wanted: false, seen: false }) });
 /** Read and change the prefs; a page with no storage just forgets. */
 export const voicePrefs = {
   read: (): VoicePrefs => { try { return prefsSlot.read(); } catch { return { wanted: false, seen: false }; } },

@@ -146,9 +146,11 @@
       "migrations": []
     },
     "device/voice": {
-      "version": 1,
-      "shape": "baab6d63cbf973ff",
-      "migrations": []
+      "version": 2,
+      "shape": "d5fc1d54ae202fb0",
+      "migrations": [
+        1
+      ]
     },
     "device/voiceSettings": {
       "version": 1,

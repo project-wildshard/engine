@@ -4,7 +4,7 @@ import { listenPage } from '@wildshard/engine/input/dom';
 import { firstPlayCardUp } from '@wildshard/engine/boot/firstPlayMark';
 import type { ChatBox } from './chatLines';
 import { cornerShown } from './chatCorner';
-import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState } from './voice';
+import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState, FIRST_TIP_SHOWINGS } from './voice';
 import { voiceTalkKey, voiceTalkKeys } from '@wildshard/engine/ui/voiceSettings';
 import { showFailure, clearFailure } from '@wildshard/engine/telemetry/runtime';
 
@@ -123,7 +123,12 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
   const tipFor = (): { key: string; text: string; tone: 'ok' | 'bad' } | null => {
     const others = [...voice.roster.values()], now = diagnosticNow();
     // SB9: the first tip's 15 s start once the Graphics card is done, so arrival shows one popup at a time
-    if (Number.isNaN(firstUntil) && chat.shown() && !firstPlayCardUp()) firstUntil = now + FIRST_TIP_MS;
+    if (Number.isNaN(firstUntil) && chat.shown() && !firstPlayCardUp()) {
+      firstUntil = now + FIRST_TIP_MS;
+      // J473 row 9: one showing per visit; the third is the last (a mic tap ends it sooner)
+      const shown = (voicePrefs.read().shown ?? 0) + 1;
+      voicePrefs.write(shown >= FIRST_TIP_SHOWINGS ? { shown, seen: true } : { shown });
+    }
     const { state } = voice;
     if (state === 'asking') return { key: 'asking', text: 'Allow the microphone when your browser asks.', tone: 'ok' };
     if (state === 'joining') return { key: 'joining', text: 'Joining voice…', tone: 'ok' };

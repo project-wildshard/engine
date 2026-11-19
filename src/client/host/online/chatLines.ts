@@ -72,6 +72,7 @@ const CSS = `
 #ws-chat[data-touch]:not([data-open])>form>input{position:absolute;left:0;bottom:0;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none}
 #ws-chat[data-touch]:not([data-open]) #ws-voice{order:1;width:36px;height:36px}
 #ws-chat[data-touch]:not([data-open]) #ws-chat-icon{order:2;display:grid}
+#ws-chat[data-touch]:not([data-open])>#ws-voice-tip{position:absolute;left:44px;bottom:42px;width:max-content;max-width:min(200px,calc(55vw - 52px))}
 #ws-chat-icon{flex:none;position:relative;width:36px;height:36px;padding:0;place-items:center;border-radius:50%;border:1.5px solid rgba(143,227,255,.5);background:rgba(9,22,36,.86);color:#9fb3c8;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 #ws-chat-icon svg{width:19px;height:19px}
 #ws-chat-icon>[data-badge]{position:absolute;right:-5px;top:-5px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#ffc56b;color:#1c1100;font:800 10px/17px system-ui,sans-serif;text-align:center}
