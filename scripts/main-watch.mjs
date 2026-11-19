@@ -23,6 +23,7 @@ import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {setTimeout} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
+import {stripVTControlCharacters} from 'node:util';
 import {AMBER,parseAmber,parseAudioAmber,parseMemoryWarnings} from './test-amber.mjs';
 import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 import {budgetReport,budgetSourceRun,parseBudgetResults} from './budgets/watch.mjs';
@@ -35,7 +36,7 @@ export const KEEPER_MS=20*60_000;
 const ADVISORY_VERSION=7;
 const NATIVE_FOOTPRINT='memory-footprint-guard';
 const NATIVE_CHECKS=new Set(['Check armed native footprints and report Template', "Check or report Nine's online native WebKit ledger"]);
-/** @typedef {{name:string,conclusion:string|null,started_at?:string|null,runner_id?:number|null,steps?:readonly {name:string,conclusion:string|null}[]}} Job */
+/** @typedef {{id?:number,name:string,conclusion:string|null,started_at?:string|null,runner_id?:number|null,steps?:readonly {name:string,conclusion:string|null}[]}} Job */
 /** @param {{conclusion:string|null}} job */
 const unsuccessful=job=>['failure','timed_out','cancelled','startup_failure'].includes(job.conclusion??'');
 
@@ -58,17 +59,20 @@ export const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.na
 /** The blocking jobs a red names. FS24's early red cancels a red run's other jobs, so `cancelled` ones are named only
  * when no job failed outright (a job over its timeout-minutes concludes `cancelled`).
  * @param {readonly Job[]} jobs @returns {string[]} */
-export function failedNames(jobs){
+function failedJobs(jobs){
   const blocking=jobs.filter(job=>!advisory(job)&&unsuccessful(job)),failed=blocking.filter(job=>job.conclusion!=='cancelled');
-  return (failed.length>0?failed:blocking).map(job=>job.name);
+  return failed.length>0?failed:blocking;
 }
+
+/** @param {readonly Job[]} jobs */
+export const failedNames=jobs=>failedJobs(jobs).map(job=>job.name);
 
 /** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,display_title?:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
 /** @typedef {{id:number,sha:string,created:string,warnings?:ReturnType<typeof parseMemoryWarnings>,pusher?:string,results?:ReturnType<typeof parseBudgetResults>}} MemoryQa */
 /** A red span main-watch has reported: the first red run, when it was reported (ms), its alert, and whether the keeper
  * (buddy-engine, FS22) already has it.
  * @typedef {{run:number,at:number,text:string,keeper:boolean}} RedSpan */
-/** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[],red?:RedSpan}} State */
+/** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[],red?:RedSpan,notified?:Record<string,string[]>}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
@@ -163,14 +167,81 @@ export function paneFor(panes,slug){
     ??panes.find(pane=>[pane.cwd,pane.foreground_cwd].some(path=>path?.endsWith(`/.worktrees/${slug}`)))?.pane_id;
 }
 
+/** Read file names from failure lines and stack frames, excluding ordinary pass/progress output.
+ * @param {readonly string[]} logs */
+export function failurePaths(logs){
+  const paths=new Set();
+  const pathPattern=/(?<![\w./-])\/?(?:[\w@.-]+\/)*[\w.-]+\.(?:[cm]?[jt]sx?|json|yml|yaml|css)(?=$|[^\w./-])/gu;
+  for(const log of logs)for(const line of stripVTControlCharacters(log).split('\n')){
+    const message=line.replace(/^\s*\d{4}-\d\d-\d\dT\S+\s+/u,'').trim();
+    if(!/^(?:FAIL\b|❯\s|✖\s|×\s|::error\b|##\[error\]|[\w.-]*Error\b)/u.test(message)&&
+      !/\berror TS\d+:/u.test(message))continue;
+    for(const match of message.matchAll(pathPattern)){
+      const file=match[0].replace(/^(?:\.\/|\/)/u,'');
+      if(!file.includes('node_modules/'))paths.add(file);
+    }
+  }
+  return [...paths];
+}
+
+/** Newest change in the red range supported by a path from a failed job.
+ * @param {readonly string[]} commits @param {readonly string[]} files
+ * @param {ReadonlyMap<string,readonly string[]>} changes */
+export function redSuspect(commits,files,changes){
+  const named=new Set(files);
+  const touched=new Set(commits.flatMap(sha=>changes.get(sha)??[]));
+  for(const file of files)if(!file.includes('/')){
+    const matches=[...touched].filter(path=>path===file||path.endsWith(`/${file}`));
+    if(matches.length===1)named.add(matches[0]);
+  }
+  for(const sha of commits){
+    const file=changes.get(sha)?.find(path=>[...named].some(reported=>reported===path||reported.endsWith(`/${path}`)));
+    if(file!==undefined)return {sha,file};
+  }
+  return undefined;
+}
+
+/** @typedef {{lane:string,sendPane?:string,key:string,lanes:Set<string>,commits:Set<string>,fixer:boolean}} RedRecipient */
+/** @typedef {{lane:string,slug:string,pane?:string}} RedLander */
+/** @param {readonly {sha:string,lander?:RedLander}[]} rows @param {Parameters<typeof paneFor>[0]} panes
+ * @param {ReadonlyMap<string,string>} agents @param {readonly string[]} fixers */
+export function redRecipients(rows,panes,agents,fixers){
+  const groups=new Map();
+  /** @param {string} lane @param {string|undefined} pane @param {string} [sha] */
+  const add=(lane,pane,sha)=>{
+    const address=pane??agents.get(lane);
+    const key=address===undefined?`agent:${lane}`:`pane:${address}`;
+    const group=/** @type {RedRecipient} */(groups.get(key)??{lane,sendPane:pane,key,lanes:new Set(),commits:new Set(),fixer:false});
+    group.lanes.add(lane);
+    if(sha===undefined)group.fixer=true;else group.commits.add(sha);
+    groups.set(key,group);
+  };
+  for(const {sha,lander} of rows)if(lander!==undefined)add(lander.lane,lander.pane??paneFor(panes,lander.slug),sha);
+  for(const lane of fixers)add(lane,undefined);
+  return /** @type {RedRecipient[]} */([...groups.values()]);
+}
+
+/** @param {RedRecipient} recipient @param {{range:string,url:string,failed:string,named:string,
+ * suspect?:ReturnType<typeof redSuspect>}} red */
+export function redMessage(recipient,{range,url,failed,named,suspect}){
+  const ownsSuspect=suspect!==undefined&&recipient.commits.has(suspect.sha);
+  const commits=[...recipient.commits].filter(sha=>!ownsSuspect||sha!==suspect?.sha).map(short).join(', ');
+  const lead=suspect===undefined?' Suspect unconfirmed.':` Suspect ${short(suspect.sha)}${ownsSuspect?' (yours)':''} last changed ${suspect.file}.`;
+  const owned=commits===''?'':` You ${ownsSuspect?'also ':''}landed ${commits}.`;
+  const why=recipient.fixer?' You are the forward fixer (M2): fix forward now, or confirm a lander has it.'
+    :recipient.commits.size>0?' Please fix forward now (J249).':' A lander could not be reached. Please fix forward now (J249).';
+  return `main-watch: MAIN RED.${lead} Engine main ${range} (${url}); failed: ${failed}.${recipient.commits.size===0?` Landers: ${named}.`:owned}${why}`;
+}
+
 /** @param {string} file @returns {State|null} */
 export function readState(file){
   if(!existsSync(file))return null;
   try{
     const value=JSON.parse(readFileSync(file,'utf8'));
-    const red=value.red;
+    const red=value.red,notified=value.notified;
     return {judged:Array.isArray(value.judged)?value.judged.filter(Number.isSafeInteger):[],dispatched:Array.isArray(value.dispatched)?value.dispatched.filter(row=>typeof row==='string'):[],
       ...(Array.isArray(value.memoryQa)?{memoryQa:value.memoryQa}:{}),
+      ...(notified!==null&&typeof notified==='object'&&!Array.isArray(notified)?{notified}:{}),
       ...(red!==null&&typeof red==='object'&&Number.isSafeInteger(red.run)&&typeof red.at==='number'&&typeof red.text==='string'?{red:{run:red.run,at:red.at,text:red.text,keeper:red.keeper===true}}:{})};
   }catch{return null;}
 }
@@ -179,7 +250,23 @@ export function readState(file){
 function writeState(file,state){
   mkdirSync(dirname(file),{recursive:true});
   const temporary=`${file}.${process.pid}.tmp`;
-  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{}),...(state.red===undefined?{}:{red:state.red})})}\n`);renameSync(temporary,file);
+  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{}),...(state.red===undefined?{}:{red:state.red}),...(state.notified===undefined?{}:{notified:state.notified})})}\n`);renameSync(temporary,file);
+}
+
+/** Save the address before submitting: an interrupted transport might already have delivered the prompt.
+ * @param {Pick<ReturnType<typeof liveIo>,'state'|'send'|'prompt'>} io @param {State} state
+ * @param {number} run @param {RedRecipient} recipient @param {string} text */
+function notifyRed(io,state,run,recipient,text){
+  const seen=state.notified??={};
+  const previous=Array.isArray(seen[run])?seen[run]:[];
+  const pane=recipient.key.startsWith('pane:'),aliases=[...recipient.lanes].map(lane=>`agent:${lane}`);
+  if(previous.includes(recipient.key)||aliases.some(alias=>previous.includes(alias)
+    ||(!pane&&previous.some(key=>key.startsWith(`${alias}@pane:`)))))return null;
+  const keys=[recipient.key,...pane?aliases.map(alias=>`${alias}@${recipient.key}`):[]];
+  seen[run]=[...new Set([...previous,...keys])];
+  writeState(io.state,state);
+  if(recipient.sendPane!==undefined)return io.send(recipient.sendPane,text)?`sent to pane ${recipient.sendPane}`:'';
+  return io.prompt(recipient.lane,text)?`prompted herdr agent ${recipient.lane}`:'';
 }
 
 /** One watcher at a time judges, so two never report the same run. The lock file holds its owner's pid; only a
@@ -228,7 +315,7 @@ export function liveIo(env=process.env){
   const receipts=resolve(env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'));
   const run=(/** @type {string} */command,/** @type {string[]} */args)=>execFileSync(command,args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
   // MF12 (4): reads go through the reader App when this machine has it; the dispatch stays on the user's login.
-  const read=(/** @type {string[]} */args)=>execFileSync('gh',args,{cwd:root,encoding:'utf8',env:readerEnv(env),stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
+  const read=(/** @type {string[]} */args,timeout=60_000)=>execFileSync('gh',args,{cwd:root,encoding:'utf8',env:readerEnv(env),stdio:['ignore','pipe','pipe'],timeout,maxBuffer:32<<20});
   const runsCache=resolve(env.WS_MAIN_WATCH_RUNS_CACHE??join(homedir(),'.cache/wildshard/main-watch-runs.json'));
   const state=resolve(env.WS_MAIN_WATCH_STATE??join(homedir(),'.cache/wildshard/main-watch.json'));
   /** @param {number} id @returns {Job[]} */
@@ -260,7 +347,18 @@ export function liveIo(env=process.env){
           return blockingRun(row,jobs);
         });
     }),
-    failed:(/** @type {number} */id)=>failedNames(jobsFor(id)),
+    failed:(/** @type {number} */id)=>{
+      const jobs=failedJobs(jobsFor(id)),deadline=Date.now()+25_000;
+      /** @type {string[]} */const logs=[];
+      for(const job of jobs){
+        const remaining=deadline-Date.now();
+        if(remaining<=0)break;
+        if(job.id===undefined)continue;
+        try{logs.push(read(['api','--allow-escape-sequences',`repos/${repo}/actions/jobs/${job.id}/logs`],Math.min(remaining,10_000)));}
+        catch{/* An expired or unavailable log cannot stop a red alert. */}
+      }
+      return {names:jobs.map(job=>job.name),logs};
+    },
     // Blocking tests own AMBER evidence. The advisory timings collector only repeats it;
     // its annotations cannot change main's verdict. Quarantine reports separately (J193).
     annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
@@ -289,10 +387,31 @@ export function liveIo(env=process.env){
     commits:(/** @type {string|null} */from,/** @type {string} */to)=>{
       try{return run('git',['rev-list','--max-count=200',from===null?to:`${from}..${to}`]).trim().split('\n').filter(Boolean);}catch{return [to];}
     },
+    changes:(/** @type {string|null} */from,/** @type {string} */to)=>{
+      const out=new Map();
+      try{
+        const log=run('git',['log','--format=%x1e%H','--name-only','-z','--diff-merges=first-parent','--max-count=200',from===null?to:`${from}..${to}`]);
+        for(const record of log.split('\u001E').filter(Boolean)){
+          const [sha,...paths]=record.split('\0');
+          out.set(sha,paths.filter(Boolean).map(file=>file.replace(/^\n/u,'')));
+        }
+      }catch{/* No local history means no suspect. */}
+      return /** @type {Map<string,string[]>} */(out);
+    },
     contains:(/** @type {string} */ancestor,/** @type {string} */descendant)=>{try{run('git',['merge-base','--is-ancestor',ancestor,descendant]);return true;}catch{return false;}},
     receipts:()=>existsSync(receipts)?readFileSync(receipts,'utf8'):'',
     receipt:(/** @type {string} */line)=>{mkdirSync(dirname(receipts),{recursive:true});appendFileSync(receipts,`${new Date().toISOString().slice(11,16)} UTC main-watch ${line}\n`);},
     panes:()=>{try{return JSON.parse(run('herdr',['pane','list'])).result.panes;}catch{return [];}},
+    agents:()=>{
+      /** @type {Map<string,string>} */const panes=new Map();
+      try{
+        /** @type {{name?:string,pane_id?:string,workspace_id?:string}[]} */
+        const agents=JSON.parse(run('herdr',['agent','list'])).result.agents;
+        for(const {name,pane_id: pane,workspace_id: workspace} of agents)if(name&&pane)
+          panes.set(name,pane.includes(':')||workspace===undefined?pane:`${workspace}:${pane}`);
+      }catch{/* A missing agent list still allows direct pane and lane-name delivery. */}
+      return panes;
+    },
     send:(/** @type {string} */pane,/** @type {string} */text)=>{try{run('herdr',['pane','run',pane,text]);return true;}catch{return false;}},
     // A lane that is a herdr agent by name (the Codex lanes) has no pane main-watch can find: prompt it by name.
     prompt:(/** @type {string} */agent,/** @type {string} */text)=>{try{run('herdr',['agent','prompt',agent,text]);return true;}catch{return false;}},
@@ -327,7 +446,8 @@ export function sweep(io,hint={}){
       io.receipt(`started: ${baseline.length} finished main runs taken as already judged`);
       if(hint.sha===undefined)return [];
     }
-    const verdicts=judge(runs,previous,io.tip()),state=/** @type {State & {memoryQa:MemoryQa[]}} */({judged:[...previous.judged],dispatched:[...previous.dispatched],memoryQa:[...previous.memoryQa??[]],...(previous.red===undefined?{}:{red:previous.red})});
+    const verdicts=judge(runs,previous,io.tip()),state=/** @type {State & {memoryQa:MemoryQa[]}} */({ ...previous,
+      judged:[...previous.judged],dispatched:[...previous.dispatched],memoryQa:[...previous.memoryQa??[]] });
     const now=io.now?.()??Date.now();
     /** @param {Run} run @param {string} annotations @param {string[]} lines */
     const memoryWarnings=(run,annotations,lines)=>{
@@ -346,7 +466,9 @@ export function sweep(io,hint={}){
       const {run}=verdict;
       // Everything a report needs is read first; the run is recorded; only then does the report go out. A failed
       // read leaves the run for the next sweep, and a report is never sent twice.
-      /** @type {string[]} */const lines=[];/** @type {{lane:string,pane:string|undefined,text:string,lander?:true}[]} */const messages=[];
+      /** @type {string[]} */const lines=[];
+      /** @type {{recipient:RedRecipient,text:string}[]} */const messages=[];
+      /** @type {RedRecipient|undefined} */let buddy;
       /** @type {string|undefined} */let buddyAlert;
       if(run.nativeInfra!==undefined)lines.push(`main advisory ${short(run.head_sha)} ${NATIVE_FOOTPRINT}: ${run.nativeInfra} (run ${run.id})`);
       if(verdict.kind==='superseded')lines.push(run.started===false
@@ -370,13 +492,15 @@ export function sweep(io,hint={}){
           for(const row of audio)lines.push(`main AMBER ${short(run.head_sha)} audio ${row.shard} ${row.tier} ${mb(row.bytes)} MB/${mb(row.budget)} MB (run ${run.id}; J303${row.level==='red'?`, over the ${mb(row.red)} MB red line`:''}: its AUDIO-PLAN source pass; never a red main)`);
         }
         else{
-          const failed=io.failed(run.id).join(' | ')||'see the run',url=`https://github.com/${io.repo}/actions/runs/${run.id}`,panes=io.panes();
+          const jobs=io.failed(run.id),files=failurePaths(jobs.logs);
+          const failed=jobs.names.join(' | ')||'see the run',url=`https://github.com/${io.repo}/actions/runs/${run.id}`;
+          const suspect=files.length===0?undefined:redSuspect(commits,files,io.changes(verdict.from??null,run.head_sha));
+          const details={range,url,failed,named,suspect},agents=io.agents();
           lines.push(`MAIN RED ${range} run ${run.id}: landers ${named}; failed: ${failed}`);
-          for(const row of found)if(row.lander!==undefined)messages.push({lane:row.lander.lane,lander:true,pane:row.lander.pane??(row.lander.slug===''?undefined:paneFor(panes,row.lander.slug)),
-            text:`main-watch: MAIN RED on engine main ${range} (${url}); failed: ${failed}. You landed ${short(row.sha)}: fix forward now (J249).`});
-          buddyAlert=`main-watch: MAIN RED on engine main ${range} (${url}); landers ${named}; failed: ${failed}. A lander could not be reached. Please fix forward now (J249).`;
-          for(const fixer of new Set(io.fixers()))messages.push({lane:fixer,pane:undefined,
-            text:`main-watch: MAIN RED on engine main ${range} (${url}); landers ${named}; failed: ${failed}. You are the forward fixer (M2): fix forward now, or confirm a lander has it.`});
+          for(const recipient of redRecipients(found,io.panes(),agents,io.fixers()))
+            messages.push({recipient,text:redMessage(recipient,details)});
+          buddy=redRecipients([],[],agents,['buddy-engine'])[0];
+          if(buddy!==undefined)buddyAlert=redMessage({...buddy,fixer:false},details);
         }
         memoryWarnings(run,annotations,lines);
       }
@@ -386,19 +510,18 @@ export function sweep(io,hint={}){
       state.judged.push(run.id);if(verdict.kind==='dispatch')state.dispatched.push(run.head_sha);writeState(io.state,state);
       if(verdict.kind==='dispatch')io.dispatch();
       for(const line of lines)io.receipt(line);
-      let needsBuddy=!messages.some(message=>message.lander);
+      let needsBuddy=!messages.some(message=>message.recipient.commits.size>0);
       let buddyAttempted=false;
-      for(const message of messages){
-        const how=message.pane!==undefined&&io.send(message.pane,message.text)?`sent to pane ${message.pane}`
-          :io.prompt(message.lane,message.text)?`prompted herdr agent ${message.lane}`:'';
-        if(message.lander&&how==='')needsBuddy=true;
-        if(message.lane==='buddy-engine')buddyAttempted=true;
-        io.receipt(`MAIN RED message to ${message.lane} ${how===''?'not delivered (no reachable pane or herdr agent)':how}`);
+      for(const {recipient,text} of messages){
+        const how=notifyRed(io,state,run.id,recipient,text);
+        if(recipient.commits.size>0&&how==='')needsBuddy=true;
+        if(recipient.key===buddy?.key||recipient.lanes.has('buddy-engine'))buddyAttempted=true;
+        if(how!==null)io.receipt(`MAIN RED message to ${[...recipient.lanes].join(', ')} ${how===''?'not delivered (no reachable pane or herdr agent)':how}`);
       }
-      if(needsBuddy&&!buddyAttempted&&buddyAlert!==undefined){
-        const delivered=io.prompt('buddy-engine',buddyAlert);
-        io.receipt(`main red fallback to buddy-engine ${delivered?'prompted herdr agent buddy-engine':'not delivered (herdr agent unreachable)'}`);
-        buddyAttempted=delivered;
+      if(needsBuddy&&!buddyAttempted&&buddyAlert!==undefined&&buddy!==undefined){
+        const how=notifyRed(io,state,run.id,buddy,buddyAlert);
+        if(how!==null)io.receipt(`main red fallback to buddy-engine ${how||'not delivered (herdr agent unreachable)'}`);
+        buddyAttempted=true;
       }
       if(verdict.kind==='red'&&buddyAttempted&&state.red!==undefined&&!state.red.keeper){state.red.keeper=true;writeState(io.state,state);}
     }
@@ -406,9 +529,12 @@ export function sweep(io,hint={}){
     // buddy-engine gets it, once per span; the pushers were pinged first and nobody else stops.
     if(state.red!==undefined&&!state.red.keeper&&now-state.red.at>=KEEPER_MS){
       const minutes=Math.round((now-state.red.at)/60_000);
-      const delivered=io.prompt('buddy-engine',`main-watch: keeper (J443): engine main is still red ${minutes} min after this alert, with no green since. ${state.red.text}`);
-      io.receipt(`main red keeper: buddy-engine ${delivered?'prompted':'not delivered (herdr agent unreachable)'} after ${minutes} min red with no green (run ${state.red.run})`);
-      if(delivered){state.red.keeper=true;writeState(io.state,state);}
+      const buddy=redRecipients([],[],io.agents(),['buddy-engine'])[0];
+      if(buddy!==undefined){
+        const how=notifyRed(io,state,state.red.run,buddy,`main-watch: keeper (J443): engine main is still red ${minutes} min after this alert, with no green since. ${state.red.text}`);
+        if(how!==null)io.receipt(`main red keeper: buddy-engine ${how?'prompted':'not delivered (herdr agent unreachable)'} after ${minutes} min red with no green (run ${state.red.run})`);
+        state.red.keeper=true;writeState(io.state,state);
+      }
     }
     for(const run of native.filter(row=>finished(row)&&!state.judged.includes(row.id))){
       /** @type {string[]} */const lines=[];

@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import { attribute, blockingRun, failedNames, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
+import '../scripts/test/main-watch-red.test.mjs';
 
 mkdirSync(resolve('tmp'), { recursive: true });
 const scratch = mkdtempSync(resolve('tmp/main-watch-'));
@@ -26,9 +27,10 @@ const contains = (ancestor: string, descendant: string): boolean => order.indexO
 interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string; ambers?: Record<number, string>; agents?: string[]; prompted?: [string, string][]; fixers?: string[]; native?: ReturnType<typeof run>[]; memoryQa?: Parameters<NonNullable<ReturnType<typeof liveIo>['memoryQa']>>[0] }
 const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   repo: 'project-wildshard/engine', state: join(scratch, `${name}.json`),
-  runs: () => world.runs, failed: () => ['tests (3)'], annotations: id => world.ambers?.[id] ?? '', tip: () => world.tip,
+  runs: () => world.runs, failed: () => ({ names: ['tests (3)'], logs: [] }), annotations: id => world.ambers?.[id] ?? '', tip: () => world.tip,
   nativeRuns: () => world.native ?? [], memoryQa: rows => { (world.memoryQa ??= []).push(...rows); },
   commits: (from, to) => order.slice(from === null ? 0 : order.indexOf(from) + 1, order.indexOf(to) + 1).reverse(),
+  changes: () => new Map(), agents: () => new Map(),
   contains, receipts: () => world.log, receipt: line => { world.receipts.push(line); },
   panes: () => [{ pane_id: 'w1:p2', label: 'engine plan/red-plan' }, { pane_id: 'w1:p3', cwd: '/x/engine/.worktrees/other' }],
   send: (pane, text) => { world.sent.push([pane, text]); return true; }, dispatch: () => { world.dispatched += 1; },
