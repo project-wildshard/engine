@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { NetClient } from '@wildshard/engine/net/client';
-import { CHAT_FADE_MS, CHAT_FRESH_MS, badgeText, cornerOpen, cornerShown, lineLook } from './chatCorner';
+import { CHAT_FADE_MS, CHAT_FRESH_MS, PEEK_MS, badgeText, cornerOpen, cornerShown, lineLook } from './chatCorner';
 import { chatDock, chatLines } from './chatLines';
 import { VOICE_GIVE_UP_MS, VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
 import { voiceUi } from './voiceUi';
@@ -484,4 +484,24 @@ test('J473 row 1: a phone\'s closed corner is the mic over a chat icon with an a
   outside();
   expect(open(box)).toBe(false);
   expect(badge()).toBe('');
+});
+
+// J473 grill wave 2: "one-line peek for 4 s; none in a fight or a talk" (badge only then).
+test('J473 row 2: a phone peeks only the newest line beside the chat icon for 4 s, and none in a fight', () => {
+  expect(lineLook(0, PEEK_MS - 1, PEEK_MS)).toBe('fresh');
+  expect(lineLook(0, PEEK_MS, PEEK_MS)).toBe('fading');
+  const hud = document.createElement('div'); hud.id = 'hud'; hud.className = 'touch'; document.body.append(hud);
+  const { box, say } = corner();
+  vi.advanceTimersByTime(500);
+  say({ line: 1, from: 2, name: 'Maren', text: 'anyone at the pier?' });
+  say({ line: 2, from: 2, name: 'Kai', text: 'on my way' });
+  expect(look(box)).toEqual(['fresh', 'fresh']);
+  vi.advanceTimersByTime(PEEK_MS);
+  expect(look(box)).toEqual(['fading', 'fading']);
+  vi.advanceTimersByTime(CHAT_FADE_MS);
+  expect(look(box)).toEqual(['gone', 'gone']);
+  // only the newest line shows, one line high beside the icon; a fight hides it
+  const sheet = document.head.textContent;
+  expect(sheet).toContain('#ws-chat[data-touch]:not([data-open])>[data-lines]{position:absolute;left:44px;bottom:0;height:36px;width:calc(45vw - 60px);');
+  expect(sheet).toContain('#ws-chat[data-touch]:not([data-open]) [data-lines]>:not(:last-child),html[data-ws-fight] #ws-chat[data-touch]:not([data-open])>[data-lines]{display:none}');
 });

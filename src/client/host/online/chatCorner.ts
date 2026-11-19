@@ -11,11 +11,15 @@ export const CHAT_FADE_MS = 600;
 /** Lines the open chat keeps, newest last. */
 export const CHAT_KEPT = 50;
 
-/** How a line looks in the calm corner `now` ms after it was said. */
+/** J473 (grill wave 2): on a phone the closed chat peeks only its newest line, beside the chat icon, for this long; then the
+ *  badge alone says there is more. No peek in a fight (`data-ws-fight`) or a talk (the corner is away then). */
+export const PEEK_MS = 4000;
+
+/** How a line looks in the calm corner `now` ms after it was said (`fresh`: how long it stays fresh there). */
 export type LineLook = 'fresh' | 'fading' | 'gone';
-export function lineLook(saidAt: number, now: number): LineLook {
+export function lineLook(saidAt: number, now: number, fresh: number = CHAT_FRESH_MS): LineLook {
   const age = now - saidAt;
-  return age < CHAT_FRESH_MS ? 'fresh' : age < CHAT_FRESH_MS + CHAT_FADE_MS ? 'fading' : 'gone';
+  return age < fresh ? 'fresh' : age < fresh + CHAT_FADE_MS ? 'fading' : 'gone';
 }
 
 // J473 (Jake, 2026-11-19 ~17:12 Cancún: "I do like the idea of them being icons and not a say something input box that takes up a lot

@@ -15,6 +15,7 @@ import { ToastStack, type ToastTone } from './ToastStack';
 import { ItemCardPop, type ItemCardSpec } from './ItemCard';
 import { ROW, hudSlots } from './hudSlots';
 import { listenReloadChip } from './reloadChip';
+import { FightMark } from './fightMark';
 
 /**
  * HUD — DOM overlay in `#hud`, styled by `src/client/engine/ui/styles/game.css` / `menu.css` (the in-game menu is src/client/engine/ui/Menu.ts + gmenu.css) on top of `base.css` (Wildshard glass identity; one class prefix per screen, see scripts/check-css.mjs).
@@ -162,6 +163,9 @@ export class HUD {
   private healthVal!: HTMLElement; private healthBar!: HTMLElement; private healthPanel!: HTMLElement; private healthMax!: HTMLElement;
   /** E319: when health last reached full (performance.now; -Infinity = full since the start, null = hurt) and the VITALS
    *  visibility as last painted — they start hidden, the player spawns at full health */
+  /** J473: a hit taken or landed in the last FIGHT_HOLD_MS (fightMark.ts) */
+  private readonly fight = new FightMark(typeof document === 'undefined' ? null : document.documentElement);
+  private struck = false;
   private hpFullAt: number | null = Number.NEGATIVE_INFINITY; private hpShown: 'show' | 'fade' | 'gone' = 'gone';
   private ammoCount!: HTMLElement; private ammoNum!: HTMLElement; private ammoStatus!: HTMLElement; private ammoStatusText!: HTMLElement; private reloadBar!: HTMLElement; private pips: HTMLElement[] = [];
   private cross!: HTMLElement; private killX!: HTMLElement; private hitRing!: HTMLElement; private aim!: HTMLElement; private aimText = '';
@@ -197,6 +201,7 @@ export class HUD {
     this.root.id = 'hud';
     this.build();
     this.mountBar();
+    this.scope.onDispose(() => { this.fight.clear(); });
     this.scope.onDispose(onDev(() => {
       if (!this.intro || !this.onEnter) return;
       const selected = this.deck?.cards[this.deck.index]?.slug;
@@ -358,7 +363,10 @@ export class HUD {
     }
     this.updateMarkers(s, deg);
     const maxHp = s.maxHealth ?? 100;
+    const now = performance.now();
+    if (this.struck) { this.struck = false; this.fight.struck(now); }
     if (s.health !== L.health || maxHp !== L.maxHealth) {
+      if (L.health !== undefined && s.health < L.health) this.fight.hurt(now);
       if (maxHp !== L.maxHealth) { L.maxHealth = maxHp; this.healthMax.textContent = engineString('s_9c6a243a6829', [maxHp]); }
       L.health = s.health;
       const h = Math.max(0, Math.min(maxHp, s.health)), pct = (h / maxHp) * 100;
@@ -368,7 +376,7 @@ export class HUD {
       this.syncBar('health');
     }
     // E319: VITALS only while hurt — full → VITALS_HIDE_MS → a fade → gone; a hit shows them the same frame
-    const now = performance.now();
+    this.fight.tick(now);
     if (s.health < maxHp) this.hpFullAt = null; else this.hpFullAt ??= now;
     const fullFor = this.hpFullAt === null ? -1 : now - this.hpFullAt;
     const hp = fullFor < VITALS_HIDE_MS ? 'show' : fullFor < VITALS_HIDE_MS + VITALS_FADE_MS ? 'fade' : 'gone';
@@ -548,6 +556,7 @@ export class HUD {
   }
 
   showHitMarker(headshot: boolean, killed: boolean): void {
+    this.struck = true; // the fight clock reads it on the next setState (one clock read a frame)
     this.cross.classList.add('hit'); this.cross.classList.toggle('head', headshot);
     this.hitTimer = 10;
     this.hitRing.classList.remove('show'); void this.hitRing.offsetWidth; this.hitRing.classList.add('show');

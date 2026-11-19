@@ -2,7 +2,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { listenPage } from '@wildshard/engine/input/dom';
 import type { NetClient } from '@wildshard/engine/net/client';
-import { CHAT_FADE_MS, CHAT_FRESH_MS, CHAT_KEPT, CORNER_MARKS, badgeText, cornerOpen, cornerShown, lineLook, type CornerEvent } from './chatCorner';
+import { CHAT_FADE_MS, CHAT_FRESH_MS, CHAT_KEPT, CORNER_MARKS, PEEK_MS, badgeText, cornerOpen, cornerShown, lineLook, type CornerEvent } from './chatCorner';
 
 /** Lines the calm corner can show at once (only fresh ones show there). Room chat is for a sitting of two (Q88). */
 const SHOWN = 6;
@@ -62,6 +62,10 @@ const CSS = `
 #ws-chat[data-touch][data-open]{--ws-chat-open-h:calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px);width:min(calc(100vw - 84px),440px)}
 }
 #ws-chat-icon{display:none}
+#ws-chat[data-touch]:not([data-open])>[data-lines]{position:absolute;left:44px;bottom:0;height:36px;width:calc(45vw - 60px);justify-content:center;align-items:flex-start}
+#ws-chat[data-touch]:not([data-open]) [data-lines]>*{max-width:100%;box-sizing:border-box}
+#ws-chat[data-touch]:not([data-open]) [data-lines]>*>span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ws-chat[data-touch]:not([data-open]) [data-lines]>:not(:last-child),html[data-ws-fight] #ws-chat[data-touch]:not([data-open])>[data-lines]{display:none}
 #ws-chat[data-touch]:not([data-open])>form{position:relative;flex-direction:column;align-items:flex-start;gap:6px}
 #ws-chat[data-touch]:not([data-open])>form>input{position:absolute;left:0;bottom:0;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none}
 #ws-chat[data-touch]:not([data-open]) #ws-voice{order:1;width:36px;height:36px}
@@ -186,12 +190,13 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
     if (name === 'keydown' && event instanceof KeyboardEvent && event.key === 'Escape') { event.preventDefault(); corner('close'); }
   });
 
-  /** A line shows fresh, fades after CHAT_FRESH_MS and is gone from the calm corner CHAT_FADE_MS later. */
+  /** A line shows fresh, fades after CHAT_FRESH_MS (a phone's peek: PEEK_MS) and is gone from the calm corner CHAT_FADE_MS later. */
   const said = (row: HTMLElement): void => {
-    const at = diagnosticNow(), paint = (): void => { row.dataset['look'] = lineLook(at, diagnosticNow()); };
+    const fresh = box.dataset['touch'] === undefined ? CHAT_FRESH_MS : PEEK_MS;
+    const at = diagnosticNow(), paint = (): void => { row.dataset['look'] = lineLook(at, diagnosticNow(), fresh); };
     row.dataset['look'] = 'fresh';
-    scope.timeout(CHAT_FRESH_MS, paint);
-    scope.timeout(CHAT_FRESH_MS + CHAT_FADE_MS, paint);
+    scope.timeout(fresh, paint);
+    scope.timeout(fresh + CHAT_FADE_MS, paint);
   };
   const add = (row: HTMLElement): void => {
     const pinned = list.scrollHeight - list.scrollTop - list.clientHeight < 8;
