@@ -39,6 +39,8 @@ export interface VehicleFollower {
   readonly seatOf: () => { readonly vehicle: string; readonly seat: number } | undefined;
   readonly pose: (id: string) => MoverPose | undefined;
   readonly kindOf: (id: string) => { readonly seats: readonly { readonly role: string }[]; readonly handling: { readonly speed: number; readonly boost: number } } | undefined;
+  /** MSZ10: another player's seat, as its body is drawn: its vehicle's heading and the seat's pose. */
+  readonly seated: (player: string) => { readonly yaw: number; readonly pose: 'sit' | 'stand' } | null;
 }
 /** A mover's look in one grid cell, as `WirePage.moverLooks` keys it. */
 export const moverLookKey = (instance: string, id: string): string => `${instance}\n${id}`;
@@ -97,6 +99,11 @@ export class WirePage {
   vehicleView(id: string): MoverView | undefined {
     for (const follower of this.vehicles.values()) { const view = follower.view(id); if (view !== undefined) return view; }
     return undefined;
+  }
+  /** MSZ10: a player's seat in a vehicle the followers know, for its drawn body; null out of one. */
+  vehicleSeat(player: string): { readonly yaw: number; readonly pose: 'sit' | 'stand' } | null {
+    for (const follower of this.vehicles.values()) { const seat = follower.seated(player); if (seat !== null) return seat; }
+    return null;
   }
   /** MSZ9b, once a frame: the followers read the vehicles and seats the wire has now. */
   syncVehicles(feet: { readonly x: number; readonly z: number }): void {

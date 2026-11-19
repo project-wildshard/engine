@@ -16,3 +16,11 @@ player's way out, and (data page only, for now) a copy of the kind's panel. The 
 player in the reserved `drive` mode (a traversal) and gives the view the steer ride's turn and swing-back, with the speed
 on the steer chip. `test/dedicated-vehicle-drive.test.ts` boards the example buggy over real sockets, drives it 20 m and
 gets out.
+
+**MSZ10, the sit.** Another page's `OtherPlayers` asks the page's vehicles (`wirePage.vehicleSeat`) for each body's seat: a
+seated body faces its vehicle's heading, never strides or holds an item, and poses the seat by bending bones (no sit clip
+yet): a `sit` seat folds thighs and knees with the hips 11 cm over the seat's base, a `stand` seat softens the knees, and
+both hold the controls at chest height. `scripts/vehicle-seat-shots.mjs` bundles the page's own `OtherPlayers` with rolldown
+(Rapier's wasm module aliased as vite does, `import.meta.env` defined, chunks served by a Playwright route) and shoots the
+example's buggy and land-sail from a second page. A blind Opus judge failed round 1 (arms straight out like a zombie reach,
+hips 10 cm low) and passed round 2.

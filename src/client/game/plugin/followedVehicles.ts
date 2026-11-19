@@ -78,6 +78,11 @@ export class FollowedVehicles {
     for (const [vehicle, seats] of this.seats) { const seat = seats.indexOf(player); if (seat !== -1 && this.live.has(vehicle)) return { vehicle, seat }; }
     return undefined;
   }
+  /** MSZ10: `player`'s seat as its body is drawn: the vehicle's heading and the seat's pose; null out of one. */
+  seated(player: string): { readonly yaw: number; readonly pose: 'sit' | 'stand' } | null {
+    const held = this.seatOf(player), vehicle = held === undefined ? undefined : this.live.get(held.vehicle), row = held === undefined ? undefined : vehicle?.kind.seats[held.seat];
+    return vehicle === undefined || row === undefined ? null : { yaw: vehicle.pose.euler.y, pose: row.pose };
+  }
   /** Where a seat stands now: its rider's feet. */
   seatPoint(id: string, seat: number): [number, number, number] | undefined {
     const vehicle = this.live.get(id), row = vehicle?.kind.seats[seat];

@@ -43,6 +43,14 @@ const BOARD_LIFT = DECK_LIFT;
 const SADDLE_LIFT = 0.85;
 /** A rider's knees, in radians. The row it rides moves the body. */
 const SEAT = 1.2;
+/** MIRROR-SALT-ZONE MSZ10: a seated body's thighs (forward) and knees, its upper arms and elbows holding a wheel or a tiller
+ *  at chest height, in radians (the rig has no sit clip yet); its hips `lift` m over the seat's base. A `stand` seat (the
+ *  land-sail's) gives its knees a little give (`stand`) and the same hands. Blind look board, 2026-11-19: the first arms
+ *  reached straight out flat and the hips sat 10 cm low. */
+const SIT = { thigh: 1.45, shin: -1.45, upperArm: 0.55, foreArm: 1.35, lift: 0.11 } as const;
+const STAND = { thigh: 0.18, shin: -0.36 } as const;
+/** MSZ10: another player in a vehicle's seat, as the page's vehicles say it: the vehicle's heading and the seat's pose. */
+export interface OtherSeat { readonly yaw: number; readonly pose: 'sit' | 'stand' }
 const AXIS = new THREE.Vector3(1, 0, 0), turn = new THREE.Quaternion();
 /** Row 54: s another body is drawn behind this page's present past the interpolation delay (its own commands' trip to the
  *  server); the soft collision leads it by both. */
@@ -80,7 +88,9 @@ export interface OtherShown { readonly name: string; readonly x: number; readonl
   /** RP7: the strike playing on its arms ('tap', 'heavy', a bow's 'draw'), or ''. */
   readonly attack: string;
   /** RP11: its death ('fall', 'lie', 'fade', 'gone') and return ('rise'), or '' alive. */
-  readonly death: DeathPhase }
+  readonly death: DeathPhase;
+  /** MSZ10: its seat's pose in a vehicle ('sit', 'stand'), or '' out of one. */
+  readonly seated: '' | OtherSeat['pose'] }
 
 /** One other player on screen. */
 class OtherBody {
@@ -100,6 +110,8 @@ class OtherBody {
   private anim: AnimMachine | null = null;
   /** Where the figure stands so its soles are on the ground. */
   private feet = 0;
+  /** MSZ10: its hips over its soles at rest: a seat's base is where they sit. */
+  private hips = 0.9;
   private speed = 0;
   /** RP4: where the body is in its stride (0 to 1, the left foot down at 0), and its pose there. */
   private phase = 0;
@@ -114,7 +126,7 @@ class OtherBody {
   readonly hurt = new RemoteHurt(this.group);
   /** Whether a row has put it anywhere yet. */
   placed = false;
-  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '', air: '', attack: '', death: '' };
+  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '', air: '', attack: '', death: '', seated: '' };
   /** Its player row's id, which voice names its talker by. */
   readonly id: string;
   constructor(name: string, id: string) {
@@ -134,9 +146,11 @@ class OtherBody {
     for (const joint of STRIDE_JOINTS) { const bone = model.joints[joint]; if (bone !== undefined) this.rest.set(joint, bone.quaternion.clone()); }
     this.anim = new AnimMachine({ states: {}, loops: ['idle'] }, model.rig); this.anim.base('idle');
     this.board.fit(model.joints);
+    const thigh = model.joints.leftThigh;
+    if (thigh !== undefined) { model.root.updateMatrixWorld(true); this.hips = thigh.getWorldPosition(new THREE.Vector3()).y - model.root.getWorldPosition(new THREE.Vector3()).y; }
   }
   /** Where the row is now, and the limbs that go with it. */
-  show(row: Float64Array, dt: number, mounted: boolean): void {
+  show(row: Float64Array, dt: number, mounted: boolean, seat: OtherSeat | null = null): void {
     // RP11: a dead body holds where it fell and a return or a teleport snaps (remoteDeath.ts), so neither slides nor runs.
     const place = placeOf(row), at = this.death.place(place.x, row[Y] ?? 0, place.z, row[YAW] ?? 0, row[HP] ?? 0, dt), { x, y, z } = at, { group } = this, alive = this.death.phase === '';
     const moved = this.placed && dt > 0 && !at.snap ? Math.hypot(x - group.position.x, z - group.position.z) / dt : 0;
@@ -144,25 +158,34 @@ class OtherBody {
     this.speed += (moved - this.speed) * Math.min(1, dt * SETTLE);
     this.placed = true;
     // A row's yaw is where a player looks, down -z at 0, and the figure faces +z.
-    group.position.set(x, y, z); group.rotation.y = at.yaw + Math.PI;
+    // MSZ10: a seated body faces its vehicle's heading, wherever its player looks
+    const seated = alive && seat !== null ? seat.pose : '';
+    group.position.set(x, y, z); group.rotation.y = (seated !== '' && seat !== null ? seat.yaw : at.yaw) + Math.PI;
     // RP4: a rider's legs stand still whatever the row's speed; on foot the speed picks and blends the clip.
-    const riding = alive && row[BOARD] === 1, onFoot = riding || mounted ? 0 : this.speed, gait = gaitOf(onFoot);
+    const riding = alive && row[BOARD] === 1, still = riding || mounted || seated !== '', onFoot = still ? 0 : this.speed, gait = gaitOf(onFoot);
     const held = row[HELD] ?? 0;
-    this.hand?.show(held, alive && !riding && !mounted && row[SWIM] !== 1, dt); // RP5: nothing in hand on a board, in a saddle or swimming
+    this.hand?.show(held, alive && !still && row[SWIM] !== 1, dt); // RP5: nothing in hand on a board, in a saddle, a seat or swimming
     this.anim?.update(dt);
-    const air = this.air.update(AIR < 0 || Number.isNaN(row[AIR] ?? Number.NaN) ? undefined : row[AIR] === 1, y, dt, riding || mounted || !alive); // RP9
+    const air = this.air.update(AIR < 0 || Number.isNaN(row[AIR] ?? Number.NaN) ? undefined : row[AIR] === 1, y, dt, still || !alive); // RP9
     if (this.shown.air !== air) this.shown = { ...this.shown, air };
     const drop = this.pose(onFoot, dt);
-    if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : -drop);
+    if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : seated === 'sit' ? SIT.lift - this.hips : seated === 'stand' ? -0.03 : -drop);
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
-    this.strike.show(row, alive && !riding && !mounted && row[SWIM] !== 1, dt, this.joints, this.rest); // RP7: after the gait and air poses
+    if (seated !== '') this.sit(seated);
+    this.strike.show(row, alive && !still && row[SWIM] !== 1, dt, this.joints, this.rest); // RP7: after the gait and air poses
     this.board.show(riding, at.yaw, this.speed, dt, this.figure, this.joints); // RP8: the deck, banked, the rider side-on on it
     this.death.layer(group, this.figure, this.tag); // RP11: last, laid down, faded, its Name dimmed
     this.hurt.update(dt); // RP10
     const { talking: keys } = voiceNear, talking = alive && (keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name })));
     this.ring.visible = talking;
     if (talking) { this.talkPhase = (this.talkPhase + dt * TALK_PULSE) % (Math.PI * 2); this.ring.scale.setScalar(TALK_SIZE * (1 + TALK_SWELL * Math.sin(this.talkPhase))); }
-    this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held, hp: row[HP] ?? 0, talking, item: this.hand?.row ?? '', attack: this.strike.playing, death: this.death.phase };
+    this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held, hp: row[HP] ?? 0, talking, item: this.hand?.row ?? '', attack: this.strike.playing, death: this.death.phase, seated };
+  }
+  /** MSZ10: a seat's pose over the still gait: knees bent on a seat (`sit`) or softly standing, and either way both hands on the controls. */
+  private sit(pose: OtherSeat['pose']): void {
+    const legs = pose === 'sit' ? SIT : STAND;
+    this.bend('leftThigh', legs.thigh); this.bend('rightThigh', legs.thigh); this.bend('leftShin', legs.shin); this.bend('rightShin', legs.shin);
+    this.bend('leftUpperArm', SIT.upperArm); this.bend('rightUpperArm', SIT.upperArm); this.bend('leftForeArm', SIT.foreArm); this.bend('rightForeArm', SIT.foreArm);
   }
   /** RP11: the server says a blow killed it. */
   killed(): void { this.death.killed(); }
@@ -243,6 +266,8 @@ export class OtherPlayers {
   private readonly client: NetClient;
   private readonly scene: THREE.Object3D;
   private readonly row = new Float64Array(PLAYER_CLASS.row.length);
+  /** MSZ10: a player's seat in a vehicle, by its row's id, as the page's vehicles say it; none by default. */
+  seats: (id: string) => OtherSeat | null = () => null;
   /** Where this page's own player stands, for voice's distances (VOICE-POLISH V7); without it voice can't measure. */
   private readonly me: Readonly<THREE.Vector3> | null;
   /** `warmRoad`: link these roots' road (exterior) variants in play, paced (Game.warmExteriorRoots); the warm body asks once
@@ -317,7 +342,7 @@ export class OtherPlayers {
   private readonly visit = (info: NetEntityInfo, handle: number): void => {
     const { client, bodies, row } = this;
     if (info.cls.cls !== PLAYER_CLASS.cls || handle === this.own || !client.interpolator.sample(handle, this.tick, row)) return;
-    (bodies.get(handle) ?? this.enter(handle, String(info.initial['name'] ?? ''), info.id)).show(row, this.dt, client.riders.has(handle));
+    (bodies.get(handle) ?? this.enter(handle, String(info.initial['name'] ?? ''), info.id)).show(row, this.dt, client.riders.has(handle), this.seats(info.id));
   };
   /** RP2: a body is dressed as it enters, from the one shared build; one that fails to build stands with its Name alone. */
   private enter(handle: number, name: string, id: string): OtherBody {

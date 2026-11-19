@@ -723,6 +723,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // E7.6: only a world has anyone else in it.
   let others: OtherPlayers | null = null;
   if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope, player.position, ports.warmRoad);
+  if (others !== null) others.seats = id => wirePage.vehicleSeat(id); // MSZ10: a seated player sits in its vehicle
   // QA-FEEDBACK-2026-11-19 row 54: players don't walk through each other. Each step's move is bent round the bodies drawn here,
   // so the server steps the same move (softCollide.ts); a crossing, a board, water or a saddle lets go.
   const soft = others?.soft ?? null, self = { x: 0, y: 0, z: 0, vx: 0, vz: 0, deep: (x: number, z: number): boolean => player.deepAt(x, z) };
