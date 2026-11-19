@@ -310,6 +310,7 @@ export function heaviestPasses(frame, info, top = 3) {
 /** @param {any} page @param {{settleMs:number}} o */
 async function censusAtControl(page, o) {
   const spawn = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { x: p.position.x, y: p.position.y, z: p.position.z, yaw: p.yaw }; });
+  const control = await page.evaluate(() => /** @type {any} */ (window).__vertexCensus.resident());
   const def = parseCameraFile({ fp: { viewport: [402, 874] }, god: { viewport: [402, 874], tier: 'phone' }, anchors: [{ id: 'spawn', P: { x: 0, z: 0 }, faceTo: { x: 0, z: -1 } }] });
   const [fx, fz] = facing(spawn.yaw), r = (/** @type {number} */ n) => Math.round(n * 1000) / 1000;
   const P = { x: r(spawn.x), z: r(spawn.z) };
@@ -324,7 +325,7 @@ async function censusAtControl(page, o) {
   }
   const resident = await page.evaluate(() => /** @type {any} */ (window).__vertexCensus.resident());
   const programs = await page.evaluate(() => /** @type {any} */ (window).__vertexCensus.programs());
-  return { spawn, frames, resident, programs };
+  return { spawn, frames, control, resident, programs };
 }
 
 const mb = (/** @type {number | null | undefined} */ b) => (b === null || b === undefined ? '-' : (b / 1e6).toFixed(1));
@@ -354,9 +355,10 @@ async function main(argv) {
       const info = new Map(probed.programs.map((/** @type {any} */ p) => [p.id, { name: programName(p.vs, p.id), varyings: liveVaryings(p.vs, p.fs) }]));
       const names = new Map([...info].map(([pid, p]) => [pid, p.name]));
       const resident = residentCensus(probed.resident, names);
+      const controlResident = residentCensus(probed.control, names);
       const frames = probed.frames.map((/** @type {any} */ f) => ({ n: f.n, id: f.id, draws: f.draws, triangles: f.triangles, vertices: f.vertices, three: f.three, heaviest: heaviestPasses(f, info, Number(args.top ?? 3)) }));
       const glBuffers = run.ledger?.byKind?.gpu?.buffer ?? null;
-      const row = { protocol: PROTOCOL, zone, query: args.query ?? null, boot: run.boot, build: run.build, date: new Date().toISOString(), spawn: probed.spawn, ledgerGpu: run.ledger?.byKind?.gpu ?? null, glBuffers, resident, frames };
+      const row = { protocol: PROTOCOL, zone, query: args.query ?? null, boot: run.boot, build: run.build, date: new Date().toISOString(), spawn: probed.spawn, ledgerGpu: run.ledger?.byKind?.gpu ?? null, glBuffers, controlResident, resident, frames };
       writeFileSync(join(out, `${zone}.json`), `${JSON.stringify(row, null, 1)}\n`);
       const fp = frames.filter((/** @type {any} */ f) => f.n <= 4), max = Math.max(...frames.map((/** @type {any} */ f) => f.triangles));
       const top = frames.flatMap((/** @type {any} */ f) => f.heaviest).sort((a, b) => b.weight - a.weight)[0];
