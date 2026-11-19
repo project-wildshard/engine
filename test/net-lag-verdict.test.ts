@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute the exact serialized browser hook in isolation.
 import { runInNewContext } from 'node:vm';
-import { b3Verdict, bridgeVerdict, installBridgeCorrections, proofVerdict } from '../scripts/net-lag-verdict.mjs';
+import { WEBKIT_PACING, b1Verdict, b3Verdict, bridgeVerdict, installBridgeCorrections, proofVerdict } from '../scripts/net-lag-verdict.mjs';
 
 const crossing = { reached: true, under: 0, falls: 0, corrections: 2, injectedSinks: [0.3, 1], forcedFrames: 30, forcedFrameMs: 60, spanSamples: 8, lowest: 5.4 };
 
@@ -83,4 +83,15 @@ test('B3 gives B4\'s forced frames the same 10 s to settle that it gives entry',
   expect(b3Verdict([...delays, { t: 80_000, delay: 121 }], 0, 0, 48_000).ok).toBe(false);
   expect(b3Verdict(delays, 2, 3, 48_000)).toMatchObject({ held: 1, ok: false });
   expect(b3Verdict([{ t: 5_000, delay: 80 }], 0, 0).ok).toBe(false);
+});
+
+test('B1 judges every line in Chromium, and only frames over 50 ms in headless WebKit (NL16)', () => {
+  // staging v0.1.50, Nine desktop, load 6: WebKit p99 21 and 22 ms with 3 and 8 frames of 30 to 40 ms, none over 50 ms
+  const paced = [{ over2x: 0, over50: 0, p99: 21 }, { over2x: 3, over50: 0, p99: 19 }];
+  expect(b1Verdict('chromium', paced, 1000 / 60)).toMatchObject({ over2x: 3, over50: 0, p99: 21, ok: false });
+  expect(b1Verdict('webkit', paced, 1000 / 60)).toMatchObject({ over2x: 3, over50: 0, p99: 21, ok: true, pacing: WEBKIT_PACING });
+  // a frame over 50 ms is real work in either engine
+  expect(b1Verdict('webkit', [...paced, { over2x: 1, over50: 1, p99: 19 }], 1000 / 60).ok).toBe(false);
+  expect(b1Verdict('chromium', [{ over2x: 0, over50: 0, p99: 16.8 }], 1000 / 60).ok).toBe(true);
+  expect(b1Verdict('chromium', [{ over2x: 0, over50: 0, p99: 33.4 }], 1000 / 30)).not.toHaveProperty('pacing');
 });

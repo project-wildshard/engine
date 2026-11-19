@@ -3,7 +3,8 @@
 // shard, a headless page enters the shard, walks, sprints and boosts (hoverboard, Shift) for `--seconds` each, and prints the
 // plan's bar per run; any miss exits 1.
 //   B1  drawn frames (the renderer's own, so a 30 fps cap reads as 30): none over 2x the frame budget nor over 50 ms, p99 at
-//       most 1.25x it. Budget = 1000 / min(display Hz, the tier's cap), read from the drawn rate before moving.
+//       most 1.25x it. Budget = 1000 / min(display Hz, the tier's cap), read from the drawn rate before moving. Headless WebKit
+//       is judged on the 50 ms line only; its pacing is read on the stand-ins (NL16, `b1Verdict`).
 //   B2  own character on foot (walk and sprint): at most 2 corrections a minute, worst render offset at most 0.10 m.
 //   B3  others: interpolation delay at most 120 ms from 10 s after entry (and after B4's forced frames), and no frame held past
 //       the buffer (`interpHeld`, from entry).
@@ -22,7 +23,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 import { watchFaults } from './proof-faults.mjs';
-import { b3Verdict, bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
+import { b1Verdict, b3Verdict, bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
 
 const arg = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const DECK = ['driftwood-isle', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pine-hollow', 'nine-dragon-stack'];
@@ -197,8 +198,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       await page.keyboard.press('KeyH'); await sleep(600);
       const after = await report();
       const footWindow = footRate(before, foot);
-      row.b1 = { budgetMs: Number(row.budgetMs.toFixed(1)), over2x: row.walk.over2x + row.sprint.over2x + row.boost.over2x, over50: row.walk.over50 + row.sprint.over50 + row.boost.over50, p99: Math.max(row.walk.p99, row.sprint.p99, row.boost.p99) };
-      row.b1.ok = row.b1.over2x === 0 && row.b1.over50 === 0 && row.b1.p99 <= 1.25 * row.budgetMs;
+      row.b1 = b1Verdict(engineName, [row.walk, row.sprint, row.boost], row.budgetMs);
       row.b2 = { ...footWindow, perMinute: Number(footWindow.perMinute.toFixed(1)), worst: Number(footWorst.toFixed(3)) };
       row.b2.ok = footWindow.perMinute <= 2 && footWorst <= 0.1;
       // the series keeps the jitter and the phase beside each delay, so a miss names when and why the delay rose

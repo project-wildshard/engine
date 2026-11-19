@@ -44,6 +44,23 @@ export function installBridgeCorrections() {
   fault.ready = true;
 }
 
+/** NET-LAG NL16: why headless WebKit's frame pacing is read on the stand-ins rather than judged here. */
+export const WEBKIT_PACING = 'headless WebKit paces frames without a vsync snap and stamps them in whole ms: an idle page reads p99 19 to 29 ms (Chromium 16.8), a 28 ms GPU frame 28 to 49 ms (NL16); its p99 and 2x-budget frames are read on the iOS Simulator stand-in (NL11, J423), its frames over 50 ms stay judged';
+
+/**
+ * B1: no drawn frame over 2x the budget nor over 50 ms, p99 at most 1.25x the budget. NL16's second branch: in headless
+ * WebKit only the 50 ms line is judged; the p99 and 2x lines are reported with `pacing` saying where they are read.
+ * @param {string} engine
+ * @param {{ over2x: number, over50: number, p99: number }[]} phases
+ * @param {number} budgetMs
+ */
+export function b1Verdict(engine, phases, budgetMs) {
+  const over2x = phases.reduce((sum, phase) => sum + phase.over2x, 0), over50 = phases.reduce((sum, phase) => sum + phase.over50, 0);
+  const p99 = Math.max(...phases.map(phase => phase.p99)), paced = over2x === 0 && p99 <= 1.25 * budgetMs;
+  const row = { budgetMs: Number(budgetMs.toFixed(1)), over2x, over50, p99 };
+  return engine === 'webkit' ? { ...row, pacing: WEBKIT_PACING, ok: over50 === 0 } : { ...row, ok: paced && over50 === 0 };
+}
+
 /**
  * B3: the interpolation delay at most 120 ms from 10 s after entry, and no frame held past the buffer. NET-LAG NL17: B4's
  * forced 60 ms frames hold the page's thread, so frames are stamped late and the delay rises to cover a stall the proof made

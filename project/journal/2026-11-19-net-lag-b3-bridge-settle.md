@@ -14,3 +14,7 @@ The same holds for B2 on the phone: B4's injected 1 m sink settled into the walk
 run at 30 fps on v0.1.49 and v0.1.50, none with no bridge. B2's window now opens once the correction count has held still
 for 2 s after the bridge (at most 10 s). Staging v0.1.50, Driftwood phone Chromium with the bridge, two rounds: B2 0 a
 minute, B3 82 and 83 ms.
+
+NL16's second branch: headless WebKit's frame pacing (no vsync snap, whole-ms stamps; an idle page reads p99 19 to 29 ms)
+cannot meet B1's p99 and 2x lines whatever the game does, so `b1Verdict` judges WebKit on the 50 ms line only and reports
+the other two with the reason. They are read on the iOS Simulator stand-in (NL11, J423). Chromium keeps every line.

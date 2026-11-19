@@ -30,3 +30,12 @@ export function b3Verdict(delays: readonly { t: number; delay: number }[], heldF
   fromSeconds: number;
   ok: boolean;
 };
+export const WEBKIT_PACING: string;
+export function b1Verdict(engine: string, phases: readonly { over2x: number; over50: number; p99: number }[], budgetMs: number): {
+  budgetMs: number;
+  over2x: number;
+  over50: number;
+  p99: number;
+  pacing?: string;
+  ok: boolean;
+};
