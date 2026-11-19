@@ -1276,9 +1276,10 @@ export class Game {
    * S1: link the exterior (road) variants of the roots the boot's entry left for play (`warmEnteredRoots`), nearest first,
    * in live slices spaced by drawn frames, as an entered frame's own roots link (G639: without them the first road frame
    * linked each environment's variant, 150-270 ms each). Roots whose owner has left are dropped. Call once control is up.
-   * Background callers may add an idle opportunity after each required completed draw.
+   * Background callers may add an idle opportunity after each required completed draw. `unpaced` (DW3/DF8, under the
+   * loading card) links them all at once with no drawn-frame spacing.
    */
-  async warmDeferredEntryRoots(current: () => boolean, idle?: () => Promise<boolean>): Promise<void> {
+  async warmDeferredEntryRoots(current: () => boolean, idle?: () => Promise<boolean>, unpaced = false): Promise<void> {
     const pending = this.deferredEntryRoots;
     this.deferredEntryRoots = [];
     const composer = this._composer;
@@ -1293,7 +1294,7 @@ export class Game {
         if (idle !== undefined && !await idle()) throw new Error('Shader warm-up owner left');
       };
       await prepareSceneRoots(this.renderer, this.camera, this.rootScene, composer.inputBuffer, roots, live,
-        pause, LIVE_UPLOAD_BUDGET, false, undefined, undefined, true,
+        unpaced ? undefined : pause, unpaced ? undefined : LIVE_UPLOAD_BUDGET, false, undefined, undefined, true,
         this.camera.getWorldPosition(new THREE.Vector3()));
     }
   }

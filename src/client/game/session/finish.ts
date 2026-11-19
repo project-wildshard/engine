@@ -28,7 +28,7 @@ import { webglRendererName } from '@wildshard/engine/core/slowGpuPacing';
 import { TIER } from '@wildshard/engine/core/tier';
 import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
-import { liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
+import { bootRoadPrograms, liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
 import { textureBytes } from '@wildshard/engine/render/textureBytes';
 import { budgetCollection, collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
@@ -289,7 +289,11 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // frame.
   await loadingStage('worldFrame', async () => {
     game.start(); game.stepFrame();
-    await precompileLevel(game, undefined, { sliceMs: BOOT_SHADER_SLICE_MS, drawnOnly: true, turns: game.warmTurnYaws() });
+    // DW3/DF8: with `debug.bootRoadPrograms` the whole inventory links here, under the card (undrawn materials, families and
+    // the entered roots' road variants), so the first seconds of play link nothing
+    const wholeInventory = bootRoadPrograms();
+    await precompileLevel(game, undefined, { sliceMs: BOOT_SHADER_SLICE_MS, ...wholeInventory ? {} : { drawnOnly: true }, turns: game.warmTurnYaws() });
+    if (wholeInventory) await game.warmDeferredEntryRoots(() => !game.levelScope.disposed && !game.levelScope.disposing, undefined, true);
     game.hiddenFrame();
     bootMark('app:first-game-frame-submitted');
     game.levelScope.raf(() => { bootMark('app:first-game-frame-opportunity'); });

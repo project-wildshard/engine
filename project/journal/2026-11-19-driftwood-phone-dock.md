@@ -15,3 +15,6 @@ DF8: on iOS a program link is a synchronous 77 ms or more, and Driftwood linked 
 the road variants and undrawn materials the boot leaves for later (S1). The slot `debug.bootRoadPrograms` links them in
 the boot's world-frame stage, under the card. On desktop WebKit, control came no later and 25 of those 32 links moved
 before it. It stays off until the phone pairs weigh the longer card against the dock's spikes.
+
+The slot landed separately from the bench: `debug.bootRoadPrograms` in render/precompile.ts, read in session/finish.ts at the
+world-frame stage, with Game.warmDeferredEntryRoots taking an unpaced run for it.
