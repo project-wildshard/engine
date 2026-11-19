@@ -32,6 +32,7 @@ import { floorBelow } from '../../../shared/engine/physics/query';
 import { applyImpulse } from '../../../shared/engine/player/impulse';
 import { shoveHop, startShove, type ShoveState } from '../../../shared/engine/player/shove';
 import { COYOTE_MS } from '../../../shared/engine/player/jump';
+import { GroundCamera } from './CameraFX';
 import { DODGE_COOLDOWN, dashToward, startDash, type DashState, type DodgeState } from '../../../shared/engine/player/dash';
 import type { Physics } from '../../../shared/engine/physics/Physics';
 
@@ -250,6 +251,7 @@ export class Player {
   private stepping = false;
   /** the feet before the last fixed step: update() interpolates the camera between it and `position` */
   private readonly prevFeet = new THREE.Vector3();
+  private readonly groundCamera = new GroundCamera();
   private readonly renderFeet = new THREE.Vector3();
   /** A correction still being glided out (client/net/predictor.ts): added to the camera's feet, never to the feet. */
   readonly renderOffset: THREE.Vector3 = new THREE.Vector3();
@@ -304,7 +306,7 @@ export class Player {
       water: (x, z) => this.waterSurfaceAt(x, z),
       heightAt: (x, z) => this.groundHeightAt(x, z),
       get platforms() { return walkable(); },
-      floor: (x, z, fromY, maxDrop) => floorBelow(this.physics, x, z, fromY, maxDrop, this.motor.collider, this.motor.solidOnly),
+      floor: (x, z, fromY, maxDrop, minNormalY) => floorBelow(this.physics, x, z, fromY, maxDrop, this.motor.collider, this.motor.solidOnly, minNormalY),
       // the open sea: ride the Ocean's own Gerstner swell (DRIFTWOOD-REMASTER W3); the pond keeps its gentle sine bob
       bob: (x, z) => {
         const sea = app.world.water.sea, seconds = this.swellSeconds;
@@ -668,7 +670,8 @@ export class Player {
     this.roll += (rollT - this.roll) * Math.min(1, dt * 5);
     this.pitchLean += (pitchT - this.pitchLean) * Math.min(1, dt * 3);
 
-    this.camera.position.set(feet.x + (bobX + dodgeLead) * cos, feet.y + this.eyeOffset + bobY - this.landImpulse - dodgeDip, feet.z - (bobX + dodgeLead) * sin);
+    const groundY = this.groundCamera.update(feet.y, dt, this.onGround && !hover && !swim && !this.carried, this.motor.opts.step);
+    this.camera.position.set(feet.x + (bobX + dodgeLead) * cos, groundY + this.eyeOffset + bobY - this.landImpulse - dodgeDip, feet.z - (bobX + dodgeLead) * sin);
     this.camera.rotation.set(0, 0, 0, 'YXZ');
     this.camera.rotation.y = this.yaw;
     this.camera.rotation.x = this.pitch + this.pitchLean + dodgePitch;

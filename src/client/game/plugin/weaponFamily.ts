@@ -120,6 +120,7 @@ function rifleMesh(ports: Pick<ItemFamilyPorts, 'view' | 'model' | 'scope'>): Gr
 const FLASH_SECONDS = 0.06;
 /** Frames the page's count may differ from the server's at rest before the server's stands. */
 const APART_FRAMES = 15;
+interface LeverAimPlayer { zoomLook: number; readonly sprinting: boolean }
 /** A lever the page holds, as the shardfile client reads and drives it (TE-ENG2). */
 export interface DeclaredLeverHandle {
   /** Whether this player has taken it off its rack: the server's word on the wire, this page's own off it. */
@@ -128,6 +129,7 @@ export interface DeclaredLeverHandle {
   readonly take: () => void;
   /** The server's owned lines for this lever: rounds in the gun, the reserve, a reload under way, taken. */
   readonly mirror: (rounds: number, reserve: number, reloading: boolean, taken: boolean) => void;
+  readonly bindAimView: (camera: PerspectiveCamera, player: LeverAimPlayer, refit: () => void) => void;
 }
 /**
  * A declared lever-action rifle (TE-ENG2, `kit.lever`): Pine's per-round cycle (`RangedAction.Cycle`) from the row's `firearm` profile,
@@ -146,6 +148,10 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
   private readonly act: InstanceType<typeof RangedAction.Cycle>;
   private readonly flash: Mesh;
   private readonly lever: Object3D | null;
+  private readonly sight: Vector3;
+  private aimView: { camera: PerspectiveCamera; player: LeverAimPlayer; refit: () => void } | undefined;
+  private hip: { fov: number; look: number } | undefined;
+  private sightBlend = 0;
   private flashT = 0; private kick = 0; private apart = 0;
   constructor(row: EquipmentRow, spec: Extract<ItemSpec, { kind: 'weapon' }>, ports: ItemFamilyPorts) {
     const profile: LeverProfile = leverProfile({ id: spec.id, profile: ports.profile });
@@ -154,6 +160,10 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
     this.act = new RangedAction.Cycle(this.store, { magazine: profile.magazine, reload: profile.reload, ...profile.lever });
     this.model = itemMesh(ports); this.setAimSource(ports.aim);
     const muzzle = this.model.getObjectByName('muzzle') ?? this.model;
+    const sight = this.model.getObjectByName('frontSight') ?? muzzle;
+    this.sight = this.model.worldToLocal(sight.getWorldPosition(new Vector3())).applyEuler(this.model.rotation);
+    // Align just above the bore when the mesh has no sight locator.
+    if (sight === muzzle) this.sight.y += 0.03;
     const ball = new SphereGeometry(0.035, 6, 4), glow = new MeshBasicMaterial({ color: 0xffd27a });
     this.flash = new Mesh(ball, glow); this.flash.visible = false; muzzle.add(this.flash);
     this.lever = this.model.getObjectByName('lever') ?? null;
@@ -162,8 +172,42 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
   }
   override install(ctx: EquipContext): void {
     super.install(ctx); ctx.scope.onDispose(() => { this.ports.scope.dispose(); });
+    ctx.scope.onDispose(() => { this.releaseAim(); });
     this.ports.input.bind('attack', () => { this.tryFire(); }, ctx.scope, () => this.enabled);
     this.ports.input.bind('reload', () => { this.reload(); }, ctx.scope, () => this.enabled);
+  }
+  bindAimView(camera: PerspectiveCamera, player: LeverAimPlayer, refit: () => void): void {
+    this.aimView = { camera, player, refit };
+  }
+  override setActive(on: boolean): void {
+    if (!on) this.releaseAim();
+    super.setActive(on);
+  }
+  private releaseAim(): void {
+    const view = this.aimView, hip = this.hip;
+    if (view !== undefined && hip !== undefined) {
+      view.camera.fov = hip.fov; view.camera.updateProjectionMatrix(); view.refit();
+      view.player.zoomLook = hip.look;
+    }
+    this.hip = undefined; this.sightBlend = 0; this.state.ads = false;
+  }
+  private updateAim(dt: number): void {
+    const view = this.aimView;
+    const aimed = this.enabled && this.taken && !this.state.reloading && view?.player.sprinting !== true
+      && (this.adsHeld || this.ports.input.held('aim'));
+    this.state.ads = aimed;
+    const target = Number(aimed);
+    const blend = MathUtils.damp(this.sightBlend, target, 20, dt);
+    this.sightBlend = Math.abs(blend - target) < 0.002 ? target : blend;
+    if (this.sightBlend === 0) { this.releaseAim(); return; }
+    if (view === undefined) return;
+    const hip = this.hip ??= { fov: view.camera.fov, look: view.player.zoomLook };
+    const zoom = 1 + 0.3 * this.sightBlend;
+    const fov = MathUtils.radToDeg(2 * Math.atan(Math.tan(MathUtils.degToRad(hip.fov) / 2) / zoom));
+    if (Math.abs(view.camera.fov - fov) > 0.01) {
+      view.camera.fov = fov; view.camera.updateProjectionMatrix(); view.refit();
+    }
+    view.player.zoomLook = hip.look / zoom;
   }
   take(): void { this.taken = true; this.sync(); }
   tryFire(): void {
@@ -194,15 +238,17 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
     // On the wire the cycle steps once per command sent, so it chambers on the tick the server's does (P1-E6).
     stepActionClock(dt, this.wire, seconds => { for (const event of this.act.events(seconds, false)) if (event === 'reloadEnd') this.onReloadEnd?.(); });
     this.sync();
+    this.updateAim(dt);
     const [x, y, z] = this.ports.view.position, [rx, ry, rz] = this.ports.view.rotation;
     this.kick *= Math.exp(-dt * 14); this.flashT = Math.max(0, this.flashT - dt);
     const throwing = Math.sin(this.act.cycleU * Math.PI), dip = this.act.phase === 'reload' ? 1 : 0;
     this.model.visible = this.taken && (this.enabled || this.holster > 0);
-    this.model.position.set(x, y - throwing * 0.03 - dip * 0.06, z + this.kick * 0.07);
+    const sightX = MathUtils.lerp(x, -this.sight.x, this.sightBlend), sightY = MathUtils.lerp(y, -this.sight.y, this.sightBlend);
+    this.model.position.set(sightX, sightY - throwing * 0.03 - dip * 0.06, z + this.kick * 0.07);
     this.model.rotation.set(rx + this.kick * 0.14, ry, rz + (this.lever === null ? throwing * 0.25 : 0) + dip * 0.45);
     if (this.lever !== null) this.lever.rotation.x = throwing * 0.9;
     this.flash.visible = this.flashT > 0;
-    keepInFrame(this.model, this.ports.view.position);
+    keepInFrame(this.model, [sightX, sightY, z]);
   }
   private sync(): void {
     const s = this.state, { act } = this;

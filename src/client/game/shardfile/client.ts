@@ -688,6 +688,7 @@ export class ShardfileClient {
     // TE-ENG2: a declared lever starts on its rack. On the wire the server takes it and says so in an owned line; with no wire the
     // rack's scene takes it here. Taken, it unlocks and comes to hand.
     const levers = [items.primary, items.secondary, ...items.extras].flatMap(weapon => { const lever = declaredLever(weapon); return lever === null ? [] : [lever]; });
+    for (const lever of levers) lever.bindAimView(world.game.camera, world.player, () => { world.sky.csm.updateFrustums(); });
     const takeHere = (item: string, action: number): boolean => {
       const lever = levers.find(entry => entry.row.id === item); if (lever === undefined) return false;
       if (action === 3) lever.take(); else lever.reload();

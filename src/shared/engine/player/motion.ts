@@ -15,7 +15,7 @@
  */
 import { Vector3 } from 'three';
 import type { LocalMovementCommand } from '../input/commands';
-import type { CharacterMotor } from '../physics/CharacterMotor';
+import { PLAYER_CAPSULE, type CharacterMotor } from '../physics/CharacterMotor';
 import { stepBoard, type BoardPorts, type BoardState, type BoardStepOut } from './board';
 import { DODGE_DIST, DODGE_TIME, dashBlocked, dashToward, dodgeHeading, startDash, startDodge, stepDash, stepDodge, type DashState, type DodgeState } from './dash';
 import { fallStep, groundedVelocity, hardLanding, landingCushion } from './fall';
@@ -28,6 +28,7 @@ import { walkingSpeed, walkVelocity } from './walk';
 
 /** Slopes (on foot, on terrain, never a platform, the water or the board): ground normal y below this (≈ 53°) slides. */
 const SLOPE_SLIDE = 0.6;
+export const WALKABLE_GROUND_Y: number = Math.cos(PLAYER_CAPSULE.maxClimbDeg * Math.PI / 180);
 /** m/s down the fall line while sliding … */
 const SLIDE_SPEED = 3.2;
 /** … reached at this rate (/s). */
@@ -121,7 +122,7 @@ export interface MotionWorld {
   /** floor functions, the bridge for decks that are not colliders; a world without them has none */
   readonly platforms: readonly MotionPlatform[];
   /** the first floor collider below (x, fromY, z) within `maxDrop`, this player's capsule excluded */
-  floor: (x: number, z: number, fromY: number, maxDrop: number) => number | undefined;
+  floor: (x: number, z: number, fromY: number, maxDrop: number, minNormalY?: number) => number | undefined;
   /** the surface's swell over its rest level at (x, z) */
   bob: (x: number, z: number) => number;
   readonly foot: MotionFoot;
@@ -177,14 +178,14 @@ export interface MotionScratch {
 
 /** The highest floor under the feet: the terrain, a floor function they are at or just under, or the first collider
  *  floor within 80 m below the feet + 0.5 m. */
-function groundUnderFeet(s: PlayerMotionState, w: MotionWorld): number {
+function groundUnderFeet(s: PlayerMotionState, w: MotionWorld, minNormalY?: number): number {
   const p = s.position;
   let g = w.heightAt(p.x, p.z);
   for (const platform of w.platforms) {
     const y = platform(p.x, p.z);
     if (y !== undefined && y > g && p.y >= y - 0.5) g = y;
   }
-  const c = w.floor(p.x, p.z, p.y + 0.5, 80);
+  const c = w.floor(p.x, p.z, p.y + 0.5, 80, minNormalY);
   return c !== undefined && c > g ? c : g;
 }
 /** The highest floor function under the feet that they can stand on (at or above it, or ≤ 0.5 m below its top). */
@@ -208,10 +209,22 @@ function motionScratch(s: PlayerMotionState, w: MotionWorld): MotionScratch {
   const out: MotionOut = { mode: 'foot', jumped: false, left: null, board: { lat: 0, fwd: 0, accel: 0, water: null }, entryKeep: 0.3 };
   return { out, ground, want: new Vector3(), heading: { x: 0, z: 0 }, locked: { vx: 0, vz: 0, time: 0, stopAt: 0 }, swimOut: { water: null },
     deep: (x, z) => w.hasWater && deepWater(x, z, s.position.y, w.water(x, z), w.heightAt(x, z), w.platforms, w.floor),
-    boardPorts: { move: (feet, want) => { w.motor.move(feet, want, true); }, ground, water: (x, z) => w.water(x, z),
+    boardPorts: { move: (feet, want) => { w.motor.move(feet, want, true); }, ground: () => groundUnderFeet(s, w, WALKABLE_GROUND_Y),
+      canJump: top => boardGroundSupportsJump(s, w, top), water: (x, z) => w.water(x, z),
       jumped: () => { out.jumped = true; w.jumped(); }, landed: (speed) => { w.boardLanded(speed); } },
     swimPorts: { move: (feet, want) => w.motor.move(feet, want, true), water: (x, z) => w.water(x, z), ground,
       get platforms() { return w.platforms; }, floor: w.floor, bob: (x, z) => w.bob(x, z), leave: () => { leaveSwim(s, w); } } };
+}
+
+function boardGroundSupportsJump(s: PlayerMotionState, w: MotionWorld, height: number): boolean {
+  const { x, y, z } = s.position, platform = platformUnderFeet(s, w);
+  if (platform !== undefined && platform >= height - .05) return true;
+  const floor = w.floor(x, z, y + .5, 80, WALKABLE_GROUND_Y);
+  if (floor !== undefined && floor >= height - .05) return true;
+  const sample = .15;
+  const dx = (w.heightAt(x + sample, z) - w.heightAt(x - sample, z)) / (2 * sample);
+  const dz = (w.heightAt(x, z + sample) - w.heightAt(x, z - sample)) / (2 * sample);
+  return 1 / Math.hypot(1, dx, dz) >= WALKABLE_GROUND_Y;
 }
 
 /** Stop swimming (the swim law's `leave`, or the board): the dive and the haul-out let go. */
@@ -326,9 +339,11 @@ function stepOnFoot(s: PlayerMotionState, cmd: MotionCommand | undefined, w: Mot
   const wadeT = wadeFraction(fall.grounded, footing.depth);
   steerFoot(s, w, run, mx, mz, wadeT, dt);
   // the jump on last step's ground, before the step's gravity
-  jumpClock(s.jump, fall.grounded, dt);
-  if (cmd?.jump === true) {
-    const vy = jumpLaw(s.jump, fall.grounded, velocity.y, foot.coyoteMs, foot.crouching || footing.sliding, jumpSpeed(wadeT));
+  const contact = w.motor.result;
+  const supported = fall.grounded && (footing.onPlatform || (contact.groundCollider !== null && contact.groundNormalY >= WALKABLE_GROUND_Y));
+  jumpClock(s.jump, supported, dt);
+  if (cmd?.jump === true && (!fall.grounded || supported)) {
+    const vy = jumpLaw(s.jump, supported, velocity.y, foot.coyoteMs, foot.crouching || footing.sliding, jumpSpeed(wadeT));
     if (vy !== null) { velocity.y = vy; fall.grounded = false; out.jumped = true; w.jumped(); }
   }
   // gravity first, then the whole move through the motor

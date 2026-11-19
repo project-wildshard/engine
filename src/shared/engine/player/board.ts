@@ -47,6 +47,8 @@ export interface BoardPorts {
   move: (feet: Vec3, want: Vec3) => void;
   /** the highest floor under the feet after the horizontal move: terrain, a platform, a collider floor */
   ground: () => number;
+  /** Whether that floor supports a jump. A repulsor can follow a steep bank but cannot launch from it. */
+  canJump?: (ground: number) => boolean;
   /** the rest water surface at (x, z), or null */
   water: (x: number, z: number) => number | null;
   /** the board jumped this step */
@@ -100,7 +102,9 @@ export function stepBoard(position: Vec3, v: Vec3, impulse: Readonly<Vec3>, want
   const g = Math.max(ports.ground(), ws ?? -Infinity); // the repulsors ride the water surface, not the seabed
   const target = g + HOVER_HEIGHT;
   const err = target - position.y;
-  if (move.jump && state.onGround && !state.hoverAir) { v.y = HOVER_JUMP; state.hoverAir = true; state.onGround = false; ports.jumped(); }
+  if (move.jump && state.onGround && !state.hoverAir && Math.abs(err) < .3 && (ws === g || ports.canJump?.(g) !== false)) {
+    v.y = HOVER_JUMP; state.hoverAir = true; state.onGround = false; ports.jumped();
+  }
   if (state.hoverAir) {
     // ── airborne: the repulsors can't reach the ground — ballistic, a little floaty, until we fall back to the ride height
     v.y -= HOVER_JUMP_GRAVITY * dt;

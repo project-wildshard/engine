@@ -78,6 +78,7 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   kit.enabled = enabled; kit.visible = visible; kit.stowed = false;
   // TE-ENG2: a lever follows the server's owned lines; taken, it unlocks and comes to hand
   const levers = weapons.flatMap(weapon => { const lever = declaredLever(weapon); return lever === null ? [] : [lever]; });
+  for (const lever of levers) lever.bindAimView(camera, player, () => { page.world.sky.csm.updateFrustums(); });
   // TEMPLATE-E2E TC-E4: a melee weapon on a rack follows its owned taken line the same way
   // the server's set exactly (never the loadout primary). A kit with no primary whose first weapon is racked still draws it
   // in hand (a kit cannot lock its first); the server refuses its blows until it is taken

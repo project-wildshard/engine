@@ -357,7 +357,7 @@ export class PlayerSim implements PlayerMotionState {
       water: (x, z) => this.host.water?.surfaceAt(x, z) ?? null,
       heightAt: (x, z) => this.host.heightAt(x, z),
       get platforms() { return floors(); },
-      floor: (x, z, fromY, maxDrop) => floorBelow(this.host.physics, x, z, fromY, maxDrop, this.motor.collider, this.motor.solidOnly),
+      floor: (x, z, fromY, maxDrop, minNormalY) => floorBelow(this.host.physics, x, z, fromY, maxDrop, this.motor.collider, this.motor.solidOnly, minNormalY),
       bob: (x, z) => this.host.water?.bob?.(x, z) ?? pondBob(this.host.clock.now),
       foot: {
         speed: (wadeT) => this.walking.speed * wadeScale(wadeT) * this.moveScale * (this.health.attributes['moveSpeedMul'] ?? 1),

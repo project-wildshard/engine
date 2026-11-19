@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is the author's rows on disk.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { Group } from 'three';
+import { Group, PerspectiveCamera } from 'three';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { Scope } from '../src/shared/engine/app/scope';
 import { ItemRuntime } from '../src/shared/engine/combat/items';
@@ -70,5 +70,42 @@ test('the held lever: locked, a tube on the HUD, presses on the wire, the server
   for (let i = 0; i < 20; i++) { lever.mirror(4, 9, false, true); lever.update(1 / 60, 0); }
   expect(lever.state.ammo).toBe(4);
   expect(lever.state.reserve).toBe(9);
+  scope.dispose();
+});
+
+test.each([
+  ['lever-action', 6, 120],
+  ['scattergun', 4, 25],
+  ['long rifle', 5, 200],
+] as const)('%s aims the viewmodel, narrows the lens and slows look', (name, magazine, range) => {
+  const family = declaredKitItemFamilies().get('kit.lever');
+  if (family?.kind !== 'weapon' || row.profile?.family !== 'firearm') throw new Error('Expected a declared firearm');
+  const scope = new Scope('lever-sights'), camera = new PerspectiveCamera(90, .46), player = { zoomLook: 1, sprinting: false };
+  const equipment: EquipmentRow = { id: row.id, legacySlot: row.id as NonNullable<EquipmentRow['legacySlot']>, ui: { name, icon: 'lever' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'ranged', lockOn: false, melee: false, tracers: false }, meta: { name, icon: 'lever' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The aim view uses no item runtime.
+  const runtime = new ItemRuntime(row, {} as ConstructorParameters<typeof ItemRuntime>[1]);
+  let held = false;
+  const lever = declaredLever(family.create(equipment, row, { scope, runtime, input: { bind: () => undefined, held: () => held },
+    aim: () => ({ origin: { x: 0, y: 1.6, z: 0 }, direction: { x: 0, y: 0, z: -1 } }), view: row.view, profile: { ...row.profile, magazine, range } }));
+  if (lever === null || !(lever.model instanceof Group)) throw new Error('Expected a lever view');
+  const model = lever.model;
+  const advance = (): void => { for (let frame = 0; frame < 30; frame++) lever.update(1 / 60, 0); };
+  lever.take(); lever.setActive(true); lever.bindAimView(camera, player, () => undefined);
+  advance();
+  const hip = model.position.clone();
+  for (const touch of [true, false]) {
+    lever.adsHeld = touch; held = !touch; advance();
+    expect(lever.state.ads).toBe(true);
+    expect(camera.fov).toBeLessThan(90);
+    expect(model.position.x).toBeCloseTo(0);
+    expect(model.position.y).toBeGreaterThan(hip.y);
+    expect(player.zoomLook).toBeLessThan(1);
+    lever.adsHeld = false; held = false; advance();
+    expect(camera.fov).toBeCloseTo(90);
+    expect(model.position.toArray()).toEqual(hip.toArray());
+  }
+  held = true; advance(); lever.setActive(false);
+  expect(camera.fov).toBe(90);
+  expect(player.zoomLook).toBe(1);
   scope.dispose();
 });

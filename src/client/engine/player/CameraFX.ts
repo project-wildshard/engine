@@ -87,3 +87,21 @@ export class CameraFX {
     this.lastX = r.x; this.lastY = r.y; this.lastZ = r.z;
   }
 }
+
+/** Keep step-sized changes out of the camera without moving the physics body. */
+export class GroundCamera {
+  private feet = Number.NaN;
+  private height = Number.NaN;
+
+  update(feet: number, seconds: number, grounded: boolean, maxStep: number): number {
+    const previous = this.feet;
+    this.feet = feet;
+    if (!grounded || !Number.isFinite(previous) || Math.abs(feet - previous) > maxStep) {
+      this.height = feet;
+    } else {
+      this.height += (feet - this.height) * -Math.expm1(-16 * seconds);
+      this.height = Math.min(feet + maxStep, Math.max(feet - maxStep, this.height));
+    }
+    return this.height;
+  }
+}
