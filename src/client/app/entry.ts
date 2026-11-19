@@ -57,7 +57,15 @@ endBootOperation('app:document-and-module-graph');
 bootTiming()?.begin('app:entry-and-session-preparation');
 const entryScope = new Scope('entry');
 const SHADER_SOURCE_CACHE_SLOT = 'debug.cacheShaderSources';
-const shaderSourceCacheEnabled = (): boolean => jsonSlot(SHADER_SOURCE_CACHE_SLOT, 'device').read() === true;
+/** STR35: the device switch, or unset, phone Low (coordinator mini 2026-11-19, QA-FEEDBACK-2026-11-19-mini row 11). `false` keeps
+ *  the old emitter on every boot for one release. */
+async function shaderSourceCacheEnabled(tier: string): Promise<boolean> {
+  const saved: unknown = jsonSlot(SHADER_SOURCE_CACHE_SLOT, 'device').read();
+  if (typeof saved === 'boolean') return saved;
+  if (tier !== 'phone') return false;
+  const { graphicsMode } = await import('@wildshard/engine/core/graphicsMode');
+  return graphicsMode() === 'low';
+}
 let crashResume: CrashResume | null = null;
 let selectedImages: Scope | undefined;
 const task = (): Promise<void> => new Promise((resolve) => { entryScope.timeout(0, resolve); });
@@ -535,7 +543,7 @@ async function startSelected(): Promise<void> {
   const listed = unloadedTitleRow(search.get('chunk'), game.shard);
   const arrival = listed?.shardfile === undefined ? game.shard : listedArrival(game.shard, { slug: listed.slug, name: listed.name, shardfile: listed.shardfile });
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
-  if (shaderSourceCacheEnabled()) await prepareShaderSourceCache(arrival.slug);
+  if (await shaderSourceCacheEnabled(TIER)) await prepareShaderSourceCache(arrival.slug);
   // BUGBASH-LOOP (J385, Jake 2026-11-16): a loading world shows exactly one screen, its own full-screen card. No live menu
   // over it (PZ27b2 put the main menu, then Shard Select, over the world's mounting HUD and shrank this card to a 3 px bar),
   // and never the launch shell (a page that booted a world from the title's address still carries it).

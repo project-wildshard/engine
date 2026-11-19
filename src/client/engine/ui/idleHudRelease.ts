@@ -4,20 +4,25 @@
  * backing each painted (Template at control holds six reward captions and a talk card, about 12 MB of GPU IOSurface [K];
  * the closed counter is a full-screen layer, 12.65 MB; meta engine-memory/gpu-staircase-2026-11-18.md). With the switch
  * on, `html[data-ws-idle-hud]` makes quest.css and shop.css hide each once its fade has ended; showing it makes it
- * visible at once. The device switch `debug.releaseIdleHud` defaults off
- * and is read on phone graphics only; the old path (the card held at opacity 0) stays for one release.
+ * visible at once. The device switch `debug.releaseIdleHud` is read on phone graphics only: unset, it follows phone Low (on in
+ * Low, off in High; coordinator mini 2026-11-19, QA-FEEDBACK-2026-11-19-mini row 11); `false` keeps the old path (the card held at
+ * opacity 0) for one release, `true` forces it on.
  */
 import type { Scope } from '../../../shared/engine/app/scope';
 import { jsonSlot } from '../saves/slots';
+import { graphicsMode } from '../core/graphicsMode';
 
 export const IDLE_HUD_SLOT = 'debug.releaseIdleHud';
 /** The attribute quest.css keys the release on. */
 export const IDLE_HUD_ATTRIBUTE = 'data-ws-idle-hud';
 
-/** Is the release on: a phone, and the device switch set to true. */
+/** Is the release on: a phone, and the device switch set to true, or unset while the phone runs Low graphics. */
 export function idleHudRelease(phone: boolean): boolean {
   if (!phone) return false;
-  try { return jsonSlot(IDLE_HUD_SLOT, 'device').read() === true; } catch { return false; }
+  try {
+    const saved = jsonSlot(IDLE_HUD_SLOT, 'device').read();
+    return typeof saved === 'boolean' ? saved : graphicsMode() === 'low';
+  } catch { return false; }
 }
 
 /** Mark the document while `scope` lives, when the release is on. */

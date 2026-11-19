@@ -4,10 +4,19 @@ import { Scope } from '../../../shared/engine/app/scope';
 import { jsonSlot } from '../saves/slots';
 import { IDLE_HUD_ATTRIBUTE, IDLE_HUD_SLOT, idleHudRelease, installIdleHudRelease } from './idleHudRelease';
 
-afterEach(() => { jsonSlot(IDLE_HUD_SLOT, 'device').write(null); document.documentElement.removeAttribute(IDLE_HUD_ATTRIBUTE); });
+afterEach(() => {
+  jsonSlot(IDLE_HUD_SLOT, 'device').write(null); jsonSlot('graphics', 'device').write(null);
+  document.documentElement.removeAttribute(IDLE_HUD_ATTRIBUTE);
+});
 
-test('the idle HUD release is off by default and off the phone', () => {
+test('the idle HUD release follows phone Low by default, the switch overrides it, and it is off off the phone', () => {
   expect(idleHudRelease(true)).toBe(false);
+  jsonSlot('graphics', 'device').write('low');
+  expect(idleHudRelease(true)).toBe(true);
+  expect(idleHudRelease(false)).toBe(false);
+  jsonSlot(IDLE_HUD_SLOT, 'device').write(false);
+  expect(idleHudRelease(true)).toBe(false);
+  jsonSlot('graphics', 'device').write('high');
   jsonSlot(IDLE_HUD_SLOT, 'device').write(true);
   expect(idleHudRelease(false)).toBe(false);
   expect(idleHudRelease(true)).toBe(true);

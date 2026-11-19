@@ -161,7 +161,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/game/systems/species/view/boar', '@wildshard/engine/game/plugin/weaponFamily']) modules[name] = kit;
   const result: unknown = runInNewContext(stripTypeScriptTypes(`${body}; startSelected();`), {
     runtimePacksOn: () => packs, search: new URLSearchParams('chunk=example'), unloadedTitleRow: () => undefined, dataPointer,
-    shaderSourceCacheEnabled: () => false,
+    shaderSourceCacheEnabled: () => Promise.resolve(false),
     prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, entryScope: {child: () => imageOwner}, selectedImages: undefined, crashResume: null,
     document: {getElementById: (id: string) => authored && id === 'ws-shardfile' ? {} : null, baseURI: 'https://example.invalid/', documentElement: {classList: {remove: noop, contains: () => false}}, querySelector: () => null},
     performance: {measure: noop},

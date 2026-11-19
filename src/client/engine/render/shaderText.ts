@@ -29,6 +29,17 @@ const COUNT = /NUM_SPOT_LIGHT_SHADOWS_WITH_MAPS|NUM_SPOT_LIGHT_SHADOWS|NUM_SPOT_
 const chunks = new Map<string, { raw: string; resolved: string }>();
 const chunkText: Readonly<Record<string, string | undefined>> = THREE.ShaderChunk;
 
+/** STR35: each chunk's source key, kept while the chunk's own text is the same, so a replayed program's chunk check hashes a
+ *  chunk once and not once per request (Pine's warm boot made 231 finishing requests of about 71 chunks each) */
+const chunkKeys = new Map<string, { raw: string; key: string }>();
+function chunkKey(name: string, raw: string): string {
+  const known = chunkKeys.get(name);
+  if (known !== undefined && known.raw === raw) return known.key;
+  const key = sourceKey(raw);
+  chunkKeys.set(name, { raw, key });
+  return key;
+}
+
 /** the chunks (name, raw text) a resolution read, recorded while one program is finished */
 let reads: Map<string, string> | undefined;
 function resolved(name: string): string | undefined {
@@ -84,18 +95,20 @@ export function finishShaderText(shader: ShaderText): void {
   const cacheKey = shaderSourceCacheActive() ? `${sourceKey(vertexRaw)}/${sourceKey(fragmentRaw)}/${counts}` : undefined;
   interface FinishedSource { vertex: string; fragment: string; chunks: [string, string][] }
   const saved = cacheKey === undefined ? undefined : replaySource('finish', cacheKey) as FinishedSource | undefined;
-  if (saved !== undefined && saved.chunks.every(([name, key]) => sourceKey(chunkText[name] ?? '') === key)) {
+  if (saved !== undefined && saved.chunks.every(([name, key]) => chunkKey(name, chunkText[name] ?? '') === key)) {
     shader.vertexShader = saved.vertex;
     shader.fragmentShader = saved.fragment;
-    return;
+    // the replayed text joins the finished texts, so the program's next request is a lookup, as on a boot that emitted it
+    for (const [name] of saved.chunks) read.set(name, chunkText[name] ?? '');
+  } else {
+    reads = read;
+    try {
+      shader.vertexShader = fillCounts(resolveIncludes(vertexRaw), shader);
+      shader.fragmentShader = fillCounts(resolveIncludes(fragmentRaw), shader);
+    } finally { reads = undefined; }
+    if (cacheKey !== undefined) recordSource('finish', cacheKey, { vertex: shader.vertexShader, fragment: shader.fragmentShader,
+      chunks: [...read].map(([name, text]) => [name, chunkKey(name, text)]) });
   }
-  reads = read;
-  try {
-    shader.vertexShader = fillCounts(resolveIncludes(vertexRaw), shader);
-    shader.fragmentShader = fillCounts(resolveIncludes(fragmentRaw), shader);
-  } finally { reads = undefined; }
-  if (cacheKey !== undefined) recordSource('finish', cacheKey, { vertex: shader.vertexShader, fragment: shader.fragmentShader,
-    chunks: [...read].map(([name, text]) => [name, sourceKey(text)]) });
   if (entries >= FINISHED_BOUND) { finished.clear(); entries = 0; }
   let fragments = finished.get(vertexRaw);
   if (fragments === undefined) { fragments = new Map(); finished.set(vertexRaw, fragments); }
@@ -107,4 +120,4 @@ export function finishShaderText(shader: ShaderText): void {
 
 /** MG9: forget every finished program text and resolved chunk (once the boot's programs are built: Pine held 26 finished
  *  fragment shaders, 4.4 MB of strings, through play). A program built later resolves its text again, as the first did. */
-export function forgetShaderText(): void { finished.clear(); entries = 0; chunks.clear(); }
+export function forgetShaderText(): void { finished.clear(); entries = 0; chunks.clear(); chunkKeys.clear(); }
