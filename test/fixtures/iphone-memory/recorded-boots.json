@@ -1,0 +1,16 @@
+{
+  "nine": {
+    "source": "mini-phone-queue/nine-on-1.out, 2026-11-19",
+    "slug": "nine-dragon-stack",
+    "build": "071d16999bf2723f4ff710476c9ed2cc9ad247d5",
+    "controlS": 16.8
+  },
+  "pine": {
+    "source": "meta iphone13/zone-sweep-2026-11-19.md, Pine Hollow",
+    "slug": "pine-hollow",
+    "build": "7c31da66a8b2b3492f8ef1904dde8b6a781daa2f",
+    "stage": "Spawn detail",
+    "progress": "60.6%",
+    "driverError": "no such window"
+  }
+}

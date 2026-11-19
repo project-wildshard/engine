@@ -32,7 +32,7 @@ test('--dry-run prints every command; with no device the script exits 1 and says
   expect(await main(['--dry-run','--seconds=60','--out=tmp/x'],{log:l=>log.push(l)})).toBe(0);
   expect(log).toHaveLength(5);
   expect(log[1]).toContain('developer dvt sysmon process monitor process --filter name=com.apple.WebKit.WebContent');
-  expect(log[1]).toContain('--interval 500 --duration 60');
+  expect(log[1]).toContain('--interval 500 --duration 60000');
   expect(log[3]).toMatch(/syslog live$/u);
   expect(log[4]).toContain('crash pull');
   const none:string[]=[];

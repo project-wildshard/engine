@@ -15,7 +15,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createWriteStream, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 
-const PMD = ['uvx', '--from', 'pymobiledevice3', 'pymobiledevice3'];
+const PMD = ['uvx', '--python', process.env.WS_IPHONE_PYTHON ?? '>=3.11', '--from', 'pymobiledevice3', 'pymobiledevice3'];
 export const PROCESSES = Object.freeze(['com.apple.WebKit.WebContent', 'com.apple.WebKit.GPU']);
 const MB = 1e6;
 
@@ -26,7 +26,7 @@ export function commands(o) {
     list: [...PMD, 'usbmux', 'list'],
     sysmon: PROCESSES.map((name) => [...PMD, 'developer', 'dvt', 'sysmon', 'process', 'monitor', 'process', '--filter', `name=${name}`,
       '--key', 'name', '--key', 'pid', '--key', 'physFootprint', '--choose', 'last', '--keep-monitoring', '--interval', '500',
-      '--duration', String(o.seconds), '--output', join(o.out, `sysmon-${name.split('.').at(-1)}.jsonl`), ...device]),
+      '--duration', String(o.seconds * 1000), '--output', join(o.out, `sysmon-${name.split('.').at(-1)}.jsonl`), ...device]),
     syslog: [...PMD, 'syslog', 'live', ...device],
     crash: [...PMD, 'crash', 'pull', join(o.out, 'crash'), '--match', '^JetsamEvent', ...device],
   };
@@ -34,7 +34,11 @@ export function commands(o) {
 
 /** One sysmon JSON line. @param {string} line */
 export function parseSysmon(line) {
-  try { const o = JSON.parse(line); const bytes = Number(o.physFootprint); return typeof o.name === 'string' && Number.isFinite(bytes) ? { name: o.name, pid: Number(o.pid), physFootprint: bytes } : null; } catch { return null; }
+  try {
+    const o = JSON.parse(line), bytes = Number(o.physFootprint), pid = Number(o.pid);
+    return typeof o.name === 'string' && o.physFootprint !== null && Number.isSafeInteger(bytes) && bytes >= 0 &&
+      Number.isSafeInteger(pid) && pid > 0 ? { name: o.name, pid, physFootprint: bytes } : null;
+  } catch { return null; }
 }
 
 /** A syslog line that names the limit or its crossing, else null. @param {string} line */

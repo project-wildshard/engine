@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!-- Field shapes and units from the same local export. PID replaced for replay. -->
+<trace-query-result>
+  <node>
+    <schema name="activity-monitor-process-live">
+      <col><mnemonic>start</mnemonic></col>
+      <col><mnemonic>process</mnemonic></col>
+      <col><mnemonic>duration</mnemonic></col>
+      <col><mnemonic>pid</mnemonic></col>
+      <col><mnemonic>memory-physical-footprint</mnemonic></col>
+    </schema>
+    <row><start-time id="1">0</start-time><process id="2"><pid id="3">7</pid></process><duration id="7">1298370125</duration><pid ref="3"/><size-in-bytes id="12">419744104</size-in-bytes></row>
+    <row><start-time id="14">1298370125</start-time><process ref="2"/><duration ref="7"/><pid ref="3"/><size-in-bytes ref="12"/></row>
+  </node>
+</trace-query-result>

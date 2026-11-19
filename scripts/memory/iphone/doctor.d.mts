@@ -9,3 +9,4 @@ export function doctor(options?: {
   log?: (line: string) => void;
 }): { udid: string; model: string | null; ios: string | null; safari: string | null;
   batteryPercent: number | null; temperature: { celsius: number; raw: number } | null };
+export function command(program: string, args: string[]): { ok: boolean; output: string };
