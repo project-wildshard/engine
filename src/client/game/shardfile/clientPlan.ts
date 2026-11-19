@@ -465,7 +465,15 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
     for (const row of plan.features) if ((row.kind === 'state.adventure' || row.kind === 'world.meadow') && !product.hasFile(row.file)) throw new Error('World services require their admitted data files');
     for (const row of plan.features) if (row.kind === 'riding.session' && (!product.hasFile(row.file) || !plan.features.some(feature => feature.kind === 'population.wildlife'))) throw new Error('Riding requires its admitted session file and wildlife feature');
     for (const row of plan.features) if (row.kind === 'population.wildlife' && [row.file, row.crowd.json, row.crowd.binary].some(file => !product.hasFile(file))) throw new Error('Wildlife requires its admitted population and crowd files');
-    if(plan.features.some(row=>row.kind==='audio.scene')&&product.shardfile.audio.scene===undefined&&(product.shardfile.audio.sceneFile===undefined||!product.hasFile(product.shardfile.audio.sceneFile)))throw new Error('Audio scene requires its declared profile');
+    if (plan.features.some(row => row.kind === 'audio.scene')) {
+      const { scene, sceneFile, sampledScene } = product.shardfile.audio;
+      if (sampledScene !== undefined) {
+        const hasPoints = Object.values(sampledScene.points).every(row => product.hasFile(typeof row === 'string' ? row : row.file));
+        if (!hasPoints) throw new Error('Sampled audio scene requires its declared placement files');
+      } else if (scene === undefined && (sceneFile === undefined || !product.hasFile(sceneFile))) {
+        throw new Error('Audio scene requires its declared profile');
+      }
+    }
     if(plan.features.some(row=>row.kind==='world.dressing')){const rows=product.section('world/scenes').dressing;if(rows===undefined||!product.hasFile(rows.phone)||!product.hasFile(rows.desktop))throw new Error('Dressing requires both declared tier files');}
     if (plan.features.some(row => row.kind === 'weather.fields' && !product.shardfile.quests.quests.some(quest => quest.id === row.quest))) throw new Error('Weather fields require their declared quest');
     for(const row of plan.features)if(row.kind==='bag.finds'&&(!product.hasFile(row.file)||!product.shardfile.quests.quests.some(quest=>quest.id===row.quest)))throw new Error('Finds require their admitted file and quest');

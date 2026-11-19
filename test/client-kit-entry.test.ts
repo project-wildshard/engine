@@ -79,3 +79,19 @@ test.each(['economy/loot', 'look/hull-book'] as const)('the existing %s owner is
     expect(() => admitClientPlan({ version: 1, features: [...pair, { kind: 'population.product-creatures' }] }, f.ctx.product)).toThrow('admitted legacy owners');
   } finally { f.scope.dispose(); }
 });
+
+test('an ordinary client plan admits sampled audio with its placement files', () => {
+  const base = emptyShardfile({ slug: 'sampled-orchard', name: 'Orchard', author: 'Fixture', revision: 1, seed: 7 });
+  const points = 'world/lanterns.json';
+  const source = { ...base, audio: { ...base.audio, sampledScene: {
+    system: 'orchard.audio', tick: 'orchard.audio.tick', debug: 'orchard.audio.debug', points: { standalone: points, cell: points },
+    loopTap: 'orchard.hum', countLabel: 'lanterns', eye: 1.68, surfaces: {}, fallback: 'rock' as const,
+    step: { id: 'orchard.step', voices: {}, fallback: 'orchard.stone', count: 4, walkGain: 0.7, runGain: 1 }, voices: {}, score: [],
+  } } };
+  const product = (hasPoints: boolean) => createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(),
+    files: new Map(hasPoints ? [[points, { hash: '0'.repeat(64), url: 'https://example.invalid/lanterns.json' }]] : []),
+    read: () => Promise.reject(new Error('Admission reads only declared names')) });
+  const plan = { version: 1, features: [{ kind: 'audio.scene' }] };
+  expect(admitClientPlan(plan, product(true)).features).toEqual(plan.features);
+  expect(() => admitClientPlan(plan, product(false))).toThrow('placement files');
+});

@@ -134,6 +134,8 @@ export async function enterDeclaredAudioPhase(ctx: ShardContext, phase: 'kit' | 
 }
 /** Z1 installs one declared director and its signal subscriptions for the entered owner. */
 export function installClientAudioScene(ctx:ShardContext):void|Promise<void>{
+ // Sampled scenes read the entered audio bank and player before taking their points and loop owners.
+ if(ctx.product.shardfile.audio.sampledScene!==undefined)return;
  const scope=ctx.scope,product=ctx.product,world=ctx.game.runtime?.world;
  if(world===undefined||world===null||scope.disposed||scope.disposing)throw new Error('Audio scene requires an entered world');
  let products=enteredScenes.get(scope);if(products===undefined){products=new WeakMap();enteredScenes.set(scope,products);}
