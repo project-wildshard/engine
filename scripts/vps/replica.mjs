@@ -287,7 +287,7 @@ async function main() {
   // Under the lock with no replica running, a door or folder left by a killed start is stale: it goes first.
   end();
   const host = exec('/usr/bin/tailscale', ['ip', '-4']).stdout?.trim().split('\n')[0] ?? '';
-  if (!/^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$/u.test(host)) stop(`the box has no tailnet address (${host || 'none'}): the replica's door opens only there`);
+  if (!/^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$/u.test(host)) stop(`the box has no tailnet address (${host === '' ? 'none' : host}): the replica's door opens only there`);
 
   const releaseUrl = stagingEnv('RELEASE_URL'), origin = stagingEnv('BUNDLE_ORIGIN');
   if (releaseUrl === undefined || origin === undefined) stop('staging.env names no RELEASE_URL or BUNDLE_ORIGIN');

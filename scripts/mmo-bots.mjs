@@ -38,10 +38,9 @@ import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, ve
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseArgs, promisify } from 'node:util';
+import { parseArgs } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..');
-const runFile = promisify(execFile);
 const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
 // MS7.3: only rooms-staging is a live socket. D7 keeps the health read private on the tailnet.
 const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';
@@ -287,20 +286,27 @@ const code = await new Promise(resolve => {
   let restart = Promise.resolve();
   // E7.4b.c: at this second, the helper either restarts the scratch cluster or arms a restart during a checkpoint.
   const pgRestart = pgRestartAt === undefined ? null : setTimeout(() => {
-    restart = (async () => {
+    restart = new Promise(_resolve => {
       const asked = performance.now();
-      try {
-        const command = 'sudo -n /usr/local/sbin/wildshard-config replica pg-restart' + (pgRestartCheckpoint ? ' --checkpoint' : '');
-        const { stdout } = await runFile('ssh', ['-o', 'BatchMode=yes', BOX, command], { encoding: 'utf8', timeout: 120_000 });
-        if (pgRestartCheckpoint) {
-          const row = JSON.parse(stdout);
-          if (row?.at !== 'scratch.restarted' || row.checkpointInFlight !== true || !Number.isFinite(row.ms)
-            || typeof row.startedAt !== 'string' || !Number.isFinite(Date.parse(row.startedAt))) throw new Error('The helper returned no checkpoint restart witness');
-          checkpointRestart = { startedAt: row.startedAt, ms: row.ms, checkpointInFlight: true };
+      const command = 'sudo -n /usr/local/sbin/wildshard-config replica pg-restart';
+      const remoteCommand = `${command}${pgRestartCheckpoint ? ' --checkpoint' : ''}`;
+      execFile('ssh', ['-o', 'BatchMode=yes', BOX, remoteCommand], { encoding: 'utf8', timeout: 120_000 }, (error, stdout) => {
+        try {
+          if (error !== null) throw error instanceof Error ? error : new Error('Scratch restart command failed');
+          if (pgRestartCheckpoint) {
+            const row = JSON.parse(stdout);
+            if (row?.at !== 'scratch.restarted' || row.checkpointInFlight !== true || !Number.isFinite(row.ms)
+              || typeof row.startedAt !== 'string' || !Number.isFinite(Date.parse(row.startedAt))) throw new Error('The helper returned no checkpoint restart witness');
+            checkpointRestart = { startedAt: row.startedAt, ms: row.ms, checkpointInFlight: true };
+          }
+          note({ step: 'pg-restart', at: pgRestartAt, ms: Math.round(performance.now() - asked), said: stdout.trim() });
+        } catch (failure) {
+          note({ step: 'pg-restart', at: pgRestartAt, error: failure instanceof Error ? failure.message : String(failure) });
+        } finally {
+          _resolve();
         }
-        note({ step: 'pg-restart', at: pgRestartAt, ms: Math.round(performance.now() - asked), said: stdout.trim() });
-      } catch (error) { note({ step: 'pg-restart', at: pgRestartAt, error: error instanceof Error ? error.message : String(error) }); }
-    })();
+      });
+    });
   }, pgRestartAt * 1000);
   child.once('exit', () => { if (pgRestart !== null) clearTimeout(pgRestart); });
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });

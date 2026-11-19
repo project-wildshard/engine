@@ -15,3 +15,6 @@ committed save, then observed one blocked insert at restart. The
 2.417 s restart preserved the committed save, and the next write
 landed. The signed helper still needs to run with two bots on the box
 to verify their positions and save latency.
+
+The driver keeps reading bot output while the restart command runs.
+It waits for the helper's result before writing the report.
