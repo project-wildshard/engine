@@ -34,6 +34,8 @@ export const ENGINE_STRINGS = {
   "s_voice_input_n": "Microphone ⟦0⟧",
   "s_voice_volume": "Voice volume",
   "s_voice_volume_pct": "⟦0⟧%",
+  "s_declared_counter_pct": "⟦0⟧%",
+  "s_declared_counter_count": "⟦0⟧ / ⟦1⟧",
   "s_voice_mode": "Talk",
   "s_voice_mode_toggle": "Press to toggle",
   "s_voice_mode_hold": "Hold to talk",

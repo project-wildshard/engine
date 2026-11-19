@@ -35,6 +35,13 @@ html[data-ws-keyboard] .ws-touch { visibility: hidden; pointer-events: none; }
    STEED ride.css, HIDDEN / GRASS stealth.css), and the tappable tags under the rows (✎ NOTE feedback.css, JOURNAL
    compendium.css). The column is a flex stack ordered by `order` (hudSlots ROW), so nothing is placed by pixel offsets */
 .ws-touch-row { position: relative; display: flex; align-items: center; gap: 7px; width: 170px; height: 22px; padding: 3px 9px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); pointer-events: none; white-space: nowrap; }
+/* a shard's declared counter (declared.ts, QA-FEEDBACK 11-19 row 28): its label, VITALS' thin bar and its value. The
+   native meter only carries the value for assistive tech: iOS paints a visible one as its own blank grey-white bar */
+.ws-declared-counter-label { flex: none; max-width: 78px; overflow: hidden; text-overflow: ellipsis; font-family: var(--ws-mono); font-size: 7.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-declared-counter meter { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); opacity: 0; }
+.ws-declared-counter-bar { position: relative; flex: 1; min-width: 24px; height: 4px; background: rgba(143, 227, 255, 0.14); overflow: hidden; }
+.ws-declared-counter-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.6); transition: width 0.25s ease-out; }
+.ws-declared-counter-value { flex: none; font-family: var(--ws-display); font-weight: 700; font-size: 15px; line-height: 1; color: #fff; font-variant-numeric: tabular-nums; }
 .ws-touch-tag { position: relative; display: none; align-items: center; gap: 7px; margin-top: 4px; padding: 4px 10px 4px 5px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); border-radius: 999px; color: var(--ws-text); font-family: var(--ws-mono); font-size: 8.5px; letter-spacing: 0.22em; text-transform: uppercase; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
 .ws-touch-tag.show { display: flex; }
 .ws-touch-tag::after { content: ''; position: absolute; inset: -8px -4px; }

@@ -3,6 +3,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import type { SystemSpec } from '../app/systems';
 import type { BossDefinition, BossPresentation } from '../../../shared/engine/ai/BossBrain';
 import type { HudVerbs } from '../../../server/engine/level/context';
+import { engineString } from '../../../shared/engine/strings';
 import { BossBar } from './BossBar';
 import type { DiscSpot } from './hudSlots';
 import { icon, type IconId } from './icons';
@@ -58,17 +59,44 @@ export interface DeclaredHudHandles {
   readonly bosses: ReadonlyMap<string, DeclaredBoss>;
 }
 
+/** a drawn counter row: the meter carries the value for assistive tech, the fill and number show it */
+interface CounterRow { readonly el: HTMLMeterElement; readonly field: string; readonly fill: HTMLElement; readonly num: HTMLElement; readonly d: DeclaredCounter; shown: number }
+
+/** QA-FEEDBACK 11-19 row 28: a bare <meter> drew as iOS's own blank grey-white bar, its name only in aria-label. A counter
+ *  is a status row like VITALS: its label, the HUD's thin bar and its value (a percent for a 0-to-1 span, else n / max). */
+function counterRow(d: DeclaredCounter, value: number): { row: HTMLElement; counter: CounterRow } {
+  const row = document.createElement('div'); row.className = 'ws-declared-counter ws-touch-row';
+  const name = document.createElement('span'); name.className = 'ws-declared-counter-label'; name.textContent = d.label;
+  const el = document.createElement('meter'); el.min = d.min; el.max = d.max; el.setAttribute('aria-label', d.label);
+  const bar = document.createElement('span'); bar.className = 'ws-declared-counter-bar'; bar.setAttribute('aria-hidden', 'true');
+  const fill = document.createElement('i'); bar.append(fill);
+  const num = document.createElement('b'); num.className = 'ws-declared-counter-value'; num.setAttribute('aria-hidden', 'true');
+  row.append(name, el, bar, num);
+  const counter: CounterRow = { el, field: d.field, fill, num, d, shown: Number.NaN };
+  paintCounter(counter, value);
+  return { row, counter };
+}
+
+function paintCounter(c: CounterRow, value: number): void {
+  if (value === c.shown) return;
+  c.shown = value; c.el.value = value;
+  const span = c.d.max - c.d.min, part = span > 0 ? Math.min(1, Math.max(0, (value - c.d.min) / span)) : 0;
+  c.fill.style.width = `${String(Math.round(part * 100))}%`;
+  c.num.textContent = span <= 1 ? engineString('s_declared_counter_pct', [Math.round(part * 100)])
+    : engineString('s_declared_counter_count', [Math.round(value), c.d.max]);
+}
+
 /** Draw each declaration on the shared HUD for the scope's life; counters refresh in the late phase. */
 export function mountDeclaredHud(list: readonly DeclaredHud[], ports: DeclaredHudPorts): DeclaredHudHandles {
-  const markers = new Map<string, HTMLElement>(), counters = new Map<string, { el: HTMLMeterElement; field: string }>();
+  const markers = new Map<string, HTMLElement>(), counters = new Map<string, CounterRow>();
   const bosses = new Map<string, DeclaredBoss>();
   for (const d of list) {
     if (d.kind === 'marker') {
       const el = document.createElement('span'); el.textContent = d.label;
       ports.hud.pin(new Vector3(d.at[0], d.at[1], d.at[2]), el); markers.set(d.id, el);
     } else if (d.kind === 'counter') {
-      const el = document.createElement('meter'); el.min = d.min; el.max = d.max; el.value = ports.read(d.field); el.setAttribute('aria-label', d.label);
-      ports.hud.widget(d.band, el, d.order); counters.set(d.id, { el, field: d.field });
+      const { row, counter } = counterRow(d, ports.read(d.field));
+      ports.hud.widget(d.band, row, d.order); counters.set(d.id, counter);
     } else if (d.kind === 'bossPanel') {
       const bar = ports.bossRoot === undefined ? new BossBar() : new BossBar(ports.bossRoot);
       ports.scope.onDispose(() => { bar.scope.dispose(); });
@@ -76,7 +104,7 @@ export function mountDeclaredHud(list: readonly DeclaredHud[], ports: DeclaredHu
     } else ports.hud.relabel(d.spot, d.label, d.icon === null ? '' : icon(d.icon));
   }
   if (counters.size > 0) ports.system({ id: 'engine.declared.counters', phase: 'late', run: () => {
-    for (const { el, field } of counters.values()) { const value = ports.read(field); if (value !== el.value) el.value = value; }
+    for (const counter of counters.values()) paintCounter(counter, ports.read(counter.field));
   } });
   return { markers, counters: new Map([...counters].map(([id, c]) => [id, c.el])), bosses };
 }
