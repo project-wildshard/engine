@@ -41,7 +41,7 @@ concurrency:
 jobs:
   pin:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     env:
       SLUG: ${{ inputs.slug || github.event.client_payload.slug }}
       REVISION: ${{ inputs.revision || github.event.client_payload.revision }}
@@ -57,6 +57,17 @@ jobs:
           node-version-file: package.json
       - name: Move the slug's pin and the staging snapshot
         run: node scripts/pin-shard.ts "$SLUG" "$REVISION" "$HASH" "$CHANNEL"
+      # A Ring 1 slug's server slice is cut from its pinned head: a new head
+      # needs a new slice in the same commit, or `pins.ts install --ring 1`
+      # refuses it ("slice belongs to another head"; main red at dfb768cd0).
+      - name: Does a Ring 1 slice come from this slug
+        id: ring1
+        run: echo "slice=$(node -e 'const r=require("./test/pins/rings.json");console.log((r["1"]?.slices??[]).includes(process.argv[1]))' "$SLUG")" >> "$GITHUB_OUTPUT"
+      - if: steps.ring1.outputs.slice == 'true'
+        uses: ./.github/actions/ring-setup
+      - name: Re-cut the Ring 1 server slices from the new pins
+        if: steps.ring1.outputs.slice == 'true'
+        run: node scripts/pins.ts slice
       - name: Mirror the tarball on the pins release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,8 +105,9 @@ jobs:
           git switch -c "$branch"
           git commit -q -m "test(pins): pin $SLUG rev $REVISION" -m "Meta SHARD-PUBLISH-ACTIONS SP6: $SLUG rev $REVISION (${HASH:0:8}),
           published to $CHANNEL from Actions; shardfiles.json and the pinned
-          document by pin-shard.ts, staging.json by refresh, tarball on pins." \
-            -m 'Assisted-by: shard-pin:workflow' -- test/pins/shardfiles.json test/pins/catalogue.json test/pins/staging.json
+          document by pin-shard.ts, staging.json by refresh, Ring 1's slices by
+          pins.ts slice, tarball on pins." \
+            -m 'Assisted-by: shard-pin:workflow' -- test/pins/shardfiles.json test/pins/catalogue.json test/pins/staging.json test/pins/slices.json
           git push "https://x-access-token:${TOKEN}@github.com/project-wildshard/engine.git" "HEAD:refs/heads/$branch"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
       - name: Name the land steps

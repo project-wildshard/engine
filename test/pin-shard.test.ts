@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import {expect, test} from 'vitest';
 import {movePin} from '../scripts/pin-shard.ts';
 
@@ -18,4 +19,16 @@ test('refuses a slug engine never pinned', () => {
 test('refuses to move a pin backwards', () => {
   const ahead = {...pins, shards: [{slug: 'nine', revision: 5, hash: a, bytes: 1}]};
   expect(() => movePin(ahead, document, {slug: 'nine', revision: 2, hash: b, bytes: 1})).toThrow(/newer than 2/u);
+});
+
+// Main red at dfb768cd0 (2026-11-19): Nalati rev 4's pin kept rev 3's Ring 1 slice row, so `pins.ts install --ring 1`
+// refused it ("slice belongs to another head"). The workflow re-cuts a Ring 1 slice and commits it with the pin.
+test('shard-pin re-cuts a Ring 1 slug\'s server slice and commits it with the pin', () => {
+  const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
+  const cut = flow.indexOf('node scripts/pins.ts slice'), move = flow.indexOf('node scripts/pin-shard.ts'), commit = flow.indexOf('git commit');
+  expect(move).toBeGreaterThan(-1);
+  expect(cut).toBeGreaterThan(move);
+  expect(commit).toBeGreaterThan(cut);
+  expect(flow).toMatch(/rings\.json[\s\S]*slices[\s\S]*node scripts\/pins\.ts slice/u);
+  expect(flow.slice(commit)).toMatch(/-- test\/pins\/shardfiles\.json [^\n]*test\/pins\/slices\.json/u);
 });
