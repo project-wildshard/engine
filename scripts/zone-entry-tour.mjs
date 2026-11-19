@@ -48,7 +48,6 @@ export function zoneEntryTour(cells) {
 /** @typedef {Point & {ride:boolean}} ApproachPoint */
 /** @typedef {readonly [number,number,number]} PortalPoint */
 /** @typedef {{road:{at:PortalPoint},route:readonly PortalPoint[]}} PortalExit */
-/** @typedef {Point & {dx:number,dz:number}} RoadDeck */
 /** @typedef {import('playwright').Page} Page */
 /** @param {Page} page */
 const feet = page => page.evaluate(() => {
@@ -149,7 +148,9 @@ async function portalExits(page, slug) {
   const path = await page.evaluate(slug_ => {
     const bank = JSON.parse(document.getElementById('boot-module-files')?.textContent ?? '{}');
     const home = bank.spawnManifests?.home, baked = home?.shards?.includes(slug_);
-    const base = new URL(baked ? home.base : bank.contentBase || document.baseURI);
+    const content = bank.contentBase;
+    const origin = typeof content === 'string' && content.length > 0 ? content : document.baseURI;
+    const base = new URL(baked ? home.base : origin);
     const loose = baked ? home.loose?.[slug_] : undefined;
     const root = typeof loose === 'string' && /^loose\/[a-f0-9]{64}\/$/u.test(loose) ? new URL(loose, base) : base;
     return new URL(`shardfiles/${encodeURIComponent(slug_)}/sections/world/edge.json`, root).href;
