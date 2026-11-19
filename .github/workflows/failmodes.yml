@@ -46,11 +46,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-        with:
-          pins-cache-scope: full
       - name: Install Chromium on the hosted runner
         run: pnpm exec playwright install chromium
-      - run: pnpm pins
       - run: pnpm exec vitest run test/tooling/failmode-deploy-fixture.test.mjs test/tooling/failmode-results.test.mjs test/failmode-cases.test.ts
       - name: Prepare one exact build
         run: |
