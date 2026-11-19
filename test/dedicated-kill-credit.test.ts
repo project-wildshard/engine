@@ -10,7 +10,7 @@ import type { SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import { questBooks, type QuestBook } from '../src/shared/engine/quest/players';
 import { test as holds } from '../src/shared/engine/world/interact/flags';
 import { directLoopback } from '../src/test/engine/netLoopback';
-import { shippedInput } from './fixtures/dedicatedDoc';
+import { shippedInput, sliceInput } from './fixtures/dedicatedDoc';
 
 const SLUG = 'brasscap-mesa', CAMP = ['bandit.camp-1.1', 'bandit.camp-1.2', 'bandit.camp-1.3'], CLEAR = { all: CAMP.map(id => `dead:${id}`) };
 let clock = 0;
@@ -88,10 +88,11 @@ test('a respawned bandit clears the world\'s death, and the killer keeps its cre
   quit(first);
 });
 
-// The same bug on the Template (opus-brassgun17, staging): a fresh player saw all four Mossgate mosslings already dead.
+// The same bug on the Template (opus-brassgun17, staging): a fresh player saw all four Mossgate mosslings already dead. J434
+// retired the Template product; its mosslings are read from the frozen gameplay slice (TEMPLATE-E2E TR-5).
 test('on the Template, a fresh player sees none of another player\'s mossling kills, on either seat', { timeout: 120_000 }, async () => {
   const PACK = ['mossling:1', 'mossling:2', 'mossling:3', 'mossling:4'], DEAD = PACK.map(id => `dead:${id}`);
-  const room = await DedicatedRoom.boot({ slug: '_template', build: '', bootId: 'kill-credit-template', input: await shippedInput('_template'), now: () => clock, post });
+  const room = await DedicatedRoom.boot({ slug: '_template', build: '', bootId: 'kill-credit-template', input: await sliceInput(), now: () => clock, post });
   rooms.push(room);
   const first = enter(room, 'a'), watcher = enter(room, 'c'); tick(room, 5);
   clearCamp(room, 'a', PACK);

@@ -6,7 +6,8 @@ import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import type {PreparedObserver} from './releaseObserver';
 import {observationInputs} from '../../../scripts/mmo-release-observer-inputs.mjs';
-import {roomBench,serverInput} from './roomBench';
+import {folderInput,roomBench,serverInput} from './roomBench';
+import {GAMEPLAY_SLICE} from '../gameplaySlice';
 import {ReleaseWatch} from '../../../src/server/host/dedicated/releaseFile';
 import {openPglite} from '../pgliteDatabase';
 import {migrate} from '../../../src/server/host/dedicated/saves/migrate';
@@ -22,9 +23,10 @@ export const sourceBuild=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8
 export function releaseObserverFixtures(){
  let connect:PreparedObserver['connect'],prepared:PreparedObserver;
  const catalogue=catalogueDocument();
- const load=(slug:string)=>serverInput(slug==='template'?'_template':slug);
+ // J434 retired the Template product: the native durable control reads its frozen gameplay slice (TEMPLATE-E2E TR-5).
+ const load=(slug:string)=>slug==='template'?folderInput(GAMEPLAY_SLICE):serverInput(slug);
  beforeAll(async()=>{
-  // Keep the durable control on the shipped Template, with an actual instance/slug alias.
+  // Keep the durable control on the Template's native world, with an actual instance/slug alias.
   const template=<T extends {instance:string;slug:string}>(row:T):T=>row.instance==='blender-template'?{...row,slug:'template'}:row;
   installCatalogue({...catalogue,placements:catalogue.placements.map(template),grid:{...catalogue.grid,cells:catalogue.grid.cells.map(template)}});
   prepared=await nativeObserverClient();connect=prepared.connect;

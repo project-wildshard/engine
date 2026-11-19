@@ -7,7 +7,8 @@ import { parseDoc, type PlayerDoc } from '../../src/server/host/dedicated/player
 import type { RoomNews } from '../../src/server/host/dedicated/cellProtocol';
 import { type SaveWrite } from '../../src/server/host/dedicated/saves/saveStore';
 import { directLoopback, type DirectLoopback } from '../../src/test/engine/netLoopback';
-import { serverInput } from './dedicated/roomBench';
+import { folderInput, serverInput } from './dedicated/roomBench';
+import { GAMEPLAY_SLICE } from './gameplaySlice';
 
 // E7.4a: a save leaves a room and comes back on Driftwood's `sealed-ring`, mid-quest with coins and gear, on the lead's seat and on an
 // added one, and across them.
@@ -20,6 +21,12 @@ export const inputs = new Map<string, ReturnType<typeof serverInput>>();
 export function shippedInput(slug: string): ReturnType<typeof serverInput> {
   let found = inputs.get(slug);
   if (found === undefined) { found = serverInput(slug); inputs.set(slug, found); }
+  return found;
+}
+/** TEMPLATE-E2E TR-5: the retired Template's gameplay (grey blob, mosslings, hut) as a room's input, from the frozen slice. */
+export function sliceInput(): ReturnType<typeof serverInput> {
+  let found = inputs.get(GAMEPLAY_SLICE);
+  if (found === undefined) { found = folderInput(GAMEPLAY_SLICE); inputs.set(GAMEPLAY_SLICE, found); }
   return found;
 }
 export const rooms: DedicatedRoom[] = [], writes: SaveWrite[] = [];

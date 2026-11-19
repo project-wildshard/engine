@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { admitDoc } from '../src/server/host/dedicated/playerDoc';
-import { bookOf, enter, post, quit, readBack, rooms, run, shippedInput, stand } from './fixtures/dedicatedDoc';
+import { bookOf, enter, post, quit, readBack, rooms, run, sliceInput, stand } from './fixtures/dedicatedDoc';
 
 // TEMPLATE-E2E TC-SHIP-e2 (opus-te2e7, 2026-11-17): on staging v0.1.34 a Template player who came back found an empty world: the door
 // read "PlayerDoc v1 on _template does not parse" and refused the save as quarantined. The grid cell runs shard `_template` (the
@@ -9,7 +9,7 @@ import { bookOf, enter, post, quit, readBack, rooms, run, shippedInput, stand } 
 // `template`, and a store namespace other than the shard's fails the doc. Goods now go under the room's shard.
 test('a Template player\'s coins save under the cell\'s shard and read back', { timeout: 60_000 }, async () => {
   const boot = async (id: string): Promise<DedicatedRoom> => {
-    const room = await DedicatedRoom.boot({ slug: '_template', cell: 'template-2', build: '', bootId: id, input: await shippedInput('_template'), now: () => 0, post });
+    const room = await DedicatedRoom.boot({ slug: '_template', cell: 'template-2', build: '', bootId: id, input: await sliceInput(), now: () => 0, post });
     rooms.push(room); return room;
   };
   const room = await boot('template-store'), phone = enter(room, 'device:hut');

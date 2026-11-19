@@ -19,8 +19,12 @@ import type { HeadlessRuntimeInput } from '../../../src/server/host/headlessRunt
 import { builtFolder } from '../../../src/test/game/builtFolder';
 
 export async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
-  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
+  return folderInput(builtFolder(slug));
+}
+/** A room's input from a product folder: a built one (`serverInput`) or a frozen slice such as the gameplay slice. */
+export async function folderInput(directory: string): Promise<HeadlessRuntimeInput> {
+  const product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error(`Missing ${directory} output`);
   const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };
