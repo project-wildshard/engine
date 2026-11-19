@@ -5,15 +5,20 @@ export const PHONE_MODEL: PhoneModel;
 export const CHROMIUM_TO_PHONE: Readonly<{ darwin: number; linux: number }>;
 export function chromiumToPhone(platform?: string): number;
 export interface BootProcessTotals { browser: number; renderer: number; gpu: number }
-export interface BootSample { atMs: number; step: string; dump: string | null; heapBytes: number; ledgerGpu?: number | null }
+export interface BootSample {
+  atMs: number; step: string; dump: string | null; heapBytes: number; ledgerGpu?: number | null;
+  ledger?: { ram: Record<string, number>; gpu: Record<string, number>; workers: Record<string, number> } | null;
+}
 export interface BootStepPeak { step: string; peakBytes: number; renderer: number; gpu: number; heapBytes: number }
 export interface BootMemoryVerdict {
   peakBytes: number;
   peak: { renderer: number; gpu: number; browser: number; heapBytes: number; step: string; atMs: number };
   rendererPeak: { bytes: number; step: string; atMs: number };
-  heapPeakBytes: number; steps: BootStepPeak[]; samples: number; factor: number; phoneBytes: number; phoneLowBytes: number; phoneHighBytes: number; budgetBytes: number; pass: boolean;
+  heapPeakBytes: number; steps: BootStepPeak[]; samples: number; factor: number | null; phoneStep: string;
+  phoneBytes: number; phoneLowBytes: number; phoneHighBytes: number; budgetBytes: number; pass: boolean;
 }
 export function processDumps(events: readonly unknown[]): Map<string, BootProcessTotals>;
+export function alignProcessDumps(samples: readonly BootSample[], dumps: Map<string, BootProcessTotals>): Map<string, BootProcessTotals>;
 export function bootMemoryVerdict(samples: readonly BootSample[], dumps: Map<string, BootProcessTotals>, options?: { factor?: number; budgetBytes?: number }): BootMemoryVerdict;
 export function bootMemoryLine(slug: string, verdict: BootMemoryVerdict): string;
 export function bootPageURL(url: string, chunk: string): string;

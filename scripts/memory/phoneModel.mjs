@@ -16,10 +16,10 @@
 //
 // Three readers take the chain from what they have:
 //   - phoneFromWebKit: measured WebKit [K] (scripts/memory/measure.mjs, native WebKit on the Mac);
-//   - phoneFromLedger: only the ledger [L] (CI on ubuntu, the Developer chip, shard-format's estimate, MG6): the
-//     zones' fit of WebKit [K] on the ledger, settled at control, and the measured peak over settled for loading;
-//   - phoneFromChromium: the Chromium renderer [R] peak under the loading card (scripts/boot-memory-peak.mjs), times
-//     the zones' fitted ratio of the phone's loading peak to that renderer peak.
+//   - phoneFromLedger: the ledger [L] (shard CI, the Developer chip, MG6): the fit of WebKit [K] on the ledger.
+//     The chip and the boot probe use observed loading samples directly. A forecast from a settled sample applies the
+//     measured peak-over-settled multiplier.
+//   - phoneFromChromium: the historical ratio for replaying a Chromium renderer [R] peak under the loading card.
 // Each returns {low, central, high} in bytes. The limit is CRASH_LINE (src/client/game/grid/budgetOverlay.ts): ActiveHard
 // 2048 MiB, 2,147 MB decimal. `limitMB` and `limitHighMB` both carry it; the fit keeps two so a disputed line can be bracketed.
 import { readFileSync } from 'node:fs';

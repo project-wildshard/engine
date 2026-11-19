@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { CRASH_LINE, MEMORY_AMBER } from '../src/client/game/grid/budgetOverlay';
-import { CHROMIUM_TO_PHONE, MEMORY_LINE_BYTES, PHONE_MODEL, bootMemoryLine, chromiumToPhone, bootMemoryVerdict, bootPageURL, processDumps } from '../scripts/boot-memory-peak.mjs';
+import { CHROMIUM_TO_PHONE, MEMORY_LINE_BYTES, PHONE_MODEL, alignProcessDumps, bootMemoryLine, chromiumToPhone, bootMemoryVerdict, bootPageURL, processDumps } from '../scripts/boot-memory-peak.mjs';
+import { phoneFromLedger } from '../scripts/memory/phoneModel.mjs';
 
 const name = (pid: number, role: string): unknown => ({ pid, ph: 'M', name: 'process_name', args: { name: role } });
 const dump = (pid: number, id: string, bytes: number): unknown => ({ pid, id, ph: 'v', args: { dumps: { process_totals: { private_footprint_bytes: bytes.toString(16) } } } });
@@ -20,7 +21,7 @@ test('MG1: each dump sums its processes by role; renderers add up', () => {
   expect(dumps.has('c')).toBe(false);
 });
 
-test('MG1: the peak is the largest renderer + GPU dump, named by its loading step; the phone estimate goes red over the line', () => {
+test('MG1: the largest renderer + GPU dump is separate from a historical renderer-only estimate', () => {
   const dumps = new Map([['a', { browser: 50 * MB, renderer: 300 * MB, gpu: 200 * MB }], ['b', { browser: 50 * MB, renderer: 900 * MB, gpu: 700 * MB }],
     ['c', { browser: 50 * MB, renderer: 1200 * MB, gpu: 600 * MB }]]);
   const samples = [{ atMs: 0, step: 'page', dump: null, heapBytes: 1 * MB }, { atMs: 250, step: 'props', dump: 'a', heapBytes: 100 * MB },
@@ -33,7 +34,7 @@ test('MG1: the peak is the largest renderer + GPU dump, named by its loading ste
   // EM11's bar scales with the factor in use
   const bar = PHONE_MODEL.chromium.loadingPerRenderer as { low: number; central: number; high: number };
   expect(red).toMatchObject({ phoneLowBytes: Math.round(1800 * MB * bar.low / bar.central), phoneHighBytes: Math.round(1800 * MB * bar.high / bar.central) });
-  expect(bootMemoryLine('nine', red)).toBe(`BOOT MEMORY nine: RED phone 1800 MB (${(red.phoneLowBytes / MB).toFixed(0)}-${(red.phoneHighBytes / MB).toFixed(0)} MB) / 1500 MB (loading renderer 900 MB at shaders x2.00, EM11); Chromium peak 1800 MB = renderer 1200 MB + GPU 600 MB at ready; JS heap peak 400 MB; 3 dumps`);
+  expect(bootMemoryLine('nine', red)).toBe(`BOOT MEMORY nine: RED phone 1800 MB (${(red.phoneLowBytes / MB).toFixed(0)}-${(red.phoneHighBytes / MB).toFixed(0)} MB) / 1500 MB (loading renderer 900 MB at shaders x2.00, legacy EM11 ratio); Chromium peak 1800 MB = renderer 1200 MB + GPU 600 MB at ready; JS heap peak 400 MB; 3 dumps`);
   expect(bootMemoryVerdict(samples, dumps, { factor: 1.5 })).toMatchObject({ phoneBytes: 1350 * MB, pass: true });
   expect(bootMemoryVerdict(samples, dumps, { factor: 2, budgetBytes: 1800 * MB }).pass).toBe(true);
   // the GPU process does not move the phone estimate (Mac ANGLE Metal read 1.3-4.5 GB on one build)
@@ -41,10 +42,41 @@ test('MG1: the peak is the largest renderer + GPU dump, named by its loading ste
   expect(bootMemoryVerdict(samples, noisy, { factor: 2 }).phoneBytes).toBe(red.phoneBytes);
 });
 
-test('MG2 / EM11: the factor puts staging v0.1.36, which killed Jake\'s iPhone 17 Pro, over the crash line, and over the 1.5 GB refusal', () => {
+test('MG2: a loading ledger uses the live fit and includes worker bytes without multiplying the boot transient', () => {
+  const process = { browser: 50 * MB, renderer: 900 * MB, gpu: 1200 * MB };
+  const dumps = new Map([['report', process]]);
+  const ledger = { ram: { owned: 120 * MB }, workers: { wasm: 30 * MB }, gpu: { texture: 150 * MB } };
+  const first = { atMs: 0, step: 'modules', dump: 'report', heapBytes: 0 };
+  const samples = [
+    { ...first, ledger: { ram: {}, gpu: {}, workers: {} } },
+    { atMs: 5, step: 'shaders', dump: null, heapBytes: 0, ledger },
+    { atMs: 8, step: 'ready', dump: null, heapBytes: 0, ledger: { ...ledger, ram: { owned: 900 * MB } } },
+  ];
+  const range = phoneFromLedger(ledger, PHONE_MODEL);
+  const verdict = bootMemoryVerdict(samples, dumps);
+  expect(verdict).toMatchObject({ factor: null, phoneStep: 'shaders', phoneBytes: Math.round(range.central),
+    phoneLowBytes: Math.round(range.low), phoneHighBytes: Math.round(range.high), pass: true });
+  expect(bootMemoryLine('nine', verdict)).toContain('EM11 ledger at shaders');
+  expect(bootMemoryVerdict(samples, dumps, { budgetBytes: verdict.phoneBytes - 1 }).pass).toBe(false);
+  expect(bootMemoryVerdict(samples, new Map([['report', { ...process, renderer: 2500 * MB, gpu: 50 * MB }]])).phoneBytes).toBe(verdict.phoneBytes);
+  expect(() => bootMemoryVerdict([{ ...first, ledger: null }], dumps)).toThrow('No loading ledger');
+});
+
+test('MG2: the first request joins the first trace dump even when ids start one apart', () => {
+  const a = { browser: 0, renderer: 100 * MB, gpu: 0 }, b = { ...a, renderer: 900 * MB };
+  const samples = [
+    { atMs: 0, step: 'page', dump: '0x1', heapBytes: 0 },
+    { atMs: 5, step: 'loading', dump: null, heapBytes: 0 },
+    { atMs: 8, step: 'shaders', dump: '0x2', heapBytes: 0 },
+  ];
+  expect([...alignProcessDumps(samples, new Map([['0x1', b], ['0x0', a]]))]).toEqual([['0x1', a], ['0x2', b]]);
+  expect(() => alignProcessDumps(samples, new Map([['0x1', b]]))).toThrow('does not match');
+});
+
+test('MG2: the historical factor replays the v0.1.36 crash anchor', () => {
   // mini-memcal 2026-11-17: v0.1.36 + Nine rev 2, Low, at "boot plan complete / compile:after", renderer 1029-1063 MB (GPU 1.7-2.3 GB)
   for (const renderer of [1029, 1061, 1063]) {
-    const verdict = bootMemoryVerdict([{ atMs: 0, step: 'finish', dump: 'a', heapBytes: 0 }], new Map([['a', { browser: 0, renderer: renderer * MB, gpu: 1700 * MB }]]));
+    const verdict = bootMemoryVerdict([{ atMs: 0, step: 'finish', dump: 'a', heapBytes: 0 }], new Map([['a', { browser: 0, renderer: renderer * MB, gpu: 1700 * MB }]]), { factor: chromiumToPhone() });
     expect(verdict.phoneBytes).toBeGreaterThan(CRASH_LINE - 0.06e9); // a floor from one crash: within ~3% of the line at the lowest run
     expect(verdict.pass).toBe(false);
   }

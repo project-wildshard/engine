@@ -8,7 +8,7 @@
 // manager shows, Linux and macOS alike), and CDP Runtime.getHeapUsage reads the JS heap; each sample is named by the loading
 // step that was running (`.ws-load[data-step]`). The peak is the largest renderer + GPU sum in one dump. The page boots
 // with Developer mode on, so an over-budget shard still loads and is measured (MG3's phone refusal spares developers), on Low
-// graphics. The phone estimate is the renderer's peak under the loading card x CHROMIUM_TO_PHONE (see there for why).
+// graphics. The phone estimate applies EM11's live ledger fit to each loading sample, as the Developer memory panel does.
 //
 //   node scripts/boot-memory-peak.mjs --url=<served client> --chunk=<slug> [--out=<file.json>] [--every=250]
 //        [--settle=5] [--timeout=240] [--factor=<chromium to phone>] [--budget-bytes=1500000000] [--entry=url|select]
@@ -16,28 +16,21 @@
 // --entry=select walks in as a player does (title, SHARD SELECT, the shard's card, ENTER WORLD) instead of `?chunk=`:
 // a released page (staging) takes that way in.
 //
-// --budget-bytes exits 1 when the phone estimate (loading renderer peak x --factor) passes it. The line is engine's MEMORY_AMBER (1.5 GB,
-// src/client/game/grid/budgetOverlay.ts); --factor defaults to MG2's calibration for this platform (CHROMIUM_TO_PHONE). A shard repo runs it
-// through `wildshard memory`; engine CI runs it on the Nine preview (`scripts/nine-ring1.mjs memory`).
+// --budget-bytes exits 1 when the central phone estimate exceeds MEMORY_AMBER (1.5 GB).
+// --factor explicitly replays the old renderer-only estimate for historical clients.
+// Shard CI runs this through `wildshard memory`; engine CI uses `scripts/nine-ring1.mjs memory`.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as v from 'valibot';
-import { loadPhoneModel } from './memory/phoneModel.mjs';
+import { loadPhoneModel, phoneFromLedger } from './memory/phoneModel.mjs';
 
-/** Engine's MEMORY_AMBER (src/client/game/grid/budgetOverlay.ts): red over it in CI (J408). Decimal bytes. */
+/** Engine's MEMORY_AMBER loading line in decimal bytes. */
 export const MEMORY_LINE_BYTES = 1.5e9;
 /** ENGINE-MEMORY EM11's phone chain (scripts/memory/phoneModel.mjs, scripts/memory/phone-model.json): what an iPhone 17 Pro's
  * WebContent holds at the loading peak, per byte of Chromium's renderer peak under the loading card, with its error bar. */
 export const PHONE_MODEL = loadPhoneModel();
-/**
- * The phone estimate's factor: the iPhone's WebContent footprint at the loading peak over Chromium's RENDERER peak while
- * the loading card is up. Was a flat 2.0 (mini-memcal, engine 3cd2dd87), the floor one crash put under v0.1.36 Nine. Now
- * EM11's chain, fitted 2026-11-17 on Template, Dunes, Pine and Nine: native WebKit's WebContent plus a share of its GPU
- * process (the share the phone charges to the page, bounded from both sides by where v0.1.36 died on the phone), over
- * this probe's renderer peak on the same build. `PHONE_MODEL.chromium.loadingPerRenderer` holds the low and high ends.
- * The renderer is CPU memory and does not depend on the GPU backend, so Linux takes the same factor.
- */
+/** Historical renderer-only fit, kept for comparing recorded probes. */
 export const CHROMIUM_TO_PHONE = Object.freeze({ darwin: PHONE_MODEL.chromium.loadingPerRenderer.central, linux: PHONE_MODEL.chromium.loadingPerRenderer.central });
 /** The factor for this host. @param {string} [platform] */
 export function chromiumToPhone(platform = process.platform) { return platform === 'darwin' ? CHROMIUM_TO_PHONE.darwin : CHROMIUM_TO_PHONE.linux; }
@@ -47,8 +40,10 @@ const named = v.looseObject({ pid: v.number(), name: v.literal('process_name'), 
 const dump = v.looseObject({ pid: v.number(), id: v.string(), ph: v.literal('v'), args: v.looseObject({ dumps: v.looseObject({
   process_totals: v.looseObject({ private_footprint_bytes: hex }) }) }) });
 const ROLES = /** @type {const} */ ({ Browser: 'browser', Renderer: 'renderer', 'GPU Process': 'gpu' });
+const bytesByKind = v.record(v.string(), v.pipe(v.number(), v.safeInteger(), v.minValue(0)));
+const ledgerCounters = v.object({ ram: bytesByKind, gpu: bytesByKind, workers: bytesByKind });
 
-/** Each memory-infra dump's simultaneous processes summed by role, keyed by the dump id `Tracing.requestMemoryDump` returned.
+/** Each memory-infra dump's simultaneous processes summed by role, keyed by the trace event's id.
  * Chromium's byte counts are hexadecimal; a role a dump omits reads 0.
  * @param {readonly unknown[]} events @returns {Map<string,{browser:number,renderer:number,gpu:number}>} */
 export function processDumps(events) {
@@ -75,16 +70,30 @@ export function processDumps(events) {
 }
 
 /**
- * @typedef {{atMs:number, step:string, dump:string|null, heapBytes:number}} BootSample
+ * @typedef {{atMs:number, step:string, dump:string|null, heapBytes:number, ledgerGpu?:number|null, ledger?:v.InferOutput<typeof ledgerCounters>|null}} BootSample
  * @typedef {{atMs:number, step:string, renderer:number, gpu:number, browser:number, heapBytes:number}} BootReading
  */
+
+/** The trace and request ids can start one apart. Match the same ordinal as measure.mjs does.
+ * @param {readonly BootSample[]} samples @param {ReturnType<typeof processDumps>} dumps */
+export function alignProcessDumps(samples, dumps) {
+  const requests = samples.flatMap(row => row.dump === null ? [] : [row.dump]);
+  const ids = [...dumps.keys()].sort((a, b) => Number.parseInt(a, 16) - Number.parseInt(b, 16));
+  if (requests.length !== ids.length) throw new Error('Chromium memory dump count does not match successful requests');
+  /** @type {ReturnType<typeof processDumps>} */ const aligned = new Map();
+  for (const [index, request] of requests.entries()) {
+    const dump = dumps.get(ids[index]);
+    if (dump !== undefined) aligned.set(request, dump);
+  }
+  return aligned;
+}
 
 /** Join each sample to its dump and name the peak: the largest renderer + GPU sum, the JS heap's own peak, the peak per
  * loading step, and the phone estimate against the line. Refuses a run with no dump that saw a renderer.
  * @param {readonly BootSample[]} samples @param {Map<string,{browser:number,renderer:number,gpu:number}>} dumps
  * @param {{factor?:number, budgetBytes?:number}} [options] */
-export function bootMemoryVerdict(samples, dumps, { factor = chromiumToPhone(), budgetBytes = MEMORY_LINE_BYTES } = {}) {
-  if (!(Number.isFinite(factor) && factor > 0) || !(Number.isFinite(budgetBytes) && budgetBytes > 0)) throw new RangeError('Invalid memory verdict factor or budget');
+export function bootMemoryVerdict(samples, dumps, { factor, budgetBytes = MEMORY_LINE_BYTES } = {}) {
+  if ((factor !== undefined && !(Number.isFinite(factor) && factor > 0)) || !(Number.isFinite(budgetBytes) && budgetBytes > 0)) throw new RangeError('Invalid memory verdict factor or budget');
   /** @type {BootReading[]} */
   const readings = [];
   for (const sample of samples) {
@@ -103,23 +112,41 @@ export function bootMemoryVerdict(samples, dumps, { factor = chromiumToPhone(), 
     if (known === undefined || sum(row) > known.peakBytes) steps.set(row.step, { step: row.step, peakBytes: sum(row), renderer: row.renderer, gpu: row.gpu, heapBytes: Math.max(row.heapBytes, known?.heapBytes ?? 0) });
     else known.heapBytes = Math.max(known.heapBytes, row.heapBytes);
   }
-  // The phone's meter: the renderer under the loading card (the step the phone died in), x the factor. After the card the
-  // renderer keeps growing with GC timing; that window has no phone reading to calibrate against.
   const loading = readings.filter(row => row.step !== 'ready');
   const rendererPeak = (loading.length > 0 ? loading : readings).reduce((best, row) => row.renderer > best.renderer ? row : best);
-  const peakBytes = sum(peak), phoneBytes = Math.round(rendererPeak.renderer * factor);
-  // EM11's error bar: the chain's low and high ends over the renderer, scaled to the factor in use
-  const bar = PHONE_MODEL.chromium.loadingPerRenderer, phoneLowBytes = Math.round(phoneBytes * bar.low / bar.central), phoneHighBytes = Math.round(phoneBytes * bar.high / bar.central);
+  const peakBytes = sum(peak);
+  const { step: phoneStep, low, central, high } = factor === undefined ? ledgerPeak(samples) : {
+    step: rendererPeak.step, central: rendererPeak.renderer * factor,
+    low: rendererPeak.renderer * factor * PHONE_MODEL.chromium.loadingPerRenderer.low / chromiumToPhone(),
+    high: rendererPeak.renderer * factor * PHONE_MODEL.chromium.loadingPerRenderer.high / chromiumToPhone(),
+  };
+  const phoneBytes = Math.round(central), phoneLowBytes = Math.round(low), phoneHighBytes = Math.round(high);
   return { peakBytes, peak: { renderer: peak.renderer, gpu: peak.gpu, browser: peak.browser, heapBytes: peak.heapBytes, step: peak.step, atMs: peak.atMs },
     rendererPeak: { bytes: rendererPeak.renderer, step: rendererPeak.step, atMs: rendererPeak.atMs },
-    heapPeakBytes: heapPeak, steps: [...steps.values()], samples: readings.length, factor, phoneBytes, phoneLowBytes, phoneHighBytes, budgetBytes, pass: phoneBytes <= budgetBytes };
+    heapPeakBytes: heapPeak, steps: [...steps.values()], samples: readings.length, factor: factor ?? null,
+    phoneStep, phoneBytes, phoneLowBytes, phoneHighBytes, budgetBytes, pass: phoneBytes <= budgetBytes };
+}
+
+/** EM11's live fit sees allocations already held at each step. The multiplier for predicting a boot from a settled
+ * ledger would count the transient twice here. Keep the largest central reading and the envelope over all steps.
+ * @param {readonly BootSample[]} samples */
+function ledgerPeak(samples) {
+  const loading = samples.flatMap(({ step, ledger }) => {
+    if (step === 'ready' || ledger == null) return [];
+    return [{ step, ...phoneFromLedger(ledger, PHONE_MODEL) }];
+  });
+  if (loading.length === 0) throw new Error('No loading ledger from the client: the phone estimate was not measured');
+  const peak = loading.reduce((best, row) => row.central > best.central ? row : best);
+  return { ...peak, low: Math.max(...loading.map(row => row.low)), high: Math.max(...loading.map(row => row.high)) };
 }
 
 /** One line a CI log and a receipt can carry. @param {string} slug @param {ReturnType<typeof bootMemoryVerdict>} verdict */
 export function bootMemoryLine(slug, verdict) {
   const mb = (/** @type {number} */ bytes) => `${(bytes / 1e6).toFixed(0)} MB`;
+  const renderer = `loading renderer ${mb(verdict.rendererPeak.bytes)} at ${verdict.rendererPeak.step}`;
+  const method = verdict.factor === null ? `EM11 ledger at ${verdict.phoneStep}; ${renderer}` : `${renderer} x${verdict.factor.toFixed(2)}, legacy EM11 ratio`;
   return `BOOT MEMORY ${slug}: ${verdict.pass ? 'PASS' : 'RED'} phone ${mb(verdict.phoneBytes)} (${(verdict.phoneLowBytes / 1e6).toFixed(0)}-${mb(verdict.phoneHighBytes)}) / ${mb(verdict.budgetBytes)}`
-    + ` (loading renderer ${mb(verdict.rendererPeak.bytes)} at ${verdict.rendererPeak.step} x${verdict.factor.toFixed(2)}, EM11);`
+    + ` (${method});`
     + ` Chromium peak ${mb(verdict.peakBytes)} = renderer ${mb(verdict.peak.renderer)} + GPU ${mb(verdict.peak.gpu)} at ${verdict.peak.step};`
     + ` JS heap peak ${mb(verdict.heapPeakBytes)}; ${verdict.samples} dumps`;
 }
@@ -134,6 +161,8 @@ export function bootPageURL(url, chunk) {
 
 /** In the page before its scripts: the loading card's current step, for the sampler to read. */
 const STEP_PROBE = String.raw`(() => {
+  const readLedger = () => globalThis.__wildshardMemory?.counters?.() ?? null;
+  document.addEventListener('ws:control-ready', () => { window.__bootMemoryControl = readLedger(); }, { once: true });
   window.__bootMemoryStep = () => {
     const root = document.querySelector('.ws-load'); if (!root) return window.__wildshard?.world?.game ? 'ready' : 'page';
     return root.getAttribute('data-step') || root.querySelector('[data-step]')?.getAttribute('data-step') || 'loading';
@@ -180,14 +209,15 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
     const sampler = (async () => {
       while (run.sampling) {
         const tick = Date.now();
-        const [dumped, heap, [step, ledgerGpu]] = await Promise.all([
+        const [dumped, heap, [step, counters]] = await Promise.all([
           tracing.send('Tracing.requestMemoryDump', { levelOfDetail: 'light', deterministic: false }).catch(() => null),
           cdp.send('Runtime.getHeapUsage').catch(() => null),
-          // EM11: the ledger's WebGL bytes beside the step (null on a client older than EM5's counters)
-          page.evaluate(`[window.__bootMemoryStep?.() ?? "page", (() => { try { const c = globalThis.__wildshardMemory?.counters?.(); return c ? Object.values(c.gpu ?? {}).reduce((a, b) => a + b, 0) : null; } catch { return null; } })()]`).catch(() => ['page', null]),
+          page.evaluate(`[window.__bootMemoryStep?.() ?? "page", globalThis.__wildshardMemory?.counters?.() ?? null]`).catch(() => ['page', null]),
         ]);
         const heapBytes = heap === null ? 0 : heap.usedSize + (heap.embedderHeapUsedSize ?? 0) + (heap.backingStorageSize ?? 0);
-        samples.push({ atMs: tick - started, step: String(step), dump: dumped?.success === true ? dumped.dumpGuid : null, heapBytes, ledgerGpu: typeof ledgerGpu === 'number' ? ledgerGpu : null });
+        const ledger = v.safeParse(ledgerCounters, counters);
+        samples.push({ atMs: tick - started, step: String(step), dump: dumped?.success === true ? dumped.dumpGuid : null, heapBytes,
+          ledger: ledger.success ? ledger.output : null, ledgerGpu: ledger.success ? Object.values(ledger.output.gpu).reduce((sum, bytes) => sum + bytes, 0) : null });
         await sleep(Math.max(0, everyMs - (Date.now() - tick)));
       }
     })();
@@ -208,15 +238,24 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
         await page.goto(bootPageURL(url, chunk), { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)));
       }
-      failure = await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null);
+      const completed = await page.evaluate(() => ({
+        error: document.querySelector('#wserr .msg')?.textContent ?? null,
+        ledger: Reflect.get(window, '__bootMemoryControl') ?? Reflect.get(window, '__wildshardMemory')?.counters?.(),
+      }));
+      failure = completed.error;
       ready = failure === null;
-      if (ready) await page.waitForTimeout(settleMs);
+      if (ready) {
+        const ledger = v.safeParse(ledgerCounters, completed.ledger);
+        if (ledger.success) samples.push({ atMs: Date.now() - started, step: 'control', dump: null, heapBytes: 0, ledger: ledger.output });
+        await page.waitForTimeout(settleMs);
+      }
     } finally {
       run.sampling = false; await sampler;
       const ended = new Promise(resolve => { tracing.once('Tracing.tracingComplete', resolve); });
       await tracing.send('Tracing.end'); await ended;
     }
-    return { chunk, url, entry, protocol: 'chromium-phone-boot/1', ready, failure, errors, everyMs, settleMs, elapsedMs: Date.now() - started, samples, dumps: processDumps(events) };
+    samples.sort((a, b) => a.atMs - b.atMs);
+    return { chunk, url, entry, protocol: 'chromium-phone-boot/1', ready, failure, errors, everyMs, settleMs, elapsedMs: Date.now() - started, samples, dumps: alignProcessDumps(samples, processDumps(events)) };
   } finally { await memoryBrowser.close(); }
 }
 
@@ -228,7 +267,10 @@ async function main(argv) {
   const number = (/** @type {string|undefined} */ text, /** @type {number} */ fallback) => text === undefined ? fallback : Number(text);
   const run = await measureBootMemory({ url: args.url, chunk: args.chunk, everyMs: number(args.every, 250), settleMs: number(args.settle, 5) * 1000, timeoutMs: number(args.timeout, 240) * 1000, entry: args.entry === 'select' ? 'select' : 'url' });
   if (!run.ready) throw new Error(`${args.chunk} did not reach its world: ${run.failure ?? 'no error card'}${run.errors.length === 0 ? '' : `; page errors: ${run.errors.slice(0, 3).join(' | ')}`}`);
-  const verdict = bootMemoryVerdict(run.samples, run.dumps, { factor: number(args.factor, chromiumToPhone()), budgetBytes: number(args['budget-bytes'], MEMORY_LINE_BYTES) });
+  const verdict = bootMemoryVerdict(run.samples, run.dumps, {
+    ...(args.factor === undefined ? {} : { factor: Number(args.factor) }),
+    budgetBytes: number(args['budget-bytes'], MEMORY_LINE_BYTES),
+  });
   const line = bootMemoryLine(args.chunk, verdict);
   if (args.out !== undefined) {
     const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true });
