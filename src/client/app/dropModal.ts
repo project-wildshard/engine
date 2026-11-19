@@ -13,7 +13,7 @@ export function reportDrop(drop: Drop, report: typeof captureBrowserError = capt
   try {
     const error = new Error(`${drop.what}: ${drop.reason}`);
     if (drop.stack !== '') error.stack = drop.stack;
-    report(error, { system: 'title-drop', build: drop.build, shard: drop.world, bootStage: drop.step, fatal: true, screen: 'title-drop',
+    report(error, { system: 'title-drop', build: drop.build, shard: drop.world, bootStage: drop.step, fatal: drop.kind !== 'background', screen: 'title-drop',
       diagnostic: { kind: drop.kind, message: drop.message, code: drop.code, end: drop.end, trail: drop.trail, route: drop.routeStack.slice(0, 1500) } });
   } catch { /* telemetry never stops the modal */ }
 }
@@ -25,6 +25,8 @@ const STYLE = `
   #wsdrop .tag::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 10px 1px 0; background: #ffb86b; box-shadow: 0 0 8px #ffb86b; vertical-align: middle; }
   #wsdrop h1 { margin: 0 0 10px; font: 700 21px/1.2 Rajdhani, "JetBrains Mono", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; overflow-wrap: anywhere; }
   #wsdrop .reason { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: #ffb86b; overflow-wrap: anywhere; }
+  #wsdrop[data-kind="background"] .reason { color: #cfe9f3; }
+  #wsdrop[data-kind="background"] .tag::before { background: #8fe3ff; box-shadow: 0 0 8px #8fe3ff; }
   #wsdrop .dev { margin: 0 0 14px; padding: 10px; border: 1px solid rgba(255, 184, 107, 0.35); background: rgba(4, 9, 14, 0.7); }
   #wsdrop .dev b { display: block; margin-bottom: 6px; font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: #ffb86b; font-weight: 400; }
   #wsdrop .dev dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; margin: 0 0 8px; }
@@ -71,7 +73,7 @@ export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev:
   root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', drop.what);
   root.dataset['kind'] = drop.kind;
   const box = make('div', 'box');
-  box.append(make('p', 'tag', drop.kind === 'restart' ? 'Restarted' : 'Back at the title'), make('h1', '', drop.what), make('p', 'reason', drop.reason));
+  box.append(make('p', 'tag', drop.kind === 'background' ? 'Welcome back' : drop.kind === 'restart' ? 'Restarted' : 'Back at the title'), make('h1', '', drop.what), make('p', 'reason', drop.reason));
   if (options.dev) {
     const dev = make('div', 'dev'); dev.append(make('b', '', 'Developer details'));
     const list = make('dl', '');

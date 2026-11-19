@@ -113,6 +113,9 @@ export interface LastEnd {
   /** STAGING-BUGBASH SB8: a fresh page after the player left for another page and came back (the page before ended on screen,
    *  this one came from outside the game). It opens what it was asked to, and the title shows no drop modal. */
   left?: true;
+  /** QA-FEEDBACK 11-19 row 11: an unexpected end of a page that was in the background (an app switch, the lock button): the
+   *  system freeing memory, most often, not the game failing. The title's card for it is calm (dropNotice `background`). */
+  hidden?: true;
 }
 /** Content supplies persistence at explicit reload boundaries, never at ordinary navigation. `settings`: a Settings pick
  *  reloads back into the world where the player stands (SETTINGS-REDESIGN SR12); unlike `reload` it does not return to the title. */
@@ -304,7 +307,8 @@ export class PageLife {
     if (a !== null) {
       if (otherPage !== '') this.pendingPage = otherPage;
       const where = str(a, 'vis') === 'hidden' ? 'in the background' : 'on screen';
-      return { kind: 'unexpected', reason: `page ended unexpectedly ${where} (browser or system cause unknown)`, at: num(a, 't'), resident: str(a, 'resident'), slug: str(a, 'slug'), mode: str(a, 'mode'), build: str(a, 'build'), ...base };
+      return { kind: 'unexpected', reason: `page ended unexpectedly ${where} (browser or system cause unknown)`, at: num(a, 't'), resident: str(a, 'resident'), slug: str(a, 'slug'), mode: str(a, 'mode'), build: str(a, 'build'), ...base,
+        ...(str(a, 'vis') === 'hidden' ? { hidden: true as const } : {}) };
     }
     if (u !== null) return { kind: 'intentional', reason: `${str(u, 'reason')} (${Math.round((now - ut) / 1000)} s before this load)`, at: ut, resident: str(u, 'resident'), slug: str(u, 'slug'), mode: str(u, 'mode'), build: str(u, 'build'), ...base };
     // no word from the game and no crash, on a reload: the player's own (browser button, pull-to-refresh), unless index.html's self-reload claimed it

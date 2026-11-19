@@ -204,3 +204,43 @@ test('a drop shows once: a later page that dies does not bring the old Playing d
   expect(again.drop).toBeNull();
   expect(modal()).toBeNull();
 });
+
+/** the world page goes to the background (an app switch, the lock button) and the system ends it there: no pagehide ran */
+function killedInBackground(t: ReturnType<typeof tab>, world: { life: PageLife; notes: DropNotes }): void {
+  world.notes.markStep({ step: 'Playing' });
+  const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  document.dispatchEvent(new Event('visibilitychange'));
+  hidden.mockRestore();
+  t.session.clear();
+}
+
+test('a page the system ended in the background comes back to a calm card, still reported (QA 11-19 row 11)', () => {
+  const t = tab(), world = enterWorld(t);
+  killedInBackground(t, world);
+  const { drop, end } = title(t, false);
+  expect(end).toMatchObject({ kind: 'unexpected', hidden: true });
+  expect(drop).toMatchObject({ kind: 'background', step: 'Playing' });
+  expect(drop?.what).not.toContain('unexpectedly');
+  expect(modal()?.querySelector('.tag')?.textContent).toBe('Welcome back');
+  expect(modal()?.dataset['kind']).toBe('background');
+});
+
+test("an old page's drop from another build never greets a new session (QA 11-19 row 11: v0.1.43's step shown on v0.1.50)", () => {
+  vi.stubGlobal('__BUILD_ID__', 'e49a1e7dc0e01d2f616a5293a6bcfb272d48ad14');
+  const t = tab(), world = enterWorld(t);
+  killedInBackground(t, world);
+  vi.stubGlobal('__BUILD_ID__', 'fedf7593aa');
+  const { drop } = title(t, false);
+  expect(drop).toBeNull();
+  expect(modal()).toBeNull();
+  vi.unstubAllGlobals();
+});
+
+test("a drop from a page that ended hours ago never greets a new session", () => {
+  const t = tab(), world = enterWorld(t);
+  killedInBackground(t, world);
+  vi.setSystemTime(1_000_000 + 24 * 3_600_000);
+  const { drop } = title(t, false);
+  expect(drop).toBeNull();
+  expect(modal()).toBeNull();
+});

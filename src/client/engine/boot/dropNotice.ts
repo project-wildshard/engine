@@ -35,8 +35,9 @@ export interface DropStep { readonly world: string; readonly name: string; reado
   readonly trail: readonly string[] }
 /** one drop, as the title shows it */
 export interface Drop {
-  /** 'error': code chose to leave and said why; 'restart': the page ended or reloaded with no word from the player */
-  readonly kind: 'error' | 'restart';
+  /** 'error': code chose to leave and said why; 'restart': the page ended or reloaded with no word from the player;
+   *  'background': the system ended the page while it was hidden (QA-FEEDBACK 11-19 row 11), said calmly */
+  readonly kind: 'error' | 'restart' | 'background';
   /** the headline, in plain words: "Couldn't enter Blender Template" */
   readonly what: string;
   /** why, in plain words: "the server closed the connection" */
@@ -83,6 +84,9 @@ export const FORCE_UPDATE_RELOAD = 'required client cache update';
 export const PLAYER_EXITS: readonly string[] = [FORCE_UPDATE_RELOAD, 'exit to main menu', 'exit to title', 'error modal:', 'update at title', 'update tapped',
   'new game', 'save import', 'debug:', 'tier pick', 'doctor', 'load failure reload', 'pause settings', 'settings', 'reload prompt', 'loading wait retry'];
 const TRAIL_MAX = 4;
+/** QA-FEEDBACK 11-19 row 11: a drop older than this, or from another build, is history: Jake's v0.1.50 title showed a
+ *  v0.1.43 page's background end from the day before. A new session is not greeted with it. */
+const DROP_FRESH_MS = 6 * 3_600_000;
 
 /** two worlds that may be the same: an unknown ('') matches either */
 const sameWorld = (a: string, b: string): boolean => a === '' || b === '' || a === b;
@@ -187,6 +191,9 @@ export class DropNotes {
     // SB8: the player left for another page and came back: theirs too
     if (end.left === true) return null;
     const said = end.kind === 'fresh' ? '' : end.reason;
+    // row 11: another build's page, or one that ended hours ago, is not this session's to explain
+    const current = (at: number, built: string): boolean => (built === '' || built === build()) && (at === 0 || this.now() - at < DROP_FRESH_MS);
+    if (pending !== null && !current(time(pending, 'at'), text(pending, 'build'))) return null;
     if (pending !== null && time(pending, 'at') >= time(expected, 't')) {
       return this.once({ kind: 'error', what: text(pending, 'what'), reason: text(pending, 'reason'), step: text(pending, 'step'), world: text(pending, 'world'),
         name: text(pending, 'name'), message: text(pending, 'message'), code: text(pending, 'code'), stack: text(pending, 'stack'), end: said,
@@ -194,11 +201,21 @@ export class DropNotes {
     }
     // the first boot of a visit, and a title after a title: no world page came before it in this tab
     if (step === null) return null;
+    if (!current(step.t, step.build)) return null;
     // the player's token (or, for a call site that says so only in words, its reason)
     if (expected !== null && !unexpected) return null;
     if (end.kind === 'intentional' && PLAYER_EXITS.some((exit) => end.reason.startsWith(exit))) return null;
     const name = first(step.name, step.world), trail = step.trail.join(' → ');
     const via = trail === '' ? '' : ` It was sent here by a redirect: ${trail} → ${name} at ${step.step}.`;
+    // row 11: the system ended the page while it was hidden (an app switch, the lock button): calm words, still reported
+    if (unexpected && end.hidden === true) {
+      return this.once({
+        kind: 'background', what: `Welcome back${name === '' ? '' : ` to ${name}`}`,
+        reason: 'Your phone closed the game while it was in the background, to free memory. Nothing went wrong in the game.',
+        step: step.step, world: step.world, name: step.name, message: step.error, code: '', stack: step.errorStack, end: first(said, step.route),
+        trail, routeStack: step.routeStack, at: step.t, build: step.build,
+      });
+    }
     return this.once({
       kind: 'restart',
       what: unexpected ? 'The game restarted unexpectedly' : 'Unexpectedly back at the title',
