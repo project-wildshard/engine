@@ -68,7 +68,11 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     // CC30b: a volume's break channel goes to 1 as it breaks, so every page reads the break off the actor channels
     const breaks = new Map((body.volumes ?? []).flatMap(row => row.channel === undefined ? [] : [[row.part, (body.channels ?? []).findIndex(channel => channel.name === row.channel)] as const]));
     const onBreak = breaks.size === 0 ? undefined : (part: string): void => { const index = breaks.get(part); if (index !== undefined && index >= 0) actor.channels[index] = 1; };
-    const parts = hp.size === 0 || pose === undefined ? undefined : new PartHealth(pose, hp, actor.combatActor(), host.combat, host.events, host.scope, onBreak);
+    // CC36a: a body that stands again has its parts whole, and each break channel back at its declared start
+    const onWhole = breaks.size === 0 ? undefined : (part: string): void => {
+      const index = breaks.get(part); if (index !== undefined && index >= 0) actor.channels[index] = body.channels?.[index]?.initial ?? 0;
+    };
+    const parts = hp.size === 0 || pose === undefined ? undefined : new PartHealth(pose, hp, actor.combatActor(), host.combat, host.events, host.scope, onBreak, onWhole);
     return [{ actor, pose: parts?.pose ?? pose, parts, trail: pose instanceof TrailCreatureVolumes || pose instanceof TailCreatureVolumes ? pose : undefined,
       locks: body.skeleton === undefined && body.lock === undefined ? undefined : new CreatureSockets(body, joints, root),
       strikes, contract: { id: spawn.id, body, skin: skin.hash, joints, ...(strikes === undefined ? {} : { strikeNames }) } }];

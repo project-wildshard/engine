@@ -21,6 +21,8 @@ export interface CreatureVolumePose {
   capture?: () => CreatureVolumeFrame;
   /** ONE-FORMAT CC23b: a volume that is off now (a serpent's buried segment) is neither hit nor collided with. */
   off?: (index: number) => boolean;
+  /** ONE-FORMAT CC36a: the body stands again (`AnimalSim.revive`), so every part it lost is whole again. */
+  whole?: () => void;
   /** ONE-FORMAT CC23b: a trail body (a serpent) has no walking capsule and no ground follow: moves place it (motor `none`). */
   readonly motorless?: boolean;
 }
