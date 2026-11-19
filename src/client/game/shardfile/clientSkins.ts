@@ -11,8 +11,9 @@
  *   clientSpeciesLooks(rows, recipes, materials, skins);                   // kit stage
  */
 import { macrotask } from '@wildshard/engine/boot/plan';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { buildTier, type Tier } from '@wildshard/engine/core/tier';
-import { InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
+import { BufferAttribute, InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
 import { is } from 'valibot';
 import type { ClipName } from '@wildshard/engine/anim/rig';
 import type { RunningAbility } from '@wildshard/engine/ai/strikes';
@@ -114,6 +115,17 @@ export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' |
   return skins;
 }
 
+/**
+ * ONE-FORMAT OF27b5: a skin material that reads vertex colours (the painterly family's default) over a GLB with no
+ * COLOR_0 needs a white colour channel before its first draw. The family's own draw-time fallback comes too late for a
+ * skin: three has already cached the mesh's buffers without it, and the skin draws black from then on.
+ */
+export function colourForVertexMaterial(geometry: BufferGeometry, material: Material): void {
+  if (!('vertexColors' in material) || !material.vertexColors || geometry.hasAttribute('color')) return;
+  const white = ownedArray(Uint8Array, geometry.getAttribute('position').count * 3, { owner: 'game/skins', asset: 'skin-colour' }).fill(255);
+  geometry.setAttribute('color', new BufferAttribute(white, 3, true));
+}
+
 interface SkinLoadContext { source: Pick<Shardfile, 'look'>; assets: ReadonlyMap<string, Uint8Array>; compile: (entry: unknown) => Material; scope: Scope; lookId: string; attackSpan: number; clipMap?: SkinClipMap }
 async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLookFiles>['skin'], { source, assets, compile, scope, lookId, attackSpan, clipMap }: SkinLoadContext): Promise<ClientSkin> {
     const glb = assets.get(row.file); if (glb === undefined) throw new Error(`skin look ${lookId}: missing admitted skin GLB`);
@@ -125,9 +137,11 @@ async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLoo
       const entry = source.look.materials[id]; if (entry === undefined) throw new Error(`skin look ${lookId}: no look material ${id}`);
       return (): Material => compile(entry);
     });
-    const player = await loadSkin(glb, row, binding, material(), scope, mapped.map(([name]) => name));
+    const drawn = material();
+    const player = await loadSkin(glb, row, binding, drawn, scope, mapped.map(([name]) => name));
     await macrotask(); // the GLB's parse and the clips' sampling a task apart
     const geometry = player.mesh.geometry, joints = player.mesh.skeleton.bones;
+    colourForVertexMaterial(geometry, drawn);
     if (parts.length === 0) { geometry.clearGroups(); geometry.addGroup(0, geometry.index?.count ?? geometry.getAttribute('position').count, 0); }
     // animated limbs and the corpse never leave this (the factory's margin for procedural creatures)
     geometry.computeBoundingSphere(); if (geometry.boundingSphere !== null) geometry.boundingSphere.radius += 0.6;
