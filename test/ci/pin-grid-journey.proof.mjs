@@ -25,7 +25,7 @@ import { runtimeAssets } from "../fixtures/engine-lift/folder.ts";
 
 const limit = 9500;
 void test(
-  "Ring 1 pin grid: spawn walk crosses the real road, returns and reloads in Template",
+  "Ring 1 pin grid: spawn walk crosses the real road, returns and reloads in Brasscap",
   { timeout: limit },
   async () => {
     const started = performance.now();
@@ -72,7 +72,7 @@ void test(
       });
       const book = new LedgerBook();
       server = await StandaloneGrid.boot({
-        slug: "_template",
+        slug: "brasscap-mesa",
         build: "tc7-pins",
         book,
         saves,
@@ -151,29 +151,27 @@ void test(
       const home = server.grid.current(),
         frame = server.assembly.cells.findIndex((cell) => cell.instance === home) + 1;
       assert.ok(home);
-      assert.equal(server.assembly.cell(home).slug, "_template");
+      assert.equal(server.assembly.cell(home).slug, "brasscap-mesa");
       assert.equal(server.restored, undefined);
       const spawn = leadPlayer(server.host).position.clone();
       await until(() => client.latest !== null, 0, 0, 30);
       assert.equal(client.latest.cell, frame);
-      // Walk south around the authored rocks before following the east entryway.
-      await until(() => leadPlayer(server.host).position.z > 25, Math.PI * 0.75, 1, 1000);
-      await until(() => leadPlayer(server.host).position.x > 100, -Math.PI / 2, 1, 8000);
-      await until(() => leadPlayer(server.host).position.z < 1, 0, 1, 2000);
-      await until(() => server.grid.current() === null, -Math.PI / 2, 1, 3000);
+      // Brasscap's spawn has an open line north to its north entryway (0, 250): walk straight out onto the road.
+      await until(() => leadPlayer(server.host).position.z > 100, Math.PI, 1, 8000);
+      await until(() => server.grid.current() === null, Math.PI, 1, 3000);
       await until(() => client.latest?.cell === 0, 0, 0, 30);
       assert.equal(travels.length, 1);
       assert.deepEqual([travels[0].from, travels[0].to], [frame, 0]);
       await until(
-        () => server.grid.worldFeet().x > server.assembly.cell(home).origin.x + 270,
-        -Math.PI / 2,
+        () => server.grid.worldFeet().z > server.assembly.cell(home).origin.z + 270,
+        Math.PI,
         1,
         500,
       );
       assert.ok(leadPlayer(server.host).health.alive);
       assert.ok(leadPlayer(server.host).position.y > -2);
-      await until(() => server.grid.current() === home, Math.PI / 2, 1, 500);
-      await until(() => leadPlayer(server.host).position.x < 240, Math.PI / 2, 1, 500);
+      await until(() => server.grid.current() === home, 0, 1, 500);
+      await until(() => leadPlayer(server.host).position.z < 240, 0, 1, 500);
       await until(() => client.latest?.cell === frame, 0, 0, 30);
       assert.equal(travels.length, 2);
       assert.deepEqual([travels[1].from, travels[1].to], [0, frame]);

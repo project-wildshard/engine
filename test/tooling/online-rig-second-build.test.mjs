@@ -17,7 +17,7 @@ test('a second build: page view ahead of the world, signed retention, and a move
   const { work, dist, next, keyFile, pair, publicHex } = fixture();
   let rig;
   try {
-    rig = await openRig({ port: 0, gridRoot: work, dist, nextDist: next, work: join(work, 'rig'), keyFile, saves: 'memory', shard: '_template', workers: 1 });
+    rig = await openRig({ port: 0, gridRoot: work, dist, nextDist: next, work: join(work, 'rig'), keyFile, saves: 'memory', shard: 'brasscap-mesa', workers: 1 });
     expect([rig.build, rig.nextBuild]).toEqual([A, B]);
     /** @param {string} path */
     const release = async path => {
@@ -80,7 +80,7 @@ test('a rig without a second build refuses to move', async () => {
   const { work, dist, keyFile } = fixture();
   let rig;
   try {
-    rig = await openRig({ port: 0, gridRoot: work, dist, work: join(work, 'rig'), keyFile, saves: 'memory', shard: '_template', workers: 1 });
+    rig = await openRig({ port: 0, gridRoot: work, dist, work: join(work, 'rig'), keyFile, saves: 'memory', shard: 'brasscap-mesa', workers: 1 });
     await expect(rig.move(join(work, 'nowhere'))).rejects.toThrow(/second build/u);
   } finally { await rig?.close(); rmSync(work, { recursive: true, force: true }); }
 }, 120_000);

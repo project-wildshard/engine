@@ -12,7 +12,7 @@ test('main-menu exit replaces the document synchronously without touching the ol
   expect(replace).toHaveBeenCalledExactlyOnceWith('https://wildshard.io/');
 });
 
-test.each(['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack', 'far-reach', 'sunscar-dunes', '_template'])(
+test.each(['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack', 'far-reach', 'sunscar-dunes', 'brasscap-mesa'])(
   '%s exits to the actual root title without a stale shard, mode or fragment', slug => {
     const replace = vi.fn<(url: string) => void>();
     exitSessionToTitle({url: `https://wildshard.io/play?chunk=${slug}&explore=hub#ws-shardfile`, replace});

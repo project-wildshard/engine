@@ -86,7 +86,7 @@ test.each([
   // like the one after Exit to Title (which drops the flags), and both enter the same world and save.
   ['mute=1&nolock=1&sw=0&fps=30', true],
   ['chunk=driftwood-isle&tier=phone&mute=1', false],
-  ['chunk=_template&touch=1&sw=0', false],
+  ['chunk=brasscap-mesa&touch=1&sw=0', false],
   ['explore=hub&mute=1', false],
 ])('environment flags on %s preserve the selected title route %s', (query, titleOnly) => {
   expect(bootRoute(new URLSearchParams(query), { line: '', level: '' })).toEqual({ rescue: false, titleOnly });

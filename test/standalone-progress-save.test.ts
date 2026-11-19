@@ -15,6 +15,7 @@ import { builtFolder } from '../src/test/game/builtFolder';
 
 // TE-ENG8: a solo server saves as progress moves, so a page reloaded a moment later keeps it. Nothing here asks for a save:
 // the page's 30 s timer never runs, and a reload ends the worker before a save the page asks for on leaving comes back.
+const BRASSCAP = 'brasscap-mesa';
 class PageStorage implements SaveStorage {
   readonly items = new Map<string, string>();
   /** Writes of every document, and of a world's continuation (its two slots). */
@@ -78,22 +79,22 @@ async function open(slug: string, storage: PageStorage, input: HeadlessRuntimeIn
   return shell;
 }
 
-test('an opened door (a public field) saves within a second of simulation, with no save asked for, and a reload keeps it', async () => {
-  const input = await product('_template'), storage = new PageStorage();
-  const first = await open('_template', storage, input), door = (shell: StandaloneShell): number | undefined => shell.client.latest === null ? undefined : shell.client.stateField(shell.client.latest, 'template.door.open');
+test('an opened gate (a public field) saves within a second of simulation, with no save asked for, and a reload keeps it', async () => {
+  const input = await product(BRASSCAP), storage = new PageStorage();
+  const first = await open(BRASSCAP, storage, input), door = (shell: StandaloneShell): number | undefined => shell.client.latest === null ? undefined : shell.client.stateField(shell.client.latest, 'brasscap.gate.open');
   expect(door(first)).toBe(0);
-  // A data shard's world has no headless resident to stand a save in: the harness stands the player at the hut door
-  // (rev 5's door prompt is at (-4, -11.5), on the hut's south wall)
-  first.place(-4, 0, -9.5, Math.PI);
+  // A data shard's world has no headless resident to stand a save in: the harness stands the player at the canyon gate
+  // (J434: its use, `brasscap.gate.use`, is radius 2 at (2, -61.5))
+  first.place(2, 0, -60, Math.PI);
   // Settle the boot's own writes, then take what the page holds as the line
   await sleep(1000);
   const before = storage.continued;
-  first.client.act({ kind: 'interact', seq: 1, id: 'template.door.use' });
+  first.client.act({ kind: 'interact', seq: 1, id: 'brasscap.gate.use' });
   await until(() => door(first) === 1);
   await expectPromptSave(storage, before);
   first.dispose(); // the reload: the worker ends with no save of its own
 
-  const second = await open('_template', storage, input);
+  const second = await open(BRASSCAP, storage, input);
   expect(door(second)).toBe(1);
   second.dispose();
 }, 40_000);
@@ -114,8 +115,8 @@ test('a quest step (a flag) saves within a second of simulation, and a reload ke
 }, 40_000);
 
 test('an idle world writes nothing between the page\'s own saves', async () => {
-  const input = await product('_template'), storage = new PageStorage();
-  const shell = await open('_template', storage, input);
+  const input = await product(BRASSCAP), storage = new PageStorage();
+  const shell = await open(BRASSCAP, storage, input);
   await sleep(1000);
   const before = storage.writes;
   await sleep(2000);

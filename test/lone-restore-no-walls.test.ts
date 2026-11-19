@@ -19,7 +19,7 @@ const walls = (physics: Physics): number => {
   physics.world.forEachCollider(c => { const h = c.halfExtents(), at = c.translation(); if (h !== null && isChunkEdgeWall([at.x, at.y, at.z], [h.x, h.y, h.z], c.rotation().w)) n++; });
   return n;
 };
-test.each(['driftwood-isle', '_template'])('a lone %s restored from a save with edge walls stands without them', { timeout: 120_000 }, async slug => {
+test.each(['driftwood-isle', 'brasscap-mesa'])('a lone %s restored from a save with edge walls stands without them', { timeout: 120_000 }, async slug => {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const input = { shard, product, assets: runtimeAssets(product, directory), rapier }, options = () => ({ saves: new SaveStore({ local: null, session: null }), lone: true, wholeSolids: true, pageless: true });

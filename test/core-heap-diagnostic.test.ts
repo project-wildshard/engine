@@ -6,7 +6,7 @@ import { expect, test } from 'vitest';
 import { captureCoreHeap, coreHeapProtocol, coreHeapRequested } from '../scripts/core-heap-diagnostic.mjs';
 import { coreMemorySummary } from '../scripts/shard-phone-memory.mjs';
 
-const target = '_template', href = 'http://127.0.0.1:4400/?sw=0&chunk=_template';
+const target = 'brasscap-mesa', href = 'http://127.0.0.1:4400/?sw=0&chunk=brasscap-mesa';
 const samples = [10, 60, 120].map(second => ({phase: `${second}s`, rendererBytes: 100, gpuBytes: 1}));
 const raw = JSON.stringify({ version: 3, nodes: [1, 100, 0, 0, 2, 200, 1, 0, 3, 40, 0, 0], nodeClassNames: ['Object', 'ArrayBuffer'] });
 function fixture() {
@@ -34,7 +34,7 @@ test('heap mode is explicit, pinned and limited to one original cold Template', 
 test('seals native samples before snapshot and retains exact raw bytes before summarizing', async () => {
   const f = fixture(), result = await captureCoreHeap(f.driver, target, 'tmp/owned-core-heap', samples, f.write);
   expect(f.calls).toEqual(['fence', 'Heap.enable', 'Heap.snapshot', 'write', 'fence', 'Heap.disable']);
-  expect(f.writes.get('tmp/owned-core-heap/_template-heap.json')).toBe(raw);
+  expect(f.writes.get('tmp/owned-core-heap/brasscap-mesa-heap.json')).toBe(raw);
   expect(result).toMatchObject({protocol: coreHeapProtocol, qualifying: false, mayCollect: true, before: href, after: href,
     snapshot: {bytes: Buffer.byteLength(raw), sha256: createHash('sha256').update(raw).digest('hex'),
       summary: {version: 3, nodes: 3, estimatedBytes: 340, classes: [
@@ -69,7 +69,7 @@ test('malformed heaps keep raw evidence and an unknown summary', async () => {
   const f = fixture();
   f.driver.send = method => { f.calls.push(method); return Promise.resolve({snapshotData: 'bad json'}); };
   const result = await captureCoreHeap(f.driver, target, 'tmp/owned-core-heap', samples, f.write);
-  expect(f.writes.get('tmp/owned-core-heap/_template-heap.json')).toBe('bad json');
+  expect(f.writes.get('tmp/owned-core-heap/brasscap-mesa-heap.json')).toBe('bad json');
   expect(result.snapshot?.summary).toBeNull(); expect(result.errors).toHaveLength(1);
   expect(f.calls.at(-1)).toBe('Heap.disable');
 });
@@ -96,7 +96,7 @@ test('a heap diagnostic cannot pass the unchanged native qualification', () => {
 test('the actual reader refuses heap mode before touching a fake Simulator', () => {
   for (const flags of [
     ['--core-memory=templates', `--rev=${'a'.repeat(40)}`],
-    ['--core-memory=_template', '--rev=HEAD'],
+    ['--core-memory=brasscap-mesa', '--rev=HEAD'],
   ]) {
     const result = spawnSync(process.execPath, ['scripts/sim-grid-entry.mjs', '--core-heap=1', ...flags],
       {env: {...process.env, SIM_UDID: 'no-such-core-heap-device'}, encoding: 'utf8', timeout: 10000});
@@ -114,7 +114,7 @@ test('foreign snapshot layouts retain raw bytes but refuse Inspector estimates',
       nodeClassNames: Array.from({length: 33}, (_, i) => `Class${i}`)});
     f.driver.send = method => { f.calls.push(method); return Promise.resolve({snapshotData: text}); };
     const result = await captureCoreHeap(f.driver, target, 'tmp/owned-core-heap', samples, f.write);
-    expect(f.writes.get('tmp/owned-core-heap/_template-heap.json')).toBe(text);
+    expect(f.writes.get('tmp/owned-core-heap/brasscap-mesa-heap.json')).toBe(text);
     expect(result.snapshot?.summary).toBeNull();
     expect(result.errors).toEqual([expect.stringContaining('Unsupported WebKit heap snapshot')]);
     expect(f.calls.at(-1)).toBe('Heap.disable');

@@ -42,15 +42,15 @@ test('the worker refuses non-file prepare URLs and modules without the prepare e
 });
 
 test('the exported session reads a consumer output and refuses corrupt admitted bytes',async()=>{
-  const root=process.cwd(),product=builtFolder('_template'),prepare=new URL('./fixtures/headless/nativeRuntime.ts',import.meta.url);
+  const root=process.cwd(),product=builtFolder('brasscap-mesa'),prepare=new URL('./fixtures/headless/nativeRuntime.ts',import.meta.url);
   mkdirSync('tmp/codex-tc48',{recursive:true});
   const consumer=mkdtempSync(resolve('tmp/codex-tc48/consumer-'));
   let sim:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
   try{
-    mkdirSync(resolve(consumer,'out'));symlinkSync(product,resolve(consumer,'out/_template'),'dir');
+    mkdirSync(resolve(consumer,'out'));symlinkSync(product,resolve(consumer,'out/brasscap-mesa'),'dir');
     process.chdir(consumer);
-    expect(builtFolder('_template')).toBe(resolve(consumer,'out/_template'));
-    const session=await beginFolderSession('_template',{prepare});
+    expect(builtFolder('brasscap-mesa')).toBe(resolve(consumer,'out/brasscap-mesa'));
+    const session=await beginFolderSession('brasscap-mesa',{prepare});
     sim=await session.ready();
     expect((await sim.step([])).tick).toBe(1);
     const file=session.product.shardfile.files.find(row=>(session.assets.get(row.hash)?.length??0)>0);
