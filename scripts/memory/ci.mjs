@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { serve } from '../parity/serve.mjs';
-import { armedMemory, comparePhoneFootprint, footprintBootFor, footprintLines, guardZone, judgeFootprint, ledgerZones, phoneFootprint } from './armed.mjs';
+import { armedMemory, CONTROL_ZONE, comparePhoneFootprint, footprintBootFor, footprintLines, guardZone, judgeFootprint, ledgerZones, phoneFootprint } from './armed.mjs';
 import { loadPhoneModel } from './phoneModel.mjs';
 import { compareLedger, footprintBoot, footprintBudget, footprintInstrument, ledgerBudget } from './ratchet.mjs';
 import { checkLedger, checkReads, judgeReads, ledgerFailure, reportLedger, zoneContentKey } from './ledgerVerdict.mjs';
@@ -73,7 +73,7 @@ try {
     ? new Set(get(join(root, 'dist', 'catalogue.json')).grid.cells.map((/** @type {{slug:string}} */ cell) => cell.slug))
     : new Set();
   let readings = mode === 'footprint'
-    ? [...new Set(['_template', ...policy.zones])]
+    ? [...new Set([CONTROL_ZONE, ...policy.zones])]
     : ['nine-dragon-stack'];
   if (mode === 'ledger') {
     const catalogue = get('test/pins/catalogue.json');
@@ -84,24 +84,24 @@ try {
     const available = built.filter(zone => zone !== 'nine-dragon-stack');
     const selection = process.env.WS_LEDGER_RECORD_ZONES?.trim();
     const requested = selection ? [...new Set(selection.split(',').map(zone => zone.trim()))] : available;
-    if (selection && (!record || !requested.includes('_template'))) throw new Error('Partial ledger recording requires _template');
+    if (selection && (!record || !requested.includes(CONTROL_ZONE))) throw new Error(`Partial ledger recording requires ${CONTROL_ZONE}`);
     readings = ledgerZones(available, policy.zones, requested);
   }
   const model = mode === 'ledger' ? null : loadPhoneModel();
   let standaloneTemplate = 'unavailable';
   if (mode === 'footprint') await guardZone('standalone Template preview', new Set(), async () => {
-    const file = join(directory, 'measure-_template-standalone.json');
-    await measure([`--url=${preview.url}`, '--chunk=_template', '--timeout=180', '--runs=5', '--instrument=minimal', `--out=${file}`]);
-    const runs = nativeRuns(measurement(file, '_template'), 5);
-    const footprint = phoneFootprint('_template', runs, model, 'standalone');
+    const file = join(directory, `measure-${CONTROL_ZONE}-standalone.json`);
+    await measure([`--url=${preview.url}`, `--chunk=${CONTROL_ZONE}`, '--timeout=180', '--runs=5', '--instrument=minimal', `--out=${file}`]);
+    const runs = nativeRuns(measurement(file, CONTROL_ZONE), 5);
+    const footprint = phoneFootprint(CONTROL_ZONE, runs, model, 'standalone');
     standaloneTemplate = `${footprintBudget(runs.map(run => run.settled.webcontent)).settled} B`;
-    console.log(`Template standalone preview settled WebContent [K] ${standaloneTemplate}`);
+    console.log(`Control standalone preview settled WebContent [K] ${standaloneTemplate}`);
     const target = comparePhoneFootprint(footprint, lines);
-    if (target !== null) console.log(`_template standalone: ${target}`);
+    if (target !== null) console.log(`${CONTROL_ZONE} standalone: ${target}`);
   }, console.log);
   for (const chunk of readings) await guardZone(chunk, policy.zones, async () => {
     if (!built.includes(chunk)) throw new Error('Prepared preview does not contain the zone');
-    const onlineBaseline = mode === 'webkit-ledger' || (mode === 'footprint' && chunk === '_template');
+    const onlineBaseline = mode === 'webkit-ledger' || (mode === 'footprint' && chunk === CONTROL_ZONE);
     const boot = onlineBaseline ? 'online' : footprintBootFor(chunk, policy.zones, placed);
     const host = boot === 'online'
       ? ['--online', `--dist=${absolute(root, 'dist')}`, `--scratch=${join(directory, 'online')}`]
@@ -115,19 +115,20 @@ try {
       return measurement(file, chunk);
     }
 
-    if (mode === 'footprint' && chunk === '_template') {
+    if (mode === 'footprint' && chunk === CONTROL_ZONE) {
       const data = await capture(3), runs = nativeRuns(data, 3);
       footprintInstrument([data], baseline);
       footprintBoot([data], baseline);
       const settled = runs.map(run => run.settled.webcontent);
-      const comparison = `Template settled WebContent [K] online ${footprintBudget(settled).settled} B, standalone preview ${standaloneTemplate}`;
+      const comparison = `Control (${CONTROL_ZONE}) settled WebContent [K] online ${footprintBudget(settled).settled} B, standalone preview ${standaloneTemplate}`;
       console.log(comparison);
       if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${comparison}\n\n`);
-      const rows = [judgeReads(budgets, 'footprint/_template/settled', settled, zoneContentKey(chunk, pins))];
+      const rows = [judgeReads(budgets, `footprint/${CONTROL_ZONE}/settled`, settled, zoneContentKey(chunk, pins))];
       budgetRows.push(...rows);
       const failure = ledgerFailure(rows);
       if (failure !== null) ledgerFailures.push(failure);
-      return;
+      // The control is an armed zone too (Brasscap, J434): its own footprint lines are judged below as well.
+      if (!policy.zones.has(chunk)) return;
     }
 
     if (mode === 'footprint') {
@@ -190,21 +191,21 @@ try {
   if (record && mode !== 'footprint') {
     const outputFile = join(directory, `${mode}-ratchet.json`);
     writeFileSync(outputFile, `${JSON.stringify({ ...baseline, zones: { ...baseline.zones, ...recorded } }, null, 2)}\n`);
-    if (mode === 'ledger' && record) await guardZone('_template', policy.zones, async () => {
-      const controlAnchor = get(outputFile).zones._template;
-      if (!controlAnchor) throw new Error('No Template ledger for the negative control');
+    if (mode === 'ledger' && record) await guardZone(CONTROL_ZONE, policy.zones, async () => {
+      const controlAnchor = get(outputFile).zones[CONTROL_ZONE];
+      if (!controlAnchor) throw new Error(`No ${CONTROL_ZONE} ledger for the negative control`);
       const clean = join(directory, 'template-clean.json'), planted = join(directory, 'template-planted.json');
-      const args = [`--url=${preview.url}`, '--chunk=_template', '--timeout=180', '--ledger-only'];
+      const args = [`--url=${preview.url}`, `--chunk=${CONTROL_ZONE}`, '--timeout=180', '--ledger-only'];
       await measure([...args, `--out=${clean}`]);
       await measure([...args, '--plant-retained-buffer', `--out=${planted}`]);
       try {
-        compareLedger(controlAnchor, [ledgerBudget(get(planted).microscope.checkpoints)], '_template');
+        compareLedger(controlAnchor, [ledgerBudget(get(planted).microscope.checkpoints)], CONTROL_ZONE);
         throw new Error('Expected the retained 20 MB buffer to push the control total past its line');
       } catch (error) {
-        if (!(error instanceof Error) || !error.message.includes('_template control total:')) throw error;
+        if (!(error instanceof Error) || !error.message.includes(`${CONTROL_ZONE} control total:`)) throw error;
         console.log(error.message);
       }
-      compareLedger(controlAnchor, [ledgerBudget(get(clean).microscope.checkpoints)], '_template');
+      compareLedger(controlAnchor, [ledgerBudget(get(clean).microscope.checkpoints)], CONTROL_ZONE);
     }, console.log);
   }
 } finally { preview.close(); await preview.closed; }

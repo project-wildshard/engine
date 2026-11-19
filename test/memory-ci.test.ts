@@ -33,7 +33,7 @@ test('(b) the macOS job reads Template and Nine in native WebKit, report-only', 
   expect(street).toContain('node scripts/nine-ring1.mjs measure');
   expect(street).toContain('continue-on-error: true');
   const ring = readFileSync(new URL('../scripts/nine-ring1.mjs', import.meta.url), 'utf8');
-  expect(ring).toContain("for (const chunk of ['_template','nine-dragon-stack'])");
+  expect(ring).toContain("for (const chunk of ['brasscap-mesa','nine-dragon-stack'])");
   expect(ring).toContain("'--runs=3'");
 });
 

@@ -36,3 +36,10 @@ found three real bugs, each fixed in its own commit:
   refusal names driftwood-isle (published, not in Ring 1's catalogue).
 - online-rig-ephemeral was main red: the T1 rig's retention signing
   wanted a commit-named build; it now signs only for those.
+- Memory control zone is `CONTROL_ZONE = 'brasscap-mesa'` (armed.mjs):
+  footprint anchor + standalone preview, partial-record requirement and
+  the ledger negative control. Brasscap is also armed, so its own
+  footprint lines are still judged after the anchor. The anchor key
+  `footprint/brasscap-mesa/settled` has no baseline until a record run
+  (verdict "raised", not red). The ladder's `_template` rung is left for
+  TR-8 (its "engine fixed" part needs the simplest shard, not Brasscap).

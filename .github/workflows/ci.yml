@@ -22,7 +22,7 @@ on:
         required: false
         default: false
       memory_record_zones:
-        description: Optional Ubuntu recording zones including _template (armed zones always run)
+        description: Optional Ubuntu recording zones including brasscap-mesa, the control (armed zones always run)
         type: string
         required: false
         default: ''
@@ -522,7 +522,7 @@ jobs:
       - name: Archive the full pinned preview
         run: |
           products=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log([...armedMemory().zones].join("\n"))')
-          server_inputs=(out/.app/grid-collision out/_template)
+          server_inputs=(out/.app/grid-collision)
           while IFS= read -r zone; do
             if [[ -n "$zone" ]]; then server_inputs+=("out/$zone"); fi
           done <<< "$products"

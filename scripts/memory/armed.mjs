@@ -7,6 +7,8 @@ import { judgeReads } from './ledgerVerdict.mjs';
 import { zoneOverRuns } from './phoneModel.mjs';
 
 const require = createRequire(import.meta.url);
+/** The control zone every memory run measures first (J434: Brasscap replaced the legacy Template). */
+export const CONTROL_ZONE = 'brasscap-mesa';
 const LIST = '@wildshard/memory-policy/memory-armed.json';
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 /** @param {unknown} value */
