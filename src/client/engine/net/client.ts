@@ -209,7 +209,14 @@ export class NetClient {
     return undefined;
   }
   /** The owner block of a frame, as field values. */
-  owner(frame: DecodedFrame): NetFields { return decodeColumns(PLAYER_CLASS.owner, frame.owner); }
+  owner(frame: DecodedFrame): NetFields {
+    // STR20: read by several systems every frame (loadout effects, the HUD); a held frame's owner block never changes, so it
+    // is decoded once per frame
+    let fields = this.owners.get(frame);
+    if (fields === undefined) { fields = Object.freeze(decodeColumns(PLAYER_CLASS.owner, frame.owner)); this.owners.set(frame, fields); }
+    return fields;
+  }
+  private readonly owners = new WeakMap<DecodedFrame, NetFields>();
   /** Queue one sim step's input; the next `flush` sends it. Returns the `seq` it was given. `viewTick`, left out, is what the
    *  screen shows now, which is what a blow is settled against (J50). */
   command(input: Omit<NetCommand, 'seq' | 'viewTick'> & { readonly viewTick?: number }): number {

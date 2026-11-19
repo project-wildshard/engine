@@ -153,7 +153,8 @@ function markGeometry(geometry: BufferGeometry, fallback: Label): void {
 function nodeResources(node: Object3D, label: Label): void {
   const geo: unknown = Reflect.get(node, 'geometry'), mats: unknown = Reflect.get(node, 'material');
   if (isGeometry(geo)) markGeometry(geo, label);
-  for (const mat of Array.isArray(mats) ? mats : [mats]) if (isMaterial(mat)) markMaterial(mat, label);
+  if (Array.isArray(mats)) { for (const mat of mats as readonly unknown[]) if (isMaterial(mat)) markMaterial(mat, label); }
+  else if (isMaterial(mats)) markMaterial(mats, label);
   const skeleton: unknown = Reflect.get(node, 'skeleton');
   const bones: unknown = skeleton !== null && typeof skeleton === 'object' ? Reflect.get(skeleton, 'boneTexture') : undefined;
   if (skeleton instanceof Skeleton) {
@@ -263,6 +264,10 @@ function amortizedTree(root: Object3D, owner: string, asset: string, priority: n
   for (let k = sweep.cursor; k < end; k++) {
     const node = nodes[k], parent = parents[k] ?? null, index = indices[k] ?? 0;
     if (node === undefined || !due(walked, node, Reflect.get(node, 'geometry'), Reflect.get(node, 'material'))) continue;
+    // as `tree`: a node already labelled at this priority keeps its label (`remember` would return it), so its path string
+    // and label are built only when it is new: each refresh window rebuilt and dropped them for every node (STR20)
+    const previous = labels.get(node);
+    if (previous !== undefined && previous.priority >= priority) { nodeResources(node, previous); continue; }
     const parentLabel = parent === null ? undefined : labels.get(parent);
     const path = parent === null ? asset : `${parentLabel?.asset ?? asset}/${node.name || `${node.type}[${index}]`}`;
     const charged = parent === null ? owner : walkOwner(owner, parentLabel, node.name);

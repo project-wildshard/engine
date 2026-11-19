@@ -250,6 +250,9 @@ export function groundContact(): THREE.Mesh {
     contactGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); contactGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4)); contactGeometry.setIndex(index);
     contactGeometry.userData['shared'] = true;
     contactMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+    // one pass: three draws a transparent double-sided material twice, flipping `side` and `needsUpdate` each time, so every
+    // body's disc rebuilt its program parameters twice a frame (mini-memstruct-m3b, STR20). A flat disc shows one face.
+    contactMaterial.forceSinglePass = true;
     contactMaterial.userData['shared'] = true;
   }
   const disc = new THREE.Mesh(contactGeometry, contactMaterial); disc.name = 'GroundContact'; disc.position.y = 0.02; disc.renderOrder = 1;

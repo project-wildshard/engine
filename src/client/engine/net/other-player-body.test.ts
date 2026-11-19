@@ -45,7 +45,11 @@ test('another player enters dressed as the castaway body, at a player\'s height,
   const bones = new Set(mesh.skeleton.bones.map(bone => bone.name));
   for (const joint of DUMMY_JOINTS) expect(bones.has(joint.charAt(0).toUpperCase() + joint.slice(1))).toBe(true);
   expect(group.getObjectByName('RightHandMount')?.parent?.name).toBe('RightHand');
-  expect(group.getObjectByName('GroundContact')).toBeDefined();
+  const contact = group.getObjectByName('GroundContact');
+  expect(contact).toBeDefined();
+  // one pass, so three never flips its side and rebuilds its program parameters twice a frame (STR20)
+  const contactMaterial: unknown = contact instanceof THREE.Mesh ? contact.material : undefined;
+    expect(contactMaterial instanceof THREE.Material && contactMaterial.forceSinglePass).toBe(true);
   // A body that leaves frees its own skeleton, never the mesh every other body shares.
   const freed: string[] = [];
   mesh.geometry.addEventListener('dispose', () => { freed.push('geometry'); });

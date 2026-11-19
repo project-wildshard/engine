@@ -324,6 +324,23 @@ function animalRows(client: NetClient): number {
   for (const info of client.entities.values()) if (info.cls.cls === ANIMAL_CLASS.cls) rows++;
   return rows;
 }
+/** STR20: the predicted capsule rows, one object per creature slot for the page's life, refilled each frame (the literal
+ *  was one object per near creature a frame). CreaturePrediction rewrites them in place too. */
+const NEAR_ROWS: CreaturePredictionRow[] = [];
+/** each creature's capsule shape, once: its dims and scale do not change while it lives (keyed by its body or its row) */
+const SHAPES = new WeakMap<object, { readonly radius: number; readonly height: number; readonly dims: BodyDims; readonly scale: number }>();
+function nearRow(near: CreaturePredictionRow[], handle: number, row: Float64Array, key: object, dims: BodyDims, scale: number): void {
+  let shape = SHAPES.get(key);
+  if (shape === undefined || shape.dims !== dims || shape.scale !== scale) {
+    const { radius, height } = creatureBodyShape(dims, scale);
+    shape = { radius, height, dims, scale }; SHAPES.set(key, shape);
+  }
+  const slot = NEAR_ROWS[near.length] ?? { handle: 0, x: 0, y: 0, z: 0, alive: false, driven: false, radius: 0, height: 0 };
+  NEAR_ROWS[near.length] = slot;
+  slot.handle = handle; slot.x = row[X] ?? 0; slot.y = row[Y] ?? 0; slot.z = row[Z] ?? 0; slot.alive = row[ALIVE] === 1; slot.driven = false;
+  slot.radius = shape.radius; slot.height = shape.height;
+  near.push(slot);
+}
 /** Rows onto the bodies, and the near ones into the predicted world as capsules. */
 function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>, home: Readonly<Place> | null = null): number {
   const { interpolator } = client, own = client.welcome?.handle ?? 0, under = client.riders.get(own);
@@ -352,8 +369,7 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<numbe
     shown++;
     if (row[RIDEABLE] === 1) rideable.add(handle);
     if (home !== null) continue; // MP5.2b: a road row has no body in the road's world to walk into
-    const { radius, height } = creatureBodyShape(body.dims, body.scale);
-    near.push({ handle, x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, alive: row[ALIVE] === 1, driven: false, radius, height });
+    nearRow(near, handle, row, body, body.dims, body.scale);
   }
   // A data cell's life draws its own bodies, and a crossing has none yet: the rows still stand in the predicted world, or walking into one corrects.
   for (const [handle, info] of client.entities) {
@@ -361,8 +377,7 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<numbe
     if (ROAD_X >= 0 && ROAD_Z >= 0 && roadPlaceOf(row[ROAD_X], row[ROAD_Z]) !== null) continue; // MP5.2b: read-only across the home edge
     const kind = String(info.initial['kind']), dims = KIND_DIMS.get(kind) ?? ports.dims(kind) ?? SOME_CREATURE;
     KIND_DIMS.set(kind, dims);
-    const { radius, height } = creatureBodyShape(dims, Number(info.initial['scale'] ?? 1));
-    near.push({ handle, x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, alive: row[ALIVE] === 1, driven: false, radius, height });
+    nearRow(near, handle, row, info, dims, Number(info.initial['scale'] ?? 1));
   }
   return shown;
 }
