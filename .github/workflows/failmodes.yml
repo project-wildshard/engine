@@ -70,7 +70,9 @@ jobs:
                 --tls-key=tmp/fm11/tls.key --tls-cert=tmp/fm11/tls.crt)
               ;;
             related)
-              flags+=("--scenario=offline-play,drop,release-429")
+              # FM11's ten-minute push budget: two link cases (and drop's hold card), a shorter connect wait;
+              # the nightly keeps the full minute and every case, release-429 among them.
+              flags+=("--scenario=offline-play,drop" "--cooldown=20")
               ;;
             refusal)
               flags+=(--refusal=screen)
