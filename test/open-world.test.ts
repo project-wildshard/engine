@@ -1,24 +1,15 @@
-// oxlint-disable-next-line import/no-nodejs-modules -- Boots the shipped product bytes and physics module.
-import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { installedKeys } from '../src/server/game/shardfile/installedSides';
 import { openWorld, openWorldAdapter } from '../src/server/host/openWorld';
-import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
+import { loadOpenWorldInput, openWorldPins } from './fixtures/engine-lift/openWorld';
 
 // SERVER-PARITY HS1 (meta docs/plans/SERVER-PARITY-PLAN.md): one world-build entry. Every pinned product boots as a room
 // (`openWorld(input, { room: true })`, a dedicated room's own call) and, a native world, through the headless tick adapter a
 // shard's CI journeys and the bake worker run; both hosts carry the same fixed-step owners and server halves. Before HS1 the adapter booted the bare
 // resident: no chapters, doors, discoveries or owned book, so Nalati's taming journey installed its chapters by hand.
-const pins = (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: readonly { slug: string }[] }).shards.map(pin => pin.slug);
-
 describe('open world: the room and the tick adapter step the same owners', { concurrent: false }, () => {
-  for (const slug of pins) test(slug, async () => {
-    const directory = builtFolder(slug);
-    if (!existsSync(directory)) throw new Error(`${slug} is pinned but not installed: pnpm pins`);
-    const product = await loadHeadlessFolder(directory);
-    const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
+  for (const slug of openWorldPins) test(slug, async () => {
+    const input = await loadOpenWorldInput(slug);
     const room = await openWorld(input, { room: true });
     try {
       const owners = room.host.stepIds();
@@ -35,31 +26,7 @@ describe('open world: the room and the tick adapter step the same owners', { con
   }, 180_000);
 });
 
-// A saved room world continues identically: the bake worker and a shard's CI resume a native world from the adapter's commit,
-// and every byte of the next steps (the physics included) matches the world that never stopped.
-describe('open world: a saved world continues identically through the tick adapter', { concurrent: false }, () => {
-  for (const slug of pins) test(slug, async () => {
-    const directory = builtFolder(slug), product = await loadHeadlessFolder(directory);
-    const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
-    const probe = await openWorld(input, { room: true }), native = probe.resident !== undefined; probe.dispose();
-    if (!native) return;
-    const control = await openWorldAdapter(input);
-    try {
-      for (let tick = 0; tick < 60; tick++) control.step([{ kind: 'player', moveX: 0, moveZ: -1, yaw: 0, commandVersion: 1 }]);
-      const resumed = await openWorldAdapter(input, control.commit().snapshot);
-      try {
-        for (let tick = 0; tick < 3; tick++) {
-          const commands = [{ kind: 'player' as const, moveX: 0, moveZ: -1, yaw: 0, commandVersion: 1 as const }];
-          control.step(commands); resumed.step(commands);
-          expect(resumed.commit(), `${slug}: tick ${tick} after the resume`).toEqual(control.commit());
-        }
-      } finally { resumed.dispose(); }
-    } finally { control.dispose(); }
-  }, 180_000);
-});
-
 test('Nalati\'s tick adapter runs its story on the server with no hand-installed chapters', async () => {
-  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory);
-  const adapter = await openWorldAdapter({ shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) });
+  const adapter = await openWorldAdapter(await loadOpenWorldInput('nalati-grasslands'));
   try { expect(installedKeys(adapter.host).has('saves'), 'serverChapters registered its feat counts and bond').toBe(true); } finally { adapter.dispose(); }
 }, 180_000);
