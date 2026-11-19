@@ -20,7 +20,7 @@ async function withRecording(verify) {
   mkdirSync('tmp', { recursive: true });
   const directory = mkdtempSync(resolve('tmp/iphone-release-'));
   try {
-    for (const key of ['template', 'nine', 'walk']) mkdirSync(join(directory, key));
+    for (const key of ['brasscap', 'nine', 'walk']) mkdirSync(join(directory, key));
     await verify(directory);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -37,12 +37,12 @@ const info = /** @type {const} */ ({ source: 'recorded', date: '2026-11-19T08:00
 test('uses all three cold readings and the full walk for the release row', async () => {
   await withRecording(path => {
     write(path, 'nine', [trial(520_000_000), trial(500_000_000), trial(510_000_000)]);
-    write(path, 'template', [trial(500_000_000), trial(520_000_000)]);
+    write(path, 'brasscap', [trial(500_000_000), trial(520_000_000)]);
     write(path, 'walk', [trial(780_000_000, 'recorded-build', 60)]);
     const reading = releaseReading(path, info);
     expect(reading.build).toBe('recorded-build');
     expect(reading.stages.nine.metrics).toMatchObject({ webPeak: 510_000_000, controlMs: 44_000 });
-    expect(reading.stages.template).toMatchObject({ status: 'incomplete', attempts: 2, metrics: { webPeak: null } });
+    expect(reading.stages.brasscap).toMatchObject({ status: 'incomplete', attempts: 2, metrics: { webPeak: null } });
     expect(reading.stages.walk.metrics.fps).toBe(60);
     write(path, 'walk', [trial(780_000_000, 'recorded-build', 59)]);
     expect(releaseReading(path, info).stages.walk.metrics.fps).toBeNull();

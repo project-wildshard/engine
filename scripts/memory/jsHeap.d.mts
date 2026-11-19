@@ -1,5 +1,5 @@
 export interface HeapMetrics {bootAllocatedBytes:number;settledUsedBytes:number;idleBytesPerSecond:number;majorGCsPer30Seconds:number}
-export interface HeapReading {shard:'_template'|'brasscap-mesa';metrics:HeapMetrics}
+export interface HeapReading {shard:'brasscap-mesa';metrics:HeapMetrics}
 export function sampledHeapBytes(profile:unknown):number;
 export function majorHeapGCs(events:unknown,seconds:number):number;
 /** An absent baseline fails qualification; explicit seeding never increases an existing metric. */

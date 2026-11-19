@@ -2,30 +2,6 @@
   "version": 1,
   "mode": "ledger",
   "zones": {
-    "_template": {
-      "control": {
-        "browser": 2810784,
-        "engine": 344064,
-        "workers": 7257724,
-        "geometry": 15301958,
-        "textures": 17885916,
-        "scene": 13892888,
-        "audio": 0,
-        "loading": 34162330,
-        "margin": 0
-      },
-      "peak": {
-        "browser": 2810784,
-        "engine": 344064,
-        "workers": 7390848,
-        "geometry": 15301958,
-        "textures": 17885916,
-        "scene": 13892888,
-        "audio": 0,
-        "loading": 43284354,
-        "margin": 0
-      }
-    },
     "brasscap-mesa": {
       "control": {
         "browser": 2810784,

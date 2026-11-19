@@ -10,7 +10,7 @@ import { median } from '../calibration.mjs';
 const STAGING = 'https://staging.wildshard.io/';
 const HISTORY = 'docs/plans/MULTI-REPO-SAGA/MEMORY-SAGA/iphone13/history.jsonl';
 const TASKS = /** @type {const} */ ([
-  { key: 'template', zone: '_template', mode: 'boot', runs: 3 },
+  { key: 'brasscap', zone: 'brasscap-mesa', mode: 'boot', runs: 3 },
   { key: 'nine', zone: 'nine-dragon-stack', mode: 'boot', runs: 3 },
   { key: 'walk', zone: 'nine-dragon-stack', mode: 'walk', runs: 1 },
 ]);

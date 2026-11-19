@@ -5,7 +5,7 @@ import { launchMemoryBrowser } from '../chromium-memory-browser.mjs';
 import { saveFixture } from '../debug-settings.mjs';
 import { sampledHeapBytes, majorHeapGCs } from './jsHeap.mjs';
 
-/** @param {string} base @param {'_template'|'brasscap-mesa'} shard */
+/** @param {string} base @param {'brasscap-mesa'} shard */
 export async function measureCleanHeap(base,shard) {
   const versionSchema=v.object({build:v.pipe(v.string(),v.minLength(1))});
   const version=async()=>{

@@ -3,7 +3,7 @@ import * as v from 'valibot';
 
 const amount=v.pipe(v.number(),v.finite(),v.minValue(0));
 const metrics=v.object({bootAllocatedBytes:amount,settledUsedBytes:amount,idleBytesPerSecond:amount,majorGCsPer30Seconds:amount});
-const reading=v.object({shard:v.picklist(['_template','brasscap-mesa']),metrics});
+const reading=v.object({shard:v.picklist(['brasscap-mesa']),metrics});
 const ratchet=v.object({version:v.literal(1),baselines:v.record(v.string(),metrics)});
 
 /** Sampled allocations include objects collected during the sample, not only

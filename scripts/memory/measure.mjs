@@ -51,8 +51,8 @@
 //   - Compare two builds with --url2: the builds alternate inside each round and the order flips each round, on the
 //     same machine in one session; report the median, min and max of N runs (--runs, 5 for a cut's proof).
 //   - --ladder [--zones=a,b] --runs=5 reads blank (the calibration page holding nothing), webgl (one context), the
-//     title, Template at control and each zone at control, rung order flipped each round. Blank is the browser,
-//     Template over blank the engine, zone over Template the zone, peak over settled the load transient; each part is
+//     title, Brasscap at control and each zone at control, rung order flipped each round. Blank is the browser,
+//     Brasscap over blank the engine, zone over Brasscap the zone, peak over settled the load transient; each part is
 //     the median of its per-round differences, and floor + engine + zone must close on the whole within 2%.
 //   - A busy machine is waited out (up to --wait minutes, 10), then refused: the 1-minute load average over --max-load
 //     (the CPU count) or more than --max-lanes other scripts/browser-lane.sh runs (2). Both are written with each round.
@@ -783,9 +783,14 @@ export async function quietMachine({ maxLoad, maxLanes, waitMs }) {
   }
 }
 
+/** The ladder's engine rung: the smallest live shard, so `engineFixed` is the engine with one shard in play and each
+ * zone's part is what it adds over that. J434 moved it from the retired Template to Brasscap Mesa, so ladders read
+ * before 2026-11-19 count the Template's few MB in engineFixed, not Brasscap's. */
+export const ENGINE_RUNG = 'brasscap-mesa';
+
 /** The ladder's parts from per-round readings, each the median of its per-round differences, so the parts are
  * independent estimates and their sum is checked against the whole (EM4: within 2%).
- * `rounds[i]` maps a rung (blank, webgl, title, _template, <zone>...) to its settled total [K] (WebContent + GPU
+ * `rounds[i]` maps a rung (blank, webgl, title, the engine rung, <zone>...) to its settled total [K] (WebContent + GPU
  * process), its ledger total [L] and, for boots, its peak total [K].
  * @param {readonly Record<string, {k:number, l:number, peak?:number}>[]} rounds @param {readonly string[]} zones */
 export function ladderParts(rounds, zones) {
@@ -794,12 +799,12 @@ export function ladderParts(rounds, zones) {
     browserFloor: { k: med((r) => r.blank.k), l: 0 },
     webglContext: { k: med((r) => r.webgl.k - r.blank.k), l: 0 },
     title: { k: med((r) => r.title.k - r.blank.k), l: med((r) => r.title.l) },
-    engineFixed: { k: med((r) => r._template.k - r.blank.k), l: med((r) => r._template.l) },
+    engineFixed: { k: med((r) => r[ENGINE_RUNG].k - r.blank.k), l: med((r) => r[ENGINE_RUNG].l) },
   };
   /** @type {Record<string, {zone:{k:number,l:number}, transient:{k:number}, whole:{k:number,l:number}, sumK:number, closesWithin2Pct:boolean}>} */
   const byZone = {};
   for (const z of zones) {
-    const zone = { k: med((r) => r[z].k - r._template.k), l: med((r) => r[z].l - r._template.l) };
+    const zone = { k: med((r) => r[z].k - r[ENGINE_RUNG].k), l: med((r) => r[z].l - r[ENGINE_RUNG].l) };
     const whole = { k: med((r) => r[z].k), l: med((r) => r[z].l) };
     const sumK = parts.browserFloor.k + parts.engineFixed.k + zone.k;
     byZone[z] = { zone, transient: { k: med((r) => (r[z].peak ?? r[z].k) - r[z].k) }, whole, sumK, closesWithin2Pct: Math.abs(sumK - whole.k) <= 0.02 * whole.k };
@@ -1037,7 +1042,7 @@ export function summaryMarkdown(chunk, webkit, summary, ledger) {
   return `${lines.join('\n')}\n\n`;
 }
 
-/** The differential ladder (EM4): blank, WebGL, title, Template at control and each zone at control, every rung a cold
+/** The differential ladder (EM4): blank, WebGL, title, Brasscap at control and each zone at control, every rung a cold
  * WebKit, rung order flipped each round, N rounds; a busy machine is waited out, then refused.
  * @param {Record<string, string>} args
  * @param {{runs:number, settleMs:number, timeoutMs:number, gcs:number, reads:number, limits:{maxLoad:number, maxLanes:number, waitMs:number}, instrument:'minimal'|'full'}} o */
@@ -1050,7 +1055,7 @@ async function ladder(args, o) {
   try {
     for (let round = 0; round < o.runs; round++) {
       const machine = await quietMachine(o.limits);
-      const rungs = ['blank', 'webgl', 'title', '_template', ...zones];
+      const rungs = ['blank', 'webgl', 'title', ENGINE_RUNG, ...zones];
       /** @type {Record<string, {k:number, l:number, peak?:number, wc:number, gpu:number, peakWc?:number}>} */
       const row = {};
       for (const rung of round % 2 === 0 ? rungs : [...rungs].reverse()) {
@@ -1071,7 +1076,7 @@ async function ladder(args, o) {
     }
   } finally { calib.close(); }
   const result = { protocol: 'memory-ladder/1', instrument: o.instrument, url: args.url, zones, date: new Date().toISOString(), runs: o.runs, rungs: {}, ...ladderParts(rounds, zones), rounds, raw };
-  for (const rung of ['blank', 'webgl', 'title', '_template', ...zones]) Reflect.set(result.rungs, rung, { k: stats(rounds.map((r) => r[rung].k)), wc: stats(rounds.map((r) => r[rung].wc)), gpu: stats(rounds.map((r) => r[rung].gpu)), l: stats(rounds.map((r) => r[rung].l)), ...(rounds[0][rung].peak === undefined ? {} : { peak: stats(rounds.map((r) => r[rung].peak ?? 0)) }) });
+  for (const rung of ['blank', 'webgl', 'title', ENGINE_RUNG, ...zones]) Reflect.set(result.rungs, rung, { k: stats(rounds.map((r) => r[rung].k)), wc: stats(rounds.map((r) => r[rung].wc)), gpu: stats(rounds.map((r) => r[rung].gpu)), l: stats(rounds.map((r) => r[rung].l)), ...(rounds[0][rung].peak === undefined ? {} : { peak: stats(rounds.map((r) => r[rung].peak ?? 0)) }) });
   for (const line of ladderLines(result)) console.log(line);
   if (args.out) { const out = resolvePath(args.out); mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, `${JSON.stringify(result, null, 1)}\n`); }
   return Object.values(result.byZone).every((z) => z.closesWithin2Pct) ? 0 : 1;
@@ -1086,8 +1091,8 @@ export function ladderLines(result) {
   for (const [rung, s] of Object.entries(result.rungs)) lines.push(`| ${rung} | ${r(s.wc)} | ${r(s.gpu)} | ${r(s.k)} | ${s.peak ? r(s.peak) : '-'} | ${f(s.l.median)} |`);
   lines.push('', '| Part | [K] settled sum | [L] |', '|---|---|---|');
   const p = result.parts;
-  lines.push(`| Browser floor (blank) | ${f(p.browserFloor.k)} | 0 |`, `| WebGL context over blank | ${f(p.webglContext.k)} | 0 |`, `| Title over blank | ${f(p.title.k)} | ${f(p.title.l)} |`, `| Engine fixed (Template over blank) | ${f(p.engineFixed.k)} | ${f(p.engineFixed.l)} |`);
-  for (const [zone, z] of Object.entries(result.byZone)) lines.push(`| ${zone}: zone over Template | ${f(z.zone.k)} | ${f(z.zone.l)} |`, `| ${zone}: load transient (peak over settled) | ${f(z.transient.k)} | - |`, `| ${zone}: floor + engine + zone vs whole | ${f(z.sumK)} vs ${f(z.whole.k)} (${z.closesWithin2Pct ? 'within 2%' : 'OUTSIDE 2%'}) | ${f(z.whole.l)} |`);
+  lines.push(`| Browser floor (blank) | ${f(p.browserFloor.k)} | 0 |`, `| WebGL context over blank | ${f(p.webglContext.k)} | 0 |`, `| Title over blank | ${f(p.title.k)} | ${f(p.title.l)} |`, `| Engine fixed (Brasscap over blank) | ${f(p.engineFixed.k)} | ${f(p.engineFixed.l)} |`);
+  for (const [zone, z] of Object.entries(result.byZone)) lines.push(`| ${zone}: zone over Brasscap | ${f(z.zone.k)} | ${f(z.zone.l)} |`, `| ${zone}: load transient (peak over settled) | ${f(z.transient.k)} | - |`, `| ${zone}: floor + engine + zone vs whole | ${f(z.sumK)} vs ${f(z.whole.k)} (${z.closesWithin2Pct ? 'within 2%' : 'OUTSIDE 2%'}) | ${f(z.whole.l)} |`);
   return lines;
 }
 

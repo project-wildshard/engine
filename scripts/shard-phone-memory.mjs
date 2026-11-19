@@ -5,7 +5,7 @@
 // Heap: <preview URL> --heap templates <label> <out.json> [--rebase] (clean diagnostic only).
 // --floor samples at 10/60/120 s without forced GC, then diagnoses HTTP-cache retention.
 // It also accepts menu or select as the target, with the real Developer prefetch on.
-// Use core --floor --pin=<sha> for all four independent milestone floors.
+// Use core --floor --pin=<sha> for all three independent milestone floors.
 // A single --floor --compiled --pin=<sha> target uses the same explicit compiled-entry contract.
 // Offline C6: node scripts/shard-phone-memory.mjs audit-estimate <floor> <estimated-bytes> < <native-summary.json>
 // Prints the fixed +/-15% model audit and independent G682 verdict; never re-bases either.
@@ -26,11 +26,11 @@ import { pageMemoryAttributionExpression } from './memory-report-snapshot.mjs';
  * Same native reader: 87,397,464 + 15,927,456 bytes; no forced GC or app scripts.
  * This calibration is pinned, never automatically re-based when memory grows. */
 export const webKitCoreMemoryFloorBytes = 103324920;
-/** Menu/select retain G682. Templates use the picked 18d3c27d7a native pair. */
+/** Menu/select retain G682. The template floor is Brasscap's, from the picked 18d3c27d7a native pair (J434 retired
+  * Template 1's floor, 274,538,200 bytes, with the Template). */
 export const coreMemoryTargets = Object.freeze([
   Object.freeze({shard: 'menu', name: 'Menu', limitBytes: webKitCoreMemoryFloorBytes + 50 * 1048576}),
   Object.freeze({shard: 'select', name: 'SHARD SELECT', limitBytes: webKitCoreMemoryFloorBytes + 50 * 1048576}),
-  Object.freeze({shard: '_template', name: 'Template 1', limitBytes: 274_538_200}),
   Object.freeze({shard: 'brasscap-mesa', name: 'Template 2', limitBytes: 261_512_872}),
 ]);
 /** G682 calibration is a separate visit, never a fifth app floor or a budget gate. */
@@ -98,7 +98,7 @@ export async function serveHelloWorldMemory(three = false) {
     });
   }};
 }
-/** Select existing floors; the Template pair preserves original objects/order.
+/** Select existing floors; the template floor preserves original objects.
  * @param {string} selection */
 export function selectedCoreMemoryTargets(selection) {
   if (selection === 'all') return coreMemoryTargets;
@@ -126,7 +126,7 @@ export function scriptResourceURLs(entries = performance.getEntriesByType('resou
  * @param {typeof fetch} [read]
  */
 export async function coreMemoryFolderIdentity(base, shard, version, read = fetch) {
-  if (shard !== '_template' && shard !== 'brasscap-mesa') return null;
+  if (shard !== 'brasscap-mesa') return null;
   try {
     const buildSchema = v.object({build: v.pipe(v.string(), v.minLength(1))});
     const expected = v.parse(buildSchema, JSON.parse(version)).build;
@@ -155,14 +155,11 @@ export async function coreMemoryFolderIdentity(base, shard, version, read = fetc
     const decoder = new TextDecoder('utf-8', {fatal: true});
     const before = v.parse(buildSchema, JSON.parse(decoder.decode(await wire('/version.json', 65536))));
     if (before.build !== expected) throw new Error('Core product metadata build changed');
-    // The first floor's directory is `_template`; its defining product uses
-    // the canonical authored identity `template` (generators/product.ts).
-    const folderSlug = shard === '_template' ? 'template' : shard;
     const path = `/shardfiles/${shard}/shard.json`, bytes = await wire(path, 1048576);
     // Identify the wire envelope only. Admission remains with the production
     // validator; no blob or section bodies enter this diagnostic.
     const index = v.parse(v.object({format: v.literal('wildshard.shardfile'), formatVersion: v.literal(2),
-      identity: v.object({slug: v.literal(folderSlug)}),
+      identity: v.object({slug: v.literal(shard)}),
       build: v.object({sourceHash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u))})}), JSON.parse(decoder.decode(bytes)));
     const after = v.parse(buildSchema, JSON.parse(decoder.decode(await wire('/version.json', 65536))));
     if (after.build !== expected) throw new Error('Core product metadata build changed');
@@ -266,7 +263,7 @@ export function contextMemoryDiagnostic(input) {
 /** Read only the original 120-second floor, never the cache-clear diagnostic.
  * Zero WebContent is unavailable evidence, even when a GPU reading exists.
  * @param {unknown} input
- * @param {string} [selection] One app floor, the Template pair, or all four by default. */
+ * @param {string} [selection] One app floor, the template floor, or all three by default. */
 function coreFloorTotals(input, selection = 'all') {
   const targets = selection === 'templates' ? coreMemoryTargets.slice(2)
     : coreMemoryTargets.filter(target => selection === 'all' || target.shard === selection);
@@ -284,7 +281,7 @@ function coreFloorTotals(input, selection = 'all') {
 /** G682 applies only to the cold, uncollected native WebKit reader.
  * Missing/failed floors stay unknown and fail; Chromium is not phone RAM.
  * @param {unknown} input
- * @param {string} [selection] One app floor, the Template pair, or all four by default. */
+ * @param {string} [selection] One app floor, the template floor, or all three by default. */
 export function coreMemorySummary(input, selection = 'all') {
   const totals = coreFloorTotals(input, selection);
   v.parse(v.array(v.object({protocol: v.literal('webkit-core-floor/1'), mode: v.literal('cold'),
@@ -480,17 +477,17 @@ async function main() {
   }
   if (process.argv[3] === '--heap') {
     const [base, , target, label, out, flag] = process.argv.slice(2);
-    if (!base || !target || !label || !out?.endsWith('.json') || !['_template','brasscap-mesa','templates'].includes(target)
+    if (!base || !target || !label || !out?.endsWith('.json') || !['brasscap-mesa','templates'].includes(target)
       || (flag !== undefined && flag !== '--rebase') || process.argv.length > 8)
-      throw new Error('Expected <preview URL> --heap <_template|brasscap-mesa|templates> <label> <out.json> [--rebase]');
+      throw new Error('Expected <preview URL> --heap <brasscap-mesa|templates> <label> <out.json> [--rebase]');
     const {measureCleanHeap} = await import('./memory/heapReader.mjs');
     const {checkHeapRatchet} = await import('./memory/jsHeap.mjs');
     const ratchetFile=new URL('memory/js-heap-ratchet.json',import.meta.url);
     const baseline=JSON.parse(readFileSync(ratchetFile,'utf8'));
-    const targets=target==='templates'?['_template','brasscap-mesa']:[target];
+    const targets=['brasscap-mesa'];
     const readings=[];
     for(const shard of targets) {
-      if(shard!=='_template'&&shard!=='brasscap-mesa')throw new Error('Unsupported heap target');
+      if(shard!=='brasscap-mesa')throw new Error('Unsupported heap target');
       const row=await measureCleanHeap(base,shard);readings.push(row);
       const m=row.metrics;
       console.info(`${shard}: boot ${(m.bootAllocatedBytes/1048576).toFixed(2)} MiB; settled post-GC ${(m.settledUsedBytes/1048576).toFixed(2)} MiB; idle ${(m.idleBytesPerSecond/1048576).toFixed(3)} MiB/s; major GC ${m.majorGCsPer30Seconds.toFixed(2)}/30s`);

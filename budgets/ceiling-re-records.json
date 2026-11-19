@@ -12,22 +12,6 @@
       "reason": "R9: all three Pine people upload behind the loading screen, before the first play frame."
     },
     {
-      "shard": "_template",
-      "tier": "phone",
-      "metric": "gpuMB",
-      "source": "budgets/calibration-reports/_template.phone.json",
-      "commit": "26b5f6b35eb7b2af4e36e617fa0321526ad6a46c",
-      "reason": "G6: mounted lantern is drawn for the first time (876 bytes)."
-    },
-    {
-      "shard": "_template",
-      "tier": "desktop",
-      "metric": "gpuMB",
-      "source": "budgets/calibration-reports/_template.desktop.json",
-      "commit": "26b5f6b35eb7b2af4e36e617fa0321526ad6a46c",
-      "reason": "G6: mounted lantern is drawn for the first time (876 bytes)."
-    },
-    {
       "shard": "pine-hollow",
       "tier": "desktop",
       "metric": "gpuMB",

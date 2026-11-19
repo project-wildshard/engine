@@ -11,9 +11,9 @@ export const LEDGER_PHASES = /** @type {const} */ (['control', 'peak']);
 /** `<mode>/<zone>/<phase>`: the budget key of one ledger total. @param {string} mode @param {string} zone @param {string} phase */
 export const ledgerKey = (mode, zone, phase) => `${mode}/${zone}/${phase}`;
 
-/** A zone's content key from the pins (`_template` is the pin `template`); an unpinned zone is engine content.
+/** A zone's content key from the pins; an unpinned zone is engine content.
  * @param {string} zone @param {Record<string, string>} pinned */
-export const zoneContentKey = (zone, pinned) => pinned[zone] ?? pinned[zone.replace(/^_/u, '')] ?? 'engine';
+export const zoneContentKey = (zone, pinned) => pinned[zone] ?? 'engine';
 
 /** One phase's total of a flat reading (`<phase>.<subsystem>` bytes). @param {Record<string, number>} reading @param {string} phase */
 export function ledgerTotal(reading, phase) {

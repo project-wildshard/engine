@@ -27,7 +27,7 @@ export function parseArmedMemory(value) {
       || typeof row.armed !== 'string' || typeof row.by !== 'string' || typeof row.evidence !== 'string') {
       throw new Error(`Invalid armed memory entry: ${slug}`);
     }
-    readings.set(slug === 'template' ? '_template' : slug, { playingBytes: row.playingBytes, loadingBytes: row.loadingBytes });
+    readings.set(slug, { playingBytes: row.playingBytes, loadingBytes: row.loadingBytes });
   }
   return { lines, zones: new Set(readings.keys()), readings };
 }

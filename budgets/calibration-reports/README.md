@@ -6,7 +6,6 @@ Final assessment uses the generated manifest data and the same budgetChecks func
 
 | Shard | Draws observed / target | Tris observed / target | Programs observed / target | GL MiB observed / ceiling | Verdict |
 |---|---|---|---|---|---|
-| _template | 46 / 1831 | 11833 / 18779873 | 40 / 148 | 76.731449 / 76.731449 | pass |
 | driftwood-isle | 223 / 1174 | 1125728 / 18779873 | 95 / 148 | 219.436898 / 219.436898 | pass |
 | far-reach | 63 / 1831 | 11972 / 18779873 | 35 / 148 | 76.629364 / 76.629364 | pass |
 | nalati-grasslands | 108 / 1174 | 1292909 / 18779873 | 98 / 148 | 225.796532 / 225.796532 | pass |
@@ -16,7 +15,7 @@ Final assessment uses the generated manifest data and the same budgetChecks func
 
 FINDING (accepted by wildshard-9): Pine phone 587.132421 MiB versus previous 581.166576 MiB (+5.965845 MiB). R9 eb3d9a7875b47cae0349ee234e47efdc75efb30c uploads all three people before play, per Jake's rule. Re-recorded only these three pose GL-byte ceilings from the capture.
 
-FINDING (accepted by wildshard-9): template phone 76.731449 MiB versus 76.730614 MiB; desktop 171.080982 versus 171.080147 MiB (+876 bytes each). G6 26b5f6b35eb7b2af4e36e617fa0321526ad6a46c first draws the mounted lantern. Re-recorded only the current GL-byte ceilings. Exact approval, causal commits, capture hashes and extracted values are in ../ceiling-sources.json reRecords and ../ceiling-re-records.json; no numbers were entered in the approval.
+FINDING (accepted by wildshard-9), retired: the Template's mounted-lantern GL re-record left with the Template (J434, TEMPLATE-E2E TR-8b).
 
 Reproduce derivation (byte-idempotent):
 

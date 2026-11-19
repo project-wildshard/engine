@@ -1,5 +1,11 @@
 # GPU parity baselines
 
+## 2026-11-19 the Template's references go (J434, TEMPLATE-E2E TR-8b)
+
+The retired Template's and Template 2's references left both lanes. Their ceilings bounded only their own slugs, so no
+live shard's budget moved; the dated sections below keep their rows as history. Brasscap Mesa has no reference yet
+(TR-5's side-parity debt).
+
 ## 2026-10-21 one-pass re-record (X22, G415/G416)
 
 The nightly gate was red on every shard x tier against the 10-13 references. M5 phone + desktop re-recorded at

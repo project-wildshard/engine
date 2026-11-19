@@ -77,7 +77,7 @@ try {
     : ['nine-dragon-stack'];
   if (mode === 'ledger') {
     const catalogue = get('test/pins/catalogue.json');
-    const expected = catalogue.shards.map((/** @type {{slug:string}} */ { slug }) => slug === 'template' ? '_template' : slug).sort();
+    const expected = catalogue.shards.map((/** @type {{slug:string}} */ { slug }) => slug).sort();
     if (JSON.stringify(built) !== JSON.stringify(expected)) throw new Error('Prepared preview must contain every catalogue pin');
     // Nine never reached control on hosted SwiftShader. Its ledger reads
     // the online native WebKit boot with the same arming switch.

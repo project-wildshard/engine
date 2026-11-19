@@ -24,7 +24,7 @@ const rows = () => coreMemoryTargets.map(target => ({...nativeProtocol, shard: t
 
 const metadataVersion = JSON.stringify({build: '1111111-original'});
 const metadataIndex = JSON.stringify({format: 'wildshard.shardfile', formatVersion: 2,
-  identity: {slug: 'template'}, build: {sourceHash: 'a'.repeat(64)}}, null, 2);
+  identity: {slug: 'brasscap-mesa'}, build: {sourceHash: 'a'.repeat(64)}}, null, 2);
 const requestPath = (input: Parameters<typeof fetch>[0]): string => new URL(input instanceof Request ? input.url : input).pathname;
 test('post-sample product identity retains the exact wire hash between original-build checks', async () => {
   const requests: {path: string; init: RequestInit | undefined}[] = [];
@@ -32,12 +32,12 @@ test('post-sample product identity retains the exact wire hash between original-
     const path = requestPath(input); requests.push({path, init});
     return Promise.resolve(new Response(path === '/version.json' ? metadataVersion : metadataIndex));
   };
-  expect(await coreMemoryFolderIdentity('https://metadata.test/', '_template', metadataVersion, read)).toEqual({
-    status: 'observed', phase: 'after-120s', build: '1111111-original', shard: '_template',
-    path: '/shardfiles/_template/shard.json', indexBytes: Buffer.byteLength(metadataIndex),
+  expect(await coreMemoryFolderIdentity('https://metadata.test/', 'brasscap-mesa', metadataVersion, read)).toEqual({
+    status: 'observed', phase: 'after-120s', build: '1111111-original', shard: 'brasscap-mesa',
+    path: '/shardfiles/brasscap-mesa/shard.json', indexBytes: Buffer.byteLength(metadataIndex),
     indexHash: createHash('sha256').update(metadataIndex).digest('hex'), sourceHash: 'a'.repeat(64),
   });
-  expect(requests.map(row => row.path)).toEqual(['/version.json', '/shardfiles/_template/shard.json', '/version.json']);
+  expect(requests.map(row => row.path)).toEqual(['/version.json', '/shardfiles/brasscap-mesa/shard.json', '/version.json']);
   const signal = requests[0]?.init?.signal;
   expect(signal).toBeInstanceOf(AbortSignal);
   for (const request of requests) expect(request.init).toEqual({signal, cache: 'no-store', redirect: 'error'});
@@ -48,14 +48,6 @@ test('non-product floors make no metadata request', async () => {
   for (const target of ['menu', 'select', 'hello']) expect(await coreMemoryFolderIdentity('https://metadata.test/', target, metadataVersion, read)).toBeNull();
 });
 
-test('the second template keeps its own canonical product identity', async () => {
-  const index = metadataIndex.replace('template', 'brasscap-mesa');
-  const read: typeof fetch = input => Promise.resolve(new Response(requestPath(input) === '/version.json' ? metadataVersion : index));
-  const result = await coreMemoryFolderIdentity('https://metadata.test/', 'brasscap-mesa', metadataVersion, read);
-  expect(result).toMatchObject({status: 'observed', shard: 'brasscap-mesa', path: '/shardfiles/brasscap-mesa/shard.json',
-    indexHash: createHash('sha256').update(index).digest('hex')});
-});
-
 test('changed builds cannot identify a product from the native reading', async () => {
   for (const changedAt of [1, 3]) {
     let calls = 0;
@@ -63,7 +55,7 @@ test('changed builds cannot identify a product from the native reading', async (
       calls++;
       return Promise.resolve(new Response(calls === changedAt ? JSON.stringify({build: '2222222-rebuilt'}) : calls === 2 ? metadataIndex : metadataVersion));
     };
-    const result = await coreMemoryFolderIdentity('https://metadata.test/', '_template', metadataVersion, read);
+    const result = await coreMemoryFolderIdentity('https://metadata.test/', 'brasscap-mesa', metadataVersion, read);
     expect(result?.status).toBe('unavailable');
     if (result?.status !== 'unavailable') throw new Error('Missing metadata refusal');
     expect(result.error).toContain('build changed');
@@ -73,12 +65,13 @@ test('changed builds cannot identify a product from the native reading', async (
 
 test('missing, foreign and corrupt product metadata remains unavailable', async () => {
   for (const response of [new Response(null, {status: 404}), new Response('{broken'),
-    new Response(metadataIndex.replace('template', 'different-shard')),
-    new Response(metadataIndex.replace('template', '_template')),
+    new Response(metadataIndex.replace('brasscap-mesa', 'different-shard')),
+    // the retired Template's product identity never stands in for Brasscap's folder
+    new Response(metadataIndex.replace('brasscap-mesa', 'template')),
     new Response(metadataIndex.replace('a'.repeat(64), 'bad-hash')),
     new Response(metadataIndex, {headers: {'content-length': String(MiB + 1)}})]) {
     const read: typeof fetch = input => Promise.resolve(requestPath(input) === '/version.json' ? new Response(metadataVersion) : response);
-    const result = await coreMemoryFolderIdentity('https://metadata.test/', '_template', metadataVersion, read);
+    const result = await coreMemoryFolderIdentity('https://metadata.test/', 'brasscap-mesa', metadataVersion, read);
     expect(result).toMatchObject({status: 'unavailable'});
     expect(result).not.toHaveProperty('indexHash');
   }
@@ -88,7 +81,7 @@ test('an oversized unknown-length index stream is cancelled at the diagnostic ca
   let cancelled = false;
   const body = new ReadableStream<Uint8Array>({start(controller) { controller.enqueue(new Uint8Array(MiB + 1)); }, cancel() { cancelled = true; }});
   const read: typeof fetch = input => Promise.resolve(requestPath(input) === '/version.json' ? new Response(metadataVersion) : new Response(body));
-  const result = await coreMemoryFolderIdentity('https://metadata.test/', '_template', metadataVersion, read);
+  const result = await coreMemoryFolderIdentity('https://metadata.test/', 'brasscap-mesa', metadataVersion, read);
   expect(result?.status).toBe('unavailable');
   if (result?.status !== 'unavailable') throw new Error('Missing metadata refusal');
   expect(result.error).toContain('exceeds cap');
@@ -96,21 +89,21 @@ test('an oversized unknown-length index stream is cancelled at the diagnostic ca
 });
 
 test('saved estimate audits keep a one-byte tolerance miss separate from the native budget', () => {
-  const summary = {rev: '1'.repeat(40), coreMemory: '_template', results: [{...nativeProtocol, version: JSON.stringify({build: '1111111-fixture'}), shard: '_template', errors: [],
+  const summary = {rev: '1'.repeat(40), coreMemory: 'brasscap-mesa', results: [{...nativeProtocol, version: JSON.stringify({build: '1111111-fixture'}), shard: 'brasscap-mesa', errors: [],
     samples: [{phase: '120s', rendererBytes: 250_000_000, gpuBytes: 50_000_000}]}]};
-  const result = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', '_template', '345000001'],
+  const result = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '345000001'],
     {encoding: 'utf8', input: JSON.stringify(summary)});
   expect(result.status).toBe(1);
   expect(result.stdout).toContain('"within15Percent":false');
   expect(result.stdout).toContain('"budgetPassed":false');
-  const accurate = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', '_template', '300000000'],
+  const accurate = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '300000000'],
     {encoding: 'utf8', input: JSON.stringify(summary)});
   expect(accurate.status).toBe(1);
   expect(accurate.stdout).toContain('"within15Percent":true');
   expect(accurate.stdout).toContain('"budgetPassed":false');
   const small = summary.results[0];
   if (small === undefined) throw new Error('Missing native fixture');
-  const passing = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', '_template', '100000000'],
+  const passing = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '100000000'],
     {encoding: 'utf8', input: JSON.stringify({...summary, results: [{...small,
       samples: [{phase: '120s', rendererBytes: 90_000_000, gpuBytes: 10_000_000}]}]})});
   expect(passing.status).toBe(0);
@@ -119,38 +112,38 @@ test('saved estimate audits keep a one-byte tolerance miss separate from the nat
 });
 
 test('model tolerance uses exact bytes in both directions and never grants a native budget pass', () => {
-  const input = [{...nativeProtocol, shard: '_template', errors: [],
+  const input = [{...nativeProtocol, shard: 'brasscap-mesa', errors: [],
     samples: [{phase: '120s', rendererBytes: 250_000_000, gpuBytes: 50_000_000}]}];
   for (const estimate of [255_000_000, 345_000_000]) {
-    expect(coreMemoryEstimateAudit(input, '_template', estimate)).toMatchObject({measuredBytes: 300_000_000,
+    expect(coreMemoryEstimateAudit(input, 'brasscap-mesa', estimate)).toMatchObject({measuredBytes: 300_000_000,
       within15Percent: true, budgetPassed: false});
   }
   for (const estimate of [254_999_999, 345_000_001]) {
-    expect(coreMemoryEstimateAudit(input, '_template', estimate)).toMatchObject({within15Percent: false, budgetPassed: false});
+    expect(coreMemoryEstimateAudit(input, 'brasscap-mesa', estimate)).toMatchObject({within15Percent: false, budgetPassed: false});
   }
-  expect(coreMemoryEstimateAudit([], '_template', 300_000_000)).toMatchObject({measuredBytes: null, within15Percent: null, errorPercent: null, budgetPassed: false});
-  for (const estimate of [-1, 0, 1.5, Number.NaN, Infinity]) expect(() => coreMemoryEstimateAudit(input, '_template', estimate)).toThrow();
+  expect(coreMemoryEstimateAudit([], 'brasscap-mesa', 300_000_000)).toMatchObject({measuredBytes: null, within15Percent: null, errorPercent: null, budgetPassed: false});
+  for (const estimate of [-1, 0, 1.5, Number.NaN, Infinity]) expect(() => coreMemoryEstimateAudit(input, 'brasscap-mesa', estimate)).toThrow();
   expect(() => coreMemoryEstimateAudit(input, 'other', 300_000_000)).toThrow('Unknown app');
 });
 
 test('saved estimate audits refuse mixed source pins before issuing a verdict', () => {
-  const summary = {rev: '1'.repeat(40), coreMemory: '_template', results: [{...nativeProtocol, version: JSON.stringify({build: '2222222-other'}), shard: '_template', errors: [],
+  const summary = {rev: '1'.repeat(40), coreMemory: 'brasscap-mesa', results: [{...nativeProtocol, version: JSON.stringify({build: '2222222-other'}), shard: 'brasscap-mesa', errors: [],
     samples: [{phase: '120s', rendererBytes: 1, gpuBytes: 1}]}]};
-  const result = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', '_template', '1'],
+  const result = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '1'],
     {encoding: 'utf8', input: JSON.stringify(summary)});
   expect(result.status).toBe(1);
   expect(result.stdout).toBe('');
   expect(result.stderr).toContain('source pin differs');
 });
 
-test('saved Template-pair estimates audit either floor without admitting other cohorts', () => {
+test('saved Template estimates audit the floor without admitting other cohorts', () => {
   const pair = rows().slice(2).map(row => Object.assign(row, {version: JSON.stringify({build: '1111111-fixture'}),
     samples: row.samples.map(sample => ({...sample, rendererBytes: 208182520 - 10 * MiB}))}));
   const summary = {rev: '1'.repeat(40), coreMemory: 'templates', results: pair};
   const audit = (target: string, input: unknown = summary) => spawnSync('node', [
     'scripts/shard-phone-memory.mjs', 'audit-estimate', target, '208182520',
   ], {encoding: 'utf8', input: JSON.stringify(input)});
-  for (const target of ['_template', 'brasscap-mesa']) {
+  for (const target of ['brasscap-mesa']) {
     const result = audit(target);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(`"shard":"${target}"`);
@@ -166,21 +159,21 @@ test('saved Template-pair estimates audit either floor without admitting other c
   for (const row of collected) row.forcedGC = true;
   for (const row of foreign) row.version = JSON.stringify({build: '2222222-other'});
   for (const results of [mixed, collected, foreign]) {
-    const refused = audit('_template', {...summary, results});
+    const refused = audit('brasscap-mesa', {...summary, results});
     expect(refused.status).toBe(1); expect(refused.stdout).toBe('');
   }
-  const missing = audit('_template', {...summary, results: pair.filter(row => row.shard !== '_template')});
+  const missing = audit('brasscap-mesa', {...summary, results: pair.filter(row => row.shard !== 'brasscap-mesa')});
   expect(missing.status).toBe(1);
   expect(missing.stdout).toContain('"measuredBytes":null');
   expect(missing.stdout).toContain('"within15Percent":null');
   expect(missing.stdout).toContain('"budgetPassed":false');
 });
 
-test('four independent floors use the picked combined process limits', () => {
+test('three independent floors use the picked combined process limits', () => {
   expect(webKitCoreMemoryFloorBytes).toBe(87397464 + 15927456);
   expect(coreMemoryTargets.map(target => [target.shard, target.limitBytes])).toEqual([
     ['menu', webKitCoreMemoryFloorBytes + 50 * MiB], ['select', webKitCoreMemoryFloorBytes + 50 * MiB],
-    ['_template', 274_538_200], ['brasscap-mesa', 261_512_872],
+    ['brasscap-mesa', 261_512_872],
   ]);
   expect(coreMemorySummary(rows()).every(row => row.passed && row.totalBytes === row.limitBytes)).toBe(true);
 });
@@ -202,18 +195,18 @@ test('single-floor cohorts retain the original target and refuse unknown selecti
     expect(selected).toHaveLength(1);
     expect(selected[0]).toBe(target);
   }
-  for (const selection of ['', 'template', '_template,menu', 'unknown']) {
+  for (const selection of ['', 'template', 'brasscap-mesa,menu', 'unknown']) {
     expect(() => selectedCoreMemoryTargets(selection)).toThrow('Expected --core-memory');
   }
 });
 
-test('Template-only cohorts retain both original floors and refuse mixed or missing evidence', () => {
+test('Template-only cohorts retain the original floor and refuse mixed or missing evidence', () => {
   const targets = selectedCoreMemoryTargets('templates');
-  expect(targets.map(target => target.shard)).toEqual(['_template', 'brasscap-mesa']);
-  expect(targets[0]).toBe(coreMemoryTargets[2]); expect(targets[1]).toBe(coreMemoryTargets[3]);
+  expect(targets.map(target => target.shard)).toEqual(['brasscap-mesa']);
+  expect(targets[0]).toBe(coreMemoryTargets[2]);
   const input = rows().slice(2);
   expect(coreMemorySummary(input, 'templates')).toEqual(coreMemorySummary(rows()).slice(2));
-  expect(coreMemorySummary(input.slice(0, 1), 'templates')[1]).toMatchObject({totalBytes: null, passed: false});
+  expect(coreMemorySummary([], 'templates')[0]).toMatchObject({totalBytes: null, passed: false});
   expect(() => coreMemorySummary(rows(), 'templates')).toThrow('Duplicate or unknown');
   const first = input[0];
   if (first === undefined) throw new Error('Missing native Template fixture');
@@ -261,7 +254,7 @@ test('uses original 120s values, counts GPU, and never substitutes a cache-clear
 });
 
 test('missing, failed and invalid readings cannot pass as zero', () => {
-  expect(coreMemorySummary([])).toHaveLength(4);
+  expect(coreMemorySummary([])).toHaveLength(3);
   expect(coreMemorySummary([]).every(row => row.totalBytes === null && !row.passed)).toBe(true);
   expect(coreMemorySummary([{...nativeProtocol, shard: 'menu', errors: ['page failed'], samples: [{phase: '120s', rendererBytes: 1, gpuBytes: 1}]}])[0])
     .toMatchObject({totalBytes: null, passed: false});
@@ -274,14 +267,14 @@ test('missing, failed and invalid readings cannot pass as zero', () => {
 
 test('GPU-only readings cannot qualify a missing WebContent floor', () => {
   for (const gpuBytes of [0, 10 * MiB]) {
-    const input = [{...nativeProtocol, shard: '_template', errors: [],
+    const input = [{...nativeProtocol, shard: 'brasscap-mesa', errors: [],
       samples: [10, 60, 120].map(second => ({phase: `${second}s`, rendererBytes: 0, gpuBytes}))}];
     expect(coreMemorySummary(input, 'templates')[0]).toMatchObject({totalBytes: null, passed: false});
-    expect(coreMemoryEstimateAudit(input, '_template', MiB)).toMatchObject({measuredBytes: null,
+    expect(coreMemoryEstimateAudit(input, 'brasscap-mesa', MiB)).toMatchObject({measuredBytes: null,
       errorPercent: null, within15Percent: null, budgetPassed: false});
   }
   // An absent GPU process is supported; a real WebContent reading still qualifies.
-  expect(coreMemorySummary([{...nativeProtocol, shard: '_template', errors: [],
+  expect(coreMemorySummary([{...nativeProtocol, shard: 'brasscap-mesa', errors: [],
     samples: [{phase: '120s', rendererBytes: MiB, gpuBytes: 0}]}], 'templates')[0])
     .toMatchObject({totalBytes: MiB, passed: true});
 });
@@ -317,14 +310,14 @@ test('core command requires the floor protocol and source pin before any browser
 
 test('single compiled floors require their protocol and exact pin before any browser', () => {
   for (const flags of [[], ['--floor']]) expect(() => execFileSync('node', [
-    'scripts/shard-phone-memory.mjs', 'http://127.0.0.1:1', '_template', 'fixture', 'tmp/unused-core.json', '--compiled', ...flags,
+    'scripts/shard-phone-memory.mjs', 'http://127.0.0.1:1', 'brasscap-mesa', 'fixture', 'tmp/unused-core.json', '--compiled', ...flags,
   ], {encoding: 'utf8', stdio: 'pipe'})).toThrow('Compiled floor requires');
 });
 
 test('official WebKit core floors refuse mixed entry modes or duplicate readings before Simulator access', () => {
   const run = (flags: readonly string[]): string => execFileSync('node', ['scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', ...flags],
     {encoding: 'utf8', stdio: 'pipe', env: {...process.env, SIM_UDID: 'no-device-opened'}});
-  expect(() => run(['--core-memory=all', '--shard=_template'])).toThrow('Expected --core-memory');
+  expect(() => run(['--core-memory=all', '--shard=brasscap-mesa'])).toThrow('Expected --core-memory');
   expect(() => run(['--core-memory=unknown'])).toThrow('Expected --core-memory');
   expect(() => run(['--core-memory=all', '--runs=2'])).toThrow('exactly one cold reading');
   expect(() => run(['--core-memory=all', '--modes=cold,warm'])).toThrow('exactly one cold reading');
@@ -335,7 +328,7 @@ test('official WebKit core floors refuse mixed entry modes or duplicate readings
 test('upgrade observation refuses unrelated or repeated Simulator scenarios before device access', () => {
   expect(() => execFileSync('node', ['scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', '--upgrade-second-tap=1'],
     { encoding: 'utf8', stdio: 'pipe', env: {...process.env, SIM_UDID: 'no-device-opened'} })).toThrow('Second tap diagnostic requires');
-  for (const flags of [[], ['--runs=2', '--modes=warm'], ['--runs=1', '--modes=cold'], ['--runs=1', '--modes=warm', '--shard=_template']]) {
+  for (const flags of [[], ['--runs=2', '--modes=warm'], ['--runs=1', '--modes=cold'], ['--runs=1', '--modes=warm', '--shard=brasscap-mesa']]) {
     expect(() => execFileSync('node', ['scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', '--upgrade-from=https://example.test', ...flags],
       {encoding: 'utf8', stdio: 'pipe', env: {...process.env, SIM_UDID: 'no-device-opened'}})).toThrow('one warm grid run');
   }
@@ -423,7 +416,7 @@ const webGLCalibration = () => ({...helloCalibration(), shard: 'webgl',
 test('context diagnostic retains the original hello target and never adds an app budget', () => {
   expect(selectedCoreMemoryTargets('contexts')).toEqual([...selectedCoreMemoryTargets('hello'), webGLMemoryTarget]);
   expect(selectedCoreMemoryTargets('webgl')).toEqual([webGLMemoryTarget]);
-  expect(selectedCoreMemoryTargets('all')).toHaveLength(4);
+  expect(selectedCoreMemoryTargets('all')).toHaveLength(3);
   expect(webGLMemoryFloor(webGLCalibration())).toEqual({phase: '120s', rendererBytes: 30 * MiB, gpuBytes: 7 * MiB, totalBytes: 37 * MiB});
   expect(webKitCoreMemoryFloorBytes).toBe(103324920);
   expect(() => coreMemorySummary([webGLCalibration()])).toThrow('unknown');
@@ -512,7 +505,7 @@ test('Three.js fixture serves only installed module bytes with independent wire 
 
 test('empty Three.js diagnostic cannot qualify an app floor or rebase G682', () => {
   expect(selectedCoreMemoryTargets('three')).toEqual([threeMemoryTarget]);
-  expect(selectedCoreMemoryTargets('all')).toHaveLength(4);
+  expect(selectedCoreMemoryTargets('all')).toHaveLength(3);
   expect(threeMemoryFloor(threeCalibration())).toEqual({phase: '120s', rendererBytes: 30 * MiB, gpuBytes: 7 * MiB, totalBytes: 37 * MiB});
   expect(() => coreMemorySummary([threeCalibration()])).toThrow('unknown');
   expect(() => helloWorldMemoryFloor(threeCalibration())).toThrow();

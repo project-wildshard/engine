@@ -55,7 +55,7 @@ test('one line per checkpoint, each number tagged',()=>{
 });
 
 test('the ladder parts are medians of per-round differences, checked against the whole',()=>{
-  const round=(blank:number,tpl:number,zone:number)=>({blank:{k:blank,l:0},webgl:{k:blank+2,l:0},title:{k:blank+90,l:5},_template:{k:tpl,l:60,peak:tpl+300},z:{k:zone,l:150,peak:zone+400}});
+  const round=(blank:number,tpl:number,zone:number)=>({blank:{k:blank,l:0},webgl:{k:blank+2,l:0},title:{k:blank+90,l:5},'brasscap-mesa':{k:tpl,l:60,peak:tpl+300},z:{k:zone,l:150,peak:zone+400}});
   const {parts,byZone}=ladderParts([round(45,900,1050),round(46,905,1040),round(44,895,1060)],['z']);
   expect(parts.browserFloor.k).toBe(45);
   expect(parts.webglContext.k).toBe(2);

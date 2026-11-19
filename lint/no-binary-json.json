@@ -138,10 +138,6 @@
       "base64Chars": 0,
       "dataUris": 1
     },
-    "test/parity/baselines/gh-macos15/_template.phone.json": {
-      "base64Chars": 66756,
-      "dataUris": 2
-    },
     "test/parity/baselines/gh-macos15/far-reach.phone.json": {
       "base64Chars": 66756,
       "dataUris": 2

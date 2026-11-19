@@ -68,38 +68,6 @@
    "commit": "f31a7d3f58",
    "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
   },
-  "ledger/_template/control": {
-   "value": 91655664,
-   "contentKey": "template@10",
-   "commit": "dfb1f92fd",
-   "detail": {
-    "browser": 2810784,
-    "engine": 344064,
-    "workers": 7257724,
-    "geometry": 15301958,
-    "textures": 17885916,
-    "scene": 13892888,
-    "audio": 0,
-    "loading": 34162330,
-    "margin": 0
-   }
-  },
-  "ledger/_template/peak": {
-   "value": 100910812,
-   "contentKey": "template@10",
-   "commit": "dfb1f92fd",
-   "detail": {
-    "browser": 2810784,
-    "engine": 344064,
-    "workers": 7390848,
-    "geometry": 15301958,
-    "textures": 17885916,
-    "scene": 13892888,
-    "audio": 0,
-    "loading": 43284354,
-    "margin": 0
-   }
-  },
   "ledger/brasscap-mesa/control": {
    "value": 114712185,
    "contentKey": "brasscap-mesa@7",
@@ -933,12 +901,6 @@
     "loading": 116585473,
     "margin": 0
    }
-  },
-  "footprint/_template/settled": {
-   "value": 354062400,
-   "contentKey": "template@10",
-   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
-   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
   },
   "walk/nine-dragon-stack/rate": {
    "value": 3556635,
