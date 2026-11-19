@@ -276,7 +276,10 @@ export async function watchPageErrors(driver) {
   await driver.evaluate(`
     if (!window.__phoneBenchErrors) {
       const errors = window.__phoneBenchErrors = [];
-      const add = (kind, args) => { if (errors.length < 40) errors.push({kind, message: args.map(String).join(' ')}); };
+      const text = a => { if (!(a instanceof Error)) return String(a); let out = String(a.stack ? a + '\\n' + a.stack : a), c = a.cause;
+        for (let depth = 0; c !== undefined && depth < 4; depth++, c = c?.cause) out += '\\ncause: ' + String(c instanceof Error && c.stack ? c + '\\n' + c.stack : c);
+        return out; };
+      const add = (kind, args) => { if (errors.length < 40) errors.push({kind, at: Math.round(performance.now()), message: args.map(text).join(' ')}); };
       const original = console.error;
       console.error = (...args) => { add('console', args); original.apply(console, args); };
       addEventListener('error', e => add('page', [e.message || '', e.error || '']));

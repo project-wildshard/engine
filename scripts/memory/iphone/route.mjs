@@ -334,6 +334,12 @@ export const holdWake = `
   answer(window.__wsRouteWakeAsk ?? navigator.wakeLock.request('screen')).then(done);
 `;
 
+/** QA 27 (the coordinator, 2026-11-19): with no finger on the glass the page's AudioContext stays suspended, so every source
+ * it starts looks live for good. Run as a gesture (the inspector's emulateUserGesture), a touchend on the body reaches
+ * audio/unlock.ts's window capture listeners, which resume the context as a real first tap does; no game control reads it. */
+export const unlockAudio = `(() => { let event; try { event = new TouchEvent('touchend', { bubbles: true, cancelable: true }); } catch { event = new Event('touchend', { bubbles: true, cancelable: true }); }
+  document.body.dispatchEvent(event); return 'touchend'; })()`;
+
 /** The expression a driver's gesture() runs first, so the request has transient activation. */
 export const askWake = "(window.__wsRouteWakeAsk = navigator.wakeLock?.request('screen'), true)";
 
@@ -401,6 +407,14 @@ export async function playRoute(driver, { slug, cap, rec = [], legs: count, log 
     const recText = recording ? await driver.evaluateAsync(recRead, [], 45_000).catch((/** @type {unknown} */ error) => `REC unread: ${String(error)}`) : null;
     legs.push({ name: leg.name, kind: leg.kind, cap, error: result?.error ?? null, nav: result?.nav ?? null, summary, samples: result?.samples ?? [], rec: recText });
     log(`${leg.name}: ${summary === null ? `no frames (${String(result?.error)})` : `${String(summary.fps)} fps p95 ${String(summary.p95Ms)} ms >50 ${String(summary.over50)}`}${result?.nav?.stuck?.length ? ` stuck ${String(result.nav.stuck.length)}` : ''}`);
+    if (result?.error) {
+      // the coordinator, 2026-11-19: a broken leg brings back the page's console errors with their stacks and the error card
+      const page = await driver.evaluateAsync(`arguments[arguments.length - 1]({ errors: window.__phoneBenchErrors ?? null,
+        card: document.querySelector('.ws-load-error')?.innerText?.trim() ?? null, build: window.__WS_BUILD_LABEL__ ?? null })`, [], 10_000)
+        .catch((/** @type {unknown} */ error) => ({ unread: String(error) }));
+      legs[legs.length - 1].page = page;
+      log(`${leg.name}: page errors ${JSON.stringify(page).slice(0, 4000)}`);
+    }
     if (result?.error === 'the page lost the controlled world during the leg' || result?.error === 'cannot run a route leg before control') break;
   }
   return legs;

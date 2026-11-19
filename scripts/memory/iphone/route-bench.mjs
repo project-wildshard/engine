@@ -20,7 +20,7 @@ import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone } from './safari.mjs';
-import { askWake, holdWake, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
+import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
@@ -74,6 +74,7 @@ async function bench() {
           if ('gesture' in driver && typeof driver.gesture === 'function') await driver.gesture(askWake).catch(() => undefined);
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
+          if ('gesture' in driver && typeof driver.gesture === 'function') row.audioUnlock = await driver.gesture(unlockAudio).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           // --profile <s>: WebKit's sampling profiler over the route's first seconds (DW2: what the long tasks are)
           if (values.profile !== undefined && 'profileStart' in driver && typeof driver.profileStart === 'function') {
             const profiled = driver;

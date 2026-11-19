@@ -23,3 +23,4 @@ export function worstSegment(report: { legs: LegResult[] }[], cap: number): { na
 
 export const holdWake: string;
 export const askWake: string;
+export const unlockAudio: string;
