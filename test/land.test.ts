@@ -13,6 +13,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
 import { shaVerdict } from '../scripts/land.mjs';
+import { T1_SHARDS } from '../scripts/t1-shards.mjs';
 import { cleanLandFixtures, trackLandFixtureRoot } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -188,7 +189,7 @@ describe('ci.yml on main', () => {
     expect(packed).toContain('name: template-e2e-products');
     const t1 = jobs.get('t1-e2e') ?? '';
     expect(t1).toMatch(/^ {4}needs: products$/mu);
-    expect(t1).toContain('suite: [A, B, C, D, E, F]');
+    expect(t1.split('\n')).toContain(`        suite: [${Object.keys(T1_SHARDS).join(', ')}]`);
     expect(t1).toContain('bash scripts/ci-playwright-install.sh --only-shell chromium');
     expect(t1).toContain('node scripts/t1-ci-proof.mjs');
     expect(t1).toContain('name: template-e2e-${{ matrix.suite }}');
