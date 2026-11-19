@@ -77,18 +77,23 @@ export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardC
   /** Every other player's pace: a body's reading is its own foe's, not the first player's. */
   const company = new Map<string, typeof motion>();
   const from = new Vector3(), to = new Vector3(), direction = new Vector3(), point = new Vector3();
-  // OF11b: a lane charge's overshoot rides the strike's motion, as the program's strike data carries it
+  // OF11b: a lane charge's overshoot rides the strike's motion and a row's `units` its sizing, as the program's strike
+  // data carries them
   const strikes = new Map<string, StrikeSpec>(rows.strikes.map(({ weight, speed, overshoot, ...row }) =>
     [row.id, { ...row, motion: overshoot === undefined ? { speed } : { speed, overshoot }, weight: () => weight }]));
   const foe = (actor: AnimalSim): ReturnType<SimHost['nearestPlayer']> => host.nearestPlayer(actor.position);
   const speedOf = (actor: AnimalSim): number => company.get(foe(actor).id)?.speed ?? motion.speed;
   const calm = (actor: AnimalSim): boolean => !foe(actor).health.alive;
   const reach = (actor: AnimalSim): boolean => canReach(actor, foe(actor).position, host.physics);
-  const hit = (actor: AnimalSim, target: ReturnType<SimHost['nearestPlayer']> | undefined, damage: number, tags: StrikeSpec['tags'], moveId: string): void => {
+  const hit = (actor: AnimalSim, target: ReturnType<SimHost['nearestPlayer']> | undefined, damage: number, tags: StrikeSpec['tags'], moveId: string,
+    blow = false): void => {
     if (!actor.alive || target === undefined || !target.health.alive) return;
     point.copy(target.position); point.y += 1.2;
     from.copy(actor.position); from.y += actor.dims.bodyY * actor.scale;
     direction.subVectors(point, from).normalize();
+    // OF11b: a strike row tagged `feel.blow` lands as the program's contact body does, at the creature, so the
+    // player's knockback (server and client read the hit's point) pushes away from it rather than along the player's yaw
+    if (blow && tags.includes('feel.blow')) point.copy(actor.position);
     host.combat.hit({ source: actor.combatActor(), sourceTags: tags, target: target.health,
       amount: damage, point, dir: direction, from, moveId });
   };
@@ -107,7 +112,7 @@ export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardC
       },
       reach: (body: AnimalSim) => nearest === undefined ? reach(body) : selected !== undefined && canReach(body, selected.position, host.physics),
       hurt: (damage: number, tags: StrikeSpec['tags'], moveId: string) => {
-        if (nearest === undefined) hurt(actor, damage, tags, moveId); else hit(actor, selected, damage, tags, moveId);
+        hit(actor, nearest === undefined ? foe(actor) : selected, damage, tags, moveId, true);
       },
       binding: nearest === undefined ? {} : { nearest,
         bindTarget: (target: () => ReturnType<SimHost['nearestPlayer']> | undefined) => { bound = target; } },

@@ -22,7 +22,7 @@ const program: StrikeData[] = [
 // sdk speciesProgramToRows' plain rows for the same strikes
 const rows = [
   { id: 'sunscar.ray.swoop', shape: { kind: 'sphere', radius: 2.2 }, windup: 0.3, active: 0.4, recover: 0.5, cooldown: 2.5, range: 7, damage: 14,
-    tags: ['creature.duneRay'], weight: 1, speed: 0 },
+    tags: ['creature.duneRay'], units: 'world', weight: 1, speed: 0 },
   { id: 'sunscar.strider.charge', shape: { kind: 'lane', length: 13, width: 2.2 }, windup: 1.1, active: 1.2, recover: 1.8, cooldown: 3.5, range: 17,
     damage: 22, tags: ['creature.duneStrider'], weight: 1, speed: 11, overshoot: 3 },
   { id: 'sunscar.strider.horns', shape: { kind: 'arc', radius: 3.4, halfAngle: 0.9 }, windup: 0.6, active: 0.2, recover: 0.8, cooldown: 1.6, range: 3.2,
@@ -34,8 +34,9 @@ beforeEach(() => bindFlatTerrain({ heightAt: () => 0, waterLevel: () => -100,
 
 /** What the strike runner reads of a strike, weight aside. */
 function ran(strike: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  const { weight: _weight, units, motion, ...rest } = strike as Record<string, unknown> & { motion?: Record<string, unknown> };
-  return { ...rest, units: units ?? 'world', motion: { speed: 0, ...motion } };
+  // `units` is compared as given: an unset one sizes by `max(1, scale)` in the runner, not as 'world'
+  const { weight: _weight, motion, ...rest } = strike as Record<string, unknown> & { motion?: Record<string, unknown> };
+  return { ...rest, motion: { speed: 0, ...motion } };
 }
 
 test('the data host runs Dunes ray and strider strikes as the program does', async () => {
