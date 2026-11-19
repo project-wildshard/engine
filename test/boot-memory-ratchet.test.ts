@@ -33,6 +33,11 @@ test('held parts or a missing measurement fail the load; high geometry and heap 
   expect(bootMemoryVerdict(marks(2),53e6,300e6,judging()).faults).toEqual(['boot memory: 2 spawn parts still held past the download step']);
   expect(bootMemoryVerdict(marks(0),null,300e6,judging()).faults).toEqual(['boot memory: no retained CPU geometry measurement at control']);
   expect(bootMemoryVerdict(marks(0),53e6,Number.NaN,judging()).faults).toEqual(['boot memory: no live heap measurement at control']);
+  // the 5 MB memory floor: hosted retained geometry moves ~2 MB with upload timing (13.3 -> 15.25 MB, QA 2026-11-19 row 4)
+  const hosted={contentKey:'nine-dragon-stack@3',budgets:{caps:readCaps(),baselines:{schema:1,about:'',baselines:{
+    'nine/boot/retained-geometry':{value:13_309_155,contentKey:'nine-dragon-stack@3'},'nine/boot/live-heap':{value:216_970_560,contentKey:'nine-dragon-stack@3'}}}}};
+  expect(statuses(bootMemoryVerdict(marks(0),15_249_927,216_259_359,hosted))).toEqual(['ok','ok']);
+  expect(statuses(bootMemoryVerdict(marks(0),18_309_155,216_259_359,hosted))).toEqual(['regressed','ok']);
   // a new Nine revision is new content: only the hard cap (none on record, D3) is checked
   expect(statuses(bootMemoryVerdict(marks(0),117e6,367e6,judging('nine-dragon-stack@4')))).toEqual(['raised','raised']);
 });

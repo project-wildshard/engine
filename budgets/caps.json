@@ -104,8 +104,9 @@
    "hard": null,
    "unit": "bytes",
    "kind": "noisy",
+   "floor": 5000000,
    "decision": null,
-   "why": "Nine's boot at control in ci's nine-ring1 load (BC11): CPU geometry still reachable from the scene, and the live JS heap after a full collection. No hard cap on record (D3); held spawn parts fail the load on their own."
+   "why": "Nine's boot at control in ci's nine-ring1 load (BC11): CPU geometry still reachable from the scene, and the live JS heap after a full collection. No hard cap on record (D3); held spawn parts fail the load on their own. Floor 5 MB like every memory total: retained geometry at control moves ~2 MB with when uploads release (retained plus released is constant)."
   },
   "nine/street/triangles95": {
    "hard": null,
