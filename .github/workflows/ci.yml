@@ -290,7 +290,8 @@ jobs:
         if: steps.pack.outputs.products == 'true'
         run: |
           set -- dist out/brasscap-mesa test/pins/saves tmp/template-e2e-ci/qualification.json
-          for extra in out/.ring-catalogue.json out/.slices/brasscap-mesa; do [ -e "$extra" ] && set -- "$@" "$extra"; done
+          # The rigs' world server reads the grid's collision and tables from out/.app (D's rooms never started without it).
+          for extra in out/.app out/.ring-catalogue.json out/.slices/brasscap-mesa; do [ -e "$extra" ] && set -- "$@" "$extra"; done
           tar -chf tmp/template-e2e-ci/products.tar "$@"
       - name: Publish the shared Template suite build
         if: steps.pack.outputs.products == 'true'
