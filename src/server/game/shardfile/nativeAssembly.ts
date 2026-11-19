@@ -11,7 +11,7 @@ import { shardLevel } from '../plugin/simulation';
 import { createNativeBakeReader, installNativeCollision, nativeBakeGround, type NativeCollisionBake, type NativeCollisionSolid } from '../population/nativeBake';
 import { NativePopulationField } from '../population/environment';
 import { need, readAssemblyInput, type AssemblyGround, type AssemblyPrepared, type NativeAssemblyContext, type NativeAssemblyPorts } from './nativeAssemblyInput';
-import { declaredWakeFight, prepareAssemblyFeature, type AssemblyRun } from './nativeAssemblyHosts';
+import { declaredWakeFight, prepareAssemblyFeature, prepareSectionMelee, type AssemblyRun } from './nativeAssemblyHosts';
 import { parseChapterWake } from '@wildshard/format/chapterDirector';
 import { installAssemblySolids, standsOwnSolids } from './assemblySolids';
 import { readPatrolIntake } from '../boss/patrolNative';
@@ -141,7 +141,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const declaredLevel: SimLevel = { ...level, entities: declaredSpawnEntities(counted) };
   const world = sectionWorld(product, plan);
   // OF22a3: with no collision host the bake lends its ground alone and the shard's prop solids stand beside it
-  const ownSolids = standsOwnSolids(plan.features.map(row => row.host));
+  const ownSolids = standsOwnSolids(plan.features.map(row => row.host)), melee = prepareSectionMelee<C>(product, plan.features.map(row => row.host));
   const ownGround = ownSolids && plan.bake !== undefined && plan.collision !== undefined ? { bake, resolution: plan.collision.resolution } : null;
   const levelPorts = { ground: false as const, heightAt };
   const walk = (host: SimHost): ReturnType<typeof proveTerrainEntries> => proveTerrainEntries(host.physics, shard.entryways, heightAt, plan.entries.walk as Parameters<typeof proveTerrainEntries>[3]);
@@ -157,6 +157,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     const run: AssemblyRun<C> = { host, context, input: null, day: world(host) };
     // OF22a3: the ground and prop solids stand first, where a plan's `collision` host stood, before any host reads them
     if (ownSolids) installAssemblySolids(host, shard, assets, ownGround, context.restoring);
+    melee?.(run); // OF22d2: the held/melee section's sword, where a plan names no item.swept host
     for (const step of steps) step(run);
     run.declared = installRuntimeCreatures(host, counted, assets, sections, { restoring: context.restoring, keeper, summoned,
       fact: (name, actor) => { need(run.input, 'A declared decision grant needs the commands host').ledger.fact(name, actor); } });

@@ -15,6 +15,7 @@ import { parseBarterEconomy } from '@wildshard/format/lootEconomy';
 import type { NativeAssemblyFeature, NativeEliteConditions } from '@wildshard/format/nativeAssembly';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { RuntimeEncounter } from './runtimeCreatures';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { parseNativeQuestComposition } from '@wildshard/format/nativeQuestComposition';
 import { QuestRuntimeDocumentSchema } from '@wildshard/format/questRuntime';
 import { TOON_DAY_PRESET } from '@wildshard/format/toonLook';
@@ -91,6 +92,18 @@ const dayOf = <C extends NativeAssemblyContext>(run: AssemblyRun<C>): DayCycleCl
 const bootOf = <C extends NativeAssemblyContext>(at: AssemblyPrepared<C>) => need(at.boot, 'Native assembly host requires boot rows') as NativePopulationBootRows & {
   riding: NativeTamingRows['programs'] & { riding: unknown }; rest: NativeTamingRows['rest']; mountable: readonly string[] };
 const fieldOf = <C extends NativeAssemblyContext>(at: AssemblyPrepared<C>) => need(at.field, 'Native assembly host requires its field');
+function installSweptMelee<C extends NativeAssemblyContext>(run: AssemblyRun<C>, items: readonly unknown[], policy: unknown): void {
+  installNativeItems(run.host, combatOf(run), { kind: 'swept', items, policy }); registerInstalled(run.host, 'heldArms'); registerInstalled(run.host, 'loadout');
+}
+/**
+ * ONE-FORMAT OF22d2: a native plan that names no `item.swept` host stands its swept melee from the shard's `held/melee`
+ * section (the same policy the host read from a server file), before any host, so a quest host that lends its sword finds it.
+ */
+export function prepareSectionMelee<C extends NativeAssemblyContext>(product: ShardFolder, hosts: readonly string[]): ((run: AssemblyRun<C>) => void) | null {
+  if (hosts.includes('item.swept') || !product.has('held/melee')) return null;
+  const policy = product.section('held/melee'), items = product.shardfile.items.rows;
+  return run => { installSweptMelee(run, items, policy); };
+}
 
 async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<NativeAssemblyFeature, { host: 'quest.composition' }>, at: AssemblyPrepared<C>): Promise<Step<C>> {
   const { product } = at, shard = product.shardfile, read = <T>(input: Parameters<typeof readAssemblyInput>[1]): Promise<T> => readAssemblyInput<T>(product, input);
@@ -270,7 +283,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
         registerInstalled(run.host, 'heldRanged');
       };
     }
-    case 'item.swept': { const policy = await readAssemblyInput(product, row.policy); return run => { installNativeItems(run.host, combatOf(run), { kind: 'swept', items: shard.items.rows, policy }); registerInstalled(run.host, 'heldArms'); registerInstalled(run.host, 'loadout'); }; }
+    case 'item.swept': { const policy = await readAssemblyInput(product, row.policy); return run => { installSweptMelee(run, shard.items.rows, policy); }; }
     case 'loadout': {
       const policy = need(shard.items.loadout.native, 'Missing native loadout'), input = need(policy.input, 'Missing native equipment input policy');
       return run => { const combat = combatOf(run); registerInstalled(run.host, 'loadout'); bindNativeLoadout(run.host, policy, { flags: run.host.flags, frame: combat,
