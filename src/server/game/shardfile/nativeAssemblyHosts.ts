@@ -13,6 +13,8 @@ import { parseAchievementCounterData } from '@wildshard/format/achievementCounte
 import { parseChapterDirector, parseChapterWake } from '@wildshard/format/chapterDirector';
 import { parseBarterEconomy } from '@wildshard/format/lootEconomy';
 import type { NativeAssemblyFeature, NativeEliteConditions } from '@wildshard/format/nativeAssembly';
+import type { Shardfile } from '@wildshard/format/shardSchema';
+import type { RuntimeEncounter } from './runtimeCreatures';
 import { parseNativeQuestComposition } from '@wildshard/format/nativeQuestComposition';
 import { QuestRuntimeDocumentSchema } from '@wildshard/format/questRuntime';
 import { TOON_DAY_PRESET } from '@wildshard/format/toonLook';
@@ -75,6 +77,13 @@ export interface AssemblyRun<C extends NativeAssemblyContext> {
   island?: ReturnType<typeof installMixedPopulation>; bindings?: NativeEliteBindings; roster?: ReturnType<typeof installNativeBootRoster>;
   weather?: { readonly wind: Wind; readonly storm: WeatherReactions }; patrol?: () => void; arena?: OpenArenaPlan;
   wild?: NativeWildEnvironment; groups?: ReturnType<typeof installNativeGroupRows>; nativeElites?: NativeEliteRoster; eliteCore?: ReturnType<typeof nativeEliteCore>; creatures?: ReturnType<typeof installNativePopulationHunt>; taming?: ReturnType<typeof installNativeTaming>;
+  /** OF22c1: the declared encounters by their spawn, once the declared creature host stands (after every host). */
+  declared?: ReadonlyMap<string, RuntimeEncounter>;
+}
+/** OF22c1: the declared boss fight on a chapter wake row's spawn, if the shard declares one. */
+export function declaredWakeFight(shard: Pick<Shardfile, 'encounters'>, spawn: string): { readonly encounter: string; readonly entity: string } | undefined {
+  const row = shard.encounters.find(entry => entry.entity === spawn && entry.kind === 'boss');
+  return row === undefined ? undefined : { encounter: row.id, entity: row.entity };
 }
 type Step<C extends NativeAssemblyContext> = (run: AssemblyRun<C>) => void;
 const combatOf = <C extends NativeAssemblyContext>(run: AssemblyRun<C>) => need(run.context.combat, 'Native assembly requires its combat frame');
@@ -305,7 +314,12 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     case 'quest.chapter': {
       const director = await readDirectorDocument(product), input = parseChapterDirector(await readAssemblyInput(product, row.rows)), wake = parseChapterWake(await readAssemblyInput(product, row.wake));
       const captain = rows['captain'] as { pool: { x: number; z: number }; arena: unknown };
-      return run => { installNativeChapterDirector(run.host, director, { id: row.id, rows: input, reward: row.reward, wake: { population: row.population, encounter: wake.encounter, placement: { pool: { x: captain.pool.x, z: captain.pool.z }, arena: captain.arena }, cues: wake.cues.map(({ id, operation }) => ({ id, operation })) } }, run.context.restoring); };
+      // OF22c1: a wake row naming a declared spawn with a boss encounter wakes that fight, not the population's reserved body
+      const fight = declaredWakeFight(product.shardfile, wake.spawn);
+      return run => {
+        const declared = fight === undefined ? undefined : { ...fight, summon: () => { need(run.declared?.get(fight.entity), 'A declared wake needs its encounter').summon(); } };
+        installNativeChapterDirector(run.host, director, { id: row.id, rows: input, reward: row.reward, wake: { population: row.population, encounter: wake.encounter, placement: { pool: { x: captain.pool.x, z: captain.pool.z }, arena: captain.arena }, cues: wake.cues.map(({ id, operation }) => ({ id, operation })) } }, run.context.restoring, declared);
+      };
     }
     default: throw new Error('Unknown native assembly host');
   }

@@ -4,7 +4,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { isJsonData } from '@wildshard/format/json';
 import { ChapterDirectorSchema, parseChapterDirector } from '@wildshard/format/chapterDirector';
-import { WakeEncounterSchema } from '@wildshard/format/bossEncounter';
+import { WakeEncounterSchema, parseWakeEncounter } from '@wildshard/format/bossEncounter';
 import type { DirectorScriptStageLane, readDirectorDocument } from '../../../shared/game/plugin/director';
 import { mixedPopulation } from '../population/mixedRoster';
 import { installWakeBoss } from '../boss/nativeWake';
@@ -19,9 +19,16 @@ const nativeChapter = v.strictObject({ id: chapterName, rows: ChapterDirectorSch
     placement: v.strictObject({ pool: v.object({ x: finite, z: finite }), arena: finite }),
     cues: v.pipe(v.array(v.strictObject({ id: chapterName, operation: v.picklist(['restore', 'wake', 'effects']) })), v.maxLength(64)) })) });
 
+/**
+ * ONE-FORMAT OF22c1: a wake whose row names a declared spawn with a `boss` encounter on it. Its wake cue summons that
+ * fight (which waits out of the world until then); its win files the wake row's death flag, which clears once the body
+ * stands again. No population body and no wake shell stand for it. `summon` is the declared host's, installed after the
+ * chapter, so it is read when a cue runs.
+ */
+export interface DeclaredWake { readonly encounter: string; readonly entity: string; readonly summon: () => void }
 /** Renderer-free chapter entry. Closed rows borrow actual population, encounter
  * and reward owners; the caller retains its existing step and save envelope. */
-export function installNativeChapterDirector(host: SimHost, director: Awaited<ReturnType<typeof readDirectorDocument>>, input: unknown, restoring = false): {
+export function installNativeChapterDirector(host: SimHost, director: Awaited<ReturnType<typeof readDirectorDocument>>, input: unknown, restoring = false, declared?: DeclaredWake): {
   readonly clock: DirectorScriptStageLane; readonly fast: ChapterClock['fast'];
   /** One tick: `step` is the lead's chapter step, and `quest` names the chapter, so each other player's clock reads its own. */
   readonly update: (dt: number, step?: string, quest?: string) => void;
@@ -36,13 +43,15 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     if (effect.kind === 'reward' && policy.reward === undefined) throw new Error('Missing native chapter reward owner');
     if (!['flag', 'phase', 'cue', 'reward'].includes(effect.kind)) throw new Error('Native chapter requires closed native effects');
   }
-  const population = policy.wake === undefined ? null : mixedPopulation(host, policy.wake.population);
+  const population = policy.wake === undefined || declared !== undefined ? null : mixedPopulation(host, policy.wake.population);
   const encounter = policy.wake === undefined || population === null ? null : installWakeBoss(host, policy.wake.encounter, policy.wake.placement, population.retireCaptain);
+  const declaredWake = policy.wake === undefined || declared === undefined ? null : bindDeclaredWake(host, policy.wake.encounter, declared);
   const reward = policy.reward === undefined ? null : installNativeQuestChannels(host, policy.reward, { started: false, completed: false });
   const leadBody = host.players.get(books.lead.player); if (leadBody === undefined) throw new Error('Native chapter requires its player');
   const timeline = new ChapterClock(host.scope, director, rows, host.flags,
     { get day() { return host.dayClock ?? null; }, player: leadBody.position, reward: rows.reward ?? null, finish: 'assign' }, effect => {
       if (effect.kind === 'reward' && reward !== null) reward[effect.state] = true;
+      else if (effect.kind === 'cue' && declaredWake !== null) declaredWake(effect.id, cues);
       else if (effect.kind === 'cue' && population !== null && encounter !== null && policy.wake !== undefined) {
         const cue = cues.get(effect.id); if (cue === undefined) throw new Error('Unknown native chapter cue');
         if (cue.operation !== 'effects') {
@@ -61,6 +70,7 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     const body = host.players.get(book.player); if (body === undefined) throw new Error('Native chapter requires its player');
     const scope = host.scope.child(`chapter:${book.player}`);
     const clock = new ChapterClock(scope, director, rows, book.flags, { get day() { return host.dayClock === undefined ? null : seen; }, player: body.position, reward: rows.reward ?? null, finish: 'assign' }, effect => {
+      if (effect.kind === 'cue' && declaredWake !== null) { declaredWake(effect.id, cues); return; }
       if (effect.kind !== 'cue' || population === null || encounter === null || policy.wake === undefined) return;
       const cue = cues.get(effect.id); if (cue === undefined) throw new Error('Unknown native chapter cue');
       // the boss is the room's: a player's chapter can wake one, and never resets a fight already running
@@ -77,4 +87,17 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
       seat.clock.update(dt, seat.book.quests.find(entry => entry.def.id === quest)?.current?.id);
     }
   } };
+}
+/** OF22c1: the declared fight behind a wake row: its wake cue summons it (a restore cue has nothing to do: the fight keeps its
+ *  own continuation), its win files the row's death flag, and its body standing again clears it. */
+function bindDeclaredWake(host: SimHost, input: unknown, declared: DeclaredWake): (cue: string, cues: ReadonlyMap<string, { readonly operation: string }>) => void {
+  const row = parseWakeEncounter(input);
+  host.events.on('boss.attempt', ({ boss, outcome }) => { if (boss === declared.encounter && outcome === 'won') host.flags.set(row.deadFlag); }, host.scope);
+  host.onStep(`${row.step}.declared`, () => {
+    if (host.flags.has(row.deadFlag) && host.entities.get(declared.entity)?.alive === true) host.flags.clear(row.deadFlag);
+  });
+  return (id, cues) => {
+    const cue = cues.get(id); if (cue === undefined) throw new Error('Unknown native chapter cue');
+    if (cue.operation === 'wake') declared.summon();
+  };
 }

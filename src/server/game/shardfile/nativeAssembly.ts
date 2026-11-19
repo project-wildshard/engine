@@ -11,7 +11,8 @@ import { shardLevel } from '../plugin/simulation';
 import { createNativeBakeReader, installNativeCollision, nativeBakeGround, type NativeCollisionBake, type NativeCollisionSolid } from '../population/nativeBake';
 import { NativePopulationField } from '../population/environment';
 import { need, readAssemblyInput, type AssemblyGround, type AssemblyPrepared, type NativeAssemblyContext, type NativeAssemblyPorts } from './nativeAssemblyInput';
-import { prepareAssemblyFeature, type AssemblyRun } from './nativeAssemblyHosts';
+import { declaredWakeFight, prepareAssemblyFeature, type AssemblyRun } from './nativeAssemblyHosts';
+import { parseChapterWake } from '@wildshard/format/chapterDirector';
 import { installAssemblySolids, standsOwnSolids } from './assemblySolids';
 import { readPatrolIntake } from '../boss/patrolNative';
 import { readSlotIntake } from '../boss/slotsNative';
@@ -132,6 +133,11 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const counted = countedShard(shard), sections = outputDescriptor(shard)?.sections ?? new Map<string, unknown>(), keeper = assemblyKeeper(counted, sections);
   admitRuntimeCreatures(counted, sections, keeper);
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
+  // OF22c1: a chapter wake row's declared fight waits, as a quest page's summoned one does, for its wake cue
+  for (const row of plan.features) if (row.host === 'quest.chapter') {
+    const { spawn } = parseChapterWake(await readAssemblyInput(product, row.wake));
+    if (declaredWakeFight(shard, spawn) !== undefined) summoned.add(spawn);
+  }
   const declaredLevel: SimLevel = { ...level, entities: declaredSpawnEntities(counted) };
   const world = sectionWorld(product, plan);
   // OF22a3: with no collision host the bake lends its ground alone and the shard's prop solids stand beside it
@@ -152,7 +158,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     // OF22a3: the ground and prop solids stand first, where a plan's `collision` host stood, before any host reads them
     if (ownSolids) installAssemblySolids(host, shard, assets, ownGround, context.restoring);
     for (const step of steps) step(run);
-    installRuntimeCreatures(host, counted, assets, sections, { restoring: context.restoring, keeper, summoned,
+    run.declared = installRuntimeCreatures(host, counted, assets, sections, { restoring: context.restoring, keeper, summoned,
       fact: (name, actor) => { need(run.input, 'A declared decision grant needs the commands host').ledger.fact(name, actor); } });
     installNativeHarvest(host, harvest);
   } };
