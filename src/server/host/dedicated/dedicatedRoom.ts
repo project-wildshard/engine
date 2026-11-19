@@ -2,6 +2,7 @@ import {importedCheckpoint,type DurableCheckpoint} from './checkpointWitness';
 // E7.3: one cell of the world (J178). C5: no road yet; GC15's `handOver` moves a seat to a cell on the same worker. C3: the first human takes the host's own seat, and a vacant lead
 // seat is refilled first. C6: every solid stays in memory. It holds no socket: a seat's `Transport` comes from the world's door.
 import type { ChatReports } from '@wildshard/engine/net/chat';
+import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { LedgerBook, type LedgerFiling } from '@wildshard/engine/net/ledgerBook';
 import { NetRoom, type NetTickInput } from '@wildshard/engine/net/room';
 import { SimNetWorld } from '@wildshard/engine/net/simWorld';
@@ -219,7 +220,12 @@ export class DedicatedRoom implements CrossTarget {
     try { if (doc !== null) {
       if (parseDoc(doc, PLAYER_DOC_VERSION, this.options.slug) === null) throw new Error('Invalid player document');
       const bounds = this.options.input.shard.manifest?.bounds, reach = host.level.ground.size / 2, slack = 64;
-      if (doc.at.x < (bounds?.x0 ?? -reach) - slack || doc.at.x > (bounds?.x1 ?? reach) + slack || doc.at.z < (bounds?.z0 ?? -reach) - slack || doc.at.z > (bounds?.z1 ?? reach) + slack) throw new Error('Player position is outside the world');
+      const { x, z } = doc.at;
+      const outsideShard = x < (bounds?.x0 ?? -reach) - slack || x > (bounds?.x1 ?? reach) + slack
+        || z < (bounds?.z0 ?? -reach) - slack || z > (bounds?.z1 ?? reach) + slack;
+      // Grid rooms save at their exits, which can stand outside a shard's standalone play area.
+      const insideGrid = this.options.road !== undefined && Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF + slack;
+      if (outsideShard && !insideGrid) throw new Error('Player position is outside the world');
       doc = recoverPlayer(doc, entry.recovery ?? [], this.options.input, this.options.slug);
     } }
     catch (error) { return `recovery: ${String(error)}`; }
