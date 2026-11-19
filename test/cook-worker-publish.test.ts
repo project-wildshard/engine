@@ -1,5 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The budget leaves no index behind.
-import {existsSync, mkdirSync, openSync, closeSync, ftruncateSync} from 'node:fs';
+import {existsSync, mkdirSync, openSync, closeSync, ftruncateSync, rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A stub of api-server's notify call.
 import {type Server} from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in folders of its own.
@@ -65,6 +65,20 @@ describe('the cook worker', () => {
     expect(row.detail ?? '').not.toContain('Over the pack budget');
     expect(row).toMatchObject({state: 'cooked'});
   }, 120_000);
+
+  // 2026-11-19: staging's bucket held 999,467 objects and its whole listing took about 6 min, so each publish that listed it
+  // first held new uploads 7.5 min apart behind a 10 s cook. One worker lists the bucket once and keeps its own writes.
+  it('lists the whole bucket once for two publishes, not once each', async () => {
+    const folder = join(h.scratch, 'listed'), inner = folderStore(folder), hash = hashOf(h.real);
+    let whole = 0;
+    const cook = createCookWorker({build: 'b7', store: {...inner, list: prefix => { if (prefix === '') whole++; return inner.list(prefix); }},
+      source: h.source(new Map([[hash, h.real]])), launcher: h.launcher(), serverPacks: join(h.scratch, 'server'), scratch: join(h.scratch, 'work')});
+    expect(await cook.cook({slug, hash})).toMatchObject({state: 'cooked'});
+    rmSync(join(folder, 'index'), {recursive: true, force: true});
+    expect(await cook.cook({slug, hash}), 'the second publish writes the index again').toMatchObject({state: 'cooked'});
+    expect(existsSync(join(folder, 'index')), 'the second publish wrote its index').toBe(true);
+    expect(whole).toBe(1);
+  }, 180_000);
 
   it('still refuses when its own keys are over the default budget', async () => {
     const store = join(h.scratch, 'full');

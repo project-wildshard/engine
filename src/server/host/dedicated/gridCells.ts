@@ -4,6 +4,7 @@
 import { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import { catalogueDocument } from '@wildshard/engine/game/grid/catalogueDocument';
 import { GRID_RADIUS } from '@wildshard/format/contentBounds';
+import { shardSlugOf } from '@wildshard/format/standaloneCatalogue';
 
 /** `WORLD_CELLS=grid`: every grid cell the release names, the home cell first. */
 export const WHOLE_GRID = 'grid';
@@ -86,6 +87,8 @@ export function placeCell(given: PlacedCell, file?: readonly PlacedCell[]): bool
   if (row.hash !== undefined) hashes.set(row.slug, row.hash);
   return true;
 }
+/** The installed catalogue's cell for an uploaded shard slug (a grid slug may carry a leading `_`), undefined when it has none. */
+export function catalogueCell(slug: string): PlacedCell | undefined { return catalogueCells().find(row => new Set([slug]).has(shardSlugOf(row.slug))); }
 /** SA47: the shardfile hash the placement named for a placed slug, so its room can open from the cook's index; undefined for any other. */
 export function placedHash(slug: string): string | undefined { return hashes.get(slug); }
 let assembled: { readonly from: unknown; readonly placed: number; readonly assembly: GridAssembly } | null = null;

@@ -31,7 +31,7 @@ import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
 import { doorTrust } from './doorTrust';
-import { WHOLE_GRID, cellShard, placeCell, placedCells, worldCells } from './gridCells';
+import { WHOLE_GRID, catalogueCell, cellShard, placeCell, placedCells, worldCells } from './gridCells';
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
 import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
 import { DEV_CONTROL_PATH, devRoute } from './devControl';
@@ -205,7 +205,7 @@ if (activationToken !== undefined) {
       return {clientPlan: input.sections?.get('client/plan') ?? (input.product?.has('client/plan') === true ? input.product.section('client/plan') : undefined)};
     },
     place: (row, file) => {placeCell(row, file);}, open: instances => world.activateCells(instances),
-    opened: instance => Object.hasOwn(world.health().table, instance),
+    opened: instance => Object.hasOwn(world.health().table, instance), catalogue: catalogueCell,
   }));
 }
 void placements?.look();

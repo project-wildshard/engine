@@ -20,6 +20,9 @@ export interface UploadActivationPorts {
   readonly place: (row: PlacedCell, file: readonly PlacedCell[]) => void;
   readonly open: (instances: readonly string[]) => Promise<readonly string[]>;
   readonly opened: (instance: string) => boolean;
+  /** The build's own catalogue cell for an uploaded slug. The signed file names only the cells the baked grid lacks (api-server
+   *  `placementCells`), so an upload of a catalogue slug moves this cell's hash instead of waiting for a row that never comes. */
+  readonly catalogue?: (slug: string) => PlacedCell | undefined;
 }
 /** Revalidate signed placement on every retry; a stale KV document cannot earn acknowledgement. */
 export function uploadActivator(ports: UploadActivationPorts): (notice: UploadActivation) => Promise<UploadActivationAck> {
@@ -29,7 +32,10 @@ export function uploadActivator(ports: UploadActivationPorts): (notice: UploadAc
     const placement = await ports.read();
     if (placement.channel !== ports.channel || placement.serial < seen) throw new Error('Stale activation placement');
     seen = placement.serial;
-    const rows = placement.cells.filter(row => new Set([notice.slug]).has(row.slug));
+    const listed = placement.cells.filter(row => new Set([notice.slug]).has(row.slug));
+    // 2026-11-19: staging withheld every catalogue slug's upload for 14 h; the file never lists them, the baked grid holds them.
+    const own = listed.length === 0 && notice.place !== false ? ports.catalogue?.(notice.slug) : undefined;
+    const rows = own === undefined ? listed : [{...own, hash: notice.hash}];
     if ((rows.length === 0 && notice.place !== false) || rows.some(row => row.hash !== notice.hash)) throw new Error('Placement does not publish the upload hash');
     const loaded = await ports.preload(notice.slug, notice.hash);
     if (ports.channel === 'production') refuseProductionDebug(loaded?.clientPlan);
@@ -60,7 +66,7 @@ export function uploadActivationReceiver(token: string, activate: (notice: Uploa
         }
         const notice = v.safeParse(UploadActivationSchema, JSON.parse(text));
         if (!notice.success) {send(400, {error: 'bad activation notice'}); return;}
-        try {send(200, await activate(notice.output));} catch {send(503, {error: 'activation not ready'});}
+        try {send(200, await activate(notice.output));} catch (error) {send(503, {error: 'activation not ready', reason: error instanceof Error ? error.message : String(error)});}
       } catch {send(400, {error: 'bad activation body'});}
     })();
     return true;

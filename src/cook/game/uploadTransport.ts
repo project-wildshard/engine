@@ -205,7 +205,11 @@ export function gameActivationClient(receivers: Readonly<Partial<Record<'staging
     if (url.protocol !== 'http:' || !new Set(['localhost', '127.0.0.1', '[::1]']).has(url.hostname) || url.username !== '' || url.password !== '') throw new Error('The game activation receiver must be loopback');
     const body = JSON.stringify({uploadId: notice.uploadId, hash: notice.hash, slug: notice.slug, channel, ...(notice.place === undefined ? {} : {place: notice.place})});
     const response = await read(new URL('/internal/upload-activation', url), {method: 'POST', redirect: 'error', headers: {authorization: `Bearer ${receiver.token}`, 'content-type': 'application/json'}, body, signal: AbortSignal.timeout(120_000)});
-    if (response.status !== 200) throw new Error(`Game activation answered ${response.status}`);
+    if (response.status !== 200) {
+      // The game's 503 says why it withholds acknowledgement (`uploadActivationReceiver`): the cook's log carries it.
+      const reason = await response.json().then((answer: unknown) => (typeof answer === 'object' && answer !== null && 'reason' in answer && typeof answer.reason === 'string' ? answer.reason.slice(0, 300) : ''), () => '');
+      throw new Error(`Game activation answered ${response.status}${reason === '' ? '' : `: ${reason}`}`);
+    }
     const value = v.parse(UploadActivationAckSchema, JSON.parse(new TextDecoder().decode(await readCapped(response, 64_000))));
     if (value.uploadId !== notice.uploadId || value.hash !== notice.hash || !new Set([notice.slug]).has(value.slug) || value.channel !== channel || value.build !== build || (value.place ?? true) !== (notice.place ?? true) || (notice.place !== false && value.instances.length === 0)) throw new Error('Game acknowledged another activation');
   }};
@@ -216,9 +220,12 @@ export function activationDelivery(api: CookApi, game: GameActivationClient, log
   const deliver = async (notice: ActivationNotice): Promise<void> => {
     try {
       const channels = notice.channels.filter((channel): channel is 'staging' | 'production' => channel !== 'preview');
-      for (const channel of channels) await game.activate(notice, channel);
+      for (const channel of channels) {
+        try {await game.activate(notice, channel);}
+        catch (error) {throw new Error(`${channel === 'staging' ? '' : `${channel}: `}${error instanceof Error ? error.message : String(error)}`, {cause: error});}
+      }
       await api.acknowledge(notice, channels);
-    } catch {log(`upload ${notice.uploadId}: game acknowledgement waiting`);}
+    } catch (error) {log(`upload ${notice.uploadId}: game acknowledgement waiting: ${error instanceof Error ? error.message : 'acknowledgement failed'}`);}
   };
   return {
     sweep: async () => {

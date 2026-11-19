@@ -261,6 +261,8 @@ export interface GcReport {readonly kept: number; readonly deleted: number; read
 export const PACK_BUDGET_BYTES = 4_000_000_000;
 /** A part younger than this may belong to a cook that hasn't written its index yet. */
 const GC_GRACE_MS = 3_600_000;
+/** How long a worker reuses its listing of the bucket (`createCookWorker`'s `bucket`); under GC_GRACE_MS / 2, though `current` doesn't rely on it. */
+const LISTING_MAX_AGE_MS = 20 * 60_000;
 /** PAGE-SIZE PZ2's content sets (`content/<set>/…`, page-release content.mjs). They are content-named and name no build,
  * so garbage collection never takes one; a set's own retention waits for a build-to-set record. */
 const CONTENT_SETS = 'content/';
@@ -365,30 +367,51 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const verdicts = new Map<string, CookRow>();
   /** SP6: how often each upload has failed in a row, and when it last did. */
   const failures = new Map<string, {readonly count: number; readonly at: number}>();
+  // 2026-11-19: staging's bucket held 999,467 objects; listing it took about 6 min, and every publish listed it first, so new
+  // uploads cooked 7.5 min apart behind 10 s jobs. The worker keeps one listing and adds its own writes to it, and lists
+  // again once it is LISTING_MAX_AGE_MS old. A kept listing may still hold keys GC took since: `current` then skips a PUT only
+  // for a key written in the last GC_GRACE_MS / 2, which GC (it takes nothing younger than GC_GRACE_MS) cannot have taken.
+  let listing: {readonly rows: Map<string, StoredObject>; readonly at: number} | undefined;
+  const bucket = async (again: boolean): Promise<Map<string, StoredObject>> => {
+    if (again || listing === undefined || clock() - listing.at >= LISTING_MAX_AGE_MS) {
+      const rows = await store.list('');
+      listing = {rows: new Map(rows.map(row => [row.key, row])), at: clock()};
+    }
+    return listing.rows;
+  };
+  const put = async (key: string, body: Uint8Array, headers: ObjectHeaders): Promise<void> => {
+    await store.put(key, body, headers);
+    listing?.rows.set(key, {key, bytes: body.byteLength, modified: clock()});
+  };
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);
     // SA48: the loose files again under this upload's own folder (`looseFolder`)
     const folder = looseFolder(hash), loose = keys.filter(key => key.startsWith('shardfiles/') || key.startsWith('programs/'));
-    const rows = await store.list(''), held = new Map(rows.map(row => [row.key, row.modified]));
-    const fresh = keys.reduce((sum, key) => sum + (held.has(key) ? 0 : statSync(join(client, key)).size), 0)
-      + loose.reduce((sum, key) => sum + (held.has(folder + key) ? 0 : statSync(join(client, key)).size), 0);
-    const used = usageOf(rows, budget).bytes;
+    const measure = (rows: ReadonlyMap<string, StoredObject>): {readonly fresh: number; readonly used: number} => ({
+      fresh: keys.reduce((sum, key) => sum + (rows.has(key) ? 0 : statSync(join(client, key)).size), 0)
+        + loose.reduce((sum, key) => sum + (rows.has(folder + key) ? 0 : statSync(join(client, key)).size), 0),
+      used: usageOf([...rows.values()], budget).bytes,
+    });
+    const kept = listing !== undefined && clock() - listing.at < LISTING_MAX_AGE_MS;
+    let held = await bucket(false), {fresh, used} = measure(held);
+    // A kept listing still counts what GC has since taken, so it reads high: list again before refusing on it.
+    if (used + fresh > budget && kept) ({fresh, used} = measure(held = await bucket(true)));
     if (used + fresh > budget) throw new Error(`Over the pack budget: ${used} + ${fresh} of ${budget}`);
     // CF-8: skipping a PUT keeps a part's old date, so GC could take it before this index lands. A part past half the grace
     // is written again, which GC reads as new.
-    const current = (key: string): boolean => clock() - (held.get(key) ?? 0) < GC_GRACE_MS / 2;
+    const current = (key: string): boolean => clock() - (held.get(key)?.modified ?? 0) < GC_GRACE_MS / 2;
     const order = (key: string): number => (key.includes('/parts/') ? 0 : key.startsWith('assets/spawn/') ? 2 : 1);
     for (const key of [...keys].sort((a, b) => order(a) - order(b))) {
-      if (!CONTENT_NAMED.test(key) || !current(key)) await store.put(key, readFileSync(join(client, key)), objectHeaders(key));
+      if (!CONTENT_NAMED.test(key) || !current(key)) await put(key, readFileSync(join(client, key)), objectHeaders(key));
     }
-    for (const key of loose) if (!current(folder + key)) await store.put(folder + key, readFileSync(join(client, key)), {...objectHeaders(key), cache: IMMUTABLE});
+    for (const key of loose) if (!current(folder + key)) await put(folder + key, readFileSync(join(client, key)), {...objectHeaders(key), cache: IMMUTABLE});
     const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
     const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...keys, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
       ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
       ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}})};
-    await store.put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
+    await put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
   };
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
     const file = join(work, 'shard.tar'), out = join(work, 'out');
