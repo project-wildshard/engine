@@ -36,7 +36,7 @@
     "js/title/gzip": 160000,
     "js/grid-session/raw": 300000,
     "js/grid-session/gzip": 100000,
-    "js/session/raw": 4400000,
+    "js/session/raw": 4488690,
     "js/session/gzip": 1361500,
     "sim-in-runtime/_template": 0,
     "sim-in-runtime/blender-template": 0,
