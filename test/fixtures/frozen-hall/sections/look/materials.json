@@ -1,0 +1,1 @@
+{"rows":{"looks":[{"animation":{"parameters":{"amplitude":0.06,"axis":"y","dead":0.4,"frequency":4,"rest":1},"recipe":"engine.scale-wave"},"id":"blender.guardian.look","material":null,"parameters":{"colour":[0.6,0.6,0.6],"heightSegments":6,"radius":0.55,"widthSegments":10},"recipe":"engine.sphere","species":"grey-blob"}]}}

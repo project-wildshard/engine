@@ -1,0 +1,1 @@
+{"hooks":{"conditions":[{"equals":1,"fieldId":101,"id":"blender.door.open","scope":"shared"}],"scenes":[{"id":"blender.door.toggle","type":201,"value":1}]}}

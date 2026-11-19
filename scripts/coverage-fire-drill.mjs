@@ -24,7 +24,7 @@ const faults=[
   {id:'export',ring:3,owner:'engine:package.json',file:'package.json',find:'',plant:'',reason:/ERR_PACKAGE_PATH_NOT_EXPORTED/u},
   {id:'format',ring:1,owner:'shardfile:src/format/shardSchema.ts',file:'node_modules/@wildshard/format/src/format/shardSchema.ts',
     find:'  version: v.literal(SHARDFILE_VERSION),',plant:'  version: v.literal(SHARDFILE_VERSION),\n  tc26Required: v.string(),',reason:/tc26Required/u},
-  {id:'dropped-section',ring:1,owner:'shardfile:corpus/handwritten',file:'',find:'',plant:'',reason:/ENOENT[\s\S]*sections\//u},
+  {id:'dropped-section',ring:1,owner:'shardfile:corpus/exports/brasscap-mesa',file:'',find:'',plant:'',reason:/ENOENT[\s\S]*sections\//u},
   {id:'broken-tar',ring:1,owner:'shardfile:src/format/tar.ts',file:'scripts/pin-format.ts',
     find:'const bytes = writeTar(files), hash =',plant:'const bytes = writeTar(files).subarray(0, 513), hash =',reason:/tar:/u},
   {id:'save-field',ring:1,owner:'engine:src/shared/engine/script/state.ts',file:'src/shared/engine/script/state.ts',
@@ -66,8 +66,8 @@ try{
     const before=run(fault.id);
     writeFileSync(join(out,`${fault.id}-baseline.log`),before.text);
     assert.equal(before.code,0,`${fault.id}: positive control must pass; see baseline log`);
-    const section=fault.id==='dropped-section'?JSON.parse(readFileSync(join(format,'corpus/handwritten/shard.json'),'utf8')).sections[0].path:undefined;
-    const path=section===undefined?join(tree,fault.file):join(format,'corpus/handwritten',section),original=readFileSync(path,'utf8');
+    const section=fault.id==='dropped-section'?JSON.parse(readFileSync(join(format,'corpus/exports/brasscap-mesa/shard.json'),'utf8')).sections[0].path:undefined;
+    const path=section===undefined?join(tree,fault.file):join(format,'corpus/exports/brasscap-mesa',section),original=readFileSync(path,'utf8');
     let planted;
     if(fault.id==='export'){
       const pkg=JSON.parse(original);assert.ok(Object.hasOwn(pkg.exports,'./host/author'));

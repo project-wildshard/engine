@@ -2,8 +2,6 @@
 // oxlint-disable-next-line import/no-unassigned-import -- Portable Math precedes the simulation graph.
 import "../../src/shared/engine/core/portableMathFirst.ts";
 import assert from "node:assert/strict";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { leadPlayer } from "../../src/shared/engine/sim/leadPlayer.ts";
 import { journey, timed } from "./folder-journey.mjs";
 
@@ -67,11 +65,9 @@ timed(
 timed(
   "frozen hall: a closed door blocks the walk, USE opens it, the guardian hits, and earned progress restores",
   async () => {
-    const formatRoot = resolve(
-      dirname(fileURLToPath(import.meta.resolve("@wildshard/format/outputIndex"))),
-      "../..",
-    );
-    await journey(join(formatRoot, "corpus/handwritten"), async (f) => {
+    // J434 retired Template 2 from the format corpus (TEMPLATE-E2E TR-10): its hall is frozen here, as TR-5 froze the
+    // Template's slice, since no live shard has a closed door, a reach-checked USE and a guardian in one hall.
+    await journey("test/fixtures/frozen-hall", async (f) => {
       f.idle(12);
       const untouched = leadPlayer(f.host).health.attributes.health;
       f.idle(100);

@@ -39,10 +39,10 @@ test('no out/, no pins file, and a folder with no readable receipt are not stale
 
 test('a format-dependency product is current while its index is the installed format\'s', () => {
   const index = '{"identity":{"slug":"dependency-product","revision":1}}', indexHash = createHash('sha256').update(index).digest('hex');
-  const source = { kind: 'format-dependency', path: '@wildshard/format/corpus/handwritten', indexHash };
+  const source = { kind: 'format-dependency', path: '@wildshard/format/corpus/exports/brasscap-mesa', indexHash };
   tree(['brasscap9'], { 'dependency-product': { hash: 'format1', revision: 1, source },
     'brasscap-mesa': { hash: 'brasscap9', revision: 9 }, 'far-reach': { hash: 'far1', revision: 1, source: { kind: 'api' } } });
-  const installed = join(root, 'node_modules/@wildshard/format/corpus/handwritten');
+  const installed = join(root, 'node_modules/@wildshard/format/corpus/exports/brasscap-mesa');
   mkdirSync(installed, { recursive: true });
   writeFileSync(join(installed, 'shard.json'), index);
   expect(stalePinFolders(root)).toEqual([{ folder: 'far-reach', revision: 1 }]);
@@ -54,7 +54,7 @@ test('a format-dependency product is current while its index is the installed fo
 // land's gen:inputs stopped on it until a hand rm -rf. A full `pnpm pins` now removes exactly what gen:inputs would refuse.
 test('pnpm pins removes the products gen:inputs calls stale, and only those, only under out/', () => {
   const index = '{"identity":{"slug":"dependency-product","revision":1}}', indexHash = createHash('sha256').update(index).digest('hex');
-  const source = { kind: 'format-dependency', path: '@wildshard/format/corpus/handwritten', indexHash };
+  const source = { kind: 'format-dependency', path: '@wildshard/format/corpus/exports/brasscap-mesa', indexHash };
   tree(['brasscap9', 'pine5'], { 'dependency-product': { hash: 'format1', revision: 1, source }, 'brasscap-mesa': { hash: 'brasscap9', revision: 9 },
     'far-reach': { hash: 'far1', revision: 1 }, 'pine-hollow': { hash: 'pine5', revision: 5 }, scratch: 'unreadable' });
   mkdirSync(join(root, 'out/build-cache'), { recursive: true });

@@ -1,0 +1,1 @@
+{"targets":{"interactions":[{"at":[0,1.5,15.6],"id":"blender.door.use","label":"Open / close door","radius":3,"scene":"blender.door.toggle"}],"panels":[{"activeWhenMatched":false,"colliders":["blender.door.collider"],"equals":1,"fieldId":101,"panel":"blender.door","scope":"shared","visibleWhenMatched":false}]},"ui":[]}

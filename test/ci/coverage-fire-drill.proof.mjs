@@ -71,17 +71,16 @@ timed('door',async()=>{
 
 timed('format',async()=>{
   const {loadHeadlessFolder}=await import('../../src/server/host/headlessFolder.ts');
-  // This is the format package's actual handwritten Template 2, rather than
-  // Brasscap's API head (the blender-template API slug until TC-SHIP-a).
-  const product=await loadHeadlessFolder('node_modules/@wildshard/format/corpus/handwritten');
-  assert.equal(product.slug,'blender-template');
-  assert.ok(product.shardfile.state.shared.some(row=>row.name==='blender.door.open'));
+  // The format package's own Brasscap export (J434 retired its handwritten Template 2, TEMPLATE-E2E TR-10).
+  const product=await loadHeadlessFolder('node_modules/@wildshard/format/corpus/exports/brasscap-mesa');
+  assert.equal(product.slug,'brasscap-mesa');
+  assert.ok(product.shardfile.state.shared.some(row=>row.name==='brasscap.gate.open'));
 });
 
 timed('dropped-section',async()=>{
   const {loadHeadlessFolder}=await import('../../src/server/host/headlessFolder.ts');
-  const product=await loadHeadlessFolder('node_modules/@wildshard/format/corpus/handwritten');
-  assert.equal(product.slug,'blender-template');
+  const product=await loadHeadlessFolder('node_modules/@wildshard/format/corpus/exports/brasscap-mesa');
+  assert.equal(product.slug,'brasscap-mesa');
 });
 
 timed('broken-tar',async()=>{

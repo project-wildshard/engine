@@ -1,0 +1,1 @@
+{"rows":{"strikes":[{"active":0.15,"cooldown":1,"damage":15,"id":"blender.guardian.bump","range":2,"recover":0.8,"shape":{"kind":"point","radius":1.8},"speed":0,"tags":["creature.greyBlob"],"weight":1,"windup":0.7}]}}
