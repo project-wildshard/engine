@@ -10,3 +10,8 @@
 - Scripts: the Template-only browser proofs go (quest-complete, split-repair data-shard, sky-trails' blob particles);
   dev, dev-world, loading-card, reload-title and the crossroads probes default to Brasscap; side parity and the offline
   deck drop the Template (Brasscap's side-parity page half still needs a `--record`).
+- TR-4b, suite C: its two phone specs each called `test.use`, so C booted the phone world twice (about 53 s each hosted);
+  both now import one `phoneTest`. The phone bar spec allows SwiftShader's whole-stage GPU blocks up to 5 s
+  (`SOFTWARE_GL_STALL_MS`, a test timeout; Metal keeps J188's 2 s); the planted stall fault is now 6 s. The suites'
+  229 MB product download gets 2 min and one retry (run 44497363007's C hung in it for 9 min). Local SwiftShader C: 8 of 8
+  in 51.9 s.

@@ -5,10 +5,12 @@ import {
 } from '../../../scripts/bugbash-probes.mjs'
 import {
   barStalls,
+  SOFTWARE_GL_STALL_MS,
+  STALL_MS,
   untracedChanges,
 } from '../../../scripts/loading-bar-rule.mjs'
 import { readClones } from './clones.ts'
-import { expect, test } from './fixtures.ts'
+import { expect, phoneTest as test } from './fixtures.ts'
 import { state } from './probe.ts'
 
 import type { BarRow } from '../../../scripts/loading-bar-rule.mjs'
@@ -19,11 +21,6 @@ interface Capture {
   readonly completedAt: number
   readonly serverFiles: boolean
 }
-
-test.use({
-  deviceProfile: 'phone',
-  entryDelayMs: process.env['WS_T1_FAULT'] === 'loading-stall' ? 3000 : 0,
-})
 
 test('phone loading bars keep moving with original producer evidence', async ({
   page,
@@ -69,10 +66,19 @@ test('phone loading bars keep moving with original producer evidence', async ({
   expect([...new Set(capture.log.map((row): string => row.bar))]).toEqual(
     expect.arrayContaining(['start', 'download', 'load']),
   )
+  // The hosted runners' SwiftShader blocks on whole shader stages; see SOFTWARE_GL_STALL_MS (TR-4b).
+  const renderer: unknown = await page.evaluate(`(() => {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const info = gl?.getExtension('WEBGL_debug_renderer_info');
+    return gl && info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+  })()`)
   const verdict = barStalls(
     capture.log,
     capture.log[0]?.t ?? 0,
     capture.completedAt,
+    typeof renderer === 'string' && renderer.includes('SwiftShader')
+      ? SOFTWARE_GL_STALL_MS
+      : STALL_MS,
   )
   expect(verdict.stalls).toEqual([])
   expect(verdict.backwards).toEqual([])

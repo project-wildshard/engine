@@ -5,6 +5,10 @@
 // test/loading-bar-rule.test.mjs pins the rule's edges.
 
 export const STALL_MS = 2000;
+// A test timeout, not the player rule (J444: one number). The hosted T1 runners draw with SwiftShader, where one shader
+// stage is a single blocking GPU call (run 44473130939: firstFrame 2.7 s, worldFrame 2.3 s, worldPrograms 4.1 s) that no
+// bar can advance through; on Metal the same boot holds STALL_MS. The rule itself stays J188/J204's 2 s.
+export const SOFTWARE_GL_STALL_MS = 5000;
 export const STEP_PCT = 0.1;
 
 
@@ -18,8 +22,8 @@ export const STEP_PCT = 0.1;
 
 /** Every stretch over 2 s in which the bars together took less than 1 %, between `start` and `end`, with the stages
  * the card named during it. A bar that runs backwards is its own finding.
- * @param {readonly BarRow[]} log @param {number} start @param {number} end */
-export function barStalls(log, start, end) {
+ * @param {readonly BarRow[]} log @param {number} start @param {number} end @param {number} [limitMs] */
+export function barStalls(log, start, end, limitMs = STALL_MS) {
   const rows = [...log].sort((a, b) => a.t - b.t);
   /** @type {Map<string, number>} */ const shown = new Map();
   /** @type {{from: number, to: number, ms: number, stages: string[]}[]} */ const stalls = [];
@@ -27,7 +31,7 @@ export function barStalls(log, start, end) {
   let gained = 0, progressAt = start, step = '';
   /** @type {Set<string>} */ let stages = new Set();
   const close = (/** @type {number} */ at) => {
-    if (at - progressAt > STALL_MS) stalls.push({ from: progressAt, to: at, ms: at - progressAt, stages: [...stages] });
+    if (at - progressAt > limitMs) stalls.push({ from: progressAt, to: at, ms: at - progressAt, stages: [...stages] });
     progressAt = at; gained = 0; stages = new Set(step === '' ? [] : [step]);
   };
   for (const row of rows) {

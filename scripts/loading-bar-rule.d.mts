@@ -27,11 +27,13 @@ export interface BarRow {
   readonly source?: ProducerReading
 }
 export const STALL_MS: number
+export const SOFTWARE_GL_STALL_MS: number
 export const STEP_PCT: number
 export function barStalls(
   log: readonly BarRow[],
   start: number,
   end: number,
+  limitMs?: number,
 ): {
   stalls: { from: number; to: number; ms: number; stages: string[] }[]
   backwards: { t: number; bar: string; from: number; to: number }[]

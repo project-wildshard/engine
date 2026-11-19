@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures.ts'
+import { expect, phoneTest as test } from './fixtures.ts'
 
 import type { CDPSession, Page } from '@playwright/test'
 
@@ -6,8 +6,6 @@ import type { CDPSession, Page } from '@playwright/test'
 // scale 3, meta engine-memory/gpu-staircase-2026-11-18.md); in play the only free one is the document's root, which a
 // blank page has too. Chromium's layer tree in play may hold the root and the game canvas at full screen; the HUD adds
 // none.
-
-test.use({ deviceProfile: 'phone' })
 
 interface CdpLayer {
   readonly layerId: string

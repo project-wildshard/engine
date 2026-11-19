@@ -341,7 +341,18 @@ jobs:
       - uses: ./.github/actions/ring-setup
       - name: Own the suite scratch folder
         run: node scripts/scratch-dir.mjs template-e2e-ci "Template suite shard"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      # TR-4b: run 44497363007's C sat 9 min in this 229 MB download until the job's 10 min ran out (a stalled blob
+      # read; the other five took seconds). Bound it and fetch once more.
+      - id: products
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: template-e2e-products
+          path: tmp/template-e2e-ci
+      - if: steps.products.outcome == 'failure'
+        timeout-minutes: 2
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: template-e2e-products
           path: tmp/template-e2e-ci

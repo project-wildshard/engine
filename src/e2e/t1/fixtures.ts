@@ -205,6 +205,18 @@ const test = base.extend<Fixtures, Workers>({
   },
 })
 
-export { enterBrasscap, test }
+/** The phone's seated world. Every phone spec imports this one test, so the suite boots that world once: two files'
+ *  own `test.use` calls made two worker pools, and C booted the same phone world twice, about 53 s each on the hosted
+ *  runners' software GL (TR-4b). The loading-stall fault holds its entry module 6 s, past both stall limits
+ *  (loading-bar-rule.mjs), for the phone bar spec to catch. */
+const phoneTest = test.extend({
+  deviceProfile: ['phone', { scope: 'worker' }],
+  entryDelayMs: [
+    process.env['WS_T1_FAULT'] === 'loading-stall' ? 6000 : 0,
+    { scope: 'worker' },
+  ],
+})
+
+export { enterBrasscap, phoneTest, test }
 export { expect } from '@playwright/test'
 export type { SeatedWorld }
