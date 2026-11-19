@@ -31,6 +31,30 @@ import { countedWait, waitFor } from '../../../shared/engine/boot/waits';
 import { jsonSlot } from '../saves/slots';
 import { isDev } from '../core/devMode';
 
+// meta IPHONE13-DRIFTWOOD DW3 / DRIFTWOOD-FPS DF8 (mini-driftwood13, 2026-11-19): link the zone's whole program inventory
+// under the loading card instead of in play. The boot's Shaders step links only what its first frame draws (S1); the
+// undrawn materials and every root's exterior (road) variants then link in play (finish.ts `warmRest`). On iOS a link is a
+// synchronous ~77 ms (150 to 270 ms cold, G639), and Driftwood linked 40 programs after control, 33 of them in the first
+// 1.2 s (DRIFTWOOD-FPS DF1): the dock's spikes over 50 ms. With the device slot on, the boot's world-frame stage links them
+// all before the reveal; the load is longer by their link time, play starts with none left.
+
+/** The device slot (true or false); with none, BOOT_ROAD_PROGRAMS_DEFAULT. */
+export const BOOT_ROAD_PROGRAMS_SLOT = 'debug.bootRoadPrograms';
+/** Off until the iPhone 13 pairs decide (load time against the dock's spikes). */
+export const BOOT_ROAD_PROGRAMS_DEFAULT = false;
+
+let picked: boolean | undefined;
+/** Whether this page links its road variants and undrawn programs at boot; read once per page. */
+export function bootRoadPrograms(): boolean {
+  if (picked !== undefined) return picked;
+  let saved: unknown = null;
+  try { saved = jsonSlot(BOOT_ROAD_PROGRAMS_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
+  picked = typeof saved === 'boolean' ? saved : BOOT_ROAD_PROGRAMS_DEFAULT;
+  return picked;
+}
+/** Tests only: read the slot again. */
+export function resetBootRoadPrograms(): void { picked = undefined; }
+
 let censusSlot = 0;
 // Weak identities only: a target becomes known after its own completed-draw
 // barrier, not merely because another concurrent warm-up allocated it.
@@ -1882,27 +1906,3 @@ export async function precompileLevel(game: Pick<Game, 'renderer' | 'camera' | '
     return report.materials;
 
 }
-
-// meta IPHONE13-DRIFTWOOD DW3 / DRIFTWOOD-FPS DF8 (mini-driftwood13, 2026-11-19): link the zone's whole program inventory
-// under the loading card instead of in play. The boot's Shaders step links only what its first frame draws (S1); the
-// undrawn materials and every root's exterior (road) variants then link in play (finish.ts `warmRest`). On iOS a link is a
-// synchronous ~77 ms (150 to 270 ms cold, G639), and Driftwood linked 40 programs after control, 33 of them in the first
-// 1.2 s (DRIFTWOOD-FPS DF1): the dock's spikes over 50 ms. With the device slot on, the boot's world-frame stage links them
-// all before the reveal; the load is longer by their link time, play starts with none left.
-
-/** The device slot (true or false); with none, BOOT_ROAD_PROGRAMS_DEFAULT. */
-export const BOOT_ROAD_PROGRAMS_SLOT = 'debug.bootRoadPrograms';
-/** Off until the iPhone 13 pairs decide (load time against the dock's spikes). */
-export const BOOT_ROAD_PROGRAMS_DEFAULT = false;
-
-let picked: boolean | undefined;
-/** Whether this page links its road variants and undrawn programs at boot; read once per page. */
-export function bootRoadPrograms(): boolean {
-  if (picked !== undefined) return picked;
-  let saved: unknown = null;
-  try { saved = jsonSlot(BOOT_ROAD_PROGRAMS_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  picked = typeof saved === 'boolean' ? saved : BOOT_ROAD_PROGRAMS_DEFAULT;
-  return picked;
-}
-/** Tests only: read the slot again. */
-export function resetBootRoadPrograms(): void { picked = undefined; }
