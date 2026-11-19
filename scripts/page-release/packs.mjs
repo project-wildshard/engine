@@ -33,19 +33,34 @@ export function serverPackOutputRoot(root, bookPath) {
  */
 export function r2Packs({log, exec = execFileSync, fetch: get = fetch, sleep = delay}) {
   let reads = 0;
+  const transient = new Set([408, 429, 500, 502, 503, 504]);
+  /** @param {string} path @param {string} cors */
+  async function readPublished(path, cors) {
+    for (let attempt = 1; ; attempt++) {
+      // A new query also keeps cached misses out of each retry.
+      const url = new URL(path, PACKS_ORIGIN);
+      url.searchParams.set('page-release', `${Date.now().toString(36)}-${(reads++).toString(36)}`);
+      try {
+        const response = await get(url, {headers:{Origin:cors}, cache:'no-store', redirect:'error', signal:AbortSignal.timeout(60_000)});
+        if (response.status === 200) return {response, bytes:Buffer.from(await response.arrayBuffer())};
+        await response.body?.cancel();
+        if (!transient.has(response.status)) return {response, bytes:null};
+        throw new Error(`HTTP ${response.status}`);
+      } catch (error) {
+        if (attempt === 3) throw new Error(`Could not read server pack ${path} after three attempts`, {cause:error});
+        log(`packs ${path}: transient read failure, retrying`);
+        await sleep(attempt*1000);
+      }
+    }
+  }
   /** @param {string} path @param {string} cors @param {Uint8Array} expected @returns {Promise<boolean>} false on 404 */
   async function current(path, cors, expected) {
-    // The CDN caches a 404 (seen 2026-11-11: MISS, then HIT) and keys on the query, so every read carries a fresh one:
-    // a part checked before its upload never hides it afterwards, and each read is the bucket's own bytes.
-    const url = new URL(path, PACKS_ORIGIN);
-    url.searchParams.set('page-release', `${Date.now().toString(36)}-${(reads++).toString(36)}`);
-    const response = await get(url, {headers: {Origin: cors}, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(60_000)});
+    const {response, bytes} = await readPublished(path, cors);
     if (response.status === 404) return false;
     if (response.status !== 200) throw new Error(`${path} answered ${response.status}`);
     if (response.headers.get('access-control-allow-origin') !== cors) throw new Error(`${path} CORS is ${response.headers.get('access-control-allow-origin')}, not ${cors}`);
     // The CDN may re-encode (PACKS-CDN PC2): the decoded bytes are what must match.
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length !== expected.length || sha256(bytes) !== sha256(expected)) throw new Error(`${path} exists with different bytes: never overwritten`);
+    if (bytes === null || bytes.length !== expected.length || sha256(bytes) !== sha256(expected)) throw new Error(`${path} exists with different bytes: never overwritten`);
     return true;
   }
   /** @param {string} key @param {string} file @param {string} type @param {string} [encoding] */
