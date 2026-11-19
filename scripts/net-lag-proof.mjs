@@ -23,7 +23,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 import { watchFaults } from './proof-faults.mjs';
-import { b1Verdict, b3Verdict, bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
+import { b1Verdict, b3Verdict, boostBack, bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
 
 const arg = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const DECK = ['driftwood-isle', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pine-hollow', 'nine-dragon-stack'];
@@ -31,9 +31,9 @@ const DECK = ['driftwood-isle', 'sunscar-dunes', 'nalati-grasslands', 'far-reach
  * NET-LAG NL15/NL17: the boost retraces the ground the walk and sprint just crossed, back for 60% of the phase and on again
  * for the rest. Straight on (14 m/s on staging) left the cell from Signal Dunes (235 m south of the spawn, cell 3 to 8: a
  * 4.4 to 5.2 s frame and the counters reset) and from Pine Hollow (a 3.7 s stall): a crossing is ZONE-ENTRY's (J352), not
- * B1's. Back is 8.4 m a phase second against the 11.75 the walk and sprint went, so the way back stays on walked ground.
+ * B1's. Back is 8.4 m a phase second against the 11.75 the walk and sprint went, so the way back stays on walked ground;
+ * `boostBack` shortens it when they went less (Nalati's sprint stuck after 3 m and the boost left the cell, NL17).
  */
-const BOOST_BACK = 0.6;
 const TITLES = /** @type {Record<string, string>} */ ({ 'pine-hollow': 'PINE HOLLOW', 'nalati-grasslands': 'NALATI GRASSLANDS', 'nine-dragon-stack': 'NINE DRAGON STACK', 'sunscar-dunes': 'SIGNAL DUNES', 'far-reach': 'SKY REACH', 'driftwood-isle': 'DRIFTWOOD ISLE' });
 const rigArg = arg('rig', ''), base = arg('base', rigArg === '' ? 'https://staging.wildshard.io' : '').replace(/\/$/u, '');
 if (rigArg === '' && !/^https:\/\/(staging|preview)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base)) throw new Error('--base takes staging, preview or a loopback page only: never production (J205)');
@@ -194,7 +194,9 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       row.sprint = await phase('sprint', ['KeyW', 'ShiftLeft']);
       const foot = await report(), footWorst = await page.evaluate(() => /** @type {any} */ (window).__netLag.worst);
       await page.keyboard.press('KeyH'); await sleep(600);
-      row.boost = await phase('boost', ['KeyS', 'ShiftLeft'], { at: Math.round(SECONDS * BOOST_BACK), from: 'KeyS', to: 'KeyW' });
+      // back over the walked ground only as far as the walk and sprint went (`boostBack`): a stuck sprint walked little
+      const walked = row.walk.from === null || row.sprint.to === null ? 0 : Math.hypot(row.sprint.to[0] - row.walk.from[0], row.sprint.to[1] - row.walk.from[1]);
+      row.boost = await phase('boost', ['KeyS', 'ShiftLeft'], { at: boostBack(SECONDS, walked), from: 'KeyS', to: 'KeyW' });
       await page.keyboard.press('KeyH'); await sleep(600);
       const after = await report();
       const footWindow = footRate(before, foot);

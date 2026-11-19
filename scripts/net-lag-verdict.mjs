@@ -44,6 +44,19 @@ export function installBridgeCorrections() {
   fault.ready = true;
 }
 
+/** The boost's speed on staging, in m/s (NL15). */
+export const BOOST_SPEED = 14;
+/**
+ * NET-LAG NL15/NL17: how many seconds the boost goes back over the walked ground before turning on again: 60% of the
+ * phase, but never further than 80% of the ground the walk and sprint actually covered. Nalati's sprint stuck after 3 m
+ * (staging v0.1.50), so 60% of a 20 s boost (168 m) went 75 m past the spawn and out of the cell (4 to 0).
+ * @param {number} seconds the phase
+ * @param {number} walked metres from the walk's start to the sprint's end
+ */
+export function boostBack(seconds, walked) {
+  return Math.max(0, Math.min(Math.round(seconds * 0.6), Math.floor(0.8 * walked / BOOST_SPEED)));
+}
+
 /** NET-LAG NL16: why headless WebKit's frame pacing is read on the stand-ins rather than judged here. */
 export const WEBKIT_PACING = 'headless WebKit paces frames without a vsync snap and stamps them in whole ms: an idle page reads p99 19 to 29 ms (Chromium 16.8), a 28 ms GPU frame 28 to 49 ms (NL16); its p99 and 2x-budget frames are read on the iOS Simulator stand-in (NL11, J423), its frames over 50 ms stay judged';
 

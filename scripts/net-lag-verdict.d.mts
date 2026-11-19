@@ -39,3 +39,5 @@ export function b1Verdict(engine: string, phases: readonly { over2x: number; ove
   pacing?: string;
   ok: boolean;
 };
+export const BOOST_SPEED: number;
+export function boostBack(seconds: number, walked: number): number;

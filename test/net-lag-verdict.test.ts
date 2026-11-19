@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute the exact serialized browser hook in isolation.
 import { runInNewContext } from 'node:vm';
-import { WEBKIT_PACING, b1Verdict, b3Verdict, bridgeVerdict, installBridgeCorrections, proofVerdict } from '../scripts/net-lag-verdict.mjs';
+import { BOOST_SPEED, WEBKIT_PACING, b1Verdict, b3Verdict, boostBack, bridgeVerdict, installBridgeCorrections, proofVerdict } from '../scripts/net-lag-verdict.mjs';
 
 const crossing = { reached: true, under: 0, falls: 0, corrections: 2, injectedSinks: [0.3, 1], forcedFrames: 30, forcedFrameMs: 60, spanSamples: 8, lowest: 5.4 };
 
@@ -94,4 +94,12 @@ test('B1 judges every line in Chromium, and only frames over 50 ms in headless W
   expect(b1Verdict('webkit', [...paced, { over2x: 1, over50: 1, p99: 19 }], 1000 / 60).ok).toBe(false);
   expect(b1Verdict('chromium', [{ over2x: 0, over50: 0, p99: 16.8 }], 1000 / 60).ok).toBe(true);
   expect(b1Verdict('chromium', [{ over2x: 0, over50: 0, p99: 33.4 }], 1000 / 30)).not.toHaveProperty('pacing');
+});
+
+test('the boost goes back no further than the walk and sprint went (NL15, NL17)', () => {
+  // staging v0.1.50, Nalati: the walk went 89 m and the sprint stuck after 3 m; 12 s back at 14 m/s left the cell
+  expect(boostBack(20, 92)).toBe(5);
+  expect(boostBack(20, 220)).toBe(12);
+  expect(boostBack(20, 0)).toBe(0);
+  expect(boostBack(20, 92) * BOOST_SPEED).toBeLessThan(92);
 });

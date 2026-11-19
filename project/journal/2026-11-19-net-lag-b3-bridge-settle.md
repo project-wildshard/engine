@@ -18,3 +18,7 @@ minute, B3 82 and 83 ms.
 NL16's second branch: headless WebKit's frame pacing (no vsync snap, whole-ms stamps; an idle page reads p99 19 to 29 ms)
 cannot meet B1's p99 and 2x lines whatever the game does, so `b1Verdict` judges WebKit on the 50 ms line only and reports
 the other two with the reason. They are read on the iOS Simulator stand-in (NL11, J423). Chromium keeps every line.
+
+The boost's way back is now bounded by the ground the walk and sprint covered (`boostBack`). In Nalati the sprint stuck
+after 3 m, so 60% of a 20 s boost went 75 m past the spawn, out of cell 4 into cell 0, where the page died on another
+cell's creature. With the bound, staging v0.1.50: both layouts stay in cell 4 with no frame over 50 ms.
