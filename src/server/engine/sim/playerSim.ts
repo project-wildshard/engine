@@ -56,6 +56,8 @@ export class PlayerSim implements PlayerMotionState {
   held = 0;
   /** The Name others see over this body (Q89). A world with one player has no one to tell. */
   netName = '';
+  /** MMO-PLAN MP1.5b: the body stands on a road, whose frame is the world's (frame 0): its place goes to others as `roadX` and `roadZ`. */
+  roadPlace = false;
   /** For the wire (P1-E5.3-E1): seconds into the running swing, null with none, and the `seq` of the last swing or shot that left. The seats write it each tick and keep the saved truth.
    *  For others (REMOTE-PLAYERS RP6): `count` moves by one on each swing or shot, wrapping at 256, and `heavy` says whether that swing was the heavy. Never saved: a restore starts the count again. */
   readonly swing: { t: number | null; seq: number; count: number; heavy: boolean } = { t: null, seq: 0, count: 0, heavy: false };

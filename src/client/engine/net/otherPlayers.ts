@@ -23,6 +23,17 @@ const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => ent
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp'), SWIM = column('swim');
 /** RP9: the row's airborne bit (RP6); a build without the column reads no data. */
 const AIR = column('air');
+/**
+ * MMO-PLAN MP1.5b: a row on a road (frame 0, the world's) carries its place in `roadX`/`roadZ`, where `x`/`z` clamp at ±260 m. A cell's
+ * rows send zero, and a room older than wire 1.2 sends neither, which reads as the node's floor, -2,048 m, outside the grid.
+ */
+const ROAD_X = column('roadX'), ROAD_Z = column('roadZ'), ROAD_FLOOR = -2048;
+/** Where a row stands across the ground, its road place when it has one. */
+export function placeOf(row: ArrayLike<number>): { readonly x: number; readonly z: number } {
+  const roadX = ROAD_X < 0 ? 0 : row[ROAD_X] ?? 0, roadZ = ROAD_Z < 0 ? 0 : row[ROAD_Z] ?? 0;
+  const onRoad = (roadX !== 0 || roadZ !== 0) && roadX > ROAD_FLOOR && roadZ > ROAD_FLOOR;
+  return onRoad ? { x: roadX, z: roadZ } : { x: row[X] ?? 0, z: row[Z] ?? 0 };
+}
 /** A body's speed settles at this rate, so one late row is no stumble. */
 const SETTLE = 8;
 /** VOICE-POLISH V8: the ring over a talking player's Name, its size in metres, and how fast and far it breathes. */
@@ -125,7 +136,7 @@ class OtherBody {
   /** Where the row is now, and the limbs that go with it. */
   show(row: Float64Array, dt: number, mounted: boolean): void {
     // RP11: a dead body holds where it fell and a return or a teleport snaps (remoteDeath.ts), so neither slides nor runs.
-    const at = this.death.place(row[X] ?? 0, row[Y] ?? 0, row[Z] ?? 0, row[YAW] ?? 0, row[HP] ?? 0, dt), { x, y, z } = at, { group } = this, alive = this.death.phase === '';
+    const place = placeOf(row), at = this.death.place(place.x, row[Y] ?? 0, place.z, row[YAW] ?? 0, row[HP] ?? 0, dt), { x, y, z } = at, { group } = this, alive = this.death.phase === '';
     const moved = this.placed && dt > 0 && !at.snap ? Math.hypot(x - group.position.x, z - group.position.z) / dt : 0;
     if (at.snap) this.speed = 0;
     this.speed += (moved - this.speed) * Math.min(1, dt * SETTLE);

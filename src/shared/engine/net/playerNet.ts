@@ -33,6 +33,9 @@ export const PLAYER_NET: NetSchema<PlayerSim> = bindClass<PlayerSim, typeof PLAY
   heavy: player => player.swing.heavy,
   // Off the ground under its own motion: a cable, a stun and a boat's deck pin the body with `grounded` false and no vertical speed.
   air: player => !player.fall.grounded && !player.swim.on && !player.carried && !player.moveLocked && player.velocity.y !== 0,
+  // MMO-PLAN MP1.5b: on a road (frame 0, the world's, about ±1,390 m) `x`/`z` clamp at ±260 m, so others read its place here. Zero in a cell.
+  roadX: player => player.roadPlace ? player.position.x : 0,
+  roadZ: player => player.roadPlace ? player.position.z : 0,
   px: player => player.position.x,
   py: player => player.position.y,
   pz: player => player.position.z,

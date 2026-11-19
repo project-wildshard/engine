@@ -116,7 +116,7 @@ export class RoadRoom implements CrossTarget {
   admit(entry: SeatEntry, transport: Transport, at: ResumeAt, motion?: PlayerSim): CrossArrival | string {
     if (this.seats.has(entry.device)) return 'held';
     const player = this.host.addPlayer(entry.body, at, at.yaw);
-    player.netName = entry.name;
+    player.netName = entry.name; player.roadPlace = true;
     // QA 11-15 row 8: the road's board cap is the page's (G60: 30 m/s on the deck, easing to 14 over a cell's strip); its frame is the world's
     player.hoverSpeedLimit = () => gridBoardLimitAt(this.assembly, player.position);
     player.resetPose(at, at.yaw);

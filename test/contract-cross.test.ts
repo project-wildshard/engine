@@ -45,7 +45,7 @@ import { tickCommands } from '../src/shared/host/tickProtocol';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // WIRE-STABILITY WR6, engine's half of the cross-version harness (plan section 7). `@wildshard/wire-released` is the wire
-// at the last release (shardfile 669d1fc, WR4's last codec commit, until `wire-v1.0.0` exists) installed beside the wire
+// at the last release (`@wildshard/wire@1.1.0` from npm, wire minor 1; it was shardfile 669d1fc until MP1.5b) installed beside the wire
 // this engine binds. Both ways, with this engine's real code on the HEAD side: a client on the released wire plays a real
 // room over the shipped Sunscar Dunes product (its frames read word for word as the bound wire reads them, its cmds and a
 // chat act driving the room), and this engine's NetClient plays a room on the released wire, once at the release's own
@@ -55,11 +55,11 @@ import { builtFolder } from '../src/test/game/builtFolder';
 
 /**
  * One module of the released wire, typed as this engine's, which is what the harness proves. Loaded by a specifier
- * TypeScript doesn't resolve: both copies are `@wildshard/wire@0.0.0`, and TypeScript would type one as the other.
+ * TypeScript doesn't resolve: both copies are `@wildshard/wire`, and TypeScript would type one as the other.
  */
 const RELEASED = '@wildshard/wire-released';
-// packageDigest of shardfile 669d1fc's packages/wire (package.json "@wildshard/wire-released"): recompute when the pin moves.
-const RELEASED_DIGEST = 'b9f717b2bc9ec808541135b4c2a6cdfb5ec86f5b94af3ea350d1a0e8d342f46c';
+// packageDigest of the npm tarball of @wildshard/wire@1.1.0 (package.json "@wildshard/wire-released"): recompute when the pin moves.
+const RELEASED_DIGEST = '5c3b996535fdad9b6195d7da6b67b9e9ce7c40a2f6cf16f07311fdfb839de2a4';
 const released = async <Module>(path: string): Promise<Module> => (await import(/* @vite-ignore */ `${RELEASED}/${path}`)) as Module;
 const { encodeClassTables, decodeClassTables } = await released<typeof ClassTables>('classTables');
 const { WIRE_CLASSES } = await released<typeof Classes>('classes');
@@ -90,7 +90,7 @@ beforeAll(() => {
   // The bytes the alias reaches, not where they sit: a classic slot's folder named the commit, a global-store slot's
   // (GVS G9) is a content hash, and a link to another commit's slot passes any path check. Bump with RELEASED's pin.
   const root = realpathSync(resolve('node_modules', RELEASED));
-  expect(packageDigest(root), 'the released wire is shardfile 669d1fc, byte for byte').toBe(RELEASED_DIGEST);
+  expect(packageDigest(root), 'the released wire is @wildshard/wire@1.1.0, byte for byte').toBe(RELEASED_DIGEST);
 });
 
 /** sha256 over a package's files (path and bytes, sorted), its own node_modules left out. */
