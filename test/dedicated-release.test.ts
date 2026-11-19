@@ -1,6 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- A release is signed by a real key.
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { expect, test } from 'vitest';
+import { releasedWorldShards } from '../src/server/host/dedicated/gridCells';
 import { readReleaseFile, ReleaseWatch } from '../src/server/host/dedicated/releaseFile';
 import type { ReleaseFile } from '../src/shared/host/releaseRows';
 
@@ -60,10 +61,42 @@ test('an installed bundle with unreadable kept metadata refuses remote fallback'
   expect(() => servingRelease('b1', 'production', release(3), null, true)).toThrow();
 });
 
-test('a release missing an open cell cannot begin a grace', async () => {
+test('a release missing an explicitly configured cell cannot begin a grace', async () => {
   const changed: number[] = [], failures: unknown[] = [];
-  const watch = new ReleaseWatch({ serving: release(1), cells: ['driftwood-isle', 'nalati-grasslands'], everyMs: 3_600_000,
+  const watch = new ReleaseWatch({ serving: release(1), everyMs: 3_600_000,
+    requiredShards: next => releasedWorldShards('driftwood-isle,nalati-grasslands', next.shards.map(row => row.slug), []),
     read: () => Promise.resolve(release(2)), changed: next => { changed.push(next.serial); return Promise.resolve(); }, failed: error => { failures.push(error); } });
   try { await watch.look(); expect(changed).toEqual([]); expect(failures).toHaveLength(1); }
   finally { watch.dispose(); }
+});
+
+test('MS9a: a signed grid retirement preloads the remaining and newly required shards before grace', async () => {
+  const home = 'driftwood-isle', retired = '_template', added = 'pine-hollow';
+  const serving = { ...release(115), shards: [{ slug: home, revision: 5 }, { slug: retired, revision: 1 }] };
+  const next = { ...release(116, 'b2'), shards: [{ slug: home, revision: 5 }, { slug: added, revision: 6 }, { slug: 'unplaced', revision: 1 }] };
+  const placements = [{ instance: home, slug: home }, { instance: 'pine-cell', slug: added }];
+  const events: string[] = [], failures: unknown[] = [];
+  let missingPack = true;
+  const watch = new ReleaseWatch({
+    serving, everyMs: 3_600_000,
+    read: async () => readReleaseFile(signed(JSON.stringify(next)), KEY),
+    requiredShards: file => releasedWorldShards('grid', file.shards.map(row => row.slug), placements),
+    changed: async (file, shards) => {
+      for (const slug of shards) {
+        if (slug === added && missingPack) throw new Error(`Missing pack: ${slug}`);
+        events.push(`pack:${slug}`);
+      }
+      events.push(`grace:${file.engineBuild}`);
+    },
+    failed: error => { failures.push(error); },
+  });
+  try {
+    await watch.look();
+    expect(failures).toEqual([new Error(`Missing pack: ${added}`)]);
+    expect(events).toEqual([`pack:${home}`]);
+    missingPack = false;
+    await watch.look();
+    await watch.look();
+    expect(events).toEqual([`pack:${home}`, `pack:${home}`, `pack:${added}`, 'grace:b2']);
+  } finally { watch.dispose(); }
 });

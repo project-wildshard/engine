@@ -135,12 +135,29 @@ export function cellFrame(cell: string): number { return roadHome(cell) !== null
  * names are refused here, before any worker boots.
  */
 export function worldCells(listed: string, released: readonly string[]): readonly string[] {
-  const named = new Set(released), { instances, home } = gridNames();
+  return selectWorldCells(listed, released, gridNames());
+}
+
+function selectWorldCells(listed: string, released: readonly string[], grid: Pick<GridNames, 'instances' | 'home' | 'shards' | 'cells'>): readonly string[] {
+  const named = new Set(released), { instances, home, shards } = grid;
+  const shardOf = (cell: string): string => shards.get(cell) ?? cell;
+  const instanceOf = (name: string): string => shards.has(name) ? name : grid.cells.get(name) ?? name;
   const cells = listed.trim() === WHOLE_GRID
-    ? [...instances.filter(cell => cell === home), ...instances.filter(cell => cell !== home)].filter(cell => named.has(cellShard(cell)))
-    : listed.split(',').map(name => cellName(name.trim()));
+    ? [...instances.filter(cell => cell === home), ...instances.filter(cell => cell !== home)].filter(cell => named.has(shardOf(cell)))
+    : listed.split(',').map(name => instanceOf(name.trim()));
   if (cells.length === 0) throw new Error(`WORLD_CELLS=${listed} opens no cell the release names`);
   if (new Set(cells).size !== cells.length) throw new Error(`WORLD_CELLS=${listed} names a cell twice`);
-  for (const cell of cells) if (!named.has(cellShard(cell))) throw new Error(`The release has no ${cellShard(cell)}`);
+  for (const cell of cells) if (!named.has(shardOf(cell))) throw new Error(`The release has no ${shardOf(cell)}`);
   return cells;
+}
+
+/** Shards to preload for the next release. A pulled bundle supplies its own grid. Local runs use the installed grid. */
+export function releasedWorldShards(listed: string, released: readonly string[], bundleCells?: readonly Pick<PlacedCell, 'instance' | 'slug'>[]): readonly string[] {
+  const grid = bundleCells === undefined ? gridNames() : {
+    instances: bundleCells.map(row => row.instance),
+    shards: new Map(bundleCells.map(row => [row.instance, row.slug])),
+    cells: new Map(bundleCells.map(row => [row.slug, row.instance])),
+    home: undefined,
+  };
+  return [...new Set(selectWorldCells(listed, released, grid).map(cell => grid.shards.get(cell) ?? cell))];
 }

@@ -21,7 +21,7 @@ import { accountRoutes } from './accountRoutes';
 import { PLAYER_TICKET_PUBLIC_KEY } from './ticket';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
-import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
+import { fetchReleaseFile, readPulledReleaseCells, servingRelease, ReleaseWatch } from './releaseFile';
 import { savesUrl } from './saves/pgDatabase';
 import { ServerReports } from './serverReports';
 import { ServerMetrics, metricsPort } from './serverMetrics';
@@ -31,7 +31,7 @@ import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
 import { doorTrust } from './doorTrust';
-import { WHOLE_GRID, catalogueCell, cellShard, placeCell, placedCells, worldCells } from './gridCells';
+import { WHOLE_GRID, catalogueCell, placeCell, placedCells, releasedWorldShards, worldCells } from './gridCells';
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
 import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
 import { DEV_CONTROL_PATH, devRoute } from './devControl';
@@ -68,7 +68,7 @@ const itemReads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 
 const catalogue = await readReleaseItems(release.items, { origin, cache }, itemReads);
 // C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
 // the release names, home first. A cell runs its shard's pack, and the release must name that shard.
-const listed = process.env['WORLD_CELLS'] ?? 'driftwood-isle', cells = worldCells(listed, release.shards.map(shard => shard.slug)), shards = [...new Set(cells.map(cellShard))];
+const listed = process.env['WORLD_CELLS'] ?? 'driftwood-isle', cells = worldCells(listed, release.shards.map(shard => shard.slug));
 const hold = process.env['HOLD_MS'], empty = process.env['EMPTY_MS'], grace = process.env['GRACE_MS'], poll = process.env['RELEASE_POLL_MS'], recordEvery = process.env['RECORD_MS'];
 // An env file's blank row means unset.
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
@@ -172,9 +172,15 @@ async function pullBundle(script: string): Promise<void> {
   const [code] = await once(spawn(process.execPath, [script, '--fetch'], { stdio: ['ignore', 'inherit', 'inherit'] }), 'exit') as [number | null];
   if (code !== 0) throw new Error('The pull refused this release');
 }
-const watch = new ReleaseWatch({ read: readRelease, serving: release, cells: shards, ...(poll === undefined ? {} : { everyMs: Number(poll) }), failed: error => { log({ at: 'release.failed', error: String(error) }); },
-  changed: async next => {
-    if (pullScript !== undefined) await pullBundle(pullScript);
+const watch = new ReleaseWatch({ read: readRelease, serving: release, ...(poll === undefined ? {} : { everyMs: Number(poll) }), failed: error => { log({ at: 'release.failed', error: String(error) }); },
+  requiredShards: async next => {
+    const released = next.shards.map(shard => shard.slug);
+    if (pullScript === undefined) return releasedWorldShards(listed, released);
+    await pullBundle(pullScript);
+    const bundleCells = await readPulledReleaseCells(process.env['WILDSHARD_HOME'] ?? '/var/lib/wildshard/production', next, releaseKey);
+    return releasedWorldShards(listed, released, bundleCells);
+  },
+  changed: async (next, shards) => {
     const nextCatalogue = await readReleaseItems(next.items, { origin, cache }, reads);
     for (const slug of shards) await readPackFolder(slug, next.engineBuild, await rapier(), { origin, cache }, reads, undefined, nextCatalogue);
     world.beginGrace(next.engineBuild);

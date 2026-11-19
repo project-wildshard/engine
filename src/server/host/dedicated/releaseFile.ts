@@ -4,6 +4,8 @@
 import { createPublicKey, verify } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- A `file:` release is a local run's.
 import { readFile } from 'node:fs/promises';
+// oxlint-disable-next-line import/no-nodejs-modules -- The pull leaves the verified bundle in a local folder.
+import { join } from 'node:path';
 import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import { ReleaseSchema, SignedSchema, type ReleaseFile } from '../../../shared/host/releaseRows';
@@ -12,6 +14,8 @@ import { ReleaseSchema, SignedSchema, type ReleaseFile } from '../../../shared/h
 const POLL_MS = 60_000;
 /** A look that hangs would stop every later look: one minute's poll is the most it may take. */
 const FETCH_MS = 30_000;
+interface BundleCell { readonly instance: string; readonly slug: string }
+const BundleCells: v.GenericSchema<readonly BundleCell[]> = v.array(v.object({ instance: v.string(), slug: v.string() }));
 /** A signed file's text as what it says. It throws on a bad signature, before a byte of the body is believed. `publicKey` is SPKI DER in hex, and the signature is hex.
  *  The release file and SA33's placement file share it, each under its own key. */
 export function readSigned<T>(text: string, publicKey: string, schema: v.GenericSchema<T>, what: string): T {
@@ -31,6 +35,19 @@ export function readReleaseFile(text: string, publicKey: string): ReleaseFile { 
 /** The release file at `url`, an `https:` bucket or a `file:` path. */
 export async function fetchReleaseFile(url: string, publicKey: string): Promise<ReleaseFile> { return readReleaseFile(await fetchSignedText(url, 'release file'), publicKey); }
 
+/** Read the grid checked by the pull. The alias may have advanced since the watch read it. */
+export async function readPulledReleaseCells(home: string, next: ReleaseFile, key: string): Promise<readonly BundleCell[]> {
+  if (!/^\w[\w.+-]*$/u.test(next.engineBuild)) throw new Error('Invalid pulled release build');
+  const folder = join(home, 'bundles', next.engineBuild);
+  const kept = readReleaseFile(await readFile(join(folder, 'release.json'), 'utf8'), key);
+  if (JSON.stringify(kept) !== JSON.stringify(next)) throw new Error('The pulled release differs from the watched release');
+  const cells = await readFile(join(folder, 'cells.json'), 'utf8').catch((error: unknown) => {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return '[]';
+    throw error;
+  });
+  return v.parse(BundleCells, JSON.parse(cells));
+}
+
 /** Boot from the release whose bundle passed the pull. Remote metadata alone cannot change its epoch.
  * A direct local boot without a kept file may use the signed file for its build and configured channel. */
 export function servingRelease(build: string, channel: string, newest: ReleaseFile | null, kept: ReleaseFile | null, installed = false): ReleaseFile {
@@ -45,12 +62,12 @@ export interface ReleaseWatchOptions {
   /** What this process is serving. */
   readonly serving: ReleaseFile;
   /** A newer release, once. Packs reach disk here, then the grace starts. A throw is told to `failed`, and the next look tries again. */
-  readonly changed: (next: ReleaseFile) => Promise<void>;
+  readonly changed: (next: ReleaseFile, shards: readonly string[]) => Promise<void>;
   /** A look that failed. The server plays on with what it has. */
   readonly failed: (error: unknown) => void;
   readonly everyMs?: number;
-  /** A release cannot begin its grace without every cell this process will open. */
-  readonly cells?: readonly string[];
+  /** The shards the next release must preload, after its bundle is ready. */
+  readonly requiredShards?: (next: ReleaseFile) => readonly string[] | Promise<readonly string[]>;
 }
 /** J174's one trigger, for a build or a flip: a release newer than the one served. */
 export class ReleaseWatch {
@@ -69,9 +86,11 @@ export class ReleaseWatch {
     try {
       const next = await this.options.read();
       if (next.channel !== this.options.serving.channel) throw new Error(`A ${next.channel} release on a ${this.options.serving.channel} server`);
-      const named = new Set(next.shards.map(row => row.slug));
-      for (const cell of this.options.cells ?? []) if (!named.has(cell)) throw new Error(`The release has no ${cell}`);
-      if (next.serial > this.options.serving.serial) { await this.options.changed(next); this.done = true; this.scope.dispose(); }
+      if (next.serial <= this.options.serving.serial) return;
+      const shards = await this.options.requiredShards?.(next) ?? [];
+      await this.options.changed(next, shards);
+      this.done = true;
+      this.scope.dispose();
     } catch (error) { this.options.failed(error); } finally { this.looking = false; }
   }
   dispose(): void { this.scope.dispose(); }

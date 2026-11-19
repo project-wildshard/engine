@@ -13,7 +13,7 @@ import type { AddressInfo } from 'node:net';
 // oxlint-disable-next-line import/no-nodejs-modules -- The folders the VPS keeps.
 import { join, resolve as absolute } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { readReleaseFile } from '../src/server/host/dedicated/releaseFile';
+import { readPulledReleaseCells, readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 
 // E7.2c and E7.8c, at their outer edge: `pull.mjs` and `uptime.sh` as systemd runs them, against a local origin.
 const PULL = absolute(process.env['WS_VPS_PULL'] ?? 'scripts/vps/pull.mjs'), UPTIME = absolute('scripts/vps/uptime.sh');
@@ -122,6 +122,7 @@ test('GO3: WORLD_CELLS is checked through the cells the new bundle places; nothi
   expect(oldGrid.out, 'a bundle from before GO3 cannot open the grid').toMatch(/places no cell the release names/u);
   expect(live()).toBe(join(home, 'bundles', 'old'));
   expect(readFileSync(join(home, 'bundles', 'old', 'release.json'), 'utf8'), 'the kept record is untouched').toBe(kept);
+  await expect(readPulledReleaseCells(home, readReleaseFile(kept, KEY), KEY)).resolves.toEqual([]);
   const named = (serial: number, shards: readonly string[]): string => signed(JSON.stringify({ channel: 'production', serial, engineBuild: 'placed', saveEpoch: 1, shards: shards.map(slug => ({ slug, revision: 1 })), bundle: { name: placed.name, sha256: placed.sha256 } }));
   text = named(2, ['driftwood-isle']);
   const refused = await pull('driftwood-isle,open-plot-nw');
@@ -132,6 +133,9 @@ test('GO3: WORLD_CELLS is checked through the cells the new bundle places; nothi
   expect((await pull('driftwood-isle,open-plot-nw')).code).toBe(0);
   expect(live()).toBe(join(home, 'bundles', 'placed'));
   expect((await pull('grid')).code).toBe(0);
+  await expect(readPulledReleaseCells(home, readReleaseFile(text, KEY), KEY)).resolves.toEqual(cells);
+  const prior = readReleaseFile(named(2, ['driftwood-isle']), KEY);
+  await expect(readPulledReleaseCells(home, prior, KEY)).rejects.toThrow('The pulled release differs from the watched release');
 });
 
 test('a stopped server tells the phone once, and once more when it is back', async () => {
