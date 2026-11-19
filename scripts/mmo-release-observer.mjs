@@ -60,10 +60,14 @@ export async function runObserver(args,root=ROOT){
  const stop=()=>{cancel.abort();};process.once('SIGINT',stop);process.once('SIGTERM',stop);
  try{
   const report=await observeRelease({read:(signal,liveGenerations)=>inputs.read(signal,liveGenerations),
-   prepare:async(snapshot,signal)=>{try{return await prepareObserverClient(snapshot,signal,{root,work});}
+   prepare:async(snapshot,signal)=>{try{
+    const clientWork=join(work,`native-${snapshot.release.engineBuild}`);
+    mkdirSync(clientWork,{mode:0o700});
+    return await prepareObserverClient(snapshot,signal,{root,work:clientWork});
+   }
     catch(error){if(signal.aborted)throw signal.reason;throw new ObservationRefusedError('client-prepare',error);}},
    devices:observerIdentities(realBase),
-   labels:[`E7-${id.slice(0,6)}-0`,`E7-${id.slice(0,6)}-1`],durationMs:seconds*1000,signal:cancel.signal,requireDurableBaseline:true,
+   labels:[`E7-${id.slice(0,6)}-0`,`E7-${id.slice(0,6)}-1`],durationMs:seconds*1000,signal:cancel.signal,requireDurableBaseline:true,reloadClient:true,
    event:phase=>{console.log(JSON.stringify({at:'release-observer',phase}));}});
   writeFileSync(join(work,'report.json'),`${JSON.stringify(report,null,2)}\n`,{mode:0o600});
   console.log(JSON.stringify({status:report.status,reason:report.reason,from:report.from,to:report.to,continuity:report.continuity,report:join(work,'report.json')}));

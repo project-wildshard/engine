@@ -59,7 +59,7 @@ export async function openQaCandidate({ root, out, candidate, build }) {
     }
   }));
   const transport = await candidateTransport(root, out, dist);
-  return { ...transport, deploymentId, ...before, verify: async () => {
+  return { ...transport, deploymentId, deploymentUrl: candidate, ...before, verify: async () => {
     const after = await readStagingInputs(build);
     if (after.aliasBuild !== before.aliasBuild || after.serial !== before.serial) throw new Error('Staging changed during candidate QA');
     if (transport.stats.pageReads === 0 || transport.stats.roomTunnels === 0) throw new Error('Candidate QA did not serve the candidate page and reach staging rooms');

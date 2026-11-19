@@ -87,7 +87,8 @@ async function journey({ id, root, url, out, build, candidate }) {
   }
   const args = gate
     ? [join(import.meta.dirname, 'zone-gate-proof.mjs'), `--base=${url}`, `--out=${dir}`, '--engine=chromium', '--viewport=1280x800@1', '--target=far-reach', '--deploy', '--online']
-    : doctor ? ['--import', join(import.meta.dirname, 'bake-loader.mjs'), join(import.meta.dirname, 'e7-doctor-proof.mjs'), url, build, RELEASE_PUBLIC_KEY, '--engine=chromium']
+    : doctor ? ['--import', join(import.meta.dirname, 'bake-loader.mjs'), join(import.meta.dirname, 'e7-doctor-proof.mjs'), url, build, RELEASE_PUBLIC_KEY, '--engine=chromium',
+      ...(candidate === undefined ? [] : [`--candidate-entry=${candidate.deploymentUrl}`, `--candidate-id=${candidate.deploymentId}`])]
     : [join(import.meta.dirname, 'journey-proof.mjs'), '--url', url, '--out', dir, '--browsers', browser, '--card', 'driftwood-isle', '--paths', 'mmo', '--runs', 'cold', '--deploy'];
   console.log(`staging-qa starting ${id}`);
   const fd = openSync(log, 'w', 0o600);
@@ -206,14 +207,18 @@ async function qualify({ url, release, root, out, store, local, kind, legStarted
     throw new Error('Staging QA requires /version.json for the requested build and version');
   }
   mkdirSync(out, { recursive: true });
+  /** @type {Proof[]} */
+  const proofs = [];
+  const journeyTarget = {root, url, out, build, ...(candidate === undefined ? {} : {candidate})};
+  // Doctor opens a fresh socket. Run it before the journeys use the shared staging connection budget.
+  if (expected.includes('doctor')) proofs.push(await journey({id: 'doctor', ...journeyTarget}));
   const smoke = selected.length === 0 ?
     { build, url, release, at: new Date().toISOString(), seconds: 0, scenarios: [], findings: [], vision: [], hold: false } :
     await runSmoke({ url, release, out: join(out, 'smoke'), only: selected, store, build, deploy: true, vision: !local, changelog: join(root, 'CHANGELOG.md') });
-  /** @type {Proof[]} */
-  const proofs = [];
   for (const id of expected) {
+    if (id === 'doctor') continue;
     proofs.push(id === 'ios-safari' ? await iosSafari({ root, url, out, build })
-      : await journey({ id, root, url, out, build, ...(candidate === undefined ? {} : { candidate }) }));
+      : await journey({ id, ...journeyTarget }));
   }
   await candidate?.verify();
   if (local) checkLocalSource(root, build);

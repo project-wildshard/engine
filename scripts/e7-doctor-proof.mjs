@@ -5,24 +5,32 @@ import {chromium,webkit,devices} from "./browser-playwright.mjs";
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {PRIVATE_HEALTH_SKIPPED,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
 import {doctorEpochOK,doctorRowsOK} from './doctor-proof-rows.mjs';
+import {isVersionUrl,WORKERS} from './page-release/hosts/workers.mjs';
 import {SOCKET_READY,SOCKET_RELIABLE,SOCKET_PING} from '../src/shared/engine/net/socketFrames.ts';
 
 const [base,build,key]=process.argv.slice(2),human=process.argv.includes('--human-static'),origin=new URL(base).origin;
 // --engine=chromium|webkit runs one browser (verify-staging.yml runs each on its own runner); both by default.
 const only=process.argv.find(arg=>arg.startsWith('--engine='))?.slice('--engine='.length);assert.ok(only===undefined||only==='chromium'||only==='webkit',only);
 assert.equal(origin,human?'https://play.wildshard.io':'https://staging.wildshard.io');assert.match(build,/^[a-f0-9]{40}$/u);
+const entry=process.argv.find(arg=>arg.startsWith('--candidate-entry='))?.slice('--candidate-entry='.length);
+const candidateId=process.argv.find(arg=>arg.startsWith('--candidate-id='))?.slice('--candidate-id='.length);
+if(entry!==undefined||candidateId!==undefined){
+ assert.ok(!human&&entry!==undefined&&candidateId!==undefined&&isVersionUrl(entry,candidateId,WORKERS.staging.worker),'Expected the uploaded staging Worker version');
+}
+// The loopback candidate runs the page assets. Only the uploaded Worker implements its document redirect.
+const staticBase=entry??base;
 const channel=human?'production':'staging',releaseURL=`https://packs.wildshard.io/releases/${channel}.json`;
 /** @param {string|URL} url */
 async function read(url){const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,String(url));return response;}
-const version=await(await read(new URL('/version.json',base))).json();assert.equal(version.build,build);
-const root=await(await read(new URL('/',base))).text(),document=await(await read(new URL('/doctor/',base))).text();
+const version=await(await read(new URL('/version.json',staticBase))).json();assert.equal(version.build,build);
+const root=await(await read(new URL('/',staticBase))).text(),document=await(await read(new URL('/doctor/',staticBase))).text();
 assert.ok(root.includes('data-doctor-door'));
-const door=await fetch(new URL('/?doctor&chunk=driftwood-isle&from=link',base),{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(15000)});
+const door=await fetch(new URL('/?doctor&chunk=driftwood-isle&from=link',staticBase),{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(15000)});
 assert.equal(door.status,307,'Doctor entry must redirect before any game HTML');
-const redirectLocation=door.headers.get('location');assert.ok(redirectLocation!==null);const destination=new URL(redirectLocation,base);
-assert.equal(destination.origin,origin);assert.equal(destination.pathname,'/doctor/');assert.equal(destination.searchParams.get('sw'),'0');assert.equal(destination.searchParams.get('chunk'),'driftwood-isle');assert.equal(destination.searchParams.get('from'),'link');
+const redirectLocation=door.headers.get('location');assert.ok(redirectLocation!==null);const destination=new URL(redirectLocation,staticBase);
+assert.equal(destination.origin,new URL(staticBase).origin);assert.equal(destination.pathname,'/doctor/');assert.equal(destination.searchParams.get('sw'),'0');assert.equal(destination.searchParams.get('chunk'),'driftwood-isle');assert.equal(destination.searchParams.get('from'),'link');
 const worldText=/globalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(document)?.[1];assert.ok(worldText,'Doctor needs a release stamp');const world=JSON.parse(worldText);assert.equal(world.release,releaseURL);assert.equal(world.key,key);
-const scripts=[...document.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map(match=>match[1]);assert.ok(scripts.length>0,'Doctor entry must be build scoped');assert.ok(scripts.every(path=>path!==undefined&&path.startsWith(`/b/${build}/doctor/`)),'Every external Doctor script must be build scoped');for(const path of scripts){assert.ok(path!==undefined);await read(new URL(path,base));}
+const scripts=[...document.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map(match=>match[1]);assert.ok(scripts.length>0,'Doctor entry must be build scoped');assert.ok(scripts.every(path=>path!==undefined&&path.startsWith(`/b/${build}/doctor/`)),'Every external Doctor script must be build scoped');for(const path of scripts){assert.ok(path!==undefined);await read(new URL(path,staticBase));}
 const signed=await(await read(releaseURL)).json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
 const release=JSON.parse(signed.body);assert.equal(release.channel,channel);assert.equal(release.engineBuild,build);assert.ok(doctorEpochOK(version.saveEpoch,release.saveEpoch),'Page epoch must match the signature-verified release');
 if(human){console.log('PASS human Doctor static publication',JSON.stringify({build,epoch:release.saveEpoch,doctorEntry:true,signedProduction:true,productionSockets:0}));}else{
@@ -45,10 +53,11 @@ if(human){console.log('PASS human Doctor static publication',JSON.stringify({bui
    const started=Date.now(),page=await context.newPage();page.on('pageerror',e=>errors.push({text:e.message}));page.on('console',m=>{if(m.type()==='error')errors.push({text:m.text(),url:m.location().url});});page.on('response',r=>{if(r.status()>=400)errors.push({text:`HTTP ${r.status()} ${r.url()}`,url:r.url()});});
    page.on('requestfailed',r=>errors.push({text:`Request failed ${r.url()}: ${r.failure()?.errorText??'unknown'}`,url:r.url()}));page.on('crash',()=>errors.push({text:'Native page crash'}));
    page.on('websocket',ws=>{if(new URL(ws.url()).origin!==socket)errors.push({text:'Non-staging Doctor socket'});ws.on('socketerror',e=>errors.push({text:`Socket error ${e}`}));ws.on('framesent',frame=>{if(!Buffer.isBuffer(frame.payload)){errors.push({text:'Non-binary Doctor frame'});return;}prefixes.push(frame.payload[0]??-1);});});
-   await page.goto(new URL('/?doctor',base).href,{waitUntil:'load',timeout:90000});await page.waitForURL(url=>url.pathname==='/doctor/',{timeout:15000});
+   const pageEntry=entry===undefined?'/?doctor':`${destination.pathname}${destination.search}`;
+   await page.goto(new URL(pageEntry,base).href,{waitUntil:'load',timeout:90000});await page.waitForURL(url=>url.pathname==='/doctor/',{timeout:15000});
    await page.locator('#ws-doctor:not([data-running])[data-verdict]').waitFor({timeout:120000});
    const rows=await page.locator('.ws-doc-row').evaluateAll(nodes=>nodes.map(node=>{if(!(node instanceof HTMLElement))throw new Error('Doctor row must be an HTML element');return{id:node.dataset.check,state:node.dataset.state,value:node.querySelector('.ws-doc-value')?.textContent,ms:node.querySelector('.ws-doc-ms')?.textContent};}));
-   assert.ok(doctorRowsOK(rows,socket),JSON.stringify(rows));
+   assert.ok(doctorRowsOK(rows,socket),JSON.stringify({rows,socketErrors:errors.filter(row=>row.text.startsWith('Socket error')),prefixes}));
    const serverRow=rows.find(row=>row.id==='server')?.value??'';
    // D7: on rooms-staging the page can't read /health, so the row says reachable; the tailnet health reads before and after prove the build.
    if(new URL(socket).host!=='rooms-staging.wildshard.io')assert.ok(serverRow.includes(build.slice(0,7)),'Opaque reachability cannot replace a matching server');

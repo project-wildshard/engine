@@ -27,6 +27,7 @@ export interface ObserverOptions {
  readonly labels?:readonly [string,string];
  readonly durationMs:number;readonly pollMs?:number;readonly signal?:AbortSignal;
  readonly requireDurableBaseline?:boolean;
+ readonly reloadClient?:boolean;
  readonly event?:(phase:string)=>void;
 }
 type Status='observed'|'failed'|'inconclusive'|'refused'|'cancelled';
@@ -38,6 +39,7 @@ interface Session {
 /** A stricter checkpoint comparison may be inconclusive after legitimate progress changes. */
 function continuityOf(sessions:readonly Session[],targetSerial:number):{kind:'restored'|'lost'|'unknown';reason:string|null}{
  if(sessions.length!==2)return {kind:'unknown',reason:'missing-durable-witness'};
+ let changed=false;
  for(const session of sessions){
   if(session.generation!==targetSerial||session.attempts<2||session.closeAt===null)return {kind:'unknown',reason:'redial-incomplete'};
   const before=session.before,after=session.latest,old=before?.checkpoint,next=after?.checkpoint;
@@ -49,9 +51,9 @@ function continuityOf(sessions:readonly Session[],targetSerial:number):{kind:'re
    (before.coins!==null&&after.coins!==null&&after.coins<before.coins)||
    (next.seq===old.seq&&next.progressHash!==old.progressHash))return {kind:'lost',reason:'checkpoint-progress-lost'};
   if(next.seq===old.seq)return {kind:'unknown',reason:'no-drain-checkpoint'};
-  if(next.progressHash!==old.progressHash)return {kind:'unknown',reason:'checkpoint-progress-changed'};
+  if(next.progressHash!==old.progressHash)changed=true;
  }
- return {kind:'restored',reason:null};
+ return changed?{kind:'unknown',reason:'checkpoint-progress-changed'}:{kind:'restored',reason:null};
 }
 const mark=(release:ReleaseFile)=>({serial:release.serial,build:release.engineBuild});
 const identity=(release:ReleaseFile):string=>JSON.stringify([release.serial,release.engineBuild,release.saveEpoch,release.socket,release.bundle,release.shards]);
@@ -69,7 +71,7 @@ export async function observeRelease(options:ObserverOptions){
  const timeout=setTimeout(()=>{limit.abort();},options.durationMs);
  const signal=options.signal===undefined?limit.signal:AbortSignal.any([limit.signal,options.signal]);
  const sessions:Session[]=[],owned:NativeObserverBot[]=[],faults:string[]=[];
- let baseline:ObservationSnapshot|null=null,target:ObservationSnapshot|null=null,prepared:PreparedObserver|undefined;
+ let baseline:ObservationSnapshot|null=null,target:ObservationSnapshot|null=null,prepared:PreparedObserver|undefined,reloaded:PreparedObserver|undefined;
  const sample=(session:Session):void=>{
   const read=session.bot.read();session.latest=read;
   if(read.tick!==null&&read.stand!==null){
@@ -88,6 +90,7 @@ export async function observeRelease(options:ObserverOptions){
  const result={
   status,reason,from:baseline===null?null:mark(baseline.release),to:target===null?null:mark(target.release),
   clientBuild:prepared?.sourceBuild??null,clientHarness:prepared?.harness??null,elapsedMs:Math.round(performance.now()-started),
+  ...(reloaded===undefined?{}:{reloadClientBuild:reloaded.sourceBuild,reloadClientHarness:reloaded.harness??null}),
   continuity,failedSaves:null,
   checkpointCoverage:['quest-book','owned-store','ledger','native-coins'] as const,
   saveCompletionTime:null,peerWorkers:{kind:'whole-release' as const,untouchedWorkerEvidence:null},
@@ -104,9 +107,9 @@ export async function observeRelease(options:ObserverOptions){
    return null;
   }
  };
- const connect=(session:Session,snapshot:ObservationSnapshot):void=>{
-  const socket=snapshot.release.socket;if(socket===undefined||prepared===undefined)throw new Error('Verified native observer target missing');
-  const bot=prepared.connect(socket,session.device,session.label);owned.push(bot);
+ const connect=(session:Session,snapshot:ObservationSnapshot,client=prepared):void=>{
+  const socket=snapshot.release.socket;if(socket===undefined||client===undefined)throw new Error('Verified native observer target missing');
+  const bot=client.connect(socket,session.device,session.label);owned.push(bot);
   session.bot=bot;session.generation=snapshot.release.serial;session.attempts++;session.first=null;session.latest=null;session.moved=false;
   bot.move();
  };
@@ -167,8 +170,12 @@ export async function observeRelease(options:ObserverOptions){
      for(const session of sessions){
       sample(session);
       if(session.latest?.closed!==null&&session.latest?.closed!==undefined){
+       if(options.reloadClient===true&&session.latest.closed==='reload'&&reloaded===undefined){
+        reloaded=await options.prepare(target,signal);
+        if(reloaded.sourceBuild!==target.release.engineBuild)throw new ObservationRefusedError('reload-client-source-build');
+       }
        if(session.attempts>=5)return report('inconclusive','reconnect-budget');
-       connect(session,target);
+       connect(session,target,reloaded??prepared);
       }
      }
     }
@@ -192,6 +199,7 @@ export async function observeRelease(options:ObserverOptions){
   clearTimeout(timeout);
   const errors:unknown[]=[];
   for(const bot of owned.reverse())try{bot.close();}catch(error){errors.push(error);}
+  try{await reloaded?.dispose?.();}catch(error){errors.push(error);}
   try{await prepared?.dispose?.();}catch(error){errors.push(error);}
   if(errors.length>0){
    if(outcome.current!==null){outcome.current.status='failed';outcome.current.reason='cleanup-failed';outcome.current.continuity='unknown';faults.push('cleanup-failed');}

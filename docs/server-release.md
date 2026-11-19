@@ -58,8 +58,7 @@ one clean release clone per channel at the exact SHA (never a worktree
 with untracked pins, never the canonical checkout):
 
 ```
-node scripts/page-release.mjs staging build,upload,check
-node scripts/page-release.mjs staging go-live --local-qa=<local-verdict> --qa=<candidate-verdict>
+node scripts/page-release.mjs staging build,go-live --local-qa=<local-verdict> --qa-out=<evidence-dir>
 node scripts/page-release.mjs production build|upload|check|go-live --qa=<verdict.json>
 node scripts/page-release.mjs preview build,upload,check,go-live
 ```
@@ -156,15 +155,19 @@ Go-live arms the MMO observer before rooms move, uploads the page and
 packs, and checks the exact signed rooms and Worker version. It runs
 K1–K6, the zone-gate play leg, Doctor and a read-only WebKit phone load.
 The smoke checks world draw and continues through Play anyway if shown.
-Go-live requires a clean verdict and the MS9 continuity witness. After
-the alias move it reruns live M3 and writes the final `verdict.json`.
+If rooms request a reload, the MMO observer compiles the signed target
+client and redials with the same identities. Go-live holds on a failed
+redial or lost durable progress. A changed hash with both bots playing
+from later checkpoints, with their coins and ledger retained, is an
+inconclusive progress comparison reported as P2. After the alias move
+the command reruns live M3 and writes the final `verdict.json`.
 The local verdict must name the release commit's parent. Use the final
 verdict as production's `--qa` input. For an already live release,
 `--observer-proof=<file>` supplies its saved MS9 witness for verification.
 Print the train order with
 `node scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z`.
 
-Within ten minutes of staging go-live, start the live leg.
+For a standalone live rerun after go-live:
 
 ```bash
 WS_LANE_NAME=codex-ms BROWSER=none bash scripts/browser-lane.sh --max 18 \

@@ -1,10 +1,12 @@
 // J434: stage the checked build, exercise the existing proofs and write one deploy decision.
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, writeSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
 import { readPublication } from '../server-release/sign.mjs';
+import { worstFirst } from '../staging-smoke/checks.mjs';
 import { CHANNELS, RELEASE_PUBLIC_KEY, RefusedError, localQaGap, qaGap } from './flow.mjs';
 
 const stage = CHANNELS.staging;
@@ -12,9 +14,24 @@ const scripts = absolute(import.meta.dirname, '..');
 const toolsRoot = absolute(scripts, '..');
 const observerFile = 'mmo-observer.json';
 /** @typedef {import('./flow.mjs').QaVerdict & {findings?: readonly import('../staging-smoke/checks.mjs').Finding[]}} DeploymentQa */
-/** @typedef {{status?:string,continuity?:string,to?:{build?:string,serial?:number}}} Observation */
+/** @typedef {{status?:string,reason?:string,continuity?:string,to?:{build?:string,serial?:number}}} Observation */
 const read = (/** @type {string} */ path) => existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : undefined;
 const write = (/** @type {string} */ path, /** @type {unknown} */ body) => writeFileSync(path, `${JSON.stringify(body, null, 2)}\n`, { mode: 0o600 });
+
+/** A retry after a harness kept sending the retired wire can resume from an owned, exact capture.
+ * @param {string} root @param {string} path @param {Observation|undefined} observed @returns {Observation|undefined} */
+function resumedObservation(root, path, observed) {
+  if (observed?.reason !== 'reconnect-budget' || !existsSync(path)) return observed;
+  const recovery = read(join(root, 'mmo-reload.json'));
+  /** @type {{moved:boolean,laterCheckpoint:boolean,sameShard:boolean,ledgerKept:boolean,coinsKept:boolean}[]|undefined} */
+  const comparisons = recovery?.recovery?.comparisons;
+  const prior = createHash('sha256').update(readFileSync(path)).digest('hex');
+  if (recovery?.recovery?.baselineSha256 !== prior || recovery?.recovery?.kind !== 'exact-client-after-reload' ||
+    observed.to?.build !== recovery.recovery.clientBuild || observed.to?.serial !== recovery.to?.serial ||
+    !Array.isArray(comparisons) || comparisons.length !== 2 ||
+    !comparisons.every(row => row.moved && row.laterCheckpoint && row.sameShard && row.ledgerKept && row.coinsKept)) return observed;
+  return recovery;
+}
 
 /** @param {{ file: string, args: string[], cwd: string, out: string, name: string, observe?: (row: {phase?:string,report?:string}) => void }} job */
 function start({ file, args, cwd, out, name, observe }) {
@@ -91,12 +108,15 @@ export async function deployStaging({ root, build, release, source, out, observe
   /** @type {Observation|undefined} */ let observation;
   let aliasMoved = false;
   let step = 'local QA';
+  /** @type {import('../staging-smoke/checks.mjs').Finding|undefined} */ let observerNote;
   const record = (/** @type {string|undefined} */ problem) => {
     /** @type {import('../staging-smoke/checks.mjs').Finding[]} */
     const findings = [...(qa?.findings ?? []), ...(live?.findings ?? [])];
+    if (observerNote !== undefined) findings.push(observerNote);
     if (problem !== undefined) findings.push({ scenario: step, key: 'deploy', severity: 'P1', source: 'check', text: problem });
+    findings.sort(worstFirst);
     const hold = findings.some(row => row.severity === 'P0' || row.severity === 'P1');
-    write(reportPath, { ...(live ?? qa), build, release, status: hold ? 'hold' : 'pass', hold, findings,
+    write(reportPath, { ...(live ?? qa), build, release, status: hold ? 'hold' : 'pass', hold, worst: findings[0]?.severity ?? 'none', findings,
       aliasMoved, deploy: { local: localQa?.build, qualification: qa, live, observation } });
   };
   try {
@@ -139,10 +159,16 @@ export async function deployStaging({ root, build, release, source, out, observe
       } finally { controller.abort(); }
     }
     observation ??= read(observedPath);
+    observation = resumedObservation(observerRoot, observedPath, observation);
     const serial = alreadyLive ? (await get(stage.health)).serial : readState().check.serial;
-    if (observation?.status !== 'observed' || observation.continuity !== 'restored' || observation.to?.build !== build || observation.to?.serial !== serial) {
+    const exact = observation?.to?.build === build && observation.to.serial === serial;
+    const restored = observation?.status === 'observed' && observation.continuity === 'restored';
+    const changed = observation?.status === 'inconclusive' && observation.reason === 'checkpoint-progress-changed';
+    if (!exact || (!restored && !changed)) {
       throw new RefusedError('MS9 has no passing continuity witness for the exact signed staging rooms');
     }
+    if (changed) observerNote = {scenario: 'MMO observer', key: 'checkpoint-progress-changed', severity: 'P2', source: 'check',
+      text: 'Both observers returned with newer saves and retained coins and ledger. A progress hash changed between the captures.'};
     if (!alreadyLive) {
       step = 'alias';
       await phase('go-live', qa);
