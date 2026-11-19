@@ -10,8 +10,9 @@ import { expect, test } from 'vitest';
 import { runCommitJobs } from '../scripts/precommit-jobs.mjs';
 
 // npm defaults to a five-minute request timeout, longer than this proof's existing ninety-second command clock.
+// Revalidate the registry metadata so an older cached response cannot hide a newly published pinned dependency.
 const INSTALL_ARGS = ['install', '--ignore-scripts', '--omit=dev', '--no-audit', '--no-fund', '--package-lock=false',
-  '--prefer-offline', '--fetch-retries=1', '--fetch-retry-mintimeout=1000', '--fetch-retry-maxtimeout=5000', '--fetch-timeout=15000'];
+  '--prefer-online', '--fetch-retries=1', '--fetch-retry-mintimeout=1000', '--fetch-retry-maxtimeout=5000', '--fetch-timeout=15000'];
 
 /** Keep subprocess clocks live while Vitest enforces the case clock; drain each owned tree before removing its files. */
 function installedCommands(root: string, signal: AbortSignal) {
