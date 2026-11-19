@@ -10,13 +10,25 @@ import {folderStore} from '../src/cook/game/packStore';
 import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** C4 (J28, J29, J30): a real product and hostile ones through real child processes under their real limits. */
-// The HTTP notice cooks the real product from a cold store and cache of its own; the pack budget then refuses
-// to publish that same product past it, on the warm encoder cache, as it did after the notice in the original file.
+// These stand in for the page's content and the cook's packed parts without allocating their disk space.
+function sparse(root: string, key: string, bytes: number): void {
+  const file = join(root, key);
+  mkdirSync(dirname(file), {recursive: true});
+  const fd = openSync(file, 'w');
+  try { ftruncateSync(fd, bytes); } finally { closeSync(fd); }
+}
+
 describe('the cook worker', () => {
   const h = useCookHarness();
 
-  it('takes a notice over HTTP, with its token, and cooks it', async () => {
-    const hash = hashOf(h.real), cook = h.worker(new Map([[hash, h.real]]), 'b4'), server: Server = notifyServer(cook, 'a-long-enough-test-token');
+  it('authenticates HTTP notices and publishes twice from one bucket listing', async () => {
+    const folder = join(h.scratch, 'listed'), inner = folderStore(folder), hash = hashOf(h.real);
+    // The page's content sets exceed the whole default cook budget by themselves.
+    sparse(folder, 'content/set-a/blob.bin', 8_000_000_000);
+    let whole = 0;
+    const cook = createCookWorker({build: 'b4', store: {...inner, list: prefix => { if (prefix === '') whole++; return inner.list(prefix); }},
+      source: h.source(new Map([[hash, h.real]])), launcher: h.launcher(), serverPacks: join(h.scratch, 'server'), scratch: join(h.scratch, 'work')});
+    const server: Server = notifyServer(cook, 'a-long-enough-test-token');
     await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });
     const address = server.address(), port = typeof address === 'object' && address !== null ? address.port : 0, url = `http://127.0.0.1:${port}`;
     const notice = {event: 'shardfile.new', stage: 'preview', shard: slug, revision: 1, hash};
@@ -31,6 +43,13 @@ describe('the cook worker', () => {
       expect(cook.rows().map(row => row.state)).toEqual(['cooked']);
       expect(await (await fetch(`${url}/health`)).json()).toMatchObject({ok: true, failed: 0});
     } finally { await new Promise(resolve => { server.close(resolve); }); }
+    expect(existsSync(join(folder, 'index')), 'the authenticated notice wrote its index despite the page content').toBe(true);
+    expect(whole).toBe(1);
+    // Force a second actual publication through the same worker and bucket.
+    rmSync(join(folder, 'index'), {recursive: true, force: true});
+    expect(await cook.cook({slug, hash}), 'the second publish writes the index again').toMatchObject({state: 'cooked'});
+    expect(existsSync(join(folder, 'index')), 'the second publish wrote its index').toBe(true);
+    expect(whole).toBe(1);
   }, 60_000);
 
   it('holds the budget: nothing is published past it', async () => {
@@ -46,44 +65,11 @@ describe('the cook worker', () => {
     expect(downloads, 'a permanent publication refusal cannot download and cook the same shard again').toBe(1);
   }, 120_000);
 
-  // From 2026-11-14 06:12 UTC the box failed every job "Over the pack budget": 4 GB against the whole bucket, which
-  // PAGE-SIZE's content/ sets (32.7 of 33.53 GB) filled alone. The budget is the cook's: content/ is the page's, and the
-  // cook never collects it. Sparse files stand in for the big objects, so no disk is used.
-  const sparse = (root: string, key: string, bytes: number): void => {
-    const file = join(root, key);
-    mkdirSync(dirname(file), {recursive: true});
-    const fd = openSync(file, 'w');
-    try { ftruncateSync(fd, bytes); } finally { closeSync(fd); }
-  };
-  const cookInto = (store: string) => createCookWorker({build: 'b6', store: folderStore(store), source: h.source(new Map([[hashOf(h.real), h.real]])),
-    launcher: h.launcher(), serverPacks: join(h.scratch, 'server'), scratch: join(h.scratch, 'work')});
-
-  it('counts only its own keys against the default budget: the page\'s content/ sets are not the cook\'s', async () => {
-    const store = join(h.scratch, 'with-content');
-    sparse(store, 'content/set-a/blob.bin', 8_000_000_000);
-    const row = await cookInto(store).cook({slug, hash: hashOf(h.real)});
-    expect(row.detail ?? '').not.toContain('Over the pack budget');
-    expect(row).toMatchObject({state: 'cooked'});
-  }, 120_000);
-
-  // 2026-11-19: staging's bucket held 999,467 objects and its whole listing took about 6 min, so each publish that listed it
-  // first held new uploads 7.5 min apart behind a 10 s cook. One worker lists the bucket once and keeps its own writes.
-  it('lists the whole bucket once for two publishes, not once each', async () => {
-    const folder = join(h.scratch, 'listed'), inner = folderStore(folder), hash = hashOf(h.real);
-    let whole = 0;
-    const cook = createCookWorker({build: 'b7', store: {...inner, list: prefix => { if (prefix === '') whole++; return inner.list(prefix); }},
-      source: h.source(new Map([[hash, h.real]])), launcher: h.launcher(), serverPacks: join(h.scratch, 'server'), scratch: join(h.scratch, 'work')});
-    expect(await cook.cook({slug, hash})).toMatchObject({state: 'cooked'});
-    rmSync(join(folder, 'index'), {recursive: true, force: true});
-    expect(await cook.cook({slug, hash}), 'the second publish writes the index again').toMatchObject({state: 'cooked'});
-    expect(existsSync(join(folder, 'index')), 'the second publish wrote its index').toBe(true);
-    expect(whole).toBe(1);
-  }, 180_000);
-
   it('still refuses when its own keys are over the default budget', async () => {
     const store = join(h.scratch, 'full');
     sparse(store, 'assets/spawn/old-part.bin', 5_000_000_000);
-    const row = await cookInto(store).cook({slug, hash: hashOf(h.real)});
+    const hash = hashOf(h.real);
+    const row = await h.worker(new Map([[hash, h.real]]), 'b6', 'full').cook({slug, hash});
     expect(row).toMatchObject({state: 'failed'});
     expect(row.detail).toContain('Over the pack budget: 5000000000 + ');
   }, 120_000);
