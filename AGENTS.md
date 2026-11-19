@@ -108,6 +108,10 @@ Docs / Repo shape
 Code rules
 
  - In the test suite, No LLM, no claude, no herdr.
+ - **Wire and save freeze (WIRE-STABILITY WR14, declared 2026-11-19 under J432):** a wire change is a lock diff
+   (`@wildshard/wire` in shard-format: a new minor, `wire check`, then the engine pin); a save change is a `v`, a
+   migration and a pin (`saves.lock.json`, `pnpm check:saves`). `check:wire` and `check:saves` run in the push gate
+   and CI static; `test/contract-cross.test.ts` plays HEAD against `@wildshard/wire-released` (the last released minor).
  - Every Chromium launch passes `--use-mock-keychain` and `--password-store=basic` (else a macOS keychain dialog opens) and `--mute-audio` (Jake, 2026-11-13); spread `KEYCHAIN_ARGS` from `scripts/chromium-keychain.mjs`, which carries all three.
 
 Agent tooling
