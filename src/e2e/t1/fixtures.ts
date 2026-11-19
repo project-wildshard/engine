@@ -5,7 +5,7 @@ import { expect, test as base } from '../../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { recordBars } from '../../../scripts/loading-card-recorder.mjs'
 import { recordImageUploads } from '../../../scripts/memory/uploadRecorder.mjs'
-import { reportBoot } from './boot-report.ts'
+import { plantDecodeDelay, reportBoot } from './boot-report.ts'
 import { watchClones } from './clones.ts'
 import { inPlay } from './probe.ts'
 
@@ -126,6 +126,9 @@ async function openWorld(
       await context.addInitScript(recordBars)
       // EM26: shard textures uploaded as decoded RGBA
       await context.addInitScript(recordImageUploads)
+    }
+    if (process.env['WS_T1_FAULT'] === 'decode-delay') {
+      await context.addInitScript(plantDecodeDelay)
     }
     if (entryDelayMs > 0) {
       await context.route('**/*.js', async (route): Promise<void> => {

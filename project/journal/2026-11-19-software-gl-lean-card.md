@@ -65,3 +65,21 @@ The gap after a drawn frame now counts as that frame's cost, and the
 scale settles at 0.5 (local fps 10 to 14.5; 0.5 alone measured 18.5
 against 8 to 12 at 1). Seen once beside a load of 32: A's boot sat in
 `home` for 112 s with no network after 6 s, the K stall's shape.
+
+## The smoke receipt names pack decode (opus-tr4b4, TB-4b)
+
+J434 retired the Template 2 smoke, so T1's Brasscap entry carries
+the receipt now (`src/e2e/t1/smoke-receipt.ts`). Each entry's boot
+timeline becomes stable leaves: every loader stage's own time, less
+the stages and decodes inside it, in whole quarter seconds, plus
+`packDecode`, the wall time of every model and texture decode. Local
+runs append a `TEMPLATE_SMOKE` line to the lane receipt log; every
+run prints `[t1-smoke] <profile> flagged: ...` against the week.
+
+A decode did not show at first: rigParser opened its `GLTF decode`
+wait after the parse's synchronous part had already run, so the
+span held almost nothing. The parse now starts one microtask into
+the wait. With three Metal seeds (home 1.75 s, packDecode 0), the
+planted fault (`WS_T1_FAULT=decode-delay`: 3 s inside the first
+GLTF decode) printed `flagged: packDecode 3000 ms (week median 18
+ms of 3)` and nothing else; unplanted runs flag none and pass.

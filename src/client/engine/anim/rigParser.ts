@@ -107,8 +107,13 @@ class BoundedRigLoader extends GLTFLoader implements RigLoader {
       }
       // Observe only active work: queued callers must not crowd this owner out
       // of the grid's bounded oldest-wait snapshot. Keep the original serial tail.
-      return waitFor(`GLTF decode ${path || '(owned bytes)'}`,
-        new Promise<GLTF>((resolve, reject) => { super.parse(read() as Parameters<GLTFLoader['parse']>[0], path, resolve, reject); }), 'work');
+      // TEMPLATE-E2E TB-4b: the parse starts a microtask after the wait opens, so the wait's span holds the parse's
+      // synchronous part (the GLB split and its JSON, most of a small model's decode), not only what it awaits after
+      const decode = async (): Promise<GLTF> => {
+        await Promise.resolve();
+        return new Promise<GLTF>((resolve, reject) => { super.parse(read() as Parameters<GLTFLoader['parse']>[0], path, resolve, reject); });
+      };
+      return waitFor(`GLTF decode ${path || '(owned bytes)'}`, decode(), 'work');
     });
     // A failed file must release the slot as well as a successful one. Keep no
     // decoded scene in the tail after handing it to its existing resource owner.

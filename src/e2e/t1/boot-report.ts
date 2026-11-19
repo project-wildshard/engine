@@ -1,6 +1,7 @@
 import { takePlayMarks } from './probe.ts'
+import { smokeReceipt } from './smoke-receipt.ts'
 
-import type { Page } from '@playwright/test'
+import type { BrowserContext, Page } from '@playwright/test'
 
 interface BootSpan {
   readonly operation: string
@@ -39,10 +40,13 @@ function bootStage(span: BootSpan | undefined): string | undefined {
   return `${name} ${((span.end - span.start) / 1000).toFixed(1)}@${(span.start / 1000).toFixed(1)}`
 }
 
+/** Brasscap entries per browser context: the first is a cold boot, later ones warm (TB-4b's receipt profile). */
+const brasscapEntries = new WeakMap<BrowserContext, number>()
+
 /** TR-4b: one stdout line per Brasscap entry with every loader stage of 0.5 s or more (its `stage:*` spans in start
  *  order: seconds, then @ seconds into the entered document), so a hosted suite killed at its budget still says where
  *  its time went. `doc` is the entered document's age at control; the rest of `in play after` is the title's. */
-export async function reportBoot(
+async function reportBoot(
   page: Page,
   startedAt: number,
   reached = 'Brasscap in play',
@@ -71,4 +75,13 @@ export async function reportBoot(
   process.stdout.write(
     `[t1-boot] ${reached} after ${((Date.now() - startedAt) / 1000).toFixed(1)} s (${steps}; ${play})\n`,
   )
+  if (reached === 'Brasscap in play') {
+    const entry = (brasscapEntries.get(page.context()) ?? 0) + 1
+    brasscapEntries.set(page.context(), entry)
+    await smokeReceipt(page, entry)
+  }
 }
+
+/** TB-4b's planted fault rides with the receipt it proves; fixtures reaches both through here. */
+export { reportBoot }
+export { plantDecodeDelay } from './smoke-receipt.ts'
