@@ -2,7 +2,7 @@ import { afterAll, expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Sphere, Sprite, SpriteMaterial, Vector3, WebGLRenderer } from 'three';
 import { textureUploadRenderer } from '../../../test/engine/textureUploadRenderer';
 import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from './changedTextureUploads';
-import { installMemorySaver, releaseDrawnGeometry } from './memorySaver';
+import { composerTriangle, installMemorySaver, releaseDrawnGeometry } from './memorySaver';
 import { arrayReleased, retainGeometryForCpuReads } from './releasedArrays';
 import { installFrameCounter } from './frameCounter';
 
@@ -164,4 +164,31 @@ test('fixed batches retire uploaded geometry at boot and keep native byte offset
     expect(Array.from(index.array)).toEqual([0, 1, 2, 3, 4, 5]);
   }
   changing.dispose(); narrow.dispose(); wide.dispose(); triangle.dispose(); material.dispose();
+});
+
+// J451 (QA 11-19 row 17): postprocessing's fullscreen triangle is one module geometry shared by every composer on the page.
+// A composer's dispose deletes its GPU buffers; a same-page zone entry's next composer uploads it again from its arrays. When
+// the Memory saver had let those go, they came back zero-filled: the final pass drew nothing and the world read transparent.
+test('phone keeps the composer fullscreen triangle readable for the next composer', () => {
+  vi.stubGlobal('WebGL2RenderingContext', FakeGL);
+  vi.stubGlobal('WebGLBuffer', FakeBuffer);
+  const gl = new FakeGL(), renderer = Object.assign(textureUploadRenderer(), { getContext: () => gl });
+  installMemorySaver(renderer, true);
+  const geometry = composerTriangle();
+  if (geometry === null) throw new Error('postprocessing no longer shares a fullscreen triangle');
+  const material = new MeshBasicMaterial(), screen = new Mesh(geometry, material);
+  geometry.computeBoundingSphere();
+  const expected = Object.fromEntries(Object.entries(geometry.attributes).map(([name, a]) => [name, Array.from((a as BufferAttribute).array)]));
+  try {
+    for (const attribute of Object.values(geometry.attributes)) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, new FakeBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, (attribute as BufferAttribute).array);
+    }
+    renderer.renderBufferDirect(new PerspectiveCamera(), new Scene(), geometry, material, screen, { start: 0, count: 3, materialIndex: 0 });
+    expect(releaseDrawnGeometry(renderer)).toBe(0);
+    // the composer's dispose deletes the GPU copies (the fake's buffers go with their uploads)
+    gl.uploads.clear();
+    geometry.dispose();
+    for (const [name, values] of Object.entries(expected)) expect(Array.from(geometry.getAttribute(name).array)).toEqual(values);
+  } finally { material.dispose(); }
 });

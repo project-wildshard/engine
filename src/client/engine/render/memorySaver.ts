@@ -18,7 +18,7 @@
  * A context loss reloads the page (gpuOnly.ts: the released copies cannot be uploaded again).
  */
 import * as THREE from 'three';
-import { RenderPass, type EffectComposer, type Pass } from 'postprocessing';
+import { Pass, RenderPass, type EffectComposer } from 'postprocessing';
 import { markGpuOnly } from '../core/gpuOnly';
 import { arrayReleased, fixedBatchGeometry, geometryHasCpuReader, markArrayReleased, markArrayRestored, releasedArrayType } from './releasedArrays';
 import type { Renderer } from './renderer';
@@ -287,6 +287,13 @@ function watchUploads(context: WebGL2RenderingContext, releaseShape: boolean): U
   return uploads;
 }
 
+/** postprocessing's one fullscreen triangle, drawn by every composer's fullscreen passes (`Pass.fullscreenGeometry`, internal in
+ *  its types) */
+export function composerTriangle(): THREE.BufferGeometry | null {
+  const geometry: unknown = Reflect.get(Pass, 'fullscreenGeometry');
+  return geometry instanceof THREE.BufferGeometry ? geometry : null;
+}
+
 /**
  * The renderer's hooks: every texture is looked at when three first asks for its properties (before its upload), every
  * geometry when it first draws.
@@ -347,8 +354,10 @@ export function installMemorySaver(renderer: Renderer, releaseShape = false): vo
     // A rig's geometry stays whole: the far and shadow herds copy every attribute of it when a batch grows, and reading
     // a released array back from the GPU (restore) stalled a desktop Pine drive 1.4 s in one frame (gl.isBuffer
     // waiting on the GPU, then getBufferSubData)
-    // Three shares one quad between all sprites, including the next renderer's sprites.
-    if (seenGeometry.has(geometry) || object instanceof THREE.SkinnedMesh || object instanceof THREE.Sprite
+    // Three shares one quad between all sprites, including the next renderer's sprites. postprocessing shares one fullscreen
+    // triangle between every composer: a composer's dispose deletes its buffers and a same-page zone entry's next composer
+    // uploads it again from its arrays (J451: released, they came back zero-filled and the final pass drew a transparent world)
+    if (seenGeometry.has(geometry) || geometry === composerTriangle() || object instanceof THREE.SkinnedMesh || object instanceof THREE.Sprite
       || (object instanceof THREE.BatchedMesh && !(releaseShape && fixedBatchGeometry(geometry)))) return;
     seenGeometry.add(geometry);
     // The scene/cache owns live geometry; this delayed optimization only borrows it.
