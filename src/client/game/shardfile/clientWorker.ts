@@ -277,6 +277,9 @@ function headOf(body: Animal | undefined, to: Vector3): boolean {
   return true;
 }
 
+type ShownRow = { -readonly [K in keyof Parameters<Animal['showRow']>[0]]-?: Parameters<Animal['showRow']>[0][K] };
+const SHOWN_ROW: ShownRow = { x: 0, y: 0, z: 0, yaw: 0, state: 'idle', attack: 0, attackDuration: 1, winding: false, flinch: 0, strafe: 0, brace: 0,
+  hp: 0, alive: true, rise: 0, act: 0, channels: [], lock: 'row' };
 /** STR20: the animal rows the client holds, counted without copying the entity map each frame */
 function animalRows(client: NetClient): number {
   let rows = 0;
@@ -295,7 +298,13 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<numbe
     if (wirePage.lookKind(entry.home, channelsOf(row, ROW_CHANNELS)) !== body.kind) { manager.retire(body); bodies.delete(handle); continue; }
     const attack = row[ATTACK] ?? 0, duration = (row[ATTACK_DUR] ?? 1000) / 1000, winding = row[WINDING] === 1;
     const stamp = row[ATTACK_STAMP] ?? 0, started = winding && row[TARGET] === own && entry.windup !== stamp;
-    body.showRow({ x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, yaw: row[YAW] ?? 0, state: ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle', attack, attackDuration: duration, winding, flinch: row[FLINCH] ?? 0, strafe: row[STRAFE] ?? 0, brace: row[BRACE] ?? 0, hp: row[HP] ?? 0, alive: row[ALIVE] === 1, rise: row[RISE] ?? 0, act: row[ACT] ?? 0, channels: channelsOf(row, ROW_CHANNELS), lock: LOCKS[row[LOCKABLE] ?? 0] ?? 'row' }, dt);
+    // STR20: one row object refilled per body (showRow copies its fields; the literal was one object per creature a frame)
+    const drawn = SHOWN_ROW;
+    drawn.x = row[X] ?? 0; drawn.y = row[Y] ?? 0; drawn.z = row[Z] ?? 0; drawn.yaw = row[YAW] ?? 0; drawn.state = ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle';
+    drawn.attack = attack; drawn.attackDuration = duration; drawn.winding = winding; drawn.flinch = row[FLINCH] ?? 0; drawn.strafe = row[STRAFE] ?? 0;
+    drawn.brace = row[BRACE] ?? 0; drawn.hp = row[HP] ?? 0; drawn.alive = row[ALIVE] === 1; drawn.rise = row[RISE] ?? 0; drawn.act = row[ACT] ?? 0;
+    drawn.channels = channelsOf(row, ROW_CHANNELS); drawn.lock = LOCKS[row[LOCKABLE] ?? 0] ?? 'row';
+    body.showRow(drawn, dt);
     if (started) { entry.windup = stamp; if (body.alive) manager.onWindup?.(body, duration); }
     shown++;
     if (row[RIDEABLE] === 1) rideable.add(handle);

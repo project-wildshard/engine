@@ -38,3 +38,11 @@
   debt in lint/no-frame-alloc-debt.json (20 sites in 5 files: Map walks, error-path strings and one-time builds behind a
   guard), rewritten by `node scripts/memory/frame-alloc-debt.mjs`; scripts/no-binary-json.mjs refuses a commit that
   raises a count.
+- STR20's Pine target, stated at 19:45 Cancún before the first finished-build Pine walk: Pine walks under 16.5 MB/s [S]
+  (base 18.2, one run). Pine's own top owners are its creatures (upload ownership 1.3, `poseIdle` 0.9, the worker's
+  `showRows` 0.7, boss bar rows 0.6), which this row does not touch; the shared fixes are ~1.5 to 2 MB/s of it.
+- STR20 for Pine (one walk on the first finished build: 17.2 MB/s against 18.2, over the 16.5 target): three of Pine's own
+  allocators. The encounter rows were rebuilt by each of a dozen readers a frame (bars, the elite page, the worker's
+  report): one build per server frame now. The worker's `showRows` made a row object per creature per frame: one refilled
+  row (`showRow` copies its fields). Upload ownership re-resolved every draw's owner path after any add or remove and made
+  a path entry and a WeakRef each time: the entry is refreshed in place and keeps its WeakRef while the root holds.

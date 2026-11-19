@@ -23,9 +23,13 @@ const PREFIX = 'encounter:';
 /** The server's encounters in the newest frame. Rows the frame doesn't carry aren't in this cell's view. */
 export function netEncounterFeed(client: Pick<NetClient, 'entities' | 'fields' | 'latest'>): EncounterFeed {
   const out: EncounterRow[] = [];
+  // STR20: a dozen views read the rows each frame (bars, the elite page, the worker's report); they change only with a new
+  // frame, so one build serves every read until the frame or the entity set moves on
+  let builtFor: unknown = null, builtSize = -1;
   return { rows: () => {
-    out.length = 0;
     const { latest } = client;
+    if (latest !== null && latest === builtFor && client.entities.size === builtSize) return out;
+    out.length = 0; builtFor = latest; builtSize = client.entities.size;
     if (latest === null) return out;
     for (const [handle, info] of client.entities) {
       if (info.cls.cls !== ENCOUNTER_CLASS.cls) continue; // the shell's bundle has its own copy of the class

@@ -99,7 +99,12 @@ function rememberOwnerPath(node: Object3D, root: Object3D | null): void {
     watchedOwners.add(parent);
     parent.addEventListener('added', ownerPathChanged); parent.addEventListener('removed', ownerPathChanged);
   }
-  ownerPaths.set(node, { generation: ownerGeneration, parent: node.parent, root: root === null ? null : new WeakRef(root) });
+  // STR20: any add or remove on a watched path moves the generation, and then every draw re-resolves its path: the
+  // entry is refreshed in place and keeps its WeakRef while the root is the same (Pine's walk made both per draw)
+  const known = ownerPaths.get(node);
+  if (known === undefined) { ownerPaths.set(node, { generation: ownerGeneration, parent: node.parent, root: root === null ? null : new WeakRef(root) }); return; }
+  known.generation = ownerGeneration; known.parent = node.parent;
+  if ((known.root?.deref() ?? null) !== root) known.root = root === null ? null : new WeakRef(root);
 }
 
 /** Nearest explicitly owned scene subtree, including meshes drawn through a shared page renderer. */
