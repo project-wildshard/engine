@@ -29,7 +29,7 @@ import { askNameToJoin } from '@wildshard/engine/ui/namePrompt';
 import { NetPlayer, type NetWeapons } from '@wildshard/engine/net/netPlayer';
 import { CreaturePrediction, type CreaturePredictionRow } from './creaturePrediction';
 import { ownsInlineCandidate } from './inlineOwner';
-import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
+import { ANIMAL_CLASS, roadPlaceOf } from '@wildshard/engine/net/netSchemas';
 import type { OtherPlayers } from '@wildshard/engine/net/otherPlayers';
 import { hurtOther } from '@wildshard/engine/net/hurtOther';
 import type { Physics } from '@wildshard/engine/physics/Physics';
@@ -62,7 +62,7 @@ import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
 import { earlyStandalone, serverRoute, serverStepLabel } from './serverRoute';
 import { worldHosted } from '../grid/oneWayIn';
-import { drawnPlace, roadPlaceOf } from '../grid/edgeCreatures';
+import { drawnPlace } from '../grid/edgeCreatures';
 import { setLampFollow } from '@wildshard/engine/render/lookLight';
 import { pageLogin, refreshTicket, signedIn, ticketBeforeJoin, ticketed, TICKET_REFRESH_MS } from '@wildshard/engine/net/playerLogin';
 

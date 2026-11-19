@@ -4,14 +4,7 @@
 // the home's own metres, so the place is moved by the home's origin. A road row is read-only: no body stands for it in the road's world,
 // so it never joins the predicted world as a capsule.
 
-/** A road place's node floor: a room older than wire 1.3 sends none, and a page reads this, outside the grid. */
-const ROAD_FLOOR = -2048;
-
-/** Where a creature row stands across the ground, if it says a road place: `roadX`/`roadZ`, nonzero and above the floor. */
-export function roadPlaceOf(roadX: number | undefined, roadZ: number | undefined): { readonly x: number; readonly z: number } | null {
-  if (roadX === undefined || roadZ === undefined || (roadX === 0 && roadZ === 0) || roadX <= ROAD_FLOOR || roadZ <= ROAD_FLOOR) return null;
-  return { x: roadX, z: roadZ };
-}
+import { roadPlaceOf } from '@wildshard/engine/net/netSchemas';
 
 /**
  * Where a page draws a creature row in the manager it spawns into. In a cell (`home` null) a row's own `x`/`z` are that cell's metres.

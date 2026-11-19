@@ -69,6 +69,12 @@ test('a cell row carries no road place, and an older room\'s rows read none', ()
   const row = new Float64Array(PLAYER_CLASS.row.length), at = (name: string): number => PLAYER_CLASS.row.findIndex(column => column.name === name);
   row[at('x')] = 12; row[at('z')] = -40;
   expect(placeOf(row), 'zero in a cell').toEqual({ x: 12, z: -40 });
+  for (const name of ['roadX', 'roadZ']) {
+    const index = at(name), road = PLAYER_CLASS.row[index];
+    if (road === undefined) throw new Error(`Missing ${name}`);
+    row[index] = Number(road.value(Math.round(2048 / road.step)));
+  }
+  expect(placeOf(row), 'the decoded zero of a cell row').toEqual({ x: 12, z: -40 });
   row[at('roadX')] = -2048; row[at('roadZ')] = -2048;
   expect(placeOf(row), 'the node floor from a room older than wire 1.2').toEqual({ x: 12, z: -40 });
   row[at('roadX')] = -281.25; row[at('roadZ')] = 500;

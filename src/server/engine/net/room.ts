@@ -21,6 +21,7 @@ import { NetHandles } from './handles';
 import { GUEST, NetIdentitySchema, type NetIdentity } from '../../../shared/engine/net/identity';
 import type { NetDied, NetPlayerDied, NetView, NetEvent, NetHit, NetReward } from '../../../shared/engine/net/messages';
 import type { NetClass, NetRefs } from '../../../shared/engine/net/schema';
+import { roadPlaceOf } from '../../../shared/engine/net/netSchemas';
 import type { FightViewCall } from '../../../shared/engine/sim/shardRows';
 import { LedgerBook, type LedgerFiling } from './ledgerBook';
 import { framesBetween, rowDue } from './tiers';
@@ -154,8 +155,6 @@ interface RoomClient {
 }
 
 
-/** A road place's node floor: a room older than its wire minor sends none, and a page reads this, outside the grid. */
-const ROAD_FLOOR = -2048;
 const roadColumns = new WeakMap<NetClass<never>, readonly [number, number] | null>();
 /** A class's `roadX` and `roadZ` row columns, or null for a class without them. */
 function roadColumnsOf(cls: NetClass<never>): readonly [number, number] | null {
@@ -173,8 +172,8 @@ function rowPosition(frame: WorldFrame, at: number, cls: NetClass<never>): { x: 
   // MMO-PLAN MP5.2b: a row on a road says its place in `roadX`/`roadZ`, where `x`/`z` clamp at ±260 m: relevance and nearness read it there
   const road = roadColumnsOf(cls);
   if (road !== null) {
-    const x = read(road[0]), z = read(road[1]);
-    if ((x !== 0 || z !== 0) && x > ROAD_FLOOR && z > ROAD_FLOOR) return { x, y: read(cls.position[1]), z };
+    const place = roadPlaceOf(read(road[0]), read(road[1]));
+    if (place !== null) return { x: place.x, y: read(cls.position[1]), z: place.z };
   }
   return { x: read(cls.position[0]), y: read(cls.position[1]), z: read(cls.position[2]) };
 }

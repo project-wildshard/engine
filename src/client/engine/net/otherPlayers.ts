@@ -3,7 +3,7 @@
 // a skeleton of its own, its limbs moved here, and its Name over it.
 import * as THREE from 'three';
 import type { Scope } from '../../../shared/engine/app/scope';
-import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
+import { PLAYER_CLASS, roadPlaceOf } from '../../../shared/engine/net/netSchemas';
 import type { DummyJoint, DummyJoints } from '../practice/TrainingDummy';
 import { castawayBody, groundContact, type CastawayBody } from '../models/castawayBody';
 import { AnimMachine } from '../anim/machine';
@@ -27,12 +27,10 @@ const AIR = column('air');
  * MMO-PLAN MP1.5b: a row on a road (frame 0, the world's) carries its place in `roadX`/`roadZ`, where `x`/`z` clamp at ±260 m. A cell's
  * rows send zero, and a room older than wire 1.2 sends neither, which reads as the node's floor, -2,048 m, outside the grid.
  */
-const ROAD_X = column('roadX'), ROAD_Z = column('roadZ'), ROAD_FLOOR = -2048;
+const ROAD_X = column('roadX'), ROAD_Z = column('roadZ');
 /** Where a row stands across the ground, its road place when it has one. */
 export function placeOf(row: ArrayLike<number>): { readonly x: number; readonly z: number } {
-  const roadX = ROAD_X < 0 ? 0 : row[ROAD_X] ?? 0, roadZ = ROAD_Z < 0 ? 0 : row[ROAD_Z] ?? 0;
-  const onRoad = (roadX !== 0 || roadZ !== 0) && roadX > ROAD_FLOOR && roadZ > ROAD_FLOOR;
-  return onRoad ? { x: roadX, z: roadZ } : { x: row[X] ?? 0, z: row[Z] ?? 0 };
+  return roadPlaceOf(row[ROAD_X], row[ROAD_Z]) ?? { x: row[X] ?? 0, z: row[Z] ?? 0 };
 }
 /** A body's speed settles at this rate, so one late row is no stumble. */
 const SETTLE = 8;

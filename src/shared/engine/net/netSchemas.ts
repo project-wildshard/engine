@@ -20,6 +20,17 @@ export const SCRIPT_CLASS: NetClass<ScriptNetView> = compileSchema(SCRIPT_NET, 3
 export const STATE_CLASS: NetClass<StateNetRow> = compileSchema(STATE_NET, 4);
 /** The compiled `flag` class. */
 export const FLAG_CLASS: NetClass<string> = compileSchema(FLAG_NET, 5);
+
+const ROAD_FLOOR = -2048;
+const roadColumn = PLAYER_CLASS.row.find(column => column.name === 'roadX');
+const decodedRoadZero = roadColumn?.value(Math.round(-ROAD_FLOOR / roadColumn.step));
+/** Cell rows send zero, which sits between two wire values. Older rooms leave the field at its floor. */
+export function roadPlaceOf(x: number | undefined, z: number | undefined): { readonly x: number; readonly z: number } | null {
+  if (x === undefined || z === undefined || !(x > ROAD_FLOOR && z > ROAD_FLOOR)) return null;
+  if ((x === 0 || x === decodedRoadZero) && (z === 0 || z === decodedRoadZero)) return null;
+  return { x, z };
+}
+
 /** Every class, in v0 wire order. A class's view type is erased here: the wire only needs its columns. */
 export const NET_CLASSES: readonly NetClass<never>[] = [PLAYER_CLASS, ANIMAL_CLASS, ENCOUNTER_CLASS, SCRIPT_CLASS, STATE_CLASS, FLAG_CLASS];
 const BY_WIRE: ReadonlyMap<number, NetClass<never>> = new Map(NET_CLASSES.map(entry => [entry.id, entry]));

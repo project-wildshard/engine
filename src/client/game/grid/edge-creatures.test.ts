@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { drawnPlace, roadPlaceOf } from './edgeCreatures';
+import { roadPlaceOf } from '@wildshard/engine/net/netSchemas';
+import { drawnPlace } from './edgeCreatures';
 
 // MMO-PLAN MP5.2b: a page on the road draws the road's rows of its home's creatures in the home's own metres; in a cell, a row's x/z.
 test('a road place is nonzero and above the node floor; an older room\'s rows say none', () => {
