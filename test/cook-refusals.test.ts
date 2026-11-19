@@ -16,7 +16,7 @@ for (const limit of ['bytes','time'] as const) test(`real cook ${limit} refusal 
   const root=process.cwd(),scratch=mkdtempSync(join(tmpdir(),'cook-refusal-'));
   try {
     const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')) as {shards:{slug:string;hash:string}[]};
-    const pin=pins.shards.find(row=>row.slug==='template');if(pin===undefined)throw new Error('Missing template pin');
+    const pin=pins.shards.find(row=>row.slug==='brasscap-mesa');if(pin===undefined)throw new Error('Missing Brasscap pin');
     const bytes=readFileSync(join(process.env['WILDSHARD_PIN_CACHE']??join(homedir(),'.cache/wildshard/pins'),`${pin.hash}.tar`));
     expect(createHash('sha256').update(bytes).digest('hex')).toBe(pin.hash);
     const store=folderStore(join(scratch,'store')),worker=createCookWorker({build:'bounded-proof',store,

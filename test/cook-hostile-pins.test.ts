@@ -21,7 +21,7 @@ for(const seed of seeds)for(const kind of ['section','blob'] as const)test(`dama
   const scratch=mkdtempSync(join(tmpdir(),'hostile-pin-'));
   try {
     const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')) as {shards:{slug:string;hash:string}[]};
-    const pin=pins.shards.find(row=>row.slug==='template');if(pin===undefined)throw new Error('Missing published Template');
+    const pin=pins.shards.find(row=>row.slug==='brasscap-mesa');if(pin===undefined)throw new Error('Missing published Brasscap');
     const files=new Map(readTar(readFileSync(join(process.env['WILDSHARD_PIN_CACHE']??join(homedir(),'.cache/wildshard/pins'),`${pin.hash}.tar`))));
     const header=files.get('shard.json');if(header===undefined)throw new Error('No original header');
     const index=parseOutputIndex(JSON.parse(new TextDecoder().decode(header)));
