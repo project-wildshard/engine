@@ -43,6 +43,7 @@ import { folderHeadlessSections } from '@wildshard/engine/host/headlessSections'
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
 import { FallFloor, shardFallFloor, shardPlayArea } from './fallFloor';
 import { stepResident } from '../../../shared/host/standalone/netInput';
+import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 
 /** The host's own player: the seat its systems are bound to. */
 export const LEAD_SEAT = 'actor.player';
@@ -207,6 +208,9 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     const routes = actRoutes(host);
     const items = kit();
     for (const { player, command } of inputs) if (command !== null) items?.command(player, command);
+    // OF41c: a plain grapple mode's LOCK press (and the hook the client's camera picked); its JUMP rides the tick's command
+    const grapple = sim()?.grapple ?? null;
+    if (grapple !== null) for (const { player, command } of inputs) if (command !== null && (command.buttons & NET_BUTTONS.lock) !== 0) grapple.press(player, { lock: true, ...(command.hookTarget === undefined ? {} : { hook: command.hookTarget }) });
     for (const { player, acts } of inputs) for (const act of acts) {
       const claim = act.kind === 'interact' ? routes.claims.get(act.id) : undefined;
       if (act.kind === 'equip' && items?.equip(player, act.slot) === true) continue;

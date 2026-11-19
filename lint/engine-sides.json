@@ -1389,6 +1389,7 @@
     "src/server/game/shardfile/decisions.ts": "server",
     "src/server/game/shardfile/dataScriptBrains.ts": "server",
     "src/server/game/shardfile/declaredAttackable.ts": "server",
+    "src/server/game/shardfile/declaredGrapple.ts": "server",
     "src/server/game/shardfile/declaredClimate.ts": "server",
     "src/server/game/shardfile/declaredKitItems.ts": "server",
     "src/server/game/shardfile/declaredPatrols.ts": "server",

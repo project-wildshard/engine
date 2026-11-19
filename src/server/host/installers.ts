@@ -14,7 +14,7 @@ export const SERVER_INSTALLERS: Readonly<Record<ServerInstallerKey, string>> = O
   arenaRoom: 'native assembly `boss.arena` (a room)',
   collision: 'native assembly `collision` / `collision.pieces`, the runtime-plan world, a data cell\'s simulation when it built prop solids',
   fallFloor: 'standalone/cellWorld.ts `FallFloor` over `shardPlayArea`; a lone resident\'s `residentFallNet`',
-  grapple: 'native assembly `grapple`',
+  grapple: 'native assembly `grapple`, game/shardfile/declaredGrapple.ts (a plain upload\'s `state/modes` grapple row, OF41c)',
   harvest: 'native assembly `installNativeHarvest` (a pack inventory)',
   heldArms: 'native assembly `held.arms` (a room), `item.swept` (the swept kit the page\'s held claims arm)',
   heldBoss: 'the runtime-plan world\'s boss encounter',

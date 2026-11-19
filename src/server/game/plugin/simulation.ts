@@ -110,6 +110,8 @@ import { dataScriptBrains } from '../shardfile/dataScriptBrains';
 import { countedShard, countSlots } from '../shardfile/declaredSpawnCount';
 import type { PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { installDeclaredAttackable } from '../shardfile/declaredAttackable';
+import { declaredGrappleTick, installDeclaredGrapple } from '../shardfile/declaredGrapple';
+import type { GrappleTickContext, NativeGrapple } from '../grapple/native';
 import { installDeclaredPatrols } from '../shardfile/declaredPatrols';
 import { installDeclaredRanks, rankCreatureSpawns } from '../shardfile/declaredRanks';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
@@ -403,6 +405,9 @@ export interface ShardfileSimPorts extends SimHostPorts {
   scriptDisabled?: ShardScriptPorts['onDisabled'];
   /** OF41b: a plain upload's `client/plan` `portal.ride` rows; the server rides its portal links under their director. */
   portalRide?: PortalRideRows | null;
+  /** OF41c: the grapple's tick port (each player's LOCK, aim and JUMP, and where its fact goes). Left out, the tick's own
+   *  commands and the admitted script values (`commands`) drive it (`declaredGrapple.ts`). */
+  grapple?: GrappleTickContext;
 }
 /** Authoritative handles for UI, quests and the existing client fixed-step driver. */
 export interface ShardfileSimulation {
@@ -420,6 +425,8 @@ export interface ShardfileSimulation {
   movers: MoverRuntime | undefined;
   /** CC40b1: the riding primitive, when a species declares a mount. */
   riding: DeclaredRiding | null;
+  /** OF41c: the grapple primitive, when a `state/modes` grapple row carries its profile and hooks. */
+  grapple: NativeGrapple | null;
 }
 /** One declared simulation core, used by the normal browser loader and the headless author validator. */
 function shardfileSimInput(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): {level: SimLevel; ports: SimHostPorts} {
@@ -773,11 +780,12 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     };
     const riding = installDeclaredRiding(host, shard);
     installDeclaredHostPortalRide(host, shard, portalRide, ports.quest?.fact ?? (() => undefined)); // OF41b: the `portal` primitive
+    const grapple = installDeclaredGrapple(host, shard, ports.grapple ?? declaredGrappleTick(host, ports.commands, ports.quest?.fact ?? (() => undefined)), ports.restoring === true); // OF41c: the `grapple` primitive
     installDeclaredAttackable(host, shard); // OF38b: each creature's own `attackable` row, never a weapon's target list
     installDeclaredPatrols(host, creatures.patrols ?? [], ports.restoring === true); // OF37b: the patrol primitive
     installDeclaredRanks(host, shard.creatures.spawns); // OF33b: the elites primitive, a ranked body's blows
     recordPrimitives(host, shard); // OF17b1: the list comes from the sections, never a host list
-    return { riding, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
+    return { riding, grapple, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
   } catch (error) { host.dispose(); throw error; }
 }
 
