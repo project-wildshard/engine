@@ -64,7 +64,8 @@ export function installGridHud(host: GridHudHost): () => GridHudState {
   card.append(cardName, cardSub);
   hudSlots.widget('band.1', card, 0, scope, hudRoot);
   // G97's edge lines
-  const lines = document.createElement('div'); lines.className = 'ws-grid-speed';
+  // STR31: at rest the lines leave the layout, so their masked full-screen box composites no 13 MB phone layer
+  const lines = document.createElement('div'); lines.className = 'ws-grid-speed'; lines.hidden = true;
   hudSlots.widget('band.1', lines, 0, scope, hudRoot);
 
   let safe = false, shownCard: string | null = null, cardTimer: (() => void) | null = null, speedShown = -1, level = 0, fovApplied = 0;
@@ -117,7 +118,7 @@ export function installGridHud(host: GridHudHost): () => GridHudState {
     level += (target - level) * Math.min(1, dt * (target > level ? 4 : 6));
     if (level < 0.01) level = 0;
     const q = Math.round(level * 50) / 50;
-    if (q !== speedShown) { speedShown = q; lines.style.setProperty('--grid-speed', String(q)); }
+    if (q !== speedShown) { speedShown = q; lines.hidden = q === 0; lines.style.setProperty('--grid-speed', String(q)); }
     if (q > 0) { fovApplied = FOV_WIDEN * smoothstep(q); camera.fov += fovApplied; camera.updateProjectionMatrix(); }
   });
   return () => ({ safe, card: shownCard, speed: Math.max(0, speedShown), fov: Math.round(camera.fov * 100) / 100, accent });
