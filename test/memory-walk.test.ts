@@ -48,3 +48,27 @@ test('routes: Nine walks its streets, every other zone spins; a missing reading 
   expect(s.stuck).toEqual([0,0,0,1,1,1]);
   expect(walkSummary([run(100),{refused:'no control'}],[sampled(10)]).complete).toBe(false);
 });
+
+test('the walk ratchet: a completed worse median fails, noise inside the allowance passes, a re-pin only tightens',async()=>{
+  const {compareWalk,parseWalkBaseline,repinWalk}=await import('../scripts/memory/walkRatchet.mjs');
+  const baseline=parseWalkBaseline({version:1,mode:'walk',boot:'online',zone:'nine-dragon-stack',seconds:60,runs:3,source:'abc',
+    rate:{value:2e6,spread:0.3e6,allowance:0.5e6},peak:{value:200e6,spread:150e6,allowance:250e6}});
+  const read=(rate:number,peak:number)=>({complete:true,bytesPerSecond:{median:rate,min:rate-1e5,max:rate+1e5,n:3},peakAboveSettled:{median:peak,min:peak-5e7,max:peak+5e7,n:3}});
+  expect(compareWalk(baseline,read(2.4e6,420e6))).toBeNull();
+  expect(compareWalk(baseline,read(2.6e6,200e6))).toMatch(/allocation 2\.60 MB\/s > 2\.50 MB\/s/u);
+  expect(compareWalk(baseline,read(2e6,460e6))).toMatch(/peak above settled 460 MB > 450 MB/u);
+  expect(()=>compareWalk(baseline,{...read(1,1),complete:false})).toThrow(/completed/u);
+  const next=repinWalk(baseline,read(1.5e6,300e6),'def');
+  expect(next.rate).toEqual({value:1.5e6,spread:2e5,allowance:0.5e6});
+  expect(next.peak.value).toBe(200e6);
+  // an allowance no wider than its spread is refused
+  expect(()=>parseWalkBaseline({...baseline,peak:{value:1,spread:5,allowance:5}})).toThrow(/allowance must exceed its spread/u);
+});
+
+test('the committed walk baseline parses: Nine, online, each allowance wider than its spread',async()=>{
+  const {walkBaseline}=await import('../scripts/memory/walkRatchet.mjs');
+  const baseline=walkBaseline();
+  expect(baseline.zone).toBe('nine-dragon-stack');
+  expect(baseline.rate.allowance).toBeGreaterThan(baseline.rate.spread);
+  expect(baseline.peak.allowance).toBeGreaterThan(baseline.peak.spread);
+});

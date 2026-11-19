@@ -33,7 +33,7 @@ jobs:
     # J426: the armed zones must pass both phone footprint lines. EM11 was fitted on macOS 27 WebKit; macOS 15 charged
     # significantly more of the same Nalati build to WebContent (44375696856).
     runs-on: xcode-27
-    timeout-minutes: 90 # Full 26-zone sweep, five cold boots per zone.
+    timeout-minutes: 110 # Full 26-zone sweep, five cold boots per zone, then Nine's walk (STR22, ~15 min).
     env:
       WS_LANE_NAME: memory-footprint
       SOURCE_RUN: ${{ inputs.source_run || github.event.workflow_run.id }}
@@ -97,6 +97,18 @@ jobs:
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
           node scripts/memory/ci.mjs webkit-ledger tmp/memory-ledger/preview tmp/memory-footprint/nine-ledger "${record[@]}"
+      # MEMORY-STRUCTURE STR22: Nine's 60 s walk on the online boot, held to scripts/memory/walk-ratchet.json (the allocation
+      # rate [S] in Chromium and WebKit's WebContent peak above settled [K]). Blocking like the armed footprints (J429): a
+      # completed worse reading fails; a walk that never completes is a warning, not a verdict.
+      - name: Check Nine's walk against its pinned allocation rate and peak
+        if: ${{ !cancelled() && steps.native-client.outcome == 'success' }}
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        run: |
+          bash scripts/ci-playwright-install.sh --no-shell chromium
+          record=()
+          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
+          node scripts/memory/walk-ci.mjs tmp/memory-ledger/preview tmp/memory-footprint/walk "${record[@]}"
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -104,5 +116,6 @@ jobs:
           path: |
             tmp/memory-footprint/readings/*.json
             tmp/memory-footprint/nine-ledger/*.json
+            tmp/memory-footprint/walk/*.json
           retention-days: 7
           if-no-files-found: ignore

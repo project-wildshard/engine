@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "mode": "walk",
+  "boot": "online",
+  "zone": "nine-dragon-stack",
+  "seconds": 60,
+  "runs": 3,
+  "source": "2d7dce9e (mini, 5 locked runs, 2026-11-18)",
+  "rate": {
+    "value": 7298145,
+    "spread": 82656,
+    "allowance": 1500000
+  },
+  "peak": {
+    "value": 293798176,
+    "spread": 313458976,
+    "allowance": 470188464
+  }
+}

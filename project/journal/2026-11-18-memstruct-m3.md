@@ -46,3 +46,11 @@
   report): one build per server frame now. The worker's `showRows` made a row object per creature per frame: one refilled
   row (`showRow` copies its fields). Upload ownership re-resolved every draw's owner path after any add or remove and made
   a path entry and a WeakRef each time: the entry is refreshed in place and keeps its WeakRef while the root holds.
+- Five locked pairs (meta docs/plans/engine-memory/walk-2026-11-18.md): Nine 15.11 -> 7.30 MB/s [S], culler 6.11 ->
+  0.073; Pine 18.29 -> 16.56, just over its 16.5. The [K] walk peak above settled is bimodal on both builds (a run reads
+  20-50 MB or 300-490 MB, as WebKit's collections fall inside or outside the walk) and its median did not move.
+- STR22, the walk ratchet (scripts/memory/walkRatchet.mjs, walk-ci.mjs, walk-ratchet.json): the macOS memory job walks
+  Nine three times on the online boot of the prepared client and fails a completed median over the pinned value plus its
+  allowance: rate 7.30 MB/s + 1.5 (spread 0.08), peak above settled 294 MB + 470 (1.5 times the 313 MB spread: the
+  bimodal peak leaves this line loose). A walk that does not complete warns and judges nothing. `--record` writes the
+  next, only-tighter baseline.
