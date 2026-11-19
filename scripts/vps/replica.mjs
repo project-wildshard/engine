@@ -248,7 +248,7 @@ async function restartAtCheckpoint() {
     clearTimeout(limit);
     lines.close();
     session.stdin.end();
-    const kill = setTimeout(() => session.kill(), 1000);
+    const kill = setTimeout(() => { session.kill(); }, 1000);
     await closed;
     clearTimeout(kill);
   }
