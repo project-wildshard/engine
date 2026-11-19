@@ -110,8 +110,8 @@ test('the dial names the goto cell; the door reads only a well-formed one', () =
 
 test('the door seats a goto in the cell it names, over the player\'s last place; a cell it doesn\'t open falls back to that place', { timeout: 120_000 }, async () => {
   const saves = memoryPlayerSaves();
-  saves.write({ player: 'device:goer', name: 'G', shard: '_template', cell: 'template-2', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
-  bench = await roomBench({ cells: ['driftwood-isle', 'template-2'], saves, workers: 1 });
+  saves.write({ player: 'device:goer', name: 'G', shard: 'brasscap-mesa', cell: 'blender-template', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: ['driftwood-isle', 'blender-template'], saves, workers: 1 });
   const goer = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:goer');
   expect(await goer.arrived()).toBe(true);
   expect(JSON.parse(goer.resume ?? '{}'), 'Shard select → Driftwood: seated in Driftwood').toMatchObject({ shard: 'driftwood-isle', cell: 'driftwood-isle' });
@@ -141,31 +141,31 @@ test('the hosting read answers within its deadline, the module import included',
 });
 
 test('FM7b2: a goto from a held seat brings its own seat, so a full world\'s line never takes it', { timeout: 120_000 }, async () => {
-  bench = await roomBench({ cells: ['driftwood-isle', 'template-2'], saves: memoryPlayerSaves(), workers: 1, seats: 1 });
+  bench = await roomBench({ cells: ['driftwood-isle', 'blender-template'], saves: memoryPlayerSaves(), workers: 1, seats: 1 });
   const first = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:mover');
   expect(await first.arrived()).toBe(true);
   const waiting = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:waiting');
   await vi.waitFor(() => { expect(waiting.closedWith).toMatchObject({ code: 'queue', position: 1 }); }, { timeout: 10_000 });
   first.drop();
   await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(true); }, { timeout: 10_000 });
-  const moved = bot(`${bench.url}?chunk=template-2`, 'bench', 'device:mover');
+  const moved = bot(`${bench.url}?chunk=blender-template`, 'bench', 'device:mover');
   expect(await moved.arrived(), JSON.stringify(bench.lines.slice(-4))).toBe(true);
-  expect(JSON.parse(moved.resume ?? '{}')).toMatchObject({ cell: 'template-2' });
+  expect(JSON.parse(moved.resume ?? '{}')).toMatchObject({ cell: 'blender-template' });
   expect(moved.closedWith, 'never put in the line behind a device that holds no seat').toBeNull();
   expect(bench.crashes).toEqual([]);
 });
 
 test('a seat held in another cell lets go on a goto, and the late leave never unseats the new one', { timeout: 120_000 }, async () => {
-  bench = await roomBench({ cells: ['driftwood-isle', 'template-2'], saves: memoryPlayerSaves(), workers: 1 });
+  bench = await roomBench({ cells: ['driftwood-isle', 'blender-template'], saves: memoryPlayerSaves(), workers: 1 });
   const first = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:mover');
   expect(await first.arrived()).toBe(true);
   await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(true); }, { timeout: 10_000 });
   first.drop();
   await new Promise(resolve => { setTimeout(resolve, 300); });
   expect(bench.room('driftwood-isle')?.holds('device:mover'), 'the dropped link\'s body is held').toBe(true);
-  const moved = bot(`${bench.url}?chunk=template-2`, 'bench', 'device:mover');
+  const moved = bot(`${bench.url}?chunk=blender-template`, 'bench', 'device:mover');
   expect(await moved.arrived(), JSON.stringify(bench.lines.slice(-4))).toBe(true);
-  expect(JSON.parse(moved.resume ?? '{}'), 'Shard select → the template plot, over the held Driftwood body').toMatchObject({ cell: 'template-2' });
+  expect(JSON.parse(moved.resume ?? '{}'), 'Shard select → the Brasscap cell, over the held Driftwood body').toMatchObject({ cell: 'blender-template' });
   await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(false); }, { timeout: 10_000 });
   await new Promise(resolve => { setTimeout(resolve, 500); });
   expect(bench.world.health(), 'one seat, in the new cell').toMatchObject({ players: 1 });

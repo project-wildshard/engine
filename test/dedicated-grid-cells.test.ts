@@ -8,16 +8,16 @@ import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 
 // GO3 (MMO-ZONE-SELECT, MP1.4): the server's cells are the grid's, named by instance. A cell whose instance isn't its shard's slug
-// (`template-2` runs `_template`, the one such cell Ring 1 installs) is the case a one-shard world never had.
-const HOME = 'driftwood-isle', PLOT = 'template-2', PLOT_SHARD = '_template';
+// (`blender-template` runs Brasscap's `brasscap-mesa`; J434 retired the Template's `template-2`) is the case a one-shard world never had.
+const HOME = 'driftwood-isle', PLOT = 'blender-template', PLOT_SHARD = 'brasscap-mesa';
 let bench: RoomBench | undefined;
 const bots: RoomBot[] = [];
 const bot = (...args: ConstructorParameters<typeof RoomBot>): RoomBot => { const made = new RoomBot(...args); bots.push(made); return made; };
 afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await bench?.close(); bench = undefined; });
 
 test('a name means a grid instance, and each cell runs its shard', () => {
-  expect([cellName(PLOT), cellName(PLOT_SHARD), cellName(HOME), cellName('_template'), cellName('not-on-the-grid')]).toEqual([PLOT, PLOT, HOME, 'template-2', 'not-on-the-grid']);
-  expect([cellShard(PLOT), cellShard(HOME), cellShard('template-2'), cellShard('not-on-the-grid')]).toEqual([PLOT_SHARD, HOME, '_template', 'not-on-the-grid']);
+  expect([cellName(PLOT), cellName(PLOT_SHARD), cellName(HOME), cellName('brasscap-mesa'), cellName('not-on-the-grid')]).toEqual([PLOT, PLOT, HOME, 'blender-template', 'not-on-the-grid']);
+  expect([cellShard(PLOT), cellShard(HOME), cellShard('blender-template'), cellShard('not-on-the-grid')]).toEqual([PLOT_SHARD, HOME, 'brasscap-mesa', 'not-on-the-grid']);
 });
 
 test('the selected channel keeps the baked grid\'s frame numbers when later placements extend it', () => {
@@ -37,7 +37,7 @@ test('a cell\'s frames carry the number a grid page gives that cell', () => {
 
 test('`grid` opens every grid cell the release names, home first; a list keeps its order; a bad list is refused before any worker', () => {
   const released = ['nalati-grasslands', PLOT_SHARD, HOME, 'not-on-the-grid'];
-  expect(worldCells('grid', released), 'catalogue order after home').toEqual([HOME, PLOT, 'nalati-grasslands']);
+  expect(worldCells('grid', released), 'catalogue order after home').toEqual([HOME, 'nalati-grasslands', PLOT]);
   expect(worldCells(` ${PLOT_SHARD},${HOME}`, released)).toEqual([PLOT, HOME]);
   expect(worldCells(HOME, released), 'the setting every VPS has today').toEqual([HOME]);
   expect(() => worldCells('pine-hollow', released)).toThrow(/release has no pine-hollow/u);

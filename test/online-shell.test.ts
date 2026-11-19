@@ -90,30 +90,30 @@ test('a seat in a cell the page has not loaded says so, and takes no body', { ti
 
 test('GO4: a grid page in its seat\'s cell takes its body there; a seat in another cell re-enters the grid, never a `?chunk=` page', { timeout: 60_000 }, async () => {
   const saves = memoryPlayerSaves();
-  saves.write({ player: IDENTITY.player, name: 'Jake', shard: '_template', cell: 'template-2', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
-  bench = await roomBench({ cells: [SHARD, 'template-2'], workers: 2, saves });
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: 'brasscap-mesa', cell: 'blender-template', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'blender-template'], workers: 2, saves });
   const reloads: string[] = [], regrids: string[] = [], placed: { cell: string; at: unknown }[] = [];
   const view = { link: (): void => undefined, countdown: (): void => undefined, elsewhere: (shard: string): void => { reloads.push(shard); }, placed: (cell: string, at: unknown): void => { placed.push({ cell, at }); }, regrid: (cell: string): void => { regrids.push(cell); } };
   const away = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, gridCell: SHARD }, view);
-  await vi.waitFor(() => { expect(regrids).toEqual(['template-2']); }, { timeout: 5000 });
-  expect(placed).toEqual([{ cell: 'template-2', at: expect.objectContaining({ x: expect.any(Number), z: expect.any(Number) }) as unknown }]);
+  await vi.waitFor(() => { expect(regrids).toEqual(['blender-template']); }, { timeout: 5000 });
+  expect(placed).toEqual([{ cell: 'blender-template', at: expect.objectContaining({ x: expect.any(Number), z: expect.any(Number) }) as unknown }]);
   expect(reloads, 'no `?chunk=` reload').toEqual([]);
-  expect(bench.room('template-2')?.holds(IDENTITY.player), 'no body while the page goes').toBe(false);
+  expect(bench.room('blender-template')?.holds(IDENTITY.player), 'no body while the page goes').toBe(false);
   away.dispose();
-  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: '_template', identity: IDENTITY, gridCell: 'template-2' }, view);
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: 'brasscap-mesa', identity: IDENTITY, gridCell: 'blender-template' }, view);
   const { client, booted, ready } = shell;
   pump = setInterval(() => { client.present(); client.flush(); }, 16);
   await booted;
   ready();
-  await vi.waitFor(() => { expect(bench?.room('template-2')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
-  await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('template-2')); }, { timeout: 5000 });
-  expect({ regrids, reloads }).toEqual({ regrids: ['template-2'], reloads: [] });
+  await vi.waitFor(() => { expect(bench?.room('blender-template')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('blender-template')); }, { timeout: 5000 });
+  expect({ regrids, reloads }).toEqual({ regrids: ['blender-template'], reloads: [] });
 });
 
 test('GO5: a seat in another cell enters it on this page and this link: no re-entry, and the next session\'s ready seats it there', { timeout: 60_000 }, async () => {
   const saves = memoryPlayerSaves();
-  saves.write({ player: IDENTITY.player, name: 'Jake', shard: '_template', cell: 'template-2', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
-  bench = await roomBench({ cells: [SHARD, 'template-2'], workers: 2, saves });
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: 'brasscap-mesa', cell: 'blender-template', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'blender-template'], workers: 2, saves });
   const regrids: string[] = [], inPage: string[] = [];
   const view = { link: (): void => undefined, countdown: (): void => undefined, elsewhere: (): void => undefined, regrid: (cell: string): void => { regrids.push(cell); },
     regridInPage: (cell: string): boolean => { inPage.push(cell); return true; } };
@@ -121,29 +121,29 @@ test('GO5: a seat in another cell enters it on this page and this link: no re-en
   shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, gridCell: SHARD }, view);
   const { client, ready, rehome } = shell;
   pump = setInterval(() => { client.present(); client.flush(); }, 16);
-  await vi.waitFor(() => { expect(inPage).toEqual(['template-2']); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(inPage).toEqual(['blender-template']); }, { timeout: 5000 });
   expect(regrids, 'no fresh page').toEqual([]);
   // The page's next session takes the link over in Template's cell (`adopt`), loads it, and says ready
-  rehome?.('template-2');
+  rehome?.('blender-template');
   ready();
-  await vi.waitFor(() => { expect(bench?.room('template-2')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
-  await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('template-2')); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(bench?.room('blender-template')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('blender-template')); }, { timeout: 5000 });
   expect(bench.room(SHARD)?.holds(IDENTITY.player), 'never a body in the hint\'s cell').toBe(false);
   expect(regrids).toEqual([]);
 });
 
 test('GO4: a held seat in another cell (no `resume`, only frames) re-enters the grid there too', { timeout: 60_000 }, async () => {
   const saves = memoryPlayerSaves(), cells = new GridAssembly({ developer: false, devserver: false }).cells.map(cell => cell.instance);
-  saves.write({ player: IDENTITY.player, name: 'Jake', shard: '_template', cell: 'template-2', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
-  bench = await roomBench({ cells: [SHARD, 'template-2'], workers: 2, saves, holdMs: 30_000 });
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: 'brasscap-mesa', cell: 'blender-template', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'blender-template'], workers: 2, saves, holdMs: 30_000 });
   const regrids: string[] = [], view = { link: (): void => undefined, countdown: (): void => undefined, elsewhere: (): void => undefined, regrid: (cell: string): void => { regrids.push(cell); } };
-  const first = connectOnline({ socket: bench.url, build: 'bench', loaded: '_template', identity: IDENTITY, gridCell: 'template-2', gridCells: cells }, view);
+  const first = connectOnline({ socket: bench.url, build: 'bench', loaded: 'brasscap-mesa', identity: IDENTITY, gridCell: 'blender-template', gridCells: cells }, view);
   pump = setInterval(() => { first.client.present(); first.client.flush(); }, 16);
   await first.booted; first.ready();
-  await vi.waitFor(() => { expect(bench?.room('template-2')?.holds(IDENTITY.player)).toBe(true); expect(first.client.latest).not.toBeNull(); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(bench?.room('blender-template')?.holds(IDENTITY.player)).toBe(true); expect(first.client.latest).not.toBeNull(); }, { timeout: 5000 });
   clearInterval(pump); first.dispose();
   shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, gridCell: SHARD, gridCells: cells }, view);
-  await vi.waitFor(() => { expect(regrids).toEqual(['template-2']); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(regrids).toEqual(['blender-template']); }, { timeout: 5000 });
 });
 
 test('a seated page that leaves takes its body with it at once', { timeout: 30_000 }, async () => {
@@ -251,7 +251,7 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
   try {
     // opus-route2 (QA row 28): the word names the shards the world opens, so a one-shard page of any other shard plays in-page.
     expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid, Driftwood alone').toEqual({ hosts: false, word: { cells: 1, shards: [SHARD], device: 1 } });
-    expect(await asked([SHARD, 'template-2']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, '_template'], device: 1 } });
+    expect(await asked([SHARD, 'blender-template']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, 'brasscap-mesa'], device: 1 } });
     expect(await worldWord({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, 500), 'unreachable: no word').toBeNull();
     expect(await worldHostsGrid({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'unreachable: solo').toBe(false);
     const stalled = createServer(() => undefined);
