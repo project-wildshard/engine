@@ -1,0 +1,11 @@
+{
+  "schema": "no-frame-alloc/1",
+  "source": "2af260b258c2324ae6dd55177879f85935011674",
+  "files": {
+    "src/client/engine/net/otherPlayers.ts": 3,
+    "src/client/game/shardfile/lentLooks.ts": 2,
+    "src/client/game/shardfile/slabRanges.ts": 3,
+    "src/client/game/shardfile/tileDriver.ts": 10,
+    "src/shared/game/plugin/channelPrograms.ts": 2
+  }
+}

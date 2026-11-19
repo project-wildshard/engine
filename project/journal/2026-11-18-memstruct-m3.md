@@ -31,3 +31,10 @@
 - What is left on Nine (~7 MB/s, one walk) is mostly three's draw path and boxed numbers: `getParameters` on program
   checks, uniform setters reading doubles through megamorphic loads, the render list's sort, channel readers returning
   numbers through calls V8 does not inline. Under the 2 MB/s line needs those, which is past this row's five.
+- STR21, `wildshard/no-frame-alloc` (lint/no-frame-alloc.mjs): a function whose comment names `@frame` allocates nothing
+  in its own body: no closure, array or object literal, `new`, spread, template with values, `for ... of`, or array and
+  string method that returns a new array or iterator (`Array.from` / `*Array.of` too). A throw's argument is exempt.
+  Syntax only. The culler, the frame pass and the five allocators are tagged; what they still hold is the shrink-only
+  debt in lint/no-frame-alloc-debt.json (20 sites in 5 files: Map walks, error-path strings and one-time builds behind a
+  guard), rewritten by `node scripts/memory/frame-alloc-debt.mjs`; scripts/no-binary-json.mjs refuses a commit that
+  raises a count.

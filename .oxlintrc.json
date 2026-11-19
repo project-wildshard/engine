@@ -27,6 +27,8 @@
     "wildshard/no-base64": "error",
     // ENGINE-MEMORY EM6: one owner per buffer (lint/owned-buffer.mjs, debt lint/owned-buffer-debt.json)
     "wildshard/owned-buffer": "error",
+    // MEMORY-STRUCTURE STR21: an @frame function allocates nothing (lint/no-frame-alloc.mjs, debt lint/no-frame-alloc-debt.json)
+    "wildshard/no-frame-alloc": "error",
     // J326 (Jake, 2026-11-13): WebGL renderer only; no three/webgpu, three/tsl, WebGPURenderer or navigator.gpu anywhere
     "wildshard/no-webgpu": "error",
     // ── kept on, but configured ──────────────────────────────────────────────────────────────────

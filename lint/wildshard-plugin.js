@@ -4,6 +4,7 @@ import { execMaxBufferRule } from './exec-max-buffer.mjs';
 import { recordedDebtRule } from './recorded-debt.mjs';
 import { BASE64_POLICY, noBase64Rule } from './no-base64.mjs';
 import { OWNED_BUFFER_POLICY, ownedBufferRule } from './owned-buffer.mjs';
+import { FRAME_ALLOC_POLICY, noFrameAllocRule } from './no-frame-alloc.mjs';
 import { SIDES_FILE, SIDE_EDGES_FILE, engineSidesRule } from './engine-sides.mjs';
 import { clientPlanSchemaViolations } from './client-plan-boundary.mjs';
 import { explicitSchemaTypes } from './schema-types.mjs';
@@ -1166,6 +1167,8 @@ const plugin = {
     'no-base64': noBase64Rule(process.env.WILDSHARD_BASE64_FILE ?? BASE64_POLICY),
     // ENGINE-MEMORY EM6: big CPU buffers are made through ownedBuffer.ts; per-file debt in lint/owned-buffer-debt.json only shrinks
     'owned-buffer': ownedBufferRule(process.env.WILDSHARD_OWNED_BUFFER_FILE ?? OWNED_BUFFER_POLICY),
+    // MEMORY-STRUCTURE STR21: an @frame function allocates nothing; per-file debt in lint/no-frame-alloc-debt.json only shrinks
+    'no-frame-alloc': noFrameAllocRule(process.env.WILDSHARD_FRAME_ALLOC_FILE ?? FRAME_ALLOC_POLICY),
     // P1-E2: the engine ownership map (lint/engine-sides.json) and its shrink-only edge counts (lint/engine-side-edges.json)
     'engine-sides': engineSidesRule(process.env.WILDSHARD_ENGINE_SIDES_FILE ?? SIDES_FILE, process.env.WILDSHARD_ENGINE_SIDE_EDGES_FILE ?? SIDE_EDGES_FILE),
     'no-generated-import': noGeneratedImportRule(REPO, resolve(import.meta.dirname,'generated-import-debt.json')),

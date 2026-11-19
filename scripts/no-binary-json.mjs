@@ -202,6 +202,7 @@ export function checkBinaryRevision(root, revision, previous, changed, rangeMess
   const base64 = [
     ...sourceDebtChanges(root,tree,parent,'lint/base64-debt.json','no-base64/1',/^(?:src|scripts)\//u,message,previous),
     ...sourceDebtChanges(root,tree,parent,'lint/owned-buffer-debt.json','owned-buffer/1',/^src\//u,message,previous),
+    ...sourceDebtChanges(root,tree,parent,'lint/no-frame-alloc-debt.json','no-frame-alloc/1',/^src\//u,message,previous),
     ...sourceDebtChanges(root,tree,parent,'lint/generated-import-debt.json','no-generated-import/1',/^(?:src|test)\//u,message,previous),
     ...checkGeneratedSourceRevision(root, revision, previous, changed),
   ];
