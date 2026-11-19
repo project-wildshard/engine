@@ -1387,6 +1387,7 @@
     "src/server/game/shard/world.ts": "server",
     "src/server/game/shardfile/borrowedDecisions.ts": "server",
     "src/server/game/shardfile/bossRow.ts": "server",
+    "src/server/game/shardfile/abilityPush.ts": "server",
     "src/server/game/shardfile/brainRuntime.ts": "server",
     "src/server/game/shardfile/dataGroundBrains.ts": "server",
     "src/server/game/shardfile/dataPerchBrains.ts": "server",

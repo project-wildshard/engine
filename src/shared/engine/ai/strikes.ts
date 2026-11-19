@@ -36,6 +36,10 @@ export interface StrikeSpec {
   independentCooldown?: true;
   from?: string;
   knockbackDistance?: number;
+  /** OF20c2: a hit throws a struck player along the strike's facing (m/s) and up (m/s): an ability's `impulse` effect. */
+  impulse?: { speed: number; lift: number };
+  /** OF20c2: metres above the target's feet the strike aims at (an ability's `aimHeight`; a stoop at the chest). */
+  aimHeight?: number;
   projectile?: { speed: number; gravity: number; radius: number };
   ability?: { clip?: CreatureSkinClipName };
   range: number; damage: number; tags: readonly CombatTag[];

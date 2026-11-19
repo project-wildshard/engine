@@ -19,6 +19,7 @@ import { bindCreatureSenses } from './creatureSenses';
 import { parseStalker, stalkerPreset, type ShardStalker, parseGuardianPattern, guardianPreset, type ShardGuardianPattern, parseSkirmisher, parseGuardian, parsePerchHunter, type ShardSkirmisher, type ShardGuardian, type ShardPerchHunter } from '@wildshard/format/brains';
 import { parseRamGrazer, parseChallengeGrazer, parseGrazer, grazerPreset, type ShardGrazer, type ShardRamGrazer, type ShardChallengeGrazer } from '@wildshard/format/grazers';
 import { parseDiver, diverPreset, type ShardDiver, parseOrbitDiver, parsePatrolDiver, parseBurstFlyer, type ShardOrbitDiver, type ShardPatrolDiver, type ShardBurstFlyer } from '@wildshard/format/flyers';
+import { abilityPush } from './abilityPush';
 
 /** Native decision families and the existing pursuit family; custom scripts require a composed host. */
 export type DeclaredNativeBrain = ShardStalker | ShardGuardianPattern | ShardDiver | ShardGrazer | PlatformBrainSpec | ShardSkirmisher | ShardGuardian | ShardPerchHunter | ShardRamGrazer | ShardChallengeGrazer | ShardOrbitDiver | ShardPatrolDiver | ShardBurstFlyer;
@@ -63,7 +64,7 @@ function prepareAbilities(host: SimHost, actor: AnimalSim, abilities: ResolvedCr
       ability: ability.clip === undefined ? {} : { clip: ability.clip },
       motion: { speed: ability.speed ?? speed },
       ...(ability.from === undefined ? {} : { from: ability.from }),
-      ...(ability.effect === 'knockback' && ability.strength !== undefined ? { knockbackDistance: ability.strength } : {}),
+      ...abilityPush(ability),
       ...(ability.projectile === undefined ? {} : { projectile: ability.projectile }),
     };
     return { min, max, ability, spec };

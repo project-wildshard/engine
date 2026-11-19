@@ -247,6 +247,8 @@ export class SimHost {
   private readonly direction = new Vector3();
   private readonly hitOrigin = new Vector3();
   private readonly hitPoint = new Vector3();
+  private readonly aimPoint = new Vector3();
+  private readonly impulse = new Vector3();
   disposed = false;
   readonly embedded: boolean;
   private readonly ownsPlayer: boolean;
@@ -790,7 +792,7 @@ export class SimHost {
     if (runner === undefined || spec === undefined || runner.busy || position === undefined || targetPosition === undefined) return false;
     const actor = source ?? sourcePlayer?.actor();
     if (actor?.alive !== true) return false;
-    runner.start(spec, actor, targetPosition); this.targetIds.set(sourceId, targetId); return true;
+    runner.start(spec, actor, aimed(this.aimPoint, targetPosition, spec)); this.targetIds.set(sourceId, targetId); return true;
   }
   private updateStrike(id: string, runner: StrikeRunner): void {
     const targetId = this.targetIds.get(id), source = this.entities.get(id), target = targetId === undefined ? undefined : this.entities.get(targetId);
@@ -807,7 +809,7 @@ export class SimHost {
     const origin = from === undefined ? undefined : source?.strikePoint(from, this.hitOrigin);
     if (from !== undefined && origin === undefined) throw new Error(`Missing installed strike socket ${from} on ${id}`);
     if (origin !== undefined) { this.hitPoint.copy(position); this.hitPoint.y += target === undefined ? 1.2 : target.dims.bodyY * target.scale; }
-    runner.update(FIXED_STEP, { actor, target: origin === undefined ? position : this.hitPoint, ...(origin === undefined ? {} : { origin }),
+    runner.update(FIXED_STEP, { actor, target: origin === undefined ? aimed(this.aimPoint, position, runner.spec) : this.hitPoint, ...(origin === undefined ? {} : { origin }),
       ...(runner.spec?.projectile === undefined ? {} : { launch: (spec: StrikeSpec) => {
         const flight = this.strikeProjectiles;
         if (flight === undefined || source === undefined) throw new Error('Missing authored creature flight owner');
@@ -826,6 +828,10 @@ export class SimHost {
         ...(spec.knockbackDistance === undefined ? {} : { shoveDistance: spec.knockbackDistance }),
         // QA 11-16 mini row 69: a creature's strike names its killer, or the death card reads "Fell too far"
         ...(source === undefined ? {} : { cause: { kind: source.kind, label: source.label } }) });
+      // OF20c2: an ability's impulse throws the struck player along the strike's facing, as a borrowed row's strikeEffects did
+      const impulse = spec.impulse;
+      if (impulse !== undefined && victim !== undefined && (impulse.speed > 0 || impulse.lift > 0))
+        victim.addImpulse(this.impulse.set(Math.sin(runner.yaw) * impulse.speed, impulse.lift, Math.cos(runner.yaw) * impulse.speed));
     } });
   }
   /** Timed attack targets are host state; snapshot restoration must reconnect them before replay. */
@@ -842,6 +848,11 @@ export class SimHost {
     if (this.disposed) return; this.disposed = true;
     yield* this.scope.disposeSteps();
   }
+}
+/** OF20c2: where a strike aims on its target: the feet, or `aimHeight` metres above them (a stoop at the chest). */
+function aimed(into: Vector3, feet: Readonly<{ x: number; y: number; z: number }>, spec: StrikeSpec | null | undefined): Readonly<{ x: number; y: number; z: number }> {
+  const height = spec?.aimHeight;
+  return height === undefined || height === 0 ? feet : into.set(feet.x, feet.y + height, feet.z);
 }
 /** Embed a level with an initialized Rapier module. Its own scope owns teardown, independently of the caller's ambient page callback. */
 export function createSimHost(level: SimLevel, ports: SimHostPorts): SimHost { return withOwner(null, () => new SimHost(level, ports)); }

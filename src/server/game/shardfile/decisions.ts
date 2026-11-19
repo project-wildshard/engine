@@ -28,6 +28,7 @@ import { installStatusEffects } from './statusEffects';
 import { ABSENT_Y } from './declaredSpawnWhen';
 import type { EncounterAdds } from './encounterAdds';
 import { SCRIPT_LIMITS } from '@wildshard/format/scriptLimits';
+import { abilityPush } from './abilityPush';
 
 interface Motion { move: number; target: number; runner: ActorMoveRunner; binding: number }
 interface Strike { strike: number; target: number; binding: number; hit: boolean }
@@ -39,7 +40,7 @@ function abilityStrikes(strikes: ReadonlyMap<string, SimStrike>, abilities: Shar
     const ability = abilities?.find(row => row.use === spec.id);
     if (ability === undefined) { rows.push(spec); continue; }
     const row: SimStrike = structuredClone(spec);
-    if (ability.effect === 'knockback' && ability.strength !== undefined) row.knockbackDistance = ability.strength;
+    Object.assign(row, abilityPush(ability));
     if (ability.projectile !== undefined) row.projectile = ability.projectile;
     rows.push(row);
   }
