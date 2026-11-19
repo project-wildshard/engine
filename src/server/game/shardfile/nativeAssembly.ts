@@ -20,6 +20,11 @@ import { installNativeHarvest } from '../loot/harvest';
 import { prepareReturns } from './nativeRuntimeLoans';
 import { recordPrimitives } from './hostPrimitives';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
+import type { Shardfile } from '@wildshard/format/shardSchema';
+import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
+import { countedShard } from './declaredSpawnCount';
+import { admitRuntimeCreatures, declaredSpawnEntities, installRuntimeCreatures, type keeperOwnership } from './runtimeCreatures';
 
 /** One prepared native world: identical to a typed runtime plan, built from data alone. */
 export interface NativeAssemblyRuntime<C extends NativeAssemblyContext> {
@@ -67,6 +72,16 @@ async function prepareField(product: ShardFolder, plan: NativeAssemblyPlan, grid
   return { pond, wet: block, world: rows.world, field: new NativePopulationField(need(grid, 'A native field needs its terrain grid'), rows, bake['trees'] as readonly (readonly [number, number, number])[], bake['tops'] as readonly number[], pond, block) };
 }
 const mergedIntake = (a: EncounterIntake, ...more: readonly EncounterIntake[]): EncounterIntake => more.reduce((all, row) => ({ species: [...all.species, ...row.species], recipes: [...all.recipes, ...row.recipes], motorless: [...all.motorless ?? [], ...row.motorless ?? []] }), a);
+/**
+ * OF22b0: what a native assembly's hosts keep beside declared creature rows. Its bodies are its hosts' own (a declared id
+ * one of them stands refuses as it spawns, `SimHost.spawn`); its decision rows are every row that binds a body no declared
+ * spawn is, which its `decisions` host lends to the bodies that bind them. A row binding both refuses at preparation.
+ */
+function assemblyKeeper(shard: Shardfile, sections: ReadonlyMap<string, unknown>): ReturnType<typeof keeperOwnership> {
+  const declared = new Set(shard.creatures.spawns.map(row => row.id));
+  return { actors: new Set(), scripts: new Set(decisionScriptsFromSections(sections).flatMap(row => {
+    const ids = Object.values(row.actors); return ids.length === 0 || ids.some(id => !declared.has(id)) ? [row.id] : []; })) };
+}
 /** True when this product ships a native-assembly plan. */
 export function hasNativeAssembly(product: ShardFolder): boolean { return product.hasFile(NATIVE_ASSEMBLY_FILE); }
 /**
@@ -88,9 +103,15 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const harvest = species === undefined ? [] : [...species.native, ...species.program?.species ?? []];
   const heightAt = ground.heightAt, speed = plan.level.authorCap === true ? clamp(shard.authorCaps.speed, 0, plan.level.speed) : plan.level.speed;
   const level = shardLevel(shard, { at: { x: shard.spawn.x, y: Math.max(shard.spawn.y, plan.level.stand ?? heightAt(shard.spawn.x, shard.spawn.z) + 0.1), z: shard.spawn.z }, yaw: shard.spawn.yaw, speed }, plan.level.ground);
+  // OF22b0: the declared spawns stand in the native level as in an ordinary upload's, beside the assembly's hosts, and the
+  // declared creature host drives them (`installRuntimeCreatures`, as OF19b0 does beside a runtime plan's keeper)
+  const counted = countedShard(shard), sections = outputDescriptor(shard)?.sections ?? new Map<string, unknown>(), keeper = assemblyKeeper(counted, sections);
+  admitRuntimeCreatures(counted, sections, keeper);
+  const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
+  const declaredLevel: SimLevel = { ...level, entities: declaredSpawnEntities(counted) };
   const levelPorts = { ground: false as const, heightAt };
   const walk = (host: SimHost): ReturnType<typeof proveTerrainEntries> => proveTerrainEntries(host.physics, shard.entryways, heightAt, plan.entries.walk as Parameters<typeof proveTerrainEntries>[3]);
-  return { level, ports: levelPorts, proveEntries: host => {
+  return { level: declaredLevel, ports: levelPorts, proveEntries: host => {
     const { fresh, proven } = plan.entries;
     if (proven !== undefined) return proven;
     if (fresh === undefined) return walk(host);
@@ -101,6 +122,8 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     recordPrimitives(host, shard, plan.features.map(row => row.host)); // OF17b1: native features name their families until M8
     const run: AssemblyRun<C> = { host, context, input: null, day: null };
     for (const step of steps) step(run);
+    installRuntimeCreatures(host, counted, assets, sections, { restoring: context.restoring, keeper, summoned,
+      fact: (name, actor) => { need(run.input, 'A declared decision grant needs the commands host').ledger.fact(name, actor); } });
     installNativeHarvest(host, harvest);
   } };
 }

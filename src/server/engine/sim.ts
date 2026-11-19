@@ -429,7 +429,9 @@ export class SimHost {
    * The installer reinstalls the saved dynamic roster before restore; native motors belong to this host, never its caller.
    */
   spawn(spawn: SimSpawn): AnimalSim {
-    if (this.disposed || this.entities.has(spawn.id) || this.players.has(spawn.id) || this.adapters.has(`runtime.actor.${spawn.id}`) || this.hasStep(`runtime.actor.${spawn.id}`)
+    // OF22b0: a body a level row (a declared spawn) or another host already stands has one owner
+    if (!this.disposed && this.entities.has(spawn.id)) throw new Error(`Simulation actor ${spawn.id} already stands: one body, one owner`);
+    if (this.disposed || this.players.has(spawn.id) || this.adapters.has(`runtime.actor.${spawn.id}`) || this.hasStep(`runtime.actor.${spawn.id}`)
       || !/^[a-zA-Z0-9._:-]{1,128}$/u.test(spawn.id) || ![spawn.seed, spawn.scale, spawn.at.x, spawn.at.y, spawn.at.z, spawn.yaw].every(Number.isFinite) || spawn.scale <= 0) throw new Error('Invalid dynamic simulation actor');
     const recipe = structuredClone(spawn), contract = JSON.stringify(recipe);
     const actor = withOwner(null, () => this.createActor(recipe));
