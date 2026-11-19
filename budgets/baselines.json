@@ -941,9 +941,10 @@
    "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
   },
   "walk/nine-dragon-stack/rate": {
-   "value": 7298145,
+   "value": 3556635,
    "contentKey": "nine-dragon-stack@3",
-   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+   "commit": "41d629f2610dd36e8883ac4e31bbd4d2e28fa76f",
+   "why": "STR22: first hosted memory-footprint run on main to judge the walk (44468967622 at 41d629f2), median of 3 (3.44-3.83 MB/s); the mini's 7.30 pin is not comparable"
   },
   "nine/boot/retained-geometry": {
    "value": 15192309,
