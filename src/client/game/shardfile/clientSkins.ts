@@ -13,7 +13,7 @@
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { buildTier, type Tier } from '@wildshard/engine/core/tier';
-import { BufferAttribute, InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
+import { BufferAttribute, Euler, InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
 import { is } from 'valibot';
 import type { ClipName } from '@wildshard/engine/anim/rig';
 import type { RunningAbility } from '@wildshard/engine/ai/strikes';
@@ -22,12 +22,14 @@ import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
 import { BipedRigPose } from '@wildshard/engine/entities/animalRig';
 import type { AnimalSpecies, BoneDef, RigAnimCtx } from '@wildshard/engine/entities/species/registry';
 import { NO_FUR } from '@wildshard/engine/entities/species/rigs';
+import { Gunfire } from '@wildshard/engine/fx/gunfire';
+import { holdQuestRewards } from '../quest/reward';
 import { loadSkin } from './skinPlayback';
 import { compileSkinPoseLayers, bindSkinPoseLayers, type CompiledSkinPoseLayers } from './skinLayerPlayback';
 import { resolveSkinLookFiles, skinLookParameters } from '@wildshard/format/skinAssets';
 import { SkinClipNameSchema, type CreatureSkinClipName } from '@wildshard/format/skinData';
 import { SKIN_LOOK_RECIPE, type SkinClipMap, type SkinClipState } from '@wildshard/format/skins';
-import { CREATURE_SKELETONS, skeletonBones } from '@wildshard/format/creatureSkeletons';
+import { CREATURE_SKELETONS, skeletonBones, trailBoneNames } from '@wildshard/format/creatureSkeletons';
 import type { CreatureBody } from '@wildshard/format/creatureLayers';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -162,6 +164,15 @@ async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLoo
 export type SkinDriveState = Pick<RigAnimCtx, 'dt' | 't' | 'alive' | 'flinch' | 'attack' | 'speed' | 'strafe' | 'scale' | 'phase' | 'state'>;
 const _q = new Quaternion();
 const BIPED_BONES = skeletonBones(CREATURE_SKELETONS.biped);
+/** A shot's follow-through, played as the round leaves (QA 11-19 row 42); a skin without it keeps its old choice. */
+const FIRE_CLIP = 'attack.fire' as CreatureSkinClipName;
+/** The attack progress a windup must reach before its end counts as a shot (a stagger cancels it earlier). */
+const RELEASE = 0.75;
+/** The clip states plus the shot's follow-through. */
+type DriverClip = SkinClipState | 'fire';
+/** The bone a gun-carrying skin fires from. */
+const MUZZLE = 'muzzle';
+const _muzzle = new Vector3();
 const _pitch = new Quaternion();
 const _xAxis = new Vector3(1, 0, 0);
 /**
@@ -192,12 +203,21 @@ export class SkinDriver {
   private readonly biped: BipedRigPose | undefined;
   private readonly layers = new Map<CreatureSkinClipName, ReturnType<typeof bindSkinPoseLayers>>();
   private active: ReturnType<typeof bindSkinPoseLayers> | undefined;
-  private state: SkinClipState | null = null;
+  private state: DriverClip | null = null;
   /** seconds since the current clip began */
   private since = 0;
   private flinch = 0;
   /** seconds into the hit reaction, -1 when none is playing */
   private hitT = -1;
+  /** the attack progress seen last frame, to catch the windup's end */
+  private lastAttack = -1;
+  /** seconds into the shot's follow-through (`attack.fire`), -1 when none is playing */
+  private fireT = -1;
+  /**
+   * QA 11-19 row 42: true on the frame a windup runs out with the creature alive (the strike runner cancels the attack
+   * phase as its active window opens): the moment a gun's round leaves. The look draws the muzzle's flash and tracer.
+   */
+  released = false;
   constructor(skin: ClientSkin, bones: Record<string, Bone>, skeleton?: CreatureBody['skeleton']) {
     this.skin = skin; this.bones = bones;
     this.biped = skeleton === 'biped' && BIPED_BONES.every(name => Object.hasOwn(bones, name)) ? new BipedRigPose(bones) : undefined;
@@ -205,20 +225,27 @@ export class SkinDriver {
     for (const [name, clip] of skin.clips) if (clip.layers !== null) this.layers.set(name, bindSkinPoseLayers(clip.layers, ordered));
   }
   /** The clip the creature's state asks for: death, then the attack, the hit reaction, the gait, idle (grazing when it grazes). */
-  private choose(c: SkinDriveState, ability?: RunningAbility): SkinClipState | null {
+  private choose(c: SkinDriveState, ability?: RunningAbility): DriverClip | null {
     // a new blow raises the flinch (Animal.stagger / applyDamage); the reaction plays once from its start
     if (c.alive && c.flinch > this.flinch + 0.05) this.hitT = 0; else if (this.hitT >= 0) this.hitT += c.dt;
     this.flinch = c.flinch;
     if (this.hitT >= (this.skin.clips.get(this.name('hit'))?.duration ?? 0)) this.hitT = -1;
+    // the windup ran out (not cut short by a stagger): the round leaves and the follow-through plays from its start
+    const progress = ability?.progress ?? c.attack;
+    this.released = c.alive && ability === undefined && progress < 0 && this.lastAttack >= RELEASE;
+    this.lastAttack = progress;
+    if (this.released) this.fireT = 0; else if (this.fireT >= 0) this.fireT += c.dt;
+    if (!c.alive || this.fireT >= (this.skin.clips.get(FIRE_CLIP)?.duration ?? 0)) this.fireT = -1;
     if (!c.alive) return this.skin.clips.has(this.name('die')) ? 'die' : null;
-    if ((ability?.progress ?? c.attack) >= 0 && this.skin.clips.has(this.name('attack', ability))) return 'attack';
+    if (progress >= 0 && this.skin.clips.has(this.name('attack', ability))) return 'attack';
+    if (this.fireT >= 0) return 'fire';
     if (this.hitT >= 0 && this.skin.clips.has(this.name('hit'))) return 'hit';
     if (Math.hypot(c.speed, c.strafe) / c.scale > 0.15 && this.skin.clips.has(this.name('walk'))) return 'walk';
     if (c.state === 'graze' && this.skin.clips.has(this.name('idle.graze'))) return 'idle.graze';
     return this.skin.clips.has(this.name('idle')) ? 'idle' : null;
   }
-  private name(state: SkinClipState, ability?: RunningAbility): CreatureSkinClipName {
-    return creatureClipName(state, this.skin.clipMap, this.skin.clips, ability);
+  private name(state: DriverClip, ability?: RunningAbility): CreatureSkinClipName {
+    return state === 'fire' ? FIRE_CLIP : creatureClipName(state, this.skin.clipMap, this.skin.clips, ability);
   }
   /** Pose this instance's bones for the frame. */
   step(c: SkinDriveState, freshBase = false, ability?: RunningAbility): void {
@@ -231,7 +258,8 @@ export class SkinDriver {
     const name = this.name(state, ability), clip = this.skin.clips.get(name); if (clip === undefined) return;
     this.since = state === this.state ? this.since + c.dt : 0; this.state = state;
     // one-shots from their trigger (the export sampled each from it), the walk from the gait phase, idles on the clock
-    const time = state === 'die' ? this.since : state === 'attack' ? (ability?.progress ?? c.attack) * this.skin.attackSpan : state === 'hit' ? this.hitT : state === 'walk' ? c.phase * clip.duration : c.t;
+    const time = state === 'die' ? this.since : state === 'attack' ? (ability?.progress ?? c.attack) * this.skin.attackSpan : state === 'hit' ? this.hitT
+      : state === 'fire' ? this.fireT : state === 'walk' ? c.phase * clip.duration : c.t;
     const looping = state === 'walk' || state.startsWith('idle'), at = looping ? time % clip.duration : Math.min(time, clip.duration);
     // A native poser already rebuilt this frame's base; restoring last frame's
     // cached layer base here would freeze its otherwise untracked gait joints.
@@ -269,6 +297,74 @@ export function clientVariantSkin(skin: ClientSkin, id: string): ClientSkin {
   return selected;
 }
 
+/**
+ * QA 11-19 row 42 (Jake: "They're clearly shooting at me, but there's no particle effects ... There's no bullets"): a
+ * skin with a `muzzle` bone fires a visible round as its windup runs out (the flash, a puff of smoke and an enemy tracer
+ * past the eye). Call after the driver's step, on any page that draws the skin.
+ */
+export function creatureGunfire(driver: SkinDriver, bones: Record<string, Bone>): void {
+  const muzzle = bones[MUZZLE];
+  if (!driver.released || muzzle === undefined) return;
+  muzzle.updateWorldMatrix(true, false);
+  Gunfire.current()?.enemyRound(muzzle.getWorldPosition(_muzzle));
+}
+
+/** s: the thrash, when the body starts to sink, how long it takes to go under, and when the loot bursts from the hole */
+const THRASH_SECONDS = 1.6, SINK_AT = 0.9, SINK_SECONDS = 2.6, LOOT_AT = 1.5;
+/** m the body sinks (a leap's arch included), and rad of the thrash's swing at each trail bone */
+const SINK_DEPTH = 14, THRASH_SWING = 0.2;
+const _ground = new Vector3(), _thrash = new Quaternion(), _euler = new Euler();
+/**
+ * QA 11-19 row 44 (Jake on the Dust Wyrm: "It has zero satisfying death animation"): a serpent's death, played over the
+ * trail its body lies on. It thrashes (a whip down the trail that dies away), a burst of sand and a jolt of the view as
+ * it goes, then sinks back under the sand along its whole length, dust rising where it goes down, and its loot bursts
+ * out of the hole. The quest card waits for it (`holdQuestRewards`). Alive again (a retry, a respawn), it resets.
+ *
+ *   const death = new SerpentDeath(trailBoneNames(count));
+ *   death.step(alive, dt, bones, rootY, rootScale);   // after the trail is laid, every frame
+ */
+export class SerpentDeath {
+  private t = -1;
+  private nextDust = 0;
+  private dusted = 0;
+  constructor(private readonly trail: readonly string[]) {}
+  step(alive: boolean, dt: number, bones: Record<string, Bone>, groundY: number, scale: number): void {
+    if (alive) { this.t = -1; this.dusted = 0; return; }
+    const head = bones[this.trail[0] ?? '']; if (head === undefined) return;
+    const fire = Gunfire.current(), last = this.t;
+    this.t = last < 0 ? 0 : last + dt;
+    const t = this.t, crossed = (at: number): boolean => last < at && t >= at;
+    // the whip: each bone swings a little out of step with the one ahead, so the body writhes along its length
+    const swing = THRASH_SWING * Math.max(0, 1 - t / THRASH_SECONDS);
+    if (swing > 0) for (let k = 1; k < this.trail.length; k++) {
+      const bone = bones[this.trail[k] ?? '']; if (bone === undefined) continue;
+      const wave = Math.sin(t * 14 - k * 0.8);
+      bone.quaternion.multiply(_thrash.setFromEuler(_euler.set(0.35 * swing * Math.cos(t * 11 - k * 0.6), swing * wave, 0)));
+    }
+    // under: the head (every bone hangs from it) goes down; a body lying high (the leap's arch) goes with it
+    const u = Math.min(1, Math.max(0, (t - SINK_AT) / SINK_SECONDS)), sink = SINK_DEPTH * u * u * (3 - 2 * u);
+    head.position.y -= sink / scale;
+    if (fire === null) return;
+    const at = (bone: Bone | undefined): Vector3 => {
+      if (bone === undefined) return _ground.set(0, groundY, 0);
+      bone.updateWorldMatrix(true, false); bone.getWorldPosition(_ground); _ground.y = groundY; return _ground;
+    };
+    if (last < 0) {
+      holdQuestRewards(SINK_AT + SINK_SECONDS + 0.8);
+      fire.dust(at(head), 5, 12); fire.quake(_ground, 0.7);
+    }
+    if (crossed(SINK_AT)) {
+      for (let k = 0; k < this.trail.length; k += 3) fire.dust(at(bones[this.trail[k] ?? '']), 2.5, 4);
+      fire.quake(at(head), 0.45);
+    }
+    if (crossed(LOOT_AT)) fire.shower(at(head).setY(groundY + 0.6));
+    if (u > 0 && u < 1 && t >= this.nextDust) {
+      this.nextDust = t + 0.3;
+      fire.dust(at(bones[this.trail[(this.dusted++ * 5) % this.trail.length] ?? '']), 2, 3);
+    }
+  }
+}
+
 /** A custom-rig engine look over a loaded skin; the platform brain's state drives the clip choice per instance. */
 export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardRows['species'][number], skin: ClientSkin): SpeciesLook {
   const drivers = new WeakMap<Record<string, Bone>, SkinDriver>();
@@ -280,10 +376,17 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
   // CC58b2: a horizontal biped leans its spine and lays its tail on the trail its volumes ride
   const contract = species.body === undefined ? undefined : bodyContract(species.body);
   const pitch = contract?.pitch === undefined ? undefined : new SkinPitch(contract.pitch), trail = contract?.trail ?? [];
+  const deaths = species.body?.skeleton === 'serpent' && species.body.trail !== undefined ? new WeakMap<Record<string, Bone>, SerpentDeath>() : undefined;
+  const serpentBones = species.body?.trail === undefined ? [] : trailBoneNames(species.body.trail.count);
   const animate = (c: RigAnimCtx): void => {
     const pose = c.animal.hitVolumes;
     if (pose?.joint !== undefined) {
       for (const [name, bone] of Object.entries(c.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative skin joint ${name}`);
+      if (deaths !== undefined) {
+        let death = deaths.get(c.bones);
+        if (death === undefined) { death = new SerpentDeath(serpentBones); deaths.set(c.bones, death); }
+        death.step(c.alive, c.dt, c.bones, c.position.y, c.scale);
+      }
       return;
     }
     let driver = drivers.get(c.bones);
@@ -294,6 +397,7 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
     pitch?.before(c.bones);
     driver.step(c, quadruped, c.animal.runningAbility);
     pitch?.after(c.bones);
+    creatureGunfire(driver, c.bones);
     if (pose?.trailJoint !== undefined) for (const name of trail) {
       const bone = c.bones[name]; if (bone !== undefined) pose.trailJoint(name, bone.position, bone.quaternion, bone.scale);
     }

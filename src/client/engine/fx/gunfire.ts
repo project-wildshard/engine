@@ -30,6 +30,10 @@ const TRACER_SPEED = 150;
 /** m of streak, and its width in pixels' worth of the view at any distance */
 const TRACER_LENGTH = 6, TRACER_ANGLE = 0.006, TRACER_MIN_WIDTH = 0.012;
 const FLASH_SECONDS = 0.08;
+/** m: a creature's round closer than this draws nothing (a knife's lunge), and how far past the eye its tracer runs */
+const MIN_ENEMY_RANGE = 3, ENEMY_OVERSHOOT = 6;
+/** m: how far a big body's blow is felt in the view */
+const QUAKE_RANGE = 45;
 const TONES: Record<TracerTone, THREE.Color> = { own: new THREE.Color(2.4, 1.9, 1.1), enemy: new THREE.Color(2.6, 1.2, 0.5) };
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _dir = new THREE.Vector3(), _cam = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 const _z = new THREE.Vector3(0, 0, 1);
@@ -123,8 +127,40 @@ export class Gunfire {
   }
   /** Shake the camera (0..1 trauma), as a blow nearby does. */
   shake(trauma: number): void { CameraFX.for(this.game).addTrauma(trauma); }
+  /** A blow at `at` felt in the view: `trauma` at its foot, fading to nothing `QUAKE_RANGE` m away. */
+  quake(at: THREE.Vector3, trauma: number): void {
+    this.game.camera.getWorldPosition(_cam);
+    const felt = trauma * Math.max(0, 1 - at.distanceTo(_cam) / QUAKE_RANGE);
+    if (felt > 0.02) this.shake(felt);
+  }
+  /** A fountain of hot gold sparks and a warm cloud bursting up out of `at` (a big kill's spoils). */
+  shower(at: THREE.Vector3): void {
+    const impacts = Impacts.for(this.game);
+    impacts.burst('sparks', at, _up, 40); impacts.burst('sand', at, _up, 16);
+    for (let i = 0; i < 6; i++) this.cloud(at, _up, 1.6, 0.9, 1.4 + this.random() * 0.6, 2.8, 0xf2c45a);
+  }
   /** A shot's kick of the view: up `pitchDeg`, rolled `rollDeg`. */
   kick(pitchDeg: number, rollDeg: number): void { CameraFX.for(this.game).kick(pitchDeg, rollDeg); }
+  /**
+   * A creature's round at the player (QA42: "They're clearly shooting at me ... There's no bullets"): a flash and a puff
+   * of smoke at `muzzle`, and an enemy tracer that passes a hand's width off the eye and runs on past it, so it reads as a
+   * round coming in without filling the view. Nothing within `MIN_ENEMY_RANGE` (a knife's reach: the rusher's lunge).
+   * Returns whether it drew.
+   */
+  enemyRound(muzzle: THREE.Vector3): boolean {
+    this.game.camera.getWorldPosition(_cam);
+    const range = muzzle.distanceTo(_cam);
+    if (range < MIN_ENEMY_RANGE) return false;
+    _dir.subVectors(_cam, muzzle).divideScalar(range);
+    // a near miss: off to one side and a little low, then on past the eye
+    _b.crossVectors(_dir, _up); if (_b.lengthSq() < 1e-6) _b.set(1, 0, 0); _b.normalize();
+    const side = (this.random() < 0.5 ? -1 : 1) * (0.25 + this.random() * 0.25);
+    _a.copy(_cam).addScaledVector(_b, side).addScaledVector(_up, -0.15 - this.random() * 0.15).addScaledVector(_dir, ENEMY_OVERSHOOT);
+    this.flash(muzzle, 0.55);
+    this.cloud(muzzle, _dir, 0.4, 0.25, 0.6, 2.2, 0xcfc6b8);
+    this.shot(muzzle, _a, 'enemy');
+    return true;
+  }
   /** Live pooled pieces, for a probe or a test. */
   get live(): { readonly tracers: number; readonly flashes: number; readonly clouds: number } {
     return { tracers: this.tracers.filter(t => t.live).length, flashes: this.flashes.filter(f => f.live).length, clouds: this.clouds.filter(c => c.live).length };

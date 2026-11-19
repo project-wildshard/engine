@@ -20,7 +20,7 @@ import { addAimTargets, type AimTarget } from '@wildshard/engine/player/AimTarge
 import type { Scope } from '@wildshard/engine/app/scope';
 import { createShardfileClientScripts } from '../shardfile/clientScripts';
 import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
-import { loadClientSkins, clientVariantSkin, SkinDriver, type ClientSkin, type SkinDriveState } from '../shardfile/clientSkins';
+import { loadClientSkins, clientVariantSkin, creatureGunfire, SerpentDeath, SkinDriver, type ClientSkin, type SkinDriveState } from '../shardfile/clientSkins';
 import { ClientScriptViews, type ClientScriptViewTarget, type ClientScriptViewState } from "../plugin/ui";
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
@@ -67,7 +67,7 @@ class CreatureTarget implements CombatTarget, AimTarget {
 }
 interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly bones: Record<string, Bone>; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; readonly target: CreatureTarget; t: number; phase: number; readonly trail?: ViewTrail }
 /** A serpent's page-side trail (CC27): its ring fed from the row's roots on the sample ticks, posed on the drawn root. */
-interface ViewTrail { readonly volumes: TrailCreatureVolumes; readonly root: { readonly position: Vector3; yaw: number; scale: number }; last: number }
+interface ViewTrail { readonly volumes: TrailCreatureVolumes; readonly root: { readonly position: Vector3; yaw: number; scale: number }; last: number; readonly death: SerpentDeath }
 /** A gap longer than this (a page hidden, a row out of relevance) lays a fresh rest trail instead of catching up. */
 const TRAIL_CATCH_UP = 60;
 interface CellLife {
@@ -151,7 +151,7 @@ export class NeighbourLife {
       }
       // CC27: a serpent's trail bones lie on the path its root drew, the same ring the server's volumes ride
       const trailRoot = { position: new Vector3(spawn.at[0], spawn.at[1], spawn.at[2]), yaw: spawn.yaw, scale };
-      const trail = species.body?.skeleton === 'serpent' ? { volumes: new TrailCreatureVolumes(species.body, trailRoot, () => -Infinity), root: trailRoot, last: -1 } : undefined;
+      const trail = species.body?.skeleton === 'serpent' ? (() => { const volumes = new TrailCreatureVolumes(species.body, trailRoot, () => -Infinity); return { volumes, root: trailRoot, last: -1, death: new SerpentDeath(volumes.bones) }; })() : undefined;
       const view: CreatureView = { id, mesh, bones, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale }, bodyY: species.dims.bodyY * scale, target, t: (spawn.seed % 97) / 13, phase: 0, ...(trail === undefined ? {} : { trail }) };
       mesh.position.set(spawn.at[0], spawn.at[1], spawn.at[2]); mesh.rotation.set(0, spawn.yaw, 0, 'YXZ'); mesh.scale.setScalar(scale);
       // ZE3a: hidden from birth unless its cell is the active one: an admission that resolves between the late phase (which
@@ -240,8 +240,15 @@ export class NeighbourLife {
         const pose = sim?.hitVolumes;
         if (pose?.joint !== undefined) {
           for (const [name, bone] of Object.entries(view.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative neighbour joint ${name}`);
-        } else view.driver.step({ dt, t: view.t, alive: sim?.alive ?? true, flinch: sim?.flinch ?? 0, attack: sim?.attackPhase ?? -1, speed, strafe, scale: sim?.scale ?? view.spawn.scale, phase: view.phase, state: sim?.state ?? 'idle' });
-        if (view.trail !== undefined && pose?.joint === undefined) poseTrail(view, view.trail, sim);
+        } else {
+          view.driver.step({ dt, t: view.t, alive: sim?.alive ?? true, flinch: sim?.flinch ?? 0, attack: sim?.attackPhase ?? -1, speed, strafe, scale: sim?.scale ?? view.spawn.scale, phase: view.phase, state: sim?.state ?? 'idle' });
+          creatureGunfire(view.driver, view.bones); // QA 11-19 row 42: a bandit's round leaves its muzzle
+        }
+        if (view.trail !== undefined && pose?.joint === undefined) {
+          poseTrail(view, view.trail, sim);
+          // QA 11-19 row 44: a serpent's death plays over the trail it lies on
+          view.trail.death.step(sim?.alive ?? true, dt, view.bones, view.mesh.position.y, view.mesh.scale.x);
+        }
       }
       if (life.failed === null) life.lane?.views.apply(dt);
     }

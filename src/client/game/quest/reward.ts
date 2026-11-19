@@ -20,11 +20,24 @@ export interface QuestRewardHost {
   sting: () => void;
 }
 
+/**
+ * QA 11-19 row 44 (Jake on the Dust Wyrm: "It has zero satisfying death animation"): a death worth watching holds the
+ * next reward card back until it has played, so the card never covers the fall. A creature look calls this as its death
+ * begins; a beat that has not started waits out the hold (one already showing is never cut).
+ */
+let held = 0;
+/** The one waiting beat that counts the hold down on its frame time (so two beats never count it twice). */
+let counter: object | null = null;
+export function holdQuestRewards(seconds: number): void { held = Math.max(held, seconds); }
+export function questRewardsHeld(): boolean { return held > 0; }
+
 /** Wendell's held reward view: the same caption, 2.5 s camera ease, 3.5 s clock ease and 7 s hold. A beat that names no
  * pose shows the caption and sting only: the player keeps the camera, the walk and the weapon in hand. */
 export class QuestRewardBeat {
   private readonly caption: RewardCaption;
   private readonly motion: QuestRewardController;
+  /** this beat's claim on the hold's countdown */
+  private readonly token = {};
   constructor(private readonly host: QuestRewardHost, spec: QuestRewardSpec) {
     this.caption = new RewardCaption(spec.kicker, spec.title, spec.subtitle);
     this.motion = new QuestRewardController(host.player, host.dayNight, spec, {
@@ -38,11 +51,17 @@ export class QuestRewardBeat {
         host.objective?.classList.remove('ws-quest-hide');
       },
     });
-    host.scope.onDispose(() => { this.motion.dispose(); this.caption.scope.dispose(); });
+    host.scope.onDispose(() => { if (counter === this.token) counter = null; this.motion.dispose(); this.caption.scope.dispose(); });
   }
   get active(): boolean { return this.motion.active; }
   /** An admitted director may supply completion explicitly; the local elapsed clock then serves presentation only. */
   update(dt: number, authoritativeFinish?: boolean): void {
-    if (!this.host.scope.disposed) this.motion.update(dt, authoritativeFinish);
+    if (this.host.scope.disposed) return;
+    if (!this.motion.active && held > 0) {
+      counter ??= this.token;
+      if (counter === this.token) { held = Math.max(0, held - dt); if (held === 0) counter = null; }
+      return;
+    }
+    this.motion.update(dt, authoritativeFinish);
   }
 }
