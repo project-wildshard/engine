@@ -65,15 +65,16 @@ export function autoPlaced(row: {readonly slug: string}): boolean {
   if (catalogue === undefined || catalogue.placements.some(placed => bareSlug(placed.slug) === bareSlug(row.slug))) return false;
   return catalogue.grid.cells.some(cell => bareSlug(cell.slug) === bareSlug(row.slug));
 }
-/** A shard the API placed on this channel after the build (the placement file's cell, `placedCells.ts`): Shard Select cards it, an open
- *  plot or an auto-placed shard too, because with no crossing (staging's default) its card and `?chunk=` are the only ways in. */
+/** A shard the API placed on this channel after the build (the placement file's cell, `placedCells.ts`).
+ *  A placement can add a card for an auto-placed shard. Rows marked `shardSelect: false` stay off the player deck. */
 export function placedByFile(row: {readonly slug: string}): boolean {
   return installedCatalogue()?.placed?.some(slug => bareSlug(slug) === bareSlug(row.slug)) === true;
 }
 
 /** The same catalogue policy for the first HTML menu and the runtime shard deck. */
 export function selectTitleRows<T extends {readonly slug: string; readonly status?: string; readonly shardSelect?: boolean}>(rows: readonly T[], showHidden: boolean): readonly T[] {
-  const ordinary = rows.filter(row => (row.shardSelect !== false && !autoPlaced(row)) || placedByFile(row));
-  const visible = ordinary.filter(row => !playerHidden(row));
-  return showHidden ? [...visible, ...ordinary.filter(playerHidden)] : visible;
+  const carded = rows.filter(row => (row.shardSelect !== false && !autoPlaced(row)) || placedByFile(row));
+  const developerOnly = (row: T): boolean => row.shardSelect === false || playerHidden(row);
+  const visible = carded.filter(row => !developerOnly(row));
+  return showHidden ? [...visible, ...carded.filter(developerOnly)] : visible;
 }

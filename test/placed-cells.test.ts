@@ -1,7 +1,7 @@
 // @vitest-environment node
 // SHARD-AUTHORING SA33 to SA35, the page half: a released page learns the cells the API placed after its build from its channel's signed
 // placement file (SA33a), checked under the API's placement key as the box (`readPlacementFile`) and SA35's preview bake check it. A
-// verified cell gets a Shard Select card and `?chunk=` enters the grid there, ring 3 included; a bad signature, a 404, a slow or an
+// verified cell can get a Zone Select card and `?chunk=` enters the grid there, ring 3 included; a bad signature, a 404, a slow or an
 // unreadable file keep the build's 24 cells.
 // oxlint-disable-next-line import/no-nodejs-modules -- It signs as the API does.
 import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
@@ -89,15 +89,14 @@ test('the address: a released page reads its own channel\'s file; preview and a 
   expect(placementsOf({ __WS_PLACEMENTS__: URL_AT })).toBe(URL_AT);
 });
 
-test('a verified file adds the cell: Thin Ice gets its card, `?chunk=` enters the grid at ring 3\'s (0,3)', async () => {
+test('a verified file adds Thin Ice at ring 3 (0,3) without adding it to player Zone Select', async () => {
   expect(cards()).toEqual(['driftwood-isle']);
   expect(shardCell('open-plot-thin-ice')).toBeUndefined();
   const read = await learnPlacedCells(URL_AT, { keep: device, fetch: answering(signed()), publicKey: api.hex });
   expect(read).toEqual({ added: THIN_ICE, left: [], serial: 1, carded: [] });
   expect(gridSlugs()).toHaveLength(25);
   expect(installedCatalogue()?.placed).toEqual(['open-plot-thin-ice']);
-  expect(cards(), 'the card, with the build\'s name and art').toEqual(['driftwood-isle', 'open-plot-thin-ice']);
-  expect(titleCards(false, () => null, () => null, () => true)[1]).toMatchObject({ name: 'Open Plot · Thin Ice', thumbnail: '/t.jpg', badge: 'Early access' });
+  expect(cards()).toEqual(['driftwood-isle']);
   // the one way in: a world page enters the grid at the placed cell, which the drawn 7 × 7 admits
   const cell = oneWayIn({ online: true, hosted: true, slug: 'open-plot-thin-ice', kept: false }, new GridAssembly(player));
   expect(cell).toMatchObject({ instance: 'open-plot-thin-ice', cell: [0, 3] });
@@ -225,7 +224,7 @@ test('SA46: the build\'s own cells go in before the catalogue is asked: a page t
   expect(read).toMatchObject({ added: THIN_ICE, carded: [] });
   expect(gridSlugs()).toContain('open-plot-thin-ice');
   expect(gridSlugs()).not.toContain('new-author-shard');
-  expect(cards()).toEqual(['driftwood-isle', 'open-plot-thin-ice']);
+  expect(cards()).toEqual(['driftwood-isle']);
 
   installCatalogue(PIN); installTitleManifests(ROWS.map((row, n) => ({ ...row, order: 40 + n })));
   const ok = await learnPlacedCells(URL_AT, { keep: device, fetch: routes({ [ENTRY_AT]: () => json(ENTRY) }, signed(both)), publicKey: api.hex, api: API, content: cooked });

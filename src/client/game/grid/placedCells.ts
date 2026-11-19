@@ -56,7 +56,7 @@ export interface Placed { readonly document: CatalogueDocument; readonly added: 
  * for rule: an instance placed elsewhere, off the 7 × 7, a slug that already has a cell (or names a cell), an instance that is a placed
  * shard's slug, a taken spot. A cell the build already places the same way is kept once. A slug this build has no card or product for
  * (`known` false: an upload after the build the API's catalogue does not card, SA46) is left out too. `placed` names the slugs the file
- * added, which Shard Select cards (`titleDeck.ts`).
+ * added, which the title deck checks against its card policy.
  */
 export function addPlacedCells(document: CatalogueDocument, file: PlacementFile, known: (slug: string) => boolean = () => true): Placed {
   const added: Cell[] = [], left: string[] = [];

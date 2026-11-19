@@ -15,7 +15,7 @@ import { installShards } from '../src/client/game/shard/list';
 const ART = { thumb: '', portrait: '', landscape: '' };
 const row = (slug: string, name: string, biome: string, status: TitleManifest['status'], shardSelect?: false): TitleManifest =>
   ({ slug, name, biome, status, card: ART, ...(shardSelect === undefined ? {} : { shardSelect }) });
-/** staging v0.1.30's rows: the API's placement file adds Thin Ice's open plot to the grid, so it gets a card (`placedByFile`) */
+/** Release rows with Thin Ice added to the grid by the API's signed placement file. */
 const ROWS: readonly TitleManifest[] = [
   row('driftwood-isle', 'Driftwood Isle', 'Low-poly island, open ocean', 'live'),
   row('open-plot-thin-ice', 'Open Plot · Thin Ice', 'Open plot · coming soon', 'earlyAccess', false),
@@ -39,13 +39,12 @@ const cardsOf = (deck: TitleDeck): { name: string; sub: string; ribbon: string; 
   enters: card.dataset['enters'] === '1',
 }));
 
-test('SB11: one Thin Ice card, the enterable open plot, and its subtitle does not say Coming soon', () => {
-  for (const mode of [PLAYER, DEVELOPER]) {
-    const thin = cardsOf(deckOf(mode)).filter(({ name }) => /thin ice/iu.test(name));
-    expect(thin, `developer ${String(mode.developer)}`).toEqual([
-      { name: 'Open Plot · Thin Ice', sub: 'Open plot', ribbon: 'Early access', tags: [], enters: true },
-    ]);
-  }
+test('QA 11-19 #12: a placed open plot stays off the player deck and has one enterable Developer card', () => {
+  expect(cardsOf(deckOf(PLAYER)).map(({ name }) => name)).toEqual(['Driftwood Isle']);
+  const thin = cardsOf(deckOf(DEVELOPER)).filter(({ name }) => /thin ice/iu.test(name));
+  expect(thin).toEqual([
+    { name: 'Open Plot · Thin Ice', sub: 'Open plot', ribbon: 'Early access', tags: [], enters: true },
+  ]);
 });
 
 test('SB11: with no Thin Ice shard carded, Developer still sees the Thin Ice draft', () => {
@@ -59,7 +58,7 @@ test('SB17: no card wears a LOAD or LOADED badge; the card still says whether EN
   document.body.append(deck.root); decks.push(deck);
   const cards = cardsOf(deck);
   expect(cards.flatMap(({ tags }) => tags)).toEqual([]);
-  expect(cards.map(({ enters }) => enters)).toEqual([true, true]);
+  expect(cards.map(({ enters }) => enters)).toEqual([true]);
 });
 
 test('SB12: an upload whose catalogue name is only its slug is a test placement: a readable name, Developer only', async () => {
