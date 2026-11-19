@@ -1013,6 +1013,7 @@
     "src/client/game/shardfile/phoneMemoryLine.ts": "client",
     "src/client/game/shardfile/clientSpeciesProgram.ts": "client",
     "src/client/game/shardfile/clientSplatTerrain.ts": "client",
+    "src/client/game/shardfile/splatLayerRead.ts": "client",
     "src/client/game/shardfile/clientStealthEntry.ts": "client",
     "src/client/game/shardfile/clientTargets.ts": "client",
     "src/client/game/shardfile/clientTimedEncounters.ts": "client",

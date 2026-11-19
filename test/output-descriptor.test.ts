@@ -1382,6 +1382,6 @@ test('ONE-FORMAT OF10a2: an outside product with this device\'s own receipt gets
     expect(store.product()?.validation).toBeDefined();
     expect(tiers).not.toHaveBeenCalled(); // no tier asked, and no receipt yet: every byte is validated
     const phone = await admitFolder(null, { ...online, offline: true, tier: 'phone', fetch: () => Promise.reject(new Error('Offline network')) });
-    expect(tiers).toHaveBeenCalledWith(phone.source, 'phone', undefined, undefined);
+    expect(tiers).toHaveBeenCalledWith(phone.source, 'phone', undefined, undefined, undefined);
   } finally { tiers.mockRestore(); restore(); }
 });
