@@ -3,7 +3,7 @@
 // `look/map` still gets one that is not flat; the map is in the minimap's frame (north +Z up, east −X right); and a zone with
 // nothing in it shows its plot grid, never one flat colour.
 // oxlint-disable-next-line import/no-nodejs-modules -- The test owns its temporary output directory.
-import {existsSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The wrapper's per-run temp root.
 import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Output paths.
@@ -13,7 +13,7 @@ import {afterAll, expect, test} from 'vitest';
 import {encodeTerrainTile} from '@wildshard/format/terrainTileBytes';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {readTar} from '@wildshard/format/tar';
-import {cookShard} from '../src/cook/game/shardCook';
+import {cookShard, openShardfile, writeCookedMap} from '../src/cook/game/shardCook';
 import {createPartEncoder} from '../src/cook/game/spawnParts';
 import {COOKED_CELL_SIZE, COOKED_MAP_SIZE, encodeMapPng, renderCookedMap, type MapSource} from '../src/cook/game/cookedMap';
 import {cookedMapPath} from '../src/shared/game/shardfile/cookedMapPath';
@@ -35,7 +35,9 @@ function spread(pixels: Uint8Array, channels: number): {readonly sd: number; rea
 
 test('a cooked product carries its map at both sizes, drawn from its world, whether or not it declares a look/map', {timeout: 120_000}, async () => {
   const legacy = legacyBrasscap();
-  const slug = parseOutputIndex(JSON.parse(new TextDecoder().decode(readTar(legacy).get('shard.json')))).identity.slug;
+  const index = parseOutputIndex(JSON.parse(new TextDecoder().decode(readTar(legacy).get('shard.json'))));
+  expect(index.sections.map(row => row.name)).not.toContain('look/map');
+  const {slug} = index.identity;
   const out = join(root, 'cooked'), warned: string[] = [];
   const report = await cookShard(legacy, out, {wireBytes: (_url, bytes) => bytes.length, now: () => 0, encoder, warn: line => { warned.push(line); }});
   expect(warned.filter(line => line.startsWith('cooked map'))).toEqual([]);
@@ -51,6 +53,12 @@ test('a cooked product carries its map at both sizes, drawn from its world, whet
     expect(sd).toBeGreaterThan(8);
     expect(colours).toBeGreaterThan(32);
   }
+});
+
+test('a map that cannot be written fails the cook step', async () => {
+  const out = join(root, 'blocked-map-output');
+  writeFileSync(out, 'A file here prevents the map output directory from being made');
+  await expect(writeCookedMap(openShardfile(legacyBrasscap()), out)).rejects.toThrow();
 });
 
 /** A one-quad GLB (a 10 m roof at 6 m) at (x, z), red, with no textures. */

@@ -13,6 +13,7 @@ import {writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {createCookWorker, indexKey} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
+import {cookedMapPath} from '../src/shared/game/shardfile/cookedMapPath';
 import {emptyShardfile} from '../src/shared/host/author';
 import {digest, json, MOVED, PREPARED, prepared} from './fixtures/stale-preparation';
 import {compileCookWorker} from './fixtures/compileCookWorker';
@@ -45,7 +46,9 @@ beforeAll(async () => { preparing = compileCookWorker(entryScope.signal); entry 
 afterAll(async () => { entryScope.abort(); await preparing?.catch(() => undefined); entry?.dispose(); rmSync(root, {recursive: true, force: true}); });
 
 test('the cook worker cooks a stale preparation in its bounded child, and its index and row say so', {timeout: 60_000}, async () => {
-  const tarball = writeTar(prepared(workerProduct(), PREPARED)), hash = digest(tarball), lines: string[] = [];
+  const product = workerProduct();
+  expect(product.has('sections/look/map.json')).toBe(false);
+  const tarball = writeTar(prepared(product, PREPARED)), hash = digest(tarball), lines: string[] = [];
   const worker = (build: string, renderer?: string): ReturnType<typeof createCookWorker> => createCookWorker({build, store: folderStore(join(root, 'worker-store')),
     source: {heads: () => Promise.resolve([{slug, hash, revision: 1}]), download: () => Promise.resolve(tarball)},
     serverPacks: join(root, 'worker-server'), scratch: join(root, 'worker-jobs'), log: line => { lines.push(line); },
@@ -62,6 +65,11 @@ test('the cook worker cooks a stale preparation in its bounded child, and its in
   const keys = (build: string): Promise<string[]> => store.get(indexKey(build, hash)).then(body => (json(body) as {keys: string[]}).keys);
   const staleKeys = await keys('moved');
   expect(staleKeys.length).toBeGreaterThan(0);
+  for (const size of ['full', 'cell'] as const) {
+    const key = `loose/${hash}/${cookedMapPath(slug, size)}`;
+    expect(staleKeys).toContain(key);
+    expect(await store.has(key)).toBe(true);
+  }
   expect(await keys('prepared')).toEqual(staleKeys);
   // A host that hands its job no fingerprint still cooks: the job can't run git under --permission, so it can't call it current.
   expect(await worker('unnamed').cook({slug, hash})).toMatchObject({state: 'cooked', preparation: 'stale'});

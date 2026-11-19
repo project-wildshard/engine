@@ -374,8 +374,8 @@ export interface CookReport {
   readonly loose: readonly string[];
   readonly parts: {readonly count: number; readonly rawBytes: number; readonly wireBytes: number};
   readonly server: {readonly url: string; readonly index: string; readonly wireBytes: number; readonly files: number};
-  /** J450: the top-down map the cook drew (`cookedMap.ts`), at `cookedMapPath`; absent when it could not draw one (it warned). */
-  readonly map?: {readonly full: number; readonly cell: number} & CookedMapStats;
+  /** J450: the top-down map the cook drew (`cookedMap.ts`), at `cookedMapPath`. */
+  readonly map: {readonly full: number; readonly cell: number} & CookedMapStats;
 }
 
 export type CookShardPhase = 'textures' | 'client-packs' | 'server-packs';
@@ -443,23 +443,20 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
     const file = join(out, 'shardfiles', half.shard.slug, path);
     mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.shard.read(path));
   }
-  // J450: every zone's map, drawn here from its own world; a map that can't be drawn warns and never fails the cook
-  const map = await writeCookedMap(half.shard, out, options.warn);
-  return {slug: half.shard.slug, preparation: half.shard.preparation, seconds: (options.now() - started) / 1000, manifests, loose: loose.map(row => row.url), ...(map === undefined ? {} : {map}), server: {url: server.url, index: `/${serverIndex}`, wireBytes: [server, ...server.more ?? []].reduce((sum, part) => sum + part.wireBytes, 0), files: [server, ...server.more ?? []].reduce((sum, part) => sum + part.files.length, 0)},
+  // J450: write both maps before the worker can publish the checked upload.
+  const map = await writeCookedMap(half.shard, out);
+  return {slug: half.shard.slug, preparation: half.shard.preparation, seconds: (options.now() - started) / 1000, manifests, loose: loose.map(row => row.url), map, server: {url: server.url, index: `/${serverIndex}`, wireBytes: [server, ...server.more ?? []].reduce((sum, part) => sum + part.wireBytes, 0), files: [server, ...server.more ?? []].reduce((sum, part) => sum + part.files.length, 0)},
     parts: {count: after.parts - before.parts, rawBytes: after.rawBytes - before.rawBytes, wireBytes: after.wireBytes - before.wireBytes}};
 }
 
-/** J450: draw the shard's map from its own world and write both sizes beside its header (`shardfiles/<slug>/`), which the cook
- *  worker publishes under the upload's loose folder. Never throws: the cook goes on without a map, and the page falls back. */
-export async function writeCookedMap(shard: Pick<OpenShardfile, 'slug' | 'index' | 'sections' | 'read'>, out: string, warn?: (line: string) => void): Promise<CookReport['map']> {
-  try {
-    const {full, cell, stats} = await cookedMapPngs({files: shard.index.files, sections: shard.sections, read: shard.read});
-    for (const [path, bytes] of [[cookedMapPath(shard.slug, 'full'), full], [cookedMapPath(shard.slug, 'cell'), cell]] as const) {
-      const file = join(out, path); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, bytes);
-    }
-    return {full: full.length, cell: cell.length, ...stats};
-  } catch (error) {
-    warn?.(`cooked map: ${shard.slug}: ${error instanceof Error ? error.message : String(error)}`);
-    return undefined;
+/** J450: draw the shard's map from its own world and write both sizes beside its header.
+ * The worker publishes them under the upload's loose folder. A failed write leaves the cook unqualified. */
+export async function writeCookedMap(shard: Pick<OpenShardfile, 'slug' | 'index' | 'sections' | 'read'>, out: string): Promise<CookReport['map']> {
+  const {full, cell, stats} = await cookedMapPngs({files: shard.index.files, sections: shard.sections, read: shard.read});
+  for (const [path, bytes] of [[cookedMapPath(shard.slug, 'full'), full], [cookedMapPath(shard.slug, 'cell'), cell]] as const) {
+    const file = join(out, path);
+    mkdirSync(dirname(file), {recursive: true});
+    writeFileSync(file, bytes);
   }
+  return {full: full.length, cell: cell.length, ...stats};
 }
