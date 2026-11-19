@@ -5,6 +5,7 @@ import { expect, test as base } from '../../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { recordBars } from '../../../scripts/loading-card-recorder.mjs'
 import { recordImageUploads } from '../../../scripts/memory/uploadRecorder.mjs'
+import { reportBoot } from './boot-report.ts'
 import { watchClones } from './clones.ts'
 import { inPlay } from './probe.ts'
 
@@ -34,47 +35,6 @@ interface Workers {
 }
 
 const dropHandled = new WeakSet<Page>()
-
-/** TR-4b: one stdout line per Brasscap entry with every loader stage of 0.5 s or more (its `stage:*` spans in start
- *  order: seconds, then @ seconds into the entered document), so a hosted suite killed at its budget still says where
- *  its time went. `doc` is the entered document's age at control; the rest of `in play after` is the title's. */
-async function reportBoot(page: Page, startedAt: number): Promise<void> {
-  const steps = await page
-    .evaluate((): string => {
-      const timing: unknown = Reflect.get(globalThis, '__bootTiming')
-      const entries: unknown =
-        typeof timing === 'object' && timing !== null && 'entries' in timing
-          ? timing.entries
-          : []
-      const rows = Array.isArray(entries) ? (entries as unknown[]) : []
-      const stages: string[] = []
-      for (const row of rows) {
-        if (
-          typeof row === 'object' &&
-          row !== null &&
-          'operation' in row &&
-          'start' in row &&
-          'end' in row &&
-          typeof row.operation === 'string' &&
-          row.operation.startsWith('stage:') &&
-          typeof row.start === 'number' &&
-          typeof row.end === 'number' &&
-          row.end - row.start >= 500
-        ) {
-          const name = row.operation.slice('stage:'.length)
-          const ms = (row.end - row.start) / 1000
-          stages.push(
-            `${name} ${ms.toFixed(1)}@${(row.start / 1000).toFixed(1)}`,
-          )
-        }
-      }
-      return `doc ${(performance.now() / 1000).toFixed(1)}; ${stages.join(', ')}`
-    })
-    .catch((): string => 'steps unread')
-  process.stdout.write(
-    `[t1-boot] Brasscap in play after ${((Date.now() - startedAt) / 1000).toFixed(1)} s (${steps})\n`,
-  )
-}
 
 /** Enter the installed Brasscap through the same controls as a player. */
 async function enterBrasscap(page: Page, name?: string): Promise<void> {

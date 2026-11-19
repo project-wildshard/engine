@@ -26,3 +26,16 @@ HUD shows the gate's prompt, then presses E, as a player does. The
 start: locally on SwiftShader `firstFrame` is 12.6 to 13.5 s of a 24 to
 28 s boot, while hosted boots run 35 to 76 s (run 44529532710), so two
 boots plus their waits overrun B's and H's 120 s.
+
+## The first frame's binding fence on software GL (opus-tr4b3)
+
+A first frame that starts narrow (only a software rasterizer does, by
+`slowShaderGpu`) kept FIRST_DRAW_NARROW's one new binding a slice, so
+Brasscap's 770 parked drawables, nearly all first-use bindings over
+programs the shaders step had linked, drew as 770 one-frame slices.
+SwiftShader now slices by 32 drawables and 32 new bindings, still one
+new program a slice: local SwiftShader `firstFrame` 12.6 s became 6.3 s
+(A, load 7 to 9), and 128 a slice measured no better (6.8 s). Metal
+never starts narrow: A's `firstFrame` stayed 0.5 s (two runs). The
+`[t1-boot]` line also names `control` and each of inPlay's waits, so a
+hosted run says where the time after the loader goes.

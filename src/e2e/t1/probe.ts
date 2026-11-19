@@ -71,7 +71,27 @@ function pinnedPoi(id: string): Poi {
   return { id, x: row.x, z: row.z }
 }
 
+/** TR-4b: each inPlay wait's end, in seconds of the entered document, for the `[t1-boot]` line (`fixtures.ts`). */
+const playMarks = new WeakMap<Page, string[]>()
+
+async function markPlay(page: Page, name: string): Promise<void> {
+  const at = await page
+    .evaluate((): number => performance.now())
+    .catch((): number => Number.NaN)
+  const marks = playMarks.get(page) ?? []
+  marks.push(`${name}@${(at / 1000).toFixed(1)}`)
+  playMarks.set(page, marks)
+}
+
+/** The marks the last inPlay left on this page, once. */
+function takePlayMarks(page: Page): readonly string[] {
+  const marks = playMarks.get(page) ?? []
+  playMarks.delete(page)
+  return marks
+}
+
 async function inPlay(page: Page): Promise<void> {
+  playMarks.delete(page)
   await page.bringToFront()
   // A level the page retires while this polls (a same-page re-entry, a healed 503) throws from the probe until the next
   // level installs its own: that read is "not in play yet", never the end of the wait.
@@ -88,6 +108,7 @@ async function inPlay(page: Page): Promise<void> {
       return false
     }
   })
+  await markPlay(page, 'frames')
   const resume = page.locator('.ws-gmenu.show:not([inert]) .ws-gmenu-close')
   if (await resume.isVisible()) {
     await resume.click()
@@ -99,6 +120,7 @@ async function inPlay(page: Page): Promise<void> {
       return false
     }
   })
+  await markPlay(page, 'play')
   const address = new URL(page.url())
   address.searchParams.set('fps', '30')
   await page.evaluate((href): void => {
@@ -108,9 +130,11 @@ async function inPlay(page: Page): Promise<void> {
   await page.waitForFunction(
     (): boolean => (globalThis.__workerClient?.().frames ?? 0) > 30,
   )
+  await markPlay(page, 'worker')
   await expect(page.locator('#hud.intro,.ws-reveal')).toHaveCount(0, {
     timeout: 10_000,
   })
+  await markPlay(page, 'revealed')
 }
 
 async function state(page: Page): Promise<State> {
@@ -158,5 +182,5 @@ async function poseAt(
   return poi
 }
 
-export { inPlay, poseAt, state }
+export { inPlay, poseAt, state, takePlayMarks }
 export type { State }

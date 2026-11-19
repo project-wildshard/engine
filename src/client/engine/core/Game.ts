@@ -93,6 +93,12 @@ const WARM_TURNS = 4;
  *  build as it completes. A GPU the shaders step measured slow (`firstFrame`'s `narrow`) starts narrow instead: the slow
  *  slice that trips the fallback has already held the bar (Driftwood's fifth, two new materials, 2.3 s). */
 const FIRST_DRAW_NARROW = { afterMs: 400, budget: { drawables: 1, newMaterials: 1, newBindings: 1, bufferBytes: 4_000_000 } } as const;
+/** TEMPLATE-E2E TR-4b: a first frame that starts narrow (`narrow`: the shaders step measured a software rasterizer,
+ *  `slowShaderGpu`) still takes one new program a slice, but not one new binding: Brasscap's 770 parked drawables are
+ *  nearly all first-use bindings over programs the shaders step already linked, so the binding fence made 770 one-frame
+ *  slices (12.3 to 13.5 s of a 24 to 30 s SwiftShader boot). A real GPU never starts narrow, and the fallback after its
+ *  slow slice keeps FIRST_DRAW_NARROW. */
+const SOFTWARE_FIRST_DRAW = { drawables: 32, newMaterials: 1, newBindings: 32, bufferBytes: 4_000_000 } as const;
 /** LS8 (J204, "weight steps by measured cost per kind"): one first-frame unit of each kind, in measured seconds, so the
  *  step's bar share follows where its time goes. Driftwood Isle, headless Chromium at 4x CPU (SwiftShader, the calibration
  *  profile of loadingPaths.ts), loading-card-proof --throttle --dump, 2026-11-09: 264 world drawables 41.8 s, 25 shadow
@@ -1511,7 +1517,7 @@ export class Game {
           onProgress: (done, count) => { drew ||= done > submitted; submitted = done; draws = count; },
           // no widening when narrow: D12 merges slices by new material only, and three new layouts of one material (the
           // view-model swords and arms) shared one 2.3 s SwiftShader frame
-          ...(narrow ? { budget: FIRST_DRAW_NARROW.budget } : { narrow: FIRST_DRAW_NARROW }) });
+          ...(narrow ? { budget: SOFTWARE_FIRST_DRAW } : { narrow: FIRST_DRAW_NARROW }) });
       checkpoint('world-pipelines:submitted');
     }
     const drawables = draws * W.drawable, world = drawables + firstView + firstMap;
