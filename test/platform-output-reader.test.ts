@@ -18,55 +18,55 @@ import {hashImmutableBytes} from '../src/shared/host/immutable';
 it('admits registered named JSON, refuses private names and detects corrupt blob bytes',()=>{
  const root=mkdtempSync(join(tmpdir(),'platform-output-json-'));
  try{
-  platformOutput(root,'_template',{}, {'ui/strings':'{"key":"1"}'});
-  expect(outputSections(root,'_template')).toMatchObject({customSectionBytes:0,customSections:[]});
-  const indexPath=join(root,'out/_template/shard.json');
+  platformOutput(root,'brasscap-mesa',{}, {'ui/strings':'{"key":"1"}'});
+  expect(outputSections(root,'brasscap-mesa')).toMatchObject({customSectionBytes:0,customSections:[]});
+  const indexPath=join(root,'out/brasscap-mesa/shard.json');
   const index=parseOutputIndex(JSON.parse(readFileSync(indexPath,'utf8')));
   const bytes=new TextEncoder().encode('[{"slot":"shape","channels":[],"file":"models/native.bin"}]');
   const blob={name:'models/shape-book.json',path:`blobs/json/${hashImmutableBytes(bytes)}.json`,hash:hashImmutableBytes(bytes),kind:'json',compressed:bytes.length,decoded:bytes.length,gpu:0,triangles:0,draws:0,critical:false,dependencies:[],jsonSchema:registeredJsonSchema('models/shape-book.json')};
-  mkdirSync(join(root,'out/_template/blobs/json'),{recursive:true});
-  writeFileSync(join(root,'out/_template',blob.path),bytes);
+  mkdirSync(join(root,'out/brasscap-mesa/blobs/json'),{recursive:true});
+  writeFileSync(join(root,'out/brasscap-mesa',blob.path),bytes);
   writeFileSync(indexPath,JSON.stringify({...index,files:[blob]}));
-  expect(outputSections(root,'_template')).toMatchObject({customSectionBytes:0,customSections:[]});
-  writeFileSync(join(root,'out/_template',blob.path),'[{}]');
-  expect(()=>outputSections(root,'_template')).toThrow('named JSON hash/size mismatch');
+  expect(outputSections(root,'brasscap-mesa')).toMatchObject({customSectionBytes:0,customSections:[]});
+  writeFileSync(join(root,'out/brasscap-mesa',blob.path),'[{}]');
+  expect(()=>outputSections(root,'brasscap-mesa')).toThrow('named JSON hash/size mismatch');
  }finally{rmSync(root,{recursive:true,force:true});}
 });
 
 it('refuses missing products and section corruption instead of reporting zero',()=>{
  const root=mkdtempSync(join(tmpdir(),'platform-output-sections-'));
  try{
-  expect(()=>outputSections(root,'_template')).toThrow('section inventory missing');
-  platformOutput(root,'_template',{}, {'ui/strings':'{"key":"1"}'});
-  writeFileSync(join(root,'out/_template/sections/ui/strings.json'),'{}');
-  expect(()=>outputSections(root,'_template')).toThrow('section hash/size mismatch');
+  expect(()=>outputSections(root,'brasscap-mesa')).toThrow('section inventory missing');
+  platformOutput(root,'brasscap-mesa',{}, {'ui/strings':'{"key":"1"}'});
+  writeFileSync(join(root,'out/brasscap-mesa/sections/ui/strings.json'),'{}');
+  expect(()=>outputSections(root,'brasscap-mesa')).toThrow('section hash/size mismatch');
  }finally{rmSync(root,{recursive:true,force:true});}
 });
 
 it('scopes verified bytes to one report',()=>{
  const root=mkdtempSync(join('tmp/','platform-output-report-'));
  try{
-  platformOutput(root,'_template',{},{'ui/strings':'{"key":"1"}'});
+  platformOutput(root,'brasscap-mesa',{},{'ui/strings':'{"key":"1"}'});
   const report=createOutputReader(root);
-  expect(report.sections('_template').sections).toEqual([{name:'ui/strings',value:{key:'1'}}]);
-  writeFileSync(join(root,'out/_template/sections/ui/strings.json'),'{}');
-  expect(report.sections('_template').sections).toEqual([{name:'ui/strings',value:{key:'1'}}]);
-  expect(()=>createOutputReader(root).sections('_template')).toThrow('section hash/size mismatch');
+  expect(report.sections('brasscap-mesa').sections).toEqual([{name:'ui/strings',value:{key:'1'}}]);
+  writeFileSync(join(root,'out/brasscap-mesa/sections/ui/strings.json'),'{}');
+  expect(report.sections('brasscap-mesa').sections).toEqual([{name:'ui/strings',value:{key:'1'}}]);
+  expect(()=>createOutputReader(root).sections('brasscap-mesa')).toThrow('section hash/size mismatch');
  }finally{rmSync(root,{recursive:true,force:true});}
 });
 
 it('shares an assembled source within a report and revalidates the next report',()=>{
  const root=mkdtempSync(join('tmp/','platform-output-source-'));
  try{
-  const declared=emptyShardfile({slug:'template',name:'Fixture',author:'Test',revision:1,seed:1});
-  platformOutput(root,'_template',{},Object.fromEntries([...outputSectionPayloads(declared)].map(([name,value])=>[name,JSON.stringify(value)])));
-  const report=createOutputReader(root),source=report.source('_template');
-  outputContent(root,'_template',join(root,'out'),report);
-  expect(report.source('_template')).toBe(source);
-  expect(createOutputReader(root).source('_template')).not.toBe(source);
-  const section=report.sections('_template').index.sections[0];
+  const declared=emptyShardfile({slug:'brasscap-mesa',name:'Fixture',author:'Test',revision:1,seed:1});
+  platformOutput(root,'brasscap-mesa',{},Object.fromEntries([...outputSectionPayloads(declared)].map(([name,value])=>[name,JSON.stringify(value)])));
+  const report=createOutputReader(root),source=report.source('brasscap-mesa');
+  outputContent(root,'brasscap-mesa',join(root,'out'),report);
+  expect(report.source('brasscap-mesa')).toBe(source);
+  expect(createOutputReader(root).source('brasscap-mesa')).not.toBe(source);
+  const section=report.sections('brasscap-mesa').index.sections[0];
   if(section===undefined)throw new Error('Missing fixture section');
-  writeFileSync(join(root,'out/_template',section.path),'{}');
-  expect(()=>createOutputReader(root).source('_template')).toThrow('section hash/size mismatch');
+  writeFileSync(join(root,'out/brasscap-mesa',section.path),'{}');
+  expect(()=>createOutputReader(root).source('brasscap-mesa')).toThrow('section hash/size mismatch');
  }finally{rmSync(root,{recursive:true,force:true});}
 });

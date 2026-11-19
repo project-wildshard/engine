@@ -449,7 +449,7 @@ async function slice(check = false): Promise<void> {
 function ringCatalogue(pins: readonly Pin[]): void {
   interface Cell { slug: string; instance: string; cell: readonly [number, number] }
   const catalogue = readJson(CATALOGUE) as { shards: { slug: string }[]; placements: { slug: string }[]; grid: { cells: Cell[] } };
-  const kept = new Set(pins.flatMap(({slug}) => [slug, `_${slug}`]));
+  const kept = new Set(pins.map(({slug}) => slug));
   const filler = 'brasscap-mesa';
   if (!kept.has(filler)) throw new Error(`Ring catalogue fills its unkept cells with ${filler}, which this ring does not install`);
   const shards = catalogue.shards.filter(row => kept.has(row.slug));

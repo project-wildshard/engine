@@ -15,7 +15,7 @@ const pins = (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as {
 
 describe('open world: the room and the tick adapter step the same owners', { concurrent: false }, () => {
   for (const slug of pins) test(slug, async () => {
-    const directory = builtFolder(slug === 'template' ? '_template' : slug);
+    const directory = builtFolder(slug);
     if (!existsSync(directory)) throw new Error(`${slug} is pinned but not installed: pnpm pins`);
     const product = await loadHeadlessFolder(directory);
     const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
@@ -39,7 +39,7 @@ describe('open world: the room and the tick adapter step the same owners', { con
 // and every byte of the next steps (the physics included) matches the world that never stopped.
 describe('open world: a saved world continues identically through the tick adapter', { concurrent: false }, () => {
   for (const slug of pins) test(slug, async () => {
-    const directory = builtFolder(slug === 'template' ? '_template' : slug), product = await loadHeadlessFolder(directory);
+    const directory = builtFolder(slug), product = await loadHeadlessFolder(directory);
     const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
     const probe = await openWorld(input, { room: true }), native = probe.resident !== undefined; probe.dispose();
     if (!native) return;

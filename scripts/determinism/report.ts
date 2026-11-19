@@ -127,7 +127,7 @@ try {
   // Transport the pin's exact admitted files in a server book. This does not cook/re-encode a product:
   // book offsets only frame immutable bytes; readServerFolder performs ordinary admission on both sides.
   for (const slug of slugs) {
-    const name = slug === "template" ? "_template" : slug;
+    const name = slug;
     const slice = `out/.slices/${name}`;
     const directory = ring.slices.includes(slug) ? slice : join("out", name);
     assert.ok(

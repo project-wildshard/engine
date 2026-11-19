@@ -52,7 +52,7 @@ function folderSections(slug,products) {
   const folder=resolve(products,slug), indexPath=resolve(folder,'shard.json');
   if(!existsSync(indexPath))throw new Error(`${slug}: section inventory missing; build every shard before measuring`);
   const index=parseOutputIndex(JSON.parse(readFileSync(indexPath,'utf8')));
-  if(index.identity.slug!==(slug==='_template'?'template':slug))throw new Error(`${slug}: output identity mismatch`);
+  if(index.identity.slug!==slug)throw new Error(`${slug}: output identity mismatch`);
   let customSectionBytes=0;const sections=[],customSections=[];
   for(const section of index.sections) {
     const content=readFileSync(resolve(folder,section.path));

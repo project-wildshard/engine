@@ -3,7 +3,7 @@
 //   - `test/pins/shardfiles.json`, the pinned heads every build installs;
 //   - `E7_STAGING_SHARDS` and `E7_PRODUCTION_SHARDS`, the GitHub variables a server release reads (empty: the default pair);
 //   - the pinned catalogue document's shards, placements and grid cells.
-// Names compare by the folder a slug serves under (`template` pins as `_template`), as the release and the grid name them.
+// Names compare by the folder a slug serves under (since J434 every pin serves under its own slug), as the release and the grid name them.
 //
 //   node scripts/pins-catalogue.ts check    CI (job 1, before install): the pins and both release variables against the live
 //                                           GET /api/catalogue; the offline half is test/pins-catalogue.test.ts

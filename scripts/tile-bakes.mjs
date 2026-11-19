@@ -77,7 +77,7 @@ export function tileBakeCensus(input, files) {
  * @param {string} folder @param {string} product */
 export function readTileBakeCensus(folder, product) {
   const bytes = readFileSync(resolve(folder, 'shard.json')), index = outputFormat.parseOutputIndex(JSON.parse(bytes.toString('utf8')));
-  if (index.identity.slug !== (product === '_template' ? 'template' : product)) throw new Error(`${product}: tile product identity differs`);
+  if (index.identity.slug !== product) throw new Error(`${product}: tile product identity differs`);
   const receipt = JSON.parse(readFileSync(resolve(folder, 'validation.json'), 'utf8'));
   if (receipt.indexHash !== hash(bytes)) throw new Error(`${product}: tile index receipt differs`);
   const section = index.sections.find(row => row.name === 'world/tiles');

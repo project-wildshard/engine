@@ -19,7 +19,7 @@ export function platformOutput(root:string,slug:string,files:Readonly<Record<str
     if(name.startsWith('custom/')){put(`out/${slug}/${schema}`,'{}');schemas.push(measured(schema,'{}'));}
     return {name,...measured(path,text),schema};
   });
-  const source=emptyShardfile({slug:slug==='_template'?'template':slug,name:'Fixture',author:'Test',revision:1,seed:1});
+  const source=emptyShardfile({slug,name:'Fixture',author:'Test',revision:1,seed:1});
   put(`out/${slug}/shard.json`,JSON.stringify({format:'wildshard.shardfile',formatVersion:2,sdk:'0.2',version:source.version,
     identity:source.identity,build:{sourceHash:'0'.repeat(64),validator:'fixture'},requires:source.requires,
     admission:{budgets:source.budgets,serverBudget:source.serverBudget,authorCaps:source.authorCaps,critical:source.critical,library:source.library},

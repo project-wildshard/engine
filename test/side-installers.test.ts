@@ -37,8 +37,7 @@ test('every SS2 server key has an installer entry, and every entry is an SS2 key
 
 describe('side installers: a room installs every server half its product declares', { concurrent: false }, () => {
   for (const slug of pins) test(slug, async () => {
-    // the pinned `template` installs as out/_template
-    const directory = builtFolder(slug === 'template' ? '_template' : slug);
+    const directory = builtFolder(slug);
     if (!existsSync(directory)) throw new Error(`${slug} is pinned but not installed: pnpm pins`);
     const product = await loadHeadlessFolder(directory);
     expect(serverSides(product).length > 0, `${slug}: declares a server half`).toBe(SIDED.includes(slug));

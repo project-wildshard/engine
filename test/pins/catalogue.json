@@ -786,12 +786,6 @@
       "name": "Signal Dunes",
       "revision": 2,
       "hash": "f4a1d611ccccb29e8b277d43b2ccca5fa574913410426065e5ee0e312e508538"
-    },
-    {
-      "slug": "template",
-      "name": "Template shard",
-      "revision": 10,
-      "hash": "cc1fcd3131c2e97376ea42fda46ce187301941c81066c3b552429d671799a747"
     }
   ],
   "missing": []

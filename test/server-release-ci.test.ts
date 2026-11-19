@@ -236,15 +236,11 @@ test('J234: both channels sign a build only after its server book and parts are 
   } finally { client.destroy(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
 });
 
-test('GO7: the release names the template by its folder, the grid\'s spelling, so the whole grid opens', () => {
+test('GO7: a release of every pin opens every grid cell, under the slug the grid reads', () => {
   const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: { slug: string; revision: number }[] };
-  const template = pins.shards.find(row => row.slug === 'template');
-  expect(template).toBeDefined();
-  // Either spelling in a variable names one shard, under the folder name the server book and the grid read.
-  for (const names of ['driftwood-isle,template', 'driftwood-isle,_template']) {
-    expect(releaseShards(pins, names)).toEqual([{ slug: 'driftwood-isle', revision: pins.shards.find(row => row.slug === 'driftwood-isle')?.revision }, { slug: '_template', revision: template?.revision }]);
-  }
-  expect(() => releaseShards(pins, 'template,_template')).toThrow(/unique/u);
+  // J434 retired the Template pin, the one whose folder differed from its slug: every pin serves under its own slug.
+  expect(releaseShards(pins, 'driftwood-isle,brasscap-mesa')).toEqual([{ slug: 'driftwood-isle', revision: pins.shards.find(row => row.slug === 'driftwood-isle')?.revision }, { slug: 'brasscap-mesa', revision: pins.shards.find(row => row.slug === 'brasscap-mesa')?.revision }]);
+  expect(() => releaseShards(pins, 'brasscap-mesa,brasscap-mesa')).toThrow(/unique/u);
   // A release of every pin opens every grid cell, through the server's own WORLD_CELLS=grid reading.
   const served = releaseShards(pins, pins.shards.map(row => row.slug).join(',')).map(row => row.slug);
   const { cells } = new GridAssembly({ developer: false, devserver: false });

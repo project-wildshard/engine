@@ -35,8 +35,8 @@ test('a catalogue missing one pinned slug is red, and green once the pin is drop
 });
 
 test('release variables compare by served folder, and an empty variable is the default pair', () => {
-  const listed = catalogueSlugs({ shards: [{ slug: 'template' }, { slug: 'driftwood-isle' }, { slug: 'nalati-grasslands' }] });
-  expect(unlistedSlugs(listed, { E7_STAGING_SHARDS: releaseNames('_template, driftwood-isle') })).toEqual([]);
+  const listed = catalogueSlugs({ shards: [{ slug: 'brasscap-mesa' }, { slug: 'driftwood-isle' }, { slug: 'nalati-grasslands' }] });
+  expect(unlistedSlugs(listed, { E7_STAGING_SHARDS: releaseNames('brasscap-mesa, driftwood-isle') })).toEqual([]);
   expect(unlistedSlugs(listed, { E7_PRODUCTION_SHARDS: releaseNames('') })).toEqual([]);
   expect(Object.keys(releaseNamed({ E7_STAGING_SHARDS: '', E7_PRODUCTION_SHARDS: 'far-reach' }))).toEqual(['the default release shards (server-release/served-slug.mjs)', 'E7_PRODUCTION_SHARDS']);
   expect(unlistedSlugs(listed, { E7_PRODUCTION_SHARDS: releaseNames('driftwood-isle,far-reach') })).toEqual([{ slug: 'far-reach', source: 'E7_PRODUCTION_SHARDS' }]);
@@ -100,7 +100,7 @@ test('pins refresh refuses a pinned slug the catalogue no longer lists, and --dr
 test('the catalogue check is red for a deleted pin or release slug, green otherwise, and a down API only warns', async () => {
   const all = { shards: pins.shards.map(row => ({ slug: row.slug })) };
   const root = tree(), base = { PATH: process.env['PATH'] };
-  const green = await tool('scripts/pins-catalogue.ts', root, { ...base, WILDSHARD_API: await api(all), E7_STAGING_SHARDS: '_template,driftwood-isle', E7_PRODUCTION_SHARDS: '' }, 'check');
+  const green = await tool('scripts/pins-catalogue.ts', root, { ...base, WILDSHARD_API: await api(all), E7_STAGING_SHARDS: 'brasscap-mesa,driftwood-isle', E7_PRODUCTION_SHARDS: '' }, 'check');
   expect(green.code, green.out).toBe(0);
   const noFar = { shards: all.shards.filter(row => row.slug !== 'far-reach') };
   const red = await tool('scripts/pins-catalogue.ts', root, { ...base, WILDSHARD_API: await api(noFar), E7_PRODUCTION_SHARDS: 'far-reach' }, 'check');

@@ -117,7 +117,7 @@ export function checkNineTiling(report,input){
  * @param {string} root @param {string} product @param {string} folder */
 export function readTilingReport(root,product,folder){
   const bytes=readFileSync(resolve(folder,'shard.json')),index=outputFormat.parseOutputIndex(JSON.parse(bytes.toString('utf8')));
-  if(index.identity.slug!==(product==='_template'?'template':product))throw new Error('Tiling product identity differs');
+  if(index.identity.slug!==product)throw new Error('Tiling product identity differs');
   const receipt=JSON.parse(readFileSync(resolve(folder,'validation.json'),'utf8'));
   if(receipt.indexHash!==hash(bytes))throw new Error('Tiling index receipt differs');
   /** @param {string} name */

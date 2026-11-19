@@ -43,7 +43,7 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refu
   const bytes=readFileSync(fixture.remote===true?join(process.env['WILDSHARD_PIN_CACHE']??join(homedir(),'.cache/wildshard/pins'),fixture.file):`test/pins/saves/${fixture.file}`);
   expect(createHash('sha256').update(bytes).digest('hex')).toBe(fixture.sha256);
   const saved=brotliDecompressSync(bytes).toString('utf8');
-  const directory=builtFolder(slug==='template'?'_template':slug),product=await loadHeadlessFolder(directory),shard=product.shardfile;
+  const directory=builtFolder(slug),product=await loadHeadlessFolder(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);if(descriptor===undefined)throw new Error('No admitted product');
   const declared=shard.runtime===null&&!product.has('sim/runtime-plan');
   const distance=(x:number,z:number):number=>Math.hypot(x-fixture.position[0],z-fixture.position[2]);
