@@ -62,7 +62,6 @@ import { compendiumSketches } from '@wildshard/format/compendiumSketches';
 import { clientMaterials } from './clientMaterials';
 import { splatGroundDrawn, splatGroundFiles, withSplatGround } from './clientSplatTerrain';
 import { lendLooks, lendSceneMaterials } from './lentLooks';
-import { declaredGrappleRow } from '../../../shared/game/grapple/declared';
 import type { GraphSources } from './clientGraphs';
 import { clientPostStack, type ClientPost } from './clientPost';
 import { loadScenePostGraphCompiler } from '@wildshard/engine/render/graphBackend';
@@ -505,7 +504,7 @@ export class ShardfileClient {
       if (ctx.scope.disposed) throw new Error('Shardfile left during play installation');
     }
     // ONE-FORMAT OF41c: a plain upload's grapple mode draws its claw, rope, hook marks and lock as the native host's does
-    if (this.mode === 'full' && !this.nativeFeatures && declaredGrappleRow(this.source) !== null) {
+    if (this.mode === 'full' && !this.nativeFeatures && this.source.modes?.grapple?.some(row => row.profile !== undefined) === true) {
       const { installDeclaredGrapplePage } = await import('../grapple/declaredGrapple');
       if (ctx.scope !== scope || ctx.product !== product || scope.disposed || scope.disposing) throw new Error('Shardfile left during grapple import');
       await installDeclaredGrapplePage(ctx, this.source);

@@ -17,3 +17,5 @@ compiles the row's named looks from the shard's `look.materials`, binds the guar
 `clientWorker`'s `bindClaw` gives it the wire's claw. The server and the page now share `declaredGrappleRow` and
 `declaredGrappleProfile` (`src/shared/game/grapple/declared.ts`). The equipped id is `tool.<row id>`, since every
 equipped tool needs a `tool.` id.
+
+The page check reads the row inline (no static import of the shared module), so the session chunk keeps its budget; format 0.43.2 and later (main pins 0.44.0) let a plain upload's row carry its tool and refuses a profile look `look.materials` lacks.
