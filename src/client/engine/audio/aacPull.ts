@@ -23,6 +23,9 @@ export const AAC_WINDOW_FRAMES = 24064;
 
 /** Pull exact native PCM into bounded short windows, never a whole-file AudioBuffer.
  * At most eight AAC packets are in flight; their AudioData are copied and closed immediately.
+ * Steady playback allocates no PCM (MEMORY-STRUCTURE row 1 of mini-memstruct-m3b): a consumed packet's planes return to
+ * a small spare list for the next packet, and `read` answers in the pull's own scratch planes. Two stereo streams
+ * otherwise made ~1.5 MB/s of typed-array garbage, half the walk's high-mode peak in WebKit.
  * Flush happens only at end-of-stream: flushing intermediate AAC batches changes native filter state.
  * Sequential pulls may overlap by 64 frames. A backwards seek replays compressed packets from the
  * beginning so codec filter state remains identical to the whole-file decoder, rather than guessing preroll.
@@ -43,6 +46,8 @@ export class AacPull {
   private cursor = 0;
   private queuedFrames = 0;
   private chunks: Chunk[] = [];
+  private spare: Channels[] = [];
+  private scratch: Float32Array[] = [];
   private history: Channels;
   private historyFrames = 0;
   private highWaterFrames = HISTORY;
@@ -63,7 +68,7 @@ export class AacPull {
     if (this.disposed) return;
     this.disposed = true; this.generation++; this.wake?.(); this.wake = undefined; this.codec?.close(); this.codec = undefined;
     this.bytes = undefined; this.failure = undefined; this.chunks = []; this.queuedFrames = 0; this.historyFrames = 0;
-    this.history = []; this.removeOwner();
+    this.history = []; this.spare = []; this.scratch = []; this.removeOwner();
   }
   private live(): void {
     if (this.disposed) throw new Error('AAC owner has retired');
@@ -84,10 +89,11 @@ export class AacPull {
         const skip = Math.min(PACKET_FRAMES, Math.max(0, this.index.primingFrames - this.outputFrames));
         this.outputFrames += data.numberOfFrames;
         if (skip === PACKET_FRAMES) return;
-        const channels = Array.from({ length: this.index.channels }, (_, planeIndex) => {
-          const channel = new Float32Array(PACKET_FRAMES);
-          data.copyTo(channel, { planeIndex, format: 'f32-planar' }); return channel;
-        });
+        const channels = this.spare.pop() ?? Array.from({ length: this.index.channels }, () => new Float32Array(PACKET_FRAMES));
+        for (let planeIndex = 0; planeIndex < channels.length; planeIndex++) {
+          const channel = channels[planeIndex];
+          if (channel) data.copyTo(channel, { planeIndex, format: 'f32-planar' });
+        }
         this.chunks.push({ channels, at: skip }); this.queuedFrames += PACKET_FRAMES - skip;
         this.highWaterFrames = Math.max(this.highWaterFrames, this.retainedFrames);
       } catch (error) { this.failed = true; this.failure = error; }
@@ -134,10 +140,11 @@ export class AacPull {
     }
     this.historyFrames = Math.min(HISTORY, this.historyFrames + count);
     chunk.at += count; this.cursor += count; this.queuedFrames -= count;
-    if (chunk.at === PACKET_FRAMES) this.chunks.shift();
+    if (chunk.at === PACKET_FRAMES) { this.chunks.shift(); if (this.spare.length < BATCH) this.spare.push(chunk.channels); }
     return count;
   }
-  /** Read source-sample coordinates after the validated priming edit; returned arrays belong to the caller. */
+  /** Read source-sample coordinates after the validated priming edit. The returned planes are views of the pull's scratch:
+   * copy them before the next read (both callers copy into their window's AudioBuffer at once). */
   async read(start: number, frames: number): Promise<Channels> {
     this.live();
     if (this.busy) throw new Error('AAC pulls must be serialized');
@@ -147,7 +154,8 @@ export class AacPull {
     try {
       if (start < this.cursor - this.historyFrames) this.reset();
       while (this.cursor < start) { await this.fill(); this.live(); this.consume(start - this.cursor, undefined, 0); }
-      const result = Array.from({ length: this.index.channels }, () => new Float32Array(frames));
+      if (this.scratch.length !== this.index.channels) this.scratch = Array.from({ length: this.index.channels }, () => new Float32Array(AAC_WINDOW_FRAMES));
+      const result = this.scratch.map(plane => plane.subarray(0, frames));
       let done = 0;
       if (start < this.cursor) {
         done = Math.min(frames, this.cursor - start);

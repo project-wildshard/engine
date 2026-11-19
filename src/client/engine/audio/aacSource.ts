@@ -15,10 +15,12 @@ export interface AacSourcePorts {
   readonly failed: (error: unknown) => void;
   readonly ended: () => void;
 }
-const RATE = 48000, MAX_WINDOWS = 48;
+const RATE = 48000, MAX_WINDOWS = 48, SPARE_BUFFERS = 4;
 /** Schedules short native sources ahead on the existing context clock; never opens an audio device.
  * The first prepared window starts synchronously. Further work is serialized and scoped; each ended
- * window drops its AudioBuffer and listeners. Suspension cannot grow the source set. A missed deadline
+ * window drops its listeners and hands its AudioBuffer to the next window of the same length (at most four wait,
+ * oldest dropped first), so steady playback makes no PCM garbage (mini-memstruct-m3b). Suspension cannot grow the
+ * source set. A missed deadline
  * fails visibly to the caller instead of skipping samples or changing the authored timing.
  */
 export class AacSource {
@@ -26,6 +28,7 @@ export class AacSource {
   private readonly ports: AacSourcePorts;
   private readonly t0: number;
   private readonly windows = new Map<Scope, PlayingWindow>();
+  private readonly spare: AudioBuffer[] = [];
   private readonly plans: AacWindows;
   private readonly pull: AacPull;
   private readonly track: AacTrack;
@@ -43,7 +46,7 @@ export class AacSource {
     this.track = track; this.ports = ports; this.t0 = t0; this.scope = ports.scope.child('AAC.source');
     this.plans = new AacWindows(track.loopStart, track.loopEnd, track.frames, join?.initial ?? 0);
     this.pull = new AacPull(track.bytes, track.index, track.factory, this.scope);
-    this.scope.onDispose(() => { this.windows.clear(); });
+    this.scope.onDispose(() => { this.windows.clear(); this.spare.length = 0; });
     this.next = this.plans.next();
     try {
       const timeline = Math.round((at - t0) * RATE);
@@ -87,10 +90,20 @@ export class AacSource {
       this.windows.set(owner, { source, end }); this.peak = Math.max(this.peak, this.windows.size);
       owner.listen(source, 'ended', () => {
         this.windows.delete(owner); owner.dispose();
+        // the oldest spare goes first, so a seam window's odd length cannot hold the list
+        if (this.active()) { this.spare.push(buffer); if (this.spare.length > SPARE_BUFFERS) this.spare.shift(); }
         if (this.stopAt !== Infinity && this.windows.size === 0 && this.next.timeline / RATE + this.t0 >= this.stopAt) this.end();
       }, { once: true });
       source.start(start, plan.offset / RATE); source.stop(end);
     } catch (error) { this.windows.delete(owner); owner.dispose(); throw error; }
+  }
+  /** An ended window's AudioBuffer of exactly `frames` (its source has stopped reading it), or undefined. */
+  private reuse(frames: number): AudioBuffer | undefined {
+    for (let i = 0; i < this.spare.length; i++) {
+      const buffer = this.spare[i];
+      if (buffer?.length === frames) { this.spare.splice(i, 1); return buffer; }
+    }
+    return undefined;
   }
   /** Explicit pump is also usable by offline conformance via the context's suspend/resume clock. */
   pump(): Promise<void> {
@@ -106,7 +119,7 @@ export class AacSource {
         const plan = this.next, start = this.t0 + plan.timeline / RATE;
         if (start >= this.stopAt || start >= this.ports.context.currentTime + this.track.lookahead) return;
         if (start < this.ports.context.currentTime) throw new Error('AAC source missed its exact scheduling deadline');
-        const buffer = this.track.buffer(plan.frames);
+        const buffer = this.reuse(plan.frames) ?? this.track.buffer(plan.frames);
         for (const part of plan.parts) {
           const pcm = await this.pull.read(part.start, part.frames);
           if (!this.active()) return;
