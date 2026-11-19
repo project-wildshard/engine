@@ -27,6 +27,10 @@ test("Safari's tab is attached, never an extension page", () => {
   const tab = { url: 'https://staging.wildshard.io/', webSocketDebuggerUrl: 'ws://a/1' };
   expect(pickPage([extension, tab])).toBe(tab);
   expect(pickPage([extension])).toBeNull();
+  // a fresh Safari restores old tabs: the bench attaches to the one it opened
+  const fresh = { url: 'https://staging.wildshard.io/robots.txt', webSocketDebuggerUrl: 'ws://a/3' };
+  expect(pickPage([extension, tab, fresh], fresh.url)).toBe(fresh);
+  expect(pickPage([extension, tab], fresh.url)).toBeNull();
 });
 
 test('serve-local needs a tailnet name with an HTTPS certificate', () => {

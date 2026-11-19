@@ -545,7 +545,10 @@ export function phoneLine(run, model = loadPhoneModel()) {
 function iphone13Line(model) {
   const entry = model.devices?.[IPHONE_13_MODEL];
   if (entry === undefined) return null;
-  return `phone [${entry.name}, ${IPHONE_13_MODEL}, report only]: ${entry.status}. Awaiting IP7's kill line and IP9's paired footprints.`;
+  const awaiting = [entry.fitInputs.killLineFromIP7 === null ? "IP7's kill line" : null,
+    entry.fitInputs.pairedFootprintsFromIP9 === null ? "IP9's paired footprints" : null].filter((x) => x !== null);
+  const kill = entry.fitInputs.killLineFromIP7, line = kill === null ? '' : ` Kill line ${String(kill.limitMB)} MB (IP7).`;
+  return `phone [${entry.name}, ${IPHONE_13_MODEL}, report only]: ${entry.status}.${line}${awaiting.length === 0 ? '' : ` Awaiting ${awaiting.join(' and ')}.`}`;
 }
 
 /** EM1's native-WebKit calibration. */

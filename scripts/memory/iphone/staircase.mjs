@@ -21,6 +21,8 @@ export async function stairs(driver, { base, kind, log }) {
       `);
       if (last !== null && step.timeOrigin !== last.timeOrigin) return { kind, startedAt, last, outcome: 'page-reloaded' };
       if (!step.visible) throw new Error('PHONE LOCKED: calibration page is hidden');
+      // the inspector's navigation returns once the document is interactive, before the page script sets __calib
+      if (step.step === null && Date.now() - startedAt < 20_000) { await pause(350); continue; }
       if (step.step === null) throw new Error('memory-calibration.html did not expose the EM9 staircase');
       if (step.step.got !== last?.step.got || step.step.done || step.step.error) {
         appendFileSync(log, `${JSON.stringify({ ...step, at: Date.now() })}\n`);

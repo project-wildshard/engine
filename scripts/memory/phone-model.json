@@ -260,7 +260,13 @@
    "limitMB": null,
    "limitHighMB": null,
    "fitInputs": {
-    "killLineFromIP7": null,
+    "killLineFromIP7": {
+     "limitMB": 1536,
+     "limitKind": "ActiveSoft, enforced as the WebContent highwater (jetsam memory-highwater)",
+     "killedAtKB": 1573026,
+     "ios": "18.6.2",
+     "measured": "2026-11-19 EM9 staircase, inspector driver, syslog memorystatus lines (meta iphone13/device-2026-11-19.md)"
+    },
     "pairedFootprintsFromIP9": null
    }
   }

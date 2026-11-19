@@ -83,6 +83,7 @@ async function zoneRun(driver, directory, overrides, capture) {
     if (boot.outcome === 'control') {
       // --probe: one page expression read at control, kept in the report (e.g. which arm an override applied)
       if (values.probe !== undefined) probe = await driver.evaluate(`return (${values.probe});`);
+      if ('quiet' in driver && typeof driver.quiet === 'function') await driver.quiet();
       // a walk first stands its 30 s at spawn, sampled (IP34 reads both)
       if (mode === 'walk') standing = await readFrames(driver, { slug: values.zone, seconds: 30, walk: false });
       else if (mode !== 'boot') await pause(30_000);
@@ -116,7 +117,7 @@ async function bench() {
   const temperatureNow = () => batteryTemperature(command('idevicediagnostics', ['-u', facts.udid, 'ioregentry', 'AppleSmartBattery']).output);
   mkdirSync(dirname(out), { recursive: true });
   mkdirSync(out);
-  const inspector = values.driver === 'inspector' ? await startInspector(facts.udid, {
+  const inspector = values.driver === 'inspector' ? await startInspector(facts.udid, { launchUrl: new URL('/robots.txt', base).href,
     overrides: localBodies.map(({ pattern, file }) => ({ pattern, body: readFileSync(file, 'utf8') })) }) : null;
   const standalone = endpoint === undefined && inspector === null ? await startSafari(facts.udid) : null;
   /** @returns {Promise<Safari>} */
@@ -156,6 +157,11 @@ async function bench() {
     writeFileSync(join(out, 'environment.json'), JSON.stringify({ ...deviceFacts, idleCelsius: idle, base, mode, driver: values.driver,
       overrides: localBodies.map(({ pattern, file }) => ({ pattern, file })) }, null, 2));
     for (const [index, kind] of trials.entries()) {
+      // the last boot's zone is still drawing in Safari's tab: park the tab, or the phone heats while it "cools"
+      if (inspector !== null) {
+        driver ??= await open().catch(() => null);
+        await driver?.navigate(new URL('/robots.txt', base).href).catch(() => undefined);
+      }
       const deadline = Date.now() + 10 * 60_000;
       let temperature = temperatureNow();
       while (temperature === null || Math.abs(temperature.celsius - idle) > 2) {
@@ -166,6 +172,12 @@ async function bench() {
       }
       const directory = join(out, kind !== null && runs === 1 ? kind : `run-${index + 1}`);
       const readingsFor = 30 + (mode === 'boot' ? 0 : 30) + duration + 240;
+      if (inspector !== null) {
+        // every trial in a fresh Safari on the zone's origin, before sysmon starts (it follows the processes alive at its
+        // start): a fresh WebContent, so no earlier boot's memory rides along (inspector.mjs fresh)
+        await driver?.close().catch(() => undefined);
+        driver = /** @type {Safari} */ (/** @type {unknown} */ (await inspector.fresh()));
+      }
       const readers = startReaders({ udid: facts.udid, out: directory, seconds: readingsFor, trace: values.trace });
       const start = Date.now();
       let zone, staircase;

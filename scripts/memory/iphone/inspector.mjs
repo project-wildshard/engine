@@ -10,7 +10,7 @@
 // Caution, measured on the iPhone 13: overrides need the Network agent on, which keeps response bodies for the inspector.
 // Two Nine boots with a service-worker override lost their tab at texture upload, so a memory or frame comparison runs
 // without overrides; they are for functional checks. WS_INSPECTOR_DEBUG=1 prints target events.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { setTimeout as pause } from 'node:timers/promises';
 import { WebDriverError } from './safari.mjs';
 
@@ -36,17 +36,18 @@ export function asyncExpression(script, args) {
 }
 
 /** The page to attach: Safari's tab, not an extension's background page. @param {{url: string, webSocketDebuggerUrl: string}[]} pages */
-export function pickPage(pages) {
-  return pages.find((page) => !page.url.startsWith('safari-web-extension:') && page.webSocketDebuggerUrl) ?? null;
+export function pickPage(pages, want = '') {
+  const open = pages.filter((page) => !page.url.startsWith('safari-web-extension:') && page.webSocketDebuggerUrl);
+  return (want === '' ? open[0] : open.find((page) => page.url === want)) ?? null;
 }
 
-/** @param {number} port @param {number} timeout */
-async function listPages(port, timeout) {
+/** @param {number} port @param {number} timeout @param {string} [want] a page at exactly this URL */
+async function listPages(port, timeout, want = '') {
   const deadline = Date.now() + timeout;
   for (;;) {
     try {
       const response = await fetch(`http://127.0.0.1:${String(port)}/json`, { signal: AbortSignal.timeout(3_000) });
-      const page = pickPage(await response.json());
+      const page = pickPage(await response.json(), want);
       if (page !== null) return page;
     } catch { /* the proxy or the page is not up yet */ }
     if (Date.now() >= deadline) throw new WebDriverError('no such window', 'Web Inspector lists no Safari page');
@@ -157,7 +158,9 @@ async function attach(socketUrl, { overrides = [] }) {
         (e) => { window.__wsAsync[${JSON.stringify(key)}] = { ok: false, e: String(e?.message ?? e) }; }), true)`, false, 10_000);
       while (Date.now() < deadline) {
         await pause(500);
-        const settled = await run(`(() => { const r = window.__wsAsync?.[${JSON.stringify(key)}]; if (r) delete window.__wsAsync[${JSON.stringify(key)}]; return r ?? null; })()`, false, 10_000);
+        // a busy page (a Nine frame sample with the Network agent on) can take over 10 s to answer one poll: ask again
+        const settled = await run(`(() => { const r = window.__wsAsync?.[${JSON.stringify(key)}]; if (r) delete window.__wsAsync[${JSON.stringify(key)}]; return r ?? null; })()`, false, 20_000)
+          .catch((/** @type {unknown} */ error) => { if (error instanceof WebDriverError && error.code === 'timeout' && Date.now() < deadline) return null; throw error; });
         if (settled !== null) {
           if (!settled.ok) throw new WebDriverError('javascript error', settled.e);
           return settled.v;
@@ -199,7 +202,16 @@ async function attach(socketUrl, { overrides = [] }) {
       await settle(() => true);
       if (await run('performance.timeOrigin', false, 10_000) === before) await settle(() => true);
     },
-    freshTab() { return this.navigate('about:blank'); },
+    // The same tab, left where it is: sysmon's process monitor follows the processes alive when it starts, so the bench
+    // puts this tab on the zone's origin before its readers start (bench.mjs) and the boot keeps that WebContent.
+    freshTab: () => Promise.resolve(),
+    // Overrides are for the boot: once the page has control the Network agent goes off, so it stops keeping bodies and
+    // streaming events while frames are sampled (bench.mjs calls this at control).
+    quiet: async () => {
+      if (overrides.length === 0) return;
+      await send('Network.setInterceptionEnabled', { enabled: false }, 15_000).catch(() => undefined);
+      await send('Network.disable', {}, 15_000).catch(() => undefined);
+    },
     /** @param {string} script @param {unknown[]} [args] */
     evaluate: (script, args = []) => run(syncExpression(script, args), false, 60_000),
     /** @param {string} script @param {unknown[]} args @param {number} timeoutMs */
@@ -213,13 +225,28 @@ async function attach(socketUrl, { overrides = [] }) {
   };
 }
 
-/** Start (or reuse) ios_webkit_debug_proxy for this phone, and open attachments to its Safari page.
- * @param {string} udid @param {{ port?: number, overrides?: Override[] }} [options] */
-export async function startInspector(udid, { port = 9322, overrides = [] } = {}) {
+/** Start (or reuse) ios_webkit_debug_proxy for this phone, and open attachments to its Safari page. With no Safari page
+ * (after a reboot, or a lost tab), Safari is opened at `launchUrl` by devicectl: no automation session, so no Guided Access.
+ * @param {string} udid @param {{ port?: number, overrides?: Override[], launchUrl?: string }} [options] */
+export async function startInspector(udid, { port = 9322, overrides = [], launchUrl } = {}) {
   const running = await fetch(`http://127.0.0.1:${String(port)}/json`, { signal: AbortSignal.timeout(2_000) }).then(() => true, () => false);
   const proxy = running ? null : spawn('ios_webkit_debug_proxy', ['-c', `${udid}:${String(port)}`], { stdio: 'ignore' });
+  const page = async () => {
+    try { return await listPages(port, 8_000); } catch (error) {
+      if (launchUrl === undefined) throw error;
+      spawnSync('xcrun', ['devicectl', 'device', 'process', 'launch', '--device', udid, '--payload-url', launchUrl, 'com.apple.mobilesafari'], { stdio: 'ignore' });
+      return listPages(port, 30_000);
+    }
+  };
   return {
-    open: async () => attach((await listPages(port, 30_000)).webSocketDebuggerUrl, { overrides }),
+    open: async () => attach((await page()).webSocketDebuggerUrl, { overrides }),
+    // A fresh Safari, so a fresh WebContent: a second Nine boot in the process that held the first one was killed at the
+    // 1536 MB line at texture upload (2026-11-19). devicectl only, no automation session, so no Guided Access.
+    fresh: async () => {
+      if (launchUrl === undefined) throw new Error('fresh() needs launchUrl');
+      spawnSync('xcrun', ['devicectl', 'device', 'process', 'launch', '--device', udid, '--terminate-existing', '--payload-url', launchUrl, 'com.apple.mobilesafari'], { stdio: 'ignore' });
+      return attach((await listPages(port, 45_000, launchUrl)).webSocketDebuggerUrl, { overrides });
+    },
     stop: () => { proxy?.kill(); return Promise.resolve(); },
   };
 }

@@ -4,7 +4,7 @@ export interface ChainModel {gpuFloorMB:number;alpha:{low:number;high:number};sc
 export interface LedgerFit {webcontent:{floorMB:number;perMB:number};gpu:{floorMB:number;perMB:number};missPct:number}
 export interface UnmeasuredPhoneFit {
   name:string;status:'unmeasured';reportOnly:true;alpha:null;scale:null;limitMB:null;limitHighMB:null;
-  fitInputs:{killLineFromIP7:null;pairedFootprintsFromIP9:null};
+  fitInputs:{killLineFromIP7:{limitMB:number;limitKind:string;killedAtKB:number;ios:string;measured:string}|null;pairedFootprintsFromIP9:null};
 }
 export interface PhoneModel extends ChainModel {
   limitMB:number;limitHighMB:number;ledger:LedgerFit;peakOverSettled:Range;chromium:{loadingPerRenderer:Range};

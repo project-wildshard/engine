@@ -27,7 +27,7 @@ test('the chip and the calibration use the one device limit, ActiveHard 2048 MiB
 test('IP11 names the unmeasured inputs and keeps the 17 Pro reading in the report', () => {
   const device = loadPhoneModel().devices?.[IPHONE_13_MODEL];
   expect(device).toEqual({ name: 'iPhone 13', status: 'unmeasured', reportOnly: true,
-    alpha: null, scale: null, limitMB: null, limitHighMB: null, fitInputs: { killLineFromIP7: null, pairedFootprintsFromIP9: null } });
+    alpha: null, scale: null, limitMB: null, limitHighMB: null, fitInputs: { killLineFromIP7: expect.objectContaining({ limitMB: 1536 }), pairedFootprintsFromIP9: null } });
   const out = execFileSync(process.execPath, ['scripts/memory/phone-fit.mjs', `--device=${IPHONE_13_MODEL}`], { encoding: 'utf8' });
   expect(JSON.parse(out)).toEqual(device);
   const run = { instrument: 'minimal', build: 'test', settled: { webcontent: 500 * MB, gpu: 300 * MB },
@@ -36,7 +36,7 @@ test('IP11 names the unmeasured inputs and keeps the 17 Pro reading in the repor
   expect(phoneLine(run)).toBe(phoneLine(run, pro));
   const report = summaryMarkdown('brasscap-mesa', [run], null, null);
   expect(report).toContain(rangeText(phoneFromWebKit(run.settled, pro)));
-  expect(report).toContain("iPhone 13, iPhone14,5, report only]: unmeasured. Awaiting IP7's kill line and IP9's paired footprints.");
+  expect(report).toContain("iPhone 13, iPhone14,5, report only]: unmeasured. Kill line 1536 MB (IP7). Awaiting IP9's paired footprints.");
 });
 
 test('a 17 Pro CLI refit keeps the separate iPhone 13 entry', () => {

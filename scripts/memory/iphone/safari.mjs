@@ -299,6 +299,7 @@ export async function waitForControl(driver, startedAt, timeout, observe, reload
   let origin;
   let reloaded = false;
   let navigations = 0;
+  let entered = startedAt;
   while (Date.now() - startedAt < timeout) {
     state = /** @type {PageState} */ (await driver.evaluate(pageState));
     observe(state);
@@ -317,6 +318,13 @@ export async function waitForControl(driver, startedAt, timeout, observe, reload
     }
     const follow = await findButton(driver, reloaded ? ['skip', 'play anyway', 'enter zone', 'enter world', 'play'] : ['skip', 'play anyway']);
     if (follow) await driver.click(follow.el);
+    // a tap before the menu's script bound its handlers does nothing (a cold Safari, 2026-11-19): ENTER ZONE still up
+    // 6 s on means the first one missed
+    if (!reloaded && Date.now() - entered >= 6_000) {
+      entered = Date.now();
+      const again = await findButton(driver, ['enter zone', 'enter world']);
+      if (again) await driver.click(again.el);
+    }
     await pause(500);
   }
   return { outcome: 'never-ready', startedAt, controlAt: null, state, reloaded, navigations };
