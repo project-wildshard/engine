@@ -28,7 +28,7 @@ beforeEach(() => { installCatalogue({ ...catalogueBeforePlacements, placed: ['op
 afterEach(() => { for (const deck of decks.splice(0)) deck.dispose(); document.body.replaceChildren(); Reflect.deleteProperty(globalThis, Symbol.for('game.catalogue')); });
 const deckOf = (mode: MenuMode): TitleDeck => {
   const deck = buildTitleDeck({ cards: titleCards(mode.developer, () => null, () => null, () => true), active: null, onEnter: () => undefined,
-    onExplore: () => undefined, onSettings: () => undefined, mode: () => mode });
+    mode: () => mode });
   document.body.append(deck.root); decks.push(deck);
   return deck;
 };
@@ -54,7 +54,7 @@ test('SB11: with no Thin Ice shard carded, Developer still sees the Thin Ice dra
 
 test('SB17: no card wears a LOAD or LOADED badge; the card still says whether ENTER WORLD enters it', () => {
   const deck = buildTitleDeck({ cards: titleCards(false, () => null, () => null, () => true), active: 'driftwood-isle', onEnter: () => undefined,
-    onExplore: () => undefined, onSettings: () => undefined, mode: () => PLAYER });
+    mode: () => PLAYER });
   document.body.append(deck.root); decks.push(deck);
   const cards = cardsOf(deck);
   expect(cards.flatMap(({ tags }) => tags)).toEqual([]);

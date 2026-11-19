@@ -19,7 +19,7 @@ test('MS3: the main menu and the deep link say zone, never shard', () => {
 test('MS3: the deck\'s button reads ENTER ZONE on an open card', () => {
   installShards([]);
   const card: TitleCard = { slug: 'driftwood-isle', name: 'Driftwood Isle', label: 'Island', thumbnail: '', heroPortrait: '', heroLandscape: '' };
-  const deck = buildTitleDeck({ cards: [card], active: null, onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined });
+  const deck = buildTitleDeck({ cards: [card], active: null, onEnter: () => undefined });
   document.body.append(deck.root);
   expect(deck.root.querySelector('.ws-menu-play b')?.textContent).toBe('Enter zone');
   expect(deck.root.textContent?.replaceAll(/wildshard/giu, '')).not.toMatch(/enter world|shard/iu);

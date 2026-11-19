@@ -321,7 +321,6 @@ async function showPageTitle(refusal = ''): Promise<void> {
     menu = buildTitleMenu({
       active: null,
       onEnter: (card) => { travel({ to: card.slug, mode: 'enter' }); },
-      onExplore: (card) => { travel({ to: card.slug, mode: 'explore' }); },
       onGrid: grid.onGrid,
       ...(gate === undefined ? {} : { gate }),
       ...(screen === undefined ? {} : { screen }),
@@ -366,15 +365,14 @@ async function showSlugPage(slug: string): Promise<void> {
     import('@wildshard/engine/game/grid/oneWayIn'), import('@wildshard/engine/game/travel/travel')]);
   const grid = installGridTitle();
   const placed = shardCell(manifest.slug) !== undefined;
-  const leave = (mode: 'enter' | 'explore') => (card: { readonly slug: string }): void => {
+  const enter = (card: { readonly slug: string }): void => {
     // the shard's page is `/?chunk=`: travel keeps this document's path, so the link's path goes first
     history.replaceState(history.state, '', home());
-    travel({ to: card.slug, mode });
+    travel({ to: card.slug, mode: 'enter' });
   };
-  showStartTitle(({ settings, notice }) => {
+  showStartTitle(({ notice }) => {
     const lines = [notice ?? '', grid.note].filter((line) => line !== '').join('\n');
-    return buildSlugPage({ manifest, placed, onEnter: leave('enter'), onExplore: leave('explore'),
-      onSettings: () => { void (async () => { const { openTitleSettings } = await import('./titleSettings'); await openTitleSettings(settings); })(); },
+    return buildSlugPage({ manifest, placed, onEnter: enter,
       ...(lines === '' ? {} : { notice: lines }) });
   });
   showDropOnTitle();

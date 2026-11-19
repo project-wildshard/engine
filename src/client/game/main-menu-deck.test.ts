@@ -6,6 +6,7 @@ import { installShards } from './shard/list';
 import { buildTitleMenu, installGridTitle } from './mainMenu';
 import { pageGridIntents } from './grid/intent';
 import type { TitleCard } from './titleDeck';
+import { GAME_STRINGS } from '../../shared/game/strings';
 import { saveStorage } from '@wildshard/engine/saves/slots';
 
 /** Jake, 2026-11-12 09:03 Cancún ("That shard select insta loads driftwood bug is still here"): on a phone, SHARD SELECT
@@ -40,7 +41,7 @@ const frames = (): Promise<void> => new Promise((resolve) => { setTimeout(resolv
 const loading = (): boolean => document.querySelector('.ws-load[data-navigation]') !== null;
 
 const menu = (onEnter: (c: TitleCard) => void) => {
-  const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
+  const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onSettings: () => undefined, onGrid: () => undefined });
   document.body.append(view.root); views.push(view);
   return view;
 };
@@ -65,7 +66,7 @@ test('a preparation menu keeps its own screen while the world creates another me
 
 test('preparation keeps the small hero off the mandatory world download connection', () => {
   const view = buildTitleMenu({ cards: CARDS, active: null, fullHero: false, readAhead: false,
-    onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
+    onEnter: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
   views.push(view);
   const hero = view.root.querySelector<HTMLElement>('.ws-main-hero');
   expect(hero?.style.getPropertyValue('--ws-hero-square')).toContain('square-first');
@@ -133,7 +134,7 @@ test('a fresh phone that picks another card gets its first-play card there, and 
 for (const developer of [false, true]) {
   test(`MS1: Developer ${developer ? 'on' : 'off'}: one ENTER THE MMO enters the grid, one ZONE SELECT opens the deck`, async () => {
     const onGrid = vi.fn<() => void>(), onEnter = vi.fn<(c: TitleCard) => void>();
-    const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onExplore: () => undefined, onSettings: () => undefined, onGrid,
+    const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onSettings: () => undefined, onGrid,
       mode: () => ({ developer, devserver: false }) });
     document.body.append(view.root); views.push(view);
     const mmo = view.root.querySelectorAll('.ws-main-mmo'), zone = view.root.querySelectorAll('.ws-main-select');
@@ -157,7 +158,7 @@ for (const developer of [false, true]) {
  *  SELECT, which loads nothing; only a click on ENTER THE MMO (Enter / Space on it focused) starts the MMO's download. */
 test('MS1: any key on the main screen opens ZONE SELECT and never enters the MMO', async () => {
   const onGrid = vi.fn<() => void>();
-  const view = buildTitleMenu({ cards: CARDS, active: null, onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined,
+  const view = buildTitleMenu({ cards: CARDS, active: null, onEnter: () => undefined, onSettings: () => undefined,
     onGrid, screen: 'main', mode: () => ({ developer: false, devserver: false }) });
   document.body.append(view.root); views.push(view);
   expect(view.screen).toBe('main');
@@ -175,7 +176,7 @@ const gated = (onEnter: (c: TitleCard) => void) => {
   const held: { go: () => void; settle: () => void }[] = [];
   const errors: unknown[] = [];
   let asking: Promise<void> | null = null;
-  const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined,
+  const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onSettings: () => undefined, onGrid: () => undefined,
     // one tap at a time, as entry.ts's gate: a second tap while the first is asked enters nothing
     gate: (go) => {
       asking ??= new Promise<void>((resolve) => { held.push({ go: () => { try { go(); } catch (error) { errors.push(error); } }, settle: resolve }); })
@@ -222,3 +223,17 @@ test('SB49: a held ENTER ZONE the player cancels lets the late catalogue refresh
   expect(refreshed()).toBe(true);
   expect(onEnter).not.toHaveBeenCalled();
 });
+
+// meta EXPLORE-MODE EX1 (J460, QA 2026-11-19 rows 47 and 48; Jake ~14:17: "In Zone Select, we can now hide the Explore button";
+// ~14:18: "We don't need the settings button here underneath enter zone"): ZONE SELECT has neither, in every mode
+for (const [name, mode] of [['player', { developer: false, devserver: false }], ['Developer', { developer: true, devserver: false }], ['DEVSERVER', { developer: false, devserver: true }]] as const) {
+  test(`ZONE SELECT shows no EXPLORE WORLD and no SETTINGS (${name}); the home screen keeps SETTINGS`, () => {
+    const view = buildTitleMenu({ cards: CARDS, active: null, onEnter: () => undefined, onSettings: () => undefined, onGrid: () => undefined, mode: () => mode });
+    document.body.append(view.root); views.push(view);
+    view.show('select');
+    expect(view.root.querySelector('.ws-menu-explore')).toBeNull();
+    expect(view.root.querySelector('.ws-menu-settings')).toBeNull();
+    expect(view.root.querySelector('.ws-menu-play')).not.toBeNull();
+    expect(view.root.querySelector('.ws-main-settings:not(.ws-main-signin)')?.textContent).toBe(GAME_STRINGS.mainMenu.settings);
+  });
+}

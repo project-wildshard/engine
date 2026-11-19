@@ -3,11 +3,11 @@
  * with friends. "it's kind of like SHARD SELECT. But instead of being shard select it has exactly one shard, the slugName, and it
  * has the hero image of it, and it will dynamically load that hero / slug / shard etc, and spawn you into the infinite grid there."
  *
- *   const view = buildSlugPage({ manifest, placed, onEnter, onExplore, onSettings })   // a TitleDeckView for showStartTitle
+ *   const view = buildSlugPage({ manifest, placed, onEnter })   // a TitleDeckView for showStartTitle
  *
  * MAIN-SCREEN MS3 (J399, "deep link ok"): it is the one-zone select, ZONE SELECT with one card, one thumbnail and ENTER ZONE.
  * It is Shard Select's own deck (src/client/game/titleDeck.ts) holding that one card, dressed the same (mainMenu.css
- * `.ws-menu-carousel`): the card, its hero behind, PLAY, SETTINGS. PLAY is ENTER WORLD: the same shardfile download, loading
+ * `.ws-menu-carousel`): the card, its hero behind, PLAY (no SETTINGS or EXPLORE: EXPLORE-MODE EX1, J460). PLAY is ENTER WORLD: the same shardfile download, loading
  * shell and `onEnter`, which src/client/app/entry.ts points at `travel`, so the next page enters the grid at the shard's cell
  * exactly as a Shard select tap does (grid/oneWayIn.ts). A slug with no grid cell (not placed yet, `--no-place`, an off-grid
  * shard such as Thin Ice) keeps its card and hero with PLAY disabled: "Not on the grid yet" (Q16). MAIN MENU leaves for `/`.
@@ -23,7 +23,7 @@ import { GAME_STRINGS } from '../../shared/game/strings';
 import './mainMenu.css';
 import './slugPage.css';
 
-export interface SlugPageOptions extends Pick<TitleDeckOptions, 'onExplore' | 'onSettings' | 'notice' | 'mode'> {
+export interface SlugPageOptions extends Pick<TitleDeckOptions, 'notice' | 'mode'> {
   /** the shard the link names (its title row) */
   readonly manifest: TitleManifest;
   /** the grid places this shard: PLAY enters it at its cell. False: PLAY is disabled, "Not on the grid yet" */
@@ -49,11 +49,10 @@ export function buildSlugPage(opts: SlugPageOptions): TitleDeckView {
       () => { naming = false; });
   };
   const deck = buildTitleDeck({
-    cards: [card], active: null, onSettings: opts.onSettings, gate,
+    cards: [card], active: null, gate,
     ...(opts.notice === undefined ? {} : { notice: opts.notice }), ...(opts.mode === undefined ? {} : { mode: opts.mode }),
     single: { play: GAME_STRINGS.mainMenu.enterZone, hint: s.placed(card.name), ...(opts.placed ? {} : { closed: s.unplaced }) },
     onEnter: (entered) => { if (!(phone && !firstPlayDone() && startFirstPlay(entered.slug))) dropFirstPlay(); opts.onEnter(entered); },
-    onExplore: (entered) => { dropFirstPlay(); opts.onExplore(entered); },
   });
   deck.root.classList.add('ws-menu-carousel', 'ws-slug');
   deck.root.dataset['slug'] = card.slug;

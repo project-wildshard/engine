@@ -123,7 +123,7 @@ try {
   await sleep(SETTLE);
   if (EXPLORE) {
     phase = 'explore';
-    await tryEval('document.querySelector(".ws-menu-explore")?.click()');
+    await tryEval('window.__wildshard?.world?.hud.startExplore(); 1'); // EXPLORE-MODE EX1: no deck button; the HUD's entry
     await sleep(SETTLE);
     phase = 'world';
     // out of Explore (its ✕ goes back to the title), then ENTER WORLD

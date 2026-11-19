@@ -130,7 +130,6 @@ async function buildLoadout(ctx: Awaited<ReturnType<typeof worldStage>>) : Promi
       cards, active: chunk.slug,
       // this card enters here; another card is a fresh page
       onEnter: (c) => { if (c === own) here.enter(); else travel({ to: c.slug, mode: 'enter' }); },
-      onExplore: (c) => { if (c !== own) { travel({ to: c.slug, mode: 'explore' }); return; } here.explore(); },
       onGrid: () => { if (pageMode() === 'grid') here.enter(); else enterGrid(); }, // SF21a: the main menu's second entry
       onSettings: here.settings,
     });

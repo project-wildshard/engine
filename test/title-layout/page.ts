@@ -13,7 +13,7 @@ installBrowserScopeEnvironment();
 installShards([]);
 installTitleManifests([]);
 const developer = new URLSearchParams(location.search).get('dev') !== '0';
-const menu = buildTitleMenu({ cards: [], active: null, onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined,
+const menu = buildTitleMenu({ cards: [], active: null, onEnter: () => undefined, onSettings: () => undefined, onGrid: () => undefined,
   mode: () => ({ developer, devserver: false }) });
 document.getElementById('hud')?.append(menu.root);
 menu.start();

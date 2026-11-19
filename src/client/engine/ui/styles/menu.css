@@ -10,7 +10,7 @@
    (scripts/hero-shots.mjs); on a shorter or taller screen the crop comes 30 % from the sky, 70 % from the foreground */
 @media (orientation: portrait) { .ws-menu .ws-menu-hero { background-position: 50% 30%; } }
 /* a teaser's slideshow (HUD.ts startShots): the next screen fades in over the backdrop, then becomes it */
-/* its caption: a glass chip top-right (EXPLORE WORLD, which lives there, is off on a teaser); a tap skips ahead */
+/* its caption: a glass chip top-right; a tap skips ahead */
 .ws-menu::before { content: ''; position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 1); pointer-events: none; background: linear-gradient(180deg, rgba(6, 10, 18, 0.45) 0%, rgba(6, 10, 18, 0.05) 28%, rgba(6, 10, 18, 0.05) 50%, rgba(6, 10, 18, 0.7) 100%); }
 .ws-menu .ws-menu-head, .ws-menu .ws-menu-deck { position: relative; z-index: calc(var(--ws-layer-hud) + 2); }
 .ws-menu .ws-menu-head { padding: 34px 44px 0; }
@@ -58,15 +58,6 @@
 .ws-menu-mode small { font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-cyan-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .ws-menu-mode:hover, .ws-menu-mode:focus-visible { background: rgba(143, 227, 255, 0.22); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 32px rgba(143, 227, 255, 0.4); outline: none; }
 .ws-menu-mode:active { background: rgba(143, 227, 255, 0.3); }
-.ws-menu-mode.ws-menu-explore { background: rgba(255, 181, 71, 0.1); border-color: var(--ws-amber); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(255, 181, 71, 0.18), inset 0 0 18px rgba(255, 181, 71, 0.07); }
-.ws-menu-mode.ws-menu-explore .ws-menu-mode-glyph { color: var(--ws-amber); }
-.ws-menu-mode.ws-menu-explore small { color: rgba(255, 181, 71, 0.75); }
-.ws-menu-mode.ws-menu-explore:hover, .ws-menu-mode.ws-menu-explore:focus-visible { background: rgba(255, 181, 71, 0.2); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 32px rgba(255, 181, 71, 0.35); }
-.ws-menu-mode.ws-menu-explore.off { display: none; }
-.ws-menu .ws-menu-row { display: flex; justify-content: center; gap: 22px; margin-top: 16px; }
-/* DEV (E140): SOUND's sibling — the same text + square; a button, so its chrome is reset. The padding / negative margin
-   give it a ~40 px tall tap target without moving the row */
-.ws-menu .ws-menu-settings { min-width: 44px; min-height: 44px; box-sizing: border-box; touch-action: manipulation; padding: 3px 9px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan-line); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan); pointer-events: auto; cursor: pointer; flex: none; white-space: nowrap; } /* main menu ▸ Settings (src/client/engine/ui/BootSettings.ts, E55) */
 
 /* ─── title screen on a phone-width viewport: the deck fills the lower third, world above ─── */
 @media (max-width: 700px) {
@@ -87,9 +78,6 @@
   .ws-menu-modes { margin-top: 12px; gap: 8px; }
   .ws-menu-mode { padding: 9px 6px 8px; }
   .ws-menu-mode b { font-size: 16px; letter-spacing: 0.14em; }
-  .ws-menu .ws-menu-row { margin-top: 8px; }
-  .ws-menu .ws-menu-settings { font-size: 9px; }
-  .ws-menu .ws-menu-row { gap: 12px; align-items: center; padding: 0 14px; } /* SETTINGS alone on its row (E318: no SOUND, no DEV; the credits moved to Settings ▸ Credits, E64) */
 }
 
 /* ─── title screen on a landscape phone (iPhone ~402, Android ~360–411 CSS px tall): the desktop deck is ~530 px tall,
@@ -109,11 +97,10 @@
   .ws-menu-mode { padding: 7px 8px; }
   .ws-menu-mode b { font-size: 16px; }
   .ws-menu-mode small { display: none; }
-  .ws-menu .ws-menu-row { margin-top: 6px; }
 }
 
-/* ─── E137 (the user's pick B, 2026-09-25): ONE big ENTER WORLD banner under the deck; EXPLORE WORLD is a side mode in the
-   top-right corner under the build pill (src/client/engine/ui/styles/update.css), out of the thumb's reach ─── */
+/* ─── E137 (the user's pick B, 2026-09-25): ONE big ENTER WORLD banner under the deck. EXPLORE WORLD and the deck's SETTINGS
+   row left it (meta EXPLORE-MODE EX1, J460, QA 2026-11-19 rows 47 and 48) ─── */
 .ws-menu .ws-menu-modes { justify-content: center; }
 .ws-menu .ws-menu-play { flex: 1 1 auto; flex-direction: row; gap: 14px; padding: 16px 14px 15px; position: relative; }
 .ws-menu .ws-menu-play b { font-size: 24px; letter-spacing: 0.22em; }
@@ -121,13 +108,6 @@
 .ws-menu .ws-menu-play { padding-bottom: 22px; }
 .ws-menu .ws-menu-play .ws-menu-mode-glyph svg { width: 24px; height: 24px; }
 .ws-menu .ws-menu-head { position: relative; }
-.ws-menu .ws-menu-head .ws-menu-explore { position: fixed; z-index: calc(var(--ws-layer-hud) + 61); right: 44px; top: calc(40px + env(safe-area-inset-top, 0px)); flex: none; flex-direction: row; gap: 10px; padding: 8px 14px 8px 11px; }
-.ws-menu .ws-menu-head .ws-menu-explore .ws-menu-mode-glyph svg { width: 22px; height: 22px; }
-.ws-menu .ws-menu-explore-text { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-.ws-menu .ws-menu-head .ws-menu-explore b { font-size: 14px; letter-spacing: 0.2em; }
-.ws-menu .ws-menu-head .ws-menu-explore small { font-size: 8px; }
 @media (max-width: 700px) {
   .ws-menu .ws-menu-play b { font-size: 20px; letter-spacing: 0.18em; }
-  .ws-menu .ws-menu-head .ws-menu-explore { right: 16px; top: calc(38px + env(safe-area-inset-top, 0px)); padding: 7px 11px 7px 9px; }
-  .ws-menu .ws-menu-head .ws-menu-explore b { font-size: 12px; letter-spacing: 0.16em; }
 }

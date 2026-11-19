@@ -39,7 +39,7 @@ afterEach(() => {
 });
 const deckOf = (opens: (slug: string) => boolean): TitleDeck => {
   const deck = buildTitleDeck({ cards: titleCards(true, () => null, () => null, opens), active: null, onEnter: () => undefined,
-    onExplore: () => undefined, onSettings: () => undefined, mode: () => DEVELOPER });
+    mode: () => DEVELOPER });
   document.body.append(deck.root); decks.push(deck);
   return deck;
 };
@@ -75,10 +75,10 @@ test('Developer on, prod\'s kept word: Brasscap and Template read "Not in this w
   const cards = view(deck), line = GAME_STRINGS.notInWorld.badge;
   expect([cards['Brasscap Mesa'], cards['Pastel Plain'], cards['Pine Hollow']]).toEqual([line, line, line]);
   expect(cards['Driftwood Isle']).toBe('Driftwood Isle');
-  const play = deck.root.querySelector<HTMLButtonElement>('.ws-menu-play'), explore = deck.root.querySelector<HTMLButtonElement>('.ws-menu-explore');
+  const play = deck.root.querySelector<HTMLButtonElement>('.ws-menu-play');
   for (const name of ['Brasscap Mesa', 'Pastel Plain']) {
     deck.select(deck.cards.findIndex(card => card.name === name));
-    expect([play?.disabled, explore?.disabled, play?.querySelector('b')?.textContent], name).toEqual([true, true, line]);
+    expect([play?.disabled, play?.querySelector('b')?.textContent], name).toEqual([true, line]);
     expect(deck.activate(), `${name} does not load`).toBeNull();
   }
   deck.select(0);

@@ -15,7 +15,7 @@ try {
     try {
       // The retired stored Auto setting must be ignored on every platform.
       await debugSettings(context, { nineFacade: 'auto' });
-      await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); // developer mode: EXPLORE WORLD is developer-only (E386)
+      await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); // developer mode, as the facade checks ran it
       await context.route('**/api/errors', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
       await context.route(/https:\/\/[^/]+\.ingest\.[^/]+\/api\//, (route) => route.fulfill({ status: 200, body: '{}' }));
       const page = await context.newPage();
@@ -25,9 +25,8 @@ try {
       page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations++; });
       await page.goto(`${base}/?chunk=nine-dragon-stack&tier=${profile.tier}&touch=1&nolock=1&mute=1&sw=0`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => Boolean(window.__wildshard?.world) || Boolean(document.querySelector('#wserr')), null, { timeout: 90_000 });
-      // SF21a's main menu sits over the shard deck: SHARD SELECT opens it, then EXPLORE WORLD
-      if (await page.locator('.ws-main:not(.hide) .ws-main-select').count() > 0) await page.locator('.ws-main-select').click({ timeout: 10_000 });
-      await page.locator('.ws-menu-explore').click({ timeout: 10_000 });
+      // meta EXPLORE-MODE EX1: the deck has no EXPLORE WORLD; the HUD's own entry opens Explore's hub (as `?explore=` does)
+      await page.evaluate(() => { window.__wildshard.world.hud.startExplore(); });
       await page.locator('.ws-x-card[data-m="world"]').click();
       await page.waitForFunction(() => Boolean(document.querySelector('.ws-x.show[data-mode="world"]')) &&
         (window.__wildshard?.world?.game.renderer.info.render.calls ?? 0) > 0, null, { timeout: 20_000 });

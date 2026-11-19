@@ -124,7 +124,6 @@
 /* The Explore action shares header flow; on a phone it wraps below BACK/title instead of covering them. */
 .ws-menu.ws-menu-carousel .ws-menu-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .ws-menu.ws-menu-carousel .ws-menu-bar { display: flex; flex: 1 0 auto; align-items: center; gap: 14px; }
-.ws-menu.ws-menu-carousel .ws-menu-head .ws-menu-explore { position: static; margin-left: auto; }
 .ws-menu.ws-menu-carousel .ws-menu-back { flex: none; padding: 9px 14px 9px 12px; appearance: none; -webkit-appearance: none; background: rgba(9, 22, 36, 0.86); border: 1px solid var(--ws-cyan-line); font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.2em; color: var(--ws-cyan); cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
 .ws-menu.ws-menu-carousel .ws-menu-back::before { content: '‹'; margin-right: 8px; font-size: 15px; }
 .ws-menu.ws-menu-carousel .ws-menu-title { font-family: var(--ws-display); font-weight: 700; font-size: 26px; letter-spacing: 0.2em; color: #bdeeff; text-shadow: 0 0 14px rgba(143, 227, 255, 0.4); white-space: nowrap; }

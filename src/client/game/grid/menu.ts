@@ -42,11 +42,6 @@ export function selectEnters(_slug: string, restricted: boolean, mode: MenuMode 
   return !restricted || mode.developer || mode.devserver;
 }
 
-/** EXPLORE WORLD: a developer tool, in Developer mode or a DEVSERVER build, for a world Select a shard can enter */
-export function selectExplores(slug: string, restricted: boolean, mode: MenuMode = menuMode()): boolean {
-  return (mode.developer || mode.devserver) && selectEnters(slug, restricted, mode);
-}
-
 /** Compatibility entry-accounting flags; all audiences and builds share one cell layout (G972). */
 export function gridMode(devserverCell: boolean, mode: MenuMode = menuMode()): GridMode {
   return { developer: mode.developer, devserver: mode.devserver, nineDragon: devserverCell };

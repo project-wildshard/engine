@@ -31,7 +31,7 @@ afterEach(() => { for (const deck of decks.splice(0)) deck.dispose(); document.b
 const deckOf = (showHidden: boolean, mode: MenuMode): TitleDeck => {
   installTitleManifests(ROWS);
   const deck = buildTitleDeck({ cards: titleCards(showHidden, () => null, () => null), active: null, onEnter: () => undefined,
-    onExplore: () => undefined, onSettings: () => undefined, mode: () => mode });
+    mode: () => mode });
   document.body.append(deck.root); decks.push(deck);
   return deck;
 };
@@ -85,7 +85,7 @@ test('a gated ENTER WORLD stays busy while the gate asks, and enters the card ta
   let release: () => void = () => undefined, enter: () => void = () => undefined;
   const entered: string[] = [];
   const deck = buildTitleDeck({ cards: titleCards(false, () => null, () => null), active: null, onEnter: (card) => { entered.push(card.slug); },
-    onExplore: () => undefined, onSettings: () => undefined, mode: () => PLAYER,
+    mode: () => PLAYER,
     gate: (go) => new Promise<void>((resolve) => { enter = go; release = resolve; }) });
   document.body.append(deck.root); decks.push(deck);
   const play = deck.root.querySelector<HTMLButtonElement>('.ws-menu-play');

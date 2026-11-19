@@ -51,14 +51,15 @@ export async function tap(page, sel) {
 export async function bootToTitle(page, base, slug) {
   const t0 = Date.now();
   await page.goto(`${base}/?chunk=${slug}&tier=phone&touch=1&mute=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => document.querySelector('.ws-menu-explore') !== null && document.querySelector('.ws-load') === null && window.__wildshard?.world !== undefined, undefined, { timeout: 480000, polling: 1000 });
+  await page.waitForFunction(() => document.querySelector('.ws-menu-play') !== null && document.querySelector('.ws-load') === null && window.__wildshard?.world !== undefined, undefined, { timeout: 480000, polling: 1000 });
   await sleep(2500);
   return Math.round((Date.now() - t0) / 1000);
 }
 
-/** EXPLORE WORLD on the title → the hub: what it lists, whether it scrolls sideways */
+/** Explore's hub over the title (meta EXPLORE-MODE EX1: the deck has no EXPLORE WORLD; the HUD's own entry, as `?explore=`
+ *  uses it): what it lists, whether it scrolls sideways */
 export async function openHub(page) {
-  await tap(page, '.ws-menu-explore');
+  await page.evaluate(() => { window.__wildshard.world.hud.startExplore(); });
   await page.waitForFunction(() => document.querySelector('.ws-x.show[data-mode="hub"] .ws-x-hub') !== null, undefined, { timeout: 180000, polling: 500 });
   await sleep(2500);
   return page.evaluate(() => {

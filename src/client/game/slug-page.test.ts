@@ -24,7 +24,7 @@ beforeEach(() => { installShards([]); markNameAsked(); });
 afterEach(() => { for (const view of views.splice(0)) view.dispose(); resetFirstPlay(); dropFirstPlay(); document.body.replaceChildren(); });
 
 const page = (placed: boolean, onEnter: (card: TitleCard) => void) => {
-  const view = buildSlugPage({ manifest: manifest('driftwood-isle', 'Driftwood Isle'), placed, onEnter, onExplore: () => undefined, onSettings: () => undefined });
+  const view = buildSlugPage({ manifest: manifest('driftwood-isle', 'Driftwood Isle'), placed, onEnter });
   document.body.append(view.root); views.push(view); view.start();
   return view;
 };
@@ -65,7 +65,7 @@ test('a slug with no grid cell: the card and hero, PLAY disabled, "Not on the gr
 
 test('Developer on: still exactly one card (no draft cards), and an unplaced slug asks no name on the confirm key', async () => {
   const onEnter = vi.fn<(c: TitleCard) => void>();
-  const view = buildSlugPage({ manifest: manifest('open-plot-thin-ice', 'Thin Ice'), placed: false, onEnter, onExplore: () => undefined, onSettings: () => undefined,
+  const view = buildSlugPage({ manifest: manifest('open-plot-thin-ice', 'Thin Ice'), placed: false, onEnter,
     mode: () => ({ developer: true, devserver: false }) });
   document.body.append(view.root); views.push(view); view.start();
   expect(document.querySelectorAll('.ws-slug .ws-menu-card')).toHaveLength(1);
@@ -74,4 +74,16 @@ test('Developer on: still exactly one card (no draft cards), and an unplaced slu
   view.activate();
   await frames();
   expect([loading(), onEnter.mock.calls.length]).toEqual([false, 0]);
+});
+
+// meta EXPLORE-MODE EX1 (J460, QA 2026-11-19 rows 47 and 48): the one-zone select is ZONE SELECT's deck, so it has no EXPLORE
+// WORLD and no SETTINGS either, Developer on or off; MAIN MENU leaves for the home screen, which keeps SETTINGS
+test('the slug page shows no EXPLORE WORLD and no SETTINGS, Developer on or off', () => {
+  for (const developer of [false, true]) {
+    const view = buildSlugPage({ manifest: manifest('driftwood-isle', 'Driftwood Isle'), placed: true, onEnter: () => undefined, mode: () => ({ developer, devserver: false }) });
+    document.body.append(view.root); views.push(view);
+    expect(view.root.querySelector('.ws-menu-explore')).toBeNull();
+    expect(view.root.querySelector('.ws-menu-settings')).toBeNull();
+    expect(view.root.querySelector('.ws-menu-play')).not.toBeNull();
+  }
 });

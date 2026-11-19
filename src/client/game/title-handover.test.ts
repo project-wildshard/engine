@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 const title = (active: string | null = null) => {
-  const view = buildTitleMenu({ cards: CARDS, active, onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
+  const view = buildTitleMenu({ cards: CARDS, active, onEnter: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
   document.body.append(view.root); views.push(view); view.start();
   return view;
 };
@@ -92,7 +92,7 @@ test('SB37b: a page a hand-over opened never hands over again (no loop), and a w
 test('SB37b: an ENTER THE MMO tap waiting on its gate holds the hand-over; a refused gate gives it back', async () => {
   let release: () => void = () => undefined;
   const gate = vi.fn(() => new Promise<void>(resolve => { release = resolve; }));
-  const view = buildTitleMenu({ cards: CARDS, active: null, gate, onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
+  const view = buildTitleMenu({ cards: CARDS, active: null, gate, onEnter: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
   document.body.append(view.root); views.push(view); view.start();
   activated();
   document.querySelector('.ws-main-mmo')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

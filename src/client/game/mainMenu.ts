@@ -59,6 +59,8 @@ let screen: MainMenuScreen = 'main';
 export interface TitleMenuOptions extends Omit<TitleDeckOptions, 'cards'> {
   /** the deck's cards (default: `titleCards()`, Developer read live) */
   readonly cards?: TitleDeckOptions['cards'];
+  /** the home screen's SETTINGS (J458); the deck under ZONE SELECT has none (EXPLORE-MODE EX1, QA row 48) */
+  readonly onSettings: () => void;
   /** ENTER THE MMO's tap: boots the grid from its one-shot intent (src/client/game/grid/pageEntry.ts `enterGrid`) */
   readonly onGrid: () => void;
   /** which screen to open on (default: the one this page was last on, the main menu at first) */
@@ -110,8 +112,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const deck = buildTitleDeck({ ...deckOpts, cards,
     // MG5: a phone with no first-play mark arms its first play for the card the player picked from the deck (the intent is a
     // session save, so it survives the hand-over); any other entry drops a first play armed and never reached
-    onEnter: (card) => { if (!(phone && !firstPlayDone() && startFirstPlay(card.slug))) dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
-    onExplore: (card) => { dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onExplore(card); } });
+    onEnter: (card) => { if (!(phone && !firstPlayDone() && startFirstPlay(card.slug))) dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(card); } });
   const s = GAME_STRINGS.mainMenu;
   const dev = mode().developer;
 

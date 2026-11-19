@@ -11,13 +11,13 @@ import { titlePrefetchChoice } from './grid/titlePrefetchChoice';
  * screens, one only please"): the cold launch (src/client/engine/ui/StartTitle.ts, renderer-free, before any shard loads) and pause ▸
  * EXIT TO MAIN (src/client/engine/ui/HUD.ts `showIntro`, over the loaded shard) build the same deck from the same cards.
  *
- *   const deck = buildTitleDeck({ cards: titleCards(), onEnter, onExplore, onSettings })
+ *   const deck = buildTitleDeck({ cards: titleCards(), onEnter })
  *   parent.append(deck.root); deck.start()                // after it is in the DOM: centre the selected card
  *   deck.select(i) · deck.index · deck.activate()          // the HUD's arrow keys / any key
  *   deck.dispose()                                          // its resize listeners, when the title goes away
  *
  * A horizontal carousel of shard cards over the selected card's hero art (portrait / landscape by the viewport), dots
- * under it, ENTER WORLD and EXPLORE WORLD, and the main menu's SETTINGS. A swipe steps one card; the centred card is the
+ * under it and ENTER ZONE. A swipe steps one card; the centred card is the
  * selection. Hero art loads for the selected card only; a neighbour's warms when a swipe or a dot press starts toward it,
  * and the card's thumbnail fills the backdrop until its hero paints.
  *
@@ -34,7 +34,7 @@ import type { ShardSlug } from '../../shared/game/shard/slug';
 import { DRAFT_TITLES, type DraftTitle } from './draftTitles';
 import { readSummary, summaryView } from './summary';
 import { GAME_STRINGS } from '../../shared/game/strings';
-import { menuMode, selectEnters, selectExplores, type MenuMode } from './grid/menu';
+import { menuMode, selectEnters, type MenuMode } from './grid/menu';
 import { pageShardRefusals, refusalReason, type ShardRefusal } from './grid/refusal';
 import { playerHidden, selectTitleRows, titleStatus } from '../../shared/game/grid/catalogueSlot';
 import { worldOpens } from './grid/oneWayIn';
@@ -133,8 +133,6 @@ export interface TitleDeckOptions {
   readonly active: string | null;
   /** ENTER WORLD on a card */
   readonly onEnter: (card: TitleCard) => void;
-  readonly onExplore: (card: TitleCard) => void;
-  readonly onSettings: () => void;
   /** a line under the wordmark (the cold launch's "returned to shard select" after an interrupted boot) */
   readonly notice?: string;
   /** what the menu may show and enter (default: Settings ▸ Developer and the DEVSERVER build, read live) */
@@ -168,7 +166,6 @@ export interface TitleDeck {
 }
 
 const SWORD = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 3.5L9 14l1 1L20.5 4.5z M6.5 12.5l5 5 M8 14l-4.5 4.5 1 1L9 15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
-const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 
 function required(root: ParentNode, selector: string): HTMLElement {
   const found = root.querySelector<HTMLElement>(selector);
@@ -185,13 +182,6 @@ const restricted = (card: DeckEntry): boolean => card.badge === 'Developer only'
 function canEnter(card: DeckEntry, mode: MenuMode = menuMode()): boolean {
   if (card.draft || card.upgrade !== undefined || card.unavailable !== undefined || card.closed === true) return false;
   return selectEnters(card.slug, restricted(card), mode);
-}
-
-/** EXPLORE WORLD is a developer tool: only in developer mode (or a DEVSERVER build), and only for a world that can be
- *  entered (Jake, E386) */
-function canExplore(card: DeckEntry, mode: MenuMode = menuMode()): boolean {
-  // OF3: exploring joins the world too (OF2), which would seat a closed shard's page in another cell
-  return !card.draft && card.closed !== true && selectExplores(card.slug, restricted(card), mode);
 }
 
 /** the tape over a card's image: a world that can't be entered reads COMING SOON, not EXPERIMENTAL (Jake, E386) */
@@ -246,12 +236,11 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   root.innerHTML = `
     <div class="ws-menu-hero"></div>
     <div class="ws-menu-head"><div class="ws-wordmark">Project <b>Wildshard</b></div>
-      <button class="ws-menu-mode ws-menu-explore" type="button"><span class="ws-menu-mode-glyph">${EYE}</span><span class="ws-menu-explore-text"><b>Explore world</b><small>Fly · inspect</small></span></button></div>
+</div>
     <div class="ws-menu-deck">
       <div class="ws-menu-cards"><div class="ws-menu-deck-track"></div></div>
       <div class="ws-menu-dots"></div>
       <div class="ws-menu-modes"><button class="ws-menu-mode ws-menu-play" type="button"><span class="ws-menu-mode-glyph">${SWORD}</span><b>${GAME_STRINGS.mainMenu.enterZone}</b><small></small></button></div>
-      <div class="ws-menu-row"><button class="ws-menu-settings" type="button">Settings</button></div>
     </div>`;
   const words = (tag: string, cls: string, text: string): HTMLElement => { const node = document.createElement(tag); node.className = cls; node.textContent = text; return node; };
   const cardTrack = required(root, '.ws-menu-deck-track'), dotTrack = required(root, '.ws-menu-dots');
@@ -301,8 +290,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const track = required(root, '.ws-menu-deck-track');
   const hint = required(root, '.ws-menu-play small');
   const play = root.querySelector<HTMLButtonElement>('.ws-menu-play');
-  const explore = root.querySelector<HTMLButtonElement>('.ws-menu-explore');
-  if (play === null || explore === null) throw new Error('Title deck: missing entry buttons');
+  if (play === null) throw new Error('Title deck: missing ENTER ZONE');
   const cardEls = Array.from(root.querySelectorAll<HTMLElement>('.ws-menu-card'));
   const dots = Array.from(root.querySelectorAll<HTMLElement>('.ws-menu-dots i'));
   const portrait = (): boolean => innerWidth < innerHeight;
@@ -340,8 +328,6 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     const open = canEnter(c, mode()), single = opts.single;
     hint.textContent = single?.closed ?? (single === undefined || !open ? hintFor(c, index === activeIndex, mode()) : single.hint);
     play.disabled = (!open && c.draft === null) || single?.closed !== undefined;
-    explore.disabled = !canExplore(c, mode());
-    explore.classList.toggle('off', !canExplore(c, mode())); // menu.css hides .off
     required(play, 'b').textContent = c.draft ? (isDev() ? GAME_STRINGS.drafts.draftMode : GAME_STRINGS.drafts.followBuild) : c.upgrade !== undefined ? GAME_STRINGS.upgrade.badge : c.unavailable !== undefined ? GAME_STRINGS.unavailable.badge : c.closed === true ? GAME_STRINGS.notInWorld.badge : open ? single?.play ?? GAME_STRINGS.mainMenu.enterZone : 'Coming soon';
     paintSummary(c);
   };
@@ -411,8 +397,8 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     playButton.setAttribute('aria-busy', 'true'); gating++;
     void asked.finally(() => { playButton.removeAttribute('aria-busy'); gating--; settle(); });
   });
-  onTap(required(root, '.ws-menu-explore'), () => { const c = entries[index]; if (c?.shard && canExplore(c, mode())) opts.onExplore(c.shard); });
-  onTap(required(root, '.ws-menu-settings'), opts.onSettings);
+  // EXPLORE-MODE EX1 (J460, QA 47 and 48): no EXPLORE WORLD and no SETTINGS on the deck. Explore is `wildshard dev`'s and the
+  // `/slug/<name>?explore` link's (session/play.ts `?explore=`); SETTINGS is the home screen's (mainMenu.ts, J458).
   // QA row 25's Developer pixel card is gone: Settings ▸ Graphics ▸ Pixel density is the one pixel control (MG8, Jake ~23:45)
 
   // hero art is ~0.2–0.3 MB a file and every card has two (portrait + landscape): only the selected card's, in the
