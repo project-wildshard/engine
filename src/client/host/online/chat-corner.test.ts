@@ -13,7 +13,7 @@ const owners: Scope[] = [];
 const marks = document.documentElement.dataset;
 // the corner shows only in play (QA 2026-11-11 loading HUD): these tests stand in the world unless they say otherwise
 beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance'] }); marks['wsState'] = 'play'; });
-afterEach(() => { for (const owner of owners.splice(0)) owner.dispose(); vi.useRealTimers(); document.body.replaceChildren(); delete marks['wsState']; delete marks['wsMenu']; delete marks['wsCovered']; });
+afterEach(() => { for (const owner of owners.splice(0)) owner.dispose(); vi.useRealTimers(); document.body.replaceChildren(); delete marks['wsState']; delete marks['wsMenu']; delete marks['wsCovered']; delete marks['wsTalk']; });
 
 /** The real chat corner and voice controls over a stub link: what it says, what it reports, who is on voice. */
 function corner(peers: readonly VoicePeer[] = []): { box: HTMLElement; field: HTMLInputElement; say: (said: Said) => void; sent: string[]; reported: number[]; muted: [string, boolean][] } {
@@ -428,4 +428,24 @@ test('FM8 mode 32: voice that cannot reach a peer says voice-failed, and Try aga
     await vi.advanceTimersByTimeAsync(500);
     expect(el()?.dataset['failmode']).toBeUndefined();
   } finally { voiceSettings.write({ mode: 'toggle' }); vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
+});
+
+test('J457 (Jake: "if you do start talking to NPCs, we hide the chat UI and we hide the microphone button"): a dialogue sends the corner away', async () => {
+  expect(cornerShown({ wsState: 'play', wsTalk: 'open' })).toBe(false);
+  const { box, field } = corner();
+  const mic = box.querySelector('#ws-voice'), tip = box.querySelector('#ws-voice-tip');
+  // the input, the mic and the mic's tip all live in the corner, so the corner's own mark hides all three
+  expect(mic).not.toBeNull(); expect(tip).not.toBeNull();
+  expect(away(box)).toBe(false);
+  // typing when an NPC starts talking: the open chat closes and the corner leaves
+  field.focus(); expect(open(box)).toBe(true);
+  marks['wsTalk'] = 'open'; await settle();
+  expect(away(box)).toBe(true); expect(open(box)).toBe(false);
+  // a fight while the box is open (the player goes down and stands again) keeps the corner away
+  marks['wsState'] = 'dead'; await settle(); expect(away(box)).toBe(true);
+  marks['wsState'] = 'play'; await settle(); expect(away(box)).toBe(true);
+  // the box closes: input, mic and tip come back
+  delete marks['wsTalk']; await settle();
+  expect(away(box)).toBe(false);
+  expect(box.contains(mic)).toBe(true); expect(box.contains(tip)).toBe(true);
 });

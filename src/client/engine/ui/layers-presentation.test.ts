@@ -47,3 +47,20 @@ test('QA 2026-11-11: <html data-ws-covered> marks a loading card over the world,
     other.holdCovered(scope.child('other'));expect(root.dataset['wsCovered']).toBeUndefined();
   }finally{scope.dispose();delete root.dataset['wsCovered'];}
 });
+test('J457: <html data-ws-talk> marks an open NPC dialogue box, under a menu too, and leaves however the box closes',()=>{
+  const layers=new UiLayers(undefined,true),other=new UiLayers(),scope=new Scope('layers-talk'),root=document.documentElement;
+  try{
+    expect(root.dataset['wsTalk']).toBeUndefined();
+    const talk=scope.child('talk');const box=layers.push('modal',view('world'),talk);expect(layers.talkOpen).toBe(true);expect(root.dataset['wsTalk']).toBe('open');
+    // a glass shop or the pause menu over the open box: still talking, and the menu mark joins it
+    const pause=scope.child('pause');layers.push('menu',view(),pause);expect(root.dataset['wsTalk']).toBe('open');expect(root.dataset['wsMenu']).toBe('open');
+    pause.dispose();expect(root.dataset['wsTalk']).toBe('open');expect(root.dataset['wsMenu']).toBeUndefined();
+    other.refresh();expect(root.dataset['wsTalk']).toBe('open');
+    // the box closes (NEXT on the last page, walking off, a fight that ends it): the mark goes
+    box.dispose();expect(layers.talkOpen).toBe(false);expect(root.dataset['wsTalk']).toBeUndefined();
+    // reopened, then its owner goes (the shard leaves): the mark goes too
+    const again=scope.child('again');layers.push('modal',view('world'),again);expect(root.dataset['wsTalk']).toBe('open');again.dispose();expect(root.dataset['wsTalk']).toBeUndefined();
+    // a glass or opaque screen alone is never a talk
+    const shop=scope.child('shop');layers.push('modal',view('glass'),shop);expect(root.dataset['wsTalk']).toBeUndefined();shop.dispose();
+  }finally{scope.dispose();delete root.dataset['wsTalk'];delete root.dataset['wsMenu'];}
+});

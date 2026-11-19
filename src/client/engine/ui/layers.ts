@@ -116,6 +116,8 @@ export class UiLayers {
   /** A menu or panel covers the world (the bag, the map, pause, settings, a shop, the journal): any input owner above the HUD
    *  that is not drawn as part of the world (an NPC's dialogue box is). */
   get menuOpen(): boolean { return this.input().some((entry) => entry.layer !== 'hud' && entry.view.presentation !== 'world'); }
+  /** An NPC's dialogue box is open: an input owner above the HUD drawn as part of the world (J457). */
+  get talkOpen(): boolean { return this.input().some((entry) => entry.layer !== 'hud' && entry.view.presentation === 'world'); }
   refresh(): void {
     const visible = this.input(), top = visible.at(-1);
     for (const entry of visible) entry.view.root.inert = entry !== top;
@@ -128,6 +130,10 @@ export class UiLayers {
     // QA 2026-11-11 (Jake: "don't show microphone and chat on the loading screen"): <html data-ws-covered> while a loading card
     // covers the world (`holdCovered`). The app state is already `play` under a READY / PLAY card, so the corner reads both.
     if (root !== null) { if (this.covers.size > 0) root.dataset['wsCovered'] = 'loading'; else delete root.dataset['wsCovered']; }
+    // J457 (Jake, 2026-11-19 ~13:46 Cancún: "if you do start talking to NPCs, we hide the chat UI and we hide the microphone
+    // button"): <html data-ws-talk> while a dialogue box is open, so the chat corner (its input, the mic and the mic's tip)
+    // stands aside and the box is the top thing on screen; the corner comes back when the box closes, however it closes.
+    if (root !== null) { if (this.talkOpen) root.dataset['wsTalk'] = 'open'; else delete root.dataset['wsTalk']; }
     this.changed?.();
     for(const update of this.observers)update();
   }

@@ -37,10 +37,13 @@ export function cornerOpen(open: boolean, event: CornerEvent): boolean {
 /** The app states that stand in the world. Boot, title, loading, paused, error and a capture do not. */
 const IN_WORLD: ReadonlySet<string> = new Set(['play', 'explore', 'practice', 'playground', 'dead']);
 /** The page's marks on <html> the corner reads (`document.documentElement.dataset`). */
-export interface PageMarks { readonly wsState?: string; readonly wsMenu?: string; readonly wsCovered?: string }
-/** Whether the chat corner (its input, the mic and the mic's tip) shows: in the world, with no menu over it and no loading card. */
+export interface PageMarks { readonly wsState?: string; readonly wsMenu?: string; readonly wsCovered?: string; readonly wsTalk?: string }
+/** Whether the chat corner (its input, the mic and the mic's tip) shows: in the world, with no menu over it, no loading card
+ *  and no NPC dialogue open (J457, Jake 2026-11-19: "if you do start talking to NPCs, we hide the chat UI and we hide the
+ *  microphone button"; `data-ws-talk`, src/client/engine/ui/layers.ts). Voice itself stays on while the corner is away. */
 export function cornerShown(marks: PageMarks): boolean {
-  return marks.wsState !== undefined && IN_WORLD.has(marks.wsState) && marks.wsMenu === undefined && marks.wsCovered === undefined;
+  return marks.wsState !== undefined && IN_WORLD.has(marks.wsState) && marks.wsMenu === undefined && marks.wsCovered === undefined
+    && marks.wsTalk === undefined;
 }
 /** The marks `cornerShown` reads, as attribute names, for a MutationObserver. */
-export const CORNER_MARKS: readonly string[] = ['data-ws-state', 'data-ws-menu', 'data-ws-covered'];
+export const CORNER_MARKS: readonly string[] = ['data-ws-state', 'data-ws-menu', 'data-ws-covered', 'data-ws-talk'];
