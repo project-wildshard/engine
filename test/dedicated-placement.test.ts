@@ -51,18 +51,18 @@ test('a placement file signed by the placement key reads back; the release key, 
 
 test('a placed cell takes an empty spot of the 7 × 7 and the next frame number; a slug keeps one cell and a spot holds one', () => {
   expect(placeCell(PLACED)).toBe(true);
-  expect([cellName(PLACED.slug), cellShard(PLACED.instance), cellFrame(PLACED.instance)], 'after J305\'s 25').toEqual([PLACED.instance, PLACED.slug, 26]);
+  expect([cellName(PLACED.slug), cellShard(PLACED.instance), cellFrame(PLACED.instance)], 'after J305\'s 24 (J434)').toEqual([PLACED.instance, PLACED.slug, 25]);
   expect(placeCell(PLACED), 'the same placement again changes nothing').toBe(false);
   expect(placedCells()).toEqual([PLACED]);
   expect(() => placeCell({ ...PLACED, cell: [1, 3] }), 'a cell for life').toThrow(/already placed/u);
   expect(() => placeCell({ instance: 'sa33-other', slug: 'sa33-other', cell: [0, 3] }), 'one cell a spot').toThrow(/0,3 is open-plot-thin-ice's/u);
-  expect(() => placeCell({ instance: 'sa33-other', slug: 'sa33-other', cell: [1, 1] }), 'a J305 spot').toThrow(/1,1 is template-2's/u);
+  expect(() => placeCell({ instance: 'sa33-other', slug: 'sa33-other', cell: [1, 0] }), 'a J305 spot').toThrow(/1,0 is nalati-grasslands's/u);
   expect(() => placeCell({ instance: 'sa33-twin', slug: 'driftwood-isle', cell: [1, 3] }), 'a grid shard never moves').toThrow(/already has a cell/u);
   expect(() => placeCell({ instance: 'sa33-far', slug: 'sa33-far', cell: [4, 0] }), 'radius 4 is off the grid').toThrow(/off the grid/u);
   expect(() => placeCell({ instance: 'brasscap-mesa', slug: 'sa33-steal', cell: [2, 3] }), 'an instance named for a grid shard would take its players').toThrow(/placed shard's name/u);
-  expect(() => placeCell({ instance: 'sa33-steal', slug: 'template-2', cell: [2, 3] }), 'a slug named for a grid instance').toThrow(/already has a cell/u);
+  expect(() => placeCell({ instance: 'sa33-steal', slug: 'open-plot-2-0', cell: [2, 3] }), 'a slug named for a grid instance').toThrow(/already has a cell/u);
   expect(placeCell({ instance: 'sa33-next', slug: 'sa33-next', cell: [1, 3] })).toBe(true);
-  expect(cellFrame('sa33-next')).toBe(27);
+  expect(cellFrame('sa33-next')).toBe(26);
   expect(cellFrame('driftwood-isle'), 'the catalogue\'s frames do not move').toBe(cellFrame(cellName('driftwood-isle')));
 });
 

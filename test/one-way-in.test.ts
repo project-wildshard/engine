@@ -39,7 +39,7 @@ test('an online build whose world hosts the grid: Shard select → Driftwood boo
   expect(shardCell('driftwood-isle', assembly)?.cell, 'the grid\'s home cell').toEqual([0, 0]);
   // A plot and a cell whose instance isn't its shard's slug go to their own cells too.
   expect(oneWayIn({ online: true, hosted: true, slug: 'nalati-grasslands', kept: false }, assembly)?.instance).toBe('nalati-grasslands');
-  expect(oneWayIn({ online: true, hosted: true, slug: '_template', kept: false }, assembly)?.instance).toBe('template-2');
+  expect(oneWayIn({ online: true, hosted: true, slug: 'brasscap-mesa', kept: false }, assembly)?.instance).toBe('blender-template');
   expect(oneWayIn({ online: true, hosted: true, slug: 'open-plot-sky-race', kept: false }, assembly)?.instance).toBe('open-plot-2-0');
 });
 

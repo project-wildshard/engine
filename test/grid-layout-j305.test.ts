@@ -4,9 +4,11 @@ import catalogue from '../src/shared/game/grid/singleplayer.json' with { type: '
 
 // J305 (Jake, 2026-11-12): the centre 3x3 holds the six main shards, the two new templates and one of Ink & Cel Valley or
 // Pastel Plain; the outer ring holds the other one, then unique open plots, then copies of the two new templates. The
-// legacy grey template (`open-plot-showcase-template`) is on no cell.
+// legacy grey template (`open-plot-showcase-template`) is on no cell. J434 (Jake, 2026-11-18) retired the Template: its (1,1)
+// is empty walkable floor, so the 5x5 holds 24 and Brasscap is the centre's one template.
 const MAIN = ['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack', 'sunscar-dunes', 'far-reach'];
-const TEMPLATES = ['_template', 'brasscap-mesa'];
+const TEMPLATES = ['brasscap-mesa'];
+const EMPTY = '1,1';
 const PICK = ['ink-cel-valley', 'pastel-plain'];
 const LEGACY = ['open-plot-showcase-template'];
 type Cell = { readonly slug: string; readonly cell: readonly number[] };
@@ -20,14 +22,15 @@ for (const [name, selected] of grids) {
   // SA34 permits later channel placements in ring 3. J305 still owns the
   // complete 5x5 core; test that core without discarding any of its rules.
   const cells = selected.filter(row => row.cell.every(axis => Math.abs(axis) <= 2));
-  test(`J305 ${name}: every slot of the 5x5 is filled once`, () => {
-    expect(cells).toHaveLength(25);
-    expect(new Set(cells.map(row => row.cell.join(','))).size).toBe(25);
+  test(`J305 ${name}: every slot of the 5x5 but the Template's is filled once`, () => {
+    expect(cells).toHaveLength(24);
+    expect(new Set(cells.map(row => row.cell.join(','))).size).toBe(24);
+    expect(cells.map(row => row.cell.join(','))).not.toContain(EMPTY);
     for (const row of cells) for (const axis of row.cell) expect(Math.abs(axis)).toBeLessThanOrEqual(2);
   });
-  test(`J305 ${name}: the centre holds the six main shards, both templates and one of Ink & Cel or Pastel`, () => {
+  test(`J305 ${name}: the centre holds the six main shards, Brasscap and one of Ink & Cel or Pastel`, () => {
     const middle = cells.filter(centre).map(row => row.slug);
-    expect(middle).toHaveLength(9);
+    expect(middle).toHaveLength(8);
     for (const slug of [...MAIN, ...TEMPLATES]) expect(middle).toContain(slug);
     expect(middle.filter(slug => PICK.includes(slug))).toHaveLength(1);
     expect(cells.find(row => row.cell[0] === 0 && row.cell[1] === 0)?.slug).toBe('driftwood-isle');

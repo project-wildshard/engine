@@ -29,7 +29,7 @@ test('the selected channel keeps the baked grid\'s frame numbers when later plac
 
 test('a cell\'s frames carry the number a grid page gives that cell', () => {
   const { cells } = new GridAssembly({ developer: false, devserver: false });
-  expect(cells).toHaveLength(25);
+  expect(cells).toHaveLength(24);
   for (const [index, cell] of cells.entries()) expect(cellFrame(cell.instance), cell.instance).toBe(index + 1);
   expect(cellFrame(HOME), 'not 1, which a grid page reads as Pine Hollow').not.toBe(1);
   expect(cellFrame('not-on-the-grid'), 'a cell the grid does not place keeps the old one-shard frame').toBe(1);

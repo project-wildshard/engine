@@ -11,7 +11,7 @@ for (const developer of [false, true]) for (const devserver of [false, true]) fo
   const mode = { developer, devserver, nineDragon };
   test(`G972: one complete placement and prefetch layout ${JSON.stringify(mode)}`, () => {
     const grid = new GridAssembly(mode), canonical = new GridAssembly(publicMode);
-    expect(grid.cells).toHaveLength(25);
+    expect(grid.cells).toHaveLength(24);
     expect(grid.cells).toEqual(canonical.cells);
     expect(grid.cell('nine-dragon-stack')).toMatchObject({ slug: 'nine-dragon-stack', cell: [1, -1],
       origin: { x: grid.pitch, y: 0, z: -grid.pitch } });
@@ -26,8 +26,9 @@ test('G972: no alternate Developer catalogue swaps remain in the shipped grid', 
   // Desert Ruin leave the grid
   for (const slug of ['open-plot-showcase-template', 'open-plot-thin-ice', 'open-plot-desert-ruin']) expect(slugs).not.toContain(slug);
   expect(catalogue.grid.cells.filter(cell => cell.slug === 'open-plot-lantern-bayou').map(cell => cell.cell)).toEqual([[-2, -1]]);
-  // NU3: changing any cell to an already used slug fails this shipped-grid invariant.
-  expect(new Set(slugs).size).toBe(25);
+  // NU3: changing any cell to an already used slug fails this shipped-grid invariant. J434 emptied the Template's (1,1).
+  expect(new Set(slugs).size).toBe(24);
+  expect(catalogue.grid.cells.find(row => row.cell[0] === 1 && row.cell[1] === 1)).toBeUndefined();
   for (const [slug, cell] of [
     ['open-plot-fossil-badlands', [-1, -2]], ['open-plot-patchwork-fairground', [-2, -2]],
     ['open-plot-saltwind-lighthouse', [0, 2]], ['open-plot-jungle-ziggurat', [-2, 2]],
@@ -35,7 +36,7 @@ test('G972: no alternate Developer catalogue swaps remain in the shipped grid', 
     // Coral Drift and Lantern Bayou hold the back line (x = -2), Mosslight and Ember Forge their east cells
     ['pine-hollow', [0, 1]], ['nalati-grasslands', [1, 0]], ['pastel-plain', [-1, 1]],
     ['driftwood-isle', [0, 0]], ['sunscar-dunes', [-1, 0]], ['far-reach', [0, -1]], ['nine-dragon-stack', [1, -1]],
-    ['_template', [1, 1]], ['brasscap-mesa', [-1, -1]], ['ink-cel-valley', [-1, 2]], ['open-plot-night-market', [1, -2]],
+    ['brasscap-mesa', [-1, -1]], ['ink-cel-valley', [-1, 2]], ['open-plot-night-market', [1, -2]],
     ['open-plot-frostline-peaks', [-2, 1]], ['open-plot-coral-drift', [-2, 0]],
     ['open-plot-mosslight-ruins', [2, 0]], ['open-plot-ember-forge', [2, -1]],
   ]) expect(catalogue.grid.cells.find(row => row.slug === slug)?.cell).toEqual(cell);

@@ -138,7 +138,7 @@ test('SA48: no hash, no index yet, junk, another build\'s, slug\'s or bytes\' in
     installCatalogue(PIN); installTitleManifests(TITLE); clearPlacedSpawns();
     const read = await learn(fetch);
     expect(read, why).toMatchObject({ added: [], carded: [], left: [expect.stringContaining('not in this build')] });
-    expect(gridSlugs(), why).toHaveLength(25);
+    expect(gridSlugs(), why).toHaveLength(24);
     expect(placedSpawn(SLUG), why).toBeUndefined();
     expect(verdicts(), why).toHaveLength(1);
   }

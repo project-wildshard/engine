@@ -283,7 +283,7 @@ test('a changed index cannot borrow its original build receipt', async () => {
 });
 
 test.each([true, false])('first-party data admission retains Explore=%s without restoring the native loader', async (withExplore) => {
-  const { source, wires } = fixture(false, 0, 1, 'template');
+  const { source, wires } = fixture(false, 0, 1, 'pine-hollow');
   const explore = { art: { world: '/assets/world.webp', models: '/assets/models.webp', sets: '/assets/sets.webp', practice: '/assets/practice.webp' } };
   const legacyLoad = () => Promise.reject(new Error('Native loader must not run'));
   const descriptorName = withExplore ? 'entry.json' : 'shard.json';
@@ -300,7 +300,7 @@ test.each([true, false])('first-party data admission retains Explore=%s without 
     const installed = await installManifestShardfile(manifest, {...options(wires), progress: row => {
       if (row.phase === 'descriptor') descriptorDetails.push(row.detail);
     }}, {
-      instance: 'template-solo', recipes: new Map(), items: new Map(), catalogue: [],
+      instance: 'pine-hollow', recipes: new Map(), items: new Map(), catalogue: [],
       voices: () => new Map(), icon: () => { throw new Error('No fixture item'); },
     });
     expect(installed.explore).toBe(withExplore ? explore : undefined);
@@ -335,7 +335,7 @@ test('a grid page\'s data home keeps its descriptor and leaves its home claim to
 });
 
 test.each(['manifest', 'external'] as const)('%s admission finishes during kit imports but publishes only after them', async kind => {
-  const { source, wires } = fixture(false, 0, 1, 'template');
+  const { source, wires } = fixture(false, 0, 1, 'pine-hollow');
   const manifest = { ...sourceManifest(source), shardfile: `${base}shard.json` };
   let release = (): void => { throw new Error('Uninitialized kit import'); };
   const imports = prepareBootImports(new Promise<void>(resolve => { release = resolve; }));
@@ -344,7 +344,7 @@ test.each(['manifest', 'external'] as const)('%s admission finishes during kit i
   const opts = { ...options(wires), progress: (row: Parameters<NonNullable<FolderOptions['progress']>>[0]) => {
     if (row.phase === 'complete') admitted();
   } };
-  const bindings = { instance: 'template-solo', recipes: new Map(), items: new Map(), catalogue: [],
+  const bindings = { instance: 'pine-hollow', recipes: new Map(), items: new Map(), catalogue: [],
     voices: () => new Map(), icon: () => { throw new Error('No fixture item'); } };
   const previous = shards(), active = game.shard;
   try {
@@ -362,12 +362,12 @@ test.each(['manifest', 'external'] as const)('%s admission finishes during kit i
 });
 
 test('a rejected kit barrier leaves admitted data unpublished and retains the original failure', async () => {
-  const { source, wires } = fixture(false, 0, 1, 'template');
+  const { source, wires } = fixture(false, 0, 1, 'pine-hollow');
   const manifest = { ...sourceManifest(source), shardfile: `${base}shard.json` };
   const kit = new Error('kit import failed'), imports = prepareBootImports(Promise.reject(kit));
   const previous = shards(), active = game.shard;
   await expect(installManifestShardfile(manifest, options(wires), {
-    instance: 'template-solo', recipes: new Map(), items: new Map(), catalogue: [],
+    instance: 'pine-hollow', recipes: new Map(), items: new Map(), catalogue: [],
     voices: () => new Map(), icon: () => { throw new Error('No fixture item'); },
   }, imports.ready)).rejects.toBe(kit);
   expect(game.shard).toBe(active);
@@ -375,7 +375,7 @@ test('a rejected kit barrier leaves admitted data unpublished and retains the or
 });
 
 test.each([true, false])('a real admission refusal drains before cleanup and retains kit-first errors=%s', async fails => {
-  const { source, wires } = fixture(false, 0, 1, 'template');
+  const { source, wires } = fixture(false, 0, 1, 'pine-hollow');
   const manifest = { ...sourceManifest(source), shardfile: `${base}shard.json` };
   let release = (): void => { throw new Error('Uninitialized import'); };
   let failImport = (_error: Error): void => { throw new Error('Uninitialized import'); };
@@ -387,7 +387,7 @@ test.each([true, false])('a real admission refusal drains before cleanup and ret
   const completed = (async () => {
     try {
       return await installManifestShardfile(manifest, { ...options(wires), fetch: () => Promise.reject(admission) }, {
-        instance: 'template-solo', recipes: new Map(), items: new Map(), catalogue: [],
+        instance: 'pine-hollow', recipes: new Map(), items: new Map(), catalogue: [],
         voices: () => new Map(), icon: () => { throw new Error('No fixture item'); },
       }, imports.ready);
     } catch (failure) { refused(); return await imports.refuse(failure); }

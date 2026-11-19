@@ -18,9 +18,9 @@ function compiled(material: Material): WebGLProgramParametersWithUniforms {
   material.onBeforeCompile(input, renderer); return input;
 }
 
-test('all 25 authored cells admit bounded draws without shader variants, and catch a late stray', () => {
+test('all 24 authored cells admit bounded draws without shader variants, and catch a late stray', () => {
   const grid = new GridAssembly({ developer: true, devserver: true });
-  expect(grid.cells).toHaveLength(25);
+  expect(grid.cells).toHaveLength(24);
   const scene = new Scene(), scope = new Scope('containment'), shared = new MeshBasicMaterial();
   try {
     for (const cell of grid.cells) {

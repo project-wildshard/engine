@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest';
 import { cellCost, COSTS_MEASURED, workerTable, worldSettings } from '../src/server/host/dedicated/workerTable';
 // J182, J185: which worker runs which cell, fixed at startup, on a worker count the bench sets.
-const REST = ['_template', 'blender-template', 'ink-cel-valley', 'pastel-plain', ...Array.from({ length: 16 }, (_unused, index) => `open-plot-${String(index)}`)];
+const REST = ['blender-template', 'ink-cel-valley', 'pastel-plain', ...Array.from({ length: 16 }, (_unused, index) => `open-plot-${String(index)}`)];
 const ALL = ['driftwood-isle', 'nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'sunscar-dunes', 'far-reach', ...REST];
 // The grid as production opens it (`WORLD_CELLS=grid`): instances, as `server.listening` names them.
-const GRID = ['driftwood-isle', 'pine-hollow', 'template-2', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pastel-plain', 'blender-template', 'nine-dragon-stack',
+const GRID = ['driftwood-isle', 'pine-hollow', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pastel-plain', 'blender-template', 'nine-dragon-stack',
   'ink-cel-valley', ...['0-0', '1-0', '2-0', '3-0', '4-0', '0-1', '4-1', '0-2', '4-2', '0-3', '4-3', '0-4', '2-4', '3-4', '4-4'].map(at => `open-plot-${at}`)];
 const sorted = (rows: readonly string[]): string[] => [...rows].sort();
 const load = (row: readonly string[]): number => row.reduce((total, slug) => total + cellCost(slug), 0);

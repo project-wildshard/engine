@@ -7,7 +7,7 @@ import type { MenuMode } from '../src/client/game/grid/menu';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
 /** J313 (Jake, 2026-11-12 ~23:05 Cancún, after GC21): Sky Reach and Signal Dunes enter for every player labelled EXPERIMENTAL,
- *  Nine Dragon labelled PARTIAL; Mossgate (`_template`) has a card for everyone; open plots have no card (players reach them by
+ *  Nine Dragon labelled PARTIAL; the Template had a card for everyone (J434 retired it); open plots have no card (players reach them by
  *  crossing the grid); the Thin Ice draft card, off the grid by J305, is Developer only. The rows are the live title rows'
  *  slug, status and `shardSelect` on staging v0.1.13 (each shard's own discovery); the catalogue is the one a release build
  *  bakes, `test/pins/catalogue.json`, whose placement statuses J313 sets. */
@@ -21,7 +21,7 @@ const ROWS: readonly TitleManifest[] = [
   row('ink-cel-valley', 'Ink & Cel Valley', 'hidden', false), row('open-plot-night-market', 'Open Plot · Night Market', 'experimental', false),
   row('open-plot-thin-ice', 'Open Plot · Thin Ice', 'earlyAccess', false), row('open-plot-desert-ruin', 'Open Plot · Desert Ruin', 'hidden', false),
   row('open-plot-coral-drift', 'Open Plot · Coral Drift', 'earlyAccess', false),
-  row('sunscar-dunes', 'Signal Dunes', 'experimental'), row('far-reach', 'Sky Reach', 'experimental'), row('_template', 'Template shard', 'hidden'),
+  row('sunscar-dunes', 'Signal Dunes', 'experimental'), row('far-reach', 'Sky Reach', 'experimental'), row('_proto', 'Prototype shard', 'hidden'),
 ];
 const PLAYER: MenuMode = { developer: false, devserver: false };
 
@@ -69,15 +69,14 @@ test('J313: Developer still sees the Thin Ice draft and the hidden shards; open 
   const names = view(deckOf(true, { developer: true, devserver: false })).map(({ name }) => name);
   expect(names).toContain('Thin Ice');
   expect(names).toContain('Brasscap Mesa');
-  expect(names).toContain('Template shard');
   expect(names.some((name) => name.startsWith('Open Plot'))).toBe(false);
 });
 
 test('SB46: the title summary counts an opened shard for a player, never the Template prototype', async () => {
   const { summaryView } = await import('../src/client/game/summary');
-  const view = summaryView({ v: 1, shards: { _template: { earned: 2, total: null, playS: 10, at: 0 }, 'far-reach': { earned: 3, total: null, playS: 10, at: 0 } } }, ROWS);
+  const view = summaryView({ v: 1, shards: { _proto: { earned: 2, total: null, playS: 10, at: 0 }, 'far-reach': { earned: 3, total: null, playS: 10, at: 0 } } }, ROWS);
   expect(view.lines.map(({ slug }) => slug)).toContain('far-reach');
-  expect(view.lines.some(({ slug }) => slug === '_template' || slug === 'brasscap-mesa')).toBe(false);
+  expect(view.lines.some(({ slug }) => slug === '_proto' || slug === 'brasscap-mesa')).toBe(false);
 });
 
 // FM4 9b/10b (meta MMO-FAILURE-MODES-PLAN; review of plan/mfm2): a world build's title gate may hold ENTER WORLD while it asks the world.
@@ -101,12 +100,14 @@ test('a gated ENTER WORLD stays busy while the gate asks, and enters the card ta
   expect(entered).toEqual(['pine-hollow']);
 });
 
-/** STAGING-BUGBASH SB46 (Jake's pick on the zone sweep board, recommended): J313 opened `_template` to players while that slug
- *  was Mossgate; Mossgate Hollow is `mossgate` now (SS-SHIPa), so the grey-box Template is Developer only again. A `_`
+/** STAGING-BUGBASH SB46 (Jake's pick on the zone sweep board, recommended): J313 opened the old `_` Template to players while
+ *  that slug was Mossgate; Mossgate Hollow is `mossgate` now (SS-SHIPa), so a grey-box prototype is Developer only again. A `_`
  *  prototype stays off a player's deck even when a catalogue placement still says `live` (an API grid a pin refresh copies). */
 test('SB46: a `_` prototype is Developer only, even when its catalogue placement says live', () => {
-  installCatalogue({ ...catalogueBeforePlacements, placements: catalogueBeforePlacements.placements.map(placed =>
-    placed.slug === '_template' ? { ...placed, status: 'live' } : placed) });
-  expect(view(deckOf(false, PLAYER)).map(({ name }) => name)).not.toContain('Template shard');
-  expect(view(deckOf(true, { developer: true, devserver: false })).map(({ name }) => name)).toContain('Template shard');
+  const [first] = catalogueBeforePlacements.placements;
+  if (first === undefined) throw new Error('The catalogue has placements');
+  installCatalogue({ ...catalogueBeforePlacements, placements: [...catalogueBeforePlacements.placements,
+    { ...first, instance: 'proto-solo', slug: '_proto', cell: [5, 9], status: 'live' }] });
+  expect(view(deckOf(false, PLAYER)).map(({ name }) => name)).not.toContain('Prototype shard');
+  expect(view(deckOf(true, { developer: true, devserver: false })).map(({ name }) => name)).toContain('Prototype shard');
 });
