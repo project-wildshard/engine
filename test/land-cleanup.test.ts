@@ -65,9 +65,9 @@ describe('land (J422): main-watch, the canonical checkout and cleanup after the 
     expect(existsSync(kept)).toBe(true);
   }, 60_000);
 
-  test('parseArgs: push by default on the MacBook, keeping the worktree; local on the mini; --hosted is gone', () => {
-    expect(parseArgs([], {}, 'Jakes-Mac-Mini.local').mode).toBe('local');
-    expect(parseArgs([], { WS_LAND_MODE: 'push' }, 'Jakes-Mac-Mini.local').mode).toBe('push');
+  test('parseArgs: push by default on every machine (J443, FS23), keeping the worktree; local only when asked; --hosted is gone', () => {
+    expect(parseArgs([], {}, 'Jakes-Mac-Mini.local').mode).toBe('push');
+    expect(parseArgs([], { WS_LAND_MODE: 'local' }, 'Jakes-Mac-Mini.local').mode).toBe('local');
     expect(parseArgs([], {}, 'macbook')).toEqual({ mode: 'push', rounds: 5, keep: true, done: false });
     expect(parseArgs(['--done'], {}, 'macbook')).toMatchObject({ mode: 'push', keep: false, done: true });
     expect(parseArgs([], { WS_LAND_MODE: 'local' })).toMatchObject({ mode: 'local', keep: false });

@@ -4,8 +4,9 @@
 // hosted full suite. No plan-branch push, no full suite in the lane, no
 // queue. The worktree stays for the next row; --done removes it. A red
 // main is fixed forward by the push main-watch names (J422 wave 2).
-// --local (J400's full local gate) stays for the Mac mini (J388), the
-// default on a host named like it. FLOW-SIMPLE FS5 deleted --hosted (the
+// --local (J400's full local gate) stays opt-in until the Mac mini's last
+// full-gate land (J443 moved the mini to push mode, FLOW-SIMPLE FS23);
+// FS5 deleted --hosted (the
 // branch-CI land: plan push, CI wait, exact/carried main push).
 // Both modes preserve pin provenance, canonical sync, main-watch and
 // owned-worktree cleanup. A red main is fixed forward at once (J249).
@@ -222,11 +223,12 @@ export function githubSlug(remote){
  return match?.[1]??null;
 }
 
-/** J422 is MacBook only for now (wave 2): the Mac mini keeps J388's local full gate by default.
- * @param {NodeJS.ProcessEnv} env @param {string} host @returns {'push'|'local'} */
-export function defaultMode(env,host){
+/** Push mode on every machine (J443, meta FLOW-SIMPLE FS23: the Mac mini moves to the push flow, replacing J388 for
+ * landing). WS_LAND_MODE=local or --local still runs J400's full local gate until the mini's last full-gate land.
+ * @param {NodeJS.ProcessEnv} env @param {string} [_host] kept for callers; no host gets its own default @returns {'push'|'local'} */
+export function defaultMode(env,_host){
  if(env.WS_LAND_MODE==='local'||env.WS_LAND_MODE==='push')return env.WS_LAND_MODE;
- return /mac-?mini/iu.test(host)?'local':'push';
+ return 'push';
 }
 
 /** Refuse anything but the known options. Any spelling of force is refused by name.
