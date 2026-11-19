@@ -2,9 +2,9 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--cool-to <°C>] [--out <dir>] [--dry-run]
 //
-// --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split).
+// --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split). --legs n plays the first n segments only.
 //
 // Each run plays the route (route.mjs) once per cap, each from its own cold boot (fresh Safari on the phone, a fresh WebKit
 // on the Mac; origin storage cleared, phone Low seeded), so every pass starts at the dock; the cap order alternates run to run. The phone runs under
@@ -25,7 +25,7 @@ import { askWake, holdWake, playRoute, routeFor, routeTable, worstSegment } from
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
-  slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, out: { type: 'string' }, udid: { type: 'string' },
+  slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'cool-to': { type: 'string' }, out: { type: 'string' }, udid: { type: 'string' },
   'dry-run': { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
@@ -48,30 +48,50 @@ async function bench() {
     route: routeFor(values.zone), phone: tools?.facts ?? null, idleCelsius: tools?.idle ?? null };
   writeFileSync(join(out, 'environment.json'), JSON.stringify(environment, null, 2));
   try {
-    const trials = Array.from({ length: runs }, (_, i) => (i % 2 === 0 ? caps : [...caps].reverse()).map((cap) => ({ run: i + 1, cap }))).flat();
-    for (const { run, cap } of trials) {
+    // --ab <slot>: each run plays the slot off and on, in alternating order (ABBA), so the pairs share one idle reading
+    const sides = values.ab === undefined ? [null] : [false, true];
+    const trials = Array.from({ length: runs }, (_, i) => (i % 2 === 0 ? sides : [...sides].reverse())
+      .flatMap((ab) => (i % 2 === 0 ? caps : [...caps].reverse()).map((cap) => ({ run: i + 1, cap, ab })))).flat();
+    for (const { run, cap, ab } of trials) {
+      const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, [values.ab]: ab };
       const temperature = tools === null ? null : await tools.cool();
       const { webkitDriver, driver } = phone ? { webkitDriver: null, driver: await /** @type {NonNullable<typeof tools>} */ (tools).fresh() }
         : await (async () => { const { startWebKit } = await import('./webkit.mjs'); const started = await startWebKit(); return { webkitDriver: started, driver: started }; })();
-      const directory = join(out, `run-${String(run)}-cap${String(cap)}`);
+      const directory = join(out, `run-${String(run)}-cap${String(cap)}${ab === null ? '' : `-${String(ab)}`}`);
       mkdirSync(directory, { recursive: true });
+      /** @type {Promise<void> | null} */
+      let profiling = null;
       /** @type {any} */
-      const row = { run, cap, temperature, boot: null, legs: [], error: null, screenshot: null };
+      const row = { run, cap, ab, temperature, boot: null, legs: [], error: null, screenshot: null };
       try {
         tools?.lockState(`run ${String(run)} cap ${String(cap)} before boot`);
-        const boot = await enterZone(/** @type {any} */ (driver), { base, slug: values.zone, slots });
+        const boot = await enterZone(/** @type {any} */ (driver), { base, slug: values.zone, slots: trialSlots });
         row.boot = { outcome: boot.outcome, controlS: boot.controlAt !== null && boot.startedAt !== null ? (boot.controlAt - boot.startedAt) / 1000 : null,
           build: boot.state?.build ?? null, version: boot.state?.version ?? null, error: boot.state?.error ?? null };
         tools?.lockState(`run ${String(run)} cap ${String(cap)} after boot`);
-        console.log(`run ${String(run)} cap ${String(cap)}: ${boot.outcome} in ${String(row.boot.controlS)} s (${String(row.boot.version)})`);
+        console.log(`run ${String(run)} cap ${String(cap)}${ab === null ? '' : ` ${String(values.ab)}=${String(ab)}`}: ${boot.outcome} in ${String(row.boot.controlS)} s (${String(row.boot.version)})`);
         if (boot.outcome === 'control') {
           if ('gesture' in driver && typeof driver.gesture === 'function') await driver.gesture(askWake).catch(() => undefined);
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
+          // --profile <s>: WebKit's sampling profiler over the route's first seconds (DW2: what the long tasks are)
+          if (values.profile !== undefined && 'profileStart' in driver && typeof driver.profileStart === 'function') {
+            const profiled = driver;
+            await profiled.profileStart();
+            profiling = (async () => {
+              try {
+                await pause(Number(values.profile) * 1000);
+                const samples = await profiled.profileStop();
+                writeFileSync(join(directory, 'profile.json'), JSON.stringify(samples));
+                console.log(`  profile: ${String(samples.length)} samples in ${join(directory, 'profile.json')}`);
+              } catch (error) { console.log(`  profile: ${String(error)}`); }
+            })();
+          }
           if ('quiet' in driver && typeof driver.quiet === 'function') await driver.quiet();
-          row.legs = await playRoute(driver, { slug: values.zone, cap, rec: values.rec ?? [], log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+          row.legs = await playRoute(driver, { slug: values.zone, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
         }
       } catch (error) { row.error = error instanceof Error ? error.message : String(error); console.log(`run ${String(run)}: ${row.error}`); }
+      await profiling;
       if (String(row.error).startsWith('PHONE LOCKED')) { report.push(row); writeFileSync(join(out, 'route.json'), JSON.stringify(report, null, 2)); throw new Error(row.error); }
       try {
         const shot = join(directory, phone ? 'end.png' : 'end.jpg');
@@ -85,7 +105,7 @@ async function bench() {
   } finally { await tools?.stop(); }
   const lines = [`# ${values.zone} route bench`, '', `${values.driver} · ${base} · ${String(runs)} runs · caps ${caps.join(', ')} · ${environment.startedAt}`, ''];
   for (const row of report) {
-    lines.push(`## Run ${String(row.run)}, cap ${String(row.cap)}: ${String(row.boot?.outcome ?? row.error)}${row.boot?.controlS ? `, control ${row.boot.controlS.toFixed(1)} s` : ''}${row.temperature === null ? '' : `, ${String(row.temperature)} °C`}`, '');
+    lines.push(`## Run ${String(row.run)}, cap ${String(row.cap)}${row.ab === null ? '' : `, ${String(values.ab)} ${String(row.ab)}`}: ${String(row.boot?.outcome ?? row.error)}${row.boot?.controlS ? `, control ${row.boot.controlS.toFixed(1)} s` : ''}${row.temperature === null ? '' : `, ${String(row.temperature)} °C`}`, '');
     lines.push(routeTable(row.legs), '');
     for (const leg of row.legs) if (typeof leg.rec === 'string') lines.push(`### REC 30 S: ${String(leg.name)}`, '', '```text', leg.rec, '```', '');
   }
@@ -131,13 +151,14 @@ async function phoneTools() {
       return driver;
     },
     lockState,
-    /** Wait (at most 10 min) for the battery to come back within 3 °C of the first reading. */
+    /** Wait (at most 10 min) for the battery to come back within 3 °C of the first reading, or to --cool-to °C. */
     async cool() {
       const deadline = Date.now() + 10 * 60_000;
       let now = reading();
-      if (idle === null) return now;
-      while (now !== null && now - idle > 3 && Date.now() < deadline) {
-        console.log(`cooling: ${String(now)} °C against ${String(idle)} °C`);
+      const line = values['cool-to'] === undefined ? (idle === null ? null : idle + 3) : Number(values['cool-to']);
+      if (line === null) return now;
+      while (now !== null && now > line && Date.now() < deadline) {
+        console.log(`cooling: ${String(now)} °C against ${String(line)} °C`);
         await pause(15_000);
         now = reading();
       }

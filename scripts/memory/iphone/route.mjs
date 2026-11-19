@@ -72,7 +72,7 @@ export function routeLegOnPage(leg) {
   // GPU traffic per second (DW1, for opus-fps: does the Memory saver purge and re-upload?): texture uploads, buffer uploads
   // and buffer read-backs (a released array read again, memorySaver.ts restore), counted on the context's prototype once
   const counts = leg.fixed ? null : (/** @type {any} */ (window).__wsRouteGl ??= (() => {
-    const tally = { tex: 0, buf: 0, read: 0, audioStarts: 0, audioEnds: 0 };
+    const tally = { tex: 0, buf: 0, read: 0, audioStarts: 0, audioEnds: 0, busyMs: 0 };
     const proto = /** @type {any} */ (globalThis).WebGL2RenderingContext?.prototype;
     const wrap = (/** @type {string} */ name, /** @type {'tex'|'buf'|'read'} */ key) => {
       const original = proto?.[name];
@@ -94,8 +94,26 @@ export function routeLegOnPage(leg) {
         original.apply(this, args);
       };
     }
+    // main-thread busy: a MessageChannel ping loop runs between tasks, so its longest gap is the longest task. A long frame
+    // with short gaps waited on the GPU; with a long gap the main thread was busy (DW2)
+    const channel = new MessageChannel();
+    let lastPing = performance.now();
+    channel.port1.onmessage = () => {
+      const now = performance.now();
+      tally.busyMs = Math.max(tally.busyMs, now - lastPing);
+      lastPing = now;
+      setTimeout(() => { channel.port2.postMessage(0); }, 0);
+    };
+    channel.port2.postMessage(0);
     return tally;
   })());
+  // the Memory saver installs its own bufferData on the context (memorySaver.ts), bound before this wrap: count that one too
+  const gl = counts === null ? null : renderer.getContext?.();
+  if (gl && Object.hasOwn(gl, 'bufferData') && !gl.__wsRouteCounted) {
+    const own = gl.bufferData;
+    gl.bufferData = function bufferData(/** @type {unknown[]} */ ...args) { counts.buf++; return own.apply(this, args); };
+    gl.__wsRouteCounted = true;
+  }
   let seenGl = { ...counts };
   const memChip = () => {
     for (const el of document.querySelectorAll('.ws-perf-dock *')) {
@@ -145,11 +163,11 @@ export function routeLegOnPage(leg) {
       delayMs: clock?.delayMs ?? null, jitterMs: clock?.jitterMs ?? null,
       ...(counts === null ? {} : {
         texUploads: counts.tex - seenGl.tex, bufUploads: counts.buf - seenGl.buf, readBacks: counts.read - seenGl.read,
-        audioStarts: counts.audioStarts - seenGl.audioStarts, audioLive: counts.audioStarts - counts.audioEnds,
+        audioStarts: counts.audioStarts - seenGl.audioStarts, audioLive: counts.audioStarts - counts.audioEnds, busyMs: Math.round(counts.busyMs),
         textures: renderer.info?.memory?.textures ?? null, geometries: renderer.info?.memory?.geometries ?? null, mem: memChip(),
       }),
       at: [Math.round((p.position.x - originX) * 10) / 10, Math.round((p.position.z - originZ) * 10) / 10] });
-    previous = now; seenGl = { ...counts };
+    previous = now; seenGl = { ...counts }; if (counts !== null) counts.busyMs = 0;
   };
   const end = (/** @type {string|null} */ error) => {
     if (ended) return;
@@ -319,30 +337,43 @@ export const holdWake = `
 /** The expression a driver's gesture() runs first, so the request has transient activation. */
 export const askWake = "(window.__wsRouteWakeAsk = navigator.wakeLock?.request('screen'), true)";
 
+/** Wait (at most 15 s) for the grid reveal to end; answer its timings (null: no reveal on this page). */
+const revealEnd = `
+  const done = arguments[arguments.length - 1];
+  const t0 = performance.now();
+  const wait = () => {
+    const reveal = window.__wsReveal ?? null;
+    if (reveal === null && performance.now() - t0 > 1000) { done(null); return; }
+    if (reveal !== null && (reveal.endedMs !== null || performance.now() - t0 > 15000)) {
+      done({ ...reveal, waitedMs: Math.round(performance.now() - t0) }); return;
+    }
+    setTimeout(wait, 100);
+  };
+  wait();
+`;
+
 /** Open the Developer frame panel and press REC 30 S (WebDriver-style async body). */
 const recStart = `
   const done = arguments[arguments.length - 1];
   const up = (el) => el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
   const root = document.querySelector('.ws-perf');
   if (!root) { done('no frame panel (Developer off?)'); return; }
-  localStorage.setItem('__routeRecWas', localStorage.getItem('wildshard.save.v2@2.device') ?? '');
   if (!root.querySelector('.ws-perf-panel.open')) up(root);
   const t0 = performance.now();
   const press = () => { const button = document.querySelector('.ws-perf-rec'); if (button) { up(button); done('recording'); } else if (performance.now() - t0 > 10000) done('no REC button'); else setTimeout(press, 200); };
   press();
 `;
 
-/** Wait for REC 30 S's summary (the device save's perf.rec), close the panel and return the text. */
+/** Wait for REC 30 S's summary (Perf.ts writes it into the panel's .ws-perf-rec-out), close the panel and return it. */
 const recRead = `
   const done = arguments[arguments.length - 1];
-  const t0 = performance.now(), was = localStorage.getItem('__routeRecWas');
+  const t0 = performance.now();
   const read = () => {
-    const now = localStorage.getItem('wildshard.save.v2@2.device') ?? '';
-    const text = JSON.parse(now || '{}').keys?.['perf.rec']?.data ?? null;
-    if ((now !== was && text) || performance.now() - t0 > 40000) {
+    const text = document.querySelector('.ws-perf-rec-out')?.textContent ?? '';
+    if (/PERF REC/u.test(text) || performance.now() - t0 > 40000) {
       const root = document.querySelector('.ws-perf');
       if (root?.querySelector('.ws-perf-panel.open')) root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
-      done(typeof text === 'string' ? text : JSON.stringify(text));
+      done(text || 'no REC summary');
     } else setTimeout(read, 500);
   };
   read();
@@ -350,14 +381,18 @@ const recRead = `
 
 /** Play `slug`'s route on a driver at control, one leg at a time.
  * @param {{ evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<any> }} driver
- * @param {{ slug: string, cap: 30 | 60 | null, rec?: string[], log?: (line: string) => void }} options */
-export async function playRoute(driver, { slug, cap, rec = [], log = () => undefined }) {
+ * @param {{ slug: string, cap: 30 | 60 | null, rec?: string[], legs?: number, log?: (line: string) => void }} options */
+export async function playRoute(driver, { slug, cap, rec = [], legs: count, log = () => undefined }) {
   const legs = [];
-  for (const leg of routeFor(slug)) {
+  // the grid's sky-down reveal (grid/reveal.ts: the camera comes down from ~400 m over the pier, 3 s) runs after control;
+  // the route measures play, so it starts once the reveal has ended, and says how long the reveal took
+  const reveal = await driver.evaluateAsync(revealEnd, [], 20_000).catch((/** @type {unknown} */ error) => ({ error: String(error) }));
+  log(`reveal: ${JSON.stringify(reveal)}`);
+  for (const leg of routeFor(slug).slice(0, count)) {
     // DW2: the game's own REC 30 S (perfHud.ts: every frame's update by system, render and gpu~, and the top spike frames
     // with their causes) over this leg; the Developer panel is open while it records, so these legs are not DW1's numbers
     const recording = rec.includes(leg.name);
-    if (recording) await driver.evaluateAsync(recStart, [], 15_000);
+    if (recording) log(`${leg.name}: REC ${String(await driver.evaluateAsync(recStart, [], 15_000))}`);
     const result = await driver.evaluateAsync(`
       const done = arguments[arguments.length - 1];
       (${routeLegOnPage.toString()})(arguments[0]).then(done, (error) => done({ error: String(error) }));

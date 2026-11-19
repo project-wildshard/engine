@@ -107,6 +107,8 @@ async function attach(socketUrl, { overrides = [] }) {
   /** @type {{ url: string, at: number }[]} */
   const served = [];
   const debug = process.env.WS_INSPECTOR_DEBUG === '1';
+  /** @type {Set<(message: any) => void>} */
+  const listeners = new Set();
   ws.onmessage = (event) => {
     const message = JSON.parse(String(event.data));
     if (debug && String(message.method ?? '').startsWith('Target.') && message.method !== 'Target.dispatchMessageFromTarget') console.error('inspector', Date.now(), JSON.stringify(message).slice(0, 300));
@@ -122,6 +124,7 @@ async function attach(socketUrl, { overrides = [] }) {
     if (message.method === 'Target.targetDestroyed' && message.params.targetId === target) { fail('the inspected page went away'); return; }
     let inner = message, from = null;
     if (message.method === 'Target.dispatchMessageFromTarget') { inner = JSON.parse(message.params.message); from = message.params.targetId; }
+    if (typeof inner.method === 'string') for (const listener of listeners) listener(inner);
     if (inner.method === 'Network.requestIntercepted') {
       const url = String(inner.params.request?.url ?? '');
       const hit = overrides.find(({ pattern }) => url.includes(pattern));
@@ -193,6 +196,23 @@ async function attach(socketUrl, { overrides = [] }) {
     /** Evaluate one expression as a user gesture (Runtime.evaluate's emulateUserGesture): an API that wants transient
      * activation, such as the Screen Wake Lock, accepts it. Returns the value, or throws what the page threw.
      * @param {string} expression */
+    /** Start WebKit's sampling profiler (ScriptProfiler, with stack samples) on the page. */
+    async profileStart() {
+      await ready;
+      await send('ScriptProfiler.startTracking', { includeSamples: true }, 15_000);
+    },
+    /** Stop the sampling profiler and answer its samples: each a timestamp (s) and its stack, innermost first. */
+    async profileStop() {
+      /** @type {(value: any) => void} */ let completed = () => undefined;
+      const complete = new Promise((resolve) => { completed = resolve; });
+      const listener = (/** @type {any} */ message) => { if (message.method === 'ScriptProfiler.trackingComplete') completed(message.params); };
+      listeners.add(listener);
+      try {
+        await send('ScriptProfiler.stopTracking', {}, 15_000);
+        const params = await Promise.race([complete, pause(60_000).then(() => null)]);
+        return params?.samples?.stackTraces ?? [];
+      } finally { listeners.delete(listener); }
+    },
     async gesture(expression) {
       await ready;
       const result = await send('Runtime.evaluate', { expression, returnByValue: true, emulateUserGesture: true }, 10_000);

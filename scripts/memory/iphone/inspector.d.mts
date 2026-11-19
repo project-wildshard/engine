@@ -7,6 +7,8 @@ export interface InspectedSafari {
   served: { url: string; at: number }[];
   getUrl: () => Promise<unknown>;
   gesture: (expression: string) => Promise<unknown>;
+  profileStart: () => Promise<void>;
+  profileStop: () => Promise<{ timestamp: number; stackFrames: { name: string; url: string; line: number; column: number }[] }[]>;
   navigate: (url: string) => Promise<void>;
   reload: () => Promise<void>;
   freshTab: () => Promise<void>;

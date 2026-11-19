@@ -18,3 +18,9 @@ before it. It stays off until the phone pairs weigh the longer card against the 
 
 The slot landed separately from the bench: `debug.bootRoadPrograms` in render/precompile.ts, read in session/finish.ts at the
 world-frame stage, with Game.warmDeferredEntryRoots taking an unpaced run for it.
+
+Later the same evening: moving the links under the card did not move the dock's first-4-s spikes on the phone. A
+MessageChannel ping loop showed 190 to 540 ms main-thread tasks between frames, and a Web Inspector ScriptProfiler sample
+named them: half the main thread in `new WebAssembly.Memory`, the grid page's script memory top-up after control
+(scriptMemoryPlan.ts, SB47). The slot `debug.scriptMemoryTopUp` (default on) can skip it; the phone pairs decide.
+The bench gained `--ab <slot>` (ABBA pairs in one process), `--cool-to`, `--legs`, `--profile <s>` and a per-second busy gap.
