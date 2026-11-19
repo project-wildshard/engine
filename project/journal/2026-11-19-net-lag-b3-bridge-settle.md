@@ -1,0 +1,11 @@
+# B3 after the bridge's forced frames (NET-LAG NL17)
+
+> Written by: Claude (opus-netlag14), 2026-11-19
+
+Driftwood missed B3 on staging in every run of NL17's matrix (128 to 172 ms) while the loopback rig passed. The
+proof now keeps a delay and jitter series per phase, and one staging run on v0.1.50 shows why: the wire's jitter is 2
+to 6 ms the whole run, except while B4 forces 60 ms frames on the rope bridge, when the held page thread stamps
+frames 120 to 134 ms late and the delay climbs to 175 ms. It is back at 70 ms 11 s after the bridge. That is the
+proof's own stall, not the link, so `b3Verdict` (scripts/net-lag-verdict.mjs) gives the forced frames the same 10 s
+to settle that entry gets. The bar (120 ms, held 0) is unchanged. NL4's Driftwood command with no bridge, same
+release: B3 80 ms, B2 0 a minute.

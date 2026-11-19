@@ -44,6 +44,22 @@ export function installBridgeCorrections() {
   fault.ready = true;
 }
 
+/**
+ * B3: the interpolation delay at most 120 ms from 10 s after entry, and no frame held past the buffer. NET-LAG NL17: B4's
+ * forced 60 ms frames hold the page's thread, so frames are stamped late and the delay rises to cover a stall the proof made
+ * (staging v0.1.50, Driftwood: jitter 2 to 6 ms on the wire, 120 to 134 ms on the bridge, delay 175 ms). That stall gets the
+ * same 10 s to settle that entry gets: `forcedEndMs`, from entry, is when the forced frames stopped.
+ * @param {{ t: number, delay: number }[]} delays samples, `t` in ms from entry
+ * @param {number} heldFrom the interpolator's held count at entry
+ * @param {number} heldAfter the same count at the run's end
+ * @param {number} [forcedEndMs]
+ */
+export function b3Verdict(delays, heldFrom, heldAfter, forcedEndMs = 0) {
+  const settled = Math.max(10_000, forcedEndMs + 10_000), late = delays.filter(sample => sample.t >= settled);
+  const delayMaxAfter10s = late.length === 0 ? null : Math.max(...late.map(sample => sample.delay)), held = heldAfter - heldFrom;
+  return { delayMaxAfter10s, held, fromSeconds: settled / 1000, ok: delayMaxAfter10s !== null && delayMaxAfter10s <= 120 && held === 0 };
+}
+
 /** Correctness runs cannot certify frame, correction-rate or clock timings.
  * @param {Record<string, any>} row
  * @param {'correctness'|'timing'} mode

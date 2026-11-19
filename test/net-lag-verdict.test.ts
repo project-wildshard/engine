@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute the exact serialized browser hook in isolation.
 import { runInNewContext } from 'node:vm';
-import { bridgeVerdict, installBridgeCorrections, proofVerdict } from '../scripts/net-lag-verdict.mjs';
+import { b3Verdict, bridgeVerdict, installBridgeCorrections, proofVerdict } from '../scripts/net-lag-verdict.mjs';
 
 const crossing = { reached: true, under: 0, falls: 0, corrections: 2, injectedSinks: [0.3, 1], forcedFrames: 30, forcedFrameMs: 60, spanSamples: 8, lowest: 5.4 };
 
@@ -71,4 +71,16 @@ test.each(['live', 'render'])('bridge faults intercept the actual %s reconciliat
     expect(fault.confirmed.map(row => row.sink)).toEqual([0.3, 1]);
   } finally { fault.cleanup(); }
   expect(predictor.reconcile).toBe(original); expect(main.corrections.size).toBe(0);
+});
+
+test('B3 gives B4\'s forced frames the same 10 s to settle that it gives entry', () => {
+  // NET-LAG NL17 (staging v0.1.50, Driftwood): jitter 2 to 6 ms on the wire, 120 to 134 ms while B4 forced 60 ms frames,
+  // delay 175 ms; it was back to 70 ms 11 s after the bridge. The proof's own stall is not the link's.
+  const delays = [{ t: 5_000, delay: 110 }, { t: 12_000, delay: 70 }, { t: 41_000, delay: 175 }, { t: 58_000, delay: 117 }, { t: 70_000, delay: 70 }];
+  expect(b3Verdict(delays, 0, 0)).toMatchObject({ delayMaxAfter10s: 175, fromSeconds: 10, ok: false });
+  expect(b3Verdict(delays, 0, 0, 48_000)).toMatchObject({ delayMaxAfter10s: 117, fromSeconds: 58, ok: true });
+  // a real rise after the settle still fails, and so does a held frame or no sample at all
+  expect(b3Verdict([...delays, { t: 80_000, delay: 121 }], 0, 0, 48_000).ok).toBe(false);
+  expect(b3Verdict(delays, 2, 3, 48_000)).toMatchObject({ held: 1, ok: false });
+  expect(b3Verdict([{ t: 5_000, delay: 80 }], 0, 0).ok).toBe(false);
 });

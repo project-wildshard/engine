@@ -5,7 +5,8 @@
 //   B1  drawn frames (the renderer's own, so a 30 fps cap reads as 30): none over 2x the frame budget nor over 50 ms, p99 at
 //       most 1.25x it. Budget = 1000 / min(display Hz, the tier's cap), read from the drawn rate before moving.
 //   B2  own character on foot (walk and sprint): at most 2 corrections a minute, worst render offset at most 0.10 m.
-//   B3  others: interpolation delay at most 120 ms from 10 s after entry, and no frame held past the buffer (`interpHeld`, from entry).
+//   B3  others: interpolation delay at most 120 ms from 10 s after entry (and after B4's forced frames), and no frame held past
+//       the buffer (`interpHeld`, from entry).
 //   B4  Driftwood only: the rope bridge crossed with forced 60 ms frames, the feet never under its planks, no fall.
 // J205: staging, preview or a loopback page only, never production; the page's sockets are held to the one door.
 //   node scripts/net-lag-proof.mjs [--base=https://staging.wildshard.io] [--socket=wss://rooms-staging.wildshard.io]
@@ -21,7 +22,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 import { watchFaults } from './proof-faults.mjs';
-import { bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
+import { b3Verdict, bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
 
 const arg = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const DECK = ['driftwood-isle', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pine-hollow', 'nine-dragon-stack'];
@@ -143,9 +144,10 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       row.bridge = await crossBridge(page);
       row.b4 = bridgeVerdict(row.bridge);
     } else {
-      const entered = Date.now(), delays = /** @type {{ t: number, delay: number }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
-      const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { sampledAt: performance.now(), corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative }, cell: w.cell, resyncs: w.resyncs ?? 0, replaysPerFrame: w.replaysPerFrame }; });
-      sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay }); return undefined; }).catch(() => undefined); }, 250);
+      let stage = 'settle';
+      const entered = Date.now(), delays = /** @type {{ t: number, delay: number, jitter: number, stage: string }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
+      const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { sampledAt: performance.now(), corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, jitter: w.jitterMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative }, cell: w.cell, resyncs: w.resyncs ?? 0, replaysPerFrame: w.replaysPerFrame }; });
+      sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay, jitter: r.jitter, stage }); return undefined; }).catch(() => undefined); }, 250);
       await sleep(2000);
       // the budget: the drawn rate standing still, against the display's 60 Hz (headless)
       await page.evaluate(() => { const S = /** @type {any} */ (window).__netLag; S.drawn.length = 0; S.on = true; });
@@ -153,13 +155,16 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       const idle = await page.evaluate(() => /** @type {any} */ (window).__netLag.drawn.slice());
       row.budgetMs = at(idle, 0.5) > 25 ? 1000 / 30 : 1000 / 60;
       // B4 first, from the spawn on the pier, where its route starts
-      if (bridge && slug === 'driftwood-isle') row.bridge = await crossBridge(page);
+      // NL17: B3 is judged from 10 s after B4's forced frames as well as after entry (`b3Verdict`)
+      let forcedEnd = 0;
+      if (bridge && slug === 'driftwood-isle') { stage = 'bridge'; row.bridge = await crossBridge(page); forcedEnd = Date.now() - entered; }
       await page.evaluate(() => { /** @type {any} */ (window).__netLag.worst = 0; });
       const before = await report();
       /** @param {string} name @param {string[]} keys @param {{ at: number, from: string, to: string }} [turn] the boost's turn back */
       const phase = async (name, keys, turn) => {
         await page.evaluate(() => { const S = /** @type {any} */ (window).__netLag; S.drawn.length = 0; });
         const from = await report();
+        stage = name;
         for (const key of keys) await page.keyboard.down(key);
         const held = [...keys];
         for (let left = SECONDS * 1000, second = 0; left > 0; left -= 1000, second++) {
@@ -183,13 +188,13 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       row.boost = await phase('boost', ['KeyS', 'ShiftLeft'], { at: Math.round(SECONDS * BOOST_BACK), from: 'KeyS', to: 'KeyW' });
       await page.keyboard.press('KeyH'); await sleep(600);
       const after = await report();
-      const footWindow = footRate(before, foot), late = delays.filter(sample => sample.t >= 10_000);
+      const footWindow = footRate(before, foot);
       row.b1 = { budgetMs: Number(row.budgetMs.toFixed(1)), over2x: row.walk.over2x + row.sprint.over2x + row.boost.over2x, over50: row.walk.over50 + row.sprint.over50 + row.boost.over50, p99: Math.max(row.walk.p99, row.sprint.p99, row.boost.p99) };
       row.b1.ok = row.b1.over2x === 0 && row.b1.over50 === 0 && row.b1.p99 <= 1.25 * row.budgetMs;
       row.b2 = { ...footWindow, perMinute: Number(footWindow.perMinute.toFixed(1)), worst: Number(footWorst.toFixed(3)) };
       row.b2.ok = footWindow.perMinute <= 2 && footWorst <= 0.1;
-      row.b3 = { delayMaxAfter10s: late.length === 0 ? null : Math.max(...late.map(sample => sample.delay)), held: (after?.held ?? 0) - heldFrom };
-      row.b3.ok = row.b3.delayMaxAfter10s !== null && row.b3.delayMaxAfter10s <= 120 && row.b3.held === 0;
+      // the series keeps the jitter and the phase beside each delay, so a miss names when and why the delay rose
+      row.b3 = { ...b3Verdict(delays, heldFrom, after?.held ?? 0, forcedEnd), series: delays.filter((_, index) => index % 4 === 0).map(sample => [Math.round(sample.t / 100) / 10, Math.round(sample.delay), Math.round(sample.jitter), sample.stage]) };
       if (row.bridge !== undefined) row.b4 = bridgeVerdict(row.bridge);
       row.ok = row.b1.ok && row.b2.ok && row.b3.ok && (row.b4?.ok ?? true);
     }
@@ -266,7 +271,7 @@ for (const engineName of engines) {
           const row = await runOne(browser, engineName, layout, slug, site.base, socket);
           rows.push(row);
           const { walk: _w, sprint: _s, boost: _b, bridge: _r, ...brief } = row;
-          console.log(`${row.ok ? 'ok  ' : 'MISS'} ${JSON.stringify(brief)}`);
+          console.log(`${row.ok ? 'ok  ' : 'MISS'} ${JSON.stringify(brief, (key, value) => key === 'series' ? undefined : value)}`);
         } finally { await site.close(); }
       }
     }
