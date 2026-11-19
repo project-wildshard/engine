@@ -8,7 +8,7 @@ import { CharacterMotor } from '@wildshard/engine/physics/CharacterMotor';
 import { tagOf } from '@wildshard/engine/physics/surface';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
-import { commandReins, MountedBody, RIDE_WORDS, mountedMotorOptions, type HorseSpeeds, type MountedRider, type MountedWorld, type ReinsFrameRow } from '../../../shared/game/riding/physics';
+import { commandReins, MountedBody, mountedMotorOptions, type HorseSpeeds, type MountedRider, type MountedWorld, type ReinsFrameRow } from '../../../shared/game/riding/physics';
 
 /** ONE-FORMAT CC40b1 (Q27, Q-S3, Q-C7): the one riding primitive on the declared path. Any spawned creature whose species
  * row carries `mount` (shard-format CC40a) takes a rider: a `ride` act's `mount` seats the player on the nearest one in
@@ -118,7 +118,9 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
   const rideOf = (seat: Seat): SimRide => ({
     motionSample: (): SimPlayerMotionSample => { motion.velocityX = seat.rider.velocity.x; motion.velocityZ = seat.rider.velocity.z; motion.grounded = seat.rider.onGround; return motion; },
     mount: () => seat.horse?.entityId ?? '',
-    capture: (out, at) => { seat.body.captureRide(out, at); return RIDE_WORDS; },
+    // OF25b: no page has a law for this ride (a data shard's page has no Mount), so it says no ride words: the server leads
+    // the seated body (`host.leading` below) and the page follows it, sending the reins as it would its walk.
+    capture: () => 0,
     read: (command, dt) => {
       const a = seat.horse; if (a === null) return;
       if (!a.alive) { dismountSeat(seat); return; }
@@ -169,6 +171,8 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
     return true;
   };
   const dismount = (player: string): void => { const seat = seats.get(player); if (seat !== undefined) dismountSeat(seat); };
+  // OF25b: a seated rider is the server's to move; its page takes the frames as they come and never waits on a ride of its own.
+  host.leading.push(player => { const seat = seats.get(player.id); return seat?.player === player && seat.horse !== null; });
   const routes = actRoutes(host);
   routes.ride = (player, action) => { if (action === 'mount') mount(player); else if (action === 'dismount') dismount(player); };
   routes.mountable = id => canTake(host.entities.get(id));
