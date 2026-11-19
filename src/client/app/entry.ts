@@ -90,16 +90,6 @@ let search = new URLSearchParams(location.search);
 // Jake (11-10): Low Power Mode for Copy diagnostics, from this document's first visible second of rAF (a busy boot can
 // only rule it out); the title's own idle reading starts once the title shows (boot/lowPower.ts)
 startLowPowerProbe();
-// A13 (meta MMO-FAILURE-MODES-PLAN): Settings ▸ Developer ▸ Failure screens asks by event. Only a Developer page (`<html data-dev>`,
-// src/client/engine/core/devMode.ts) answers, and only then is the prototype module downloaded: the worker never precaches it
-// (scripts/app-build/serviceWorker.ts), so no player loads or sees it. Developer off closes an open screen.
-entryScope.listen(document, 'ws:failscreen', event => {
-  if (!Object.hasOwn(document.documentElement.dataset, 'dev')) return;
-  const id = event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : 'gallery';
-  void (async (): Promise<void> => {
-    try { const screens = await import('./failScreens'); if (Object.hasOwn(document.documentElement.dataset, 'dev')) screens.showFailScreen(id); } catch (error) { console.warn('[failScreens] did not load', error); }
-  })();
-});
 // Do not depend on the sibling sw.ts module finishing first; both entry points share the same consumed record.
 inspectPreviousBoot();
 // Safari may reload the same document after WebContent dies. Keep that automatic retry on the

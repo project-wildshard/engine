@@ -3,7 +3,7 @@
 // see if you try to play because you can't play'". Three of the plan's five styles live here: the **banner** (a tab in the top band,
 // play goes on), the **notice** (Reconnected), the **card** (the link gave up, the world is full, another tab took the seat, the server
 // turned the link away) and its **hold card** (the banner's sibling: what was tapped, the dial's live progress, what happens by itself).
-// The look is the Developer prototypes' (src/client/app/failScreens.ts, FM1b); each root carries the catalogue's `data-failmode` ids.
+// The look is FM1b's five styles (the prototypes were deleted by FM9); each root carries the catalogue's `data-failmode` ids.
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { LinkAway, LinkCause, LinkProgress, LinkState } from '@wildshard/engine/net/redial';
 import type { Countdown } from '@wildshard/engine/net/socketFrames';

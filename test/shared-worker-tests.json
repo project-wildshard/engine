@@ -628,7 +628,6 @@
  "src/client/engine/render/data-look-sky.test.ts",
  "test/boot-extras.test.ts",
  "test/devices-script.test.ts",
- "test/fail-screens-catalogue.test.ts",
  "test/failmode-cases.test.ts",
  "test/grid-crossing-ratchet.test.ts",
  "test/title-chunk-budget.test.ts",
