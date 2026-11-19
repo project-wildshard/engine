@@ -113,6 +113,9 @@ test('native group, explicit order, variant, depth and object tie-breaks keep th
   expect(gltfOpaqueSort(item(first, { renderOrder: 2 }), item(second, { renderOrder: 1 }))).toBe(1);
   expect(gltfOpaqueSort(item(first, { materialVariant: 2 }), item(first, { materialVariant: 1 }))).toBe(1);
   expect(gltfOpaqueSort(item(first, { z: 2 }), item(first, { z: 1 }))).toBe(1);
+  // STR20: depth answers its sign (a Smi), never the fractional difference; NaN is a tie, as sort read NaN before
+  expect(gltfOpaqueSort(item(first, { z: 0.25 }), item(first, { z: 0.75 }))).toBe(-1);
+  expect(gltfOpaqueSort(item(first, { z: Number.NaN, id: 2 }), item(first, { z: 1, id: 1 }))).toBe(0);
   expect(gltfOpaqueSort(item(first, { id: 2 }), item(first, { id: 1 }))).toBe(1);
   const plain = new Material();
   expect(gltfOpaqueSort(item(plain), item(first))).toBeGreaterThan(0);

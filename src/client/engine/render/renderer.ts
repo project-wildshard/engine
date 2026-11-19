@@ -26,6 +26,7 @@ import { installVertexPack, VERTEX_PACK_SLOT, vertexPackWanted } from './vertexP
 import { jsonSlot } from '../saves/slots';
 import { TIER } from '../core/tier';
 import { gltfOpaqueSort } from './gltfMaterialOrder';
+import { installRenderListSort } from './renderListSort';
 import type { AssetService } from '../app/assets';
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { UploadOwnership } from './uploadOwnership';
@@ -53,6 +54,7 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   // failure as three would (precompile.ts reportLinkFailure)
   renderer.debug.checkShaderErrors = false;
   renderer.setOpaqueSort(gltfOpaqueSort);
+  installRenderListSort(renderer); // STR20: render lists sort in place, no work array per sort
   installUniformCacheKinds(renderer); // D180: float uniform caches keep double elements (uniformCaches.ts)
   ownership.uploads.attach(renderer);
   installShadowMaterialOwnership(renderer, ownership.assets, ownership.scope);

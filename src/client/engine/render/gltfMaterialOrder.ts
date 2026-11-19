@@ -78,6 +78,8 @@ export function gltfOpaqueSort(a: RenderItem, b: RenderItem): number {
   const index = (first.index ?? 0) - (second.index ?? 0);
   if (index !== 0) return index;
   if (a.materialVariant !== b.materialVariant) return a.materialVariant - b.materialVariant;
-  if (a.z !== b.z) return a.z - b.z;
+  // STR20: the sign alone, not the depth difference: sort reads only the sign, and a fractional difference returned to the
+  // builtin boxed a fresh number on every compare (~0.09 MB/s on Nine's walk). NaN compares as equal, as NaN did.
+  if (a.z !== b.z) return a.z < b.z ? -1 : a.z > b.z ? 1 : 0;
   return a.id - b.id;
 }

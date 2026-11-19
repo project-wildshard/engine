@@ -437,6 +437,7 @@
     "src/client/engine/render/textureUploadEvents.ts": "client",
     "src/client/engine/render/tierBenchmark.ts": "client",
     "src/client/engine/render/tierBoot.ts": "client",
+    "src/client/engine/render/renderListSort.ts": "client",
     "src/client/engine/render/spriteViews.ts": "client",
     "src/client/engine/render/tiers.ts": "client",
     "src/client/engine/render/tierSelect.ts": "client",
