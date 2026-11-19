@@ -246,3 +246,12 @@ test('the spawn download reads its manifest and parts under a set path', async (
   expect(fetched.length).toBeGreaterThan(1);
   expect(fetched.filter(url => !url.startsWith(SET))).toEqual([]);
 });
+
+// QA 11-19 row 19: the launch still stays up until the document's `load`, and the first hero, on the content origin, is
+// the last thing `load` waits for. The handshake to that origin starts with the head, before the inline script asks.
+test('a stamped document preconnects to the content origin first thing in its head, once', () => {
+  const html = stampContentBase(DOCUMENT, SET), origin = new URL(SET).origin;
+  expect(html.startsWith(`<head><link rel="preconnect" href="${origin}" /><link rel="preconnect" href="${origin}" crossorigin />`)).toBe(true);
+  expect(stampContentBase(html, SET).split('rel="preconnect"')).toHaveLength(3);
+  expect(stampContentBase(DOCUMENT, '')).not.toContain('preconnect');
+});

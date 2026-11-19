@@ -413,6 +413,10 @@ export function start(): Promise<void> {
       try { await installInPageEntry(); } catch (error) { console.warn('[grid] the same-page entry was not installed at control', error); }
     })();
   }, { once: true });
+  // QA 11-19 row 19: the Web Analytics beacon loads once the title or a world is interactive, never on the `load` path
+  for (const ready of ['ws:ready', 'ws:control-ready']) entryScope.listen(document, ready, () => { entryScope.timeout(1000, () => {
+    void import('@wildshard/engine/telemetry/analyticsBeacon').then(({ loadAnalyticsBeacon }) => loadAnalyticsBeacon()).catch(() => false);
+  }); }, { once: true });
   const run = startPage();
   latestStart = run.catch(() => undefined);
   return run;

@@ -624,6 +624,7 @@
     "./ui/EliteBar": "./src/client/engine/ui/EliteBar.ts",
     "./ui/ErrorModal": "./src/client/engine/ui/ErrorModal.ts",
     "./ui/slowLoad": "./src/client/engine/ui/slowLoad.ts",
+    "./telemetry/analyticsBeacon": "./src/client/engine/telemetry/analyticsBeacon.ts",
     "./ui/Feedback": "./src/client/engine/ui/Feedback.ts",
     "./ui/FirstHints": "./src/client/engine/ui/FirstHints.ts",
     "./ui/HUD": "./src/client/engine/ui/HUD.ts",

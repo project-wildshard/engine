@@ -17,7 +17,16 @@ export function stampContentBase(html, base) {
   if (typeof bank !== 'object' || bank === null || Array.isArray(bank)) throw new Error('Invalid boot bank');
   const json = JSON.stringify({ ...bank, contentBase: base === '' ? '' : new URL(base).href }).replaceAll('<', String.raw`<`);
   const stamped = html.replace(expression, () => `<script type="application/json" id="boot-module-files">${json}</script>`);
-  return base === '' ? stamped : titleArtOn(stamped, new URL(base).href);
+  return base === '' ? stamped : preconnect(titleArtOn(stamped, new URL(base).href), new URL(base).origin);
+}
+
+/** QA 11-19 row 19: a Home Screen launch keeps iOS's still image up until `load`, and the first hero on the content origin is
+ * the last read `load` waits for. Open that origin's connections with the head: a plain one for the hero image (a no-cors
+ * read) and an anonymous one for the CORS reads that follow. Once only, however often a document is stamped.
+ * @param {string} html @param {string} origin */
+function preconnect(html, origin) {
+  if (html.includes(`<link rel="preconnect" href="${origin}"`)) return html;
+  return html.replace(/<head(\s[^>]*)?>/u, head => `${head}<link rel="preconnect" href="${origin}" /><link rel="preconnect" href="${origin}" crossorigin />`);
 }
 
 /** The document's title art on the base: `href="/assets/title/…"`, CSS URLs (quoted or minified) and the values of the
