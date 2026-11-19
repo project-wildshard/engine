@@ -125,8 +125,9 @@ const CLOCK_MS = 100;
  * picks it; with none, phone Low gets LEAN_CARD_DEFAULT.
  */
 export const LEAN_CARD_SLOT = 'debug.leanCard';
-/** IP33's pairs met the go line stacked with IP30 and IP31 but not alone (2 of 3 pairs lower, twice), so phone Low starts off. */
-export const LEAN_CARD_DEFAULT = false;
+/** On for phone Low (Jake, 2026-11-19: the before/after card "looks exactly the same"). IP33's GPU loading peak was 24-35 MB
+ *  lower in all 15 locked pairs, no slower; Nine alone was lower in 2 of 3 pairs per set, stacked with IP30 and IP31 3 of 3. */
+export const LEAN_CARD_DEFAULT = true;
 /** the lean tick; facts repaint on every tick, as PAINT_MS is shorter */
 const LEAN_MS = 250;
 let leanOn: boolean | undefined;
