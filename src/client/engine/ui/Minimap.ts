@@ -50,6 +50,7 @@ import { app } from '../app/runtime';
 import { onOwnerDispose } from '../../../shared/engine/app/ownership';
 import { ROOM_BG, arenaMap, fitRoom, paintRoom, type RoomMap } from './roomMap';
 import { drawOther, othersOnMap, type OtherMark } from '../net/othersOnMap';
+import type { MapGrid } from './mapView';
 
 /** the level's baked map while it loads (`image` null) and once decoded; `closed` once released */
 interface BakedGround { url: string; image: ImageBitmap | null; closed: boolean; ready: Promise<void> }
@@ -95,6 +96,8 @@ export interface MapExtras {
   readonly rects: readonly MapExtraRect[];
   readonly images: readonly MapExtraImage[];
   readonly labels: readonly MapExtraLabel[];
+  /** J455: the grid square the full map spans, opens in and clamps its pan to (mapView.ts); unset = the extras' bounds */
+  readonly grid?: MapGrid;
 }
 /** an axis-aligned rectangle: its centre and half extents (m) */
 export interface MapExtraRect { readonly x: number; readonly z: number; readonly hx: number; readonly hz: number; readonly color: string }

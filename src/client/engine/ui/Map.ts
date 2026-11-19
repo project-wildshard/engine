@@ -16,6 +16,8 @@ import { engineString } from '../../../shared/engine/strings';
  * frame over the stretched layer, cached (E97: the 2 px/m layer alone went to mush at 4–6×). A baked map is drawn as it is.
  * Around the chunk, `setExtras` lays out more ground as data (the grid: every cell's baked map at its cell, the road network
  * and each shard's name; SF66), and the view then spans all of it.
+ * On the grid (the extras carry a `grid`, J455) the map opens centred on you at 3.5 cells across (2×), 1× fits the whole
+ * 7 by 7, and the pan is clamped so a whole grid cell always stays in view (mapView.ts).
  * Drag to pan, pinch or wheel to zoom (1× = the chunk fitted to the frame, up to 6×). The world
  * keeps running underneath; the canvas swallows touch so the pads don't move you.
  *
@@ -41,6 +43,7 @@ import { CABIN_SITES, POND, hasPond } from '../../../shared/engine/world/Heightf
 import { activeLevel } from '../../../shared/engine/level/selection';
 import type { MapExtras, MapFeatures, Minimap } from './Minimap';
 import { MapPainter } from './mapPainter';
+import { clampView, gridPpm, gridSide, openZoom, type MapGrid } from './mapView';
 
 /** a point on the full map: a discovered place (named), an undiscovered one ("?"), or a live quest marker (pulsing diamond);
  *  `short` = a quest marker's short name ("SEA CAVE" for "SEA CAVE SHARD") — the map labels it with that */
@@ -173,9 +176,12 @@ export class FullMap {
     this.layer = app.ui.push('gameMenu', { root: this.root, embedded: true, order: 0, back: () => { this.hide(); } }, this.openScope);
     this.root.style.display = 'block';
     this.preparePainter();
-    const b = this.bounds(this.extrasSource?.() ?? null);
-    this.cx = (b.x0 + b.x1) / 2; this.cz = (b.z0 + b.z1) / 2; this._zoom = 1;
+    const extras = this.extrasSource?.() ?? null, grid = extras?.grid ?? null, b = this.bounds(extras);
+    // J455: on the grid the map opens on you at 3.5 cells across; a one-shard map opens on its whole chunk
+    if (grid !== null) { this.cx = this.pose.x; this.cz = this.pose.z; this._zoom = openZoom(grid); }
+    else { this.cx = (b.x0 + b.x1) / 2; this.cz = (b.z0 + b.z1) / 2; this._zoom = 1; }
     this.fit();
+    this.clamp();
     // E440: the map drives its own draw while open. The menu that shows it pauses the app (Menu.open), and a paused
     // app runs no update phase (Game.runPhase, E357 F8), so a draw driven from the play loop never came and the frame stayed black.
     // FC4 (G909): each frame only checks; the painter repaints when what it shows changed
@@ -183,7 +189,7 @@ export class FullMap {
     const frame = (): void => { if (this.painter?.draw() === true) this.syncPulses(); scope.raf(frame); };
     scope.raf(frame);
     this.onToggle?.(true);
-    this.onZoom?.(1);
+    this.onZoom?.(this._zoom);
   }
   hide(): void { if (!this.open) return; this.layer?.dispose(); this.layer = null; this.openScope?.dispose(); this.openScope = null; this.root.style.display = 'none'; this.pointers.clear(); for (const ring of this.rings.splice(0)) ring.remove(); this.onToggle?.(false); }
 
@@ -196,9 +202,12 @@ export class FullMap {
     this.canvas.height = Math.round(h * this.dpr);
     this.dash = [3 * this.dpr, 2.5 * this.dpr];
     this.painter?.invalidate();
+    if (this.open) this.clamp(); // a resized frame keeps the J455 clamp
   }
   /** the world square the map spans (metres): the chunk, grown to hold every extra */
   private bounds(extras: MapExtras | null): { x0: number; x1: number; z0: number; z1: number; span: number } {
+    const grid = extras?.grid;
+    if (grid !== undefined) { const side = gridSide(grid); return { x0: grid.x0, x1: grid.x0 + side, z0: grid.z0, z1: grid.z0 + side, span: side }; }
     let x0 = -CHUNK_HALF, x1 = CHUNK_HALF, z0 = -CHUNK_HALF, z1 = CHUNK_HALF;
     for (const r of extras?.rects ?? []) { x0 = Math.min(x0, r.x - r.hx); x1 = Math.max(x1, r.x + r.hx); z0 = Math.min(z0, r.z - r.hz); z1 = Math.max(z1, r.z + r.hz); }
     for (const m of extras?.images ?? []) { const h = m.size / 2; x0 = Math.min(x0, m.x - h); x1 = Math.max(x1, m.x + h); z0 = Math.min(z0, m.z - h); z1 = Math.max(z1, m.z + h); }
@@ -207,7 +216,16 @@ export class FullMap {
   private span(): number { return this.bounds(this.extrasSource?.() ?? null).span; }
   private zoomMax(): number { return ZOOM_CHUNK_MAX * this.span() / CHUNK_SIZE; }
   /** screen px (device) per metre at the current zoom */
-  private ppm() { return (Math.min(this.canvas.width, this.canvas.height) * 0.9 / this.span()) * this._zoom; }
+  private ppm(): number {
+    const short = Math.min(this.canvas.width, this.canvas.height), grid = this.grid();
+    return grid !== null ? gridPpm(grid, short, this._zoom) : (short * 0.9 / this.span()) * this._zoom;
+  }
+  private grid(): MapGrid | null { return this.extrasSource?.()?.grid ?? null; }
+  /** the world rectangle in view now (the map's metres): what the J455 clamp and its tests read */
+  viewBox(): { x0: number; x1: number; z0: number; z1: number } {
+    const ppm = this.ppm(), hx = this.canvas.width / 2 / ppm, hz = this.canvas.height / 2 / ppm;
+    return { x0: this.cx - hx, x1: this.cx + hx, z0: this.cz - hz, z1: this.cz + hz };
+  }
   private pair(): [{ x: number; y: number }, { x: number; y: number }] { const [a, b] = [...this.pointers.values()]; if (!a || !b) throw new Error('FullMap: pinch needs two pointers'); return [a, b]; }
   private dist(): number { const [a, b] = this.pair(); return Math.hypot(a.x - b.x, a.y - b.y); }
   private mid(): { x: number; y: number } { const [a, b] = this.pair(); return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
@@ -234,6 +252,12 @@ export class FullMap {
     return { x: this.cx - ((client.x - r.left) * this.dpr - W / 2) / ppm, z: this.cz - ((client.y - r.top) * this.dpr - H / 2) / ppm };
   }
   private clamp() {
+    const grid = this.grid();
+    if (grid !== null) {
+      const ppm = this.ppm(), at = clampView(grid, { cx: this.cx, cz: this.cz, halfX: this.canvas.width / 2 / ppm, halfZ: this.canvas.height / 2 / ppm });
+      this.cx = at.cx; this.cz = at.cz;
+      return;
+    }
     const b = this.bounds(this.extrasSource?.() ?? null), m = (b.span / 2) * (1 - 0.5 / this._zoom), mx = (b.x0 + b.x1) / 2, mz = (b.z0 + b.z1) / 2;
     this.cx = Math.max(mx - m, Math.min(mx + m, this.cx)); this.cz = Math.max(mz - m, Math.min(mz + m, this.cz));
   }

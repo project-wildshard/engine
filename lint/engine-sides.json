@@ -508,6 +508,7 @@
     "src/client/engine/ui/Map.ts": "client",
     "src/client/engine/ui/mapLabel.ts": "client",
     "src/client/engine/ui/mapPainter.ts": "client",
+    "src/client/engine/ui/mapView.ts": "client",
     "src/client/engine/ui/Menu.ts": "client",
     "src/client/engine/ui/menuSettings.ts": "client",
     "src/client/engine/ui/namePrompt.ts": "client",

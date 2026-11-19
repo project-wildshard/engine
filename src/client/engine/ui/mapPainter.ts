@@ -3,6 +3,7 @@ import { engineString } from '../../../shared/engine/strings';
 import { LAYER_PPM, type MapExtras, type Minimap } from './Minimap';
 import { ROOM_BG, fitRoom, paintRoom } from './roomMap';
 import { fitMapLabel } from './mapLabel';
+import { cellAt } from './mapView';
 import type { MapPoi, MapZone } from './Map';
 
 type Pin = MapPoi & { color?: string };
@@ -146,9 +147,11 @@ export class MapPainter {
     fc.drawImage(cover, ox, oy, side, side);
     ctx.drawImage(this.fog, 0, 0);
 
-    // chunk edge
-    ctx.strokeStyle = 'rgba(143, 227, 255, 0.55)'; ctx.lineWidth = 1.5 * this.view.dpr();
-    ctx.strokeRect(ox, oy, side, side);
+    // the chunk's edge; on the grid (J455) the edge of the cell you are in, its N above it
+    const here = extras?.grid === undefined ? null : cellAt(extras.grid, pos.x, pos.z);
+    const ex = here === null ? ox : sx(here.x + CHUNK_HALF), ey = here === null ? oy : sz(here.z + CHUNK_HALF);
+    ctx.strokeStyle = here === null ? 'rgba(143, 227, 255, 0.55)' : 'rgba(143, 227, 255, 0.9)'; ctx.lineWidth = (here === null ? 1.5 : 2.5) * this.view.dpr();
+    ctx.strokeRect(ex, ey, side, side);
 
     // the extras' labels (the grid: each cell's shard name), under the pins
     const held: Box[] = [];
@@ -213,7 +216,7 @@ export class MapPainter {
 
     // N marker at the top edge of the chunk
     ctx.fillStyle = '#8fe3ff'; ctx.font = `700 ${Math.max(12 * this.view.dpr(), fs * 1.3)}px Rajdhani, sans-serif`; ctx.textBaseline = 'bottom';
-    ctx.fillText(engineString('s_8ce86a6ae65d'), ox + side / 2, oy - 4 * this.view.dpr());
+    ctx.fillText(engineString('s_8ce86a6ae65d'), ex + side / 2, ey - 4 * this.view.dpr());
   }
 
   // ── zoom tiles: the ground at the screen's own resolution, level ℓ = LAYER_PPM · 2^ℓ px/m ──

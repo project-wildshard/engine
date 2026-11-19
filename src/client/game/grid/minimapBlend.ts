@@ -18,6 +18,8 @@ import type { GridAssembly, GridCell } from '../../../shared/game/grid/assembly'
 import type { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { RAIL_OFFSET, ROAD_HALF } from '../../../shared/game/grid/roadLayout';
 import { FLAT_MAP_SPREAD } from '../../../shared/game/shardfile/cookedMapPath';
+import { DRAWN_GRID_RADIUS } from '../../../shared/game/grid/catalogue';
+import type { MapGrid } from '@wildshard/engine/ui/mapView';
 
 /** On the road the neighbours' terrain shows at this opacity (G107: "faded ~50 %"). */
 export const ROAD_TERRAIN_ALPHA = 0.5;
@@ -192,6 +194,14 @@ export function minimapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
  *  edge; the home's own ground is the map's base layer. Home-frame metres. A cell the atlas has no tile for (a placed cell,
  *  QA-FEEDBACK 2026-11-13 row 44) draws its own baked map once that loads, and a plain-plot square until then. */
 type AtlasTile = (slug: string) => Pick<MapExtraImage, 'image' | 'crop'> | null;
+/** J455: the whole drawn 7 by 7 in the home frame, so the full map spans it, opens on you inside it and clamps its pan to it.
+ *  Spanning only the placed cells' rectangle cut staging's map to 6 by 6 (QA 2026-11-19 row 31: x -2..3, z -2..3 placed).
+ *  A lone shard (one cell) keeps its own map. */
+export function fullMapGrid(assembly: GridAssembly, home: GridCell): MapGrid | undefined {
+  if (assembly.cells.length < 2) return undefined;
+  const p = assembly.pitch, edge = -(DRAWN_GRID_RADIUS + 0.5) * p;
+  return { x0: edge - home.origin.x, z0: edge - home.origin.z, pitch: p, cells: 2 * DRAWN_GRID_RADIUS + 1 };
+}
 export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraRect[], atlas?: AtlasTile): MapExtras {
   const { assembly, home } = host, ox = home.origin.x, oz = home.origin.z, homeImage = atlas === undefined ? host.image(home.instance) : null;
   const images: MapExtraImage[] = [], labels: MapExtraLabel[] = [], plots: MapExtraRect[] = [];
@@ -211,7 +221,10 @@ export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
     const image = host.image(cell.instance);
     if (image !== null) images.push({ image, x, z, size: 2 * CHUNK_HALF, alpha: 1 });
   }
-  return { outside: VOID, baseAlpha: atlas === undefined && homeImage === null ? 1 : 0, rects: plots.length === 0 ? rects : [...rects, ...plots], images, labels };
+  const grid = fullMapGrid(assembly, home), side = grid === undefined ? 0 : grid.cells * grid.pitch;
+  // the 7 by 7's empty cells past the placed rectangle show as the strips' ground, as the empty cells inside it do
+  const ground: MapExtraRect[] = grid === undefined ? [] : [{ x: grid.x0 + side / 2, z: grid.z0 + side / 2, hx: side / 2, hz: side / 2, color: STRIP }];
+  return { outside: VOID, baseAlpha: atlas === undefined && homeImage === null ? 1 : 0, rects: [...ground, ...rects, ...plots], images, labels, ...(grid === undefined ? {} : { grid }) };
 }
 
 interface ExtrasSink { setExtras: (source: (() => MapExtras | null) | null) => void }

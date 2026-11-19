@@ -56,11 +56,24 @@ test('a placed cell the atlas has no tile for draws its own map, or a plain plot
   const tile = (slug: string) => slug === placed.slug ? null : { image: atlasImage, crop: [0, 0, 256, 256] as [number, number, number, number] };
   const first = fullMapOverlay(host, [], tile);
   expect(first.images).toHaveLength(23); expect(first.labels).toHaveLength(24); expect(asked).toEqual([placed.instance]);
-  expect(first.rects).toEqual([{ x: placed.origin.x - home.origin.x, z: placed.origin.z - home.origin.z, hx: CHUNK_HALF, hz: CHUNK_HALF, color: '#69704f' }]);
+  expect(first.rects.slice(1)).toEqual([{ x: placed.origin.x - home.origin.x, z: placed.origin.z - home.origin.z, hx: CHUNK_HALF, hz: CHUNK_HALF, color: '#69704f' }]);
   ownLoaded = true;
   const loaded = fullMapOverlay(host, [], tile);
   expect(loaded.images).toHaveLength(24); expect(loaded.images.find(row => row.image === own)).toMatchObject({ x: placed.origin.x - home.origin.x, alpha: 1 });
-  expect(loaded.rects).toEqual([]);
+  expect(loaded.rects.slice(1)).toEqual([]);
+});
+
+test('the full map spans the whole drawn 7 by 7, not the placed rectangle (J455, QA 2026-11-19 row 31: staging showed 6 by 6)', () => {
+  const assembly = new GridAssembly({ developer: true, devserver: true }), home = assembly.cells[0];
+  if (home === undefined) throw new Error('Missing home');
+  const host = { assembly, home, cells: new GridCellEvents(), worldFeet: () => home.origin, name: (cell: { slug: string }) => cell.slug, image: () => null };
+  const overlay = fullMapOverlay(host, [], () => null), p = assembly.pitch;
+  expect(overlay.grid).toEqual({ x0: -3.5 * p - home.origin.x, z0: -3.5 * p - home.origin.z, pitch: p, cells: 7 });
+  expect(overlay.rects[0]).toMatchObject({ x: 0 - home.origin.x, z: 0 - home.origin.z, hx: 3.5 * p, hz: 3.5 * p });
+  // a lone shard keeps its own map
+  const lone = new GridAssembly({ developer: true, devserver: true }, undefined, home.slug), only = lone.cells[0];
+  if (only === undefined) throw new Error('Missing lone cell');
+  expect(fullMapOverlay({ ...host, assembly: lone, home: only }, [], () => null).grid).toBeUndefined();
 });
 
 test('the road minimap draws the atlas, not each cell\'s product (ZONE-ENTRY ZE14: offline it read every cell\'s whole product)', () => {

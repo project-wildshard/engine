@@ -633,6 +633,7 @@
     "./ui/Map": "./src/client/engine/ui/Map.ts",
     "./ui/Menu": "./src/client/engine/ui/Menu.ts",
     "./ui/Minimap": "./src/client/engine/ui/Minimap.ts",
+    "./ui/mapView": "./src/client/engine/ui/mapView.ts",
     "./ui/Perf": "./src/client/engine/ui/Perf.ts",
     "./ui/ReloadPrompt": "./src/client/engine/ui/ReloadPrompt.ts",
     "./ui/RotateGate": "./src/client/engine/ui/RotateGate.ts",
