@@ -82,6 +82,9 @@ test.each([
   ['v=build', true],
   ['tier=phone&touch=1&mute=1&nolock=1&sw=0', true],
   ['tier=phone&touch=1&mute=1&nolock=1&sw=0&v=build', true],
+  // TEMPLATE-E2E TR-4: T1's seat (`mute=1&nolock=1&sw=0&fps=30`) is the title: a frame cap selects no level, so its first Play is a tap
+  // like the one after Exit to Title (which drops the flags), and both enter the same world and save.
+  ['mute=1&nolock=1&sw=0&fps=30', true],
   ['chunk=driftwood-isle&tier=phone&mute=1', false],
   ['chunk=_template&touch=1&sw=0', false],
   ['explore=hub&mute=1', false],

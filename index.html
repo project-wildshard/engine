@@ -232,7 +232,7 @@
       // END TITLE URLS
       const homeParams = new URLSearchParams(location.search);
       // The environment flags select no level (src/client/app/bootRoute.ts keeps the same list): a launch with only them is the title.
-      for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw']) homeParams.delete(key);
+      for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw', 'fps']) homeParams.delete(key);
       // STAGING-BUGBASH SB44: a world page's address is bare (GO4), so the engine's own update reload of one (lastEnd's young
       // `stale deployment code` / `stale build` / `new build panel`, not a `reload` that means the title) would land on the title.
       // That page handed its tap to this document (titleArrival, session, 60 s): the address names the world again, so the page

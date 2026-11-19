@@ -11,7 +11,7 @@ export function bootRoute(search: URLSearchParams, previous: { readonly line: st
   if (previous.reload === true) return { rescue: true, titleOnly: true };
   const rescue = previous.line !== '' && search.get('chunk') === previous.level;
   const route = new URLSearchParams(search);
-  for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw']) route.delete(key); // index.html's title-first rule keeps the same list
+  for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw', 'fps']) route.delete(key); // index.html's title-first rule keeps the same list
   return { rescue, titleOnly: rescue || route.size === 0 };
 }
 
