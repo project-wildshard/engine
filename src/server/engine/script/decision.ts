@@ -31,6 +31,8 @@ export type DecisionExternalCommand = readonly [number,number,number,number,numb
 export interface DecisionWorld {
   /** Host-owned observed player for bindings granted requested movement; never an owned actor. */
   readonly player?: number;
+  /** OF25a: a binding is about to run or re-prepare: the world turns its player handle to the one this binding deals with. */
+  enter?: (context: DecisionContext) => void;
   read: (op: number, a: number, b: number, context: DecisionContext) => number;
   list: (op: number, a: number, b: number, output: Float64Array, context: DecisionContext) => number;
   prepare: (commands: readonly ScriptV1Command[], context: DecisionContext) => DecisionCommit;
@@ -321,6 +323,7 @@ export class DecisionHost {
     row.io[2] = row.binding.id; row.io[3] = row.binding.self;
     row.io.set(row.values, row.layout.state); row.io.set(row.params, row.layout.params);
     row.nextTimers.set(row.timers); row.nextRng = row.rng; row.nextLastCall = this.tick;
+    this.options.world.enter?.(row.context);
     row.observed.clear(); row.players.clear(); row.owners.clear();
     for (const actor of row.binding.actors) { row.observed.add(actor); row.owners.add(actor); }
     const player = this.options.world.player;
@@ -529,6 +532,7 @@ export class DecisionHost {
         const context: DecisionContext = { tick: snapshot.tick, script: row.script, binding: row.binding, observed };
         // The authoritative world revalidates the entire mixed bank before any
         // branch can publish. V1 retains its exact command tuple and save wire.
+        this.options.world.enter?.(context);
         if (pending.external === undefined) transaction = this.options.world.prepare(pending.commands, context);
         else {
           const prepare = this.options.world.prepareExternal;

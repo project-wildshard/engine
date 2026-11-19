@@ -53,7 +53,12 @@ function abilityStrikes(strikes: ReadonlyMap<string, SimStrike>, abilities: Shar
 export interface DecisionRuntime extends Pick<SimHost, 'scope' | 'events' | 'physics' | 'groundHeightAt'
   | 'registerStrikeCatalogue' | 'startDeclaredStrike'> {
   readonly flags: Pick<SimHost['flags'], 'has' | 'set' | 'onChange'>;
+  /** The player a script deals with where no creature names one (the host's focused player). */
   readonly player: Pick<PlayerSim, 'id' | 'position' | 'yaw' | 'health' | 'motor'>;
+  /** OF25a: the player nearest `point`; a binding's script deals with the one nearest its creature. Absent: `player`. */
+  readonly nearestPlayer?: (point: { readonly x: number; readonly y: number; readonly z: number }) => DecisionRuntime['player'];
+  /** OF25a: whether `id` is any player of this host: each one's blows reach a script as the one player handle. */
+  readonly isPlayer?: (id: string) => boolean;
   readonly state: Pick<SimHost['state'], 'tick'>;
   readonly slots: Pick<SimHost['slots'], 'ledgerDedupe'>;
   readonly entities: ReadonlyMap<string, AnimalSim>;
@@ -91,6 +96,7 @@ export function decisionRuntime(host: SimHost, scene?: DecisionRuntime['scene'],
     root: (id, seconds, source) => { const player = host.players.get(id); if (player !== undefined) installStatusEffects(host).apply(player.health, 'effect.root', source, seconds); },
   };
   return { ...(scene === undefined ? {} : { scene }), ...(playerVerbs === undefined ? {} : { playerVerbs }), ...(adds === undefined ? {} : { adds }), scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, groundHeightAt: (x, z) => host.groundHeightAt(x, z), player: focusPlayer(host),
+    nearestPlayer: point => host.nearestPlayer(point), isPlayer: id => host.players.has(id),
     state: host.state, slots: host.slots, entities: host.entities, strikes: host.strikes,
     registerStrikeCatalogue: (id, specs) => { host.registerStrikeCatalogue(id, specs); }, startDeclaredStrike: (source, target, strike) => host.startDeclaredStrike(source, target, strike),
     onStep: (id, run, adapter, phase) => host.onStep(id, run, adapter, phase) };
@@ -155,6 +161,8 @@ export class ShardDecisions {
   /** CC28: each creature's `actorChannel` values, by actor handle then channel index. */
   private readonly actorChannels = new Map<number, Map<number, number>>();
   private readonly playerFlags = new Set<number>();
+  /** OF25a: the player nearest the running binding's creature (`enter`), cleared around each step and restore. */
+  private dealing: DecisionRuntime['player'] | undefined;
   private readonly zones = new Set<string>();
   // Keys contain only private scalar handles, never a live actor or host.
   // Weak source ownership drops retired trigger rows; a renamed zone refreshes
@@ -241,7 +249,7 @@ export class ShardDecisions {
       scripts.push({ ...simDecisionRow(row), state: [...row.state], ids: map.ids, reads: row.reads.filter(readName), lists: row.reads.filter(listName) });
       return { id: index + 1, script: row.id, self, actors: actorIds, instance: 0 };
     });
-    const world: DecisionWorld = { player: DECISION_PLAYER_HANDLE, read: (op, a, b, context) => this.read(op, a, b, context), list: (op, a, b, out) => this.list(op, a, b, out),
+    const world: DecisionWorld = { player: DECISION_PLAYER_HANDLE, enter: context => { this.enter(context); }, read: (op, a, b, context) => this.read(op, a, b, context), list: (op, a, b, out) => this.list(op, a, b, out),
       prepare: (commands, context) => this.prepare(commands, context), failed: (mode, context, reason) => {
         onDisabled?.({ module: context.script.module, entity: `binding:${context.binding.id}`, reason, failures: 3 });
         if (mode === 'hold') return;
@@ -270,20 +278,32 @@ export class ShardDecisions {
     }, sim.scope);
     sim.events.on('creature.part-broken', ({ actor, index }) => { const handle = this.combatHandle(actor.id); if (handle !== undefined) this.publish([19, handle, index, 0, 0, 0]); }, sim.scope);
     sim.events.on('actor.died', ({ actor, req }) => { const handle = this.combatHandle(actor.id); if (handle !== undefined) this.publish([9, handle, req.source === 'env' ? 0 : this.combatHandle(req.source.id) ?? 0, 0, 0, 0]); }, sim.scope);
-    sim.onStep('decision.declared', () => { this.events = []; this.lifecycle(); this.host.step(sim.state.tick); this.stepMoves(); }, {
+    sim.onStep('decision.declared', () => { this.events = []; this.dealing = undefined; this.lifecycle(); this.host.step(sim.state.tick); this.dealing = undefined; this.stepMoves(); }, {
       snapshot: () => this.snapshot(), restore: value => this.restore(value),
     });
     sim.onStep('decision.observations', () => this.observe(), undefined, 'afterBodies');
     if (!restoring) this.lifecycle();
   }
-  private actor(handle: number) { const name = requireValue(this.actors.get(handle), 'unknown actor'); return name === this.sim.player.id ? undefined : requireValue(this.sim.entities.get(name), 'absent actor'); }
+  private actor(handle: number) { const name = requireValue(this.actors.get(handle), 'unknown actor'); return handle === DECISION_PLAYER_HANDLE ? undefined : requireValue(this.sim.entities.get(name), 'absent actor'); }
+  /** OF25a: a binding's script deals with the player nearest its own creature (an encounter's boss, else its first actor). */
+  private enter(context: DecisionContext): void {
+    this.dealing = undefined;
+    const nearest = this.sim.nearestPlayer; if (nearest === undefined) return;
+    const { self, actors } = context.binding, handle = self > 0 ? self : actors[0];
+    if (handle === undefined || handle === DECISION_PLAYER_HANDLE) return;
+    const name = this.actors.get(handle), body = name === undefined ? undefined : this.sim.entities.get(name);
+    if (body !== undefined) this.dealing = nearest(body.position);
+  }
+  /** The player the running binding deals with; between bindings, the host's. */
+  private get player(): DecisionRuntime['player'] { return this.dealing ?? this.sim.player; }
   private combatHandle(id: string): number | undefined {
     for (const [handle, name] of this.actors) if (this.sim.borrowedActors?.has(name) === true && this.sim.entities.get(name)?.combatActor().id === id) return handle;
     // A retained-body binding shares the world's events but lends only its own body.
     // A catalogue identity alone is not authority to sample another binding's actor.
-    return id === this.sim.player.id || this.sim.entities.has(id) ? this.names.get(id) : undefined;
+    if (id === this.sim.player.id || this.sim.isPlayer?.(id) === true) return DECISION_PLAYER_HANDLE;
+    return this.sim.entities.has(id) ? this.names.get(id) : undefined;
   }
-  private position(handle: number) { return handle === DECISION_PLAYER_HANDLE ? this.sim.player.position : requireValue(this.actor(handle), 'actor position').position; }
+  private position(handle: number) { return handle === DECISION_PLAYER_HANDLE ? this.player.position : requireValue(this.actor(handle), 'actor position').position; }
   private name(kind: keyof DecisionRegistries, id: number): string { return requireValue(inverse(this.registries[kind]).get(id), `undeclared ${kind}`); }
   private inside(zone: string, actor: number): boolean {
     const rows = this.source.quests.triggers, count = rows.length;
@@ -309,18 +329,18 @@ export class ShardDecisions {
       if (_context !== undefined && this.sim.borrowedControls?.get(_context.script.id)?.calm === true) return 0;
       if (binding !== undefined && 'encounter' in binding) {
         const arena = requireValue(this.source.encounters.find(row => row.id === binding.encounter), 'encounter').arena;
-        const player = this.sim.player.position;
+        const player = this.player.position;
         if (Math.hypot(player.x - arena.at[0], player.y - arena.at[1], player.z - arena.at[2]) > arena.radius) return 0;
       }
-      return this.sim.player.health.alive ? DECISION_PLAYER_HANDLE : 0;
+      return this.player.health.alive ? DECISION_PLAYER_HANDLE : 0;
     }
     if (op === 8 || op === 19) { const from = this.position(a), to = this.position(b); return op === 8 ? Math.hypot(to.x - from.x, to.z - from.z) : Math.atan2(to.x - from.x, to.z - from.z); }
     if (op === 13) return Number(this.inside(this.name('zones', b), a));
     const actor = this.actor(a), point = this.position(a);
     if (op === 1) return point.x; if (op === 2) return point.y; if (op === 3) return point.z;
-    if (op === 4) return actor?.yaw ?? this.sim.player.yaw;
-    if (op === 5) return actor === undefined ? this.sim.player.health.attributes.health / this.sim.player.health.attributes.maxHealth : actor.hp / actor.maxHp;
-    if (op === 6) return Number(actor?.alive ?? this.sim.player.health.alive);
+    if (op === 4) return actor?.yaw ?? this.player.yaw;
+    if (op === 5) return actor === undefined ? this.player.health.attributes.health / this.player.health.attributes.maxHealth : actor.hp / actor.maxHp;
+    if (op === 6) return Number(actor?.alive ?? this.player.health.alive);
     if (op === 7) return this.fieldValue(a, b);
     if (op === 15) return Number(this.motions.has(a));
     if (op === 16) return ['idle', 'windup', 'active', 'recover', 'cooldown'].indexOf(this.sim.strikes.get(requireValue(this.actors.get(a), 'strike actor'))?.state ?? 'idle');
@@ -342,14 +362,14 @@ export class ShardDecisions {
       output.set([point.x, point.y, point.z]); return 3;
     }
     if (op === 5) {
-      const nav = requireValue(this.navigation, 'navigation owner'), points = nav.findPath(this.position(a), this.position(b), this.actor(a)?.dims.bodyRadius ?? this.sim.player.motor.opts.radius, [], 128) ?? [];
+      const nav = requireValue(this.navigation, 'navigation owner'), points = nav.findPath(this.position(a), this.position(b), this.actor(a)?.dims.bodyRadius ?? this.player.motor.opts.radius, [], 128) ?? [];
       const count = Math.min(points.length, Math.floor(output.length / 3), 32);
       for (let i = 0; i < count; i++) { const point = points[i]; if (point !== undefined) output.set([point.x, point.y, point.z], i * 3); }
       return count * 3;
     }
     let handles: number[];
     if (op === 1) handles = [...this.actors.keys()].filter(actor => actor !== DECISION_PLAYER_HANDLE && this.inside(this.name('zones', a), actor));
-    else if (op === 2) { if (b < 0) throw new Error('Invalid player radius'); handles = this.sim.player.health.alive && this.position(a).distanceTo(this.sim.player.position) <= b ? [DECISION_PLAYER_HANDLE] : []; }
+    else if (op === 2) { if (b < 0) throw new Error('Invalid player radius'); handles = this.player.health.alive && this.position(a).distanceTo(this.player.position) <= b ? [DECISION_PLAYER_HANDLE] : []; }
     else throw new Error('Decision navigation requires an admitted navigation owner');
     handles.sort((left, right) => left - right); const count = Math.min(output.length, handles.length); for (let i = 0; i < count; i++) output[i] = handles[i] ?? 0; return count;
   }
@@ -435,7 +455,8 @@ export class ShardDecisions {
       } else if (op === 10 || op === 11) {
         const fact = this.name(op === 10 ? 'facts' : 'rewards', a), grant = requireValue(this.fact, 'ledger authority');
         if (target !== 0 && (target !== DECISION_PLAYER_HANDLE || !context.observed.has(target))) throw new Error('Decision ledger player authority');
-        apply.push(() => { const key = `decision:${context.binding.id}:${target}:${fact}`; if (!this.sim.slots.ledgerDedupe.includes(key)) { this.sim.slots.ledgerDedupe.push(key); grant(fact, this.sim.player.id); } });
+        const player = this.player.id;
+        apply.push(() => { const key = `decision:${context.binding.id}:${target}:${fact}`; if (!this.sim.slots.ledgerDedupe.includes(key)) { this.sim.slots.ledgerDedupe.push(key); grant(fact, player); } });
       } else if (op === 12) {
         this.name('cues', a); if (target > 0) this.position(target);
         apply.push(() => { this.events.push({ kind: 'cue', actor: target, id: a, target: 0 }); });
@@ -468,13 +489,13 @@ export class ShardDecisions {
       } else if (op === SCRIPT_V1_COMMANDS.pull || op === SCRIPT_V1_COMMANDS.root) {
         const verbs = requireValue(this.sim.playerVerbs, 'player motion owner');
         if (target !== DECISION_PLAYER_HANDLE || !context.observed.has(target)) throw new Error('Decision player verb authority');
-        const player = this.sim.player.id;
+        const player = this.player.id;
         if (op === SCRIPT_V1_COMMANDS.pull) {
           const actor = requireValue(this.sim.entities.get(this.owned(b, context)), 'pull actor');
           apply.push(() => { verbs.pull(player, actor.position.x, actor.position.z, a); });
         } else {
           const self = context.binding.self > 0 ? this.actor(context.binding.self) : undefined;
-          const source = self?.combatActor() ?? this.sim.player.health;
+          const source = self?.combatActor() ?? this.player.health;
           apply.push(() => { verbs.root(player, a, source); });
         }
       } else if (op === 15) {
@@ -684,7 +705,7 @@ export class ShardDecisions {
   }
   /** A logical restore resumes the simulation's clock at its saved tick but carries no decision state (it is not
    *  portable progress): the fresh guests continue from that tick, so the next fixed step is consecutive. */
-  continueAt(tick: number): void { this.host.restore({ ...this.host.snapshot(), tick }); }
+  continueAt(tick: number): void { this.host.restore({ ...this.host.snapshot(), tick }); this.dealing = undefined; }
   /** Validate the whole logical record before mutation; loading invokes no Wasm or gameplay edge. */
   restore(input: SimValue): void {
     if (typeof input !== 'string') throw new Error('Invalid decision continuation');
@@ -722,7 +743,7 @@ export class ShardDecisions {
       if (!Object.values(ids.actors ?? {}).includes(strike.actor) || !Object.values(ids.strikes ?? {}).includes(strike.strike)) throw new Error('Invalid decision strike ownership');
       this.position(strike.target);
     }
-    this.host.restore(saved.decision);
+    this.host.restore(saved.decision); this.dealing = undefined;
     this.enabled.clear(); for (const [id, on] of saved.enabled) this.enabled.set(id, on);
     this.fields.clear(); for (const [id, values] of fields) this.fields.set(id, values);
     for (const [actor, values] of fields) for (const [field, value] of values) this.writeField(actor, field, value);
