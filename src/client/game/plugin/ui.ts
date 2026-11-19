@@ -57,7 +57,7 @@ import { npcDef, type NpcRow } from '../../../shared/game/plugin/quests';
 import { installPivotNpc, pivotNpcParts, type PivotNpcGeometry, type PivotNpcLevel, type PivotNpcPorts } from './geometry';
 import { parseQuestNpcBinding, type QuestNpcTalkBinding } from '@wildshard/format/npcs';
 import { parseBossProfile, parseMarkedBossPresentation, type MarkedBossPresentation } from '@wildshard/format/bossProfiles';
-import { bodyBossFight, type HeldBossBrain } from '../../../shared/game/plugin/bodyBoss';
+import { bodyBossFight, stormGoal, type HeldBossBrain } from '../../../shared/game/plugin/bodyBoss';
 import { bossStorm } from './bossStorm';
 import { enterMovers } from './moverViews';
 import { finishedAfterSeen } from '../quest/finishedAfterSeen';
@@ -1440,7 +1440,7 @@ function rowBossSpec(ctx: ShardContext, rows: RowBossRows, ports: RowBossPorts):
       // J130: a page on a server steps no fight, so its row says when the storm blows, by the same phases and at the same ease.
       ctx.system({ id: `${rows.definition.id}.storm`, phase: 'update', run: dt => {
         const row = wirePage.encounters().find(entry => entry.id === (rows.row ?? rows.definition.id));
-        const goal = (row?.state === 'fight' || row?.state === 'beat') && profile.fight.stormPhases.includes(row.phase) ? 1 : 0;
+        const goal = stormGoal(row, profile.fight.stormPhases);
         fight.weather.storm = easeField(fight.weather.storm, goal, dt, { seconds: profile.fight.stormFade });
         weather(dt, fight.weather.storm); burst.update(dt, player);
       } });

@@ -200,8 +200,19 @@ export function declaredOwnerHooks(host: SimHost, input: unknown, body: AnimalSi
   const saved = record?.saved ?? row.saved ?? { defeated: false, rewardTaken: false, kills: 0 };
   const persist = record?.persist ?? (() => undefined);
   const bounty = new BossBounty(host, () => body, row.step);
+  const marks = row.profile.pattern === 'spawned' ? row.profile.fight : null;
   // OF20c: its strikes are said as the keeper's borrowed decisions say them (`boss.strike.<id>`), so a page's lane sheet draws them
-  host.onStep(row.step, () => {
+  host.onStep(row.step, dt => {
+    // OF19c1: a spawned profile's marks follow the declared fight as the keeper's fresh body wore them (`bodyBossFight`): the
+    // rise counts up through the intro, the fight mark stands through fight and beat, the phase mark is the fight's phase.
+    // Her clips and the page read them from her memory (pose inputs); the body's own snapshot keeps them.
+    const boss = brain();
+    if (marks !== null && boss !== undefined) {
+      const state = boss.state, fighting = state === 'fight' || state === 'beat', mem = body.mem, f = marks.fields;
+      mem[f.rise] = fighting ? 1 : state === 'intro' ? Math.min(1, (mem[f.rise] ?? 0) + dt / marks.riseSeconds) : 0;
+      mem[f.fight] = fighting ? 1 : 0;
+      mem[f.phase] = boss.engaged ? boss.phase : boss.checkpoint;
+    }
     const runner = host.strikes.get(row.actor), spec = runner?.spec;
     if (runner !== undefined && spec !== null && spec !== undefined) sayFightView(host, `${BOSS_STRIKE}${spec.id}`, [runner.through, runner.yaw, body.position.x, body.position.z]);
   }, { snapshot: () => JSON.stringify(bounty.earned),

@@ -49,6 +49,11 @@ export type BodyBossProfile =
   | { readonly kind: 'boss'; readonly pattern: 'spawned'; readonly fight: SpawnedBossRow }
   | { readonly kind: 'boss'; readonly pattern: 'held'; readonly fight: HeldBossRow };
 
+/** J130 / OF19c1: the storm a page blows off its fight's wire row (it steps no fight of its own): 1 while the fight, or its
+ *  beat, is in one of the profile's storm phases, else 0. The page eases toward it by the profile's `stormFade`. */
+export function stormGoal(row: { readonly state: string; readonly phase: number } | undefined, stormPhases: readonly number[]): 0 | 1 {
+  return row !== undefined && (row.state === 'fight' || row.state === 'beat') && stormPhases.includes(row.phase) ? 1 : 0;
+}
 const heldFinite = v.pipe(v.number(), v.finite());
 const HeldContinuation = v.strictObject({ hp: heldFinite, invulnerable: v.boolean() });
 /** The body's health/phase driver shares one BossScript clock; each pattern keeps its native reset and continuation. */
@@ -60,7 +65,7 @@ export function bodyBossFight<B extends BodyBossActor>(profile: BodyBossProfile,
 export function bodyBossFight<B extends BodyBossActor>(profile: BodyBossProfile, ports: SpawnedBossPorts<B>|HeldBossPorts<B>): SpawnedBossFight<B>|HeldBossFight {
   if (profile.pattern === 'spawned' && 'rewardPoint' in ports) {
     const row = profile.fight, focus = new Vector3(), { spawn, retire } = ports.body, weather = { storm: 0 }, f = row.fields;
-    let animal: B | null = null, invulnerable = false, stormGoal = 0;
+    let animal: B | null = null, invulnerable = false, stormTarget = 0;
     const stormEase = { seconds: row.stormFade };
     const goal = (phase: number): number => row.stormPhases.includes(phase) ? 1 : 0;
     const fresh = (): B | null => {
@@ -72,15 +77,15 @@ export function bodyBossFight<B extends BodyBossActor>(profile: BodyBossProfile,
     const script: BossScript = {
       inArena: (p) => Math.hypot(p.x - row.arena.x, p.z - row.arena.z) < row.arena.r,
       reset: (checkpoint) => {
-        stormGoal = 0; const a = fresh();
+        stormTarget = 0; const a = fresh();
         if (a) { a.hp = a.maxHp * (row.hpShares[checkpoint] ?? row.hpShares[row.hpShares.length - 1] ?? 1); a.mem[f.phase] = checkpoint; }
       },
       seal: () => undefined,
       intro: (t) => { if (animal) { animal.mem[f.rise] = Math.min(1, t / row.riseSeconds); focus.copy(animal.position); return focus; } return ports.rewardPoint; },
-      begin: (next) => { if (animal) { animal.mem[f.rise] = 1; animal.mem[f.fight] = 1; animal.mem[f.phase] = next; } stormGoal = goal(next); },
-      enterPhase: (next) => { if (animal) animal.mem[f.phase] = next; stormGoal = goal(next); },
+      begin: (next) => { if (animal) { animal.mem[f.rise] = 1; animal.mem[f.fight] = 1; animal.mem[f.phase] = next; } stormTarget = goal(next); },
+      enterPhase: (next) => { if (animal) animal.mem[f.phase] = next; stormTarget = goal(next); },
       update: (dt) => {
-        weather.storm = easeField(weather.storm, stormGoal, dt, stormEase);
+        weather.storm = easeField(weather.storm, stormTarget, dt, stormEase);
         ports.update?.(dt, weather.storm);
       },
       get hpFrac() { return animal ? Math.max(0, animal.hp / animal.maxHp) : 0; },
@@ -88,13 +93,13 @@ export function bodyBossFight<B extends BodyBossActor>(profile: BodyBossProfile,
       get dead() { return animal !== null && !animal.alive; },
       clampHp: (frac) => { if (animal) animal.hp = frac * animal.maxHp; },
       setInvulnerable: (on) => { invulnerable = on; },
-      victory: () => { stormGoal = 0; ports.victory(); },
+      victory: () => { stormTarget = 0; ports.victory(); },
       rewardPoint: () => ports.rewardPoint,
       respawnPoint: ports.respawnPoint,
     };
     return { script, weather, body: () => animal, adopt: (actor) => { animal = actor; }, invulnerable: () => invulnerable,
-      snapshot: () => ({ stormGoal, storm: weather.storm, invulnerable }),
-      restore: (state: SpawnedBossState) => { stormGoal = state.stormGoal; weather.storm = state.storm; invulnerable = state.invulnerable; } };
+      snapshot: () => ({ stormGoal: stormTarget, storm: weather.storm, invulnerable }),
+      restore: (state: SpawnedBossState) => { stormTarget = state.stormGoal; weather.storm = state.storm; invulnerable = state.invulnerable; } };
   }
   if (profile.pattern !== 'held' || !('brain' in ports)) throw new Error('Boss row/host policy mismatch');
   const row = profile.fight, { body, brain } = ports;

@@ -981,6 +981,7 @@
     "src/client/game/shardfile/clientAmbientLife.ts": "client",
     "src/client/game/shardfile/clientAssets.ts": "client",
     "src/client/game/shardfile/clientBossFight.ts": "client",
+    "src/client/game/shardfile/declaredBossStorm.ts": "client",
     "src/client/game/shardfile/clientBossTelegraph.ts": "client",
     "src/client/game/shardfile/clientCatalogue.ts": "client",
     "src/client/game/shardfile/clientCosmeticFinishes.ts": "client",

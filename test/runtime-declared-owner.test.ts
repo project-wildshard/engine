@@ -63,7 +63,9 @@ function declaring(source: Shardfile, ground: number): Shardfile {
       start: 'spawned', arena: { at, radius: 30 }, intro: 0.25, introShort: 0.25, respawn: { at: [ARENA[0], ground, ARENA[1] + 20], yaw: 0 },
       phases: [{ at: 1, name: 'one', caption: 'She rises', speed: 0, stopDistance: 2, turnRate: 6 }, { at: 0.5, name: 'two', caption: 'She rages', speed: 0, stopDistance: 2, turnRate: 8 }] }] });
   return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
-    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: parsed.creatures, encounters: parsed.encounters };
+    looks: [...source.rows.looks, ...parsed.rows.looks] },
+    // the shipped brains stay: Dunes r4's species rows name them (its declared homes leave with their spawns)
+    creatures: { ...parsed.creatures, brains: source.creatures.brains }, encounters: parsed.encounters };
 }
 const fightState = v.object({ boss: v.object({ state: v.string(), phase: v.number(), saved: v.object({ defeated: v.boolean(), rewardTaken: v.boolean(), kills: v.number() }) }) });
 function fight(host: SimHost): v.InferOutput<typeof fightState>['boss'] {
@@ -183,5 +185,35 @@ test('a declared owner boss says its strikes as the keeper\'s did, so a page\'s 
     const strike = host.strikes.get(BOSS)?.spec?.id;
     expect(strike).toBeDefined();
     expect([...said]).toEqual([`boss.strike.${strike ?? ''}`]);
+  } finally { host.dispose(); }
+}, 120_000);
+
+// OF19c1: Dunes' owner row carries the Matriarch's spawned profile, whose marks her grounded clips and page read (`fight`,
+// `rise`, `phase` in her body's memory, said to the page as pose inputs). A declared boss on that row keeps them: the rise
+// counts up through the intro, the fight mark stands through fight and beat, and the phase mark follows the fight's phase.
+test('a declared boss on a spawned profile keeps its marks: rise through the intro, fight, and the phase it fights', async () => {
+  const context = await arena(), { host, world, fixture } = context, body = host.entities.get(BOSS);
+  try {
+    const owner = fixture.plan.recipe.population.owner;
+    if (body === undefined || owner?.profile.pattern !== 'spawned') throw new Error('Dunes\' owner row keeps its spawned profile');
+    const fields = owner.profile.fight.fields, seen = { intro: [] as number[], phases: new Set<number>(), fight: new Set<number>() };
+    for (let i = 0; i < 2400 && fight(host).state !== 'victory'; i++) {
+      // the marks step runs before the fight's own, so a step's marks are the fight as the step began
+      const now = fight(host);
+      fightOn(context, 1, () => false, now.state === 'fight' ? 40 : 0);
+      if (now.state === 'intro') seen.intro.push(body.mem[fields.rise] ?? -1);
+      if (now.state === 'fight' || now.state === 'beat') { seen.fight.add(body.mem[fields.fight] ?? -1); seen.phases.add(body.mem[fields.phase] ?? -1);
+        expect(body.mem[fields.phase]).toBe(now.phase); expect(body.mem[fields.rise]).toBe(1); }
+    }
+    expect(fight(host).state).toBe('victory');
+    expect(seen.intro.length).toBeGreaterThan(2);
+    expect(seen.intro.every((rise, i) => rise > 0 && rise < 1 && (i === 0 || rise > (seen.intro[i - 1] ?? 0)))).toBe(true);
+    expect([...seen.fight]).toEqual([1]);
+    expect([...seen.phases].sort()).toEqual([0, 1]);
+    fightOn(context, 2, () => false, 0);
+    expect(body.mem[fields.fight]).toBe(0);
+    const saved = snapshotSimHost(host);
+    const restored = restoreSimHost(world.level, { ...world.ports, rapier: fixture.rapier }, saved, fresh => { context.install(fresh, true, saved); });
+    try { expect(canonicalSimDigest(snapshotSimHost(restored))).toBe(canonicalSimDigest(saved)); } finally { restored.dispose(); }
   } finally { host.dispose(); }
 }, 120_000);

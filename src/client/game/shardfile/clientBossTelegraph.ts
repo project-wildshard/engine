@@ -5,6 +5,7 @@ import type { ShardContext } from '../plugin/context';
 import { clientNativeBook } from './clientNativeBook';
 import { BOSS_STRIKE } from '../../../shared/game/shardfile/wirePrompts';
 import { wirePage } from './wirePage';
+import { installDeclaredBossStorm } from './declaredBossStorm';
 
 /** How long a strike the server said stands without being said again: a frame covers two ticks, and a page can lag. */
 const HEARD_FOR = 0.25;
@@ -12,12 +13,16 @@ const HEARD_FOR = 0.25;
  * when the spawned fight binds; lane sheets draw the strikes the server says (a keeper's or a declared owner boss's). */
 export function installClientBossTelegraph(ctx: ShardContext, input: unknown): void {
   const row = parse(ClientBossTelegraphSchema, input), fight = clientNativeBook(ctx).fight, view = row.view;
-  const world = ctx.game.runtime?.world, owner = ctx.product.section('sim/runtime-plan').recipe.population.owner?.actor, source = ctx.product.shardfile;
+  const world = ctx.game.runtime?.world, ownerRow = ctx.product.section('sim/runtime-plan').recipe.population.owner, owner = ownerRow?.actor, source = ctx.product.shardfile;
   // OF20c: an owner row naming a declared spawn is its declared boss encounter's; the page binds no fight, and the server says its strikes
-  const declared = owner !== undefined && source.creatures.spawns.some(spawn => spawn.id === owner) && source.encounters.some(encounter => encounter.entity === owner && encounter.kind === 'boss');
-  if ((fight === null && !declared) || world === undefined || world === null || row.actor !== owner)
+  const encounter = owner !== undefined && source.creatures.spawns.some(spawn => spawn.id === owner) ? source.encounters.find(entry => entry.entity === owner && entry.kind === 'boss') : undefined;
+  if ((fight === null && encounter === undefined) || world === undefined || world === null || row.actor !== owner)
     throw new Error('Boss telegraph requires its actual encounter owner');
-  if (view.kind === 'marked') return; // a row names no strike
+  if (view.kind === 'marked') {
+    // a row names no strike: a keeper's spawned fight consumes it as it binds; OF19c1: a declared boss on a spawned profile blows its storm
+    if (encounter !== undefined && ownerRow?.profile.pattern === 'spawned') installDeclaredBossStorm(ctx, source, encounter.id, world.player.position, ownerRow.profile.fight, view.rows);
+    return;
+  }
   const strike = ctx.product.section('actors/strikes').find(entry => entry.id === view.strike);
   if (strike?.shape.kind !== 'lane') throw new Error('Lane sheet requires its admitted lane strike and held controller');
   const width = strike.shape.width, reach = strike.shape.length;
