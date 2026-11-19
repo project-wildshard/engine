@@ -14,7 +14,7 @@ import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { CACHE_BYTE_LIMITS, ResidentByteCache } from '@wildshard/engine/core/memoryBudget';
 import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
-import {placedLoose, placedSpawn} from './placedSpawn';
+import {looseSlug, placedLoose, placedSpawn} from './placedSpawn';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -205,7 +205,7 @@ function installMemberLayer(): boolean {
     const held = await heldPartMember(url);
     if (held !== null) return held;
     // SA48: a slug placed after the build keeps its loose files (its header, DL18) in the cook's store, under its upload
-    const loose = placedLoose(url.pathname, url.search);
+    const loose = storedLoose(url.pathname, url.search);
     // Placed sections live in their whole-level parts, not their loose folder.
     // Ask that verified inventory before an absent loose probe emits a404.
     if (loose !== undefined) { const packed = await partMember(url); if (packed !== null) return packed; }
@@ -647,7 +647,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 // PZ3: on the content base only content moves; code and rapier stay with the page (a J138 home holds all of it).
                 const source = new URL(url), page = new URL(base);
                 // SA48: a slug placed after the build reads its loose files from its upload's own folder in the store
-                const target = source.origin !== page.origin ? url : placedLoose(source.pathname, source.search) ?? (packs === contentBase() ? contentURL(url)
+                const target = source.origin !== page.origin ? url : storedLoose(source.pathname, source.search) ?? (packs === contentBase() ? contentURL(url)
                   : new URL(source.pathname + source.search, packs).href);
                 return ports.fetch(target, signal, init);
               },
@@ -914,6 +914,28 @@ function packBase(home: unknown, slug: string): string {
   // PZ3: the content base (an origin, or PZ13's `content/<set>/` on one) when the boot bank names one; else this page
   return contentBase() || document.baseURI;
 }
+const LOOSE_FOLDER = /^loose\/[a-f0-9]{64}\/$/u;
+let bakedHome: {readonly text: string; readonly folders: ReadonlyMap<string, string>} | undefined;
+/** SA48 (4de1e703e): a stored cook this build baked keeps its loose files (header, discovery, programs, every `/shardfiles/<slug>/`
+ *  file) only under its upload's folder, which the bake names in `spawnManifests.home.loose`, as a placed slug's are under its own.
+ *  Its page path read there; undefined for every other path. The bank is parsed once per text, not per read. */
+function bakedLoose(pathname: string, search = ''): string | undefined {
+  const owner = looseSlug(pathname);
+  if (owner === undefined || typeof document === 'undefined') return undefined;
+  const text = document.getElementById('boot-module-files')?.textContent ?? '';
+  if (bakedHome?.text !== text) {
+    const folders = new Map<string, string>();
+    const home = text === '' ? undefined : get(get(JSON.parse(text) as unknown, 'spawnManifests'), 'home'), loose = get(home, 'loose');
+    if (typeof loose === 'object' && loose !== null) for (const [name, folder] of Object.entries(loose)) {
+      if (typeof folder === 'string' && LOOSE_FOLDER.test(folder)) folders.set(bareSlug(name), new URL(folder, packBase(home, name)).href);
+    }
+    bakedHome = {text, folders};
+  }
+  const folder = bakedHome.folders.get(owner);
+  return folder === undefined ? undefined : new URL(`.${pathname}${search}`, folder).href;
+}
+/** Where a loose page path is read: a placed slug's upload folder, a baked stored cook's, or undefined (this page or the base). */
+function storedLoose(pathname: string, search = ''): string | undefined { return placedLoose(pathname, search) ?? bakedLoose(pathname, search); }
 /** Optional recorded programs use the cook's actual inventory. Null means the cook published no such file. */
 export function shardPackBase(slug: string): string | null {
   const text = document.getElementById('boot-module-files')?.textContent;
