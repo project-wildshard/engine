@@ -39,14 +39,15 @@ export function preprocess(source) {
   /** @type {{active: boolean, taken: boolean, parent: boolean}[]} */ const stack = [];
   const live = () => stack.every((f) => f.active);
   const value = (/** @type {string} */ expr) => {
-    let e = expr.replace(/\/\/.*$/u, '').replace(/defined\s*\(\s*(\w+)\s*\)|defined\s+(\w+)/gu, (_, a, b) => (defines.has(a ?? b) ? '1' : '0'));
+    let e = expr.replace(/\/\/.*$/u, '').replaceAll(/defined\s*\(\s*(\w+)\s*\)|defined\s+(\w+)/gu, (_, a, b) => (defines.has(a ?? b) ? '1' : '0'));
     for (let i = 0; i < 8; i++) {
-      const next = e.replace(/\b[A-Za-z_]\w*\b/gu, (id) => (defines.has(id) ? `(${defines.get(id) || '1'})` : '0'));
+      const next = e.replaceAll(/\b[A-Za-z_]\w*\b/gu, (id) => (defines.has(id) ? `(${defines.get(id) === '' ? '1' : defines.get(id)})` : '0'));
       if (next === e) break; e = next;
     }
-    e = e.replace(/(\d+(?:\.\d+)?)[uUfF]\b/gu, '$1');
+    e = e.replaceAll(/(\d+(?:\.\d+)?)[uUfF]\b/gu, '$1');
     if (!/^[\d\s()+\-*/%<>=!&|.]*$/u.test(e)) return false;
-    try { return Boolean(Function(`"use strict"; return (${e});`)()); } catch { return false; }
+    // oxlint-disable-next-line no-new-func, typescript/no-implied-eval -- e is checked above to hold only digits and operators
+    try { return Boolean(new Function(`"use strict"; return (${e});`)()); } catch { return false; }
   };
   const lines = [];
   for (const raw of source.split('\n')) {
@@ -81,9 +82,9 @@ export function stageVaryings(source, stage) {
   const { lines, defines } = preprocess(source);
   const keyword = (/** @type {string} */ k) => defines.get(k) ?? k;
   /** @type {Map<string, number>} */ const out = new Map();
-  const text = lines.join('\n').replace(/\/\*[\s\S]*?\*\//gu, '').replace(/\/\/.*$/gmu, '');
+  const text = lines.join('\n').replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\/\/.*$/gmu, '');
   for (const statement of text.split(';')) {
-    const words = statement.replace(/\s+/gu, ' ').trim();
+    const words = statement.replaceAll(/\s+/gu, ' ').trim();
     if (words === '' || /\(|\{|\}|=/u.test(words) || /^layout\b/u.test(words)) continue;
     const parts = words.split(' ').map(keyword).join(' ').split(' ').filter(Boolean);
     const qualifier = parts.find((p) => p === 'varying' || p === 'out' || p === 'in');
@@ -325,12 +326,14 @@ async function censusAtControl(page, o) {
   return { spawn, frames, resident, programs };
 }
 
+const mb = (/** @type {number | null | undefined} */ b) => (b === null || b === undefined ? '-' : (b / 1e6).toFixed(1));
+
 /** @param {string[]} argv */
 async function main(argv) {
   const args = Object.fromEntries(argv.map((a) => /^--([^=]+)(?:=(.*))?$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2] ?? '1']));
   if ((!args.dist && !args.url) || !args.zones) { console.error('usage: vertex-census.mjs --dist=<built client folder> | --url=<served client>, --zones=a,b|all [--out=<dir>] [--settle=3]'); return 64; }
   const catalogue = args.dist ? JSON.parse(readFileSync(join(args.dist, 'catalogue.json'), 'utf8')) : null;
-  const zones = args.zones === 'all' ? [...new Set((catalogue?.grid?.cells ?? []).map((/** @type {any} */ c) => c.slug))].sort() : args.zones.split(',');
+  const zones = args.zones === 'all' ? [...new Set((catalogue?.grid?.cells ?? []).map((/** @type {any} */ c) => c.slug))].sort((a, b) => a.localeCompare(b)) : args.zones.split(',');
   const out = resolvePath(args.out ?? 'tmp/vertex-census'); mkdirSync(out, { recursive: true });
   const settleMs = Number(args.settle ?? 3) * 1000;
   const { harnessPins } = await import('../debug-settings.mjs');
@@ -363,6 +366,5 @@ async function main(argv) {
   }
   return failed === 0 ? 0 : 1;
 }
-const mb = (/** @type {number | null | undefined} */ b) => (b === null || b === undefined ? '-' : (b / 1e6).toFixed(1));
 
 if (process.argv[1] !== undefined && resolvePath(process.argv[1]) === import.meta.filename) process.exitCode = await main(process.argv.slice(2));
