@@ -6,7 +6,7 @@ import {stripTypeScriptTypes} from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- Inject finite module/cache ports into the real world-only continuation.
 import {runInNewContext} from 'node:vm';
 import {prepareBootImports} from './bootDownloads';
-import {reserveScriptMemory} from './scriptMemoryPlan';
+import {reserveScriptMemory, scriptMemoryTopUp, SCRIPT_MEMORY_TOP_UP_SLOT} from './scriptMemoryPlan';
 import {dataPointer} from '@wildshard/engine/game/shard/pointer';
 import {bootAwait,bootMark,bootTask,bootTiming} from '@wildshard/engine/boot/timing';
 
@@ -146,7 +146,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
       events.push('memory:end');
     }},
     '@wildshard/engine/core/workSlice': {yieldTask: () => { reserveClock.turns++; return resolved(); }},
-    './scriptMemoryPlan': {reserveScriptMemory},
+    './scriptMemoryPlan': {reserveScriptMemory, scriptMemoryTopUp, SCRIPT_MEMORY_TOP_UP_SLOT},
     '@wildshard/engine/boot/idle': {idleTurn: () => Promise.resolve(true)},
     '@wildshard/engine/core/clock': {diagnosticNow: () => reserveClock.now},
     './assetTables': {prepareAssetPackRead: () => ({ready: resolved}), adoptInlineMounts: () => Promise.resolve(0)},

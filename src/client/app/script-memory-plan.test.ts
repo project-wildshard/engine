@@ -2,7 +2,7 @@
 // loader: 1.1-2.0 s of Application modules on headless WebKit iPhone at 4x CPU. Under the loader it reserves the standalone
 // bank; the rest tops up after control, a reserve an idle turn.
 import { expect, test } from 'vitest';
-import { GRID_SCRIPT_MEMORY, PAGE_SCRIPT_MEMORY, reserveScriptMemory } from './scriptMemoryPlan';
+import { GRID_SCRIPT_MEMORY, PAGE_SCRIPT_MEMORY, SCRIPT_MEMORY_TOP_UP_DEFAULT, reserveScriptMemory, scriptMemoryTopUp } from './scriptMemoryPlan';
 import { prepareScriptMemoryBank, scriptMemoryCensus } from '@wildshard/engine/script/moduleV2';
 
 const total = (bank: typeof PAGE_SCRIPT_MEMORY): number => bank.counts.reduce((n, c) => n + c, 0) + bank.virgin.reduce((n, row) => n + row.count, 0);
@@ -41,4 +41,16 @@ test('a top-up whose owner ends stops between reserves', async () => {
   await new Promise((resolve) => { setTimeout(resolve, 20); });
   expect(banks).toEqual([PAGE_SCRIPT_MEMORY.counts[0], GRID_SCRIPT_MEMORY.counts[0]]);
   expect(turns).toBe(3);
+});
+
+test('debug.scriptMemoryTopUp false: a grid page reserves the standalone bank and tops up nothing (DW3)', async () => {
+  let asked = false;
+  const banks: number[] = [];
+  await reserveScriptMemory(true, { prepare: (counts, _y, virgin) => { banks.push(counts.reduce((n, c) => n + c, 0) + (virgin ?? []).reduce((n, row) => n + row.count, 0)); return Promise.resolve(); },
+    yieldTask: () => Promise.resolve(), afterControl: () => { asked = true; }, idle: () => Promise.resolve(true), topUp: false });
+  expect(banks).toEqual([total(PAGE_SCRIPT_MEMORY)]);
+  expect(asked).toBe(false);
+  expect(scriptMemoryTopUp(false)).toBe(false);
+  expect(scriptMemoryTopUp(true)).toBe(true);
+  expect(scriptMemoryTopUp('off')).toBe(SCRIPT_MEMORY_TOP_UP_DEFAULT);
 });

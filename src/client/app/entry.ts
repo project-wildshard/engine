@@ -671,10 +671,11 @@ async function startSelected(): Promise<void> {
     // route's demand for its cell activations after control, a reserve an idle turn. A miss allocates in place, as before.
     const grid = page.mode === 'grid';
     const assetTables = await import('./assetTables'), packs = assetTables.prepareAssetPackRead(grid || TIER !== 'phone' ? undefined : game.shard.slug);
-    const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }, { reserveScriptMemory }, { idleTurn }] = await Promise.all([
+    const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }, { reserveScriptMemory, scriptMemoryTopUp, SCRIPT_MEMORY_TOP_UP_SLOT }, { idleTurn }] = await Promise.all([
       import('@wildshard/engine/script/moduleV2'), import('@wildshard/engine/core/workSlice'),
       import('@wildshard/engine/core/clock'), import('./scriptMemoryPlan'), import('@wildshard/engine/boot/idle'),
     ]);
+    const savedTopUp = (): unknown => { try { return jsonSlot(SCRIPT_MEMORY_TOP_UP_SLOT, 'device').read(); } catch { return null; } };
     const memoryStartedAt = diagnosticNow();
     // NB4: a reserve yields once its slice has run 8 ms, not after every reserve. In Chromium the 45 reserves cost
     // 0.6 ms together; the 45 timer turns between them were the whole 0.35 s of this span at CPU x4 (NB1). A reserve
@@ -688,7 +689,7 @@ async function startSelected(): Promise<void> {
         if (entryScope.disposed || entryScope.disposing) throw new Error('Entry memory preparation ended');
       },
       afterControl: (run) => { entryScope.listen(document, 'ws:control-ready', run, { once: true }); },
-      idle: () => idleTurn(entryScope) }));
+      idle: () => idleTurn(entryScope), topUp: scriptMemoryTopUp(savedTopUp()) }));
     performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
       detail: { memoryTurns, memoryWaitMs, grid } });
     await packs.ready();

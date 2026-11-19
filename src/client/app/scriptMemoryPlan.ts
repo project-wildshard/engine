@@ -26,16 +26,26 @@ export function scriptMemoryPlan(grid: boolean): { readonly boot: ScriptMemoryBa
   return { boot: PAGE_SCRIPT_MEMORY, play: grid ? GRID_SCRIPT_MEMORY : null };
 }
 
+/** meta IPHONE13-DRIFTWOOD DW2/DW3 (mini-driftwood13, 2026-11-19): on the iPhone 13 the grid top-up after control is the dock's
+ *  first-seconds stall. A ScriptProfiler sample of Driftwood's first 8 s of play put half the main thread (about 2.5 s) in
+ *  `new WebAssembly.Memory` from this top-up, 190 to 540 ms tasks between frames while update and render stayed under 20 ms.
+ *  The device slot `debug.scriptMemoryTopUp` (true or false) keeps or skips it; skipped, a cell activation that finds the
+ *  bank short allocates in place, as a miss always has. On until the phone pairs decide. */
+export const SCRIPT_MEMORY_TOP_UP_SLOT = 'debug.scriptMemoryTopUp';
+export const SCRIPT_MEMORY_TOP_UP_DEFAULT = true;
+/** The slot's value: a boolean wins, anything else is the default. */
+export function scriptMemoryTopUp(saved: unknown): boolean { return typeof saved === 'boolean' ? saved : SCRIPT_MEMORY_TOP_UP_DEFAULT; }
+
 type Prepare = (counts: readonly number[], yieldTask: () => Promise<void>, virgin?: ScriptMemoryBank['virgin']) => Promise<void>;
 /**
  * Reserve the boot bank now (`yieldTask` between reserves), and once `afterControl` runs its callback, top up to the play
  * bank with `idle` between reserves (false: the owner ended, nothing more is reserved). Resolves with the boot bank.
  */
 export async function reserveScriptMemory(grid: boolean, ports: { readonly prepare: Prepare; readonly yieldTask: () => Promise<void>;
-  readonly afterControl: (run: () => void) => void; readonly idle: () => Promise<boolean> }): Promise<void> {
+  readonly afterControl: (run: () => void) => void; readonly idle: () => Promise<boolean>; readonly topUp?: boolean }): Promise<void> {
   const plan = scriptMemoryPlan(grid), play = plan.play;
   await ports.prepare(plan.boot.counts, ports.yieldTask, plan.boot.virgin);
-  if (play === null) return;
+  if (play === null || ports.topUp === false) return;
   ports.afterControl(() => {
     const paced = async (): Promise<void> => { if (!await ports.idle()) throw new Error('Script memory top-up ended'); };
     // optional: a top-up that ends (the page left play) or fails leaves the bank as it is, and a miss allocates in place
