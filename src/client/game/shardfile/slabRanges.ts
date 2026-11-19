@@ -565,7 +565,7 @@ const draws: SlabDraws = { starts: new Int32Array(256), counts: new Int32Array(2
 let offsets = new Int32Array(256), elements = new Int32Array(256), instances = new Int32Array(256);
 /** the one draw armed on a context: its element count, the extension, and the renderer frame it was armed in */
 interface Armed { readonly count: number; readonly extension: MultiDrawExtension; readonly info: { readonly frame: number } | undefined; readonly frame: number }
-interface DrawHook { armed: Armed | null; readonly wrapper: (...args: number[]) => void }
+interface DrawHook { armed: Armed | null; readonly wrapper: (mode: number, count: number, type: number, offset: number, instances?: number) => void }
 /** per context, the hook over `drawElementsInstanced` (instanced parts) and, mini-nb8j, over `drawElements` (a plain mesh) */
 const hooks = new WeakMap<object, DrawHook>(), singleHooks = new WeakMap<object, DrawHook>();
 /**
@@ -584,16 +584,20 @@ function hookOf(gl: MultiDrawGl, instanced = true): DrawHook | null {
   if (typeof plain !== 'function') return null;
   const hook: DrawHook = {
     armed: null,
-    wrapper: function wrapper(this: unknown, ...args: number[]): void {
-      const armed = hook.armed, [mode = 0, elementCount = 0, type = 0, offset = 0, instanceCount = 1] = args;
+    // STR20: every draw on the context passes through here, so it takes its arguments by name (a rest array and a
+    // Reflect.apply list were two arrays per draw) @frame
+    wrapper: function wrapper(this: unknown, mode: number, elementCount: number, type: number, offset: number, instanceCount?: number): void {
+      const armed = hook.armed;
       const single = instanced ? undefined : armed?.extension.multiDrawElementsWEBGL;
       if (armed === null || elementCount !== armed.count || offset !== 0 || (armed.info !== undefined && armed.info.frame !== armed.frame) || (!instanced && single === undefined)) {
-        Reflect.apply(plain, this, args); return;
+        if (instanced) (plain as DrawElementsInstanced).call(this, mode, elementCount, type, offset, instanceCount ?? 1);
+        else (plain as DrawElements).call(this, mode, elementCount, type, offset);
+        return;
       }
       const n = draws.n, bytes = type === gl.UNSIGNED_INT ? 4 : type === gl.UNSIGNED_SHORT ? 2 : 1;
       if (offsets.length < n) { offsets = new Int32Array(n * 2); elements = new Int32Array(n * 2); instances = new Int32Array(n * 2); }
-      for (let i = 0; i < n; i++) { offsets[i] = (draws.starts[i] ?? 0) * 3 * bytes; elements[i] = (draws.counts[i] ?? 0) * 3; instances[i] = instanceCount; }
-      if (single !== undefined) Reflect.apply(single, armed.extension, [mode, elements, 0, type, offsets, 0, n]);
+      for (let i = 0; i < n; i++) { offsets[i] = (draws.starts[i] ?? 0) * 3 * bytes; elements[i] = (draws.counts[i] ?? 0) * 3; instances[i] = instanceCount ?? 1; }
+      if (single !== undefined) single.call(armed.extension, mode, elements, 0, type, offsets, 0, n);
       else armed.extension.multiDrawElementsInstancedWEBGL(mode, elements, 0, type, offsets, 0, instances, 0, n);
     },
   };

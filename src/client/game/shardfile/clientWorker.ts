@@ -259,7 +259,10 @@ function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map
     bodies.set(handle, { body, manager: animals, home });
     Object.assign(body.mem, poses.get(info.id));
   }
-  for (const body of animals.animals.filter(entry => !entry.rowDriven)) { animals.retire(body); retired.set(body.kind, (retired.get(body.kind) ?? 0) + 1); } // what the page's own population made
+  // STR20: run every frame; the page's own population is retired once, so the common frame finds none and copies nothing
+  let own = false;
+  for (let k = 0; k < animals.animals.length && !own; k++) own = animals.animals[k]?.rowDriven === false;
+  if (own) for (const body of animals.animals.filter(entry => !entry.rowDriven)) { animals.retire(body); retired.set(body.kind, (retired.get(body.kind) ?? 0) + 1); } // what the page's own population made
 }
 
 type BodyDims = Parameters<typeof creatureBodyShape>[0];
@@ -274,6 +277,12 @@ function headOf(body: Animal | undefined, to: Vector3): boolean {
   return true;
 }
 
+/** STR20: the animal rows the client holds, counted without copying the entity map each frame */
+function animalRows(client: NetClient): number {
+  let rows = 0;
+  for (const info of client.entities.values()) if (info.cls.cls === ANIMAL_CLASS.cls) rows++;
+  return rows;
+}
 /** Rows onto the bodies, and the near ones into the predicted world as capsules. */
 function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>): number {
   const { interpolator } = client, own = client.welcome?.handle ?? 0, under = client.riders.get(own);
@@ -683,7 +692,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const entered = grid?.items() ?? items;
     if (entered !== items) { items = entered; net.bindSlots(slotsOf(items)); }
     sayPoseInputs(); syncCreatures(client, animals, bodies, retired, spawnMs, poses);
-    if (here) for (const event of contacts.splice(0)) {
+    if (here && contacts.length > 0) for (const event of contacts.splice(0)) {
       const entry = bodies.get(event.kind === 'hit' ? event.target : event.kind === 'died' ? event.id : event.body);
       if (entry === undefined) continue;
       if (event.kind === 'hit') entry.manager.presentHit?.(entry.body, event.amount, new Vector3(...event.at), event.head, event.killed, event.confirmFor !== 0);
@@ -699,7 +708,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const shown = showRows(client, ports, bodies, renderTick, dt, row, near, rideable);
     others?.frame(renderTick, dt);
     wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day()); decks.frame(renderTick);
-    report.rows = animals === null ? [...client.entities.values()].filter(info => info.cls.cls === ANIMAL_CLASS.cls).length : shown; // a data cell's life draws them
+    report.rows = animals === null ? animalRows(client) : shown; // a data cell's life draws them
     if (!quiet()) net.present(dt);
     const now = diagnosticNow(), { predictor } = net, seconds = (now - started) / 1000, tick = client.latest?.tick ?? 0;
     costs[report.frames % costs.length] = cost + now - at;

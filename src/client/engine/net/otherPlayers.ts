@@ -15,7 +15,7 @@ import { NameTag, type NameTagShown } from './nameTag';
 import { RemoteDeath, type DeathPhase } from './remoteDeath';
 import { RemoteHurt, type HurtShown } from './remoteHurt';
 import { HeldInHand, heldOnOthers } from './heldOnOthers';
-import type { NetClient } from './client';
+import type { NetClient, NetEntityInfo } from './client';
 import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
 
@@ -269,16 +269,26 @@ export class OtherPlayers {
     if (killed) body?.killed();
     return body !== undefined;
   }
+  /** @frame */
   frame(renderTick: number, dt: number): void {
     this.warm?.frame();
-    const { client, bodies, row } = this, own = client.welcome?.handle ?? 0;
-    for (const handle of bodies.keys()) if (!client.entities.has(handle)) this.drop(handle);
-    for (const [handle, info] of client.entities) {
-      if (info.cls.cls !== PLAYER_CLASS.cls || handle === own || !client.interpolator.sample(handle, renderTick, row)) continue;
-      (bodies.get(handle) ?? this.enter(handle, String(info.initial['name'] ?? ''), info.id)).show(row, dt, client.riders.has(handle));
-    }
+    const { client, bodies } = this;
+    if (bodies.size > 0) for (const handle of bodies.keys()) if (!client.entities.has(handle)) this.drop(handle);
+    // STR20: every net entity (creatures and movers too) is visited each frame; `forEach` with one made visitor walks the
+    // map with no entry pairs, where `for ... of` made one per entity
+    this.tick = renderTick; this.dt = dt; this.own = client.welcome?.handle ?? 0;
+    client.entities.forEach(this.visit);
     othersOnMap.update(bodies.values()); // REMOTE-PLAYERS RP3: the minimap draws each body where it stands, facing its way
   }
+  private tick = 0;
+  private dt = 0;
+  private own = 0;
+  /** one entity of `frame`'s walk: a player's body follows its sampled row @frame */
+  private readonly visit = (info: NetEntityInfo, handle: number): void => {
+    const { client, bodies, row } = this;
+    if (info.cls.cls !== PLAYER_CLASS.cls || handle === this.own || !client.interpolator.sample(handle, this.tick, row)) return;
+    (bodies.get(handle) ?? this.enter(handle, String(info.initial['name'] ?? ''), info.id)).show(row, this.dt, client.riders.has(handle));
+  };
   /** RP2: a body is dressed as it enters, from the one shared build; one that fails to build stands with its Name alone. */
   private enter(handle: number, name: string, id: string): OtherBody {
     const body = new OtherBody(name, id);

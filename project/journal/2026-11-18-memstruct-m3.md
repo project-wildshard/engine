@@ -19,3 +19,15 @@
   camera pose (plain and widened) and each view copies the frustum. One walk on the finished build: culler 0.08 MB/s.
 - The culler meter counts every function of cull.ts plus place.ts's frame pass and the scene's residency test; placing
   a streamed tile's copies (place.ts's builders, `posed`) is loading, not the frame, and is left out of it.
+- STR20, the next frame allocators from STR18's list (Nine, one walk each on the finished build; base 15.2 MB/s):
+  the lent-param writers (0.67: a miss after any lend change made seven arrays and closures per id; now one list),
+  the channel programs (0.57: the merged lane's observation object and destructuring `for ... of` per lane; the post
+  look's own observation, empty values bag and writer object per frame), the grapple's state rows (0.39: two strings per
+  read and a decoded row object; `stateField` now finds the handle by declared name and decodes the one `value` column),
+  the tile driver's step (0.36: a position object, two layer arrays, a closure per tile scanned and a key string per tile
+  per frame), the slab draw hook (0.27: a rest array and a `Reflect.apply` list per draw on the context), and the cheap
+  part of the worker's present (the page population filter, the contact splice, the entity map copy) and the other
+  players' entity walk (`forEach` with one visitor, no entry pairs).
+- What is left on Nine (~7 MB/s, one walk) is mostly three's draw path and boxed numbers: `getParameters` on program
+  checks, uniform setters reading doubles through megamorphic loads, the render list's sort, channel readers returning
+  numbers through calls V8 does not inline. Under the 2 MB/s line needs those, which is past this row's five.

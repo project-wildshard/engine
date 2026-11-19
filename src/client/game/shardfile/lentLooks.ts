@@ -142,6 +142,12 @@ let writerGeneration = -1;
 // repeating its outer lookup; generation changes still invalidate every book.
 let writerOwner: Scope | null | undefined;
 let ownerWriters = new Map<string, readonly LentLooks[]>();
+type Lend = (typeof lends)[number];
+/** a's and b's scopes are on one owner line (either holds the other) */
+function onLine(a: Scope | null, b: Scope | null): boolean { return a !== null && b !== null && (a.belongsTo(b) || b.belongsTo(a)); }
+/** STR20: the chosen lends of the id being found, reused (a miss runs every write of a frame after a lend starts or ends) */
+const chosenScratch: Lend[] = [];
+/** @frame */
 function paramWriters(id: string): readonly LentLooks[] {
   if (writerGeneration !== lendGeneration) { writerCache.clear(); writerGeneration = lendGeneration; writerOwner = undefined; }
   const owner = enteredOwner();
@@ -153,15 +159,29 @@ function paramWriters(id: string): readonly LentLooks[] {
   const byId = ownerWriters;
   const cached = byId.get(id);
   if (cached !== undefined) return cached;
-  const line = (a: Scope | null, b: Scope | null): boolean => a !== null && b !== null && (a.belongsTo(b) || b.belongsTo(a));
-  const held = lends.filter(lend => lend.looks.materials.has(id)).reverse();
-  const chosen = held.filter(lend => !lend.follows && line(owner, lend.scope));
-  const newest = held.find(lend => !lend.follows);
+  // STR20: the lends holding `id`, newest first, read by index into the one book this id keeps (the filters, find, spread
+  // and map made seven arrays and closures each miss)
+  const chosen = chosenScratch; chosen.length = 0;
+  let newest: Lend | undefined;
+  for (let i = lends.length - 1; i >= 0; i--) {
+    const lend = lends[i];
+    if (lend === undefined || lend.follows || !lend.looks.materials.has(id)) continue;
+    newest ??= lend;
+    if (onLine(owner, lend.scope)) chosen.push(lend);
+  }
   if (chosen.length === 0 && newest !== undefined) chosen.push(newest);
+  const writers: LentLooks[] = [];
+  for (let k = 0; k < chosen.length; k++) { const lend = chosen[k]; if (lend !== undefined) writers.push(lend.looks); }
   // a following compile takes the writes made on its line: the owner's, or a chosen lend's (the frame feeds write with no
   // owner, so they reach the newest lend alone)
-  const followers = held.filter(lend => lend.follows && (line(owner, lend.scope) || chosen.some(writer => line(writer.scope, lend.scope))));
-  const writers = [...chosen, ...followers].map(lend => lend.looks);
+  for (let i = lends.length - 1; i >= 0; i--) {
+    const lend = lends[i];
+    if (lend === undefined || !lend.follows || !lend.looks.materials.has(id)) continue;
+    let follows = onLine(owner, lend.scope);
+    for (let k = 0; !follows && k < chosen.length; k++) follows = onLine(chosen[k]?.scope ?? null, lend.scope);
+    if (follows) writers.push(lend.looks);
+  }
+  chosen.length = 0;
   byId.set(id, writers);
   return writers;
 }

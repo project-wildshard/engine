@@ -99,6 +99,8 @@ export class NetClient {
   private readonly senderClasses = new Map<number, number>();
   private tableHash = -1;
   private readonly ids = new Map<string, number>();
+  /** STR20: the shared state rows' handles by their declared name (the id less `STATE_PREFIX`), so a read builds no key */
+  private readonly stateIds = new Map<string, number>();
   private unacked: NetCommand[] = [];
   private fresh = 0;
   private seq = 0;
@@ -191,10 +193,20 @@ export class NetClient {
     for (const entity of this.entities.values()) if (entity.cls === FLAG_CLASS) out.add(entity.id.slice(FLAG_PREFIX.length));
     return out;
   }
-  /** One public shared state field in a frame, by its declared name. */
+  /** One public shared state field in a frame, by its declared name. STR20: read every frame (the grapple's seven rows, the
+   *  day, the weather), so it decodes the one `value` column in place: no key string and no decoded row object. @frame */
   stateField(frame: DecodedFrame, name: string): number | undefined {
-    const value = this.fields(frame, this.ids.get(`${STATE_PREFIX}${name}`) ?? 0)?.['value'];
-    return typeof value === 'number' ? value : undefined;
+    const handle = this.stateIds.get(name);
+    const row = handle === undefined ? undefined : frame.rows.get(handle), cls = handle === undefined ? undefined : this.entities.get(handle)?.cls;
+    if (row === undefined || cls === undefined) return undefined;
+    const columns = cls.row;
+    for (let k = 0; k < columns.length; k++) {
+      const column = columns[k];
+      if (column?.name !== 'value') continue;
+      const value = column.value(row[k] ?? 0);
+      return typeof value === 'number' ? value : undefined;
+    }
+    return undefined;
   }
   /** The owner block of a frame, as field values. */
   owner(frame: DecodedFrame): NetFields { return decodeColumns(PLAYER_CLASS.owner, frame.owner); }
@@ -306,7 +318,7 @@ export class NetClient {
       if (event.kind === 'phase') { if (event.on) this.phased.add(event.flag); else this.phased.delete(event.flag); continue; }
       if (event.kind === 'despawn') {
         const id = this.entities.get(event.handle)?.id;
-        if (id !== undefined) this.ids.delete(id);
+        if (id !== undefined) { this.ids.delete(id); if (id.startsWith(STATE_PREFIX)) this.stateIds.delete(id.slice(STATE_PREFIX.length)); }
         this.entities.delete(event.handle); this.senderClasses.delete(event.handle);
         continue;
       }
@@ -320,10 +332,11 @@ export class NetClient {
       cls.text.forEach((field, index) => { initial[field.name] = texts[index] ?? ''; });
       this.entities.set(event.handle, { handle: event.handle, id: event.id, cls, initial });
       this.ids.set(event.id, event.handle);
+      if (event.id.startsWith(STATE_PREFIX)) this.stateIds.set(event.id.slice(STATE_PREFIX.length), event.handle);
     }
   }
   /** Everything it holds named the cell it left. Commands stand: the player's own stream goes on. */
-  private left(): void { this.welcome = null; this.latest = null; this.deathTick = -1; this.clock.reset(); this.interpolator.clear(); this.delivery.clear(); this.frames.clear(); this.entities.clear(); this.senderClasses.clear(); this.ids.clear(); this.quests.clear(); this.phased.clear(); this.riders.clear(); this.owned.clear(); this.ownedVersion++; this.ledgerSerial = 0; }
+  private left(): void { this.welcome = null; this.latest = null; this.deathTick = -1; this.clock.reset(); this.interpolator.clear(); this.delivery.clear(); this.frames.clear(); this.entities.clear(); this.senderClasses.clear(); this.ids.clear(); this.stateIds.clear(); this.quests.clear(); this.phased.clear(); this.riders.clear(); this.owned.clear(); this.ownedVersion++; this.ledgerSerial = 0; }
   private receipt(event: NetLedger): void {
     if (event.serial <= this.ledgerSerial || this.granted.has(event.id)) return;
     this.ledgerSerial = event.serial; this.granted.add(event.id);

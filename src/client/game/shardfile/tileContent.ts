@@ -20,7 +20,7 @@ import type { ClientAssets } from './clientAssets';
 import type { ClientTileViews } from './clientViews';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { Scope } from '@wildshard/engine/app/scope';
-import { TILES_PER_SIDE, TILE_SIZE, tileOf, tileOrder, type CellTile } from '../../../shared/game/shardfile/tileOrder';
+import { clampTile, TILES_PER_SIDE, TILE_SIZE, tileOf, tileOrder, type CellTile } from '../../../shared/game/shardfile/tileOrder';
 import { noteEnteredTiles } from './enteredTileReadout';
 import { holdStaticMatrices } from '@wildshard/engine/render/staticMatrices';
 
@@ -116,7 +116,10 @@ export function ring(centre: CellTile, radius: number): Set<number> {
  * current tile, so walking along a tile edge never flips the resident set back and forth, while a jump (a respawn, a
  * teleport, a recovery) that lands anywhere further away moves it at once, even near the new tile's own edge.
  */
+// STR20: run every frame by the tile driver: a step inside the current tile returns it (callers compare i and j), so the
+// common case makes no tile. @frame
 export function followTile(current: CellTile | null, x: number, z: number, hysteresis = 4): CellTile {
+  if (current !== null && Number.isFinite(x) && Number.isFinite(z) && clampTile(x) === current.i && clampTile(z) === current.j) return current;
   const next = tileOf(x, z);
   if (current === null || (next.i === current.i && next.j === current.j)) return next;
   const left = -HALF + current.i * TILE_SIZE, bottom = -HALF + current.j * TILE_SIZE;

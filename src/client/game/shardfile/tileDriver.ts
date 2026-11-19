@@ -75,6 +75,9 @@ interface TileRingPlan {
   readonly nearest: Record<Layer, readonly number[]>;
 }
 
+/** STR20: the layer orders `step` walks every frame, made once */
+const RETIRE_ORDER: readonly Layer[] = ['render', 'colliders'], ATTACH_ORDER: readonly Layer[] = ['colliders', 'render'];
+
 export class TileDriver {
   private readonly attached: Record<Layer, Map<number, Attachment>> = { render: new Map(), colliders: new Map() };
   /** tiles that failed to attach (`layer:key`) and their errors; in play one stays out, in the loader's fence it is tried
@@ -101,7 +104,8 @@ export class TileDriver {
     }));
     liveDrivers.add(this); scope.onDispose(() => { liveDrivers.delete(this); });
   }
-  private last: { readonly x: number; readonly z: number } | null = null;
+  /** the player's last cell-local position (STR20: one object, moved in place each step) */
+  private last: { x: number; z: number } | null = null;
   /** MF13: the camera's view, and when each wanted render tile was first wanted (an in-view one waits up to VIEW_DEFER_MS) */
   private view: (() => ViewCone | null) | null = null;
   private readonly wantedAt = new Map<number, number>();
@@ -197,14 +201,19 @@ export class TileDriver {
    *  tile not yet attached (colliders first), one at a time in play; under the loader all at once (DL21, NB3: the
    *  fence's slab reads and decodes then overlap, where one tile at a time held its queue at one job). Render owners retire one tile beyond the attach ring;
    *  collider owners retain the exact 3 x 3 physical ring (D2 B). */
+  /** @frame */
   step(x: number, z: number): void {
     if (this.scope.disposed || this.scope.disposing) return;
-    this.last = { x, z };
+    if (this.last === null) this.last = { x, z }; else { this.last.x = x; this.last.z = z; }
     const centre = this.centre = followTile(this.centre, x, z), plan = this.ringPlan(centre, this.radius()), wanted = plan.wanted;
     this.renderRing = plan.retained.render;
-    for (const layer of ['render', 'colliders'] as const) for (const [key, tile] of this.attached[layer]) {
-      if (plan.retained[layer].has(key)) continue;
-      this.attached[layer].delete(key); tile.scope.dispose();
+    for (let l = 0; l < RETIRE_ORDER.length; l++) {
+      const layer = RETIRE_ORDER[l] as Layer, attached = this.attached[layer], retained = plan.retained[layer];
+      if (attached.size <= retained.size && this.allRetained(attached, retained)) continue;
+      for (const [key, tile] of attached) {
+        if (retained.has(key)) continue;
+        attached.delete(key); tile.scope.dispose();
+      }
     }
     // NB3: under the loader every fence tile starts at once. A tile's attach mostly awaits shared work (its slab banks'
     // reads and their one publication chain, the refinement queue's FENCE_LANES jobs), so a lane cap left the spawn's
@@ -212,20 +221,22 @@ export class TileDriver {
     const lanes = loaderMode ? Number.POSITIVE_INFINITY : 1;
     if (this.inflight.size >= lanes) return;
     const now = diagnosticNow(), cone = loaderMode || this.view === null ? null : this.view(), streamView = spawnViewUsesCamera() ? this.streamingView?.() ?? null : null;
-    for (const key of this.wantedAt.keys()) if (!wanted.render.has(key)) this.wantedAt.delete(key);
+    if (this.wantedAt.size > 0) for (const key of this.wantedAt.keys()) if (!wanted.render.has(key)) this.wantedAt.delete(key);
     for (let started = true; started && this.inflight.size < lanes;) {
       started = false;
-      for (const layer of ['colliders', 'render'] as const) {
+      for (let l = 0; l < ATTACH_ORDER.length; l++) {
+        const layer = ATTACH_ORDER[l] as Layer, nearest = plan.nearest[layer];
         // a tile with every content done (done.size >= contents.length, as everywhere here) skips the content scan
         let next: number | undefined;
-        for (const key of plan.nearest[layer]) {
+        for (let n = 0; n < nearest.length; n++) {
+          const key = nearest[n] as number;
           const tile = this.attached[layer].get(key);
           // NT8's full camera ranking supersedes the horizontal-only defer rule:
           // filtering visible tiles here would let off-view work win the scan.
           // (under the loader a tile already attaching is another lane's; play re-awaits it, one at a time, as before DL21)
           if ((loaderMode && tile !== undefined && tile.pending !== null) || !this.inView(key, layer === 'render' ? streamView : null) || (layer === 'render' && streamView === null && this.deferred(key, cone, now))
-            || !(tile === undefined || tile.done.size < this.contents.length && this.contents.some(content => !tile.done.has(content) && (layer === 'colliders' || content.ready?.() !== false)))
-            || this.failed.has(`${layer}:${String(key)}`)) continue;
+            || !(tile === undefined || tile.done.size < this.contents.length && this.waiting(tile, layer))
+            || (this.failed.size > 0 && this.failed.has(`${layer}:${String(key)}`))) continue;
           if (next === undefined) next = key;
           else if (layer === 'render' && streamView !== null) {
             const candidate = this.targets.get(key), prior = this.targets.get(next);
@@ -245,6 +256,22 @@ export class TileDriver {
         break;
       }
     }
+  }
+
+  /** Whether every attached tile is retained (STR20: the common frame, which then makes no Map iterator). @frame */
+  private allRetained(attached: ReadonlyMap<number, Attachment>, retained: ReadonlySet<number>): boolean {
+    if (attached.size === 0) return true;
+    for (const key of attached.keys()) if (!retained.has(key)) return false;
+    return true;
+  }
+  /** A content of `tile` not yet done that can attach now (render waits for a content's readiness). @frame */
+  private waiting(tile: Attachment, layer: Layer): boolean {
+    const contents = this.contents;
+    for (let k = 0; k < contents.length; k++) {
+      const content = contents[k] as TileContent;
+      if (!tile.done.has(content) && (layer === 'colliders' || content.ready?.() !== false)) return true;
+    }
+    return false;
   }
 
   /** Membership and fallback ordering depend only on the player's tile/radius.

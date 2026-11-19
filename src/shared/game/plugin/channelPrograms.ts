@@ -10,6 +10,7 @@ import { emitFault, NumericInputError } from '@wildshard/engine/core/faults';
 /** Copied values may be an existing common read vector or a named observation for independently authored DAGs. */
 export interface ChannelProgramObservation {readonly time:number;readonly delta:number;readonly values:readonly number[]|Readonly<Record<string,number>>}
 function vector(value:ChannelProgramObservation['values']):value is readonly number[]{return Array.isArray(value);}
+const EMPTY:readonly number[]=Object.freeze([]);
 const notedPoses = new WeakSet();
 /** Every `mem` field a pose program built on this page reads. A body a server runs writes these there, and only this page knows which they are. */
 export const poseInputNames: Set<string> = new Set<string>();
@@ -85,7 +86,10 @@ function buildChannelPrograms(input:unknown,group:string,owners:ReadonlyMap<stri
  const merged=merge===null?null:admittedClientChannels(merge.program),laneList=lanes.map(row=>row.lane);
  const publish=merge===null||merged===null?undefined:bindMergedChannels(merge,merged,laneList);
  let reported=false;
+ // STR20: the merged lane's observation, refilled each call (the lane reads it synchronously and keeps nothing of it)
+ const mergedFrame:{time:number;delta:number;values:readonly number[]}={time:0,delta:0,values:[]};
  return Object.freeze({ids,
+  /** Every frame, per actor rig: by index, no observation, iterator or destructured row made. @frame */
   evaluate:(observation:ChannelProgramObservation):void=>{
    try {
    const external=observation.values,isVector=vector(external);call++;
@@ -94,9 +98,9 @@ function buildChannelPrograms(input:unknown,group:string,owners:ReadonlyMap<stri
     if(!isVector||external.length!==copiedNames.length)throw new Error('Invalid copied pose vector');
     for(let index=0;index<external.length;index++){const value=external[index];if(value===undefined||!Number.isFinite(value)||Math.abs(value)>1e12)throw new NumericInputError(copiedNames[index]??String(index),'Invalid copied pose value');}
     let published=false;
-    if(publish!==undefined&&merged!==null&&isVector){try{merged.evaluate({time:observation.time,delta:observation.delta,values:external});publish();published=true;}catch{/* the lanes below refuse as before */}}
-    if(published){for(const {lane,ports} of lanes)ports.apply(lane.frame);return;}
-    for(const {indices,values}of lanes){if(indices===undefined)throw new Error('Missing copied pose indices');for(let index=0;index<indices.length;index++)values[index]=external[indices[index]??-1]??Number.NaN;}
+    if(publish!==undefined&&merged!==null&&isVector){try{mergedFrame.time=observation.time;mergedFrame.delta=observation.delta;mergedFrame.values=external;merged.evaluate(mergedFrame);publish();published=true;}catch{/* the lanes below refuse as before */}finally{mergedFrame.values=EMPTY;}}
+    if(published){for(let l=0;l<lanes.length;l++){const row=lanes[l];if(row!==undefined)row.ports.apply(row.lane.frame);}return;}
+    for(let l=0;l<lanes.length;l++){const row=lanes[l];if(row===undefined)continue;const {indices,values}=row;if(indices===undefined)throw new Error('Missing copied pose indices');for(let index=0;index<indices.length;index++)values[index]=external[indices[index]??-1]??Number.NaN;}
    }else if(borrowed){
     if(isVector&&(shared.length>0||external.length!==shared.length))throw new Error('Numeric channel vector differs from its declared reads');
     for(let index=0;index<gathers.length;index++){
@@ -108,9 +112,10 @@ function buildChannelPrograms(input:unknown,group:string,owners:ReadonlyMap<stri
      sharedCall[index]=call;
      if(Object.is(value,sharedValues[index]))continue;
      sharedValues[index]=value;
-     for(const {values,slot}of gather.writes)values[slot]=value;
+     const writes=gather.writes;for(let w=0;w<writes.length;w++){const write=writes[w];if(write!==undefined)write.values[write.slot]=value;}
     }
-   }else for(const {lane,inputs,readers,values} of lanes){
+   }else for(let l=0;l<lanes.length;l++){
+    const row=lanes[l];if(row===undefined)continue;const {lane,inputs,readers,values}=row;
     if(isVector&&(inputs.size>0||external.length!==values.length))throw new Error('Numeric channel vector differs from its declared reads');
     const reads=lane.reads;
     for(let index=0;index<reads.length;index++){
@@ -124,8 +129,8 @@ function buildChannelPrograms(input:unknown,group:string,owners:ReadonlyMap<stri
     }
    }
    // Existing evaluators publish only finite complete frames; no visual target changes on a refused input.
-   for(const {lane,observation:frame} of lanes){frame.time=observation.time;frame.delta=observation.delta;lane.evaluate(frame);}
-   for(const {lane,ports} of lanes)ports.apply(lane.frame);
+   for(let l=0;l<lanes.length;l++){const row=lanes[l];if(row===undefined)continue;const frame=row.observation;frame.time=observation.time;frame.delta=observation.delta;row.lane.evaluate(frame);}
+   for(let l=0;l<lanes.length;l++){const row=lanes[l];if(row!==undefined)row.ports.apply(row.lane.frame);}
    } catch(error) {
     // Detached pose lanes belong to their actor; the caller reports that actor.
     if(!(error instanceof NumericInputError)||copiedNames!==undefined)throw error;

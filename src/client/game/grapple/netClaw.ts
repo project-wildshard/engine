@@ -15,8 +15,12 @@ export function netClaw(client: NetClient, player: string, wire: NetHookWire, st
   const missEnd = new Vector3();
   let course = start, phase: GrapplePhase = 'idle', clock = 0, target: GrappleTarget | null = null, armedMiss = false;
   let events: GrappleEvent[] = [], press: number | null = null;
+  // STR20: the seven rows' names made once (sync runs every frame and built each name each read)
+  const rows = { phase: grappleRow(player, 'phase'), clock: grappleRow(player, 'clock'), hook: grappleRow(player, 'hook'), armed: grappleRow(player, 'armed'),
+    mx: grappleRow(player, 'mx'), my: grappleRow(player, 'my'), mz: grappleRow(player, 'mz') };
+  /** @frame */
   const read = (field: Parameters<typeof grappleRow>[1]): number | undefined => {
-    const frame = client.latest; return frame === null ? undefined : client.stateField(frame, grappleRow(player, field));
+    const frame = client.latest; return frame === null ? undefined : client.stateField(frame, rows[field]);
   };
   const hookTarget = (index: number): GrappleTarget | null => {
     const hook = course.hooks[index]; return hook === undefined ? null : { hook, landing: hook, approach: hook, lifts: false };

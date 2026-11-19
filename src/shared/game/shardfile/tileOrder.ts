@@ -31,7 +31,8 @@ export interface TileOrder {
   readonly last: number;
 }
 
-const clampTile = (v: number): number => Math.min(TILES_PER_SIDE - 1, Math.max(0, Math.floor((v + HALF) / TILE_SIZE)));
+/** The tile row or column holding a cell-local coordinate (clamped to the cell's edge tiles). */
+export const clampTile = (v: number): number => Math.min(TILES_PER_SIDE - 1, Math.max(0, Math.floor((v + HALF) / TILE_SIZE)));
 /** The tile holding a cell-local point (points outside the cell clamp to its edge tiles). */
 export function tileOf(x: number, z: number): CellTile {
   if (!Number.isFinite(x) || !Number.isFinite(z)) throw new RangeError('A tile needs a finite cell-local point');

@@ -167,6 +167,7 @@ export function bindPostGraphEvents(rows: PostGraphLookRow['events'], bag: Unifo
 /** the camera facts a look's channel group reads as its 'view' owner */
 interface FrameView { eyeX: number; eyeY: number; eyeZ: number; near: number; p00: number; p11: number; rootX: number; rootY: number; rootZ: number }
 const point = new Vector3();
+const NO_VALUES: Readonly<Record<string, number>> = Object.freeze({});
 /** A look's declared channel group over a bag: the view and the bag's numbers it reads, then its outputs pushed into the
  *  bag's uniforms (a number, or a vector's or colour's components) and the lent graph looks' params it names. */
 function frameChannels(rows: NonNullable<PostGraphLookRow['channels']>, bag: UniformMap): (camera: PerspectiveCamera, root: Object3D | null, time: number, delta: number) => void {
@@ -176,14 +177,19 @@ function frameChannels(rows: NonNullable<PostGraphLookRow['channels']>, bag: Uni
   const lane = installChannelPrograms(rows.programs, rows.group, new Map<string, unknown>([['view', view], ['uniforms', bag], ...lent.roots, ...own.roots]));
   const uniforms = { setParam: (_bag: string, name: string, value: number | number[]): void => {
     if (typeof value === 'number') { need(bag, name).value = value; return; }
-    value.forEach((part, index) => { setComponent(need(bag, name).value, index, part); });
+    const target = need(bag, name).value;
+    for (let index = 0; index < value.length; index++) setComponent(target, index, value[index] ?? 0);
   } };
+  // STR20: the frame's observation and the lent writer, made once (each frame made both, and the empty bag of values)
+  const observation = { time: 0, delta: 0, values: NO_VALUES }, lentWriter = { setParam: setLentParam };
+  /** @frame */
   return (camera, root, time, delta) => {
     point.setFromMatrixPosition(camera.matrixWorld); view.eyeX = point.x; view.eyeY = point.y; view.eyeZ = point.z;
     view.near = camera.near; view.p00 = camera.projectionMatrix.elements[0]; view.p11 = camera.projectionMatrix.elements[5];
     if (root === null) point.set(0, 0, 0); else point.setFromMatrixPosition(root.matrixWorld);
     view.rootX = point.x; view.rootY = point.y; view.rootZ = point.z;
-    lane.evaluate({ time, delta, values: {} }); own.push(uniforms); lent.push({ setParam: setLentParam });
+    observation.time = time; observation.delta = delta;
+    lane.evaluate(observation); own.push(uniforms); lent.push(lentWriter);
   };
 }
 
