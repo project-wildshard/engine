@@ -22,3 +22,10 @@ What changed:
 
 The bandit's rifle, its muzzle and its clips, and the Wyrm's faster moves and glowing seams are shard content
 (shard-brasscap `src/generators/bandit.ts`, `src/generators/wyrm.ts`, `src/behaviour/wyrm.as`).
+
+## The death ran away (fix)
+
+On a local world with Brasscap rev 13 the bot finally killed the Wyrm, and the death ran every frame on bones nobody posed
+again (the dead Wyrm came by the clip path, which leaves the trail alone), so the sink and the thrash added up: the head
+fell 5 km in eight seconds. `SerpentDeath` now keeps the trail's pose as it died and starts each frame from it, and the
+clip path plays the death as well as the volume path.

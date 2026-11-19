@@ -327,12 +327,20 @@ export class SerpentDeath {
   private t = -1;
   private nextDust = 0;
   private dusted = 0;
+  /** the trail's pose as it died: each frame starts from it, since a dead body's bones are not posed again */
+  private readonly rest = new Map<Bone, { readonly position: Vector3; readonly quaternion: Quaternion }>();
   constructor(private readonly trail: readonly string[]) {}
   step(alive: boolean, dt: number, bones: Record<string, Bone>, groundY: number, scale: number): void {
-    if (alive) { this.t = -1; this.dusted = 0; return; }
+    if (alive) { this.t = -1; this.dusted = 0; this.rest.clear(); return; }
     const head = bones[this.trail[0] ?? '']; if (head === undefined) return;
     const fire = Gunfire.current(), last = this.t;
     this.t = last < 0 ? 0 : last + dt;
+    for (const name of this.trail) {
+      const bone = bones[name]; if (bone === undefined) continue;
+      const rest = this.rest.get(bone);
+      if (rest === undefined) this.rest.set(bone, { position: bone.position.clone(), quaternion: bone.quaternion.clone() });
+      else { bone.position.copy(rest.position); bone.quaternion.copy(rest.quaternion); }
+    }
     const t = this.t, crossed = (at: number): boolean => last < at && t >= at;
     // the whip: each bone swings a little out of step with the one ahead, so the body writhes along its length
     const swing = THRASH_SWING * Math.max(0, 1 - t / THRASH_SECONDS);
@@ -378,15 +386,18 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
   const pitch = contract?.pitch === undefined ? undefined : new SkinPitch(contract.pitch), trail = contract?.trail ?? [];
   const deaths = species.body?.skeleton === 'serpent' && species.body.trail !== undefined ? new WeakMap<Record<string, Bone>, SerpentDeath>() : undefined;
   const serpentBones = species.body?.trail === undefined ? [] : trailBoneNames(species.body.trail.count);
+  // QA 11-19 row 44: the death plays on whichever path posed the body this frame (a dead Wyrm's came by the clip path)
+  const serpentDeath = (c: RigAnimCtx): void => {
+    if (deaths === undefined) return;
+    let death = deaths.get(c.bones);
+    if (death === undefined) { death = new SerpentDeath(serpentBones); deaths.set(c.bones, death); }
+    death.step(c.alive, c.dt, c.bones, c.position.y, c.scale);
+  };
   const animate = (c: RigAnimCtx): void => {
     const pose = c.animal.hitVolumes;
     if (pose?.joint !== undefined) {
       for (const [name, bone] of Object.entries(c.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative skin joint ${name}`);
-      if (deaths !== undefined) {
-        let death = deaths.get(c.bones);
-        if (death === undefined) { death = new SerpentDeath(serpentBones); deaths.set(c.bones, death); }
-        death.step(c.alive, c.dt, c.bones, c.position.y, c.scale);
-      }
+      serpentDeath(c);
       return;
     }
     let driver = drivers.get(c.bones);
@@ -401,6 +412,7 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
     if (pose?.trailJoint !== undefined) for (const name of trail) {
       const bone = c.bones[name]; if (bone !== undefined) pose.trailJoint(name, bone.position, bone.quaternion, bone.scale);
     }
+    serpentDeath(c);
   };
   return { id: row.id, species: species.id, kind: species.kind, rig: quadruped ? 'quadruped' : 'custom', fur: NO_FUR,
     rigContract: { skeleton: quadruped ? 'kit.quadruped' : skin.skeleton, sockets: [...skin.sockets],

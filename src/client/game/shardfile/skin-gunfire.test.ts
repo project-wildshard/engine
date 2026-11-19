@@ -64,3 +64,11 @@ test('a dead serpent thrashes, then sinks its head (and the trail behind it) und
   pose(); death.step(true, 0.1, bones, 0, 5);
   expect(bones['head']?.position.y).toBe(0);
 });
+
+test('a dead serpent nobody poses again sinks 14 m, not 14 m a frame (QA 11-19 row 44, the local Wyrm fell 5 km)', () => {
+  const names = ['head', 'seg1', 'seg2'], bones: Record<string, Bone> = Object.fromEntries(names.map(name => [name, new Bone()]));
+  const death = new SerpentDeath(names);
+  for (let t = 0; t < 6; t += 1 / 60) death.step(false, 1 / 60, bones, 0, 5);
+  expect(bones['head']?.position.y).toBeCloseTo(-14 / 5, 5);
+  expect(bones['seg2']?.quaternion.w).toBeCloseTo(1, 5);
+});
