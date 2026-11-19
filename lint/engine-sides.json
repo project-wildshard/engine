@@ -1378,6 +1378,7 @@
     "src/server/game/quest/chapterRecords.ts": "server",
     "src/server/game/quest/eliteDrops.ts": "server",
     "src/server/game/quest/eliteFeature.ts": "server",
+    "src/server/game/quest/declaredQuestBodies.ts": "server",
     "src/server/game/quest/killSteps.ts": "server",
     "src/server/game/quest/nativeBodyScripts.ts": "server",
     "src/server/game/quest/nativeChapter.ts": "server",

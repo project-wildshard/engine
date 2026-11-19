@@ -48,7 +48,8 @@ import { ownContractCatalogue } from '../../../shared/game/quest/contracts';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import { installNativeEliteFeature, readEliteFeature } from '../quest/eliteFeature';
 import { eliteDrops } from '../quest/eliteDrops';
-import { installQuestKillSteps } from '../quest/killSteps';
+import { installQuestKillSteps, rosterKind } from '../quest/killSteps';
+import { declaredQuestBodies } from '../quest/declaredQuestBodies';
 import { installNativeChapterDirector } from '../quest/nativeChapter';
 import { installNativeQuestComposition, readNativeQuestSpots, type NativeQuestCompositionInput } from '../quest/nativeComposition';
 import { readNativeQuestSecret } from '../quest/nativeSecret';
@@ -117,7 +118,9 @@ async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<Native
   const props = row.props === undefined ? undefined : await read<unknown>(row.props);
   const trades = row.barter === true ? parseBarterEconomy(need(shard.rows.loot[0], 'Missing barter row').economy).exchange : undefined;
   const secret = content === undefined ? undefined : await readNativeQuestSecret(product);
-  return run => { registerInstalled(run.host, 'questComposition'); run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
+  // OF22e1: a plan with no `population.mixed` host guards its quest with the declared bodies alone
+  const island = at.plan.features.some(feature => feature.host === 'population.mixed');
+  return run => { registerInstalled(run.host, 'questComposition'); run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, island, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
     ...(content === undefined ? {} : { steps: content.steps, deaths: content.deaths, readings: content.readings, lead: content.lead }),
     ...(contracts === undefined ? {} : { contracts: ownContractCatalogue(contracts, run.host.scope) }), ...(trades === undefined ? {} : { trades }), ...(director === undefined ? {} : { director }),
     ...(props === undefined ? {} : { props }), ...(secret === undefined ? {} : { secret }), ...(row.restoring === true ? { restoring: run.context.restoring } : {}) }); };
@@ -322,7 +325,11 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     case 'quest.body-scripts': return run => { installBodyScripts(run.host, run.context, { product, assets: at.assets }); };
     case 'quest.kill-steps': {
       const input = await readAssemblyInput(product, row.rows), counters = parseAchievementCounterData(await readAssemblyInput(product, row.counters));
-      return run => { installQuestKillSteps(run.host, input, counters.feats, need(run.island, 'Kill steps need the island population').bodies, need(run.input, 'Kill steps need their commands').ledger.fact); };
+      // OF22e1: the island's bodies where the plan stands it, then the declared bodies (a body's kind is its species row's)
+      return run => {
+        const island = run.island === undefined ? undefined : rosterKind(run.island.bodies), declared = declaredQuestBodies(run.host, shard);
+        installQuestKillSteps(run.host, input, counters.feats, actor => island?.(actor) ?? declared.kindOf(actor), need(run.input, 'Kill steps need their commands').ledger.fact);
+      };
     }
     case 'quest.chapter': {
       const director = await readDirectorDocument(product), input = parseChapterDirector(await readAssemblyInput(product, row.rows)), wake = parseChapterWake(await readAssemblyInput(product, row.wake));

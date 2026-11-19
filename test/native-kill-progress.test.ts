@@ -1,7 +1,7 @@
 import liftInputs from './fixtures/engine-lift/inputs.json' with { type: 'json' };
 const { DRIFTWOOD_FEATS } = liftInputs;
 // oxlint-disable-next-line import/no-nodejs-modules -- The native behaviour fixture uses the actual shipped physics binary.
-import { installQuestKillSteps } from '@wildshard/engine/game/quest/killSteps';
+import { installQuestKillSteps, rosterKind } from '@wildshard/engine/game/quest/killSteps';
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { expect,test } from 'vitest';
@@ -20,7 +20,7 @@ test('native kill counters resume old progress, keep flag/emission order and ref
   const host = createSimHost({ ...SIM_LEVEL, entities: [] }, { rapier });
   const bodies: { kind: string; actor: ReturnType<typeof host.spawn> }[] = [], facts: string[] = [];
   try {
-    const kills = installQuestKillSteps(host, rows, DRIFTWOOD_FEATS, () => bodies, (name, identity) => {
+    const kills = installQuestKillSteps(host, rows, DRIFTWOOD_FEATS, rosterKind(() => bodies), (name, identity) => {
       if (name === 'driftwood.sailor') expect(host.flags.has('dead:sailor')).toBe(true);
       facts.push(identity);
     });

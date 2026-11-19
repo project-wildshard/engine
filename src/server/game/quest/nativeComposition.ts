@@ -5,6 +5,7 @@ import { nativeQuestChannels } from './nativeInputs';
 import { prepareNativeQuestEntry } from './nativeEntry';
 import { nativeStageLane, type readDirectorDocument } from '../../../shared/game/plugin/director';
 import { mixedPopulation } from '../population/mixedRoster';
+import { declaredQuestBodies } from './declaredQuestBodies';
 import * as v from 'valibot';
 import { Vector3 } from 'three';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
@@ -104,6 +105,8 @@ export interface NativeQuestCompositionInput {
   /** SS5: the page's quest-view secret (Pine's hollow log), asked here for each player. */
   readonly secret?: NativeQuestSecret;
   readonly director?: Awaited<ReturnType<typeof readDirectorDocument>>;
+  /** OF22e1: whether the plan stands the acquisition's mixed population; with none the declared bodies guard alone. */
+  readonly island?: boolean;
 }
 
 const SeatGearSaved = v.strictObject({ iron: v.boolean(), rewardOwned: v.boolean(), skins: v.array(v.string()) });
@@ -143,7 +146,8 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   const gearOf = (player: string): SeatGear => seatOf(player).gear;
   const state = { iron: false, pickup: false, rewardOwned: false }; let finishes = new Set(skinSave.read(ports.source.identity.slug).owned.filter(id => rows.board?.ids.includes(id)));
   const purchases = new Map<string, Map<number, number>>();
-  const population = rows.acquisition === undefined ? null : mixedPopulation(host, rows.acquisition.population);
+  const population = rows.acquisition === undefined || ports.island === false ? null : mixedPopulation(host, rows.acquisition.population);
+  const declared = rows.acquisition === undefined ? null : declaredQuestBodies(host, ports.source);
   const equipment = rows.acquisition === undefined ? null : nativeMeleeItem(host, rows.acquisition.equipment);
   // opus-slotsync (J293): a page may ask for any slot by its kit's order; the quest's item stays the quest's to give
   if (equipment !== null && rows.acquisition !== undefined) { const quested = rows.acquisition.slot; equipment.owns((body, slot) => slot !== quested || gearOf(body.id).state.iron); }
@@ -190,7 +194,9 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
     keyPrompt.x = key.x; keyPrompt.y = key.y + need(rows.props, 'props').promptHeight; keyPrompt.z = key.z; return keyPrompt;
   };
   const guarded = (): boolean => {
-    if (population === null || rows.acquisition === undefined) return false;
+    if (rows.acquisition === undefined) return false;
+    if (declared?.standing(rows.acquisition.kind) === true) return true;
+    if (population === null) return false;
     const bodies = population.bodies();
     for (let i = 0; i < MAX_BODIES; i++) { const body = bodies[i]; if (body === undefined) break; if (body.kind === rows.acquisition.kind && body.actor?.alive === true) return true; }
     return false;
