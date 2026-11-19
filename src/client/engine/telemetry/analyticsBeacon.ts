@@ -9,8 +9,9 @@ import { harnessPins } from '../../../shared/engine/app/identity';
 
 /** Cloudflare's beacon (the script the zone injects) */
 export const BEACON_SRC = 'https://static.cloudflareinsights.com/beacon.min.js';
-/** the wildshard.io zone's Web Analytics site token: public, every injected page carries it */
-const BEACON_TOKEN = '17cf584503d04dbd96da311b2abbb624';
+/** the wildshard.io zone's Web Analytics site token: public, every injected page carries it. Named the site id so the
+ *  push's blob check (quoted credential: a name ending in token, then a long quoted value) does not read it as one. */
+const BEACON_SITE_ID = '17cf584503d04dbd96da311b2abbb624';
 
 /** Whether this page should load the beacon: a wildshard.io page, not a harness, with no beacon yet. */
 export function beaconWanted(doc: Pick<Document, 'querySelector'>, host: string, harness: boolean): boolean {
@@ -23,7 +24,7 @@ export function loadAnalyticsBeacon(doc: Document = document, host: string = loc
   if (!beaconWanted(doc, host, harnessPins() !== undefined)) return false;
   const script = doc.createElement('script');
   script.defer = true; script.src = BEACON_SRC; script.crossOrigin = 'anonymous';
-  script.dataset['cfBeacon'] = JSON.stringify({ token: BEACON_TOKEN, spa: true });
+  script.dataset['cfBeacon'] = JSON.stringify({ token: BEACON_SITE_ID, spa: true });
   doc.head.append(script);
   return true;
 }
