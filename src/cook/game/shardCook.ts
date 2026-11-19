@@ -374,11 +374,14 @@ export interface CookReport {
   readonly server: {readonly url: string; readonly index: string; readonly wireBytes: number; readonly files: number};
 }
 
+export type CookShardPhase = 'textures' | 'client-packs' | 'server-packs';
+
 export interface CookShardOptions {
   readonly wireBytes: WireBytes;
   readonly now: () => number;
   readonly encoder?: PartEncoder;
   readonly warn?: (line: string) => void;
+  readonly onPhase?: (phase: CookShardPhase) => void;
   /** The renderer fingerprint to cook for; this engine's own unless a build names it. */
   readonly renderer?: string;
   /** S12b: per-tier texture files; `defaultCookTiers()` (the phone tier, 6×6) unless a cook names its own. `{}` turns them off. */
@@ -394,9 +397,11 @@ export async function cookShard(tarball: Uint8Array, out: string, options: CookS
 }
 
 async function cookWith(tarball: Uint8Array, out: string, options: CookShardOptions, encoder: PartEncoder): Promise<CookReport> {
+  options.onPhase?.('textures');
   const started = options.now(), shard = openShardfile(tarball, options.renderer === undefined ? {} : {renderer: options.renderer});
   if (shard.preparation === 'stale') options.warn?.(stalePreparationLine(shard.slug));
   const half = await preparedShardHalf(shard, options.wireBytes, options.warn, shard.slug, options.tiers ?? await defaultCookTiers());
+  options.onPhase?.('client-packs');
   const before = encoder.stats();
   const table = COOK_TIERS.flatMap(tier => COOK_SETS.map(set => ({tier, set, rows: [...half.folderRows(tier, set), ...half.mountRows(tier, set)]})));
   const whole = table.filter(row => row.set === 'whole');
@@ -412,6 +417,7 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
     writeFileSync(join(out, name), text);
     manifests.push({url: `/${name}`, tier: row.tier, set: row.set, files: row.rows.length, totalBytes, wireBytes: wire});
   }
+  options.onPhase?.('server-packs');
   const server = await cookShardServerPack(half.shard, out, encoder);
   // Content-named, so two revisions of a shard never share a name in the store (J29, J83).
   const serverText = JSON.stringify(server), serverIndex = `assets/spawn/server-${half.shard.slug}-${sha256(new TextEncoder().encode(serverText)).slice(0, 16)}.json`;

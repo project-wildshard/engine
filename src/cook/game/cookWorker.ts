@@ -120,8 +120,8 @@ export interface CookLimits {
   /** Host CPU grant, including the job's coordinating thread. */
   readonly cpuSlots?: number;
 }
-/** The shared VPS CPU grant can put a cold large cook near ten minutes (QA29 Nalati). */
-export const DEFAULT_LIMITS: CookLimits = {seconds: 900, memoryMB: 6144, heapMB: 4096};
+/** QA29: Pine r6's cold cook hit 900 s on the shared VPS. Its 144 phone texture encodes precede all cold pack work. */
+export const DEFAULT_LIMITS: CookLimits = {seconds: 1500, memoryMB: 6144, heapMB: 4096};
 
 export interface JobOutcomeOk {readonly kind: 'cooked'; readonly report: CookJobReport; readonly peakMB: number}
 export interface JobOutcomeRefused {readonly kind: 'refused'; readonly reason: string; readonly check?: CookJobReport['check']}
@@ -149,9 +149,10 @@ async function rssMB(pid: number): Promise<number> {
   try { return Number((await run('ps', ['-o', 'rss=', '-p', String(pid)])).stdout.trim()) / 1024 || 0; } catch { return 0; }
 }
 const CAPTURE_BYTES = 2_000_000;
+const COOK_PHASE = /^phase (validation|proof|textures|client-packs|server-packs|server-files) (\d{1,8})ms$/gmu;
 
 /** One child. Its stdout is a report or a refusal; anything else, a crash or a limit, is `killed`. */
-export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string): Promise<JobOutcome> {
+export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string, reportPhases?: (phases: string) => void): Promise<JobOutcome> {
   const {root, execPath, loader, script, wrap, limits} = launcher, work = dirname(out);
   const granted = process.env['WS_CPU_SLOTS'];
   const slots = [limits.cpuSlots, granted === undefined ? undefined : Number(granted)].filter((value): value is number => value !== undefined);
@@ -184,6 +185,8 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
     child.on('error', error => { scope.dispose(); resolve({kind: 'killed', reason: error.message}); });
     child.on('close', (code, signal) => {
       scope.dispose();
+      const phases = [...stdout.matchAll(COOK_PHASE)].slice(-6).map(([, phase, elapsedMs]) => `${phase}@${elapsedMs}ms`);
+      if (phases.length > 0) reportPhases?.(phases.join(', '));
       const resultFile = `${out}.result.json`;
       let last: string;
       try {
@@ -416,7 +419,9 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
     const file = join(work, 'shard.tar'), out = join(work, 'out');
     writeFileSync(file, tarball);
-    const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug));
+    const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug), phases => {
+      log(`cook ${head.slug} ${head.hash.slice(0, 12)}: phases ${phases}`);
+    });
     if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason, ...(outcome.check === undefined ? {} : {check: outcome.check})};
     if (outcome.kind === 'killed') return {...head, state: 'failed', detail: outcome.reason};
     if (!outcome.report.check?.pass) return {...head, state: 'failed', detail: 'The job supplied no successful full check'};

@@ -13,6 +13,7 @@
 // COOK_SERVER_PACKS, COOK_SCRATCH; COOK_SECONDS, COOK_MEMORY_MB, COOK_HEAP_MB, COOK_MAX_SHARDFILE_BYTES; COOK_JOB_WRAP, a JSON array the host puts
 // before each job to take its network away (see the wildshard-cook unit in scripts/vps/rebuild.sh).
 import { readFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,6 +45,7 @@ const uploadApi = env.COOK_SIGNING_KEY === undefined || env.COOK_SIGNING_KEY ===
 const publicSource = apiSource(env.WILDSHARD_API_URL ?? 'https://api.wildshard.io', fetch, maxBytes);
 const privateSource = uploadApi === undefined ? undefined : pendingSource(uploadApi, publicSource);
 const uploadSource = privateSource ?? publicSource;
+const [command, ...rest] = process.argv.slice(2);
 const worker = () => createCookWorker({
   build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); },
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch: resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch'),
@@ -51,11 +53,12 @@ const worker = () => createCookWorker({
   launcher: {
     root, execPath: process.execPath, loader: fileURLToPath(new URL('bake-loader.mjs', import.meta.url)), script: fileURLToPath(new URL('cook-job.mjs', import.meta.url)),
     wrap: JSON.parse(env.COOK_JOB_WRAP ?? '[]'), ...(renderer === undefined ? {} : { renderer }),
-    limits: { seconds: Number(env.COOK_SECONDS ?? DEFAULT_LIMITS.seconds), memoryMB: Number(env.COOK_MEMORY_MB ?? DEFAULT_LIMITS.memoryMB), heapMB: Number(env.COOK_HEAP_MB ?? DEFAULT_LIMITS.heapMB), maxBytes },
+    limits: { seconds: Number(env.COOK_SECONDS ?? DEFAULT_LIMITS.seconds), memoryMB: Number(env.COOK_MEMORY_MB ?? DEFAULT_LIMITS.memoryMB), heapMB: Number(env.COOK_HEAP_MB ?? DEFAULT_LIMITS.heapMB), maxBytes,
+      // The service's AllowedCPUs already constrains the cook. Pass that grant so its encoders reserve one core for coordination.
+      ...(command === 'serve' ? {cpuSlots: availableParallelism()} : {}) },
   },
 });
 
-const [command, ...rest] = process.argv.slice(2);
 if (command === 'serve') {
   const cook = worker(), port = Number(env.COOK_PORT ?? 8792), host = env.COOK_HOST ?? '127.0.0.1';
   notifyServer(cook, need('COOK_NOTIFY_TOKEN')).listen(port, host, () => { console.log(`cook worker on ${host}:${port}`); });

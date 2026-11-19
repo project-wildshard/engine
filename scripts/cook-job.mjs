@@ -16,6 +16,7 @@ try {
     ...(expectedSlug === undefined ? {} : {expectedSlug}),
     check: (shard, assets, sections) => checkShardfile(shard, assets, {sections}),
     now: () => performance.now(),
+    onPhase: (phase, elapsedMs) => { console.log(`phase ${phase} ${elapsedMs}ms`); },
     ...(process.env.COOK_MAX_SHARDFILE_BYTES === undefined ? {} : { maxBytes: Number(process.env.COOK_MAX_SHARDFILE_BYTES) }),
     // The host brotli's a loose file itself; q5 is near enough for the report and costs no cache.
     wireBytes: (url, bytes) => servedAsIs(url, bytes) ? bytes.length : brotliCompressSync(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: 5 } }).length,

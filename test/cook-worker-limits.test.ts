@@ -72,11 +72,11 @@ describe('the cook worker', () => {
     expect(await folderStore(join(h.scratch, 'other')).has(indexKey('b3', hash))).toBe(false);
   }, 60_000);
 
-  const job = (name: string, text: string, limits: Partial<JobLauncher['limits']> = {}, wrap: readonly string[] = []): ReturnType<typeof runJob> => {
+  const job = (name: string, text: string, limits: Partial<JobLauncher['limits']> = {}, wrap: readonly string[] = [], reportPhases?: (phases: string) => void): ReturnType<typeof runJob> => {
     const work = join(mkdtempSync(join(h.scratch, 'limit-')), 'job'), script = join(work, name);
     mkdirSync(work);
     writeFileSync(script, text);
-    return runJob({...h.launcher(script, limits), wrap}, join(work, 'x.tar'), join(work, 'out'));
+    return runJob({...h.launcher(script, limits), wrap}, join(work, 'x.tar'), join(work, 'out'), undefined, reportPhases);
   };
 
   it('keeps a complete refusal beyond the diagnostic capture cap', async () => {
@@ -85,8 +85,13 @@ describe('the cook worker', () => {
   }, 30_000);
 
   it('kills a job past its clock', async () => {
-    const outcome = await job('hang.mjs', 'for (;;) { /* a bomb the proof never ended */ }', {seconds: 2});
+    const phases: string[] = [];
+    const script = `import {writeSync} from 'node:fs';
+      writeSync(1, 'phase validation 0ms\\nuncharted contents\\nphase textures 125ms\\n');
+      for (;;) { /* a bomb the cook never ended */ }`;
+    const outcome = await job('hang.mjs', script, {seconds: 2}, [], line => {phases.push(line);});
     expect(outcome).toEqual({kind: 'killed', reason: 'past 2 s'});
+    expect(phases).toEqual(['validation@0ms, textures@125ms']);
   }, 30_000);
 
   it('kills a job past its resident memory', async () => {

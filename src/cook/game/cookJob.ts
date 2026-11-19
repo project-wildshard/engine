@@ -16,7 +16,7 @@ import {validateShardfileFolder, type ValidatedShardfile} from '@wildshard/forma
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import type {ShardfileCheckReport, ShardfileEntryProof} from '@wildshard/engine/game/shardfile/checkReport';
 import {readTar} from '@wildshard/format/tar';
-import {cookShard, openShardfile, serverRows, type CookReport, type OpenShardfile, type WireBytes} from './shardCook';
+import {cookShard, openShardfile, serverRows, type CookReport, type CookShardPhase, type OpenShardfile, type WireBytes} from './shardCook';
 import type {PartEncoder} from './spawnParts';
 
 /** D31: the largest shardfile, stored or decoded: `api-server`'s cap, which Pine's head needs (J137). */
@@ -31,6 +31,8 @@ export class ShardfileRefusedError extends Error {
 }
 
 export type SimulationProof = ShardfileEntryProof;
+type CookJobPhase = 'validation' | 'proof' | 'server-files' | CookShardPhase;
+
 export interface CookJobPorts {
   /** Host-owned notice identity; reject a valid product for another shard before its simulation/cook. */
   readonly expectedSlug?: string;
@@ -41,6 +43,7 @@ export interface CookJobPorts {
   readonly maxBytes?: number;
   readonly encoder?: PartEncoder;
   readonly warn?: (line: string) => void;
+  readonly onPhase?: (phase: CookJobPhase, elapsedMs: number) => void;
   /** The renderer fingerprint the worker cooks for (J262); this process's own when unset. */
   readonly renderer?: string;
 }
@@ -116,17 +119,21 @@ function writeServerPack(shard: OpenShardfile, out: string): ServerPackReport {
 /** The whole job: `out/client` for the store, `out/server` for the room, and the header a client reads first. */
 export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJobPorts): Promise<CookJobReport> {
   const started = ports.now();
+  const phase = (stage: CookJobPhase): void => { ports.onPhase?.(stage, Math.round(ports.now() - started)); };
+  phase('validation');
   await prepareAssetDecoders();
   const {product, receipt} = admit(tarball, ports.maxBytes ?? MAX_SHARDFILE_BYTES);
   // Match the transport's generic identity allowlist, without shard behavior branches.
   if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
     throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
   }
+  phase('proof');
   const check = await checked(product, ports);
   const proof = check.proof === 'refused' ? 'unmeasured' : check.proof;
   const client = join(out, 'client');
   const renderer = ports.renderer === undefined ? {} : {renderer: ports.renderer};
-  const cook = await cookShard(tarball, client, {wireBytes: ports.wireBytes, now: ports.now, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});
+  const cook = await cookShard(tarball, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});
+  phase('server-files');
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
   const shard = openShardfile(tarball, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
   mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, shard.header);
