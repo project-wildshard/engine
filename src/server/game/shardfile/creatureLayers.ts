@@ -1,4 +1,4 @@
-import { parse, strictObject, pipe, number, finite, minValue, maxValue, type InferOutput, type GenericSchema } from 'valibot';
+import { parse, strictObject, exactOptional, pipe, number, finite, minValue, maxValue, type InferOutput, type GenericSchema } from 'valibot';
 import { CreatureBodySchema, CreatureTemperamentSchema, CreatureSensesSchema, CreatureAbilitySchema, CreaturePresentationSchema,
   type CreatureBody, type CreatureTemperament, type CreatureSenses, type CreatureAbility, type CreaturePresentation } from '@wildshard/format/creatureLayers';
 import type { SkeletonContract } from '@wildshard/format/creatureSkeletons';
@@ -9,11 +9,13 @@ import type { ShardRows, StrikeRows } from '@wildshard/format/rows';
 
 type BrainRow = ShardCreatures['brains'][number];
 type HuntNumbers = InferOutput<typeof HuntTuningSchema>;
-interface HuntMotion { walkSpeed: number; chargeSpeed: number; chargeWindup: number; ringRadius: number; trampleRadius: number }
-const HuntMotionSchema: GenericSchema<HuntMotion> = strictObject({ walkSpeed: pipe(number(), finite(), minValue(0), maxValue(15)),
-  chargeSpeed: pipe(number(), finite(), minValue(0), maxValue(15)), chargeWindup: pipe(number(), finite(), minValue(0), maxValue(3600)),
-  ringRadius: pipe(number(), finite(), minValue(0), maxValue(500)), trampleRadius: pipe(number(), finite(), minValue(0), maxValue(500)) });
-/** The existing policy declaration owns its parameters; hunting retains its complete numeric contract. */
+/** A program species' motion numbers. Each is optional, as the program's own species rows are: an absent one keeps the
+ *  hunt's default (a grazer walks 1.3, a charger 1.1, by its provocation), which no fixed number can stand in for (OF23a). */
+interface HuntMotion { walkSpeed?: number; chargeSpeed?: number; chargeWindup?: number; ringRadius?: number; trampleRadius?: number }
+const motionNumber = (max: number) => exactOptional(pipe(number(), finite(), minValue(0), maxValue(max)));
+const HuntMotionSchema: GenericSchema<HuntMotion> = strictObject({ walkSpeed: motionNumber(15), chargeSpeed: motionNumber(15),
+  chargeWindup: motionNumber(3600), ringRadius: motionNumber(500), trampleRadius: motionNumber(500) });
+/** The existing policy declaration owns its parameters; hunting retains its complete numeric contract (its motion any subset). */
 export type ResolvedCreatureBrain = { readonly kind: 'none' }
   | { readonly kind: 'hunt'; readonly tuning: HuntNumbers; readonly motion?: HuntMotion }
   | { readonly kind: 'declared'; readonly declaration: BrainRow; readonly referenced: boolean };

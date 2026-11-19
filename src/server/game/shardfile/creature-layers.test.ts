@@ -79,7 +79,7 @@ test('a custom GLB omits a kit skeleton, while flat declarations retain their ex
   expect(speciesResolver(fixture(false))(row.id, 'plain')).toMatchObject({ hp: 117, aggressive: true, dims: row.dims });
 });
 
-test('hunting requires complete authored numbers and never selects a preset from the label', () => {
+test('hunting requires complete authored numbers, takes any of its motion numbers and never selects a preset from the label', () => {
   const rows = fixture(), row = rows.species[0]; if (row?.temperament === undefined) throw new Error('Missing fixture temperament');
   row.temperament.brain = 'hunt';
   row.temperament.tuning = { hp: 117, sightRange: 18, sightRangeGraze: 12, sightCone: 1, hearStill: 2, hearCrouch: 4, hearWalk: 8, hearSprint: 16,
@@ -91,6 +91,13 @@ test('hunting requires complete authored numbers and never selects a preset from
   row.temperament.tuning = { ...numbers, motion };
   expect(resolveCreatureLayers(rows).get(row.id)?.brain).toEqual({ kind: 'hunt', tuning: numbers, motion });
   row.temperament.tuning = { ...numbers, motion: { ...motion, chargeSpeed: Number.NaN } };
+  expect(() => resolveCreatureLayers(rows)).toThrow('fixture.creature');
+  // OF23a: a program species may author any of its five motion numbers (Pine's deer and elk give walk and trample only);
+  // each absent one keeps the hunt's own default, as the native roster does
+  const grazer = { walkSpeed: 1.3, trampleRadius: 0.5 };
+  row.temperament.tuning = { ...numbers, motion: grazer };
+  expect(resolveCreatureLayers(rows).get(row.id)?.brain).toEqual({ kind: 'hunt', tuning: numbers, motion: grazer });
+  row.temperament.tuning = { ...numbers, motion: { ...grazer, gallop: 3 } };
   expect(() => resolveCreatureLayers(rows)).toThrow('fixture.creature');
   row.temperament.tuning = numbers;
   Reflect.deleteProperty(row.temperament.tuning, 'hp');
