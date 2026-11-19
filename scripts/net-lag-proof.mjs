@@ -25,6 +25,13 @@ import { bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag
 
 const arg = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const DECK = ['driftwood-isle', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pine-hollow', 'nine-dragon-stack'];
+/**
+ * NET-LAG NL15/NL17: the boost retraces the ground the walk and sprint just crossed, back for 60% of the phase and on again
+ * for the rest. Straight on (14 m/s on staging) left the cell from Signal Dunes (235 m south of the spawn, cell 3 to 8: a
+ * 4.4 to 5.2 s frame and the counters reset) and from Pine Hollow (a 3.7 s stall): a crossing is ZONE-ENTRY's (J352), not
+ * B1's. Back is 8.4 m a phase second against the 11.75 the walk and sprint went, so the way back stays on walked ground.
+ */
+const BOOST_BACK = 0.6;
 const TITLES = /** @type {Record<string, string>} */ ({ 'pine-hollow': 'PINE HOLLOW', 'nalati-grasslands': 'NALATI GRASSLANDS', 'nine-dragon-stack': 'NINE DRAGON STACK', 'sunscar-dunes': 'SIGNAL DUNES', 'far-reach': 'SKY REACH', 'driftwood-isle': 'DRIFTWOOD ISLE' });
 const rigArg = arg('rig', ''), base = arg('base', rigArg === '' ? 'https://staging.wildshard.io' : '').replace(/\/$/u, '');
 if (rigArg === '' && !/^https:\/\/(staging|preview)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base)) throw new Error('--base takes staging, preview or a loopback page only: never production (J205)');
@@ -137,7 +144,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       row.b4 = bridgeVerdict(row.bridge);
     } else {
       const entered = Date.now(), delays = /** @type {{ t: number, delay: number }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
-      const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { sampledAt: performance.now(), corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative } }; });
+      const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { sampledAt: performance.now(), corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative }, cell: w.cell, resyncs: w.resyncs ?? 0, replaysPerFrame: w.replaysPerFrame }; });
       sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay }); return undefined; }).catch(() => undefined); }, 250);
       await sleep(2000);
       // the budget: the drawn rate standing still, against the display's 60 Hz (headless)
@@ -149,26 +156,30 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       if (bridge && slug === 'driftwood-isle') row.bridge = await crossBridge(page);
       await page.evaluate(() => { /** @type {any} */ (window).__netLag.worst = 0; });
       const before = await report();
-      const phase = async (/** @type {string} */ name, /** @type {string[]} */ keys) => {
+      const phase = async (/** @type {string} */ name, /** @type {string[]} */ keys, /** @type {{ at: number, from: string, to: string } | undefined} */ turn = undefined) => {
         await page.evaluate(() => { const S = /** @type {any} */ (window).__netLag; S.drawn.length = 0; });
         const from = await report();
         for (const key of keys) await page.keyboard.down(key);
-        for (let left = SECONDS * 1000, turn = 0; left > 0; left -= 1000, turn++) {
+        const held = [...keys];
+        for (let left = SECONDS * 1000, second = 0; left > 0; left -= 1000, second++) {
+          if (turn !== undefined && second === turn.at) { await page.keyboard.up(turn.from); await page.keyboard.down(turn.to); held[held.indexOf(turn.from)] = turn.to; }
           await sleep(1000);
-          if (turn % 5 === 2) { const side = turn % 10 === 2 ? 'KeyA' : 'KeyD'; await page.keyboard.down(side); await sleep(300); await page.keyboard.up(side); }
+          if (second % 5 === 2) { const side = second % 10 === 2 ? 'KeyA' : 'KeyD'; await page.keyboard.down(side); await sleep(300); await page.keyboard.up(side); }
         }
-        for (const key of [...keys].reverse()) await page.keyboard.up(key);
+        for (const key of held.reverse()) await page.keyboard.up(key);
         const drawn = await page.evaluate(() => /** @type {any} */ (window).__netLag.drawn.slice()), to = await report();
         // what this phase's corrections disagreed on (position, grounded, board, swim, ride), for the row a miss becomes
         const missed = Object.fromEntries(Object.entries(to?.missed ?? {}).filter(([key]) => key !== 'gap').map(([key, value]) => [key, value - (/** @type {Record<string, number> | undefined} */ (from?.missed)?.[key] ?? 0)]).filter(([, value]) => value !== 0));
         const authoritative = Object.fromEntries(Object.entries(to?.authoritative ?? {}).map(([key, value]) => [key, value - (/** @type {Record<string, number> | undefined} */ (from?.authoritative)?.[key] ?? 0)]).filter(([, value]) => value !== 0));
-        return { name, corrections: (to?.corrections ?? 0) - (from?.corrections ?? 0), missed, authoritative, frames: drawn.length, p50: at(drawn, 0.5), p99: at(drawn, 0.99), max: at(drawn, 1), over2x: drawn.filter((/** @type {number} */ ms) => ms > 2 * row.budgetMs).length, over50: drawn.filter((/** @type {number} */ ms) => ms > 50).length };
+        // a phase that changed cells measured a crossing, not this bar: say so rather than read it as a frame or a correction
+        if (from !== null && to !== null && from.cell !== to.cell) errors.push(`${name} left cell ${String(from.cell)} for ${String(to.cell)}: the route crosses a cell edge (ZONE-ENTRY), not this bar`);
+        return { name, corrections: (to?.corrections ?? 0) - (from?.corrections ?? 0), resyncs: (to?.resyncs ?? 0) - (from?.resyncs ?? 0), missed, authoritative, frames: drawn.length, p50: at(drawn, 0.5), p99: at(drawn, 0.99), max: at(drawn, 1), over2x: drawn.filter((/** @type {number} */ ms) => ms > 2 * row.budgetMs).length, over50: drawn.filter((/** @type {number} */ ms) => ms > 50).length };
       };
       row.walk = await phase('walk', ['KeyW']);
       row.sprint = await phase('sprint', ['KeyW', 'ShiftLeft']);
       const foot = await report(), footWorst = await page.evaluate(() => /** @type {any} */ (window).__netLag.worst);
       await page.keyboard.press('KeyH'); await sleep(600);
-      row.boost = await phase('boost', ['KeyW', 'ShiftLeft']);
+      row.boost = await phase('boost', ['KeyS', 'ShiftLeft'], { at: Math.round(SECONDS * BOOST_BACK), from: 'KeyS', to: 'KeyW' });
       await page.keyboard.press('KeyH'); await sleep(600);
       const after = await report();
       const footWindow = footRate(before, foot), late = delays.filter(sample => sample.t >= 10_000);
