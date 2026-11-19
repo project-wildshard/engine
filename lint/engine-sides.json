@@ -487,6 +487,7 @@
     "src/client/engine/ui/frameWindow.ts": "client",
     "src/client/engine/ui/haptics.ts": "client",
     "src/client/engine/ui/hoverBoost.ts": "client",
+    "src/client/engine/ui/idleHudRelease.ts": "client",
     "src/client/engine/ui/HUD.ts": "client",
     "src/client/engine/ui/hudAdapters.ts": "client",
     "src/client/engine/ui/hudSlots.ts": "client",

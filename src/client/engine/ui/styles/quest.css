@@ -80,6 +80,10 @@
 /* ── the reward caption (the golden-hour view) ── */
 .ws-quest-reward { position: absolute; left: 0; right: 0; top: 22%; display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; transition: opacity 1.6s; pointer-events: none; text-align: center; }
 .ws-quest-reward.show { opacity: 1; }
+/* STR31 (idleHudRelease.ts): with the phone switch on, an idle card hides once its fade ends and so keeps no
+   composited backing; .show makes it visible at once (visibility is not in the base rules' transitions) */
+html[data-ws-idle-hud] .ws-quest-reward:not(.show) { visibility: hidden; transition: opacity 1.6s, visibility 0s linear 1.6s; }
+html[data-ws-idle-hud] .ws-quest-talk:not(.show) { visibility: hidden; transition: opacity 0.25s, transform 0.25s, visibility 0s linear 0.25s; }
 .ws-quest-reward-kicker { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--ws-cyan); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
 .ws-quest-reward-title { font-family: var(--ws-display); font-weight: 700; font-size: 38px; letter-spacing: 0.08em; text-transform: uppercase; color: #fff4dc; text-shadow: 0 0 22px rgba(255, 190, 110, 0.6), 0 2px 4px rgba(0, 0, 0, 0.7); }
 .ws-quest-reward-sub { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }

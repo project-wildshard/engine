@@ -62,6 +62,7 @@ import { dropOutputDepth, installMemorySaver, shadowLights } from '../render/mem
 import { dropShadowColour } from '../world/shadowVariants';
 import { duringShadowPass } from '../world/cascadeCull';
 import { recordGpuCheckpoint, traceBootPasses } from '../boot/gpuTrace';
+import { installIdleHudRelease } from '../ui/idleHudRelease';
 import { exploreEntryPending, recordExploreFrame, recordBootCheckpoint, bootTraceActive } from '../boot/bootTrace';
 import { cullPlaced } from '../models/place';
 import { DrawCheck, hdrTargetType } from '../render/drawCheck';
@@ -564,6 +565,8 @@ export class Game {
     // MG12 prototype: the phone's cap follows the preset and Low Power live (60 only on exactly Low with Low Power off); read
     // off a cached value, refreshed on every PIXELS_EVENT (a control, a preset, a Low Power flip) and the 2 s mode check
     if (this.phoneGraphics) this.engineScope.onDispose(setMobileFrameCap(() => this.qualityCap));
+    // STR31: a phone's idle quest cards drop their composited backing once faded (device switch, off by default)
+    installIdleHudRelease(this.engineScope, this.phoneGraphics);
     // MG8 prototype: Settings ▸ Graphics' frame readout (fps over the last half second, the median and slow frames, draws)
     this.engineScope.onDispose(setFrameReadout(() => {
       const ms = [...this.frameMs].filter((v) => v > 0).sort((a, b) => a - b);
