@@ -8,4 +8,4 @@ draft · ready for review · draft, parked · in progress · held · done.
 line. Done plans move to `project/archive/`.
 
 Cross-repo plans for Project Wildshard live in
-`Raynos/project-wildshard-meta` under `docs/multi-repo/`.
+`Raynos/project-wildshard-meta` under `docs/plans/MULTI-REPO-SAGA/`.
