@@ -808,6 +808,18 @@ export type AuthoredShardBindings = Omit<ShardManifestRows, keyof ManifestMetada
   readonly bootBindings?: Pick<BootSpec, 'files' | 'sources' | 'lateReads' | 'bakedUnread' | 'audio' | 'explore'>;
   readonly forestQueries?: Pick<ChunkForest, 'density' | 'scale' | 'species'>;
 };
+/**
+ * ONE-FORMAT OF9b2: the plain level look (a white sun from the south-east, no fog, no grade), for a discovery document that
+ * carries none. A product built since OF9b2 keeps its level look in `look/look` (`look.level`); its build copies it into
+ * discovery for what reads the level before the product admits (the grid page's shell), and a declared page draws its
+ * product's own (`declaredLevel`).
+ */
+export const PLAIN_LEVEL_LOOK: Readonly<Pick<ShardManifest, 'sky' | 'atmosphere' | 'grade'>> = Object.freeze({
+  sky: { sunColor: [1, 1, 1], sunIntensity: 1, envIntensity: 0.5, bgIntensity: 1, fogSunColor: [1, 1, 1], cloudSunColor: [1, 1, 1], hemiSky: 0x9ca7b4, hemiGround: 0x606060, hemiIntensity: 0.7, sun: { azimuth: 35, elevation: 45 } },
+  atmosphere: { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0, fogDistDensity: 0, volumetricSunColor: [1, 1, 1] },
+  grade: { saturation: 0, brightness: 0, contrast: 0, bloomIntensity: 0, bloomThreshold: 1, shadowTint: [1, 1, 1], highTint: [1, 1, 1], lift: [0, 0, 0], gain: [1, 1, 1], gamma: 1 },
+});
+
 /** Validate authored metadata, resolve literal bundled image imports and compose
  * the unchanged native boot owners. Missing source images refuse admission. */
 export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: AuthoredShardBindings,
@@ -820,6 +832,7 @@ export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: Autho
     return path;
   };
   const { mapPalette: palette, audioBindings, bootBindings, forestQueries, poses, ...bindings } = rows;
+  const sky = data.sky ?? PLAIN_LEVEL_LOOK.sky;
   const { catalogue, ...audio } = data.audio;
   const compare = data.explore.compare?.map(row => ({...row, live: image(row.live), image: image(row.image)}));
   // a declared tree set (its product's rows file) builds on the game's tree set factory
@@ -849,7 +862,8 @@ export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: Autho
     audio: {...audio, ...audioBindings, ...(catalogue===undefined?{}:{catalogue})},
     ...(bootBindings === undefined ? {} : { boot: { ...bootData, ...bootBindings, explore: { art: bootBindings.explore === undefined ? [...Object.values(data.explore.art).map(image), ...(compare?.flatMap(({live, image: target}) => [live, target]) ?? [])] : bootBindings.explore.art.map(image) } } }),
     card: { thumb: image(data.card.thumb), portrait: image(data.card.portrait), landscape: image(data.card.landscape) },
-    sky: { ...data.sky, ...(data.sky.hdri === undefined ? {} : { hdri: image(data.sky.hdri) }) },
+    sky: { ...sky, ...(sky.hdri === undefined ? {} : { hdri: image(sky.hdri) }) },
+    atmosphere: data.atmosphere ?? PLAIN_LEVEL_LOOK.atmosphere, grade: data.grade ?? PLAIN_LEVEL_LOOK.grade,
     minimap: { ...data.minimap, image: image(data.minimap.image), ...(palette === undefined ? {} : { palette }) },
     explore: { art: { world: image(data.explore.art.world), models: image(data.explore.art.models),
       sets: image(data.explore.art.sets), practice: image(data.explore.art.practice) }, ...(compare === undefined ? {} : {compare}) },

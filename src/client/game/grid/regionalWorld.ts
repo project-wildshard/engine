@@ -1,5 +1,6 @@
 import { LightPool } from '@wildshard/engine/fx/LightPool';
 import { clientPageGround } from '../../../shared/game/shardfile/clientGround';
+import { declaredLevel, withoutHorizon } from '../shardfile/declaredLook';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { bindSceneSourceLooks } from '../shardfile/sceneSources';
 import { bindPaintedMaterialMaps } from '../looks/paintedLook';
@@ -266,7 +267,7 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
       ?shardFolderFromAdmission(request.admitted,request.scope):undefined;
     // G782: Developer pages time each native foundation wait (`wildshard.prepare:<slug>:native.<step>`) beside its whole span
     if(product!==undefined)await timeClientPreparation(request.manifest.slug,'native.scalar-blocks',()=>prepareManifestScalarBlocks(request.manifest,product,request.scope));
-    const level = ports.level === undefined ? toLevelSpec(hasDeclaredClientPage(request.admitted.source) ? { ...request.manifest, ground: clientPageGround(request.admitted.source, request.admitted.assets) } : request.manifest, product) : ports.level(request.manifest);
+    const level = ports.level === undefined ? toLevelSpec(hasDeclaredClientPage(request.admitted.source) ? { ...withoutHorizon(request.manifest), ...declaredLevel(request.manifest, request.admitted.source), ground: clientPageGround(request.admitted.source, request.admitted.assets) } : request.manifest, product) : ports.level(request.manifest);
     const { slug: identity } = request.manifest;
     if (level.id !== identity) throw new Error('Regional level identity differs from its native manifest');
     // PZ22: the table goes in before Auto resolves, and before the resident's scope exists to leak on a refusal

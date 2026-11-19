@@ -29,7 +29,7 @@ import { ownInlineCandidate } from './inlineOwner';
 import { folderPaintedLook } from '../looks/paintedLook';
 import { emptyLook } from './emptyLook';
 import { shardfileLook } from './look';
-import { declaredLook } from './declaredLook';
+import { declaredLook, withoutHorizon } from './declaredLook';
 import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
 import { admitFolder, readFolderInput, readFolderDescriptor, type AdmittedFolder, type FolderOptions } from './folder';
 import { manifestReader, provideManifestAdmission } from './runtimeFolder';
@@ -231,9 +231,10 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
   const { image: _unadmittedImage, ...mapLook } = manifest.minimap ?? {};
   // Built-in declared pages keep their authored scalar level presentation and boot inventory.
   // The admitted client owns ground, navigation and all executable stages; no shard loader survives.
-  const page: ShardManifest = hasDeclaredClientPage(source) ? { ...manifest,
-    // ONE-FORMAT OF7: look/look's declared light and bloom over the manifest's (declaredLook.ts)
-    ...declaredLook(manifest, source.look, lookLightOn(), TIER),
+  const page: ShardManifest = hasDeclaredClientPage(source) ? { ...withoutHorizon(manifest),
+    // ONE-FORMAT OF7, OF9b2: look/look's level look (sky, atmosphere, grade, horizon) and its declared light and bloom
+    // over the manifest's (declaredLook.ts)
+    ...declaredLook(manifest, source, lookLightOn(), TIER),
     boot: compiledPageBoot(manifest.boot, client.boot),
     ground: clientPageGround(source, admitted.assets), spawns: [],
     ...(client.navigation === undefined ? {} : { navigation: client.navigation }),

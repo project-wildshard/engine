@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { LookLevel } from '@wildshard/format/look-level';
 import type { ShardManifest } from '../shard/manifest';
-import { declaredLook } from './declaredLook';
+import { declaredLevel, declaredLook } from './declaredLook';
 
 // ONE-FORMAT OF7: a declared page reads `look/look` over its manifest's sky, atmosphere and grade where the look declares
 // them. Driftwood, Pine and Dunes declare no light and no bloom, so their level look is their manifest's, unchanged.
@@ -15,23 +16,48 @@ const DECLARED = { light: { heightFog: { height: 4, falloff: 0.2, density: 0.01 
 describe('declaredLook (OF7)', () => {
   it('keeps the manifest look when the look declares nothing (Driftwood, Pine, Dunes)', () => {
     for (const tier of ['desktop', 'phone']) for (const on of [true, false]) {
-      const look = declaredLook(MANIFEST, EMPTY, on, tier);
+      const look = declaredLook(MANIFEST, { look: EMPTY }, on, tier);
       expect(look.sky).toBe(MANIFEST.sky); expect(look.atmosphere).toBe(MANIFEST.atmosphere); expect(look.grade).toBe(MANIFEST.grade);
     }
   });
 
   it('reads the height fog and the desktop bloom from the look over the manifest', () => {
-    const look = declaredLook(MANIFEST, DECLARED, true, 'desktop');
+    const look = declaredLook(MANIFEST, { look: DECLARED }, true, 'desktop');
     expect(look.sky).toBe(MANIFEST.sky);
     expect(look.atmosphere).toEqual({ ...MANIFEST.atmosphere, fogHeight: 4, fogHeightFalloff: 0.2, fogHeightDensity: 0.01 });
     expect(look.grade).toEqual({ ...MANIFEST.grade, bloomIntensity: 0.6, bloomThreshold: 0.9 });
   });
 
   it('keeps the manifest bloom on the phone tier and everything with the look light off', () => {
-    const phone = declaredLook(MANIFEST, DECLARED, true, 'phone');
+    const phone = declaredLook(MANIFEST, { look: DECLARED }, true, 'phone');
     expect(phone.grade).toBe(MANIFEST.grade);
     expect(phone.atmosphere).toEqual({ ...MANIFEST.atmosphere, fogHeight: 4, fogHeightFalloff: 0.2, fogHeightDensity: 0.01 });
-    const off = declaredLook(MANIFEST, DECLARED, false, 'desktop');
+    const off = declaredLook(MANIFEST, { look: DECLARED }, false, 'desktop');
     expect(off.atmosphere).toBe(MANIFEST.atmosphere); expect(off.grade).toBe(MANIFEST.grade);
+  });
+});
+
+// ONE-FORMAT OF9b2: the level look lives in look/look's `level`; an older product's manifest fields are lifted at the door.
+const HORIZON = { rings: [], cloudSea: true };
+const LEVEL = { sky: { ...MANIFEST.sky, sunIntensity: 3.1 }, atmosphere: MANIFEST.atmosphere, grade: MANIFEST.grade, horizon: HORIZON } as unknown as LookLevel;
+
+describe('declaredLevel (OF9b2)', () => {
+  it('draws look/look\'s level look over the discovery manifest', () => {
+    const level = declaredLevel(MANIFEST, { look: { level: LEVEL } });
+    expect(level.sky).toBe(LEVEL.sky); expect(level.atmosphere).toBe(LEVEL.atmosphere); expect(level.grade).toBe(LEVEL.grade);
+    expect(level.horizon).toBe(HORIZON);
+  });
+
+  it('lifts an older product\'s manifest level look byte for byte, else keeps the discovery manifest\'s', () => {
+    const lifted = declaredLevel(MANIFEST, { look: {}, manifest: { ...LEVEL } });
+    expect(JSON.stringify(lifted)).toBe(JSON.stringify(LEVEL));
+    const kept = declaredLevel(MANIFEST, { look: {} });
+    expect(kept.sky).toBe(MANIFEST.sky); expect('horizon' in kept).toBe(false);
+  });
+
+  it('lays the look\'s height fog and desktop bloom over the level look', () => {
+    const look = declaredLook(MANIFEST, { look: { ...DECLARED, level: LEVEL } }, true, 'desktop');
+    expect(look.sky).toBe(LEVEL.sky); expect(look.horizon).toBe(HORIZON);
+    expect(look.grade).toEqual({ ...LEVEL.grade, bloomIntensity: 0.6, bloomThreshold: 0.9 });
   });
 });
