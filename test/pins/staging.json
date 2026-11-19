@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "dd0b06dd7dff14217463e397c045cca37d92084e4f5c1b5fef4cf8a1d1310d69",
+  "catalogueHash": "249477732bfa60fb8a987c7e6aabd6ae1bd1bcb5b609de2281e1ce5a1bedbf36",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -672,8 +672,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 11,
-        "hash": "1214e5e2930ffa6b65243dce75401ecb8b5fde01a8cd86df6f17722451faff23"
+        "revision": 12,
+        "hash": "4c4d1cb0f217b638d9aff7b7345027ab17821b745681ec334e07255fcc2ab165"
       },
       {
         "slug": "driftwood-isle",
@@ -690,8 +690,8 @@
       {
         "slug": "glowfen",
         "name": "Glowfen",
-        "revision": 4,
-        "hash": "266c40c8e16abde75871e03fc311ad1d4460e9dbe9b4e5e62a9c8df26842cbe8"
+        "revision": 5,
+        "hash": "a561454cf68d06d30a71368193dd448e03dd4c8b241120c7fd64b819c2ee8d2d"
       },
       {
         "slug": "ink-cel-valley",
@@ -708,8 +708,8 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "revision": 6,
-        "hash": "b1a7ffb471277b43d72e931f34abca264da04522e8260ac048d7f867208f2dba"
+        "revision": 8,
+        "hash": "558ac0bbec3ec892c1cca1e89d09adaf0b1afb49a6f9ead765d2cbde92bc795d"
       },
       {
         "slug": "nalati-grasslands",
@@ -849,9 +849,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 11,
-      "hash": "1214e5e2930ffa6b65243dce75401ecb8b5fde01a8cd86df6f17722451faff23",
-      "bytes": 22113792
+      "revision": 12,
+      "hash": "4c4d1cb0f217b638d9aff7b7345027ab17821b745681ec334e07255fcc2ab165",
+      "bytes": 22389760
     },
     {
       "slug": "driftwood-isle",
@@ -867,9 +867,9 @@
     },
     {
       "slug": "glowfen",
-      "revision": 4,
-      "hash": "266c40c8e16abde75871e03fc311ad1d4460e9dbe9b4e5e62a9c8df26842cbe8",
-      "bytes": 19928064
+      "revision": 5,
+      "hash": "a561454cf68d06d30a71368193dd448e03dd4c8b241120c7fd64b819c2ee8d2d",
+      "bytes": 20577792
     },
     {
       "slug": "ink-cel-valley",
@@ -885,9 +885,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 6,
-      "hash": "b1a7ffb471277b43d72e931f34abca264da04522e8260ac048d7f867208f2dba",
-      "bytes": 19310080
+      "revision": 8,
+      "hash": "558ac0bbec3ec892c1cca1e89d09adaf0b1afb49a6f9ead765d2cbde92bc795d",
+      "bytes": 20170240
     },
     {
       "slug": "nalati-grasslands",
