@@ -8,7 +8,7 @@ import { devices } from '../../../scripts/browser-playwright.mjs'
 import { expect, test as base } from '../../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { openDevWorld } from '../../../scripts/dev-world.mjs'
-import { enterTemplate } from './fixtures.ts'
+import { enterBrasscap } from './fixtures.ts'
 
 import type { DevWorld } from '../../../scripts/dev-world.mjs'
 
@@ -25,6 +25,7 @@ const test = base.extend<object, { readonly dev: DevWorld }>({
       const world = await openDevWorld({
         dist,
         work,
+        shard: 'brasscap-mesa',
         port: 0,
         log: (): void => undefined,
       })
@@ -90,7 +91,7 @@ test('the dev page plays on the local Node server, a restart keeps its save and 
     })
     // No init script: the dev port stamps the document itself.
     await page.goto(`${dev.url}?mute=1&nolock=1&fps=30`)
-    await enterTemplate(page, 'Dev Alice')
+    await enterBrasscap(page, 'Dev Alice')
     expect(
       await page.evaluate(
         (): boolean => Reflect.get(globalThis, '__WS_WORLD__') !== undefined,
@@ -176,7 +177,7 @@ test('the harness verbs reach the dev server for a seated page', async ({
     const page = await context.newPage()
     const before = await seatsOf(dev)
     await page.goto(`${dev.url}?mute=1&nolock=1&fps=30`)
-    await enterTemplate(page, 'Dev Bob')
+    await enterBrasscap(page, 'Dev Bob')
     // The page's own device: the seat that is new (an earlier test's body may still be held)
     const after = await seatsOf(dev)
     const seats = after.filter((seat): boolean => !before.includes(seat))

@@ -26,16 +26,19 @@ interface Approach {
   readonly yaw?: number
 }
 
-/** The fixture serves the validated Template 1 pin at the origin cell. */
+/** The fixture serves the validated Brasscap pin at the origin cell. */
 function pinnedPoi(id: string): Poi {
   const data: unknown = JSON.parse(
     readFileSync(
-      new URL('../../../out/_template/sections/ui/level.json', import.meta.url),
+      new URL(
+        '../../../out/brasscap-mesa/sections/ui/level.json',
+        import.meta.url,
+      ),
       'utf8',
     ),
   )
   if (typeof data !== 'object' || data === null || !('manifest' in data)) {
-    throw new TypeError('Missing pinned Template 1 manifest')
+    throw new TypeError('Missing pinned Brasscap manifest')
   }
   const { manifest } = data
   if (
@@ -44,7 +47,7 @@ function pinnedPoi(id: string): Poi {
     !('pois' in manifest) ||
     !Array.isArray(manifest.pois)
   ) {
-    throw new TypeError('Missing pinned Template 1 POIs')
+    throw new TypeError('Missing pinned Brasscap POIs')
   }
   const row: unknown = manifest.pois.find(
     (value: unknown): boolean =>
@@ -63,29 +66,39 @@ function pinnedPoi(id: string): Poi {
     !Number.isFinite(row.x) ||
     !Number.isFinite(row.z)
   ) {
-    throw new TypeError(`Unknown or invalid Template 1 POI: ${id}`)
+    throw new TypeError(`Unknown or invalid Brasscap POI: ${id}`)
   }
   return { id, x: row.x, z: row.z }
 }
 
 async function inPlay(page: Page): Promise<void> {
   await page.bringToFront()
+  // A level the page retires while this polls (a same-page re-entry, a healed 503) throws from the probe until the next
+  // level installs its own: that read is "not in play yet", never the end of the wait.
   await page.waitForFunction((): boolean => {
-    const probe = globalThis.__wildshard
-    return (
-      (probe?.app.state === 'play' || probe?.app.state === 'paused') &&
-      probe.area()?.slug === '_template' &&
-      (probe.area()?.targets.length ?? 0) > 0 &&
-      (probe.world?.game.frameCount ?? 0) > 5
-    )
+    try {
+      const probe = globalThis.__wildshard
+      return (
+        (probe?.app.state === 'play' || probe?.app.state === 'paused') &&
+        probe.area()?.slug === 'brasscap-mesa' &&
+        (probe.area()?.targets.length ?? 0) > 0 &&
+        (probe.world?.game.frameCount ?? 0) > 5
+      )
+    } catch {
+      return false
+    }
   })
   const resume = page.locator('.ws-gmenu.show:not([inert]) .ws-gmenu-close')
   if (await resume.isVisible()) {
     await resume.click()
   }
-  await page.waitForFunction(
-    (): boolean => globalThis.__wildshard?.app.state === 'play',
-  )
+  await page.waitForFunction((): boolean => {
+    try {
+      return globalThis.__wildshard?.app.state === 'play'
+    } catch {
+      return false
+    }
+  })
   const address = new URL(page.url())
   address.searchParams.set('fps', '30')
   await page.evaluate((href): void => {
@@ -104,8 +117,8 @@ async function state(page: Page): Promise<State> {
   return await page.evaluate((): State => {
     const probe = globalThis.__wildshard
     const area = probe?.area()
-    if (probe === undefined || area?.slug !== '_template') {
-      throw new Error('Template 1 is not seated')
+    if (probe === undefined || area?.slug !== 'brasscap-mesa') {
+      throw new Error('Brasscap is not seated')
     }
     const { player } = probe.state()
     return {

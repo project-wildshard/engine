@@ -2,7 +2,7 @@ import { devices } from '../../../scripts/browser-playwright.mjs'
 import { expect, test as base } from '../../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { openT1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
-import { enterTemplate } from './fixtures.ts'
+import { enterBrasscap } from './fixtures.ts'
 
 import type { T1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
 import type { Browser, BrowserContext, Page } from '@playwright/test'
@@ -63,7 +63,7 @@ async function enter(
   const opened = await device(browser, rig)
   try {
     await opened.page.goto('/?mute=1&nolock=1&sw=0&fps=30')
-    await enterTemplate(opened.page, name)
+    await enterBrasscap(opened.page, name)
     return opened
   } catch (error) {
     await opened.context.close()

@@ -92,7 +92,7 @@ test('the phone boot clones no worker buffer of 64 KB or more', async ({
 // their last job (the far impostor decoder too), so a few seconds after control T1's page keeps at most the committed set:
 // the standalone server, the neighbours' tile decoder and live JSON parser, held from loading to the page's end so no
 // worker script is fetched in play (DL17, G872), and the region's road capture worker. A direct zone boot keeps only
-// `serverWorker` (Template, Nine, Pine, Nalati, 2026-11-17).
+// `serverWorker` (Template, Nine, Pine, Nalati, 2026-11-17; Brasscap since J434).
 const PHONE_WORKERS_AT_CONTROL: readonly string[] = [
   'liveJsonParser.worker',
   'roadTileCapture.worker',
@@ -123,7 +123,7 @@ test('the phone keeps only its committed workers after control', async ({
   )
 })
 
-// ENGINE-MEMORY EM26 (design rule 7): the phone tier has one texture path, KTX2. Template's phone boot uploads no shard
+// ENGINE-MEMORY EM26 (design rule 7): the phone tier has one texture path, KTX2. Brasscap's phone boot uploads no shard
 // texture as decoded RGBA8 over 1 MB (scripts/memory/uploadRecorder.mjs).
 test('the phone boot uploads no shard texture as RGBA8 over 1 MB', async ({
   page,

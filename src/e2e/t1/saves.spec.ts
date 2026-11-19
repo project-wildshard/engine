@@ -1,56 +1,57 @@
-import { hideAndSave, walkTo } from '../smoke/game.ts'
-import { enterTemplate, expect, test } from './fixtures.ts'
-import { inPlay, poseAt, state } from './probe.ts'
+import { hideAndSave } from '../smoke/game.ts'
+import { enterBrasscap, expect, test } from './fixtures.ts'
+import { inPlay, poseAt } from './probe.ts'
 
 import type { Page } from '@playwright/test'
 
-async function doorIsOpen(page: Page): Promise<boolean> {
+// J434: Brasscap's canyon gate (POI `gate`, shared field 101 `brasscap.gate.open`) is the saved door: its use
+// (`brasscap.gate.use`, radius 2 at (2, -61.5)) opens it, and its panel `brasscap.gate` stops blocking.
+async function gateIsOpen(page: Page): Promise<boolean> {
   return await page.evaluate(
     (): boolean =>
       globalThis.__wildshard
         ?.area()
-        ?.targets.find((target): boolean => target.panel === 'template.door')
+        ?.targets.find((target): boolean => target.panel === 'brasscap.gate')
         ?.solid === false,
   )
 }
 
-async function expectOpenDoor(page: Page): Promise<void> {
+// The gate is a shared field, not a flag: `area().flags` stays empty, so its panel is the read.
+async function expectOpenGate(page: Page): Promise<void> {
   await expect
-    .poll(async (): Promise<readonly string[]> => {
-      const view = await state(page)
-      return view.flags
-    })
-    .toContain('template.door-open')
-  await expect
-    .poll(async (): Promise<boolean> => await doorIsOpen(page))
+    .poll(async (): Promise<boolean> => await gateIsOpen(page))
     .toBe(true)
 }
 
-async function openDoor(page: Page): Promise<void> {
-  const approach = await poseAt(page, 'hut', { z: -4, yaw: Math.PI })
-  await walkTo(page, approach.z + 2)
+async function openGate(page: Page): Promise<void> {
+  // A pose alone shows no prompt: walk the last 2 m in, as a player does.
+  await poseAt(page, 'gate', { z: 3, yaw: 0 })
+  expect(await gateIsOpen(page)).toBe(false)
+  await page.keyboard.down('KeyW')
+  await page.waitForTimeout(500)
+  await page.keyboard.up('KeyW')
   await page.keyboard.press('KeyE', { delay: 100 })
-  await expectOpenDoor(page)
+  await expectOpenGate(page)
 }
 
-test('the hut door flag survives a save and real reload', async ({
+test('the canyon gate survives a save and real reload', async ({
   page,
 }): Promise<void> => {
-  await openDoor(page)
+  await openGate(page)
   await hideAndSave(page)
   await page.reload()
-  await enterTemplate(page)
+  await enterBrasscap(page)
   await inPlay(page)
-  await expectOpenDoor(page)
+  await expectOpenGate(page)
 })
 
-test('Exit to Title keeps the hut door in an independent save', async ({
+test('Exit to Title keeps the canyon gate in an independent save', async ({
   freshPage,
 }): Promise<void> => {
   const page = await freshPage()
-  await openDoor(page)
+  await openGate(page)
   await page.keyboard.press('Escape')
   await page.locator('.ws-gmenu.show:not([inert]) .ws-gmenu-exit').click()
-  await enterTemplate(page)
-  await expectOpenDoor(page)
+  await enterBrasscap(page)
+  await expectOpenGate(page)
 })

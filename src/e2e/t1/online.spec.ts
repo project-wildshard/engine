@@ -2,7 +2,7 @@ import { expect } from '@playwright/test'
 
 import { test } from './online-fixtures.ts'
 
-test('two Template pages see bodies, names and chat on memory saves', async ({
+test('two Brasscap pages see bodies, names and chat on memory saves', async ({
   peers,
 }): Promise<void> => {
   const { first, second } = peers
@@ -22,13 +22,13 @@ test('two Template pages see bodies, names and chat on memory saves', async ({
       )
     }),
   )
-  await second.page.locator('#ws-chat input').fill('hello from Template')
+  await second.page.locator('#ws-chat input').fill('hello from Brasscap')
   await second.page.locator('#ws-chat input').press('Enter')
   await expect(first.page.locator('#ws-chat')).toContainText(
-    'T1 Bob: hello from Template',
+    'T1 Bob: hello from Brasscap',
   )
   await expect(second.page.locator('#ws-chat')).toContainText(
-    'T1 Bob: hello from Template',
+    'T1 Bob: hello from Brasscap',
   )
   expect(first.errors).toEqual([])
   expect(second.errors).toEqual([])
@@ -45,7 +45,7 @@ function expectInjectedSocketErrors(errors: readonly string[]): void {
   ).toEqual([])
 }
 
-test('a real dropped Template socket shows its strip and recovers', async ({
+test('a real dropped Brasscap socket shows its strip and recovers', async ({
   peers,
   rig,
 }): Promise<void> => {

@@ -33,8 +33,8 @@ interface Workers {
   readonly entryDelayMs: number
 }
 
-/** Enter the installed Template 1 through the same controls as a player. */
-async function enterTemplate(page: Page, name?: string): Promise<void> {
+/** Enter the installed Brasscap through the same controls as a player. */
+async function enterBrasscap(page: Page, name?: string): Promise<void> {
   await page.locator('.ws-main-select').waitFor()
   const dismiss = page.locator('#wsdrop .dismiss')
   if ((await dismiss.count()) > 0) {
@@ -69,10 +69,10 @@ async function enterTemplate(page: Page, name?: string): Promise<void> {
       typeof value === 'object' &&
       value !== null &&
       'slug' in value &&
-      value.slug === '_template',
+      value.slug === 'brasscap-mesa',
   )
   if (typeof row !== 'object' || row === null || !('name' in row)) {
-    throw new Error('The build has no Template 1')
+    throw new Error('The build has no Brasscap')
   }
   const cards = await page.locator('.ws-menu-card b').allTextContents()
   const index = cards.indexOf(String(row.name))
@@ -87,7 +87,7 @@ async function enterTemplate(page: Page, name?: string): Promise<void> {
 
 async function seat(page: Page): Promise<void> {
   await page.goto('/?mute=1&nolock=1&sw=0&fps=30')
-  await enterTemplate(page)
+  await enterBrasscap(page)
 }
 
 async function openWorld(
@@ -205,6 +205,6 @@ const test = base.extend<Fixtures, Workers>({
   },
 })
 
-export { enterTemplate, test }
+export { enterBrasscap, test }
 export { expect } from '@playwright/test'
 export type { SeatedWorld }

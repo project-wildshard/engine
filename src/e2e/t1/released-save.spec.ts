@@ -2,9 +2,17 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { brotliDecompressSync } from 'node:zlib'
 
-import { array, literal, looseObject, number, parse, string } from 'valibot'
+import {
+  array,
+  literal,
+  looseObject,
+  number,
+  optional,
+  parse,
+  string,
+} from 'valibot'
 
-import { enterTemplate, expect, test } from './fixtures.ts'
+import { enterBrasscap, expect, test } from './fixtures.ts'
 import { state } from './probe.ts'
 
 const pinSchema = looseObject({
@@ -14,6 +22,7 @@ const pinSchema = looseObject({
   saveEpoch: number(),
   refused: string(),
   slug: string(),
+  formerSlug: optional(string()),
   tick: number(),
 })
 const shardSchema = looseObject({ slug: string(), hash: string() })
@@ -44,7 +53,7 @@ const EPOCH = parse(
 function releasedFile(instance: string): string {
   const pin = parse(
     pinSchema,
-    JSON.parse(readFileSync('test/pins/saves/template.json', 'utf8')),
+    JSON.parse(readFileSync('test/pins/saves/brasscap-mesa.json', 'utf8')),
   )
   const pins = parse(
     pinsSchema,
@@ -63,7 +72,8 @@ function releasedFile(instance: string): string {
     JSON.parse(brotliDecompressSync(bytes).toString('utf8')),
   )
   const { snapshot } = wire
-  expect(snapshot.levelId).toBe(pin.slug)
+  // TC-SHIP-a: Brasscap's v0.1.1 save names its level by the retired slug.
+  expect(snapshot.levelId).toBe(pin.formerSlug ?? pin.slug)
   expect(snapshot.state.tick).toBe(pin.tick)
   expect(pin.saveEpoch).toBeLessThanOrEqual(EPOCH)
   snapshot.flags.push(CARRIED_FLAG)
@@ -89,7 +99,7 @@ function releasedFile(instance: string): string {
   })
 }
 
-test('released Template world is refused while its progress carries', async ({
+test('released Brasscap world is refused while its progress carries', async ({
   freshPage,
 }): Promise<void> => {
   const page = await freshPage()
@@ -97,14 +107,14 @@ test('released Template world is refused while its progress carries', async ({
     (): string | null | undefined => globalThis.__wildshard?.area()?.instance,
   )
   if (typeof instance !== 'string') {
-    throw new TypeError('Missing Template cell identity')
+    throw new TypeError('Missing Brasscap cell identity')
   }
   const file = releasedFile(instance)
   await page.keyboard.press('Escape')
   const menu = page.locator('.ws-gmenu.show:not([inert])')
   await menu.locator('[data-sv-tab="saves"]').click()
   await menu.locator('input[type=file]').setInputFiles({
-    name: 'released-template.json',
+    name: 'released-brasscap.json',
     mimeType: 'application/json',
     buffer: Buffer.from(file),
   })
@@ -115,7 +125,7 @@ test('released Template world is refused while its progress carries', async ({
       .locator('[role=status]'),
   ).toContainText('Imported 1 keys. Skipped 0 keys.')
   await page.reload()
-  await enterTemplate(page)
+  await enterBrasscap(page)
   await expect
     .poll(async (): Promise<readonly string[]> => {
       const view = await state(page)

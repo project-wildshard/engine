@@ -1,6 +1,6 @@
 import { errors as playwrightErrors, expect } from '@playwright/test'
 
-import { enterTemplate } from './fixtures.ts'
+import { enterBrasscap } from './fixtures.ts'
 import { device, test } from './online-fixtures.ts'
 
 import type { T1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
@@ -12,7 +12,7 @@ test.use({ rigGroup: 'entry' })
 
 async function seatedResult(page: Page, name: string): Promise<unknown> {
   try {
-    await enterTemplate(page, name)
+    await enterBrasscap(page, name)
     return undefined
   } catch (error) {
     return error
@@ -72,14 +72,14 @@ async function load503(
   }
 }
 
-test('a matched release 503 shows its page and heals to Template control', async ({
+test('a matched release 503 shows its page and heals to Brasscap control', async ({
   browser,
   rig,
 }): Promise<void> => {
   await load503(browser, rig, 'release')
 })
 
-test('a matched pack 503 keeps bad bytes out and heals to Template control', async ({
+test('a matched pack 503 keeps bad bytes out and heals to Brasscap control', async ({
   browser,
   rig,
 }): Promise<void> => {

@@ -31,10 +31,10 @@ async function journey(
 ): Promise<void> {
   await page.goto(
     way === 'deeplink'
-      ? '/slug/_template?mute=1&nolock=1'
+      ? '/slug/brasscap-mesa?mute=1&nolock=1'
       : '/?mute=1&nolock=1',
   )
-  const samples = await tapJourney(page, { card: '_template', path: way })
+  const samples = await tapJourney(page, { card: 'brasscap-mesa', path: way })
   const path = samples.map(
     (row: Sample): string => `${String(row.t)}:${label(row.s)}`,
   )
@@ -56,7 +56,7 @@ test('a tapped phone journey shows only menu, loading card and play, cold and wa
     ...(baseURL === undefined ? {} : { baseURL }),
   })
   try {
-    // Template 1 is a Developer card; Developer changes no screen on this path
+    // Brasscap is a Developer card; Developer changes no screen on this path
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true })
     await harnessPins(context, { seed: 357 })
     const page = await context.newPage()
