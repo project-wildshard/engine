@@ -33,13 +33,23 @@ interface Workers {
   readonly entryDelayMs: number
 }
 
+const dropHandled = new WeakSet<Page>()
+
 /** Enter the installed Brasscap through the same controls as a player. */
 async function enterBrasscap(page: Page, name?: string): Promise<void> {
-  await page.locator('.ws-main-select').waitFor()
-  const dismiss = page.locator('#wsdrop .dismiss')
-  if ((await dismiss.count()) > 0) {
-    await dismiss.click()
+  // The title's drop modal ("Unexpectedly back at the title": a reload after a page went hidden, as `hideAndSave` fakes)
+  // can mount after the title's controls do. A one-off check missed it under load and the next click waited behind it
+  // for the whole test (TR-4b), so dismiss it, as a player does, whenever it covers an action.
+  if (!dropHandled.has(page)) {
+    dropHandled.add(page)
+    await page.addLocatorHandler(
+      page.locator('#wsdrop .dismiss'),
+      async (dismiss): Promise<void> => {
+        await dismiss.click()
+      },
+    )
   }
+  await page.locator('.ws-main-select').waitFor()
   const developer = page.locator('.ws-main-dev')
   if ((await developer.getAttribute('aria-checked')) !== 'true') {
     await developer.click()
