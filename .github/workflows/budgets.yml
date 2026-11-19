@@ -1,0 +1,125 @@
+name: budgets
+# BUDGET-CAPS BC9 (meta docs/plans/BUDGET-CAPS-PLAN.md; J444, J445): the 10% regression check runs here, after ci, so ci's
+# verdict and the release train's green-main read never wait on it. ci's own build steps refuse only past a hard cap
+# (budgets/caps.json). This job measures the exact full pinned client ci's memory-client-build archived
+# (memory-pinned-client): every zone's memory ledger (two totals a zone, median of three when a read is over), each
+# shard's phone download and the app's code sizes, and judges them with `node scripts/budgets/cli.mjs check`.
+# A red run here is a fix row for whoever pushed the regression (main-watch names them), never a red main or a release
+# hold. A new shard revision is new content and passes; record it with `node scripts/budgets/cli.mjs record --run <id>`.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: The ci run whose memory-pinned-client to measure
+        type: string
+        required: true
+      seed:
+        description: Extra budget measures (JSON, the cli.mjs measures shape) judged with the run's, to prove the job
+        type: string
+        required: false
+        default: ''
+      memory_record:
+        description: Take three ledger reads a zone so the run's measures can be recorded
+        type: boolean
+        required: false
+        default: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: budgets-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
+jobs:
+  budgets:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.head_repository.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.memory_record && 120 || 60 }}
+    env:
+      WS_LANE_NAME: budgets
+      SOURCE_RUN: ${{ inputs.source_run || github.event.workflow_run.id }}
+    steps:
+      - name: Find the source run's pinned client
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" --jq .head_sha)
+          count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/artifacts?name=memory-pinned-client" --jq '[.artifacts[] | select(.expired == false)] | length')
+          printf 'sha=%s\nartifact=%s\n' "$sha" "$([[ "$count" -gt 0 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          if [[ "$count" -eq 0 ]]; then echo "::notice::ci run $SOURCE_RUN archived no memory-pinned-client (no code change, or its build failed); nothing to measure"; fi
+      - if: steps.source.outputs.artifact == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          persist-credentials: false
+      - if: steps.source.outputs.artifact == 'true'
+        uses: ./.github/actions/ring-setup
+      - if: steps.source.outputs.artifact == 'true'
+        run: node scripts/scratch-dir.mjs budgets 'BUDGET-CAPS BC9 regression check'
+      - if: steps.source.outputs.artifact == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN }}
+          name: memory-pinned-client
+          path: tmp/memory-ledger
+      - name: Restore the pinned preview and install Chromium
+        id: client
+        if: steps.source.outputs.artifact == 'true'
+        run: |
+          tar -xf tmp/memory-ledger/client.tar
+          rm tmp/memory-ledger/client.tar
+          bash scripts/ci-playwright-install.sh chromium
+      - name: Record the served ledger Brotli part digests
+        if: steps.client.outcome == 'success'
+        continue-on-error: true
+        run: |
+          export LC_ALL=C
+          cd tmp/memory-ledger/preview/dist/assets/spawn
+          manifest="$GITHUB_WORKSPACE/tmp/memory-ledger/spawn-parts.sha256"
+          sha256sum -- parts/*.pack.br server/*.pack.br > "$manifest.tmp"
+          mv -- "$manifest.tmp" "$manifest"
+      # The ledger step records its judged totals in tmp/budgets/ledger/budget-measures.json; the check below judges
+      # them with the rest, so the step itself never decides the job.
+      - name: Read every zone's memory ledger
+        if: steps.client.outcome == 'success'
+        continue-on-error: true
+        env:
+          MEMORY_RECORD: ${{ inputs.memory_record }}
+        run: |
+          record=()
+          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
+          node scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/budgets/ledger "${record[@]}"
+      - name: Measure the downloads and code sizes
+        if: steps.client.outcome == 'success'
+        run: |
+          node scripts/shard-size-gate.mjs tmp/memory-ledger/preview/dist --hard-only --measures tmp/budgets/downloads.json
+          inputs=(tmp/budgets/downloads.json)
+          for file in tmp/memory-ledger/preview/dist/.vite/budget-measures.json tmp/budgets/ledger/budget-measures.json; do
+            if [[ -f "$file" ]]; then inputs+=("$file"); fi
+          done
+          node scripts/budgets/cli.mjs merge tmp/budgets/measures.json "${inputs[@]}"
+      - name: Add the dispatched seed
+        if: steps.client.outcome == 'success' && inputs.seed != ''
+        env:
+          SEED: ${{ inputs.seed }}
+        run: |
+          printf '%s\n' "$SEED" > tmp/budgets/seed.json
+          node scripts/budgets/cli.mjs merge tmp/budgets/measures.json tmp/budgets/measures.json tmp/budgets/seed.json
+      - name: Judge every budget (regressed or over a hard cap fails this job only)
+        if: steps.client.outcome == 'success'
+        run: node scripts/budgets/cli.mjs check tmp/budgets/measures.json
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: budgets
+          path: |
+            tmp/budgets/*.json
+            tmp/budgets/ledger/*.json
+            tmp/memory-ledger/spawn-parts.sha256
+          retention-days: 14
+          if-no-files-found: ignore

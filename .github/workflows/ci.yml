@@ -538,54 +538,8 @@ jobs:
           path: ~/.cache/wildshard/gen/spawn-parts-br/1
           key: ${{ steps.ledger-codec.outputs.key }}
 
-  memory-ledger-guard:
-    # J426: shard-format memory-armed.json controls which per-zone ceilings block.
-    # Nine stalled on hosted SwiftShader, so its ledger uses native WebKit.
-    needs: memory-client-build
-    if: ${{ !cancelled() && needs.memory-client-build.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.memory_record && 120 || 60 }}
-    env:
-      WS_LANE_NAME: memory-ledger
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/ring-setup
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: memory-pinned-client
-          path: tmp/memory-ledger
-      - name: Restore the pinned preview and install Chromium
-        run: |
-          tar -xf tmp/memory-ledger/client.tar
-          rm tmp/memory-ledger/client.tar
-          bash scripts/ci-playwright-install.sh chromium
-      - name: Record the served ledger Brotli part digests
-        continue-on-error: true
-        run: |
-          export LC_ALL=C
-          cd tmp/memory-ledger/preview/dist/assets/spawn
-          manifest="$GITHUB_WORKSPACE/tmp/memory-ledger/spawn-parts.sha256"
-          sha256sum -- parts/*.pack.br server/*.pack.br > "$manifest.tmp"
-          mv -- "$manifest.tmp" "$manifest"
-      - name: Read or block on subsystem ledger bytes
-        env:
-          MEMORY_RECORD: ${{ inputs.memory_record }}
-          WS_LEDGER_RECORD_ZONES: ${{ inputs.memory_record_zones }}
-        run: |
-          record=()
-          if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          node scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/memory-ledger/readings "${record[@]}"
-      - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: memory-ledger-guard
-          path: |
-            tmp/memory-ledger/readings/*.json
-            tmp/memory-ledger/spawn-parts.sha256
-          retention-days: 7
-          if-no-files-found: ignore
+  # BUDGET-CAPS BC9 (J444): the memory ledger's regression check left ci for budgets.yml, which reads this run's
+  # memory-pinned-client after ci, so a regression is a fix row and never ci's verdict or a release hold.
 
   nine-ledger-diagnostic:
     # This bounded experiment runs only on an explicit memory qualification.

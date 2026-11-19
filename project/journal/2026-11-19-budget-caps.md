@@ -39,3 +39,8 @@
   totals against its baseline + 10%, re-reading three times only when the first
   read is over; `compareLedger` no longer lowers a baseline. One table, no
   `::warning`.
+- BC9: `budgets.yml` runs after ci on main, measures ci's archived pinned
+  client (ledger, downloads, code sizes) and runs `cli.mjs check`. ci lost
+  `memory-ledger-guard`; every build gate runs hard-only. main-watch reads the
+  budgets runs and files a fix row for the pusher.
+- BC10: `cli.mjs record --run <id>` records from a budgets run's artifact.

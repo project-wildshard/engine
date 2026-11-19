@@ -54,6 +54,11 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
  - **`test/pins/` changes (J375)** reach main through `land.mjs` from a plan worktree or `main-push.mjs` from
    `engine-quickfix` (FS18), both through the push gate; the pre-push (`.githooks/pin-provenance.mjs`) refuses a hand
    `git push`. Escape hatch when truly stuck: `ALLOW_PIN_PUSH=1`, said in your receipt.
+ - **Budgets (J444, meta BUDGET-CAPS):** hard caps live in `budgets/caps.json`, each naming its J-number (only Jake's
+   word moves one); baselines live in `budgets/baselines.json`, written by `node scripts/budgets/cli.mjs`, never by hand.
+   A pin lane runs `cli.mjs record --run <budgets.yml run id>` after its pin's first green main run and commits the file.
+   An engine feature that grows a budget runs `cli.mjs declare <key> --why "<feature>"` in the same commit. `cli.mjs check
+   <measures.json>` prints the table. A `main BUDGET regressed` receipt is a fix row for its pusher, never a red main.
  - **Local cross-repo proof on the mini (LOCAL-LINK, M1):** from repo-kit,
    `WS_LANE_NAME=<lane> node kit/cli/main.ts local init`, then `local link
    --consumer sharddev --production-live v0.1.2 --reason "<purpose>"` with

@@ -28,7 +28,7 @@ function fixture(measures: unknown) {
   const lines: string[] = [], errors: string[] = [], summary = join(root, 'summary.md');
   const run = (...argv: string[]) => runCli(argv.map(arg => arg === 'M' ? join(root, 'measures.json') : arg), { root, env: { GITHUB_STEP_SUMMARY: summary }, out: line => { lines.push(line); }, err: line => { errors.push(line); } });
   const baselines = (): BudgetBaselines['baselines'] => (JSON.parse(readFileSync(join(root, 'budgets/baselines.json'), 'utf8')) as BudgetBaselines).baselines;
-  return { run, lines, errors, summary, baselines };
+  return { run, lines, errors, summary, baselines, root };
 }
 
 test('check exits 0 on ok and raised, and prints one table line a budget with no ::warning', () => {
@@ -77,4 +77,22 @@ test('declare needs a reason, and a declared key is judged as new content', () =
   expect(f.run('check', 'M')).toBe(1);
   expect(f.run('declare', 'download/phone/a', '--why', 'a feature')).toBe(0);
   expect(f.run('check', 'M')).toBe(0);
+});
+
+test('BC10: record --run writes the baselines from a saved budgets artifact; a second check on the same readings is ok', () => {
+  const f = fixture({ measures: {} });
+  const saved = readFileSync('test/fixtures/budgets-run/budgets/measures.json', 'utf8');
+  const download = (run: string, directory: string): void => {
+    expect(run).toBe('44470000001');
+    mkdirSync(join(directory, 'budgets'));
+    writeFileSync(join(directory, 'budgets/measures.json'), saved);
+  };
+  const root = f.root;
+  expect(runCli(['record', '--run', '44470000001'], { root, env: {}, out: () => undefined, err: () => undefined, download })).toBe(0);
+  expect(f.baselines()['download/phone/driftwood-isle']).toEqual({ value: 70, contentKey: 'driftwood-isle@6', commit: 'abcdef1234' });
+  expect(f.baselines()['ledger/driftwood-isle/peak']).toEqual({ value: 44, contentKey: 'driftwood-isle@6', commit: 'abcdef1234', detail: { audio: 30 } });
+  expect(f.baselines()['download/phone/a']?.value).toBe(50);
+  writeFileSync(join(root, 'measures.json'), saved);
+  expect(f.run('check', 'M')).toBe(0);
+  expect(runCli(['record', '--run', 'nope'], { root, env: {}, out: () => undefined, err: () => undefined, download })).toBe(2);
 });

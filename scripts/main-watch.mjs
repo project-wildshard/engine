@@ -25,6 +25,7 @@ import {setTimeout} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
 import {AMBER,parseAmber,parseAudioAmber,parseMemoryWarnings} from './test-amber.mjs';
 import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
+import {budgetReport,parseBudgetResults} from './budgets/watch.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
@@ -63,7 +64,7 @@ export function failedNames(jobs){
 }
 
 /** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
-/** @typedef {{id:number,sha:string,created:string, warnings:ReturnType<typeof parseMemoryWarnings>}} MemoryQa */
+/** @typedef {{id:number,sha:string,created:string,warnings?:ReturnType<typeof parseMemoryWarnings>,pusher?:string,results?:ReturnType<typeof parseBudgetResults>}} MemoryQa */
 /** A red span main-watch has reported: the first red run, when it was reported (ms), its alert, and whether the keeper
  * (buddy-engine, FS22) already has it.
  * @typedef {{run:number,at:number,text:string,keeper:boolean}} RedSpan */
@@ -263,6 +264,12 @@ export function liveIo(env=process.env){
     annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
       .filter(job=>job.name.startsWith('tests')||job.name==='memory-ledger-guard'||job.name===NATIVE_FOOTPRINT)
       .map(job=>read(['api','--paginate',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`,'--jq','.[].message'])).join('\n'),
+    // BUDGET-CAPS BC9: the budgets workflow follows ci; its failures are fix rows, never main's verdict.
+    budgetRuns:()=>sharedRuns(`${runsCache}.budgets`,()=>/** @type {Run[]} */(
+      JSON.parse(read(['api',`repos/${repo}/actions/workflows/budgets.yml/runs?branch=main&per_page=15`])).workflow_runs)),
+    budgetAnnotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
+      .filter(job=>job.name==='budgets')
+      .map(job=>read(['api','--paginate',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`,'--jq','.[].message'])).join('\n'),
     nativeRuns:()=>sharedRuns(`${runsCache}.memory-footprint`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/memory-footprint.yml/runs?branch=main&per_page=15`])).workflow_runs)),
     memoryQa:(/** @type {MemoryQa[]} */rows)=>{
@@ -407,6 +414,27 @@ export function sweep(io,hint={}){
       }
       state.judged.push(run.id);writeState(io.state,state);
       for(const line of lines)io.receipt(line);
+    }
+    // BUDGET-CAPS BC9: a failed budgets run names its pushers (the landers of the commits since the previous budgets run).
+    let budgetRuns=/** @type {Run[]} */([]);
+    try{budgetRuns=io.budgetRuns?.()??[];}catch(error){
+      io.receipt(`budgets status unavailable: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
+    }
+    for(const run of budgetRuns.filter(row=>finished(row)&&!state.judged.includes(row.id))){
+      /** @type {ReturnType<typeof budgetReport>} */let report={lines:[],qa:null};
+      if(run.conclusion==='failure'){
+        try{
+          const before=budgetRuns.find(row=>row.id<run.id&&finished(row)&&row.head_sha!==run.head_sha);
+          const pushers=[...new Set(attribute(io.commits(before?.head_sha??null,run.head_sha),who).map(row=>row.lander?.lane??'').filter(Boolean))];
+          report=budgetReport(run,parseBudgetResults(io.budgetAnnotations?.(run.id)??''),pushers);
+        }catch(error){
+          io.receipt(`budgets results unavailable for run ${run.id}: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
+          continue;
+        }
+      }
+      if(report.qa!==null)state.memoryQa.push(report.qa);
+      state.judged.push(run.id);writeState(io.state,state);
+      for(const line of report.lines)io.receipt(line);
     }
     if(state.memoryQa.length>0&&io.memoryQa!==undefined){
       try{io.memoryQa(state.memoryQa);state.memoryQa=[];writeState(io.state,state);}catch(error){

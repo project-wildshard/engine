@@ -271,6 +271,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     step([
       "scripts/shard-size-gate.mjs",
       outDir,
+      // BUDGET-CAPS BC9: a build (ci, a release) refuses only past a hard cap; budgets.yml runs the 10% check after ci.
+      "--hard-only",
       ...(process.env.WILDSHARD_CATALOGUE === undefined ? [] : ["--cooks-after"]),
     ]);
 

@@ -29,10 +29,10 @@ describe('shaVerdict', () => {
   });
 });
 
-function ciJob(name: string): string {
-  const text = readFileSync('.github/workflows/ci.yml', 'utf8');
+function ciJob(name: string, workflow = 'ci.yml'): string {
+  const text = readFileSync(`.github/workflows/${workflow}`, 'utf8');
   const start = text.indexOf(`\n  ${name}:\n`);
-  if (start === -1) throw new Error(`ci.yml has no ${name} job`);
+  if (start === -1) throw new Error(`${workflow} has no ${name} job`);
   const next = text.slice(start + 1).search(/\n {2}[a-z][a-z0-9_-]*:\n/u);
   return next === -1 ? text.slice(start) : text.slice(start, start + 1 + next);
 }
@@ -49,21 +49,21 @@ test('boundaries stays blocking and independent; J400 moves quarantine to report
   expect(ciJob('tests')).not.toMatch(/^ {4}if: /mu);
 });
 
-test('the blocking memory ledger restores and saves its own verified Brotli parts', () => {
+test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves its own verified Brotli parts', () => {
   const producer = ciJob('memory-client-build');
-  const ledger = ciJob('memory-ledger-guard');
+  const ledger = ciJob('budgets', 'budgets.yml');
   // The native consumer runs after ci in memory-footprint.yml (ci's verdict never waits on its xcode-27 runner).
   const native = readFileSync('.github/workflows/memory-footprint.yml', 'utf8');
   const restore = producer.indexOf('uses: actions/cache/restore@');
   const build = producer.indexOf('name: Build every production pin');
   const archive = producer.indexOf('name: Archive the full pinned preview');
   const save = producer.indexOf('uses: actions/cache/save@');
-  const read = ledger.indexOf('name: Read or block on subsystem ledger bytes');
+  const read = ledger.indexOf("name: Read every zone's memory ledger");
   expect(restore).toBeGreaterThan(0);
   expect(build).toBeGreaterThan(restore);
   expect(archive).toBeGreaterThan(build);
   expect(save).toBeGreaterThan(archive);
-  expect(ledger).toContain('needs: memory-client-build');
+  expect(readFileSync('.github/workflows/budgets.yml', 'utf8')).toContain('workflows: [ci]');
   expect(native).toContain('workflows: [ci]');
   for (const consumer of [ledger, native]) {
     expect(consumer).toContain('name: memory-pinned-client');
@@ -85,9 +85,12 @@ test('the blocking memory ledger restores and saves its own verified Brotli part
   expect(producer).toContain("steps.ledger-parts.outputs.cache-hit != 'true'");
   expect(producer).not.toContain('ring1-spawn-parts-br-');
   expect(ledger).not.toMatch(/^ {4}continue-on-error:/mu);
-  const upload = ledger.indexOf('- if: always()', read);
-  expect(upload).toBeGreaterThan(read);
-  expect(ledger.slice(read, upload)).not.toContain('continue-on-error');
+  // The ledger read never decides the job; the one check of every budget does, with no bypass.
+  const judge = ledger.indexOf('name: Judge every budget'), upload = ledger.indexOf('- if: always()', read);
+  expect(upload).toBeGreaterThan(judge);
+  expect(judge).toBeGreaterThan(read);
+  expect(ledger.slice(judge, upload)).not.toContain('continue-on-error');
+  expect(ledger.slice(judge, upload)).toContain('node scripts/budgets/cli.mjs check tmp/budgets/measures.json');
 });
 
 test('the ledger cache preserves browser and server packs and records both digests', () => {
@@ -105,7 +108,7 @@ test('the ledger cache preserves browser and server packs and records both diges
     writeFileSync(join(spawnRoot, folder, `${hash.slice(0, 16)}.pack.br`), hash);
   }
   const run = (job: string, name: string) => {
-    const step = ciJob(job).split(`      - name: ${name}\n`)[1]?.split(/\n {6}- /u)[0];
+    const step = ciJob(job, job === 'budgets' ? 'budgets.yml' : 'ci.yml').split(`      - name: ${name}\n`)[1]?.split(/\n {6}- /u)[0];
     const shell = step?.split('\n        run: |\n')[1];
     if (shell === undefined) throw new Error(`Missing shell step ${name}`);
     const script = shell.replace('cache="$HOME/.cache/wildshard/gen/spawn-parts-br/1"', 'cache="$LEDGER_FIXTURE_CACHE"');
@@ -121,13 +124,13 @@ test('the ledger cache preserves browser and server packs and records both diges
   expect(run('memory-client-build', prune).status).toBe(1);
   expect(readdirSync(cache).sort()).toEqual([`${browser}.br`, `${server}.br`, `${stale}.br`]);
   const digestStep = 'Record the served ledger Brotli part digests';
-  expect(run('memory-ledger-guard', digestStep).status).not.toBe(0);
+  expect(run('budgets', digestStep).status).not.toBe(0);
   expect(readdirSync(join(root, 'tmp/memory-ledger'))).not.toContain('spawn-parts.sha256');
   renameSync(hiddenServer, serverFolder);
   const pruned = run('memory-client-build', prune);
   expect(pruned.status, pruned.stderr).toBe(0);
   expect(readdirSync(cache).sort()).toEqual([`${browser}.br`, `${server}.br`]);
-  const recorded = run('memory-ledger-guard', digestStep);
+  const recorded = run('budgets', digestStep);
   expect(recorded.status, recorded.stderr).toBe(0);
   const manifest = readFileSync(join(root, 'tmp/memory-ledger/spawn-parts.sha256'), 'utf8');
   expect(manifest.trim().split('\n').map(line => line.split('  ')[1])).toEqual([

@@ -10,4 +10,6 @@ export function budgetTable(rows: readonly BudgetRow[]): string;
 export function failed(rows: readonly BudgetRow[], options?: { hardOnly?: boolean }): boolean;
 export function recordAll(caps: BudgetCaps, baselines: BudgetBaselines, measures: BudgetMeasures, options?: { why?: string; commit?: string }): { errors: string[]; baselines: BudgetBaselines };
 export function declareRaise(caps: BudgetCaps, baselines: BudgetBaselines, key: string, why: string | undefined): { errors: string[]; baselines: BudgetBaselines; note?: string };
-export function runCli(argv: string[], io?: { root?: string; env?: NodeJS.ProcessEnv; out?: (line: string) => void; err?: (line: string) => void }): number;
+export function downloadRun(run: string, directory: string): void;
+export function runCli(argv: string[], io?: { root?: string; env?: NodeJS.ProcessEnv; out?: (line: string) => void; err?: (line: string) => void; download?: (run: string, directory: string) => void }): number;
+export function mergeMeasures(files: readonly BudgetMeasures[]): BudgetMeasures;

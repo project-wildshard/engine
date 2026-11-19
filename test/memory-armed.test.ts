@@ -152,7 +152,9 @@ test('CI runs both armed measurement jobs without a job-level bypass, the native
     return body;
   };
   const ci = read('ci.yml'), footprint = read('memory-footprint.yml');
-  const ledger = section(ci, 'memory-ledger-guard'), native = section(footprint, 'memory-footprint-guard');
+  // BUDGET-CAPS BC9: the ledger runs in budgets.yml after ci; ci's verdict waits on neither measurement.
+  const ledger = section(read('budgets.yml'), 'budgets'), native = section(footprint, 'memory-footprint-guard');
+  expect(ci).not.toMatch(/\n {2}memory-ledger-guard:\n/u);
   // ci's verdict never waits on the xcode-27 runner (44392712273); the footprint run follows ci and reads its client.
   expect(ci).not.toMatch(/\n {2}memory-footprint-guard:\n/u);
   expect(footprint).toMatch(/workflow_run:\n {4}workflows: \[ci\]/u);
@@ -165,6 +167,7 @@ test('CI runs both armed measurement jobs without a job-level bypass, the native
   expect(ledger).toMatch(/\n {4}runs-on:/u);
   expect(native).toContain('runs-on: xcode-27');
   expect(ledger).not.toMatch(/\n {4}continue-on-error:/u);
+  expect(ledger).toContain('node scripts/budgets/cli.mjs check tmp/budgets/measures.json');
   expect(native).not.toContain('continue-on-error');
 });
 

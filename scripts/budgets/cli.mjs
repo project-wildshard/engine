@@ -5,16 +5,22 @@
 //                                       exit 1 on regressed or over-hard, or only on over-hard with --hard-only
 //   node scripts/budgets/cli.mjs record <measures.json> [--why "<why>"]   write the measured baselines with their
 //                                       content keys, clearing declared; refuses a value over its hard cap
+//   node scripts/budgets/cli.mjs record --run <id>   the same from a main run's `budgets` artifact (budgets.yml, BC10):
+//                                       a pin lane runs it after its pin's first green main run
 //   node scripts/budgets/cli.mjs declare <key> --why "<engine feature>"   an engine feature raises this budget in
 //                                       this commit: the next check treats the key as new content
+//   node scripts/budgets/cli.mjs merge <out.json> <in.json>...   one measures file from several (later wins)
 //
 // measures.json: { "commit"?: sha, "measures": { "<key>": { "value": n } | { "reads": [a, b, c] }, plus "contentKey",
 // and an optional "detail": { "<part>": n } shown in the table only } }.
-import { appendFileSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { capFor, readBaselines, readCaps, writeBaselines } from './files.mjs';
 import { judgedValue, verdict } from './verdict.mjs';
+import { budgetResultLine } from './watch.mjs';
 
 const STATUS = { ok: 'ok', raised: 'raised', regressed: 'REGRESSED', 'over-hard': 'OVER HARD' };
 
@@ -93,8 +99,22 @@ export function declareRaise(caps, baselines, key, why) {
   return { errors: [], baselines: { ...baselines, baselines: { ...baselines.baselines, [key]: { ...row, declared: why } } } };
 }
 
-/** @param {string[]} argv @param {{ root?: string, env?: NodeJS.ProcessEnv, out?: (line: string) => void, err?: (line: string) => void }} [io] */
-export function runCli(argv, { root, env = process.env, out = line => console.info(line), err = line => console.error(line) } = {}) {
+/** One measures file from several; a later file's key wins, and the first commit named is kept.
+ * @param {readonly { commit?: string, measures: Record<string, any> }[]} files */
+export function mergeMeasures(files) {
+  const commit = files.find(file => file.commit !== undefined)?.commit;
+  return { ...(commit === undefined ? {} : { commit }), measures: Object.assign({}, ...files.map(file => file.measures)) };
+}
+
+/** The `budgets` artifact of a budgets.yml run, downloaded with gh into `directory` (`budgets/measures.json` inside).
+ * @param {string} run @param {string} directory */
+export function downloadRun(run, directory) {
+  execFileSync('gh', ['run', 'download', run, '--name', 'budgets', '--repo', 'project-wildshard/engine', '--dir', directory], { stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+/** @param {string[]} argv @param {{ root?: string, env?: NodeJS.ProcessEnv, out?: (line: string) => void, err?: (line: string) => void,
+ *   download?: (run: string, directory: string) => void }} [io] */
+export function runCli(argv, { root, env = process.env, out = line => console.info(line), err = line => console.error(line), download = downloadRun } = {}) {
   const [command, ...rest] = argv;
   const flag = name => { const at = rest.indexOf(name); return at === -1 ? undefined : rest[at + 1]; };
   const valued = new Set(['--why', '--run']);
@@ -105,14 +125,30 @@ export function runCli(argv, { root, env = process.env, out = line => console.in
     const rows = judgeAll(caps, baselines, readMeasures()), table = budgetTable(rows);
     out(table);
     if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, `### Budgets\n\n${table}\n`);
+    // BC9: one line per failing row, which main-watch reads (an error annotation in Actions); nothing for a passing one.
+    for (const row of rows) if (row.status === 'regressed' || row.status === 'over-hard') {
+      const line = budgetResultLine(row);
+      out(env.GITHUB_ACTIONS === 'true' ? `::error title=Budget ${row.status}::${line}` : line);
+    }
     return failed(rows, { hardOnly: rest.includes('--hard-only') }) ? 1 : 0;
   }
   if (command === 'record') {
-    const result = recordAll(caps, baselines, readMeasures(), { why: flag('--why') });
+    const run = flag('--run');
+    let measures;
+    if (run === undefined) measures = readMeasures();
+    else {
+      if (!/^\d+$/u.test(run)) { err('budget: --run takes a budgets.yml run id'); return 2; }
+      const directory = mkdtempSync(join(tmpdir(), 'budgets-run-'));
+      try {
+        download(run, directory);
+        measures = JSON.parse(readFileSync(join(directory, 'budgets/measures.json'), 'utf8'));
+      } finally { rmSync(directory, { recursive: true, force: true }); }
+    }
+    const result = recordAll(caps, baselines, measures, { why: flag('--why') });
     for (const error of result.errors) err(error);
     if (result.errors.length > 0) return 1;
     writeBaselines(result.baselines, root);
-    out(`budget: recorded ${Object.keys(readMeasures().measures).length} baseline(s) in budgets/baselines.json`);
+    out(`budget: recorded ${Object.keys(measures.measures).length} baseline(s) in budgets/baselines.json${run === undefined ? '' : ` from run ${run}`}`);
     return 0;
   }
   if (command === 'declare') {
@@ -123,7 +159,15 @@ export function runCli(argv, { root, env = process.env, out = line => console.in
     else { writeBaselines(result.baselines, root); out(`budget: ${target} declared; commit budgets/baselines.json with the feature`); }
     return 0;
   }
-  err('usage: cli.mjs check <measures.json> [--hard-only] | record <measures.json> [--why <why>] | declare <key> --why <why>');
+  if (command === 'merge') {
+    const [output, ...inputs] = rest.filter(arg => !arg.startsWith('--'));
+    if (output === undefined || inputs.length === 0) { err('budget: merge <out.json> <in.json>...'); return 2; }
+    const merged = mergeMeasures(inputs.map(file => JSON.parse(readFileSync(resolve(file), 'utf8'))));
+    writeFileSync(resolve(output), `${JSON.stringify(merged, null, 1)}\n`);
+    out(`budget: merged ${Object.keys(merged.measures).length} measure(s) into ${output}`);
+    return 0;
+  }
+  err('usage: cli.mjs check <measures.json> [--hard-only] | record <measures.json> [--why <why>] | declare <key> --why <why> | merge <out.json> <in.json>...');
   return 2;
 }
 
