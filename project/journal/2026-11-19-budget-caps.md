@@ -16,3 +16,8 @@
   A cap key ending in `/*` covers every key under it. Downloads seeded from
   the old ceilings minus margins, at each shard's pinned revision; Driftwood
   at rev 5's 22,218,404 B (J437).
+- BC3: `scripts/budgets/cli.mjs` `check` (one table, also to the job
+  summary; exit 1 on regressed or over-hard, `--hard-only` only on
+  over-hard), `record` (writes baselines with content keys, clears
+  `declared`, refuses past a hard cap) and `declare <key> --why`. A measure
+  with no cap entry fails the check.
