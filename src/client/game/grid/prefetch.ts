@@ -25,6 +25,7 @@ import type { OfflineDownloadEnd } from '@wildshard/engine/ui/offlineDownload';
 import { hasCachedAsset, cacheAsset } from '../shardfile/assetCache';
 import { builtIndexHash, builtIndexHashes } from '@wildshard/format/builtIndexes';
 import { readPrefetchIndex } from './prefetchIndex';
+import { readPhoneSplatLayers } from './prefetchSplatLayers';
 import { markPackMissing, packGone, packMissing } from '../../../shared/game/shardfile/packReads';
 import type { GridAssembly } from '../../../shared/game/grid/assembly';
 import {TIER, MOBILE_DEVICE, type Tier} from '@wildshard/engine/core/tier';
@@ -161,7 +162,9 @@ class GridPrefetch {
     if (indexHash !== null) url.searchParams.set('v', indexHash.slice(0, 8));
     if (typeof caches === 'undefined') { this.stop('no content cache'); return; }
     const indexes = import.meta.env.DEV ? null : builtIndexHashes();
-    const index = await readPrefetchIndex({url:url.href,indexHashes:indexes===null?null:[...indexes],phone:this.tier==='phone'});
+    // S12f2b4: a phone reads the cook's own file for a cooked splat layer, so its blob is not prefetched either
+    const splatLayers = this.tier === 'phone' ? await readPhoneSplatLayers(manifest?.discovery, this.title ? this.transfer.signal : undefined) : undefined;
+    const index = await readPrefetchIndex({url:url.href,indexHashes:indexes===null?null:[...indexes],phone:this.tier==='phone',...(splatLayers===undefined?{}:{splatLayers})});
     if(index===null){this.stop('a newer deployment');return;}
     const listed: Row[] = [...index.sections, ...index.schemas, ...index.files.map(file => ({ path: file.path, hash: file.hash, bytes: file.compressed }))];
     const urls = new Map(listed.map(row => [row.hash, new URL(row.path, base).href]));
@@ -319,7 +322,9 @@ export async function remainingDownloadBytes(owner?: Scope): Promise<number | nu
     if (descriptor === undefined) continue;
     const url = new URL(descriptor, location.href), indexHash = import.meta.env.DEV ? null : builtIndexHash(url.pathname);
     if (indexHash !== null) url.searchParams.set('v', indexHash.slice(0, 8));
-    const index = await readPrefetchIndex({ url: url.href, indexHashes: indexes === null ? null : [...indexes], phone: tier === 'phone' }, owner);
+    const splatLayers = tier === 'phone' ? await readPhoneSplatLayers(manifest?.discovery) : undefined;
+    live();
+    const index = await readPrefetchIndex({ url: url.href, indexHashes: indexes === null ? null : [...indexes], phone: tier === 'phone', ...(splatLayers === undefined ? {} : { splatLayers }) }, owner);
     live();
     if (index === null) return null;
     for (const row of [...index.sections, ...index.schemas, ...index.files.map(file => ({ path: file.path, hash: file.hash, bytes: file.compressed }))]) {

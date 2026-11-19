@@ -729,6 +729,7 @@
     "src/client/game/grid/prefetch.ts": "client",
     "src/client/game/grid/prefetchIndex.ts": "client",
     "src/client/game/grid/prefetchIndexCore.ts": "client",
+    "src/client/game/grid/prefetchSplatLayers.ts": "client",
     "src/client/game/grid/prelinkViews.ts": "client",
     "src/client/game/grid/preparationAdmission.ts": "client",
     "src/client/game/grid/folderInputs.ts": "client",

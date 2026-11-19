@@ -5,7 +5,10 @@ import {contentHash} from '../../../shared/game/shardfile/contentHash';
 import {yieldTask} from '@wildshard/engine/core/workSlice';
 import {readCheckedOutputIndex} from '../../../shared/game/shardfile/outputIndexChecks';
 
-export interface PrefetchIndexRequest {readonly url:string;readonly indexHashes:readonly string[]|null;readonly phone:boolean}
+export interface PrefetchIndexRequest {readonly url:string;readonly indexHashes:readonly string[]|null;readonly phone:boolean;
+  /** S12f2b4: the product's cooked splat layers (blob hash to the cook's 6x6 file, `phoneSplatLayers`): a phone reads those
+   *  files by URL, so their blobs leave the phone's selection here too */
+  readonly splatLayers?:Readonly<Record<string,string>>}
 /** Strict Node author controls may inject their byte fixture; browsers do not. */
 export interface PrefetchIndexAuthorCache {get:(hash:string)=>Promise<Uint8Array|null>;put:(hash:string,bytes:Uint8Array,keep:boolean)=>Promise<boolean>}
 
@@ -36,6 +39,8 @@ export async function preparePrefetchIndex(request:PrefetchIndexRequest, authorC
     pack:(path,maximum)=>read(new URL(path,base).href,maximum),
     ...(authorCache === undefined ? {} : { cached: (hash: string) => authorCache.get(hash), store: (hash: string, body: Uint8Array) => authorCache.put(hash, body, true) })});
   if(!isBuildValidatedOutput(source))return index;
-  const kept=new Set((await tierFolderFilesPaced(source,'phone',yieldTask)).map(file=>file.hash));
+  const layers=request.splatLayers;
+  const layer=layers===undefined?undefined:(hash:string):string|undefined=>Object.hasOwn(layers,hash)?layers[hash]:undefined;
+  const kept=new Set((await tierFolderFilesPaced(source,'phone',yieldTask,undefined,layer)).map(file=>file.hash));
   return {...index,files:index.files.filter(file=>kept.has(file.hash))};
 }
