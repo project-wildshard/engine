@@ -21,8 +21,8 @@ export interface FigureRig {
 /** Immutable sources are shared; every resident figure gets its own skeleton. */
 export class FigureSkins {
   /** Shared prepared-skin validation for individual and merged row-owned figures. */
-  static async prepared(url: string): Promise<THREE.SkinnedMesh> {
-    const gltf = await loadRigFile(url), meshes: THREE.SkinnedMesh[] = [];
+  static async prepared(url: string, read: typeof loadRigFile = loadRigFile): Promise<THREE.SkinnedMesh> {
+    const gltf = await read(url), meshes: THREE.SkinnedMesh[] = [];
     rigRoot(gltf).traverse(node => { if (isSkin(node)) meshes.push(node); });
     const mesh = meshes[0];
     if (mesh === undefined || meshes.length !== 1 || !mesh.geometry.hasAttribute('skinIndex')
@@ -102,10 +102,11 @@ export class FigureSkins {
 export function folderSkinUrl(product: { readonly hasFile: (name: string) => boolean; readonly url: (name: string) => string }): (url: string) => string {
   return url => product.hasFile(url) ? product.url(url) : url;
 }
-export async function atlasFigureSkin(input: unknown, sky: SkyRig, owner: Scope, skinUrl: (url: string) => string = url => url): Promise<THREE.SkinnedMesh> {
+export async function atlasFigureSkin(input: unknown, sky: SkyRig, owner: Scope, skinUrl: (url: string) => string = url => url,
+  read: typeof loadRigFile = loadRigFile): Promise<THREE.SkinnedMesh> {
   const row = v.parse(FigureAtlasSchema, input);
   if (row.sources.length > row.columns * row.rows || new Set(row.joints).size !== row.joints.length) throw new Error('Invalid figure atlas layout');
-  const [mesh, sources] = await Promise.all([FigureSkins.prepared(skinUrl(row.url)), Promise.all(row.sources.map(url => loadRigFile(url)))]);
+  const [mesh, sources] = await Promise.all([FigureSkins.prepared(skinUrl(row.url), read), Promise.all(row.sources.map(url => read(url)))]);
   owner.own(mesh.geometry); owner.own(mesh.skeleton);
   for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material.dispose();
   if (owner.disposed) throw new Error('Figure left during skin admission');
@@ -120,7 +121,14 @@ export async function atlasFigureSkin(input: unknown, sky: SkyRig, owner: Scope,
     if (!(object instanceof THREE.Mesh)) throw new Error('Missing figure atlas source');
     const material: unknown = Array.isArray(object.material) ? object.material[0] : object.material;
     if (!(material instanceof THREE.MeshStandardMaterial) || material.map === null) throw new Error('Missing figure atlas image');
-    context.drawImage(material.map.image as CanvasImageSource, i % row.columns * row.cell, Math.floor(i / row.columns) * row.cell, row.cell, row.cell);
+    const image = material.map.image as CanvasImageSource;
+    try {
+      context.drawImage(image, i % row.columns * row.cell, Math.floor(i / row.columns) * row.cell, row.cell, row.cell);
+    } finally {
+      // The uncached GLTF owns this bitmap. The canvas has its own copy
+      // after drawImage, so it no longer needs the source pixels.
+      if (!THREE.Cache.enabled && typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) image.close();
+    }
   });
   const map = owner.own(new THREE.CanvasTexture(canvas)); map.flipY = false; map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
   // MG11 (J410): nothing redraws the packed atlas, so its canvas goes once the texture is on the GPU (Nalati's camp: 1.6 MB)
