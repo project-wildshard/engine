@@ -11,28 +11,34 @@
 // Its files live in ./tmp/dev-world/ (key, saves, client builds, server log); delete the folder, with dev stopped, for a
 // fresh world.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readdirSync, rmSync, watch } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { DEV_PORT, openDevWorld } from './dev-world.mjs';
+import { readStaging } from './pins-staging.ts';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const { values } = parseArgs({ options: {
   shard: { type: 'string', default: 'brasscap-mesa' }, port: { type: 'string', default: String(DEV_PORT) }, dist: { type: 'string' },
   saves: { type: 'string', default: 'disk' }, 'no-watch': { type: 'boolean', default: false }, work: { type: 'string', default: 'tmp/dev-world' },
+  staging: { type: 'boolean', default: false },
   'public-origin': { type: 'string' }, 'public-socket': { type: 'string' }, 'socket-port': { type: 'string', default: '0' },
 } });
 if (values.saves !== 'disk' && values.saves !== 'memory') throw new Error('--saves is disk or memory');
 const work = resolve(ROOT, values.work), port = Number(values.port);
 mkdirSync(work, { recursive: true });
 // Ring 1 holds Brasscap (J434); any other shard installs every pin.
-const ring = values.shard === 'brasscap-mesa';
-const catalogue = ring ? resolve(ROOT, 'out/.ring-catalogue.json') : resolve(ROOT, 'test/pins/catalogue.json');
+if (values.staging && process.env.WS_RELEASE === '1') throw new Error('The staging dev world is a local build');
+const staging = values.staging ? readStaging() : undefined;
+if (staging !== undefined && !staging.shards.some(({ slug }) => slug === values.shard)) throw new Error(`${values.shard} is absent from the staging snapshot`);
+const ring = staging === undefined && values.shard === 'brasscap-mesa';
+const catalogue = staging !== undefined ? join(work, 'catalogue.json') : resolve(ROOT, ring ? 'out/.ring-catalogue.json' : 'test/pins/catalogue.json');
+if (staging !== undefined) writeFileSync(catalogue, JSON.stringify(staging.catalogue));
 
 /** @param {string} command @param {string[]} args */
 const step = (command, args) => {
-  const done = spawnSync(command, args, { cwd: ROOT, stdio: ['ignore', 'inherit', 'inherit'], env: { ...process.env, WILDSHARD_CATALOGUE: catalogue } });
+  const done = spawnSync(command, args, { cwd: ROOT, stdio: ['ignore', 'inherit', 'inherit'], env: { ...process.env, WILDSHARD_CATALOGUE: catalogue, ...(staging === undefined ? {} : { WS_DEV_STAGING: '1' }) } });
   if (done.status !== 0) throw new Error(`pnpm dev: ${[command, ...args].join(' ')} stopped (${String(done.status)})`);
 };
 let generation = 0;
@@ -49,14 +55,14 @@ const buildClient = () => {
 // an edit there makes them stale, and installing the pins again checks them anew.
 let validated = '';
 const pins = () => {
-  step(process.execPath, ['scripts/pins.ts', 'install', ...ring ? ['--ring', '1'] : []]);
+  step(process.execPath, ['scripts/pins.ts', 'install', ...ring ? ['--ring', '1'] : staging === undefined ? [] : ['--staging']]);
   step(process.execPath, ['scripts/gen.mjs', '--inputs-only']);
   validated = shardfileValidationRevision(ROOT);
 };
 let dist = values.dist;
 if (dist === undefined) { pins(); dist = buildClient(); }
 const world = await openDevWorld({ dist: resolve(ROOT, dist), work, shard: values.shard, port, saves: values.saves,
-  publicOrigin: values['public-origin'], publicSocket: values['public-socket'], socketPort: Number(values['socket-port']) });
+  ...(staging === undefined ? {} : { staging: staging.shards }), publicOrigin: values['public-origin'], publicSocket: values['public-socket'], socketPort: Number(values['socket-port']) });
 console.log(`engine dev on ${world.url} (${values.shard}, saves ${values.saves === 'disk' ? join(values.work, 'saves') : 'in memory'}, server log ${join(values.work, 'server.log')})`);
 
 let closing = false;

@@ -39,10 +39,16 @@ export async function refreshStaging(api: string): Promise<void> {
   console.log(`Pinned ${snapshot.shards.length} staging heads; release-hash verification waits on api-server AP-26`);
 }
 
-/** Materialize only in an explicitly selected test checkout; installers and both rings keep one input path. */
-export function selectStaging(): void {
+/** Read the reviewed staging heads without changing the normal checkout pins. */
+export function readStaging(): StagingPins {
   const snapshot = JSON.parse(readFileSync(file, 'utf8')) as StagingPins;
   checkStaging(snapshot);
+  return snapshot;
+}
+
+/** Materialize only in an explicitly selected test checkout; installers and both rings keep one input path. */
+export function selectStaging(): void {
+  const snapshot = readStaging();
   writeFileSync('test/pins/shardfiles.json', json({api: snapshot.api, shards: snapshot.shards}));
   writeFileSync('test/pins/catalogue.json', json(snapshot.catalogue));
   console.log(`Selected staging catalogue ${snapshot.catalogueHash}; release hash is unverified (AP-26)`);

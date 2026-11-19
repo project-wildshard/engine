@@ -132,12 +132,12 @@ test('baked source identity ignores property order but distinguishes changed val
 });
 
 /** Bake a grid's blocks into a scratch root; read them back as the page does. */
-async function baked(set = 64 * 1024 * 1024) {
+async function baked(set = 64 * 1024 * 1024, report?: (message: string) => void) {
   const g = grid(), source = await platformGeometrySource(g.cells, g.empty), root = mkdtempSync(resolve('tmp/grid-strip-blocks-'));
   mkdirSync(join(root, 'out/.app'), { recursive: true });
   try {
     const result = writeGridStripBlocks(root, 'a'.repeat(64), [{ source, pitch: CONTENT_CAPS.pitch, strips: g.strips,
-      homes: g.cells.map(cell => ({ instance: cell.instance, slug: 'fixture', origin: cell.origin })) }], 1.5 * CONTENT_CAPS.pitch + 1, set);
+      homes: g.cells.map(cell => ({ instance: cell.instance, slug: 'fixture', origin: cell.origin })) }], 1.5 * CONTENT_CAPS.pitch + 1, set, report);
     const files = new Map<string, Uint8Array>();
     for (const file of result.files) files.set(file.url, readFileSync(join(root, 'out/.app/grid-strip-pages', basename(file.url))));
     return { g, source, result, files, root };
@@ -322,4 +322,14 @@ test('the strip set budget is the committed room per distinct home, so staging\'
   // a home every grid mode shares counts once
   expect(gridStripSetBudget(room, [...homes(25, 'pinned'), ...homes(25, 'pinned')])).toBe(gridStripSetBudget(room, homes(25, 'pinned')));
   expect(() => gridStripSetBudget({ set: 3_700_000 }, homes(1, 'a'))).toThrow('budgets/grid-strip-room.json');
+});
+
+
+test('only an explicit local report handler keeps the exact over-budget strip blocks', async () => {
+  await expect(baked(1)).rejects.toThrow('over the 1 in budgets/grid-strip-room.json');
+  const messages: string[] = [], b = await baked(1, message => { messages.push(message); });
+  try {
+    expect(messages).toEqual([expect.stringContaining('over the 1 in budgets/grid-strip-room.json')]);
+    expect(b.result.geometry?.homes).toHaveLength(25);
+  } finally { rmSync(b.root, { recursive: true, force: true }); }
 });

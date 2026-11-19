@@ -10,7 +10,7 @@
 // open page redials and stays in play. `move(dist)` is a client rebuild: the page port serves the new build, the release
 // names it, the world restarts on it, and the open page (its injected poll sees the new revision) opens it again.
 import { spawn, spawnSync } from 'node:child_process';
-import { generateKeyPairSync, sign } from 'node:crypto';
+import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { join, resolve as absolute } from 'node:path';
@@ -67,11 +67,11 @@ const stopChild = (child, graceMs = 15_000) => new Promise(resolve => {
  * `product` is the shard's built product folder (STR5: `wildshard dev` names the author's build); by default the one this
  * checkout's pins installed (`built-folder.mjs` `readBuiltShardfile`).
  * `publicOrigin` and `publicSocket` name the page and the world's socket as another device reaches them through an HTTPS
- * proxy in front of the loopback ports (`serve-local.mjs`: `tailscale serve`, tailnet only); `socketPort` fixes the world
- * socket's loopback port for that proxy. Unset, everything is the loopback address.
+ * proxy in front of the loopback ports (`serve-local.mjs`); `socketPort` fixes the world
+ * socket's loopback port for that proxy. Staging mode serves the full snapshot and builds the server without dev controls.
  * @param {{ dist: string, work: string, shard?: string, product?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string,
- *   publicOrigin?: string, publicSocket?: string, socketPort?: number, log?: (line: string) => void }} options */
-export async function openDevWorld({ dist, work: requestedWork, shard = 'brasscap-mesa', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, publicOrigin, publicSocket, socketPort = 0, log = line => { console.log(line); } }) {
+ *   publicOrigin?: string, publicSocket?: string, socketPort?: number, staging?: readonly { slug: string, revision: number }[], log?: (line: string) => void }} options */
+export async function openDevWorld({ dist, work: requestedWork, shard = 'brasscap-mesa', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, publicOrigin, publicSocket, socketPort = 0, staging, log = line => { console.log(line); } }) {
   if (!/^[a-z0-9_-]+$/u.test(shard)) throw new Error('A dev world shard must be a slug');
   const work = absolute(requestedWork); mkdirSync(work, { recursive: true });
   const key = devKey(work);
@@ -97,16 +97,22 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     let pageOrigin = '', stamp = { release: '', key: key.public };
     let serial = 0, signed = '', revision = 0, build = '', served = 0;
     const origin = join(work, 'origin'), server = join(work, 'server');
-    const book = product === undefined ? run(['--input-type=module', '-e', `console.log((await import('./scripts/built-folder.mjs')).readBuiltShardfile(process.cwd(), '${shard}'))`], 'the product read').trim() : absolute(product);
-    /** The server book and bundle for a client build. @param {string} id */
-    const serverFor = id => {
-      run(['scripts/server-origin.mjs', origin, id, `--grid=${absolute(gridRoot)}`, `${shard}=${book}`], 'the server book');
-      run(['scripts/build-server.mjs', '--build', id, '--out', server, '--dev'], 'the server build');
+    const shards = staging?.map(({ slug, revision }) => ({ slug, revision })) ?? [{ slug: shard, revision: 1 }];
+    const cells = staging === undefined ? shard : [shard, ...shards.map(row => row.slug).filter(slug => slug !== shard)].join(',');
+    const secret = staging === undefined ? 'dev-world' : randomBytes(32).toString('hex');
+    const books = product === undefined ? JSON.parse(run(['--input-type=module', '-e',
+      "const {readBuiltShardfile} = await import('./scripts/built-folder.mjs'); console.log(JSON.stringify(process.argv.slice(1).map(slug => slug + '=' + readBuiltShardfile(process.cwd(), slug))));",
+      '--', ...shards.map(row => row.slug)], 'the product read').trim()) : [`${shard}=${absolute(product)}`];
+    /** The server book and bundle for a client build. @param {string} id @param {string} built */
+    const serverFor = (id, built) => {
+      run(['scripts/server-origin.mjs', origin, id, `--grid=${absolute(gridRoot)}`, ...books], 'the server book');
+      run(['scripts/build-server.mjs', '--build', id, '--out', server,
+        ...staging === undefined ? ['--dev'] : ['--catalogue', join(built, 'catalogue.json')]], 'the server build');
     };
     /** @param {string} id */
     const publish = id => {
       serial++;
-      const body = JSON.stringify({ channel: 'staging', serial, engineBuild: id, saveEpoch: JSON.parse(readFileSync(join(ROOT, 'save-epoch.json'), 'utf8')).saveEpoch, shards: [{ slug: shard, revision: 1 }], socket });
+      const body = JSON.stringify({ channel: 'staging', serial, engineBuild: id, saveEpoch: JSON.parse(readFileSync(join(ROOT, 'save-epoch.json'), 'utf8')).saveEpoch, shards, socket });
       signed = JSON.stringify({ body, signature: sign(null, Buffer.from(body), key.private).toString('hex') });
     };
     /** @type {import('node:child_process').ChildProcess | undefined} */
@@ -114,7 +120,7 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     const startWorld = async () => {
       const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
         env: { ...process.env, RELEASE_URL: `${pageOrigin}${DEV_RELEASE}`, RELEASE_PUBLIC_KEY: key.public, RELEASE_CHANNEL: 'staging', PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'),
-          DATABASE_URL: database, SEAT_SECRET: 'dev-world', HOST: '127.0.0.1', PORT: '0', ALLOWED_ORIGINS: [pageOrigin, pageOrigin.replace('127.0.0.1', 'localhost'), ...publicOrigin === undefined ? [] : [publicOrigin]].join(','), WILDSHARD_BUILD: build, WORLD_CELLS: shard,
+          DATABASE_URL: database, SEAT_SECRET: secret, HOST: '127.0.0.1', PORT: '0', ALLOWED_ORIGINS: [pageOrigin, pageOrigin.replace('127.0.0.1', 'localhost'), ...publicOrigin === undefined ? [] : [publicOrigin]].join(','), WILDSHARD_BUILD: build, WORLD_CELLS: cells,
           WORLD_WORKERS: '1', RELEASE_POLL_MS: '1000', GRACE_MS: '1000' } });
       room.stdout?.pipe(serverLog, { end: false }); room.stderr?.pipe(serverLog, { end: false });
       room.once('exit', code => { worldFront.clear(); if (world === room) log(`dev world: the server stopped (${String(code)}); see ${join(work, 'server.log')}`); });
@@ -166,14 +172,15 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     resources.push(async () => { front.closeAllConnections(); await new Promise(resolve => { front.close(() => { resolve(undefined); }); }); });
 
     /** Serve a client build: its pages, its server book and bundle, the release naming it, and a world on it. @param {string} built */
+    let activeDist = dist;
     const open = async built => {
       const id = buildOf(built);
       await servePages(built);
-      serverFor(id);
+      serverFor(id, built);
       await stopWorld();
       build = id; publish(id);
       await startWorld();
-      revision++;
+      activeDist = built; revision++;
     };
     await open(dist);
     const url = `${publicOrigin ?? pageOrigin}/`;
@@ -183,7 +190,7 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
        *  while the old world still runs (as `move` does), so the world is down only for its drain and start: rebuilding it
        *  down took 7 s of a hosted T1 J run's 10 s redial window (TR-4b), and a bundle that fails to build leaves it up.
        *  Resolves to the time (`Date.now()`) the old world was told to stop. */
-      restart: async () => { serverFor(build); const down = Date.now(); await stopWorld(); await startWorld(); return down; },
+      restart: async () => { serverFor(build, activeDist); const down = Date.now(); await stopWorld(); await startWorld(); return down; },
       /** A new client build: pages, release and world move to it; open pages open it again. @param {string} built */
       move: open,
       close };

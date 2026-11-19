@@ -2,7 +2,7 @@
 // tailnet check. The device half is proved on the iPhone 13 (meta iphone13/device-2026-11-19.md).
 import { expect, test } from 'vitest';
 import { asyncExpression, pickPage, syncExpression } from '../scripts/memory/iphone/inspector.mjs';
-import { tailnetName } from '../scripts/memory/iphone/serve-local.mjs';
+import { quickTunnelOrigin, tailnetName } from '../scripts/memory/iphone/serve-local.mjs';
 
 test('a WebDriver body runs with its arguments and returns elements as handles', () => {
   const window = globalThis as unknown as { __wsInspectorElements?: unknown[] };
@@ -38,4 +38,11 @@ test('serve-local needs a tailnet name with an HTTPS certificate', () => {
   expect(tailnetName(JSON.stringify({ Self: { DNSName: `${name}.` }, CertDomains: [name] }))).toBe(name);
   expect(() => tailnetName(JSON.stringify({ Self: { DNSName: `${name}.` }, CertDomains: null }))).toThrow('no HTTPS certificate');
   expect(() => tailnetName(JSON.stringify({ Self: { DNSName: '' } }))).toThrow('no tailnet name');
+});
+
+
+test('serve-local accepts the announced HTTPS quick tunnel origin', () => {
+  expect(quickTunnelOrigin('INF | https://mini-playtest-example.trycloudflare.com |')).toBe('https://mini-playtest-example.trycloudflare.com');
+  expect(quickTunnelOrigin('INF https://mini-playtest-example.trycloudflare.com.invalid')).toBeUndefined();
+  expect(quickTunnelOrigin('INF http://mini-playtest-example.trycloudflare.com')).toBeUndefined();
 });

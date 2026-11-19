@@ -235,11 +235,11 @@ function pinHashes(root){
  * revision's, so the boot stamps gen:inputs writes from public/ would carry the old files (Far Reach rev 1's 21 rows,
  * re-added by lands from such worktrees, 2026-11-14). A tree with no `out/` or no pins file has none, and a format-dependency
  * product (installed from the frozen format package, named by no pin) is never stale.
- * @param {string} root @returns {{folder:string,revision:unknown}[]}
+ * @param {string} root @param {readonly string[]} [hashes] @returns {{folder:string,revision:unknown}[]}
  */
-export function stalePinFolders(root){
+export function stalePinFolders(root,hashes){
  let want;
- try{want=new Set(pinHashes(root));}catch{return [];}
+ try{want=new Set(hashes??pinHashes(root));}catch{return [];}
  let folders;
  try{folders=readdirSync(join(root,'out'),{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);}catch{return [];}
  /** @type {{folder:string,revision:unknown}[]} */const stale=[];
@@ -262,9 +262,9 @@ export function stalePinFolders(root){
 /** A full `pnpm pins` removes every out/ product `stalePinFolders` names, so land's gen:inputs never refuses a tree the pins
  * just installed (opus-bugfix2, 2026-11-16: the Brasscap rename left a worktree's out/<old slug> behind until a hand
  * rm -rf). Only folders under out/ with a pin receipt; anything else in out/ stays. Their public/ mounts went with the ledger.
- * @param {string} root @returns {{folder:string,revision:unknown}[]} the products removed */
-export function pruneStalePinProducts(root){
- const stale=stalePinFolders(root).filter(row=>folderName(row.folder));
+ * @param {string} root @param {readonly string[]} [hashes] @returns {{folder:string,revision:unknown}[]} the products removed */
+export function pruneStalePinProducts(root,hashes){
+ const stale=stalePinFolders(root,hashes).filter(row=>folderName(row.folder));
  for(const {folder} of stale){
   insideTree(root,join('out',folder));
   rmSync(join(root,'out',folder),{recursive:true,force:true});

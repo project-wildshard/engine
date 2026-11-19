@@ -191,7 +191,7 @@ export function gridStripSetBudget(room: unknown, sources: readonly GridStripSou
  * them under out/.app/grid-strip-pages. `reach` is the session's ring (a strip whose origin is within it of the home is
  * initial, the rest outer); `set` is the whole block set's wire ratchet (budgets/grid-strip-room.json).
  */
-export function writeGridStripBlocks(root: string, seams: string, sources: readonly GridStripSource[], reach: number, set: number): CompiledGridBuild {
+export function writeGridStripBlocks(root: string, seams: string, sources: readonly GridStripSource[], reach: number, set: number, report?: (message: string) => void): CompiledGridBuild {
   if (new Set(sources.map(row => row.source)).size !== sources.length) throw new Error('Grid strip source is not deterministic');
   const blocks: CompiledGridBlockFile[] = [], blockIndex = new Map<string, number>(), decodedBlocks: DecodedGridBlock[] = [];
   const homes: CompiledGridDirectory['homes'][number][] = [], owners: { readonly source: string; readonly home: string; readonly slug: string }[] = [];
@@ -254,7 +254,11 @@ export function writeGridStripBlocks(root: string, seams: string, sources: reado
   }
   const wire = new Map([...files.values()].map(file => [file.address.sha256, servedBytes(file.bytes)]));
   const total = [...wire.values()].reduce((sum, bytes) => sum + bytes, 0);
-  if (total > set) throw new Error(`Grid strip blocks are ${String(total)} wire bytes, over the ${String(set)} in budgets/grid-strip-room.json`);
+  if (total > set) {
+    const message = `Grid strip blocks are ${String(total)} wire bytes, over the ${String(set)} in budgets/grid-strip-room.json`;
+    if (report === undefined) throw new Error(message);
+    report(message);
+  }
   const folder = join(root, 'out/.app/grid-strip-pages'); rmSync(folder, { recursive: true, force: true }); mkdirSync(folder, { recursive: true });
   for (const file of files.values()) writeFileSync(join(folder, basename(file.address.url)), file.bytes);
   const blockWire = (index: number): number => { const block = blocks[index]; return block === undefined ? 0 : (wire.get(block.header.address.sha256) ?? 0) + (wire.get(block.body.address.sha256) ?? 0); };

@@ -92,7 +92,9 @@ const ordered = rows => [...rows].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
 const output = JSON.stringify({ plans: ordered(plans), edges: ordered(sources) });
 if (!collisionOnly) {
   const set = gridStripSetBudget(JSON.parse(readFileSync(resolve(root, 'budgets/grid-strip-room.json'), 'utf8')), compiled);
-  const pages = writeGridStripBlocks(outputRoot, createHash('sha256').update(output).digest('hex'), compiled, reach, set);
+  // The locally shared staging snapshot can have more cells than the shipping pin. Keep the release limit and report it here.
+  const report = process.env.WS_DEV_STAGING === '1' && process.env.WS_RELEASE !== '1' ? console.warn : undefined;
+  const pages = writeGridStripBlocks(outputRoot, createHash('sha256').update(output).digest('hex'), compiled, reach, set, report);
   // Addressing only: all original strip bytes and hashes stay in writeGridStripBlocks.
   // The title can request a home's exact initial blocks.
   writeFileSync(resolve(outputRoot, 'out/.app/grid-strip-entry-modes.json'), JSON.stringify(Object.fromEntries(entryModes)));

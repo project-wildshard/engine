@@ -10,6 +10,7 @@ import { copyRapierWasm } from '../../vite/rapier';
 import { copyBasisTranscoder } from './basis';
 import { publicBytesTableSource, assetVersionsTableSource } from '../boot-publication.mjs';
 import { stalePinFolders } from '../pins-reuse.mjs';
+import { readStaging } from '../pins-staging.ts';
 
 // /asset-index.json: every file under public/assets with its byte size, so the loading
 // screen can show real "x / y MB" totals for the files it has requested so far.
@@ -34,7 +35,8 @@ function bytesModule(): string {
   // stamping them would put that revision's files back in the table, as lands from such worktrees did (Far Reach rev 1).
   // Only land, which commits what this writes, refuses (`WS_STALE_PINS=refuse`, scripts/land.mjs); elsewhere it warns, since
   // CI's ring-1 job installs its own pin list into out/ on purpose (main red 43568190100).
-  const stale = stalePinFolders('.');
+  const stagingHashes = process.env['WS_DEV_STAGING'] === '1' ? readStaging().shards.map(row => row.hash) : undefined;
+  const stale = stalePinFolders('.', stagingHashes);
   if (stale.length > 0) {
     const why = `out/ holds pinned products the pins no longer name (${stale.map(row => `${row.folder} revision ${String(row.revision)}`).join(', ')}): their public/ mounts would go into the boot stamps. Run \`pnpm pins\` in this tree, then gen:inputs again`;
     if (process.env['WS_STALE_PINS'] === 'refuse') throw new Error(why);

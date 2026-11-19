@@ -5,13 +5,20 @@
 // (the Tailscale app open) gets a secure context, so the service worker, storage and crypto behave as on staging; plain
 // http on a LAN address does not. Tailnet only: this never runs `tailscale funnel`.
 //
-//   node scripts/memory/iphone/serve-local.mjs [--shard nine-dragon-stack] [--port 4402] [--socket-port 4412] [--dry-run]
+// --public instead opens two owned Cloudflare quick tunnels and serves the reviewed staging snapshot with in-memory saves.
+//   node scripts/memory/iphone/serve-local.mjs [--public] [--shard nine-dragon-stack] [--port N] [--socket-port N] [--dry-run]
 //
 // It prints the URL once the world is up. dev.mjs watches src/: an edit rebuilds the client and the open page opens the new
 // build by itself. Ctrl-C stops the world and removes both serve entries.
 import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
+import { createInterface } from 'node:readline';
+import { setTimeout as delay } from 'node:timers/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { listenLoopback } from '../../rig-listeners.mjs';
+
+const ROOT = resolve(import.meta.dirname, '../../..');
 
 /** The tailnet name and whether the tailnet issues HTTPS certificates. @param {string} json */
 export function tailnetName(json) {
@@ -22,15 +29,135 @@ export function tailnetName(json) {
   return name;
 }
 
+/** A quick tunnel advertises a single HTTPS origin on its generated domain. @param {string} line */
+export function quickTunnelOrigin(line) {
+  return /(?:^|\s)(https:\/\/[a-z0-9-]+\.trycloudflare\.com)(?=\s|$)/u.exec(line)?.[1];
+}
+
+/** @param {number} port */
+const tunnelArgs = port => ['tunnel', '--no-autoupdate', '--protocol', 'http2', '--url', `http://127.0.0.1:${String(port)}`];
+
+/** Wait until the signed release and game door are serving through the two public hosts.
+ * @param {string} origin @param {string} socketOrigin @param {AbortSignal} signal */
+async function waitForPublicWorld(origin, socketOrigin, signal) {
+  const deadline = AbortSignal.any([signal, AbortSignal.timeout(45_000)]);
+  for (;;) {
+    deadline.throwIfAborted();
+    try {
+      const release = await fetch(`${origin}/__dev/release.json`, { signal: deadline, cache: 'no-store' });
+      const health = await fetch(`${socketOrigin}/health`, { signal: deadline, cache: 'no-store' });
+      if (release.ok && health.ok) {
+        const { body } = await release.json();
+        if (body !== '' && JSON.parse(body).engineBuild === (await health.json()).build) return;
+      }
+    } catch { /* The public routes may still be propagating. */ }
+    await delay(500, undefined, { signal: deadline });
+  }
+}
+
+/** @param {string} shard @param {number} port @param {number} socketPort @param {boolean} dryRun */
+async function servePublic(shard, port, socketPort, dryRun) {
+  const work = `tmp/dev-world-public-${String(port)}`;
+  const flags = ['scripts/dev.mjs', '--staging', '--saves', 'memory', '--work', work,
+    '--shard', shard, '--port', String(port), '--socket-port', String(socketPort)];
+  if (dryRun) {
+    console.log(JSON.stringify({ tunnels: [port, socketPort].map(n => ['cloudflared', ...tunnelArgs(n)]),
+      dev: ['node', ...flags, '--public-origin', '<page HTTPS>', '--public-socket', '<socket WSS>'] }, null, 2));
+    return;
+  }
+
+  const started = performance.now(), stop = new AbortController();
+  /** @type {Set<import('node:child_process').ChildProcess>} */
+  const children = new Set();
+  const interrupt = () => { stop.abort(); };
+  process.once('SIGINT', interrupt);
+  process.once('SIGTERM', interrupt);
+  /** @param {string} bin @param {string[]} args */
+  const start = (bin, args) => {
+    stop.signal.throwIfAborted();
+    const child = spawn(bin, args, { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    children.add(child);
+    const ended = new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.once('exit', (code, signal) => {
+        if (stop.signal.aborted) resolve(undefined);
+        else reject(new Error(`${bin} exited (${String(code ?? signal)})`));
+      });
+    });
+    // An exit at any time, even after readiness, ends the whole share.
+    void ended.catch(error => { stop.abort(error); });
+    return { child, ended };
+  };
+  /** @param {number} target */
+  const tunnel = async target => {
+    const { child, ended } = start('cloudflared', tunnelArgs(target));
+    child.stdout?.resume();
+    if (child.stderr === null) throw new Error('No cloudflared diagnostic stream');
+    const lines = createInterface({ input: child.stderr });
+    try {
+      const origin = await Promise.race([ended, new Promise((resolve, reject) => {
+        const timeout = AbortSignal.any([stop.signal, AbortSignal.timeout(30_000)]);
+        timeout.addEventListener('abort', () => { reject(timeout.reason); }, { once: true });
+        lines.on('line', line => {
+          const found = quickTunnelOrigin(line);
+          if (found !== undefined) resolve(found);
+          else if (/\bERR\b/u.test(line)) console.error(line);
+        });
+      })]);
+      if (typeof origin !== 'string') throw new Error('cloudflared did not announce its HTTPS origin');
+      return origin;
+    } finally { lines.close(); child.stderr.resume(); }
+  };
+  try {
+    // Never point a public tunnel at an existing local listener.
+    for (const target of [port, socketPort]) {
+      const check = createServer();
+      await listenLoopback(check, target);
+      await new Promise(resolve => { check.close(() => { resolve(undefined); }); });
+    }
+    const [origin, socketOrigin] = await Promise.all([tunnel(port), tunnel(socketPort)]);
+    const socket = socketOrigin.replace(/^https:/u, 'wss:') + '/';
+    const { child, ended } = start(process.execPath, [...flags, '--public-origin', origin, '--public-socket', socket]);
+    child.stderr?.pipe(process.stderr, { end: false });
+    if (child.stdout === null) throw new Error('No dev world diagnostic stream');
+    const lines = createInterface({ input: child.stdout });
+    await new Promise((resolve, reject) => {
+      stop.signal.addEventListener('abort', () => { reject(stop.signal.reason); }, { once: true });
+      lines.on('line', line => {
+        if (line.startsWith('engine dev on ')) resolve(undefined);
+        else console.log(line);
+      });
+    });
+    await waitForPublicWorld(origin, socketOrigin, stop.signal);
+    const url = new URL(`/slug/${shard}`, origin);
+    console.log(`serve-local: ${url.href} (public, up in ${((performance.now() - started) / 1000).toFixed(1)} s)`);
+    await Promise.race([ended, new Promise(resolve => { stop.signal.addEventListener('abort', () => { resolve(undefined); }, { once: true }); })]);
+    if (stop.signal.aborted && !(stop.signal.reason instanceof DOMException)) throw stop.signal.reason;
+  } catch (error) {
+    if (!stop.signal.aborted || !(stop.signal.reason instanceof DOMException)) throw error;
+  } finally {
+    stop.abort();
+    process.off('SIGINT', interrupt);
+    process.off('SIGTERM', interrupt);
+    for (const child of children) {
+      if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) continue;
+      // Each child owns a process group. A signal during a build also stops its subprocesses.
+      try { process.kill(-child.pid, 'SIGTERM'); } catch { /* Already exited. */ }
+    }
+  }
+}
+
 /** Build, serve and print the URL; ends when the dev world does. */
-function main() {
-  const ROOT = resolve(import.meta.dirname, '../../..');
+async function main() {
   const { values } = parseArgs({ options: {
-    shard: { type: 'string', default: 'nine-dragon-stack' }, port: { type: 'string', default: '4402' },
-    'socket-port': { type: 'string', default: '4412' }, 'dry-run': { type: 'boolean', default: false },
+    shard: { type: 'string', default: 'nine-dragon-stack' }, port: { type: 'string' },
+    'socket-port': { type: 'string' }, public: { type: 'boolean', default: false }, 'dry-run': { type: 'boolean', default: false },
   } });
-  const port = Number(values.port), socketPort = Number(values['socket-port']);
-  if (!Number.isInteger(port) || !Number.isInteger(socketPort) || port === socketPort) throw new Error('--port and --socket-port are two distinct ports');
+  if (!/^[a-z0-9_-]+$/u.test(values.shard)) throw new Error('--shard needs a slug');
+  const port = Number(values.port ?? (values.public ? 4442 : 4402));
+  const socketPort = Number(values['socket-port'] ?? (values.public ? 4452 : 4412));
+  if ([port, socketPort].some(n => !Number.isInteger(n) || n < 1 || n > 65535) || port === socketPort) throw new Error('--port and --socket-port are two distinct ports');
+  if (values.public) { await servePublic(values.shard, port, socketPort, values['dry-run']); return; }
 
   const status = spawnSync('tailscale', ['status', '--json'], { encoding: 'utf8' });
   if (status.status !== 0) throw new Error(`tailscale status failed: ${status.stderr}`);
@@ -64,4 +191,4 @@ function main() {
   child.once('exit', code => { unserve(); process.exit(code ?? 0); });
 }
 
-if (process.argv[1] === import.meta.filename) main();
+if (process.argv[1] === import.meta.filename) await main();
