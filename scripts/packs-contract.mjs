@@ -167,7 +167,13 @@ async function hostedProof(directory,result) {
     const part=writes.find(row=>partKey(row.key));assert.ok(part);
     const held=await wire(`${origin}/${part.key}`),raw=await source.get(part.key);assert.ok(raw);
     assert.ok(held.body.equals(Buffer.from(raw)),'workerd must serve exactly one Brotli layer');assert.equal(held.headers['content-encoding'],'br');assert.match(held.headers['cache-control']??'',/immutable/u);
-    for(const key of [index.header,indexWrite.key]){const reply=await wire(`${origin}/${key}`);assert.equal(reply.status,200);assert.equal(reply.headers['cache-control'],'public, max-age=300');}
+    assert.ok(index.loose);
+    const descriptor = await wire(`${origin}/${index.loose}${index.header}`);
+    assert.equal(descriptor.status, 200);
+    assert.match(descriptor.headers['cache-control'] ?? '', /immutable/u);
+    const indexed = await wire(`${origin}/${indexWrite.key}`);
+    assert.equal(indexed.status, 200);
+    assert.equal(indexed.headers['cache-control'], 'public, max-age=300');
     result.cf4={part:part.key,wireBytes:held.body.length,encoding:held.headers['content-encoding'],serializedWrites:serialized.length,reader:'frozen historical Worker in real workerd/R2',workerSha256:provenance.sha256};
   }finally{await runtime.dispose();}
   const part=writes.find(row=>partKey(row.key));assert.ok(part);

@@ -97,7 +97,7 @@ for(const [file,value] of [[${JSON.stringify(header)},JSON.stringify({revision})
  const path=join(out,'client',file);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,value);
 }
 mkdirSync(join(out,'server'),{recursive:true});writeFileSync(join(out,'server/shard.json'),JSON.stringify({revision}));
-console.log(JSON.stringify({slug:${JSON.stringify(slug)},hash:createHash('sha256').update(body).digest('hex'),proof:'unmeasured',cook:{manifests:[]},header:${JSON.stringify(header)},server:{files:1,bytes:1},seconds:0}));`;
+console.log(JSON.stringify({slug:${JSON.stringify(slug)},hash:createHash('sha256').update(body).digest('hex'),proof:'unmeasured',check:{pass:true},cook:{manifests:[]},header:${JSON.stringify(header)},server:{files:1,bytes:1},seconds:0}));`;
 
 function harness(root: string): {store: PackStore; worker: (build?: string, store?: PackStore) => ReturnType<typeof createCookWorker>;
   launches: () => number; downloads: () => number; counter: string} {
@@ -117,14 +117,16 @@ function harness(root: string): {store: PackStore; worker: (build?: string, stor
 
 await test('a persistent hit launches no child and two revisions retain their own shard.json', () => fixture(async root => {
   const h = harness(root), first = {slug, hash: digest(Buffer.from('one'))}, next = {slug, hash: digest(Buffer.from('two'))};
-  assert.equal((await h.worker().cook(first)).state, 'cooked');
+  const cookedFirst = await h.worker().cook(first);
+  assert.equal(cookedFirst.state, 'cooked', cookedFirst.detail);
   assert.equal(h.launches(), 1); assert.equal(h.downloads(), 1);
   const before = await h.store.list('');
   // A separate worker cannot pass through its own in-memory verdict.
   assert.equal((await h.worker().cook(first)).state, 'present');
   assert.equal(h.launches(), 1); assert.equal(h.downloads(), 1);
   assert.deepEqual(await h.store.list(''), before);
-  assert.equal((await h.worker().cook(next)).state, 'cooked');
+  const cookedNext = await h.worker().cook(next);
+  assert.equal(cookedNext.state, 'cooked', cookedNext.detail);
   assert.equal(h.launches(), 2); assert.equal(h.downloads(), 2);
   for (const [head, revision] of [[first, 'one'], [next, 'two']] as const) {
     const index = JSON.parse(text(await h.store.get(indexKey('same', head.hash)))) as CookIndex;
@@ -132,13 +134,14 @@ await test('a persistent hit launches no child and two revisions retain their ow
     assert.equal(revisionOf(await h.store.get(index.loose + index.header)), revision);
     assert.equal(revisionOf(readFileSync(join(root, 'server', slug, head.hash, 'shard.json'))), revision);
   }
-  assert.equal(revisionOf(await h.store.get(header)), 'two');
+  assert.equal(await h.store.get(header), undefined, 'A cook cannot replace the shared descriptor');
   console.log(JSON.stringify({criterion: 'hit-and-revisions', launches: h.launches(), downloads: h.downloads(), revisions: 2}));
 }));
 
 await test('GC before the new index commits cannot delete a reused part', () => fixture(async root => {
   const h = harness(root);
-  assert.equal((await h.worker('old').cook({slug, hash: digest(Buffer.from('one'))})).state, 'cooked');
+  const cookedOld = await h.worker('old').cook({slug, hash: digest(Buffer.from('one'))});
+  assert.equal(cookedOld.state, 'cooked', cookedOld.detail);
   const stale = Date.now() / 1000 - 7200;
   utimesSync(join(root, 'store', part), stale, stale);
   let interleaved = false;
@@ -147,7 +150,8 @@ await test('GC before the new index commits cannot delete a reused part', () => 
     if (key === indexKey('new', hash)) {interleaved = true; await collectGarbage(h.store, ['new'], 1e12, Date.now());}
     await h.store.put(key, bytes, headers);
   }};
-  assert.equal((await h.worker('new', racing).cook({slug, hash})).state, 'cooked');
+  const cookedNew = await h.worker('new', racing).cook({slug, hash});
+  assert.equal(cookedNew.state, 'cooked', cookedNew.detail);
   assert.equal(interleaved, true);
   const index = JSON.parse(text(await h.store.get(indexKey('new', hash)))) as CookIndex;
   assert.ok(index.keys.includes(part));
