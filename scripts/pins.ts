@@ -444,9 +444,8 @@ async function slice(check = false): Promise<void> {
   console.log(`${rows.length} slices, ${(rows.reduce((sum, row) => sum + row.bytes, 0) / 1e6).toFixed(1)} MB`);
 }
 
-/** A catalogue a build can bake with only `slugs` on disk. Dunes takes the home cell, because a grid opens on a shard it can admit;
- *  every other cell becomes a Brasscap road cell (J434: Brasscap replaced the Template that filled them), as Brasscap's own
- *  cell at (-1,-1) is, so the grid keeps its shape (G972), its seam bake keeps every home's room, and the crossing stays real. */
+/** A catalogue a build can bake with only the installed products. Dunes takes home if the pinned inputs omit the home shard.
+ *  Uninstalled cells become Brasscap road cells (J434), preserving the grid's shape and playable crossings. */
 function ringCatalogue(pins: readonly Pin[]): void {
   interface Cell { slug: string; instance: string; cell: readonly [number, number] }
   const catalogue = readJson(CATALOGUE) as { shards: { slug: string }[]; placements: { slug: string }[]; grid: { cells: Cell[] } };
@@ -458,10 +457,11 @@ function ringCatalogue(pins: readonly Pin[]): void {
     const pin = pins.find(candidate => candidate.slug === row.slug);
     if (pin !== undefined) Object.assign(row, {hash: pin.hash, revision: pin.revision});
   }
-  const home = catalogue.grid.cells.find(row => row.cell[0] === 0 && row.cell[1] === 0)?.instance ?? 'home';
+  const home = catalogue.grid.cells.find(row => row.cell[0] === 0 && row.cell[1] === 0);
+  const replaceHome = home === undefined || !kept.has(home.slug);
   const cells = catalogue.grid.cells.map(row => {
-    if (row.instance === home) return { instance: 'sunscar-dunes', slug: 'sunscar-dunes', cell: row.cell };
-    if (row.slug === 'sunscar-dunes') return { instance: home, slug: filler, cell: row.cell, speedClass: 'road' };
+    if (replaceHome && row.instance === (home?.instance ?? 'home')) return { instance: 'sunscar-dunes', slug: 'sunscar-dunes', cell: row.cell };
+    if (replaceHome && row.slug === 'sunscar-dunes') return { instance: home?.instance ?? 'home', slug: filler, cell: row.cell, speedClass: 'road' };
     return kept.has(row.slug) ? row : { instance: row.instance, slug: filler, cell: row.cell, speedClass: 'road' };
   });
   writeFileSync(RING_CATALOGUE, json({ ...catalogue, shards, placements: catalogue.placements.filter(row => kept.has(row.slug)), grid: { ...catalogue.grid, cells } }));
