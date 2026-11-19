@@ -2,6 +2,7 @@ import { uiScope, mountUi } from './ownership';
 import { engineString } from '../../../shared/engine/strings';
 import type { WeaponUi } from '../../../shared/engine/combat/Equipment';
 import { app } from '../app/runtime';
+import { exploreChannel } from '../app/view/exploreChannel';
 import { tap } from '../../../shared/engine/core/harnessTap';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { CABIN_SITES } from '../../../shared/engine/world/Heightfield';
@@ -568,7 +569,10 @@ export class HUD {
 
   /** one queue (src/client/engine/ui/ToastStack.ts: ≤ 3 up, the older ones dimmed, stepping down under the elite / boss bars), placed per
    *  A1 (E130): right-aligned under the quest chip */
-  toast(text: string, tone: ToastTone = 'plain'): void { this.placeToasts(); this.toasts.push(text, tone); }
+  toast(text: string, tone: ToastTone = 'plain'): void {
+    if (tone === 'plain' && exploreChannel()) return; // Public Explore has its own messages and no gameplay notices.
+    this.placeToasts(); this.toasts.push(text, tone);
+  }
 
   /** A red strip under the top bar, shown only with Settings ▸ Developer on (G168: the technical reason behind a player toast).
    *  The text is content-supplied and set through textContent; a new alert replaces the last. */

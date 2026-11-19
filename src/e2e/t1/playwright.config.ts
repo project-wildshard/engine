@@ -19,6 +19,10 @@ function glArgs(): readonly string[] {
     ? ['--use-angle=metal', '--ignore-gpu-blocklist']
     : []
 }
+const suites =
+  process.env['WS_T1_EXPLORE'] === '1'
+    ? { Explore: /explore\.spec\.ts$/u }
+    : T1_SHARDS
 export default defineConfig({
   testDir: '.',
   outputDir: path.resolve(
@@ -27,7 +31,7 @@ export default defineConfig({
     't1/results',
     process.env['WS_T1_SHARD'] ?? 'all',
   ),
-  projects: Object.entries(T1_SHARDS).map(
+  projects: Object.entries(suites).map(
     ([name, testMatch]: readonly [string, Readonly<RegExp>]): {
       name: string
       testMatch: RegExp

@@ -19,7 +19,10 @@ interface SmokeProbe {
   } | null
   readonly app: { readonly state: string }
   readonly world?: {
-    readonly game: { readonly frameCount: number }
+    readonly game: {
+      readonly frameCount: number
+      readonly camera: { readonly position: SmokeVec3 }
+    }
     readonly player: { readonly hover: boolean; readonly hoverBlend: number }
     readonly weapons: {
       readonly tools: readonly {

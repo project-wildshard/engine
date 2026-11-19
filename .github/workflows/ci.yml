@@ -382,6 +382,34 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  explore-e2e:
+    # EX7: the Ring 1 product with the Explore document and standalone worker.
+    needs: products
+    if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' && needs.products.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WS_LANE_NAME: explore-e2e
+      WS_T1_EXPLORE: '1'
+      WS_T1_SHARD: Explore
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Install headless Chromium
+        run: bash scripts/ci-playwright-install.sh --only-shell chromium
+      - name: Browse, fly and inspect in Explore
+        run: pnpm test:t1
+      - name: Keep failing Explore traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: explore-e2e-traces
+          path: tmp/explore-e2e/t1/results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
+
   nine-ring1-build:
     # NB6 needs full Nine; the packed products unit installs only its server
     # slice. Preserve the standalone props check and measured street workload

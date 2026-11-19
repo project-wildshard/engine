@@ -17,6 +17,7 @@ import { engineString } from '../../../../shared/engine/strings';
 import '../../ui/styles/quest.css';
 import type { Scope } from '../../../../shared/engine/app/scope';
 import { app } from '../../app/runtime';
+import { exploreChannel } from '../../app/view/exploreChannel';
 import { listenPage } from '../../input/dom';
 
 const hudRoot = (): HTMLElement => document.getElementById('hud') ?? document.body;
@@ -288,5 +289,5 @@ export class RewardCaption {
     el('div', 'ws-quest-reward-sub', this.root).textContent = sub;
     mountUi(this.root, this.scope, hudRoot());
   }
-  show(on: boolean): void { this.root.classList.toggle('show', on); }
+  show(on: boolean): void { this.root.classList.toggle('show', on && !exploreChannel()); }
 }

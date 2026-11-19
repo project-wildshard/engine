@@ -164,7 +164,11 @@ export async function bootstrap(step: StepRunner, level: LevelSpec, inputContext
     : playing() && player.link !== null && app.state === 'play' && !app.clock.paused && document.visibilityState !== 'hidden' ? 'live' : 'paused';
   // labels name them in error reports; `true` = core: the world step and the player's move can't be switched off (src/shared/engine/core/faults.ts)
   player.inputService = app.input; player.traversalEvents = app.events;
-  app.addSystem({ id: 'engine.input.collect', phase: 'input', before: ['engine.player.input'], run: () => { if (playing()) player.collectActions(); else app.input.clear(); } }, game.levelScope);
+  app.addSystem({ id: 'engine.input.collect', phase: 'input', before: ['engine.player.input'], run: () => {
+    if (playing()) player.collectActions();
+    // Explore uses the same held keys for flight while the player is parked.
+    else if (tour.active || app.state !== 'explore') app.input.clear();
+  } }, game.levelScope);
   game.onInput((dt) => { if (playing()) player.input(dt); }, 'engine.player.input');
   game.onFixed('pre', () => { for (const m of moving) m(); }, 'physics.movers');
   game.onFixed('step', () => { world.physics.step(); }, 'physics.step', true);
