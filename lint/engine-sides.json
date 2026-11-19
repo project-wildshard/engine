@@ -1001,6 +1001,7 @@
     "src/client/game/shardfile/clientNativeBook.ts": "client",
     "src/client/game/shardfile/clientPlaceSets.ts": "client",
     "src/client/game/shardfile/clientPlan.ts": "client",
+    "src/client/game/shardfile/cookedDocument.ts": "client",
     "src/client/game/shardfile/clientPlayerEnter.ts": "client",
     "src/client/game/shardfile/clientPopulation.ts": "client",
     "src/client/game/shardfile/clientPopulationProjection.ts": "client",

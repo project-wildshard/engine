@@ -5,6 +5,8 @@ import { loadGc } from '@wildshard/engine/boot/lentBody';
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { WORK_SLICE_MS } from '@wildshard/engine/core/workSlice';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import type { Shardfile } from '@wildshard/format/shardSchema';
+import { placementPageContract, verifiedCookedDocument } from './cookedDocument';
 
 type Prepared = { readonly ok: true; readonly bytes: Uint8Array; readonly page: WorldScenePlacementPage }
   | { readonly ok: false; readonly error: unknown };
@@ -39,19 +41,21 @@ const pageSlices = parseSlicer();
  * retained until the original ordered admission cursor; no row is published. */
 export class WorldScenePlacementPages {
   private readonly entries = new Map<string, Promise<Prepared>>();
-  constructor(reads: Pick<WorldSceneReads, 'file'>, names: readonly string[]) {
+  constructor(reads: Pick<WorldSceneReads, 'file'>, names: readonly string[], source?: Shardfile) {
     for (const name of names) {
       if (this.entries.has(name)) continue;
-      this.entries.set(name, this.prepare(reads, name));
+      this.entries.set(name, this.prepare(reads, name, source));
     }
   }
-  private async prepare(reads: Pick<WorldSceneReads, 'file'>, name: string): Promise<Prepared> {
+  private async prepare(reads: Pick<WorldSceneReads, 'file'>, name: string, source?: Shardfile): Promise<Prepared> {
     try {
       const bytes = await reads.file(name);
+      const cooked = source !== undefined && await verifiedCookedDocument(source, name, placementPageContract, bytes);
       return { ok: true, bytes, page: await pageSlices.run(() => {
         // IP31: under the load switch, a page is admitted from its text (EM17's path, unwired by d11afc8f until the dead
         // buffers it waited on were cut: the lent held files are that cut)
         const text = decoder.decode(bytes);
+        if (cooked) return JSON.parse(text) as WorldScenePlacementPage;
         return loadGc() ? parseWorldScenePlacementPageText(text) : parseWorldScenePlacementPage(JSON.parse(text));
       }) };
     } catch (error) { return { ok: false, error }; }

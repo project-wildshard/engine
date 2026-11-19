@@ -12,12 +12,13 @@ import { deviceLibraryCostSteps } from '@wildshard/format/deviceMemoryCost';
 import { frameBudgetSpent } from '@wildshard/engine/core/framePacing';
 import { preflightShardfile, preflightShardfileSteps } from '@wildshard/format/preflight';
 import { jsonDataHeapBytes } from '@wildshard/format/json';
-import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/shardfile/outputDescriptor';
+import { outputDescriptor, isBuildValidatedOutput, type OutputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { cookedSplatLayers, otherTierSplatFiles } from '../../../shared/game/shardfile/wholeInputs';
 import {builtShardfilePostCost} from '@wildshard/format/validationReceipt';
 import {postStackCost,type PostStackCost} from '@wildshard/format/postStack';
 import { isPlatformDataSection } from '@wildshard/format/outputFields';
-import { parseWorldScenes } from '@wildshard/format/worldScenes';
+import { isDev } from '@wildshard/engine/core/devMode';
+import { readSceneSection } from './cookedDocument';
 import { parseWorldSceneModels, worldSceneModelGraphs, worldSceneModelResources } from '@wildshard/format/worldSceneModels';
 import { plumbingKnob } from '../shard/declaredPlumbing';
 import { recordSceneProfile } from './sceneProfile';
@@ -72,7 +73,7 @@ export async function scopedSpecimenLibrarySourcePaced(source: Shardfile, assets
 function* specimenCosts(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, quality?: SpecimenQuality): Generator<void, Shardfile> {
   const descriptor = outputDescriptor(source), input = descriptor?.sections.get('world/scenes');
   if (descriptor === undefined || input === undefined) return source;
-  const scenes = parseWorldScenes(input);
+  const scenes = readSceneSection(source, input);
   if (scenes.catalogue === undefined) return source;
   const names = new Map<string, string>();
   for (const file of descriptor.index.files) for (const name of [file.hash, file.path, `/shardfiles/${source.identity.slug}/${file.path}`, ...file.name === undefined ? [] : [file.name]]) names.set(name, file.hash);
@@ -196,6 +197,14 @@ export function tierLibrarySource(source: Shardfile, tier: 'phone' | 'desktop', 
 export function tierLibrarySourcePaced(source: Shardfile, tier: 'phone' | 'desktop', assets: ReadonlyMap<string, Uint8Array>, pause: (() => Promise<void>) | undefined): Promise<Shardfile> {
   return paced(tierLibrarySourceSteps(source, tier, assets), pause ?? (() => Promise.resolve()));
 }
+
+/** Use the published projection only for the exact admitted source, before callers project scene fields. */
+function publishedExclusions(source: Shardfile, descriptor: OutputDescriptor, kind: 'phone' | 'desktop' | 'play'): ReadonlySet<string | undefined> | undefined {
+  if (isDev() || !isBuildValidatedOutput(source)) return undefined;
+  const indexes = descriptor.entryExclusions?.[kind];
+  return indexes === undefined ? undefined : new Set(indexes.map(at => descriptor.index.files[at]?.hash));
+}
+
 /** Typed alternatives which no critical, shared or dependency reader needs can
  * stay on disk. The full descriptor remains available for verified late reads.
  * The boot compiler and runtime use this same selection before declaring bytes. */
@@ -203,7 +212,8 @@ export async function tierFolderFilesPaced(source: Shardfile, tier: 'phone' | 'd
   splatLayer?: (hash: string) => string | undefined): Promise<Shardfile['files']> {
   const descriptor = outputDescriptor(source);
   if (descriptor === undefined) return source.files;
-  const inactive = await paced(entryFileSteps(source, tier, descriptor), pause ?? (() => Promise.resolve()));
+  const inactive = publishedExclusions(source, descriptor, tier)
+    ?? await paced(entryFileSteps(source, tier, descriptor), pause ?? (() => Promise.resolve()));
   // S12f2b2: a phone layer the cook made its own 6×6 file for is read by URL (`clientMaterials`), never as its blob
   const splat = new Set([...otherTierSplatFiles(source, splatTier), ...cookedSplatLayers(source, splatTier, splatLayer)]);
   return inactive.size === 0 && splat.size === 0 ? source.files : source.files.filter(file => !inactive.has(file.hash) && !splat.has(file.hash));
@@ -235,7 +245,7 @@ export function playLibrarySourcePaced(source: Shardfile, pause: (() => Promise<
 function* playLibrarySourceSteps(source: Shardfile): Generator<void, Shardfile> {
   const descriptor = outputDescriptor(source);
   if (descriptor === undefined) return source;
-  const excluded = yield* playLibrarySteps(source, descriptor);
+  const excluded = publishedExclusions(source, descriptor, 'play') ?? (yield* playLibrarySteps(source, descriptor));
   const library = new Set(source.library);
   let saving = 0;
   for (const file of source.files) if (library.has(file.hash) && excluded.has(file.hash)) saving += file.decoded + file.gpu;

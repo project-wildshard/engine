@@ -3,10 +3,22 @@ import { packOrLoose, packReads } from './packReads';
 import type { OutputIndex } from '@wildshard/format/outputIndex';
 import { assembleOutputTransport } from '@wildshard/format/outputFields';
 import { isJsonDataWithFileSchemas } from '@wildshard/format/json';
-import { builtValidationReceipt, builtShardfileResidency, validationSourceBytes, validationSourceBytesPaced, type ValidationReceipt } from '@wildshard/format/validationReceipt';
+import { builtValidationReceipt, builtShardfileResidency, validationRevision, validationSourceBytes, validationSourceBytesPaced, type ValidationReceipt } from '@wildshard/format/validationReceipt';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { parseOutputLineageIndex } from '@wildshard/format/stateLineage';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import type { ClientPlan } from '@wildshard/format/clientPlan';
+import type { ParsedWorldScenes } from '@wildshard/format/worldScenes';
+
+export interface CookedEntryFacts {
+  readonly phone: readonly number[];
+  readonly desktop: readonly number[];
+  readonly play: readonly number[];
+  /** The already cooked scene bytes decode to the exact schema output. */
+  readonly sceneIsSchemaOutput?: true;
+  readonly planIsSchemaOutput?: true;
+  readonly sceneCatalogue?: string;
+}
 
 /** Host-owned checked-ingestion capability, supplied explicitly by Node author readers. */
 /**
@@ -24,7 +36,7 @@ export interface OutputDescriptorChecks {
 export interface OutputDescriptorReader {
   /** Build-owned browser transport; the producer already checked these files.
    * Authored JSON cannot supply this capability. Node/external readers omit it. */
-  built?: {readonly read:(path:string,bytes:number,hash?:string)=>Promise<Uint8Array>;readonly indexHash:string};
+  built?: {readonly read:(path:string,bytes:number,hash?:string)=>Promise<Uint8Array>;readonly indexHash:string;readonly verifiedIndex?:true};
   /** Node author bundles supply their defining checked port; authored JSON cannot provide it. */
   checks?: OutputDescriptorChecks;
   /** Optional live parser; hashes, receipts and all admission checks remain here. */
@@ -63,6 +75,12 @@ export interface OutputDescriptorReader {
 
 export interface OutputDescriptor {
   readonly built?:true;
+  /** The exact private index bytes matched a current build-owned validation receipt. */
+  readonly verifiedIndex?:true;
+  readonly entryExclusions?: Pick<CookedEntryFacts, 'phone' | 'desktop' | 'play'>;
+  readonly cookedScenes?: ParsedWorldScenes;
+  readonly cookedPlan?: ClientPlan;
+  readonly cookedCatalogue?: string;
   readonly residentBytes?:number;
   readonly index: OutputIndex;
   readonly sections: ReadonlyMap<string, unknown>;
@@ -144,6 +162,10 @@ async function ownedBuildIndex(input: unknown, reader: OutputDescriptorReader): 
 
 /** G887: assemble our emitted files; strict checks remain in the build publisher. */
 async function readBuiltOutput(index:OutputIndex,reader:OutputDescriptorReader,built:NonNullable<OutputDescriptorReader['built']>):Promise<Shardfile>{
+  const verifiedIndex = built.verifiedIndex === true && builtValidationReceipt(index.build.sourceHash, built.indexHash) !== null;
+  const entryExclusions = verifiedIndex ? cookedEntryExclusions(built.indexHash, index.files.length) : undefined;
+  let cookedScenes: ParsedWorldScenes | undefined;
+  let cookedPlan: ClientPlan | undefined;
   const sections=new Map<string,unknown>();
   // Schemas validated these sections at publication; the client never downloads them to repeat that work.
   const rows=index.sections;
@@ -152,6 +174,7 @@ async function readBuiltOutput(index:OutputIndex,reader:OutputDescriptorReader,b
   let parseTail=Promise.resolve();
   const values=await Promise.allSettled(rows.map(async row=>{
     const bytes=await built.read(row.path,row.bytes,row.hash);
+    if (verifiedIndex && (bytes.length !== row.bytes || await reader.hash(bytes) !== row.hash)) throw new Error(`Cooked section hash or size differs: ${row.name}`);
     // Reads overlap; parsing takes one cooperative turn at a time. Warm cache
     // completions must not all resume from the same pause into a parse burst.
     const previous=parseTail;let release=():void=>{ /* Assigned synchronously before the first await. */ };
@@ -161,7 +184,9 @@ async function readBuiltOutput(index:OutputIndex,reader:OutputDescriptorReader,b
       await reader.pause?.();
       const value:unknown=reader.parseJson===undefined?JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)):await reader.parseJson(bytes);
       await reader.pause?.();
-      return [row.name,value] as const;
+      if (row.name === 'world/scenes' && entryExclusions?.sceneIsSchemaOutput === true) cookedScenes = value as ParsedWorldScenes;
+      if (row.name === 'client/plan' && entryExclusions?.planIsSchemaOutput === true) cookedPlan = value as ClientPlan;
+      return [row.name, value] as const;
     }finally{release();}
   }));
   // Drain every started read and retain authored publication/error order.
@@ -169,8 +194,33 @@ async function readBuiltOutput(index:OutputIndex,reader:OutputDescriptorReader,b
   const source=assembleOutputTransport(index,sections);
   if(!isBuiltClientSource(source,reader))throw new Error('Built output needs its built-in reader');
   const residentBytes=builtShardfileResidency(index.build.sourceHash);
-  buildValidated.add(source);descriptors.set(source.files,{index,sections,cached:false,indexHash:built.indexHash,built:true,...(residentBytes===undefined?{}:{residentBytes})});
+  buildValidated.add(source);descriptors.set(source.files,{index,sections,cached:false,indexHash:built.indexHash,built:true,
+    ...(verifiedIndex ? {verifiedIndex:true} : {}), ...(entryExclusions === undefined ? {} : {entryExclusions}),
+    ...(cookedScenes === undefined ? {} : {cookedScenes}),
+    ...(cookedPlan === undefined ? {} : {cookedPlan}),
+    ...(entryExclusions?.sceneCatalogue === undefined ? {} : { cookedCatalogue: entryExclusions.sceneCatalogue }),
+    ...(residentBytes===undefined?{}:{residentBytes})});
   return source;
+}
+
+/** The host verdicts come from the document builder, never the product index. */
+function cookedEntryExclusions(indexHash: string, size: number): CookedEntryFacts | undefined {
+  const verdicts: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__');
+  if (!Array.isArray(verdicts)) return undefined;
+  const revision = validationRevision();
+  const row: unknown = verdicts.find((value: unknown) => typeof value === 'object' && value !== null
+    && Reflect.get(value, 'indexHash') === indexHash && Reflect.get(value, 'revision') === revision);
+  if (typeof row !== 'object' || row === null) return undefined;
+  const entry: unknown = Reflect.get(row, 'entryExclusions');
+  if (entry === undefined) return undefined;
+  if (typeof entry !== 'object' || entry === null || !('phone' in entry) || !('desktop' in entry) || !('play' in entry)) throw new Error('Malformed cooked entry selection');
+  const indexes = (value: unknown): value is number[] => Array.isArray(value) && value.every(
+    (at: unknown, i: number) => typeof at === 'number' && Number.isSafeInteger(at) && at >= 0 && at < size && (i === 0 || at > Number(value[i - 1])));
+  if (!indexes(entry.phone) || !indexes(entry.desktop) || !indexes(entry.play)) throw new Error('Malformed cooked entry selection');
+  return { phone: entry.phone, desktop: entry.desktop, play: entry.play,
+    ...('sceneIsSchemaOutput' in entry && entry.sceneIsSchemaOutput === true ? { sceneIsSchemaOutput: true } : {}),
+    ...('planIsSchemaOutput' in entry && entry.planIsSchemaOutput === true ? { planIsSchemaOutput: true } : {}),
+    ...('sceneCatalogue' in entry && typeof entry.sceneCatalogue === 'string' ? { sceneCatalogue: entry.sceneCatalogue } : {}) };
 }
 
 /** The native build reader is the type authority here, not an authored field.

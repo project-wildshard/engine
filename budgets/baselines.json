@@ -55,12 +55,14 @@
   "js/session/raw": {
    "value": 4413316,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "declared": "EM17 verifies cooked document provenance before typed intake"
   },
   "js/session/gzip": {
    "value": 1365883,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "declared": "EM17 verifies cooked document provenance before typed intake"
   },
   "ledger/brasscap-mesa/control": {
    "value": 63331668,

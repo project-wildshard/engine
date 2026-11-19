@@ -231,13 +231,14 @@ async function readBoundedResponse(response: Response, maximum: number, read?: (
   for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
   return bytes;
 }
-function resolveDescriptor(input: unknown, options: FolderOptions, lineage = false, background = false): Promise<unknown> {
+function resolveDescriptor(input: unknown, options: FolderOptions, { lineage = false, background = false, verifiedIndex = false } = {}): Promise<unknown> {
   const base = new URL('.', options.base).href, cache = options.cache, backgroundStore = cache?.putAssetBackground;
   const builtRead=options.buildRead;
   if(builtRead!==undefined)return resolveOutputDescriptor(input,{
     offline:options.offline,deferAssetDeclarations:true,hash:options.hash,
     built:{read:(path,bytes,hash)=>builtRead(new URL(path,base).href,bytes,undefined,hash),
-      indexHash:options.descriptorHash??builtIndexHash(new URL(options.descriptorPath??'shard.json',base).pathname)??''},
+      indexHash:options.descriptorHash??builtIndexHash(new URL(options.descriptorPath??'shard.json',base).pathname)??'',
+      ...(verifiedIndex ? {verifiedIndex:true} : {})},
     read:(path,bytes)=>builtRead(new URL(path,base).href,bytes),
     ...(options.pause===undefined?{}:{pause:options.pause}),
     ...(options.parseJson===undefined?{}:{parseJson:options.parseJson}),
@@ -327,9 +328,15 @@ export async function readFolderDescriptor(options: FolderOptions, declaredUrl?:
   const builtRead=options.buildRead;
   if(builtRead!==undefined)return timeClientPreparation(new URL('.',url).pathname,'product.source',async()=>{
     const bytes=await builtRead(url.href,undefined,undefined,options.descriptorHash??indexHash??undefined);
+    if (indexHash !== null && await options.hash(bytes) !== indexHash) {
+      await options.built?.stale();
+      throw new StaleClientError();
+    }
     await options.pause?.();
     const input:unknown=options.parseJson===undefined?JSON.parse(descriptorDecoder.decode(bytes)):await options.parseJson(bytes);
-    const source=await resolveDescriptor(input,options);
+    if (indexHash !== null && (!isOutputIndex(input) || typeof input !== 'object' || input === null
+      || !('formatVersion' in input) || input.formatVersion !== 2)) throw new Error('Shardfile requires a format-2 output');
+    const source=await resolveDescriptor(input,options,{ verifiedIndex: indexHash !== null });
     if(!isBuildValidatedOutput(source))throw new Error('Built-in reader did not assemble its build output');
     return source;
   });
@@ -372,7 +379,7 @@ export async function readFolderDescriptor(options: FolderOptions, declaredUrl?:
 
 /** Assemble an inline or already fetched descriptor through the same verified section reader. */
 export async function readFolderInput(input: unknown, options: FolderOptions): Promise<Shardfile> {
-  const assembled = await resolveDescriptor(input, options, false, true);
+  const assembled = await resolveDescriptor(input, options, { background: true });
   if (isBuildValidatedOutput(assembled)) return assembled;
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned reader');
   await preflightFolder(assembled, options.pause);
@@ -516,7 +523,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
     // Only its identity and state are compared: an older build's sections can fail this build's schemas (G531 retired
     // `entries.public`), and refusing them would leave a returning player's shard unloadable.
     try { previous = (fresh ? currentOutputLineage(visited.source, source) : undefined)
-        ?? await resolveDescriptor(visited.source, { ...options, offline: true }, true); }
+        ?? await resolveDescriptor(visited.source, { ...options, offline: true }, { lineage: true }); }
     catch (error) {
       // An old index can outlive its immutable sections. It is no longer an admitted offline copy;
       // the online descriptor above must complete admission and replace it, just like a first visit.

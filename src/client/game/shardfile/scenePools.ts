@@ -20,6 +20,15 @@ export function worldScenePool(product: Pick<ShardFolder, 'file' | 'url'>, row: 
   // Admit and detach all rows before URL lookup, decoder construction or verified reads.
   const admitted = parseWorldScenes({ version: 1, libraries: [row], materials: [], steps: [] }).libraries[0];
   if (admitted?.kind !== 'pool') throw new Error('Expected a scene pool');
+  return makeScenePool(product, row, admitted, selected);
+}
+
+/** The world scene admission has already checked these complete rows. */
+export function admittedWorldScenePool(product: Pick<ShardFolder, 'file' | 'url'>, row: WorldScenePoolRow): ModelLibrary<never, never> {
+  return makeScenePool(product, row, row);
+}
+
+function makeScenePool(product: Pick<ShardFolder, 'file' | 'url'>, row: WorldScenePoolRow, admitted: WorldScenePoolRow, selected?: WorldScenePoolRow['files']): ModelLibrary<never, never> {
   const full = selected === undefined || selected === row.files;
   if (!full && (!isJsonData(selected) || new Set(selected).size !== selected.length)) throw new Error('Scene pool requires distinct declared files');
   const files = full ? admitted.files : selected.map(file => {

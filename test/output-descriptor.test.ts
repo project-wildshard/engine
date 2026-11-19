@@ -12,6 +12,8 @@ import { parseStateLineage } from '@wildshard/format/stateLineage';
 import { readFolderDescriptor, admitFolder, type CachedFolder, type FolderCache, type FolderOptions } from '../src/client/game/shardfile/folder';
 import { provideRuntimeDeclaration, runtimeFolder, loadShardFolder, completeManifestCache } from '../src/client/game/shardfile/runtimeFolder';
 import { ClientAssets } from '../src/client/game/shardfile/clientAssets';
+import { placementPageContract, readCookedDocument } from '../src/client/game/shardfile/cookedDocument';
+import { setDev } from '../src/client/engine/core/devMode';
 import { isBuildValidatedOutput, outputBlobUrl, outputDescriptor, resolveOutputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { saves } from '../src/shared/engine/saves/runtime';
 import { installManifestShardfile, installShardfileFolder } from '../src/client/game/shardfile/clientSource';
@@ -185,6 +187,39 @@ function sectionReader(wires: ReadonlyMap<string, Uint8Array>): (path: string) =
     return Promise.resolve(new Uint8Array(bytes));
   };
 }
+
+test('cooked intake binds exact schema and bytes to a current build-owned index', async () => {
+  const f = fixture(), name = 'world/placement-pages/camp.json';
+  const page = { version: 1, rows: [{ id: 'camp', model: 'hut', draw: 'single', poses: [] }] };
+  const body = encodeCanonicalJson(page), ref = hashImmutableBytes(body);
+  const index: OutputIndex = { ...f.index, files: [{ name, hash: ref, kind: 'json',
+    path: `blobs/json/${ref}.json`, compressed: body.byteLength, decoded: body.byteLength,
+    gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false,
+    jsonSchema: { $schema: 'http://json-schema.org/draft-07/schema#', $comment: placementPageContract } }] };
+  const restore = installIndexReceipt(index, new URL('shard.json', base).pathname);
+  const wire = encodeCanonicalJson(index);
+  f.wires.set('shard.json', wire);
+  const stale = vi.fn(async () => undefined);
+  const native: FolderOptions = { ...options(f.wires), built: { indexes: new Set([hashImmutableBytes(wire)]), stale },
+    buildRead: address => sectionReader(f.wires)(new URL(address).pathname.slice(new URL(base).pathname.length)) };
+  try {
+    const source = await readFolderDescriptor(native);
+    const read = vi.fn(async () => body);
+    expect(await readCookedDocument(source, name, placementPageContract, read)).toEqual({ value: page });
+    await expect(readCookedDocument(source, name, '@wildshard/format/worldScenePlacement#WorldScenePlacementSchema', read))
+      .rejects.toThrow('Cooked document contract differs');
+    const foreign = encodeCanonicalJson({ ...page, version: 2 });
+    expect(foreign.byteLength).toBe(body.byteLength);
+    await expect(readCookedDocument(source, name, placementPageContract, async () => foreign))
+      .rejects.toThrow('Cooked document hash or size differs');
+    setDev(true);
+    expect(await readCookedDocument(source, name, placementPageContract, read)).toBeUndefined();
+    expect(read).toHaveBeenCalledTimes(2);
+    f.wires.set('shard.json', encodeCanonicalJson({ ...index, formatVersion: 1 }));
+    await expect(readFolderDescriptor(native)).rejects.toThrow('older than the shard');
+    expect(stale).toHaveBeenCalledTimes(1);
+  } finally { setDev(false); restore(); }
+});
 
 test('receipted phone admission defers unused bytes and publishes offline only after their verified storage', async () => {
   const row = fixture(true, 0, 1, 'loader-fixture', true), restore = installIndexReceipt(row.index), store = cacheStore();

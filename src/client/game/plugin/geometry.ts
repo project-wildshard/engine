@@ -1819,13 +1819,19 @@ export interface WholeGeometryView {
  * vertices and triangles; completeness belongs to the full-model reader. */
 /** format's piece shape over three's geometry and matrix (SDK-SPLIT SP5b) */
 export interface WholeGeometryPiece extends FormatWholeGeometryPiece<BufferGeometry, Matrix4>, WholeGeometryView {}
+function wholePose(input: unknown): input is number[] {
+  if (!Array.isArray(input) || input.length !== 16) return false;
+  for (const component of input) if (typeof component !== 'number' || !Number.isFinite(component)) return false;
+  return true;
+}
+
 class WholeGeometryAssembler {
   private readonly groups = new Map<string, { output: BufferGeometry; matrix: Matrix4; seen: Uint8Array; triangles: Uint8Array; layout: string }>();
   add(node: Mesh, ownership: 'borrow' | 'take' = 'borrow'): void {
     const metadata: unknown = node.userData['wholePartition'], instances: unknown = node.userData['instances64'];
     const pose: unknown = node.userData['matrix64'] ?? (node instanceof InstancedMesh && node.count === 1 && Array.isArray(instances) && instances.length === 1 ? instances[0] : undefined);
     const row = readWholePartition(metadata);
-    const values = wholeV.parse(wholeV.pipe(wholeV.array(wholeV.pipe(wholeV.number(), wholeV.finite())), wholeV.length(16)), pose);
+    if (!wholePose(pose)) throw new Error('Whole geometry requires 16 finite matrix values');
     const { geometry: input, channels } = admitNativeWholeGeometry(node, ownership, true);
     try {
       const signature = JSON.stringify(channels);
@@ -1841,10 +1847,10 @@ class WholeGeometryAssembler {
         const output = new BufferGeometry();
         for (const [name, channel] of Object.entries(channels)) output.setAttribute(name, wholeStorage(row.grid !== undefined && name === 'position' ? { ...channel, storage: 'Float32Array', normalized: false } : channel, row.vertexCount));
         if (row.index !== 'none') output.setIndex(new BufferAttribute(row.index === 'u16' ? new Uint16Array(row.indexCount) : new Uint32Array(row.indexCount), 1));
-        group = { output, matrix: new Matrix4().fromArray(values), seen: new Uint8Array(row.vertexCount), triangles: new Uint8Array((row.index === 'none' ? row.vertexCount : row.indexCount) / 3), layout: signature };
+        group = { output, matrix: new Matrix4().fromArray(pose), seen: new Uint8Array(row.vertexCount), triangles: new Uint8Array((row.index === 'none' ? row.vertexCount : row.indexCount) / 3), layout: signature };
         this.groups.set(row.id, group);
       }
-      if (signature !== group.layout || !group.matrix.equals(new Matrix4().fromArray(values)) || row.vertexCount !== group.seen.length || row.indexCount !== (group.output.index?.count ?? 0)) throw new Error('Whole source layout or transform differs');
+      if (signature !== group.layout || !group.matrix.equals(new Matrix4().fromArray(pose)) || row.vertexCount !== group.seen.length || row.indexCount !== (group.output.index?.count ?? 0)) throw new Error('Whole source layout or transform differs');
       // The channels are resolved once per node and copied in plain index loops: the per-vertex entries / getAttribute /
       // subarray walk was one ~600 ms desktop (~1.5 s iOS Simulator) task for a Nine Dragon tile when a grid cell builds it
       // on the road (sp-o112). The bytes written, the shared-vertex check and every refusal are unchanged.

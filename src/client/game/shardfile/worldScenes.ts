@@ -9,6 +9,7 @@ import { tileBufferedDraws } from './tileBufferedDraws';
 import type { SceneBuffers } from '@wildshard/format/sceneBuffers';
 import { WorldSceneReads } from './worldSceneReads';
 import { WorldScenePlacementPages } from './worldScenePlacementPages';
+import { placementContract, readSceneCatalogue, readSceneSection, verifiedCookedDocument } from './cookedDocument';
 import { prepareSceneSources, sceneModelSource, sceneBakeSource, sceneSourceDeclares } from './sceneSources';
 import { drawSceneRows, prepareSceneDrawRows } from './sceneDraws';
 import { admitWorldSceneStepSources, worldSceneStepSources } from './worldSceneStepSources';
@@ -43,12 +44,12 @@ import { presenting } from '@wildshard/engine/core/framePacing';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { ControlRefinement } from './controlRefinement';
 import type { ColliderDesc } from '@wildshard/engine/world/registry';
-import { parseWorldSceneModels, worldSceneModelResources, worldSceneModelGraphs } from '@wildshard/format/worldSceneModels';
-import { parseWorldScenes, worldScenesForTier, type WorldScenesSection } from '@wildshard/format/worldScenes';
+import { worldSceneModelResources, worldSceneModelGraphs, type WorldSceneModels } from '@wildshard/format/worldSceneModels';
+import { worldScenesForTier, type WorldScenesSection } from '@wildshard/format/worldScenes';
 import { parseWorldScene, type WorldSceneRecipe } from '@wildshard/format/clientChannels';
 import type { ShardContext } from '../plugin/context';
 import type { ModelLibrary } from '../plugin/geometry';
-import { tierFile, worldScenePool } from './scenePools';
+import { admittedWorldScenePool, tierFile } from './scenePools';
 import { createWorldScene, bindWorldSceneParts } from '../plugin/scene';
 import { hasLentLook, lentLook, lentMappedLook, lendLooks, sceneMaterial } from './lentLooks';
 import { runtimeLookMaterials } from './runtimeFolder';
@@ -115,7 +116,7 @@ export function installWorldScenes(ctx: ShardContext, input: WorldScenesSection,
   const product = ctx.product;
   const previous = products.get(product); if (previous !== undefined) return previous;
   let section: WorldScenesSection;
-  try { section = worldScenesForTier(parseWorldScenes(input), TIER); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error('World scene admission failed', { cause: error })); }
+  try { section = worldScenesForTier(readSceneSection(ctx.product.shardfile, input), TIER); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error('World scene admission failed', { cause: error })); }
   const pending = build(ctx, section, resident);
   products.set(product, pending);
   const cache = products;
@@ -142,7 +143,7 @@ async function build(ctx: ShardContext, section: WorldScenesSection, resident: S
 
 async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, resident: Scope, reads: WorldSceneReads): Promise<SceneHandles> {
   const placementPages = new WorldScenePlacementPages(reads,
-    (section.placements ?? []).flatMap(row => 'file' in row && row.member !== undefined ? [row.file] : []));
+    (section.placements ?? []).flatMap(row => 'file' in row && row.member !== undefined ? [row.file] : []), ctx.product.shardfile);
   const registry = () => ctx.game.runtime?.world?.registry ?? ctx.app.registry;
   const product = ctx.product, recipes = new Map<string, WorldSceneRecipe>(), packets = new Map<string, Uint8Array>(), libraryRows = new Map(section.libraries.map(row => [row.id, row]));
   const geometryNames = new Map<string, ReadonlySet<string>>(), paintedNames = new Map<string, ReadonlySet<string>>();
@@ -193,11 +194,11 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
     if (row.kind === 'volume') for (const variant of [row.files.standalone, row.files.cell]) requireFile(variant[TIER].file);
     if (row.kind === 'product') { requireFile(row.file[TIER]); if ((row.looks.length > 0) !== (row.param !== undefined) || row.looks.length === 0 && row.publish === undefined) throw new Error('A product texture is lent with a param or published'); }
   }
-  let catalogue: ReturnType<typeof parseWorldSceneModels> | undefined;
+  let catalogue: WorldSceneModels | undefined;
   let modelScenes: ReadonlyMap<string, WorldSceneWeld> = new Map();
   if (section.catalogue !== undefined) {
     requireFile(section.catalogue);
-    catalogue = parseWorldSceneModels(JSON.parse(decoder.decode(await reads.file(section.catalogue))));
+    catalogue = await readSceneCatalogue(product.shardfile, section.catalogue, await reads.file(section.catalogue));
     if (!Object.is(catalogue.product, product.shardfile.identity.slug)) throw new Error('Scene catalogue product identity differs');
     // a draw (and a LOD draw's attribute donor) reads an owned or whole model, or a part of a pool's files
     const source = (ref: { readonly library: string; readonly model: string }): boolean => { const library = libraryRows.get(ref.library);
@@ -277,7 +278,12 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
         const member = page.rows[declared.member];
         if (member === undefined || member.tier !== declared.tier) throw new Error('Scene placement page member differs');
         row = member;
-      } else row = 'file' in declared ? parseWorldScenePlacement(JSON.parse(decoder.decode(bytes))) : declared;
+      } else if ('file' in declared) {
+        if (bytes === undefined) throw new Error('Missing placement blob bytes');
+        const cooked = await verifiedCookedDocument(product.shardfile, declared.file, placementContract, bytes);
+        const value: unknown = JSON.parse(decoder.decode(bytes));
+        row = cooked ? value as WorldScenePlacementRow : parseWorldScenePlacement(value);
+      } else row = declared;
       if (row.id !== declared.id) throw new Error('Scene placement blob identity differs');
       placements.push(row);
       const model = declaredModels.get(row.model);
@@ -507,7 +513,7 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
             libraries.set(row.id, { geometry: id => models.get(id)?.copy() ?? null, draw: id => models.get(id)?.draw() });
           } else {
             requireSceneOwner(owner);
-            const models = worldScenePool(product, row);
+            const models = admittedWorldScenePool(product, row);
             await models.preload(() => constructionCheckpoint(owner) ?? Promise.resolve());
             requireSceneOwner(owner);
             if (row.publish !== undefined) for (const part of row.files.flatMap(file => file.parts)) {

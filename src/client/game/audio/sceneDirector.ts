@@ -6,7 +6,8 @@ import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { Vector3 } from 'three';
 import { parse } from 'valibot';
 import { ScalarLatticeBindings } from '@wildshard/engine/world/scalarChannel';
-import { AudioSceneSchema, parseSampledAudioPlacement, type AudioScene } from '@wildshard/format/audioScene';
+import { AudioSceneSchema, parseSampledAudioPlacement, type AudioScene, type SampledAudioPointSource } from '@wildshard/format/audioScene';
+import type { WorldScenePlacementRow } from '@wildshard/format/worldScenePlacement';
 import type { AudioData } from '@wildshard/format/audio';
 import type { Audio, HoofSurface, ImpactKind } from '@wildshard/engine/audio/Audio';
 import type { Music } from '@wildshard/engine/audio/Music';
@@ -28,6 +29,7 @@ import type { ShardContext } from '../plugin/context';
 import { installEnteredRuntimeService } from '../shard/retainedHooks';
 import { AudioVoicePatches } from './voicePatches';
 import { cueManifest } from '@wildshard/engine/audio/bootAudio';
+import { placementContract, placementPageContract, readCookedDocument } from '../shardfile/cookedDocument';
 
 /** Native polyline observation; returns distance and the direction toward its closest point. */
 export function audioPathProbe(points:readonly (readonly [number,number])[],x:number,z:number):{distance:number;x:number;z:number}{
@@ -204,6 +206,19 @@ export async function enterClientAudioScene(ctx:ShardContext):Promise<void>{
 
 /** Sample strategy of the scene director. Rows own recipes and observations;
  * the native entered scope owns the bank, ray query, clocks and loop sources. */
+async function audioPointPlacement(product: ShardFolder, source: SampledAudioPointSource): Promise<WorldScenePlacementRow> {
+  const read = (name: string) => product.file(name);
+  if (typeof source === 'string') {
+    const cooked = await readCookedDocument(product.shardfile, source, placementContract, read);
+    return cooked?.value ?? parseSampledAudioPlacement(await product.json(source), source);
+  }
+  const cooked = await readCookedDocument(product.shardfile, source.file, placementPageContract, read);
+  if (cooked === undefined) return parseSampledAudioPlacement(await product.json(source.file), source);
+  const row = cooked.value.rows[source.member];
+  if (row === undefined || row.id !== source.id) throw new Error('Audio placement page member differs');
+  return row;
+}
+
 async function installSampledAudioScene(ctx:ShardContext,data:AudioData):Promise<void>{
  const row=requireAudioProfile(data.sampledScene,'sample scene'),profile=requireAudioProfile(data.zones,'sample zones'),musicProfile=requireAudioProfile(data.music,'sample score');
  const audio=ctx.app.audio;if(audio?.music===null||audio===null)throw new Error('Sample scene requires audio/music');
@@ -224,7 +239,7 @@ async function installSampledAudioScene(ctx:ShardContext,data:AudioData):Promise
  const beds=new SampledAmbience(audio,profile,player,scope);scope.onDispose(()=>{beds.dispose();});
  audio.installBeds(requireAudioProfile(profile.beds,'sample beds').map(bed=>bed.id),scope,()=>beds.audible.length);
  const pointSource=row.points[ctx.cube===null?'standalone':'cell'];
- const points=parseSampledAudioPlacement(await ctx.product.json(typeof pointSource==='string'?pointSource:pointSource.file),pointSource).poses.map(({x,y,z})=>new Vector3(x,y,z));
+ const points=(await audioPointPlacement(ctx.product,pointSource)).poses.map(({x,y,z})=>new Vector3(x,y,z));
  if(scope.disposed)throw new Error('Sample scene left while reading its points');
  const positional=requireAudioProfile(profile.positional,'positional profile');
  const loops=new PositionalLoops(audio,scope,points,()=>player.loop(positional.sample),()=>{tap.sound?.(row.loopTap,'ambient');},random,positional.max,positional.reach);

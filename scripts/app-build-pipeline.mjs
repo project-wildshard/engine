@@ -3,7 +3,7 @@
 // former Vite plugin is one of them), so every caller builds the app through this file, never a bare `vite build`.
 //
 //   node scripts/build-app.mjs [vite build arguments…]       e.g. --config <file>, --outDir <dir>
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { bakeAssetTables, writeAssetTables } from "./app-build/assetTables.mjs";
@@ -27,7 +27,6 @@ import { homeIconChannel, writeHomeIcons } from "./app-build/homeIcons.mjs";
 import { carryPreviousDeploy, channelOrigin, previousDeployOptional } from "./app-build/previousDeploy.mjs";
 import { PAGE_LIMITS, pageSize } from "./page-size.mjs";
 import { assertAssetLimits, describeAssetLimits } from "./app-build/assetLimits.mjs";
-import { buildValidationReceipts } from "./app-build/validationReceipts.mjs";
 import { shardfileValidationRevision } from "./shardfile-validation-revision.mjs";
 import { checkBakedTextures } from "./app-build/bakedTextures.mjs";
 
@@ -209,9 +208,13 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   const preview = mode === "preview" || process.env.WS_CHANNEL === "preview";
   if (preview && (world !== undefined || mode === "devserver" || (process.env.WS_CHANNEL !== undefined && process.env.WS_CHANNEL !== "preview")))
     throw new Error("A preview build cannot be a devserver or name a world");
+  const verdicts = /** @type {unknown} */ (JSON.parse(execFileSync(process.execPath, [
+    "--import", "./scripts/bake-loader.mjs", "./scripts/app-build/cookedEntryExclusions.ts", validator,
+  ], { encoding: "utf8", maxBuffer: 8 << 20 })));
+  if (!Array.isArray(verdicts)) throw new Error("Invalid compiled validation verdicts");
   stampBuildDocuments(outDir, {
     validator,
-    verdicts: buildValidationReceipts(validator),
+    verdicts,
     ...(world === undefined ? {} : { world }),
     ...(preview ? { preview: true } : {}),
     // QA 11-13: the static title's build pill, before any bundle (index.html data-launch-progress)

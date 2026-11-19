@@ -39,6 +39,8 @@ import { readFileInputs } from '../../../shared/game/shardfile/fileInputs';
 import { StaticCapture, staticCaptureUniforms, type StaticCaptureUniforms } from './staticCapture';
 import { installChannelPrograms } from '../../../shared/game/plugin/channelPrograms';
 import { graphParamRoots } from './graphDaySky';
+import type { Shardfile } from '@wildshard/format/shardSchema';
+import { readCookedDocument } from '../shardfile/cookedDocument';
 
 /** a side target no pass drew reads as black */
 const black = new DataTexture(new Uint8Array(4), 1, 1);
@@ -209,19 +211,28 @@ function lentTextures(rows: NonNullable<PostGraphLookRow['textures']>, bag: Unif
 }
 
 /** Read a level's post-graph look from its product file (`field` the path to its row) and make its strategy. */
-export async function postGraphLook(product: { readonly slug: string; readonly json: (name: string) => Promise<unknown>; readonly file?: (name:string)=>Promise<Uint8Array> }, source: { readonly file: string; readonly field: readonly string[] }): Promise<LookStrategy> {
+export async function postGraphLook(product: { readonly slug: string; readonly shardfile?: Shardfile; readonly json: (name: string) => Promise<unknown>; readonly file?: (name:string)=>Promise<Uint8Array> }, source: { readonly file: string; readonly field: readonly string[] }): Promise<LookStrategy> {
   const json=product.json,readFile=product.file,tier=TIER;
   const live=():void=>{if(product.json!==json||product.file!==readFile)throw new Error('Painted world product reader changed');};
-  let at: unknown = await json.call(product,source.file);live();
+  // The format's registered checks admit these two complete post-graph rows.
+  const schema = source.file === 'look/post.json' && source.field.length === 0
+    ? '@wildshard/format/postGraphLook#PostGraphLookSchema'
+    : source.file === 'weapons/jian-row.json' && source.field.length === 2 && source.field[0] === 'look' && source.field[1] === 'post'
+      ? '@wildshard/format/heldJianDocument#HeldJianDocumentSchema' : undefined;
+  const cooked = schema === undefined || product.shardfile === undefined || readFile === undefined ? undefined
+    : await readCookedDocument(product.shardfile, source.file, schema, name => readFile.call(product, name));
+  let at: unknown = cooked === undefined ? await json.call(product,source.file) : cooked.value;
+  live();
   for (const key of source.field) at = typeof at === 'object' && at !== null ? Reflect.get(at, key) : undefined;
-  const painted = parsePostGraphDocument(at).painted;
+  const row = cooked === undefined ? parsePostGraphDocument(at) : at as PostGraphLookRow;
+  const painted = row.painted;
   const names=painted===undefined?[]:grassPresentationFiles(v.parse(GrassPresentationSchema,painted.grass.rows),tier);
   if(names.length>0&&readFile===undefined)throw new Error('Painted world product file reader required');
   const files=await readFileInputs(names,name=>{
     if(readFile===undefined)throw new Error('Painted world product file reader required');
     return readFile.call(product,name);
   },live);
-  const look = postGraphLookOf(product.slug, at);
+  const look = buildPostGraphLook(product.slug, row);
   // a painterly level's painted world (fog, ground, grass, sky) beside its graphs
   return painted === undefined ? look : { ...look, ...paintedWorld(product.slug, painted,files,tier).look };
 }
@@ -251,7 +262,10 @@ class ShadowFirstRenderPass extends RenderPass {
 }
 
 export function postGraphLookOf(slug: string, input: unknown): LookStrategy {
-  const row = parsePostGraphDocument(input);
+  return buildPostGraphLook(slug, parsePostGraphDocument(input));
+}
+
+function buildPostGraphLook(slug: string, row: PostGraphLookRow): LookStrategy {
   const lut: UniformMap = row.lut === undefined ? {} : { [row.lut.texture]: { value: neutralLut() }, [row.lut.amount]: { value: 0 } };
   if (row.lut !== undefined) {
     const { url, texture, amount } = row.lut;

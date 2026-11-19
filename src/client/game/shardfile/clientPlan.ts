@@ -21,7 +21,8 @@ import { clientNativeBook } from './clientNativeBook';
 import type { PlatformSectionName } from '@wildshard/format/sections';
 import { constructionCheckpoint } from './constructionCheckpoint';
 import type { Scope } from '@wildshard/engine/app/scope';
-import { parseClientPlan, type ClientFeatureKind, type ClientFeatureRow } from '@wildshard/format/clientPlan';
+import type { ClientFeatureKind, ClientFeatureRow } from '@wildshard/format/clientPlan';
+import { readClientPlan } from './cookedDocument';
 import { clientOwnershipRules } from '@wildshard/format/clientOwnership';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import type { ShardContext } from '../plugin/context';
@@ -379,7 +380,7 @@ function stageCpuMicros(product: ShardFolder): number {
 /** Validate the whole plan and all required sections before the first feature can mutate the page. */
 export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedClientPlan {
   try {
-    const plan = parseClientPlan(input);
+    const plan = readClientPlan(product.shardfile, input);
     const limit = stageCpuMicros(product);
     // A row is the smallest host installer we can pace between drawn frames.
     for (const row of plan.features) {
