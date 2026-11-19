@@ -2,8 +2,9 @@ name: shard-pin
 
 # Meta SHARD-PUBLISH-ACTIONS SP6 (J369, J371): after a shard repo's
 # publish.yml commits a revision, pin it here on plan/pin-<slug>-r<N>,
-# mirror its tarball on the `pins` release, and open a PR. A machine lands
-# that branch through land.mjs's checks (the PR body names the commands).
+# mirror its tarball on the `pins` release, and name the land steps in the
+# run summary. A machine lands that branch through land.mjs's checks. No PR:
+# pins reach main by land, never by pull request (Jake, 2026-11-19).
 # Engine releases stay the MacBook's (J369); a pin bump is code.
 #   gh workflow run shard-pin.yml -R project-wildshard/engine \
 #     -f slug=<slug> -f revision=<N> -f hash=<sha256> -f channel=staging
@@ -32,7 +33,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: shard-pin-${{ inputs.slug || github.event.client_payload.slug }}
@@ -116,24 +116,3 @@ jobs:
             echo 'WS_LANE_NAME=<lane> node scripts/land.mjs'
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
-      # Needs the repo's "Allow GitHub Actions to create pull requests";
-      # without it the branch stands and the summary names the land steps.
-      - name: Open the PR
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ steps.branch.outputs.branch }}
-        run: |
-          slug_dir="pin-$SLUG-r$REVISION"
-          gh pr create --base main --head "$BRANCH" --title "test(pins): pin $SLUG rev $REVISION" --body "Published to $CHANNEL from Actions (meta SHARD-PUBLISH-ACTIONS SP6). Land it from either machine:
-
-          \`\`\`sh
-          cd ~/projects/games/wildshard/engine
-          node scripts/worktree.mjs new $slug_dir
-          cd .worktrees/$slug_dir && git fetch origin $BRANCH && git merge --ff-only FETCH_HEAD
-          pnpm pins
-          WS_LANE_NAME=<lane> node scripts/land.mjs
-          \`\`\`
-
-          Ring re-records (ring-digests, side parity) are the lander's, as for a hand bump."
-          echo "PR opened for $BRANCH" >> "$GITHUB_STEP_SUMMARY"
