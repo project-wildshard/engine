@@ -28,6 +28,8 @@ export interface PlacedCell { readonly instance: string; readonly slug: string; 
 const placed: PlacedCell[] = [];
 /** SA47: each placed slug's shardfile hash, when its placement named one. */
 const hashes = new Map<string, string>();
+/** MZ33: moves on every change to `placed` (a row added, dropped or re-slotted), so the cached names and assembly follow it. */
+let version = 0;
 let read: { readonly from: unknown; readonly placed: number; readonly names: GridNames } | null = null;
 /** The installed catalogue's cells, assembled the way a grid page assembles them. */
 function catalogueCells(): readonly PlacedCell[] {
@@ -37,14 +39,14 @@ function catalogueCells(): readonly PlacedCell[] {
 /** Parsed once per installed catalogue, the way a grid page assembles it, then the placed cells: frame `catalogue count + 1 + slot`. */
 function gridNames(): GridNames {
   const { grid } = catalogueDocument();
-  if (read?.from === grid && read.placed === placed.length) return read.names;
+  if (read?.from === grid && read.placed === version) return read.names;
   const cells = catalogueCells(), rows = [...cells, ...placed];
   // MA10k: a placed cell's frame is its slot, its place in the file, never the order its pack arrived in.
   const frame = (cell: PlacedCell, index: number): number => index < cells.length ? index + 1 : cells.length + 1 + (cell.slot ?? index - cells.length);
   const names: GridNames = { instances: rows.map(cell => cell.instance), frames: new Map(rows.map((cell, index) => [cell.instance, frame(cell, index)])),
     shards: new Map(rows.map(cell => [cell.instance, cell.slug])), cells: new Map(rows.map(cell => [cell.slug, cell.instance])),
     home: cells.find(cell => cell.cell[0] === 0 && cell.cell[1] === 0)?.instance, spots: new Map(rows.map(cell => [cell.cell.join(','), cell.instance])) };
-  read = { from: grid, placed: placed.length, names };
+  read = { from: grid, placed: version, names };
   return names;
 }
 /**
@@ -84,6 +86,7 @@ export function placeCell(given: PlacedCell, file?: readonly PlacedCell[]): bool
   const taken = spots.get(spot);
   if (taken !== undefined) throw new Error(`${spot} is ${taken}'s`);
   placed.push({ instance: row.instance, slug: row.slug, cell: [x, z], ...(row.hash === undefined ? {} : { hash: row.hash }), ...(row.speedClass === undefined ? {} : { speedClass: row.speedClass }), ...(row.slot === undefined ? {} : { slot: row.slot }) });
+  version++;
   if (row.hash !== undefined) hashes.set(row.slug, row.hash);
   return true;
 }
@@ -97,10 +100,10 @@ let assembled: { readonly from: unknown; readonly placed: number; readonly assem
  * square. `placedToo` false: the catalogue's alone, the grid the build's road pack was baked for.
  */
 export function gridAssembly(placedToo = true): GridAssembly {
-  const { grid } = catalogueDocument(), count = placedToo ? placed.length : 0;
-  if (assembled?.from === grid && assembled.placed === count) return assembled.assembly;
+  const { grid } = catalogueDocument(), count = placedToo ? placed.length : 0, key = placedToo ? version : -1;
+  if (assembled?.from === grid && assembled.placed === key) return assembled.assembly;
   const assembly = new GridAssembly({ developer: false, devserver: false }, count === 0 ? grid : { ...grid, cells: [...grid.cells, ...placed.map(({ instance, slug, cell, speedClass }) => ({ instance, slug, cell: [...cell], ...(speedClass === undefined ? {} : { speedClass }) }))] });
-  assembled = { from: grid, placed: count, assembly };
+  assembled = { from: grid, placed: key, assembly };
   return assembly;
 }
 /** What a worker thread is booted with, so its rooms name, frame and load a placed cell as the door does. */
@@ -112,8 +115,30 @@ export function placedCells(): readonly PlacedCell[] {
   });
   return [...baked, ...placed.map(row => {const hash = hashes.get(row.slug); return hash === undefined ? row : {...row, hash};})];
 }
+/**
+ * MOSSGATE-ZONE MZ33: the placed cells a placement file still names, re-slotted as a page numbers them. A `wildshard delete` drops a row
+ * from the signed file; a page re-slots the file's cells (`addPlacedCells`), so every placed cell after the gone one takes the frame before
+ * it. `keep` is each kept instance's slot (`placementSlots(file)` on the door, the door's handed list on a worker): a placed row it does
+ * not name leaves, and every other takes its slot, so the door, its workers and a fresh page agree on every frame with no restart. Answers
+ * the instances that left.
+ */
+export function keepPlacedCells(keep: ReadonlyMap<string, number | undefined>): readonly string[] {
+  const gone: string[] = [];
+  let moved = false;
+  for (let index = placed.length - 1; index >= 0; index--) {
+    const row = placed[index] as PlacedCell;
+    if (!keep.has(row.instance)) { placed.splice(index, 1); hashes.delete(row.slug); gone.unshift(row.instance); continue; }
+    const slot = keep.get(row.instance);
+    if (slot === row.slot) continue;
+    const { slot: _old, ...plain } = row;
+    placed[index] = slot === undefined ? plain : { ...plain, slot };
+    moved = true;
+  }
+  if (gone.length > 0 || moved) version++;
+  return gone;
+}
 /** Tests only: forget every placed cell. */
-export function forgetPlacedCells(): void { placed.length = 0; hashes.clear(); read = null; assembled = null; }
+export function forgetPlacedCells(): void { placed.length = 0; hashes.clear(); version++; read = null; assembled = null; }
 
 /** The instance a name means: an instance stands, a grid shard's slug becomes its cell, and anything else is its own name. */
 export function cellName(name: string): string { const { shards, cells } = gridNames(); return shards.has(name) ? name : cells.get(name) ?? name; }

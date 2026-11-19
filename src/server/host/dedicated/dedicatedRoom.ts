@@ -118,7 +118,7 @@ export class DedicatedRoom implements CrossTarget {
   private readonly blank: PlayerDoc;
   private constructor(options: DedicatedRoomOptions, cell: CellWorld, seats: Map<string, Seat>, bodies: Map<string, Seat>, playerRefusals: Map<string, string>) {
     this.options = options; this.cell = cell; this.host = cell.host; this.seats = seats; this.bodies = bodies; this.playerRefusals = playerRefusals;
-    this.sim = new SimNetWorld(this.host, cellFrame(this.name), () => this.filings());
+    this.sim = new SimNetWorld(this.host, () => cellFrame(this.name), () => this.filings());
     this.sim.identified = (body, identity): boolean => {
       const seat = bodies.get(body);
       if (seat === undefined || seat.device !== identity.player) { playerRefusals.set(body, 'identity'); return false; }

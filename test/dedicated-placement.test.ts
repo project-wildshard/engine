@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
-import { cellFrame, cellName, cellShard, forgetPlacedCells, placeCell, placedCells, placedHash, type PlacedCell } from '../src/server/host/dedicated/gridCells';
+import { cellFrame, cellName, cellShard, forgetPlacedCells, keepPlacedCells, placeCell, placedCells, placedHash, placementSlots, type PlacedCell } from '../src/server/host/dedicated/gridCells';
 import { readPackFolder, type PackReaderOptions, type PackReads } from '../src/server/host/dedicated/packReader';
 import {uploadActivator} from '../src/server/host/dedicated/uploadActivation';
 import { PlacementWatch, readPlacementFile } from '../src/server/host/dedicated/placementFile';
@@ -90,6 +90,60 @@ test('MA10k: a late middle placement keeps the frame a page gives it; the door, 
   for (const row of handed) placeCell(row);
   expect(door, 'the door').toEqual(Object.fromEntries(rows.map(row => [row.instance, page[row.instance]])));
   expect(frames(), 'a worker').toEqual(door);
+});
+
+// MOSSGATE-ZONE MZ33 (meta, 2026-11-19): `wildshard delete cinder-orchard` dropped its row from the signed file; pages re-slot the file's
+// cells, but the running server kept the old rows, so every placed cell after it went out in the wrong frame (Mossgate's seat bounced to
+// Mirror Salt) until a restart. The door keeps only the cells the file names, in the file's slots, and hands its workers the same list.
+test('MZ33: a placement file losing a row re-slots the door and a worker as a page does, with no restart', () => {
+  const rows: readonly PlacedCell[] = [
+    { instance: 'mz33-gone', slug: 'mz33-gone', cell: [-1, 3] },
+    { instance: 'mz33-next', slug: 'mz33-next', cell: [0, 3], hash: 'b'.repeat(64) },
+    { instance: 'mz33-last', slug: 'mz33-last', cell: [1, 3] },
+  ];
+  const kept = rows.slice(1);
+  const pageFrames = (cells: readonly PlacedCell[]): Record<string, number | undefined> => {
+    const { document } = addPlacedCells(catalogueDocument(), file(1, cells));
+    const page = Object.fromEntries(new GridAssembly({ developer: false, devserver: false }, document.grid).cells.map((cell, index) => [cell.instance, index + 1]));
+    return Object.fromEntries(cells.map(row => [row.instance, page[row.instance]]));
+  };
+  const frames = (cells: readonly PlacedCell[]): Record<string, number> => Object.fromEntries(cells.map(row => [row.instance, cellFrame(row.instance)]));
+  for (const row of rows) placeCell(row, rows);
+  // a worker booted before the delete, from what the door handed it
+  const handed = placedCells();
+  expect(frames(rows), 'before the delete').toEqual(pageFrames(rows));
+  // the door reads the file without the first row
+  expect(keepPlacedCells(placementSlots(kept)), 'the gone row leaves').toEqual(['mz33-gone']);
+  expect(keepPlacedCells(placementSlots(kept)), 'a second look changes nothing').toEqual([]);
+  const door = frames(kept);
+  expect(door, 'the door numbers the rest as a fresh page does').toEqual(pageFrames(kept));
+  expect([cellName('mz33-gone'), placedHash('mz33-gone'), placedHash('mz33-next')]).toEqual(['mz33-gone', undefined, 'b'.repeat(64)]);
+  // the worker, booted with the old list, hears the door's new one
+  const after = placedCells();
+  forgetPlacedCells();
+  for (const row of handed) placeCell(row);
+  expect(keepPlacedCells(new Map(after.map(row => [row.instance, row.slot]))), 'the worker drops it too').toEqual(['mz33-gone']);
+  for (const row of after) placeCell(row);
+  expect(frames(kept), 'a worker').toEqual(door);
+  // a later upload of the gone slug may place it again, in the file's order
+  expect(placeCell(rows[0] as PlacedCell, [...kept, rows[0] as PlacedCell])).toBe(true);
+  expect(frames(rows)).toEqual(pageFrames([...kept, rows[0] as PlacedCell]));
+});
+
+test('MZ33: a watch hands every file to keep before it opens, and opens a cell again once it left and came back', async () => {
+  let next: PlacementFile = file(1);
+  const asked: string[][] = [], kept: string[][] = [];
+  let gone: readonly string[] = [];
+  const watch = new PlacementWatch({ channel: 'staging', everyMs: 3_600_000, failed: () => undefined,
+    read: () => Promise.resolve(next),
+    keep: cells => { kept.push(cells.map(cell => cell.instance)); return gone; },
+    open: cells => { asked.push(cells.map(cell => cell.instance)); return Promise.resolve(cells.map(cell => cell.instance)); } });
+  await watch.look();
+  next = file(2, []); gone = [PLACED.instance]; await watch.look();
+  next = file(3); gone = []; await watch.look();
+  expect(kept).toEqual([[PLACED.instance], [], [PLACED.instance]]);
+  expect(asked, 'opened, then asked again once it came back').toEqual([[PLACED.instance], [PLACED.instance]]);
+  watch.dispose();
 });
 
 test('a watch opens only cells it has not opened, asks again for one that did not open, and never believes an older serial', async () => {

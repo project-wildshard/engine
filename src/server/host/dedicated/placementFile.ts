@@ -24,11 +24,15 @@ export interface PlacementWatchOptions {
   /** Open these cells, the ones this server hasn't opened yet; answer the instances that opened. A cell left out is asked for again next look.
    *  `file` is every cell the file names, in its order, so a late cell keeps its place (MA10k). */
   readonly open: (cells: readonly PlacedCell[], file: readonly PlacedCell[]) => Promise<readonly string[]>;
+  /** MZ33: every look's file, before any cell opens, so the server drops a cell the file no longer names (a `wildshard delete`) and
+   *  re-slots the rest as a page does. Answers the instances that left, which a later file may name and open again. */
+  readonly keep?: (file: readonly PlacedCell[]) => readonly string[];
   /** A look that failed. The server plays on with the cells it has. */
   readonly failed: (error: unknown) => void;
   readonly everyMs?: number;
 }
-/** SA33: a running server's cells grow when the placement file names one it hasn't opened. It never closes one: delete is SA31's, at a restart. */
+/** SA33: a running server's cells grow when the placement file names one it hasn't opened. MZ33: a cell the file stops naming leaves the
+ *  server's grid (`keep`), so a delete needs no restart; its worker idles until the next restart deals the cells out again. */
 export class PlacementWatch {
   private readonly options: PlacementWatchOptions;
   private readonly scope = new Scope('dedicated.placement');
@@ -50,6 +54,7 @@ export class PlacementWatch {
       if (file.channel !== this.options.channel) throw new Error(`A ${file.channel} placement file on a ${this.options.channel} server`);
       if (file.serial < this.seen) throw new Error(`Placement serial ${String(file.serial)} is older than ${String(this.seen)}`);
       this.seen = file.serial;
+      for (const instance of this.options.keep?.(file.cells) ?? []) this.opened.delete(instance);
       const fresh = file.cells.filter(cell => !this.opened.has(cell.instance));
       if (fresh.length > 0) for (const instance of await this.options.open(fresh, file.cells)) this.opened.add(instance);
     } catch (error) { this.options.failed(error); } finally { this.looking = false; }

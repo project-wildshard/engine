@@ -10,7 +10,7 @@ import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { DedicatedRoom, type DedicatedRoomRoad } from './dedicatedRoom';
-import { cellShard, gridAssembly, gridCell, placeCell, placedHash, roadName } from './gridCells';
+import { cellShard, gridAssembly, gridCell, keepPlacedCells, placeCell, placedHash, roadName } from './gridCells';
 import { RoadRoom } from './roadRoom';
 import { EDGE_EVERY, EdgeList, EdgeRows, type EdgeCell } from './edgeRows';
 import { applyMotion } from '@wildshard/engine/game/grid/simulation';
@@ -296,11 +296,14 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const opened: string[] = [];
     let laid: (() => void) | undefined;
     try {
+      // MZ33: the door's whole placed list: a cell it dropped (a delete) leaves this worker's grid too, and the rest take its slots
+      keepPlacedCells(new Map(order.cells.map(row => [row.instance, row.slot])));
       for (const row of order.cells) placeCell(row);
       for (const cell of cells.values()) if (stale(cell)) revised.add(cell);
       const was = crossing?.assembly, grown = gridAssembly();
       if (crossing !== undefined && was !== undefined && was !== grown) {
-        const { strips, seams: more } = placedStrips(grown, was), fresh = grown.cells.slice(was.cells.length);
+        const known = new Set(was.cells.map(cell => cell.instance));
+        const { strips, seams: more } = placedStrips(grown, was), fresh = grown.cells.filter(cell => !known.has(cell.instance));
         crossing = { name: crossing.name, assembly: grown, strips: [...crossing.strips, ...strips], seams: [...crossing.seams, ...more] };
         laid = () => { road?.place(grown, strips, fresh); };
       }

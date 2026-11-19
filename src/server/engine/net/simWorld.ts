@@ -38,11 +38,11 @@ export class SimNetWorld implements NetWorld {
   /** The standing looks now up, newest last. */
   private readonly up = new Map<string, FightViewCall>();
   private readonly wire: CombatWire;
-  private readonly frame: number;
+  private readonly frame: number | (() => number);
   private readonly filings: (() => readonly LedgerFiling[]) | undefined;
   private readonly turn = { still: new Set<string>(), extra: new Map<string, NetCommand>() };
   /** `frame` names the cell this host's positions are local to; 0 is the highway, and any world that is not on a grid. `filings` reads the tick's grants, which the host's owner holds: the sim keeps none. `owner` selects the default network seat explicitly; legacy standalone callers use actor.player. */
-  constructor(host: SimHost, frame = 0, filings?: () => readonly LedgerFiling[], owner = 'actor.player') {
+  constructor(host: SimHost, frame: number | (() => number) = 0, filings?: () => readonly LedgerFiling[], owner = 'actor.player') {
     this.host = host; this.frame = frame; this.filings = filings; this.wire = new CombatWire(host); keepHitHistory(host);
     this.player = this.playerOf(owner);
   }
@@ -69,7 +69,8 @@ export class SimNetWorld implements NetWorld {
   }
   refused(): number { const routes = actRoutes(this.host), { refused } = routes; routes.refused = 0; return refused; }
   tick(): number { return this.host.state.tick; }
-  cell(): number { return this.frame; }
+  /** MZ33: a function frame is read each time, so a placed cell re-slotted after a delete goes out in its new frame with no restart. */
+  cell(): number { return typeof this.frame === 'function' ? this.frame() : this.frame; }
   combat(): readonly CombatEvent[] {
     const { calls, standing } = shardRows(this.host), settled = this.wire.drain(), { tick } = this.host.state;
     if (standing.size > 0) for (const call of calls) this.heardLook(call, standing);

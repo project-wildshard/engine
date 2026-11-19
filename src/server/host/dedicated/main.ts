@@ -31,7 +31,7 @@ import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
 import { doorTrust } from './doorTrust';
-import { WHOLE_GRID, catalogueCell, placeCell, placedCells, releasedWorldShards, worldCells } from './gridCells';
+import { WHOLE_GRID, catalogueCell, keepPlacedCells, placeCell, placedCells, placementSlots, releasedWorldShards, worldCells } from './gridCells';
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
 import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
 import { DEV_CONTROL_PATH, devRoute } from './devControl';
@@ -191,6 +191,16 @@ const watch = new ReleaseWatch({ read: readRelease, serving: release, ...(poll =
 placements = placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID ? null : new PlacementWatch({
   read: () => fetchPlacementFile(placementAt, placementKey), channel: release.channel, ...(poll === undefined ? {} : { everyMs: Number(poll) }),
   failed: error => { log({ at: 'placement.failed', error: String(error) }); },
+  // MZ33: a cell the file stops naming (a `wildshard delete`) leaves the grid, and the rest re-slot as a page does; the workers hear the
+  // door's new list, so a room's frame (read live) and a fresh page agree with no restart
+  keep: file => {
+    const before = JSON.stringify(placedCells()), gone = keepPlacedCells(placementSlots(file));
+    if (JSON.stringify(placedCells()) !== before) {
+      log({ at: 'placement.kept', gone });
+      void (async () => { try { await world.activateCells([]); } catch (error) { log({ at: 'placement.keep-failed', error: String(error) }); } })();
+    }
+    return gone;
+  },
   open: async (rows, file) => {
     const ready: string[] = [];
     for (const row of rows) {
