@@ -479,7 +479,7 @@
   "nine-dragon-stack": {
    "baselinePhoneBytes": 21798837,
    "recordedPhoneBytes": 42130782,
-   "ceilingPhoneBytes": 34683878,
+   "ceilingPhoneBytes": 27202151,
    "shrinkOnly": true,
    "baseline": {
     "phone": {
@@ -552,7 +552,7 @@
     "bytes": 113122816,
     "mountsAssetsBytes": 19473265
    },
-   "latchedPhoneBytes": 32396386
+   "latchedPhoneBytes": 27202151
   }
  }
 }
