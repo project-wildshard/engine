@@ -2,7 +2,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { deployFrameProblem } from './journey-proof.mjs';
 
-/** @typedef {{instance:string, cell:readonly [number,number]}} Cell */
+/** @typedef {{instance:string, slug?:string, cell:readonly [number,number]}} Cell */
 /** @typedef {{from:Cell, to:Cell}} Leg */
 /** @typedef {{from:string,to:string}} Pair */
 /** @typedef {{from:string,to:string,ms:number}} Arrival */
@@ -45,6 +45,10 @@ export function zoneEntryTour(cells) {
 }
 
 /** @typedef {{x:number,z:number}} Point */
+/** @typedef {Point & {ride:boolean}} ApproachPoint */
+/** @typedef {readonly [number,number,number]} PortalPoint */
+/** @typedef {{road:{at:PortalPoint},route:readonly PortalPoint[]}} PortalExit */
+/** @typedef {Point & {dx:number,dz:number}} RoadDeck */
 /** @typedef {import('playwright').Page} Page */
 /** @param {Page} page */
 const feet = page => page.evaluate(() => {
@@ -75,9 +79,10 @@ async function bounded(ms, run, message) {
   try { await Promise.race([time, run()]); } finally { clearTimeout(timer); }
 }
 
-/** Walk by input. Reading feet and setting the heading leaves the online seat under the server's control.
- * @param {Page} page @param {Point} target @param {number} end @param {boolean} sprint @param {string} [arriving] */
-async function walk(page, target, end, sprint, arriving) {
+/** Travel by input. Reading feet and setting the heading leaves the online seat under the server's control.
+ * @param {Page} page @param {Point} target @param {number} end
+ * @param {{sprint?:boolean, arriving?:string, within?:number, landed?:(here:Point)=>boolean}} [options] */
+async function walk(page, target, end, {sprint = false, arriving, within = sprint ? 1.5 : 0.4, landed} = {}) {
   /** @type {Point | null} */ let last = null;
   let movedAt = Date.now();
   if (sprint) await page.keyboard.down('ShiftLeft');
@@ -86,7 +91,7 @@ async function walk(page, target, end, sprint, arriving) {
       const here = await feet(page).catch(() => null);
       if (here === null) { await delay(150); continue; }
       const distance = Math.hypot(here.x-target.x, here.z-target.z);
-      if (here.home === arriving || distance <= (sprint ? 1.5 : 0.4)) return;
+      if (here.home === arriving || distance <= within || landed?.(here) === true) return;
       await face(page, here, target);
       await page.keyboard.down('KeyW');
       if (last === null || Math.hypot(last.x-here.x, last.z-here.z) >= 0.5) {
@@ -105,9 +110,82 @@ async function walk(page, target, end, sprint, arriving) {
   }
 }
 
+/** Toggle the normal board control and wait for the motor to acknowledge it.
+ * @param {Page} page @param {boolean} enabled */
+async function board(page, enabled) {
+  await page.keyboard.press('KeyH');
+  await page.waitForFunction(on => /** @type {any} */ (window).__wildshard?.world?.player?.hover === on,
+    enabled, { timeout: 5000, polling: 100 });
+}
+
+/** Ride only along the boulevards. Walk the turn-ins and stop on foot before aiming at a gate.
+ * @param {Page} page @param {ApproachPoint} point @param {number} end */
+async function approachPoint(page, point, end) {
+  if (point.ride) {
+    await board(page, true);
+    try {
+      await walk(page, point, end, {within: 18});
+    } finally {
+      await board(page, false);
+    }
+  }
+  await walk(page, point, end, {sprint: true});
+}
+
+/** Convert the published square route and its possible road landings to grid metres.
+ * @param {readonly PortalExit[]} entries @param {Point} center @param {Point} incoming */
+export function portalExitPlan(entries, center, incoming) {
+  const decks = entries.map(({road:{at:[x, , z]}}) => {
+    const [dx, dz] = Math.abs(x) > Math.abs(z) ? [Math.sign(x), 0] : [0, Math.sign(z)];
+    return {x:center.x+x, z:center.z+z, dx, dz};
+  });
+  const entry = entries[decks.findIndex(deck => deck.dx === incoming.x && deck.dz === incoming.z)];
+  return entry === undefined ? null : {walk:entry.route.map(([x, , z]) => ({x:center.x+x,z:center.z+z})), decks};
+}
+
+/** The same content set the served page reads. Portal routes are optional product data.
+ * @param {Page} page @param {string} slug @returns {Promise<PortalExit[]>} */
+async function portalExits(page, slug) {
+  const path = await page.evaluate(slug_ => {
+    const bank = JSON.parse(document.getElementById('boot-module-files')?.textContent ?? '{}');
+    const home = bank.spawnManifests?.home, baked = home?.shards?.includes(slug_);
+    const base = new URL(baked ? home.base : bank.contentBase || document.baseURI);
+    const loose = baked ? home.loose?.[slug_] : undefined;
+    const root = typeof loose === 'string' && /^loose\/[a-f0-9]{64}\/$/u.test(loose) ? new URL(loose, base) : base;
+    return new URL(`shardfiles/${encodeURIComponent(slug_)}/sections/world/edge.json`, root).href;
+  }, slug);
+  const address = new URL(path);
+  if (!['https://packs.wildshard.io', 'https://staging.wildshard.io'].includes(address.origin)) throw new Error('Unexpected portal data origin');
+  const response = await fetch(address, {signal: AbortSignal.timeout(10_000)});
+  if (!response.ok) throw new Error(`Could not read the portal rows (HTTP ${response.status})`);
+  const edge = /** @type {{entryways?: {portal?:PortalExit}[]}} */ (await response.json());
+  return (edge.entryways ?? []).flatMap(row => row.portal === undefined ? [] : [row.portal]);
+}
+
+/** A portal can carry the walker inside immediately after a gate. Walk the declared exit first.
+ * @param {Page} page @param {Cell} from @param {Cell} last @param {Point} center @param {number} end @returns {Promise<Cell>} */
+async function exitToRoad(page, from, last, center, end) {
+  const at = await feet(page);
+  if (at === null || Math.max(Math.abs(at.x-center.x), Math.abs(at.z-center.z)) >= HALF-30) return last;
+  const plan = portalExitPlan(await portalExits(page, from.slug ?? from.instance), center,
+    {x:last.cell[0]-from.cell[0], z:last.cell[1]-from.cell[1]});
+  if (plan === null || plan.walk.length === 0) throw new Error('The gate seated the walker inland without a declared portal exit');
+  /** @param {Point} point */
+  const onDeck = point => plan.decks.some(deck => Math.hypot(point.x-deck.x, point.z-deck.z) < 5);
+  for (const point of plan.walk) await walk(page, point, end, {landed: onDeck});
+  await page.waitForFunction(decks => {
+    const st = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.();
+    return st !== undefined && decks.some(deck => Math.hypot(st.feet.x-deck.x, st.feet.z-deck.z) < 5);
+  }, plan.decks, {timeout: Math.min(10_000, Math.max(1, end-Date.now())), polling: 150});
+  const out = await feet(page);
+  const deck = out === null ? undefined : plan.decks.find(row => Math.hypot(out.x-row.x, out.z-row.z) < 5);
+  if (deck === undefined) throw new Error('The portal did not leave the walker on a declared deck');
+  return {instance:from.instance, cell:[from.cell[0]+deck.dx, from.cell[1]+deck.dz]};
+}
+
 /** Stay on the public road around the current cell when changing exit sides.
- * @param {Cell} last @param {Leg} leg @param {Point} center @param {number} pitch @returns {Point[]} */
-function roadApproach(last, leg, center, pitch) {
+ * @param {Cell} last @param {Leg} leg @param {Point} center @param {number} pitch @returns {ApproachPoint[]} */
+export function roadApproach(last, leg, center, pitch) {
   const incoming = SIDES.findIndex(([dx, dz]) => last.cell[0]-leg.from.cell[0] === dx && last.cell[1]-leg.from.cell[1] === dz);
   const outgoing = SIDES.findIndex(([dx, dz]) => leg.to.cell[0]-leg.from.cell[0] === dx && leg.to.cell[1]-leg.from.cell[1] === dz);
   const sign = (outgoing-incoming+SIDES.length)%SIDES.length <= 2 ? 1 : -1;
@@ -117,13 +195,13 @@ function roadApproach(last, leg, center, pitch) {
     return {x: x*pitch/2, z: z*pitch/2};
   };
   const first = road(incoming);
-  const points = [{x: center.x+first.x, z: center.z+first.z}];
+  const points = [{x: center.x+first.x, z: center.z+first.z, ride: false}];
   for (let side = incoming; side !== outgoing;) {
     const before = road(side);
     side = (side+sign+SIDES.length)%SIDES.length;
     const after = road(side);
-    points.push({x: center.x+before.x+after.x, z: center.z+before.z+after.z},
-      {x: center.x+after.x, z: center.z+after.z});
+    points.push({x: center.x+before.x+after.x, z: center.z+before.z+after.z, ride: true},
+      {x: center.x+after.x, z: center.z+after.z, ride: true});
   }
   return points;
 }
@@ -171,17 +249,20 @@ export async function walkZoneEntryTour(page, origin, result, save) {
     const dx = to.cell[0]-from.cell[0], dz = to.cell[1]-from.cell[1];
     const gate = {x: center.x+dx*(pitch-HALF+2), z: center.z+dz*(pitch-HALF+2)};
     const targetCenter = {x:center.x+dx*pitch,z:center.z+dz*pitch};
-    const approach = previous === undefined
-      ? [{x: center.x+dx*(HALF-15), z: center.z+dz*(HALF-15)}] : roadApproach(previous, leg, center, pitch);
+    const arrivedFrom = previous;
     result.failure = {...pair, reason: 'The runner stopped during this crossing'};
     save();
     try {
+      const approachEnd = Date.now()+APPROACH_MS;
       await bounded(APPROACH_MS, async () => {
-        for (const point of approach) await walk(page, point, Date.now()+APPROACH_MS, true);
+        const approach = arrivedFrom === undefined
+          ? [{x: center.x+dx*(HALF-15), z: center.z+dz*(HALF-15), ride: false}]
+          : roadApproach(await exitToRoad(page, from, arrivedFrom, center, approachEnd), leg, center, pitch);
+        for (const point of approach) await approachPoint(page, point, approachEnd);
       }, 'The walker timed out on the gate approach');
       const started = Date.now();
       await bounded(ENTRY_MS, async () => {
-        await walk(page, gate, started+ENTRY_MS, false, to.instance);
+        await walk(page, gate, started+ENTRY_MS, {arriving: to.instance});
         await arrived(page, to.instance, targetCenter, started+ENTRY_MS);
       }, 'The next world did not reach drawn, interactive play within 90 seconds');
       result.arrivals.push({...pair, ms: Date.now()-started});
