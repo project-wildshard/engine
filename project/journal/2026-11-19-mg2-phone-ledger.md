@@ -55,3 +55,24 @@ Raw captures and exact pin hashes are in
 `~/.cache/wildshard/plan-artifacts/mg2-probe-parity-2026-11-19/`. The hosted Linux Nine
 boot timeout in run `44580026170` occurs before a memory verdict. Its diagnosis is part
 of MG2's shard CI wiring.
+
+## Follow-up on incomplete Pine samples
+
+Two runs of the v0.1.50 probe on Pine reached control, but the last sampling tick started
+502 ms after navigation and only one renderer dump matched. The old unit treated that page
+snapshot as a complete loading measurement. A third run captured 44 dumps. The two
+incomplete reports identify the sampling gap without identifying which Chromium call
+delayed the shared sampling loop.
+
+The client ledger now samples inside the document and sends snapshots to the harness
+independently of the process loop. It stops at control. A startup and control pair alone
+is insufficient to judge the loading peak. The old renderer-only replay rejects incomplete
+loading coverage, and the live ledger report labels a partial Chromium peak.
+
+On the same Pine r6 archive and v0.1.50 client, the new probe measured 1,320 MB with 43
+process dumps. Holding the third Chromium dump response for 12 s left three process dumps.
+The separate ledger reached control and measured 1,319 MB. The report labelled the
+427 MB process peak partial. Both captures are in the raw evidence directory above.
+
+Nine needs the first published engine and preparation-client pair containing the probe
+change. The v0.1.51 cut at `8b5719cf` predates it, so v0.1.52 is the earliest candidate.

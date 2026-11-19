@@ -1,6 +1,8 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+import { runInNewContext } from 'node:vm';
 import { CRASH_LINE, MEMORY_AMBER } from '../src/client/game/grid/budgetOverlay';
-import { CHROMIUM_TO_PHONE, MEMORY_LINE_BYTES, PHONE_MODEL, alignProcessDumps, bootMemoryLine, chromiumToPhone, bootMemoryVerdict, bootPageURL, processDumps } from '../scripts/boot-memory-peak.mjs';
+import { CHROMIUM_TO_PHONE, MEMORY_LINE_BYTES, PHONE_MODEL, alignProcessDumps, bootMemoryLine, chromiumToPhone, bootMemoryVerdict, bootPageURL, installBootMemoryProbe, processDumps } from '../scripts/boot-memory-peak.mjs';
+import type { BootSample } from '../scripts/boot-memory-peak.mjs';
 import { phoneFromLedger } from '../scripts/memory/phoneModel.mjs';
 
 const name = (pid: number, role: string): unknown => ({ pid, ph: 'M', name: 'process_name', args: { name: role } });
@@ -71,6 +73,40 @@ test('MG2: the first request joins the first trace dump even when ids start one 
   ];
   expect([...alignProcessDumps(samples, new Map([['0x1', b], ['0x0', a]]))]).toEqual([['0x1', a], ['0x2', b]]);
   expect(() => alignProcessDumps(samples, new Map([['0x1', b]]))).toThrow('does not match');
+});
+
+test('MG2: the page samples the load even if Chromium process dumps stop at page start', async () => {
+  const page = new EventTarget();
+  let step = 'modules', ram = 80 * MB;
+  const samples: BootSample[] = [{ atMs: 0, step: 'page', dump: 'start', heapBytes: 0 }];
+  const counters = () => ({ ram: { 'array-buffer': ram }, gpu: {}, workers: {} });
+  vi.useFakeTimers();
+  const document = Object.assign(page, { querySelector: () => ({ dataset: { step }, querySelector: () => null }) });
+  const window = {
+    __wildshardMemory: { counters },
+    __recordBootMemoryLedger: (row: { at: number; step: string; counters: ReturnType<typeof counters> }) => {
+      samples.push({ atMs: row.at, step: row.step, ledger: row.counters, dump: null, heapBytes: 0 });
+    },
+  };
+  try {
+    runInNewContext(`(${installBootMemoryProbe.toString()})(250)`, { document, window, Date, setInterval, clearInterval });
+    await vi.advanceTimersByTimeAsync(250);
+    step = 'shaders';
+    ram = 360 * MB;
+    await vi.advanceTimersByTimeAsync(250);
+    ram = 120 * MB;
+    page.dispatchEvent(new Event('ws:control-ready'));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(samples.map(row => row.step)).toEqual(['page', 'modules', 'shaders', 'control']);
+    const dumps = new Map([['start', { browser: 0, renderer: 122 * MB, gpu: 0 }]]);
+    const measured = bootMemoryVerdict(samples, dumps);
+    expect(measured).toMatchObject({ phoneStep: 'shaders', pass: false, rendererThroughControl: false });
+    expect(bootMemoryLine('pine', measured)).toContain('Chromium partial peak');
+    expect(() => bootMemoryVerdict(samples, dumps, { factor: chromiumToPhone() })).toThrow('Renderer dumps did not cover loading through control');
+    expect(() => bootMemoryVerdict(samples.filter(row => row.step === 'page' || row.step === 'control'), dumps)).toThrow('No loading ledger');
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('MG2: the historical factor replays the v0.1.36 crash anchor', () => {

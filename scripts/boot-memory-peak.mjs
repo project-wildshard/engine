@@ -114,6 +114,11 @@ export function bootMemoryVerdict(samples, dumps, { factor, budgetBytes = MEMORY
   }
   const loading = readings.filter(row => row.step !== 'ready');
   const rendererPeak = (loading.length > 0 ? loading : readings).reduce((best, row) => row.renderer > best.renderer ? row : best);
+  const control = samples.find(row => row.step === 'control');
+  const rendererThroughControl = control === undefined ? null : readings.some(row => row.step === 'ready' && row.atMs >= control.atMs);
+  if (factor !== undefined && (!loading.some(row => row.step !== 'page') || rendererThroughControl === false)) {
+    throw new Error('Renderer dumps did not cover loading through control: the legacy phone estimate was not measured');
+  }
   const peakBytes = sum(peak);
   const { step: phoneStep, low, central, high } = factor === undefined ? ledgerPeak(samples) : {
     step: rendererPeak.step, central: rendererPeak.renderer * factor,
@@ -122,7 +127,7 @@ export function bootMemoryVerdict(samples, dumps, { factor, budgetBytes = MEMORY
   };
   const phoneBytes = Math.round(central), phoneLowBytes = Math.round(low), phoneHighBytes = Math.round(high);
   return { peakBytes, peak: { renderer: peak.renderer, gpu: peak.gpu, browser: peak.browser, heapBytes: peak.heapBytes, step: peak.step, atMs: peak.atMs },
-    rendererPeak: { bytes: rendererPeak.renderer, step: rendererPeak.step, atMs: rendererPeak.atMs },
+    rendererPeak: { bytes: rendererPeak.renderer, step: rendererPeak.step, atMs: rendererPeak.atMs }, rendererThroughControl,
     heapPeakBytes: heapPeak, steps: [...steps.values()], samples: readings.length, factor: factor ?? null,
     phoneStep, phoneBytes, phoneLowBytes, phoneHighBytes, budgetBytes, pass: phoneBytes <= budgetBytes };
 }
@@ -132,10 +137,10 @@ export function bootMemoryVerdict(samples, dumps, { factor, budgetBytes = MEMORY
  * @param {readonly BootSample[]} samples */
 function ledgerPeak(samples) {
   const loading = samples.flatMap(({ step, ledger }) => {
-    if (step === 'ready' || ledger === null || ledger === undefined) return [];
+    if (step === 'page' || step === 'ready' || ledger === null || ledger === undefined) return [];
     return [{ step, ...phoneFromLedger(ledger, PHONE_MODEL) }];
   });
-  if (loading.length === 0) throw new Error('No loading ledger from the client: the phone estimate was not measured');
+  if (!loading.some(row => row.step !== 'control')) throw new Error('No loading ledger from the client: the phone estimate was not measured');
   const peak = loading.reduce((best, row) => row.central > best.central ? row : best);
   return { ...peak, low: Math.max(...loading.map(row => row.low)), high: Math.max(...loading.map(row => row.high)) };
 }
@@ -145,9 +150,10 @@ export function bootMemoryLine(slug, verdict) {
   const mb = (/** @type {number} */ bytes) => `${(bytes / 1e6).toFixed(0)} MB`;
   const renderer = `loading renderer ${mb(verdict.rendererPeak.bytes)} at ${verdict.rendererPeak.step}`;
   const method = verdict.factor === null ? `EM11 ledger at ${verdict.phoneStep}; ${renderer}` : `${renderer} x${verdict.factor.toFixed(2)}, legacy EM11 ratio`;
+  const processPeak = verdict.rendererThroughControl === false ? 'Chromium partial peak' : 'Chromium peak';
   return `BOOT MEMORY ${slug}: ${verdict.pass ? 'PASS' : 'RED'} phone ${mb(verdict.phoneBytes)} (${(verdict.phoneLowBytes / 1e6).toFixed(0)}-${mb(verdict.phoneHighBytes)}) / ${mb(verdict.budgetBytes)}`
     + ` (${method});`
-    + ` Chromium peak ${mb(verdict.peakBytes)} = renderer ${mb(verdict.peak.renderer)} + GPU ${mb(verdict.peak.gpu)} at ${verdict.peak.step};`
+    + ` ${processPeak} ${mb(verdict.peakBytes)} = renderer ${mb(verdict.peak.renderer)} + GPU ${mb(verdict.peak.gpu)} at ${verdict.peak.step};`
     + ` JS heap peak ${mb(verdict.heapPeakBytes)}; ${verdict.samples} dumps`;
 }
 
@@ -159,15 +165,41 @@ export function bootPageURL(url, chunk) {
   return page.href;
 }
 
-/** In the page before its scripts: the loading card's current step, for the sampler to read. */
-const STEP_PROBE = String.raw`(() => {
-  const readLedger = () => globalThis.__wildshardMemory?.counters?.() ?? null;
-  document.addEventListener('ws:control-ready', () => { window.__bootMemoryControl = readLedger(); }, { once: true });
-  window.__bootMemoryStep = () => {
-    const root = document.querySelector('.ws-load'); if (!root) return window.__wildshard?.world?.game ? 'ready' : 'page';
-    return root.getAttribute('data-step') || root.querySelector('[data-step]')?.getAttribute('data-step') || 'loading';
+/** Install inside each document so a delayed Chromium process dump cannot stall the loading ledger.
+ * @param {number} everyMs */
+export function installBootMemoryProbe(everyMs) {
+  const step = () => {
+    const root = /** @type {HTMLElement | null} */ (document.querySelector('.ws-load'));
+    if (!root) return Reflect.get(window, '__wildshard')?.world?.game ? 'ready' : 'page';
+    const child = /** @type {HTMLElement | null} */ (root.querySelector('[data-step]'));
+    return root.dataset.step ?? child?.dataset.step ?? 'loading';
   };
-})();`;
+  const capture = (/** @type {string} */ phase) => {
+    try {
+      const counters = Reflect.get(window, '__wildshardMemory')?.counters?.();
+      if (counters !== undefined) {
+        return Promise.resolve(Reflect.get(window, '__recordBootMemoryLedger')({ at: Date.now(), step: phase, counters }))
+          .catch(() => undefined);
+      }
+    } catch { /* A departing document can lose its diagnostics binding. */ }
+    return Promise.resolve();
+  };
+  const timer = setInterval(() => {
+    const phase = step();
+    if (phase !== 'page' && phase !== 'ready') void capture(phase);
+  }, everyMs);
+  /** @type {Promise<unknown> | undefined} */ let control;
+  const finish = () => {
+    if (control === undefined) {
+      clearInterval(timer);
+      control = capture('control');
+    }
+    return control;
+  };
+  document.addEventListener('ws:control-ready', () => { void finish(); }, { once: true });
+  Reflect.set(window, '__bootMemoryStep', step);
+  Reflect.set(window, '__finishBootMemoryLedger', finish);
+}
 
 /**
  * Boot `chunk` on the phone tier in headless Chromium and sample its processes until the world is drawn plus `settleMs`.
@@ -186,6 +218,7 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
   /** @type {string[]} */
   const errors = [];
   let ready = false, failure = /** @type {string|null} */ (null);
+  let started = 0;
   try {
     // The iPhone 17 Pro's portrait viewport (402x874 @3, touch), as memory-proof.mjs boots it; Chromium's own user agent, so
     // the page takes no Safari-only path Chromium can't run.
@@ -195,7 +228,13 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
     // Low graphics (1x, no sun shadows): the preset Jake's phone ran when it crashed, so the calibration's preset
     await saveFixture(context, { scope: 'device', key: 'graphics', data: 'low' });
     await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0 } });
-    await context.addInitScript(STEP_PROBE);
+    await context.exposeBinding('__recordBootMemoryLedger', ({ frame, page: sourcePage }, /** @type {{at:number,step:string,counters:unknown}} */ row) => {
+      if (started === 0 || frame !== sourcePage.mainFrame()) return;
+      const ledger = v.safeParse(ledgerCounters, row.counters);
+      if (ledger.success) samples.push({ atMs: row.at - started, step: row.step, dump: null, heapBytes: 0, ledger: ledger.output,
+        ledgerGpu: Object.values(ledger.output.gpu).reduce((sum, bytes) => sum + bytes, 0) });
+    });
+    await context.addInitScript(installBootMemoryProbe, everyMs);
     await context.route('**/api/errors', route => route.fulfill({ status: 204, body: '' }));
     const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);
     page.on('pageerror', error => { errors.push(error.message); });
@@ -204,20 +243,19 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
     // No periodic dumps (CDP types memoryDumpConfig as strings): only the light dumps the sampler asks for.
     const traceConfig = /** @type {{includedCategories:string[]}} */ ({ includedCategories: ['disabled-by-default-memory-infra'], memoryDumpConfig: { triggers: [] } });
     await tracing.send('Tracing.start', { transferMode: 'ReportEvents', traceConfig });
-    const started = Date.now();
+    started = Date.now();
     const run = { sampling: true };
     const sampler = (async () => {
       while (run.sampling) {
         const tick = Date.now();
-        const [dumped, heap, [step, counters]] = await Promise.all([
+        const [dumped, heap, step] = await Promise.all([
           tracing.send('Tracing.requestMemoryDump', { levelOfDetail: 'light', deterministic: false }).catch(() => null),
           cdp.send('Runtime.getHeapUsage').catch(() => null),
-          page.evaluate(`[window.__bootMemoryStep?.() ?? "page", globalThis.__wildshardMemory?.counters?.() ?? null]`).catch(() => ['page', null]),
+          page.evaluate(`window.__bootMemoryStep?.() ?? "page"`).catch(() => 'page'),
         ]);
         const heapBytes = heap === null ? 0 : heap.usedSize + (heap.embedderHeapUsedSize ?? 0) + (heap.backingStorageSize ?? 0);
-        const ledger = v.safeParse(ledgerCounters, counters);
-        samples.push({ atMs: tick - started, step: String(step), dump: dumped?.success === true ? dumped.dumpGuid : null, heapBytes,
-          ledger: ledger.success ? ledger.output : null, ledgerGpu: ledger.success ? Object.values(ledger.output.gpu).reduce((sum, bytes) => sum + bytes, 0) : null });
+        const guid = dumped?.dumpGuid;
+        samples.push({ atMs: tick - started, step: String(step), dump: guid === '' ? null : guid ?? null, heapBytes });
         await sleep(Math.max(0, everyMs - (Date.now() - tick)));
       }
     })();
@@ -238,17 +276,13 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
         await page.goto(bootPageURL(url, chunk), { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)));
       }
-      const completed = await page.evaluate(() => ({
-        error: document.querySelector('#wserr .msg')?.textContent ?? null,
-        ledger: Reflect.get(window, '__bootMemoryControl') ?? Reflect.get(window, '__wildshardMemory')?.counters?.(),
-      }));
-      failure = completed.error;
+      failure = await page.evaluate(async () => {
+        const error = document.querySelector('#wserr .msg')?.textContent ?? null;
+        if (error === null) await Reflect.get(window, '__finishBootMemoryLedger')?.();
+        return error;
+      });
       ready = failure === null;
-      if (ready) {
-        const ledger = v.safeParse(ledgerCounters, completed.ledger);
-        if (ledger.success) samples.push({ atMs: Date.now() - started, step: 'control', dump: null, heapBytes: 0, ledger: ledger.output });
-        await page.waitForTimeout(settleMs);
-      }
+      if (ready) await page.waitForTimeout(settleMs);
     } finally {
       run.sampling = false; await sampler;
       const ended = new Promise(resolve => { tracing.once('Tracing.tracingComplete', resolve); });
