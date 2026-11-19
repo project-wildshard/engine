@@ -27,6 +27,7 @@ export function deployFrameProblem(page: Pick<Page, 'waitForTimeout' | 'screensh
 /** SS-JP1: the index of `card`'s Shard Select card among the cards' names (title row, else the slug, else its words), or -1. */
 export function titleCardIndex(rows: unknown, names: readonly string[], card: string): number;
 export function tapJourney(page: Page, options: { card: string; path?: JourneyPath; budgetMs?: number; sampleMs?: number; frames?: (row: Sample) => Promise<void> }): Promise<Sample[]>;
+export function acceptPhoneMemoryWarning(page: Page): Promise<void>;
 export function stickMoves(page: Page): Promise<boolean>;
 /** SB44: null when the stick moved the player, else why not (the page left play during the check included) */
 export function stickProblem(page: Page): Promise<string | null>;

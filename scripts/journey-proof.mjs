@@ -284,6 +284,12 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
   return sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample, start });
 }
 
+/** Continue from J431's phone memory warning using the same control as a player. @param {Page} page */
+export async function acceptPhoneMemoryWarning(page) {
+  const play = page.locator('dialog.ws-load-memory-warning[open][data-boot-wait="player"] > button.ws-load-play');
+  if (await play.isVisible().catch(() => false)) await play.click({ timeout: 1000 }).catch(() => undefined);
+}
+
 /** Sample from the tap until play holds for 2 s, or the budget runs out.
  * @param {Page} page @param {{ budgetMs: number, sampleMs: number, frames?: (row: Sample) => Promise<void>, samples: Sample[], sample: () => Promise<Screen | null>, start: number, skipName?: () => Promise<void> }} run
  * @returns {Promise<Sample[]>} */
@@ -296,7 +302,9 @@ async function sampleToPlay(page, { budgetMs, sampleMs, frames, samples, sample,
     const s = await sample();
     const last = samples.at(-1);
     if (frames !== undefined && last !== undefined && Date.now() - shotAt > 450) { shotAt = Date.now(); await frames(last).catch(() => undefined); }
-    if (label(s) === 'play') {
+    const state = label(s);
+    if (state === 'loading' || state === 'bar') await acceptPhoneMemoryWarning(page);
+    if (state === 'play') {
       playSince ??= Date.now();
       if (Date.now() - playSince > 2000) break;
     } else playSince = null;

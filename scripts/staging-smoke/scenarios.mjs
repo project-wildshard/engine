@@ -4,7 +4,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { deployFrameProblem, judge, judgeDeploy, label, PHONE, screenNow, stickMoves } from '../journey-proof.mjs';
+import { acceptPhoneMemoryWarning, deployFrameProblem, judge, judgeDeploy, label, PHONE, screenNow, stickMoves } from '../journey-proof.mjs';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { modalKind } from './checks.mjs';
 import { judgeFrame } from './worldFrame.mjs';
@@ -129,6 +129,7 @@ export async function watchLeg(page, { name, tap, budgetMs = 90_000, holdMs = 20
   const modals = [];
   while (Date.now() - start < budgetMs) {
     const what = label(await sample());
+    if (what === 'loading' || what === 'bar') await acceptPhoneMemoryWarning(page);
     if (what === 'modal') {
       const kind = await page.evaluate(modalKind).catch(() => null);
       if (kind !== null && !modals.includes(kind)) modals.push(kind);
