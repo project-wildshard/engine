@@ -30,7 +30,7 @@ test('a dock spawns its vehicle, a scripted stick drives it, its body rides with
     expect(runtime.ids()).toEqual(['line.sail']); // the shared one stands at once, the buggy waits for a player
     const buggy = runtime.spawn('yard.buggy', 'p1');
     expect(runtime.spawn('yard.buggy', 'p1')).toBe(buggy);
-    expect(runtime.board(buggy, 'p2')).toBe(false); // someone else's buggy
+    expect(runtime.board(buggy, 'p2', 0)).toBe(false); // someone else's buggy to drive
     expect(runtime.board(buggy, 'p1')).toBe(true); expect(runtime.driver(buggy)).toBe('p1');
     sticks.set('p1', { throttle: 1, turn: 0, boost: false });
     run(runtime, physics, 2);
@@ -44,7 +44,7 @@ test('a dock spawns its vehicle, a scripted stick drives it, its body rides with
     sticks.set('p1', { throttle: 1, turn: 1, boost: false });
     run(runtime, physics, 1);
     expect(runtime.pose(buggy).euler.y).toBeLessThan(-0.3); // a right turn lowers yaw
-    runtime.leave(buggy);
+    runtime.leave('p1');
     run(runtime, physics, VEHICLE_IDLE_DESPAWN - 1);
     expect(runtime.ids()).toContain(buggy);
     expect(runtime.speed(buggy)).toBe(0); // left, it coasted to a stand
@@ -62,7 +62,7 @@ test('a shared vehicle left away from its dock goes home after the dock\'s respa
     run(runtime, physics, 3);
     const away = runtime.pose('line.sail');
     expect(Math.hypot(away.position.x - 6, away.position.z - 20)).toBeGreaterThan(5);
-    runtime.leave('line.sail');
+    runtime.leave('p1');
     run(runtime, physics, 29);
     expect(Math.hypot(runtime.pose('line.sail').position.x - 6, runtime.pose('line.sail').position.z - 20)).toBeGreaterThan(5);
     run(runtime, physics, 1.5);
