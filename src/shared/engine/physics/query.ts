@@ -4,6 +4,7 @@
  * was hit: the point, the surface normal, the distance, its material (bolts stick in wood, glance off stone; impact
  * sounds and dust by material) and its owner (the piece, door or animal behind the collider).
  */
+import { RawVector } from '@dimforge/rapier3d-simd/raw.js';
 import type { Ball, Collider, Ray } from '@dimforge/rapier3d-simd';
 import type { Physics } from './Physics';
 import { GROUP, queryGroups, type GroupName } from './groups';
@@ -153,17 +154,29 @@ export function clearStand(physics: Physics, x: number, z: number, fromY: number
   physics.world.forEachCollider(collider => {
     if (collider.isEnabled() && !collider.isSensor() && collider.handle !== exclude?.handle && ((collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0) world.push(collider);
   });
-  const { R } = physics, ray = new R.Ray({ x, y: fromY + lift, z }, { x: 0, y: -1, z: 0 });
+  const { R } = physics, { raw } = physics.world.colliders;
+  // Each footprint ray goes through the same set of colliders. Reuse the
+  // native inputs that Collider.castRay would allocate for every collider.
+  const down = new RawVector(0, -1, 0);
   let low = Infinity, high = -Infinity;
-  for (let point = -1; point < 8; point++) {
-    const angle = point * Math.PI / 4;
-    ray.origin = point < 0 ? { x, y: fromY + lift, z } : { x: x + Math.cos(angle) * radius, y: fromY + lift, z: z + Math.sin(angle) * radius };
-    let near = Infinity;
-    for (const collider of world) { const t = collider.castRay(ray, lift + drop, true); if (t >= 0 && t < near) near = t; }
-    if (near === Infinity) return undefined;
-    const floor = fromY + lift - near;
-    low = Math.min(low, floor); high = Math.max(high, floor);
-  }
+  try {
+    const origin = new RawVector(x, fromY + lift, z);
+    try {
+      for (let point = -1; point < 8; point++) {
+        const angle = point * Math.PI / 4;
+        origin.x = point < 0 ? x : x + Math.cos(angle) * radius;
+        origin.z = point < 0 ? z : z + Math.sin(angle) * radius;
+        let near = Infinity;
+        for (const collider of world) {
+          const t = raw.coCastRay(collider.handle, origin, down, lift + drop, true);
+          if (t >= 0 && t < near) near = t;
+        }
+        if (near === Infinity) return undefined;
+        const floor = fromY + lift - near;
+        low = Math.min(low, floor); high = Math.max(high, floor);
+      }
+    } finally { origin.free(); }
+  } finally { down.free(); }
   if (high - low > lift) return undefined;
   const feet = high > fromY ? high + skin : fromY, shape = new R.Capsule(Math.max(0.01, height / 2 - radius), radius);
   const centre = { x, y: feet + height / 2 + 0.03, z }, rotation = { x: 0, y: 0, z: 0, w: 1 };
