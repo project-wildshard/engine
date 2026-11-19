@@ -425,8 +425,14 @@ async function startPage(): Promise<void> {
   // best effort: a failed read never stops the report or the modal (Codex, J206)
   const stall = (): Record<string, unknown> => {
     try {
-      return stuckContext(reportCardOf(card()), {
-        connection: (navigator as Navigator & { connection?: { effectiveType?: string } }).connection?.effectiveType, visibility: document.visibilityState });
+      // TR-4b: the boot's own operations still open, newest last: a stall names the await it sits in (hosted T1 runs
+      // stopped in "home" and "road" with no reads and no named wait), in the report and in the console a trace keeps
+      const now = Number(document.timeline.currentTime ?? 0), open = (bootTiming()?.entries ?? []).filter(row => row.end === null).slice(-12)
+        .map(row => `${row.operation} ${((now - row.start) / 1000).toFixed(1)}s`);
+      const why = { ...stuckContext(reportCardOf(card()), {
+        connection: (navigator as Navigator & { connection?: { effectiveType?: string } }).connection?.effectiveType, visibility: document.visibilityState }), open };
+      console.warn('[boot] stalled', JSON.stringify(why));
+      return why;
     } catch { return { unreadable: true }; }
   };
   const started = startSelected();

@@ -150,6 +150,10 @@ async function openWorld(
       if (message.type() === 'error') {
         errors.push(message.text())
       }
+      // TR-4b: a stalled boot names its open operations; a suite the runner kills keeps only stdout
+      if (message.text().startsWith('[boot] stalled')) {
+        process.stdout.write(`[t1-stall] ${message.text()}\n`)
+      }
     })
     await seat(page)
     expect(errors).toEqual([])
