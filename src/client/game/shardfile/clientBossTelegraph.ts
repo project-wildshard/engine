@@ -9,11 +9,13 @@ import { wirePage } from './wirePage';
 /** How long a strike the server said stands without being said again: a frame covers two ticks, and a page can lag. */
 const HEARD_FOR = 0.25;
 /** Client-only telegraphs on the original encounter. Marked views are consumed
- * when the spawned fight binds; lane sheets read its real strike controller. */
+ * when the spawned fight binds; lane sheets draw the strikes the server says (a keeper's or a declared owner boss's). */
 export function installClientBossTelegraph(ctx: ShardContext, input: unknown): void {
   const row = parse(ClientBossTelegraphSchema, input), fight = clientNativeBook(ctx).fight, view = row.view;
-  const world = ctx.game.runtime?.world;
-  if (fight === null || world === undefined || world === null || row.actor !== ctx.product.section('sim/runtime-plan').recipe.population.owner?.actor)
+  const world = ctx.game.runtime?.world, owner = ctx.product.section('sim/runtime-plan').recipe.population.owner?.actor, source = ctx.product.shardfile;
+  // OF20c: an owner row naming a declared spawn is its declared boss encounter's; the page binds no fight, and the server says its strikes
+  const declared = owner !== undefined && source.creatures.spawns.some(spawn => spawn.id === owner) && source.encounters.some(encounter => encounter.entity === owner && encounter.kind === 'boss');
+  if ((fight === null && !declared) || world === undefined || world === null || row.actor !== owner)
     throw new Error('Boss telegraph requires its actual encounter owner');
   if (view.kind === 'marked') return; // a row names no strike
   const strike = ctx.product.section('actors/strikes').find(entry => entry.id === view.strike);

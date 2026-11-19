@@ -16,6 +16,8 @@ import { BossContenders } from '@wildshard/engine/ai/bossContenders';
 import { BossBounty } from '../boss/bounty';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { NO_MOMENTS, publishEncounter, type EncounterReward } from '@wildshard/engine/sim/encounterRows';
+import { sayFightView } from '@wildshard/engine/sim/shardRows';
+import { BOSS_STRIKE } from '../../../shared/game/shardfile/wirePrompts';
 
 /** What a boss row's encounter is given: its definition and view-free script, its body, its record and its fight state. */
 export interface BossRowSpec {
@@ -188,7 +190,7 @@ export interface DeclaredOwnerHooks {
  * the flag, when `once`), its coins pay on the win or once as a claim (each earner once in a room, J105, keyed by the row's
  * step), its record is the row's flags (`record`) or its inline `saved`, and a death the fall dealt files and pays nothing
  * (HS3). `brain` is the encounter's, once installed: a claim marks its record taken. The room's earners keep a fixed step
- * named after the row, so a kill and its victory may straddle a save. The row's profile and stages are the keeper's and
+ * named after the row, so a kill and its victory may straddle a save; the step also says the body's strikes to the page. The row's profile and stages are the keeper's and
  * are not run here.
  */
 export function declaredOwnerHooks(host: SimHost, input: unknown, body: AnimalSim, ports: Omit<BossOwnerPorts, 'body'>, brain: () => BossBrain | undefined): DeclaredOwnerHooks {
@@ -198,7 +200,11 @@ export function declaredOwnerHooks(host: SimHost, input: unknown, body: AnimalSi
   const saved = record?.saved ?? row.saved ?? { defeated: false, rewardTaken: false, kills: 0 };
   const persist = record?.persist ?? (() => undefined);
   const bounty = new BossBounty(host, () => body, row.step);
-  host.onStep(row.step, () => undefined, { snapshot: () => JSON.stringify(bounty.earned),
+  // OF20c: its strikes are said as the keeper's borrowed decisions say them (`boss.strike.<id>`), so a page's lane sheet draws them
+  host.onStep(row.step, () => {
+    const runner = host.strikes.get(row.actor), spec = runner?.spec;
+    if (runner !== undefined && spec !== null && spec !== undefined) sayFightView(host, `${BOSS_STRIKE}${spec.id}`, [runner.through, runner.yaw, body.position.x, body.position.z]);
+  }, { snapshot: () => JSON.stringify(bounty.earned),
     restore: value => { if (typeof value !== 'string') throw new Error(`Invalid ${row.step} continuation`); bounty.restore(v.parse(v.array(v.string()), JSON.parse(value))); } });
   const pay = (): void => {
     const { amount } = row.reward;

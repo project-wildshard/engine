@@ -21,6 +21,7 @@ import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { prepareRuntimePlan, prepareRuntimeWorld, type NativeRuntimeEffect, type NativeRuntimeRecipe } from '../src/server/game/plugin/simulation';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
+import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { emptyShardfile } from '../src/shared/host/author';
 import { canonicalSimDigest } from '../src/test/engine/simState';
@@ -57,7 +58,7 @@ function declaring(source: Shardfile, ground: number): Shardfile {
   const looks = [{ id: 'of20c.look.boss', species: 'of20c.creature.boss', recipe: 'sunscar.rig', material: null, parameters: {}, animation: { recipe: 'sunscar.clips', parameters: {} } }];
   const at: [number, number, number] = [ARENA[0], ground, ARENA[1]];
   const parsed = parseShardfile({ ...base, rows: { ...base.rows, species, strikes: rows.rows.strikes, looks },
-    creatures: { ...base.creatures, spawns: [{ id: BOSS, species: 'of20c.creature.boss', variant: 'dusk', brain: null, strike: null, seed: 3, scale: 1, at, yaw: 0 }] },
+    creatures: { ...base.creatures, spawns: [{ id: BOSS, species: 'of20c.creature.boss', variant: 'dusk', brain: null, strike: 'sunscar.strider.horns', seed: 3, scale: 1, at, yaw: 0 }] },
     encounters: [{ id: FIGHT, entity: BOSS, kind: 'boss', panel: null, name: 'Dune Matriarch', title: 'Mother of the Sands', retry: 'Again',
       start: 'spawned', arena: { at, radius: 30 }, intro: 0.25, introShort: 0.25, respawn: { at: [ARENA[0], ground, ARENA[1] + 20], yaw: 0 },
       phases: [{ at: 1, name: 'one', caption: 'She rises', speed: 0, stopDistance: 2, turnRate: 6 }, { at: 0.5, name: 'two', caption: 'She rages', speed: 0, stopDistance: 2, turnRate: 8 }] }] });
@@ -94,12 +95,12 @@ async function arena(owner?: (row: Owner) => Owner): Promise<Arena> {
   return { host, effects, world, fixture, ground, install };
 }
 /** The player stands in the arena, unhurt; each tick a player blow lands on the boss while the fight takes it. */
-function fightOn(context: Arena, ticks: number, until: () => boolean, blow = 40): void {
+function fightOn(context: Arena, ticks: number, until: () => boolean, blow = 40, off = 5): void {
   const { host, ground } = context, player = leadPlayer(host), body = host.entities.get(BOSS);
   if (body === undefined) throw new Error('Missing declared boss');
   host.events.answer('damage.modify', request => request?.target === player.health ? null : request, host.scope);
   for (let i = 0; i < ticks && !until(); i++) {
-    player.position.set(ARENA[0], ground + 0.1, ARENA[1] + 5); player.velocity.set(0, 0, 0);
+    player.position.set(ARENA[0], ground + 0.1, ARENA[1] + off); player.velocity.set(0, 0, 0);
     if (blow > 0 && fight(host).state === 'fight' && body.alive) host.combat.hit({ source: player.health, sourceTags: ['actor.player'], target: body.combatActor(), amount: blow,
       point: body.position.clone(), dir: new Vector3(), cause: { kind: 'test', label: 'test' } });
     host.step();
@@ -166,4 +167,21 @@ test('an owner row on a declared spawn with no boss encounter refuses', async ()
   const shard = declaring(fixture.shard, probe.ports.heightAt(ARENA[0], ARENA[1]));
   await expect(prepareRuntimeWorld({ ...shard, encounters: [] }, fixture.assets, fixture.plan.baked, keeperless(fixture.plan), cellSections(fixture)))
     .rejects.toThrow(/names declared spawn sunscar.matriarch, which has no boss encounter/u);
+}, 120_000);
+
+test('a declared owner boss says its strikes as the keeper\'s did, so a page\'s lane sheet draws them', async () => {
+  const context = await arena(), { host } = context, said = new Set<string>();
+  try {
+    const body = host.entities.get(BOSS);
+    if (body === undefined) throw new Error('Missing declared boss');
+    fightOn(context, 600, () => fight(host).state === 'fight', 0);
+    expect(fight(host).state).toBe('fight');
+    for (let i = 0; i < 600 && said.size === 0; i++) {
+      shardRows(host).calls.length = 0; fightOn(context, 1, () => false, 0, 1.5);
+      for (const call of shardRows(host).calls) if (call.name.startsWith('boss.strike.')) said.add(call.name);
+    }
+    const strike = host.strikes.get(BOSS)?.spec?.id;
+    expect(strike).toBeDefined();
+    expect([...said]).toEqual([`boss.strike.${strike ?? ''}`]);
+  } finally { host.dispose(); }
 }, 120_000);
