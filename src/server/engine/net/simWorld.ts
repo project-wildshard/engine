@@ -25,6 +25,9 @@ export class SimNetWorld implements NetWorld {
   identified(seat: string, identity: NetIdentity): boolean { actRoutes(this.host).identities.set(seat, identity.player); return true; }
   /** MP2.4: a dedicated host sets this to the Name its door claimed; a local worker has none. */
   nameOf?: (seat: string) => string | undefined;
+  /** MMO-PLAN MP5.2a: rows of bodies another room holds, shown here read-only (a dedicated worker's `EdgeList`), and who is kept from them. */
+  edge: { visit: (visitor: NetVisitor) => void } | null = null;
+  hides?: (player: string, entity: string) => boolean;
   readonly player: NetPlayer;
   private readonly host: SimHost;
   private readonly pose: AnimalPoseSample = emptyPose();
@@ -113,6 +116,7 @@ export class SimNetWorld implements NetWorld {
   visit(visitor: NetVisitor): void {
     const { host, pose } = this, targets = new Map(host.attackTargets());
     for (const player of host.players.values()) if (!host.parked.has(player.id) || host.shown.has(player.id)) visitor.entity(player.id, PLAYER_CLASS, player);
+    this.edge?.visit(visitor);
     for (const [id, sim] of host.entities) {
       sim.samplePose(pose);
       const view: AnimalNetView = { sim, pose, target: targets.get(id) ?? null, rideable: actRoutes(this.host).mountable?.(id) === true };

@@ -109,6 +109,10 @@ export class RoadRoom implements CrossTarget {
     for (const seat of this.seats.values()) { const at = this.host.players.get(seat.body)?.position; if (at !== undefined && Math.abs(at.x - origin.x) <= reach && Math.abs(at.z - origin.z) <= reach) return true; }
     return false;
   }
+  /** MP5.2a: each seat's body and the home it walked out of. */
+  homes(): Map<string, string | null> { const homes = new Map<string, string | null>(); for (const seat of this.seats.values()) homes.set(seat.body, seat.home); return homes; }
+  /** MP5.2a: the grid as this road reads it now (a placement grows it). */
+  get grid(): GridAssembly { return this.assembly; }
   /** ZE9a: the cell this seat is entering by its gate, its body frozen, or null. */
   entering(device: string): string | null { return this.seats.get(device)?.frozen?.cell ?? null; }
   bodyOf(device: string): PlayerSim | undefined { const seat = this.seats.get(device); return seat === undefined ? undefined : this.host.players.get(seat.body); }

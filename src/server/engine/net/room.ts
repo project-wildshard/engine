@@ -61,6 +61,8 @@ export interface NetWorld {
   tick: () => number;
   /** The cell frame positions are local to (§3.5). */
   cell: () => number;
+  /** MMO-PLAN MP5.2a: whether the client owning `player` is kept from the row `entity` it would otherwise see. Left out, nobody is. */
+  hides?: (player: string, entity: string) => boolean;
   /** Visit every replicated entity, the player included. */
   visit: (visitor: NetVisitor) => void;
   /** What the tick settled (P1-E3.2): each hit and death since the last call. A world with no fights leaves it out. */
@@ -428,10 +430,11 @@ export class NetRoom {
     client.nextView = (client.nextView + 1) % FRAME_RING;
     view.tick = frame.tick; view.visible.clear(); view.due.clear();
     const places = this.placesOf(frame), { handles, classes, xyz, has } = places, ownAt = places.index.get(own);
-    const origin = ownAt === undefined || has[ownAt] === 0 ? -1 : ownAt * 3, frameAt = Math.floor(frame.tick / TICKS_PER_FRAME);
+    const origin = ownAt === undefined || has[ownAt] === 0 ? -1 : ownAt * 3, frameAt = Math.floor(frame.tick / TICKS_PER_FRAME), { hides } = this.world;
     for (let slot = 0; slot < handles.length; slot++) {
       const handle = handles[slot] as number, cls = classes[slot] as NetClass<never>;
       if (handle === own) continue;
+      if (hides !== undefined && hides(client.player.id, this.handles.idOf(handle) ?? '')) continue;
       const at = slot * 3, away = origin < 0 || has[slot] === 0 ? 0 : ((xyz[at] as number) - (xyz[origin] as number)) ** 2 + ((xyz[at + 1] as number) - (xyz[origin + 1] as number)) ** 2 + ((xyz[at + 2] as number) - (xyz[origin + 2] as number)) ** 2;
       if (cls.radius !== null && away > cls.radius ** 2) continue;
       view.visible.add(handle);

@@ -12,6 +12,7 @@ import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { DedicatedRoom, type DedicatedRoomRoad } from './dedicatedRoom';
 import { cellShard, gridAssembly, gridCell, placeCell, placedHash, roadName } from './gridCells';
 import { RoadRoom } from './roadRoom';
+import { EDGE_EVERY, EdgeList, EdgeRows, type EdgeCell } from './edgeRows';
 import { applyMotion } from '@wildshard/engine/game/grid/simulation';
 import { placedStrips } from '@wildshard/engine/game/grid/voidFloor';
 import { openRoad } from '../standalone/roadWorld';
@@ -166,6 +167,22 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     options.booted?.(slug, room);
     return room;
   };
+  // MMO-PLAN MP5.2a: players across the home edge, read-only, between this worker's cells and its road (`edgeRows.ts`)
+  let edgeTicks = 0, edges: EdgeRows | undefined;
+  const edgeLists = new WeakMap<DedicatedRoom, EdgeList>(), roadList = new EdgeList();
+  const refreshEdges = (on: RoadRoom): void => {
+    if (edges === undefined) {
+      const rows = edges = new EdgeRows();
+      on.sim.edge = roadList; on.sim.hides = (player, entity) => rows.hides(player, entity);
+    }
+    const listed: EdgeCell[] = [];
+    for (const { slug, room } of cells.values()) {
+      let list = edgeLists.get(room);
+      if (list === undefined) { list = new EdgeList(); edgeLists.set(room, list); room.sim.edge = list; }
+      listed.push({ slug, host: room.host, list, taken: room.taken });
+    }
+    edges.refresh({ host: on.host, list: roadList, taken: on.taken, homes: () => on.homes() }, listed, new Map(on.grid.cells.map(cell => [cell.instance, cell.origin])));
+  };
   const step = (): void => {
     const begun = diagnosticNow();
     try {
@@ -179,6 +196,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
         own.ms += diagnosticNow() - at; own.ticks++; spent.set(slug, own);
       }
       if (road !== undefined && road.taken > 0) road.tick();
+      if (road !== undefined && ++edgeTicks % EDGE_EVERY === 0) refreshEdges(road);
     } catch (error) { fail(error); return; }
     ticks.push(diagnosticNow() - begun); ticked++;
     if (ticks.length > TICKS_KEPT) ticks.shift();

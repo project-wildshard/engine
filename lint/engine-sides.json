@@ -1426,6 +1426,7 @@
     "src/server/host/dedicated/cellHost.ts": "server",
     "src/server/host/dedicated/crossing.ts": "server",
     "src/server/host/dedicated/loopLag.ts": "server",
+    "src/server/host/dedicated/edgeRows.ts": "server",
     "src/server/host/dedicated/roadRoom.ts": "server",
     "src/server/host/dedicated/cellProtocol.ts": "server",
     "src/server/host/dedicated/cellWorker.ts": "server",
