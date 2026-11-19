@@ -24,8 +24,13 @@ export function netNeighbourRegion(client: NetClient, renderTick: () => number):
       const trail = trails.get(id) ?? { tick, x, z, speed: 0 };
       if (tick - trail.tick >= SPEED_SPAN) Object.assign(trail, { speed: Math.hypot(x - trail.x, z - trail.z) / ((tick - trail.tick) * FIXED_STEP), tick, x, z });
       trails.set(id, trail);
+      // CC27: the row's root at an earlier whole tick, for a serpent view's trail ring (a held sample reads exactly)
+      const rootAt = (at: number): { x: number; y: number; z: number } | null => {
+        const then = client.interpolator.fields(handle, at), tx = then?.['x'], ty = then?.['y'], tz = then?.['z'];
+        return typeof tx !== 'number' || typeof ty !== 'number' || typeof tz !== 'number' ? null : { x: tx, y: ty, z: tz };
+      };
       return { position: { x, y, z }, yaw, scale, speed: trail.speed, strafe: 0, alive: alive === true, attackPhase: attackT === 0 ? -1 : Number(attackT), state,
-        ...(typeof hp === 'number' ? { hp } : {}), ...(typeof flinch === 'number' ? { flinch } : {}) };
+        ...(typeof hp === 'number' ? { hp } : {}), ...(typeof flinch === 'number' ? { flinch } : {}), tick, rootAt };
     }
     return undefined;
   };

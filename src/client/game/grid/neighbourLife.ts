@@ -25,6 +25,8 @@ import { ClientScriptViews, type ClientScriptViewTarget, type ClientScriptViewSt
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import type { GridCell } from '../../../shared/game/grid/assembly';
+import { TrailCreatureVolumes } from '../../../shared/game/shardfile/trailCreatureVolumes';
+import { TRAIL_SAMPLE_TICKS } from '@wildshard/engine/entities/trailBones';
 
 /** One creature as a view draws it (E6): a page reads the region's sim entity, a client reads its row. */
 export interface NeighbourCreature {
@@ -34,6 +36,10 @@ export interface NeighbourCreature {
   readonly alive: boolean; readonly attackPhase: number; readonly state: SkinDriveState['state'];
   /** The row's hp and flinch (absent on a source that sends neither): a fall in hp is a blow, whoever landed it. */
   readonly hp?: number; readonly flinch?: number;
+  /** ONE-FORMAT CC27: the tick this row is drawn at, and the row's root at an earlier whole tick (null when the source no
+   *  longer holds it). A serpent's view feeds its own trail ring from these on the 10 Hz sample ticks, as the server does. */
+  readonly tick?: number;
+  readonly rootAt?: (tick: number) => { readonly x: number; readonly y: number; readonly z: number } | null;
 }
 /** A cell's admitted region, as much of it as a view reads. */
 export interface NeighbourRegion { readonly host: { readonly entities: { get: (id: string) => NeighbourCreature | undefined } } }
@@ -59,7 +65,11 @@ class CreatureTarget implements CombatTarget, AimTarget {
     readonly dims: { readonly bodyY: number; readonly bodyRadius: number }, readonly lockable: boolean) { this.hp = maxHp; this.maxHp = maxHp; this.scale = scale; }
   headWorld(out: Vector3): Vector3 { return out.copy(this.position).setY(this.position.y + this.head * this.scale); }
 }
-interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly bones: Record<string, Bone>; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; readonly target: CreatureTarget; t: number; phase: number }
+interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly bones: Record<string, Bone>; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; readonly target: CreatureTarget; t: number; phase: number; readonly trail?: ViewTrail }
+/** A serpent's page-side trail (CC27): its ring fed from the row's roots on the sample ticks, posed on the drawn root. */
+interface ViewTrail { readonly volumes: TrailCreatureVolumes; readonly root: { readonly position: Vector3; yaw: number; scale: number }; last: number }
+/** A gap longer than this (a page hidden, a row out of relevance) lays a fresh rest trail instead of catching up. */
+const TRAIL_CATCH_UP = 60;
 interface CellLife {
   readonly cell: GridCell; readonly root: Group; readonly creatures: ReadonlyMap<string, CreatureView>;
   /** null: the cell binds no script (or its lane failed to build, `failed` says why); its creatures still draw */
@@ -139,7 +149,10 @@ export class NeighbourLife {
           get yaw() { return mesh.rotation.y; }, get scale() { return mesh.scale.x; } });
         target.lockPoints = { names: points.names, point: (index, out) => { root.updateWorldMatrix(true, false); return points.point(index, out).applyMatrix4(root.matrixWorld); } };
       }
-      const view: CreatureView = { id, mesh, bones, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale }, bodyY: species.dims.bodyY * scale, target, t: (spawn.seed % 97) / 13, phase: 0 };
+      // CC27: a serpent's trail bones lie on the path its root drew, the same ring the server's volumes ride
+      const trailRoot = { position: new Vector3(spawn.at[0], spawn.at[1], spawn.at[2]), yaw: spawn.yaw, scale };
+      const trail = species.body?.skeleton === 'serpent' ? { volumes: new TrailCreatureVolumes(species.body, trailRoot, () => -Infinity), root: trailRoot, last: -1 } : undefined;
+      const view: CreatureView = { id, mesh, bones, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale }, bodyY: species.dims.bodyY * scale, target, t: (spawn.seed % 97) / 13, phase: 0, ...(trail === undefined ? {} : { trail }) };
       mesh.position.set(spawn.at[0], spawn.at[1], spawn.at[2]); mesh.rotation.set(0, spawn.yaw, 0, 'YXZ'); mesh.scale.setScalar(scale);
       // ZE3a: hidden from birth unless its cell is the active one: an admission that resolves between the late phase (which
       // hides a frozen cell's creatures) and the draw drew them once, and that draw linked their programs on the frame (a
@@ -228,6 +241,7 @@ export class NeighbourLife {
         if (pose?.joint !== undefined) {
           for (const [name, bone] of Object.entries(view.bones)) if (!pose.joint(name, bone.position, bone.quaternion, bone.scale)) throw new Error(`Missing authoritative neighbour joint ${name}`);
         } else view.driver.step({ dt, t: view.t, alive: sim?.alive ?? true, flinch: sim?.flinch ?? 0, attack: sim?.attackPhase ?? -1, speed, strafe, scale: sim?.scale ?? view.spawn.scale, phase: view.phase, state: sim?.state ?? 'idle' });
+        if (view.trail !== undefined && pose?.joint === undefined) poseTrail(view, view.trail, sim);
       }
       if (life.failed === null) life.lane?.views.apply(dt);
     }
@@ -246,5 +260,30 @@ export class NeighbourLife {
 
   state(): readonly NeighbourLifeCell[] {
     return [...this.cells.values()].map((life) => ({ instance: life.cell.instance, creatures: life.creatures.size, frozen: !this.ports.active(life.cell.instance), views: life.lane?.views.state() ?? { targets: 0, posed: 0, particles: 0, capacity: 0, tick: 0 }, failed: life.failed }));
+  }
+}
+
+/**
+ * CC27: feed a serpent view's ring with the row's root on every sample tick (multiples of `TRAIL_SAMPLE_TICKS`) up to the
+ * tick it is drawn at, then lay its trail bones from the drawn root. Two pages that heard the same rows hold the same ring,
+ * so their bodies behind the head lie on one path; the head leads by whatever the two pages' draw ticks differ by.
+ */
+function poseTrail(view: CreatureView, trail: ViewTrail, sim: NeighbourCreature | undefined): void {
+  const { root, volumes } = trail, now = sim?.tick === undefined ? undefined : Math.floor(sim.tick);
+  if (sim !== undefined && now !== undefined && sim.rootAt !== undefined) {
+    if (trail.last < 0 || now < trail.last || now - trail.last > TRAIL_CATCH_UP) {
+      root.position.copy(sim.position); root.yaw = sim.yaw; root.scale = sim.scale; volumes.reseed();
+    } else {
+      for (let tick = (Math.floor(trail.last / TRAIL_SAMPLE_TICKS) + 1) * TRAIL_SAMPLE_TICKS; tick <= now; tick += TRAIL_SAMPLE_TICKS) {
+        const at = sim.rootAt(tick);
+        if (at !== null) { root.position.set(at.x, at.y, at.z); volumes.sample(tick); }
+      }
+    }
+    trail.last = now;
+  }
+  root.position.copy(view.mesh.position); root.yaw = view.mesh.rotation.y; root.scale = view.mesh.scale.x;
+  for (const name of volumes.bones) {
+    const bone = view.bones[name];
+    if (bone !== undefined) volumes.joint(name, bone.position, bone.quaternion, bone.scale);
   }
 }
