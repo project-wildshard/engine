@@ -43,14 +43,14 @@ export function driverUsesPort(commandLine, port) {
     args.some((arg, i) => ((arg === '-p' || arg === '--port') && args[i + 1] === port) || arg === `--port=${port}`);
 }
 
-export function doctor({ udid, sharedPort, run = command, log = console.log } = {}) {
+export function doctor({ udid: requestedUdid, sharedPort, run = command, log = console.log } = {}) {
   function check(name, passed, help) {
     if (!passed) throw new Error(`${name}: ${help}`);
     log(`ok ${name}`);
   }
   const usb = run('idevice_id', ['-l']);
   const ids = usb.output.split(/\s+/u).filter(Boolean);
-  udid ??= ids.length === 1 ? ids[0] : undefined;
+  const udid = requestedUdid ?? (ids.length === 1 ? ids[0] : undefined);
   check('usbmux', usb.ok && udid !== undefined && ids.some((entry) => id(entry) === id(udid)),
     ids.length > 1 ? 'select an attached phone with --udid' : 'plug in and unlock the iPhone');
   const usbArgs = ['-u', udid];
@@ -72,7 +72,10 @@ export function doctor({ udid, sharedPort, run = command, log = console.log } = 
     !driverUsesPort(run('ps', ['-p', pid, '-o', 'command=']).output, sharedPort));
   check('Safari driver ownership', foreign.length === 0, `foreign safaridriver PID ${foreign.join(', ')}. Wait for its owner`);
 
-  const info = (key) => run('ideviceinfo', [...usbArgs, '-k', key]).output || null;
+  const info = (key) => {
+    const { output } = run('ideviceinfo', [...usbArgs, '-k', key]);
+    return output === '' ? null : output;
+  };
   const battery = run('ideviceinfo', [...usbArgs, '-q', 'com.apple.mobile.battery', '-k', 'BatteryCurrentCapacity']);
   const level = battery.ok && /^\d{1,3}$/u.test(battery.output) && Number(battery.output) <= 100 ?
     Number(battery.output) : null;
