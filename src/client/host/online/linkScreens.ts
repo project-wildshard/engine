@@ -77,8 +77,9 @@ const CSS = `
 @keyframes ws-link-fade{from{opacity:0}}@keyframes ws-link-rise{from{opacity:0;transform:translateY(8px)}}
 .ws-link-notice{animation-name:ws-link-fade}
 .ws-link-page{background:#05101a;animation:ws-link-fade .2s ease-out}.ws-link-page .ws-link-box{animation:none}
-.ws-link-mark{position:fixed;left:calc(12px + env(safe-area-inset-left,0px));top:calc(92px + env(safe-area-inset-top,0px));z-index:2147482200;padding:2px 8px;pointer-events:none;white-space:nowrap;background:rgba(13,27,38,.78);border:1px solid rgba(255,181,71,.5);font-size:9px;line-height:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--a)}
+.ws-link-mark{position:fixed;left:calc(12px + env(safe-area-inset-left,0px));top:calc(36px + env(safe-area-inset-top,0px));z-index:2147482200;padding:2px 8px;pointer-events:none;white-space:nowrap;background:rgba(13,27,38,.78);border:1px solid rgba(255,181,71,.5);font-size:9px;line-height:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--a)}
 body:has(.ws-gmenu.show) .ws-link-mark{top:calc(8px + env(safe-area-inset-top,0px))}
+body:has(.ws-link-mark) .ws-touch .ws-touch-status{top:calc(var(--ws-top) + 52px)}body:has(.ws-link-mark) .ws-touch>.ws-loot-chip{top:calc(var(--ws-top) + 78px)}
 @media (max-width:420px){.ws-link-banner{max-width:calc(100% - 220px);padding-left:12px;padding-right:12px}.ws-link-banner b{letter-spacing:.08em}}
 @media (min-width:700px){.ws-link-banner{max-width:min(620px,calc(100% - 440px))}.ws-link-box{padding:28px 26px 20px}.ws-link h1{font-size:28px}}
 @media (prefers-reduced-motion:reduce){.ws-link,.ws-link *{animation:none!important;transition:none!important}}
