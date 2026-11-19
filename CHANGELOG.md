@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.52 (2026-11-19)
+
+- Phone Low scales terrain detail to screen density. An intermittent iPhone crash while loading far terrain is fixed.
+- Zone crossings keep the live loading card, and the touch movement stick recovers after interrupted input.
+- The Bag map shows empty cells and opens on the player. Runtime plans can declare strikes for encounters such as Sky Reach.
+- Brasscap rev 10 brings the sheriff. Aim, stair movement and grounded jumps have been fixed.
+- App switches keep play active and quiet. System-ended tabs show Welcome back. Zone Select hides Thin Ice.
+
 ## v0.1.50 (2026-11-19)
 
 - Brasscap Mesa uses revision 9, with the current Dust Wyrm.
