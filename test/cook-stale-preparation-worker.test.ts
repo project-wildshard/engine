@@ -1,6 +1,5 @@
-// J262 (SP1a), the cook worker's half of cook-stale-preparation.test.ts: a stale preparation cooks in the worker's bounded
-// child, and the index and row say so. Split out so neither file passes the 60 s CI file budget (J193): together they
-// measured 61.4 s on main run 43288951110.
+// J262 (SP1a): exercise the real bounded child and publication for each renderer state.
+// The in-process suite uses a published zone for content and pack checks.
 // oxlint-disable-next-line import/no-nodejs-modules -- The test owns its temporary output directories.
 import {mkdtempSync, rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The wrapper's per-run temp root.
@@ -8,40 +7,62 @@ import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- The worker's launcher takes absolute script paths.
 import {join, resolve} from 'node:path';
 import {afterAll, beforeAll, expect, test} from 'vitest';
+import {outputSectionPayloads} from '@wildshard/format/outputFields';
+import {FIRST_VERSION} from '@wildshard/format/sectionVersions';
 import {writeTar} from '@wildshard/format/tar';
+import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {createCookWorker, indexKey} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
+import {emptyShardfile} from '../src/shared/host/author';
 import {digest, json, MOVED, PREPARED, prepared} from './fixtures/stale-preparation';
 import {compileCookWorker} from './fixtures/compileCookWorker';
 
 const root = mkdtempSync(join(tmpdir(), 'cook-stale-preparation-worker-'));
-const CHILD_TIMEOUT_SECONDS = 50;
-// The test awaits three independent child cooks. Keep the per-child limit
-// visible, with a separate aggregate watchdog for their startup and checks.
-const TEST_TIMEOUT = (3 * CHILD_TIMEOUT_SECONDS + 10) * 1000;
+const slug = 'stale-preparation-fixture';
+
+function workerProduct(): Map<string, Uint8Array> {
+  const source = emptyShardfile({slug, name: 'Stale Preparation Fixture', author: 'Test', revision: 1, seed: 1});
+  const files = new Map<string, Uint8Array>();
+  const sections = Array.from(outputSectionPayloads(source), ([name, payload]) => {
+    const path = `sections/${name}.json`, bytes = validationSourceBytes(payload);
+    files.set(path, bytes);
+    return {name, path, hash: digest(bytes), bytes: bytes.length, schema: `wildshard:${name}@${FIRST_VERSION}`};
+  });
+  const {identity, version, requires, budgets, serverBudget, authorCaps, critical, library} = source;
+  const cook = validationSourceBytes({version: 1, mounts: []});
+  files.set('cook.json', cook);
+  files.set('shard.json', validationSourceBytes({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2',
+    version, identity, requires, admission: {budgets, serverBudget, authorCaps, critical, library},
+    build: {sourceHash: digest(validationSourceBytes(source)), validator: 'fixture'}, sections, schemas: [], files: [], runtime: null,
+    cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
+  return files;
+}
+
 const entryScope = new AbortController();
 let entry: Awaited<ReturnType<typeof compileCookWorker>> | undefined;
 let preparing: ReturnType<typeof compileCookWorker> | undefined;
 beforeAll(async () => { preparing = compileCookWorker(entryScope.signal); entry = await preparing; });
 afterAll(async () => { entryScope.abort(); await preparing?.catch(() => undefined); entry?.dispose(); rmSync(root, {recursive: true, force: true}); });
 
-test('the cook worker cooks a stale preparation in its bounded child, and its index and row say so', {timeout: TEST_TIMEOUT}, async () => {
-  const tarball = writeTar(prepared(PREPARED)), hash = digest(tarball), lines: string[] = [];
+test('the cook worker cooks a stale preparation in its bounded child, and its index and row say so', {timeout: 60_000}, async () => {
+  const tarball = writeTar(prepared(workerProduct(), PREPARED)), hash = digest(tarball), lines: string[] = [];
   const worker = (build: string, renderer?: string): ReturnType<typeof createCookWorker> => createCookWorker({build, store: folderStore(join(root, 'worker-store')),
-    source: {heads: () => Promise.resolve([{slug: 'brasscap-mesa', hash, revision: 1}]), download: () => Promise.resolve(tarball)},
+    source: {heads: () => Promise.resolve([{slug, hash, revision: 1}]), download: () => Promise.resolve(tarball)},
     serverPacks: join(root, 'worker-server'), scratch: join(root, 'worker-jobs'), log: line => { lines.push(line); },
     launcher: {root: process.cwd(), execPath: process.execPath, loader: resolve('scripts/bake-loader.mjs'), get script() { if (entry === undefined) throw new Error('Missing fixed cook entry'); return entry.script; }, wrap: [],
-      limits: {seconds: CHILD_TIMEOUT_SECONDS, memoryMB: 4096, heapMB: 2048}, ...(renderer === undefined ? {} : {renderer})}});
-  const stale = await worker('moved', MOVED).cook({slug: 'brasscap-mesa', hash});
-  expect(stale).toMatchObject({state: 'cooked', preparation: 'stale'});
-  expect(lines.some(line => line.includes('stale preparation: brasscap-mesa'))).toBe(true);
+      limits: {seconds: 50, memoryMB: 4096, heapMB: 2048}, ...(renderer === undefined ? {} : {renderer})}});
+  const stale = await worker('moved', MOVED).cook({slug, hash});
+  expect(stale, lines.join('\n')).toMatchObject({state: 'cooked', preparation: 'stale'});
+  expect(lines.some(line => line.includes(`stale preparation: ${slug}`))).toBe(true);
   const store = folderStore(join(root, 'worker-store'));
-  expect(json(await store.get(indexKey('moved', hash)))).toMatchObject({slug: 'brasscap-mesa', preparation: 'stale'});
-  const fast = await worker('prepared', PREPARED).cook({slug: 'brasscap-mesa', hash});
+  expect(json(await store.get(indexKey('moved', hash)))).toMatchObject({slug, preparation: 'stale'});
+  const fast = await worker('prepared', PREPARED).cook({slug, hash});
   expect(fast).toMatchObject({state: 'cooked', preparation: 'current'});
   // Same parts either way: the second build's index names exactly the first one's stored objects.
-  const keys = (build: string): Promise<unknown> => store.get(indexKey(build, hash)).then(body => (json(body) as {keys: string[]}).keys);
-  expect(await keys('prepared')).toEqual(await keys('moved'));
+  const keys = (build: string): Promise<string[]> => store.get(indexKey(build, hash)).then(body => (json(body) as {keys: string[]}).keys);
+  const staleKeys = await keys('moved');
+  expect(staleKeys.length).toBeGreaterThan(0);
+  expect(await keys('prepared')).toEqual(staleKeys);
   // A host that hands its job no fingerprint still cooks: the job can't run git under --permission, so it can't call it current.
-  expect(await worker('unnamed').cook({slug: 'brasscap-mesa', hash})).toMatchObject({state: 'cooked', preparation: 'stale'});
+  expect(await worker('unnamed').cook({slug, hash})).toMatchObject({state: 'cooked', preparation: 'stale'});
 });

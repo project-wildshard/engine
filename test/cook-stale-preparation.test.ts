@@ -11,12 +11,14 @@ import {join, relative} from 'node:path';
 import {afterAll, expect, test} from 'vitest';
 import {readCookData} from '@wildshard/format/cookData';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
-import {writeTar} from '@wildshard/format/tar';
+import {readTar, writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {cookShard, openShardfile, type CookReport} from '../src/cook/game/shardCook';
 import {createPartEncoder} from '../src/cook/game/spawnParts';
-import {digest, json, legacy, MOVED, PREPARED, prepared} from './fixtures/stale-preparation';
+import {digest, json, legacyBrasscap, MOVED, PREPARED, prepared} from './fixtures/stale-preparation';
 
+const legacy = legacyBrasscap();
+const brasscap = readTar(legacy);
 const root = mkdtempSync(join(tmpdir(), 'cook-stale-preparation-'));
 const encoder = createPartEncoder();
 afterAll(async () => { await encoder.close(); rmSync(root, {recursive: true, force: true}); });
@@ -41,7 +43,7 @@ async function cook(tarball: Uint8Array, name: string, renderer: string): Promis
 }
 
 test('a preparation from another renderer opens as stale, a matching one as current, none without one', () => {
-  const tarball = writeTar(prepared(PREPARED));
+  const tarball = writeTar(prepared(brasscap, PREPARED));
   expect(openShardfile(tarball, {renderer: PREPARED}).preparation).toBe('current');
   expect(openShardfile(tarball, {renderer: MOVED}).preparation).toBe('stale');
   expect(openShardfile(legacy, {renderer: MOVED}).preparation).toBe('none');
@@ -49,7 +51,7 @@ test('a preparation from another renderer opens as stale, a matching one as curr
 });
 
 test('a stale preparation cooks to the same bytes as the matching renderer, and says so', {timeout: 60_000}, async () => {
-  const tarball = writeTar(prepared(PREPARED));
+  const tarball = writeTar(prepared(brasscap, PREPARED));
   const fast = await cook(tarball, 'current', PREPARED), moved = await cook(tarball, 'stale', MOVED);
   expect(fast.report.preparation).toBe('current');
   expect(fast.warned).not.toContain('stale preparation: brasscap-mesa');
@@ -68,14 +70,14 @@ test('a stale preparation cooks to the same bytes as the matching renderer, and 
     return (json(readFileSync(join(root, dir, row.url.slice(1)))) as {files: {url: string}[]}).files.map(file => file.url);
   };
   // The stale cook still goes by the author's fence: its recorded read is in the entry set, and gone when the fence is empty.
-  const unfenced = await cook(writeTar(prepared(PREPARED, false)), 'stale-unfenced', MOVED);
+  const unfenced = await cook(writeTar(prepared(brasscap, PREPARED, false)), 'stale-unfenced', MOVED);
   expect(entry(moved, 'stale').some(url => url.startsWith('/assets/stale-proof.bin'))).toBe(true);
   expect(entry(unfenced, 'stale-unfenced').some(url => url.startsWith('/assets/stale-proof.bin'))).toBe(false);
-  expect(moved.files['programs/brasscap-mesa.json']).toBe(digest(prepared(PREPARED).get('mounts/programs/brasscap-mesa.json') ?? new Uint8Array()));
+  expect(moved.files['programs/brasscap-mesa.json']).toBe(digest(prepared(brasscap, PREPARED).get('mounts/programs/brasscap-mesa.json') ?? new Uint8Array()));
 });
 
 test('SA48: every file of the shard is in a whole set or loose at its product URL', {timeout: 60_000}, async () => {
-  const files = prepared(PREPARED), cooked = await cook(writeTar(files), 'whole-or-loose', PREPARED);
+  const files = prepared(brasscap, PREPARED), cooked = await cook(writeTar(files), 'whole-or-loose', PREPARED);
   const index = parseOutputIndex(json(files.get('shard.json')));
   // Each tier's whole set on its own: a file any tier's set lacks must be loose, or that tier reads a 404.
   const sets = cooked.report.manifests.filter(manifest => manifest.set === 'whole').map(row =>
@@ -87,7 +89,7 @@ test('SA48: every file of the shard is in a whole set or loose at its product UR
 });
 
 test('one changed byte of a stale cook.json still refuses before any part is written', async () => {
-  const files = prepared(PREPARED), held = files.get('cook.json');
+  const files = prepared(brasscap, PREPARED), held = files.get('cook.json');
   if (held === undefined) throw new Error('No preparation');
   files.set('cook.json', new TextEncoder().encode(`${new TextDecoder().decode(held)} `));
   const out = join(root, 'changed-byte');
@@ -96,7 +98,7 @@ test('one changed byte of a stale cook.json still refuses before any part is wri
 });
 
 test('a preparation relabelled to this renderer without re-recording still refuses', async () => {
-  const files = prepared(PREPARED), held = readCookData(json(files.get('cook.json')));
+  const files = prepared(brasscap, PREPARED), held = readCookData(json(files.get('cook.json')));
   // A forger claims the current renderer; the input hash still binds the one it was recorded on.
   const forged = withCook(files, validationSourceBytes({...held, renderer: MOVED}));
   expect(() => openShardfile(forged, {renderer: MOVED})).toThrow(/stale cook preparation/u);

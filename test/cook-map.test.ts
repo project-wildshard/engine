@@ -17,7 +17,7 @@ import {cookShard} from '../src/cook/game/shardCook';
 import {createPartEncoder} from '../src/cook/game/spawnParts';
 import {COOKED_CELL_SIZE, COOKED_MAP_SIZE, encodeMapPng, renderCookedMap, type MapSource} from '../src/cook/game/cookedMap';
 import {cookedMapPath} from '../src/shared/game/shardfile/cookedMapPath';
-import {legacy} from './fixtures/stale-preparation';
+import {legacyBrasscap} from './fixtures/stale-preparation';
 
 const root = mkdtempSync(join(tmpdir(), 'cook-map-'));
 const encoder = createPartEncoder();
@@ -34,6 +34,7 @@ function spread(pixels: Uint8Array, channels: number): {readonly sd: number; rea
 }
 
 test('a cooked product carries its map at both sizes, drawn from its world, whether or not it declares a look/map', {timeout: 120_000}, async () => {
+  const legacy = legacyBrasscap();
   const slug = parseOutputIndex(JSON.parse(new TextDecoder().decode(readTar(legacy).get('shard.json')))).identity.slug;
   const out = join(root, 'cooked'), warned: string[] = [];
   const report = await cookShard(legacy, out, {wireBytes: (_url, bytes) => bytes.length, now: () => 0, encoder, warn: line => { warned.push(line); }});
