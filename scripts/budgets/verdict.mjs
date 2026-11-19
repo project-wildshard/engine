@@ -6,6 +6,8 @@
 //   raised     new content (the content key moved, the key is declared, or nothing is recorded yet): only the hard
 //              cap is checked, and the lane records the new baseline
 //   regressed  the same content grew to the soft line or past it: a fix row for the pusher, never a release hold
+//   warning    a noisy overage within the J431 margin
+//   confirm    a noisy overage needs three fresh reads
 //   ok         everything else, silently
 
 export const SOFT_RATIO = 0.1;
@@ -30,11 +32,11 @@ export const softLine = (baseline, floor = 0) => baseline + Math.max(baseline * 
 
 /**
  * @param {{ measure: number | readonly number[], baseline: { value: number, contentKey: string } | null | undefined,
- *   hard: number | null | undefined, contentKey: string, declared?: boolean, kind: 'exact' | 'noisy', floor?: number }} input
- * @returns {{ status: 'ok' | 'raised' | 'regressed' | 'over-hard', value: number, line: number | null,
+ *   hard: number | null | undefined, contentKey: string, declared?: boolean, kind: 'exact' | 'noisy', floor?: number, confirm?: boolean }} input
+ * @returns {{ status: 'ok' | 'raised' | 'regressed' | 'over-hard' | 'warning' | 'confirm', value: number, line: number | null,
  *   delta: number | null, ratio: number | null }}
  */
-export function verdict({ measure, baseline, hard, contentKey, declared = false, kind, floor = 0 }) {
+export function verdict({ measure, baseline, hard, contentKey, declared = false, kind, floor = 0, confirm = false }) {
   const value = judgedValue(kind, measure);
   const recorded = baseline ?? null;
   const delta = recorded === null ? null : value - recorded.value;
@@ -46,5 +48,11 @@ export function verdict({ measure, baseline, hard, contentKey, declared = false,
   // Integer bytes: compare the rise against 10% without the float error of baseline * 1.1.
   const rise = value - recorded.value;
   const regressed = rise * 10 >= recorded.value && rise >= floor;
+  if (regressed && confirm && kind === 'noisy' && line !== null) {
+    // Apply J431 to the overage of the J444 soft line. The 5 MB floor is
+    // already expressed in this budget's unit in caps.json.
+    if (value - line <= Math.max(line * 0.02, floor)) return { status: 'warning', value, line, delta, ratio };
+    if (typeof measure === 'number' || measure.length === 1) return { status: 'confirm', value, line, delta, ratio };
+  }
   return { status: regressed ? 'regressed' : 'ok', value, line, delta, ratio };
 }

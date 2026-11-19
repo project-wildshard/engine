@@ -19,10 +19,12 @@ function fixture(measures: unknown) {
   writeFileSync(join(root, 'budgets/caps.json'), JSON.stringify({ schema: 1, about: 'a', caps: {
     'download/phone/*': { hard: 100, unit: 'bytes', kind: 'exact', decision: 'J338', why: 'w' },
     'ledger/*': { hard: null, unit: 'bytes', kind: 'noisy', floor: 5, decision: null, why: 'w' },
+    'nine/boot/live-heap': { hard: null, unit: 'bytes', kind: 'noisy', floor: 5_000_000, confirm: true, decision: null, why: 'w' },
   } }));
   writeFileSync(join(root, 'budgets/baselines.json'), JSON.stringify({ schema: 1, about: 'a', baselines: {
     'download/phone/a': { value: 50, contentKey: 'a@1', commit: 'c0' },
     'ledger/a/peak': { value: 40, contentKey: 'a@1', commit: 'c0' },
+    'nine/boot/live-heap': { value: 216_970_560, contentKey: 'nine-dragon-stack@3' },
   } }));
   writeFileSync(join(root, 'measures.json'), JSON.stringify(measures));
   const lines: string[] = [], errors: string[] = [], summary = join(root, 'summary.md');
@@ -95,4 +97,39 @@ test('BC10: record --run writes the baselines from a saved budgets artifact; a s
   writeFileSync(join(root, 'measures.json'), saved);
   expect(f.run('check', 'M')).toBe(0);
   expect(runCli(['record', '--run', 'nope'], { root, env: {}, out: () => undefined, err: () => undefined, download })).toBe(2);
+});
+
+test('Nine boot warns for the recorded single overage and asks for three reads only beyond J431 noise', () => {
+  const key = 'nine/boot/live-heap', contentKey = 'nine-dragon-stack@3';
+  const near = fixture({ measures: { [key]: { reads: [239_806_041], contentKey } } });
+  expect(near.run('needs-confirmation', 'M')).toBe(0);
+  expect(near.lines).toEqual(['false']);
+  expect(near.run('check', 'M')).toBe(0);
+  expect(near.lines.join('\n')).toContain('within J431 noise margin');
+  expect(near.lines.join('\n')).not.toContain('BUDGET regressed');
+
+  const far = fixture({ measures: { [key]: { reads: [260_000_000], contentKey } } });
+  expect(far.run('needs-confirmation', 'M')).toBe(0);
+  expect(far.lines).toEqual(['true']);
+  expect(far.run('check', 'M')).toBe(0);
+  expect(far.lines.join('\n')).toContain('unconfirmed: needs three fresh reads');
+
+  const writeRead = (name: string, value: number, pin = contentKey): string => {
+    const path = join(far.root, name);
+    writeFileSync(path, JSON.stringify({ measures: { [key]: { reads: [value], contentKey: pin } } }));
+    return path;
+  };
+  const first = writeRead('first.json', 250_000_000), second = writeRead('second.json', 242_000_000);
+  const wrongPin = writeRead('wrong.json', 260_000_000, 'nine-dragon-stack@4');
+  const original = readFileSync(join(far.root, 'measures.json'), 'utf8');
+  expect(far.run('confirm', 'M', first, second, wrongPin)).toBe(1);
+  expect(readFileSync(join(far.root, 'measures.json'), 'utf8')).toBe(original);
+  expect(far.run('confirm', 'M', first, second, writeRead('quiet.json', 241_000_000))).toBe(0);
+  expect(far.run('check', 'M')).toBe(0);
+  expect(far.lines.at(-1)).toContain('within J431 noise margin');
+
+  writeFileSync(join(far.root, 'measures.json'), original);
+  expect(far.run('confirm', 'M', first, second, writeRead('high.json', 260_000_000))).toBe(0);
+  expect(far.run('check', 'M')).toBe(1);
+  expect(far.lines.at(-1)).toContain('BUDGET regressed key=nine/boot/live-heap measured=250000000');
 });

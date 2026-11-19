@@ -10,6 +10,8 @@
 //   node scripts/budgets/cli.mjs declare <key> --why "<engine feature>"   an engine feature raises this budget in
 //                                       this commit: the next check treats the key as new content
 //   node scripts/budgets/cli.mjs merge <out.json> <in.json>...   one measures file from several (later wins)
+//   node scripts/budgets/cli.mjs needs-confirmation <measures.json>   true if a noisy overage needs a retry
+//   node scripts/budgets/cli.mjs confirm <measures.json> <fresh1> <fresh2> <fresh3>   attach the three fresh reads
 //
 // measures.json: { "commit"?: sha, "measures": { "<key>": { "value": n } | { "reads": [a, b, c] }, plus "contentKey",
 // and an optional "detail": { "<part>": n } shown in the table only } }.
@@ -22,7 +24,7 @@ import { capFor, readBaselines, readCaps, writeBaselines } from './files.mjs';
 import { judgedValue, verdict } from './verdict.mjs';
 import { budgetResultLine } from './watch.mjs';
 
-const STATUS = { ok: 'ok', raised: 'raised', regressed: 'REGRESSED', 'over-hard': 'OVER HARD' };
+const STATUS = { ok: 'ok', raised: 'raised', regressed: 'REGRESSED', 'over-hard': 'OVER HARD', warning: 'WARNING', confirm: 'WARNING' };
 
 /** @param {number | null | undefined} value @param {string} unit */
 function show(value, unit) {
@@ -44,7 +46,7 @@ export function judgeAll(caps, baselines, measures) {
     }
     const recorded = baselines.baselines[key];
     const result = verdict({ measure: measure.reads ?? /** @type {number} */ (measure.value), baseline: recorded, hard: cap.hard, contentKey: measure.contentKey,
-      declared: recorded?.declared !== undefined, kind: cap.kind, floor: cap.floor ?? 0 });
+      declared: recorded?.declared !== undefined, kind: cap.kind, floor: cap.floor ?? 0, confirm: cap.confirm === true });
     rows.push(Object.assign(result, { key, unit: cap.unit, baseline: recorded?.value ?? null, previousKey: recorded?.contentKey ?? null, hard: cap.hard, target: cap.target ?? null, contentKey: measure.contentKey, detail: measure.detail }));
   }
   return rows;
@@ -57,6 +59,8 @@ export function budgetTable(rows) {
   for (const row of rows) {
     const notes = [];
     if (row.status === 'unknown') notes.push('no cap entry in budgets/caps.json');
+    if (row.status === 'warning') notes.push('within J431 noise margin');
+    if (row.status === 'confirm') notes.push('unconfirmed: needs three fresh reads');
     if (row.status === 'raised') notes.push(row.previousKey === null ? `new: record ${row.contentKey}` : row.previousKey === row.contentKey ? 'declared: record it' : `${row.previousKey} → ${row.contentKey}: record it`);
     if (row.ratio !== null && row.ratio < 0 && row.status === 'ok') notes.push(`${Math.round(-row.ratio * 100)}% under baseline`);
     if (row.target !== null && row.value !== null && row.value > row.target) notes.push(`past the ${show(row.target, row.unit)} target`);
@@ -121,6 +125,32 @@ export function runCli(argv, { root, env = process.env, out = line => console.in
   const target = rest.find((arg, index) => !arg.startsWith('--') && !valued.has(rest[index - 1]));
   const caps = readCaps(root), baselines = readBaselines(root);
   const readMeasures = () => JSON.parse(readFileSync(resolve(target ?? ''), 'utf8'));
+  if (command === 'needs-confirmation') {
+    out(String(judgeAll(caps, baselines, readMeasures()).some(row => row.status === 'confirm')));
+    return 0;
+  }
+  if (command === 'confirm') {
+    const [, ...paths] = rest;
+    if (target === undefined || paths.length !== 3) { err('budget: confirm needs a measures file and three fresh runs'); return 2; }
+    const original = readMeasures();
+    const fresh = paths.map(path => /** @type {import('./cli.mjs').BudgetMeasures} */ (JSON.parse(readFileSync(resolve(path), 'utf8'))));
+    for (const row of judgeAll(caps, baselines, original)) {
+      if (row.status !== 'confirm') continue;
+      const reads = fresh.flatMap(file => {
+        const sample = file.measures[row.key];
+        if (sample?.contentKey !== row.contentKey || (sample.reads !== undefined && sample.reads.length !== 1)) return [];
+        const value = sample.reads?.[0] ?? sample.value;
+        return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? [value] : [];
+      });
+      if (reads.length !== 3) {
+        err(`budget: ${row.key} needs three comparable single reads for ${row.contentKey}`);
+        return 1;
+      }
+      original.measures[row.key] = { contentKey: row.contentKey, reads };
+    }
+    writeFileSync(resolve(target), `${JSON.stringify(original, null, 1)}\n`);
+    return 0;
+  }
   if (command === 'check') {
     const rows = judgeAll(caps, baselines, readMeasures()), table = budgetTable(rows);
     out(table);

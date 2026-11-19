@@ -35,6 +35,7 @@ export function fileErrors(caps, baselines) {
     if (cap.hard !== null && !/^J\d+$/u.test(cap.decision ?? '')) errors.push(`${key}: a hard cap names the J-number that set it`);
     if (cap.target !== undefined && !/^J\d+$/u.test(cap.decision ?? '')) errors.push(`${key}: a target names the J-number that set it`);
     if (cap.kind !== 'exact' && cap.kind !== 'noisy') errors.push(`${key}: kind is exact or noisy`);
+    if (cap.confirm !== undefined && (typeof cap.confirm !== 'boolean' || cap.kind !== 'noisy')) errors.push(`${key}: confirm is a boolean on a noisy cap`);
     if (typeof cap.unit !== 'string' || cap.unit === '') errors.push(`${key}: names a unit`);
     if (typeof cap.why !== 'string' || cap.why.trim() === '') errors.push(`${key}: says why`);
   }

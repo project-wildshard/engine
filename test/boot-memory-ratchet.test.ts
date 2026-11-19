@@ -26,10 +26,10 @@ test('early releases pass with no held parts and both memory measurements within
   expect(regressed.faults).toEqual([]);
 });
 
-test('held parts or a missing measurement fail the load; high geometry and heap are regressions, not faults',()=>{
+test('held parts or a missing measurement fail the load; high geometry is reported and high heap needs confirmation',()=>{
   const verdict=bootMemoryVerdict(marks(undefined,77.6e6),117e6,367e6,judging());
   expect(verdict.faults).toEqual(['boot memory: no download:members-dropped mark with its held count']);
-  expect(statuses(verdict)).toEqual(['regressed','regressed']);
+  expect(statuses(verdict)).toEqual(['regressed','confirm']);
   expect(bootMemoryVerdict(marks(2),53e6,300e6,judging()).faults).toEqual(['boot memory: 2 spawn parts still held past the download step']);
   expect(bootMemoryVerdict(marks(0),null,300e6,judging()).faults).toEqual(['boot memory: no retained CPU geometry measurement at control']);
   expect(bootMemoryVerdict(marks(0),53e6,Number.NaN,judging()).faults).toEqual(['boot memory: no live heap measurement at control']);

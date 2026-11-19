@@ -108,6 +108,15 @@
    "decision": null,
    "why": "Nine's boot at control in ci's nine-ring1 load (BC11): CPU geometry still reachable from the scene, and the live JS heap after a full collection. No hard cap on record (D3); held spawn parts fail the load on their own. Floor 5 MB like every memory total: retained geometry at control moves ~2 MB with when uploads release (retained plus released is constant)."
   },
+  "nine/boot/live-heap": {
+   "hard": null,
+   "unit": "bytes",
+   "kind": "noisy",
+   "floor": 5000000,
+   "confirm": true,
+   "decision": null,
+   "why": "Nine's collected live heap at control (BC11). J431 treats a small overage as noise and requires a three-boot median for a regression."
+  },
   "nine/street/triangles95": {
    "hard": null,
    "unit": "triangles",

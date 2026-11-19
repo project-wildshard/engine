@@ -126,6 +126,40 @@ jobs:
             if [[ -n "$file" && -f "$file" ]]; then inputs+=("$file"); fi
           done
           node scripts/budgets/cli.mjs merge tmp/budgets/measures.json "${inputs[@]}"
+      - name: Check whether Nine boot needs confirmation
+        id: nine-confirm
+        if: steps.client.outcome == 'success'
+        run: |
+          needed=false
+          if [[ $(jq -r '.caps["nine/boot/live-heap"].confirm // false' budgets/caps.json) == true ]]; then
+            needed=$(node scripts/budgets/cli.mjs needs-confirmation tmp/budgets/measures.json)
+          fi
+          printf 'needed=%s\n' "$needed" >> "$GITHUB_OUTPUT"
+      - name: Fetch the exact Nine client for confirmation
+        id: nine-client
+        if: steps.nine-confirm.outputs.needed == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN }}
+          name: nine-ring1-client
+          path: tmp/nine-ring1
+      - name: Confirm Nine boot on three fresh runs
+        if: steps.nine-client.outcome == 'success'
+        continue-on-error: true
+        run: |
+          mkdir -p tmp/nine-ring1/preview
+          tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
+          rm tmp/nine-ring1/client.tar
+          reads=()
+          for trial in 1 2 3; do
+            node scripts/nine-ring1.mjs boot
+            path="tmp/budgets/nine-confirm-$trial.json"
+            cp tmp/nine-ring1/boot/budget-measures.json "$path"
+            reads+=("$path")
+          done
+          node scripts/budgets/cli.mjs confirm tmp/budgets/measures.json "${reads[@]}"
       - name: Add the dispatched seed
         if: steps.client.outcome == 'success' && inputs.seed != ''
         env:
