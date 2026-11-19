@@ -190,6 +190,15 @@ async function attach(socketUrl, { overrides = [] }) {
     sessionId: `inspector:${socketUrl}`,
     served,
     getUrl: () => run('location.href', false, 10_000),
+    /** Evaluate one expression as a user gesture (Runtime.evaluate's emulateUserGesture): an API that wants transient
+     * activation, such as the Screen Wake Lock, accepts it. Returns the value, or throws what the page threw.
+     * @param {string} expression */
+    async gesture(expression) {
+      await ready;
+      const result = await send('Runtime.evaluate', { expression, returnByValue: true, emulateUserGesture: true }, 10_000);
+      if (result?.wasThrown) throw new WebDriverError('javascript error', String(result.result?.description ?? JSON.stringify(result.result)));
+      return result?.result?.value ?? null;
+    },
     /** @param {string} url */
     async navigate(url) {
       const want = new URL(url).href;

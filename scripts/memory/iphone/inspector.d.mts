@@ -6,6 +6,7 @@ export interface InspectedSafari {
   sessionId: string;
   served: { url: string; at: number }[];
   getUrl: () => Promise<unknown>;
+  gesture: (expression: string) => Promise<unknown>;
   navigate: (url: string) => Promise<void>;
   reload: () => Promise<void>;
   freshTab: () => Promise<void>;

@@ -69,6 +69,41 @@ export function routeLegOnPage(leg) {
     try { Object.defineProperty(game, 'qualityCap', { get: () => leg.cap, set: () => { /* held */ }, configurable: true }); } catch { /* read-only */ }
   }
   const clock = p.link?.client?.clock ?? null;
+  // GPU traffic per second (DW1, for opus-fps: does the Memory saver purge and re-upload?): texture uploads, buffer uploads
+  // and buffer read-backs (a released array read again, memorySaver.ts restore), counted on the context's prototype once
+  const counts = /** @type {any} */ (window).__wsRouteGl ??= (() => {
+    const tally = { tex: 0, buf: 0, read: 0, audioStarts: 0, audioEnds: 0 };
+    const proto = /** @type {any} */ (globalThis).WebGL2RenderingContext?.prototype;
+    const wrap = (/** @type {string} */ name, /** @type {'tex'|'buf'|'read'} */ key) => {
+      const original = proto?.[name];
+      if (typeof original !== 'function') return;
+      proto[name] = function counted(/** @type {unknown[]} */ ...args) { tally[key]++; return original.apply(this, args); };
+    };
+    for (const name of ['texImage2D', 'texSubImage2D', 'compressedTexImage2D', 'compressedTexSubImage2D', 'texImage3D', 'texSubImage3D']) wrap(name, 'tex');
+    for (const name of ['bufferData', 'bufferSubData']) wrap(name, 'buf');
+    wrap('getBufferSubData', 'read');
+    // live Web Audio sources (opus-fps, Jake's 17 Pro video: 4 -> 42 in 12 s on the dock), as perfHud's own counter: a start
+    // adds one, its 'ended' takes it off; installed at the first leg, so sources started before then are not in it
+    const audioProtos = [globalThis.AudioScheduledSourceNode?.prototype, globalThis.AudioBufferSourceNode?.prototype];
+    for (const audioProto of audioProtos) {
+      if (audioProto === undefined || !Object.hasOwn(audioProto, 'start')) continue;
+      const original = audioProto.start;
+      audioProto.start = function start(/** @type {unknown[]} */ ...args) {
+        tally.audioStarts++;
+        this.addEventListener('ended', () => { tally.audioEnds++; }, { once: true });
+        original.apply(this, args);
+      };
+    }
+    return tally;
+  })();
+  let seenGl = { ...counts };
+  const memChip = () => {
+    for (const el of document.querySelectorAll('.ws-perf-dock *')) {
+      const text = el.textContent?.trim() ?? '';
+      if (/^mem\s+[\d.]+/iu.test(text) && text.length < 16) return text;
+    }
+    return null;
+  };
   const t0 = performance.now(), frames0 = game.frameCount;
   let seen = game.frameCount, previous = t0, last = t0, at = 0, metres = 0, prevX = p.position.x, prevZ = p.position.z;
   let detours = 0, detourUntil = 0, detourYaw = 0, pressedLock = 0, checkX = prevX, checkZ = prevZ, still = 0, swings = 0, target = /** @type {any} */ (null), engaged = false;
@@ -108,8 +143,11 @@ export function routeLegOnPage(leg) {
     samples.push({ tMs: now - t0, seconds: (now - previous) / 1000, frames, frameMs, updateMs, renderMs, gpuApproxMs,
       draws: game.lastFrame.calls, triangles: game.lastFrame.triangles, programs: renderer.info?.programs?.length ?? null,
       delayMs: clock?.delayMs ?? null, jitterMs: clock?.jitterMs ?? null,
+      texUploads: counts.tex - seenGl.tex, bufUploads: counts.buf - seenGl.buf, readBacks: counts.read - seenGl.read,
+      audioStarts: counts.audioStarts - seenGl.audioStarts, audioLive: counts.audioStarts - counts.audioEnds,
+      textures: renderer.info?.memory?.textures ?? null, geometries: renderer.info?.memory?.geometries ?? null, mem: memChip(),
       at: [Math.round((p.position.x - originX) * 10) / 10, Math.round((p.position.z - originZ) * 10) / 10] });
-    previous = now;
+    previous = now; seenGl = { ...counts };
   };
   const end = (/** @type {string|null} */ error) => {
     if (ended) return;
@@ -249,21 +287,75 @@ export function legSummary(samples) {
     jitterMs: round(percentile(finite(samples.map((row) => row.jitterMs)), 0.5)), jitterMaxMs: round(Math.max(0, ...finite(samples.map((row) => row.jitterMs)))),
     trianglesP95: percentile(samples.map((row) => row.triangles), 0.95), drawsP95: percentile(samples.map((row) => row.draws), 0.95),
     programsMax: Math.max(0, ...finite(samples.map((row) => row.programs))),
+    texUploads: samples.reduce((sum, row) => sum + (row.texUploads ?? 0), 0), bufUploads: samples.reduce((sum, row) => sum + (row.bufUploads ?? 0), 0),
+    readBacks: samples.reduce((sum, row) => sum + (row.readBacks ?? 0), 0),
+    texturesMin: Math.min(...finite(samples.map((row) => row.textures ?? null))), texturesMax: Math.max(0, ...finite(samples.map((row) => row.textures ?? null))),
+    mem: samples.findLast((row) => typeof row.mem === 'string')?.mem ?? null,
+    audioLiveMax: Math.max(0, ...finite(samples.map((row) => row.audioLive ?? null))), audioLiveEnd: samples.at(-1)?.audioLive ?? null,
+    audioStartsPerS: round(seconds > 0 ? samples.reduce((sum, row) => sum + (row.audioStarts ?? 0), 0) / seconds : null),
   };
 }
 
+/** Ask for a Screen Wake Lock (a backup to Auto-Lock Never: a gap between runs can't sleep the phone) and say what the
+ * browser answered: 'granted', 'unsupported' or the refusal. The lock lasts while the page stays visible. */
+export const holdWake = `
+  const done = arguments[arguments.length - 1];
+  if (!('wakeLock' in navigator)) { done('unsupported'); return; }
+  const answer = (pending) => pending.then((lock) => { window.__wsRouteWake = lock; return lock.released ? 'released' : 'granted'; },
+    (error) => 'refused: ' + String(error?.name ?? error) + ' ' + String(error?.message ?? ''));
+  // a gesture call (the inspector's emulateUserGesture) leaves its request here; without one, ask now
+  answer(window.__wsRouteWakeAsk ?? navigator.wakeLock.request('screen')).then(done);
+`;
+
+/** The expression a driver's gesture() runs first, so the request has transient activation. */
+export const askWake = "(window.__wsRouteWakeAsk = navigator.wakeLock?.request('screen'), true)";
+
+/** Open the Developer frame panel and press REC 30 S (WebDriver-style async body). */
+const recStart = `
+  const done = arguments[arguments.length - 1];
+  const up = (el) => el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+  const root = document.querySelector('.ws-perf');
+  if (!root) { done('no frame panel (Developer off?)'); return; }
+  localStorage.setItem('__routeRecWas', localStorage.getItem('wildshard.save.v2@2.device') ?? '');
+  if (!root.querySelector('.ws-perf-panel.open')) up(root);
+  const t0 = performance.now();
+  const press = () => { const button = document.querySelector('.ws-perf-rec'); if (button) { up(button); done('recording'); } else if (performance.now() - t0 > 10000) done('no REC button'); else setTimeout(press, 200); };
+  press();
+`;
+
+/** Wait for REC 30 S's summary (the device save's perf.rec), close the panel and return the text. */
+const recRead = `
+  const done = arguments[arguments.length - 1];
+  const t0 = performance.now(), was = localStorage.getItem('__routeRecWas');
+  const read = () => {
+    const now = localStorage.getItem('wildshard.save.v2@2.device') ?? '';
+    const text = JSON.parse(now || '{}').keys?.['perf.rec']?.data ?? null;
+    if ((now !== was && text) || performance.now() - t0 > 40000) {
+      const root = document.querySelector('.ws-perf');
+      if (root?.querySelector('.ws-perf-panel.open')) root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+      done(typeof text === 'string' ? text : JSON.stringify(text));
+    } else setTimeout(read, 500);
+  };
+  read();
+`;
+
 /** Play `slug`'s route on a driver at control, one leg at a time.
  * @param {{ evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<any> }} driver
- * @param {{ slug: string, cap: 30 | 60 | null, log?: (line: string) => void }} options */
-export async function playRoute(driver, { slug, cap, log = () => undefined }) {
+ * @param {{ slug: string, cap: 30 | 60 | null, rec?: string[], log?: (line: string) => void }} options */
+export async function playRoute(driver, { slug, cap, rec = [], log = () => undefined }) {
   const legs = [];
   for (const leg of routeFor(slug)) {
+    // DW2: the game's own REC 30 S (perfHud.ts: every frame's update by system, render and gpu~, and the top spike frames
+    // with their causes) over this leg; the Developer panel is open while it records, so these legs are not DW1's numbers
+    const recording = rec.includes(leg.name);
+    if (recording) await driver.evaluateAsync(recStart, [], 15_000);
     const result = await driver.evaluateAsync(`
       const done = arguments[arguments.length - 1];
       (${routeLegOnPage.toString()})(arguments[0]).then(done, (error) => done({ error: String(error) }));
     `, [{ ...leg, cap }], (leg.seconds + 45) * 1000);
     const summary = result?.samples?.length ? legSummary(result.samples) : null;
-    legs.push({ name: leg.name, kind: leg.kind, cap, error: result?.error ?? null, nav: result?.nav ?? null, summary, samples: result?.samples ?? [] });
+    const recText = recording ? await driver.evaluateAsync(recRead, [], 45_000).catch((/** @type {unknown} */ error) => `REC unread: ${String(error)}`) : null;
+    legs.push({ name: leg.name, kind: leg.kind, cap, error: result?.error ?? null, nav: result?.nav ?? null, summary, samples: result?.samples ?? [], rec: recText });
     log(`${leg.name}: ${summary === null ? `no frames (${String(result?.error)})` : `${String(summary.fps)} fps p95 ${String(summary.p95Ms)} ms >50 ${String(summary.over50)}`}${result?.nav?.stuck?.length ? ` stuck ${String(result.nav.stuck.length)}` : ''}`);
     if (result?.error === 'the page lost the controlled world during the leg' || result?.error === 'cannot run a route leg before control') break;
   }
@@ -273,12 +365,12 @@ export async function playRoute(driver, { slug, cap, log = () => undefined }) {
 /** The route's markdown table: one row per leg. Pure.
  * @param {{name:string, cap:number|null, error:string|null, summary: ReturnType<typeof legSummary> | null, nav: any}[]} legs */
 export function routeTable(legs) {
-  const head = '| Segment | Cap | s | fps | p50 | p95 | max | >33 | >50 | >50/30 s | upd p50/p95 | rnd p50/p95 | gpu~ p95 | delay / jitter | tris | draws | progs | stuck |';
+  const head = '| Segment | Cap | s | fps | p50 | p95 | max | >33 | >50 | >50/30 s | upd p50/p95 | rnd p50/p95 | gpu~ p95 | delay / jitter | tris | draws | progs | tex/buf up, reads | textures | mem | audio live end/max, starts/s | stuck |';
   const rows = legs.map(({ name, cap, error, summary: s, nav }) => s === null ? `| ${name} | ${String(cap)} | ${String(error)} |` :
     `| ${name} | ${String(cap)} | ${String(s.seconds)} | ${String(s.fps)} | ${String(s.p50Ms)} | ${String(s.p95Ms)} | ${String(s.maxMs)} | ${String(s.over33)} | ${String(s.over50)} | ${String(s.over50Per30s)} | ` +
     `${String(s.updateP50Ms)} / ${String(s.updateP95Ms)} | ${String(s.renderP50Ms)} / ${String(s.renderP95Ms)} | ${String(s.gpuApproxP95Ms)} | ${String(s.delayMs)} / ${String(s.jitterMs)} | ` +
-    `${s.trianglesP95 === null ? '—' : `${String(Math.round(s.trianglesP95 / 1000))}k`} | ${String(s.drawsP95)} | ${String(s.programsMax)} | ${String(nav?.stuck?.length ?? 0)}${nav?.skipped ? ` (${String(nav.skipped)} skipped)` : ''} |`);
-  return [head, `|${'---|'.repeat(18)}`, ...rows].join('\n');
+    `${s.trianglesP95 === null ? '—' : `${String(Math.round(s.trianglesP95 / 1000))}k`} | ${String(s.drawsP95)} | ${String(s.programsMax)} | ${String(s.texUploads)}/${String(s.bufUploads)}, ${String(s.readBacks)} | ${String(s.texturesMin)}–${String(s.texturesMax)} | ${s.mem ?? '—'} | ${String(s.audioLiveEnd)}/${String(s.audioLiveMax)}, ${String(s.audioStartsPerS)} | ${String(nav?.stuck?.length ?? 0)}${nav?.skipped ? ` (${String(nav.skipped)} skipped)` : ''} |`);
+  return [head, `|${'---|'.repeat(22)}`, ...rows].join('\n');
 }
 
 /** The worst segment over every run of a cap: the highest p95, then the most spikes over 50 ms per 30 s.
