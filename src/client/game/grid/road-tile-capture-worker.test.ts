@@ -5,7 +5,7 @@ import type { CullPlan } from './roadCull';
 import type { RoadTileStore } from './roadTileArchive';
 import { RoadTileBacking } from './roadTileBacking';
 import { captureJobTiles } from './roadTileCaptureJob';
-import { jobMessage, type CaptureJob } from './roadTileCaptureWorker';
+import { CAPTURE_REPLY_DEADLINE_MS, jobMessage, type CaptureJob } from './roadTileCaptureWorker';
 
 function fixture(count = 6, seed = 0): { mesh: Mesh; plan: CullPlan } {
   const geometry = new BufferGeometry(), positions = new Float32Array(count * 9), index = new Uint32Array(count * 6);
@@ -77,6 +77,28 @@ test('the road joins its worker captures: joinCapture waits for every answer', a
   for (const answer of held.splice(0)) answer();
   await join; expect(joined).toBe(true); expect(backing.state().backedTiles).toBeGreaterThan(0);
   scope.dispose();
+});
+
+test('TR-4b: a job the worker never answers falls back to the page after its reply deadline, and the late reply is ignored', async () => {
+  vi.stubGlobal('Worker', FakeWorker); mode = 'hold';
+  const f = fixture(), expected = await pageBodies(f.mesh, f.plan), order: string[] = [];
+  const scope = new Scope('silent'), backing = new RoadTileBacking(scope, memoryStore(order).store, { pitch: 125, plans: new Map() }, 'https://wildshard.test');
+  await settle();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    await drive(backing, f.mesh, f.plan);
+    expect(posted).toBe(1);
+    let joined = false; const join = (async (): Promise<void> => { await backing.joinCapture(); joined = true; })();
+    await vi.advanceTimersByTimeAsync(CAPTURE_REPLY_DEADLINE_MS - 1); expect(joined).toBe(false); expect(order).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(2); await join;
+    expect(joined).toBe(true);
+    expect([...order].sort()).toEqual(expected); expect(backing.state().backedTiles).toBe(expected.length);
+    // the silent worker's answer, if it ever comes, changes nothing; the next source is captured on the page
+    for (const answer of held.splice(0)) answer();
+    await vi.advanceTimersByTimeAsync(0);
+    const next = fixture(2, 7); await drive(backing, next.mesh, next.plan);
+    expect(posted).toBe(1);
+  } finally { vi.useRealTimers(); scope.dispose(); }
 });
 
 test('worker captures keep the window: the 33rd source waits until a job answers', async () => {

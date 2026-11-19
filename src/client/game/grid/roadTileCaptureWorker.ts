@@ -45,6 +45,12 @@ export function jobMessage(job: CaptureJob, channel: string): { message: Capture
   return { message: { ...job, attributes, source: copy(job.source), channel }, transfer };
 }
 
+/** TR-4b: how long the worker may go without answering while it holds a job. Past it the worker is retired and every job it
+ *  holds is captured on the page (the `refused` path), so a lost reply never holds the road: hosted T1's B, E and I sat 60 s
+ *  at `wait:Road tile capture worker` on a second boot until the boot watchdog. A job answers in well under a second on the
+ *  Mac and a few seconds on hosted SwiftShader, so only a silent worker reaches it. */
+export const CAPTURE_REPLY_DEADLINE_MS = 8000;
+
 export class RoadTileCaptureWorker {
   private worker: Worker | undefined;
   private ready = false;
@@ -52,6 +58,7 @@ export class RoadTileCaptureWorker {
   private readonly waiting = new Map<number, { job: CaptureJob; resolve: (result: CaptureResult) => void; reject: (error: Error) => void;
     refused: (job: CaptureJob) => Promise<CaptureResult> }>();
   private readonly listeners: (() => void)[] = [];
+  private deadline: ReturnType<Scope['timeout']> | undefined;
   constructor(private readonly scope: Scope) {
     scope.onDispose(() => { this.stop(new Error('Road tile capture owner retired')); });
     if (typeof Worker !== 'function') return;
@@ -76,6 +83,7 @@ export class RoadTileCaptureWorker {
     const worker = this.worker; if (!this.usable() || worker === undefined) return null;
     return new Promise<CaptureResult>((resolve, reject) => {
       this.waiting.set(job.id, { job, resolve, reject, refused });
+      if (this.deadline === undefined) this.arm();
       const { message, transfer } = jobMessage(job, pageCacheChannel()); // OF12: the worker's cache channel
       worker.postMessage(message, { transfer });
     });
@@ -86,6 +94,7 @@ export class RoadTileCaptureWorker {
     const id: unknown = Reflect.get(reply, 'id'), row = typeof id === 'number' ? this.waiting.get(id) : undefined;
     if (typeof id !== 'number' || row === undefined) { this.stop(new Error('Unknown road tile capture reply')); return; }
     this.waiting.delete(id);
+    this.arm();
     const fine: unknown = Reflect.get(reply, 'fine'), coarse: unknown = Reflect.get(reply, 'coarse');
     if (Reflect.get(reply, 'ok') === true && Array.isArray(fine) && Array.isArray(coarse) && [...fine, ...coarse].every(reference))
       row.resolve({ fine, coarse });
@@ -97,9 +106,25 @@ export class RoadTileCaptureWorker {
     try { row.resolve(await row.refused(row.job)); }
     catch (error: unknown) { row.reject(error instanceof Error ? error : new Error('Road tile capture failed', { cause: error })); }
   }
-  private stop(error: Error): void {
+  /** The reply deadline runs while a job waits and restarts at each answer. */
+  private arm(): void {
+    if (this.deadline !== undefined) this.scope.cancelTimer(this.deadline);
+    this.deadline = this.waiting.size === 0 ? undefined : this.scope.timeout(CAPTURE_REPLY_DEADLINE_MS, () => { this.deadline = undefined; this.silent(); });
+  }
+  /** The worker stopped answering: retire it (later sources take the page path) and capture what it held on the page, in order. */
+  private silent(): void {
+    const rows = [...this.waiting.values()]; this.waiting.clear();
+    console.warn(`[grid] road tile capture worker silent for ${String(CAPTURE_REPLY_DEADLINE_MS)} ms with ${String(rows.length)} jobs: capturing them on the page`);
+    this.retire();
+    void (async () => { for (const row of rows) await this.retry(row); })();
+  }
+  private retire(): void {
+    if (this.deadline !== undefined) { this.scope.cancelTimer(this.deadline); this.deadline = undefined; }
     for (const forget of this.listeners.splice(0)) forget();
     this.worker?.terminate(); this.worker = undefined; this.ready = false;
+  }
+  private stop(error: Error): void {
+    this.retire();
     for (const row of this.waiting.values()) row.reject(error);
     this.waiting.clear();
   }
