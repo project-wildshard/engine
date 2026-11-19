@@ -40,5 +40,10 @@ test('row 58: the grid map\'s chips read 0.25x 0.5x 1x 2x, open lit on 1x, and s
   chips[1]?.click();
   expect(setZoom.mock.calls).toEqual([[half.zoom]]);
   expect(chips.map(c => c.classList.contains('active'))).toEqual([false, true, false, false]);
+  // MN8: while a pinch runs, the chip of the stop it will settle on is lit
+  state.zoom = one.zoom * 1.3; map.onZoom?.(state.zoom);
+  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, true, false]);
+  state.zoom = one.zoom * 1.5; map.onZoom?.(state.zoom);
+  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, false, true]);
   menu.close();
 });

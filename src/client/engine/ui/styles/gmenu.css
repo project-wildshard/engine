@@ -58,10 +58,6 @@
 .ws-gmenu .ws-gmenu-tab:last-child { border-right: 0; }
 .ws-gmenu .ws-gmenu-tab[hidden] { display: none; }
 .ws-gmenu .ws-gmenu-tabs[hidden] { display: none; } /* split menus (E124): PAUSED with only Settings has no bar */
-/* five tabs (FEEDBACK, once the review inbox is unlocked) on a phone: tighter lettering so ACHIEVEMENTS still fits */
-/* four tabs (BAG + Pine Hollow's JOURNAL): tighter tracking so ACHIEVEMENTS fits a phone's quarter width */
-@media (max-width: 560px) { .ws-gmenu .ws-gmenu-tabs.four .ws-gmenu-tab { padding-left: 2px; padding-right: 2px; letter-spacing: 0.1em; } }
-@media (max-width: 560px) { .ws-gmenu .ws-gmenu-tabs.review .ws-gmenu-tab { padding-left: 1px; padding-right: 1px; font-size: 8.5px; letter-spacing: 0.06em; } }
 .ws-gmenu .ws-gmenu-tab.active { color: #fff; text-shadow: 0 0 10px rgba(143, 227, 255, 0.5); }
 .ws-gmenu .ws-gmenu-tab.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ws-cyan); box-shadow: 0 0 10px rgba(143, 227, 255, 0.8); }
 
@@ -77,9 +73,9 @@
 .ws-gmenu .ws-gmenu-empty { padding: 20px 0; text-align: center; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); }
 .ws-gmenu svg { width: 100%; height: 100%; display: block; }
 
-/* MAP: label row, a frame the FullMap canvas fills (1.4 times as tall as wide, row 58), zoom chips + legend */
-.ws-gmenu .ws-gmenu-panel.map { touch-action: none; padding: 8px; }
-.ws-gmenu .ws-gmenu-mapmeta { flex: none; margin-bottom: 8px; font-size: 9.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-text-dim); }
+/* MAP: label row, a frame the FullMap canvas fills (1.4 times as tall as wide, row 58), zoom chips + legend. The panel is a
+   size container, so the frame's height reads the panel's width (386 x 540 inside a 402 pt phone's 1 px sheet border) */
+.ws-gmenu .ws-gmenu-panel.map { touch-action: none; padding: 8px 7px; container-type: size; }
 /* the quest card (E51): the chapter title, the full objective and its sub-steps — the HUD carries only the short chip */
 .ws-gmenu .ws-gmenu-mapquest { flex: none; margin-bottom: 10px; padding: 8px 10px 8px 12px; border: 1px solid rgba(143, 227, 255, 0.22); border-left: 2px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.05); }
 .ws-gmenu .ws-gmenu-mapquest[hidden] { display: none; }
@@ -87,7 +83,7 @@
 .ws-gmenu .ws-gmenu-mapquest-obj { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-family: var(--ws-display); font-weight: 600; font-size: 15px; letter-spacing: 0.03em; color: var(--ws-text); }
 .ws-gmenu .ws-gmenu-mapquest-obj i { flex: none; width: 7px; height: 7px; transform: rotate(45deg); background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.8); }
 .ws-gmenu .ws-gmenu-mapquest-hint { margin-top: 3px; padding-left: 15px; font-size: 9.5px; letter-spacing: 0.06em; color: var(--ws-text-dim); }
-.ws-gmenu .ws-gmenu-mapframe { position: relative; flex: 0 1 auto; width: 100%; aspect-ratio: 5 / 7; min-height: 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(4, 7, 12, 0.9); overflow: hidden; }
+.ws-gmenu .ws-gmenu-mapframe { position: relative; flex: 0 1 auto; width: 100%; height: calc(100cqw * 1.4); min-height: 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(4, 7, 12, 0.9); overflow: hidden; }
 .ws-gmenu .ws-gmenu-mapfoot { flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
 .ws-gmenu .ws-gmenu-zooms { display: flex; gap: 6px; }
 .ws-gmenu .ws-gmenu-zoom { min-width: 42px; min-height: 36px; padding: 6px 8px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.05); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.04em; cursor: pointer; }
@@ -101,16 +97,18 @@
 /* QA 11-19 row 58, Jake's A-1.4 (17:20, board 9TGmo1PWB5zAEd4GaPSdHL): the BAG (not PAUSE) gets a shorter CLOSE · BAG
    header, the map at the sheet's full width and 1.4 times as tall, the zoom row (0.25x 0.5x 1x 2x) and the key under it,
    and nothing below: no hint line (the web app's bottom bar sits there). The 44 px tap height stays, past the button. */
-.ws-gmenu:not(.pause) .ws-gmenu-bar { padding: 3px 10px; }
-.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-close { position: relative; min-height: 34px; padding: 4px 14px; font-size: 12px; letter-spacing: 0.2em; }
-.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-close::before { content: ''; position: absolute; inset: -5px -4px; }
+.ws-gmenu:not(.pause) .ws-gmenu-bar { padding: 2px 10px; }
+.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-close { position: relative; min-height: 32px; padding: 4px 14px; font-size: 12px; letter-spacing: 0.2em; }
+.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-close::before { content: ''; position: absolute; inset: -6px -4px; }
+/* MAP-NEXT MN11: with the icon tabs' padding (the BAG rule below) the header and the tab row are 88 pt or less together */
+/* MN12: in a home-screen app iOS reports no bottom inset (E58); --ws-home stands in, so the sheet ends above the home bar */
+.ws-gmenu:not(.pause) { padding-bottom: calc(10px + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px))); }
+/* MN10: on a wider screen the frame keeps its 1.4, capped by the height the sheet leaves it */
+@media (min-width: 561px) { .ws-gmenu .ws-gmenu-mapframe { width: auto; max-width: 100%; aspect-ratio: 5 / 7; align-self: center; } }
 .ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-title { font-size: 17px; letter-spacing: 0.3em; }
 .ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-sub { margin-top: 2px; font-size: 8.5px; letter-spacing: 0.24em; }
 .ws-gmenu .ws-gmenu-hint:empty { display: none; }
-@media (max-width: 560px) {
-  .ws-gmenu:not(.pause) { padding-left: 0; padding-right: 0; }
-  .ws-gmenu .ws-gmenu-panel.map .ws-gmenu-mapmeta { display: none; } /* the header's subtitle names the zone */
-}
+@media (max-width: 560px) { .ws-gmenu:not(.pause) { padding-left: 0; padding-right: 0; } } /* the sheet at the phone's full width */
 
 /* INVENTORY: equipped weapon cards + the 3-column pack grid */
 .ws-gmenu .ws-gmenu-weapon { flex: none; display: flex; align-items: center; gap: 14px; width: 100%; margin-bottom: 8px; padding: 10px 12px; appearance: none; -webkit-appearance: none; text-align: left; background: rgba(143, 227, 255, 0.04); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text); font-family: var(--ws-mono); cursor: pointer; }
@@ -246,7 +244,7 @@
 
 /* ── the BAG (E314, project/archive/2026-09-30-driftwood-loot.md): five icon tabs, one short word each (board 8 A) — MAP · GEAR · FINDS ·
    PACK · FEATS (+ Pine Hollow's JOURNAL); the panels are src/client/game/bag/bag.ts ── */
-.ws-gmenu .ws-gmenu-tabs.icons .ws-gmenu-tab { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 2px 9px; font-size: 9px; letter-spacing: 0.16em; }
+.ws-gmenu .ws-gmenu-tabs.icons .ws-gmenu-tab { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 2px 7px; font-size: 9px; letter-spacing: 0.16em; } /* MN11: 4 to 6 tabs, one rule */
 .ws-gmenu .ws-gmenu-tabs.icons .ws-gmenu-tab[hidden] { display: none; } /* PAUSE's tabs stay hidden in the BAG */
 .ws-gmenu .ws-gmenu-ticon { display: block; width: 20px; height: 20px; opacity: 0.75; }
 .ws-gmenu .ws-gmenu-tab.active .ws-gmenu-ticon { opacity: 1; color: var(--ws-cyan); filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.6)); }

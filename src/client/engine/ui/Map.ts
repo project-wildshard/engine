@@ -183,8 +183,15 @@ export class FullMap {
   get zoom(): number { return this._zoom; }
   /** the zoom chips, widest first: on the grid 0.25× · 0.5× · 1× · 2× (row 58), else the chunk's 1× · 2× · 4× */
   get stops(): readonly ZoomStop[] { const grid = this.grid(); return grid !== null ? gridStops(grid) : SHARD_STOPS; }
-  /** zoom about the frame centre (the menu's zoom chips: a stop's `zoom`) */
-  setZoom(z: number): void { this.settling++; const r = this.canvas.getBoundingClientRect(); this.zoomTo(z, { x: r.left + r.width / 2, y: r.top + r.height / 2 }); }
+  /** the menu's zoom chips (a stop's `zoom`): on the grid about you, so 1× always brings back the opening view (MAP-NEXT
+   *  MN7); a one-shard map zooms about the frame's centre */
+  setZoom(z: number): void {
+    this.settling++;
+    if (this.grid() !== null) {
+      this._zoom = Math.min(this.zoomMax(), Math.max(ZOOM_MIN, z)); this.cx = this.pose.x; this.cz = this.pose.z;
+      this.clamp(); this.onZoom?.(this._zoom); return;
+    }
+    const r = this.canvas.getBoundingClientRect(); this.zoomTo(z, { x: r.left + r.width / 2, y: r.top + r.height / 2 }); }
   show(): void {
     if (this.open) return;
     this.openScope = this.scope.child('open');

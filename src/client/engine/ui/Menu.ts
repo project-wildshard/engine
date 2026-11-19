@@ -15,6 +15,7 @@ import type { Action } from '../input/InputService';
  */
 import { activeLevel } from '../../../shared/engine/level/selection';
 import type { FullMap } from './Map';
+import { nearestStop } from './mapView';
 import { icon, type IconId } from './icons';
 import { onReview, reviewUnlocked } from './review';
 import { buildMenuSettings, type MenuSettingsState, type SettingsCtx } from './menuSettings';
@@ -81,7 +82,6 @@ export class GameMenu {
   private exitBtn: HTMLElement;
   private panels: Record<BuiltInTab, HTMLElement> & Partial<Record<string, HTMLElement>>;
   private hint: HTMLElement;
-  private mapMeta: HTMLElement;
   private mapQuest: HTMLElement;
   /** the map's POI · You key: hidden over a practice room's own map (its names are on it, it has no POIs; E353) */
   private mapLegend: HTMLElement;
@@ -147,8 +147,7 @@ export class GameMenu {
 
     // ── MAP: the FullMap canvas lives inside this panel (Map.ts embedded mode) ──
     // row 58 (Jake's A-1.4): the map is the panel's full width and 1.4 times as tall, the zoom row and the key under it and
-    // nothing below. The shard's name line is hidden on a phone (the header's subtitle already names it)
-    this.mapMeta = el('ws-gmenu-mapmeta'); this.mapMeta.textContent = levelName; // E318: the shard's name, no chunk size
+    // nothing below. The map has no name line of its own: the header's subtitle names the zone, or a practice room (MN10)
     this.mapQuest = el('ws-gmenu-mapquest');
     const frame = el('ws-gmenu-mapframe');
     opts.fullMap.mount(frame);
@@ -156,7 +155,7 @@ export class GameMenu {
     this.zooms = el('ws-gmenu-zooms');
     this.mapLegend = el('ws-gmenu-legend', engineString('s_dd35e28aa4b1', [icon('poi'), icon('you')]));
     foot.append(this.zooms, this.mapLegend);
-    this.panels.map.append(this.mapMeta, this.mapQuest, frame, foot);
+    this.panels.map.append(this.mapQuest, frame, foot);
     opts.fullMap.onZoom = () => this.syncZoom();
 
     // ── SETTINGS ──
@@ -215,8 +214,6 @@ export class GameMenu {
       (b as HTMLElement).hidden = !on;
       if (on) shown++;
     }
-    this.tabBar.classList.toggle('review', shown >= 5);
-    this.tabBar.classList.toggle('four', shown === 4); // a BAG without FINDS (Nalati, Nine Dragon): ACHIEVEMENTS must fit a phone
     this.tabBar.hidden = shown <= 1;
     this.tabBar.classList.toggle('icons', group === 'play');
     this.title.textContent = this.practice && group === 'pause' ? engineString('s_d3857b12b4ce') : TITLE[group];
@@ -256,7 +253,6 @@ export class GameMenu {
   private syncName(): void {
     const name = this.practice ? this.room : this.levelName;
     this.subtitle.textContent = name;
-    this.mapMeta.textContent = name; // E314: the MAP tab over a room's own map names the room
   }
 
   /** pause ▸ Settings ▸ Debug, the grouped registry (E162; the title's Settings mounts the same one, E172) */
@@ -388,8 +384,9 @@ export class GameMenu {
       });
       this.zooms.replaceChildren(...this.zoomChips);
     }
-    // a chip lights at its stop (a pinch settles there; the wheel may sit between two, and then none is lit)
-    for (const [i, b] of this.zoomChips.entries()) { const stop = stops[i]; b.classList.toggle('active', stop !== undefined && Math.abs(Math.log(stop.zoom / z)) < 0.01); }
+    // the nearest stop's chip is lit, so it follows a pinch (MAP-NEXT MN8) and names the stop the pinch settles on
+    const near = stops.length > 0 ? nearestStop(stops, z) : null;
+    for (const [i, b] of this.zoomChips.entries()) b.classList.toggle('active', stops[i] === near);
   }
 
   // ── SETTINGS ──

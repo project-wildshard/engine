@@ -38,12 +38,20 @@ test('row 58: 1x opens on you, 0.5x and 2x halve and double it, 0.25x is the who
   // 0.25x: the 7 by 7 exactly across the short side (zoom 1), not a quarter of 1x (which leaves a cell and a half out)
   expect(1000 / gridPpm(GRID, 1000, stops[0]?.zoom ?? 0) / PITCH).toBeCloseTo(7);
   expect(open / 4).toBeGreaterThan(1.3);
-  expect(nearestStop(stops, open * 1.3).label).toBe(1);
-  expect(nearestStop(stops, open * 1.5).label).toBe(2);
-  expect(nearestStop(stops, 1.6).label).toBe(0.25);
-  expect(nearestStop(stops, 2.2).label).toBe(0.5);
-  expect(nearestStop(stops, 100).label).toBe(2);
   expect(SHARD_STOPS.map(s => s.label)).toEqual([1, 2, 4]);
+});
+
+test('MN8: a pinch settles on the nearest stop by log distance, either side of each midpoint and past both ends', () => {
+  const stops = gridStops(GRID);
+  for (const [i, stop] of stops.entries()) {
+    const next = stops[i + 1];
+    if (next === undefined) continue;
+    const mid = Math.sqrt(stop.zoom * next.zoom);
+    expect(nearestStop(stops, mid * 0.99)).toBe(stop);
+    expect(nearestStop(stops, mid * 1.01)).toBe(next);
+  }
+  expect(nearestStop(stops, 0.5).label).toBe(0.25);
+  expect(nearestStop(stops, 100).label).toBe(2);
 });
 
 test('panning away leaves exactly one whole corner cell in view, at every zoom', () => {
@@ -193,5 +201,39 @@ test('a one-shard map keeps its 1x 2x 4x chips and its free pinch', () => {
     const at = (id: number, x: number, type = 'pointermove'): void => { canvas.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: 300 })); };
     at(1, 400, 'pointerdown'); at(2, 600, 'pointerdown'); at(1, 370); at(2, 630); at(2, 630, 'pointerup');
     expect(map.zoom).toBeCloseTo(1.3);
+  } finally { scope.dispose(); }
+});
+
+test('MN7: a 386 x 540 pt frame at each stop, every chip zooming about you', () => {
+  const { map, scope } = fixture(gridExtras);
+  try {
+    Object.defineProperty(map.root, 'clientWidth', { value: 386 });
+    Object.defineProperty(map.root, 'clientHeight', { value: 540 });
+    const you = { x: 40, z: -30 };
+    map.update(you, 0); map.show();
+    const across = (): number => { const b = map.viewBox(); return b.x1 - b.x0; };
+    const centred = (): void => { const b = map.viewBox(); expect((b.x0 + b.x1) / 2).toBeCloseTo(you.x); expect((b.z0 + b.z1) / 2).toBeCloseTo(you.z); };
+    expect((map.viewBox().z1 - map.viewBox().z0) / across()).toBeCloseTo(540 / 386);
+    const [quarter, half, one, two] = map.stops;
+    if (quarter === undefined || half === undefined || one === undefined || two === undefined) throw new Error('four stops');
+    map.setZoom(two.zoom); expect(ZONE / across()).toBeCloseTo(1.44); centred();
+    map.setZoom(half.zoom); expect(across() / PITCH).toBeCloseTo(2.47, 1); centred();
+    map.setZoom(quarter.zoom); expect(wholeCellsIn(GRID, map.viewBox())).toBe(49);
+    // pan far away: at 1x the clamp keeps a whole cell in view; at 2x the frame is narrower than a cell (347 m of 562.5),
+    // so the clamp keeps the whole view inside the corner cell. The 1x chip brings back the opening view on you
+    const canvas = map.root.querySelector('canvas');
+    if (canvas === null) throw new Error('no canvas');
+    const panFar = (): void => {
+      canvas.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 0, clientY: 0 }));
+      for (let i = 1; i <= 40; i++) canvas.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: i * 400, clientY: -i * 400 }));
+      canvas.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }));
+    };
+    map.setZoom(one.zoom); panFar();
+    expect(wholeCellsIn(GRID, map.viewBox())).toBeGreaterThanOrEqual(1);
+    map.setZoom(two.zoom); panFar();
+    const box = map.viewBox(), edge = 3.5 * PITCH;
+    expect(box.x1).toBeLessThanOrEqual(edge + 1e-6); expect(box.x0).toBeGreaterThanOrEqual(edge - PITCH - 1e-6);
+    expect(box.z0).toBeGreaterThanOrEqual(-edge - 1e-6); expect(box.z1).toBeLessThanOrEqual(-edge + PITCH + 1e-6);
+    map.setZoom(one.zoom); expect(ZONE / across()).toBeCloseTo(0.72); centred();
   } finally { scope.dispose(); }
 });
