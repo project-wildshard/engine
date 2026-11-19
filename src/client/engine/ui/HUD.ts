@@ -588,7 +588,7 @@ export class HUD {
   /** A1 (E130): the toasts hang right-aligned under the quest chip (placed by QuestUI under the minimap; hidden, its slot
    *  still is) — on a shard without one, under the minimap. Read at each toast: every layout puts them differently */
   private placeToasts(): void {
-    const chip = this.root.querySelector('.ws-quest-obj'), anchor = chip ?? this.root.querySelector('.ws-minimap');
+    const chip = this.root.querySelector('.ws-quest-obj:not(.ws-quest-yield)'), anchor = chip ?? this.root.querySelector('.ws-minimap');
     if (anchor === null) return;
     const r = anchor.getBoundingClientRect(), host = this.root.getBoundingClientRect();
     if (r.height === 0) return;

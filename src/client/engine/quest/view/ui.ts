@@ -24,8 +24,34 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent?:
   const e = document.createElement(tag); e.className = cls; parent?.append(e); return e;
 };
 
-/** the quest chip: one slim glass line under the minimap with the goal, its count and the nearest marker's bearing */
+/** QA-FEEDBACK 11-19 row 28: how long a quest's completion holds the tracker before the next objective takes it */
+const COMPLETE_MS = 2500;
+
+/** the quest chip: one slim glass line under the minimap with the goal, its count and the nearest marker's bearing.
+ *  QA-FEEDBACK 11-19 row 28 (Jake: "We shouldn't even be having overlapping badges like that"): every quest on a page has a
+ *  chip, all in this one spot, so they share it: one badge at a time. A fresh completion holds it for COMPLETE_MS, then the
+ *  most recently changed objective; a finished quest's badge stays only while no other quest has a goal. A chip that gives
+ *  way leaves at once (`ws-quest-yield`), so the old badge is gone before the new one fades in. */
 export class ObjectiveLine {
+  private static readonly live = new Set<ObjectiveLine>();
+  private static order = 0;
+  /** when the newest completion's hold ends (0: none pending) */
+  private static holdEnds = 0;
+  /** the newest frame time any chip was updated with (ms): the chips' own clock */
+  private static clockMs = 0;
+  private static share(): void {
+    const now = ObjectiveLine.clockMs;
+    let fresh: ObjectiveLine | null = null, goal: ObjectiveLine | null = null, done: ObjectiveLine | null = null;
+    for (const c of ObjectiveLine.live) {
+      if (!c.has) continue;
+      if (!c.finished) { if (goal === null || c.seq > goal.seq) goal = c; }
+      else if (now - c.changedAt < COMPLETE_MS) { if (fresh === null || c.seq > fresh.seq) fresh = c; }
+      else if (done === null || c.seq > done.seq) done = c;
+    }
+    const drawn = fresh ?? goal ?? done;
+    for (const c of ObjectiveLine.live) { c.root.classList.toggle('show', c === drawn); c.root.classList.toggle('ws-quest-yield', c !== drawn); }
+  }
+  private seq = 0; private changedAt = -Infinity; private has = false; private finished = false;
   readonly scope: Scope = uiScope('objective');
   readonly root: HTMLDivElement = el('div', 'ws-quest-obj');
   private goal = el('span', 'ws-quest-obj-goal', this.root);
@@ -46,6 +72,8 @@ export class ObjectiveLine {
     this.arrow.textContent = engineString('s_671fd067cc0e');
     this.sep.style.display = this.nav.style.display = 'none';
     mountUi(this.root, this.scope, hudRoot());
+    ObjectiveLine.live.add(this);
+    this.scope.onDispose(() => { ObjectiveLine.live.delete(this); ObjectiveLine.share(); });
   }
 
   /** the chip's goal: a short label ("Glyph shards") and its counter ("1/3", or '') — pulses cyan when either changes */
@@ -57,7 +85,10 @@ export class ObjectiveLine {
     this.label.textContent = label;
     this.count.textContent = count;
     this.count.style.display = count ? '' : 'none';
-    this.root.classList.toggle('show', label !== '');
+    this.has = label !== ''; this.finished = label === engineString('s_f316ae64883e');
+    this.seq = ++ObjectiveLine.order; this.changedAt = ObjectiveLine.clockMs;
+    if (this.finished) ObjectiveLine.holdEnds = this.changedAt + COMPLETE_MS;
+    ObjectiveLine.share();
   }
 
   /** hide the chip while a caption has the screen (`ws-quest-hide`); it keeps its place and its goal */
@@ -82,6 +113,14 @@ export class ObjectiveLine {
    *  second, then places the chip from the minimap's and the HUD's size reports, read right after a layout (a read here,
    *  on the frame the HUD was built, forced a whole-page layout). */
   update(t: number): void {
+    const next = t * 1000;
+    if (next < ObjectiveLine.clockMs) { // a clock that restarted (a new level's frame time): keep every hold's length
+      const back = ObjectiveLine.clockMs - next;
+      if (ObjectiveLine.holdEnds !== 0) ObjectiveLine.holdEnds -= back;
+      for (const c of ObjectiveLine.live) c.changedAt -= back;
+    }
+    ObjectiveLine.clockMs = next;
+    if (ObjectiveLine.holdEnds !== 0 && ObjectiveLine.clockMs >= ObjectiveLine.holdEnds) { ObjectiveLine.holdEnds = 0; ObjectiveLine.share(); }
     if (this.placing !== null || t - this.placeT < 1) return;
     this.placeT = t;
     const mini = document.querySelector('.ws-minimap'), parent = this.root.parentElement;
