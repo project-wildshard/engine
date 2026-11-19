@@ -1,5 +1,7 @@
 import { Scope } from '../../../shared/engine/app/scope';
-import { harnessPins, installedIdentity } from '../../../shared/engine/app/identity';
+import { installedIdentity } from '../../../shared/engine/app/identity';
+import { classifyActor, type ActorFacts } from '../../../shared/engine/app/actor';
+import { pageActor } from './pageActor';
 import { pageScope } from '../../../shared/engine/app/resources';
 import { jsonSlot, type Json } from '../saves/slots';
 /** Optional, error-only Sentry channel. The existing /api/errors report remains the primary local inbox. */
@@ -73,7 +75,6 @@ export function browserErrorDist(build: string): string | undefined {
   return build !== '' && build.length <= 64 ? build : undefined;
 }
 let sdk: Promise<BrowserSdk | null> | null = null;
-const AUTOMATION_AGENT = /HeadlessChrome|Playwright|PhantomJS/u;
 /** S13: deliveries waiting on an event that beforeSend refused (noise, a page that stopped reporting): that event is done, not owed */
 const refusedListeners = new Set<(id: string) => void>();
 const refused = (id: string | undefined): null => { for (const listener of refusedListeners) listener(id ?? ''); return null; };
@@ -85,10 +86,10 @@ const refused = (id: string | undefined): null => { for (const listener of refus
  * error card on staging v0.1.33 and v0.1.34 was met only by agent proofs and so never reached Sentry.
  */
 export type BrowserErrorAudience = 'player' | 'automation';
-export function browserErrorAudience(environment: { readonly origin: string; readonly automated: boolean; readonly harness: boolean; readonly userAgent?: string },
+export function browserErrorAudience(environment: ActorFacts & { readonly origin: string; readonly automated: boolean },
   origins: readonly string[]): BrowserErrorAudience | null {
   if (!origins.includes(environment.origin)) return null;
-  return environment.automated || environment.harness || AUTOMATION_AGENT.test(environment.userAgent ?? '') ? 'automation' : 'player';
+  return classifyActor({ ...environment, webdriver: environment.automated }).actor === 'agent' ? 'automation' : 'player';
 }
 /** S21: the most events an automated page sends (beforeSend refuses the rest), so an agent soak cannot spend the project's quota */
 export const AUTOMATION_EVENTS_MAX = 20;
@@ -138,8 +139,8 @@ export function browserErrorLevel(error: unknown, fatal: boolean, screen?: Error
 
 function pageAudience(): BrowserErrorAudience | null {
   if (typeof location === 'undefined' || typeof navigator === 'undefined') return null;
-  return browserErrorAudience({origin: location.origin, automated: navigator.webdriver, harness: harnessPins() !== undefined, userAgent: navigator.userAgent},
-    installedIdentity()?.errorReportOrigins ?? []);
+  if (installedIdentity()?.errorReportOrigins?.includes(location.origin) !== true) return null;
+  return pageActor().actor === 'agent' ? 'automation' : 'player';
 }
 function productionPage(): boolean { return pageAudience() !== null; }
 /** S21: the distinct events this automated page sent; an outbox resend keeps its event id, so it is not a second one */

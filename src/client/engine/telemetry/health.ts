@@ -1,22 +1,27 @@
 import * as v from 'valibot';
+import { actorTags, type ActorTags } from '../../../shared/engine/app/actor';
 import type { SaveStore } from '../../../shared/engine/saves/store';
 import { classifySession, type Heartbeat, type SessionEnd } from './model';
 
 const heartbeatSchema = v.object({ session: v.string(), build: v.string(), level: v.string(), stage: v.string(),
-  at: v.number(), fps: v.number(), clean: v.boolean(), error: v.boolean(), contextLost: v.boolean() });
-export interface HealthReport { kind: 'session'; install: string; heartbeat: Heartbeat; end: SessionEnd; build: string }
+  at: v.number(), fps: v.number(), clean: v.boolean(), error: v.boolean(), contextLost: v.boolean(),
+  actor: v.exactOptional(v.picklist(['human', 'agent'])), lane: v.exactOptional(v.string()) });
+type TaggedHeartbeat = Heartbeat & Partial<ActorTags>;
+export interface HealthReport extends Partial<ActorTags> { kind: 'session'; install: string; heartbeat: Heartbeat; end: SessionEnd; build: string }
 export class SessionHealth {
   private readonly local;
   private readonly tab;
   private readonly identity;
   private readonly reported;
   readonly install: string;
-  private current: Heartbeat;
+  private current: TaggedHeartbeat;
   private readonly send: (report: HealthReport) => void;
-  constructor(store: SaveStore, build: string, send: (report: HealthReport) => void, now: number = Date.now(), id: () => string = () => crypto.randomUUID()) {
+  constructor(store: SaveStore, build: string, send: (report: HealthReport) => void, now: number = Date.now(),
+    id: () => string = () => crypto.randomUUID(), actor?: ActorTags) {
     this.send = send;
-    this.local = store.define({ key: 'telemetry.heartbeat', scope: 'device', version: 1, schema: v.nullable(heartbeatSchema), initial: () => null });
-    this.tab = store.define({ key: 'telemetry.heartbeat', scope: 'session', version: 1, schema: v.nullable(heartbeatSchema), initial: () => null });
+    const compatible = { key: 'telemetry.heartbeat', version: 2, schema: v.nullable(heartbeatSchema), initial: () => null, migrate: { 1: (old: unknown) => old } };
+    this.local = store.define({ ...compatible, scope: 'device' });
+    this.tab = store.define({ ...compatible, scope: 'session' });
     this.identity = store.define({ key: 'telemetry.install', scope: 'device', version: 1, schema: v.string(), initial: () => '' });
     this.reported = store.define({ key: 'telemetry.reported', scope: 'device', version: 1, schema: v.array(v.string()), initial: () => [] });
     this.install = this.identity.read() || id(); this.identity.write(this.install);
@@ -24,10 +29,13 @@ export class SessionHealth {
     // A different live tab must not be diagnosed as a killed page. Reloads retain the tab heartbeat.
     const previous = tab ?? (local && (local.clean || now - local.at > 15_000) ? local : null);
     if (previous && !this.reported.read().includes(previous.session)) {
-      this.send({ kind: 'session', install: this.install, heartbeat: previous, end: classifySession(previous), build: previous.build });
+      const { actor: previousActor, lane, ...heartbeat } = previous;
+      this.send({ kind: 'session', install: this.install, heartbeat, end: classifySession(previous), build: previous.build,
+        ...(previousActor === undefined ? {} : actorTags(lane === undefined ? { actor: previousActor } : { actor: previousActor, lane })) });
       this.reported.write([...this.reported.read(), previous.session].slice(-32));
     }
-    this.current = { session: id(), build, level: '', stage: 'boot', at: now, fps: 0, clean: false, error: false, contextLost: false };
+    this.current = { session: id(), build, level: '', stage: 'boot', at: now, fps: 0, clean: false, error: false, contextLost: false,
+      ...(actor === undefined ? {} : actorTags(actor)) };
     this.write();
   }
   private write(): void { this.local.write(this.current); this.tab.write(this.current); }

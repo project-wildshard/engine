@@ -1,3 +1,5 @@
+import type { ActorTags } from '../../../shared/engine/app/actor';
+
 export type SessionEnd = 'clean' | 'crash' | 'context-loss' | 'likely-oom';
 export interface Heartbeat {
   session: string; build: string; level: string; stage: string; at: number; fps: number;
@@ -21,7 +23,7 @@ export interface AnalyticsMap {
 /** An observed reason a visible failure episode ended; unknown duration is never reported as zero. */
 export type FailureClear = 'recovered' | 'dismissed' | 'replaced' | 'hidden' | 'pagehide' | 'disposed';
 export type AnalyticsEvent = { [K in keyof AnalyticsMap]: { name: K; data: AnalyticsMap[K] } }[keyof AnalyticsMap];
-export interface AnalyticsBatch { kind: 'analytics'; build: string; install: string; events: AnalyticsEvent[] }
+export interface AnalyticsBatch extends Partial<ActorTags> { kind: 'analytics'; build: string; install: string; events: AnalyticsEvent[] }
 export class AnalyticsSink {
   private queue: AnalyticsEvent[] = [];
   private readonly build: string;

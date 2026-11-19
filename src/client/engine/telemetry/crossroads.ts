@@ -15,7 +15,7 @@ export async function flushCrossroads(storage: SaveStorage | null = saveEnvironm
     while (pending.length > 0) {
       const record = pending[0];
       if (record === null || typeof record !== 'object' || !('kind' in record) || record.kind !== 'crossroads') return;
-      const body = JSON.stringify(record);
+      const body = JSON.stringify({ ...record, actor: 'agent' });
       if (body.length > 16_384) return;
       const response = await post(`${apiOrigin()}/api/telemetry`, { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: true });
       if (!response.ok || storage?.getItem(KEY) !== raw) return;

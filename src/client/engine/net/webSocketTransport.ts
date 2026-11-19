@@ -1,4 +1,5 @@
 import { Scope } from '../../../shared/engine/app/scope';
+import { doorPassLane } from '../../../shared/engine/app/actor';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { channelPrefix, closeCode, closeReason, COMMAND_SKIP_BYTES, controlPrefix, decodePong, encodePing, framed, PING_MS, SOCKET_ARRIVE, SOCKET_COUNTDOWN, SOCKET_ENTER, SOCKET_PLAYTEST, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME, SOCKET_UNRELIABLE, SOCKET_VOICE, SOCKET_WORLD, type SocketControl } from '../../../shared/engine/net/socketFrames';
 import { decodeSocketCloseInfo, type SocketCloseInfo } from '../../../shared/engine/net/socketClose';
@@ -20,7 +21,7 @@ const harnessDoorPass = (): unknown => (globalThis as { __wildshardDoorPass?: un
  *  lane's sockets apart from the address its players share), or none. A door that knows no pass picks it and goes on as before. */
 export function doorPassProtocols(read: () => unknown = harnessDoorPass): string[] {
   const pass = read();
-  return typeof pass === 'string' && /^pass:[a-z0-9-]{1,40}\.[0-9]{1,12}\.[0-9a-f]{128}$/u.test(pass) ? [`wspass.${pass.slice('pass:'.length)}`] : [];
+  return typeof pass === 'string' && doorPassLane(pass) !== undefined ? [`wspass.${pass.slice('pass:'.length)}`] : [];
 }
 
 /** A socket's close event has no type on `Scope.listen`, which knows only the page's events. */

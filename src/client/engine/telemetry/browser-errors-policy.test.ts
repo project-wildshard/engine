@@ -12,6 +12,7 @@ test.each([
   ['https://play.example.invalid',false,false,desktopAgent.replace('Chrome/','HeadlessChrome/'),'automation'],
   ['https://play.example.invalid',false,false,`${desktopAgent} Playwright/1.60`,'automation'],
   ['https://play.example.invalid',false,false,'Mozilla/5.0 PhantomJS/2.1.1','automation'],
+  ['https://play.example.invalid',false,false,`${desktopAgent} WildshardAgent/1 (qa)`,'automation'],
   ['http://localhost:4401',false,false,desktopAgent,null],
   ['http://localhost:4401',true,false,desktopAgent,null],
   ['http://127.0.0.1:4401',false,false,desktopAgent,null],

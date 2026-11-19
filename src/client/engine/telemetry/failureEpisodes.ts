@@ -1,10 +1,11 @@
 import * as v from 'valibot';
+import { actorTags, type ActorTags } from '../../../shared/engine/app/actor';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import type { SaveKeyDef, SaveStorage } from '../../../shared/engine/saves/store';
 import type { AnalyticsBatch, AnalyticsMap, FailureClear } from './model';
 
 type Outcome = AnalyticsMap['failure.screen'];
-interface Record { readonly build: string; readonly install: string; readonly data: Outcome }
+interface Record extends Partial<ActorTags> { readonly build: string; readonly install: string; readonly data: Outcome }
 interface Active { readonly id: string; readonly screen: string; readonly level: string; readonly since: number }
 const KEY = 'failure-screen.pending', MAX = 32, MAX_BYTES = 65_536;
 /** Registered device storage for pending immutable outcomes; unrelated settings remain separate. */
@@ -16,14 +17,18 @@ const Text = v.pipe(v.string(), v.maxLength(128));
 const OutcomeSchema = v.strictObject({ id: Id, level: Text, screen: Code,
   durationMs: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   clear: v.picklist(['recovered', 'dismissed', 'replaced', 'hidden', 'pagehide', 'disposed']) });
-const Records = v.pipe(v.array(v.strictObject({ build: Text, install: Text, data: OutcomeSchema })), v.maxLength(MAX));
+const Records = v.pipe(v.array(v.strictObject({ build: Text, install: Text, data: OutcomeSchema,
+  actor: v.exactOptional(v.picklist(['human', 'agent'])), lane: v.exactOptional(Text) })), v.maxLength(MAX));
 
 /** Bounded pending outcomes. Storage refusal keeps the current document's copy; only successful writes survive restart. */
 export class FailureOutbox {
   private memory: readonly Record[] = [];
   private readonly sending = new Set<string>();
   private readonly storage: Pick<SaveStorage, 'getItem' | 'setItem' | 'removeItem'> | null;
-  constructor(storage: Pick<SaveStorage, 'getItem' | 'setItem' | 'removeItem'> | null) { this.storage = storage; }
+  private readonly actor;
+  constructor(storage: Pick<SaveStorage, 'getItem' | 'setItem' | 'removeItem'> | null, actor?: ActorTags) {
+    this.storage = storage; this.actor = actor === undefined ? {} : actorTags(actor);
+  }
   private read(): readonly Record[] {
     try {
       const raw = this.storage?.getItem(KEY);
@@ -51,7 +56,7 @@ export class FailureOutbox {
   }
   /** Same id always retains its immutable first outcome. False explicitly means persistence failed. */
   add(build: string, install: string, data: Outcome): boolean {
-    const decoded = v.safeParse(Records, [{ build, install, data }]);
+    const decoded = v.safeParse(Records, [{ build, install, data, ...this.actor }]);
     if (!decoded.success) return false;
     const records = this.pending();
     return this.write(records.some(record => record.data.id === data.id) ? records : [...records, ...decoded.output]);
@@ -63,7 +68,8 @@ export class FailureOutbox {
       if (this.sending.has(id)) continue;
       this.sending.add(id);
       try {
-        if (await deliver({ kind: 'analytics', build: record.build, install: record.install, events: [{ name: 'failure.screen', data: record.data }] })) {
+        const { data, ...stored } = record;
+        if (await deliver({ kind: 'analytics', ...stored, events: [{ name: 'failure.screen', data }] })) {
           this.write(this.pending().filter(entry => entry.data.id !== id));
         }
       } catch { /* Retained until another actual acknowledgement. */ }

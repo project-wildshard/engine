@@ -1,4 +1,5 @@
 import { harnessPins } from '../../../shared/engine/app/identity';
+import { actorTags } from '../../../shared/engine/app/actor';
 import type { App } from '../app/app';
 import { apiUrl } from '../core/apiOrigin';
 import { Scope } from '../../../shared/engine/app/scope';
@@ -8,6 +9,7 @@ import { AnalyticsSink, type FailureClear } from './model';
 import { flushCrossroads } from './crossroads';
 import { FailureOutbox, failureOutcomeSave } from './failureEpisodes';
 import { FailureTelemetry } from './failureTelemetry';
+import { pageActor } from './pageActor';
 
 declare const __BUILD_ID__: string;
 let health: SessionHealth | null = null;
@@ -25,19 +27,21 @@ const send = (body: object): void => {
   void fetch(apiUrl('telemetry'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), keepalive: true }).catch(() => undefined);
 };
 /** E7.8a shares the existing anonymous install and telemetry endpoint. */
-export function onlineTelemetry():{install:string;send:(body:object)=>void}{startTelemetry();return {install:health?.install??crypto.randomUUID(),send};}
+const sendFromPage = (body: object): void => { send({ ...body, ...actorTags(pageActor()) }); };
+export function onlineTelemetry():{install:string;send:(body:object)=>void}{startTelemetry();return {install:health?.install??crypto.randomUUID(),send:sendFromPage};}
 /** Start the page telemetry session and its native event observers once. */
 export function startTelemetry(): void {
   if (health !== null || typeof window === 'undefined' || typeof document === 'undefined') return;
   const build = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '';
-  health = new SessionHealth(saves, build, send);
-  analytics = new AnalyticsSink(build, health.install, send);
+  const actor = actorTags(pageActor());
+  health = new SessionHealth(saves, build, send, undefined, undefined, actor);
+  analytics = new AnalyticsSink(build, health.install, sendFromPage);
   scope = new Scope('telemetry');
   if (harnessPins() === undefined) {
     const slot = saves.define(failureOutcomeSave);
     const outbox = new FailureOutbox({ getItem: () => slot.read(),
       setItem: (_key, value) => { if (!slot.write(value)) throw new Error('Failure outcome storage refused'); },
-      removeItem: () => { if (!slot.write(null)) throw new Error('Failure outcome acknowledgement storage refused'); } });
+      removeItem: () => { if (!slot.write(null)) throw new Error('Failure outcome acknowledgement storage refused'); } }, actor);
     failures = new FailureTelemetry(scope, outbox, build, health.install, () => level || 'boot', async batch => {
       const response = await fetch(apiUrl('telemetry'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(batch), keepalive: true });
       return response.ok;
