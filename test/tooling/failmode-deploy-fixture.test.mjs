@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { nextFailmodeDeploy } from '../../scripts/failmode-deploy-fixture.mjs';
+import { fixtureScratch } from './owned-scratch.mjs';
+
+test('FM11 changes the deployment documents while preserving compiled entry bytes', () => {
+  const root = fixtureScratch('failmode-deploy');
+  const first = join(root, 'first'), next = join(root, 'next');
+  const assets = join(first, 'assets/spawn'), code = join(first, 'b/1234567-fixture');
+  mkdirSync(assets, { recursive: true });
+  mkdirSync(code, { recursive: true });
+  const time = '2026-11-19T05:00:00.000Z';
+  const html = '<meta name="ws-built-at" content="' + time + '"><script>globalThis.__WS_BUILD_ID__="1234567-fixture";globalThis.__WS_BUILT_AT__=' + String(Date.parse(time)) + ';</script><script src="/b/1234567-fixture/entry.js"></script>';
+  writeFileSync(join(first, 'version.json'), JSON.stringify({ build: '1234567-fixture', time }));
+  writeFileSync(join(first, 'index.html'), html);
+  writeFileSync(join(code, 'entry.js'), 'globalThis.answer = 42');
+  writeFileSync(join(assets, 'packs-1234567-fixture.json'), '{}');
+
+  assert.equal(nextFailmodeDeploy(first, next), '1234567-fixture-next');
+  assert.equal(readFileSync(join(first, 'index.html'), 'utf8'), html);
+  const document = readFileSync(join(next, 'index.html'), 'utf8');
+  assert.match(document, /__WS_BUILD_ID__="1234567-fixture-next";/u);
+  assert.match(document, /2026-11-19T05:00:01.000Z/u);
+  assert.match(document, /src="\/b\/1234567-fixture\/entry.js"/u);
+  assert.equal(readFileSync(join(next, 'b/1234567-fixture/entry.js'), 'utf8'), 'globalThis.answer = 42');
+  assert.equal(readFileSync(join(next, 'assets/spawn/packs-1234567-fixture-next.json'), 'utf8'), '{}');
+  assert.deepEqual(JSON.parse(readFileSync(join(next, 'version.json'), 'utf8')), {
+    build: '1234567-fixture-next', time: '2026-11-19T05:00:01.000Z',
+  });
+});

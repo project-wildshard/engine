@@ -1,0 +1,91 @@
+name: ring-2-failmodes
+
+on:
+  schedule:
+    - cron: '37 7 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/failmodes.yml'
+      - 'scripts/failmode-*.mjs'
+      - 'scripts/online-rig*.mjs'
+      - 'scripts/chaos-proxy*.mjs'
+      - 'src/client/app/failScreens.ts'
+      - 'src/client/engine/boot/**'
+      - 'src/client/engine/net/**'
+      - 'src/client/game/boot/**'
+      - 'src/client/game/grid/*Shell.ts'
+      - 'src/client/host/**/shell.ts'
+      - 'src/client/host/online/**'
+      - 'src/server/host/online/**'
+      - 'src/shared/engine/net/**'
+  workflow_dispatch:
+    inputs:
+      selection:
+        description: Run all modes, the related-push sample, or a deliberately broken screen expectation
+        type: choice
+        options: [all, related, refusal]
+        default: all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ring-2-failmodes-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ github.event_name == 'push' && 15 || 75 }}
+    env:
+      WS_LANE_NAME: fm11
+      SELECTION: ${{ github.event_name == 'push' && 'related' || inputs.selection || 'all' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - run: bash scripts/ci-playwright-install.sh chromium
+      - run: pnpm pins
+      - run: node --test test/tooling/failmode-deploy-fixture.test.mjs
+      - run: pnpm exec vitest run test/tooling/failmode-results.test.mjs test/failmode-cases.test.ts
+      - name: Prepare one exact build
+        run: |
+          node scripts/scratch-dir.mjs fm11 'Ring 2 browser failure proof'
+          flags=()
+          if [ "$SELECTION" = all ]; then flags+=(--next); fi
+          node scripts/failmode-proof.mjs --prepare tmp/fm11/build "${flags[@]}"
+      - name: Judge the real failure screens
+        run: |
+          flags=(--engine=chromium --baseline)
+          case "$SELECTION" in
+            all)
+              openssl req -quiet -x509 -newkey rsa:2048 -noenc -days 1 -subj /CN=localhost \
+                -keyout tmp/fm11/tls.key -out tmp/fm11/tls.crt
+              flags+=(--scenario=all --seats=2 --next=tmp/fm11/build/next \
+                --tls-key=tmp/fm11/tls.key --tls-cert=tmp/fm11/tls.crt)
+              ;;
+            related)
+              flags+=("--scenario=offline-play,drop,release-429,version-skew")
+              ;;
+            refusal)
+              flags+=(--refusal=screen)
+              ;;
+            *)
+              exit 2
+              ;;
+          esac
+          scripts/browser-lane.sh node scripts/failmode-proof.mjs \
+            tmp/fm11/build/dist tmp/fm11/run tmp/fm11/build/key.json pglite: "${flags[@]}"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: failmodes-${{ github.sha }}
+          path: |
+            tmp/fm11/run/failmodes/receipt.json
+            tmp/fm11/run/failmodes/shots/*.png
+          if-no-files-found: error
+          retention-days: 7
