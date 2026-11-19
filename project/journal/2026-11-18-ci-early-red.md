@@ -2,7 +2,7 @@
 
 > Written by: Claude (opus-cispeed)
 >
-> **State:** meta FLOW-SIMPLE FS22, J435 (the J422 freeze lifted).
+> **State:** meta FLOW-SIMPLE FS24, J435 (the J422 freeze lifted).
 
 Main's ci group keeps the running run and only the newest pending one
 (CIQ1). With pushes a median 4 min apart and runs a median 17 min

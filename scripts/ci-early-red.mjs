@@ -1,4 +1,4 @@
-// Early red (meta FLOW-SIMPLE FS22, J435): when a push reaches main while main's running `ci` run already has a
+// Early red (meta FLOW-SIMPLE FS24, J435): when a push reaches main while main's running `ci` run already has a
 // failed blocking job, cancel that run so the pending run for the new push starts now.
 //
 //   node scripts/ci-early-red.mjs        decide from main's ci runs and cancel at most one (ci-early-red.yml runs this)

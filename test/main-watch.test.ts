@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { blockingRun, failedNames, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { attribute, blockingRun, failedNames, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 
 mkdirSync(resolve('tmp'), { recursive: true });
@@ -392,9 +392,69 @@ test('J431 writes each memory warning and gate-flake receipt once and queues QA 
   ]);
 });
 
-test('FS22: an early-red cancel names the failed jobs, not the ones it cancelled', () => {
+test('FS24: an early-red cancel names the failed jobs, not the ones it cancelled', () => {
   const job = (name: string, conclusion: string) => ({ name, conclusion });
   expect(failedNames([job('boundaries', 'failure'), job('tests (3)', 'cancelled'), job('timings', 'failure'), job('tests (1)', 'success')])).toEqual(['boundaries']);
   // Run 44361972035: a timeout concludes `cancelled`; with no outright failure it is still named.
   expect(failedNames([job('nine-ring1-build', 'cancelled'), job('tests (1)', 'success')])).toEqual(['nine-ring1-build']);
+});
+
+// FS19 (build-max 2026-11-18 A4): 26 of 52 reds in 24 h came through main-push and named no one.
+test('FS19: a red pushed through main-push names its pusher and messages its pane', () => {
+  // The receipt main-push writes (Cancún clock), here carrying two commits: the tip and the one under it.
+  const log = '23:24 Cancún opus-of-m23 main-push pushed main bbbb222200: 2 commit(s) pane w4:p1';
+  const w = world(replay, log), io = fake('main-push-red', w);
+  sweep(io);
+  w.runs = [...replay, run(42970000009, 'bbbb2222', 'failure', 52)];w.tip = sha('bbbb2222');w.receipts.length = 0;
+  sweep(io);
+  expect(w.receipts.filter(line => line.startsWith('MAIN RED ') && line.includes('..bbbb222200 run 42970000009'))).toEqual([expect.stringMatching(/: landers opus-of-m23; failed: tests \(3\)$/u)]);
+  expect(w.sent[0]).toEqual(['w4:p1', expect.stringContaining('You landed bbbb222200')]);
+  expect(w.receipts).toContain('MAIN RED message to opus-of-m23 sent to pane w4:p1');
+});
+
+test('FS19: main-push receipts parse with or without a pane; land wins a shared SHA; a push covers its count', () => {
+  const map = landers('22:38 Cancún codex-ms main-push pushed main 7f961fe1b9: 1 commit(s)\n'
+    + '23:24 Cancún opus-a main-push pushed main 2c18d3d9b5: 3 commit(s) pane w2:pV, 1 of them another lane\'s, carried along (M1): x\n'
+    + '05:50 UTC opus-red land plan/red-plan landed 2c18d3d9b5 on main (a..b); push');
+  expect(map.get('7f961fe1b9')).toEqual({ lane: 'codex-ms', slug: '', count: 1 });
+  expect(map.get('2c18d3d9b5')).toEqual({ lane: 'opus-red', slug: 'red-plan' });
+  const pushed = landers('23:24 Cancún opus-a main-push pushed main 2c18d3d9b5: 3 commit(s) pane w2:pV');
+  expect(pushed.get('2c18d3d9b5')).toEqual({ lane: 'opus-a', slug: '', count: 3, pane: 'w2:pV' });
+  // Newest first: the push's tip owns the two under it, but not a third, nor one with its own lander.
+  const who = new Map([['c'.repeat(10), { lane: 'push', count: 3 }], ['a'.repeat(10), { lane: 'land' }]]);
+  expect(attribute(['c', 'b', 'a', 'z'].map(row => row.repeat(40)), who).map(row => row.lander?.lane)).toEqual(['push', 'push', 'land', undefined]);
+});
+
+// FS22 (J443): buddy-engine keeps engine main when no pusher fixed a red in 20 minutes.
+test('FS22: a delivered red with no green after 20 min goes to the keeper once; a green ends the span', () => {
+  let clock = Date.parse('2026-11-19T05:00:00Z');
+  const log = '05:50 UTC opus-red land plan/red-plan landed aaaa111100 on main (652afa6c00..aaaa111100); push';
+  const w = world(replay, log), io = { ...fake('keeper', w), now: () => clock };
+  w.agents = ['buddy-engine'];
+  sweep(io);
+  w.runs = [...replay, run(42970000011, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
+  sweep(io);
+  expect(w.sent.map(([pane]) => pane)).toEqual(['w1:p2']);
+  expect(w.prompted ?? []).toEqual([]);
+  clock += 19 * 60_000;sweep(io);
+  expect(w.prompted ?? []).toEqual([]);
+  clock += 2 * 60_000;sweep(io);sweep(io);
+  expect(w.prompted?.map(([agent, text]) => [agent, text.slice(0, 36)])).toEqual([['buddy-engine', 'main-watch: keeper (J443): engine ma']]);
+  expect(w.receipts).toContain('main red keeper: buddy-engine prompted after 21 min red with no green (run 42970000011)');
+  // A green ends the span: the next red starts a fresh clock.
+  w.runs = [...w.runs, run(42970000012, 'bbbb2222', 'success', 55)];w.tip = sha('bbbb2222');
+  sweep(io);clock += 30 * 60_000;sweep(io);
+  expect(w.prompted).toHaveLength(1);
+});
+
+test('FS22: a red whose pusher has no pane reaches the keeper at once, and not again at 20 min', () => {
+  let clock = Date.parse('2026-11-19T06:00:00Z');
+  const w = world(replay), io = { ...fake('keeper-fallback', w), now: () => clock };
+  w.agents = ['buddy-engine'];
+  sweep(io);
+  w.runs = [...replay, run(42970000013, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
+  sweep(io);
+  expect(w.prompted?.map(([agent]) => agent)).toEqual(['buddy-engine']);
+  clock += 25 * 60_000;sweep(io);
+  expect(w.prompted).toHaveLength(1);
 });

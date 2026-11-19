@@ -1,6 +1,6 @@
 name: ci-early-red
 
-# Meta FLOW-SIMPLE FS22 (J435): on each push to main, cancel main's running ci run when one of its blocking jobs has
+# Meta FLOW-SIMPLE FS24 (J435): on each push to main, cancel main's running ci run when one of its blocking jobs has
 # already failed, so the pending run for this push starts now instead of waiting out a run that is red already.
 # scripts/ci-early-red.mjs decides; it never touches release refs or qualification dispatches (their own groups).
 on:

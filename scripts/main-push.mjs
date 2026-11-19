@@ -251,7 +251,9 @@ export function pushMain(cwd, remote = 'origin') {
     rmSync(log, { force: true });
     const head = sent.slice(0, 10);
     const carried = outgoing.filter((row) => !OWN.has(row.slice(row.indexOf(' ') + 1)));
-    const line = `pushed main ${head}: ${outgoing.length} commit(s)${carried.length > 0 ? `, ${carried.length} of them another lane's, carried along (M1): ${carried.join('; ')}` : ''}`;
+    // FS19: the pane lets main-watch message this lane on a red it pushed.
+    const pane = /^[\w:.-]+$/u.test(process.env.HERDR_PANE_ID ?? '') ? ` pane ${process.env.HERDR_PANE_ID}` : '';
+    const line = `pushed main ${head}: ${outgoing.length} commit(s)${pane}${carried.length > 0 ? `, ${carried.length} of them another lane's, carried along (M1): ${carried.join('; ')}` : ''}`;
     receipt(`main-push ${line}`);
     return line;
   }

@@ -1,4 +1,4 @@
-// Early red (meta FLOW-SIMPLE FS22): a push behind a running main run that is already red cancels that run, so the
+// Early red (meta FLOW-SIMPLE FS24): a push behind a running main run that is already red cancels that run, so the
 // pending run for the newer push starts at once. Only push runs on main; a run with no finished failure is kept.
 import { expect, test } from 'vitest';
 import { earlyRed, failedBlocking } from '../scripts/ci-early-red.mjs';

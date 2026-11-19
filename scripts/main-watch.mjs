@@ -10,7 +10,7 @@
 // The verdict for a SHA is the newest completed main `ci` run that isn't cancelled and whose SHA is that SHA or a
 // descendant of it. A cancelled run is superseded when a later main run exists, never red; with no later run,
 // the watcher dispatches `ci` on main once. A started run cancelled with a blocking job failed, timed out or
-// cancelled is red, not superseded: main cancels a started run only for a timeout (J422) or when it is red already (FS22). Each red run gives one `MAIN RED <range>` receipt naming the landers
+// cancelled is red, not superseded: main cancels a started run only for a timeout (J422) or when it is red already (FS24). Each red run gives one `MAIN RED <range>` receipt naming the landers
 // of the commits in its range (from their `landed` receipts) and a message to each lander's herdr pane. State
 // (~/.cache/wildshard/main-watch.json) keeps the judged run ids, so a run is reported once however often this runs.
 // A green run that carries AMBER files (J295: a test file over its time budget, scripts/test-amber.mjs) also gives
@@ -28,6 +28,8 @@ import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
+/** FS22 (J443): a red with no green this long after its first alert goes to the keeper. */
+export const KEEPER_MS=20*60_000;
 // NB6's street and EM35's Chromium diagnostic jobs are advisory.
 const ADVISORY_VERSION=7;
 const NATIVE_FOOTPRINT='memory-footprint-guard';
@@ -52,7 +54,7 @@ function nativeInfrastructure(job){
 export const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic'
   ||nativeInfrastructure(job)!==undefined;
 
-/** The blocking jobs a red names. FS22's early red cancels a red run's other jobs, so `cancelled` ones are named only
+/** The blocking jobs a red names. FS24's early red cancels a red run's other jobs, so `cancelled` ones are named only
  * when no job failed outright (a job over its timeout-minutes concludes `cancelled`).
  * @param {readonly Job[]} jobs @returns {string[]} */
 export function failedNames(jobs){
@@ -62,13 +64,16 @@ export function failedNames(jobs){
 
 /** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
 /** @typedef {{id:number,sha:string,created:string, warnings:ReturnType<typeof parseMemoryWarnings>}} MemoryQa */
-/** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[]}} State */
+/** A red span main-watch has reported: the first red run, when it was reported (ms), its alert, and whether the keeper
+ * (buddy-engine, FS22) already has it.
+ * @typedef {{run:number,at:number,text:string,keeper:boolean}} RedSpan */
+/** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[],red?:RedSpan}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
 const finished=(/** @type {Run} */run)=>run.status==='completed';
 /** Superseded, never red: a cancel that hid no blocking failure. Main pushes never cancel a started run (ci.yml's
- * cancel-in-progress is false for main) unless it is red already (ci-early-red.yml, FS22), so a started run whose
+ * cancel-in-progress is false for main) unless it is red already (ci-early-red.yml, FS24), so a started run whose
  * blocking job failed, timed out or was cancelled (a job over its timeout-minutes concludes `cancelled`:
  * nine-ring1-build in run 44361972035) is red (J422). */
 const cancelled=(/** @type {Run} */run)=>(run.conclusion==='cancelled'||run.conclusion==='skipped')&&run.blockingFailed!==true;
@@ -115,14 +120,37 @@ export function verdictFor(runs,sha,contains){
   return run===undefined?null:{state:run.conclusion==='success'?'green':'red',run};
 }
 
-/** Landed receipts by short SHA: `HH:MM UTC <lane> land plan/<slug> landed <sha10> on main …`.
- * @param {string} text @returns {Map<string,{lane:string,slug:string,pane?:string}>} */
+/** Who pushed each SHA, by short SHA: land's `HH:MM UTC <lane> land plan/<slug> landed <sha10> on main …`, and
+ * main-push's `HH:MM Cancún <lane> main-push pushed main <sha10>: <n> commit(s)[ pane <id>]…` (FS19: half of 11-18's
+ * reds came through main-push and named no one). A main-push line covers its tip and the n-1 commits under it.
+ * @param {string} text @returns {Map<string,{lane:string,slug:string,pane?:string,count?:number}>} */
 export function landers(text){
   const out=new Map();
+  for(const match of text.matchAll(/^\d\d:\d\d (?:UTC|Cancún) (\S+) main-push pushed main ([0-9a-f]{10}): (\d+) commit\(s\)(?: pane (\S+?)(?=[,\s]|$))?/gmu)){
+    const [,lane='',sha='',count='1',pane]=match;out.set(sha,{lane,slug:'',count:Number(count),...(pane===undefined?{}:{pane})});
+  }
   for(const match of text.matchAll(/^\d\d:\d\d UTC (\S+) land plan\/(\S+) landed(?:, MAIN RED)? ([0-9a-f]{10}) on main/gmu)){
     const [,lane='',slug='',sha='']=match;out.set(sha,{lane,slug});
   }
   return out;
+}
+
+/** Each commit of a red range with its lander. `commits` is newest first (rev-list); a main-push lander also owns the
+ * older commits its push carried (its count), unless they have a lander of their own.
+ * @template {{lane:string,count?:number}} L
+ * @param {readonly string[]} commits @param {ReadonlyMap<string,L>} who @returns {{sha:string,lander:L|undefined}[]} */
+export function attribute(commits,who){
+  const found=commits.map(sha=>({sha,lander:who.get(sha.slice(0,10))}));
+  const own=found.map(row=>row.lander);
+  for(const [index,row] of found.entries()){
+    if(own[index]===undefined)continue;
+    const count=row.lander?.count??1;
+    for(let under=index+1;under<Math.min(found.length,index+count);under++){
+      const older=found[under];
+      if(older!==undefined&&older.lander===undefined)older.lander=row.lander;
+    }
+  }
+  return found;
 }
 
 /** The herdr pane of a lander: its worktree's pane label (`engine plan/<slug>`) or working directory.
@@ -137,8 +165,10 @@ export function readState(file){
   if(!existsSync(file))return null;
   try{
     const value=JSON.parse(readFileSync(file,'utf8'));
+    const red=value.red;
     return {judged:Array.isArray(value.judged)?value.judged.filter(Number.isSafeInteger):[],dispatched:Array.isArray(value.dispatched)?value.dispatched.filter(row=>typeof row==='string'):[],
-      ...(Array.isArray(value.memoryQa)?{memoryQa:value.memoryQa}:{})};
+      ...(Array.isArray(value.memoryQa)?{memoryQa:value.memoryQa}:{}),
+      ...(red!==null&&typeof red==='object'&&Number.isSafeInteger(red.run)&&typeof red.at==='number'&&typeof red.text==='string'?{red:{run:red.run,at:red.at,text:red.text,keeper:red.keeper===true}}:{})};
   }catch{return null;}
 }
 
@@ -146,7 +176,7 @@ export function readState(file){
 function writeState(file,state){
   mkdirSync(dirname(file),{recursive:true});
   const temporary=`${file}.${process.pid}.tmp`;
-  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{})})}\n`);renameSync(temporary,file);
+  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{}),...(state.red===undefined?{}:{red:state.red})})}\n`);renameSync(temporary,file);
 }
 
 /** One watcher at a time judges, so two never report the same run. The lock file holds its owner's pid; only a
@@ -284,7 +314,8 @@ export function sweep(io,hint={}){
       io.receipt(`started: ${baseline.length} finished main runs taken as already judged`);
       if(hint.sha===undefined)return [];
     }
-    const verdicts=judge(runs,previous,io.tip()),state={judged:[...previous.judged],dispatched:[...previous.dispatched],memoryQa:[...previous.memoryQa??[]]};
+    const verdicts=judge(runs,previous,io.tip()),state=/** @type {State & {memoryQa:MemoryQa[]}} */({judged:[...previous.judged],dispatched:[...previous.dispatched],memoryQa:[...previous.memoryQa??[]],...(previous.red===undefined?{}:{red:previous.red})});
+    const now=io.now?.()??Date.now();
     /** @param {Run} run @param {string} annotations @param {string[]} lines */
     const memoryWarnings=(run,annotations,lines)=>{
       const warnings=parseMemoryWarnings(annotations);
@@ -297,7 +328,7 @@ export function sweep(io,hint={}){
     };
     const who=landers(io.receipts());
     // land names itself and its pane when it starts a follow, before its own receipt may be written.
-    if(hint.sha!==undefined&&hint.lane!==undefined)who.set(hint.sha.slice(0,10),{lane:hint.lane,slug:who.get(hint.sha.slice(0,10))?.slug??'',pane:hint.pane});
+    if(hint.sha!==undefined&&hint.lane!==undefined){const kept=who.get(hint.sha.slice(0,10));who.set(hint.sha.slice(0,10),{lane:hint.lane,slug:kept?.slug??'',pane:hint.pane??kept?.pane,...(kept?.count===undefined?{}:{count:kept.count})});}
     for(const verdict of verdicts){
       const {run}=verdict;
       // Everything a report needs is read first; the run is recorded; only then does the report go out. A failed
@@ -311,7 +342,7 @@ export function sweep(io,hint={}){
       else if(verdict.kind==='dispatch')lines.push(`main ${short(run.head_sha)} has only a cancelled run (${run.id}) and nothing newer; dispatched ci on main once`);
       else{
         const commits=io.commits(verdict.from??null,run.head_sha),range=`${short(verdict.from)||'start'}..${short(run.head_sha)}`;
-        const found=commits.map(sha=>({sha,lander:who.get(sha.slice(0,10))}));
+        const found=attribute(commits,who);
         const names=[...new Set(found.map(row=>row.lander?.lane??'').filter(Boolean))];
         const named=names.length===0?'no land receipt (pushed by hand or the queue)':names.join(', ');
         let annotations='';
@@ -336,6 +367,9 @@ export function sweep(io,hint={}){
         }
         memoryWarnings(run,annotations,lines);
       }
+      if(verdict.kind==='green')delete state.red;
+      // FS22: a red span starts at its first reported red; the keeper's 20-minute clock runs from there.
+      if(verdict.kind==='red'&&buddyAlert!==undefined&&state.red===undefined)state.red={run:run.id,at:now,text:buddyAlert,keeper:false};
       state.judged.push(run.id);if(verdict.kind==='dispatch')state.dispatched.push(run.head_sha);writeState(io.state,state);
       if(verdict.kind==='dispatch')io.dispatch();
       for(const line of lines)io.receipt(line);
@@ -351,7 +385,17 @@ export function sweep(io,hint={}){
       if(needsBuddy&&!buddyAttempted&&buddyAlert!==undefined){
         const delivered=io.prompt('buddy-engine',buddyAlert);
         io.receipt(`main red fallback to buddy-engine ${delivered?'prompted herdr agent buddy-engine':'not delivered (herdr agent unreachable)'}`);
+        buddyAttempted=delivered;
       }
+      if(verdict.kind==='red'&&buddyAttempted&&state.red!==undefined&&!state.red.keeper){state.red.keeper=true;writeState(io.state,state);}
+    }
+    // FS22 (J443): the keeper owns a red no pusher fixed. KEEPER_MS after the span's first alert with no green verdict,
+    // buddy-engine gets it, once per span; the pushers were pinged first and nobody else stops.
+    if(state.red!==undefined&&!state.red.keeper&&now-state.red.at>=KEEPER_MS){
+      const minutes=Math.round((now-state.red.at)/60_000);
+      const delivered=io.prompt('buddy-engine',`main-watch: keeper (J443): engine main is still red ${minutes} min after this alert, with no green since. ${state.red.text}`);
+      io.receipt(`main red keeper: buddy-engine ${delivered?'prompted':'not delivered (herdr agent unreachable)'} after ${minutes} min red with no green (run ${state.red.run})`);
+      if(delivered){state.red.keeper=true;writeState(io.state,state);}
     }
     for(const run of native.filter(row=>finished(row)&&!state.judged.includes(row.id))){
       /** @type {string[]} */const lines=[];

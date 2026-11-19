@@ -267,5 +267,6 @@ test('a push names another lane\'s committed commit it carries along (M1)', () =
   write(a, 'mine.md', 'y\n');
   const out = push(a, '-m', 'docs: mine', 'mine.md');
   assert.equal(out.status, 0, out.stderr);
-  assert.match(out.stdout, /2 commit\(s\), 1 of them another lane's, carried along \(M1\): [0-9a-f]+ other lane: carried/u);
+  // FS19: the pusher's herdr pane rides in the receipt when the push runs in one.
+  assert.match(out.stdout, /2 commit\(s\)(?: pane \S+)?, 1 of them another lane's, carried along \(M1\): [0-9a-f]+ other lane: carried/u);
 });
