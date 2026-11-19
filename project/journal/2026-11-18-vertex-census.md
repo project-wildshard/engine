@@ -28,3 +28,19 @@ branches, then the vertex outputs that the fragment stage declares
 The boot is measure.mjs's own `webkitBoot`, online (STR1). It gained a
 `prepare` hook for the shim and the harness pins. The census counts;
 it never rides a memory reading, because the shim slows the page.
+
+## The triangle-budget probe (STR12)
+
+`?trisprobe=half` keeps the first half of each slab chunk's triangles
+and drops the vertices only that half reads, so a phone uploads and
+draws about what a half LOD would cost. `all` also halves the model
+library's rest pools, after the pool admits its own draw groups. A
+first try halved every GLB mesh at parse and hung the boot at "gap
+after Region world" with no error: rest pools and other readers keep
+index ranges in the node's extras, and a range past the halved index
+is refused inside a wait nobody reports. So the switch only touches
+the two owners that read their ranges after it. It is a probe, never
+shipped: engine forbids URL switches (lint `no-url-switch`), so it
+lives as a patch on `6fd4c1f2` in meta
+`docs/plans/engine-memory/probe-scripts/str12-trisprobe.patch`, applied
+to a scratch build only.

@@ -32,9 +32,9 @@ test('resident vertices count each vertex buffer once, by its stride; instance, 
     {id:6,bytes:99,target:0x8892,layout:[],programs:[]},
   ],new Map([[1,'three:MeshStandardMaterial'],[2,'graph:slab']]));
   expect(r).toMatchObject({arrayBytes:8739,elementBytes:300,instanceBytes:6400,unlaidBytes:99,vertexBytes:2240,vertices:140});
-  expect(r.channels.position.bytes).toBe(100*12+40*8);
-  expect(r.channels.aMisc.perVertex).toEqual({f16x2:40});
-  expect(r.families.slab).toMatchObject({bytes:640,vertices:40,vertexBytes:16});
+  expect(r.channels['position']?.bytes).toBe(100*12+40*8);
+  expect(r.channels['aMisc']?.perVertex).toEqual({f16x2:40});
+  expect(r.families['slab']).toMatchObject({bytes:640,vertices:40,vertexBytes:16});
 });
 
 test('the heaviest pass weighs vertex invocations by varying components plus the position',()=>{
