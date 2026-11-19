@@ -15,7 +15,7 @@ import { parseWorldTargets, worldTargetRules } from '@wildshard/format/worldTarg
 import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
 import { prepareNativePopulation, type NativePopulationRows } from '../shardfile/bossRow';
 import { serverReturnRows } from '../shardfile/nativeRuntimeLoans';
-import { admitRuntimeCreatures, declaredSpawnEntities, installRuntimeCreatures, keeperOwnership, nameDeclaredBodies, type RuntimeEncounter } from '../shardfile/runtimeCreatures';
+import { admitRuntimeCreatures, declaredOwner, declaredSpawnEntities, installRuntimeCreatures, keeperOwnership, nameDeclaredBodies, type RuntimeEncounter } from '../shardfile/runtimeCreatures';
 import { parseQuestWorldReactions, type QuestWorldReactionsData } from '@wildshard/format/questInteractions';
 import { installQuestGraph, type QuestGraphPorts } from '../../../shared/game/plugin/quests';
 import { parseQuestHost, type QuestHostRow } from '@wildshard/format/questHost';
@@ -216,9 +216,10 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
     || row.permissions.some(value => !data.some(declaration => declaration.id === value.mover)))) throw new Error('Unbound native world motion rows');
   const policy = recipe.population;
   const actors = policy.sources === 'actors+bosses' ? (() => { const rows = readRuntimeWorldMetadata(baked, true); return [...rows.actors, ...rows.bosses]; })() : readRuntimeWorldMetadata(baked).actors;
-  const population = prepareNativePopulation(policy.seed === 'identity' ? { ...policy.rows, seed: shard.identity.seed } : policy.rows, actors, policy.owner);
+  // OF20c / OF19c1: an owner row naming a declared spawn is its declared boss encounter's, never the keeper's
+  const counted = countedShard(shard), keeper = keeperOwnership(policy.rows), owned = declaredOwner(counted, policy.owner, keeper);
+  const population = prepareNativePopulation(policy.seed === 'identity' ? { ...policy.rows, seed: shard.identity.seed } : policy.rows, actors, owned === undefined ? policy.owner : undefined);
   // OF19b0: the declared spawns stand in the native level as in an ordinary upload's, and the declared host drives them
-  const counted = countedShard(shard), keeper = keeperOwnership(policy.rows);
   admitRuntimeCreatures(counted, sections, keeper);
   // OF20b: the plan's floor and death plane hold its declared bodies as its keeper's
   const world = { ...(recipe.floor === 'solids' ? { floor: { fallback: policy.rows.placement?.fallback ?? recipe.ground.height } } : {}),
@@ -253,7 +254,8 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
       scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, player: focusPlayer(host), groundHeightAt: host.groundHeightAt.bind(host),
       live: actor => host.entities.get(actor.entityId) === actor, fixed: (id, run, scope) => { scope.onDispose(host.onStep(id, run)); }, say: (name, args) => { sayFightView(host, name, args); },
     }));
-    const declared = installRuntimeCreatures(host, counted, assets, sections, { restoring, keeper, fact: ledger.fact, summoned, world });
+    const declared = installRuntimeCreatures(host, counted, assets, sections, { restoring, keeper, fact: ledger.fact, summoned, world,
+      ...(owned === undefined ? {} : { owner: { row: policy.owner, actor: owned, coins: ledger.coins } }) });
     return { ...environment, ledger, ...installed, declared };
   } };
 }

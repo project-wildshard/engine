@@ -178,6 +178,49 @@ export function installBossOwnerRow(host: SimHost, input: unknown, ports: BossOw
     ...(reward === undefined ? {} : { spawnReward: reward }), armed: row.armed }));
 }
 
+/** What a declared encounter beside a runtime plan takes from the plan's owner row (`PhaseEncounterPorts` less its summon). */
+export interface DeclaredOwnerHooks {
+  readonly saved: BossSaved; readonly persist: (value: BossSaved) => void; readonly reward: () => void; readonly victory: () => void;
+}
+/**
+ * ONE-FORMAT OF20c / OF19c1: a runtime plan's owner row naming a declared spawn binds that spawn's declared boss encounter,
+ * as it bound the keeper's boss (`installBossOwnerRow`): each win sets the row's victory flag and files its fact (once, by
+ * the flag, when `once`), its coins pay on the win or once as a claim (each earner once in a room, J105, keyed by the row's
+ * step), its record is the row's flags (`record`) or its inline `saved`, and a death the fall dealt files and pays nothing
+ * (HS3). `brain` is the encounter's, once installed: a claim marks its record taken. The room's earners keep a fixed step
+ * named after the row, so a kill and its victory may straddle a save. The row's profile and stages are the keeper's and
+ * are not run here.
+ */
+export function declaredOwnerHooks(host: SimHost, input: unknown, body: AnimalSim, ports: Omit<BossOwnerPorts, 'body'>, brain: () => BossBrain | undefined): DeclaredOwnerHooks {
+  const row = parseBossOwnerRow(input);
+  if (body.entityId !== row.actor) throw new Error('Owner row and declared encounter name different bodies');
+  const record = row.record === undefined ? undefined : bossFlagRecord(host.flags, row.record);
+  const saved = record?.saved ?? row.saved ?? { defeated: false, rewardTaken: false, kills: 0 };
+  const persist = record?.persist ?? (() => undefined);
+  const bounty = new BossBounty(host, () => body, row.step);
+  host.onStep(row.step, () => undefined, { snapshot: () => JSON.stringify(bounty.earned),
+    restore: value => { if (typeof value !== 'string') throw new Error(`Invalid ${row.step} continuation`); bounty.restore(v.parse(v.array(v.string()), JSON.parse(value))); } });
+  const pay = (): void => {
+    const { amount } = row.reward;
+    if (bounty.room) bounty.pay(amount, player => { ports.coins(amount, player); }, row.actor); else ports.coins(amount, row.actor);
+  };
+  let fell = false, unearned = false;
+  const actor = body.combatActor(), base = actor.applyDamage;
+  actor.applyDamage = req => { const killed = base(req); if (killed) fell = req.sourceTags.includes('env.fall'); return killed; };
+  host.scope.onDispose(() => { actor.applyDamage = base; });
+  const victory = (): void => {
+    unearned = fell; fell = false;
+    if (unearned || (row.victory.once && host.flags.has(row.victory.flag))) return;
+    host.flags.set(row.victory.flag); ports.fact(row.victory.fact, row.actor);
+    if (row.reward.when === 'victory') pay();
+  };
+  const reward = (): void => {
+    if (unearned || row.reward.when !== 'claim' || brain()?.takeReward() !== true) return;
+    pay();
+  };
+  return { saved, persist, reward, victory };
+}
+
 /** Install an encounter over its declared population's actual owner. Admission
  * checks the owner address before allocating bodies; held controllers come from
  * that population's admitted brain, and spawned bosses use its own keeper.

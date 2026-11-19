@@ -27,7 +27,10 @@ const ABSENT_Y = -1e4;
 /** Profile/instance persistence and rewards arrive through explicit platform ports. No shard save is imported. */
 export interface PhaseEncounterPorts { saved: BossSaved; persist: (saved: BossSaved) => void; reward: () => void; presentation?: BossPresentation;
   /** OF19c0: a quest page summons this fight: it waits dormant (a spawned boss out of the world) until `summon` arms it. */
-  summoned?: boolean }
+  summoned?: boolean;
+  /** OF20c: the fight's own victory, each win, before its record persists and its first reward (a runtime plan's owner row
+   *  files its flag and fact here). */
+  victory?: () => void }
 const finite = v.pipe(v.number(), v.finite(), v.minValue(0));
 const natural = v.pipe(finite, v.integer());
 const continuation = v.strictObject({ state: v.picklist(['dormant', 'armed', 'intro', 'fight', 'beat', 'victory']), phase: natural, checkpoint: natural, attempts: natural, t: finite, skipT: finite, short: v.boolean(), saved: v.strictObject({ defeated: v.boolean(), rewardTaken: v.boolean(), kills: natural }) });
@@ -93,7 +96,7 @@ export class PhaseEncounter {
         if (fighting && actor.alive && foe.health.alive) sim.startStrike(actor.entityId, foe.id);
       }, get hpFrac() { return actor.hp / actor.maxHp; }, get shielded() { return false; }, get dead() { return !actor.alive && !held(); },
       clampHp: (fraction) => { actor.hp = actor.maxHp * fraction; }, setInvulnerable: (on) => { this.shield = on; },
-      victory: () => { actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; }, rewardPoint: () => focus,
+      victory: () => { actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; ports.victory?.(); }, rewardPoint: () => focus,
       respawnPoint: () => ({ pos: new Vector3(...spec.respawn.at), yaw: spec.respawn.yaw }),
     }, { events: sim.events, player: party.player, lockInput: () => undefined, respawn: party.respawn,
       skipHeld: () => false, faceToward: () => undefined, spawnReward: ports.reward, persist: (value) => { ports.persist({ ...value }); },

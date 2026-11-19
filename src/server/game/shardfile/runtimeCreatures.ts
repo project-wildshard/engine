@@ -5,6 +5,7 @@
 // `sim/scripts` decision row has one owner: the keeper's borrowed authority runs the rows its program's decision brains
 // name, the declared host's `ShardDecisions` the rest.
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { parseBossOwnerRow } from '@wildshard/format/bossProfiles';
 import type { SimHost, SimSpawn } from '@wildshard/engine/sim';
 import { buildPlatformSpawns } from '@wildshard/engine/ai/platform';
 import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
@@ -30,7 +31,8 @@ import { countSlots } from './declaredSpawnCount';
 import { decisionRuntime, ShardDecisions } from './decisions';
 import { installDeclaredEncounters } from '../shard/declaredEncounters';
 import { installEncounterAdds } from './encounterAdds';
-import type { NativePopulationRows } from './bossRow';
+import { declaredOwnerHooks, type NativePopulationRows } from './bossRow';
+import type { PhaseEncounter } from '@wildshard/engine/ai/phases';
 import { creatureFloor } from './homeKeeper';
 import { killBelowWorld } from '@wildshard/engine/entities/killHeight';
 
@@ -75,6 +77,17 @@ export function admitRuntimeCreatures(shard: Shardfile, sections: ReadonlyMap<st
   if (shard.creatures.spawns.some(spawn => spawn.brain !== null && custom.has(spawn.brain))) throw new Error('Declared script brains do not run beside a native runtime plan');
 }
 
+/** OF20c / OF19c1: the actor of a runtime plan's owner row when it names a declared spawn the keeper does not stand, whose
+ *  declared boss encounter then takes the row; undefined when the row is the keeper's or the plan keeps none. A row on a
+ *  declared spawn with no boss encounter refuses. */
+export function declaredOwner(shard: Pick<Shardfile, 'creatures' | 'encounters'>, owner: unknown, keeper: ReturnType<typeof keeperOwnership>): string | undefined {
+  if (owner === undefined) return undefined;
+  const actor = parseBossOwnerRow(owner).actor;
+  if (keeper.actors.has(actor) || !shard.creatures.spawns.some(row => row.id === actor)) return undefined;
+  if (!shard.encounters.some(row => row.entity === actor && row.kind === 'boss')) throw new Error(`The runtime plan's owner row names declared spawn ${actor}, which has no boss encounter`);
+  return actor;
+}
+
 export interface RuntimeCreaturePorts {
   readonly restoring: boolean;
   /** What the plan's keeper owns (`keeperOwnership`); a declared row never shares a body or a decision row with it. */
@@ -87,6 +100,9 @@ export interface RuntimeCreaturePorts {
    *  Reach's isles, `floor: 'solids'`) stands declared bodies there too, over `fallback` where none is below; `killY`:
    *  a declared body under the plan's death plane dies by the fall, as a keeper home does. */
   readonly world?: { readonly floor?: { readonly fallback: number }; readonly killY?: number };
+  /** OF20c / OF19c1: the plan's owner row when it names a declared encounter's spawn (`declaredOwner`): that encounter
+   *  files its victory, pays its reward and keeps its record (`declaredOwnerHooks`), paid through `coins`. */
+  readonly owner?: { readonly row: unknown; readonly actor: string; readonly coins: (amount: number, actorId: string) => void };
 }
 export const DECLARED_KILL_STEP = 'runtime.declared-kill';
 
@@ -150,9 +166,16 @@ export function installRuntimeCreatures(host: SimHost, shard: Shardfile, assets:
   const owned = scripts.filter(row => !ports.keeper.scripts.has(row.id));
   // OF19c0: declared encounters as `bindShardfileSim` installs them; one the quest page summons waits for its summon
   const actors = new Set(owned.flatMap(row => Object.values(row.actors)));
-  const encounters = installDeclaredEncounters(host, shard.encounters, id => ({ saved: { defeated: false, rewardTaken: false, kills: 0 }, persist: () => undefined,
-    reward: () => undefined, summoned: shard.encounters.some(row => row.id === id && ports.summoned.has(row.entity)) }), undefined,
+  // OF20c: the encounter the plan's owner row names takes its hooks; every other one keeps no record and pays nothing
+  const fights: { value?: ReadonlyMap<string, PhaseEncounter> } = {};
+  const hooks = (id: string) => {
+    const row = shard.encounters.find(entry => entry.id === id), owner = ports.owner, body = row === undefined ? undefined : host.entities.get(row.entity);
+    if (owner === undefined || row?.entity !== owner.actor || body === undefined) return { saved: { defeated: false, rewardTaken: false, kills: 0 }, persist: () => undefined, reward: () => undefined };
+    return declaredOwnerHooks(host, owner.row, body, { fact: ports.fact, coins: owner.coins }, () => fights.value?.get(id)?.boss);
+  };
+  const encounters = installDeclaredEncounters(host, shard.encounters, id => ({ ...hooks(id), summoned: shard.encounters.some(row => row.id === id && ports.summoned.has(row.entity)) }), undefined,
   new Set(shard.encounters.filter(row => actors.has(row.entity)).map(row => row.id)));
+  fights.value = encounters;
   const adds = installEncounterAdds(host, shard.encounters, creatures.spawns, encounters, ports.restoring);
   if (owned.length > 0) new ShardDecisions(decisionRuntime(host, undefined, adds ?? undefined), shard, assets, new Map([...sections, ['sim/scripts', owned]]), encounters, undefined,
     undefined, ports.fact, ports.restoring);

@@ -35,7 +35,7 @@ import { loadingUnits } from '@wildshard/engine/boot/waits';
 import { Mesh, Object3D, Vector3 } from 'three';
 import { installDeclaredQuests } from './declaredQuests';
 import { placementLedger, recordWireFacts } from './wireFacts';
-import { declaredFields, installDeclaredHud } from './declaredHud';
+import { declaredFields, hasDeclaredHud, installDeclaredHud, type BossPanelPorts } from './declaredHud';
 import { Flags } from '@wildshard/engine/world/interact/flags';
 import type { Actor, CombatTarget } from '@wildshard/engine/combat/pipeline';
 import { fovForAspect } from '@wildshard/engine/combat/blocks/melee';
@@ -530,8 +530,19 @@ export class ShardfileClient {
       if (ctx.scope !== scope || ctx.product !== product || scope.disposed || scope.disposing) throw new Error('Shardfile left during grapple import');
       await installDeclaredGrapplePage(ctx, this.source);
     }
+    // ONE-FORMAT OF20c / OF19c1: a runtime-plan page's declared boss (its owner row on a declared spawn) has no page feature:
+    // the page draws its declared `ui` rows, boss panels among them, off the wire as an ordinary page does
+    if (this.mode === 'full' && this.nativeFeatures && hasDeclaredHud(this.source)) this.nativeHud(ctx);
     await this.phase(ctx, 'prepare-play');
     await this.phase(ctx, 'play');
+  }
+
+  /** A runtime-plan page's declared HUD: its fields are the wire's (a public row, an owned line), its boss panels the wire's encounter rows. */
+  private nativeHud(ctx: ShardContext): void {
+    const play = ctx.game.runtime?.play, source = this.source, lines = ownedLineFields(source);
+    if (play === null || play === undefined) throw new Error('Declared HUD requires the normal play stage');
+    const { named } = declaredFields(source, { row: name => wirePage.row(name), line: name => (lines.has(name) && wirePage.client !== null ? wirePage.line(name) : undefined) });
+    installDeclaredHud(source, { hud: ctx.hud, system: ctx.system, scope: ctx.scope, bag: ctx.bag, read: named, encounters: () => wirePage.encounters(), boss: bossPanelPorts(ctx, play) });
   }
 
   private *playSteps(ctx: ShardContext, presentation: typeof ScriptPresentation | null, lootPresentation: typeof LootPresentation | null, compendium: typeof CompendiumPresentation | null): Generator<void, void> {
@@ -596,10 +607,7 @@ export class ShardfileClient {
     };
     // SS-GP3: one field reader and one HUD install with a grid data cell's (`grid/dataCellHud.ts`)
     const { value: fieldValue, read, named } = declaredFields(source, { row: name => wirePage.row(name), line: itemLine });
-    installDeclaredHud(source, { hud: ctx.hud, system: ctx.system, scope: ctx.scope, bag: ctx.bag, read: named, encounters: () => wirePage.encounters(), boss: {
-      lock: on => { play.weapons.setEnabled(!on); },
-      attempt: (boss, outcome) => { ctx.app.events.emit('boss.attempt', { boss, outcome }); },
-      died: then => { ctx.on('player.died', ({ actor }) => { if (actor === ctx.app.player) then(); }); } } });
+    installDeclaredHud(source, { hud: ctx.hud, system: ctx.system, scope: ctx.scope, bag: ctx.bag, read: named, encounters: () => wirePage.encounters(), boss: bossPanelPorts(ctx, play) });
     yield;
     let simulationActive = true;
     // This page's flags are the server's, followed by `wirePage`: nothing here saves them.
@@ -818,4 +826,11 @@ export class ShardfileClient {
       checkpoint: () => !ctx.scope.disposed, setActive: (active) => { simulationActive = active && !ctx.scope.disposed; },
     });
   }
+}
+
+/** What a page's declared boss panel does: hold its weapons through the intro, count an attempt, hear its player die. */
+function bossPanelPorts(ctx: ShardContext, play: { readonly weapons: { setEnabled: (on: boolean) => void } }): BossPanelPorts {
+  return { lock: on => { play.weapons.setEnabled(!on); },
+    attempt: (boss, outcome) => { ctx.app.events.emit('boss.attempt', { boss, outcome }); },
+    died: then => { ctx.on('player.died', ({ actor }) => { if (actor === ctx.app.player) then(); }); } };
 }
