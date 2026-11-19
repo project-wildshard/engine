@@ -2,3 +2,7 @@
 .ws-quest-pin::before { content: '◆'; margin-right: 7px; }
 .ws-quest-pin b { margin-left: 7px; font-weight: 400; color: var(--ws-text); font-variant-numeric: tabular-nums; }
 #hud.intro .ws-quest-pin, #hud.playground-active .ws-quest-pin { visibility: hidden; }
+/* J473 row 7 (Jake, 2026-11-19 grill wave 4): on a phone the tracked goal's pin is the diamond and the distance only; the
+   tracker under the map names it. Other pins keep their names. */
+#hud.touch .ws-quest-pin[data-tracked] > span { display: none; }
+#hud.touch .ws-quest-pin[data-tracked] b { margin-left: 0; }

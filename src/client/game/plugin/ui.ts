@@ -505,7 +505,8 @@ export function presentQuest<Q extends QuestView & { readonly flags?: Flags }>(h
     for (const m of all) {
       // The same id can occur at a different position in a later step; projection reads the active marker.
       if (pins.has(m.id)) continue;
-      const root = document.createElement('span'); root.className = 'ws-quest-pin';
+      // J473 row 7: the tracked goal's own pin; on a phone it drops its name (the tracker under the map says it)
+      const root = document.createElement('span'); root.className = 'ws-quest-pin'; root.dataset['tracked'] = '';
       const label = document.createElement('span'), distance = document.createElement('b');
       root.append(label, distance);
       const position = new Vector3(); pins.set(m.id, { root, distance, position });
