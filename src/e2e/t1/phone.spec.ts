@@ -105,10 +105,11 @@ const PHONE_WORKERS_AT_CONTROL: readonly string[] = [
   'serverWorker',
   'tileDecodeWorker',
 ]
+// A build hash is 8 base64url characters, so it can hold a '-' or '_' (run 44509093652's `serverWorker-Cmd9sw-J.js`).
 const workerName = (url: string): string =>
   url
     .replace(/^.*\//u, '')
-    .replace(/-[\w]{6,}\.js$/u, '')
+    .replace(/-[\w-]{8}\.js$/u, '')
     .replace(/^blob:.*/u, 'blob')
 test('the phone keeps only its committed workers after control', async ({
   page,
