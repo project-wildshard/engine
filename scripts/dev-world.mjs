@@ -66,8 +66,12 @@ const stopChild = (child, graceMs = 15_000) => new Promise(resolve => {
 /** The dev world.
  * `product` is the shard's built product folder (STR5: `wildshard dev` names the author's build); by default the one this
  * checkout's pins installed (`built-folder.mjs` `readBuiltShardfile`).
- * @param {{ dist: string, work: string, shard?: string, product?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string, log?: (line: string) => void }} options */
-export async function openDevWorld({ dist, work: requestedWork, shard = 'brasscap-mesa', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, log = line => { console.log(line); } }) {
+ * `publicOrigin` and `publicSocket` name the page and the world's socket as another device reaches them through an HTTPS
+ * proxy in front of the loopback ports (`serve-local.mjs`: `tailscale serve`, tailnet only); `socketPort` fixes the world
+ * socket's loopback port for that proxy. Unset, everything is the loopback address.
+ * @param {{ dist: string, work: string, shard?: string, product?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string,
+ *   publicOrigin?: string, publicSocket?: string, socketPort?: number, log?: (line: string) => void }} options */
+export async function openDevWorld({ dist, work: requestedWork, shard = 'brasscap-mesa', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, publicOrigin, publicSocket, socketPort = 0, log = line => { console.log(line); } }) {
   if (!/^[a-z0-9_-]+$/u.test(shard)) throw new Error('A dev world shard must be a slug');
   const work = absolute(requestedWork); mkdirSync(work, { recursive: true });
   const key = devKey(work);
@@ -86,9 +90,9 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
       resources.push(async () => { await front.stop(); await db.close(); });
       database = `postgresql://postgres@${front.getServerConn()}/postgres?sslmode=disable`;
     }
-    const worldFront = await rigFront();
+    const worldFront = await rigFront(socketPort);
     resources.push(worldFront.close);
-    const socket = `ws://127.0.0.1:${String(worldFront.port)}/`;
+    const socket = publicSocket ?? `ws://127.0.0.1:${String(worldFront.port)}/`;
     // the page port listens first (0: the OS picks), so the stamp and the world's allowed origin name the bound port
     let pageOrigin = '', stamp = { release: '', key: key.public };
     let serial = 0, signed = '', revision = 0, build = '', served = 0;
@@ -110,7 +114,7 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     const startWorld = async () => {
       const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
         env: { ...process.env, RELEASE_URL: `${pageOrigin}${DEV_RELEASE}`, RELEASE_PUBLIC_KEY: key.public, RELEASE_CHANNEL: 'staging', PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'),
-          DATABASE_URL: database, SEAT_SECRET: 'dev-world', HOST: '127.0.0.1', PORT: '0', ALLOWED_ORIGINS: [pageOrigin, pageOrigin.replace('127.0.0.1', 'localhost')].join(','), WILDSHARD_BUILD: build, WORLD_CELLS: shard,
+          DATABASE_URL: database, SEAT_SECRET: 'dev-world', HOST: '127.0.0.1', PORT: '0', ALLOWED_ORIGINS: [pageOrigin, pageOrigin.replace('127.0.0.1', 'localhost'), ...publicOrigin === undefined ? [] : [publicOrigin]].join(','), WILDSHARD_BUILD: build, WORLD_CELLS: shard,
           WORLD_WORKERS: '1', RELEASE_POLL_MS: '1000', GRACE_MS: '1000' } });
       room.stdout?.pipe(serverLog, { end: false }); room.stderr?.pipe(serverLog, { end: false });
       room.once('exit', code => { worldFront.clear(); if (world === room) log(`dev world: the server stopped (${String(code)}); see ${join(work, 'server.log')}`); });
@@ -158,7 +162,7 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
       request.pipe(upstream);
     });
     const bound = await listenLoopback(front, port);
-    pageOrigin = `http://127.0.0.1:${String(bound)}`; stamp = { release: `${pageOrigin}${DEV_RELEASE}`, key: key.public };
+    pageOrigin = `http://127.0.0.1:${String(bound)}`; stamp = { release: `${publicOrigin ?? pageOrigin}${DEV_RELEASE}`, key: key.public };
     resources.push(async () => { front.closeAllConnections(); await new Promise(resolve => { front.close(() => { resolve(undefined); }); }); });
 
     /** Serve a client build: its pages, its server book and bundle, the release naming it, and a world on it. @param {string} built */
@@ -172,7 +176,7 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
       revision++;
     };
     await open(dist);
-    const url = `${pageOrigin}/`;
+    const url = `${publicOrigin ?? pageOrigin}/`;
     return { url, stamp, socket, database, port: bound,
       get build() { return build; }, get revision() { return revision; },
       /** The world down and up again on the same client build, its server bundle rebuilt from this checkout. The bundle builds

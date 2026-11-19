@@ -1,6 +1,6 @@
 import { appendFileSync } from 'node:fs';
 import { setTimeout as pause } from 'node:timers/promises';
-import { WebDriverError } from './safari.mjs';
+import { coldOrigin, WebDriverError } from './safari.mjs';
 
 export const stairKinds = ['arraybuffer', 'texrgba', 'texcomp', 'glbuffer', 'canvas2d'];
 
@@ -11,6 +11,8 @@ export async function stairs(driver, { base, kind, log }) {
   const startedAt = Date.now();
   let last = null;
   try {
+    // a game service worker left by a zone boot answers the calibration URL with the game (device-2026-11-19 step 4)
+    await coldOrigin(driver, base);
     await driver.navigate(page.href);
     const until = startedAt + 210_000;
     while (Date.now() < until) {

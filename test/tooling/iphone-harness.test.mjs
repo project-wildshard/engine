@@ -107,6 +107,13 @@ test('footprint windows select a new PID, keep control and settled separate and 
   expect(footprintWindow([old, { ...old, time: opened }, ...rows], opened, control))
     .toMatchObject({ pid: 7, peakBytes: 500, controlBytes: 102, settledBytes: 107.5, samples: 13 });
   expect(footprintWindow([{ ...old, time: opened }, ...rows], opened, control)).toMatchObject({ pid: null, peakBytes: null });
+  // the inspector keeps Safari's tab: both processes predate the trial, and the zone's dwarfs the idle spare
+  const spare = { ...old, physFootprint: 6, time: opened - 100 }, zone = rows.map((row) => ({ ...row, time: row.time }));
+  expect(footprintWindow([spare, { ...spare, time: opened }, { ...zone[0], time: opened - 50 }, ...zone], opened, control))
+    .toMatchObject({ pid: 7, peakBytes: 500 });
+  // and a fresh spare process beside it is not the zone's
+  expect(footprintWindow([{ ...zone[0], time: opened - 50 }, ...zone, { ...spare, pid: 8, time: opened + 600 }], opened, control))
+    .toMatchObject({ pid: 7, peakBytes: 500 });
   expect(footprintWindow(rows.slice(0, 4), opened, control).settledBytes).toBeNull();
   expect(commands({ seconds: 60, out: 'tmp/iphone13' }).sysmon[0]).toContain('60000');
   expect(frameSummary([{ seconds: 1, frames: 30, tMs: 1000, frameMs: [25, 30, 33], gpuApproxMs: [1, 2, 3], draws: 121, triangles: 911_000 }]))

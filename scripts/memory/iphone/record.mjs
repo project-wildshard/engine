@@ -70,7 +70,14 @@ export function footprintWindow(samples, openedAt, controlAt) {
   const fresh = [...active].filter((pid) => !old.has(pid));
   // If a tab process already existed, only accept it when there is a single
   // candidate. Never merge two Safari tabs into one memory reading.
-  const pid = fresh.length === 1 ? fresh[0] : active.size === 1 ? [...active][0] : null;
+  // The inspector driver keeps Safari's tab, so the zone's process can predate the trial beside an idle one: take the one
+  // whose peak is at least 4x every other's (a 6 MB spare beside a 1.4 GB zone), else none.
+  const peaks = [...active].map((pid) => /** @type {[number, number]} */ ([pid, Math.max(...current.filter((row) => row.pid === pid).map((row) => row.physFootprint))]))
+    .sort((a, b) => b[1] - a[1]);
+  const dominant = peaks.length > 1 && peaks[0][1] >= 4 * peaks[1][1] ? peaks[0][0] : null;
+  // a fresh process counts only if it is not a spare: Safari starts a ~7 MB one beside the zone's (iPhone 13, 2026-11-19)
+  const peakOf = new Map(peaks), big = fresh.filter((pid) => 4 * (peakOf.get(pid) ?? 0) >= (peaks[0]?.[1] ?? 0));
+  const pid = big.length === 1 ? big[0] : active.size === 1 ? [...active][0] : dominant;
   if (pid === null) return { pid, peakBytes: null, controlBytes: null, settledBytes: null, samples: 0, candidatePids: [...active] };
   const series = current.filter((row) => row.pid === pid).sort((a, b) => a.time - b.time);
   const boot = series.filter((row) => controlAt === null || row.time <= controlAt);

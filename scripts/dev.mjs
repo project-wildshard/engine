@@ -6,6 +6,7 @@
 // page opens the new build.
 //
 //   pnpm dev [--shard brasscap-mesa] [--port 4402] [--dist <built client folder>] [--saves disk|memory] [--no-watch]
+//            [--public-origin https://<name> --public-socket wss://<name>:8443/ --socket-port 4412]   (serve-local.mjs)
 //
 // Its files live in ./tmp/dev-world/ (key, saves, client builds, server log); delete the folder, with dev stopped, for a
 // fresh world.
@@ -20,6 +21,7 @@ const ROOT = resolve(import.meta.dirname, '..');
 const { values } = parseArgs({ options: {
   shard: { type: 'string', default: 'brasscap-mesa' }, port: { type: 'string', default: String(DEV_PORT) }, dist: { type: 'string' },
   saves: { type: 'string', default: 'disk' }, 'no-watch': { type: 'boolean', default: false }, work: { type: 'string', default: 'tmp/dev-world' },
+  'public-origin': { type: 'string' }, 'public-socket': { type: 'string' }, 'socket-port': { type: 'string', default: '0' },
 } });
 if (values.saves !== 'disk' && values.saves !== 'memory') throw new Error('--saves is disk or memory');
 const work = resolve(ROOT, values.work), port = Number(values.port);
@@ -53,7 +55,8 @@ const pins = () => {
 };
 let dist = values.dist;
 if (dist === undefined) { pins(); dist = buildClient(); }
-const world = await openDevWorld({ dist: resolve(ROOT, dist), work, shard: values.shard, port, saves: values.saves });
+const world = await openDevWorld({ dist: resolve(ROOT, dist), work, shard: values.shard, port, saves: values.saves,
+  publicOrigin: values['public-origin'], publicSocket: values['public-socket'], socketPort: Number(values['socket-port']) });
 console.log(`engine dev on ${world.url} (${values.shard}, saves ${values.saves === 'disk' ? join(values.work, 'saves') : 'in memory'}, server log ${join(values.work, 'server.log')})`);
 
 let closing = false;

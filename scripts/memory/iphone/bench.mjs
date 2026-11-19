@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
@@ -9,6 +9,7 @@ import { frameSummary, readFrames } from './frames.mjs';
 import { underPhoneLocks } from './locks.mjs';
 import { activityMonitor, footprintWindow, pullJetsam, startReaders, takeScreenshot } from './record.mjs';
 import { attachSafari, enterZone, openSharedSafari, readRecovery, startSafari, WebDriverError } from './safari.mjs';
+import { startInspector } from './inspector.mjs';
 import { stairs, stairKinds } from './staircase.mjs';
 import { sweep } from './sweep.mjs';
 
@@ -20,7 +21,8 @@ const { values } = parseArgs({ args: release ? [] : args, options: {
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, udid: { type: 'string' },
   webdriver: { type: 'string' }, session: { type: 'string' }, trace: { type: 'string' },
   'idle-celsius': { type: 'string' }, out: { type: 'string' }, seconds: { type: 'string' },
-  'reload-at': { type: 'string' },
+  'reload-at': { type: 'string' }, driver: { type: 'string', default: 'webdriver' }, override: { type: 'string', multiple: true },
+  probe: { type: 'string' },
   'dry-run': { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 
@@ -34,6 +36,15 @@ if (!['boot', 'walk', 'soak', 'sweep', 'staircase'].includes(mode) ||
   (values.pair && (values.slots === undefined || !['boot', 'walk', 'soak'].includes(mode)))) {
   throw new Error('Expected boot|walk|soak|sweep|staircase, positive runs and seconds, at least 30 s for boot, and slots with --pair');
 }
+if (!['webdriver', 'inspector'].includes(values.driver) || (values.override !== undefined && values.driver !== 'inspector')) {
+  throw new Error('--driver is webdriver or inspector; --override <url part>=<file> needs --driver inspector');
+}
+// Web Inspector local overrides: a request whose URL contains the part is answered with the file (inspector.mjs).
+const localBodies = (values.override ?? []).map((pick) => {
+  const at = pick.lastIndexOf('=');
+  if (at < 1) throw new Error('--override is <url part>=<file>');
+  return { pattern: pick.slice(0, at), file: resolve(pick.slice(at + 1)) };
+});
 const slots = Object.fromEntries(Object.entries(deviceSavePicks(values.slots ?? [])).map(([key, text]) => {
   try { return [key, JSON.parse(text)]; } catch { return [key, text]; }
 }));
@@ -56,6 +67,10 @@ async function zoneRun(driver, directory, overrides, capture) {
   let boot;
   /** @type {Awaited<ReturnType<typeof readFrames>> | undefined} */
   let frames;
+  /** @type {Awaited<ReturnType<typeof readFrames>> | undefined} */
+  let standing;
+  /** @type {unknown} */
+  let probe = null;
   let screenshot = null;
   let screenshotError = null;
   let error = null;
@@ -66,7 +81,11 @@ async function zoneRun(driver, directory, overrides, capture) {
       saw.push({ at: Date.now(), phases: state.phases });
     } });
     if (boot.outcome === 'control') {
-      if (mode !== 'boot') await pause(30_000);
+      // --probe: one page expression read at control, kept in the report (e.g. which arm an override applied)
+      if (values.probe !== undefined) probe = await driver.evaluate(`return (${values.probe});`);
+      // a walk first stands its 30 s at spawn, sampled (IP34 reads both)
+      if (mode === 'walk') standing = await readFrames(driver, { slug: values.zone, seconds: 30, walk: false });
+      else if (mode !== 'boot') await pause(30_000);
       frames = await readFrames(driver, { slug: values.zone, seconds: duration, walk: mode !== 'boot' });
       if (mode === 'walk') {
         for (let i = 0; i < frames.samples.length; i += 10) {
@@ -85,19 +104,24 @@ async function zoneRun(driver, directory, overrides, capture) {
       screenshot = path;
     }
   } catch (cause) { screenshotError = String(cause); }
-  return { openedAt, boot, last, saw, frames, screenshot, screenshotError, error };
+  return { openedAt, boot, last, saw, probe, standing, frames, screenshot, screenshotError, error };
 }
 
 /** @param {number|null|undefined} bytes */
 const mb = (bytes) => typeof bytes === 'number' && Number.isFinite(bytes) ? (bytes / 1e6).toFixed(1) : '—';
 
 async function bench() {
-  const facts = doctor({ udid, sharedPort });
+  // The inspector driver opens no WebDriver session; the mini's shared listener (:4444) may keep running beside it.
+  const facts = doctor({ udid, sharedPort: values.driver === 'inspector' ? sharedPort ?? '4444' : sharedPort });
   const temperatureNow = () => batteryTemperature(command('idevicediagnostics', ['-u', facts.udid, 'ioregentry', 'AppleSmartBattery']).output);
   mkdirSync(dirname(out), { recursive: true });
   mkdirSync(out);
-  const standalone = endpoint === undefined ? await startSafari(facts.udid) : null;
-  const open = () => standalone !== null ? standalone.open() : openSharedSafari(/** @type {string} */ (endpoint), facts.udid);
+  const inspector = values.driver === 'inspector' ? await startInspector(facts.udid, {
+    overrides: localBodies.map(({ pattern, file }) => ({ pattern, body: readFileSync(file, 'utf8') })) }) : null;
+  const standalone = endpoint === undefined && inspector === null ? await startSafari(facts.udid) : null;
+  /** @returns {Promise<Safari>} */
+  const open = () => inspector !== null ? /** @type {Promise<Safari>} */ (/** @type {unknown} */ (inspector.open())) :
+    standalone !== null ? standalone.open() : openSharedSafari(/** @type {string} */ (endpoint), facts.udid);
   const capture = (/** @type {string} */ path) => takeScreenshot(facts.udid, path);
   /** @type {Safari | null} */
   let driver = null;
@@ -129,7 +153,8 @@ async function bench() {
     const report = [];
     const trials = Array.from({ length: runs * (values.pair ? 2 : 1) }, () => mode === 'staircase' ? stairKinds : [null]).flat();
     const { udid: _udid, ...deviceFacts } = facts;
-    writeFileSync(join(out, 'environment.json'), JSON.stringify({ ...deviceFacts, idleCelsius: idle, base, mode }, null, 2));
+    writeFileSync(join(out, 'environment.json'), JSON.stringify({ ...deviceFacts, idleCelsius: idle, base, mode, driver: values.driver,
+      overrides: localBodies.map(({ pattern, file }) => ({ pattern, file })) }, null, 2));
     for (const [index, kind] of trials.entries()) {
       const deadline = Date.now() + 10 * 60_000;
       let temperature = temperatureNow();
@@ -190,7 +215,9 @@ async function bench() {
       }
       const row = { trial: kind ?? index + 1, mode, zoneSlug: kind === null ? values.zone : null, scope,
         slots: overrides, temperature, measurements, jetsam, limits: raw.limits, readerStatus: raw.statuses,
-        trace: raw.trace, activityMonitor: activityMeasurements, zone, staircase, fault, recovery };
+        trace: raw.trace, activityMonitor: activityMeasurements, zone, staircase, fault, recovery,
+        // inspector overrides answered during this trial (none under WebDriver)
+        overridden: localBodies.length === 0 ? null : (/** @type {{served?: {url: string, at: number}[]}} */ (driver ?? {})).served?.filter(({ at }) => at >= start).map(({ url }) => url) ?? null };
       report.push(row);
       writeFileSync(join(directory, 'report.json'), JSON.stringify(row, null, 2));
       writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2));
@@ -215,6 +242,7 @@ async function bench() {
   } finally {
     await driver?.close().catch(() => undefined);
     await standalone?.stop();
+    await inspector?.stop();
   }
 }
 
@@ -223,7 +251,8 @@ if (release) {
   process.exitCode = await releaseSuite(args.slice(2), { script: benchScript, lock: underPhoneLocks });
 } else if (values['dry-run']) {
   console.log('Under iphone13.lock, then mini-measure.lock: doctor, Safari driver, native readers, screenshots and report');
-  console.log(JSON.stringify({ base, mode, zone: values.zone, runs, seconds: duration, reloadAt, pair: values.pair ?? false, slots, out, trace: values.trace }));
+  console.log(JSON.stringify({ base, mode, zone: values.zone, runs, seconds: duration, reloadAt, pair: values.pair ?? false, slots, out, trace: values.trace,
+    driver: values.driver, overrides: localBodies }));
 } else if (!values['with-locks']) {
   process.exitCode = await underPhoneLocks(benchScript, [...args, '--out', out, '--with-locks']);
 } else {

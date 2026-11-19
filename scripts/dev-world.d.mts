@@ -30,5 +30,10 @@ export function openDevWorld(options: {
   readonly port?: number
   readonly saves?: 'disk' | 'memory'
   readonly gridRoot?: string
+  /** the page and the world socket as another device reaches them through an HTTPS proxy (serve-local.mjs) */
+  readonly publicOrigin?: string
+  readonly publicSocket?: string
+  /** a fixed loopback port for the world socket (0: the OS's) */
+  readonly socketPort?: number
   readonly log?: (line: string) => void
 }): Promise<DevWorld>
