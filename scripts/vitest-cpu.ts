@@ -5,7 +5,6 @@ import {holdCpu,parentCpuContext,PARENT_CONTEXT} from './cpu-admission.mjs';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
 import {CI_SERIAL_TESTS,CPU_EXCLUSIVE_TESTS} from './vitest-ci-files.ts';
 import {PUSH_BUDGET} from './push-budget.mjs';
-import {reserveMachineBrowserAdmission} from './browser-machine-loader.mjs';
 
 interface CookEnvironment extends NodeJS.ProcessEnv { WS_CPU_SLOTS?:string }
 const {WS_CPU_ADMISSION:enabled}=process.env;
@@ -32,10 +31,8 @@ if(enabled==='1'||(!process.env.CI&&!process.env.GITHUB_ACTIONS)){
   const cook=COOK_WORKER_TESTS.has(file);
   const exclusive=new Set<string>(CPU_EXCLUSIVE_TESTS).has(file);
   const native=new Set<string>(CI_SERIAL_TESTS).has(file);
-  // Acquire the real browser slot before collection and case clocks. Physical
-  // launches consume that held slot; file teardown refuses an unclosed browser.
-  const browser=file==='test/net-strip-browser.test.ts'?await reserveMachineBrowserAdmission():undefined;
-  const lease=browser??await holdCpu(exclusive?'all':cook?PUSH_BUDGET.cookSlots:native?2:1,{inherit:true});
+  // TEMPLATE-E2E T1E-8 (J434) deleted net-strip-browser.test.ts, the one file that held a machine browser slot here.
+  const lease=await holdCpu(exclusive?'all':cook?PUSH_BUDGET.cookSlots:native?2:1,{inherit:true});
   const cookEnvironment:CookEnvironment=process.env,previousCookGrant=cookEnvironment.WS_CPU_SLOTS;
   const previousParentGrant=process.env[PARENT_CONTEXT];
   try{

@@ -1,5 +1,5 @@
 // Meta STAGING-SMOKE SM1 (J398): the runner and its five scenarios. The browser runs need a browser, so they run only by
-// name, in the browser lane (as test/net-strip-browser.test.ts):
+// name, in the browser lane:
 //   WS_SMOKE_BROWSER=1 scripts/browser-lane.sh --max 10 pnpm exec vitest run test/staging-smoke-runner.test.ts
 //   WS_SMOKE_BUILD=http://127.0.0.1:<port> (scripts/serve-build.sh) adds the real local build, K3 to K5 clean.
 // oxlint-disable-next-line import/no-nodejs-modules -- It serves a stub page and reads the run's files.

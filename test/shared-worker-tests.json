@@ -492,7 +492,6 @@
  "test/net-ranged-clocks.test.ts",
  "test/net-rejoin.test.ts",
  "test/net-room-input.test.ts",
- "test/net-strip-browser.test.ts",
  "test/net-talk-route.test.ts",
  "test/net-tiers.test.ts",
  "test/nightly-tag.test.ts",
