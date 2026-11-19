@@ -522,6 +522,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/DENSITY_LOD_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/EARLY_PROGRAMS_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
