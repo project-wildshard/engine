@@ -18,6 +18,7 @@
     "src/client/engine/app/systems.ts": "client",
     "src/client/engine/app/ui.ts": "client",
     "src/client/engine/app/view/frameScheduler.ts": "client",
+    "src/client/engine/app/view/exploreChannel.ts": "client",
     "src/client/engine/app/view/pageActivity.ts": "client",
     "src/client/engine/app/view/presentation.ts": "client",
     "src/client/engine/app/view/presentationLoop.ts": "client",

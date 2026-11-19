@@ -1,3 +1,5 @@
+import { exploreChannel } from '../app/view/exploreChannel';
+
 /** MF1/MF4: immutable code, content and versioned metadata, keyed by exact absolute URL. Production's name; the other
  *  channels' names carry the channel (`cacheName`). */
 export const ASSET_CACHE_NAME = 'ws-assets-v1';
@@ -10,12 +12,12 @@ export const ASSET_CACHE_NAME = 'ws-assets-v1';
  *  Production keeps the names it always had (renaming them would cold-start every player's cache); preview and staging
  *  put the channel after `ws-` (`ws-preview-assets-v1`, `ws-staging-shell-v3-<build>`), so production's prefix tests
  *  (`ws-shell-`) never match another channel's caches. */
-export type CacheChannel = 'production' | 'staging' | 'preview';
-export const CACHE_CHANNELS: readonly CacheChannel[] = ['production', 'staging', 'preview'];
+export type CacheChannel = 'production' | 'staging' | 'preview' | 'explore';
+export const CACHE_CHANNELS: readonly CacheChannel[] = ['production', 'staging', 'preview', 'explore'];
 
 /** The channel of a build stamp (`__WS_WORLD__`, or undefined on a build with no world). */
-export function cacheChannel(world: unknown): CacheChannel {
-  if (typeof world !== 'object' || world === null) return 'preview';
+export function cacheChannel(world: unknown, explore = false): CacheChannel {
+  if (typeof world !== 'object' || world === null) return explore ? 'explore' : 'preview';
   const release: unknown = Reflect.get(world, 'release');
   return typeof release === 'string' && /\/releases\/production\.json(?:[?#]|$)/u.test(release) ? 'production' : 'staging';
 }
@@ -40,7 +42,7 @@ export function setCacheChannel(channel: unknown): void {
 
 /** This page's (or this worker's, once told) channel. */
 export function pageCacheChannel(): CacheChannel {
-  return given ?? cacheChannel((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__);
+  return given ?? cacheChannel((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__, exploreChannel());
 }
 
 /** The cross-build asset cache of this page's channel. */

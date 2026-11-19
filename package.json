@@ -726,6 +726,7 @@
     "./ui/declared": "./src/client/engine/ui/declared.ts",
     "./ui/panel": "./src/client/engine/ui/panel.ts",
     "./app/view/scopeEnvironment": "./src/client/engine/app/view/scopeEnvironment.ts",
+    "./app/view/exploreChannel": "./src/client/engine/app/view/exploreChannel.ts",
     "./app/view/pageActivity": "./src/client/engine/app/view/pageActivity.ts",
     "./sim": "./src/server/engine/sim.ts",
     "./sim/actRoutes": "./src/shared/engine/sim/actRoutes.ts",

@@ -15,7 +15,8 @@ import { Scene, Vector3, type Object3D } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { SEAT_GRACE_MS, seatedInTime } from './seatGrace';
-import { importPageSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
+import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
+import { importPageSaves, pageOnlyServerSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
 import { saveEnvironment } from '@wildshard/engine/saves/environment';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { syncPageRewards } from '../../../shared/game/saves';
@@ -437,7 +438,7 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   const { startStandalone } = await loadServerModules(), { build } = buildRoot(), { savePrefix } = appIdentity(), page = saveEnvironment().storage('shard');
   // The server's saves: the page's own, read once into IndexedDB and left in place. A session outgrows localStorage at its first cell.
   await bootTask('server:previous-session-close', () => previous); // a world a session just left may still be saving into what this one reads
-  const saves = await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase()));
+  const saves = exploreChannel() ? pageOnlyServerSaves() : await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase()));
   if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
   // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
   // PZ3: its book, server parts, road part and loose reads follow the content base; rapier stays in the page

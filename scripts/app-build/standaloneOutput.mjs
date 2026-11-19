@@ -23,7 +23,7 @@ export function checkServerOutput(outDir, preview) {
     .filter(row => row.isFile()).map(row => relative(outDir, resolve(row.parentPath, row.name))) : [];
   const server = files.filter(standaloneServerFile);
   if (!preview && server.length > 0) throw new Error(`Unexpected in-page server output: ${server.join(', ')}`);
-  if (preview && !server.some(path => /\/serverWorker[^/]*\.js$/u.test(path))) throw new Error('Preview build has no server worker');
+  if (preview && !server.some(path => /\/serverWorker[^/]*\.js$/u.test(path))) throw new Error('Solo build has no server worker');
 }
 
 /** @param {string} outDir @param {string} buildId @param {string} root @param {{ preview?: boolean, devserver?: boolean }} [options] */

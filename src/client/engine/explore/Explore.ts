@@ -64,8 +64,9 @@ export interface ExploreHost {
   title: ExploreTitle;
   /** ✕ / ◀ TITLE: main.ts shows the title again */
   onExit: () => void;
+  exitLabel?: string;
   /** the hub's Practice Arena card returns to play with the current shard's starter weapon */
-  onPractice: () => void;
+  onPractice?: () => void;
   /** a feature playground's card (E307): main.ts loads its scene and enters it, as the Practice card enters the arena */
   onPlayground?: (id: PlaygroundId) => void;
   /** ✎: main.ts opens the review composer (src/client/engine/ui/Feedback.ts) */
@@ -202,17 +203,18 @@ export class Explore {
     // the Practice card is this shard's own arena: the room takes each shard's grade and weapon (E292)
     const practiceArt = hubArt?.practice ?? this.title.thumb;
     // E307: the shard's own feature playgrounds under the shared cards (placeholder art: the verb's glyph on a dev tile)
-    const playgrounds = playgroundsFor(game.level.id);
+    const playgrounds = host.onPlayground === undefined ? [] : playgroundsFor(game.level.id);
     // a scrolling list (E307, Jake: "this is going to have to be a scrollable list"), anchored to the bottom while it fits
     this.hubEl = html('div', 'ws-x-hub', `<div class="ws-x-hub-list">
       <div class="ws-x-hub-heading">Choose an explorer</div>
       <button class="ws-x-card" type="button" data-m="model"><span class="ws-x-card-art"></span><span class="ws-x-card-text"><b>Model explorer</b><small>Inspect every model up close</small></span><span class="ws-x-card-go">›</span></button>
       <button class="ws-x-card" type="button" data-m="sets"><span class="ws-x-card-art${hubArt?.sets === undefined ? ' ws-x-sets-art' : ''}"></span><span class="ws-x-card-text"><b>Set explorer</b><small>Camps, squares, fields: groups of models where they stand</small></span><span class="ws-x-card-go">›</span></button>
       <button class="ws-x-card" type="button" data-m="world"><span class="ws-x-card-art"></span><span class="ws-x-card-text"><b>World explorer</b><small></small></span><span class="ws-x-card-go">›</span></button>
-      <button class="ws-x-card" type="button" data-m="practice" data-dev><span class="ws-x-card-art ws-x-practice-art"></span><span class="ws-x-card-text"><b>Practice arena</b><small>HUD · weapon explorer</small></span><span class="ws-x-card-go">›</span></button>
+      ${host.onPractice === undefined ? '' : `<button class="ws-x-card" type="button" data-m="practice" data-dev><span class="ws-x-card-art ws-x-practice-art"></span><span class="ws-x-card-text"><b>Practice arena</b><small>HUD · weapon explorer</small></span><span class="ws-x-card-go">›</span></button>`}
       </div>`);
     for (const [mode, art] of [['model', modelsArt], ['sets', setsArt], ['world', worldArt], ['practice', practiceArt]] as const) {
-      const image = this.hubEl.querySelector<HTMLElement>(`[data-m="${mode}"] .ws-x-card-art`); if (image === null) throw new Error('Explore: missing card art'); image.style.backgroundImage = `url('${art}')`;
+      const image = this.hubEl.querySelector<HTMLElement>(`[data-m="${mode}"] .ws-x-card-art`);
+      if (image !== null) image.style.backgroundImage = `url('${art}')`;
     }
     fill(this.hubEl, '[data-m="world"] small', `Fly over ${this.title.name} in god mode`);
     const hubList = this.hubEl.querySelector('.ws-x-hub-list'); if (hubList === null) throw new Error('Explore: missing hub list');
@@ -456,7 +458,7 @@ export class Explore {
   syncBack(): void {
     const inner = this.mode !== 'hub' || this.map?.isOpen === true || this.compare?.isOpen === true;
     this.closeBtn.textContent = inner ? engineString('s_0685a836e461') : engineString('s_be64f28a8d0a');
-    this.closeBtn.setAttribute('aria-label', inner ? engineString('s_76900f1bfd16') : engineString('s_eac4d36a9469'));
+    this.closeBtn.setAttribute('aria-label', inner ? engineString('s_76900f1bfd16') : this.host.exitLabel ?? engineString('s_eac4d36a9469'));
   }
 
   /** Put the parked player back before either leaving to the title or entering practice. */
@@ -484,7 +486,10 @@ export class Explore {
   close(): void { if (this.leave()) this.host.onExit(); }
 
   /** Option A: the third equal hub card opens the current shard's shared practice room. */
-  private startPractice(): void { if (this.leave()) this.host.onPractice(); }
+  private startPractice(): void {
+    const go = this.host.onPractice;
+    if (go !== undefined && this.leave()) go();
+  }
 
   /** E307: a feature playground's card — out of Explore and into that shard's dev level */
   private startPlayground(id: PlaygroundId): void {

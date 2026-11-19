@@ -72,6 +72,7 @@ import { animalPositions } from './positions';
 import { describeKeyBindings } from '../keyBindings';
 import { app } from '@wildshard/engine/app/runtime';
 import { beginExploreEntry, recordBootCheckpoint } from '@wildshard/engine/boot/bootTrace';
+import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { startMenuPreload, type Preload, type AudioBanks } from '@wildshard/engine/boot/extras';
 import { macrotask, type Plan, type StepRunner } from '@wildshard/engine/boot/plan';
 import { waitFor } from '@wildshard/engine/boot/waits';
@@ -160,6 +161,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   let viewPrograms: ReturnType<typeof createViewProgramKeeper> | undefined;
   await macrotask();
   // SF21a / the grid client: EXPERIMENTAL Wildshard's 3 × 3 around this home cell (deck, soft walls, neighbours' far proxies)
+  const exploreApp = exploreChannel();
   const grid = await step('assembly', async p => {
     if (pageMode() !== 'grid') return null;
     const { GridSession } = await timeClientPreparation('grid', 'assembly.module', () => waitFor('Read grid session module', import('../grid/session'), 'file'));
@@ -205,7 +207,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     // + the practice room's dummies when this boot lands in it (a travel in arena mode): full on its first frame (E291). Any
     // other boot loads them when the room opens, in every mode (G187: −33.6 MB of GL on Pine; SF47 made it the only path).
     const practice = isDev() && session.arrival?.mode === 'arena' ? prepareArena().then(room => room.preload()) : null;
-    if (pageMode() !== 'grid') await (menuLoad ?? startMenuPreload(files, chunk)).wait(p); // the grid has no title deck (data.ts)
+    if (pageMode() !== 'grid' && !exploreApp) await (menuLoad ?? startMenuPreload(files, chunk)).wait(p); // the grid has no title deck (data.ts)
     await practice; // the grid's streaming is covered by its entry reveal (G98, below), not the loading screen
   });
   const { audio, music } = prepareAudio();
@@ -371,7 +373,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // the AR-15 is found, not issued: a floating pickup on the floor of cabin 1 (the hollow), inside by the door wall
   // (cabin local frame: door on +X, chimney end -Z — Cabin.ts); "[E] Take AR-15" through the door / harvest prompt path
   if (params.get('weapon') === 'rifle' || params.get('weapon') === 'lever') { weapons.unlock('rifle'); weapons.select('rifle', true); boot.runtime.hooks.disposeRifleDrop?.(); } // dev: start with it
-  weapons.placePickups(chunk.loadout ?? {}, { prompts: boot.runtime.interactables, owned: {
+  if (!exploreApp) weapons.placePickups(chunk.loadout ?? {}, { prompts: boot.runtime.interactables, owned: {
     has: (id) => { if (!isOwnedId(id)) throw new Error(`Unknown owned equipment: ${id}`); return owned.has(id); },
     grant: (id) => { if (!isOwnedId(id)) throw new Error(`Unknown owned equipment: ${id}`); owned.grant(id); },
   },
@@ -530,10 +532,11 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   const resuming = session.crashResume !== undefined || session.recovery !== undefined || params.has('glreload');
   const continuingGridEntry = session.crashResume !== undefined || plannedGridReload(session.recovery);
   const arrival = session.arrival;
-  const menuFirst = arrival === null && !params.has('skipintro') && !params.has('tour') && !resuming;
+  const menuFirst = !exploreApp && arrival === null && !params.has('skipintro') && !params.has('tour') && !resuming;
   let firstIn = true;
   let fromTitle = false; // pause → "Exit to main menu" → ENTER WORLD starts over at the spawn (E121), a plain resume does not
   const enter = () => {
+    if (exploreApp) return;
     if (fromTitle) { fromTitle = false; toSpawn(); lastPlace?.reset(); }
     audio.resume();
     audio.worldMuted = false;
@@ -564,6 +567,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // ── Explore World (project/archive/2026-09-23-explore-world.md): the title's EXPLORE WORLD panel — the viewer over this same loaded shard (a
   // lazy chunk). God-mode camera, Model Explorer, one ✎ to the review inbox; ✕ comes back here to the title.
   const exitExplore = () => {
+    if (exploreApp) { location.assign('/'); return; }
     perf.setActive(false); audio.worldMuted = true; music.setState({ mode: 'menu' }); hud.showIntro(enter);
   };
   const noteSheet = async (): Promise<void> => { const f = await loadFeedback(); await f.openSheet(); };
@@ -597,20 +601,22 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     const { Explore: X } = await loadExplore();
     const t1 = performance.now();
     recordBootCheckpoint('explore:imported');
-    explore ??= new X({ world, title: { name: manifest.name, landscape: manifest.card.landscape, thumb: manifest.card.thumb }, onExit: exitExplore, onPractice: () => { hud.enterArenaNow(); }, onPlayground: (id) => { void enterPlayground(id); }, openFeedback: () => { void noteSheet(); }, hide: [boundary.group], creatures: animals.animals,
+    explore ??= new X({ world, title: { name: manifest.name, landscape: manifest.card.landscape, thumb: manifest.card.thumb }, onExit: exitExplore,
+      ...(exploreApp ? { exitLabel: 'Back to zones' } : { onPractice: () => { hud.enterArenaNow(); }, onPlayground: (id: PlaygroundId) => { void enterPlayground(id); } }),
+      openFeedback: () => { void noteSheet(); }, hide: [boundary.group], creatures: animals.animals,
       overhead: boot.runtime.overhead });
     const t2 = performance.now();
     recordBootCheckpoint('explore:constructed');
     explore.open(mode, opts);
     console.info(`[explore] open: import ${Math.round(t1 - t0)} ms · build ${Math.round(t2 - t1)} ms · open ${Math.round(performance.now() - t2)} ms`);
   };
-  const exploreParam = params.get('explore');
+  const exploreParam = params.get('explore') ?? (exploreApp ? 'hub' : null);
   const exploreMode: ExploreMode = exploreParam === 'world' || exploreParam === 'model' || exploreParam === 'sets' ? exploreParam : 'hub';
   hud.onExplore = () => { void openExplore('hub'); };
   // Not a frame is rendered or ticked while the menu is up: hud.entered is the gate.
   game.frameGate = () => ((hud.entered && !hud.paused) || exploring()) && !feedbackHeld && !app.ui.still && !rotateGated() && !shardCompleteUp() && (gridLive?.frameReady() ?? true); // Entered runtime installation finishes before another input or gameplay tick.
   if (menuFirst) { weapons.setEnabled(false); weapons.visible = false; perf.setActive(false); audio.worldMuted = true; hud.showIntro(enter); }
-  else if (arrival?.mode === 'explore') { weapons.setEnabled(false); weapons.visible = false; perf.setActive(false); hud.setOnEnter(enter); } // Explore ▸ Practice enters through it without the title: no handler left the weapon off and the DODGE disc dead (E285)
+  else if (exploreApp || arrival?.mode === 'explore') { weapons.setEnabled(false); weapons.visible = false; perf.setActive(false); hud.setOnEnter(enter); } // Explore ▸ Practice enters through it without the title: no handler left the weapon off and the DODGE disc dead (E285)
   else { hud.markEntered(enter); weapons.setEnabled(!nolock || params.has('skipintro')); }
   // the grid's player-facing moments: G98's sky-down reveal to the pier (G622 D1: 3 s, any touch or key takes over), then
   // G78's SAFE ZONE + dimmed ATTACK on the road, G82 / G105's title card on entering a shard, G97's speed look (gridHud.ts)
@@ -659,7 +665,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   }
   // ?explore=hub|world|model|sets[&cam=x,y,z,yaw,pitch][&model=id] — straight into the viewer (a shard with ShardManifest.explore — D4, E66; a note's "go there")
   let startExplore: (() => void) | undefined;
-  if (exploreParam !== null && chunk.explore !== undefined) {
+  if (exploreParam !== null && (exploreApp || chunk.explore !== undefined)) {
     const cam = (params.get('cam') ?? '').split(',').filter((v) => v !== '').map(Number);
     const model = params.get('model');
     hud.onExplore = () => { hud.onExplore = () => { void openExplore('hub'); }; void openExplore(exploreMode, { ...(cam.length >= 3 ? { cam } : {}), ...(model !== null ? { model } : {}) }); };
@@ -680,7 +686,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   let nearest: (typeof boot.runtime.interactables)[number] | undefined;
   let carcass: (typeof animals.animals)[number] | undefined;
   app.input.bind('use', () => {
-    if (!hud.entered) return;
+    if (exploreApp || !hud.entered) return;
     if (nearest) { tap.use?.(nearest.label); if (nearest.wireId !== undefined) wirePage.send(nearest.wireId); nearest.onInteract(); }
     else if (carcass && boot.runtime.hooks.harvestBusy?.() !== true) {
       const selectedCarcass = carcass;
@@ -752,6 +758,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   } }, game.levelScope);
   app.addSystem({ id: 'main.equipment', phase: 'update', after: ['engine.creatures.update'], before: ['engine.audio.listener'], run: (dt, t) => {
     mark('animals');
+    if (exploreApp) return;
     weapons.update(dt, t); // every weapon ticks (bolts in flight keep flying while the rifle is out)
     boot.runtime.hooks.equipmentUpdate?.(dt); weaponStrip.update();
     boot.runtime.hooks.updatePickups?.(dt, t);
@@ -767,6 +774,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
 
     // nearest interactable: standalone and in the grid's home frame the page runtime's own; inside an entered runtime cell
     // (Sky Reach's RIDE, a cell's talk / pickup / open) that cell's own, in its frame (grid-interact, src/client/game/grid/enteredInteract.ts)
+    if (exploreApp) return;
     const physics = app.physics;
     const homeActive = grid === null || gridLive === null;
     nearest = gridLive === null ? pickInteractable(boot.runtime.interactables, game.camera.position, physics)

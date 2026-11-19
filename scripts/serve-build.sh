@@ -2,7 +2,7 @@
 # serve-build.sh — build the game and serve that build: the ONLY way to run it locally (E317, Jake 2026-09-29: "Vite dev
 # sucks. No one should be using Vite dev … a combination of vite build and vite start"). No `vite` dev servers.
 #
-#   scripts/serve-build.sh [--head | --rev <rev>] [--shard <slug>[,<slug>]] [--full] [--port <n>] [--hours <h>] [--name <label>] [--devserver]
+#   scripts/serve-build.sh [--head | --rev <rev>] [--shard <slug>[,<slug>]] [--full] [--port <n>] [--hours <h>] [--name <label>] [--devserver | --explore]
 #        app build → a private out dir → scripts/preview-server.mjs on a free port (4400–4999), detached. Prints the URL.
 #        --head   reserve preview room, then build HEAD in the shared mirror slot pool
 #        --rev    the same for any commit (a before / after pair, e.g. scripts/nine-sim-memory.mjs --rev=f9ca6490)
@@ -83,6 +83,7 @@ ARGS=("$@")
 while [ $# -gt 0 ]; do
   case "$1" in
     --devserver) MODE=devserver; shift;;
+    --explore) MODE=explore; shift;;
     --head) HEAD_ONLY=1; shift;;
     --rev) HEAD_ONLY=1; REV="$2"; shift 2;;
     --full) FULL=1; shift;;

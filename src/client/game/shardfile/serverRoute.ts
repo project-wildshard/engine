@@ -1,15 +1,15 @@
-/** A world stamp always wins. Only a preview-stamped page can boot a worker. */
+/** A world stamp always wins. A standalone worker requires a solo channel stamp. */
 export type ServerRoute = 'online' | 'standalone' | 'missing';
 export const MISSING_SERVER = 'No game server is configured. Run pnpm dev for the engine or wildshard dev for a shard.';
 
-export function serverRoute(world: unknown, preview: unknown): ServerRoute {
+export function serverRoute(world: unknown, preview: unknown, explore?: unknown): ServerRoute {
   if (world !== undefined) return 'online';
-  return preview === true ? 'standalone' : 'missing';
+  return preview === true || explore === true ? 'standalone' : 'missing';
 }
 
 export function pageServerRoute(): ServerRoute {
-  const stamps = globalThis as { __WS_WORLD__?: unknown; __WS_PREVIEW__?: unknown };
-  return serverRoute(stamps.__WS_WORLD__, stamps.__WS_PREVIEW__);
+  const stamps = globalThis as { __WS_WORLD__?: unknown; __WS_PREVIEW__?: unknown; __WS_EXPLORE__?: unknown };
+  return serverRoute(stamps.__WS_WORLD__, stamps.__WS_PREVIEW__, stamps.__WS_EXPLORE__);
 }
 
 /** Whether the door's `world` word (`socketFrames.ts` `WorldWord`, sent on every socket before hello) says it hosts the grid: more

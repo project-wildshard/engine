@@ -35,7 +35,8 @@ import { startShellClock, waitForLoadingStyles } from '@wildshard/engine/boot/sh
 import { inspectPreviousBoot, previousBootLine, previousBootLevel } from '@wildshard/engine/boot/bootTrace';
 import { Scope } from '@wildshard/engine/app/scope';
 import { harnessPins } from '@wildshard/engine/app/identity';
-import { bootRoute, onlineTitleFirst } from './bootRoute';
+import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
+import { bootRoute, exploreBootParams, onlineTitleFirst } from './bootRoute';
 import { arrivalTier, consumeTitleArrival, pendingTitleArrival, setTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { lastEnd, markUnload, settleLastEnd } from '@wildshard/engine/boot/lastEnd';
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
@@ -95,6 +96,10 @@ persistHomeScreen();
 definePageSaveKeys(saves);
 /** the page's address as the boot reads it; a same-page entry (ZE10a3) reads it again for its next session */
 let search = new URLSearchParams(location.search);
+if (exploreChannel()) {
+  search = exploreBootParams(search);
+  history.replaceState(history.state, '', `${location.pathname}?${search.toString()}${location.hash}`);
+}
 // Jake (11-10): Low Power Mode for Copy diagnostics, from this document's first visible second of rAF (a busy boot can
 // only rule it out); the title's own idle reading starts once the title shows (boot/lowPower.ts)
 startLowPowerProbe();
@@ -185,7 +190,7 @@ async function enterPage(): Promise<unknown> {
   // QA 11-12 row 35 (Jake, 20:04: "I expected reload to go back to main menu"): the player's own browser reload lands on the title,
   // before a tap still pending from this load (or the grid's one way in) can enter the world again; the title stays quiet
   // (dropNotice). A reload the engine makes marks itself first (lastEnd), so it resumes; harness flags keep their world.
-  if (lastEnd().player === true && document.getElementById('ws-shardfile') === null && !search.has('skipintro') && !search.has('tour')) {
+  if (!exploreChannel() && lastEnd().player === true && document.getElementById('ws-shardfile') === null && !search.has('skipintro') && !search.has('tour')) {
     if (requested !== null) consumeTitleArrival(requested);
     consumeGridRecovery({ previous: lastEnd(), search });
     history.replaceState(history.state, '', new URL('/', location.origin));
@@ -238,7 +243,7 @@ async function enterPage(): Promise<unknown> {
     history.replaceState(history.state, '', url);
     document.documentElement.classList.remove('title-first');
   }
-  const route = recovery !== null || crashResume !== null ? { rescue: false, titleOnly: false } : gridRecoveryRefused() ? { rescue: true, titleOnly: true } : bootRoute(search, { line: previousBootLine(), level: previousBootLevel(), reload: end.reload === true });
+  const route = exploreChannel() || recovery !== null || crashResume !== null ? { rescue: false, titleOnly: false } : gridRecoveryRefused() ? { rescue: true, titleOnly: true } : bootRoute(search, { line: previousBootLine(), level: previousBootLevel(), reload: end.reload === true });
   const rescueBoot = route.rescue;
   const titleOnly = route.titleOnly;
   if (rescueBoot) {
@@ -252,6 +257,7 @@ async function enterPage(): Promise<unknown> {
   /** resolves once the title or the selected shard's entry has been evaluated */
   return (gridRecoveryRefused() || (titleOnly && document.getElementById('ws-shardfile') === null)) ? showPageTitle() : (async () => {
     // DL21 (E526): the static card runs its clock from the tap and names the code wait until Loading adopts it.
+    if (exploreChannel()) document.documentElement.classList.remove('title-first');
     const chunk = search.get('chunk'); if (chunk !== null) startShellClock(entryScope, chunk);
     // a crash that boots straight back into its world (crash resume, grid recovery) says so before its breadcrumb is replaced
     if (lastEnd().kind === 'unexpected') showDrop(takeDrop(lastEnd()));

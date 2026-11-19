@@ -98,7 +98,7 @@ test('STR7 retains online code while excluding an old preview worker', async () 
     expect(readFileSync(join(next, online), 'utf8')).toBe(online);
     for (const path of server) expect(existsSync(join(next, path))).toBe(false);
     checkServerOutput(next, false);
-    expect(() => checkServerOutput(next, true)).toThrow('Preview build has no server worker');
+    expect(() => checkServerOutput(next, true)).toThrow('Solo build has no server worker');
   } finally {rmSync(root, {recursive: true, force: true});}
 });
 

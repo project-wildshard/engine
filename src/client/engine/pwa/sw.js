@@ -28,7 +28,7 @@ const WORLD = /\bglobalThis\.__WS_WORLD__=/u.test(DOCUMENT);
 const CHANNEL = cacheChannel((() => {
   const stamp = /\bglobalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(DOCUMENT)?.[1];
   try { return stamp === undefined ? undefined : JSON.parse(stamp); } catch { return {}; }
-})());
+})(), /\bglobalThis\.__WS_EXPLORE__=true;/u.test(DOCUMENT));
 const ASSETS = cacheName('__ASSET_CACHE__', CHANNEL);
 const BOOKS = cacheName('ws-builds-v1', CHANNEL);
 const SHELL_FAMILY = cacheName('ws-shell-', CHANNEL);

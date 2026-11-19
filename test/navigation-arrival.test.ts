@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { freshPageArrival, setTitleArrival, consumeTitleArrival, dropTabArrival, pendingTitleArrival } from '../src/client/engine/boot/titleArrival';
 import { saveStorage } from '../src/client/engine/saves/slots';
-import { bootRoute, onlineTitleFirst } from '../src/client/app/bootRoute';
+import { bootRoute, exploreBootParams, onlineTitleFirst } from '../src/client/app/bootRoute';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { gridIntents } from '../src/client/game/grid/intent';
 import { travelService, travelSlot } from '../src/client/game/travel/travel';
@@ -128,4 +128,10 @@ test('a page reloading itself hands the tap to its own tab only (QA row 16)', ()
   expect(pendingTitleArrival('driftwood-isle')).toEqual({ slug: 'driftwood-isle', mode: 'enter' });
   dropTabArrival();
   expect(pendingTitleArrival('driftwood-isle')).toBeNull();
+});
+
+test('Explore opens Driftwood in the hub by default and retains an explicit view', () => {
+  expect(Object.fromEntries(exploreBootParams(new URLSearchParams()))).toEqual({ chunk: 'driftwood-isle', explore: 'hub' });
+  const link = new URLSearchParams('chunk=mossgate&explore=model&model=oak&tier=phone');
+  expect(exploreBootParams(link).toString()).toBe(link.toString());
 });

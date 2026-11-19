@@ -16,6 +16,7 @@ import type { SessionContext, StagedBoot, SessionState, KitPorts } from './conte
 import { currentOwner } from '@wildshard/engine/app/ownership';
 import { app } from '@wildshard/engine/app/runtime';
 import { declareTotals, installByteCounter } from '@wildshard/engine/boot/bytes';
+import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { bootFiles, extraFetches, startAudioPreload, startDeferredAudioPreload, startMenuPreload, useDownloadAudio, type Preload, type AudioBanks } from '@wildshard/engine/boot/extras';
 import { spawnHeldBytes, spawnListed } from '../boot/spawnDownload';
 import { registerGpuFiles, setTexturePolicy } from '@wildshard/engine/boot/gpuFiles';
@@ -97,7 +98,7 @@ async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audi
   const deferExtras = (manifest.boot?.phone?.deferExtras === true || phoneBudget()) && TIER === 'phone';
   // The grid never shows the title deck: its cards keep their URLs (decoded if a menu ever opens) and the Explore
   // controls load when opened, so a grid entry does not decode every card's art (round 40: the phone froze 10-14 s)
-  const menuLoad = deferExtras || currentPageMode() === 'grid' ? null : startMenuPreload(files, manifest);
+  const menuLoad = deferExtras || currentPageMode() === 'grid' || exploreChannel() ? null : startMenuPreload(files, manifest);
   const audioLoad = deferExtras ? null : startAudioPreload(files, manifest, audioProfile);
   const deferredAudio = deferExtras ? startDeferredAudioPreload(files, manifest, audioProfile) : null;
   // MG10 (J410): the in-page server's worker starts now and warms physics while the page holds little (clientWorker.ts);

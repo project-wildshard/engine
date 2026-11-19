@@ -242,7 +242,7 @@
       // `stale deployment code` / `stale build` / `new build panel`, not a `reload` that means the title) would land on the title.
       // That page handed its tap to this document (titleArrival, session, 60 s): the address names the world again, so the page
       // goes back in (entry.ts reads the tap as a title PLAY's) instead of the title's UNEXPECTEDLY BACK AT THE TITLE.
-      if (homeParams.size === 0 && location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
+      if (!globalThis.__WS_EXPLORE__ && homeParams.size === 0 && location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
         const saved = (store, scope, key) => { const item = JSON.parse(store.getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; };
         const left = saved(localStorage, 'device', 'life.lastUnload'), tap = saved(sessionStorage, 'session', 'titleArrival'), now = Date.now();
         if (left && left.reload !== true && now - left.t >= 0 && now - left.t < 10000 && /^(?:stale deployment code|stale build|new build panel)/u.test(left.reason)
@@ -252,7 +252,7 @@
           history.replaceState(history.state, '', location.pathname + '?' + next.toString() + location.hash);
         }
       } catch { /* storage blocked: the title, as before */ }
-      if (homeParams.size === 0) document.documentElement.classList.add('title-first');
+      if (!globalThis.__WS_EXPLORE__ && homeParams.size === 0) document.documentElement.classList.add('title-first');
       // BUGBASH-LOOP (J385): the launch shell and live menu belong to the title only. A world page (`?chunk=`, a tap's
       // navigation) paints its own full-screen loading card from the first bytes, never the bare title over it.
       if (homeParams.size === 0 && document.getElementById('ws-shardfile') === null) document.documentElement.classList.add('boot-menu');

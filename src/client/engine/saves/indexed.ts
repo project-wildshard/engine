@@ -8,6 +8,21 @@ import { bootTiming } from '../../../shared/engine/boot/timing';
 
 /** A server's saves on a page: the same documents localStorage would hold. */
 export interface IndexedSaves { readonly storage: SaveStorage; readonly write: (key: string, value: string | null) => Promise<boolean>; readonly close?: () => void }
+/** The Explore server's documents belong to the lifetime of its page. */
+export function pageOnlyServerSaves(): IndexedSaves {
+  const documents = new Map<string, string>();
+  const storage: SaveStorage = {
+    get length() { return documents.size; },
+    key: index => [...documents.keys()][index] ?? null,
+    getItem: key => documents.get(key) ?? null,
+    setItem: (key, value) => { documents.set(key, value); },
+    removeItem: key => { documents.delete(key); },
+  };
+  return { storage, write: (key, value) => {
+    if (value === null) storage.removeItem(key); else storage.setItem(key, value);
+    return Promise.resolve(true);
+  } };
+}
 /** The database the page's server keeps its saves in. */
 export const SERVER_SAVES = 'wildshard-saves';
 const epochDatabase = (epoch: number): string => epoch === 0 ? SERVER_SAVES : `${SERVER_SAVES}@${epoch}`;

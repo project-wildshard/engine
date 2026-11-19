@@ -1,3 +1,4 @@
+import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { TIER } from '@wildshard/engine/core/tier';
 import { readDiscovery } from '@wildshard/engine/game/shard/discovery';
 import { installShards } from '@wildshard/engine/game/shard/list';
@@ -25,7 +26,7 @@ export async function completeCatalogue(wait=true):Promise<void>{
 
 /** Phones prepare their original selected manifest, never every world's data.
  * Desktop background prefetch retains full discovery; frozen phone entries prepare
- * only their inventoried primary pair, preserving content and save namespaces. */
+ * only their inventoried primary pair, preserving content and save namespaces. Explore always opens just one shard. */
 export async function prepareSelectedShard():Promise<void>{
   const rows=titleManifests(),named=new URLSearchParams(location.search).get('chunk');
   // C3: a catalogue shard with no discovery enters on the first row's page; its product replaces it in admission.
@@ -33,7 +34,7 @@ export async function prepareSelectedShard():Promise<void>{
   if(named!==null&&row===undefined&&document.getElementById('ws-shardfile')===null)throw new Error('The requested world is not listed');
   const selected=hasDiscovery(row)?row:rows.find(hasDiscovery);
   if(selected===undefined)throw new Error('No shard has a discovery document');
-  if(TIER!=='phone'){await completeCatalogue();return;}
+  if(TIER!=='phone'&&!exploreChannel()){await completeCatalogue();return;}
   const prepared=await selectedManifests(selected,loaders());
   installShards(prepared.manifests);
 }

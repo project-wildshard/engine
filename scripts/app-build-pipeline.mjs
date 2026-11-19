@@ -189,7 +189,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // HTML owns the deploy identity; hashed runtime code stays reusable across builds.
   // Calibration documents need it too. The worker must see these final bytes.
   const validator = shardfileValidationRevision();
-  // STR7: the preview channel and local preview proofs opt in explicitly.
+  // STR7 and EX2: only preview and Explore can run an in-page server.
   const {
     WILDSHARD_RELEASE_URL: worldFile,
     WILDSHARD_RELEASE_KEY: worldKey,
@@ -206,8 +206,11 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
           ...(recordTag === undefined ? {} : { recordTag }),
         };
   const preview = mode === "preview" || process.env.WS_CHANNEL === "preview";
-  if (preview && (world !== undefined || mode === "devserver" || (process.env.WS_CHANNEL !== undefined && process.env.WS_CHANNEL !== "preview")))
-    throw new Error("A preview build cannot be a devserver or name a world");
+  const explore = mode === "explore" || process.env.WS_CHANNEL === "explore";
+  const solo = preview || explore;
+  if (solo && (preview && explore || worldFile !== undefined || worldKey !== undefined || mode === "devserver" ||
+    (process.env.WS_CHANNEL !== undefined && process.env.WS_CHANNEL !== (explore ? "explore" : "preview"))))
+    throw new Error("A solo build requires one solo channel and cannot name a world or run as devserver");
   const verdicts = /** @type {unknown} */ (JSON.parse(execFileSync(process.execPath, [
     "--import", "./scripts/bake-loader.mjs", "./scripts/app-build/cookedEntryExclusions.ts", validator,
   ], { encoding: "utf8", maxBuffer: 8 << 20 })));
@@ -217,6 +220,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     verdicts,
     ...(world === undefined ? {} : { world }),
     ...(preview ? { preview: true } : {}),
+    ...(explore ? { explore: true } : {}),
     // QA 11-13: the static title's build pill, before any bundle (index.html data-launch-progress)
     label: buildLabelOf(buildId, engineRelease(process.cwd())),
   });
@@ -227,7 +231,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
 
   // Preview adds its worker beside the common server, storage and identity modules.
   const { checkServerOutput, standaloneServerFile, writeStandaloneOutput } = await import("./app-build/standaloneOutput.mjs");
-  await writeStandaloneOutput(outDir, buildId, process.cwd(), { preview, devserver: mode === "devserver" });
+  await writeStandaloneOutput(outDir, buildId, process.cwd(), { preview: solo, devserver: mode === "devserver" });
 
   // the crossroads phone rig beside the bundle (was vite/crossroadsRig.ts); before the worker, which counts its files
   step([
@@ -307,12 +311,12 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
       ...(previousOrigin === undefined ? {} : { previousOrigin }),
       optional,
       contentBase,
-      ...(preview ? {} : { keepFile: path => !standaloneServerFile(path) }),
+      ...(solo ? {} : { keepFile: path => !standaloneServerFile(path) }),
       ...(budget === undefined ? {} : { budget }),
     }),
   );
 
-  checkServerOutput(outDir, preview);
+  checkServerOutput(outDir, solo);
 
   // OFF-VERCEL OV3: dist/ is the Workers asset directory. Refuse what Workers static assets would refuse.
   if (outDir === resolve("dist")) console.log(`Asset limits: ${describeAssetLimits(assertAssetLimits(outDir))}`);

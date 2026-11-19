@@ -30,6 +30,16 @@ test('a preview document opts in before the module starts', () => {
   expect(() => stampBuildHtml(html, 'invalid', { ...facts, world, preview: true })).toThrow('A preview document cannot name a world');
 });
 
+test('Explore has its own solo stamp before the app starts', () => {
+  const html = '<html><head><script type="module" src="/main.js"></script></head></html>';
+  const facts = { validator: 'a'.repeat(64), verdicts: [], explore: true as const };
+  const stamped = stampBuildHtml(html, 'explore', facts);
+  expect(stamped.indexOf('globalThis.__WS_EXPLORE__=true;')).toBeGreaterThan(0);
+  expect(stamped.indexOf('globalThis.__WS_EXPLORE__=true;')).toBeLessThan(stamped.indexOf('src="/main.js"'));
+  expect(stamped).not.toContain('__WS_PREVIEW__');
+  expect(() => stampBuildHtml(html, 'invalid', { ...facts, preview: true })).toThrow('An Explore document cannot name a world or preview');
+});
+
 test('the post-bundle stamp covers web and native document entries without modifying code', () => {
   mkdirSync('tmp', { recursive: true });
   const root = mkdtempSync(resolve('tmp/build-identity-'));

@@ -1,4 +1,5 @@
 import type { BuiltWorld } from './context';
+import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { captureHeightfield } from '@wildshard/engine/world/Heightfield';
@@ -421,7 +422,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     }
   };
   const titleShaders = warmRest();
-  if (arrival?.mode === 'enter' || arrival?.mode === 'arena' || ctx.continuingGridEntry || (arrival === null && loading.playRequested)) enter();
+  const exploreApp = exploreChannel();
+  if (!exploreApp && (arrival?.mode === 'enter' || arrival?.mode === 'arena' || ctx.continuingGridEntry || (arrival === null && loading.playRequested))) enter();
   else if (arrival?.mode === 'explore') hud.startExplore(); // import the viewer only after shader compilation and the loader's peak
   if (arrival?.mode === 'arena') hud.enterArenaNow();
   if (ctx.gridLive === null) installCrashCheckpoint(game.levelScope, manifest.slug, () => hud.entered && !world.freeCamera && !world.tour.active && !exploring()
@@ -504,7 +506,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     if (ctx.grid === null) asShell(() => { startShardPrefetch(manifest); });
   };
   afterControl(game.levelScope, run => { game.onLate(run, 'game.boot.background'); },
-    () => hud.entered && !hud.paused && !app.clock.paused && game.frameGate(), () => {
+    () => (exploreApp ? exploring() : hud.entered && !hud.paused) && !app.clock.paused && game.frameGate(), () => {
       document.dispatchEvent(new Event('ws:control-ready'));
       sustainedFrames.start(diagnosticNow()); // QA row 31: the sustained fps window opens at control
       reachControl(game.levelScope);

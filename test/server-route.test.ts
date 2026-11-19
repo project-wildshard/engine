@@ -8,10 +8,13 @@ import { shardCell } from '../src/client/game/grid/oneWayIn';
 const WORLD = { release: 'https://packs.example/releases/staging.json', key: 'ab' };
 const source = (): string => readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
 
-test('only an explicit preview stamp can start the standalone server', () => {
+test('only explicit preview and Explore stamps can start the standalone server', () => {
   expect(serverRoute(WORLD, undefined)).toBe('online');
   expect(serverRoute(WORLD, true)).toBe('online');
   expect(serverRoute(undefined, true)).toBe('standalone');
+  expect(serverRoute(undefined, undefined, true)).toBe('standalone');
+  expect(serverRoute(WORLD, undefined, true)).toBe('online');
+  expect(serverRoute(undefined, undefined, 'true')).toBe('missing');
   expect(serverRoute(undefined, undefined)).toBe('missing');
   expect(serverRoute(undefined, 'true')).toBe('missing');
 });

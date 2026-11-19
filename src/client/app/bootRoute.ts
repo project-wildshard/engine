@@ -6,6 +6,14 @@
  * level this URL asks for again, the load is rescued to the title until the player chooses a level again.
  * A URL with only version or environment harness settings is the title too; those settings do not select a level.
  */
+/** Explore's standalone entry opens a shard into its hub unless a view was requested. */
+export function exploreBootParams(search: URLSearchParams): URLSearchParams {
+  const route = new URLSearchParams(search);
+  if (!route.has('chunk')) route.set('chunk', 'driftwood-isle');
+  if (!route.has('explore')) route.set('explore', 'hub');
+  return route;
+}
+
 export interface BootRoute { readonly rescue: boolean; readonly titleOnly: boolean }
 export function bootRoute(search: URLSearchParams, previous: { readonly line: string; readonly level: string; readonly reload?: boolean }): BootRoute {
   if (previous.reload === true) return { rescue: true, titleOnly: true };

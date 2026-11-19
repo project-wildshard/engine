@@ -1,7 +1,9 @@
+import { exploreChannel } from '../../app/view/exploreChannel';
 import { installSaveEnvironment } from '../../../../shared/engine/saves/environment';
 
 /** Installed before save readers run. Keep browser APIs out of the save schema/store import graph. */
 export function installBrowserSaveEnvironment(): void {
+  if (exploreChannel()) return; // The save store's default environment keeps writes in memory.
   installSaveEnvironment({
     storage: (scope) => { try { return scope === 'session' ? globalThis.sessionStorage : globalThis.localStorage; } catch { return null; } },
     persistent: () => typeof window !== 'undefined',
