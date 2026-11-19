@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the real native roster over shipped Rapier.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createSimHost } from '../src/server/engine/sim';
 import { createNativeCreatureRoster } from '../src/server/game/shardfile/homeKeeper';

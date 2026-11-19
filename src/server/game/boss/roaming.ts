@@ -4,7 +4,7 @@ import type { SpeciesProgramData } from '@wildshard/format/speciesPrograms';
 import type { SpeciesDecisionAuthority } from '../plugin/brain';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { BossBrain } from '@wildshard/engine/ai/BossBrain';
-import { fnv1a32, Rng, type RngState } from '@wildshard/engine/core/rng';
+import { fnv1a32, Rng, type RngState } from '@wildshard/format/seededRng';
 import type { RoamingEncounterRow } from '@wildshard/format/bossEncounter';
 import { strikeFromData } from '@wildshard/engine/ai/strikeRows';
 import { StrikeRunner } from '@wildshard/engine/ai/strikes';

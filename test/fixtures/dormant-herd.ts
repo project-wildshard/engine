@@ -1,5 +1,5 @@
 import { PackBrain, type PackPrey } from '@wildshard/engine/ai/pack';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { SimHost } from '@wildshard/engine/sim';
 import { nativeGroupBrain } from '@wildshard/format/groupBrains';

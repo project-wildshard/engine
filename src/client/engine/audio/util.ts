@@ -3,7 +3,7 @@ import type { Audio } from './Audio';
 import type { AudioData } from '@wildshard/format/audio';
 import type { Vector3 } from 'three';
 import { tap, ambientTick } from '../../../shared/engine/core/harnessTap';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 
 declare module '../../../shared/engine/core/rng' { interface RngStreams { audio: true } }
 

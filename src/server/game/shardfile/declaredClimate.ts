@@ -1,5 +1,5 @@
 import type { ShardRows } from '@wildshard/format/rows';
-import { fnv1a32, Rng } from '@wildshard/engine/core/rng';
+import { fnv1a32, Rng } from '@wildshard/format/seededRng';
 import type { SimHost } from '@wildshard/engine/sim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { publishDay } from '@wildshard/engine/sim/shardRows';

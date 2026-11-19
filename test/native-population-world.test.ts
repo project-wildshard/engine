@@ -14,7 +14,7 @@ import { NativeWildEnvironment } from '../src/server/game/population/nativeManag
 import { installNativeBootRoster } from '../src/server/game/riding/nativePopulation';
 import { installWeatherContinuation } from '../src/server/game/weather/continuation';
 import { nativeWeatherBundle } from '../src/server/game/weather/reactions';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import pine from './fixtures/engine-lift/pine-weather.json' with { type: 'json' };
 import { weatherWitness as storm } from './fixtures/engine-lift/pins';

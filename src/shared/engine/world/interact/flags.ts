@@ -10,7 +10,7 @@ import { saves } from '../../saves/runtime';
  *   flags.onChange((flag, on) => …);   test(flags, { all: ['a'], none: ['b'] })
  *   flags.reset()                      // dev: `?resetquest` — forget this level's progress
  */
-import { TRANSIENT_PREFIXES, autoFlag, type InteractDef, type Cond } from './types';
+import { TRANSIENT_PREFIXES, autoFlag, type InteractDef, type Cond } from '@wildshard/format/interactTable';
 
 const flagsSave = saves.define({ key: 'flags', scope: 'shard', version: 1, schema: v.array(v.string()), initial: () => [] as string[] });
 

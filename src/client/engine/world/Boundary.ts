@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { CHUNK_HALF, CHUNK_DEPTH, ROAD_WIDTH } from '../../../shared/engine/core/config';
+import { CHUNK_HALF, CHUNK_DEPTH } from '../../../shared/engine/core/config';
+import { ROAD_WIDTH } from '@wildshard/format/contentBounds';
 import { heightAt as terrainHeightAt, waterLevel, pondMask, streamAt } from '../../../shared/engine/world/Heightfield';
 import { app } from '../app/runtime';
 import type { SkyRig as Sky } from './skyRig';

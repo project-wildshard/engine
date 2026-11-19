@@ -1,4 +1,4 @@
-import { smoothstep as sstep } from '../../../../shared/engine/core/noise';
+import { smoothstep as sstep } from '@wildshard/format/noise';
 import { app, gameplayRandom } from '../../app/runtime';
 import type { EquipContext, EquipmentRow } from '../../../../shared/engine/combat/Equipment';
 import type { Targets, TargetHit } from '../types';

@@ -14,7 +14,7 @@ import { PackBrain, type PackPorts, type PackContext, type PackPrey } from '@wil
 import { HerdBrain, type HerdPorts, type HerdContext } from '@wildshard/engine/ai/herd';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { SimHost } from '@wildshard/engine/sim';
-import type { Rng, RngState } from '@wildshard/engine/core/rng';
+import type { Rng, RngState } from '@wildshard/format/seededRng';
 import { nativeGroupBrain, groupBrainRules, type ShardGroupBrain, type ShardPackGroup, type ShardHerdGroup } from '@wildshard/format/groupBrains';
 
 /** One group continuation; actor memory, motors and random streams remain with the simulation owner. */

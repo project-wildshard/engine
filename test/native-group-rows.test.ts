@@ -8,7 +8,7 @@ import { createSimHost } from '../src/server/engine/sim';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { installNativeGroupRows, nativeGroupCollection, nativeHerdCollection } from '../src/server/game/shardfile/groupRuntime';
 import { NativeWildEnvironment } from '../src/server/game/population/nativeManager';
-import { GrassField } from '../src/shared/game/systems/looks/grassField';
+import { GrassField } from '@wildshard/format/grassField';
 import { TrampleField } from '../src/shared/game/systems/looks/trampleField';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 

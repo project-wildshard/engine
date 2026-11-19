@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { StalkerBrain } from '../src/shared/engine/ai/stalker';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { huntMemoryCodec, type HuntGround, type HuntTuning } from '../src/shared/engine/ai/huntPattern';
 import { FIXTURE_HUNT_TUNING } from './fixtures/hunt-tuning';
 

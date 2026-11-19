@@ -8,7 +8,7 @@ import { mixedPopulation } from '../population/mixedRoster';
 import * as v from 'valibot';
 import { Vector3 } from 'three';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
-import type { InteractTable } from '@wildshard/engine/world/interact/types';
+import type { InteractTable } from '@wildshard/format/interactTable';
 import type { Flags } from '@wildshard/engine/world/interact/flags';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { NativeCableRider } from '@wildshard/engine/sim/cableTraversal';

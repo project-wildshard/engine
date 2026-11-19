@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import * as v from 'valibot';
 import { isJsonData } from '@wildshard/format/json';
 import { cacheUntilDisposed } from '@wildshard/engine/app/disposalCache';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { emitFault } from '@wildshard/engine/core/faults';
 import { LightPool } from '@wildshard/engine/fx/LightPool';
 import { ItemPickup } from '@wildshard/engine/player/WeaponPickup';

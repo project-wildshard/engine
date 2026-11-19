@@ -232,8 +232,6 @@ export function splatTerrainMaterial(layers: SplatLayers, ground: SplatGround): 
   }
 }
 
-/** Existing Terrain callers retain these exact functions; offline bakers use their defining shared entry. */
-export const terrainChunkGeometry: typeof pureTerrain.terrainChunkGeometry = pureTerrain.terrainChunkGeometry;
 export const terrainChunkSteps: typeof pureTerrain.terrainChunkSteps = pureTerrain.terrainChunkSteps;
 export const vertexNormalSteps: typeof pureTerrain.vertexNormalSteps = pureTerrain.vertexNormalSteps;
 export const canopyChannel: typeof pureTerrain.canopyChannel = pureTerrain.canopyChannel;
@@ -362,7 +360,7 @@ export class Terrain {
     }
     const [layers] = await Promise.all([loadPBRArray([...groundSet({ assets }).layers], 1024), loadBakedTerrain(captured)]); // baked heights/splat → captured frame
     await macrotask(); // the layer copies above and the mesh below were one ~110 ms task at 4x CPU
-    // the ground in work slices (it runs in play when a grid cell enters): the same bytes as terrainChunkGeometry
+    // Build the ground in work slices when a grid cell enters during play.
     const steps = terrainChunkSteps(captured.field), slice = workSlice();
     let step = steps.next();
     while (step.done !== true) { if (slice.due()) await slice.yield(); step = steps.next(); }

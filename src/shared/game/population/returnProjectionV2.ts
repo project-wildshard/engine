@@ -5,7 +5,7 @@ import { parseReturnProjectionV2,returnProjectionV2Layout } from '@wildshard/for
 import { prepareV2Rng } from '@wildshard/format/scriptRngV2';
 import { admitScriptV2 } from '@wildshard/format/scriptAdmissionV2';
 import { createV2FrameWriter,validateV2Frame,type V2FrameAuthority } from '@wildshard/format/scriptWireV2';
-import type { Rng,RngState } from '@wildshard/engine/core/rng';
+import type { Rng,RngState } from '@wildshard/format/seededRng';
 import { loanedSha256, sha256 } from '../plugin/moduleHash';
 import { GroupStepV2 } from '@wildshard/engine/script/groupStepV2';
 import { ScriptModuleV2, prepareScriptMemory, type PreparedScriptMemory } from '@wildshard/engine/script/moduleV2';

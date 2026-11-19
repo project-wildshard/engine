@@ -1,4 +1,5 @@
-import { CHUNK_HALF, CONTENT_CAPS, ROAD_WIDTH } from '@wildshard/engine/core/config';
+import { CHUNK_HALF, CONTENT_CAPS } from '@wildshard/engine/core/config';
+import { ROAD_WIDTH } from '@wildshard/format/contentBounds';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { GridPoint } from './assembly';
 

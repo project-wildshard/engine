@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHUNK_DEPTH } from '../../../shared/engine/core/config';
-import { Noise2D } from '../../../shared/engine/core/noise';
+import { Noise2D } from '@wildshard/format/noise';
 import { attachFogUniforms, fogUniforms } from './Atmosphere';
 import { PaintedHorizon, levelHorizonStrips } from './HorizonMatte';
 import type { SkyRig as Sky } from './skyRig';

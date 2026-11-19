@@ -9,7 +9,7 @@ import { BowDraw } from '@wildshard/engine/combat/bowDraw';
 import { ProjectileSlots, projectileFlightStep, type FlightSlot } from '@wildshard/engine/combat/projectileFlight';
 import { ProjectileContact, StoppedProjectileSlots, stoppedProjectileSaved } from '@wildshard/engine/combat/projectileContact';
 import { drawnSpreadDegrees, instantSpreadDegrees, shotRandom, shotSpread } from '@wildshard/engine/combat/shotSpread';
-import { smoothstep } from '@wildshard/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import { worldHit, floorBelow } from '@wildshard/engine/physics/query';
 import { fieldGustAt, type WindFieldSpec } from '@wildshard/engine/world/windField';
 import { BowWeaponProfileSchema, parseNativeFirearmProfile } from '@wildshard/format/weaponProfiles';

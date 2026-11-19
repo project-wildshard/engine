@@ -13,7 +13,7 @@ import type { GroupBankValueV2 } from '@wildshard/format/scriptGroupBankV2';
 import { GroupBrain, type GroupGuestFrameV2, type GroupGuestProjectionV2, type GroupGuestPublicationV2 } from '../src/shared/engine/ai/GroupBrain';
 import { Scope } from '../src/shared/engine/app/scope';
 import { onFault, type Fault } from '../src/shared/engine/core/faults';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { GrazerBrain, type GuardedHerdContext, type GuardedHerdPorts } from '../src/server/engine/ai/grazer';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';

@@ -1,13 +1,5 @@
-/** The seeded draws (mulberry32, forks, continuation state): format's law (SDK-SPLIT SP5a, Q35); the named streams and
- *  the page salt stay here. */
-import * as seeded from '@wildshard/format/seededRng';
+import { Rng, fnv1a32, validateRngState, type RngState } from '@wildshard/format/seededRng';
 
-/** Mulberry32 with forks and continuation, the identical defining format class. */
-export class Rng extends seeded.Rng {}
-export type RngPort = seeded.RngPort;
-export type RngState = seeded.RngState;
-export const fnv1a32: typeof seeded.fnv1a32 = seeded.fnv1a32;
-const validateRngState = seeded.validateRngState;
 const uint32 = (value: number): boolean => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
 export interface RngStreams { gameplay: true; ai: true; spawn: true; cosmetic: true }
 export type RngStream = keyof RngStreams;

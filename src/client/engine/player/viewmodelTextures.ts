@@ -1,4 +1,4 @@
-import { smoothstep } from '../../../shared/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 /**
  * The weapon viewmodels' procedural texture sets as plain pixels — no three.js, no DOM (a 2D canvas comes from the
  * caller), so the same code runs in a worker (viewmodelTextures.worker.ts) or on the main thread. Drawing them is

@@ -4,7 +4,7 @@ import {AnimalSim} from '../src/shared/engine/entities/AnimalSim';
 import {GuardianPolicy, type GuardianProfile, type GuardianObservation} from '../src/server/engine/ai/guardianPolicy';
 import {DiverBrain, type DiverProfile, type DiverObservation} from '../src/shared/engine/ai/diver';
 import type {StrikeSpec} from '../src/shared/engine/ai/strikes';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {onFault, type Fault} from '../src/shared/engine/core/faults';
 
 function owner() {

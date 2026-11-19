@@ -1,16 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { RngPort } from '../../../shared/engine/core/rng';
-import { Noise2D } from '../../../shared/engine/core/noise';
-import { bakedGeometry } from './geometryBake';
+import type { RngPort } from '@wildshard/format/seededRng';
 import { dropTriangles, hiddenTriangles, type HiddenOptions } from './hiddenFaces';
-
-/**
- * The engine geometry kit (E357 X5, 10 §X5): the shape builders every model kit shares. Flat-shaded ones (`log`, `beam`,
- * `rope`, `rock`, `plank`, `wobble`, `tris`: the low-poly kit's faceted look) and smooth ones (`blob`: welded, smooth
- * normals, for the painted kit). Each keeps its own vertex maths (a `log` is a scaled unit prism), so every model built
- * from them is unchanged.
- */
 
 // ── flat-shaded primitives ──────────────────────────────────────────────────────────────────────────
 
@@ -107,52 +98,6 @@ export function tris(v: number[]): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
   return g;
-}
-
-// ── smooth primitives ───────────────────────────────────────────────────────────────────────────────
-
-/** a smooth lumpy stone: an icosphere (detail 2 = 320 faces, 1 = 80) displaced by seeded noise, squashed. A shard that adds
- *  a geometry bake (./geometryBake.ts) reads the shape from it; the smooth normals are exact arithmetic, made here */
-export function blob(r: number, rng: RngPort, detail = 1, squash = 0.75, rough = 0.22): THREE.BufferGeometry {
-  const g = bakedGeometry('engine/blob', [r, detail, squash, rough], rng, () => blobShape(r, rng, detail, squash, rough));
-  g.computeVertexNormals();
-  return g;
-}
-
-/** the blob's welded, displaced shape: indexed, `position` only */
-function blobShape(r: number, rng: RngPort, detail: number, squash: number, rough: number): THREE.BufferGeometry {
-  const g = new THREE.IcosahedronGeometry(r, detail);
-  const merged = mergeVerticesByPos(g);
-  const pos = merged.getAttribute('position');
-  const ox = rng.range(0, 100), oz = rng.range(0, 100);
-  const nz = new Noise2D(rng.int(1, 1e6));
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-    const k = 1 + rough * (nz.get(x / r * 1.3 + ox, z / r * 1.3 + y / r + oz) * 0.75 + nz.get(x / r * 3 + oz, y / r * 3 - ox) * 0.25);
-    pos.setXYZ(i, x * k, y * k * squash, z * k);
-  }
-  return merged;
-}
-
-/** weld an unindexed / seam-split geometry by position (so displacement keeps it watertight and normals smooth) */
-function mergeVerticesByPos(g: THREE.BufferGeometry): THREE.BufferGeometry {
-  const src = g.index ? g.toNonIndexed() : g;
-  const pos = src.getAttribute('position');
-  const map = new Map<string, number>();
-  const verts: number[] = [], idx: number[] = [];
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-    const key = `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)}`;
-    let k = map.get(key);
-    if (k === undefined) { k = verts.length / 3; verts.push(x, y, z); map.set(key, k); }
-    idx.push(k);
-  }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  out.setIndex(idx);
-  if (src !== g) src.dispose();
-  g.dispose();
-  return out;
 }
 
 /** Finished parts (normals and colours baked) without their hidden triangles (hiddenFaces.ts: inside another closed part,

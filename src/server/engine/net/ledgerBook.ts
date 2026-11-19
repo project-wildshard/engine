@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { fnv1a32 } from '../../../shared/engine/core/rng';
+import { fnv1a32 } from '@wildshard/format/seededRng';
 import type { LedgerGrant, NetLedger } from '../../../shared/engine/net/ledgerWire';
 
 /** Receipts a player can still ask for. Grants are rare, and the durable ledger holds them all. */

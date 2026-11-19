@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { Scope } from '../src/shared/engine/app/scope';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';
 import { parseGroupStepV2, groupStepLayoutV2, GroupStepV2Schema } from '@wildshard/format/scriptGroupStepV2';
 import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';

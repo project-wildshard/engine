@@ -3,7 +3,7 @@ import * as v from 'valibot';
 import { MathUtils, Vector3 } from 'three';
 import { GroupBrain } from '@wildshard/engine/ai/GroupBrain';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { SimValue } from '@wildshard/engine/sim';
 import { inspectBrain } from '@wildshard/engine/ai/inspect';
 import { StrikeRunner, type StrikeSpec, type StrikeContext } from '@wildshard/engine/ai/strikes';

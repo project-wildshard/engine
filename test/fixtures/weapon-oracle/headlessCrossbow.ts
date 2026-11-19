@@ -5,7 +5,7 @@ import type { SimHost } from '../../../src/server/engine/sim';
 import type { AnimalSim } from '../../../src/shared/engine/entities/AnimalSim';
 import type { DamageRequest } from '../../../src/shared/engine/combat/pipeline';
 import { shotSpread } from '../../../src/shared/engine/combat/shotSpread';
-import { smoothstep } from '../../../src/shared/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import { sticksIn } from '../../../src/shared/engine/physics/query';
 import { CROSSBOW_PROFILE } from './crossbowProfile';
 import { projectileFlightStep } from '../../../src/shared/engine/combat/projectileFlight';

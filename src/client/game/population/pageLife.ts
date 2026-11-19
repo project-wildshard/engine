@@ -2,14 +2,14 @@
  * populations, discovery and timed tools; ABI-v1 guests own content decisions.
  * No shard callback, subclass or reflected owner/path is accepted. */
 import * as THREE from 'three';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { app } from '@wildshard/engine/app/runtime';
 import { TickScheduler } from '@wildshard/engine/app/scheduler';
 import { PlaceGuide, type GuidePoint } from '@wildshard/engine/quest/view';
 import { audioRandom } from '@wildshard/engine/audio/util';
 import { CameraFX } from '@wildshard/engine/player/CameraFX';
 import { terrainHeight as heightAt } from '@wildshard/engine/world/terrainHeight';
-import { smoothstep } from '@wildshard/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import { installCombatTargets } from '../shardfile/clientTargets';
 import type { DeclaredSoundBank } from '@wildshard/engine/audio/declaredBank';

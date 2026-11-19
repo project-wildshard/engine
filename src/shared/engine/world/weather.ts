@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import type { Rng } from '../core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { Scope } from '../app/scope';
 import type { DayCycleClock } from './dayCycle';
 

@@ -8,7 +8,7 @@ import { FixedMemory } from '../src/shared/engine/script/fixedMemory';
 import { ScriptModuleV2, prepareScriptMemory, scriptMemoryCensus } from '../src/shared/engine/script/moduleV2';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { ReturnProgramSchema } from '@wildshard/format/namedJsonContracts';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { frozenAdmissionProgram as admission } from './fixtures/frozen/nalati';
 import { lendFrozenPasture as lendNalatiTitan } from './fixtures/frozen/runtimePrograms';
 import { frozenTitanPrograms as titanRawPrograms, frozenTitanInline as titanPrograms, frozenTitanModule as titanModuleBytes } from './fixtures/frozen/runtimePrograms';

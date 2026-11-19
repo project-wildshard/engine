@@ -5,7 +5,7 @@ import * as v from 'valibot';
 import { CellFieldSchema,type CellFieldRows } from '@wildshard/format/cellField';
 import { isJsonData } from '@wildshard/format/json';
 import { ProjectedState,type ProjectedSnapshot,type ReturnProgram } from '../population/returnProgram';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 
 function freeze(value: unknown): void {
   if (value !== null && typeof value === 'object') { Object.freeze(value);Object.values(value).forEach(freeze); }

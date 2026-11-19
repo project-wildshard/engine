@@ -1,6 +1,6 @@
 import { MathUtils, Vector3 } from 'three';
 import * as v from 'valibot';
-import { Rng } from '../core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { TickScheduler, type TickPoint } from '../app/scheduler';
 import { emitFault } from '../core/faults';
 

@@ -4,7 +4,7 @@ import {AnimalSim} from '../src/shared/engine/entities/AnimalSim';
 import {GrazerBrain, type GrazerObservation, type GrazerProfile} from '../src/server/engine/ai/grazer';
 import {GrazerBrain as OriginalGrazerBrain} from './fixtures/grazer-herd-original';
 import type {StrikeSpec} from '../src/shared/engine/ai/strikes';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {onFault, type Fault} from '../src/shared/engine/core/faults';
 import type {SimValue} from '../src/server/engine/sim';
 

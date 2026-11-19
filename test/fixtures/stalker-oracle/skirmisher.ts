@@ -2,7 +2,7 @@
 // Original SHA-256: 9e0fa34fe16f6035af43566baabe0c3edeef1a3394808335aca22952e1166ba8
 import type { AnimalSim } from '../../../src/shared/engine/entities/AnimalSim';
 import type { SimValue } from '../../../src/server/engine/sim';
-import type { Rng } from '../../../src/shared/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 
 /** Parameters for a circling melee archetype with idle wandering and subordinate scattering. */
 export interface SkirmisherSpec {

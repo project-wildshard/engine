@@ -81,7 +81,7 @@ import type * as THREE from 'three';
 import { Group, Object3D } from 'three';
 import type { ColliderDesc, ModelCategory, Pipeline } from '../world/registry';
 import type { Material } from '../../../shared/engine/physics/surface';
-import type { Rng } from '../../../shared/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { SkyRig as Sky } from '../world/skyRig';
 import type { Animal } from '../entities/AnimalView';
 import type { WeldBuild } from './weld';

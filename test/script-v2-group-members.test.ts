@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';
 import { ObservationColumnsV2, type V2ColumnOwners } from '../src/shared/engine/script/observationColumnsV2';
 import { parseGroupStepV2, GroupStepV2Schema } from '@wildshard/format/scriptGroupStepV2';

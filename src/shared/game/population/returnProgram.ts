@@ -5,7 +5,7 @@ import { DecisionModule } from '@wildshard/engine/script/decisionModule';
 import { scriptV1Layout, SCRIPT_V1_EVENTS, SCRIPT_V1_COMMANDS } from '@wildshard/format/scriptAbiV1';
 import { decisionScriptContract, parseDecisionScripts, SCRIPT_V1_REFERENCE_KINDS, type DecisionScriptRow } from '@wildshard/format/decisionScripts';
 import type {V2ActionBinding} from '@wildshard/format/scriptActionsV2';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import { emitFault } from '@wildshard/engine/core/faults';
 import type { GroupStepV2 } from '@wildshard/engine/script/groupStepV2';
 import type { PreparedScriptMemory } from '@wildshard/engine/script/moduleV2';

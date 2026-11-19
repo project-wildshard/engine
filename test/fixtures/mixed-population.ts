@@ -1,4 +1,4 @@
-import { Rng } from '../../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { MixedPopulationInput } from '@wildshard/engine/game/population/mixedRoster';
 import { readSpeciesPrograms } from '@wildshard/format/speciesPrograms';
 import { SIM_LEVEL } from './sim-level/level';

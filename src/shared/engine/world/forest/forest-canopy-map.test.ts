@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { CHUNK_HALF, CHUNK_SIZE } from '../../core/config';
-import { canopyMapOf } from './placement';
+import { canopyMapOf } from '@wildshard/format/forestPlacement';
 
 // G227 / tile streaming P1: the canopy density is a pure function of the trees, so the runtime forest and a baked tiled
 // ground share it. A crown is a disc of 0.16 x the tree's height, 0.7 at its centre, summed and capped at 1.

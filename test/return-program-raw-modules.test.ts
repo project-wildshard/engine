@@ -1,5 +1,5 @@
 import {weatherRaw,weatherWitness,weatherModuleBytes,nightParameters} from './fixtures/weatherInlineWitness';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {parseReturnProjectionV2} from '@wildshard/format/returnProjectionV2';
 import {expect,test,vi} from 'vitest';
 import {Scope} from '../src/shared/engine/app/scope';

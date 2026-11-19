@@ -25,7 +25,7 @@ import type { RowBodiesView } from '@wildshard/engine/entities/RowBodies';
 import type { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { modelContext, type ModelContext } from '@wildshard/engine/models/model';
 import { parsePrivateScene } from '@wildshard/format/clientChannels';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { buildYield } from '@wildshard/engine/core/workSlice';
 import { gpuOnlyAttributes } from '@wildshard/engine/core/gpuOnly';

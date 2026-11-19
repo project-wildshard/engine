@@ -18,7 +18,7 @@ import { packRoadSignPixels } from './roadSignPixels';
 import { paintRoadSignCanvas, roadSignPaintLayout, roadSignLineKey as lineKey, SIGN_LINE_W as LINE_W, SIGN_LINE_H as LINE_H, type RoadSignSource } from './roadSignPaint';
 import { ownRoadMesh, type RoadMapShare } from './roadResources';
 import { roadSignScale } from './roadSignScale';
-import { ROAD_SKY } from './frameModel';
+import { ROAD_SKY } from '@wildshard/format/roadLight';
 import { coverageMaterial, coverageTable, gpuOnlyTextureBytes, uniformPart, type CoverageColours, type SolidPart } from './roadSolid';
 import { bytePlan, cullIntoSteps, gpuOnlyRoad, meshBytesSteps, type CullSource, type RoadCuller } from './roadCull';
 import { allocateRenderSteps, type PlatformRenderAdmission } from './renderResidency';

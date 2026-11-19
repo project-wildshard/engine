@@ -10,7 +10,7 @@ import type { ShardContext } from '../plugin/context';
 import { installBossEncounter, type Boss } from '../Boss';
 import type { BossBar } from '@wildshard/engine/ui/BossBar';
 import type { Game } from '@wildshard/engine/core/Game';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { Player } from '@wildshard/engine/player/Player';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { ReturnProgramSchema } from '@wildshard/format/namedJsonContracts';

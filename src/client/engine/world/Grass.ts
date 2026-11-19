@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SEED } from '../../../shared/engine/core/config';
-import { Rng } from '../../../shared/engine/core/rng';
-import { Noise2D, smoothstep, lerp } from '../../../shared/engine/core/noise';
+import { Rng } from '@wildshard/format/seededRng';
+import { Noise2D, smoothstep, lerp } from '@wildshard/format/noise';
 import { heightAt, normalAt, splatAt, inChunk, pondMask, waterLevel, bindHeightfield, captureHeightfield } from '../../../shared/engine/world/Heightfield';
 import { attachFogUniforms } from './Atmosphere';
 import { windUniforms } from './TreeFactory';

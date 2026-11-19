@@ -3,7 +3,7 @@ import * as v from 'valibot';
 import { app } from '@wildshard/engine/app/runtime';
 import { CHUNK_HALF, SEED } from '@wildshard/engine/core/config';
 import { practiceRoom } from '@wildshard/engine/core/practiceRoom';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { TIER } from '@wildshard/engine/core/tier';
 import { floorBelow } from '@wildshard/engine/physics/query';
 import { pondMask, streamAt } from '@wildshard/engine/world/Heightfield';

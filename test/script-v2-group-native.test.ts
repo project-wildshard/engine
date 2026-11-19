@@ -4,7 +4,7 @@ import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { Scope } from '../src/shared/engine/app/scope';
 import { Events } from '../src/shared/engine/events/events';
 import { AggressionDirector, AggressionService } from '../src/shared/engine/ai/director';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { GroupStepV2, prepareGroupNativeV2, type GroupStepNativeOwnersV2, type GroupStepOperationV2 } from '../src/shared/engine/script/groupStepV2';
 import type { V2ColumnOwners } from '../src/shared/engine/script/observationColumnsV2';
 import { parseGroupStepV2, GroupStepV2Schema, groupStepLayoutV2 } from '@wildshard/format/scriptGroupStepV2';

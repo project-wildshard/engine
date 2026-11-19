@@ -21,7 +21,7 @@ import * as v from 'valibot';
 import { leadSnapshot, decodeSimSnapshot } from '@wildshard/engine/sim/snapshot';
 import { SCRIPT_LIMITS } from '@wildshard/format/scriptLimits';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
-import { headlessSections } from '../../shared/host/headlessSections';
+import { headlessSections } from '@wildshard/format/headlessSections';
 
 /** A plain-Node authoritative session. Failed ticks quarantine the isolate and retain the previous exact checkpoint. */
 export class HeadlessSimulation {

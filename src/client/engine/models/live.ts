@@ -17,7 +17,7 @@
  */
 import { app } from '../app/runtime';
 import * as THREE from 'three';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { DrawnAs, ModelEntry, Pipeline, WorldRegistry } from '../world/registry';
 import { withTier } from '../explore/tiers';
 import type { Animal } from '../entities/AnimalView';

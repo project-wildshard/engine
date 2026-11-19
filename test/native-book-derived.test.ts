@@ -4,7 +4,7 @@ import { HullLookBook } from '../src/client/game/looks/speciesBook';
 import { SpeciesService } from '../src/client/engine/entities/species/look';
 import { hasSpecies } from '../src/shared/engine/entities/species/registry';
 import { Scope } from '../src/shared/engine/app/scope';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { SpeciesRow } from '../src/server/engine/ai/species';
 import type { EngineRows } from '@wildshard/engine/level/context';
 import fixture from './fixtures/native-book-derived.json';

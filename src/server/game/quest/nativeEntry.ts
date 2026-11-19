@@ -1,5 +1,5 @@
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
-import type { InteractTable } from '@wildshard/engine/world/interact/types';
+import type { InteractTable } from '@wildshard/format/interactTable';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { NativeInventory } from '../../../shared/game/inventoryLaw';
 import { ItemCatalogue } from '../../../shared/game/loadout/itemCatalogue';

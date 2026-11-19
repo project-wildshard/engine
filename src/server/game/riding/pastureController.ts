@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { Vector3 } from 'three';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { PackPrey } from '@wildshard/engine/ai/pack';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { ReturnProgram } from '../../../shared/game/population/returnProgram';
 
 interface NativeRaidPackPolicy<A> {

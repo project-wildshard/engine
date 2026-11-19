@@ -2,13 +2,13 @@
  * The engine's tileable cloud fbm (SF67, E461): 512² six-octave simplex noise sampled on a torus, so both axes wrap
  * without seams. One grey byte per texel, rows top to bottom (a canvas's order).
  *
- * It is a pure function of this file and `core/noise.ts`, so `scripts/bake-cloud-field.mjs` writes it once to
+ * It is a pure function of this file and `@wildshard/format/noise`, so `scripts/bake-cloud-field.mjs` writes it once to
  * `CLOUD_FIELD_URL` (boot/bakedApi.ts) (bake-check fails when the bytes go stale) and a level that declares that file in its boot gets the
  * texture without the ~400 ms task (4× CPU) the march costs; any other page marches it here, byte for byte the same in V8.
  *
  *   const grey = cloudFieldPixels();            // Uint8ClampedArray, CLOUD_FIELD_N² bytes
  */
-import { Noise2D } from '../../../shared/engine/core/noise';
+import { Noise2D } from '@wildshard/format/noise';
 
 export const CLOUD_FIELD_N = 512;
 

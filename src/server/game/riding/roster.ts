@@ -2,7 +2,7 @@ import type { FlockBrain } from '@wildshard/engine/ai/flock';
 import type { AnimalSim, AnimalSimSpec } from '@wildshard/engine/entities/AnimalSim';
 import { StalkerBrain } from '@wildshard/engine/ai/stalker';
 import type { HuntBody } from '@wildshard/engine/ai/hunt';
-import { Rng, type RngState } from '@wildshard/engine/core/rng';
+import { Rng, type RngState } from '@wildshard/format/seededRng';
 import type { SimHost } from '@wildshard/engine/sim';
 import { NativeActors } from '../population/actors';
 import { creatureFloor, nativeCreatureRecipes } from '../shardfile/homeKeeper';

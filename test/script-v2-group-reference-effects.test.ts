@@ -2,7 +2,7 @@ import { beforeAll, expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { FlockBrain } from '../src/shared/engine/ai/flock';
 import { CrowdTargets } from '../src/shared/game/shardfile/crowdRuntime';
 import { GroupStepV2, type GroupStepReferenceV2 } from '../src/shared/engine/script/groupStepV2';

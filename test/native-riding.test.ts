@@ -21,7 +21,7 @@ import { zlibSync } from 'fflate';
 import { createHash } from 'node:crypto';
 import { Vector3 } from 'three';
 import { expect,test } from 'vitest';
-import { Rng as FixtureRandom } from '../src/shared/engine/core/rng';
+import { Rng as FixtureRandom } from '@wildshard/format/seededRng';
 import fixtureBrains from './fixtures/engine-lift/brains.json' with { type: 'json' };
 import { NALATI_RIDING_PROGRAMS as programs } from './fixtures/engine-lift/pins';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
@@ -173,7 +173,7 @@ test('an input lock holds the walk and the reins through a save, and a respawn r
 
 test('G478 orchard fixture owns companion allocation, retirement and native taming inputs', async () => {
   const { fixtureNativeRoster } = await import('./fixtures/native-roster');
-  const { Rng } = await import('@wildshard/engine/core/rng');
+  const { Rng } = await import('@wildshard/format/seededRng');
   const { NativeActors } = await import('../src/server/game/population/actors');
   const { BondedMountRoster } = await import('@wildshard/engine/game/riding/roster');
   const { installNativeTaming, nativeTamingControls } = await import('@wildshard/engine/game/riding/nativeTaming');
@@ -236,7 +236,7 @@ test('G478 orchard fixture owns companion allocation, retirement and native tami
 
 test('orchard native manager drives the admitted roster at ten Hz across body frames', async () => {
   const { fixtureNativeRoster } = await import('./fixtures/native-roster');
-  const { Rng } = await import('@wildshard/engine/core/rng');
+  const { Rng } = await import('@wildshard/format/seededRng');
   const { NativeManager, NativePopulationDriver } = await import('@wildshard/engine/game/population/nativeManager');
   const { createNativeCreatureRoster } = await import('@wildshard/engine/game/shardfile/homeKeeper');
   const { nativeEliteBindings: eliteBindings } = await import('@wildshard/engine/ai/eliteRoster');
@@ -272,7 +272,7 @@ test('orchard native manager drives the admitted roster at ten Hz across body fr
 
 test('orchard deferred actors share allocator, stream and native retirement ownership', async () => {
   const { fixtureNativeRoster } = await import('./fixtures/native-roster');
-  const { Rng } = await import('@wildshard/engine/core/rng');
+  const { Rng } = await import('@wildshard/format/seededRng');
   const { createNativeCreatureRoster, NativeDeferredRoster } = await import('@wildshard/engine/game/shardfile/homeKeeper');
   const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
   const host = createSimHost({ ...SIM_LEVEL, entities: [], quests: [] }, { rapier }), random = new Rng(71), control = new Rng(71);
@@ -302,7 +302,7 @@ test('orchard wildlife frame continues real foragers and tramples through numeri
   const { ForagerPopulation } = await import('@wildshard/engine/ai/ambientForager');
   const { ForagerPopulationSchema } = await import('@wildshard/format/ambientLife');
   const { NativeWildlifeFrame, NativeWildEnvironment } = await import('@wildshard/engine/game/population/nativeManager');
-  const { GrassField } = await import('@wildshard/engine/game/systems/looks/grassField');
+  const { GrassField } = await import('@wildshard/format/grassField');
   const { TrampleField } = await import('@wildshard/engine/game/systems/looks/trampleField');
   const { default: foragerRow } = await import('./fixtures/engine-lift/foragers.json');
   const { bindFlatTerrain } = await import('@wildshard/engine/test/terrain');
@@ -337,14 +337,14 @@ test('orchard wildlife frame continues real foragers and tramples through numeri
 
 test('orchard fixture installs the complete native population through data rows', async () => {
   const { fixtureNativeRoster } = await import('./fixtures/native-roster');
-  const { Rng } = await import('@wildshard/engine/core/rng');
+  const { Rng } = await import('@wildshard/format/seededRng');
   const { PackBrain } = await import('@wildshard/engine/ai/pack');
   const { nativeGroupBrain } = await import('@wildshard/format/groupBrains');
   const { NativeGroupCollection } = await import('@wildshard/engine/game/shardfile/groupRuntime');
   const { NativeWildEnvironment } = await import('@wildshard/engine/game/population/nativeManager');
   const { installNativePopulation, nativePopulationOf } = await import('@wildshard/engine/game/riding/nativePopulation');
   const { nativeEliteBindings: eliteBindings } = await import('@wildshard/engine/ai/eliteRoster');
-  const { GrassField } = await import('@wildshard/engine/game/systems/looks/grassField');
+  const { GrassField } = await import('@wildshard/format/grassField');
   const { TrampleField } = await import('@wildshard/engine/game/systems/looks/trampleField');
   const { ForagerPopulation } = await import('@wildshard/engine/ai/ambientForager');
   const { ForagerPopulationSchema } = await import('@wildshard/format/ambientLife');

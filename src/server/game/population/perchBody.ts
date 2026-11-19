@@ -1,7 +1,7 @@
 import { MixedPopulationSchema, type MixedPopulationRows } from '@wildshard/format/mixedPopulation';
 import type { AnimalRigContext } from '@wildshard/engine/entities/animalRig';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { PerchHunterPorts } from '@wildshard/engine/ai/guardianPolicy';
 import { Scope } from '@wildshard/engine/app/scope';
 import { numericCreaturePose } from '../../../shared/game/plugin/channelPrograms';

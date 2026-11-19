@@ -6,7 +6,7 @@ import { legacyDouble } from '../src/test/engine/FakeGame';
 import { sharedModelContext, specimenReady } from '../src/client/engine/models/model';
 import { SkyRig } from '../src/client/engine/world/skyRig';
 import { WorldRegistry } from '../src/client/engine/world/registry';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';
 import { emptyShardfile } from '../src/shared/host/author';
 import { hashImmutableBytes } from '../src/shared/host/immutable';

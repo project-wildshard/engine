@@ -18,7 +18,7 @@ import type { GraphLiteral } from '@wildshard/format/materialGraph';
 import { parseWaterSurface, type WaterSurfaceRow } from '@wildshard/format/water';
 import { CHUNK_HALF, CHUNK_SIZE } from '@wildshard/engine/core/config';
 import { waveClock, waterExtent } from '@wildshard/engine/world/waves';
-import { smoothstep } from '@wildshard/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 
 /** a surface's compiled graph: its material and, for a row that feeds params or a floor, its writers */
 export interface WaterSurfaceLook {

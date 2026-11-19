@@ -3,14 +3,13 @@ import { MathUtils, Vector3 } from "three";
 import * as v from "valibot";
 import * as npcs from '@wildshard/format/npcs';
 import * as graphContracts from '@wildshard/format/questGraph';
-import * as interactTable from '@wildshard/format/interactTable';
 
 import type { NpcDef } from "@wildshard/engine/quest/core";
 import type { SimHost } from "@wildshard/engine/sim";
 import { DeclaredQuests } from "../quest/declared";
 import { questBooks } from '@wildshard/engine/quest/players';
 import { playerInteractionRules, bindHeadlessPrompts, createHeadlessPromptPicker, type HeadlessPrompt, type PromptRegistration, eyeReaches, installInteractionRows, InteractionRules, type InteractionRowsData, type InteractionSpot } from "../quest/interactionRows";
-import type { InteractTable } from "@wildshard/engine/world/interact/types";
+import type { InteractTable } from "@wildshard/format/interactTable";
 import { bindInteractionState, type Flags } from "@wildshard/engine/world/interact/flags";
 import type { QuestData } from "@wildshard/format/quests";
 import { NativeQuestProps } from '../quest/nativeProps';
@@ -234,10 +233,6 @@ export function installQuestGraph(host: SimHost, rows: QuestGraphRows, ports: Qu
       const spot = spots[id]; if (spot === undefined) throw new Error(`Undeclared quest spot ${id}`); return eyeReaches(feet, spot);
     } };
 }
-
-/** Compile the flag effects of latched levers, pickups and benches from the engine's authored table: format's law
- * (SDK-SPLIT SP5c). Unsupported kinds refuse instead of losing effects. */
-export const compileQuestTable: typeof interactTable.compileQuestTable = interactTable.compileQuestTable;
 
 /** Preflight table/spot identity before borrowing the native interaction states.
  * Each value retains its actual captured spot. Iteration follows the table's

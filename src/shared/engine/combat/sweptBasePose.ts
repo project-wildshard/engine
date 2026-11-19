@@ -1,5 +1,5 @@
 import { MathUtils, Quaternion, Vector3 } from 'three';
-import { smoothstep } from '../core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import { sweptSwingPose, type BladeKey } from './sweptBlade';
 
 /**

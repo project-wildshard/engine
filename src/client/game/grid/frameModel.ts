@@ -15,7 +15,6 @@
  *   way round the day.
  */
 
-import * as roadLight from '@wildshard/format/roadLight';
 
 /** How wide (m) the frame's blend is at the cell edge, centred on the line: 8 m in, 8 m out. */
 export const FRAME_BAND = 16;
@@ -34,21 +33,6 @@ export const NEUTRAL_GRADE: RegionGrade = { exposure: 0, saturation: 1, contrast
 export const HIGHWAY_GRADE: RegionGrade = { exposure: 0, saturation: 0.8, contrast: 1, tint: [0.95, 0.99, 1.07] };
 /** The neutral road look: its grey-blue grade, and its air is the home horizon with half its colour taken out. */
 export const HIGHWAY_LOOK: { readonly grade: RegionGrade; readonly fogDesaturate: 0.5; } = { grade: HIGHWAY_GRADE, fogDesaturate: 0.5 } as const;
-/**
- * G165 (Jake: "A, road light over everything") and G242 (Jake's pick B, "grid dawn", `art/grid/round-26-road-sky/B-grid-dawn.jpg`):
- * the road's own sky and key light, which replace the page's while the player is on the road (`roadSky.ts`). One shader
- * dome, no textures: a dawn gradient (a peach horizon, a lavender band, a clear blue zenith), a thin cyan horizon line and a
- * faint cyan grid round the horizon echoing the HUD and the VR void; a low warm dawn sun. Colours are linear RGB.
- * - `air`: the road's air (the frame's fog colour on the road, which the far proxies haze into) and the dome's horizon;
- * - `mid` / `zenith`: the dome's lavender band and its zenith;
- * - `line` / `grid`: the cyan horizon line and grid, `gridStrength` the grid's opacity at the horizon;
- * - `void`: G630, the blue-violet past the grid floor (the dome below the horizon, the grid page's background), on the road
- *   and with a cell entered alike (the shipped 10-13 hero's);
- * - `sun`: the key light (compass degrees, its colour, its intensity) and the glow it puts in the dome;
- * - `hemi`, `env`, `fogSun`: the fill, the environment's intensity and the fog's in-scatter colour under it.
- */
-export const ROAD_SKY: typeof roadLight.ROAD_SKY = roadLight.ROAD_SKY;
-
 /** A grade with every field present (the frame's blended grade). */
 export interface FullGrade { readonly exposure: number; readonly saturation: number; readonly contrast: number; readonly tint: readonly [number, number, number] }
 

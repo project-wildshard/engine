@@ -4,7 +4,7 @@ import {Vector3} from 'three';
 import {createSimHost} from '../src/server/engine/sim';
 import {Bodies,RowBodySlots} from '../src/shared/engine/physics/bodies';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {perchFixture} from './fixtures/plain-perch';
 import {SIM_LEVEL} from './fixtures/sim-level/level';
 

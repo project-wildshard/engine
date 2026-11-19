@@ -1,6 +1,6 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { SocketCloseInfo } from '../../../shared/engine/net/socketClose';
 import type { Transport } from '../../../shared/engine/net/transport';
 import type { NetClient } from './client';

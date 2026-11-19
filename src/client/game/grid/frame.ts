@@ -49,7 +49,8 @@ import type { LookCellPost } from '@wildshard/engine/render/look';
 import { RoadSky, type RoadSkyPage } from './roadSky';
 import { FAR_RING, GRID_HAZE } from '../../../shared/game/grid/farProxy';
 import { bindFrameLook, type FrameLookContribution, type FramePost, type FrameSkyLayer, type RegionChain, type RegionPost } from './frameLook';
-import { NEUTRAL_GRADE, ROAD_SKY, dominantOwner, edgeDistance, frameFog, frameGrade, frameOwners, type FrameCell, type FullGrade, type RegionGrade, type RegionWeights } from './frameModel';
+import { NEUTRAL_GRADE, dominantOwner, edgeDistance, frameFog, frameGrade, frameOwners, type FrameCell, type FullGrade, type RegionGrade, type RegionWeights } from './frameModel';
+import { ROAD_SKY } from '@wildshard/format/roadLight';
 
 /** What the frame reads from the page: the scene and camera, the engine's composer and its grade effects (late-bound). */
 export interface GridFrameHost {

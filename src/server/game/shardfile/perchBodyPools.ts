@@ -4,7 +4,7 @@ import type {ShardRows} from '@wildshard/format/rows';
 import {Vector3,Euler,Quaternion} from 'three';
 import type {AnimalSim} from '@wildshard/engine/entities/AnimalSim';
 import type {SimHost} from '@wildshard/engine/sim';
-import type {Rng} from '@wildshard/engine/core/rng';
+import type {Rng} from '@wildshard/format/seededRng';
 import {Bodies,RowBodySlots} from '@wildshard/engine/physics/bodies';
 import {publishScriptBody} from '@wildshard/engine/sim/shardRows';
 import {volleyRow} from '../../../shared/game/shardfile/wirePrompts';

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { bindQuestTableSpots } from '../../../shared/game/plugin/quests';
 import { Flags, bindInteractionTransitions } from '@wildshard/engine/world/interact/flags';
-import type { InteractTable } from '@wildshard/engine/world/interact/types';
+import type { InteractTable } from '@wildshard/format/interactTable';
 
 test('quest spot intake preflights identity and lends live interaction laws without writes', () => {
   const flags = new Flags('spot-intake', false);

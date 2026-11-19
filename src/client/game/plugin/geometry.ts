@@ -1,10 +1,10 @@
-import { readWholePartition } from '../shardfile/wholeGeometryPieces';
-import type { WholeGeometryPiece as FormatWholeGeometryPiece } from '@wildshard/format/wholePartition';
+import { readWholePartition, type WholeGeometryPiece as FormatWholeGeometryPiece } from '@wildshard/format/wholePartition';
 import { materialColourGraph } from '@wildshard/engine/render/graph/colourFunction';
 import { isJsonData } from '@wildshard/format/json';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
 import { unzlibSync } from 'fflate';
-import { type NativeAttributeSchema as WholeAttribute, admitNativeWholeGeometry, halfAttribute } from '@wildshard/engine/models/nativeGeometry';
+import { admitNativeWholeGeometry, halfAttribute } from '@wildshard/engine/models/nativeGeometry';
+import type { NativeAttributeSchema as WholeAttribute } from '@wildshard/format/nativeGeometryChannels';
 import { fetchDeflatedBytes, fetchLaneBytes, unshuffleLanes as restoreLanes } from '@wildshard/engine/core/deflate';
 import { geometryBoundsSteps } from '@wildshard/engine/world/geometryBounds';
 import { BAKED_BYTES as codecBakedBytes, appendGeometry as codecAppendGeometry, bakedGeometryBytes as codecBakedGeometryBytes, pad4 as codecPad4, readBakedAttribute, readBakedGeometry as codecReadBakedGeometry, type BakedGeometryRow as CodecBakedGeometryRow, type BakedType as CodecBakedType } from './bakedGeometry';
@@ -29,7 +29,7 @@ import { ktx2File, prepareCompressedTexture } from "@wildshard/engine/core/ktx2"
 import { RepeatWrapping, Matrix4, Bone, FileLoader, SkinnedMesh, Texture, type AnimationClip, type Wrapping, type MinificationTextureFilter, type MagnificationTextureFilter, Box3, Sphere, BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, Uint16BufferAttribute, Vector3, BufferAttribute, InterleavedBufferAttribute, type Object3D, CanvasTexture, LinearMipmapLinearFilter, SRGBColorSpace, BoxGeometry, CylinderGeometry, ConeGeometry, SphereGeometry, TorusGeometry, IcosahedronGeometry, CapsuleGeometry, Shape, ExtrudeGeometry, Color, type MeshStandardMaterialParameters, type Material, InstancedMesh } from "three";
 import { applySurfaceLooks, type SurfaceInputs } from "../systems/looks/surfaceLooks";
 import type { SurfaceLook } from "@wildshard/format/surfaceLooks";
-import { Rng } from "@wildshard/engine/core/rng";
+import { Rng } from "@wildshard/format/seededRng";
 import type { SpeciesLook } from "@wildshard/engine/entities/species/look";
 import { NO_FUR } from "@wildshard/engine/entities/species/rigs";
 import { clipAnimate, stepCreatureLift, type SpeciesClips } from "../../../shared/game/plugin/animation";

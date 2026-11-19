@@ -27,7 +27,7 @@ import { Euler, Quaternion } from 'three';
 import { BodySlotsSchema, type BodySlotsData } from '@wildshard/format/bodySlots';
 import { parse } from 'valibot';
 import type { SimHost } from '../../../server/engine/sim';
-import type { Rng } from '../core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import { terrainHeight, terrainWaterLevel } from '../world/terrainHeight';
 import { waveHeight } from '../world/waves';
 

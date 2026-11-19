@@ -10,7 +10,7 @@ import type { SpeciesFlight } from '../../../shared/engine/ai/flight';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { SEED } from '../../../shared/engine/core/config';
 import { frameCost } from '../../../shared/engine/core/frameCost';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { creatureFloor } from '../../../shared/engine/entities/creatureFloor';
 import { EntityIds } from '../../../shared/engine/entities/ids';
 import { poseEvery } from '../../../shared/engine/entities/poseCadence';

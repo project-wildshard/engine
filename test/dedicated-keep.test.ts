@@ -10,7 +10,7 @@ import type { SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import type { SavedPlayer } from '../src/server/host/dedicated/world';
 import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { isOwnedId } from '../src/shared/game/loot/Owned';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { personalCoinTable, personalItemTable } from '../src/server/game/loot/personal';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
 import { roomBench, serverInput, type RoomBench } from './fixtures/dedicated/roomBench';

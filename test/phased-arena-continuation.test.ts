@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
 import {Vector3} from 'three';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {parseBossProfile} from '@wildshard/format/bossProfiles';
 import {bossFight,type PhasedBossBody} from '../src/server/game/plugin/bossPhase';
 import {parse,object,unknown} from 'valibot';

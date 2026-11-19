@@ -4,7 +4,7 @@ import type { NativeGroupCollection } from '../shardfile/groupRuntime';
 import * as v from 'valibot';
 import { ActorProjectionV2,type ActorProjectionOwner } from './actorProjectionV2';
 import { ForagerPopulation } from '@wildshard/engine/ai/ambientForager';
-import { GrassField } from '../../../shared/game/systems/looks/grassField';
+import { GrassField } from '@wildshard/format/grassField';
 import { TrampleField } from '../../../shared/game/systems/looks/trampleField';
 import { knockdownVelocity, PopulationRelations } from './relations';
 import { installPopulationSignals } from './signals';
@@ -22,7 +22,7 @@ import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { HuntBody } from '@wildshard/engine/ai/hunt';
 import { huntMemoryCodec } from '@wildshard/engine/ai/huntPattern';
 import { StalkerBrain } from '@wildshard/engine/ai/stalker';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { SimHost } from '@wildshard/engine/sim';
 import { emitFault } from '@wildshard/engine/core/faults';
 

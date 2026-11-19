@@ -16,7 +16,7 @@ import * as v from 'valibot';
 import { Euler, Vector3 } from 'three';
 import { publishScriptBody } from '@wildshard/engine/sim/shardRows';
 import { volleyRow } from '../../../shared/game/shardfile/wirePrompts';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { AnimalSim, AnimalSimSpec } from '@wildshard/engine/entities/AnimalSim';
 import type { HuntBody, HuntNav, HuntSpecies } from '@wildshard/engine/ai/hunt';
 import { Bodies, RowBodySlots, type BodyLaunchRow } from '@wildshard/engine/physics/bodies';

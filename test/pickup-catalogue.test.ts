@@ -10,7 +10,7 @@ import * as v from 'valibot';
 // oxlint-disable-next-line import/no-nodejs-modules -- Pin original raw geometry bytes independently of the file names.
 import { createHash } from 'node:crypto';
 import { Scope } from '../src/shared/engine/app/scope';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { modelContext, type ModelPart } from '../src/client/engine/models/model';
 import { SkyRig } from '../src/client/engine/world/skyRig';
 import { pickupLook } from '../src/shared/engine/world/interact/types';

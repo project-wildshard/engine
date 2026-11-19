@@ -3,7 +3,7 @@ import type { PastureCues } from '../../../shared/game/riding/pastureCues';
 import * as v from 'valibot';
 import { ATTACK_TURN, type HuntBody, type HuntNav } from '@wildshard/engine/ai/hunt';
 import type { StalkerBrain } from '@wildshard/engine/ai/stalker';
-import { Rng, type RngState } from '@wildshard/engine/core/rng';
+import { Rng, type RngState } from '@wildshard/format/seededRng';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { SimSnapshot } from '@wildshard/engine/sim/snapshot';
 import type { AnimalSim, AnimalSimSpec } from '@wildshard/engine/entities/AnimalSim';

@@ -1,6 +1,6 @@
 import {expect,test,vi} from 'vitest';
 import {Scope} from '../src/shared/engine/app/scope';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {V2_ACTION_OPS,type V2ActionBinding} from '@wildshard/format/scriptActionsV2';
 import {parseReturnProjectionV2} from '@wildshard/format/returnProjectionV2';
 import {ProjectedState,ReturnProgram} from '../src/shared/game/population/returnProgram';

@@ -1,7 +1,8 @@
 import { Vector3 } from 'three';
 import type { World } from '@wildshard/engine/core/bootstrap';
 import type { LevelContext } from '@wildshard/engine/level/context';
-import { KinematicMover, type MoverBox, type MoverPose } from '@wildshard/engine/physics/mover';
+import { KinematicMover } from '@wildshard/engine/physics/mover';
+import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { RopeChain } from '@wildshard/engine/physics/ropeChain';
 import { MoverLifecycle, moverEndState, type MoverEndEvent } from '@wildshard/engine/sim/moverLifecycle';

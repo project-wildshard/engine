@@ -7,7 +7,7 @@ import {listModel} from '../src/client/engine/models/live';
 import {withOwner} from '../src/shared/engine/app/ownership';
 import {Scope} from '../src/shared/engine/app/scope';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import * as deflate from '../src/client/engine/core/deflate';
 import {modelContext} from '../src/client/engine/models/model';
 import {SkyRig} from '../src/client/engine/world/skyRig';

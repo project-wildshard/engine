@@ -4,7 +4,7 @@ import '../../shared/engine/core/portableMathFirst';
 import { createRequire, flushCompileCache } from 'node:module';
 import { TickWorkerHost } from '../../server/host/tickWorkerHost';
 import type { Shardfile } from '../../shared/host/shardfile';
-import { headlessSections } from '../../shared/host/headlessSections';
+import { headlessSections } from '@wildshard/format/headlessSections';
 import { outputDescriptor } from '../../shared/game/shardfile/outputDescriptor';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/shardfileAssets';

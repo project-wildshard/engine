@@ -1,7 +1,7 @@
 import {expect,test} from 'vitest';
 import {TickScheduler} from '../app/scheduler';
 import {BodyBandClocks} from './bands';
-import {Rng} from '../core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 
 const actor=(index:number)=>({entityId:`animal:${index}`,position:{x:100,y:0,z:0}});
 test('fresh half-body wakes split work without changing decisions or their shared stream',()=>{

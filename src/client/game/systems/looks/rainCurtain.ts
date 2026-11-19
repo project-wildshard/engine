@@ -1,4 +1,4 @@
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { attachFogUniforms } from '@wildshard/engine/world/Atmosphere';
 import * as THREE from 'three';
 

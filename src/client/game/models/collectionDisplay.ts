@@ -2,7 +2,7 @@ import * as v from 'valibot';
 /** Client-only collection presentation over existing game/save owners. */
 import * as THREE from 'three';
 import { defineModel, modelContext, seedOf, type ModelContext, type ModelDef } from '@wildshard/engine/models/model';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { resourceScope } from '@wildshard/engine/app/resources';
 import { SlotGeometry } from '@wildshard/engine/models/slots';
 import { lowPolyLookMaterial } from '@wildshard/engine/world/lowpolyKit';

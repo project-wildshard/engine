@@ -3,7 +3,7 @@ import type { RigContract } from '../../../../client/engine/anim/rig';
 import { validateCreatureBones as validateDeclaredBones } from '@wildshard/format/skinData';
 import { WeightedTable } from '../../ai/weighted';
 import type * as THREE from 'three';
-import type { Rng } from '../../core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { DamageRequest } from '../../combat/pipeline';
 import type { HuntTuning } from '../../../../server/engine/ai/hunt';
 import type { Animal } from '../../../../client/engine/entities/AnimalView';
@@ -13,12 +13,6 @@ import type { SpeciesFlight } from '../../ai/flight';
 
 /**
  * Species registry — the pluggable contract every huntable species implements.
- *
- * A species lives in ONE file, `src/engine/entities/species/<kind>.ts`, that ends with `registerSpecies({...})`.
- * `AnimalFactory.ts` imports every file in this folder (`import.meta.glob`, eager) so dropping a new file in
- * is the whole integration: nothing in AnimalFactory / Animal / AnimalManager needs a new `case`.
- * Import the geometry helpers from `./loft` and the types + `registerSpecies` from `./registry` — never
- * from `../AnimalFactory` (that would be an import cycle: the factory imports you).
  *
  * See the header of `src/client/engine/entities/AnimalFactory.ts` for the full contract (coordinates, dims, fur, tints).
  */
@@ -343,7 +337,7 @@ export function validateCreatureBones(species: string, names: readonly string[])
   validateDeclaredBones(species, names);
 }
 
-/** Register a species (call once at module top level of `species/<kind>.ts`). Re-registering replaces it. */
+/** Register a species fixture for the legacy registry. Re-registering replaces it. */
 export function registerSpecies(def: SpeciesDef): SpeciesDef {
   validateCreatureBones(def.kind, def.rigContract.sockets);
   if (def.variants.length === 0) throw new Error(`species '${def.kind}' has no variants`);

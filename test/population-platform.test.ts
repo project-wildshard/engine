@@ -15,7 +15,7 @@ import { installPopulationRoster } from '../src/server/game/population/roster';
 import { HerdShelter,installNativeHerdShelter } from '../src/server/game/population/shelter';
 import { createNativeCreatureRoster } from '../src/server/game/shardfile/homeKeeper';
 import { installWeatherContinuation } from '../src/server/game/weather/continuation';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { RespawnQueue } from '../src/shared/game/population/respawn';

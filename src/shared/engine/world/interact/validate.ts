@@ -10,7 +10,7 @@
  * row count (griefing / perf: 256 rows, 64 per kind).
  */
 import { CHUNK_HALF } from '../../core/config';
-import { flagsRaised, flagsRead, type InteractDef, type InteractTable } from './types';
+import { flagsRaised, flagsRead, type InteractDef, type InteractTable } from '@wildshard/format/interactTable';
 
 export const LIMITS = { rows: 256, perKind: 64, localReach: 60, doorMax: 6, plateMax: 4 };
 

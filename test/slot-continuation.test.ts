@@ -1,7 +1,7 @@
 import {expect,test} from 'vitest';
 import * as v from 'valibot';
 import {SlotViewSchema} from '@wildshard/format/encounterRows';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {ReturnProgram} from '../src/shared/game/population/returnProgram';
 import {SlotEncounterLaw,type SlotActor} from '../src/shared/game/boss/slotLaw';
 import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';

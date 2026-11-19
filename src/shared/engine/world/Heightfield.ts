@@ -6,7 +6,7 @@ import { activeLevel, onLevelChange, selectedLevel } from '../level/selection';
 // The level's terrain shape. Pure functions so the same field drives the mesh,
 // player collision, tree placement and grass.
 //
-// The field itself is the selected level's `LevelSpec.ground.terrain` (compiled by src/shared/engine/world/terrainField.ts);
+// The field itself is the selected level's `LevelSpec.ground.terrain` (compiled by @wildshard/format/terrainField);
 // this module re-exports it under the names every consumer already imports. The exports are live `let` bindings
 // resolved when a level is configured (src/shared/engine/level/selection.ts) and again on every level change — no per-call
 // lookup, so heightAt() stays as cheap as before. Read before any level is configured, a function resolves the active

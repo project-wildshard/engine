@@ -1,10 +1,7 @@
 import { BufferAttribute, BufferGeometry, Float16BufferAttribute, InterleavedBufferAttribute, type Mesh, type TypedArray } from 'three';
 import * as v from 'valibot';
-import * as channelLaw from '@wildshard/format/nativeGeometryChannels';
+import { NativeAttributesSchema } from '@wildshard/format/nativeGeometryChannels';
 
-/** The stored channel table: format's law (SDK-SPLIT SP5b), the identical defining format schemas. */
-export const NativeAttributeSchema: typeof channelLaw.NativeAttributeSchema = channelLaw.NativeAttributeSchema;
-export const NativeAttributesSchema: typeof channelLaw.NativeAttributesSchema = channelLaw.NativeAttributesSchema;
 const NO_WORDS = new Uint16Array(0);
 /** MEMORY-GATES MG10: a half-float attribute over `words` itself. three's Float16BufferAttribute constructor copies its
  *  array (`new Uint16Array(array)`), so every half channel made from words already in hand cost a second buffer and left

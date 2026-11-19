@@ -11,7 +11,7 @@ import {
 } from "../src/server/game/plugin/simulation";
 import { createSimHost } from "../src/server/engine/sim";
 import { snapshotSimHost } from "../src/shared/engine/sim/snapshot";
-import { Rng } from "../src/shared/engine/core/rng";
+import { Rng } from "@wildshard/format/seededRng";
 import { loadRapier } from "../src/shared/engine/physics/rapier";
 import { huntFixture } from "./fixtures/layer-hunt";
 

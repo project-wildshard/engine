@@ -8,7 +8,7 @@ import {
   prepareShardfileSimRestore,
   type ShardfileSimulation,
 } from "../src/server/game/plugin/simulation";
-import { Rng } from "../src/shared/engine/core/rng";
+import { Rng } from "@wildshard/format/seededRng";
 import { Bodies } from "../src/shared/engine/physics/bodies";
 import { loadRapier } from "../src/shared/engine/physics/rapier";
 import { leadCommands, leadPlayer } from "../src/shared/engine/sim/leadPlayer";

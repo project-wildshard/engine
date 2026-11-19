@@ -14,13 +14,11 @@ import { parse, type InferOutput } from 'valibot';
  *   grassBaseHeightAt(x, z)  metres (0 = bare: water, trail bed, rock, snow, yurt floor) — before trampling
  *   flowerPatchAt(x, z)      0..1 flower-drift strength (GrassField.sample channels: 1 tone, 3 species, 7 bloom)
  */
-export class GrassField extends grass.GrassField {}
-export type GrassFieldPorts = grass.GrassFieldPorts;
 
 /** The page's field: the installed terrain (live: a baked grid installed later is read from then on) and the active level's paint. */
 let layout: grass.GrassFieldLayout | null = null;
-function pageField(): GrassField {
-  return new GrassField({
+function pageField(): grass.GrassField {
+  return new grass.GrassField({
     seed: SEED, half: CHUNK_HALF, heightAt, normalAt: (x, z, eps) => normalAt(x, z, eps), splatAt: (x, z) => splatAt(x, z),
     trailDistance: (x, z) => trailDistance(x, z), cabinMask: (x, z) => cabinMask(x, z), pondMask: (x, z) => pondMask(x, z), waterLevel: () => waterLevel(),
     paint: (x, z, y, slope, out) => {
@@ -58,7 +56,7 @@ function meadowLayout(): grass.GrassFieldLayout | null {
   return layout;
 }
 /** the page field, the level-change listener installed on first use (as the field always has) */
-function page(): GrassField { meadowLayout(); return field; }
+function page(): grass.GrassField { meadowLayout(); return field; }
 
 /**
  * Grass height before trampling, metres (0 = no grass), on the page's field (GrassField.baseHeightAt). `td` =

@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { SkyRig as Sky } from './skyRig';
 import { patchSway, swayByHeight } from './wind';
 import { attachFogUniforms } from './Atmosphere';

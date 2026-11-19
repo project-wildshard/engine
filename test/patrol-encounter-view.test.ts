@@ -13,7 +13,7 @@ import { CueDirector } from '../src/client/game/audio/cueDirector';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
 import { PatrolEncounterView } from '../src/client/game/boss/encounterView';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
 import {withWeatherWitness} from './fixtures/weatherInlineWitness';
 

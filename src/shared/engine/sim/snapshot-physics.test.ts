@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Exact predecessor encoder byte pins in the Node test host.
 import { createHash } from 'node:crypto';
 import { expect, test } from 'vitest';
-import { Rng } from '../core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { MAX_REFERENCE_BYTES, encodePhysicsReferences, decodePhysicsReferences, validatePhysicsReferences } from './snapshotPhysics';
 
 test('minimum-match qualification reconstructs every byte across offsets, tails and native-sized repeated blocks', () => {

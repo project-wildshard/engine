@@ -3,7 +3,7 @@
 // server. Each table compiles once into columns; encode and decode are plain loops over those columns.
 import type { ClassBindings, WireClass } from '@wildshard/wire/grammar';
 import { v0Field } from '@wildshard/wire/v0Field';
-import { fnv1a32 } from '../core/rng';
+import { fnv1a32 } from '@wildshard/format/seededRng';
 import { bitsToFloat, floatToBits } from './bits';
 
 /** Who receives a field. `initial` goes once in the spawn event, then never again (COND_InitialOnly). */

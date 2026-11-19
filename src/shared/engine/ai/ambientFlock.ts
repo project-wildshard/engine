@@ -10,7 +10,7 @@
  * back into a loop (`guide.after`) or hidden. Driftwood's gulls and Pine Hollow's breadcrumb ravens are its rows.
  *
  */
-import { Rng } from '../core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { CirclingFlyer, type AmbientWheelOrbit } from './ambientFlight';
 import { terrainHeight } from '../world/terrainHeight';
 import type { AmbientFlockData } from '@wildshard/format/ambientLife';

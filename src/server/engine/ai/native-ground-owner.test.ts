@@ -1,6 +1,6 @@
 import { expect,test } from 'vitest';
 import { Vector3 } from 'three';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { HuntingStalkerCore,type HuntGround, type HuntConfig } from '../../../shared/engine/ai/huntPattern';
 import type { AnimalSim } from '../../../shared/engine/entities/AnimalSim';
 import { decodeTerrainTile,encodeTerrainTile,bilinearTerrainSamplers,type TerrainTileData } from '@wildshard/format/terrainTileBytes';

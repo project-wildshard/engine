@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { creatureRank } from '@wildshard/format/creatureRanks';
-import { Rng, fnv1a32 } from '@wildshard/engine/core/rng';
+import { Rng, fnv1a32 } from '@wildshard/format/seededRng';
 import { WeightedTable, type TableDrop } from '@wildshard/engine/ai/weighted';
 import type { SimHost } from '@wildshard/engine/sim';
 import { bountyKey } from '../../../shared/game/loot/Bounty';

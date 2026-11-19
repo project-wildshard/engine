@@ -2,7 +2,7 @@ import {readFileSync} from 'node:fs';
 import {expect, test, vi} from 'vitest';
 import {Vector3} from 'three';
 import {parsePerchHunter} from '@wildshard/format/brains';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {createSimHost} from '../src/server/engine/sim';
 import {PerchHunterBrain} from '../src/server/engine/ai/perchHunter';

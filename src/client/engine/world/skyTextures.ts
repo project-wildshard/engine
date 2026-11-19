@@ -7,8 +7,8 @@
  *   const bands = giantTexture();                       // 512 × 256 gas-giant bands, seeded
  */
 import * as THREE from 'three';
-import { Noise2D } from '../../../shared/engine/core/noise';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Noise2D } from '@wildshard/format/noise';
+import { Rng } from '@wildshard/format/seededRng';
 import { CLOUD_FIELD_N } from './cloudField';
 
 /** A canvas's 2D context, or a thrown error naming the sky. */

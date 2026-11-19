@@ -5,7 +5,7 @@ import { practiceRoomState } from '@wildshard/engine/core/practiceRoomState';
 import type { ModelContext, ModelDef } from '@wildshard/engine/models/model';
 import type { RowBodiesView } from '@wildshard/engine/entities/RowBodies';
 import type { Renderer } from '@wildshard/engine/render/renderer';
-import type { QuestPlace } from '@wildshard/engine/world/interact/types';
+import type { QuestPlace } from '@wildshard/format/interactTable';
 import type { Flags } from '@wildshard/engine/world/interact/flags';
 import type { WorldRegistry } from '@wildshard/engine/world/registry';
 import type { SkyRig } from '@wildshard/engine/world/skyRig';

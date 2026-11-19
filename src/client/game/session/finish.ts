@@ -3,7 +3,7 @@ import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { captureHeightfield } from '@wildshard/engine/world/Heightfield';
 import { sustainedFrames } from '@wildshard/engine/core/sustainedFrames';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { gridCells } from '../plugin/context';
 import { initialHomeMetadataRequired } from '../grid/homeMetadata';
 import { reenterGrid, reenterGridInPage, reenterShard, showGridDestination } from '../grid/pageEntry';

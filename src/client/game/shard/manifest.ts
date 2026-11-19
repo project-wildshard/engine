@@ -8,7 +8,7 @@ import { basinBody,type WaterBody } from '@wildshard/engine/world/water/body';
 import type { ShardPlugin } from "../plugin/context";
 import type { Ktx2Table } from '@wildshard/engine/boot/gpuFiles';
 import type { SwordArms, SwordFraming, SwordMoveSet, SwordRig } from '@wildshard/engine/combat/view/melee';
-import type { Noise2D } from '@wildshard/engine/core/noise';
+import type { Noise2D } from '@wildshard/format/noise';
 import type { HuntTuning } from '@wildshard/engine/ai/hunt';
 import type { ExploreSpec } from '@wildshard/engine/level/data';
 import type { LevelSpec, EngineMechanism, TierOverrides, BootSpec, LoadoutSpec } from '@wildshard/engine/level/spec';
@@ -26,7 +26,7 @@ import type { SkyRig as Sky } from '@wildshard/engine/world/skyRig';
 import type { TreeFactory } from '@wildshard/engine/world/TreeFactory';
 import { flatTerrainField } from '@wildshard/engine/world/groundField';
 import { createBakedTerrainField } from '@wildshard/engine/world/bakedTerrainField';
-import { buildTerrainMetadata } from '@wildshard/engine/world/terrainField';
+import { buildTerrainMetadata } from '@wildshard/format/terrainField';
 import { declaredWaterBody } from '@wildshard/engine/world/water/declared';
 import { ForestRowsSchema, GroundRowsSchema, PondClipSchema,type GroundRows } from '@wildshard/format/terrain';
 import { currentPageMode } from '../../../shared/game/grid/pageMode';
@@ -89,7 +89,7 @@ export interface TerrainNoise { n: Noise2D; n2: Noise2D }
 
 /**
  * The compiled terrain: pure functions over (x, z). Built once per def by `buildTerrain()` in
- * `src/shared/engine/world/terrainField.ts`; `src/shared/engine/world/Heightfield.ts` re-exports the active one so the many
+ * `@wildshard/format/terrainField`; `src/shared/engine/world/Heightfield.ts` re-exports the active one so the many
  * consumers (Terrain, Forest, Grass, Props, Cabin, Water, Player, animals…) call these directly.
  */
 export interface ChunkTerrain {

@@ -10,7 +10,7 @@ import { NetRoom } from '../src/server/engine/net/room';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
 import { createSimHost,type SimHost } from '../src/server/engine/sim';
 import { MoverScriptDriver,type MoverView } from '../src/server/game/plugin/mover';
-import type { MoverPose } from '../src/shared/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import { loadRapier,type Rapier } from '../src/shared/engine/physics/rapier';
 import { emptyShardfile } from '../src/shared/host/author';
 import { directLoopback } from '../src/test/engine/netLoopback';

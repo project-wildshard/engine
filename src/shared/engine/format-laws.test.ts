@@ -5,13 +5,10 @@ import { createRequire } from 'node:module';
 import { expect, test } from 'vitest';
 import * as forestLaw from '@wildshard/format/forestPlacement';
 import * as colliderLaw from '@wildshard/format/colliders';
-import * as seeded from '@wildshard/format/seededRng';
-import * as noiseLaw from '@wildshard/format/noise';
-import * as fieldLaw from '@wildshard/format/terrainField';
 import { fixtureBytes } from '../../test/engine/nativeBytes';
-import { Rng, RngService, fnv1a32, type RngPort, type RngState } from './core/rng';
-import { Noise2D } from './core/noise';
-import { buildTerrain } from './world/terrainField';
+import { RngService } from './core/rng';
+import { Rng, fnv1a32, type RngPort, type RngState } from '@wildshard/format/seededRng';
+import { buildTerrain } from '@wildshard/format/terrainField';
 import { placeForest } from './world/forest/placement';
 import { loadRapier } from './physics/rapier';
 import { Physics } from './physics/Physics';
@@ -38,7 +35,7 @@ function draw(rng: RngPort): Draws {
     pick: rng.pick(['a', 'b', 'c', 'd', 'e']), chance: rng.chance(0.37), weighted: rng.weighted([['x', 1], ['y', 2.5], ['z', 0.5]]), state: rng.snapshot() };
 }
 
-test('the engine RNG and the sim streams replay format golden draws', () => {
+test('the sim streams replay the defining seeded RNG law', () => {
   expect(golden.cases.length).toBeGreaterThanOrEqual(7);
   for (const want of golden.cases) {
     const plain = new Rng(want.seed);
@@ -49,17 +46,9 @@ test('the engine RNG and the sim streams replay format golden draws', () => {
     expect(draw(scrambled)).toEqual(want.scrambled);
     expect(draw(scrambled.fork(7))).toEqual(want.scrambledFork);
     const streams = new RngService(want.seed);
-    expect(draw(streams.stream('gameplay'))).toEqual(draw(new seeded.Rng(seeded.fnv1a32(`${String(want.seed)}:gameplay`))));
+    expect(draw(streams.stream('gameplay'))).toEqual(draw(new Rng(fnv1a32(`${String(want.seed)}:gameplay`))));
   }
   for (const { text, hash } of golden.hashes) expect(fnv1a32(text)).toBe(hash);
-});
-
-test('noise and the terrain field are format laws, not engine copies', () => {
-  expect(Object.getPrototypeOf(Noise2D)).toBe(noiseLaw.Noise2D);
-  expect(Object.getPrototypeOf(Rng)).toBe(seeded.Rng);
-  expect(buildTerrain).toBe(fieldLaw.buildTerrain);
-  const engine = new Noise2D(5), format = new noiseLaw.Noise2D(5);
-  for (let i = 0; i < 64; i++) expect(bits(engine.fbm(i * 1.37, i * -0.91))).toBe(bits(format.fbm(i * 1.37, i * -0.91)));
 });
 
 test('engine forest placement gives format trees, tints as THREE.Color', () => {

@@ -7,7 +7,7 @@ import { groundFixture, skirmisherTuning } from './fixtures/plain-ground';
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { SkirmisherBrain, type SkirmisherPorts } from '../src/server/engine/ai/skirmisher';
 import { GuardianBrain, type GuardianPorts } from '../src/server/engine/ai/guardian';
 

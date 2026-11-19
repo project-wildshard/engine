@@ -2,7 +2,7 @@ import { beforeAll, expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { HuntingStalkerCore, huntMemoryCodec, type HuntGround, type HuntNav } from '../src/shared/engine/ai/huntPattern';
 import type { GuardedHerdContext } from '../src/server/engine/ai/grazer';
 import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';

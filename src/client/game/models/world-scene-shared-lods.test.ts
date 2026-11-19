@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry, MeshBasicMaterial, Object3D } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import { modelContext } from '@wildshard/engine/models/model';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { bindWorldSceneModelSources, defineWorldSceneCatalogue } from './worldSceneCatalogue';
 import { parseWorldSceneModels, worldSceneModelResources } from '@wildshard/format/worldSceneModels';
 

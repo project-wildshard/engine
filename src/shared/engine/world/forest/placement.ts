@@ -6,14 +6,11 @@ import type { TreeSpec, ForestSpec, TerrainField } from '../../level/data';
  */
 import * as THREE from 'three';
 import * as forestLaw from '@wildshard/format/forestPlacement';
+import type { PlantSpec } from '@wildshard/format/forestPlacement';
 import { TREE_COUNT, SEED } from '../../core/config';
 import { heightAt, normalAt, trailDistance, cabinMask, pondMask } from '../Heightfield';
 import { activeLevel } from '../../level/selection';
 import type { TreeSpecies, TreeSetVariant } from '../../../../client/engine/world/forest/treeSpecies';
-
-/** The canopy density map, the identical defining format function. */
-export const canopyMapOf: typeof forestLaw.canopyMapOf = forestLaw.canopyMapOf;
-export type PlantSpec = forestLaw.PlantSpec;
 
 export interface TreeInstance { x: number; y: number; z: number; r: number; variant: number; scale: number; rot: number; height: number; tint: THREE.Color; species?: TreeSpecies | undefined }
 

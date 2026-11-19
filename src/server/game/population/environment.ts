@@ -1,14 +1,15 @@
 import * as v from 'valibot';
 import { PopulationEnvironmentSchema, PopulationFieldSchema } from '@wildshard/format/populationEnvironment';
 import { readScalarLattice } from '@wildshard/engine/world/scalarChannel';
-import { GrassField, populationMeadow } from '../../../shared/game/systems/looks/grassField';
+import { populationMeadow } from '../../../shared/game/systems/looks/grassField';
+import { GrassField } from '@wildshard/format/grassField';
 import { TrampleField } from '../../../shared/game/systems/looks/trampleField';
 import { bakedSamplers } from '@wildshard/format/bakedTerrainSampling';
 import type { BakedGrid } from '@wildshard/format/bakedTerrainBytes';
 import { terrainTileHeight } from '@wildshard/format/terrainTileBytes';
 import type { HuntGround, HuntTree } from '@wildshard/engine/ai/hunt';
 import { TreeGrid } from '@wildshard/engine/world/forest/placement';
-import { buildTerrainMetadata } from '@wildshard/engine/world/terrainField';
+import { buildTerrainMetadata } from '@wildshard/format/terrainField';
 import { declaredWaterBody } from '@wildshard/engine/world/water/declared';
 import type { SimHost } from '@wildshard/engine/sim';
 

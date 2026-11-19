@@ -3,7 +3,7 @@ import { parseLootEconomy, parseBarterEconomy, type BarterEconomy, type LootEcon
 import { isOwnedId, isCosmetic, type OwnedId, type CosmeticId } from '../loot/Owned';
 import { Weather, type WeatherProfile } from '@wildshard/engine/world/weather';
 import { DayCycle } from '@wildshard/engine/world/dayCycle';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { ShardCompendium, EntryDef, EntryStats } from '../compendium/types';
 import type { JournalRow } from '@wildshard/format/compendiumRows';
 import type { ShardFolder } from '../shardfile/shardFolder';

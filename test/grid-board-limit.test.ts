@@ -1,7 +1,8 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture uses shipped Rapier bytes.
 import { readFileSync } from 'node:fs';
 import { afterEach, expect, test } from 'vitest';
-import { CHUNK_HALF, CONTENT_CAPS, ROAD_WIDTH } from '@wildshard/engine/core/config';
+import { CHUNK_HALF, CONTENT_CAPS } from '@wildshard/engine/core/config';
+import { ROAD_WIDTH } from '@wildshard/format/contentBounds';
 import { createSimHost, type SimHost, type SimLevel } from '../src/server/engine/sim';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { loadRapier } from '../src/shared/engine/physics/rapier';

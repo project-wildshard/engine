@@ -2,12 +2,8 @@ import { Euler, Quaternion } from 'three';
 import type { Physics } from './Physics';
 import { groups } from './groups';
 import { tagCollider, tagOf } from './surface';
-import type * as moverPose from '@wildshard/format/moverPose';
+import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 
-/** A script-owned platform's local boxes and its published pose (Euler order YXZ): format's (SDK-SPLIT SP5c); the physics
- *  layer alone constructs Rapier descriptors. */
-export type MoverBox = moverPose.MoverBox;
-export type MoverPose = moverPose.MoverPose;
 /** A kinematic deck moves before the world step and carries the existing CharacterMotor without another collision path. */
 export class KinematicMover {
   readonly body: ReturnType<Physics['world']['getRigidBody']>;

@@ -15,7 +15,7 @@ import { SkyRig } from '../src/client/engine/world/skyRig';
 import { bindWorldSceneModelSources, defineWorldSceneCatalogue } from '../src/client/game/models/worldSceneCatalogue';
 import { parseWorldSceneModels, worldSceneModelResources } from '@wildshard/format/worldSceneModels';
 import { sharedModelContext } from '../src/client/engine/models/model';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { withOwner } from '../src/shared/engine/app/ownership';
 import { installWorldScenes } from '../src/client/game/shardfile/worldScenes';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';

@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { createCreatureSpawner } from '../src/server/game/plugin/brain';
 import { ReturnGate } from '../src/shared/game/population/respawn';
 import { manager as realManager, huntOf } from '@wildshard/engine/test/manager';

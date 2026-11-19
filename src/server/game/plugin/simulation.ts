@@ -49,7 +49,7 @@ import { createSimHost, type SimHost, type SimCommand, type SimHostPorts, type S
 import { buildPlatformSpawns } from "@wildshard/engine/ai/platform";
 import { addBakedTerrainCollider } from "@wildshard/engine/physics/terrainTiles";
 import { decodeTerrainTile, terrainTileHeight, type TerrainTileData } from "@wildshard/format/terrainTileBytes";
-import { fnv1a32 } from "@wildshard/engine/core/rng";
+import { fnv1a32 } from "@wildshard/format/seededRng";
 import { installScriptLane, type ScriptLanePort } from "@wildshard/engine/script/lane";
 import { publishOwned, publishShardState, sayFightView } from '@wildshard/engine/sim/shardRows';
 import type { EffectRules, ScriptEntity } from "@wildshard/engine/script/effects";
@@ -90,7 +90,7 @@ import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { MoverScriptDriver, playerGrounds, verifiedMoverModules, proveTerrainEntries, type TerrainEntryWalk, type DeclaredMoverComposition, type MoverRuntime } from "./mover";
 import { socketLiftEntries } from "@wildshard/format/socketLiftAssets";
 import { createClientChannels } from "../../../shared/game/plugin/channels";
-import type { MoverPose } from "@wildshard/engine/physics/mover";
+import type { MoverPose } from "@wildshard/format/moverPose";
 import { liftPrompt } from "../../../shared/game/shardfile/wirePrompts";
 import { portalLinkEntries, portalLinkRules } from "@wildshard/format/portalLinkAssets";
 import { validatePortalFloors } from "@wildshard/format/portalFloor";

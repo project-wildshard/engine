@@ -12,7 +12,7 @@ import type { Placed } from '@wildshard/engine/models/place';
 import type { LiveMarker } from '@wildshard/engine/quest/view';
 import type { Flags } from '@wildshard/engine/world/interact/flags';
 import type { Interactables } from '@wildshard/engine/world/interact/Interactables';
-import type { InteractTable, createQuestPlacements } from '@wildshard/engine/world/interact/types';
+import type { InteractTable, createQuestPlacements } from '@wildshard/format/interactTable';
 import type { QuestPageTalksRows } from '@wildshard/format/npcs';
 import { completionProjection, type CompletionProgress } from '../complete/declared';
 import { FolderFigureCatalogue } from '../models/figureCatalogue';

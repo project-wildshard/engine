@@ -16,7 +16,7 @@ import { registerItemRow } from '../src/shared/game/bag/itemCatalog';
 import { installShards } from '../src/client/game/shard/list';
 import { installTitleManifests } from '../src/client/game/shard/titleList';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { createNativeCreatureRoster } from '../src/server/game/shardfile/homeKeeper';
 import { fixtureNativeRoster } from './fixtures/native-roster';
 import { admitSpeciesBrains, installSpeciesHomes } from '../src/server/game/plugin/brain';

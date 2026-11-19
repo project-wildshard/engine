@@ -3,7 +3,7 @@ import { Vector3, MathUtils } from 'three';
 import type { AnimalSim } from '../entities/AnimalSim';
 import { HuntingStalkerCore, type HuntConfig, type HuntPorts } from './huntPattern';
 import type { AggressionDirector } from './director';
-import type { Rng } from '../core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import { emitFault } from '../core/faults';
 import type { SimValue } from '../../../server/engine/sim';
 import { isJsonData } from '@wildshard/format/json';

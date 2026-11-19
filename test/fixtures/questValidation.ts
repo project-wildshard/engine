@@ -1,5 +1,5 @@
 import { CHIP_MAX, type QuestDef } from '../../src/shared/engine/quest/core';
-import type { Cond } from '../../src/shared/engine/world/interact/types';
+import type { Cond } from '@wildshard/format/interactTable';
 
 // Historical contract oracle; production consumers use the data-driven owners.
 /** checks a quest def is sound: unique step ids, every step reachable (a done condition that is not trivially true) */

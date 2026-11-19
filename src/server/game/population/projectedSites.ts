@@ -1,4 +1,4 @@
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { ReturnProgram } from '../../../shared/game/population/returnProgram';
 
 /** Finite site observations. Coordinates and metadata are immutable authored data. */

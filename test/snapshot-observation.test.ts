@@ -5,7 +5,7 @@ import { createSimHost } from '../src/server/engine/sim';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { checkSimSnapshotWire, leadSnapshot, snapshotSimHostBytes, serializeSimSnapshot, type SimSnapshotBytes } from '../src/shared/engine/sim/snapshot';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { MAX_TICK_SNAPSHOT_CHARS } from '../src/shared/host/tickProtocol';
 
 let initial: SimSnapshotBytes;

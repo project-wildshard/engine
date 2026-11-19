@@ -1,36 +1,5 @@
 import type { BufferGeometry, Vector3 } from 'three';
 import type { ModelDef } from '../../../../client/engine/models/model';
-import * as table from '@wildshard/format/interactTable';
-/**
- * Interactables kit: the DATA schema (rows, conditions, flags, quest placements) is format's law (SDK-SPLIT SP5c, Q35),
- * `@wildshard/format/interactTable`, with its full description there. The runtime's looks and props stay here.
- */
-export type AltarDef = table.AltarDef;
-export type BarrelDef = table.BarrelDef;
-export type BeaconDef = table.BeaconDef;
-export type BenchDef = table.BenchDef;
-export type ChestDef = table.ChestDef;
-export type ChestItem = table.ChestItem;
-export type Cond = table.Cond;
-export type DoorDef = table.DoorDef;
-export type InteractDef = table.InteractDef;
-export type InteractPlacement = table.InteractPlacement;
-export type InteractTable = table.InteractTable;
-export type KeyDef = table.KeyDef;
-export type LeverDef = table.LeverDef;
-export type Place = table.Place;
-export type PlateDef = table.PlateDef;
-export type PoiId = table.PoiId;
-export type QuestPlace = table.QuestPlace;
-export type QuestPlaceAnchor = table.QuestPlaceAnchor;
-export type QuestPlacementPorts = table.QuestPlacementPorts;
-export const autoFlag: typeof table.autoFlag = table.autoFlag;
-export const bindInteractPlacements: typeof table.bindInteractPlacements = table.bindInteractPlacements;
-export const createQuestPlacements: typeof table.createQuestPlacements = table.createQuestPlacements;
-export const flagsRaised: typeof table.flagsRaised = table.flagsRaised;
-export const flagsRead: typeof table.flagsRead = table.flagsRead;
-export const readInteractPlacements: typeof table.readInteractPlacements = table.readInteractPlacements;
-export const TRANSIENT_PREFIXES: typeof table.TRANSIENT_PREFIXES = table.TRANSIENT_PREFIXES;
 
 /** Weak actions yield to another reachable prompt. */
 /** `wireId`, when a server knows this prompt: what a client's press of it sends. */

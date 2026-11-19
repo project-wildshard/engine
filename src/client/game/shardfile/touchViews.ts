@@ -8,7 +8,7 @@
 import { Euler, Quaternion, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Physics } from '@wildshard/engine/physics/Physics';
-import type { MoverPose } from '@wildshard/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import { groups } from '@wildshard/engine/physics/groups';
 import { tagCollider } from '@wildshard/engine/physics/surface';
 import type { Shardfile } from '@wildshard/format/shardSchema';

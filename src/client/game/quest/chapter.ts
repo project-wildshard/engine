@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import type { Vector3 } from 'three';
-import { bindInteractPlacements, createQuestPlacements, type InteractTable } from '@wildshard/engine/world/interact/types';
+import { bindInteractPlacements, createQuestPlacements, type InteractTable } from '@wildshard/format/interactTable';
 import { validateTable } from '@wildshard/engine/world/interact/validate';
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { isJsonData } from '@wildshard/format/json';

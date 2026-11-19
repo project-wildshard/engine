@@ -9,7 +9,7 @@ import { beforeAll,expect,test,vi } from 'vitest';
 import { createSimHost } from '../src/server/engine/sim';
 import { installPopulationRoster } from '../src/server/game/population/roster';
 import { installNativeSpawnScript,SpawnScript } from '../src/server/game/population/spawnScript';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { loadRapier,type Rapier } from '../src/shared/engine/physics/rapier';
 import { pineNightBytes as PINE_NIGHT_MODULE,pineSpecies as PINE_SPECIES_PROGRAMS,pineNight as rawNight } from './fixtures/engine-lift/pins';

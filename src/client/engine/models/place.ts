@@ -28,7 +28,7 @@ import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from '../render/ch
 import { setInstanceEnvelope } from '../render/instancedGeometry';
 import { cullCopiesPerCascade } from '../world/cascadeCull';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { currentOwner, enteredOwner, withOwner } from '../../../shared/engine/app/ownership';
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { ColliderDesc, DrawnAs, ModelEntry, WorldRegistry } from '../world/registry';

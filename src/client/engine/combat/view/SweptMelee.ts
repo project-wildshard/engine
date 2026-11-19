@@ -28,7 +28,7 @@ import type { MeleeProfile } from '../../../../shared/engine/combat/meleeProfile
 
 import * as THREE from 'three';
 
-import { smoothstep } from '../../../../shared/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 
 /** Optional swing, contact and cover reactions supplied by the owning recipe. */
 export interface MeleeEvents {

@@ -1,5 +1,5 @@
 import type { AnimalSim } from '../../../shared/engine/entities/AnimalSim';
-import type { Rng } from '../../../shared/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { SimValue } from '../sim';
 import { emitFault } from '../../../shared/engine/core/faults';
 

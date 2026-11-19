@@ -134,7 +134,6 @@
  "src/client/engine/ui/mapLabel.test.ts",
  "src/client/engine/world/coarse-mask-shared.test.ts",
  "src/client/engine/world/frame-camera.test.ts",
- "src/client/engine/world/geometry-bake-producer.test.ts",
  "src/client/engine/world/hidden-faces.test.ts",
  "src/client/engine/world/node-map-fillers.test.ts",
  "src/client/engine/world/painterly-compatibility.test.ts",

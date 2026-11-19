@@ -1,5 +1,5 @@
 /** Render-free visitor flight, feeding and perch poses driven entirely by flock rows. */
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { CirclingFlyer } from '@wildshard/engine/ai/ambientFlight';
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { AmbientFlock, type AmbientFlockBird,type AmbientFlockCall,type AmbientFlockPlayer,type AmbientPerch } from '@wildshard/engine/ai/ambientFlock';

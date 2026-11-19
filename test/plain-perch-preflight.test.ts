@@ -11,7 +11,7 @@ import {
 } from '../src/server/game/plugin/simulation'
 import { preflightPlainPerches } from '../src/server/game/shardfile/dataPerchBrains'
 import { Scope } from '../src/shared/engine/app/scope'
-import { Rng } from '../src/shared/engine/core/rng'
+import { Rng } from '@wildshard/format/seededRng'
 import { loadRapier } from '../src/shared/engine/physics/rapier'
 import { sha256 } from '../src/shared/game/plugin/moduleHash'
 import { ReturnProgram } from '../src/shared/game/population/returnProgram'

@@ -2,11 +2,9 @@ import { BufferAttribute, InstancedMesh, InterleavedBufferAttribute, Matrix4, ty
 import * as wholeV from 'valibot';
 import { admitNativeWholeGeometry } from '@wildshard/engine/models/nativeGeometry';
 import type { WholeGeometryPiece } from '../plugin/geometry';
-import * as partition from '@wildshard/format/wholePartition';
+import { readWholePartition } from '@wildshard/format/wholePartition';
 
 /** A whole piece's partition row and its run lists: format's law (SDK-SPLIT SP5b), the identical defining format reader. */
-export const readWholePartition: typeof partition.readWholePartition = partition.readWholePartition;
-export type WholePartitionRow = partition.WholePartitionRow;
 
 /** Decode independent render pieces without allocating the whole source's
  * arrays. Every local channel, source ordinal and original matrix is checked.

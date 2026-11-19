@@ -2,7 +2,7 @@ import { zlibSync } from 'fflate';
 import { afterAll, expect, test, vi } from 'vitest';
 import { packedCreatureBodies } from './geometry';
 import { HullLookBook } from '../looks/speciesBook';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 
 const file = `/assets/test/bodies-${'a'.repeat(64)}.bin`;
 const row = () => ({ file, bytes: 36, bodies: [{ kind: 'bird', variant: 'small',

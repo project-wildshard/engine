@@ -9,7 +9,7 @@ import type { CuePlayer } from './Cues';
 import type { AudioSampleMix, AudioMixExpr } from '@wildshard/format/audioProfiles';
 import { audioMixValue, requireAudioProfile, type AudioZoneProfile } from '../../../shared/engine/audio/audioProfiles';
 import { app } from '../app/runtime';
-import { Rng, fnv1a32 } from '../../../shared/engine/core/rng';
+import { Rng, fnv1a32 } from '@wildshard/format/seededRng';
 import { tap, ambientTick } from '../../../shared/engine/core/harnessTap';
 
 interface LoopVoice { gain: GainNode; pan: StereoPannerNode; stop: () => void }

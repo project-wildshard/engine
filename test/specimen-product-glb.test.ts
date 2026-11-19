@@ -9,7 +9,7 @@ import {Scope} from '../src/shared/engine/app/scope';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
 import {bindFlatTerrain} from '@wildshard/engine/test/terrain';
 import {TIER,initializeTier} from '../src/client/engine/core/tier';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {modelContext} from '../src/client/engine/models/model';
 import {SkyRig} from '../src/client/engine/world/skyRig';
 import {WorldRegistry} from '../src/client/engine/world/registry';

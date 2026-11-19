@@ -2,7 +2,7 @@ import { lowerMoverMotion } from '@wildshard/format/moverMotion';
 import { parseMovers } from '@wildshard/format/movers';
 import { expect, test } from 'vitest';
 import type { SystemSpec } from '../src/client/engine/app/systems';
-import type { MoverPose } from '../src/shared/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import { Scope } from '../src/shared/engine/app/scope';
 import { FollowedMovers } from '../src/client/game/plugin/followedMovers';
 import { installSteerRide, STEER_RECENTRE } from '../src/client/game/plugin/steerRide';

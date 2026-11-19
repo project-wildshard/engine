@@ -19,7 +19,7 @@ import { paintedSky, skyFaceOf, type PaintedSky, type SkyFace } from '../looks/k
 import { pageSky } from './pageSky';
 import type { WeatherHUD } from '@wildshard/engine/ui/HUD';
 import { wetFlight } from '@wildshard/engine/combat/ammo';
-import { smoothstep } from '@wildshard/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import { panFromYaw } from '@wildshard/engine/audio/util';
 import { audioVoicePatches } from '../audio/voicePatches';
 import { rainCurtainGeometry } from '../systems/looks/rainCurtain';

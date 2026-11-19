@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { BossScript } from '@wildshard/engine/ai/BossBrain';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { TargetAnimal, TargetHit } from '@wildshard/engine/combat/types';
 import type { AimTarget } from '@wildshard/engine/player/AimTargets';

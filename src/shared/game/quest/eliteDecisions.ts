@@ -3,7 +3,7 @@ import { readStrikeState } from '@wildshard/engine/ai/strikeState';
 import { strikeFromData } from '@wildshard/engine/ai/strikeRows';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { EliteCoreScript } from '../eliteSystem';
-import { Rng, type RngState } from '@wildshard/engine/core/rng';
+import { Rng, type RngState } from '@wildshard/format/seededRng';
 import type { EliteFeatureRows } from '@wildshard/format/eliteFeature';
 import { eliteStream } from './eliteStreams';
 import type { SpawnScript } from '../../../server/game/population/spawnScript';

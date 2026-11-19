@@ -1,6 +1,6 @@
 import {Vector3} from 'three';
 import type {AnimalSim} from '../../src/shared/engine/entities/AnimalSim';
-import type {Rng} from '../../src/shared/engine/core/rng';
+import type {Rng} from '@wildshard/format/seededRng';
 import type {FlockThreat} from '../../src/shared/engine/ai/flock';
 import type {ReturnProgram} from '../../src/shared/game/population/returnProgram';
 import type {V2CrowdColumns} from '../../src/shared/engine/script/observationColumnsV2';

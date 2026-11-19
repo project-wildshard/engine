@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { CanvasTexture, MeshLambertMaterial } from 'three';
-import { ROAD_SKY } from './frameModel';
+import { ROAD_SKY } from '@wildshard/format/roadLight';
 import { ROAD_OVERLAY_LIGHT, RoadOverlayLight } from './roadLook';
 
 // W1 grid-ready check (2026-10-14): Signal's dusk light and grade turned the 15 m of road asphalt forced into each entry

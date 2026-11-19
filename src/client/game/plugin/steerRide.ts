@@ -1,5 +1,5 @@
 import type { SystemSpec } from '@wildshard/engine/app/systems';
-import type { MoverPose } from '@wildshard/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import { steerStick } from '@wildshard/engine/sim/moverMotion';
 import type { FollowedMovers } from './followedMovers';
 import type { SteerRow } from './steerPrediction';

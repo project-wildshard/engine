@@ -3,7 +3,6 @@
 import { BufferAttribute, BufferGeometry, InstancedMesh, Material, Matrix4, Mesh, Object3D, Quaternion, Vector3 } from 'three';
 import { compileTubeCurve, parseClientChannels, type ClientChannelProgram } from '@wildshard/format/clientChannels';
 import { createClientChannels, type ClientTubeFrame, type ClientConnectorFrame, type ClientChannelObservation } from '../../../shared/game/plugin/channels';
-import * as moverPose from '@wildshard/format/moverPose';
 
 function clientInstance(value: unknown): value is InstancedMesh {
   return value instanceof InstancedMesh && value.geometry instanceof BufferGeometry
@@ -116,6 +115,3 @@ export function createClientChannelView(input: unknown, targets: ReadonlyMap<str
     stateless: lane.stateless && bindings.every(binding => binding.numeric !== null), toggles: bindings.some(binding => binding.numeric === null),
     ...(lane.connectors === undefined ? {} : { connectors: lane.connectors }) });
 }
-
-/** Copy only the fixed mover ABI's published observations, never its world or module memory: format's (SDK-SPLIT SP5c). */
-export const moverChannelValues: typeof moverPose.moverChannelValues = moverPose.moverChannelValues;

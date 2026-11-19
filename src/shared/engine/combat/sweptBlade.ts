@@ -1,5 +1,5 @@
 import { Vector3, type Quaternion } from 'three';
-import { smoothstep } from '../core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import type { TargetHit } from '../../../client/engine/combat/types';
 
 /**

@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { Vector3 } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import { app } from '@wildshard/engine/app/runtime';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { pinBrain } from '@wildshard/engine/ai/pinning';
 import { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import { followRing } from '../src/client/game/shardfile/tileDriver';

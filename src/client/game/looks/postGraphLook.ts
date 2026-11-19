@@ -21,7 +21,7 @@ import type { FogModel, GrassDriver, LookCellComposite, LookStrategy, SkyDressin
 import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import { headingTexture } from '@wildshard/engine/render/dataLook';
 import { ColourRampFog, panoramaTint } from '@wildshard/engine/world/Atmosphere';
-import { smoothstep } from '@wildshard/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import type { Events } from '@wildshard/engine/events/events';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { TIER, TIER_CONFIG, type Tier } from '@wildshard/engine/core/tier';

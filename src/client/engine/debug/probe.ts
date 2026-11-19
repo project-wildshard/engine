@@ -13,7 +13,7 @@ import type { Interactable } from '../../../shared/engine/world/interact/types';
 import { floorBelow } from '../../../shared/engine/physics/query';
 import { tagOf, type ColliderTag } from '../../../shared/engine/physics/surface';
 import type { Navmesh } from '../../../shared/engine/physics/navmesh';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { TIER } from '../core/tier';
 import { levelDebugRows } from '../ui/debugOptions';
 import { tap } from '../../../shared/engine/core/harnessTap';

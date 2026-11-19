@@ -4,7 +4,7 @@ import { afterEach, expect, test } from 'vitest';
 import { RespawnQueue } from '../src/shared/game/population/respawn';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { frozenReturnProgram as RETURN_PROGRAM } from './fixtures/frozen/returns';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { setTerrainHeight } from '../src/shared/engine/world/terrainHeight';
 
 const owners:Scope[]=[];afterEach(()=>{for(const owner of owners.splice(0))owner.dispose();});

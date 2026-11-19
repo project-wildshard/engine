@@ -1,5 +1,5 @@
 import { Euler, Quaternion, Vector3 } from 'three';
-import type { MoverBox } from '@wildshard/engine/physics/mover';
+import type { MoverBox } from '@wildshard/format/moverPose';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 
 /**

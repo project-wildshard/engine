@@ -1,4 +1,4 @@
-import { smoothstep } from '../../../shared/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import { uiScope, mountUi } from './ownership';
 import { app } from '../app/runtime';
 import { listenPage, listenTap } from '../input/dom';

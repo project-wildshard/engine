@@ -8,7 +8,7 @@ import { GroupBankV2 } from '../../../shared/engine/script/groupBankV2';
 import type { GroupStepNativeResultV2 } from '../../../shared/engine/script/groupStepV2';
 import { isJsonData } from '@wildshard/format/json';
 import type { AnimalSim } from '../../../shared/engine/entities/AnimalSim';
-import type { Rng } from '../../../shared/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import { emitFault } from '../../../shared/engine/core/faults';
 import type { SimValue } from '../sim';
 import { inspectBrain } from '../../../shared/engine/ai/inspect';

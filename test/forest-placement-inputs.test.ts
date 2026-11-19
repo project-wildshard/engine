@@ -8,7 +8,7 @@ const setup = `
   import { placeForest,placeForestSteps } from './src/shared/engine/world/forest/placement.ts';
   import { selectedLevel,configureLevel } from './src/shared/engine/level/selection.ts';
   import { _applyChunkConstants,SEED,TREE_COUNT } from './src/shared/engine/core/config.ts';
-  import { buildTerrain } from './src/shared/engine/world/terrainField.ts';
+  import { buildTerrain } from '@wildshard/format/terrainField';
   const forest={spacing:13,densityFreq:.03,clearings:[-.7,.2],maxSlope:.8,tintHue:.25,tintHueJitter:[-.01,.02],tintSat:[.4,.7],tintLight:[.5,.8],largeVariantChance:.2};
   const terrain=buildTerrain(77,{landscape:()=>0,trails:[],cabinSites:[]});
   const source={...terrain,seed:77,treeCount:12,forest};

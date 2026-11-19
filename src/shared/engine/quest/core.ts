@@ -2,7 +2,7 @@ import { questChip, questHint, questObjective, type QuestProgress } from './prog
 import { test, type Flags } from '../world/interact/flags';
 import type { Scope } from '../app/scope';
 import type { Events } from '../events/events';
-import type { Cond, QuestPlace } from '../world/interact/types';
+import type { Cond, QuestPlace } from '@wildshard/format/interactTable';
 import type { QuestView } from './viewPort';
 
 export interface QuestMarker {

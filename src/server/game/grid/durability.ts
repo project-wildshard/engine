@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import type { SaveKeyDef, SaveStore, InstanceSaveSlot } from '@wildshard/engine/saves/store';
 import type { SimHost } from '@wildshard/engine/sim';
-import { fnv1a32 } from '@wildshard/engine/core/rng';
+import { fnv1a32 } from '@wildshard/format/seededRng';
 import { serializeSimSnapshotSteps, finishSimSteps, decodeSimSnapshotBytes, SnapshotBasisMismatchError, SIM_REGION_SNAPSHOT_CHAR_BUDGET, type SimSnapshot, type SimSnapshotBytes } from '@wildshard/engine/sim/snapshot';
 import { instanceSave, type LocalSaveInstance } from '../../../shared/game/instanceSaves';
 import { Ledger, installLedgerEmitter, type LedgerCatalogueItem, type LedgerEmitter } from '../../../shared/game/ledger';

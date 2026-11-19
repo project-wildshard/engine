@@ -1,5 +1,5 @@
 import {PolearmRowsSchema,type PolearmRows,type PolearmPresentation} from '@wildshard/format/heldMelee';
-import { smoothstep as sstep } from '@wildshard/engine/core/noise';
+import { smoothstep as sstep } from '@wildshard/format/noise';
 import { gameplayRandom, app } from '@wildshard/engine/app/runtime';
 import { aimRay, fovForAspect } from '@wildshard/engine/combat/blocks/melee';
 import type { EquipContext } from '@wildshard/engine/combat/Equipment';

@@ -6,7 +6,7 @@ import { wirePage } from '../shardfile/wirePage';
 import { volleyRow } from '../../../shared/game/shardfile/wirePrompts';
 import { app } from '@wildshard/engine/app/runtime';
 import type { Scope } from '@wildshard/engine/app/scope';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { SEED } from '@wildshard/engine/core/config';
 import { TIER } from '@wildshard/engine/core/tier';
 import { worldTime } from '@wildshard/engine/core/time';

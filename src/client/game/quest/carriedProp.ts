@@ -3,7 +3,7 @@ import { parseCarriedQuest, type CarriedQuestRows } from '@wildshard/format/ques
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { practiceRoom } from '@wildshard/engine/core/practiceRoom';
 import { resourceScope } from '@wildshard/engine/app/resources';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { modelContext } from '@wildshard/engine/models/model';
 import { defineSpecimenCatalogue } from '../models/specimenCatalogue';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';

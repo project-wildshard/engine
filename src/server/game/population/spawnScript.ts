@@ -24,7 +24,7 @@ import { DecisionHost, simDecisionRow, type DecisionContext, type DecisionScript
 import { ActorMoveRunner } from '@wildshard/engine/ai/moves';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import type { DayCycleClock } from '@wildshard/engine/world/dayCycle';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { DECISION_PLAYER_HANDLE, decisionBindingMap } from '@wildshard/format/decisionBindings';
 import { parseSpawnScript, SpawnScriptsSchema, spawnScriptRegistries, type SpawnScriptRows } from '@wildshard/format/spawnScripts';
 import { SCRIPT_V1_EVENTS, SCRIPT_V1_READS, SCRIPT_V1_LISTS, type ScriptV1Command, type ScriptV1ReadName, type ScriptV1ListName } from '@wildshard/format/scriptAbiV1';

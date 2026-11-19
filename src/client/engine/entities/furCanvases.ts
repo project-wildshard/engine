@@ -3,7 +3,7 @@
  * normal field the factory draws its fur with, and the value noise behind them. A `platform.skin` surface's `strands`
  * (format `fur-strands.ts`) draws the same canvases from the same numbers (render/families/strands.ts).
  */
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { FurStyle } from '../../../shared/engine/entities/species/registry';
 
 

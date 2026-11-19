@@ -15,7 +15,7 @@ import { place, type Placed } from '@wildshard/engine/models/place';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { painterlyMaterial, painterlyUniforms } from '@wildshard/engine/world/painterly';
 import { wind } from '@wildshard/engine/world/steppeWind';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { buildYield, workSlice } from '@wildshard/engine/core/workSlice';
 import { scatterLayer, instanceBoxes, type ScatterLayer, type ScatterPose } from '@wildshard/engine/render/scatterInstances';
 import { instancedQuad } from '@wildshard/engine/render/instancedGeometry';

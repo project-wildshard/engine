@@ -1,6 +1,6 @@
 import type { RespawnRule, RespawnEntry, RespawnTraversal } from '@wildshard/format/populationRespawn';
 import type { ReturnProgram } from './returnProgram';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 
 /** Corpse fade/refill mechanics. Timers remain in the caller's original save
  * object; the page can instead observe its actual view's hidden state. */

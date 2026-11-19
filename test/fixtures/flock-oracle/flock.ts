@@ -1,6 +1,6 @@
 // Generated mechanically from shipping.txt by capture.ts; the source hash fences the oracle.
 import * as THREE from 'three';
-import { Rng } from '../../../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { TickScheduler } from '../../../src/shared/engine/app/scheduler';
 export interface OracleThreat { alive: boolean; position: THREE.Vector3 }
 export interface OracleOpts { x: number; z: number; count: number; seed: number; range?: number }

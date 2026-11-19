@@ -1,5 +1,5 @@
 import { app } from '@wildshard/engine/app/runtime';
-import type { RngPort as Rng } from '@wildshard/engine/core/rng';
+import type { RngPort as Rng } from '@wildshard/format/seededRng';
 import { fxMaterial, annulus, FX, type FxMaterial } from '@wildshard/engine/fx/groundFx';
 import type { BoxSpec as Collider } from '@wildshard/engine/physics/box';
 import { HeightPatch } from '@wildshard/engine/physics/heightPatch';

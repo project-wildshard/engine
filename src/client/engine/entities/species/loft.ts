@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Noise2D } from '../../../../shared/engine/core/noise';
+import { Noise2D } from '@wildshard/format/noise';
 import type { Scope } from '../../../../shared/engine/app/scope';
 import type { VariantDef } from '../../../../shared/engine/entities/species/registry';
 

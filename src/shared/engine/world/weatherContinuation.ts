@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import type { WeatherProgram } from '@wildshard/format/weatherProgram';
 import { audioMixValue } from '../audio/audioProfiles';
-import { Rng } from '../core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { TickScheduler } from '../app/scheduler';
 import { Weather, type WeatherNumbers, type WeatherProfile } from './weather';
 import { clockGust, fieldGustAt } from './windField';

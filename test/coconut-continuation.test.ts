@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { Euler,Quaternion,Vector3 } from 'three';
 import { expect,test } from 'vitest';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { Bodies,Drop,RowBodySlots } from '../src/shared/engine/physics/bodies';
 import { Physics } from '../src/shared/engine/physics/Physics';
 import { loadRapier } from '../src/shared/engine/physics/rapier';

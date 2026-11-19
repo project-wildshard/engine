@@ -1,4 +1,5 @@
-import { createClientChannelView, moverChannelValues, type ClientGeometryKernels } from './clientChannelView';
+import { createClientChannelView, type ClientGeometryKernels } from './clientChannelView';
+import { moverChannelValues, type MoverPose } from '@wildshard/format/moverPose';
 import { bindPageQuest, type RuntimeQuestPorts } from '../../../shared/game/quest/pageState';
 import { bindPagePersistence, bindPageBossRecord, type PagePersistenceRows, type PagePersistence } from '../../../shared/game/quest/pagePersistence';
 import { lightEmitterPresentation } from '../shardfile/lightEmitters';
@@ -31,8 +32,8 @@ import type { MapMark } from '@wildshard/engine/ui/Minimap';
 import { Flags, test as testFlags } from '@wildshard/engine/world/interact/flags';
 import type { BoxSpec } from '@wildshard/engine/physics/box';
 import { boxInFrame } from '@wildshard/engine/physics/boxFrame';
-import type { MoverPose } from '@wildshard/engine/physics/mover';
-import type { Place, QuestPlace, Interactable } from '@wildshard/engine/world/interact/types';
+import type { Interactable } from '@wildshard/engine/world/interact/types';
+import type { Place, QuestPlace } from '@wildshard/format/interactTable';
 import { questMessageHandlers, type QuestMessageRows, QuestState, type QuestDef, type QuestStep, type NpcDef } from '@wildshard/engine/quest/core';
 import type { QuestView } from '@wildshard/engine/quest/viewPort';
 import { QuestChip, NpcTalk, type LiveMarker, type NpcTalkOpts } from '@wildshard/engine/quest/view';

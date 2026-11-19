@@ -26,7 +26,7 @@ import type { Player } from './Player';
 import { SWIM_SPEED, STROKE_PERIOD } from '../../../shared/engine/player/swim';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { isMesh, viewmodelMaterial, whiteColors } from '../combat/view/ranged';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 
 /** the gloves' look: smooth (`pbr`, every shard but a low-poly one) or faceted (`lowpoly`) */
 export type SwimStyle = 'pbr' | 'toon';

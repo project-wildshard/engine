@@ -2,7 +2,7 @@ import {expect, test} from 'vitest';
 import {AnimalSim} from '../src/shared/engine/entities/AnimalSim';
 import {SkirmisherBrain, type SkirmisherPorts, type SkirmisherSpec} from '../src/server/engine/ai/skirmisher';
 import {CapturedSkirmisherBrain} from './fixtures/stalker-oracle/skirmisher';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {onFault, type Fault} from '../src/shared/engine/core/faults';
 
 const spec: SkirmisherSpec = {awareRadius: 14, shyRadius: 8, disengageRadius: 24, holdRadius: 3,

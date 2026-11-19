@@ -11,7 +11,7 @@ import {
   installPerchBodyPools,
   PERCH_POOLS_STEP,
 } from '../src/server/game/shardfile/perchBodyPools'
-import { Rng } from '../src/shared/engine/core/rng'
+import { Rng } from '@wildshard/format/seededRng'
 import { Bodies } from '../src/shared/engine/physics/bodies'
 import { loadRapier } from '../src/shared/engine/physics/rapier'
 import { shardRows } from '../src/shared/engine/sim/shardRows'

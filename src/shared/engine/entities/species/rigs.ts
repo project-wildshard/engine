@@ -1,6 +1,6 @@
 import { MathUtils, Vector3, type Bone, type Vector3Like } from 'three';
 import type { FurStyle } from './registry';
-import { smoothstep } from '../../core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 
 /**
  * Helpers shared by the CUSTOM rigs (crab / monkey / sailor — `SpeciesDef.rig: 'custom'`): pose maths that every

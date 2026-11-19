@@ -25,7 +25,7 @@ import { netEncounterFeed, type EncounterRow } from '../boss/barFeed';
 import { netLootFeed, type LootFeed } from '../loot/feed';
 import { netCreatureCount } from '../population/netCounts';
 import type { MoverView } from '../../../server/game/plugin/mover';
-import type { MoverPose } from '@wildshard/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 
 type Live = (client: NetClient) => (() => void) | undefined;
 /** A mover's look in one grid cell, as `WirePage.moverLooks` keys it. */

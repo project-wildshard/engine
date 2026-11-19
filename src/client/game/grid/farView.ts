@@ -15,7 +15,7 @@ import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { GRID_HAZE, type FarLookRuntime } from '../../../shared/game/grid/farProxy';
 import { NEAR_GRAIN_SIZE, nearGrainBytes } from './nearGrain';
 import { installFarImpostor, type FarImpostorData } from './farImpostorView';
-import * as roadLight from '@wildshard/format/roadLight';
+import { FAR_CLIFF_FLOOR } from '@wildshard/format/roadLight';
 
 /**
  * SF23 / G90: how far (m) the foot of a proxy's border skirt steps in from the cell edge. The skirt keeps its top on the
@@ -31,14 +31,6 @@ export const FAR_SKIRT_INSET = 3;
  * flat past `fade` metres where a bed is under two pixels.
  */
 export const FAR_STRATA = { bed: 3.8, contrast: 0.19, block: 11, fade: [1200, 2200] } as const;
-/**
- * Playtest round 2: the light floor of the boundary face, as a multiple of its rock colour added after lighting. A face that
- * turns away from the frame's sun got no light at all under a frame without an ambient term (any page where no admitted
- * shard brings its sky light), so every shaded cliff drew as a pitch-black 100 m slab beside the road; with the floor a
- * shaded face is the rock's own colour dimmed (×0.8) and a sunlit one only slightly brighter than before.
- */
-export const FAR_CLIFF_FLOOR: typeof roadLight.FAR_CLIFF_FLOOR = roadLight.FAR_CLIFF_FLOOR;
-
 /**
  * G342 near round 5 (sp-o67's open row 2: a surface finer than per-vertex colour): the near placeholder's grain. Its
  * baked vertex colour (the shard's own palette, ~2 m apart) keeps the hue; one small engine-owned noise texture (128²

@@ -16,7 +16,8 @@ import { createShardfileComposedLane, type DeclaredScriptBrainPorts, type Declar
 import { verifiedScriptModules, type ShardScriptContent, type ShardScriptPorts } from "../shardfile/scripts";
 import type { ScriptRole, ScriptSchedule } from "@wildshard/engine/script/composition";
 import type { Scope } from "@wildshard/engine/app/scope";
-import { KinematicMover, type MoverBox, type MoverPose } from "@wildshard/engine/physics/mover";
+import { KinematicMover } from "@wildshard/engine/physics/mover";
+import type { MoverBox, MoverPose } from "@wildshard/format/moverPose";
 import { RopeChain } from "@wildshard/engine/physics/ropeChain";
 import { MOVER_FIELDS, MOVER_FIELD_RANGES, moverScriptEntities } from "../../../shared/game/shardfile/movers";
 import { MoverLifecycle, MoverLifecycleStateSchema, moverEndState, type MoverEndEvent } from '@wildshard/engine/sim/moverLifecycle';

@@ -1,23 +1,12 @@
-/** Pure native ground channels shared by the page and offline tile baker. */
+/** Native ground channels built as the page enters a cell. */
 import * as THREE from 'three';
 import { CHUNK_SIZE, CHUNK_HALF, TERRAIN_RES } from '../../../shared/engine/core/config';
 import type { TerrainField } from '../../../shared/engine/level/data';
 
-/**
- * The chunk's drawn ground (pure, no GPU): a TERRAIN_RES² grid over the chunk (three's PlaneGeometry laid flat: row 0 at
- * z = −half, each cell split on its (i + 1, i + res) diagonal), heights and normalised `splat` weights from the field at
- * the float32 vertex positions, normals computed over the whole grid. A bake that cuts the ground into tiles slices this
- * (SHARD-PLATFORM G227), so every tile vertex carries the chunk's own position, normal and weights.
- */
-export function terrainChunkGeometry(field: Pick<TerrainField, 'heightAt' | 'splatAt'>): THREE.BufferGeometry {
-  const steps = terrainChunkSteps(field);
-  for (;;) { const r = steps.next(); if (r.done === true) return r.value; }
-}
-
 /** vertices / triangles between two yields of the chunk's build */
 const CHUNK_STEP = 8192;
 /**
- * `terrainChunkGeometry` as steps, yielding between short stretches (SF63: the chunk's ground was 30 ms of one task on the
+ * Build the drawn ground in short stretches (SF63: the chunk's ground was 30 ms of one task on the
  * desktop as a grid cell entered in play, several times that on the Simulator): the same float operations in the same
  * order, so the same bytes; the normals are three's `computeVertexNormals`, step by step (`vertexNormalSteps`).
  */

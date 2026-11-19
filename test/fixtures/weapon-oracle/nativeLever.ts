@@ -7,7 +7,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { DamageRequest } from '@wildshard/engine/combat/pipeline';
 import { instantSpreadDegrees, shotSpread } from '@wildshard/engine/combat/shotSpread';
-import { smoothstep } from '@wildshard/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import { LeverAction, parseLeverProfile } from './leverBridge';
 import { aimAt, bodyHit } from './headlessRanged';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';

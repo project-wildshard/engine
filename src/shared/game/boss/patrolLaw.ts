@@ -1,4 +1,4 @@
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { EncounterPatrolRows, EncounterScheduleRows } from '@wildshard/format/encounterRows';
 import { ProjectedState, type ProjectedSnapshot, type ReturnProgram } from '../population/returnProgram';
 

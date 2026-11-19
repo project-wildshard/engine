@@ -4,7 +4,7 @@ import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { Physics } from '../src/shared/engine/physics/Physics';
-import type { MoverPose } from '../src/shared/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import { installFollowedMovers } from '../src/client/game/plugin/followedMovers';
 import { wirePage } from '../src/client/game/shardfile/wirePage';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';

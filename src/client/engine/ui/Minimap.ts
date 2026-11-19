@@ -42,8 +42,8 @@ import type { MapPoi as MapPoiRow } from '@wildshard/format/minimap';
  */
 import { CHUNK_HALF, CHUNK_SIZE, SEED } from '../../../shared/engine/core/config';
 import { heightAt, trailDistance, TRAILS, CABIN_SITES, POND, hasPond, pondMask, waterLevel, streamAt } from '../../../shared/engine/world/Heightfield';
-import { Noise2D, smoothstep } from '../../../shared/engine/core/noise';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Noise2D, smoothstep } from '@wildshard/format/noise';
+import { Rng } from '@wildshard/format/seededRng';
 import { activeLevel, onLevelChange } from '../../../shared/engine/level/selection';
 import { hasSpecies, speciesDef } from '../../../shared/engine/entities/species/registry';
 import { app } from '../app/runtime';

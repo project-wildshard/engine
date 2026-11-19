@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { Quaternion, Ray, Sphere, Vector3 } from 'three';
-import { smoothstep } from '../src/shared/engine/core/noise';
-import { Rng } from '../src/shared/engine/core/rng';
+import { smoothstep } from '@wildshard/format/noise';
+import { Rng } from '@wildshard/format/seededRng';
 import type { TargetHit } from '../src/client/engine/combat/types';
 import { BladeSweep, bladeInReach, sweptSwingPose, type BladeKey } from '../src/shared/engine/combat/sweptBlade';
 

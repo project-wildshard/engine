@@ -1,5 +1,5 @@
 import type { TerrainField, CabinSite, Vec2 } from '../level/data';
-import { buildTerrainMetadata } from './terrainField';
+import { buildTerrainMetadata } from '@wildshard/format/terrainField';
 import { bakedSamplers } from '@wildshard/format/bakedTerrainSampling';
 
 /** A required manifest ground: `key` names it to the session's required-ground loader; the selected level supplies the same seed. */

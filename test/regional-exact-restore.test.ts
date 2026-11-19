@@ -17,7 +17,7 @@ import {addBakedTerrainCollider} from '../src/shared/engine/physics/terrainTiles
 import {encodeTerrainTile} from '@wildshard/format/terrainTileBytes';
 import {GridRegionDurability} from '../src/server/game/grid/durability';
 import {SaveStore} from '../src/shared/engine/saves/store';
-import {fnv1a32} from '../src/shared/engine/core/rng';
+import {fnv1a32} from '@wildshard/format/seededRng';
 import * as v from 'valibot';
 import {encodeMeshCollision} from '@wildshard/format/meshCollisionBytes';
 import {SIM_LEVEL} from './fixtures/sim-level/level';

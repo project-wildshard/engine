@@ -4,7 +4,7 @@ import type {ThinkCtx} from '../../src/shared/engine/entities/species/registry';
 import {ANIMAL_STATES} from '../../src/shared/engine/entities/animalStates';
 import {app} from '../../src/client/engine/app/runtime';
 import {terrainHeight as heightAt} from '../../src/shared/engine/world/terrainHeight';
-import type {Rng} from '../../src/shared/engine/core/rng';
+import type {Rng} from '@wildshard/format/seededRng';
 import type {ReturnProgram} from '../../src/shared/game/population/returnProgram';
 import type {CrowdTargets} from '../../src/shared/game/shardfile/crowdRuntime';
 export interface OriginalGuardBinding {

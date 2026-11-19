@@ -4,7 +4,7 @@ import { selectedLevel } from '../../../shared/engine/level/selection';
 import * as THREE from 'three';
 import type { GraphShaderMaterial } from '../render/graph/glslMaterial';
 import { mergeAnimalGeometry } from '../models/animalGeometry';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { canvas2d, makeFurCanvases } from './furCanvases';
 import type { SkyRig as Sky } from '../world/skyRig';
 import { bindFurRim } from '../render/furRim';
@@ -38,18 +38,6 @@ import.meta.glob(['../../../shared/engine/entities/species/*.ts', '!../../../sha
  * MeshStandardMaterial: no fur texture, no fur shells (`model.shells` is empty, `createShells()` returns []).
  * See `src/client/engine/entities/lowpoly.ts`. The default 'pbr' path is unchanged.
  *
- * ── Adding a species (bear, elk, …) ──────────────────────────────────────────────────────────────
- * Create `src/engine/entities/species/<kind>.ts` and end it with `registerSpecies({...})` — this file globs the
- * folder, so nothing else needs an edit (not this file, not Animal.ts, not AnimalManager.ts). Import
- * helpers from `./species/loft` and types from `./species/registry`, NEVER from this file (cycle).
- *
- *   registerSpecies({
- *     kind: 'bear', label: 'Bear',
- *     fur: FurStyle,                        // texture seed/params, roughness, sheen, rim colour, shell length, shag
- *     variants: VariantDef[],               // weighted table: id, label, weight, rarity, scale [min,max], hp?, tint?, fur?, traits?, mods?
- *     build(variant, rng): AnimalSpecies,   // geometry parts + bones + dims for ONE variant (cached per kind:variant)
- *     aggressive?, walkSpeed?, chargeSpeed?, chargeDamage?, tuning?, sounds?, pose?   // AI flavour (see registry.ts)
- *   });
  *
  * `build(variant, rng)` returns { bones, furParts, hardParts, eyeParts, dims }:
  *   • Animal-local space: +Z forward (nose), +Y up, X left, metres, origin ON THE GROUND under the body

@@ -24,7 +24,7 @@ import {
   bindInteractPlacements,
   createQuestPlacements,
   readInteractPlacements,
-} from '../../src/shared/engine/world/interact/types.ts'
+} from '@wildshard/format/interactTable'
 import { directLoopback } from '../../src/test/engine/netLoopback.ts'
 import { runtimeAssets } from '../fixtures/engine-lift/folder.ts'
 import { SIM_LEVEL } from '../fixtures/sim-level/level.ts'

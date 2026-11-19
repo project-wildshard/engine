@@ -3,7 +3,7 @@ import {Vector3} from 'three';
 import {Scope} from '../src/shared/engine/app/scope';
 import {AnimalSim} from '../src/shared/engine/entities/AnimalSim';
 import type {Animal} from '../src/client/engine/entities/AnimalView';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {StalkerBrain,type CirclingPackContext,type CirclingPackPorts} from '../src/shared/engine/ai/stalker';
 import {GrazerBrain,type GuardedHerdContext,type GuardedHerdPorts} from '../src/server/engine/ai/grazer';
 import {GroupBrain} from '../src/shared/engine/ai/GroupBrain';

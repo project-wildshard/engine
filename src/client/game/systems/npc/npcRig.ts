@@ -38,7 +38,7 @@ import { bindRig } from '@wildshard/engine/anim/rig';
  * as in A, which also caught the outside of his right shin.
  */
 import * as THREE from 'three';
-import { smoothstep } from '@wildshard/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 
 /** Authored pivot and skinned models share the NPC row lifecycle; their pose driver stays with the content. */
 export interface NpcModel {

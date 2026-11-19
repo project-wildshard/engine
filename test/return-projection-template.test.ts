@@ -7,7 +7,7 @@ import {SCRIPT_V2_REVISIONS} from '@wildshard/format/scriptAdmissionV2';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 import {writeV2Frame} from '@wildshard/format/scriptWireV2';
 import {prepareV2Rng} from '@wildshard/format/scriptRngV2';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {Scope} from '../src/shared/engine/app/scope';
 import {fixtureBytes} from '@wildshard/engine/test/nativeBytes';
 

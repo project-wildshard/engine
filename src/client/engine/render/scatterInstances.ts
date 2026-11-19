@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { smoothstep } from '../../../shared/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 
 /** Client-only bounded scatter drawing. Placement, colour, range and collision ownership remain authored data. */
 export interface ScatterPose {

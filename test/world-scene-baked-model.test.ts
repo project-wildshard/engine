@@ -4,7 +4,7 @@ import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial, Tex
 import { Scope } from '../src/shared/engine/app/scope';
 import { app } from '../src/client/engine/app/runtime';
 import { sharedModelContext } from '../src/client/engine/models/model';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { TIER, TIER_CONFIG, applyLevelTier, initializeTier } from '../src/client/engine/core/tier';
 import { withTier } from '../src/client/engine/explore/tiers';
 import { parsePlumbing } from '@wildshard/format/plumbing';

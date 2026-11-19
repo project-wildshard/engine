@@ -8,7 +8,7 @@ import type { World } from '@wildshard/engine/core/bootstrap';
 import type { LevelContext } from '@wildshard/engine/level/context';
 import type { NetClient } from '@wildshard/engine/net/client';
 import type { PredictedMover } from '@wildshard/engine/net/predictionWorld';
-import type { MoverPose } from '@wildshard/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import { RopeChain } from '@wildshard/engine/physics/ropeChain';
 import type { MoverData } from '@wildshard/format/movers';
 import { installFollowedMovers, type FollowedMoverInstallation, type FollowedMovers, type MoverView } from './followedMovers';

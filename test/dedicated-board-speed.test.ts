@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { CHUNK_HALF, CONTENT_CAPS, ROAD_WIDTH } from '../src/shared/engine/core/config';
+import { CHUNK_HALF, CONTENT_CAPS } from '../src/shared/engine/core/config';
+import { ROAD_WIDTH } from '@wildshard/format/contentBounds';
 import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
 import type { PlayerSim } from '../src/server/engine/sim/playerSim';
 import { roadName } from '../src/server/host/dedicated/gridCells';

@@ -12,7 +12,7 @@ import { createSimHost } from "../src/server/engine/sim";
 import { dataCreaturePorts } from "../src/shared/game/shardfile/dataCreaturePorts";
 import { dataGroundBrains } from "../src/server/game/shardfile/dataGroundBrains";
 import { dataPerchBrains } from "../src/server/game/shardfile/dataPerchBrains";
-import { Rng } from "../src/shared/engine/core/rng";
+import { Rng } from "@wildshard/format/seededRng";
 import { Bodies } from "../src/shared/engine/physics/bodies";
 import { loadRapier } from "../src/shared/engine/physics/rapier";
 import { aliases, canonical, fixture, requireBrain } from "./fixtures/plain-brain-roster";

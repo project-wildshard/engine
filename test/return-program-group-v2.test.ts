@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
 import {Scope} from '../src/shared/engine/app/scope';
-import {Rng} from '../src/shared/engine/core/rng';
+import {Rng} from '@wildshard/format/seededRng';
 import {ReturnProgram} from '../src/shared/game/population/returnProgram';
 import {ReturnProjectionV2} from '../src/shared/game/population/returnProjectionV2';
 import {parseReturnProjectionV2} from '@wildshard/format/returnProjectionV2';

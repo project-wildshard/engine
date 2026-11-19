@@ -10,7 +10,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { StrikeRunner } from '@wildshard/engine/ai/strikes';
 import { strikeFromData } from '@wildshard/engine/ai/strikeRows';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
-import type { Rng } from '@wildshard/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import type { Vector3 } from 'three';
 

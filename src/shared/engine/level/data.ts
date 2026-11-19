@@ -4,7 +4,7 @@ import type { LookReplaceContext } from '../../../client/engine/render/look';
 import type { SkyRig as Sky } from '../../../client/engine/world/skyRig';
 import type { TreeFactory } from '../../../client/engine/world/TreeFactory';
 import type { SpeciesWeights, TreeSpeciesTraits, TreeSetVariant } from '../../../client/engine/world/forest/treeSpecies';
-import type { Vec2 as TerrainVec2, CabinSite as TerrainCabinSite, PondDef as TerrainPondDef, TerrainNoise as FieldNoise, TerrainField as CompiledTerrain, TerrainSpec as TerrainInput } from '../world/terrainField';
+import type { Vec2 as TerrainVec2, CabinSite as TerrainCabinSite, PondDef as TerrainPondDef, TerrainNoise as FieldNoise, TerrainField as CompiledTerrain, TerrainSpec as TerrainInput } from '@wildshard/format/terrainField';
 
 // Keep the public level-data names while the compiler owns their definitions.
 export type Vec2 = TerrainVec2;

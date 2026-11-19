@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { Scope } from '../src/shared/engine/app/scope';
 import { ObservationColumnsV2, type V2ColumnOwners, type V2SenseColumns } from '../src/shared/engine/script/observationColumnsV2';
 import { ObservationColumnsV2Schema, parseObservationColumnsV2 } from '@wildshard/format/scriptObservationColumnsV2';

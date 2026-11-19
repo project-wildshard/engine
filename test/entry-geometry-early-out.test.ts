@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { clipEntryPolygon, entryFootprints, obstructsEntry, type EntryVertex } from '@wildshard/format/entryGeometry';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 
 // obstructsEntry's early exit (a triangle wholly past one footprint side) beside the full clip it skips: the same verdict
 // for random triangles near, across and far from every edge footprint, including ones touching a side exactly.

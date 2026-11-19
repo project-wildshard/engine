@@ -22,7 +22,7 @@ import { canReach } from '@wildshard/engine/ai/reach';
 import { StrikeRunner, type StrikeSpec } from '@wildshard/engine/ai/strikes';
 import { strikeFromData } from '@wildshard/engine/ai/strikeRows';
 import { modelContext, type ModelDef } from '@wildshard/engine/models/model';
-import { Rng } from '@wildshard/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { ShardContext } from '../../src/client/game/plugin/context';
 import { installChannelPrograms } from '../../src/shared/game/plugin/channelPrograms';
 import type { WeatherReactions } from '../../src/server/game/weather/reactions';

@@ -6,7 +6,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { MOUNTED_FIGURE } from './fixtures/frozen/renderRows';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { ModelContext } from '../src/client/engine/models/model';
-import type { Rng } from '../src/shared/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 
 
 const row = { model: { id: 'fixture/rider', name: 'A rider', category: 'people', pipeline: ['code'], file: 'test/mounted-specimen-factory.test.ts', defaults: {} },

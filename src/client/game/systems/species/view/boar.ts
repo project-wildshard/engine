@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { smoothstep as sstep } from '@wildshard/engine/core/noise';
-import type { Rng } from '@wildshard/engine/core/rng';
+import { smoothstep as sstep } from '@wildshard/format/noise';
+import type { Rng } from '@wildshard/format/seededRng';
 import { crestSpikes } from '@wildshard/engine/entities/lowpoly';
 import { loft, tube, skinPlain, S, boneIndex, mix, paintNoise, setShag, isLowPoly, paletteColors, srgb, toonPaint, type Paint, type RGB } from '@wildshard/engine/entities/species/loft';
 import type { SpeciesLook } from '@wildshard/engine/entities/species/look';

@@ -14,7 +14,7 @@ import type { CharacterMotor } from '../../../shared/engine/physics/CharacterMot
 import { SEED, CHUNK_HALF } from '../../../shared/engine/core/config';
 import { spawnRolls, fallbackSound, ATTACK_TURN, HURT_ARC, type HuntGround, type HuntHerd } from '../ai/hunt';
 import { StalkerBrain } from '../../../shared/engine/ai/stalker';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { heightAt, normalAt, trailDistance, cabinMask, inChunk, waterLevel, hasPond, POND, streamAt } from '../../../shared/engine/world/Heightfield';
 import type { Forest } from '../../../client/engine/world/forest/Forest';
 import { speciesDef, type EnemyWorld, type ThinkCtx } from '../../../shared/engine/entities/species/registry';

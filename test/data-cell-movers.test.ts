@@ -8,7 +8,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { Physics } from '../src/shared/engine/physics/Physics';
 import { floorBelow } from '../src/shared/engine/physics/query';
-import type { MoverPose } from '../src/shared/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import { installDataCellMovers } from '../src/client/game/grid/dataCellMovers';
 import { moverLookKey, wirePage } from '../src/client/game/shardfile/wirePage';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';

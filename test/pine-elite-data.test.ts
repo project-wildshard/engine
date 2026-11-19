@@ -9,7 +9,7 @@ import { expect,test } from 'vitest';
 import { createSimHost } from '../src/server/engine/sim';
 import { installPopulationRoster } from '../src/server/game/population/roster';
 import { installNativeEliteFeature } from '../src/server/game/quest/eliteFeature';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { DayCycle } from '../src/shared/engine/world/dayCycle';
 import { keyedSkyDaySpec } from '../src/shared/game/looks/keyedSkyClock';

@@ -4,7 +4,7 @@ import { fixtureNativeRoster } from './fixtures/native-roster';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native ownership tests use the actual shipped Rapier binary.
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
-import { Rng } from '../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { HuntBrain, type HuntBody } from '../src/server/engine/ai/hunt';
 import { NativeManager } from '../src/server/game/population/nativeManager';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';

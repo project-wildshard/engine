@@ -4,7 +4,7 @@ import { registerPopulationHomes } from '../../../shared/game/population/census'
 import { clearBody } from '@wildshard/engine/entities/bodyClear';
 import { CREDIT_PREFIX } from '@wildshard/engine/quest/players';
 import * as v from 'valibot';
-import { Rng, type RngState } from '@wildshard/engine/core/rng';
+import { Rng, type RngState } from '@wildshard/format/seededRng';
 import type { AnimalSim, AnimalSimSpec } from '@wildshard/engine/entities/AnimalSim';
 import { roomRefillRate } from '@wildshard/engine/entities/creatureRefill';
 import { killBelowWorld } from '@wildshard/engine/entities/killHeight';

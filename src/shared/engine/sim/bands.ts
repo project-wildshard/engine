@@ -1,5 +1,5 @@
 import type { TickBand, TickRate } from '../app/scheduler';
-import { fnv1a32 } from '../core/rng';
+import { fnv1a32 } from '@wildshard/format/seededRng';
 
 /**
  * The distance bands the page updates creatures on, as pure data and arithmetic shared by the page and the renderer-free

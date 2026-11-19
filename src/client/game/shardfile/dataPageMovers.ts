@@ -10,7 +10,7 @@
 import type { Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Physics } from '@wildshard/engine/physics/Physics';
-import type { MoverPose } from '@wildshard/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { FollowedMovers, type MoverView } from '../plugin/followedMovers';

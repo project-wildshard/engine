@@ -9,7 +9,7 @@
  * Presentation only: nothing here writes a simulation, a field or a collider.
  */
 import { Euler, Matrix4, Quaternion, Vector3, type Group, type Object3D } from 'three';
-import type { MoverPose } from '@wildshard/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import type { ClientTileViews } from '../shardfile/clientViews';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { GridCell } from '../../../shared/game/grid/assembly';

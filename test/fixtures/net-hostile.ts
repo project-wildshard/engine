@@ -1,6 +1,6 @@
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../../src/client/engine/net/client';
-import { Rng } from '../../src/shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import type { NetRoomAct } from '../../src/shared/engine/net/acts';
 import { BitWriter } from '../../src/shared/engine/net/bits';
 import { encodeCommands, MAX_BUNDLE } from '../../src/shared/engine/net/command';

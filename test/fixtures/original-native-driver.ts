@@ -14,7 +14,7 @@ import { ReturnProgram } from '../../src/shared/game/population/returnProgram';
 import type { AnimalSim } from '../../src/shared/engine/entities/AnimalSim';
 import type { HuntBody } from '../../src/server/engine/ai/hunt';
 import type { StalkerBrain } from '../../src/shared/engine/ai/stalker';
-import type { Rng } from '../../src/shared/engine/core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { SimHost } from '../../src/server/engine/sim';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 export interface NativeDriverRows {

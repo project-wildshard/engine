@@ -7,7 +7,7 @@ import type { TerrainPainter } from '@wildshard/engine/render/look';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { loadTextureRow } from '@wildshard/engine/core/assets';
 import { gpuOnlyTrees } from '@wildshard/engine/core/gpuOnly';
-import { smoothstep } from '@wildshard/engine/core/noise';
+import { smoothstep } from '@wildshard/format/noise';
 import { TIER } from '@wildshard/engine/core/tier';
 import { headingTexture } from '@wildshard/engine/render/dataLook';
 import { applyPaintedTerrain, bindPaintedTerrainBake } from '@wildshard/engine/render/families/paintedTerrain';

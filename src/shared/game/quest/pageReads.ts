@@ -1,6 +1,6 @@
 import type { QuestPageRows } from '@wildshard/format/questPageComposition';
 import type { AdventureContent } from '@wildshard/format/questStory';
-import type { InteractTable } from '@wildshard/engine/world/interact/types';
+import type { InteractTable } from '@wildshard/format/interactTable';
 import type { ShardFolder } from '../shardfile/shardFolder';
 
 interface AssemblyRows { readonly constants: { readonly interact: InteractTable; readonly interactSpots: unknown } }

@@ -1,4 +1,4 @@
-import type { MoverPose } from '@wildshard/engine/physics/mover';
+import type { MoverPose } from '@wildshard/format/moverPose';
 import type { ScriptEntity } from '@wildshard/engine/script/effects';
 import { MoverMechanic, STEER_FIELDS, type MoverSteer } from '@wildshard/engine/sim/moverMotion';
 import type { MoverData } from '@wildshard/format/movers';

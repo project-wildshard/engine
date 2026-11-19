@@ -1,5 +1,5 @@
 import { bakedSamplers, parseBakedTerrain } from '@wildshard/engine/world/BakedTerrain';
-import { clamp } from '@wildshard/engine/core/noise';
+import { clamp } from '@wildshard/format/noise';
 import { readNavmesh } from '@wildshard/engine/physics/navmesh';
 import { createSimHost, type SimHost, type SimLevel } from '@wildshard/engine/sim';
 import { parseNativeAssembly, NATIVE_ASSEMBLY_FILE, type NativeAssemblyBake, type NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';

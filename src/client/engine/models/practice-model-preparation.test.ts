@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { dummyFigure, dummyStandIn } from './trainingDummyFigure';
 import { trainingDummy } from './trainingDummy';
 import { modelContext } from './model';
-import { Rng } from '../../../shared/engine/core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 
 afterEach(() => { vi.restoreAllMocks(); });
 

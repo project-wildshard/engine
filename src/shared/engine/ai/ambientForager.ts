@@ -16,7 +16,7 @@
  * Users: Pine Hollow's hares (hop, away, roaming), Nalati's marmot colonies (walk, home, sentries, saved).
  */
 import * as v from 'valibot';
-import { Rng } from '../core/rng';
+import { Rng } from '@wildshard/format/seededRng';
 import { BodyBandClocks, DEFAULT_TICK_RATES, bandAt } from '../sim/bands';
 import { cabinMask, inChunk, normalAt, pondMask, streamAt, waterLevel } from '../world/Heightfield';
 import { terrainHeight } from '../world/terrainHeight';

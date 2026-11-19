@@ -7,7 +7,7 @@ import { runtimePagePointer } from '../shard/pointer';
 import { toLevelSpec } from '../shard/spec';
 import { EmptyEquipment } from '../shardfile/emptyEquipment';
 import { emptyLook } from '../shardfile/emptyLook';
-import { ROAD_SKY } from './frameModel';
+import { ROAD_SKY } from '@wildshard/format/roadLight';
 import type { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 
 

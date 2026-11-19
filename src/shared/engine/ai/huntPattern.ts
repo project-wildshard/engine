@@ -1,7 +1,7 @@
 import { MathUtils, Vector3 } from 'three';
 import type { AnimalSim, AnimalState } from '../entities/AnimalSim';
 import { GroupBrain } from './GroupBrain';
-import type { Rng } from '../core/rng';
+import type { Rng } from '@wildshard/format/seededRng';
 import type { FightRules } from '../level/spec';
 import type { HerdPlan } from '../level/data';
 import type { Navmesh } from '../physics/navmesh';

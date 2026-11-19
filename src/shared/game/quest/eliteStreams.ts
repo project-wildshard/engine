@@ -1,4 +1,4 @@
-import { fnv1a32, Rng } from '@wildshard/engine/core/rng';
+import { fnv1a32, Rng } from '@wildshard/format/seededRng';
 import type { EliteFeatureRows } from '@wildshard/format/eliteFeature';
 
 /** One independently named content stream, derived only from the declared seed/prefix/id tuple. */
