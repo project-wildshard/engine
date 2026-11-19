@@ -676,6 +676,8 @@ async function startSelected(): Promise<void> {
       import('@wildshard/engine/core/clock'), import('./scriptMemoryPlan'), import('@wildshard/engine/boot/idle'),
     ]);
     const savedTopUp = (): unknown => { try { return jsonSlot(SCRIPT_MEMORY_TOP_UP_SLOT, 'device').read(); } catch { return null; } };
+    // DW3: unset, phone Low skips the top-up (scriptMemoryPlan.ts)
+    const phoneLow = TIER === 'phone' && (await import('@wildshard/engine/core/graphicsMode')).graphicsMode() === 'low';
     const memoryStartedAt = diagnosticNow();
     // NB4: a reserve yields once its slice has run 8 ms, not after every reserve. In Chromium the 45 reserves cost
     // 0.6 ms together; the 45 timer turns between them were the whole 0.35 s of this span at CPU x4 (NB1). A reserve
@@ -689,7 +691,7 @@ async function startSelected(): Promise<void> {
         if (entryScope.disposed || entryScope.disposing) throw new Error('Entry memory preparation ended');
       },
       afterControl: (run) => { entryScope.listen(document, 'ws:control-ready', run, { once: true }); },
-      idle: () => idleTurn(entryScope), topUp: scriptMemoryTopUp(savedTopUp()) }));
+      idle: () => idleTurn(entryScope), topUp: scriptMemoryTopUp(savedTopUp(), phoneLow) }));
     performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
       detail: { memoryTurns, memoryWaitMs, grid } });
     await packs.ready();

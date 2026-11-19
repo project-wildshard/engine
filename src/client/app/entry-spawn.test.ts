@@ -148,6 +148,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/core/workSlice': {yieldTask: () => { reserveClock.turns++; return resolved(); }},
     './scriptMemoryPlan': {reserveScriptMemory, scriptMemoryTopUp, SCRIPT_MEMORY_TOP_UP_SLOT},
     '@wildshard/engine/boot/idle': {idleTurn: () => Promise.resolve(true)},
+    '@wildshard/engine/core/graphicsMode': {graphicsMode: () => 'high'},
     '@wildshard/engine/core/clock': {diagnosticNow: () => reserveClock.now},
     './assetTables': {prepareAssetPackRead: () => ({ready: resolved}), adoptInlineMounts: () => Promise.resolve(0)},
     '@wildshard/engine/game/shardfile/folder': {},

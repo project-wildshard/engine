@@ -54,3 +54,11 @@ test('debug.scriptMemoryTopUp false: a grid page reserves the standalone bank an
   expect(scriptMemoryTopUp(true)).toBe(true);
   expect(scriptMemoryTopUp('off')).toBe(SCRIPT_MEMORY_TOP_UP_DEFAULT);
 });
+
+test('unset, phone Low skips the top-up and every other page keeps it; a saved pick wins (DW3)', () => {
+  expect(scriptMemoryTopUp(null, true)).toBe(false);
+  expect(scriptMemoryTopUp(undefined, false)).toBe(true);
+  expect(scriptMemoryTopUp(null)).toBe(SCRIPT_MEMORY_TOP_UP_DEFAULT);
+  expect(scriptMemoryTopUp(true, true)).toBe(true);
+  expect(scriptMemoryTopUp(false, false)).toBe(false);
+});
