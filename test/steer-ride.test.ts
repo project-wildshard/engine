@@ -1,5 +1,6 @@
 import { lowerMoverMotion } from '@wildshard/format/moverMotion';
 import { parseMovers } from '@wildshard/format/movers';
+import { liftSteerVehicles, vehicleCarryHulls, vehicleCarryMovers, type LiftSource } from '@wildshard/format/vehicle-lift';
 import { expect, test } from 'vitest';
 import type { SystemSpec } from '../src/client/engine/app/systems';
 import type { MoverPose } from '@wildshard/format/moverPose';
@@ -87,4 +88,47 @@ test('the chip shows the speed as a share of the boosted top speed and lights BO
   expect(shown.at(-1)?.boosting).toBe(false);
   press(true); for (let i = 0; i < 60; i++) frame(12 * DT);
   expect(shown.at(-1)?.speed).toBeCloseTo(1, 1); expect(shown.at(-1)?.boosting).toBe(true);
+});
+
+// MIRROR-SALT-ZONE MSZ2: Mirror Salt rev 4's teal sail (shard-mirror-salt a9e2a92, SDK 0.4.12), lifted to a world/vehicles
+// kind and dock (format 0.53.0) and lowered back to the steer carry this engine boards: the same prompts, seat and steering.
+const REV4_SAIL = { at: { x: 0.955, y: -0.09, z: 146.5218 }, euler: { x: 0, y: -0.05, z: 0 },
+  driver: { kind: 'steer', speed: 9, turn: 1, boost: 1.6, accel: 4, ground: true, wind: { toward: [0.8, 0.6], push: 4 } } } as const;
+const rev4 = (): LiftSource => {
+  const lift = lowerMoverMotion({ trigger, driver: REV4_SAIL.driver }, { at: REV4_SAIL.at, euler: REV4_SAIL.euler });
+  const movers = parseMovers([{ id: 'salt.land-sail', entity: 9101, module: lift.module, execution: 'native', kind: 'channel', ...REV4_SAIL,
+    enabled: true, boxes: [], trigger, input: lift.input,
+    carry: { seat: 0.8, landings: [[2.816, 0, 0], [-2.816, 0, 0]], yaw: 0, surface: carry.surface,
+      prompts: [{ at: [0, 1, 0], radius: 4.3881, label: 'Board the land-sail' }, { at: [0, 2, 0], radius: 2, label: 'Leave the land-sail' }] } }]);
+  const props = { panels: [{ id: 'salt.land-sail', file: 'e41e2ad858c81984d2abece4c2e5b5a15701c61540a0eb657fd5a11540124b2e', visible: true }],
+    colliders: [{ id: 'salt.land-sail', panel: 'salt.land-sail', initialActive: false, shapes: [{ kind: 'box', x: 1, y: 0.7, z: 147, hx: 0.6, hy: 0.125, hz: 1.8, yaw: -0.05 }] }] };
+  return { movers, props } as unknown as LiftSource;
+};
+
+test('the migrated sail (rev 4, lifted to a vehicle and lowered back) boards and steers as the steer carry did', () => {
+  const { vehicles, movers: left } = liftSteerVehicles(rev4());
+  expect(left).toEqual([]);
+  expect(vehicles.docks.map(dock => [dock.id, dock.kind, dock.per])).toEqual([['salt.land-sail', 'salt.land-sail', 'shared']]);
+  const sail = parseMovers(vehicleCarryMovers(vehicles, 9101));
+  expect(sail.map(row => [row.id, row.driver?.kind, row.carry?.seat])).toEqual([['salt.land-sail', 'steer', 0.8]]);
+  expect(vehicleCarryHulls(vehicles).get('salt.land-sail')?.length).toBe(1);
+  const movers = new FollowedMovers(sail, { physics: null as never, scope: new Scope('steer-ride-migrated') });
+  const [board, leave] = movers.ridePrompts();
+  if (board === undefined || leave === undefined) throw new Error('Missing the migrated sail\'s prompts');
+  expect([board.label, leave.label]).toEqual(['Board the land-sail', 'Leave the land-sail']);
+  const systems: SystemSpec[] = [], player = { yaw: 2, position: { x: 3, y: 0, z: 146 } };
+  let led = false;
+  installSteerRide(movers, { system: spec => { systems.push(spec); }, led: () => led, player, view: { show: () => undefined }, boost: () => false });
+  const pose: MoverPose = { position: { ...REV4_SAIL.at }, euler: { ...REV4_SAIL.euler }, enabled: true };
+  const frame = (): void => {
+    movers.follow('salt.land-sail', pose);
+    if (led) player.position = { x: pose.position.x, y: pose.position.y + 0.8, z: pose.position.z }; // the server leads the rider on its seat
+    for (const system of systems) system.run(DT, 0);
+  };
+  frame();
+  expect(board.radius).toBeGreaterThan(0); expect(leave.radius).toBe(0);
+  led = true; frame();
+  expect(movers.steered).toBe('salt.land-sail');
+  expect(player.yaw).toBeCloseTo(-0.05, 9); // boarding faces the sail's heading
+  expect([board.radius, leave.radius]).toEqual([0, 2]);
 });
