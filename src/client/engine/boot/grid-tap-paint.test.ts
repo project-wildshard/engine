@@ -57,6 +57,14 @@ test('a running page creates the identical retired shell and a handoff failure r
   expect(card().disabled).toBe(false); expect(card().hasAttribute('aria-busy')).toBe(false);
 });
 
+test('QA 11-19 row 17: a zone entry in a long-lived page stamps its own start, so START counts from the entry, not the document', () => {
+  vi.spyOn(performance, 'now').mockReturnValue(401_400);
+  const attempt = beginNavigationShell('Mirror Salt', owner, () => undefined);
+  const root = document.querySelector<HTMLElement>('.ws-load');
+  expect(root?.dataset['startedAt']).toBe('401400');
+  attempt.dispose(); vi.restoreAllMocks();
+});
+
 test('failure restores an adopted panel and a later user tap may start a new attempt', () => {
   const root = document.createElement('div'); root.className = 'ws-load hide'; root.innerHTML = loadShellTemplate(); document.body.append(root);
   const attempt = beginNavigationShell('Home', owner, () => { throw new Error('Navigation refused'); }, card());

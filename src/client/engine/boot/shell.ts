@@ -122,12 +122,16 @@ export function beginNavigationShell(name: string, owner: Scope, navigate: () =>
   if (hud !== null) hud.inert = true;
   if (nameField !== null) nameField.textContent = name;
   root.classList.remove('hide'); root.dataset['navigation'] = '';
+  // QA 11-19 row 17: Loading counts START from the card's `startedAt`, and an adopted card with none counts from the document's
+  // start. A zone entry runs in a page that has lived for minutes (Jake's Mirror Salt card read START 401.4 s): this entry starts now.
+  const startedBefore = root.dataset['startedAt']; root.dataset['startedAt'] = String(diagnosticNow());
   html.classList.remove('title-first');
   if (card !== undefined && card !== null) { card.disabled = true; card.setAttribute('aria-busy', 'true'); }
   attempt.onDispose(() => {
     if (hud !== null) hud.inert = inert;
     if (existing === null) slots.discard(root);
-    else { root.classList.toggle('hide', hidden); delete root.dataset['navigation']; if (nameField !== null) nameField.textContent = previousName; }
+    else { root.classList.toggle('hide', hidden); delete root.dataset['navigation'];
+      if (startedBefore === undefined) delete root.dataset['startedAt']; else root.dataset['startedAt'] = startedBefore; if (nameField !== null) nameField.textContent = previousName; }
     html.classList.toggle('title-first', title);
     if (card !== undefined && card !== null) { card.disabled = disabled; if (busy === null) card.removeAttribute('aria-busy'); else card.setAttribute('aria-busy', busy); }
   });
