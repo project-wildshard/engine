@@ -8,6 +8,8 @@
 //   node scripts/mmo-bots.mjs replica --remote wildshard-agent --bots-on-host [--bot-cpus 14-15] ...   (MP1.2: bots on the box too)
 //   node scripts/mmo-bots.mjs replica --box [--seconds 1800] ...   (MP1.2.d: the replica on the box's staging CPUs through the
 //     allowlisted `wildshard-config replica`, bots on this Mac over the tailnet; no other command reaches the box)
+//   node scripts/mmo-bots.mjs replica --box --box-saves postgres --pg-restart-at 120 ...   (MMO-SERVER E7.4b.c: the replica's
+//     saves on the box's scratch cluster, which the helper restarts once at that second; never a channel's Postgres)
 //   node scripts/mmo-bots.mjs staging [--bots 2] [--seconds 60]   (at most 4: one address)
 //   node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60   (TC45: public Tunnel, no private health)
 //   node scripts/mmo-bots.mjs staging --tailnet ...   (NET-LAG NL3: the same, over staging's tailnet Serve address, no Cloudflare)
@@ -53,7 +55,7 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
   'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false },
   'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false }, 'outside-proof': { type: 'boolean', default: false },
-  box: { type: 'boolean', default: false } } });
+  box: { type: 'boolean', default: false }, 'box-saves': { type: 'string', default: 'memory' }, 'pg-restart-at': { type: 'string' } } });
 const outsideProof = values['outside-proof'];
 if (outsideProof && (mode !== 'staging' || values.tailnet || values.remote !== undefined || values['bots-on-host']))
   throw new Error('--outside-proof is one public staging client, without tailnet, SSH or a replica');
@@ -73,6 +75,11 @@ const box = values.box, BOX = 'wildshard-agent', BOX_SLACK = 420;
 if (box && (mode !== 'replica' || remote !== undefined || values.database !== 'memory:' || values['server-from'] !== undefined || values.spread
   || !/^[1-4]$/u.test(values.workers) || !/^\d{1,2}$/u.test(values.seats) || Number(values.seats) > 64 || Number(values.seconds ?? 120) + BOX_SLACK > 3900))
   throw new Error('--box is a replica on memory saves from the signed staging bundle: no --remote, --server-from or --spread, 4 workers, 64 seats, 3,480 s at most');
+// E7.4b.c: the scratch cluster is the box replica's only Postgres; its one restart is the helper's own verb.
+const boxSaves = values['box-saves'], pgRestartAt = values['pg-restart-at'] === undefined ? undefined : Number(values['pg-restart-at']);
+if ((boxSaves !== 'memory' && boxSaves !== 'postgres') || (boxSaves === 'postgres' && !box)) throw new Error('--box-saves is memory or postgres, with --box');
+if (pgRestartAt !== undefined && (boxSaves !== 'postgres' || !/^\d{1,4}$/u.test(values['pg-restart-at'] ?? '') || pgRestartAt < 10 || pgRestartAt >= Number(values.seconds ?? 120)))
+  throw new Error('--pg-restart-at is a second inside the run, with --box-saves postgres');
 if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
 const bots = Number(values.bots ?? (outsideProof ? 1 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
@@ -209,7 +216,7 @@ if (mode === 'replica') {
   const boxStop = () => { try { execFileSync('ssh', ['-o', 'BatchMode=yes', BOX, 'sudo -n /usr/local/sbin/wildshard-config replica stop'], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 60_000 }); } catch { /* already gone */ } };
   if (box) {
     room = spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, BOX, `sudo -n /usr/local/sbin/wildshard-config replica start --seconds ${String(seconds + BOX_SLACK)}`
-      + ` --workers ${values.workers} --seats ${values.seats} --cells ${values.cells}`], { stdio: ['ignore', 'pipe', 'pipe'] });
+      + ` --workers ${values.workers} --seats ${values.seats} --cells ${values.cells} --saves ${boxSaves}`], { stdio: ['ignore', 'pipe', 'pipe'] });
     note({ step: 'box', host: BOX, via: 'wildshard-config replica' });
   }
   else if (remote === undefined) room = spawn(process.execPath, [join(served, 'main.mjs')], { cwd: served, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -270,6 +277,15 @@ const code = await new Promise(resolve => {
     ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
     : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : '', values.tailnet ? 'tailnet' : 'public'], { stdio: ['ignore', 'pipe', 'inherit'] });
   botsChild = child;
+  // E7.4b.c: one restart of the box replica's scratch cluster, by the helper, at that second of the bots' run.
+  const pgRestart = pgRestartAt === undefined ? null : setTimeout(() => {
+    const asked = performance.now();
+    try {
+      const said = execFileSync('ssh', ['-o', 'BatchMode=yes', BOX, 'sudo -n /usr/local/sbin/wildshard-config replica pg-restart'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], timeout: 120_000 });
+      note({ step: 'pg-restart', at: pgRestartAt, ms: Math.round(performance.now() - asked), said: said.trim() });
+    } catch (error) { note({ step: 'pg-restart', at: pgRestartAt, error: error instanceof Error ? error.message : String(error) }); }
+  }, pgRestartAt * 1000);
+  child.once('exit', () => { if (pgRestart !== null) clearTimeout(pgRestart); });
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   /** @type {ReturnType<typeof setTimeout> | null} */let force = null;
   const watchdog = outsideProof ? setTimeout(() => {

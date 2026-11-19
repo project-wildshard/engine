@@ -12,7 +12,13 @@
 //     it), where systemd-socket-proxyd hands each connection to loopback: the replica's door trusts a bot's X-Forwarded-For
 //     only from a loopback peer (doorTrust.ts), so 32 bots from one Mac each count as their own address, as on a local
 //     replica. Its stdout (the worker lines mmo-bots.mjs reads) comes back to the caller, and both go when it ends.
-//   replica.mjs stop      ends both units and removes the folder.
+//   replica.mjs start <seconds> <workers> <seats> <cells> postgres
+//     MMO-SERVER E7.4b.b: the same, but its saves go to a scratch cluster, a throwaway apt Postgres 16 cluster
+//     (16 wildshard-replica, port 5439, socket only, peer for postgres and one per-run scram password for the replica's
+//     role), so a Postgres outage can be witnessed on apt Postgres without blipping a channel's saves. Only the constants
+//     below name a cluster: the channels' own cluster and databases are never touched.
+//   replica.mjs pg-restart  restarts only the scratch cluster, while a replica runs on it.
+//   replica.mjs stop      ends both units, drops the scratch cluster and removes the folder.
 // Nothing a channel's user can write is read (Codex J206): no bundle folder, no pulled release.json.
 import { spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
@@ -24,17 +30,29 @@ import { pathToFileURL } from 'node:url';
 export const RELEASE_PUBLIC_KEY = '302a300506032b657003210012e17122631777e2a6ad68e2fb4883d856def46f812aa9a3e49d701ed44ad17b';
 export const UNIT = 'wildshard-replica', DOOR = 'wildshard-replica-door', PORT = 18796, INNER = 18797, CPUS = '9-12';
 const PROXYD = '/usr/lib/systemd/systemd-socket-proxyd';
+// E7.4b.b: the scratch cluster. Its name, port, role and database are this file's own, never a channel's.
+export const PG_VERSION = '16', CLUSTER = 'wildshard-replica', PG_PORT = 5439, PG_ROLE = 'replica', PG_DATABASE = 'saves_replica';
+const PG_SOCKET = '/var/run/postgresql', PG_UNIT = `postgresql@${PG_VERSION}-${CLUSTER}.service`;
 const PACK_ORIGIN = 'https://packs.wildshard.io', MAX_BUNDLE = 256 * 1024 * 1024;
 const CELL = /^[a-z0-9][a-z0-9-]{0,63}(?:,[a-z0-9][a-z0-9-]{0,63}){0,7}$/u, HEX40 = /^[0-9a-f]{40}$/u, HEX64 = /^[0-9a-f]{64}$/u;
 const BUNDLE_NAME = /^[A-Za-z0-9._-]{1,120}(?:\/[A-Za-z0-9._-]{1,120})?$/u;
 
 /** The limits wildshard-config checks too, so a direct caller gets the same refusals. */
 export function limits(/** @type {string[]} */ args) {
-  const [seconds = '', workers = '', seats = '', cells = ''] = args;
-  if (args.length !== 4 || !/^\d{2,4}$/u.test(seconds) || Number(seconds) < 60 || Number(seconds) > 3900) return null;
+  const [seconds = '', workers = '', seats = '', cells = '', saves = 'memory'] = args;
+  if ((args.length !== 4 && args.length !== 5) || (saves !== 'memory' && saves !== 'postgres') || !/^\d{2,4}$/u.test(seconds) || Number(seconds) < 60 || Number(seconds) > 3900) return null;
   if (!/^[1-4]$/u.test(workers) || !/^\d{1,2}$/u.test(seats) || Number(seats) < 1 || Number(seats) > 64 || !CELL.test(cells)) return null;
-  return { seconds: Number(seconds), workers: Number(workers), seats: Number(seats), cells };
+  return { seconds: Number(seconds), workers: Number(workers), seats: Number(seats), cells, saves };
 }
+
+/** E7.4b.b: the replica's saves on the scratch cluster, over its socket, with this run's password. @param {string} password */
+export function scratchUrl(password) {
+  if (!/^[0-9a-f]{32,64}$/u.test(password)) throw new Error('the scratch password is hex');
+  return `postgresql://${PG_ROLE}:${password}@localhost:${String(PG_PORT)}/${PG_DATABASE}?host=${PG_SOCKET}`;
+}
+
+/** The scratch cluster's pg_hba: postgres by peer for setup, the replica's role by password, nothing over TCP. */
+export const SCRATCH_HBA = `local all postgres peer\nlocal ${PG_DATABASE} ${PG_ROLE} scram-sha-256\n`;
 
 /**
  * Staging's release as a signed file says it, or null. A bad signature is never believed (pull.mjs `readRelease`).
@@ -69,11 +87,13 @@ export function replicaRelease(release) {
 
 /**
  * systemd-run's words for the replica: the sandbox, the bounds and the env. Every value is checked or this script's own.
- * @param {{ seconds: number, workers: number, seats: number, cells: string, host: string, publicKey: string, folder: string }} run
+ * @param {{ seconds: number, workers: number, seats: number, cells: string, host: string, publicKey: string, folder: string, database?: string }} run
  */
 export function unitArgs(run) {
   if (!/^100\.\d{1,3}\.\d{1,3}\.\d{1,3}$/u.test(run.host)) throw new Error(`${run.host} is not a tailnet address`);
-  const env = { PACK_ORIGIN, PACK_CACHE: `/var/cache/${UNIT}`, DATABASE_URL: 'memory:', SEAT_SECRET: randomBytes(32).toString('hex'),
+  const database = run.database ?? 'memory:';
+  if (database !== 'memory:' && !database.startsWith(`postgresql://${PG_ROLE}:`)) throw new Error('the replica saves in memory or on the scratch cluster');
+  const env = { PACK_ORIGIN, PACK_CACHE: `/var/cache/${UNIT}`, DATABASE_URL: database, SEAT_SECRET: randomBytes(32).toString('hex'),
     HOST: '127.0.0.1', PORT: String(INNER), RELEASE_CHANNEL: 'production', RELEASE_URL: pathToFileURL(join(run.folder, 'release.json')).href,
     RELEASE_PUBLIC_KEY: run.publicKey, WORLD_CELLS: run.cells, WORLD_WORKERS: String(run.workers), WORLD_SEATS: String(run.seats),
     TELEMETRY_URL: '', ERRORS_URL: '', SENTRY_DSN: '', RECORD_TAG: '', METRICS_PORT: '', PLAYTEST: '' };
@@ -102,7 +122,7 @@ export function doorArgs(run) {
 
 // The engine's test hands it a made-up /etc, its own key and stand-ins; never as root, so sudo cannot.
 const test = process.geteuid?.() !== 0 ? process.env.WILDSHARD_REPLICA_TEST : undefined;
-const ETC = `${test ?? ''}/etc/wildshard`, FOLDER = test !== undefined ? join(test, 'replica') : `/var/lib/${UNIT}`;
+const ETC = `${test ?? ''}/etc/wildshard`, PG_ETC = `${test ?? ''}/etc/postgresql/${PG_VERSION}/${CLUSTER}`, FOLDER = test !== undefined ? join(test, 'replica') : `/var/lib/${UNIT}`;
 const CLEAN = { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.UTF-8' };
 
 /** @param {string} message @returns {never} */
@@ -110,10 +130,36 @@ function stop(message) { console.error(`stop    ${message}`); process.exit(1); }
 /** One line on stderr, so stdout carries only the server's own lines. @param {string} what @param {string} message */
 function say(what, message) { try { console.error(`${what.padEnd(7)} ${message}`); } catch { /* the caller went away */ } }
 /** @param {string} command @param {string[]} args */
-function exec(command, args, inherit = false) {
+function exec(command, args, inherit = false, /** @type {string | undefined} */ input = undefined) {
   const stand = test !== undefined ? process.env[`WILDSHARD_REPLICA_TEST_${command.split('/').pop()?.replaceAll('-', '_').toUpperCase() ?? ''}`] : undefined;
   return spawnSync(stand ?? command, args, { encoding: 'utf8', cwd: '/', env: test !== undefined ? { ...process.env, ...CLEAN, PATH: process.env.PATH ?? CLEAN.PATH } : CLEAN,
-    stdio: inherit ? ['ignore', 'inherit', 'inherit'] : ['ignore', 'pipe', 'pipe'] });
+    ...(input === undefined ? {} : { input }), stdio: [input === undefined ? 'ignore' : 'pipe', inherit ? 'inherit' : 'pipe', inherit ? 'inherit' : 'pipe'] });
+}
+/** E7.4b.b: drop the scratch cluster if it exists. It holds only a replica's throwaway saves. */
+function dropScratch() {
+  if (existsSync(PG_ETC)) exec('/usr/bin/pg_dropcluster', ['--stop', PG_VERSION, CLUSTER]);
+}
+/** E7.4b.b: a fresh scratch cluster with the replica's role and database; its DATABASE_URL, or a stop. */
+function makeScratch() {
+  dropScratch();
+  const password = randomBytes(24).toString('hex');
+  /** @type {[string, string[]][]} */
+  const steps = [
+    ['/usr/bin/pg_createcluster', [PG_VERSION, CLUSTER, '--port', String(PG_PORT)]],
+    ['/usr/bin/pg_conftool', [PG_VERSION, CLUSTER, 'set', 'listen_addresses', '']],
+  ];
+  for (const [command, args] of steps) if (exec(command, args).status !== 0) { dropScratch(); stop(`${command.split('/').pop() ?? command} failed for the scratch cluster`); }
+  writeFileSync(join(PG_ETC, 'pg_hba.conf'), SCRATCH_HBA, { mode: 0o640 });
+  // Never started by a boot: a cluster a killed run left behind waits, stopped, for the next start or stop to drop it.
+  writeFileSync(join(PG_ETC, 'start.conf'), 'manual\n', { mode: 0o644 });
+  if (exec('/usr/bin/pg_ctlcluster', [PG_VERSION, CLUSTER, 'start']).status !== 0) { dropScratch(); stop('the scratch cluster did not start'); }
+  // The password goes on stdin, never argv, so no process list shows it.
+  const sql = `CREATE ROLE ${PG_ROLE} LOGIN PASSWORD '${password}';\nCREATE DATABASE ${PG_DATABASE} OWNER ${PG_ROLE};\n`;
+  if (exec('/usr/sbin/runuser', ['-u', 'postgres', '--', '/usr/bin/psql', '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-p', String(PG_PORT), '-d', 'postgres'], false, sql).status !== 0) {
+    dropScratch(); stop('the scratch cluster refused its role or database');
+  }
+  say('ok', `scratch cluster ${PG_VERSION}/${CLUSTER} on port ${String(PG_PORT)}, socket only`);
+  return scratchUrl(password);
 }
 /** staging.env's value for a key, as systemd reads it; only RELEASE_URL and BUNDLE_ORIGIN are asked for. @param {string} key */
 function stagingEnv(key) {
@@ -133,18 +179,25 @@ async function fetchCapped(url, limit) {
 }
 const UNITS = [`${UNIT}.service`, `${DOOR}.socket`, `${DOOR}.service`];
 const running = () => exec('/usr/bin/systemctl', ['is-active', '--quiet', `${UNIT}.service`]).status === 0;
-const end = () => { exec('/usr/bin/systemctl', ['stop', ...UNITS]); rmSync(FOLDER, { recursive: true, force: true }); };
+const end = () => { exec('/usr/bin/systemctl', ['stop', ...UNITS]); dropScratch(); rmSync(FOLDER, { recursive: true, force: true }); };
 
 async function main() {
   const [verb, ...args] = process.argv.slice(2);
   if (test === undefined) process.chdir('/');
   if (verb === 'stop' && args.length === 0) {
     end();
-    say('ok', `${UNIT} and ${DOOR} stopped; ${FOLDER} removed`);
+    say('ok', `${UNIT} and ${DOOR} stopped; scratch cluster dropped; ${FOLDER} removed`);
+    return 0;
+  }
+  if (verb === 'pg-restart' && args.length === 0) {
+    if (!existsSync(PG_ETC) || !running()) stop('no replica runs on the scratch cluster (start one with --saves postgres)');
+    const started = Date.now(), restarted = exec('/usr/bin/systemctl', ['restart', PG_UNIT]);
+    if (restarted.status !== 0) stop(`${PG_UNIT} did not restart`);
+    console.info(JSON.stringify({ at: 'scratch.restarted', unit: PG_UNIT, ms: Date.now() - started }));
     return 0;
   }
   const bounds = verb === 'start' ? limits(args) : null;
-  if (bounds === null) stop('usage: replica.mjs start <seconds 60-3900> <workers 1-4> <seats 1-64> <cells> | stop');
+  if (bounds === null) stop('usage: replica.mjs start <seconds 60-3900> <workers 1-4> <seats 1-64> <cells> [memory|postgres] | pg-restart | stop');
   // One start at a time, held for the whole run: a second waits for nothing and stops, so it never wipes the first's folder
   // or stops its units (flock -E 75 on a lock in /run, which a reboot clears).
   if (test === undefined && process.env.WILDSHARD_REPLICA_LOCKED !== '1') {
@@ -181,10 +234,11 @@ async function main() {
   writeFileSync(join(FOLDER, 'release.json'), own.text, { mode: 0o644 });
   chmodSync(join(FOLDER, 'release.json'), 0o644);
 
-  const words = unitArgs({ ...bounds, host, publicKey: own.publicKey, folder: FOLDER }), door = doorArgs({ seconds: bounds.seconds, host });
+  const database = bounds.saves === 'postgres' ? makeScratch() : 'memory:';
+  const words = unitArgs({ ...bounds, host, publicKey: own.publicKey, folder: FOLDER, database }), door = doorArgs({ seconds: bounds.seconds, host });
   if (exec('/usr/bin/systemd-run', door).status !== 0) { end(); stop(`${DOOR} did not open ${host}:${String(PORT)}`); }
   // The first stdout line says which build runs, so mmo-bots.mjs checks it against the bots' own before a hello.
-  console.info(JSON.stringify({ at: 'replica', build: release.engineBuild, serial: release.serial, host, port: PORT, cpus: CPUS, seconds: bounds.seconds }));
+  console.info(JSON.stringify({ at: 'replica', build: release.engineBuild, serial: release.serial, host, port: PORT, cpus: CPUS, seconds: bounds.seconds, saves: bounds.saves }));
   say('run', `${UNIT} on ${host}:${String(PORT)}, CPUs ${CPUS}, ${String(bounds.workers)} workers, ${String(bounds.seats)} seats, at most ${String(bounds.seconds)} s`);
   const served = exec('/usr/bin/systemd-run', words, true);
   end();

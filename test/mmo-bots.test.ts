@@ -181,3 +181,18 @@ test("MP1.2.d: a refused box start never stops another lane's replica", () => {
   const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', '--box', '--workers', '1;id'], { encoding: 'utf8', timeout: 10_000 });
   expect(run.status).not.toBe(0);
 });
+
+test('MMO-SERVER E7.4b.c: scratch saves only on the box replica, and one restart inside the run, through the helper', () => {
+  for (const [args, why] of [
+    [['replica', '--box-saves', 'postgres'], '--box-saves is memory or postgres, with --box'],
+    [['replica', '--box', '--box-saves', 'main'], '--box-saves is memory or postgres, with --box'],
+    [['replica', '--box', '--pg-restart-at', '30'], '--pg-restart-at is a second inside the run'],
+    [['replica', '--box', '--box-saves', 'postgres', '--seconds', '60', '--pg-restart-at', '60'], '--pg-restart-at is a second inside the run'],
+  ] as const) {
+    const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', ...args], { encoding: 'utf8', timeout: 10_000 });
+    expect(run.status, args.join(' ')).not.toBe(0);
+    expect(run.stderr, args.join(' ')).toContain(why);
+  }
+  expect(driver).toContain("'sudo -n /usr/local/sbin/wildshard-config replica pg-restart'");
+  expect(driver).toContain(' --saves ${boxSaves}');
+});

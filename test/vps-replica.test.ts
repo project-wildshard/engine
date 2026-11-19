@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path'
 
 import { afterEach, expect, test } from 'vitest'
 
-import { doorArgs, limits, RELEASE_PUBLIC_KEY, replicaRelease, stagingRelease, unitArgs } from '../scripts/vps/replica.mjs'
+import { doorArgs, limits, RELEASE_PUBLIC_KEY, replicaRelease, SCRATCH_HBA, scratchUrl, stagingRelease, unitArgs } from '../scripts/vps/replica.mjs'
 
 const REPLICA = resolve('scripts/vps/replica.mjs'), CONFIG = resolve('scripts/vps/wildshard-config')
 const key = generateKeyPairSync('ed25519')
@@ -81,7 +81,7 @@ test('the unit is sandboxed, bounded, on staging CPUs and the tailnet, and holds
 })
 
 test('the bounds: 60 to 3,900 seconds, 1 to 4 workers, 1 to 64 seats, up to 8 cell slugs', () => {
-  expect(limits(['1800', '4', '32', 'driftwood-isle'])).toEqual({ seconds: 1800, workers: 4, seats: 32, cells: 'driftwood-isle' })
+  expect(limits(['1800', '4', '32', 'driftwood-isle'])).toEqual({ seconds: 1800, workers: 4, seats: 32, cells: 'driftwood-isle', saves: 'memory' })
   for (const bad of [['59', '4', '32', 'a'], ['3901', '4', '32', 'a'], ['600', '5', '32', 'a'], ['600', '4', '65', 'a'], ['600', '4', '0', 'a'],
     ['600', '4', '32', 'A;rm'], ['600', '4', '32', 'a,b,c,d,e,f,g,h,i'], ['600', '4', '32']])
     expect(limits(bad), bad.join(' ')).toBeNull()
@@ -114,6 +114,12 @@ function box(bundleSha?: string) {
     WILDSHARD_REPLICA_TEST_TAILSCALE: stand('tailscale', 'echo 100.70.1.2'),
     WILDSHARD_REPLICA_TEST_SYSTEMD_RUN: stand('systemd-run', `[ "$1" = --unit=wildshard-replica-door ] && exit 0; cat "${root}/replica/release.json" > "${root}/seen-release.json"; ls -l "${root}/replica/release.json" | cut -c1-10 > "${root}/seen-mode"; ls "${root}/replica/server" > "${root}/seen-server"; echo '{"at":"worker","p95":1}'`),
     WILDSHARD_REPLICA_TEST_CHMOD: stand('chmod', 'exit 0'),
+    // E7.4b.b: the scratch cluster's tools. createcluster makes its conf folder, dropcluster removes it, runuser keeps its SQL.
+    WILDSHARD_REPLICA_TEST_PG_CREATECLUSTER: stand('pg_createcluster', `mkdir -p "${root}/etc/postgresql/16/wildshard-replica" && echo planted > "${root}/etc/postgresql/16/wildshard-replica/pg_hba.conf"`),
+    WILDSHARD_REPLICA_TEST_PG_CONFTOOL: stand('pg_conftool', 'exit 0'),
+    WILDSHARD_REPLICA_TEST_PG_CTLCLUSTER: stand('pg_ctlcluster', `cp "${root}/etc/postgresql/16/wildshard-replica/pg_hba.conf" "${root}/seen-hba"`),
+    WILDSHARD_REPLICA_TEST_PG_DROPCLUSTER: stand('pg_dropcluster', `rm -rf "${root}/etc/postgresql/16/wildshard-replica"`),
+    WILDSHARD_REPLICA_TEST_RUNUSER: stand('runuser', `cat > "${root}/seen-sql"`),
   }
   return { root, env, calls: () => readFileSync(log, 'utf8') }
 }
@@ -173,6 +179,83 @@ test('wildshard-config replica passes only checked words to the root-owned helpe
   rmSync(seen)
   for (const bad of [['--seconds', '4000'], ['--workers', '9'], ['--seats', '100'], ['--cells', 'a;b'], ['--host', '0.0.0.0'], ['--seconds']]) {
     const run = config('replica', 'start', ...bad)
+    expect(run.status, bad.join(' ')).toBe(1)
+    expect(run.stderr).toContain('usage: wildshard-config replica start')
+  }
+  expect(existsSync(seen)).toBe(false)
+})
+
+test('E7.4b.b: the bounds take memory or postgres saves, and the scratch URL is the replica role on its own socket port', () => {
+  expect(limits(['600', '2', '16', 'driftwood-isle', 'postgres'])).toEqual({ seconds: 600, workers: 2, seats: 16, cells: 'driftwood-isle', saves: 'postgres' })
+  expect(limits(['600', '2', '16', 'driftwood-isle'])?.saves).toBe('memory')
+  for (const bad of [['600', '2', '16', 'a', 'pg'], ['600', '2', '16', 'a', 'postgres', 'x']]) expect(limits(bad), bad.join(' ')).toBeNull()
+  const password = 'a'.repeat(48)
+  expect(scratchUrl(password)).toBe(`postgresql://replica:${password}@localhost:5439/saves_replica?host=/var/run/postgresql`)
+  expect(() => scratchUrl("x';--")).toThrow('hex')
+  const words = unitArgs({ seconds: 600, workers: 2, seats: 16, cells: 'a', host: '100.70.1.2', publicKey: 'ab', folder: '/x', database: scratchUrl(password) })
+  expect(words).toContain(`DATABASE_URL=${scratchUrl(password)}`)
+  for (const database of ['postgresql:///saves_staging?host=/var/run/postgresql', 'postgresql:///saves_production?host=/var/run/postgresql'])
+    expect(() => unitArgs({ seconds: 600, workers: 2, seats: 16, cells: 'a', host: '100.70.1.2', publicKey: 'ab', folder: '/x', database })).toThrow('scratch cluster')
+  expect(SCRATCH_HBA).toBe('local all postgres peer\nlocal saves_replica replica scram-sha-256\n')
+  // Nothing in the helper names the channels' cluster or databases.
+  const source = readFileSync(REPLICA, 'utf8')
+  for (const name of ['16-main', "'main'", 'saves_production', 'saves_staging', '5432']) expect(source, name).not.toContain(name)
+})
+
+test('E7.4b.b: a postgres start makes the scratch cluster, keeps the password off argv, and stop leaves no cluster', () => {
+  const { root, env, calls } = box()
+  const run = spawnSync('node', [REPLICA, 'start', '600', '2', '16', 'driftwood-isle', 'postgres'], { encoding: 'utf8', env })
+  expect(run.status, run.stderr).toBe(0)
+  const asked = calls(), sql = readFileSync(join(root, 'seen-sql'), 'utf8')
+  const password = /PASSWORD '([0-9a-f]{48})'/u.exec(sql)?.[1] ?? ''
+  expect(password).toMatch(/^[0-9a-f]{48}$/u)
+  expect(sql).toContain('CREATE DATABASE saves_replica OWNER replica;')
+  expect(asked).toContain('pg_createcluster 16 wildshard-replica --port 5439')
+  expect(asked).toContain('pg_conftool 16 wildshard-replica set listen_addresses')
+  expect(asked).toContain('pg_ctlcluster 16 wildshard-replica start')
+  expect(asked).toContain('runuser -u postgres -- /usr/bin/psql -X -q -v ON_ERROR_STOP=1 -p 5439 -d postgres')
+  expect(asked.split('\n').filter(line => !line.startsWith('systemd-run')).join('\n')).not.toContain(password)
+  expect(asked).toContain(`DATABASE_URL=postgresql://replica:${password}@localhost:5439/saves_replica?host=/var/run/postgresql`)
+  expect(readFileSync(join(root, 'seen-hba'), 'utf8')).toBe(SCRATCH_HBA)
+  expect(asked).toContain('pg_dropcluster --stop 16 wildshard-replica')
+  expect(JSON.parse(run.stdout.trim().split('\n')[0] ?? '{}')).toMatchObject({ at: 'replica', saves: 'postgres' })
+  expect(existsSync(join(root, 'etc/postgresql/16/wildshard-replica'))).toBe(false)
+  expect(existsSync(join(root, 'replica'))).toBe(false)
+})
+
+test('E7.4b.b: pg-restart restarts only the scratch cluster, and only while a replica runs on it', () => {
+  const { root, env, calls } = box()
+  const none = spawnSync('node', [REPLICA, 'pg-restart'], { encoding: 'utf8', env: { ...env, ACTIVE: '0' } })
+  expect(none.status).toBe(1)
+  expect(none.stderr).toContain('no replica runs on the scratch cluster')
+  mkdirSync(join(root, 'etc/postgresql/16/wildshard-replica'), { recursive: true })
+  const idle = spawnSync('node', [REPLICA, 'pg-restart'], { encoding: 'utf8', env })
+  expect(idle.status).toBe(1)
+  const run = spawnSync('node', [REPLICA, 'pg-restart'], { encoding: 'utf8', env: { ...env, ACTIVE: '0' } })
+  expect(run.status, run.stderr).toBe(0)
+  expect(JSON.parse(run.stdout.trim())).toMatchObject({ at: 'scratch.restarted', unit: 'postgresql@16-wildshard-replica.service' })
+  expect(calls()).toContain('systemctl restart postgresql@16-wildshard-replica.service')
+  expect(calls()).not.toContain('16-main')
+  const stop = spawnSync('node', [REPLICA, 'stop'], { encoding: 'utf8', env })
+  expect(stop.status).toBe(0)
+  expect(calls()).toContain('pg_dropcluster --stop 16 wildshard-replica')
+  expect(existsSync(join(root, 'etc/postgresql/16/wildshard-replica'))).toBe(false)
+})
+
+test('E7.4b.b: wildshard-config passes --saves and pg-restart through, and nothing else', () => {
+  const root = scratch(), seen = join(root, 'seen'), helper = join(root, 'replica.mjs')
+  writeFileSync(helper, `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(seen)}, process.argv.slice(2).join(' '))\n`)
+  const config = (...args: string[]) => spawnSync('python3', [CONFIG, ...args], { encoding: 'utf8',
+    env: { PATH: process.env['PATH'] ?? '', WILDSHARD_CONFIG_TEST_ROOT: root, WILDSHARD_CONFIG_TEST_REPLICA: helper } })
+  expect(config('replica', 'start', '--saves', 'postgres', '--workers', '2').status).toBe(0)
+  expect(readFileSync(seen, 'utf8')).toBe('start 1800 2 32 driftwood-isle postgres')
+  expect(config('replica', 'start', '--saves', 'memory').status).toBe(0)
+  expect(readFileSync(seen, 'utf8')).toBe('start 1800 4 32 driftwood-isle')
+  expect(config('replica', 'pg-restart').status).toBe(0)
+  expect(readFileSync(seen, 'utf8')).toBe('pg-restart')
+  rmSync(seen)
+  for (const bad of [['start', '--saves', 'main'], ['start', '--saves', 'postgres;id'], ['pg-restart', 'main']]) {
+    const run = config('replica', ...bad)
     expect(run.status, bad.join(' ')).toBe(1)
     expect(run.stderr).toContain('usage: wildshard-config replica start')
   }
