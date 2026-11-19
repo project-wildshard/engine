@@ -61,6 +61,12 @@ describe('the catalogue a page reads', () => {
     expect(() => { assertShardSlug('profile'); }).toThrow('private save namespace');
   });
 
+  it('uses the cell identity when a placed zone has no stand-alone catalogue row', () => {
+    installCatalogue({ ...added, placements: shipped.placements });
+    expect(catalogueInstance('test-shard')).toBe('test-shard');
+    expect(() => catalogueInstance('missing')).toThrow('Unknown built-in instance');
+  });
+
   it('lists a placed head the build has no card for, and only that', () => {
     const rows = [title('driftwood-isle'), title('_proto')];
     expect(withCatalogueHeads(rows)).toBe(rows);

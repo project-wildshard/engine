@@ -1,0 +1,64 @@
+.ws-explore-index {
+  position: fixed;
+  z-index: 190;
+  inset: 0;
+  overflow: auto;
+  padding: max(30px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right))
+    max(30px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+  color: #edf7f5;
+  background: #081817;
+  font-family: Rajdhani, system-ui, sans-serif;
+  touch-action: pan-y;
+}
+
+.ws-explore-index h1 {
+  max-width: 68rem;
+  margin: 0 auto 20px;
+  font-size: clamp(2rem, 7vw, 3.5rem);
+  line-height: 1;
+}
+
+.ws-explore-index ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 14px;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-explore-index a {
+  position: relative;
+  display: grid;
+  align-items: end;
+  aspect-ratio: 16 / 10;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid #345953;
+  border-radius: 8px;
+  background: #183632;
+  color: inherit;
+  text-decoration: none;
+}
+
+.ws-explore-index a:hover,
+.ws-explore-index a:focus-visible {
+  outline: 2px solid #8febd6;
+  outline-offset: 3px;
+}
+
+.ws-explore-index img {
+  position: absolute;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ws-explore-index span {
+  padding: 1.4rem 12px 8px;
+  background: linear-gradient(transparent, #060c0bf2);
+  font-size: clamp(1.2rem, 4vw, 1.5rem);
+  font-weight: 700;
+}

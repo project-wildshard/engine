@@ -96,7 +96,8 @@ persistHomeScreen();
 definePageSaveKeys(saves);
 /** the page's address as the boot reads it; a same-page entry (ZE10a3) reads it again for its next session */
 let search = new URLSearchParams(location.search);
-if (exploreChannel()) {
+const exploreIndex = exploreChannel() && location.pathname === '/' && !search.has('chunk');
+if (exploreChannel() && !exploreIndex) {
   search = exploreBootParams(search);
   history.replaceState(history.state, '', `${location.pathname}?${search.toString()}${location.hash}`);
 }
@@ -137,6 +138,7 @@ function learnPlacedCellsOnce(): Promise<void> {
   return Promise.race([read, deadline]);
 }
 async function enterPage(): Promise<unknown> {
+  if (exploreIndex) return showExploreIndex();
   if (pageServerRoute() === 'missing') {
     const { showError } = await import('@wildshard/engine/ui/ErrorModal');
     showError(MISSING_SERVER);
@@ -174,6 +176,7 @@ async function enterPage(): Promise<unknown> {
   // An embedded author product has its own admission. A game URL must name a
   // listed world before any discovery, tables or renderer can be prepared.
   if (requested !== null && document.getElementById('ws-shardfile') === null && findTitleManifest(requested) === undefined) {
+    if (exploreChannel()) return showExploreIndex(UNLISTED);
     document.documentElement.classList.add('title-first');
     return showPageTitle(UNLISTED);
   }
@@ -292,6 +295,11 @@ async function enterPage(): Promise<unknown> {
     return bootTask('app:main-import', () => import('./main'));
   })();
 }
+async function showExploreIndex(notice?: string): Promise<void> {
+  const { showExploreIndex: show } = await import('./exploreIndex');
+  show(entryScope, notice);
+}
+
 function preparePageTitleImports() {
   return prepareBootImports(Promise.all([import('@wildshard/engine/ui/StartTitle'),
     import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel')]));
