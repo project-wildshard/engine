@@ -91,6 +91,31 @@ const readBlob = (object, size) => execFileSync('git', ['cat-file', 'blob', obje
 const isShell = (path) => path.endsWith('.sh') || /^\.githooks\/[^/.]+$/.test(path);
 
 /**
+ * Reviewed false positives (secret-false-positives.json): one line of one exact blob, by its object id, path and line.
+ * A blob id names those exact bytes, so an entry never covers a later edit, and every other line is still scanned.
+ * History scans (a main dispatch, a release branch) re-read old commits, where a per-push ALLOW_SECRET cannot reach.
+ * @type {readonly {blob: string, path: string, line: number}[]}
+ */
+const FALSE_POSITIVES = JSON.parse(readFileSync(new URL('./secret-false-positives.json', import.meta.url), 'utf8')).entries;
+
+/**
+ * The credential problem in one blob's text: the first line a pattern matches that no reviewed entry names.
+ * @param {string} path @param {string} object @param {string} text
+ * @param {readonly {blob: string, path: string, line: number}[]} [reviewed]
+ * @returns {string[]}
+ */
+export function secretProblems(path, object, text, reviewed = FALSE_POSITIVES) {
+  const lines = text.split('\n');
+  /** @param {number} index */
+  const listed = (index) => reviewed.some((row) => row.blob === object && row.path === path && row.line === index + 1);
+  for (const [name, pattern] of SECRETS) {
+    const at = lines.findIndex((line, index) => pattern.test(line) && !listed(index));
+    if (at !== -1) return [`${path}:${at + 1}: looks like a ${name}. Reference where it lives, never the value (ALLOW_SECRET=1 for a false positive)`];
+  }
+  return [];
+}
+
+/**
  * Check one blob. `entry` is { path, object, mode }.
  * @returns {string[]} problems; empty when clean.
  */
@@ -106,16 +131,7 @@ export function checkBlob(entry, size, env = process.env) {
   if (bytes.subarray(0, 8000).includes(0)) return problems; // binary
 
   const text = bytes.toString('utf8');
-  if (env.ALLOW_SECRET !== '1') {
-    for (const [name, pattern] of SECRETS) {
-      const lines = text.split('\n');
-      const at = lines.findIndex((line) => pattern.test(line));
-      if (at !== -1) {
-        problems.push(`${path}:${at + 1}: looks like a ${name}. Reference where it lives, never the value (ALLOW_SECRET=1 for a false positive)`);
-        break;
-      }
-    }
-  }
+  if (env.ALLOW_SECRET !== '1') problems.push(...secretProblems(path, object, text));
 
   let check;
   if (isShell(path)) check = spawnSync('bash', ['-n'], { input: bytes, encoding: 'utf8' });
