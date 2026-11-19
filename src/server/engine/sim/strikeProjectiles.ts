@@ -54,6 +54,8 @@ export class StrikeProjectiles implements SimStateAdapter {
     slot.spec = spec;
     slot.pos.copy(from);
     slot.vel.set(at.x, at.y, at.z).sub(from).normalize().multiplyScalar(projectile.speed);
+    const { x, y, z } = from, dir = this.direction.copy(slot.vel).normalize();
+    this.host.events.emit('strike.flight', { source, at: { x, y, z }, dir: { x: dir.x, y: dir.y, z: dir.z }, speed: projectile.speed, gravity: projectile.gravity });
   }
   step(dt: number): void { this.pool.step(dt); }
   removeSource(source: string): void {

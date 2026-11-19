@@ -25,6 +25,14 @@ export function projectileFlightStep(pos: Vector3, vel: Vector3, h: number,
   pos.addScaledVector(vel, h);
 }
 
+/** ONE-FORMAT CC18c: where a drag- and wind-free flight stands after `steps` steps of `h` from `at` along unit `dir` at
+ *  `speed`: `projectileFlightStep`'s semi-implicit law in closed form (velocity falls first, then moves the point), so a
+ *  page flies a server's flight from one event. A fractional `steps` lands between two steps on the same curve. */
+export function flightPoint(at: Readonly<{ x: number; y: number; z: number }>, dir: Readonly<{ x: number; y: number; z: number }>,
+  speed: number, gravity: number, h: number, steps: number, out: Vector3): Vector3 {
+  const t = steps * h;
+  return out.set(at.x + dir.x * speed * t, at.y + dir.y * speed * t - gravity * h * h * steps * (steps + 1) / 2, at.z + dir.z * speed * t);
+}
 
 /** Mechanical flight-slot state; presentation/ammunition data is borrowed. */
 export interface FlightSlotState { pos: Vector3; vel: Vector3; active: boolean; age: number; glanced: boolean }

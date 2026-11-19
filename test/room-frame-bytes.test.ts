@@ -85,8 +85,9 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
  *  Restored cell positions and distance tiers by recognizing the decoded wire zero (old: fa844910). Re-taken for ONE-FORMAT
  *  CC11a2c (wire 1.4): every creature row carries its running ability and how far through, zero when none (old: cdbcfce3).
  *  Re-taken for NL14b1 (J280): `slideOffBank` measures the bank as the terrain's slope across the nearest point and drops
- *  the push into it on a ramp across the climb limit (old law: 388e1517). */
-const EXPECTED = '8e8f6a3a88ef27c5b76046243e473dda58a584d806ea474f772aedf877d6ad0c';
+ *  the push into it on a ramp across the climb limit (old law: 388e1517). Re-taken for ONE-FORMAT CC18c (wire 1.5): the
+ *  welcome's event table gains event 16 `flight` (old: 8e8f6a3a). */
+const EXPECTED = 'cb46bc6896a8e9bd73e9c9c2c18be89bfe97f7012c8bd89bddfc52ba207ad926';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
  *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. Re-taken
  *  for RP6 as above. Re-taken for GC36 and NL13 as above. Re-taken for Nalati continuation af0adf3f:
@@ -95,5 +96,5 @@ const EXPECTED = '8e8f6a3a88ef27c5b76046243e473dda58a584d806ea474f772aedf877d6ad
  *  Re-taken for NL13b4 as above (old law: cd2d9048). Re-taken for CC28a as above (old: f231d52d). Re-taken for NL14b2 as
  *  above (old law: 9b5c9aad). Re-taken for MP1.5b as above (old: 620028c6), and for MP5.2b as above (old: 8dd4d5a6).
  *  Restored cell positions and distance tiers as above (old: 3c9036b7). Re-taken for CC11a2c as above (old: e8e25c9d).
- *  Re-taken for NL14b1 as above (old law: c1823a44). */
-const EXPECTED_ROOM = '35acd7ed03365af8c9e33413c1e2cb690764428a852a39af4d6e9acf20848c52';
+ *  Re-taken for NL14b1 as above (old law: c1823a44), and for CC18c as above (old: 35acd7ed). */
+const EXPECTED_ROOM = '978e70bd684148ec6d2fcc34ec9c67589d25d0a13c7211e94e393563424b6be7';

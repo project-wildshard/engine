@@ -19,7 +19,7 @@ import { snapshotOf } from '../../../shared/engine/net/wireFrames';
 import { eventsMessage, eventsMessages, welcomeMessage, WireClientReader, type Span } from '../../../shared/engine/net/wireMessages';
 import { NetHandles } from './handles';
 import { GUEST, NetIdentitySchema, type NetIdentity } from '../../../shared/engine/net/identity';
-import type { NetDied, NetPlayerDied, NetView, NetEvent, NetHit, NetReward } from '../../../shared/engine/net/messages';
+import type { NetDied, NetFlight, NetPlayerDied, NetView, NetEvent, NetHit, NetReward } from '../../../shared/engine/net/messages';
 import type { NetClass, NetRefs } from '../../../shared/engine/net/schema';
 import { roadPlaceOf } from '../../../shared/engine/net/netSchemas';
 import type { FightViewCall } from '../../../shared/engine/sim/shardRows';
@@ -121,7 +121,7 @@ function freshViews(rows: readonly RoomCombat[]): readonly RoomCombat[] {
   for (const [index, row] of rows.entries()) if (row.kind === 'view') last.set(key(row), index);
   return last.size === 0 ? rows : rows.filter((row, index) => row.kind !== 'view' || last.get(key(row)) === index);
 }
-type RoomCombat = NetView | NetDied | NetPlayerDied | (NetHit & { readonly landedBy: string | null; readonly seen?: readonly [number, number, number] }) | (NetReward & { readonly owner: string });
+type RoomCombat = NetView | NetDied | NetPlayerDied | NetFlight | (NetHit & { readonly landedBy: string | null; readonly seen?: readonly [number, number, number] }) | (NetReward & { readonly owner: string });
 interface RoomClient {
   readonly id: number; readonly transport: Transport; readonly queue: CommandQueue; readonly player: NetPlayer;
   /** Who it said it is at `hello` (J111). A hand-off keeps it. */
@@ -316,6 +316,7 @@ export class NetRoom {
       if (row.kind === 'view') { this.combat.push(row); continue; }
       if (row.kind === 'reward') { const { player, ...reward } = row; this.combat.push({ ...reward, body: refs(row.body), owner: player }); continue; }
       if (row.kind === 'player-died') { const id = refs(row.id); if (id !== 0) this.combat.push({ ...row, id }); continue; }
+      if (row.kind === 'flight') { const source = refs(row.source); if (source !== 0) this.combat.push({ ...row, source }); continue; }
       if (row.kind === 'hit') { const target = refs(row.target); if (target !== 0) { const { by, seq, ...hit } = row; this.combat.push({ ...hit, target, confirmFor: seq, landedBy: by }); } }
       else { const id = refs(row.id); if (id !== 0) this.combat.push({ ...row, id, by: row.by === null ? 0 : refs(row.by) }); }
     }
@@ -534,6 +535,7 @@ export class NetRoom {
       if (row.kind === 'reward') { if (row.owner === client.player.id) { const { owner: _owner, ...reward } = row; events.push(reward); } continue; }
       if (row.kind === 'died') { if (row.id === own || client.known.has(row.id)) events.push(row); continue; }
       if (row.kind === 'player-died') { if (row.id === own) events.push(row); continue; }
+      if (row.kind === 'flight') { if (client.known.has(row.source)) events.push(row); continue; } // CC18c: those who see its creature
       const { landedBy, seen, ...hit } = row, owned = landedBy === client.player.id;
       if (row.target !== own && !owned && !client.known.has(row.target)) continue;
       // the shooter's spark goes where it saw the body, everyone else's where the body is (J47, J50)

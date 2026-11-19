@@ -18,7 +18,7 @@ import { readMessage, TAG_EVENTS } from '@wildshard/wire/game';
 import { decodeWelcome } from '@wildshard/wire/handshake';
 import { WireFrameReader } from '../../../shared/engine/net/wireFrames';
 import { actMessage, commandsMessage, eventsReader, helloMessage, type Span } from '../../../shared/engine/net/wireMessages';
-import type { NetEvent, NetView, NetCombatEvent, NetPlayerDied, NetRide, NetTravel, NetWelcome } from '../../../shared/engine/net/messages';
+import type { NetEvent, NetFlight, NetView, NetCombatEvent, NetPlayerDied, NetRide, NetTravel, NetWelcome } from '../../../shared/engine/net/messages';
 import { FLAG_CLASS, netClassOf, PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import { FLAG_PREFIX, STATE_PREFIX } from '../../../shared/engine/net/shardNet';
 import type { NetClass, NetValue } from '../../../shared/engine/net/schema';
@@ -75,6 +75,7 @@ export class NetClient {
   private readonly deaths = new Set<(event: NetPlayerDied) => void>();
   private deathTick = -1;
   private readonly fightViews = new Set<(view: NetView) => void>();
+  private readonly flights = new Set<(flight: NetFlight) => void>();
   private readonly travels = new Set<(event: NetTravel) => void>();
   private readonly rides = new Set<(event: NetRide) => void>();
   /** The last ledger serial this client has: pass it to `hello` when it comes back, and it hears only what it missed. */
@@ -162,6 +163,8 @@ export class NetClient {
   get stats():Transport['stats']{return this.transport.stats;}
   /** Call for every look a fight tells its views; returns the unsubscribe. */
   onView(listener: (view: NetView) => void): () => void { this.fightViews.add(listener); return () => { this.fightViews.delete(listener); }; }
+  /** ONE-FORMAT CC18c: a creature's strike launched a projectile this client can see the creature of. */
+  onFlight(listener: (flight: NetFlight) => void): () => void { this.flights.add(listener); return () => { this.flights.delete(listener); }; }
   /** Call for every settled hit and death (P1-E3.2); returns the unsubscribe. */
   onCombat(listener: (event: NetCombatEvent) => void): () => void { this.fights.add(listener); return () => { this.fights.delete(listener); }; }
   /** Own-player health death once per tick, at receipt before an owner frame can move the page. */
@@ -321,6 +324,7 @@ export class NetClient {
       }
       if (event.kind === 'hit' || event.kind === 'died' || event.kind === 'reward') { for (const listener of this.fights) listener(event); this.delivery.receive(event); continue; }
       if (event.kind === 'view') { for (const listener of this.fightViews) listener(event); continue; }
+      if (event.kind === 'flight') { for (const listener of this.flights) listener(event); continue; }
       if (event.kind === 'quest') { this.quests.set(event.quest, event); continue; }
       if (event.kind === 'ledger') { this.receipt(event); continue; }
       if (event.kind === 'owned') { if (event.value === 0) this.owned.delete(event.name); else this.owned.set(event.name, event.value); this.ownedVersion++; continue; }

@@ -2,6 +2,7 @@
 // reconciles, and every creature is an interpolated row drawn by the real views.
 import type { CreatureSkinClipName } from '@wildshard/format/skinData';
 import { AbilityTells } from './abilityTell';
+import { StrikeFlights } from './strikeFlight';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { DevBox, DevGround } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
@@ -695,8 +696,14 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   scope.onDispose(client.onView(({ name }) => { heard[name] = (heard[name] ?? 0) + 1; }));
   const contacts: NetCombatEvent[] = [];
   scope.onDispose(client.onTravel(() => { contacts.length = 0; near.length = 0; }));
+  // CC18c: a creature's projectiles, each flown from its `flight` event; a crossing leaves them, a hit beside one ends it
+  const flights = new StrikeFlights(ports.scene);
+  scope.onDispose(client.onFlight(flight => { flights.add(flight); }));
+  scope.onDispose(client.onTravel(() => { flights.clear(); }));
+  scope.onDispose(() => { flights.clear(); });
   scope.onDispose(client.onCombat(event => {
     contacts.push(event);
+    if (event.kind === 'hit') flights.struck(event.at, event.tick);
     if (event.kind === 'hit' && event.target === client.welcome?.handle) ports.hurt(event.amount, new Vector3(...event.at), event.blow === true);
     else hurtOther(event, client.welcome?.handle, others); // REMOTE-PLAYERS RP10: a hit on another player flashes their body
     if (event.kind === 'hit' && event.confirmFor !== 0) { report.hits++; if (event.killed) report.kills++; }
@@ -777,7 +784,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     if (arrows !== undefined && arrows !== arrowsSaid) { arrowsSaid = arrows; ports.weapons.mirrorArrows(arrows - 1); }
     bindMount(); offerMounts(); seatMount(); bindClaw();
     const shown = showRows(client, ports, bodies, renderTick, dt, row, near, rideable, home);
-    others?.frame(renderTick, dt);
+    others?.frame(renderTick, dt); flights.show(renderTick);
     wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day()); decks.frame(renderTick);
     report.rows = animals === null ? animalRows(client) : shown; // a data cell's life draws them
     if (!quiet()) net.present(dt);

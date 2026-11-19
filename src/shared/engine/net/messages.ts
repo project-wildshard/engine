@@ -68,6 +68,9 @@ export interface NetPlayerDied { readonly kind: 'player-died'; readonly tick: nu
 export interface NetReward { readonly kind: 'reward'; readonly tick: number; readonly coins: number; readonly body: number; readonly item?: string }
 /** A fight told its views something: a tell, a ring, a glow. A client's room draws them in order, and nothing here decides. */
 export interface NetView { readonly kind: 'view'; readonly tick: number; readonly name: string; readonly args: readonly number[] }
+/** ONE-FORMAT CC18c (wire 1.5): a creature's strike launched a projectile from `at` along unit `dir` at `speed`, falling at `gravity`.
+ *  `source` is its creature's handle. Each page flies it by the server's law (`flightPoint`); no row carries it. */
+export interface NetFlight { readonly kind: 'flight'; readonly tick: number; readonly source: number; readonly at: NetVector; readonly dir: NetVector; readonly speed: number; readonly gravity: number }
 /** The events a settled fight sends. */
 export type NetCombatEvent = NetHit | NetDied | NetReward;
 /** A quest moved for this client's own player (P1-E3.3), or it joined: quest state is per player and goes only to its owner. */
@@ -82,7 +85,7 @@ interface NetRideChange<Kind extends string> { readonly kind: Kind; readonly tic
 export type NetRide = NetRideChange<'mount'> | NetRideChange<'dismount'>;
 /** One line of what this client's own player holds in this world, a purse's coins or a pack's count, as it changed. 0 is gone. */
 export interface NetOwned { readonly kind: 'owned'; readonly tick: number; readonly name: string; readonly value: number }
-export type NetEvent = NetSpawn | NetDespawn | NetCombatEvent | NetPlayerDied | NetView | NetQuest | NetPhase | NetTravel | NetLedger | NetChat | NetRide | NetOwned;
+export type NetEvent = NetSpawn | NetDespawn | NetCombatEvent | NetPlayerDied | NetView | NetFlight | NetQuest | NetPhase | NetTravel | NetLedger | NetChat | NetRide | NetOwned;
 /** The events' and commands' wire form, in NET_SCHEMA_HASH: a change here must refuse a stale client like a field table's does (J54). */
 export const NET_EVENT_FORMS = 'view:s,u8,f32n;hit:h16,f32,p48,b,b,b,u16;died:h16,h16,d24,f32;player-died:h16,b,b,?s,?s,b,?s;quest:s,b,b,s,u16;phase:s,b;reward:u32,h16,b,?s;travel:u16,u16;ledger:u32,u32,s,u2,s,f32,b;chat:u32,u32,b,h16,s,s;buttons:u8,b,u8;lockTarget:h16;hookTarget:u16;ride:u8;fresh:b;mount:h16,h16,u16;dismount:h16,h16,u16;rideWords:b,u8,f32;climate:b,s,f32;buy:u16;board:b,u16;wear:s;pose:s;owned:s,f32';
 /** The spawn's column widths, which only the receiver's class table knows. */
@@ -113,7 +116,8 @@ function readDied(reader: BitReader): NetDied {
   return { kind: 'died', tick: reader.read(32), id: reader.read(16), by: reader.read(16), dir: readVector(reader, 1, 8, UNIT_TOP), impulse: bitsToFloat(reader.read(32)) };
 }
 /** Encode an `events` message; `bits` gives the spawn fields' declared widths. */
-export function encodeEvents(writer: BitWriter, tick: number, events: readonly NetEvent[], bits: InitialBits): ArrayBuffer {
+export function encodeEvents(writer: BitWriter, tick: number, all: readonly NetEvent[], bits: InitialBits): ArrayBuffer {
+  const events = all.filter(event => event.kind !== 'flight'); // v0 is frozen: it has no flight form (wire 1.5 carries it)
   writer.write(MSG_EVENTS, 8); writer.write(tick, 32); writer.write(events.length, 16);
   for (const event of events) {
     if (event.kind === 'despawn') { writer.write(EVENT_DESPAWN, 8); writer.write(event.handle, 16); continue; }

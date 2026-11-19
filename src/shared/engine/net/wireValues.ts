@@ -70,7 +70,7 @@ export function fromWireEvent(event: WireEvent): NetEvent | null {
     }
     case 'quest': return { kind: 'quest', ...fields, step: fields['step'] ?? null } as unknown as NetEvent;
     case 'despawn': case 'died': case 'phase': case 'reward': case 'travel': case 'ledger': case 'chat': case 'mount':
-    case 'dismount': case 'owned': case 'view': case 'player-died':
+    case 'dismount': case 'owned': case 'view': case 'player-died': case 'flight':
       return { kind: event.event, ...fields } as unknown as NetEvent;
     default: return null;
   }

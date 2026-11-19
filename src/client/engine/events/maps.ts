@@ -21,6 +21,9 @@ export interface EventMap {
   /** J105: a personal roll paid out; only `player` hears of it. */
   'reward.granted': { player: string; coins: number; body: string; item?: string };
   'actor.died': { actor: Actor; req: DamageRequest };
+  /** ONE-FORMAT CC18c: a creature's strike launched a projectile (`strikeProjectiles.ts`) before its tick's flight step; the
+   *  wire's `flight` event says it. Plain points: a queued payload outlives the step, and a save holds it. */
+  'strike.flight': { source: string; at: { x: number; y: number; z: number }; dir: { x: number; y: number; z: number }; speed: number; gravity: number };
   'player.died': { actor: Actor; checkpoint: boolean; cause?: DeathCause };
   'player.respawned': { at: Vector3; checkpoint: boolean; player?: string };
   'practice.active': boolean;
