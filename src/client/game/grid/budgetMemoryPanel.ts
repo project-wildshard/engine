@@ -1,4 +1,5 @@
 import type { Scope } from '@wildshard/engine/app/scope';
+import { bootMemorySamples } from '@wildshard/engine/boot/bootTrace';
 import type { MemorySnapshot } from '@wildshard/engine/core/memoryAttribution';
 import model from '../../../../scripts/memory/phone-model.json';
 import { memorySubsystems, PHONE_MEMORY_BUDGETS, type BudgetLedger, type MemorySubsystem } from '@wildshard/engine/core/memoryBudget';
@@ -6,12 +7,36 @@ import { phoneFromLedger, type PhoneMemoryRange } from '@wildshard/engine/core/p
 import { memoryRows, type MemoryGrouping, type MemorySort } from './memoryRows';
 import type { PointsTone } from './budgetPoints';
 
-export interface PhoneBudgetReading { readonly ledger: BudgetLedger; readonly range: PhoneMemoryRange }
+export interface PhoneBudgetReading {
+  readonly ledger: BudgetLedger;
+  readonly range: PhoneMemoryRange;
+}
 export function readPhoneBudget(): PhoneBudgetReading | null {
   const reader = Reflect.get(globalThis, '__wildshardMemory') as { counters?: () => BudgetLedger } | null | undefined;
   if (typeof reader?.counters !== 'function') return null;
   const ledger = reader.counters();
   return { ledger, range: phoneFromLedger(ledger, model) };
+}
+
+let sampledBoot: ReturnType<typeof bootMemorySamples> | undefined;
+let sampledCount = 0;
+let sampledPeak: number | null = null;
+/** The largest EM11 estimate from this boot's live ledger samples. The
+ * peak-over-settled multiplier is for predicting an unseen boot from play. */
+export function readLoadingPeak(): number | null {
+  const samples = bootMemorySamples();
+  if (sampledBoot !== samples) {
+    sampledBoot = samples;
+    sampledCount = 0;
+    sampledPeak = null;
+  }
+  if (sampledCount === samples.length) return sampledPeak;
+  for (const { ram, gpu } of samples.slice(sampledCount)) {
+    const reading = phoneFromLedger({ ram: { bytes: ram }, gpu: { bytes: gpu } }, model).central;
+    sampledPeak = Math.max(sampledPeak ?? 0, reading);
+  }
+  sampledCount = samples.length;
+  return sampledPeak;
 }
 
 const SUBSYSTEM_NAMES: Readonly<Record<MemorySubsystem, string>> = {

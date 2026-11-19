@@ -2,14 +2,10 @@
  * The memory card (SHARD-PLATFORM SF38 / G30, rebuilt by G628's memory-strip rows M1 / M3 / M5 / M7): Developer mode only,
  * grid pages only. A14 (Jake, 2026-11-10: "MEM becomes a really small card at the top, labelled mem, right next to the FPS
  * chip"): a chip on the Developer dock (`perfDock.ts`) reading "mem 1.46" (GB), toned by its band, with a red "!" while a
- * shard is over its limit. A tap drops the panel: the headline against the phone's crash line, in plain words
- * ("MEM ≈1.46 GB / 2.15 · 3 WORLDS · +440 MB SINCE START"), its colour the danger band (amber from 1.5 GB, red from
- * 1.75 GB: D1, against the 17 Pro's ~2.15 GB WebContent jetsam line), and one red line per loaded shard over its own limit
- * (M4, `memoryWarning.ts`). The headline is the larger of the cost model (`allocator.cost().playing`) and what this page
- * measured (M5, D2): the native WebContent + GL reading when a harness lent one, else the engine base plus the observed GPU
- * storage and RAM. A tap expands the parts that add up to the model (M2's `budgetBreakdown`), the trend (M7: the headline
- * at each cell entry, the first and the last six), each world's shard limit alone and the observed allocations. Read
- * once a second, never per frame.
+ * shard is over its limit. The chip shows EM11's playing estimate and the largest sampled EM11 estimate
+ * through boot. The panel adds the playing upper bound, device crash line, world limits, entry trend,
+ * and observed allocations. Claims and observations can supply the labelled fallback before the ledger
+ * is available. The panel reads once a second.
  *
  * Costs nothing when off: no element and no timer exist until the Developer switch is on; switching it off stops the
  * timer and hides the strip (the trend still records each entry: one allocator read). Text is authored with
@@ -23,7 +19,7 @@ import { memoryAttribution, type MemorySnapshot } from '@wildshard/engine/core/m
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { budgetBreakdown, megabytes, PLATFORM_OWNER, readBudgetPoints, type BudgetPoints, type PointsTone } from './budgetPoints';
 import type { MemoryGrouping, MemorySort } from './memoryRows';
-import type { PhoneBudgetReading, readPhoneBudget, renderMemoryPanel } from './budgetMemoryPanel';
+import type { PhoneBudgetReading, readLoadingPeak, readPhoneBudget, renderMemoryPanel } from './budgetMemoryPanel';
 import './budgetOverlay.css';
 import { PHONE_MEMORY_LOADING_CAP_BYTES } from '@wildshard/engine/core/phoneMemoryCap';
 
@@ -33,6 +29,18 @@ export const MEMORY_AMBER: number = PHONE_MEMORY_LOADING_CAP_BYTES;
 export const MEMORY_RED = 1.75e9;
 /** iPhone 17 Pro WebContent jetsam log, ActiveHard 2048 MiB. https://developer.apple.com/forums/thread/823061 */
 export const CRASH_LINE: number = 2048 * 1024 ** 2;
+/** IP7 will replace this with the measured iPhone 13 WebContent line. */
+export const IPHONE_13_CRASH_LINE_UNMEASURED: number | null = null;
+
+/** Safari exposes screen geometry. Several iPhone models can share it. */
+export function phoneCrashLine(ua: string, width: number, height: number, dpr: number): { label: string; bytes: number | null } {
+  if (/\biPhone\b/u.test(ua) && dpr === 3) {
+    const short = Math.min(width, height), long = Math.max(width, height);
+    if (short === 390 && long === 844) return { label: 'IPHONE 13-CLASS', bytes: IPHONE_13_CRASH_LINE_UNMEASURED };
+    if (short === 402 && long === 874) return { label: 'IPHONE 17 PRO REFERENCE', bytes: CRASH_LINE };
+  }
+  return { label: 'DEVICE', bytes: null };
+}
 /** M7: how many entries after the first the trend keeps */
 export const TREND_KEPT = 6;
 /** How often the strip re-reads the allocator while it shows. */
@@ -65,7 +73,7 @@ export interface BudgetOverlay {
   readonly crossed: () => void;
 }
 
-/** M1 / M5: the page's memory headline, the larger of the cost model and the page's own measurement. */
+/** Playing estimate with its source and the peak sampled during loading. */
 export interface MemoryHeadline {
   readonly bytes: number; readonly tone: PointsTone;
   /** the cost model's playing bytes */
@@ -74,15 +82,18 @@ export interface MemoryHeadline {
   readonly measured: number | null;
   /** which of the two the headline is */
   readonly source: 'model' | 'native' | 'observed' | 'predicted';
+  readonly loadingPeak: number | null;
 }
 export function memoryTone(bytes: number): PointsTone { return bytes >= MEMORY_RED ? 'red' : bytes >= MEMORY_AMBER ? 'amber' : 'green'; }
 export function memoryHeadline(model: number, snapshot: MemorySnapshot | null, engineBase: number): MemoryHeadline {
   const native = snapshot?.measured ?? null, observed = snapshot === null ? 0 : snapshot.totals.gpu + snapshot.totals.ram;
   const measured = native !== null ? native.webContentBytes + native.labelledGpuBytes : observed > 0 ? engineBase + observed : null;
   const bytes = Math.max(model, measured ?? 0);
-  return { bytes, tone: memoryTone(bytes), model, measured, source: measured === null || measured <= model ? 'model' : native !== null ? 'native' : 'observed' };
+  return { bytes, tone: memoryTone(bytes), model, measured, loadingPeak: null,
+    source: measured === null || measured <= model ? 'model' : native !== null ? 'native' : 'observed' };
 }
 
+const SOURCE: Readonly<Record<MemoryHeadline['source'], string>> = { model: 'CLAIMS', native: 'NATIVE', observed: 'OBSERVED', predicted: 'EM11' };
 const MB = (bytes: number): string => `${megabytes(bytes)} MB`;
 const GB = (bytes: number): string => (bytes / 1e9).toFixed(2);
 function el(tag: string, className: string, text?: string): HTMLElement {
@@ -104,7 +115,8 @@ function section(title: string, ...rows: HTMLElement[]): HTMLElement {
 /** Install the strip on a grid page; everything leaves with the scope. */
 export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   const { scope } = host;
-  let root: HTMLElement | null = null, gb: HTMLElement | null = null, alert: HTMLElement | null = null, bar: HTMLElement | null = null, detail: HTMLElement | null = null, more: HTMLElement | null = null;
+  let root: HTMLElement | null = null, gb: HTMLElement | null = null, badge: HTMLElement | null = null, alert: HTMLElement | null = null, bar: HTMLElement | null = null, detail: HTMLElement | null = null, more: HTMLElement | null = null;
+  let crash: ReturnType<typeof phoneCrashLine> | null = null;
   let timer: ReturnType<typeof setInterval> | 0 = 0, expanded = false, last: BudgetPoints | null = null, head: MemoryHeadline | null = null, signature = '';
   let group: MemoryGrouping = 'owner', sort: MemorySort = 'total';
   let allocationScope: Scope | null = null;
@@ -115,7 +127,7 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   const read = (cost: ReturnType<BudgetOverlayHost['allocator']['cost']>, memory: MemorySnapshot | null): MemoryHeadline =>
     memoryHeadline(cost.playing, memory, cost.input.engineBase ?? CONTENT_CAPS.engineBase);
 
-  let memoryPanel: { readPhoneBudget: typeof readPhoneBudget; renderMemoryPanel: typeof renderMemoryPanel } | undefined;
+  let memoryPanel: { readPhoneBudget: typeof readPhoneBudget; readLoadingPeak: typeof readLoadingPeak; renderMemoryPanel: typeof renderMemoryPanel } | undefined;
   let loadingPanel = false;
   async function loadPanel(): Promise<void> {
     if (loadingPanel || memoryPanel !== undefined) return;
@@ -131,10 +143,12 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   }
   const paint = (points: BudgetPoints, headline: MemoryHeadline, parts: ReturnType<typeof budgetBreakdown>, memory: MemorySnapshot | null,
     over: readonly { readonly owner: string; readonly overBytes: number }[], prediction: PhoneBudgetReading | null): void => {
-    if (root === null || gb === null || alert === null || bar === null || more === null) return;
+    if (root === null || gb === null || badge === null || alert === null || bar === null || more === null || crash === null) return;
     const worlds = parts.worlds.length, start = prediction === null ? trend[0] : undefined;
     const since = start === undefined ? '' : ` · ${headline.bytes >= start ? '+' : '−'}${Math.round(Math.abs(headline.bytes - start) / 1e6)} MB SINCE START`;
-    const line = el('span', 'ws-grid-budget-x', `${prediction === null ? 'MEM' : 'PHONE'} ≈${GB(headline.bytes)} GB / ${GB(CRASH_LINE)} · ${worlds} ${worlds === 1 ? 'WORLD' : 'WORLDS'}${since}`);
+    const source = SOURCE[headline.source], peak = headline.loadingPeak === null ? '—' : GB(headline.loadingPeak);
+    const crashLine = crash.bytes === null ? 'UNMEASURED' : `${GB(crash.bytes)} GB`;
+    const line = el('span', 'ws-grid-budget-x', `${source} ≈${GB(headline.bytes)} GB PLAYING · ${worlds} ${worlds === 1 ? 'WORLD' : 'WORLDS'}${since}`);
     data(line, 'tone', headline.tone); data(line, 'bytes', headline.bytes); data(line, 'source', headline.source);
     const lines = over.map(({ owner, overBytes }) => {
       const node = el('span', 'ws-grid-budget-over', `${label(owner).toUpperCase()} OVER ITS LIMIT · +${MB(overBytes)}`);
@@ -142,14 +156,22 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
     });
     bar.replaceChildren(line, ...lines);
     gb.textContent = GB(headline.bytes); data(gb, 'tone', headline.tone);
+    badge.textContent = `${source} · peak ${peak}`;
+    data(root, 'source', headline.source); data(root, 'playing-bytes', headline.bytes);
+    if (headline.loadingPeak === null) delete root.dataset['loadingPeakBytes'];
+    else data(root, 'loading-peak-bytes', headline.loadingPeak);
     alert.hidden = over.length === 0; alert.textContent = over.length > 1 ? `!${String(over.length)}` : '!';
-    root.setAttribute('aria-label', line.textContent ?? '');
+    root.setAttribute('aria-label', `${line.textContent ?? ''} · LOADING PEAK ${peak}${headline.loadingPeak === null ? '' : ' GB'}`);
     if (!expanded) { allocationScope?.dispose(); allocationScope = null; more.replaceChildren(); return; }
     if (prediction !== null) line.title = `Predicted phone range ${GB(prediction.range.low)}–${GB(prediction.range.high)} GB`;
-    const total = section(`MEMORY ≈${GB(headline.bytes)} GB OF ~${GB(CRASH_LINE)} GB CRASH LINE`,
+    const total = section('MEMORY ESTIMATES',
+      ...(prediction === null ? [] : [row('EM11 PLAYING UPPER', `${GB(prediction.range.high)} GB`)]),
+      row('LOADING PEAK · EM11 CHECKPOINTS', headline.loadingPeak === null ? 'NOT SAMPLED' : `${peak} GB`),
+      row(`CRASH LINE · ${crash.label}`, crashLine),
       row('MODEL (CLAIMS)', MB(headline.model), headline.source === 'model' ? headline.tone : null),
       ...(prediction === null ? [] : [row('PHONE PREDICTION RANGE', `${GB(prediction.range.low)}–${GB(prediction.range.high)} GB`)]),
-      row('OBSERVED', headline.measured === null ? 'NOTHING OBSERVED' : MB(headline.measured), headline.source === 'model' ? null : headline.tone));
+      row('OBSERVED', headline.measured === null ? 'NOTHING OBSERVED' : MB(headline.measured),
+        headline.source === 'observed' || headline.source === 'native' ? headline.tone : null));
     const owned = section('WORLDS · OWN BYTES (THESE ADD UP)', ...parts.worlds.map(world => { const r = row(label(world.owner), MB(world.bytes)); data(r, 'world', world.owner); return r; }));
     const shared = section('SHARED', ...parts.shared.map(part => row(part.label.toUpperCase(), MB(part.bytes))),
       row(`OTHER CELLS · ${parts.cells.count}`, MB(parts.cells.bytes)));
@@ -172,13 +194,15 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
     const cost = host.allocator.cost(), entries = host.allocator.entries(), memory = snapshot(cost.accounted), over = host.overLimit?.() ?? [];
     // repaint only when the table, the observed totals, the over-limit lines or the view changed: the timer is otherwise a cheap read
     const prediction = memoryPanel?.readPhoneBudget() ?? null;
+    const loadingPeak = memoryPanel?.readLoadingPeak() ?? null;
     const shown = expanded ? JSON.stringify(memory) : `${memory.totals.gpu}|${memory.totals.ram}|${memory.measured?.sampledAt ?? ''}`;
-    const next = `${cost.accounted}|${entries.length}|${String(expanded)}|${group}|${sort}|${trend.length}|${JSON.stringify(over)}|${shown}|${JSON.stringify(prediction?.ledger)}`;
+    const next = `${cost.accounted}|${entries.length}|${String(expanded)}|${group}|${sort}|${trend.length}|${JSON.stringify(over)}|${shown}|${JSON.stringify(prediction?.ledger)}|${loadingPeak}`;
     if (next === signature && last !== null) return;
     signature = next;
     last = readBudgetPoints({ entries: () => entries, cost: () => cost }, { name: label, ...(host.shard === undefined ? {} : { shard: host.shard }) });
     head = read(cost, memory);
     if (prediction !== null) head = { ...head, bytes: prediction.range.central, tone: memoryTone(prediction.range.central), source: 'predicted' };
+    head = { ...head, loadingPeak };
     paint(last, head, budgetBreakdown(entries, cost), expanded ? memory : null, over, prediction);
   }
   const toggle = (): void => {
@@ -193,18 +217,20 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
     // at phone 4x). Entries queue in order, so the trend is the same.
     const cost = host.allocator.cost();
     scope.timeout(0, () => {
-      trend.push(read(cost, isDev() ? snapshot(cost.accounted, false) : null).bytes);
+      const dev = isDev();
+      trend.push((dev ? memoryPanel?.readPhoneBudget()?.range.central : undefined) ?? read(cost, dev ? snapshot(cost.accounted, false) : null).bytes);
       if (trend.length > TREND_KEPT + 1) trend.splice(1, 1);
       refresh();
     });
   };
   const build = (): void => {
+    crash = phoneCrashLine(navigator.userAgent, screen.width, screen.height, devicePixelRatio);
     root = el('div', 'ws-grid-budget'); root.setAttribute('role', 'button'); root.setAttribute('aria-expanded', 'false'); root.tabIndex = -1;
-    gb = el('b', 'ws-grid-budget-gb', '—'); alert = el('i', 'ws-grid-budget-alert', '!'); alert.hidden = true;
+    gb = el('b', 'ws-grid-budget-gb', '—'); badge = el('span', 'ws-grid-budget-label'); alert = el('i', 'ws-grid-budget-alert', '!'); alert.hidden = true;
     // the panel: the headline and the over-limit lines, then (expanded) the breakdown
     bar = el('div', 'ws-grid-budget-bar'); more = el('div', 'ws-grid-budget-more'); detail = el('div', 'ws-grid-budget-detail'); detail.hidden = true;
     detail.append(bar, more);
-    root.append(el('i', 'ws-grid-budget-label', 'mem'), gb, alert, detail);
+    root.append(el('i', 'ws-grid-budget-label', 'mem'), gb, badge, alert, detail);
     // the card takes its own taps; the touch controls under it never see them
     scope.listen(root, 'pointerdown', (event: Event) => { event.stopPropagation(); });
     scope.listen(root, 'click', (event: Event) => { event.stopPropagation(); toggle(); });

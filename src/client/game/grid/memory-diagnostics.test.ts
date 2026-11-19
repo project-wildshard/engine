@@ -1,12 +1,15 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
+import { provideBootLedger, recordBootCheckpoint, startBoot } from '@wildshard/engine/boot/bootTrace';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { contentCost, type ContentCostInput } from '@wildshard/format/contentCost';
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { memoryAttribution, type MemorySnapshot } from '@wildshard/engine/core/memoryAttribution';
-import { installBudgetOverlay, memoryHeadline } from './budgetOverlay';
+import { phoneFromLedger } from '@wildshard/engine/core/phoneMemoryModel';
+import phoneModel from '../../../../scripts/memory/phone-model.json';
+import { CRASH_LINE, installBudgetOverlay, memoryHeadline, phoneCrashLine } from './budgetOverlay';
 import { installMemoryWarning } from './memoryWarning';
 import { perfDockSections } from '@wildshard/engine/ui/perfDock';
 
@@ -24,7 +27,7 @@ test('G628 M1/M3: one line, the page headline in its danger band; the shard limi
   const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Driftwood Isle', memory: () => observed(0, 0),
     allocator: { entries: () => [sim('dw', bytes)], cost: () => ({ ...contentCost(input), input }) } }));
   const line = hud.querySelector<HTMLElement>('.ws-grid-budget-x');
-  expect(line?.textContent).toBe(`MEM ≈${(contentCost(input).playing / 1e9).toFixed(2)} GB / 2.15 · 1 WORLD`);
+  expect(line?.textContent).toBe(`CLAIMS ≈${(contentCost(input).playing / 1e9).toFixed(2)} GB PLAYING · 1 WORLD`);
   expect(line?.dataset['tone']).toBe('green');
   // A14: the card on the Developer dock reads "mem 0.70", toned; the headline above waits in its panel
   const card = document.querySelector<HTMLElement>('.ws-perf-dock .ws-grid-budget');
@@ -100,23 +103,51 @@ test('collapsed strip reads current totals and expands with full allocation deta
   } finally { vi.useRealTimers(); }
 });
 
-test('phone rows use the live ledger, show the model range and flag a subsystem above budget', async () => {
-  vi.stubGlobal('__wildshardMemory', { counters: () => ({ gpu: { buffer: 300e6, texture: 10e6 }, workers: { 'decoder/wasm': 2e6 } }) });
+test('the chip shows EM11 central and boot peak, while the panel shows the playing upper and subsystem budgets', async () => {
+  const playing = { gpu: { buffer: 300e6, texture: 10e6 }, workers: { 'decoder/wasm': 2e6 } };
+  const loading = { ...playing, ram: { decode: 150e6 } };
+  let ledger = loading;
+  vi.stubGlobal('__wildshardMemory', { counters: () => playing });
+  vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone)' });
+  vi.stubGlobal('screen', { width: 390, height: 844 });
+  vi.stubGlobal('devicePixelRatio', 3);
+  provideBootLedger(() => ledger);
   try {
     setDev(true);
+    startBoot({ id: 'nine', name: 'Nine' }, false);
+    recordBootCheckpoint('decode:peak');
+    ledger = { ...playing, ram: { decode: 0 } };
+    document.dispatchEvent(new Event('ws:control-ready'));
     const scope = owner(), input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: 0, commons: 0, overlap: 0 };
     const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: id => id,
+      memory: () => observed(2e9, 3e9),
       allocator: { entries: () => [], cost: () => ({ ...contentCost(input), input }) } }));
     await vi.dynamicImportSettled();
+    const range = phoneFromLedger(playing, phoneModel), peak = phoneFromLedger(loading, phoneModel).central;
+    const chip = document.querySelector<HTMLElement>('.ws-grid-budget');
+    expect(chip?.dataset).toMatchObject({ source: 'predicted', playingBytes: String(range.central), loadingPeakBytes: String(peak) });
+    expect(chip?.textContent).toContain(`EM11 · peak ${(peak / 1e9).toFixed(2)}`);
+    expect(overlay.headline()).toMatchObject({ source: 'predicted', bytes: range.central, loadingPeak: peak });
     overlay.toggle();
-    expect(overlay.headline()?.source).toBe('predicted');
-    expect(document.querySelector('.ws-grid-budget-x')?.textContent).toContain('PHONE');
-    expect(document.querySelector('.ws-grid-budget-x')?.getAttribute('title')).toContain('Predicted phone range');
+    expect(document.querySelector('.ws-grid-budget-x')?.textContent).toContain('EM11');
+    expect(chip?.textContent).toContain(`EM11 PLAYING UPPER${(range.high / 1e9).toFixed(2)} GB`);
+    expect(chip?.textContent).toContain('CRASH LINE · IPHONE 13-CLASSUNMEASURED');
     const geometry = document.querySelector<HTMLElement>('[data-subsystem="geometry"]');
     expect(geometry?.dataset).toMatchObject({ liveBytes: '300000000', budgetBytes: '150000000', tone: 'red' });
     expect(geometry?.querySelector('meter')?.getAttribute('max')).toBe('150000000');
     expect(document.querySelector<HTMLElement>('[data-subsystem="workers"]')?.dataset['liveBytes']).toBe('2000000');
-  } finally { vi.unstubAllGlobals(); }
+  } finally {
+    setDev(false);
+    startBoot({ id: 'nine', name: 'Nine' }, false);
+    vi.unstubAllGlobals();
+  }
+});
+
+test('crash lines distinguish the iPhone references and an unknown device', () => {
+  expect(phoneCrashLine('iPhone', 874, 402, 3)).toEqual({ label: 'IPHONE 17 PRO REFERENCE', bytes: CRASH_LINE });
+  expect(phoneCrashLine('iPhone', 390, 844, 3)).toEqual({ label: 'IPHONE 13-CLASS', bytes: null });
+  expect(phoneCrashLine('iPhone', 430, 932, 3)).toEqual({ label: 'DEVICE', bytes: null });
+  expect(phoneCrashLine('Macintosh', 402, 874, 3)).toEqual({ label: 'DEVICE', bytes: null });
 });
 
 test('G628 M4/M7: a red line per shard over its limit; the trend keeps the first entry and the last six', async () => {

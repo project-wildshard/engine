@@ -21,7 +21,7 @@
 .ws-grid-budget-detail[hidden] { display: none; }
 .ws-grid-budget-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; }
 .ws-grid-budget-more:not(:empty) { margin-top: 5px; border-top: 1px solid rgba(255, 242, 239, 0.25); padding-top: 4px; }
-.ws-grid-budget-x { font-weight: 700; white-space: nowrap; }
+.ws-grid-budget-x { font-weight: 700; }
 .ws-grid-budget-over { flex-basis: 100%; font-weight: 700; }
 .ws-grid-budget [data-tone='green'] { color: #6ee08f; }
 .ws-grid-budget [data-tone='amber'] { color: #ffc35a; }

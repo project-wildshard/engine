@@ -1,4 +1,6 @@
 import { pageScope } from '../../../shared/engine/app/resources';
+import { ledgerSplit } from '../../../shared/engine/core/phoneMemoryModel';
+import { isDev } from '../core/devMode';
 import { saveStorage } from '../saves/slots';
 /** A small durable breadcrumb for an enabled level boot. A terminated WebContent process cannot run a final handler. */
 import { deliverBrowserError, flushScreenReports, screenReportsEnabled } from '../telemetry/browserErrors';
@@ -50,7 +52,7 @@ export interface BootTraceTransports {
   inbox: (error: Error, build: string, diagnostic: string, system: string, level: string) => Promise<string>;
   deliver: typeof deliverBrowserError;
   /** the ledger by domain and kind (glCounters' memoryCounters); a test passes its own */
-  ledger?: () => Record<string, Record<string, number>>;
+  ledger?: () => Record<string, Record<string, number>> | undefined;
 }
 
 /** The ledger flattened to `<domain>/<kind>` in decimal MB to 0.1, kinds under 0.05 MB left out; every worker summed into
@@ -72,7 +74,7 @@ export function provideBootLedger(ledger: () => Record<string, Record<string, nu
 const PAGE_TRANSPORTS: BootTraceTransports = {
   inbox: async (error, build, diagnostic, system, level) => (await import('../telemetry/bootInbox')).reportBootInterruption(error, build, diagnostic, system, level),
   deliver: deliverBrowserError,
-  ledger: () => pageLedger?.() ?? {},
+  ledger: () => pageLedger?.(),
 };
 
 /** one page's boot trace (createBootTrace) */
@@ -87,6 +89,7 @@ export interface BootTrace {
   bootDiagnosticJson: () => string;
   recordBootProgress: (view: ProgressView) => void;
   recordBootCheckpoint: (operation: string, facts?: Facts) => void;
+  bootMemorySamples: () => readonly ReturnType<typeof ledgerSplit>[];
   startBoot: (level: { id: string; name: string }, enabled?: boolean) => void;
   markBootPlanned: () => void;
   markBootHandledError: () => void;
@@ -98,12 +101,18 @@ export interface BootTrace {
   recordGpuRecovery: (reason: string) => void;
 }
 
+const NO_MEMORY_SAMPLES: readonly ReturnType<typeof ledgerSplit>[] = [];
+
 /**
  * One page's boot trace over its transports. The page has one (below); a test builds one per simulated page load with
  * its own transports instead of reloading the module and mocking them (E422).
  */
 export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORTS): BootTrace {
   let current: BootRecord | null = null;
+  // Keep just the two byte totals per sample for Developer's loading maximum.
+  // The bounded crash report can drop early checkpoints and follow later Explore work.
+  let loadingMemory: { active: boolean; step: string; samples: ReturnType<typeof ledgerSplit>[] } | null = null;
+  const bootMemorySamples = (): readonly ReturnType<typeof ledgerSplit>[] => loadingMemory?.samples ?? NO_MEMORY_SAMPLES;
   /** when recordBootProgress last persisted the record (PROGRESS_WRITE_MS) */
   let progressWrittenAt = -Infinity;
   let previousLine = '';
@@ -187,8 +196,11 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
       typeof facts === 'object' && facts !== null && !Array.isArray(facts) &&
       Object.values(facts).every((v: unknown) => v === null || typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)));
   }
-  function ledgerNow(): { ledger?: Record<string, number> } {
-    try { const counters = transports.ledger?.(); return counters ? { ledger: ledgerTotals(counters) } : {}; } catch { return {}; }
+  function ledgerNow(): Record<string, Record<string, number>> | undefined {
+    try { return transports.ledger?.(); } catch { return undefined; }
+  }
+  function sampleLoadingMemory(counters: ReturnType<typeof ledgerNow>): void {
+    if (counters !== undefined) loadingMemory?.samples.push(ledgerSplit(counters));
   }
   function write(key: string, value: BootRecord): void { try { storage()?.setItem(key, JSON.stringify(value)); } catch { /* storage may be unavailable */ } }
   function update(status: Status): void {
@@ -260,6 +272,10 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
   function recordBootProgress(view: ProgressView): void {
     // the drop notice's breadcrumb names the card's step on every world boot, traced or not
     if (view.label !== '') markDropStep({ step: view.done ? 'Load complete' : view.label });
+    if (loadingMemory?.active === true && loadingMemory.step !== view.step && isDev()) {
+      loadingMemory.step = view.step;
+      sampleLoadingMemory(ledgerNow());
+    }
     if (current === null) return;
     if (current.status !== 'in_progress') return;
     // Arrival can open Explore before the loader emits its final progress notification.
@@ -281,15 +297,29 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
 
   /** Synchronous, bounded evidence written BEFORE risky GPU work, surviving a process termination. */
   function recordBootCheckpoint(operation: string, facts: Facts = {}): void {
+    const sample = loadingMemory?.active === true && isDev();
+    if (!sample && current?.status !== 'in_progress') return;
+    const counters = ledgerNow();
+    if (sample) sampleLoadingMemory(counters);
     if (current?.status !== 'in_progress') return;
     const now = Date.now();
-    const checkpoint: Checkpoint = { atMs: now - current.startedAt, operation, facts, ...ledgerNow() };
+    const checkpoint: Checkpoint = { atMs: now - current.startedAt, operation, facts,
+      ...(counters === undefined ? {} : { ledger: ledgerTotals(counters) }) };
     current = { ...current, updatedAt: now, checkpoints: [...(current.checkpoints ?? []), checkpoint].slice(-HISTORY_LIMIT) };
     write(KEY, current);
   }
 
   /** Begin once an enabled level loader exists; the root title has no boot in progress. */
   function startBoot(level: { id: string; name: string }, enabled = true): void {
+    loadingMemory = isDev() ? { active: true, step: '', samples: [] } : null;
+    if (loadingMemory !== null) {
+      const boot = loadingMemory;
+      pageScope.listen(document, 'ws:control-ready', () => {
+        if (loadingMemory !== boot) return;
+        if (isDev()) sampleLoadingMemory(ledgerNow());
+        boot.active = false;
+      }, { once: true });
+    }
     if (!enabled) return;
     transition = null;
     hiddenStatus = null;
@@ -368,7 +398,7 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
     // Copy synchronously before navigation. The static title sends it on the next document.
     enqueue(current, reason.slice(0, 200));
   }
-  return { bootTraceActive, previousBootLevel, flushBootReports, inspectPreviousBoot, previousBootLine, bootDiagnostic, bootDiagnosticJson, recordBootProgress, recordBootCheckpoint, startBoot, markBootPlanned, markBootHandledError, markBootContextLost, beginExploreEntry, endExploreEntry, exploreEntryPending, recordExploreFrame, recordGpuRecovery };
+  return { bootTraceActive, previousBootLevel, flushBootReports, inspectPreviousBoot, previousBootLine, bootDiagnostic, bootDiagnosticJson, recordBootProgress, recordBootCheckpoint, bootMemorySamples, startBoot, markBootPlanned, markBootHandledError, markBootContextLost, beginExploreEntry, endExploreEntry, exploreEntryPending, recordExploreFrame, recordGpuRecovery };
 }
 
 /** the page's boot trace */
@@ -382,6 +412,7 @@ export const bootDiagnostic: BootTrace['bootDiagnostic'] = page.bootDiagnostic;
 export const bootDiagnosticJson: BootTrace['bootDiagnosticJson'] = page.bootDiagnosticJson;
 export const recordBootProgress: BootTrace['recordBootProgress'] = page.recordBootProgress;
 export const recordBootCheckpoint: BootTrace['recordBootCheckpoint'] = page.recordBootCheckpoint;
+export const bootMemorySamples: BootTrace['bootMemorySamples'] = page.bootMemorySamples;
 export const startBoot: BootTrace['startBoot'] = page.startBoot;
 export const markBootPlanned: BootTrace['markBootPlanned'] = page.markBootPlanned;
 export const markBootHandledError: BootTrace['markBootHandledError'] = page.markBootHandledError;

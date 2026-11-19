@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 // ENGINE-MEMORY EM9 (b): each boot checkpoint carries the ledger's totals by kind, so the "Abrupt previous page" report of
 // a page the phone killed says what the engine held at its last step.
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { setDev } from '../core/devMode';
 import { saveStorage } from '../saves/slots';
 import { createBootTrace, ledgerTotals, type BootTraceTransports } from './bootTrace';
 
@@ -12,6 +13,7 @@ const MB = 1e6;
 const PROGRESS_WRITE_MS = 1000;
 
 beforeEach(() => { localStorage.clear(); saveStorage('device').removeItem('boot.trace'); saveStorage('device').removeItem('boot.reports'); vi.stubGlobal('__BUILD_ID__', 'test-build'); });
+afterEach(() => { setDev(false); });
 
 test('the ledger flattens to <domain>/<kind> in MB to 0.1, small kinds dropped, workers summed', () => {
   expect(ledgerTotals({ gpu: { texture: 17.88 * MB, renderbuffer: 0.04 * MB }, ram: { 'array-buffer': 25.45 * MB },
@@ -53,6 +55,33 @@ test('a ledger that throws leaves the checkpoint without one', () => {
   trace.recordBootCheckpoint('world:data');
   const stored = JSON.parse(saveStorage('device').getItem('boot.trace') ?? 'null') as { checkpoints: Record<string, unknown>[] };
   expect(stored.checkpoints[0]).toEqual({ atMs: expect.any(Number), operation: 'world:data', facts: {} });
+});
+
+test('Developer loading samples survive the crash ring and stop at control', () => {
+  let held = 300 * MB;
+  const ledger = vi.fn(() => ({ gpu: { texture: held }, workers: { 'decoder/wasm': 4 * MB } }));
+  const trace = createBootTrace({ inbox: () => Promise.resolve('ok'), deliver: () => Promise.resolve(true), ledger });
+  const level = { id: 'nine-dragon-stack', name: 'Nine Dragon Stack' };
+  trace.startBoot(level, false);
+  trace.recordBootCheckpoint('off');
+  expect(ledger).not.toHaveBeenCalled();
+  expect(trace.bootMemorySamples()).toEqual([]);
+
+  setDev(true);
+  trace.startBoot(level);
+  trace.recordBootCheckpoint('peak');
+  held = 10 * MB;
+  for (let i = 0; i < 40; i++) trace.recordBootCheckpoint('later');
+  expect(trace.bootDiagnosticJson()).not.toContain('"operation":"peak"');
+  expect(trace.bootMemorySamples()[0]).toEqual({ gpu: 300 * MB, ram: 4 * MB });
+  document.dispatchEvent(new Event('ws:control-ready'));
+  const samples = trace.bootMemorySamples().length;
+  held = 500 * MB;
+  trace.recordBootCheckpoint('playing');
+  expect(trace.bootMemorySamples()).toHaveLength(samples);
+  trace.startBoot(level, false);
+  expect(trace.bootMemorySamples()).toEqual([]);
+  document.dispatchEvent(new Event('ws:control-ready'));
 });
 
 test('MG10: a detail-only change persists at most once a second; a stage or checkpoint writes at once', () => {
