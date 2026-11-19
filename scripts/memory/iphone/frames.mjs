@@ -12,8 +12,8 @@ async function sampleOnPage(options, walk) {
   const game = world.game, started = performance.now();
   let seen = game.frameCount, previous = started;
   const runningWalk = options.walk ? walk(options) : null;
-  /** @type {{ tMs: number; seconds: number; frames: number; frameMs: number[]; gpuApproxMs: number[];
-   * draws: number; triangles: number }[]} */
+  /** @type {{ tMs: number; seconds: number; frames: number; frameMs: number[]; gpuApproxMs: number[]; updateMs: number[];
+   * renderMs: number[]; draws: number; triangles: number; programs: number | null; net: string | null }[]} */
   const samples = [];
   const until = started + options.seconds * 1000;
   while (previous < until) {
@@ -22,16 +22,19 @@ async function sampleOnPage(options, walk) {
       throw new Error('the phone lost the controlled world during frame sampling');
     }
     const now = performance.now(), frames = game.frameCount - seen;
-    const frameMs = [], gpuApproxMs = [];
+    const frameMs = [], gpuApproxMs = [], updateMs = [], renderMs = [];
     seen = game.frameCount;
     for (let k = Math.min(frames, game.frameMs.length); k >= 1; k--) {
       const i = (game.frameI - k + game.frameMs.length) % game.frameMs.length;
       frameMs.push(game.frameMs[i]);
+      updateMs.push(game.updateMs[i]); renderMs.push(game.renderMs[i]);
       gpuApproxMs.push(Math.max(0, game.frameMs[i] - Math.max(game.updateMs[i] + game.renderMs[i], 1000 / 30)));
     }
+    // the worker client's wire line (Developer panel), every 5 s: delay and jitter of the server's snapshots
+    const net = samples.length % 5 === 0 ? /delay [\d.]+ ms\s+jitter [\d.]+ ms/u.exec(document.body.textContent)?.[0] ?? null : null;
     samples.push({
-      tMs: now - started, seconds: (now - previous) / 1000, frames, frameMs, gpuApproxMs,
-      draws: game.lastFrame.calls, triangles: game.lastFrame.triangles,
+      tMs: now - started, seconds: (now - previous) / 1000, frames, frameMs, gpuApproxMs, updateMs, renderMs,
+      draws: game.lastFrame.calls, triangles: game.lastFrame.triangles, programs: game.renderer.info?.programs?.length ?? null, net,
     });
     previous = now;
   }
@@ -62,6 +65,12 @@ export function frameSummary(samples) {
     gpuApproxP95Ms: percentile(samples.flatMap((sample) => sample.gpuApproxMs), .95),
     drawsP95: percentile(samples.map((sample) => sample.draws), .95),
     trianglesP95: percentile(samples.map((sample) => sample.triangles), .95),
+    maxMs: frame.length === 0 ? null : Math.max(...frame), over50: frame.filter((ms) => ms > 50).length,
+    updateP50Ms: percentile(samples.flatMap((sample) => sample.updateMs ?? []), .5),
+    updateP95Ms: percentile(samples.flatMap((sample) => sample.updateMs ?? []), .95),
+    renderP50Ms: percentile(samples.flatMap((sample) => sample.renderMs ?? []), .5),
+    renderP95Ms: percentile(samples.flatMap((sample) => sample.renderMs ?? []), .95),
+    programsP95: percentile(samples.map((sample) => sample.programs ?? 0), .95),
   };
 }
 

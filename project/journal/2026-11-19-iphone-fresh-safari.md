@@ -20,3 +20,10 @@ files. Four things the phone taught us on the way:
 The fresh-Safari loop ran IP34's pairs on the iPhone 13 with the IP34 control chunk overridden on staging v0.1.50.
 At `debug.densityLod` 3 Nine reached control in about 19 s and walked at about 31 fps in all three boots; off took
 35-39 s and walked at about 20 fps in the boots paired with them. `true` was mixed. Phone Low now defaults to 3.
+
+## Later: fuller frame readings, and a release mirror left out
+
+The frame sampler now keeps update and render ms, frames over 50 ms, the max, programs and the worker client's delay and
+jitter line, for IPHONE13-DRIFTWOOD. A `bench.mjs --mirror <dist>` that answered staging's origin from a local release
+build (to run v0.1.46 on the phone with no tailnet) stays out of main: binary bodies need base64 over the inspector, which
+G649 refuses, and a v0.1.46 Driftwood boot through it stalled at 348 of 541 world files anyway.
