@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { blockingRun, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { blockingRun, failedNames, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 
 mkdirSync(resolve('tmp'), { recursive: true });
@@ -390,4 +390,11 @@ test('J431 writes each memory warning and gate-flake receipt once and queues QA 
     expect.objectContaining({ id: ci.id, sha: ci.head_sha, warnings: [expect.objectContaining({ zone: 'brasscap-mesa', delta: 305012 })] }),
     expect.objectContaining({ id: native.id, sha: native.head_sha, warnings: [expect.objectContaining({ median: 995000000 })] }),
   ]);
+});
+
+test('FS22: an early-red cancel names the failed jobs, not the ones it cancelled', () => {
+  const job = (name: string, conclusion: string) => ({ name, conclusion });
+  expect(failedNames([job('boundaries', 'failure'), job('tests (3)', 'cancelled'), job('timings', 'failure'), job('tests (1)', 'success')])).toEqual(['boundaries']);
+  // Run 44361972035: a timeout concludes `cancelled`; with no outright failure it is still named.
+  expect(failedNames([job('nine-ring1-build', 'cancelled'), job('tests (1)', 'success')])).toEqual(['nine-ring1-build']);
 });

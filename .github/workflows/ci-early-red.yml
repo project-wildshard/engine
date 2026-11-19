@@ -1,0 +1,35 @@
+name: ci-early-red
+
+# Meta FLOW-SIMPLE FS22 (J435): on each push to main, cancel main's running ci run when one of its blocking jobs has
+# already failed, so the pending run for this push starts now instead of waiting out a run that is red already.
+# scripts/ci-early-red.mjs decides; it never touches release refs or qualification dispatches (their own groups).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ci-early-red
+  cancel-in-progress: false
+
+jobs:
+  early-red:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      - name: Cancel a running main run that is already red behind this push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-early-red.mjs

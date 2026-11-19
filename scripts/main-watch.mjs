@@ -10,7 +10,7 @@
 // The verdict for a SHA is the newest completed main `ci` run that isn't cancelled and whose SHA is that SHA or a
 // descendant of it. A cancelled run is superseded when a later main run exists, never red; with no later run,
 // the watcher dispatches `ci` on main once. A started run cancelled with a blocking job failed, timed out or
-// cancelled is red, not superseded: main never cancels a started run, so that cancel was a timeout (J422). Each red run gives one `MAIN RED <range>` receipt naming the landers
+// cancelled is red, not superseded: main cancels a started run only for a timeout (J422) or when it is red already (FS22). Each red run gives one `MAIN RED <range>` receipt naming the landers
 // of the commits in its range (from their `landed` receipts) and a message to each lander's herdr pane. State
 // (~/.cache/wildshard/main-watch.json) keeps the judged run ids, so a run is reported once however often this runs.
 // A green run that carries AMBER files (J295: a test file over its time budget, scripts/test-amber.mjs) also gives
@@ -49,8 +49,16 @@ function nativeInfrastructure(job){
 }
 
 /** @param {Job} job */
-const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic'
+export const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='nine-ring1 (street, macos-15)'||job.name==='nine-ledger-diagnostic'
   ||nativeInfrastructure(job)!==undefined;
+
+/** The blocking jobs a red names. FS22's early red cancels a red run's other jobs, so `cancelled` ones are named only
+ * when no job failed outright (a job over its timeout-minutes concludes `cancelled`).
+ * @param {readonly Job[]} jobs @returns {string[]} */
+export function failedNames(jobs){
+  const blocking=jobs.filter(job=>!advisory(job)&&unsuccessful(job)),failed=blocking.filter(job=>job.conclusion!=='cancelled');
+  return (failed.length>0?failed:blocking).map(job=>job.name);
+}
 
 /** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
 /** @typedef {{id:number,sha:string,created:string, warnings:ReturnType<typeof parseMemoryWarnings>}} MemoryQa */
@@ -60,8 +68,9 @@ const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='n
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
 const finished=(/** @type {Run} */run)=>run.status==='completed';
 /** Superseded, never red: a cancel that hid no blocking failure. Main pushes never cancel a started run (ci.yml's
- * cancel-in-progress is false for main), so a started run whose blocking job failed, timed out or was cancelled
- * (a job over its timeout-minutes concludes `cancelled`: nine-ring1-build in run 44361972035) is red (J422). */
+ * cancel-in-progress is false for main) unless it is red already (ci-early-red.yml, FS22), so a started run whose
+ * blocking job failed, timed out or was cancelled (a job over its timeout-minutes concludes `cancelled`:
+ * nine-ring1-build in run 44361972035) is red (J422). */
 const cancelled=(/** @type {Run} */run)=>(run.conclusion==='cancelled'||run.conclusion==='skipped')&&run.blockingFailed!==true;
 const byCreated=(/** @type {Run} */a,/** @type {Run} */b)=>Date.parse(a.created_at)-Date.parse(b.created_at)||a.id-b.id;
 
@@ -218,7 +227,7 @@ export function liveIo(env=process.env){
           return blockingRun(row,jobs);
         });
     }),
-    failed:(/** @type {number} */id)=>jobsFor(id).filter(job=>!advisory(job)&&unsuccessful(job)).map(job=>job.name),
+    failed:(/** @type {number} */id)=>failedNames(jobsFor(id)),
     // Blocking tests own AMBER evidence. The advisory timings collector only repeats it;
     // its annotations cannot change main's verdict. Quarantine reports separately (J193).
     annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
