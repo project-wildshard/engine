@@ -4,8 +4,8 @@
 //
 //   node --experimental-transform-types scripts/ring-step.ts [--ticks 240] [--update] [--only slug,slug]
 //
-// Run `pins.ts install --ring 1` first. Digests are kept per platform and architecture, because Darwin's are the only ones
-// compared today, and that's how Pine and Far Reach drifted unseen (J97). A platform with no baseline fails: `--update` records it.
+// Run `pins.ts install --ring 1` first. Digests are kept per platform and architecture (J97).
+// A platform with no baseline fails a full comparison. `--update` records measurements in the running platform's baseline.
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
 import './bake-loader.mjs';
 import { createHash } from 'node:crypto';
@@ -26,6 +26,8 @@ const sha256 = (text: string): string => createHash('sha256').update(text).diges
  *  its own verb is proved to load, not to work: that's what the tapes in row 7 are for. */
 const line = (tick: number): HeadlessCommand => ({ kind: 'player', moveX: 0.3 * Math.sin(tick / 90), moveZ: -1, yaw: 0, ...(tick % 47 === 0 ? { jump: true as const } : {}), ...(tick % 97 === 0 ? { dodge: true as const } : {}) });
 const only = option('only')?.split(',');
+const update = process.argv.includes('--update');
+if (only === undefined && process.argv.includes('--only')) throw new Error('--only requires a list of Ring 1 slugs');
 
 const { prepareAssetDecoders } = await import('@wildshard/format/shardfileAssets');
 const { loadRapier } = await import('../src/shared/engine/physics/rapier.ts');
@@ -83,16 +85,19 @@ function outputFolderOf(slug: string): string {
 await prepareAssetDecoders();
 const ring = (JSON.parse(readFileSync('test/pins/rings.json', 'utf8')) as Record<string, Ring>)['1'];
 if (ring === undefined) throw new Error('No ring 1');
-const rows = [...ring.products.map(slug => [slug, outputFolderOf(slug)] as const), ...ring.slices.map(slug => [slug, join('out/.slices', slug)] as const)].filter(([slug]) => only === undefined || only.includes(slug));
+const slugs = [...ring.products, ...ring.slices];
+for (const slug of only ?? []) if (!slugs.includes(slug)) throw new Error(`${slug}: not a Ring 1 slug`);
+const rows = slugs.filter(slug => only === undefined || only.includes(slug));
 const baseline = (existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {}) as Digests, held = baseline[PLATFORM]?.[String(TICKS)] ?? {};
 const measured: Record<string, readonly string[]> = {};
 let failed = 0;
-for (const [slug, folder] of rows) {
+for (const slug of rows) {
   try {
+    const folder = ring.products.includes(slug) ? outputFolderOf(slug) : join('out/.slices', slug);
     const { chain, seconds, path } = await step(folder);
     measured[slug] = chain;
     const was = held[slug], same = JSON.stringify(was) === JSON.stringify(chain);
-    if (was !== undefined && !same) failed++;
+    if (!update && was !== undefined && !same) failed++;
     console.log(`${slug}: ${path}, ${TICKS} ticks in ${seconds.toFixed(1)}s, ${chain.at(-1)?.slice(0, 16) ?? 'no chain'} ${was === undefined ? 'no baseline' : same ? 'same' : `DIFFERS from ${was.at(-1)?.slice(0, 16) ?? 'none'}`}`);
   } catch (error) {
     failed++;
@@ -101,10 +106,11 @@ for (const [slug, folder] of rows) {
 }
 const report = option('report');
 if (report !== undefined) writeFileSync(report, `${JSON.stringify({version: 1, sha: execFileSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(), platform: PLATFORM, ticks: TICKS, measured}, null, 2)}\n`);
-if (process.argv.includes('--update')) {
-  if (failed > 0 && Object.keys(measured).length < rows.length) throw new Error('A row failed to step: nothing recorded');
-  writeFileSync(BASELINE, `${JSON.stringify({ ...baseline, [PLATFORM]: { ...baseline[PLATFORM], [String(TICKS)]: { ...held, ...measured } } }, null, 1)}\n`);
-  console.log(`${BASELINE}: recorded ${Object.keys(measured).length} rows for ${PLATFORM}`);
+if (update) {
+  if (failed === 0) {
+    writeFileSync(BASELINE, `${JSON.stringify({ ...baseline, [PLATFORM]: { ...baseline[PLATFORM], [String(TICKS)]: { ...held, ...measured } } }, null, 1)}\n`);
+    console.log(`${BASELINE}: recorded ${Object.keys(measured).length} rows for ${PLATFORM}`);
+  } else console.error('A row failed to step: nothing recorded');
 } else if (only === undefined && Object.keys(held).length === 0) {
   failed++;
   console.error(`${PLATFORM} has no baseline in ${BASELINE}: a compare that can't fail is no gate. Record one with --update.`);

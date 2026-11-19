@@ -32,3 +32,16 @@ test('shard-pin re-cuts a Ring 1 slug\'s server slice and commits it with the pi
   expect(flow).toMatch(/rings\.json[\s\S]*slices[\s\S]*node scripts\/pins\.ts slice/u);
   expect(flow.slice(commit)).toMatch(/-- test\/pins\/shardfiles\.json [^\n]*test\/pins\/slices\.json/u);
 });
+
+test('shard-pin records only the moved Ring 1 product or slice before committing the pin', () => {
+  const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
+  const cut = flow.indexOf('node scripts/pins.ts slice');
+  const install = flow.indexOf('node scripts/pins.ts install --ring 1');
+  const record = flow.indexOf('scripts/ring-step.ts --update --only "$SLUG"');
+  const commit = flow.indexOf('git commit');
+  expect(flow).toMatch(/slice \|\| ring\.products\.includes\(process\.argv\[1\]\)/u);
+  expect(install).toBeGreaterThan(cut);
+  expect(record).toBeGreaterThan(install);
+  expect(commit).toBeGreaterThan(record);
+  expect(flow.slice(commit)).toMatch(/-- test\/pins\/shardfiles\.json [^\n]*test\/pins\/ring-digests\.json/u);
+});
