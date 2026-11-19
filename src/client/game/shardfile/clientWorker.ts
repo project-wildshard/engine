@@ -163,7 +163,9 @@ interface OnlineSession {
   readonly onEnded: (heard: () => void) => void;
   readonly signIn: () => Promise<boolean>;
 }
-interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: OnlineGrid; session?: OnlineSession }) => Promise<Shell> }
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: OnlineGrid; session?: OnlineSession }) => Promise<Shell>;
+  /** TR-4b: the release read, begun at the boot's data step (shell.ts `readReleaseEarly`) */
+  readonly readReleaseEarly?: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving }) => void }
 interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; devGround?: (ground: DevGround) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void;
   /** ZE10d2: an online shell's gate word and its adoption by the next session on this page (`shell.ts` `StartedOnline`) */
   enter?: (cell: string) => Promise<{ readonly x: number; readonly z: number; readonly yaw: number } | null>;
@@ -450,6 +452,20 @@ export function prespawnWorkerServer(): void {
   if (pageServerRoute() !== 'standalone') return;
   void (async () => {
     try { (await loadServerModules()).prespawnStandalone?.(url => spawnHeldBytes(url)); } catch { /* the server's boot loads them again */ }
+  })();
+}
+/** TEMPLATE-E2E TR-4b (T1 K): a build with a world reads its release file now, at the boot's data step, so a missing file
+ *  ("Can't find the world") shows within seconds of the tap rather than after the whole load; the server step's `startOnline`
+ *  takes the read over (shell.ts `readReleaseEarly`). */
+export function readOnlineReleaseEarly(): void {
+  const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
+  if (world === undefined) return;
+  void (async () => {
+    try {
+      const { root } = buildRoot();
+      const online = await import(/* @vite-ignore */ `${root}/online.js`) as OnlineModule;
+      online.readReleaseEarly?.({ ...world, keep: releaseKeep(), leaving: onlineLeaving });
+    } catch { /* the server step reads it as before */ }
   })();
 }
 /** Start the standalone server now, for the server step to adopt. A one-shard page of a build with a world joins it at

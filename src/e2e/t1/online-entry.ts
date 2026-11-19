@@ -1,5 +1,6 @@
 import { errors as playwrightErrors, expect } from '@playwright/test'
 
+import { reportBoot } from './boot-report.ts'
 import { enterBrasscap } from './fixtures.ts'
 import { device } from './online-fixtures.ts'
 
@@ -26,6 +27,7 @@ export async function load503(
   try {
     const before = await rig.matches(route)
     await rig.arm(id, [{ route, kind: 'status', code: 503 }])
+    const startedAt = Date.now()
     await opened.page.goto('/?mute=1&nolock=1&sw=0&fps=30')
     // Observe the blocked load while keeping an early rejection owned.
     result = seatedResult(opened.page, `T1 ${route}`)
@@ -36,6 +38,8 @@ export async function load503(
     await expect(
       Promise.race([screen.waitFor().then((): typeof seen => seen), result]),
     ).resolves.toBe(seen)
+    // TR-4b: how long the blocked load took to say so, and where that load stood
+    await reportBoot(opened.page, startedAt, `${id} page shown`)
     expect(await rig.matches(route)).toBeGreaterThan(before)
     // A 503 body must never be credited as admitted bytes and reach play.
     const blocked = await opened.page.evaluate(

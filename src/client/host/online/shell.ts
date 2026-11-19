@@ -20,6 +20,7 @@ import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
 import { FRESH_WAIT_MS, fetchSignedRelease, freshAfterDial, releaseToDial, type ReleaseKeep } from './release';
 import { releaseScreens, stagingMark } from './releaseScreens';
+import { beginRelease, takeRelease } from './earlyRelease';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
 import { saveScreens } from './saveScreens';
@@ -425,19 +426,27 @@ export interface StartedOnline extends OnlineShell {
   /** The next session's slug and grid: the seat's cell, its place hint and re-entry are the new session's, and its `ready` the door's go. */
   readonly adopt: (next: { readonly loaded: string; readonly grid: NonNullable<StartOnline['grid']> }) => void;
 }
+/** OF4: a verified kept release file dials at once (offline too), and the fresh read follows; with none, the page waits for the read.
+ *  FM5: with no kept copy and no file, the page says why (offline, the file's server down or busy, a portal, a bad signature) and
+ *  reads again by release.ts's policy until a verified file answers; Title screen stops the load. */
+function readRelease(at: string, key: string, keep: ReleaseKeep, leaving: OnlineLeaving): ReturnType<typeof releaseToDial> {
+  const waiting = new Scope('online.release-wait');
+  const toTitle = (): void => { leaving.unload('release page: title screen'); location.replace(new URL('/', location.origin).toString()); };
+  // SB44: a page that can read waits FRESH_WAIT_MS for the fresh file behind a kept copy, so another build reloads it before play
+  const freshWait = typeof navigator === 'undefined' || navigator.onLine ? { freshWaitMs: FRESH_WAIT_MS, timer: (ms: number) => new Promise<void>(resolve => { waiting.timeout(ms, resolve); }) } : {};
+  return releaseToDial(at, key, { keep, wait: releaseScreens(waiting, { doctor, title: toTitle }), ...freshWait }).finally(() => { waiting.dispose(); });
+}
+/** TEMPLATE-E2E TR-4b (T1 K): a world build reads its release file from the boot's data step (clientWorker.ts), so a missing
+ *  file shows its page within seconds of the tap, beside the load, not after it; `startOnline` takes the read over. */
+export function readReleaseEarly(config: { readonly release: string; readonly key: string; readonly keep?: ReleaseKeep; readonly leaving?: OnlineLeaving }): void {
+  beginRelease(config.release, () => readRelease(config.release, config.key, config.keep ?? NO_KEEP, config.leaving ?? OWN_LEAVING));
+}
 export async function startOnline(config: StartOnline): Promise<StartedOnline> {
-  // OF4: a verified kept release file dials at once (offline too), and the fresh read follows; with none, the page waits for the read
   const { release: at, key, keep, identity, recordTag, grid, leaving = OWN_LEAVING, session, ...link } = config;
   // ZE10d2: a gate's adoption moves the page's slug, grid and goto to the cell entered (a redial then asks for that cell)
   let loadedNow = link.loaded, gridNow = grid, goto = grid?.goto === true ? grid.cell : undefined;
-  // FM5: with no kept copy and no file, the page says why (offline, the file's server down or busy, a portal, a bad signature) and
-  // reads again by release.ts's policy until a verified file answers; Title screen stops the load
-  const waiting = new Scope('online.release-wait');
   const toTitle = (from = 'release page'): void => { leaving.unload(`${from}: title screen`); location.replace(new URL('/', location.origin).toString()); };
-  let dial: Awaited<ReturnType<typeof releaseToDial>>;
-  // SB44: a page that can read waits FRESH_WAIT_MS for the fresh file behind a kept copy, so another build reloads it before play
-  const freshWait = typeof navigator === 'undefined' || navigator.onLine ? { freshWaitMs: FRESH_WAIT_MS, timer: (ms: number) => new Promise<void>(resolve => { waiting.timeout(ms, resolve); }) } : {};
-  try { dial = await releaseToDial(at, key, { keep: keep ?? NO_KEEP, wait: releaseScreens(waiting, { doctor, title: () => { toTitle(); } }), ...freshWait }); } finally { waiting.dispose(); }
+  const dial = await takeRelease(at, () => readRelease(at, key, keep ?? NO_KEEP, leaving));
   const { file: release, fresh } = dial, { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
   const entering = (slug: string): void => { leaving.arrive(slug); };

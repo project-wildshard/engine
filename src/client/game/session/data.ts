@@ -100,8 +100,9 @@ async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audi
   const menuLoad = deferExtras || currentPageMode() === 'grid' ? null : startMenuPreload(files, manifest);
   const audioLoad = deferExtras ? null : startAudioPreload(files, manifest, audioProfile);
   const deferredAudio = deferExtras ? startDeferredAudioPreload(files, manifest, audioProfile) : null;
-  // MG10 (J410): the in-page server's worker starts now and warms physics while the page holds little (clientWorker.ts)
-  void loadWorkerClient().then(worker => worker.prespawnWorkerServer()).catch(() => undefined);
+  // MG10 (J410): the in-page server's worker starts now and warms physics while the page holds little (clientWorker.ts);
+  // TR-4b: a world build's release file is read now, so a missing one says so within seconds
+  void loadWorkerClient().then(worker => { worker.prespawnWorkerServer(); worker.readOnlineReleaseEarly(); return undefined; }).catch(() => undefined);
   void startViewmodelTextures(manifest.boot?.viewmodelSets ?? false); // the crossbow's + rifle's textures, drawn in a worker while the world builds
   const fieldModels = manifest.fieldModels?.() ?? null;
   return { ...ctx, loading, audioProfile, files, plan, step, menuLoad, audioLoad, deferredAudio, fieldModels };

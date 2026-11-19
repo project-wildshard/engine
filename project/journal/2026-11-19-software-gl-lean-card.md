@@ -39,3 +39,15 @@ new program a slice: local SwiftShader `firstFrame` 12.6 s became 6.3 s
 never starts narrow: A's `firstFrame` stayed 0.5 s (two runs). The
 `[t1-boot]` line also names `control` and each of inPlay's waits, so a
 hosted run says where the time after the loader goes.
+
+## K's release read moves to boot start (opus-tr4b3)
+
+K's 503 page showed only once the whole grid boot reached the server
+step, because `startOnline` was the release file's only reader: 19.6 s
+locally on SwiftShader, about 49 s hosted, and never when the boot
+stalled at `home` first. The boot's data step now begins the same read
+(`readOnlineReleaseEarly`), with its pages and retry ladder, and
+`startOnline` dials what it heard. Locally the page shows after 6.2 s.
+The 503 load still boots the grid (no word: J300) and reshards to the
+one-shard page once the healed read lets the server step hear the
+world, so K is still two boots.

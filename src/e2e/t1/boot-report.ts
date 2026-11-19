@@ -42,7 +42,11 @@ function bootStage(span: BootSpan | undefined): string | undefined {
 /** TR-4b: one stdout line per Brasscap entry with every loader stage of 0.5 s or more (its `stage:*` spans in start
  *  order: seconds, then @ seconds into the entered document), so a hosted suite killed at its budget still says where
  *  its time went. `doc` is the entered document's age at control; the rest of `in play after` is the title's. */
-export async function reportBoot(page: Page, startedAt: number): Promise<void> {
+export async function reportBoot(
+  page: Page,
+  startedAt: number,
+  reached = 'Brasscap in play',
+): Promise<void> {
   const steps = await page
     .evaluate((): { doc: number; entries: unknown } => {
       const timing: unknown = Reflect.get(globalThis, '__bootTiming')
@@ -65,6 +69,6 @@ export async function reportBoot(page: Page, startedAt: number): Promise<void> {
     .catch((): string => 'steps unread')
   const play = takePlayMarks(page).join(', ')
   process.stdout.write(
-    `[t1-boot] Brasscap in play after ${((Date.now() - startedAt) / 1000).toFixed(1)} s (${steps}; ${play})\n`,
+    `[t1-boot] ${reached} after ${((Date.now() - startedAt) / 1000).toFixed(1)} s (${steps}; ${play})\n`,
   )
 }

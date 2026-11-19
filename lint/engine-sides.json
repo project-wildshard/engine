@@ -1198,6 +1198,7 @@
     "src/client/host/online/releaseScreens.ts": "client",
     "src/client/host/online/reconnectStrip.ts": "client",
     "src/client/host/online/codeRetention.ts": "client",
+    "src/client/host/online/earlyRelease.ts": "client",
     "src/client/host/online/release.ts": "client",
     "src/client/host/online/devControl.ts": "client",
     "src/client/host/online/shell.ts": "client",
