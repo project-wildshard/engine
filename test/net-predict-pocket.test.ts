@@ -15,8 +15,12 @@ interface Bin { readonly file: string; readonly byteOffset: number; readonly byt
 interface Solid { readonly at: readonly number[]; readonly rot: readonly number[]; readonly shape: number; readonly half?: readonly number[]; readonly vertices?: Bin; readonly friction: number; readonly groups: number }
 const root = 'out/nalati-grasslands';
 const read = (file: string): unknown => JSON.parse(readFileSync(`${root}/${file}`, 'utf8'));
-const files = new Map((read('shard.json') as { files: { name: string; path: string }[] }).files.map(row => [row.name, row.path]));
-const bake = read('server/json/136bce9bfb837eca147c7d5dbd4dc2eab866b67d6f16451d0a95af04eb9cfaae.json') as {
+const shard = read('shard.json') as { files: { name: string; path: string }[]; admission: { server: { name: string; path: string }[] } };
+const files = new Map(shard.files.map(row => [row.name, row.path]));
+// The physics bake by its name in the admitted server set, not by a hash: a new Nalati pin (rev 3, fcfaf6469) moves the hash.
+const physics = shard.admission.server.find(row => row.name === 'server/physics.json');
+if (physics === undefined) throw new Error('The pinned Nalati product admits no server/physics.json');
+const bake = read(physics.path) as {
   ground: { rows: number; cols: number; heights: { file: string }; scale: { x: number; y: number; z: number }; at: { x: number; y: number; z: number }; friction: number; groups: number };
   solids: Solid[] };
 const bytes = (name: string): ArrayBuffer => Uint8Array.from(readFileSync(`${root}/${files.get(name) ?? name}`)).buffer;
