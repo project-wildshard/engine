@@ -1,0 +1,66 @@
+{
+ "schema": 1,
+ "about": "BUDGET-CAPS: each budget's recorded baseline, written by node scripts/budgets/cli.mjs record (never by hand). contentKey is what the value was measured on: a shard's pinned revision (<slug>@<revision>) for its numbers, engine for the app's own. declared: an engine feature that raised this budget in the commit that wrote it (cli.mjs declare); record clears it. The soft line is value plus 10% (J444).",
+ "baselines": {
+  "download/phone/pine-hollow": {
+   "value": 41824808,
+   "contentKey": "pine-hollow@5",
+   "commit": "161063f3b4"
+  },
+  "download/phone/driftwood-isle": {
+   "value": 22218404,
+   "contentKey": "driftwood-isle@5",
+   "commit": "161063f3b4"
+  },
+  "download/phone/far-reach": {
+   "value": 26340742,
+   "contentKey": "far-reach@4",
+   "commit": "161063f3b4"
+  },
+  "download/phone/sunscar-dunes": {
+   "value": 12421514,
+   "contentKey": "sunscar-dunes@2",
+   "commit": "161063f3b4"
+  },
+  "download/phone/nalati-grasslands": {
+   "value": 44038111,
+   "contentKey": "nalati-grasslands@2",
+   "commit": "161063f3b4"
+  },
+  "download/phone/nine-dragon-stack": {
+   "value": 27202151,
+   "contentKey": "nine-dragon-stack@3",
+   "commit": "161063f3b4"
+  },
+  "js/grid-session/raw": {
+   "value": 41848,
+   "contentKey": "engine",
+   "commit": "43c891e6"
+  },
+  "js/grid-session/gzip": {
+   "value": 14344,
+   "contentKey": "engine",
+   "commit": "43c891e6"
+  },
+  "js/title/raw": {
+   "value": 365885,
+   "contentKey": "engine",
+   "commit": "43c891e6"
+  },
+  "js/title/gzip": {
+   "value": 126248,
+   "contentKey": "engine",
+   "commit": "43c891e6"
+  },
+  "js/session/raw": {
+   "value": 4396414,
+   "contentKey": "engine",
+   "commit": "43c891e6"
+  },
+  "js/session/gzip": {
+   "value": 1358266,
+   "contentKey": "engine",
+   "commit": "43c891e6"
+  }
+ }
+}

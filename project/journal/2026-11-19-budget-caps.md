@@ -9,3 +9,10 @@
   5 MB for memory). A new content key (a new shard revision), a declared key
   or no baseline yet is `raised` and only the hard cap applies. Integer
   compare (`rise * 10 >= baseline`) so +10% is regressed without float error.
+- BC2: `budgets/caps.json` (hard caps with their J-numbers: 100 MB phone
+  download J338, 1.5 GB loading J410, 1 MB raw title J324, 1.0 GB playing as
+  a target J445; `null` where no cap is on record, D3) and
+  `budgets/baselines.json` (value, content key, commit, optional `declared`).
+  A cap key ending in `/*` covers every key under it. Downloads seeded from
+  the old ceilings minus margins, at each shard's pinned revision; Driftwood
+  at rev 5's 22,218,404 B (J437).

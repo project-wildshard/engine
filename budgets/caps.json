@@ -1,0 +1,16 @@
+{
+ "schema": 1,
+ "about": "BUDGET-CAPS (meta docs/plans/BUDGET-CAPS-PLAN.md; J439 as amended by J444). Each budget's one hard cap, with the J-number that set it. A hard cap moves only with a new J-number from Jake. A key ending in /* covers every key under it. hard null: no hard cap on record (D3), the baseline alone guards it. target: a line the player is warned at and nothing is refused (J445). floor: the least rise that counts as a regression for a noisy measure. The baselines are in budgets/baselines.json; node scripts/budgets/cli.mjs check | record | declare.",
+ "caps": {
+  "download/phone/*": { "hard": 100000000, "unit": "bytes", "kind": "exact", "decision": "J338", "why": "A shard's phone download: up to 50 MB is fine and prints nothing, 100 MB is the hard ceiling (Jake 2026-11-13)." },
+  "memory/loading/*": { "hard": 1500000000, "unit": "bytes", "kind": "noisy", "floor": 5000000, "decision": "J410", "why": "A zone's modelled phone memory while loading: 1.5 GB is the one memory refusal (J410, J431, J445); the phone shows Play anyway (J431)." },
+  "memory/playing/*": { "hard": null, "target": 1000000000, "unit": "bytes", "kind": "noisy", "floor": 5000000, "decision": "J445", "why": "A zone's modelled phone memory while playing: 1.0 GB is a target that shows the may-crash card, never a refusal (J445 amends J410 and J429)." },
+  "ledger/*": { "hard": null, "unit": "bytes", "kind": "noisy", "floor": 5000000, "decision": null, "why": "The memory ledger's control and peak totals a zone (BC6): a regression check against the zone's own baseline; the hard line is memory/loading/*." },
+  "js/title/raw": { "hard": 1000000, "unit": "bytes", "kind": "exact", "decision": "J324", "why": "\"A 1 megabyte title page is fine\" (Jake 2026-11-13)." },
+  "js/title/gzip": { "hard": null, "unit": "bytes", "kind": "exact", "decision": null, "why": "No hard cap on record; the raw cap is J324's (D3)." },
+  "js/session/raw": { "hard": null, "unit": "bytes", "kind": "exact", "decision": null, "why": "No hard cap on record (D3)." },
+  "js/session/gzip": { "hard": null, "unit": "bytes", "kind": "exact", "decision": null, "why": "No hard cap on record (D3)." },
+  "js/grid-session/raw": { "hard": null, "unit": "bytes", "kind": "exact", "decision": null, "why": "No hard cap on record (D3)." },
+  "js/grid-session/gzip": { "hard": null, "unit": "bytes", "kind": "exact", "decision": null, "why": "No hard cap on record (D3)." }
+ }
+}
