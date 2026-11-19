@@ -17,18 +17,13 @@ test('the bound wire is an npm release, locked by integrity', () => {
   expect(version, 'one registry entry for @wildshard/wire').toBeDefined();
 });
 
-// WR6 installs a second copy, the last wire release (`@wildshard/wire-released`), beside the bound one: a git dev dependency (consumers
-// never install it). Its pin has exactly one entry, at its own commit, that keeps the subdirectory.
-test('the released wire pin has one lockfile entry that keeps its subdirectory path', () => {
-  const pins = [pkg.devDependencies['@wildshard/wire-released']]
-    .map(spec => /^github:project-wildshard\/shard-format#([0-9a-f]{40})&path:\/packages\/wire$/u.exec(spec ?? '')?.[1]);
-  expect(pins.every(sha => sha !== undefined), 'the released wire pin names a shard-format commit and the subdirectory').toBe(true);
-  const blocks = lock.split('\n\n').filter(block => block.includes('resolution:'));
-  for (const sha of new Set(pins)) {
-    const tarball = `https://codeload.github.com/project-wildshard/shard-format/tar.gz/${sha ?? ''}`;
-    const entries = blocks.filter(block => block.includes(`${tarball}#path:/packages/wire'`));
-    expect(entries, `one entry for ${sha ?? ''}`).toHaveLength(1);
-    expect(entries[0]).toContain(`resolution: {path: /packages/wire, tarball: ${tarball}}`);
-    expect(entries[0]).not.toMatch(/gitHosted/u);
-  }
+// WR6 keeps the previous npm minor beside the bound wire for cross-version proof.
+test('the released wire fixture resolves its exact npm pin by integrity', () => {
+  const spec = pkg.devDependencies['@wildshard/wire-released'] ?? '';
+  const version = /^npm:@wildshard\/wire@(\d+\.\d+\.\d+)$/u.exec(spec)?.[1];
+  expect(version, 'the previous wire release is an exact npm alias').toBeDefined();
+  const importer = /'@wildshard\/wire-released':\n {8}specifier: (npm:@wildshard\/wire@[^\n]+)\n {8}version: '@wildshard\/wire@(\d+\.\d+\.\d+)(?:\([^\n]*\))?'/u.exec(lock);
+  expect(importer?.slice(1), 'the alias importer names the same registry release').toEqual([spec, version]);
+  const packages = [...lock.matchAll(/'@wildshard\/wire@(\d+\.\d+\.\d+)':\n {4}resolution: \{integrity: sha512-/gu)];
+  expect(packages.filter(row => row[1] === version), 'one integrity-locked previous release').toHaveLength(1);
 });
