@@ -205,40 +205,40 @@ export function verifyBootSignalRoad(witness) {
   if (failures.length > 0) throw new Error(`Signal road entry: ${failures.join('; ')}`);
 }
 
-/** A short real Template entry/departure exercises the durable crossing without spending a diagonal home trip.
+/** A short real Brasscap entry/departure exercises the durable crossing without spending a diagonal home trip.
  * @param {unknown} state @returns {{entry:import('../frame-floor-grid.mjs').FloorGridPlan,exit:import('../frame-floor-grid.mjs').FloorGridPlan}} */
-export function bootTemplateRoadPlans(state) {
+export function bootCellRoadPlans(state) {
   if (typeof state !== 'object' || state === null || !('cells' in state) || !Array.isArray(state.cells)) throw new Error('Missing grid cell catalogue');
-  const targets = state.cells.filter((/** @type {unknown} */ row) => typeof row === 'object' && row !== null && 'slug' in row && row.slug === '_template' &&
+  const targets = state.cells.filter((/** @type {unknown} */ row) => typeof row === 'object' && row !== null && 'slug' in row && row.slug === 'brasscap-mesa' &&
     'instance' in row && typeof row.instance === 'string').sort((a, b) => a.instance.localeCompare(b.instance));
   const target = /** @type {unknown} */ (targets.at(0));
   if (typeof target !== 'object' || target === null || !('instance' in target) || typeof target.instance !== 'string' || target.instance.length === 0 ||
-    !('cell' in target) || !Array.isArray(target.cell) || target.cell.length !== 2) throw new Error('Template grid cell is missing or invalid');
+    !('cell' in target) || !Array.isArray(target.cell) || target.cell.length !== 2) throw new Error('Brasscap grid cell is missing or invalid');
   const x = /** @type {unknown} */ (target.cell[0]), z = /** @type {unknown} */ (target.cell[1]);
-  if (typeof x !== 'number' || typeof z !== 'number' || !Number.isSafeInteger(x) || !Number.isSafeInteger(z)) throw new Error('Invalid Template grid address');
+  if (typeof x !== 'number' || typeof z !== 'number' || !Number.isSafeInteger(x) || !Number.isSafeInteger(z)) throw new Error('Invalid Brasscap grid address');
   const pitch = 'pitch' in state && state.pitch !== undefined ? state.pitch : 555;
   if (typeof pitch !== 'number' || !Number.isFinite(pitch) || pitch <= 500) throw new Error('Invalid grid pitch');
   const road = { x: x * pitch - pitch / 2, z: z * pitch }, inside = { x: x * pitch - 230, z: z * pitch };
-  return { entry: { name: 'boot-template-entry', from: null, to: target.instance, movement: 'road-hover', start: road,
+  return { entry: { name: 'boot-brasscap-entry', from: null, to: target.instance, movement: 'road-hover', start: road,
     waypoints: [inside], requiredResidents: [target.instance], finishOnArrival: true },
-  exit: { name: 'boot-template-return', from: target.instance, to: null, movement: 'road-hover', waypoints: [road], requiredResidents: [], finishOnArrival: true } };
+  exit: { name: 'boot-brasscap-return', from: target.instance, to: null, movement: 'road-hover', waypoints: [road], requiredResidents: [], finishOnArrival: true } };
 }
 
 /** Read actual durable storage, never the save service's retryable in-memory fallback.
  * @param {string} instance */
-export function bootTemplateCheckpoint(instance, raw = localStorage.getItem(`wildshard.save.v2@2.${instance}`)) {
-  if (raw === null) throw new Error('Template crossing has no durable checkpoint');
+export function bootCellCheckpoint(instance, raw = localStorage.getItem(`wildshard.save.v2@2.${instance}`)) {
+  if (raw === null) throw new Error('Brasscap crossing has no durable checkpoint');
   const document = JSON.parse(raw), served = document?.keys?.continuation;
   if (served !== undefined) { // A server's own document: src/server/host/standalone/continuation.ts.
     const run = served.data;
-    if (served.v !== 1 || !Number.isSafeInteger(run?.tick) || run.tick < 0 || typeof run?.snapshot !== 'string' || run.snapshot.length === 0) throw new Error('Template crossing has an invalid durable checkpoint');
+    if (served.v !== 1 || !Number.isSafeInteger(run?.tick) || run.tick < 0 || typeof run?.snapshot !== 'string' || run.snapshot.length === 0) throw new Error('Brasscap crossing has an invalid durable checkpoint');
     return { instance, mode: 'exact', revision: run.tick, integrity: 0, snapshotCharacters: run.snapshot.length, storageCharacters: raw.length };
   }
   const slot = document?.keys?.['platform.region'], data = slot?.data;
   if (slot?.v !== 1 || !Number.isSafeInteger(data?.revision) || data.revision < 1 || !Number.isSafeInteger(data?.integrity) ||
     data.integrity < 0 || data.integrity > 0xffffffff ||
     !(data.mode === 'exact' && typeof data.snapshot === 'string' && data.snapshot.length > 0 || data.mode === 'logical' && data.snapshot === null && typeof data.logical === 'object' && data.logical !== null)) {
-    throw new Error('Template crossing has an invalid durable checkpoint');
+    throw new Error('Brasscap crossing has an invalid durable checkpoint');
   }
   return { instance, mode: data.mode, revision: data.revision, integrity: data.integrity, snapshotCharacters: data.snapshot?.length ?? 0, storageCharacters: raw.length };
 }
@@ -262,13 +262,13 @@ export async function bootStoredSave(instance) {
   } finally { database.close(); }
 }
 
-/** @param {{entry:import('../frame-floor-grid.mjs').FloorGridWitness,exit:import('../frame-floor-grid.mjs').FloorGridWitness,checkpoint:ReturnType<typeof bootTemplateCheckpoint>}} result */
-export function verifyBootTemplateRoad(result) {
+/** @param {{entry:import('../frame-floor-grid.mjs').FloorGridWitness,exit:import('../frame-floor-grid.mjs').FloorGridWitness,checkpoint:ReturnType<typeof bootCellCheckpoint>}} result */
+export function verifyBootCellRoad(result) {
   const failures = [...gridFloorWitnessFailures(result.entry), ...gridFloorWitnessFailures(result.exit)];
   const id = result.entry.plan.to, cell = result.entry.after.cells.find(row => row.instance === id);
-  if (result.entry.plan.from !== null || cell?.slug !== '_template' || result.exit.plan.from !== id || result.exit.plan.to !== null) failures.push('Required Template entry and checkpoint-backed road return were not driven');
-  if (result.checkpoint.instance !== id || result.checkpoint.storageCharacters <= 0) failures.push('Template durable checkpoint does not match its crossing');
-  if (failures.length > 0) throw new Error(`Template checkpoint roundtrip: ${failures.join('; ')}`);
+  if (result.entry.plan.from !== null || cell?.slug !== 'brasscap-mesa' || result.exit.plan.from !== id || result.exit.plan.to !== null) failures.push('Required Brasscap entry and checkpoint-backed road return were not driven');
+  if (result.checkpoint.instance !== id || result.checkpoint.storageCharacters <= 0) failures.push('Brasscap durable checkpoint does not match its crossing');
+  if (failures.length > 0) throw new Error(`Brasscap checkpoint roundtrip: ${failures.join('; ')}`);
 }
 
 /** Failure-only: compare the small travel readout with the observer's actual owner.
@@ -313,7 +313,7 @@ export async function bootRoadFailure(read, primary) {
   return new Error(`${cause.message}; roadCompletion=${evidence}`, {cause});
 }
 
-/** The Template roundtrip and mandatory Signal entry share the original road leg's 90-second budget.
+/** The Brasscap roundtrip and mandatory Signal entry share the original road leg's 90-second budget.
  * @param {import('playwright').Page} page @param {string[]} faults
  * @param {import('../frame-floor-grid.mjs').FloorGridPlan} plan @param {import('../frame-floor-grid.mjs').FloorGridDocumentIdentity} documentOrigin
  * @param {number} deadline @param {string} label */
@@ -333,21 +333,21 @@ async function bootRoadRoute(page, faults, plan, documentOrigin, deadline, label
 
 /** @param {import('playwright').Page} page @param {string[]} faults
  * @param {import('./black-frame.mjs').BootFrameSample[]} frames @param {number} deadline */
-async function bootTemplateRoad(page, faults, frames, deadline) {
-  const plans = bootTemplateRoadPlans((await page.evaluate(bootObservation)).grid), documentOrigin = await page.evaluate(gridFloorDocumentIdentity);
-  const entry = await bootRoadRoute(page, faults, plans.entry, documentOrigin, deadline, 'Template road entry');
+async function bootCellRoad(page, faults, frames, deadline) {
+  const plans = bootCellRoadPlans((await page.evaluate(bootObservation)).grid), documentOrigin = await page.evaluate(gridFloorDocumentIdentity);
+  const entry = await bootRoadRoute(page, faults, plans.entry, documentOrigin, deadline, 'Brasscap road entry');
   const initial = await page.evaluate(bootObservation);
-  await until(page, faults, async () => { const observed = await page.evaluate(bootObservation); return observed.ready && observed.frame >= initial.frame + 10; }, 'Template ten live gameplay frames', deadline);
-  await captureBootFrame(page, 'grid Template entered', deadline, frames);
-  const exit = await bootRoadRoute(page, faults, plans.exit, documentOrigin, deadline, 'Template checkpoint-backed return');
+  await until(page, faults, async () => { const observed = await page.evaluate(bootObservation); return observed.ready && observed.frame >= initial.frame + 10; }, 'Brasscap ten live gameplay frames', deadline);
+  await captureBootFrame(page, 'grid Brasscap entered', deadline, frames);
+  const exit = await bootRoadRoute(page, faults, plans.exit, documentOrigin, deadline, 'Brasscap checkpoint-backed return');
   const instance = plans.entry.to ?? '';
   // A server writes this from its worker, a moment behind the frames.
   await until(page, faults, async () => {
-    try { bootTemplateCheckpoint(instance, await page.evaluate(bootStoredSave, instance)); return true; } catch { return false; }
-  }, 'Template durable checkpoint', Math.min(deadline, Date.now() + 15000)).catch(() => undefined);
-  const result = { entry, exit, checkpoint: bootTemplateCheckpoint(instance, await page.evaluate(bootStoredSave, instance)) };
-  verifyBootTemplateRoad(result);
-  await captureBootFrame(page, 'grid Template checkpoint return', deadline, frames);
+    try { bootCellCheckpoint(instance, await page.evaluate(bootStoredSave, instance)); return true; } catch { return false; }
+  }, 'Brasscap durable checkpoint', Math.min(deadline, Date.now() + 15000)).catch(() => undefined);
+  const result = { entry, exit, checkpoint: bootCellCheckpoint(instance, await page.evaluate(bootStoredSave, instance)) };
+  verifyBootCellRoad(result);
+  await captureBootFrame(page, 'grid Brasscap checkpoint return', deadline, frames);
   return result;
 }
 
@@ -567,9 +567,9 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     if (faults.length > 0) throw new Error(JSON.stringify(faults));
     await captureBootFrame(page, mode === 'grid' ? 'grid HOME' : `${shard} gameplay`, deadline, frames);
     const roadDeadline = Date.now() + 90000;
-    const templateRoad = mode === 'grid' ? await bootTemplateRoad(page, faults, frames, roadDeadline) : null;
+    const cellRoad = mode === 'grid' ? await bootCellRoad(page, faults, frames, roadDeadline) : null;
     const road = mode === 'grid' ? await bootSignalRoad(page, faults, frames, roadDeadline) : null;
-    const result = { mode, phases, frames, gameplayFrames, stalls, playStall, gridWaits: gridWaits.samples, templateRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
+    const result = { mode, phases, frames, gameplayFrames, stalls, playStall, gridWaits: gridWaits.samples, cellRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
     if (faults.length > 0 || result.fatal.length > 0) throw new Error(JSON.stringify(result));
     writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify(result, null, 2)}\n`);
     return result;

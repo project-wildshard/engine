@@ -6,7 +6,7 @@
 //                                           release pair or a set E7_*_SHARDS names a slug GET /api/catalogue no longer
 //                                           lists (DEL9); `--drop <slug>` lets refresh drop a deleted pin
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
-//   node scripts/pins.ts install --ring 1   Ring 1: pinned Template 1 and Dunes, dependency Template 2, and server slices
+//   node scripts/pins.ts install --ring 1   Ring 1: pinned Brasscap Mesa and Dunes (J434), and server slices
 //   node scripts/pins.ts install --from-format <slug>  a frozen dependency product (blender-template, brasscap-mesa),
 //                                                      without network or cook
 //   node scripts/pins.ts slice              cut Ring 1's server slices from the pinned heads into test/pins/slices.json
@@ -286,7 +286,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   const { readTar } = await import('@wildshard/format/tar');
   const { restorePacks } = await import('./pin-packs.ts');
   if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly one product: blender-template or brasscap-mesa');
-  const formatSlug = source === 'format' ? only[0] : (source === 'ring' && only.includes('blender-template') ? 'blender-template' : undefined);
+  const formatSlug = source === 'format' ? only[0] : undefined;
   const dependency = local ?? (formatSlug === undefined ? undefined : (await import('./pin-format.ts')).formatTemplate(formatSlug));
   const shards = dependency === undefined ? trackedPins : [...trackedPins.filter(row => row.slug !== dependency.pin.slug), dependency.pin];
   const pins = only.length === 0 ? shards : shards.filter(row => only.includes(row.slug));
@@ -444,21 +444,15 @@ async function slice(check = false): Promise<void> {
   console.log(`${rows.length} slices, ${(rows.reduce((sum, row) => sum + row.bytes, 0) / 1e6).toFixed(1)} MB`);
 }
 
-/** A catalogue a build can bake with only `slugs` on disk. Dunes takes the home cell, because a grid opens on a shard it can admit; every other
- *  cell becomes a road, as the live grid's template cell is, so the grid keeps its shape (G972) and the crossing stays real. */
+/** A catalogue a build can bake with only `slugs` on disk. Dunes takes the home cell, because a grid opens on a shard it can admit;
+ *  every other cell becomes a Brasscap road cell (J434: Brasscap replaced the Template that filled them), as Brasscap's own
+ *  cell at (-1,-1) is, so the grid keeps its shape (G972), its seam bake keeps every home's room, and the crossing stays real. */
 function ringCatalogue(pins: readonly Pin[]): void {
   interface Cell { slug: string; instance: string; cell: readonly [number, number] }
   const catalogue = readJson(CATALOGUE) as { shards: { slug: string }[]; placements: { slug: string }[]; grid: { cells: Cell[] } };
   const kept = new Set(pins.flatMap(({slug}) => [slug, `_${slug}`]));
-  // Ring 1's blender-template is the format's own Template 2, while the catalogue names that row by the slug that replaced
-  // it (brasscap-mesa, TC-SHIP-a, src/shared/game/slugNames.json): the ring's catalogue names the product it installs.
-  const formerly = new Map(Object.entries((readJson('src/shared/game/slugNames.json') as { names: Record<string, string> }).names).map(([old, now]) => [now, old]));
-  const ringSlug = <T extends { slug: string }>(row: T): T => {
-    const bare = row.slug.replace(/^_/u, ''), old = formerly.get(bare);
-    return old === undefined || kept.has(bare) || !kept.has(old) ? row : { ...row, slug: row.slug.startsWith('_') ? `_${old}` : old };
-  };
-  catalogue.shards = catalogue.shards.map(ringSlug); catalogue.placements = catalogue.placements.map(ringSlug);
-  catalogue.grid.cells = catalogue.grid.cells.map(ringSlug);
+  const filler = 'brasscap-mesa';
+  if (!kept.has(filler)) throw new Error(`Ring catalogue fills its unkept cells with ${filler}, which this ring does not install`);
   const shards = catalogue.shards.filter(row => kept.has(row.slug));
   for (const row of shards) {
     const pin = pins.find(candidate => candidate.slug === row.slug);
@@ -467,8 +461,8 @@ function ringCatalogue(pins: readonly Pin[]): void {
   const home = catalogue.grid.cells.find(row => row.cell[0] === 0 && row.cell[1] === 0)?.instance ?? 'home';
   const cells = catalogue.grid.cells.map(row => {
     if (row.instance === home) return { instance: 'sunscar-dunes', slug: 'sunscar-dunes', cell: row.cell };
-    if (row.slug === 'sunscar-dunes') return { instance: home, slug: '_template', cell: row.cell, speedClass: 'road' };
-    return kept.has(row.slug) ? row : { instance: row.instance, slug: '_template', cell: row.cell, speedClass: 'road' };
+    if (row.slug === 'sunscar-dunes') return { instance: home, slug: filler, cell: row.cell, speedClass: 'road' };
+    return kept.has(row.slug) ? row : { instance: row.instance, slug: filler, cell: row.cell, speedClass: 'road' };
   });
   writeFileSync(RING_CATALOGUE, json({ ...catalogue, shards, placements: catalogue.placements.filter(row => kept.has(row.slug)), grid: { ...catalogue.grid, cells } }));
 }

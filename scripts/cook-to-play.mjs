@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// P2 / EG-13: a real build ships Template only; production store attachment
-// replaces it and adds the other two Ring 1 pins. All three play those bytes.
+// P2 / EG-13: a real build ships Dunes only; production store attachment
+// replaces it and adds the other Ring 1 pin (Brasscap Mesa). Both play those bytes (J434).
 // Ring 2: includes a fresh client build and cold q11 cooks (over ten seconds).
 import {execFileSync} from 'node:child_process';
 import {mkdirSync,mkdtempSync,readFileSync,realpathSync,rmSync,writeFileSync} from 'node:fs';
@@ -38,10 +38,10 @@ let preview=null;
 try {
   const archive=execFileSync('git',['archive','HEAD'],{maxBuffer:512*1024*1024});
   execFileSync('tar',['-x','-C',tree],{input:archive});linkNodeModules(root,tree);
-  node(['scripts/pins.ts','install','template'],tree);
+  node(['scripts/pins.ts','install','sunscar-dunes'],tree);
   /** @type {import('@wildshard/format/standaloneCatalogue').StandaloneCatalogue} */
   const live=JSON.parse(readFileSync('out/.ring-catalogue.json','utf8'));
-  const selected={...live,shards:live.shards.filter(row=>row.slug==='template'),placements:live.placements.filter(row=>bareSlug(row.slug)==='template')};
+  const selected={...live,shards:live.shards.filter(row=>row.slug==='sunscar-dunes'),placements:live.placements.filter(row=>bareSlug(row.slug)==='sunscar-dunes')};
   const catalogue=join(work,'catalogue.json');writeFileSync(catalogue,JSON.stringify(selected));
   // The tree is a `git archive` under this checkout's tmp/, so `git rev-parse` there names the outer checkout: hand the
   // build HEAD's own file list instead (source-input-proof.mjs's inventory), as build-mirror.mjs does (main ci 43064007268)
@@ -71,19 +71,19 @@ try {
   const address=packs.address();if(address===null||typeof address==='string')throw new Error('No pack origin');
   const origin=`http://127.0.0.1:${address.port}`;
   const pinCache=process.env.WILDSHARD_PIN_CACHE??join(homedir(),'.cache/wildshard/pins');
-  // The production installer preserves bundled products. Retire Template's
+  // The production installer preserves bundled products. Retire Dunes'
   // bundled route so it too must read this run's cook, as nightly-heads does.
   const htmlFile=join(dist,'index.html'),html=readFileSync(htmlFile,'utf8');
   const expression=/(<script type="application\/json" id="boot-module-files">)([^<]+)(<\/script>)/u;
   const text=expression.exec(html)?.[2];if(text===undefined)throw new Error('Missing build bank');
   const bank=JSON.parse(text);
-  const expected=['template','blender-template','sunscar-dunes'];
+  const expected=['brasscap-mesa','sunscar-dunes'];
   const inputs=ringCookInputs(expected,receipt.heads,pinCache);
   for(const head of receipt.heads)if(!inputs.heads.some(row=>row.slug===head.slug&&row.hash===head.hash))throw new Error('Cook differs from the installed Ring 1 inputs');
   for(const rows of [bank.spawnManifests.client,bank.entryPrograms??{}])for(const slug of Object.keys(rows))if(expected.includes(bareSlug(slug)))delete rows[slug];
   writeFileSync(htmlFile,html.replace(expression,(_match,before,_body,after)=>`${before}${JSON.stringify(bank).replaceAll('<',String.raw`\u003c`)}${after}`));
   // The whole-pack book can retain authored aliases from the build too. Its
-  // exact `_template` row must not shadow the attached cook's `template` row.
+  // exact `_sunscar-dunes` row must not shadow the attached cook's `sunscar-dunes` row.
   const bookFile=join(dist,packsBookPath(build)),book=JSON.parse(readFileSync(bookFile,'utf8'));
   for(const slug of Object.keys(book.client??{}))if(expected.includes(bareSlug(slug)))delete book.client[slug];
   writeFileSync(bookFile,JSON.stringify(book));

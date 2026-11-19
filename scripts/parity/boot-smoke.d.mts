@@ -22,14 +22,14 @@ export function bootSignalRoadPlan(state: unknown): FloorGridPlan;
 /** Refuse missing Signal transitions, live residency or actual road frames. */
 export function verifyBootSignalRoad(witness: FloorGridWitness): void;
 
-/** Actual Template border entry and checkpoint-backed departure, sharing Signal's original 90-second budget. */
-export function bootTemplateRoadPlans(state: unknown): {entry: FloorGridPlan; exit: FloorGridPlan};
+/** Actual Brasscap border entry and checkpoint-backed departure, sharing Signal's original 90-second budget. */
+export function bootCellRoadPlans(state: unknown): {entry: FloorGridPlan; exit: FloorGridPlan};
 /** Read durable storage only; a retryable save-service fallback cannot satisfy this proof. */
-export function bootTemplateCheckpoint(instance: string, raw?: string | null): {instance:string; mode:'exact'|'logical'; revision:number; integrity:number; snapshotCharacters:number; storageCharacters:number};
+export function bootCellCheckpoint(instance: string, raw?: string | null): {instance:string; mode:'exact'|'logical'; revision:number; integrity:number; snapshotCharacters:number; storageCharacters:number};
 /** A world's document where this page keeps it: IndexedDB for a server's saves, localStorage for a page's. */
 export function bootStoredSave(instance: string): Promise<string | null>;
-/** Both real frame commits and the matching durable Template namespace must be present. */
-export function verifyBootTemplateRoad(result: {entry:FloorGridWitness;exit:FloorGridWitness;checkpoint:ReturnType<typeof bootTemplateCheckpoint>}):void;
+/** Both real frame commits and the matching durable Brasscap namespace must be present. */
+export function verifyBootCellRoad(result: {entry:FloorGridWitness;exit:FloorGridWitness;checkpoint:ReturnType<typeof bootCellCheckpoint>}):void;
 
 /** Each case's own slot browser; the grid gets a fresh one after that slot's prior contexts are closed, preserving every case law. */
 export function bootCaseBrowser<T>(pool: {browser:(slot:number)=>Promise<T>;release:(slot:number)=>Promise<void>}, mode:'standalone'|'grid'|'public-policy', slot?:number):Promise<T>;

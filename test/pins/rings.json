@@ -1,6 +1,6 @@
 {
   "1": {
-    "products": ["template", "blender-template", "sunscar-dunes"],
+    "products": ["brasscap-mesa", "sunscar-dunes"],
     "slices": ["far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"]
   }
 }

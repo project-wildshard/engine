@@ -12,7 +12,7 @@ test('the blocking grid case keeps every original clock, pixel and road assertio
   expect(source).toContain('await until(page, faults, () => gameplay(true)');
   expect(source).toContain("'ten live gameplay frames', deadline");
   expect(source).toContain("await captureBootFrame(page, mode === 'grid' ? 'grid HOME'");
-  expect(source).toContain('await bootTemplateRoad(page, faults, frames, roadDeadline)');
+  expect(source).toContain('await bootCellRoad(page, faults, frames, roadDeadline)');
   expect(source).toContain('await bootSignalRoad(page, faults, frames, roadDeadline)');
   expect(source).toContain('elapsedMs: Date.now() - started');
 });
