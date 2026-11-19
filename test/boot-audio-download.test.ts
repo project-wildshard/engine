@@ -54,15 +54,21 @@ test('a player reads only what the download listed (one music style, AU16)', asy
 
 // The pinned products (`node scripts/pins.ts install`) and this build's boot table, when the checkout has them.
 const bootTables = 'out/.app/boot-tables.json';
-for (const [shard, fenceAudio, pageAudio] of [['driftwood-isle', 18, 91], ['pine-hollow', 0, 1], ['nalati-grasslands', 0, 1], ['nine-dragon-stack', 0, 1]] as const) {
+for (const [shard, pageAudio] of [['driftwood-isle', 91], ['pine-hollow', 1], ['nalati-grasslands', 1], ['nine-dragon-stack', 1]] as const) {
   const product = `out/${shard}`;
   test.skipIf(!existsSync(`${product}/shard.json`) || !existsSync(bootTables))(`${shard}: its fence audio and its default boot set are on the download`, async () => {
     const common = JSON.parse((JSON.parse(readFileSync(bootTables, 'utf8')) as { common: string }).common) as AssetTables;
     const half = shardHalf(openShardfile(folderTarball(product)), (_url, bytes) => bytes.length);
     const mounts = half.mountRows('phone', 'entry').map(row => row.url);
-    const fence = mounts.map(url => url.split('?')[0] ?? url).filter(url => /^\/assets\/(?:music|sfx)\//u.test(url));
+    const audioPath = /^\/assets\/(?:music|sfx)\//u;
+    const fence = mounts.map(url => url.split('?')[0] ?? url).filter(url => audioPath.test(url));
     const listed = shardBootAudio(half.shard.sections, common, mounts, shard);
-    expect(fence.length).toBeGreaterThanOrEqual(fenceAudio);
+    const cook = half.shard.cook;
+    if (cook?.version === 2 || cook?.version === 3) {
+      const recorded = new Set(cook.fence);
+      const recordedAudio = cook.mounts.filter(mount => recorded.has(mount.hash) && audioPath.test(mount.url));
+      expect(fence).toEqual(expect.arrayContaining(recordedAudio.map(mount => mount.url)));
+    }
     expect(listed).toEqual(expect.arrayContaining(fence));
     const row = half.shard.sections.get('audio/audio') as { audio: AudioData };
     installAssetTables(common);
@@ -70,6 +76,7 @@ for (const [shard, fenceAudio, pageAudio] of [['driftwood-isle', 18, 91], ['pine
     installAssetTables(tables);
     // The page's default-style boot reads are exactly the cooked boot set; the fence adds its own on top.
     expect(page.length).toBeGreaterThanOrEqual(pageAudio);
+    if (shard === 'driftwood-isle') expect(page.filter(url => url.startsWith('/assets/sfx/driftwood-isle/')).length).toBeGreaterThanOrEqual(16);
     expect(listed).toEqual([...new Set([...page, ...fence])].filter(url => Object.hasOwn(common.bytes, url)));
   });
 }

@@ -1,6 +1,6 @@
 // AUDIO AU19 (J299, J304): DOWNLOAD fetches exactly the audio a shard names. For each pinned shard, the `/assets/music/**`
 // and `/assets/sfx/**` rows of its cooked `client-phone` and `grid-phone` manifests are AU18's derived engine music, the
-// engine's default sound-effect boot set, and the shard's own audio mounts: nothing more, nothing missing, no row twice,
+// default boot effects (including authored sample overlays), and the shard's fence audio: nothing more, no row twice,
 // and no engine style but the one. A shard with no recorded music (Dunes, Far Reach) has no engine music row.
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the pinned products and own the cook's folder.
 import { existsSync, rmSync } from 'node:fs';
@@ -10,7 +10,7 @@ import type { SpawnManifestBook } from '../src/cook/game/entryTotals';
 import { readBuiltSpawnManifest } from '../src/cook/game/engineHalf';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
 import { folderTarball } from '../src/cook/game/folderTarball';
-import { DEFAULT_SFX_SET, defaultBootAudio, ENGINE_MUSIC_STYLE, engineMusicFiles, musicDir, sfxDir } from '../src/shared/engine/audio/bootAudio';
+import { defaultBootAudio, ENGINE_MUSIC_STYLE, engineMusicFiles, musicDir } from '../src/shared/engine/audio/bootAudio';
 import { withAssetTables, type AssetTables } from '../src/shared/engine/boot/tables';
 import { cookFilesOnly } from './filesOnlyCook';
 
@@ -31,18 +31,17 @@ function audioDiff(listed: readonly string[], want: readonly string[]): { extra:
 }
 const clean = { extra: [], missing: [], twice: [] };
 
-// The shard's own words, read without the cook: AU18's engine music, the default set's boot effects, its own mounts.
+// The shard's own words, read without the cook: the selected boot recordings and the recorded fence mounts.
 function expected(shard: string, common: AssetTables): { want: string[]; engineMusic: string[] } {
   const half = shardHalf(openShardfile(folderTarball(`out/${shard}`)), (_url, bytes) => bytes.length);
   const row = half.shard.sections.get('audio/audio') as { audio: AudioData } | undefined, data = row?.audio;
   const shipped = (url: string): boolean => Object.hasOwn(common.bytes, url);
   const engineMusic = data === undefined ? [] : withAssetTables(common, () => engineMusicFiles(data));
-  const engineSfx = data?.music === undefined || data.samples === undefined ? []
-    : withAssetTables(common, () => defaultBootAudio(data)).filter(url => url.startsWith(sfxDir(DEFAULT_SFX_SET)));
+  const boot = data?.music === undefined || data.samples === undefined ? [] : withAssetTables(common, () => defaultBootAudio(data));
   // Every own audio mount ships: one the build lacks would drop from both sides and hide a missing row.
   const own = half.mountRows('phone', 'entry').map(mount => path(mount.url)).filter(url => AUDIO.test(url));
   expect(own.filter(url => !shipped(url)), `${shard}: own audio mounts the build lacks`).toEqual([]);
-  return { want: [...new Set([...engineMusic, ...engineSfx, ...own])].sort(), engineMusic: engineMusic.sort() };
+  return { want: [...new Set([...boot, ...own])].sort(), engineMusic: engineMusic.sort() };
 }
 
 let root = '', output = '', book: SpawnManifestBook | undefined, common: AssetTables | undefined;
