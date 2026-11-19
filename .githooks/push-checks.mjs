@@ -112,6 +112,9 @@ function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
     {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'kit/scripts/asks.mjs','check','--all']]},
     {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
+    // DL21: index.html's inlined shell CSS is today's base.css + loading.css. Its test reads the sheets by path, so the
+    // related selection never maps a loading.css edit to it (red 44617020403, after 60e6a0696).
+    {name:'check:inline-shell-css',commands:[[process.execPath,'scripts/inline-shell-css.mjs','--check']]},
     // WIRE-STABILITY WR6: the bound wire's lock is current against v0, under 1 s (release rules come with a newer pin).
     {name:'check:wire',commands:[['pnpm','run','--silent','check:wire']]},
     // WIRE-STABILITY WR7: saves.lock.json, every save key's version, shape and migrations (test/saves-lock.test.ts).
