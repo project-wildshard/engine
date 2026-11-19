@@ -34,7 +34,7 @@ function cacheEntries(folder){
 try{
  const quick=JSON.parse(readFileSync(join(reports,'quick.json'),'utf8'));
  assert.equal(quick.version,1);assert.equal(quick.complete,true);assert.equal(quick.cases,3);assert.equal(quick.sha,sha);assert.equal(quick.cookRevision,recipe.revision);
- const product=formatTemplate('blender-template'),head={slug:product.pin.slug,hash:product.pin.hash};
+ const product=formatTemplate('brasscap-mesa'),head={slug:product.pin.slug,hash:product.pin.hash};
  const script=join(root,'scripts/cook-job.mjs');
  const shared=join(work,'shared-jobs'),coldJobs=join(work,'cold-jobs');
  assert.equal(existsSync(join(shared,'cache')),false);assert.equal(existsSync(join(coldJobs,'cache')),false);

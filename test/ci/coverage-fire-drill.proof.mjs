@@ -87,8 +87,8 @@ timed('dropped-section',async()=>{
 timed('broken-tar',async()=>{
   const {formatTemplate}=await import('../../scripts/pin-format.ts');
   const {readTar}=await import('@wildshard/format/tar');
-  const files=readTar(formatTemplate('blender-template').bytes);
-  assert.ok(files.has('shard.json'),'Actual published Template 2 archive must be admitted');
+  const files=readTar(formatTemplate('brasscap-mesa').bytes);
+  assert.ok(files.has('shard.json'),'Actual published Brasscap archive must be admitted');
 });
 
 timed('save-field',async()=>{
@@ -115,18 +115,12 @@ timed('save-field',async()=>{
 
 timed('cook-source',async()=>{
   const {ringCookInputs}=await import('../../scripts/ring-cook-inputs.ts');
-  const {formatTemplate}=await import('../../scripts/pin-format.ts');
-  const {readTar}=await import('@wildshard/format/tar');
-  const {parseOutputIndex}=await import('@wildshard/format/outputIndex');
   const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')).shards;
-  const format=formatTemplate('blender-template'),ring1=ringCookInputs(['blender-template'],pins,'tmp/absent-cook-cache');
-  assert.equal(ring1.heads[0].hash,format.pin.hash,'TC27_FORMAT_INPUT: Ring 1 must cook its installed handwritten Template 2');
-  const files=readTar(ring1.read(format.pin.hash)),index=parseOutputIndex(JSON.parse(new TextDecoder().decode(files.get('shard.json'))));
-  assert.equal(index.identity.slug,'blender-template');assert.equal(index.identity.revision,format.pin.revision);
-  const ring2=ringCookInputs(['brasscap-mesa'],pins,'tmp/absent-cook-cache',true);
-  assert.deepEqual(ring2.heads,[pins.find(row=>row.slug==='brasscap-mesa')]);
-  assert.throws(()=>ring2.read(ring2.heads[0].hash),/ENOENT/u,'A missing Ring 2 head cannot be replaced by the format corpus');
-  assert.throws(()=>ring1.read('0'.repeat(64)),/unselected input/u);
+  // J434: both rings cook the catalogue head from the pin cache; the format corpus never stands in for it
+  const ring=ringCookInputs(['brasscap-mesa'],pins,'tmp/absent-cook-cache');
+  assert.deepEqual(ring.heads,[pins.find(row=>row.slug==='brasscap-mesa')]);
+  assert.throws(()=>ring.read(ring.heads[0].hash),/ENOENT/u,'A missing head cannot be replaced by the format corpus');
+  assert.throws(()=>ring.read('0'.repeat(64)),/unselected input/u);
 });
 
 timed('shard-red',()=>{

@@ -2,7 +2,7 @@ import { memoryBlocks, memoryOwnerInventory } from './memory-report-blocks.mjs';
 import { memoryNoOwner } from './memory-report-data.mjs';
 
 const WIDTH=1179, HEIGHT=2556;
-const ACCENTS={'driftwood-isle':'#fbbb2d','pine-hollow':'#89c06a','nalati-grasslands':'#fe8169','sunscar-dunes':'#e989e1','far-reach':'#f9add0','nine-dragon-stack':'#bc8bfe','_template':'#beaf91'};
+const ACCENTS={'driftwood-isle':'#fbbb2d','pine-hollow':'#89c06a','nalati-grasslands':'#fe8169','sunscar-dunes':'#e989e1','far-reach':'#f9add0','nine-dragon-stack':'#bc8bfe','brasscap-mesa':'#beaf91'};
 /** @param {string} value */
 const escape=value=>value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 /** @param {number|null} value */

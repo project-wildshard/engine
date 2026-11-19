@@ -1,5 +1,5 @@
-// J233 / BM-2: the format dependency ships two Template products, Template 1's `blender-template` and Template 2's
-// `brasscap-mesa`; `pins.ts install --from-format <slug>` admits either from the installed package alone.
+// J233 / BM-2: the format dependency ships Brasscap Mesa's export (J434 retired the handwritten Template 2 product);
+// `pins.ts install --from-format <slug>` admits it from the installed package alone.
 import { createHash } from 'node:crypto';
 import { expect, test } from 'vitest';
 import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
@@ -21,11 +21,8 @@ test.each(Object.entries(FORMAT_PRODUCTS))('%s is admitted from the format depen
   }, { hash: sha256 })).not.toThrow();
 });
 
-test('the two Templates are two products, sharing no baked file', () => {
-  const blobs = (slug: string): Set<string> => new Set([...readTar(formatTemplate(slug).bytes).keys()].filter(path => path.startsWith('blobs/')));
-  const first = blobs('blender-template'), second = blobs('brasscap-mesa');
-  expect(second.size).toBeGreaterThan(0);
-  expect([...second].filter(path => first.has(path))).toEqual([]);
+test('Brasscap is the one format product', () => {
+  expect(Object.keys(FORMAT_PRODUCTS)).toEqual(['brasscap-mesa']);
 });
 
 test('any other slug is refused, an inherited key included', () => {

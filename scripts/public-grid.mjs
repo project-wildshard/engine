@@ -40,9 +40,9 @@ export function readPublicGridWitness() {
 }
 
 /** The slugs the public catalogue may hold (G258, G270). */
-const PUBLIC_SLUGS = new Set(['driftwood-isle','_template','pine-hollow','nalati-grasslands','far-reach','sunscar-dunes']);
+const PUBLIC_SLUGS = new Set(['driftwood-isle','pine-hollow','nalati-grasslands','far-reach','sunscar-dunes']);
 
-/** G258 / G270: the five real shards and Template 1 are public; Blender Template (Developer) and Nine Dragon (DEVSERVER) are not.
+/** G258 / G270: the five real shards are public (J434 retired Template 1); Brasscap (Developer) and Nine Dragon (DEVSERVER) are not.
  * @param {import('./public-grid.mjs').PublicGridWitness} witness @param {boolean} requireTemplate */
 export function publicGridWitnessFailures(witness, requireTemplate) {
   const failures = [], state = witness.state;

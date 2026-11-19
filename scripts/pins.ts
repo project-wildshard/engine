@@ -7,7 +7,7 @@
 //                                           lists (DEL9); `--drop <slug>` lets refresh drop a deleted pin
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
 //   node scripts/pins.ts install --ring 1   Ring 1: pinned Brasscap Mesa and Dunes (J434), and server slices
-//   node scripts/pins.ts install --from-format <slug>  a frozen dependency product (blender-template, brasscap-mesa),
+//   node scripts/pins.ts install --from-format <slug>  a frozen dependency product (brasscap-mesa),
 //                                                      without network or cook
 //   node scripts/pins.ts slice              cut Ring 1's server slices from the pinned heads into test/pins/slices.json
 //   node scripts/pins.ts keep <dir>         copy every pinned and sliced tarball to <dir>, for the release that outlives J85
@@ -285,7 +285,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   const { validateShardfileFolder } = await import('@wildshard/format/shardfileValidation');
   const { readTar } = await import('@wildshard/format/tar');
   const { restorePacks } = await import('./pin-packs.ts');
-  if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly one product: blender-template or brasscap-mesa');
+  if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly one product: brasscap-mesa');
   const formatSlug = source === 'format' ? only[0] : undefined;
   const dependency = local ?? (formatSlug === undefined ? undefined : (await import('./pin-format.ts')).formatTemplate(formatSlug));
   const shards = dependency === undefined ? trackedPins : [...trackedPins.filter(row => row.slug !== dependency.pin.slug), dependency.pin];

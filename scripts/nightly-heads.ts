@@ -98,8 +98,8 @@ try {
       const bank = JSON.parse(bankText) as {spawnManifests: {client: Record<string, unknown>}; entryPrograms?: Record<string, unknown>};
       for (const slug of Object.keys(bank.spawnManifests.client)) if (bareSlug(slug) === bareSlug(head.slug)) delete bank.spawnManifests.client[slug];
       if (bank.entryPrograms !== undefined) for (const slug of Object.keys(bank.entryPrograms)) if (bareSlug(slug) === bareSlug(head.slug)) delete bank.entryPrograms[slug];
-      // Detach the whole-level row too. Its authored `_template` key wins
-      // exact lookup over a newly installed canonical `template` cook row,
+      // Detach the whole-level row too. An authored `_<slug>` key wins
+      // exact lookup over a newly installed canonical `<slug>` cook row,
       // otherwise sending an old manifest URL to the new cold pack store.
       const book = JSON.parse(originalBook) as {client: Record<string, unknown>};
       for (const slug of Object.keys(book.client)) if (bareSlug(slug) === bareSlug(head.slug)) delete book.client[slug];

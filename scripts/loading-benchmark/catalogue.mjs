@@ -1,7 +1,7 @@
-/** Display names of the seven SF67 benchmark cards; shared by desktop and Safari drivers. */
+/** Display names of the SF67 benchmark cards (J434 retired the Template's); shared by desktop and Safari drivers. */
 const names = new Map([
   ['driftwood-isle', 'Driftwood Isle'], ['nalati-grasslands', 'Nalati'], ['pine-hollow', 'Pine Hollow'],
-  ['_template', 'Template shard'], ['brasscap-mesa', 'Brasscap Mesa'], ['far-reach', 'Sky Reach'], ['sunscar-dunes', 'Signal Dunes'],
+  ['brasscap-mesa', 'Brasscap Mesa'], ['far-reach', 'Sky Reach'], ['sunscar-dunes', 'Signal Dunes'],
   ['nine-dragon-stack', 'Nine Dragon'],
 ]);
 
@@ -17,7 +17,7 @@ export function loadingShardName(shard) {
  * @param {string} shard */
 export function loadingShardNeedsDeveloper(shard) {
   loadingShardName(shard);
-  return ['_template', 'far-reach', 'sunscar-dunes', 'nine-dragon-stack'].includes(shard);
+  return ['far-reach', 'sunscar-dunes', 'nine-dragon-stack'].includes(shard);
 }
 
 /** Each requested cold/warm row owns one file; duplicates cannot overwrite its evidence.

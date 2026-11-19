@@ -10,8 +10,9 @@ import { rapierAlias } from '../vite/rapier.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const option = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-/** The four cells around the corner the page stands at, and any world a player can reach from there on foot. */
-export const CROSSROADS = ['driftwood-isle', 'nalati-grasslands', 'pine-hollow', '_template'];
+/** The cells around the corner the page stands at, and any world a player can reach from there on foot. The fourth
+ * corner, (1,1), is void floor since J434 retired the Template. */
+export const CROSSROADS = ['driftwood-isle', 'nalati-grasslands', 'pine-hollow'];
 const out = resolve(option('out', join(ROOT, 'tmp/crossroads/site'))), products = resolve(option('products', join(ROOT, 'out')));
 
 /** Copy what a server can read of one product: the index, its sections, and its bin, json, wasm and tiles. */

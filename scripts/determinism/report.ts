@@ -15,7 +15,6 @@ import { rapierAlias } from "../../vite/rapier.ts";
 import { KEYCHAIN_ARGS } from "../chromium-keychain.mjs";
 import { homedir } from "node:os";
 import { readTar } from "@wildshard/format/tar";
-import { formatTemplate } from "../pin-format.ts";
 import * as v from "valibot";
 import { loadHeadlessFolder } from "../../src/server/host/headlessFolder.ts";
 import {
@@ -140,10 +139,9 @@ try {
     const sliced = sliceRows.find((row) => row.slug === slug);
     if (ring.slices.includes(slug))
       assert.equal(sliced?.from, pin.hash, "Slice does not match the selected head");
-    const frozen = slug === "blender-template" ? formatTemplate(slug) : undefined;
-    const pinHash = frozen?.pin.hash ?? (ring.slices.includes(slug) ? sliced?.hash : pin.hash);
+    const pinHash = ring.slices.includes(slug) ? sliced?.hash : pin.hash;
     assert.ok(pinHash, "Missing pinned archive identity");
-    const archive = frozen?.bytes ?? readFileSync(join(cache, `${pinHash}.tar`));
+    const archive = readFileSync(join(cache, `${pinHash}.tar`));
     assert.equal(sha(archive), pinHash, "Pinned archive hash differs");
     const pinnedHeader = readTar(archive).get("shard.json");
     assert.ok(pinnedHeader, "Pinned archive has no output index");

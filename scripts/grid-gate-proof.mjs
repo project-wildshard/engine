@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // GO4 on the rooms address: the grid page's gate, in a real browser, behind a front door that keeps `/health` private as D7 and
 // MS5.1's Caddy do (every plain HTTP request a 404 with no CORS; only the socket upgrade passes). The server runs WORLD_CELLS=grid
-// over Driftwood and the template, and the page must still learn the world hosts the grid: Shard select opens the deck, the Template
-// shard card enters the grid at the template's cell (GO7), the page boots past the loading card's `server` step on the world and the
+// over Driftwood and Brasscap, and the page must still learn the world hosts the grid: Shard select opens the deck, the Brasscap
+// Mesa card enters the grid at Brasscap's data cell (GO7; J434 retired the Template's), the page boots past the loading card's `server` step on the world and the
 // player walks; then a second phone does the same from the Driftwood card and is seated in Driftwood, and a third from the Signal Dunes
 // card (a client-page home, the deck's stall at loading step `home`). `--legs=` picks others: sky (Sky Reach) is a spot check. The
 // Open Plots have no deck card, so none of them is ever a page's first home from Shard select.
-//   scripts/browser-lane.sh node scripts/grid-gate-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--legs=template,driftwood,dunes]
+//   scripts/browser-lane.sh node scripts/grid-gate-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--legs=brasscap,driftwood,dunes]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { connect } from 'node:net';
@@ -20,10 +20,10 @@ const [dist = '', relativeWork = ''] = process.argv.slice(2), work = relativeWor
 if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-gate-proof.mjs <dist> <work> <key.json>');
 /** Each leg: the deck's card, and the grid slug it seats you in. Driftwood is the rig's home cell. */
 const LEGS = /** @type {Record<string, { card: string, slug: string }>} */ ({
-  template: { card: 'Template shard', slug: '_template' }, driftwood: { card: 'Driftwood Isle', slug: 'driftwood-isle' },
+  brasscap: { card: 'Brasscap Mesa', slug: 'brasscap-mesa' }, driftwood: { card: 'Driftwood Isle', slug: 'driftwood-isle' },
   dunes: { card: 'Signal Dunes', slug: 'sunscar-dunes' }, sky: { card: 'Sky Reach', slug: 'far-reach' },
 });
-const legs = (process.argv.find(arg => arg.startsWith('--legs='))?.slice(7) ?? 'template,driftwood,dunes').split(',');
+const legs = (process.argv.find(arg => arg.startsWith('--legs='))?.slice(7) ?? 'brasscap,driftwood,dunes').split(',');
 for (const name of legs) if (LEGS[name] === undefined) throw new Error(`No leg ${name}: ${Object.keys(LEGS).join(', ')}`);
 const DOOR_PORT = 18795, shots = join(work, 'shots');
 mkdirSync(shots, { recursive: true });
@@ -109,7 +109,7 @@ try {
     note(`${name}: no page errors`, errors.length === 0, errors);
     } finally { await context.close().catch(() => undefined); }
   };
-  // The template cell runs `_template` (MS7: WORLD_CELLS=grid opens it), and Driftwood is the home cell.
+  // Brasscap's cell runs `brasscap-mesa` (MS7: WORLD_CELLS=grid opens it), and Driftwood is the home cell.
   /** @type {{ grid: { cells: { instance: string, slug: string }[] } }} */
   const catalogue = JSON.parse(readFileSync(join(dist, 'catalogue.json'), 'utf8'));
   for (const name of legs) {

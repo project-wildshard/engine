@@ -23,13 +23,6 @@
       "purpose": "Driftwood's Drowned Captain painted coat (G7): the 1024 atlas as a mipmapped UASTC KTX2 look texture, replacing the runtime load of the whole captain GLB; ASTC on the phone is ~1.4 MB of GPU against the 5.6 MB RGBA8 it replaces"
     },
     {
-      "path": "src/shards/blender-template/assets/world.glb",
-      "oid": "55f92056db514b8e343fa27cf49024ee2258429b",
-      "bytes": 1034748,
-      "kind": "runtime",
-      "purpose": "Template 2's committed Blender world (SF55), the build input of its shardfile tiles; the G527 dev-map measure UVs add 1.7 KB to the 1.03 MB clay export"
-    },
-    {
       "path": "public/assets/nalati/baked/crags.bin",
       "oid": "eb3a5c00953f2ab01853c2aae6bd028bc0cbeac9",
       "bytes": 2087994,

@@ -125,8 +125,6 @@ export function codeMeasures(modules, budgets) {
 /** @param {ChunkBudgets} budgets */
 export function checkChunks(manifest, modules, closures, budgets) {
   const errors = [];
-  // SF16 keeps picker metadata; every authored template gameplay module is data loaded from its shardfile.
-  const templateMetadata = new Set(['manifest.ts', 'manifest.json', 'discovery.generated.ts', 'boot/bindings.ts', 'budgets.ts', 'budgetCeilings.ts', 'data/budgets.ts', 'data/budgetCeilings.ts', 'data/spawn.ts', 'explore/art.ts'].map((path) => `src/shards/_template/${path}`));
   const allowed = new Set(Object.values(closures).flat());
   const cold = new Set();
   function reach(key) {
@@ -152,7 +150,6 @@ export function checkChunks(manifest, modules, closures, budgets) {
     for (const raw of row.moduleIds) {
       const id = raw.replaceAll('\\', '/').split('?')[0];
       const match = /^src\/shards\/([^/]+)\//.exec(id);
-      if (match?.[1] === '_template' && !templateMetadata.has(id)) errors.push(`${id} is template gameplay code in chunk ${file}: SF16 requires no template runtime chunk`);
       // SHARD-PLATFORM SP5: a shard's generators run at bake time; their code never ships in any chunk
       if (match && /^src\/shards\/[^/]+\/(?:generators|bake)\//.test(id)) errors.push(`${id} is a generator in chunk ${file}: generators run at bake time and never ship`);
       if (!match || allowed.has(id)) continue;

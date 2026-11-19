@@ -18,12 +18,13 @@ export interface AerialHeroPose {
 /** Fifteen G332 round-2 views, derived from the shipping layout, never a staged scene. */
 export function aerialHeroPlan(): { junction: string; surrounding: readonly string[]; poses: AerialHeroPose[] } {
   const grid = new GridAssembly({ developer: true, devserver: false });
-  const template = grid.cells.find(cell => cell.slug === '_template');
-  if (template === undefined) throw new Error('Aerial shoot requires the real template cell');
+  // The roundabout Pine, Nalati and Driftwood share; its fourth corner, (1,1), is void floor since J434 retired the Template.
+  const corner = ['pine-hollow', 'nalati-grasslands', 'driftwood-isle'].map(slug => grid.cells.find(cell => cell.slug === slug));
+  if (corner.some(cell => cell === undefined)) throw new Error('Aerial shoot requires the real Pine, Nalati and Driftwood cells');
+  const reach = (point: { x: number; z: number }): number => corner.reduce((sum, cell) => sum + Math.hypot(point.x - (cell?.origin.x ?? 0), point.z - (cell?.origin.z ?? 0)), 0);
   const layout = roadLayout(grid, slug => slug);
   const candidates = layout.junctions.filter(junction => junction.roundabout);
-  candidates.sort((a, b) => Math.hypot(a.centre.x - template.origin.x, a.centre.z - template.origin.z)
-    - Math.hypot(b.centre.x - template.origin.x, b.centre.z - template.origin.z));
+  candidates.sort((a, b) => reach(a.centre) - reach(b.centre));
   const junction = candidates.at(0);
   if (junction === undefined) throw new Error('No central roundabout');
   const target = { ...junction.centre, y: 0 };
@@ -44,14 +45,17 @@ export function aerialHeroPlan(): { junction: string; surrounding: readonly stri
     const radius = height / Math.tan(down * Math.PI / 180), angle = heading * Math.PI / 180;
     add(id, 'Free aerial', { x: target.x + radius * Math.sin(angle), y: height, z: target.z + radius * Math.cos(angle) }, time);
   }
-  const centre = template.origin;
-  const corner = { x: centre.x + Math.sign(target.x - centre.x) * CHUNK_HALF,
+  // The void (1,1) cell's centre, one pitch-step grid from Pine's own cell and origin.
+  const pine = corner[0];
+  if (pine === undefined) throw new Error('Aerial shoot requires the real Pine cell');
+  const centre = { x: pine.origin.x + (1 - pine.cell[0]) * grid.pitch, z: pine.origin.z + (1 - pine.cell[1]) * grid.pitch };
+  const cornerPoint = { x: centre.x + Math.sign(target.x - centre.x) * CHUNK_HALF,
     z: centre.z + Math.sign(target.z - centre.z) * CHUNK_HALF };
-  const midpoint = { x: (corner.x + centre.x) / 2, z: (corner.z + centre.z) / 2 };
+  const midpoint = { x: (cornerPoint.x + centre.x) / 2, z: (cornerPoint.z + centre.z) / 2 };
   for (const [group, label, at, heights] of [
-    ['E2', 'Template corner', corner, [45, 75, 100]],
+    ['E2', 'Void-cell corner', cornerPoint, [45, 75, 100]],
     ['M', 'Corner-centre midpoint', midpoint, [70, 110, 150]],
-    ['T', 'Template centre', centre, [80, 115, 150]],
+    ['T', 'Void-cell centre', centre, [80, 115, 150]],
   ] as const) {
     for (const [index, height] of heights.entries()) {
       add(`${group}-${String.fromCodePoint(97 + index)}`, label, { x: at.x, y: height, z: at.z },

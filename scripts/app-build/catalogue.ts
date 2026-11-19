@@ -48,8 +48,8 @@ const hash8 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).
 export function titleRowOf(bytes: Uint8Array, home = '', resourceSlug?: string): TitleManifest {
   const {data} = JSON.parse(new TextDecoder().decode(bytes)) as {readonly data: TitleManifest};
   const base = home.replace(/\/$/u, ''), from = `/shardfiles/${data.slug}/`, to = `/shardfiles/${resourceSlug ?? data.slug}/`;
-  // A stored cook serves blobs under its canonical identity (template),
-  // while an older discovery can still name its authored folder (_template).
+  // A stored cook serves blobs under its canonical identity, while an older discovery can still name its
+  // authored folder.
   const at = (url: string): string => (url.startsWith(from) ? `${base}${to}${url.slice(from.length)}` : url.startsWith('/shardfiles/') ? `${base}${url}` : url);
   const {thumb, portrait, landscape} = data.card;
   return {...titleMetadata(data), ...(data.shardfile === undefined ? {} : {shardfile: at(data.shardfile)}), card: {thumb: at(thumb), portrait: at(portrait), landscape: at(landscape)}, discovery: `${base}/shardfiles/${data.slug}/discovery.json?v=${hash8(bytes)}`};

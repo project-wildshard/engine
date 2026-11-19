@@ -246,7 +246,7 @@ export function stalePinFolders(root){
  for(const folder of folders.sort()){
   /** @type {unknown} */let pin,source;
   try{({pin,source}=JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8')));}catch{continue;}
-  // A format-dependency product (`pins.ts install --from-format`, Ring 1's blender-template: the format's own Template 2) is
+  // A format-dependency product (`pins.ts install --from-format`) is
   // named by no pin on purpose, so it is current while its index is the installed format package's (TEMPLATE-E2E, 2026-11-16)
   // and stale once the dependency moves past it.
   if(typeof source==='object'&&source!==null&&'kind'in source&&source.kind==='format-dependency'){
@@ -260,7 +260,7 @@ export function stalePinFolders(root){
 }
 
 /** A full `pnpm pins` removes every out/ product `stalePinFolders` names, so land's gen:inputs never refuses a tree the pins
- * just installed (opus-bugfix2, 2026-11-16: the Brasscap rename left a worktree's out/blender-template behind until a hand
+ * just installed (opus-bugfix2, 2026-11-16: the Brasscap rename left a worktree's out/<old slug> behind until a hand
  * rm -rf). Only folders under out/ with a pin receipt; anything else in out/ stays. Their public/ mounts went with the ledger.
  * @param {string} root @returns {{folder:string,revision:unknown}[]} the products removed */
 export function pruneStalePinProducts(root){

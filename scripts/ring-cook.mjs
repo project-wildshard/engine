@@ -28,7 +28,7 @@ const { shards } = JSON.parse(readFileSync('test/pins/shardfiles.json','utf8'));
 const allowed = values.ring2 ? shards.map(row => row.slug) : products;
 const selected = values.only === undefined ? allowed : values.only.split(',');
 if (selected.length === 0 || new Set(selected).size !== selected.length || selected.some(slug => !allowed.includes(slug))) throw new Error('Cook selection must name distinct pinned products in this ring');
-const inputs=ringCookInputs(selected,shards,cache,values.ring2),heads=inputs.heads;
+const inputs=ringCookInputs(selected,shards,cache),heads=inputs.heads;
 const store = folderStore(join(out,'store'));
 // Ring 2 qualifies the production worker, including its heap/resident limits.
 // Keep Ring 1's established smaller envelope; neither path extends its clock.

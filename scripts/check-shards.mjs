@@ -8,7 +8,7 @@ import { shardOutputs } from './shard-outputs.mjs';
 export function checkShardLayout(entries, config, outputs = {}) {
   const failures = [], source = config.sourceLayout;
   for (const [slug, names] of Object.entries(entries)) {
-    if (slug !== '_template' && !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u.test(slug)) failures.push(`${slug}: folder name must be a kebab-case slug`);
+    if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u.test(slug)) failures.push(`${slug}: folder name must be a kebab-case slug`);
     const allowed = new Set([...source.requiredFiles, ...source.allowedFiles, ...source.folders.map(name => `${name}/`)]);
     const productFiles = new Set((outputs[slug] ?? []).map(output => `discovery.${output}.generated.ts`));
     if (productFiles.size > 0) productFiles.add('outputs.json');

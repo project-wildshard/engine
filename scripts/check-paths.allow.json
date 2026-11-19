@@ -600,11 +600,6 @@
     "why": "Left with sharddev or a shard at P3"
   },
   {
-    "path": "src/shards/blender-template/assets/world.glb",
-    "file": "scripts/storage-policy.json",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
     "path": "src/shards/nalati-grasslands/data/sign-atlas-roads.bin",
     "file": "scripts/storage-policy.json",
     "why": "Left with sharddev or a shard at P3"

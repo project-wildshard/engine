@@ -29,66 +29,6 @@
   },
   "products": [
     {
-      "slug": "blender-template",
-      "shardfile": "5400ea84de953f98d690fe93abd6ac46ee3e2a42fe4ed194a255638013295d37",
-      "manifests": [
-        {
-          "tier": "phone",
-          "set": "entry",
-          "hash": "7866502bd0fad2b30641c98069a7ba09481019d669ec017824b793cdef849d30",
-          "raw": 3164873,
-          "wire": 1618807,
-          "parts": []
-        },
-        {
-          "tier": "phone",
-          "set": "whole",
-          "hash": "2a7f23b1689341a27a061898cacebf71ad9135fa11e421ab0a595d115635723c",
-          "raw": 3164873,
-          "wire": 1618807,
-          "parts": [
-            {
-              "url": "/assets/spawn/parts/241660f87b01988a.pack.br",
-              "bytes": 14101,
-              "hash": "49e1b07659a065b3124ab8da5d8bc10c3b4b207932a46c9a4df769401bfab50c"
-            },
-            {
-              "url": "/assets/spawn/parts/812f96bb8de41e4c.pack.br",
-              "bytes": 1342024,
-              "hash": "6e4bba698cacffa3bf8c1a257b8409dbb36dc28af619a88db70c715af7a677ae"
-            }
-          ]
-        },
-        {
-          "tier": "desktop",
-          "set": "entry",
-          "hash": "7bcf957b471e47b6a81a845a8e128f1a8281eea6ca25a3bda9495b9e48c5bf41",
-          "raw": 3164873,
-          "wire": 1618807,
-          "parts": []
-        },
-        {
-          "tier": "desktop",
-          "set": "whole",
-          "hash": "fb85cd12f541ffd28fab259729b5347f62becddf471385870dcc039189636a5b",
-          "raw": 3164873,
-          "wire": 1618807,
-          "parts": [
-            {
-              "url": "/assets/spawn/parts/241660f87b01988a.pack.br",
-              "bytes": 14101,
-              "hash": "49e1b07659a065b3124ab8da5d8bc10c3b4b207932a46c9a4df769401bfab50c"
-            },
-            {
-              "url": "/assets/spawn/parts/812f96bb8de41e4c.pack.br",
-              "bytes": 1342024,
-              "hash": "6e4bba698cacffa3bf8c1a257b8409dbb36dc28af619a88db70c715af7a677ae"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "slug": "sunscar-dunes",
       "shardfile": "2e78b39ea7b91902829cb08ee7466b4d7127cda7bc4bb98664a42c3e1a89151d",
       "manifests": [
