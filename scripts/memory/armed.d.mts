@@ -1,6 +1,7 @@
 import type { BudgetBaselines, BudgetCaps } from '../budgets/files.mjs';
 import type { LedgerRow } from './ledgerVerdict.mjs';
 
+export const CONTROL_ZONE: 'brasscap-mesa';
 export interface MemoryLines { playingBytes: number; loadingBytes: number }
 export interface ArmedMemory { lines: MemoryLines; zones: Set<string>; readings: Map<string, MemoryLines> }
 export interface PhoneFootprint { playing: number; loading: number }
