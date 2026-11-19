@@ -13,6 +13,7 @@ import * as v from 'valibot';
 import { bareSlug } from '../../../shared/game/grid/catalogueSlot';
 import { readSpawnManifest, readSpawnManifestAddress, type SpawnManifestAddress } from '../../../shared/game/shardfile/spawnManifest';
 import { cookIndexPath } from '../../../shared/game/shardfile/serverPack';
+import { cookedMapPath } from '../../../shared/game/shardfile/cookedMapPath';
 import { installPlacedSpawn, type PlacedSpawn } from '../boot/placedSpawn';
 
 /** An index is a few KB; a manifest is at most `readSpawnManifestAddress`'s 2 MB. */
@@ -95,7 +96,9 @@ export async function placedContent(slug: string, hash: string, ports: PlacedCon
     const fetched = async (path: string): Promise<Uint8Array> => bounded(await read(at(path), { credentials: 'omit', redirect: 'error', signal: ports.signal }), DISCOVERY_BYTES);
     const card = await cookedHero(product, index, fetched, at);
     return { spawn: { slug: product, entry, whole: pick('whole'), base: ports.packs, loose: at(index.loose),
-      programs: index.keys.includes(`${index.loose}programs/${product}.json`) }, verdict, ...(card === undefined ? {} : { card }) };
+      programs: index.keys.includes(`${index.loose}programs/${product}.json`),
+      // J450: the cook's map, both sizes, as this index lists them (an index from before J450 lists none: the cell draws its plot)
+      maps: index.keys.includes(`${index.loose}${cookedMapPath(product, 'full')}`) && index.keys.includes(`${index.loose}${cookedMapPath(product, 'cell')}`) }, verdict, ...(card === undefined ? {} : { card }) };
   } catch { return undefined; }
 }
 

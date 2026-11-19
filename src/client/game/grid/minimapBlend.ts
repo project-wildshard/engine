@@ -17,6 +17,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { GridAssembly, GridCell } from '../../../shared/game/grid/assembly';
 import type { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { RAIL_OFFSET, ROAD_HALF } from '../../../shared/game/grid/roadLayout';
+import { FLAT_MAP_SPREAD } from '../../../shared/game/shardfile/cookedMapPath';
 
 /** On the road the neighbours' terrain shows at this opacity (G107: "faded ~50 %"). */
 export const ROAD_TERRAIN_ALPHA = 0.5;
@@ -43,6 +44,22 @@ function roadNames(host: MinimapBlendHost, feet: { readonly x: number; readonly 
 /** A cell the atlas has no tile for, until its own map loads: the build's plain-plot green (scripts/app-build/worldMapAtlas.ts). */
 const PLOT = '#69704f';
 
+/** J450: whether a decoded map is one flat colour; false when it can't be measured (no canvas), so the author's map stays. */
+export function flatMap(image: CanvasImageSource): boolean {
+  if (typeof document === 'undefined') return false;
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 32;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (ctx === null) return false;
+  try {
+    ctx.drawImage(image, 0, 0, 32, 32);
+    const { data } = ctx.getImageData(0, 0, 32, 32);
+    let sum = 0, square = 0;
+    for (let i = 0; i < data.length; i += 4) { const l = 0.2126 * (data[i] ?? 0) + 0.7152 * (data[i + 1] ?? 0) + 0.0722 * (data[i + 2] ?? 0); sum += l; square += l * l; }
+    const n = data.length / 4;
+    return Math.sqrt(Math.max(0, square / n - (sum / n) ** 2)) < FLAT_MAP_SPREAD;
+  } catch { return false; } finally { canvas.width = canvas.height = 0; }
+}
+
 /** Each shard's baked map, loaded the first time a cell of it is drawn, downscaled once and shared by its copies. */
 interface MapEntry { image: HTMLCanvasElement | ImageBitmap | null; deferredAt?: number }
 export class CellMinimaps {
@@ -50,6 +67,8 @@ export class CellMinimaps {
   private disposed = false;
   constructor(scope: Scope, private readonly url: (slug: string) => Promise<string | {
     readonly url: string; readonly retained: (image: { readonly width: number; readonly height: number } | null) => void;
+    /** J450: the cook's map, drawn instead when the author's own map is flat (`flatMap`) */
+    readonly fallback?: string;
   } | undefined>, private readonly fullSize: (slug: string) => boolean = () => false,
   private readonly retry?: { revision: () => number; deferred: (error: unknown) => boolean }) {
     scope.onDispose(() => { this.disposed = true; for (const m of this.maps.values()) if (m.image !== null) {
@@ -69,6 +88,8 @@ export class CellMinimaps {
     if (typeof document !== 'undefined') void this.load(slug, entry);
     return null;
   }
+  /** whether `slug`'s map is kept at full size (the home's), else at CELL_PX */
+  fullSized(slug: string): boolean { return this.fullSize(slug); }
   /** bytes held now (RGBA), for the memory readouts */
   get bytes(): number { let n = 0; for (const m of this.maps.values()) if (m.image !== null) n += m.image.width * m.image.height * 4; return n; }
   private isDisposed(): boolean { return this.disposed; }
@@ -80,9 +101,15 @@ export class CellMinimaps {
       const url = typeof leased === 'string' ? leased : leased.url;
       if (typeof leased !== 'string') settled = leased.retained;
       if (this.isDisposed()) return;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const full = await createImageBitmap(await res.blob());
+      const decode = async (at: string): Promise<ImageBitmap> => {
+        const res = await fetch(at);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return createImageBitmap(await res.blob());
+      };
+      let full = await decode(url);
+      // J450: an author's map that is one flat colour (Saltwind's, Cinder Orchard's) counts as no map: the cook's is drawn
+      const fallback = typeof leased === 'string' ? undefined : leased.fallback;
+      if (fallback !== undefined && !this.isDisposed() && flatMap(full)) { full.close(); full = await decode(fallback); }
       try {
         if (this.disposed) return;
         if (this.fullSize(slug)) { entry.image = full; return; }

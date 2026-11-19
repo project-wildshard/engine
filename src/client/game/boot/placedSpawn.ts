@@ -3,6 +3,7 @@
 // book (`addCookedShards`); a page that never saw the shard reads them here instead. A leaf: the title's placement read writes it and
 // the spawn download reads it, with no import of either.
 import type { SpawnManifestAddress } from '../../../shared/game/shardfile/spawnManifest';
+import { cookedMapPath, type CookedMapSize } from '../../../shared/game/shardfile/cookedMapPath';
 
 type Tiers = Readonly<Partial<Record<'phone' | 'desktop', SpawnManifestAddress>>>;
 export interface PlacedSpawn {
@@ -19,6 +20,8 @@ export interface PlacedSpawn {
   readonly loose: string;
   /** Whether the cook published its recorded entry programs. */
   readonly programs: boolean;
+  /** J450: whether the cook drew this upload's map (`cookedMapPath`, both sizes, under `loose`); an index from before J450 has none. */
+  readonly maps?: boolean;
 }
 const placed = new Map<string, PlacedSpawn>();
 const bare = (slug: string): string => slug.replace(/^_/u, '');
@@ -32,6 +35,12 @@ const LOOSE_PATH = /^\/(?:shardfiles\/([a-z0-9_-]+)\/|programs\/([a-z0-9_-]+)\.j
 export function placedLoose(pathname: string, search = ''): string | undefined {
   const owner = looseSlug(pathname), row = owner === undefined ? undefined : placed.get(owner);
   return row === undefined ? undefined : new URL(`.${pathname}${search}`, row.loose).href;
+}
+/** J450: the cook's map of a placed slug at `size`, at its upload's loose copy; undefined for a slug the cook drew none for, and
+ *  for every slug the build has (its atlas tile covers it). */
+export function placedCookedMap(slug: string, size: CookedMapSize): string | undefined {
+  const row = placed.get(bare(slug));
+  return row?.maps === true ? placedLoose(`/${cookedMapPath(row.slug, size)}`) : undefined;
 }
 /** The bare slug a loose page path (`/shardfiles/<slug>/…`, `/programs/<slug>.json`) belongs to; undefined for any other path. */
 export function looseSlug(pathname: string): string | undefined {

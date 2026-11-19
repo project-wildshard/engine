@@ -109,6 +109,7 @@ import { talkStandIns } from '../shardfile/declaredTalks';
 import { copyMarks } from './copyIdentity';
 import { CellMinimaps } from './minimapBlend';
 import { leaseMapImage } from '../shardfile/mapImage';
+import { placedCookedMap } from '../boot/placedSpawn';
 import { crossingSaveStatus, installBorderShimmer, type BorderShimmerState, type CrossingSaveStatus } from './borderShimmer';
 import { refusalReporter, saveFailedReporter } from './screenReports';
 import { GAME_STRINGS } from '../../../shared/game/strings';
@@ -618,14 +619,20 @@ export class GridSession {
     const mapReads = new AbortController(); host.scope.onDispose(() => { mapReads.abort(); });
     this.mapImages = new CellMinimaps(host.scope, async slug => {
       const owner = { allocator: this.allocator, scope: host.scope };
-      const metadata = await gridShardfileFolder(slug, owner, 'optional-metadata');
-      if (metadata === null) return undefined;
+      // J450: the cook's own map of the zone (the home's full size, every other cell's copy), behind an author's look/map; a
+      // build-pinned slug has none here, as its atlas tile is drawn from it (scripts/app-build/worldMapAtlas.ts)
+      const cooked = placedCookedMap(slug, this.mapImages.fullSized(slug) ? 'full' : 'cell');
+      const metadata = await (gridShardfileFolder(slug, owner, 'optional-metadata') ?? Promise.resolve(null))
+        .catch((error: unknown) => { if (cooked === undefined) throw error; return null; });
+      if (metadata === null) return cooked;
       try {
-        const map = metadata.admitted.source.map; if (map === undefined) return undefined;
+        const map = metadata.admitted.source.map; if (map === undefined) return cooked;
         const product = await gridShardfileFolder(slug, owner, { signal: mapReads.signal, files: [map.image] });
-        if (product === null) return undefined;
-        try { return leaseMapImage(product.admitted.source, product.admitted.assets, this.allocator, host.scope, true); }
-        finally { try { await product.releaseInputs(); } finally { product.release(); } }
+        if (product === null) return cooked;
+        try {
+          const leased = leaseMapImage(product.admitted.source, product.admitted.assets, this.allocator, host.scope, true);
+          return leased === undefined ? cooked : cooked === undefined ? leased : { ...leased, fallback: cooked };
+        } finally { try { await product.releaseInputs(); } finally { product.release(); } }
       } finally { metadata.release(); }
     }, identity => { const { slug: homeIdentity } = this.home; return identity === homeIdentity; },
     { revision: () => this.allocator.revision, deferred: error => error instanceof ApproachInputsDeferredError });
