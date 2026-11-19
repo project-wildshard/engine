@@ -13,3 +13,6 @@ BC15 found two rough edges on main's first budgets runs. A ci run of a commit fr
 failed the job on a missing `cli.mjs` (now a notice). And main-watch blamed the landers of the default branch's tip,
 because a workflow_run's head_sha is not the commit it measured; `budgets.yml` now names its source ci run in
 `run-name`, and main-watch reads that run's commit.
+
+The app-code baselines (js/*) were taken from a stale local build at 43c891e6; they are now the CI measure of main
+f31a7d3f58 (budgets run 44475200178), session raw 4,401,289 B.

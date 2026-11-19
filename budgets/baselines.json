@@ -33,34 +33,40 @@
    "commit": "161063f3b4"
   },
   "js/grid-session/raw": {
-   "value": 41848,
+   "value": 41947,
    "contentKey": "engine",
-   "commit": "43c891e6"
+   "commit": "f31a7d3f58",
+   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
   },
   "js/grid-session/gzip": {
-   "value": 14344,
+   "value": 14366,
    "contentKey": "engine",
-   "commit": "43c891e6"
+   "commit": "f31a7d3f58",
+   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
   },
   "js/title/raw": {
-   "value": 365885,
+   "value": 367634,
    "contentKey": "engine",
-   "commit": "43c891e6"
+   "commit": "f31a7d3f58",
+   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
   },
   "js/title/gzip": {
-   "value": 126248,
+   "value": 126670,
    "contentKey": "engine",
-   "commit": "43c891e6"
+   "commit": "f31a7d3f58",
+   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
   },
   "js/session/raw": {
-   "value": 4396414,
+   "value": 4401289,
    "contentKey": "engine",
-   "commit": "43c891e6"
+   "commit": "f31a7d3f58",
+   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
   },
   "js/session/gzip": {
-   "value": 1358266,
+   "value": 1360483,
    "contentKey": "engine",
-   "commit": "43c891e6"
+   "commit": "f31a7d3f58",
+   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
   },
   "ledger/_template/control": {
    "value": 91655664,
