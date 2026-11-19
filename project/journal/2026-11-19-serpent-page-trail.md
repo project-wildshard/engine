@@ -10,3 +10,6 @@
 - Second, staging's loose `shardfiles/brasscap-mesa/shard.json` on packs.wildshard.io was written at 10:43 UTC with an
   older Brasscap (no serpent skin), while the build's index names revision 9: the page drew the Wyrm with the
   wyrmling's skin. Reported to the release owner; not fixed here.
+- Pinned Brasscap revision 9 (56414c67, the serpent Wyrm and its fight; shard-pin run 44514655382) so engine builds
+  and pages carry it, and re-recorded its Ring 1 chain (6eb55ee to 45e8b62 on darwin, copied to linux-x64 as TR-3 did;
+  every other row the same).
