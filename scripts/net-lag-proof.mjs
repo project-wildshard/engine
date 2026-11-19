@@ -146,7 +146,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
     } else {
       let stage = 'settle';
       const entered = Date.now(), delays = /** @type {{ t: number, delay: number, jitter: number, stage: string }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
-      const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { sampledAt: performance.now(), corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, jitter: w.jitterMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative }, cell: w.cell, resyncs: w.resyncs ?? 0, replaysPerFrame: w.replaysPerFrame }; });
+      const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { sampledAt: performance.now(), corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, jitter: w.jitterMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative }, cell: w.cell, x: w.x, z: w.z, resyncs: w.resyncs ?? 0, replaysPerFrame: w.replaysPerFrame }; });
       sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay, jitter: r.jitter, stage }); return undefined; }).catch(() => undefined); }, 250);
       await sleep(2000);
       // the budget: the drawn rate standing still, against the display's 60 Hz (headless)
@@ -187,7 +187,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
         const authoritative = Object.fromEntries(Object.entries(to?.authoritative ?? {}).map(([key, value]) => [key, value - (/** @type {Record<string, number> | undefined} */ (from?.authoritative)?.[key] ?? 0)]).filter(([, value]) => value !== 0));
         // a phase that changed cells measured a crossing, not this bar: say so rather than read it as a frame or a correction
         if (from !== null && to !== null && from.cell !== to.cell) errors.push(`${name} left cell ${String(from.cell)} for ${String(to.cell)}: the route crosses a cell edge (ZONE-ENTRY), not this bar`);
-        return { name, corrections: (to?.corrections ?? 0) - (from?.corrections ?? 0), resyncs: (to?.resyncs ?? 0) - (from?.resyncs ?? 0), missed, authoritative, frames: drawn.length, p50: at(drawn, 0.5), p99: at(drawn, 0.99), max: at(drawn, 1), over2x: drawn.filter((/** @type {number} */ ms) => ms > 2 * row.budgetMs).length, over50: drawn.filter((/** @type {number} */ ms) => ms > 50).length };
+        return { name, from: from === null ? null : [Math.round(from.x), Math.round(from.z), from.cell], to: to === null ? null : [Math.round(to.x), Math.round(to.z), to.cell], corrections: (to?.corrections ?? 0) - (from?.corrections ?? 0), resyncs: (to?.resyncs ?? 0) - (from?.resyncs ?? 0), missed, authoritative, frames: drawn.length, p50: at(drawn, 0.5), p99: at(drawn, 0.99), max: at(drawn, 1), over2x: drawn.filter((/** @type {number} */ ms) => ms > 2 * row.budgetMs).length, over50: drawn.filter((/** @type {number} */ ms) => ms > 50).length };
       };
       row.walk = await phase('walk', ['KeyW']);
       row.sprint = await phase('sprint', ['KeyW', 'ShiftLeft']);
