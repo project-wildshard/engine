@@ -1,11 +1,14 @@
 import { expect, test, vi } from 'vitest';
 import { WorldScenePlacementPages } from './worldScenePlacementPages';
+import { loadGc } from '@wildshard/engine/boot/lentBody';
 
 const encode = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
 const row = { id: 'first', model: 'rock', draw: 'instanced', poses: [] };
 
 test('complete native parsing finishes during read-ahead before the admission cursor requests the page', async () => {
   const text = JSON.stringify({ version: 1, rows: [row] }), bytes = new TextEncoder().encode(text);
+  // IP31's switch reads its device slot once per page (JSON); a booted page has read it before any placement page
+  loadGc();
   const parse = vi.spyOn(JSON, 'parse');
   try {
     const pages = new WorldScenePlacementPages({ file: () => Promise.resolve(bytes) }, ['page']);
