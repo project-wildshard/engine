@@ -129,8 +129,9 @@ const CLEAN = { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.U
 function stop(message) { console.error(`stop    ${message}`); process.exit(1); }
 /** One line on stderr, so stdout carries only the server's own lines. @param {string} what @param {string} message */
 function say(what, message) { try { console.error(`${what.padEnd(7)} ${message}`); } catch { /* the caller went away */ } }
-/** @param {string} command @param {string[]} args @param {boolean} [inherit] @param {string} [input] */
-function exec(command, args, inherit = false, input) {
+/** @param {string} command @param {string[]} args @param {{ inherit?: boolean, input?: string }} [how] */
+function exec(command, args, how = {}) {
+  const { inherit = false, input } = how;
   const stand = test !== undefined ? process.env[`WILDSHARD_REPLICA_TEST_${command.split('/').pop()?.replaceAll('-', '_').toUpperCase() ?? ''}`] : undefined;
   return spawnSync(stand ?? command, args, { encoding: 'utf8', cwd: '/', env: test !== undefined ? { ...process.env, ...CLEAN, PATH: process.env.PATH ?? CLEAN.PATH } : CLEAN,
     ...(input === undefined ? {} : { input }), stdio: [input === undefined ? 'ignore' : 'pipe', inherit ? 'inherit' : 'pipe', inherit ? 'inherit' : 'pipe'] });
@@ -155,7 +156,7 @@ function makeScratch() {
   if (exec('/usr/bin/pg_ctlcluster', [PG_VERSION, CLUSTER, 'start']).status !== 0) { dropScratch(); stop('the scratch cluster did not start'); }
   // The password goes on stdin, never argv, so no process list shows it.
   const sql = `CREATE ROLE ${PG_ROLE} LOGIN PASSWORD '${password}';\nCREATE DATABASE ${PG_DATABASE} OWNER ${PG_ROLE};\n`;
-  if (exec('/usr/sbin/runuser', ['-u', 'postgres', '--', '/usr/bin/psql', '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-p', String(PG_PORT), '-d', 'postgres'], false, sql).status !== 0) {
+  if (exec('/usr/sbin/runuser', ['-u', 'postgres', '--', '/usr/bin/psql', '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-p', String(PG_PORT), '-d', 'postgres'], { input: sql }).status !== 0) {
     dropScratch(); stop('the scratch cluster refused its role or database');
   }
   say('ok', `scratch cluster ${PG_VERSION}/${CLUSTER} on port ${String(PG_PORT)}, socket only`);
@@ -240,7 +241,7 @@ async function main() {
   // The first stdout line says which build runs, so mmo-bots.mjs checks it against the bots' own before a hello.
   console.info(JSON.stringify({ at: 'replica', build: release.engineBuild, serial: release.serial, host, port: PORT, cpus: CPUS, seconds: bounds.seconds, saves: bounds.saves }));
   say('run', `${UNIT} on ${host}:${String(PORT)}, CPUs ${CPUS}, ${String(bounds.workers)} workers, ${String(bounds.seats)} seats, at most ${String(bounds.seconds)} s`);
-  const served = exec('/usr/bin/systemd-run', words, true);
+  const served = exec('/usr/bin/systemd-run', words, { inherit: true });
   end();
   say('ok', `${UNIT} ended (${String(served.status)}); ${DOOR} closed; ${FOLDER} removed`);
   return served.status ?? 1;
