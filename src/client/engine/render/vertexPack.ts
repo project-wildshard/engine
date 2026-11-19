@@ -71,9 +71,18 @@ function fits(f: PackFormat, value: number): boolean {
   return Number.isFinite(value) && value <= 1 + slack && value >= (signed(f.type) ? -1 - slack : 0);
 }
 
-/** Vertices `[from, to)` of `source` (component `e` of the channel read at `read(e)`) in `f`'s layout. */
+/** One staging array the packed uploads share (GL copies it at once), let go when the task's uploads end. */
+let staging: Uint8Array | null = null;
+function stagingBytes(bytes: number): Uint8Array {
+  if (staging === null || staging.byteLength < bytes) staging = ownedArray(Uint8Array, Math.max(bytes, 2 * (staging?.byteLength ?? 0)), PACKED);
+  const out = staging.subarray(0, bytes); out.fill(0); return out;
+}
+/** The shared staging goes (the end of a task's uploads). */
+export function releasePackStaging(): void { staging = null; }
+
+/** Vertices `[from, to)` in `f`'s layout, in the shared staging array: upload it before the next `encode`. */
 export function encode(f: PackFormat, from: number, to: number, read: (element: number) => number): { bytes: Uint8Array; fits: boolean } {
-  const vertices = Math.max(0, to - from), out = ownedArray(Uint8Array, vertices * f.stride, PACKED), view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  const vertices = Math.max(0, to - from), out = stagingBytes(vertices * f.stride), view = new DataView(out.buffer, out.byteOffset, out.byteLength);
   const scale = SCALE[f.type], lo = signed(f.type) ? -1 : 0, wide = BYTES[f.type] === 2;
   let ok = true;
   for (let v = 0; v < vertices; v++) for (let c = 0; c < f.size; c++) {
@@ -145,7 +154,9 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
     if (previous !== buffer) bindBuffer(ARRAY_BUFFER, previous);
     vertexPackStats.unpacked++;
   };
-  const flushAll = (): void => { scheduled = false; for (const [buffer, entry] of pending) flushOne(buffer, entry); };
+  const flushAll = (): void => { scheduled = false; for (const [buffer, entry] of pending) flushOne(buffer, entry); releasePackStaging(); };
+  /** the end of this task flushes what is still waiting and lets the staging go */
+  const later = (): void => { if (!scheduled) { scheduled = true; schedule(flushAll); } };
   const nameOf = (index: number): string | undefined => {
     if (!live(program)) return undefined;
     let table = names.get(program);
@@ -200,7 +211,7 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
       if (was !== undefined && data instanceof Float32Array && data.length === was.vertices * was.format.size) {
         // a whole new copy into a packed buffer: vertex arrays already read it packed
         const out = encode(was.format, 0, was.vertices, e => data[e] ?? Number.NaN);
-        if (out.fits) return bufferData(target, out.bytes, usage);
+        if (out.fits) { later(); return bufferData(target, out.bytes, usage); }
         revert(buffer, was, floats => { floats.set(data); });
         return undefined;
       }
@@ -208,7 +219,7 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
       if (args.length === 3 && usage === STATIC_DRAW && data instanceof Float32Array && Object.getPrototypeOf(data) === Float32Array.prototype
         && data.length >= MIN_FLOATS && !pointed.has(buffer) && enabled()) {
         pending.set(buffer, { data, usage });
-        if (!scheduled) { scheduled = true; schedule(flushAll); }
+        later();
         return undefined;
       }
     }
@@ -226,7 +237,7 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
       if (f === null) bufferData(ARRAY_BUFFER, waiting.data, waiting.usage);
       else {
         const vertices = waiting.data.length / f.size, out = encode(f, 0, vertices, e => waiting.data[e] ?? Number.NaN);
-        bufferData(ARRAY_BUFFER, out.bytes, waiting.usage);
+        bufferData(ARRAY_BUFFER, out.bytes, waiting.usage); later();
         packed.set(buffer, { format: f, vertices, arrays: new Map() });
         vertexPackStats.buffers++; vertexPackStats.floatBytes += waiting.data.byteLength; vertexPackStats.packedBytes += out.bytes.byteLength;
       }
@@ -261,7 +272,7 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
     const v0 = Math.floor(first / f.size), v1 = Math.min(entry.vertices, Math.ceil((first + count) / f.size));
     const covered = from - (first - v0 * f.size) >= 0 && from + (v1 * f.size - first) <= data.length;
     const out = covered ? encode(f, v0, v1, read) : { bytes: new Uint8Array(0), fits: false };
-    if (out.fits) return bufferSubData(target, v0 * f.stride, out.bytes);
+    if (out.fits) { later(); return bufferSubData(target, v0 * f.stride, out.bytes); }
     revert(buffer, entry, floats => { for (let e = first; e < first + count; e++) floats[e] = read(e); });
     return undefined;
   });
