@@ -59,4 +59,5 @@ export function cornerShown(marks: PageMarks): boolean {
     && marks.wsTalk === undefined;
 }
 /** The marks `cornerShown` reads, as attribute names, for a MutationObserver. */
-export const CORNER_MARKS: readonly string[] = ['data-ws-state', 'data-ws-menu', 'data-ws-covered', 'data-ws-talk'];
+/** `data-ws-hurt` is not a show rule: a hit taken closes an open chat (J473 row 3). */
+export const CORNER_MARKS: readonly string[] = ['data-ws-state', 'data-ws-menu', 'data-ws-covered', 'data-ws-talk', 'data-ws-hurt'];

@@ -336,7 +336,7 @@ test('a voice peer takes the body the relay renames it to (the lead seat)', () =
 // MOBILE-KEYBOARD MK2 (J297, Jake 2026-11-12 17:44 Cancún: "move the whole chat to be just above the keyboard"): the open chat
 // tells the game how much of the band over the keyboard its dock takes, and gives it back as it closes.
 test('the open chat reserves its dock over a phone keyboard, and gives it back on close', () => {
-  expect(chatDock(445)).toBe(150); // portrait: input and three lines
+  expect(chatDock(445)).toBe(190); // portrait: input and six lines (J473 row 3)
   expect(chatDock(170)).toBe(85); // landscape: half the band, so the world keeps a strip
   // Jake's iPhone 17 Pro with the keyboard up: 445 pt of the page still shows
   vi.stubGlobal('visualViewport', Object.assign(new EventTarget(), { height: 445, offsetTop: 0, scale: 1 }));
@@ -346,8 +346,8 @@ test('the open chat reserves its dock over a phone keyboard, and gives it back o
     expect(root.dataset['wsKbReserve']).toBeUndefined();
     field.dispatchEvent(new FocusEvent('focus'));
     expect(open(box)).toBe(true);
-    expect(root.dataset['wsKbReserve']).toBe('156');
-    expect(box.style.getPropertyValue('--ws-chat-dock')).toBe('150px');
+    expect(root.dataset['wsKbReserve']).toBe('196');
+    expect(box.style.getPropertyValue('--ws-chat-dock')).toBe('190px');
     outside();
     expect(open(box)).toBe(false);
     expect(root.dataset['wsKbReserve']).toBeUndefined();
@@ -504,4 +504,31 @@ test('J473 row 2: a phone peeks only the newest line beside the chat icon for 4 
   const sheet = document.head.textContent;
   expect(sheet).toContain('#ws-chat[data-touch]:not([data-open])>[data-lines]{position:absolute;left:44px;bottom:0;height:36px;width:calc(45vw - 60px);');
   expect(sheet).toContain('#ws-chat[data-touch]:not([data-open]) [data-lines]>:not(:last-child),html[data-ws-fight] #ws-chat[data-touch]:not([data-open])>[data-lines]{display:none}');
+});
+
+// J473 grill wave 3: "the chat icon opens one panel down to the keyboard top (last 6 lines plus input); it closes on
+// send-and-dismiss, a tap outside, or a hit".
+test('J473 row 3: the phone\'s typing panel docks the last 6 lines on the keyboard, and a send or a hit closes it', async () => {
+  const hud = document.createElement('div'); hud.id = 'hud'; hud.className = 'touch'; document.body.append(hud);
+  const { box, field, sent } = corner();
+  vi.advanceTimersByTime(500);
+  expect(document.head.textContent).toContain('html[data-ws-keyboard] #ws-chat[data-open] [data-lines]>:nth-last-child(n+7){display:none}');
+  // a send closes the panel (and lets the field go, so the keyboard drops)
+  field.dispatchEvent(new FocusEvent('focus'));
+  expect(open(box)).toBe(true);
+  field.value = 'omw';
+  box.querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }));
+  expect(sent).toEqual(['omw']);
+  expect(open(box)).toBe(false);
+  // a hit taken closes it; the hit count only moves while you fight, it never hides the corner
+  field.dispatchEvent(new FocusEvent('focus'));
+  expect(open(box)).toBe(true);
+  marks['wsHurt'] = '1'; await settle();
+  expect(open(box)).toBe(false);
+  expect(away(box)).toBe(false);
+  // a tap outside still closes it
+  field.dispatchEvent(new FocusEvent('focus'));
+  outside();
+  expect(open(box)).toBe(false);
+  delete marks['wsHurt'];
 });

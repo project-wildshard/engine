@@ -11,7 +11,9 @@ const SHOWN = 6;
  *  width and compact: the input and the last few lines, no head, no voice rows (the accessory bar's Done or a tap outside
  *  ends it). The game fits the band above (`data-ws-kb-reserve`, the dock and its gap). Half the band at most, so a landscape
  *  phone keeps some world. */
-const DOCK_PX = 150, DOCK_GAP_PX = 6;
+const DOCK_PX = 190, DOCK_GAP_PX = 6;
+/** J473 row 3 (grill wave 3: "panel from the icon down to the keyboard"): the dock holds the input and the last 6 lines. */
+const DOCK_LINES = 6;
 export function chatDock(bandHeight: number): number { return Math.round(Math.min(DOCK_PX, bandHeight / 2)); }
 /** A14 (Jake, 2026-11-10: "move the chat bar to just above the bottom HUD, bottom left, directly above MOVE"; QA row 15: "when the
  *  menu is open, can we just hide the chat and the audio?"). On a touch screen the row sits over MOVE as wide as MOVE, above the
@@ -77,6 +79,7 @@ const CSS = `
 html[data-ws-keyboard] #ws-chat[data-open]{top:calc(var(--ws-kb-bottom) - ${String(DOCK_GAP_PX)}px);bottom:auto;transform:translateY(-100%);left:calc(env(safe-area-inset-left,0px) + 6px);width:calc(100vw - 12px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:var(--ws-chat-dock,${String(DOCK_PX)}px);max-height:none;padding:6px;gap:4px;border-radius:10px}
 html[data-ws-keyboard] #ws-chat[data-open]>[data-head],html[data-ws-keyboard] #ws-chat[data-open]>#ws-voice-peers,html[data-ws-keyboard] #ws-chat[data-open]>#ws-voice-tip{display:none}
 html[data-ws-keyboard] #ws-chat[data-open]>[data-lines]{gap:2px}
+html[data-ws-keyboard] #ws-chat[data-open] [data-lines]>:nth-last-child(n+${String(DOCK_LINES + 1)}){display:none}
 `;
 /** What stands at a keyboard page's bottom left, which the corner sits over: the coins, a steed's row, the health readout, and
  *  on a desktop the Developer alerts (perf.css). Measured, because a steed's row or a many-line alert has no fixed height. */
@@ -169,11 +172,14 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
   if (typeof visualViewport !== 'undefined' && visualViewport !== null) scope.listen(visualViewport, 'resize', () => { if (open) { fit(); toBottom(); } });
   place(box); scope.interval(PLACE_EVERY_MS, () => { place(box); });
   // in play only (QA 2026-11-11): the page's state marks decide, as they change; leaving play closes an open chat
-  let shown = false;
+  let shown = false, hurt = document.documentElement.dataset['wsHurt'];
   const follow = (): void => {
-    shown = cornerShown(document.documentElement.dataset);
+    const marks = document.documentElement.dataset;
+    shown = cornerShown(marks);
     box.toggleAttribute('data-away', !shown);
-    if (!shown && open) corner('close');
+    // J473 row 3: a hit taken (`data-ws-hurt` moves, src/client/engine/ui/fightMark.ts) closes an open chat
+    const hit = marks['wsHurt'] !== hurt; hurt = marks['wsHurt'];
+    if ((!shown || hit) && open) corner('close');
   };
   follow();
   const marks = new MutationObserver(follow);
@@ -219,8 +225,9 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
       add(row);
     } else client.say('room', text);
     field.value = '';
-    // chatting mode stays open to say more; a line sent from the calm corner (a key that never opened it) leaves the field
-    if (open) corner('sent'); else field.blur();
+    // chatting mode stays open to say more on a keyboard page; on a phone a send also dismisses (J473 row 3: the panel and the
+    // keyboard go, the world comes back); a line sent from the calm corner (a key that never opened it) leaves the field
+    if (open) corner(box.dataset['touch'] === undefined ? 'sent' : 'close'); else field.blur();
   });
   const own = (): string | undefined => client.welcome === null ? undefined : String(client.welcome.handle);
   scope.onDispose(client.onChat(({ line, from, name, text }) => {
