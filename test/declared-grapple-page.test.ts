@@ -2,13 +2,14 @@ import { expect, test, vi } from 'vitest';
 import { parse } from 'valibot';
 import { MeshBasicMaterial } from 'three';
 import { ModesSchema } from '@wildshard/format/modes';
+import type { Shardfile } from '@wildshard/format/shardSchema';
 import { Scope } from '@wildshard/engine/app/scope';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { ShardContext } from '@wildshard/engine/game/plugin/context';
 import { emptyShardfile } from '../src/shared/host/author';
 import { declaredGrappleProfile, declaredGrappleRow } from '../src/shared/game/grapple/declared';
 import { declaredGrapplePresentation, declaredGrappleTool, installDeclaredGrapplePage } from '../src/client/game/grapple/declaredGrapple';
-import { GrappleTool, grappleGuard } from '../src/client/game/grapple/tool';
+import { GrappleTool, grappleGuard, pageGrappleFacts } from '../src/client/game/grapple/tool';
 import { Filament } from '../src/client/game/grapple/ribbon';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
 import source from './fixtures/engine-lift/grapple.json' with { type: 'json' };
@@ -75,4 +76,13 @@ test('OF41c page: install binds the tool to its guard and adds it to the loadout
     expect(add).toHaveBeenCalledWith(installed, { locked: false });
     expect(() => { if (installed !== null) grappleGuard(scope).bind(installed); }).toThrow('already bound');
   } finally { scope.dispose(); }
+});
+
+test('OF41c page: a plain upload binds no page ledger for its fact; a native runtime still needs one', () => {
+  const plain = shard([{ id: 'quarry.claw', ...timings, profile: tool, hooks: HOOKS }]);
+  const ctx = (shardfile: Shardfile) => legacyDouble<ShardContext>({ app: legacyDouble<ShardContext['app']>({}), game: legacyDouble<ShardContext['game']>({}),
+    product: legacyDouble<ShardContext['product']>({ shardfile, slug: 'grapple-fixture' }) });
+  expect(plain.runtime).toBeNull();
+  expect(pageGrappleFacts(ctx(plain), tool)).toBeUndefined();
+  expect(() => pageGrappleFacts(ctx({ ...plain, runtime: legacyDouble<NonNullable<Shardfile['runtime']>>({ binds: [] }) }), tool)).toThrow('not bound by its runtime');
 });

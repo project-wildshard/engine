@@ -98,13 +98,19 @@ class Pin {
   }
 }
 
+/** The page's fact port for a grapple's completion fact: a native runtime's ledger. A plain upload has no runtime, and its
+ *  server's declared grapple files the fact (OF41c), so its page binds no ledger (binding one threw on entry). */
+export function pageGrappleFacts(shard: Pick<ShardContext, 'app' | 'product' | 'game'>, profile: Pick<GrappleProfile, 'fact'>): ReturnType<typeof projectRuntimeFacts> | undefined {
+  if (profile.fact === undefined || shard.product.shardfile.runtime === null) return undefined;
+  return projectRuntimeFacts(bindRuntimeLedger(shard, shard.product.shardfile, shard.product.slug), shard.game.runtime?.play?.progress);
+}
+
 /** Client-only presentation; all rules below are native platform traversal. */
 function installGrappleAim(ctx: EquipmentHost, shard: ShardContext, scope: Scope, row: GrappleAimRow, burstData: GrappleRows['bursts'], profile: GrappleProfile, tool: GrappleTool): (course: GrappleCourseRow | null) => void {
   const ports: GrapplePorts = { get physics() { return ctx.physics; }, get body() { return ctx.player; } };
   const fragment = grappleCourse({ ...profile.course, hooks: tool.hooks });
   const modeRow = fragment.mode ?? DEFAULT_GRAPPLE_MODE;
-  const facts = profile.fact === undefined ? undefined : projectRuntimeFacts(
-    bindRuntimeLedger(shard, shard.product.shardfile, shard.product.slug), shard.game.runtime?.play?.progress);
+  const facts = pageGrappleFacts(shard, profile);
   const rules = {
     fragment, context: { id: 'grapple', actions: ['lock', 'jump'], blocks: [], touch: { relabel: {} } } satisfies InputContextDef,
     reach: { min: modeRow.minRange, max: modeRow.maxRange, winX: modeRow.windowX, winY: modeRow.windowY },
