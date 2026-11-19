@@ -23,7 +23,7 @@ export const WALK_RATCHET = new URL('walk-ratchet.json', import.meta.url);
 export function parseWalkBaseline(value) {
   const v = /** @type {any} */ (value);
   const held = (/** @type {any} */ h) => h !== null && typeof h === 'object' && [h.value, h.spread].every((n) => Number.isFinite(n) && n >= 0)
-    && typeof h.judged === 'boolean' && (h.judged || (typeof h.why === 'string' && h.why.length > 0));
+    && (h.judged === true || (h.judged === false && typeof h.why === 'string' && h.why.length > 0));
   if (v?.version !== 2 || v.mode !== 'walk' || v.boot !== 'online' || typeof v.zone !== 'string' || !(v.seconds > 0) || !Number.isInteger(v.runs) || v.runs < 3
     || typeof v.source !== 'string' || !held(v.rate) || !held(v.peak)) throw new Error('Invalid walk ratchet baseline (three runs or more; a reading not judged says why)');
   if (!v.rate.judged) throw new Error('Invalid walk ratchet baseline: the allocation rate is always judged');

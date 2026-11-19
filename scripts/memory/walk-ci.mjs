@@ -35,9 +35,8 @@ async function walk(name) {
     return null;
   }
   const peaks = /** @type {number[]} */ (data.webkit.map((/** @type {any} */ r) => r.walk?.aboveSettled?.webcontent).filter((/** @type {unknown} */ v) => typeof v === 'number'));
-  summary(`Walk ratchet ${baseline.zone} (${name}, ${String(data.walk.bytesPerSecond.n)} runs): ${mb(data.walk.bytesPerSecond.median)} MB/s allocated [S] `
-    + `(pinned ${mb(baseline.rate.value)}, line ${mb(rateLine(baseline))}), WebContent peak ${mb(data.walk.peakAboveSettled.median)} MB above settled [K]`
-    + (baseline.peak.judged ? ` (line ${mb(peakLine(baseline))})` : ''));
+  const peakJudged = baseline.peak.judged ? ` (line ${mb(peakLine(baseline))})` : '';
+  summary(`Walk ratchet ${baseline.zone} (${name}, ${String(data.walk.bytesPerSecond.n)} runs): ${mb(data.walk.bytesPerSecond.median)} MB/s allocated [S] (pinned ${mb(baseline.rate.value)}, line ${mb(rateLine(baseline))}), WebContent peak ${mb(data.walk.peakAboveSettled.median)} MB above settled [K]${peakJudged}`);
   for (const line of reportedLines(baseline, data.walk, peaks)) summary(line);
   return data.walk;
 }
