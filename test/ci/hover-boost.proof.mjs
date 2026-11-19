@@ -6,6 +6,7 @@ import {test,after} from 'node:test';
 import {readFileSync} from 'node:fs';
 import {Window} from 'happy-dom';
 import {PerspectiveCamera} from 'three';
+import {ROAD_WIDTH} from '@wildshard/format/contentBounds';
 const page=new Window({url:'http://127.0.0.1/hover-proof'}),borrowed=new Map();
 for(const key of ['window','document','location','localStorage','HTMLElement','Element','Node','Event','CustomEvent','PointerEvent','HTMLCanvasElement','ResizeObserver','setTimeout','clearTimeout','setInterval','clearInterval','requestAnimationFrame','cancelAnimationFrame']){
  borrowed.set(key,Object.getOwnPropertyDescriptor(globalThis,key));
@@ -23,7 +24,7 @@ const {setDev}=await import('../../src/client/engine/core/devMode.ts');
 const {mountBoostLook,BOOST_TAP_MS}=await import('../../src/client/engine/ui/hoverBoost.ts');
 const {installShardHoverSpeed,installGridHoverSpeed,gridHoverSpeed}=await import('../../src/shared/game/grid/rules.ts');
 const {hoverSpeed}=await import('../../src/shared/engine/player/hoverSpeed.ts');
-const {CHUNK_HALF,CONTENT_CAPS,ROAD_WIDTH}=await import('../../src/shared/engine/core/config.ts');
+const {CHUNK_HALF,CONTENT_CAPS}=await import('../../src/shared/engine/core/config.ts');
 const {createSimHost}=await import('../../src/server/engine/sim.ts');
 const {allowDeveloperBoost}=await import('../../src/server/engine/sim/playerSim.ts');
 const {leadPlayer}=await import('../../src/shared/engine/sim/leadPlayer.ts');
