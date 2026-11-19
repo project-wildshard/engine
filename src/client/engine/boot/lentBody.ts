@@ -4,16 +4,22 @@
  * (`contentRead`) streamed that copy into a third buffer of the file's length. WebKit's collector often runs no full
  * collection inside a loading step, so all three stay in the page at once: on Nine's phone boot ~53 MB of held files
  * became ~160 MB by `readyFrame`. Lent, the Response carries the bytes themselves and the reader takes them whole.
- * The device slot `debug.loadGc` (true or false) picks it; a harness sets it before the boot.
+ * The device slot `debug.loadGc` (true or false) picks it; unset, phone Low has it on (iPhone 13 device runs, 2026-11-19).
  */
 import { jsonSlot } from '../saves/slots';
+import { TIER } from '../core/tier';
+import { graphicsMode } from '../core/graphicsMode';
 
 export const LOAD_GC_SLOT = 'debug.loadGc';
 let on: boolean | undefined;
 /** IP31's switch, read once per page. */
 export function loadGc(): boolean {
   if (on !== undefined) return on;
-  try { on = jsonSlot(LOAD_GC_SLOT, 'device').read() === true; } catch { on = false; }
+  try {
+    const saved = jsonSlot(LOAD_GC_SLOT, 'device').read();
+    // unset, phone Low takes it (iPhone 13, 2026-11-19: Nine reached control ~6 s sooner with IP30 and IP31 on)
+    on = typeof saved === 'boolean' ? saved : TIER === 'phone' && graphicsMode() === 'low';
+  } catch { on = false; }
   return on;
 }
 
