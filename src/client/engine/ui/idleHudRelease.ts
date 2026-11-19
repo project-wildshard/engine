@@ -1,9 +1,10 @@
 /** MEMORY-STRUCTURE STR31: idle HUD cards release their composited backing on a phone.
  *
- * A quest reward caption or talk card waits at opacity 0 between showings, and WebKit keeps the backing it painted
- * (Template at control holds six reward captions and a talk card: about 12 MB of GPU IOSurface [K], meta
- * engine-memory/gpu-staircase-2026-11-18.md). With the switch on, `html[data-ws-idle-hud]` makes quest.css hide each card
- * once its fade has ended; showing it makes it visible at once. The device switch `debug.releaseIdleHud` defaults off
+ * A quest reward caption, the talk card and the trader's counter wait at opacity 0 between showings, and WebKit keeps the
+ * backing each painted (Template at control holds six reward captions and a talk card, about 12 MB of GPU IOSurface [K];
+ * the closed counter is a full-screen layer, 12.65 MB; meta engine-memory/gpu-staircase-2026-11-18.md). With the switch
+ * on, `html[data-ws-idle-hud]` makes quest.css and shop.css hide each once its fade has ended; showing it makes it
+ * visible at once. The device switch `debug.releaseIdleHud` defaults off
  * and is read on phone graphics only; the old path (the card held at opacity 0) stays for one release.
  */
 import type { Scope } from '../../../shared/engine/app/scope';

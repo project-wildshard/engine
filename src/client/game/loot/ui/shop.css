@@ -4,6 +4,9 @@
    column at the bottom centre. */
 .ws-shop { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 40); display: flex; flex-direction: column; justify-content: space-between; padding: calc(var(--ws-top) + 6px) 12px calc(12px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to bottom, rgba(6, 10, 18, 0.55), rgba(6, 10, 18, 0) 18%, rgba(6, 10, 18, 0) 38%, rgba(6, 10, 18, 0.5)); opacity: 0; pointer-events: none; transition: opacity 0.18s; font-family: var(--ws-mono); color: var(--ws-text); }
 .ws-shop.show { opacity: 1; pointer-events: auto; }
+/* STR31 (engine/ui/idleHudRelease.ts): with the phone switch on, the closed counter hides once its fade ends and keeps no
+   full-screen composited backing (12.65 MB at device scale 3); .show makes it visible at once */
+html[data-ws-idle-hud] .ws-shop:not(.show) { visibility: hidden; transition: opacity 0.18s, visibility 0s linear 0.18s; }
 .ws-shop button { appearance: none; -webkit-appearance: none; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
 /* top bar */
