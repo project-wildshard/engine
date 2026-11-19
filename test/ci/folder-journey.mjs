@@ -17,10 +17,8 @@ import {
   serializeSimSnapshot,
   snapshotSimHostBytes,
 } from "../../src/shared/engine/sim/snapshot.ts";
-import {
-  outputDescriptor,
-  serverReadsFile,
-} from "../../src/shared/game/shardfile/outputDescriptor.ts";
+import { outputDescriptor } from "../../src/shared/game/shardfile/outputDescriptor.ts";
+import { serverInputFiles } from "../../src/shared/game/shardfile/serverSkinRigs.ts";
 
 const limit = 9500;
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -31,12 +29,7 @@ export async function journey(directory, work) {
   const descriptor = outputDescriptor(shard);
   assert.ok(descriptor);
   const assets = new Map(
-    descriptor.index.files
-      .filter(
-        (file) =>
-          serverReadsFile(file, shard.terrain?.collider) &&
-          (file.name === undefined || file.kind === "wasm" || file.kind === "tile"),
-      )
+    serverInputFiles(descriptor.index.files, shard)
       .map((file) => [
         file.commons === true ? `commons:${file.hash}` : file.hash,
         Uint8Array.from(readFileSync(join(directory, file.path))),

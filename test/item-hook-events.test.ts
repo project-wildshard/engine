@@ -2,7 +2,8 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -15,7 +16,7 @@ test('an item hook answers every swing, past the script event allowance', async 
   const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
   const shard = product.shardfile;
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, shard);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const sim = createShardfileSim(shard, assets, { rapier, quest: { fact: () => undefined, coins: () => undefined } });

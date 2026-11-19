@@ -8,7 +8,8 @@ import { kitSlots } from '../src/client/engine/net/heldOnOthers';
 import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
@@ -27,7 +28,7 @@ afterEach(() => { live?.dispose(); live = undefined; });
 async function open(slug: string): Promise<DedicatedRoom> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   clock = 0;
   live = await DedicatedRoom.boot({ slug, build: '', bootId: 'b1', input: { shard: product.shardfile, assets, rapier, product }, now: () => clock, post: () => undefined });

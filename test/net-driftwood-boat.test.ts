@@ -8,7 +8,8 @@ import { tagOf } from '../src/shared/engine/physics/surface';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { SimHost } from '../src/server/engine/sim';
@@ -32,7 +33,7 @@ test('a room player standing on Driftwood\'s moored boat for 30 s rides the deck
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const row = shard.movers.find(mover => mover.id === BOAT);
   if (row === undefined || row.kind !== 'platform' || row.carry !== undefined) throw new Error('Driftwood\'s boat is no longer a moored platform');
-  const assets = new Map(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))
+  const assets = new Map(serverInputFiles(descriptor.index.files, shard)
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), input = { shard, assets, rapier, product };
   // the page: its own world holding the boat's declared boxes, posed from the room's row as `FollowedMovers` poses them

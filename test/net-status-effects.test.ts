@@ -11,7 +11,8 @@ import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { FIXED_STEP } from '../src/shared/engine/core/fixedStep';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { NetRoom, type NetTickInput } from '../src/server/engine/net/room';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
@@ -28,7 +29,7 @@ const BLOB = 'grey-blob:1', HEAVY = 30;
 async function templateCell() {
   const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   return openCellWorld({ instance: '_template' }, { shard: product.shardfile, product, assets, rapier }, undefined, { saves: new SaveStore({ local: null, session: null }), lone: true, pageless: true });

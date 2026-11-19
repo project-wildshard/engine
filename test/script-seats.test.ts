@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
@@ -15,8 +16,7 @@ const rapier = await loadRapier(readFileSync(new URL('../public/assets/physics/r
 const directory = builtFolder('pastel-plain'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
 if (descriptor === undefined) throw new Error('Missing pastel-plain output');
 const source = product.shardfile;
-const assets: ReadonlyMap<string, Uint8Array> = new Map(descriptor.index.files
-  .filter(file => serverReadsFile(file, source.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))
+const assets: ReadonlyMap<string, Uint8Array> = new Map(serverInputFiles(descriptor.index.files, source)
   .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
 const ports = { rapier, quest: { fact: () => undefined, coins: () => undefined } };
 function tick(sim: ShardfileSimulation, count = 1): void {

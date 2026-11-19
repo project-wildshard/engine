@@ -6,7 +6,8 @@ import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { installDeclaredKitItems, type DeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
 import { exportSeats, importSeats } from '../src/server/game/plugin/playerSeats';
@@ -19,7 +20,7 @@ import { builtFolder } from '../src/test/game/builtFolder';
 async function template(): Promise<HeadlessRuntimeInput> {
   const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };
 }

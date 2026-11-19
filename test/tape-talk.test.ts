@@ -8,7 +8,8 @@ import { questBooks } from '../src/shared/engine/quest/players';
 import { talkLine } from '../src/shared/game/shardfile/talks';
 import { createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 // TE-ENG3's fixture: a quest-giver from rows alone (`test/fixtures/declared-talk/rows.json`), on Template's product. Its talk offers a quest;
@@ -23,7 +24,7 @@ const fixture = JSON.parse(readFileSync('test/fixtures/declared-talk/rows.json',
 async function withTalk(): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array>; rapier: Awaited<ReturnType<typeof loadRapier>> }> {
   const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), base = product.shardfile, descriptor = outputDescriptor(base);
   if (descriptor === undefined) throw new Error('Missing _template output');
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, base.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, base);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const shard: Shardfile = { ...base,
     quests: { ...base.quests, flags: [...base.quests.flags, ...fixture.flags], quests: [...base.quests.quests, fixture.quest],

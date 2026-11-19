@@ -1,7 +1,8 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Ring 1 must actually use the server-only pin.
 import { existsSync, readFileSync } from 'node:fs';
 import { builtFolder as fullFolder } from '../../../src/test/game/builtFolder';
-import { outputDescriptor, serverReadsFile } from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../../../src/shared/game/shardfile/serverSkinRigs';
 import type { ShardFolder } from '../../../src/shared/game/shardfile/shardFolder';
 
 export function builtFolder(slug: string): string {
@@ -14,7 +15,6 @@ export function builtFolder(slug: string): string {
 export function runtimeAssets(product: ShardFolder, directory: string): Map<string, Uint8Array> {
   const descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing admitted runtime inventory');
-  return new Map(descriptor.index.files
-    .filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))
+  return new Map(serverInputFiles(descriptor.index.files, product.shardfile)
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
 }

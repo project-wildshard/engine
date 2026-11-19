@@ -5,7 +5,8 @@ import { lowerMoverMotion } from '@wildshard/format/moverMotion';
 import { parseMovers } from '@wildshard/format/movers';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -17,7 +18,7 @@ const PLAYER = 'actor.player', DOOR_FIELD = 101;
 async function withLift() {
   const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const base = product.shardfile;
   const rest = { at: { x: 4, y: 0, z: 4 }, euler: { x: 0, y: 0, z: 0 } };

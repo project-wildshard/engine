@@ -4,7 +4,8 @@ import { expect, vi } from 'vitest';
 import { loadRapier } from '../../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../../src/shared/engine/saves/store';
 import { GridAssembly, type GridPoint } from '../../src/shared/game/grid/assembly';
-import { outputDescriptor, serverReadsFile } from '../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../../src/shared/game/shardfile/serverSkinRigs';
 import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../../src/server/host/standalone/gridServer';
@@ -28,7 +29,7 @@ export class PageStorage implements SaveStorage {
 export async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };
 }

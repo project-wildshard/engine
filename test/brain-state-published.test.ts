@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -17,7 +18,7 @@ const rapier = loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 async function product(slug: string): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array> }> {
   const directory = builtFolder(slug), loaded = await loadHeadlessFolder(directory), descriptor = outputDescriptor(loaded.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, loaded.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, loaded.shardfile);
   return { shard: loaded.shardfile, assets: new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))])) };
 }
 // Brasscap's catalogue slug is brasscap-mesa from TC-SHIP-a; before that it is blender-template

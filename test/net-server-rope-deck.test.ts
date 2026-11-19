@@ -2,7 +2,8 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
@@ -35,7 +36,7 @@ const planks = (host: SimHost): number => {
 test('the room stands a walker on Driftwood\'s rope bridge, and a restore keeps one chain', async () => {
   const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
-  const assets = new Map(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))
+  const assets = new Map(serverInputFiles(descriptor.index.files, shard)
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), input = { shard, assets, rapier, product };
   const resident = await createNativeHeadlessResident(input, undefined, { room: true });

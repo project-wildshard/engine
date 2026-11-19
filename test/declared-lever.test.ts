@@ -6,7 +6,8 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { declaredKitSlots, leverLines } from '../src/shared/game/shardfile/items';
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { installDeclaredKitItems, type DeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
@@ -26,7 +27,7 @@ const fixture = JSON.parse(readFileSync('test/fixtures/declared-lever/rows.json'
 async function withLever(): Promise<HeadlessRuntimeInput> {
   const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const base = product.shardfile;
   const shard: Shardfile = { ...base,

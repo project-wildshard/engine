@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier';
-import { outputDescriptor, serverReadsFile } from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../../../src/shared/game/shardfile/serverSkinRigs';
 import { runCells } from '../../../src/server/host/dedicated/cellHost';
 import { loopLag } from '../../../src/server/host/dedicated/loopLag';
 import type { WorkerNews } from '../../../src/server/host/dedicated/cellProtocol';
@@ -20,7 +21,7 @@ import { builtFolder } from '../../../src/test/game/builtFolder';
 export async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
   const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
-  const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
+  const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };
 }

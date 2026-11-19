@@ -1,6 +1,8 @@
 import { skinLookParameters } from '@wildshard/format/skinAssets';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { serverReadsFile } from './outputDescriptor';
+import type { OutputIndex } from '@wildshard/format/outputIndex';
 
 /**
  * The skin rigs a server reads (GLB refs, as a skin row names its file): a spawned species' skin look and its variants. The
@@ -26,4 +28,13 @@ export function serverSkinRigs(shard: Pick<Shardfile, 'rows' | 'files' | 'creatu
     if (variants !== undefined) walk(variants);
   }
   return rigs;
+}
+
+/** The output files a room reads when a tool or test builds its input from a built folder: the unnamed bin and json, wasm,
+ *  the terrain tile, and the spawned skin rigs (`serverSkinRigs`), as the cook's server pack carries them (AP36c). */
+export function serverInputFiles<F extends Pick<OutputIndex['files'][number], 'kind' | 'hash' | 'name' | 'commons'>>(
+  files: readonly F[], shard: Pick<Shardfile, 'rows' | 'files' | 'creatures' | 'terrain'>): F[] {
+  const rigs = serverSkinRigs(shard);
+  return files.filter(file => (serverReadsFile(file, shard.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))
+    || rigs.has(file.commons === true ? `commons:${file.hash}` : file.hash));
 }
