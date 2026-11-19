@@ -51,6 +51,16 @@ mkdirSync(out, { recursive: true });
 /** @typedef {{ name: string, left: number, top: number, right: number, bottom: number }} Box */
 /** @typedef {{ guarded: Box[], chat: Box[], developer: Box[], rest: Box[], mic: { ok: boolean, at: string | null } | null, chatShown: boolean }} Boxes */
 
+/** The chat row's modules reach rapier (its wasm init is a top-level await, which an IIFE can't hold) and the game's lazy
+ * imports (split chunks, which an IIFE can't hold either) through shared engine modules; the row uses neither. Rapier becomes an
+ * inert stub and every lazy import stays an empty external, so the bundle is one IIFE again (broken since rapier's TLA). */
+const RAPIER_STUB = 'const stub = new Proxy(function () {}, { get: (_, key) => key === "then" ? undefined : stub, apply: () => stub, construct: () => stub }); export default stub; export const RawVector = stub;';
+/** @type {import('vite').Plugin} */
+const chatOnly = { name: 'hud-worst-chat-only', enforce: 'pre',
+  resolveId: id => id.startsWith('@dimforge/rapier3d') ? '\0hud-worst-no-rapier' : null,
+  load: id => id === '\0hud-worst-no-rapier' ? RAPIER_STUB : null,
+  resolveDynamicImport: () => ({ id: 'data:text/javascript,export{}', external: true }) };
+
 /** The chat row's real modules over a stub link, as one script for the page (from `rev`'s modules when given).
  * @param {string} rev @returns {Promise<string>} */
 async function chatBundle(rev) {
@@ -69,7 +79,7 @@ async function chatBundle(rev) {
     entry = join(dir, 'chat.ts'); writeFileSync(entry, text);
   }
   /** @type {any} */
-  const result = await build({ configFile: false, logLevel: 'warn', publicDir: false, define: { __BUILD_ID__: '"hud-worst"' },
+  const result = await build({ configFile: false, logLevel: 'warn', publicDir: false, define: { __BUILD_ID__: '"hud-worst"' }, plugins: [chatOnly],
     build: { outDir: join(dir, 'out'), emptyOutDir: true, write: false, minify: false, target: 'es2022',
       lib: { entry, formats: ['iife'], name: 'hudWorstChat', fileName: () => 'chat.js' } } });
   /** @type {{ type: string, code?: string }[]} */

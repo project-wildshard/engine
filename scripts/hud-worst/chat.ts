@@ -20,7 +20,7 @@ function mount(lines: readonly (readonly [string, string])[], state: VoiceChat['
   } as unknown as NetClient;
   const roster = new Map<string, VoicePeer>(peers.map((name, i) => [`p${String(i)}`, { id: `p${String(i)}`, name, speaking: i === 0, muted: i === 2, linked: true, far: false }]));
   const voice = {
-    state, speaking: true, level: 0.6, roster,
+    state, speaking: true, level: 0.6, roster, unreachable: [], retryUnreachable: (): Promise<void> => Promise.resolve(),
     onChange: (): (() => void) => () => undefined,
     toggle: (): void => undefined, mute: (): void => undefined, press: (): void => undefined, release: (): void => undefined, mode: 'toggle', sending: state === 'on',
   } as unknown as VoiceChat;
