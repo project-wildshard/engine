@@ -10,6 +10,7 @@ import { CreatureSockets } from '../../../shared/game/shardfile/creatureSockets'
 import { ClipCreatureVolumes } from '../../../shared/game/shardfile/creatureClipVolumes';
 import { PartHealth } from '../../../shared/game/shardfile/partHealth';
 import { TrailCreatureVolumes } from '../../../shared/game/shardfile/trailCreatureVolumes';
+import { TailCreatureVolumes } from '../../../shared/game/shardfile/tailCreatureVolumes';
 import type { Vector3 } from 'three';
 import { checkCreatureHeight } from './creatureSizes';
 import { bodyContract } from '../../../shared/game/shardfile/creatureContract';
@@ -47,6 +48,7 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     const root = { position: actor.position, get yaw() { return actor.yaw; }, get scale() { return actor.scale; } };
     const parameters = skinLookParameters(look);
     const pose = body.skeleton === 'serpent' ? new TrailCreatureVolumes(body, root, (x, z) => host.heightAt(x, z))
+      : body.stance === 'horizontal' ? new TailCreatureVolumes(body, joints, root)
       : body.hits === 'clip' ? new ClipCreatureVolumes(body, bytes, joints, actor, () => host.clock.now, parameters.attackSpan, parameters.clipMap)
       : body.skeleton === undefined && body.volumes === undefined ? undefined : new RestCreatureVolumes(body, joints, root);
     checkCreatureHeight(body, bytes, actor, pose);
@@ -57,7 +59,8 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     const strikes = strikeNames.length === 0 ? undefined : new CreatureSockets(body, joints, root, {
       names: strikeNames,
       ...(pose instanceof ClipCreatureVolumes ? { posed: pose.socket.bind(pose) }
-        : pose instanceof TrailCreatureVolumes ? { posed: trailSocket(pose, joints) } : {}),
+        : pose instanceof TrailCreatureVolumes ? { posed: trailSocket(pose, joints) }
+        : pose instanceof TailCreatureVolumes ? { posed: (index: number, _at: readonly [number, number, number], out: Vector3) => pose.socket(joints[index]?.name ?? '', out) } : {}),
     });
     // CC31: authored volumes with hp break at 0 (their volume goes off and `creature.part-broken` fires once)
     const hp = new Map((body.volumes ?? []).flatMap(row => row.hp === undefined ? [] : [[row.part, row.hp] as const]));
@@ -66,7 +69,7 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     const breaks = new Map((body.volumes ?? []).flatMap(row => row.channel === undefined ? [] : [[row.part, (body.channels ?? []).findIndex(channel => channel.name === row.channel)] as const]));
     const onBreak = breaks.size === 0 ? undefined : (part: string): void => { const index = breaks.get(part); if (index !== undefined && index >= 0) actor.channels[index] = 1; };
     const parts = hp.size === 0 || pose === undefined ? undefined : new PartHealth(pose, hp, actor.combatActor(), host.combat, host.events, host.scope, onBreak);
-    return [{ actor, pose: parts?.pose ?? pose, parts, trail: pose instanceof TrailCreatureVolumes ? pose : undefined,
+    return [{ actor, pose: parts?.pose ?? pose, parts, trail: pose instanceof TrailCreatureVolumes || pose instanceof TailCreatureVolumes ? pose : undefined,
       locks: body.skeleton === undefined && body.lock === undefined ? undefined : new CreatureSockets(body, joints, root),
       strikes, contract: { id: spawn.id, body, skin: skin.hash, joints, ...(strikes === undefined ? {} : { strikeNames }) } }];
   });
@@ -111,8 +114,11 @@ function trailSocket(pose: TrailCreatureVolumes, joints: readonly { readonly nam
   };
 }
 
-/** CC22/CC23b: every serpent's ring takes the root on the 10 Hz sample ticks, after the bodies move; the rings are state. */
-function installTrails(host: SimHost, trails: readonly TrailCreatureVolumes[]): void {
+/** A trail ring the sim samples and saves: a serpent's (CC23b) or a horizontal biped's tail (CC58b). */
+interface TrailState { sample: (tick: number) => void; snapshot: () => { head: number; size: number; points: number[] }; restore: (saved: unknown) => void }
+
+/** CC22/CC23b/CC58b: every trail ring takes its root on the 10 Hz sample ticks, after the bodies move; the rings are state. */
+function installTrails(host: SimHost, trails: readonly TrailState[]): void {
   host.onStep('creatures.trails', () => { for (const trail of trails) trail.sample(host.state.tick); }, {
     snapshot: () => trails.map(trail => trail.snapshot()),
     restore: saved => {

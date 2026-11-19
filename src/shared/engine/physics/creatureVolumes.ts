@@ -14,6 +14,9 @@ export interface CreatureVolumePose {
   segment: (index: number, rear: Vector3, front: Vector3) => void;
   /** Opted-in clip poses lend the exact same local transforms to their skin view. */
   joint?: (name: string, position: Vector3, quaternion: Quaternion, scale: Vector3) => boolean;
+  /** ONE-FORMAT CC58b2: lends one trail bone's local transform on a body whose other bones a skin driver poses (a
+   *  horizontal biped's tail); false for a bone it does not own. */
+  trailJoint?: (name: string, position: Vector3, quaternion: Quaternion, scale: Vector3) => boolean;
   /** Only animated authority needs historical joint endpoints beyond the old root history. */
   capture?: () => CreatureVolumeFrame;
   /** ONE-FORMAT CC23b: a volume that is off now (a serpent's buried segment) is neither hit nor collided with. */

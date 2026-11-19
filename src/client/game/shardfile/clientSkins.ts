@@ -32,6 +32,7 @@ import type { CreatureBody } from '@wildshard/format/creatureLayers';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { creatureClipName } from '../../../shared/game/shardfile/creatureClipChoice';
+import { bodyContract } from '../../../shared/game/shardfile/creatureContract';
 
 interface SampledTrack { bone: string; property: 'position' | 'quaternion' | 'scale'; interpolant: Interpolant }
 interface SampledClip { duration: number; tracks: readonly SampledTrack[]; layers: CompiledSkinPoseLayers | null }
@@ -161,6 +162,29 @@ async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLoo
 export type SkinDriveState = Pick<RigAnimCtx, 'dt' | 't' | 'alive' | 'flinch' | 'attack' | 'speed' | 'strafe' | 'scale' | 'phase' | 'state'>;
 const _q = new Quaternion();
 const BIPED_BONES = skeletonBones(CREATURE_SKELETONS.biped);
+const _pitch = new Quaternion();
+const _xAxis = new Vector3(1, 0, 0);
+/**
+ * ONE-FORMAT CC58b2: a contract's forward pitch on its bone (a horizontal biped's spine), applied over whatever the skin
+ * driver posed this frame. A driver that leaves the bone alone would compound it, so each frame first takes off the
+ * pitch it put on (a driver that rewrote the bone already dropped it).
+ */
+export class SkinPitch {
+  private readonly pitched = new WeakMap<Bone, Quaternion>();
+  constructor(private readonly pitch: { readonly bone: string; readonly angle: number }) {}
+  /** Before the driver: undo last frame's pitch where the bone still carries it. */
+  before(bones: Record<string, Bone>): void {
+    const bone = bones[this.pitch.bone], last = bone === undefined ? undefined : this.pitched.get(bone);
+    if (bone !== undefined && last !== undefined && bone.quaternion.equals(last)) bone.quaternion.premultiply(_pitch.setFromAxisAngle(_xAxis, -this.pitch.angle));
+  }
+  /** After the driver: lean the bone by the pitch in its parent's frame. */
+  after(bones: Record<string, Bone>): void {
+    const bone = bones[this.pitch.bone]; if (bone === undefined) return;
+    bone.quaternion.premultiply(_pitch.setFromAxisAngle(_xAxis, this.pitch.angle));
+    const seen = this.pitched.get(bone);
+    if (seen === undefined) this.pitched.set(bone, bone.quaternion.clone()); else seen.copy(bone.quaternion);
+  }
+}
 /** One creature's playback (one per rig's bone record): which clip, from when, and its pose layers bound to this instance's bones. */
 export class SkinDriver {
   private readonly skin: ClientSkin;
@@ -253,6 +277,9 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
   const bones = (selected: ClientSkin): BoneDef[] => selected.bones.map((bone): BoneDef => ({ name: bone.name, parent: bone.parent, pos: [bone.pos[0], bone.pos[1], bone.pos[2]] }));
   const dims = (): AnimalSpecies['dims'] => ({ ...species.dims, feet: species.dims.feet.map(([x, z]): [number, number] => [x, z]) });
   const quadruped = species.body?.skeleton === 'quadruped';
+  // CC58b2: a horizontal biped leans its spine and lays its tail on the trail its volumes ride
+  const contract = species.body === undefined ? undefined : bodyContract(species.body);
+  const pitch = contract?.pitch === undefined ? undefined : new SkinPitch(contract.pitch), trail = contract?.trail ?? [];
   const animate = (c: RigAnimCtx): void => {
     const pose = c.animal.hitVolumes;
     if (pose?.joint !== undefined) {
@@ -264,7 +291,12 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
       driver = new SkinDriver(select(c.animal.variant), c.bones, species.body?.skeleton);
       drivers.set(c.bones, driver);
     }
+    pitch?.before(c.bones);
     driver.step(c, quadruped, c.animal.runningAbility);
+    pitch?.after(c.bones);
+    if (pose?.trailJoint !== undefined) for (const name of trail) {
+      const bone = c.bones[name]; if (bone !== undefined) pose.trailJoint(name, bone.position, bone.quaternion, bone.scale);
+    }
   };
   return { id: row.id, species: species.id, kind: species.kind, rig: quadruped ? 'quadruped' : 'custom', fur: NO_FUR,
     rigContract: { skeleton: quadruped ? 'kit.quadruped' : skin.skeleton, sockets: [...skin.sockets],

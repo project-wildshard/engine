@@ -11,6 +11,20 @@ export interface CreatureRestJoint extends CollisionJoint { readonly name: strin
 interface Root { readonly position: Vector3; readonly yaw: number; readonly scale: number }
 interface RestVolume { readonly rear: Vector3; readonly front: Vector3 }
 const ORIGIN = [0, 0, 0] as const;
+const NO_BONES: ReadonlySet<string> = new Set();
+
+/** The rest rig solved with the contract's forward pitch on its bone (CC58b: a horizontal biped's spine), so volumes and
+ * sockets above that bone lean out over the legs as the page draws them. */
+export function restPose(joints: readonly CreatureRestJoint[], pitch: { readonly bone: string; readonly angle: number } | undefined): CollisionPose {
+  const pose = new CollisionPose(joints);
+  if (pitch !== undefined) {
+    const index = joints.findIndex(row => row.name === pitch.bone);
+    if (index === -1) throw new Error(`Missing creature pitch bone ${pitch.bone}`);
+    pose.set(index, ORIGIN, [pitch.angle, 0, 0]);
+  }
+  pose.solve(new Matrix4());
+  return pose;
+}
 
 /** Skeleton defaults plus authored part replacements, compiled against the real rest rig.
  * This has no controller, scene nodes, animation clock or saved mutable state. */
@@ -19,18 +33,20 @@ export class RestCreatureVolumes implements CreatureVolumePose {
   private readonly rest: readonly RestVolume[];
   private readonly root: Root;
   private readonly scale: number;
-  constructor(input: CreatureBody, joints: readonly CreatureRestJoint[], root: Root) {
+  /** `skip`: bones another poser owns (CC58b: a horizontal biped's tail trail bones). */
+  constructor(input: CreatureBody, joints: readonly CreatureRestJoint[], root: Root, skip: ReadonlySet<string> = NO_BONES) {
     const body = parse(CreatureBodySchema, input);
     if (body.hits === 'clip') throw new Error('Clip hits require a published clip-volume pose');
     if (!Number.isFinite(root.scale) || root.scale <= 0) throw new Error('Invalid creature volume scale');
     this.root = root; this.scale = root.scale;
-    const defaults = bodyContract(body)?.volumes ?? [];
+    const contract = bodyContract(body), defaults = contract?.volumes ?? [];
     const definitions = new Map<string, CreatureVolume>(defaults.map(row => [row.part, row]));
     for (const row of body.volumes ?? []) definitions.set(row.part, row);
+    for (const [part, row] of definitions) if (skip.has(row.bone)) definitions.delete(part);
     if (definitions.size === 0) throw new Error('Creature volumes need a skeleton or authored volumes');
     const names = new Map(joints.map((row, index) => [row.name, index]));
     if (names.size !== joints.length) throw new Error('Duplicate creature rest joint');
-    const pose = new CollisionPose(joints); pose.solve(new Matrix4());
+    const pose = restPose(joints, contract?.pitch);
     const rest: RestVolume[] = [], volumes: CreatureHitVolume[] = [];
     const centre = new Vector3(), axis = new Vector3();
     for (const row of definitions.values()) {
