@@ -164,3 +164,29 @@ it('keeps a private draw packed and returns the exact legacy CPU copy', async ()
   expect(library.geometry('a', { borrow: true })).toBe(library.geometry('a', { borrow: true }));
   legacy.dispose(); cpu.dispose(); draw.geometry.dispose();
 });
+it('takes a packed static vertex (STR16) as plain Float32 rest channels in identity space', async () => {
+  const load = async (packed: boolean) => {
+    const mesh = primitive('a'), scene = new Group();
+    if (packed) {
+      // GLTFLoader's view of 4-byte-aligned packed channels: Int8 normals and Uint8 colours padded to 4, Uint16 UVs tight
+      mesh.geometry.setAttribute('normal', new InterleavedBufferAttribute(new InterleavedBuffer(new Int8Array([0, 0, 127, 0, 0, 0, 127, 0, 0, 0, 127, 0, 0, 0, 127, 0]), 4), 3, 0, true));
+      mesh.geometry.setAttribute('color', new InterleavedBufferAttribute(new InterleavedBuffer(new Uint8Array([255, 0, 0, 0, 0, 255, 0, 0, 0, 0, 255, 0, 255, 255, 255, 0]), 4), 3, 0, true));
+      mesh.geometry.setAttribute('uv', new BufferAttribute(new Uint16Array([0, 65535, 65535, 65535, 0, 0, 65535, 0]), 2, true));
+    } else {
+      mesh.geometry.setAttribute('color', new BufferAttribute(new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1]), 3));
+    }
+    scene.add(mesh);
+    const library = createModelLibrary<never, never>({ ...empty, geometryPools: [{ url: 'pool', parts: ['a'], keepGrid: true }] }, 'test', {}, () => Promise.resolve({ scene }));
+    await library.preload();
+    return library.geometry('a');
+  };
+  const plain = await load(false), packed = await load(true);
+  if (plain === null || packed === null) throw new Error('Missing rest pool geometry');
+  for (const name of ['position', 'normal', 'uv', 'color']) {
+    const attribute = packed.getAttribute(name);
+    expect(attribute).toBeInstanceOf(BufferAttribute);
+    expect(attribute.array).toBeInstanceOf(Float32Array);
+    expect(attribute.normalized).toBe(false);
+    expect([...attribute.array]).toEqual([...plain.getAttribute(name).array]);
+  }
+});

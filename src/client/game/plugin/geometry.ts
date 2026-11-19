@@ -9,6 +9,7 @@ import { fetchDeflatedBytes, fetchLaneBytes, unshuffleLanes as restoreLanes } fr
 import { geometryBoundsSteps } from '@wildshard/engine/world/geometryBounds';
 import { BAKED_BYTES as codecBakedBytes, appendGeometry as codecAppendGeometry, bakedGeometryBytes as codecBakedGeometryBytes, pad4 as codecPad4, readBakedAttribute, readBakedGeometry as codecReadBakedGeometry, type BakedGeometryRow as CodecBakedGeometryRow, type BakedType as CodecBakedType } from './bakedGeometry';
 import { workSlice } from '@wildshard/engine/core/workSlice';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { presenting } from '@wildshard/engine/core/framePacing';
 import { constructionCheckpoint } from '../shardfile/constructionCheckpoint';
 import { PreparationReads } from '../shardfile/preparationReads';
@@ -209,9 +210,22 @@ function packedRestChannel(attribute: BufferAttribute | InterleavedBufferAttribu
     const end = attribute instanceof InterleavedBufferAttribute
       ? (attribute.count - 1) * attribute.data.stride + attribute.offset + attribute.itemSize
       : attribute.count * attribute.itemSize;
-    return attribute.count > 0 && end <= array.length && (array instanceof Int16Array || array instanceof Int8Array || array instanceof Uint8Array);
+    return attribute.count > 0 && end <= array.length && (array instanceof Int16Array || array instanceof Int8Array || array instanceof Uint8Array || array instanceof Uint16Array);
   }
   return array instanceof Float32Array;
+}
+/** STR16: a packed static vertex (sharddev `setStaticVertexPacking`) keeps Float32 positions and writes Int8 normals,
+ *  Uint8 colours and Uint16 UVs, each in its own 4-byte-aligned view, which GLTFLoader reads back interleaved. An
+ *  identity-space rest mesh takes those channels as plain Float32, the storage its consumers read. */
+function widenPackedRestChannels(geometry: BufferGeometry): void {
+  for (const [name, attribute] of Object.entries(geometry.attributes)) {
+    if (name === 'position') continue;
+    const interleavedFloat = attribute instanceof InterleavedBufferAttribute && attribute.data.array instanceof Float32Array && !attribute.normalized;
+    if (!interleavedFloat && !(attribute.normalized && packedRestChannel(attribute))) continue;
+    const out = ownedArray(Float32Array, attribute.count * attribute.itemSize, { owner: 'game/rest-pool', asset: name, kind: 'geometry-cpu' });
+    for (let i = 0; i < attribute.count; i++) for (let lane = 0; lane < attribute.itemSize; lane++) out[i * attribute.itemSize + lane] = attribute.getComponent(i, lane);
+    geometry.setAttribute(name, new BufferAttribute(out, attribute.itemSize));
+  }
 }
 function finiteRestFloat(attribute: BufferAttribute | InterleavedBufferAttribute, packed: boolean): boolean {
   if (attribute.normalized) return false;
@@ -371,6 +385,7 @@ export function createModelLibrary<M extends string, H extends string>(rows: Mod
         const decoded = identity || packed ? null : identitySpaceGeometry(node);
         if (!identity && !packed && decoded === null) throw new Error('Rest pool requires named identity-space ordinary meshes');
         if (decoded !== null) node.geometry.dispose();
+        if (identity) widenPackedRestChannels(node.geometry);
         const geometry = decoded ?? node.geometry, position = geometry.getAttribute('position');
         if (position === undefined || !packed && !(position instanceof BufferAttribute) || position.count === 0 || position.count > 400_000 || Object.keys(geometry.morphAttributes).length > 0) throw new Error('Rest pool requires bounded rigid positions');
         const channels = (pool.channels ?? []).filter(row => row.parts === undefined || row.parts.includes(name));
