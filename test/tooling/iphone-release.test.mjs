@@ -1,7 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { memoryChange, releaseReading, releaseSuite, releaseTable } from '../../scripts/memory/iphone/release.mjs';
+import recorded from '../fixtures/iphone-memory/recorded-boots.json';
 
 /** @param {number} peak @param {string} [build] @param {number} [seconds] */
 function trial(peak, build = 'recorded-build', seconds = 30) {
@@ -56,6 +58,47 @@ test('keeps a deploy during the suite out of the comparisons', async () => {
     expect(reading.build).toBeNull();
     expect(reading.stages.nine.metrics.webPeak).toBeNull();
     expect(releaseTable(reading, null)).toContain('Several page builds were observed');
+  });
+});
+
+test('a reload-qualified control attempt stays in the log and outside the cold median', async () => {
+  await withRecording(path => {
+    const normal = trial(500_000_000), reload = trial(900_000_000);
+    write(path, 'nine', [normal, normal, {
+      ...reload, zone: { ...reload.zone, boot: { ...reload.zone.boot, reloaded: true } },
+    }]);
+    const reading = releaseReading(path, info);
+    expect(reading.stages.nine).toMatchObject({ status: 'incomplete', control: 2, metrics: { webPeak: null } });
+    expect(releaseTable(reading, null)).toContain('excluded (boot reloaded during capture)');
+  });
+});
+
+test('bench release replay retains the recorded Nine control and Pine tab loss without inventing medians', async () => {
+  await withRecording(path => {
+    const { nine, pine } = recorded;
+    write(path, 'nine', [{ zoneSlug: nine.slug, zone: { boot: {
+      outcome: 'control', state: { build: nine.build }, startedAt: 0, controlAt: nine.controlS * 1000,
+    } } }]);
+    // Pine came from the deck survey. A stray report filed under the control
+    // folder must not turn it into a Brasscap sample or poison Nine's build.
+    write(path, 'brasscap', [{ zoneSlug: pine.slug, zone: {
+      last: { build: pine.build, phases: { su: { fact: pine.stage, pct: pine.progress } } },
+      error: { code: pine.driverError, message: pine.driverError },
+    } }]);
+    const history = join(path, 'replay-history.jsonl');
+    const replay = ['scripts/memory/iphone/bench.mjs', '--suite', 'release', '--recorded', path, '--history', history];
+    execFileSync(process.execPath, replay, { encoding: 'utf8' });
+    const report = execFileSync(process.execPath, replay, { encoding: 'utf8' });
+    expect(report).toContain(`Previous build ${nine.build}`);
+    expect(report).toContain('control in 16.80 s');
+    expect(report).toContain('pine-hollow');
+    expect(report).toContain('no such window · 60.6% · Spawn detail · excluded (expected brasscap-mesa)');
+    const lines = readFileSync(history, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toMatchObject({ source: 'recorded', build: nine.build, builds: [nine.build], stages: {
+      nine: { status: 'incomplete', control: 1, metrics: { controlMs: null, webPeak: null } },
+      brasscap: { status: 'incomplete', control: 0 },
+    } });
   });
 });
 

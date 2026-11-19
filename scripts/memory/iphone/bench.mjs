@@ -188,7 +188,7 @@ async function bench() {
           if (driver !== null) recovery = await readRecovery(driver, base, ['devMode', 'graphics', ...Object.keys(overrides)]);
         } catch (error) { recovery = { error: String(error) }; }
       }
-      const row = { trial: kind ?? index + 1, mode, scope,
+      const row = { trial: kind ?? index + 1, mode, zoneSlug: kind === null ? values.zone : null, scope,
         slots: overrides, temperature, measurements, jetsam, limits: raw.limits, readerStatus: raw.statuses,
         trace: raw.trace, activityMonitor: activityMeasurements, zone, staircase, fault, recovery };
       report.push(row);

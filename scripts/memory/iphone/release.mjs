@@ -21,13 +21,15 @@ const METRICS = /** @type {const} */ ([
 ]);
 
 /** @typedef {{peakBytes?: number | null, settledBytes?: number | null}} Footprint */
-/** @typedef {{measurements?: Readonly<Record<string, Footprint>>, zone?: {
- * openedAt?: number, last?: {build?: string | null}, error?: {message: string} | null,
- * boot?: {outcome: string, startedAt?: number | null, controlAt?: number | null, state?: {build?: string | null}},
+/** @typedef {{build?: string | null, phases?: {su?: {fact?: string | null, pct?: string | null}}}} PageState */
+/** @typedef {{zoneSlug?:string|null, fault?:string|null, measurements?: Readonly<Record<string, Footprint>>, zone?: {
+ * openedAt?: number, last?: PageState, error?: {message: string, code?: string | null} | null,
+ * boot?: {outcome: string, startedAt?: number | null, controlAt?: number | null, reloaded?: boolean, state?: PageState},
  * frames?: {samples?: readonly {seconds: number}[], summary?: {fps?: number | null}}
  * }}} Trial */
 /** @typedef {(typeof METRICS)[number][0]} Metric */
-/** @typedef {{status: string, attempts: number, control: number, metrics: Record<Metric, number | null>}} Stage */
+/** @typedef {ReturnType<typeof observedAttempt>} Attempt */
+/** @typedef {{status: string, attempts: number, control: number, metrics: Record<Metric, number | null>, observations?: Attempt[]}} Stage */
 /** @typedef {{date: string, source: 'phone' | 'recorded', base: string, build: string | null, builds: string[],
  * stages: Record<(typeof TASKS)[number]['key'], Stage>}} HistoryRow */
 
@@ -52,16 +54,33 @@ function completeMedian(values, runs) {
 /** @param {Trial} row */
 const pageBuild = row => row.zone?.boot?.state?.build ?? row.zone?.last?.build ?? null;
 
+/** Older bench recordings did not tag their zone. Their task folder is the only source.
+ * @param {Trial} row @param {string} slug */
+const matchesZone = (row, slug) => row.zoneSlug === undefined || row.zoneSlug === slug;
+
+/** @param {Trial} row @param {string} expected */
+function observedAttempt(row, expected) {
+  const { zone } = row, step = zone?.last?.phases?.su ?? zone?.boot?.state?.phases?.su;
+  const start = zone?.boot?.startedAt, end = zone?.boot?.controlAt;
+  const controlMs = typeof start === 'number' && typeof end === 'number' && Number.isFinite(end - start) && end >= start ? end - start : null;
+  const outcome = zone?.error?.code ?? (zone?.error || row.fault ? 'capture error' : zone?.boot?.outcome ?? 'unavailable');
+  const excluded = !matchesZone(row, expected) ? `expected ${expected}`
+    : zone?.boot?.reloaded === true ? 'boot reloaded during capture' : null;
+  return { zone: row.zoneSlug ?? expected, build: pageBuild(row), outcome, controlMs,
+    stage: step?.fact ?? null, progress: step?.pct ?? null, excluded };
+}
+
 /** @param {readonly Trial[]} trials @param {(typeof TASKS)[number]} task @param {string|null} build */
 function stageOf(trials, task, build) {
-  const played = trials.filter(row => row.zone?.boot?.outcome === 'control' && !row.zone.error);
-  const readings = played.filter(row => build !== null && pageBuild(row) === build).map(({ measurements, zone }) => {
+  const attempts = trials.map(row => ({ row, observation: observedAttempt(row, task.zone) }));
+  const played = attempts.filter(({ row, observation }) =>
+    observation.excluded === null && row.zone?.boot?.outcome === 'control' && !row.zone.error && !row.fault);
+  const readings = played.filter(({ observation }) => build !== null && observation.build === build).map(({ row: { measurements, zone }, observation }) => {
     const web = measurements?.['com.apple.WebKit.WebContent'], gpu = measurements?.['com.apple.WebKit.GPU'];
-    const start = zone?.boot?.startedAt, end = zone?.boot?.controlAt;
     const seconds = zone?.frames?.samples?.reduce((sum, sample) => sum + sample.seconds, 0) ?? 0;
     return {
       webPeak: web?.peakBytes, webSettled: web?.settledBytes, gpuPeak: gpu?.peakBytes, gpuSettled: gpu?.settledBytes,
-      controlMs: typeof start === 'number' && typeof end === 'number' ? end - start : null,
+      controlMs: observation.controlMs,
       fps: task.mode === 'walk' && Math.round(seconds * 1000) >= 60_000 ? zone?.frames?.summary?.fps : null,
     };
   });
@@ -69,15 +88,16 @@ function stageOf(trials, task, build) {
     [key, completeMedian(readings.map(row => row[key]), task.runs)])));
   const complete = trials.length === task.runs && METRICS.every(([key]) =>
     (key === 'fps' && task.mode !== 'walk') || metrics[key] !== null);
-  return { status: complete ? 'complete' : 'incomplete', attempts: trials.length, control: played.length, metrics };
+  return { status: complete ? 'complete' : 'incomplete', attempts: trials.length, control: played.length, metrics,
+    observations: attempts.map(({ observation }) => observation) };
 }
 
 /** @param {string} directory @param {{date: string, source: HistoryRow['source'], base: string}} info */
 export function releaseReading(directory, info) {
   const results = TASKS.map(task => ({ task, trials: readTrials(join(directory, task.key)) }));
-  const builds = [...new Set(results.flatMap(({ trials }) => trials.flatMap(row => {
+  const builds = [...new Set(results.flatMap(({ task, trials }) => trials.flatMap(row => {
     const build = pageBuild(row);
-    return build !== null && build.trim() !== '' ? [build] : [];
+    return matchesZone(row, task.zone) && build !== null && build.trim() !== '' ? [build] : [];
   })))];
   const build = builds.length === 1 ? builds[0] : null;
   const stages = /** @type {HistoryRow['stages']} */ (Object.fromEntries(results.map(({ task, trials }) =>
@@ -121,6 +141,13 @@ export function releaseTable(reading, previous) {
       lines.push(`| ${task.key} | ${label} | ${readingText(current, unit)} | ${change !== null && change > 0 ? '+' : ''}${readingText(change, unit)} | ${verdict} |`);
     }
   }
+  const observations = TASKS.flatMap(({ key }) => (reading.stages[key].observations ?? []).map((attempt, index) => {
+    const detail = [attempt.progress, attempt.stage, attempt.excluded === null ? null : `excluded (${attempt.excluded})`]
+      .filter(part => part !== null).join(' · ');
+    const time = attempt.controlMs === null ? '' : ` in ${readingText(attempt.controlMs, 's')}`;
+    return `- ${key} ${index + 1}, ${attempt.zone}, build ${attempt.build ?? 'unconfirmed'} · ${attempt.outcome}${time}${detail === '' ? '' : ` · ${detail}`}`;
+  }));
+  if (observations.length > 0) lines.push('', 'Captured attempts', ...observations);
   return lines.join('\n');
 }
 
