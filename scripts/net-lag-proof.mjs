@@ -156,7 +156,8 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       if (bridge && slug === 'driftwood-isle') row.bridge = await crossBridge(page);
       await page.evaluate(() => { /** @type {any} */ (window).__netLag.worst = 0; });
       const before = await report();
-      const phase = async (/** @type {string} */ name, /** @type {string[]} */ keys, /** @type {{ at: number, from: string, to: string } | undefined} */ turn = undefined) => {
+      /** @param {string} name @param {string[]} keys @param {{ at: number, from: string, to: string }} [turn] the boost's turn back */
+      const phase = async (name, keys, turn) => {
         await page.evaluate(() => { const S = /** @type {any} */ (window).__netLag; S.drawn.length = 0; });
         const from = await report();
         for (const key of keys) await page.keyboard.down(key);
