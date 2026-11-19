@@ -1,5 +1,7 @@
-/* ZE8: the gate card, in Shard Select's card language (glass, cyan line, mono), standing on the gate's face */
-.ws-gate-card { position: fixed; left: 0; top: 0; z-index: calc(var(--ws-layer-hud) + 30); pointer-events: none; width: 220px; padding: 14px 16px 16px; text-align: center; transform-origin: 50% 100%;
+/* ZE8: the gate card, in Shard Select's card language (glass, cyan line, mono). QA 11-19 row 53 (Jake 16:12: "a fixed distance away
+   from your face, no matter which way you're looking"): locked to the screen above the crosshair for the whole count, below the
+   top HUD row and the minimap, where it stood when Jake read it at the gate */
+.ws-gate-card { position: fixed; left: 50%; top: max(22%, calc(env(safe-area-inset-top, 0px) + 96px)); transform: translateX(-50%); z-index: calc(var(--ws-layer-hud) + 30); pointer-events: none; width: 220px; max-width: calc(100% - 32px); box-sizing: border-box; padding: 14px 16px 16px; text-align: center;
   background: var(--ws-glass-deep, rgba(9, 22, 36, 0.88)); border: 1px solid var(--ws-cyan-line, rgba(143, 227, 255, 0.4)); color: var(--ws-text, #e8f6ff);
   font-family: var(--ws-mono, ui-monospace, monospace); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 12px 40px rgba(0, 0, 0, 0.45);
   -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); }

@@ -1198,13 +1198,12 @@ export class GridSession {
     return this.gateHeld.get(instance) ?? null;
   }
   private shardName(instance: string): string { const slug = this.assembly.cell(instance).slug; return this.names.get(slug) ?? slug; }
-  private drawGate(at: { x: number; z: number }): void {
+  private drawGate(): void {
     const card = this.gateCard, { cell } = this.gateState;
     if (card === null) return;
     if (cell === null) { card.hide(); return; }
-    const origin = this.assembly.cell(cell).origin, home = this.home.origin;
-    card.show({ centre: { x: origin.x - home.x, z: origin.z - home.z }, feet: { x: at.x - home.x, z: at.z - home.z }, name: this.shardName(cell), count: this.gateState.count, reason: this.gateReason(cell) },
-      this.host.frame?.camera, innerWidth, innerHeight);
+    // QA 11-19 row 53: camera-locked for the whole count (gateCard.ts), so the feet only pick the gate, not where it shows
+    card.show({ name: this.shardName(cell), count: this.gateState.count, reason: this.gateReason(cell) });
   }
 
   /** Tile streaming T5.3 (G775): the entered cell's resident L0 tiles (key j * 8 + i) and its origin from the home cell,
@@ -1247,7 +1246,7 @@ export class GridSession {
     for (const cell of this.neighbours) if (this.placeholderBlocksTiles(cell.instance)) this.rings.retireRefinement(cell.instance);
     if (this.host.heldFrame !== undefined) this.host.heldFrame.enabled = false;
     this.shimmer.step();
-    this.drawGate(at);
+    this.drawGate();
     const active = this.live === null ? this.home.instance : this.live.live.current();
     const eye = this.host.eye?.();
     if (this.host.backgroundReady?.() !== false) this.near.update(eye === undefined || !Number.isFinite(eye.x) || !Number.isFinite(eye.z) ? at : { x: at.x + eye.x, z: at.z + eye.z }, active);
