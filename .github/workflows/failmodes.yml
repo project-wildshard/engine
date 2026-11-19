@@ -64,7 +64,7 @@ jobs:
           flags=(--engine=chromium --baseline)
           case "$SELECTION" in
             all)
-              openssl req -quiet -x509 -newkey rsa:2048 -noenc -days 1 -subj /CN=localhost \
+              openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost \
                 -keyout tmp/fm11/tls.key -out tmp/fm11/tls.crt
               flags+=(--scenario=all --seats=2 --next=tmp/fm11/build/next \
                 --tls-key=tmp/fm11/tls.key --tls-cert=tmp/fm11/tls.crt)
