@@ -29,5 +29,10 @@ test('Jake\'s hard caps are seeded: 100 MB download (J338), 1.5 GB loading (J410
   expect(capFor(caps, 'memory/loading/far-reach')).toMatchObject({ hard: 1_500_000_000, decision: 'J410' });
   expect(capFor(caps, 'memory/playing/far-reach')).toMatchObject({ hard: null, target: 1_000_000_000, decision: 'J445' });
   expect(capFor(caps, 'js/title/raw')).toMatchObject({ hard: 1_000_000, decision: 'J324' });
-  expect(baselines.baselines['download/phone/driftwood-isle']).toMatchObject({ value: 22_218_404, contentKey: 'driftwood-isle@5' });
+  // A baseline moves with content (J444): `cli.mjs record` rewrites it, so this checks it is recorded and under Jake's cap,
+  // never its bytes (main 44563105968 broke on 452e939bf's re-record).
+  const driftwood = baselines.baselines['download/phone/driftwood-isle'];
+  expect(driftwood?.contentKey).toMatch(/^driftwood-isle@\d+$/u);
+  expect(driftwood?.value).toBeGreaterThan(0);
+  expect(driftwood?.value).toBeLessThanOrEqual(capFor(caps, 'download/phone/driftwood-isle')?.hard ?? 0);
 });
