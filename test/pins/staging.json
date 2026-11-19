@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "249477732bfa60fb8a987c7e6aabd6ae1bd1bcb5b609de2281e1ce5a1bedbf36",
+  "catalogueHash": "4369cb734c885f3509006cc419571fb87bebbf682ff63720e0cb445a36e3c2ad",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -672,8 +672,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 12,
-        "hash": "4c4d1cb0f217b638d9aff7b7345027ab17821b745681ec334e07255fcc2ab165"
+        "revision": 13,
+        "hash": "c0a5acd3fb815e910557931ab3554fbd20eec1a5828718a4f96880fea9468233"
       },
       {
         "slug": "driftwood-isle",
@@ -708,8 +708,8 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "revision": 8,
-        "hash": "558ac0bbec3ec892c1cca1e89d09adaf0b1afb49a6f9ead765d2cbde92bc795d"
+        "revision": 10,
+        "hash": "816964cd6d4c6af8824128fbc8dfdb773670b8a1d1efef29e9ef6d9720f87563"
       },
       {
         "slug": "nalati-grasslands",
@@ -849,9 +849,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 12,
-      "hash": "4c4d1cb0f217b638d9aff7b7345027ab17821b745681ec334e07255fcc2ab165",
-      "bytes": 22389760
+      "revision": 13,
+      "hash": "c0a5acd3fb815e910557931ab3554fbd20eec1a5828718a4f96880fea9468233",
+      "bytes": 22462464
     },
     {
       "slug": "driftwood-isle",
@@ -885,9 +885,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 8,
-      "hash": "558ac0bbec3ec892c1cca1e89d09adaf0b1afb49a6f9ead765d2cbde92bc795d",
-      "bytes": 20170240
+      "revision": 10,
+      "hash": "816964cd6d4c6af8824128fbc8dfdb773670b8a1d1efef29e9ef6d9720f87563",
+      "bytes": 20238336
     },
     {
       "slug": "nalati-grasslands",
