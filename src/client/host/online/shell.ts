@@ -59,6 +59,9 @@ export interface OnlineConfig {
   readonly gridCell?: string;
   /** The grid's cells by instance, in frame order (a frame's cell number less one): what a held seat's first frame names. */
   readonly gridCells?: readonly string[];
+  /** A one-shard page: the world's cells by shard, in frame order. A held seat whose first frame stands in another shard than
+   *  `loaded` goes there, as a `resume` naming it would; its rows never reach this page's creatures (Jake's duneRay, 2026-11-19). */
+  readonly shardCells?: readonly string[];
   /** Optional anonymous measurements; the page supplies the existing API sink. */
   readonly record?:{readonly install:string;readonly session:string;readonly tag?:string;readonly send:(record:NetRecord)=>void};
 }
@@ -200,6 +203,8 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     offFirst();
     const frame = client.latest?.cell, cell = frame === undefined || frame === 0 ? undefined : config.gridCells?.[frame - 1];
     if (gridCell !== undefined && cell !== undefined && cell !== gridCell) { (view.regrid ?? view.elsewhere)(cell); return; }
+    const shard = gridCell === undefined && frame !== undefined && frame !== 0 ? config.shardCells?.[frame - 1] : undefined;
+    if (shard !== undefined && shard !== config.loaded) { view.elsewhere(shard); return; }
     arrive({ tick: client.latest?.tick ?? 0, restored: true });
   });
   client.hello(config.build, config.identity);
@@ -291,6 +296,8 @@ function seatWaitBeat(): void {
 /** What the page lends the online shell: its build's world, as the document was stamped (`WILDSHARD_RELEASE_URL`). */
 export interface StartOnline {
   readonly loaded: string; readonly build: string;
+  /** A one-shard page: the world's cells by shard, in frame order (`connectOnline`'s `shardCells`). */
+  readonly shardCells?: readonly string[];
   /** Who this device is. A Name given here is kept with its id, and asked only once. */
   readonly identity: (name?: string) => NetIdentity;
   /** GO4: a grid page: the cell it booted in, where its seat stands, and how it enters the grid again in another cell. */

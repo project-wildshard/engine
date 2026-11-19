@@ -146,6 +146,24 @@ test('GO4: a held seat in another cell (no `resume`, only frames) re-enters the 
   await vi.waitFor(() => { expect(regrids).toEqual(['blender-template']); }, { timeout: 5000 });
 });
 
+test('a one-shard page whose held seat stands in another shard goes there, and never arrives on its rows (duneRay, 2026-11-19)', { timeout: 60_000 }, async () => {
+  const saves = memoryPlayerSaves(), assembly = new GridAssembly({ developer: false, devserver: false }).cells, cells = assembly.map(cell => cell.instance), shards = assembly.map(cell => cell.slug);
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: 'brasscap-mesa', cell: 'blender-template', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'blender-template'], workers: 2, saves, holdMs: 30_000 });
+  const places: string[] = [], view = { link: (): void => undefined, countdown: (): void => undefined, elsewhere: (shard: string): void => { places.push(shard); } };
+  const first = connectOnline({ socket: bench.url, build: 'bench', loaded: 'brasscap-mesa', identity: IDENTITY, gridCell: 'blender-template', gridCells: cells }, view);
+  pump = setInterval(() => { first.client.present(); first.client.flush(); }, 16);
+  await first.booted; first.ready();
+  await vi.waitFor(() => { expect(bench?.room('blender-template')?.holds(IDENTITY.player)).toBe(true); expect(first.client.latest).not.toBeNull(); }, { timeout: 5000 });
+  clearInterval(pump); first.dispose();
+  // Driftwood picked on the title inside the 30 s hold: a one-shard page, no grid
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, shardCells: shards }, view);
+  let arrived = false;
+  void shell.booted.then(() => { arrived = true; return undefined; });
+  await vi.waitFor(() => { expect(places).toEqual(['brasscap-mesa']); }, { timeout: 5000 });
+  expect(arrived, 'the Driftwood page never takes the Brasscap seat as its own').toBe(false);
+});
+
 test('a seated page that leaves takes its body with it at once', { timeout: 30_000 }, async () => {
   bench = await roomBench();
   shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });

@@ -7,6 +7,8 @@ import { Scope } from '@wildshard/engine/app/scope';
 import type { DevBox, DevGround } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
 import { chosenArrival, chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
+import { GridAssembly } from '../../../shared/game/grid/assembly';
+import { speciesDef } from '@wildshard/engine/entities/species/registry';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
 import { Scene, Vector3, type Object3D } from 'three';
@@ -266,6 +268,19 @@ function poseActs(names: ReadonlySet<string>): readonly string[] {
 interface RowBody { readonly body: Animal; readonly manager: Creatures; windup?: number; /** its page kind before a look swap (CC28c) */ readonly home: string;
   /** CC11a2c: its species id, and the running ability its row names, refilled in place */ readonly species: string; readonly ability: { id: string; clip?: CreatureSkinClipName; progress: number } }
 /** Every creature on this page is a row: a new one spawns through the real manager, one the server dropped retires. */
+/** A one-shard page's view of the world's cells, by shard in frame order (the grid page's `cells`); none when the catalogue can't say. */
+function oneShardCells(): readonly string[] | undefined {
+  try { return new GridAssembly({ developer: false, devserver: false }).cells.map(cell => cell.slug); } catch { return undefined; }
+}
+/** A row whose kind this page has no species for (another cell's creature) is never drawn, and is said once per kind; the page goes
+ *  on (Jake's duneRay, 2026-11-19: a Driftwood page given Signal Dunes' rows died on its first frame). */
+const foreignSaid = new Set<string>();
+function drawable(kind: string): boolean {
+  try { speciesDef(kind); return true; } catch (error) {
+    if (!foreignSaid.has(kind)) { foreignSaid.add(kind); console.warn(`[worker client] a row of '${kind}' has no species on this page; not drawn`, error instanceof Error ? error.message : error); }
+    return false;
+  }
+}
 function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map<number, RowBody>, retired: Map<string, number>, spawnMs: Map<string, number>, poses: ReadonlyMap<string, Record<string, number>>, edgeHome: Readonly<Place> | null = null): void {
   if (animals === null) return;
   for (const [handle, info] of client.entities) {
@@ -278,6 +293,7 @@ function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map
     const { x, z } = place;
     const home = wirePage.rowKind(info.initial['species'], String(info.initial['kind'])), at = diagnosticNow();
     const kind = wirePage.lookKind(home, channelsOf(client.interpolator.sample(handle, Number.MAX_SAFE_INTEGER, SYNC_ROW) ? SYNC_ROW : SYNC_ROW.fill(0), SYNC_CHANNELS));
+    if (!drawable(kind)) continue;
     const body = animals.spawn(kind, x, z, yaw, String(info.initial['variant']), { y, body: { seed: Number(info.initial['seed']), scale: Number(info.initial['scale']) } });
     spawnMs.set(kind, Math.max(spawnMs.get(kind) ?? 0, diagnosticNow() - at));
     body.rowDriven = true;
@@ -562,7 +578,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
       },
     };
     return startOnline({ ...world, keep: releaseKeep(), leaving: onlineLeaving, loaded: slug, build, identity: name => ticketed(login, deviceIdentity(storage, savePrefix, name)), session,
-      ...(first === undefined ? {} : { grid: first }) });
+      ...(first === undefined ? { shardCells: oneShardCells() } : { grid: first }) });
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
   // OFFLINE OF2 (J298): a build with a world sends every page online; the world's word never picks the server. A grid page whose world
