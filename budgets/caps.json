@@ -130,6 +130,27 @@
    "kind": "exact",
    "decision": null,
    "why": "NB6: the most draw calls at p95 in any minute of Nine's phone street walk (ci-reports, BC11). No hard cap on record (D3)."
+  },
+  "render/phone-low/triangles/*": {
+   "hard": null,
+   "unit": "triangles",
+   "kind": "exact",
+   "decision": null,
+   "why": "J444: phone Low triangles in the fixed headless spawn views, compared with the zone's own pinned revision."
+  },
+  "render/phone-low/draws/*": {
+   "hard": null,
+   "unit": "draws",
+   "kind": "exact",
+   "decision": null,
+   "why": "J444: phone Low draws in the fixed headless spawn views, compared with the zone's own pinned revision."
+  },
+  "render/phone-low/programs/*": {
+   "hard": null,
+   "unit": "programs",
+   "kind": "exact",
+   "decision": null,
+   "why": "J444: phone Low programs in the fixed headless spawn views, compared with the zone's own pinned revision."
   }
  }
 }

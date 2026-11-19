@@ -6,7 +6,7 @@ run-name: budgets for ci ${{ inputs.source_run || github.event.workflow_run.id }
 # verdict and the release train's green-main read never wait on it. ci's own build steps refuse only past a hard cap
 # (budgets/caps.json). This job measures the exact full pinned client ci's memory-client-build archived
 # (memory-pinned-client): every zone's memory ledger (two totals a zone, median of three when a read is over), each
-# shard's phone download and the app's code sizes, and judges them with `node scripts/budgets/cli.mjs check`.
+# shard's phone download, the app's code sizes, and phone Low triangles, draws and programs. It judges them with `node scripts/budgets/cli.mjs check`.
 # A red run here is a fix row for whoever pushed the regression (main-watch names them), never a red main or a release
 # hold. A new shard revision is new content and passes; record it with `node scripts/budgets/cli.mjs record --run <id>`.
 on:
@@ -94,6 +94,16 @@ jobs:
           manifest="$GITHUB_WORKSPACE/tmp/memory-ledger/spawn-parts.sha256"
           sha256sum -- parts/*.pack.br server/*.pack.br > "$manifest.tmp"
           mv -- "$manifest.tmp" "$manifest"
+      - name: Measure phone Low frames for every pinned zone
+        if: steps.client.outcome == 'success'
+        env:
+          FRAME_BUILD: ${{ steps.source.outputs.sha }}
+        run: |
+          if [[ ! -f scripts/budgets/phone-frames.mjs ]]; then
+            echo "::notice::source commit predates the phone Low frame budgets"
+            exit 0
+          fi
+          node scripts/budgets/phone-frames.mjs tmp/memory-ledger/preview tmp/budgets/phone-frames.json "$FRAME_BUILD"
       # The ledger step records its judged totals in tmp/budgets/ledger/budget-measures.json; the check below judges
       # them with the rest, so the step itself never decides the job.
       - name: Read every zone's memory ledger
@@ -116,11 +126,12 @@ jobs:
           run-id: ${{ env.SOURCE_RUN }}
           name: nine-ring1-load
           path: tmp/budgets/nine
-      - name: Measure the downloads and code sizes
+      - name: Collect the measured budgets
         if: steps.client.outcome == 'success'
         run: |
           node scripts/shard-size-gate.mjs tmp/memory-ledger/preview/dist --hard-only --measures tmp/budgets/downloads.json
           inputs=(tmp/budgets/downloads.json)
+          if [[ -f scripts/budgets/phone-frames.mjs ]]; then inputs+=(tmp/budgets/phone-frames.json); fi
           nine=$(find tmp/budgets/nine -name budget-measures.json 2>/dev/null | head -1 || true)
           for file in tmp/memory-ledger/preview/dist/.vite/budget-measures.json tmp/budgets/ledger/budget-measures.json "$nine"; do
             if [[ -n "$file" && -f "$file" ]]; then inputs+=("$file"); fi
