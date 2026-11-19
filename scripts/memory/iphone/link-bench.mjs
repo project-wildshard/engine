@@ -28,7 +28,7 @@ const { values } = parseArgs({ options: {
 const cold = Number(values.runs), warm = Number(values.warm), base = new URL(values.base).href;
 if (!Number.isSafeInteger(cold) || cold < 1 || !Number.isSafeInteger(warm) || warm < 0) throw new Error('--runs is at least 1, --warm at least 0');
 const out = resolve(values.out ?? join('tmp/iphone13', `link-${values.zone}-${String(Date.now())}`));
-const name = values.zone.replace(/-/gu, ' ');
+const name = values.zone.replaceAll('-', ' ');
 
 /** One boot from the origin to control, every stage timed from the navigation. @param {any} driver */
 async function linkRun(driver) {

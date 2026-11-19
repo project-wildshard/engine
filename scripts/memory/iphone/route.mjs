@@ -44,7 +44,7 @@ export function routeLegOnPage(leg) {
   const game = w.game, input = game.app.input, p = w.player, renderer = game.renderer;
   // the cap: Game re-reads qualityCap every 2 s from the preset and Low Power; held here for the whole leg
   if (leg.cap !== null) {
-    try { Object.defineProperty(game, 'qualityCap', { get: () => leg.cap, set: () => undefined, configurable: true }); } catch { /* read-only */ }
+    try { Object.defineProperty(game, 'qualityCap', { get: () => leg.cap, set: () => { /* held */ }, configurable: true }); } catch { /* read-only */ }
   }
   const clock = p.link?.client?.clock ?? null;
   const t0 = performance.now(), frames0 = game.frameCount;
@@ -174,7 +174,7 @@ export function legSummary(samples) {
   const round = (/** @type {number|null} */ value, digits = 1) => value === null ? null : Number(value.toFixed(digits));
   return {
     seconds: round(seconds), fps: round(seconds > 0 ? samples.reduce((sum, row) => sum + row.frames, 0) / seconds : null),
-    p50Ms: round(percentile(frames, 0.5)), p95Ms: round(percentile(frames, 0.95)), maxMs: round(frames.length ? Math.max(...frames) : null),
+    p50Ms: round(percentile(frames, 0.5)), p95Ms: round(percentile(frames, 0.95)), maxMs: round(frames.length > 0 ? Math.max(...frames) : null),
     over33: over(1000 / 30 + 0.7), over50: over(50), over50Per30s: round(seconds > 0 ? over(50) * 30 / seconds : null),
     updateP50Ms: round(percentile(samples.flatMap((row) => row.updateMs), 0.5)), updateP95Ms: round(percentile(samples.flatMap((row) => row.updateMs), 0.95)),
     renderP50Ms: round(percentile(samples.flatMap((row) => row.renderMs), 0.5)), renderP95Ms: round(percentile(samples.flatMap((row) => row.renderMs), 0.95)),

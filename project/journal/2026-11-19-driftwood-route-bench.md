@@ -9,3 +9,6 @@ by pinning `Game.qualityCap` in the page, so one build reads both the Low Power 
 The route was tuned on headless WebKit: the north shore past (23, 145) traps the player, so it goes out to the altar and
 back down the west path. A blocked walk steps aside before it skips a waypoint. `link-bench.mjs` times the player's way
 in (menu, ZONE SELECT, ENTER ZONE, start, download, load, control), cold with Web Inspector's Disable Caches.
+
+The push gate's lint refused the first cut: `new Function` is implied eval, so the WebKit proxy now evaluates the same
+string wrappers the inspector driver sends the phone, which also makes the two drivers return identical element handles.

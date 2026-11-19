@@ -59,11 +59,11 @@ async function bench() {
         const boot = await enterZone(/** @type {any} */ (driver), { base, slug: values.zone, slots });
         row.boot = { outcome: boot.outcome, controlS: boot.controlAt !== null && boot.startedAt !== null ? (boot.controlAt - boot.startedAt) / 1000 : null,
           build: boot.state?.build ?? null, version: boot.state?.version ?? null, error: boot.state?.error ?? null };
-        console.log(`run ${String(run)}: ${String(boot.outcome)} in ${String(row.boot.controlS)} s (${String(row.boot.version)})`);
+        console.log(`run ${String(run)}: ${boot.outcome} in ${String(row.boot.controlS)} s (${String(row.boot.version)})`);
         if (boot.outcome === 'control') {
           if ('quiet' in driver && typeof driver.quiet === 'function') await driver.quiet();
           for (const cap of order) {
-            const legs = await playRoute(/** @type {any} */ (driver), { slug: values.zone, cap, log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+            const legs = await playRoute(driver, { slug: values.zone, cap, log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
             row.legs.push(...legs);
             if (legs.some((leg) => leg.error === 'the page lost the controlled world during the leg')) break;
           }
@@ -71,11 +71,10 @@ async function bench() {
       } catch (error) { row.error = error instanceof Error ? error.message : String(error); console.log(`run ${String(run)}: ${row.error}`); }
       try {
         const shot = join(directory, phone ? 'end.png' : 'end.jpg');
-        if (phone) await /** @type {NonNullable<typeof tools>} */ (tools).screenshot(shot); else await /** @type {any} */ (driver).screenshot(shot);
+        await (phone ? /** @type {NonNullable<typeof tools>} */ (tools).screenshot(shot) : /** @type {any} */ (driver).screenshot(shot));
         row.screenshot = shot;
       } catch (error) { row.screenshotError = String(error); }
-      if (webkitDriver !== null) await webkitDriver.stop();
-      else await /** @type {any} */ (driver).close?.().catch(() => undefined);
+      await (webkitDriver === null ? /** @type {any} */ (driver).close?.().catch(() => undefined) : webkitDriver.stop());
       report.push(row);
       writeFileSync(join(out, 'route.json'), JSON.stringify(report, null, 2));
     }
@@ -83,7 +82,7 @@ async function bench() {
   const lines = [`# ${values.zone} route bench`, '', `${values.driver} · ${base} · ${String(runs)} runs · caps ${caps.join(', ')} · ${environment.startedAt}`, ''];
   for (const row of report) {
     lines.push(`## Run ${String(row.run)}: ${String(row.boot?.outcome ?? row.error)}${row.boot?.controlS ? `, control ${row.boot.controlS.toFixed(1)} s` : ''}${row.temperature === null ? '' : `, ${String(row.temperature)} °C`}`, '');
-    lines.push(routeTable(row.legs.map((/** @type {any} */ leg) => ({ ...leg }))), '');
+    lines.push(routeTable(row.legs), '');
   }
   for (const cap of caps) {
     const ranked = worstSegment(report, cap);
@@ -112,7 +111,8 @@ async function phoneTools() {
     async cool() {
       const deadline = Date.now() + 10 * 60_000;
       let now = reading();
-      while (idle !== null && now !== null && now - idle > 3 && Date.now() < deadline) {
+      if (idle === null) return now;
+      while (now !== null && now - idle > 3 && Date.now() < deadline) {
         console.log(`cooling: ${String(now)} °C against ${String(idle)} °C`);
         await pause(15_000);
         now = reading();

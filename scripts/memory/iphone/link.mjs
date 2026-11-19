@@ -19,7 +19,7 @@ export function linkStages(at) {
 
 /** @param {(number|null)[]} list */
 const median = (list) => {
-  const sorted = /** @type {number[]} */ (list.filter((value) => typeof value === 'number')).sort((a, b) => a - b);
+  const sorted = list.filter((value) => typeof value === 'number').sort((a, b) => a - b);
   return sorted.length === 0 ? null : sorted[Math.floor((sorted.length - 1) / 2)] ?? null;
 };
 
@@ -34,8 +34,8 @@ export function linkTable(rows) {
   });
   /** @type {{kind: string, label: string, median: number}[]} */
   const biggest = [];
-  for (const kind of [...new Set(rows.map((row) => row.kind))]) {
-    const mine = rows.filter((row) => row.kind === kind && row.error == null);
+  for (const kind of new Set(rows.map((row) => row.kind))) {
+    const mine = rows.filter((row) => row.kind === kind && (row.error === undefined || row.error === null));
     const medians = labels.map((label) => median(mine.map((row) => linkStages(row.at)[label] ?? null)));
     lines.push(`| **${kind} median** (${String(mine.length)}) | ${medians.map((value) => value ?? '—').join(' | ')} | ${String(median(mine.map((row) => row.at.control ?? null)) ?? '—')} | |`);
     const top = labels.map((label, i) => ({ kind, label, median: medians[i] ?? -1 })).sort((a, b) => b.median - a.median)[0];
