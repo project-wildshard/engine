@@ -17,3 +17,6 @@ declared.ts pass.
 
 Earlier today I had ruled the counter out for Glowfen, whose source declares none. Mossgate's comes from
 the Template.
+
+[J249 follow-up] The row's classes use the `ws-touch-` prefix owned by `touch.css`.
+This fixes the static failure in run `44593656749` and keeps the row's display and native meter.

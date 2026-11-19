@@ -29,9 +29,9 @@ test('a declared counter is a HUD row that names what it counts and shows how mu
   const values = new Map([['template.lantern.oil', 0.6]]);
   const { row, meter } = mount(oil, values);
   expect(row.tagName).not.toBe('METER');
-  expect(row.classList.contains('ws-declared-counter')).toBe(true);
+  expect(row.classList.contains('ws-touch-declared-counter')).toBe(true);
   expect(shown(row)).toBe('LANTERN OIL 60%');
-  const fill = row.querySelector<HTMLElement>('.ws-declared-counter-bar i');
+  const fill = row.querySelector<HTMLElement>('.ws-touch-declared-counter-bar i');
   expect(fill?.style.width).toBe('60%');
   // the value stays readable to assistive tech, on the meter the handles name
   expect(meter?.value).toBeCloseTo(0.6);
@@ -45,24 +45,24 @@ test('the row follows the field each frame: the fill, the number and the meter t
   expect(shown(row)).toBe('LANTERN OIL 100%');
   values.set('template.lantern.oil', 0.25); frame();
   expect(shown(row)).toBe('LANTERN OIL 25%');
-  expect(row.querySelector<HTMLElement>('.ws-declared-counter-bar i')?.style.width).toBe('25%');
+  expect(row.querySelector<HTMLElement>('.ws-touch-declared-counter-bar i')?.style.width).toBe('25%');
   expect(meter?.value).toBeCloseTo(0.25);
   values.set('template.lantern.oil', 0); frame();
   expect(shown(row)).toBe('LANTERN OIL 0%');
-  expect(row.querySelector<HTMLElement>('.ws-declared-counter-bar i')?.style.width).toBe('0%');
+  expect(row.querySelector<HTMLElement>('.ws-touch-declared-counter-bar i')?.style.width).toBe('0%');
 });
 
 test('a count wider than one reads as a count: 2 / 5', () => {
   const braziers: DeclaredCounter = { ...oil, id: 'braziers', label: 'BRAZIERS', band: 'band.2', min: 0, max: 5, field: 'lit' };
   const { row } = mount(braziers, new Map([['lit', 2]]));
   expect(shown(row)).toBe('BRAZIERS 2 / 5');
-  expect(row.querySelector<HTMLElement>('.ws-declared-counter-bar i')?.style.width).toBe('40%');
+  expect(row.querySelector<HTMLElement>('.ws-touch-declared-counter-bar i')?.style.width).toBe('40%');
 });
 
 test('a value outside its range draws a full or empty bar, never past the row', () => {
   const values = new Map([['template.lantern.oil', 3]]);
   const { row, frame } = mount(oil, values);
-  expect(row.querySelector<HTMLElement>('.ws-declared-counter-bar i')?.style.width).toBe('100%');
+  expect(row.querySelector<HTMLElement>('.ws-touch-declared-counter-bar i')?.style.width).toBe('100%');
   values.set('template.lantern.oil', -2); frame();
-  expect(row.querySelector<HTMLElement>('.ws-declared-counter-bar i')?.style.width).toBe('0%');
+  expect(row.querySelector<HTMLElement>('.ws-touch-declared-counter-bar i')?.style.width).toBe('0%');
 });

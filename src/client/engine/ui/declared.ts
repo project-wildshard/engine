@@ -65,12 +65,12 @@ interface CounterRow { readonly el: HTMLMeterElement; readonly field: string; re
 /** QA-FEEDBACK 11-19 row 28: a bare <meter> drew as iOS's own blank grey-white bar, its name only in aria-label. A counter
  *  is a status row like VITALS: its label, the HUD's thin bar and its value (a percent for a 0-to-1 span, else n / max). */
 function counterRow(d: DeclaredCounter, value: number): { row: HTMLElement; counter: CounterRow } {
-  const row = document.createElement('div'); row.className = 'ws-declared-counter ws-touch-row';
-  const name = document.createElement('span'); name.className = 'ws-declared-counter-label'; name.textContent = d.label;
+  const row = document.createElement('div'); row.className = 'ws-touch-declared-counter ws-touch-row';
+  const name = document.createElement('span'); name.className = 'ws-touch-declared-counter-label'; name.textContent = d.label;
   const el = document.createElement('meter'); el.min = d.min; el.max = d.max; el.setAttribute('aria-label', d.label);
-  const bar = document.createElement('span'); bar.className = 'ws-declared-counter-bar'; bar.setAttribute('aria-hidden', 'true');
+  const bar = document.createElement('span'); bar.className = 'ws-touch-declared-counter-bar'; bar.setAttribute('aria-hidden', 'true');
   const fill = document.createElement('i'); bar.append(fill);
-  const num = document.createElement('b'); num.className = 'ws-declared-counter-value'; num.setAttribute('aria-hidden', 'true');
+  const num = document.createElement('b'); num.className = 'ws-touch-declared-counter-value'; num.setAttribute('aria-hidden', 'true');
   row.append(name, el, bar, num);
   const counter: CounterRow = { el, field: d.field, fill, num, d, shown: Number.NaN };
   paintCounter(counter, value);
