@@ -58,8 +58,9 @@ function declaring(source: Shardfile, ground: number): Shardfile {
     encounters: [{ id: FIGHT, entity: BOSS, kind: 'boss', panel: null, name: 'Dune Matriarch', title: 'Mother of the Sands', retry: 'Again',
       start: 'spawned', arena: { at, radius: 30 }, intro: 0.5, introShort: 0.25, respawn: { at: [ARENA[0], ground, ARENA[1] + 20], yaw: 0 },
       phases: [{ at: 1, name: 'one', caption: 'She rises', speed: 4, stopDistance: 2, turnRate: 6 }, { at: 0.5, name: 'two', caption: 'She rages', speed: 6, stopDistance: 2, turnRate: 8 }] }] });
-  return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
-    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: parsed.creatures, encounters: parsed.encounters };
+  const strikes = [...source.rows.strikes.filter(row => !parsed.rows.strikes.some(entry => entry.id === row.id)), ...parsed.rows.strikes];
+  return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes,
+    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: { ...parsed.creatures, brains: source.creatures.brains }, encounters: parsed.encounters };
 }
 const fightState = v.object({ boss: v.object({ state: v.string(), phase: v.number() }) });
 function fight(host: SimHost): { state: string; phase: number } {
@@ -83,7 +84,9 @@ test('the quest page binds its summon to a declared boss encounter beside a runt
   const probe = await prepareRuntimePlan(fixture.shard, fixture.assets, fixture.plan.baked, fixture.plan.recipe, fixture.sections);
   const shard = declaring(fixture.shard, probe.ports.heightAt(ARENA[0], ARENA[1]));
   // with no keeper boss and no declared one, the signal fire's `{ spawn: sunscar.matriarch }` has no owner
-  const bare = await prepareRuntimePlan({ ...fixture.shard }, fixture.assets, fixture.plan.baked, recipe, sections);
+  const bareSections = new Map(sections); bareSections.set('sim/scripts', []);
+  const bare = await prepareRuntimePlan({ ...fixture.shard, creatures: { ...fixture.shard.creatures, spawns: [] } },
+    fixture.assets, fixture.plan.baked, recipe, bareSections);
   const empty = createSimHost(bare.level, { ...bare.ports, rapier: fixture.rapier });
   try { expect(() => { bare.install(empty, context(false)); }).toThrow(/Unbound quest encounter sunscar.matriarch/u); } finally { empty.dispose(); }
   // the declared encounter on that spawn answers it
