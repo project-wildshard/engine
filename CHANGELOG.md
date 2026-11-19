@@ -18,7 +18,7 @@ valid section, and a `vX.Y.Z` tag whose commit has none.
 - Native runtime plans now run the creatures declared by ordinary shard uploads.
 - Pine phone textures use both cook encoder lanes and have time to finish a cold cook.
 - Declared creatures can hold their spawn, using shard format 0.47.0.
-- Shard recooks keep each upload’s headers and recorded programs together.
+- Recooking a shard keeps its own discovery, descriptor, and recorded programs.
 
 ## v0.1.48 (2026-11-19)
 
