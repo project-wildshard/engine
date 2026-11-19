@@ -520,6 +520,12 @@ async function askPhoneMemory(root: HTMLElement, scope: Scope): Promise<void> {
   await confirmPhoneMemory(root, scope);
 }
 
+/** The opt-in cache stays outside the mandatory startup module bank. */
+async function prepareShaderSourceCache(zone: string): Promise<void> {
+  const { openShaderSourceCache } = await import('./shaderSourceStore');
+  await openShaderSourceCache(__BUILD_ID__, zone, entryScope);
+}
+
 async function startSelected(): Promise<void> {
   const selected = bootAwait('app:selected-discovery', import('./shardSelection').then(async selection => {
     await selection.prepareSelectedShard();
@@ -533,10 +539,7 @@ async function startSelected(): Promise<void> {
   const listed = unloadedTitleRow(search.get('chunk'), game.shard);
   const arrival = listed?.shardfile === undefined ? game.shard : listedArrival(game.shard, { slug: listed.slug, name: listed.name, shardfile: listed.shardfile });
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
-  if (shaderSourceCacheEnabled()) {
-    const { openShaderSourceCache } = await import('@wildshard/engine/render/shaderSourceCache');
-    await openShaderSourceCache(__BUILD_ID__, arrival.slug, entryScope);
-  }
+  if (shaderSourceCacheEnabled()) await prepareShaderSourceCache(arrival.slug);
   // BUGBASH-LOOP (J385, Jake 2026-11-16): a loading world shows exactly one screen, its own full-screen card. No live menu
   // over it (PZ27b2 put the main menu, then Shard Select, over the world's mounting HUD and shrank this card to a 3 px bar),
   // and never the launch shell (a page that booted a world from the title's address still carries it).

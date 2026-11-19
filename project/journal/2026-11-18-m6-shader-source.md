@@ -21,8 +21,9 @@ sample was 0.95 MB higher at peak and 4.92 MB higher settled, inside the
 spread of these boots. The recording itself stays opt-in.
 
 The GLSL identity suite compares pinned graph output byte for byte with
-and without replay. The local production session occupied 4,396,366 raw
-bytes and 1,359,350 gzip bytes, under both caps. The old emitter remains
+and without replay. The local production session occupied 4,399,328 raw
+bytes and 1,360,677 gzip bytes, under both caps. The old emitter remains
 the default and the fallback for the next release. The save contract
 records the new version-one device setting. The title reads only that
-setting; selecting a world with it enabled imports the renderer cache.
+setting. That opt-in world boot imports the IndexedDB storage separately
+from the renderer’s synchronous source lookup.
