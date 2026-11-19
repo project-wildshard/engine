@@ -30,6 +30,6 @@ export function titlePrefetchChoice(store: Pick<SaveStore, 'define'>): TitlePref
  * Frozen LEGACY-only, hidden and unavailable metadata never seeds downloads. */
 export function titlePrefetchTarget(last: string | null, rows: readonly TitleManifest[], developer: boolean): string | undefined {
   const row = last === null ? undefined : new Map(rows.map(candidate => [candidate.slug, candidate])).get(last);
-  if (row === undefined || row.shardfile === undefined && row.gridShardfile === undefined) return undefined;
+  if (row === undefined || row.shardfile === undefined) return undefined;
   return developer || !playerHidden(row) ? row.slug : undefined; // J313: experimental and partial shards are player picks
 }

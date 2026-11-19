@@ -39,7 +39,7 @@ export function toLevelSpec(manifest: ShardManifest, product?: ShardFolder): Lev
     species: manifest.species ?? [], spawns: manifest.spawns,
     minimap: ((map) => {
       const { image: path, ...look } = map ?? {};
-      const built = manifest.shardfile !== undefined || manifest.gridShardfile !== undefined;
+      const built = manifest.shardfile !== undefined;
       const image = path === undefined || (built && !path.startsWith('data:') && !path.startsWith('blob:')) ? undefined : bakedMapUrl(path);
       return image === undefined ? look : { ...look, image };
     })(manifest.minimap),

@@ -50,7 +50,7 @@ for (const developer of modes) for (const devserver of modes) for (const nineDra
   const edges = await loadGridEdgeProfiles(assembly.cells, async cell => {
     try {
       const source = await readGridEdges(cell, { fetch: fetchFile, edges: slug => {
-        const manifest = findShard(slug), descriptor = manifest?.shardfile ?? manifest?.gridShardfile;
+        const manifest = findShard(slug), descriptor = manifest?.shardfile;
         if (descriptor === undefined) return null;
         let pending = products.get(slug);
         if (pending === undefined) {

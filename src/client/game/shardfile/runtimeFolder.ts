@@ -305,7 +305,7 @@ export function manifestAdmittedSource(manifest: ShardManifest): Shardfile | und
 
 /** Load a configured output before its plugin constructor, independent of entry mode. */
 export async function loadManifestFolder(manifest: ShardManifest, scope: Scope): Promise<ShardFolder> {
-  const installed = manifestAdmissions.get(manifest),path=manifest.shardfile??manifest.gridShardfile;
+  const installed = manifestAdmissions.get(manifest),path=manifest.shardfile;
   const product=installed!==undefined?shardFolderFromAdmission(installed.admitted,scope,installed.options)
     :path===undefined?absentShardFolder(manifest.slug)
     :await loadShardFolder(manifest.slug,browserShardfileOptions(new URL('.',new URL(path,typeof document==='undefined'?location.href:document.baseURI||location.href)).href,true),scope);

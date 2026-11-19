@@ -2,6 +2,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { TerrainLattice } from '@wildshard/engine/physics/terrain';
 import { inflateScalarBlocks,readScalarChannel,readScalarLattice,ScalarLatticeBindings } from '@wildshard/engine/world/scalarChannel';
 import { readFileInputs } from '../../../shared/game/shardfile/fileInputs';
+import { liftLegacyPointer } from './legacyPointer';
 import { ScalarLatticeSchema,ScalarTripletSchema,type ScalarLatticeRows,type ScalarTripletRows } from '@wildshard/format/scalarChannel';
 import { bakedSamplers } from '@wildshard/format/bakedTerrainSampling';
 import { basinBody,type WaterBody } from '@wildshard/engine/world/water/body';
@@ -463,8 +464,6 @@ export interface ShardManifest {
   next?: string;
   /** Built built-in data source, admitted before the existing session boot; picker identity stays on this manifest. */
   shardfile?: string;
-  /** Built-in grid declaration for a native runtime shard; discovery alone does not replace the standalone boot path. */
-  gridShardfile?: string;
   /** Built-in finite page owner, derived from the admitted entry policy; no source module exists. */
   clientPlanRuntime?: true;
   /** Definition-owned raw scalar preparation; never an authored callback. */
@@ -813,7 +812,7 @@ export type AuthoredShardBindings = Omit<ShardManifestRows, keyof ManifestMetada
  * the unchanged native boot owners. Missing source images refuse admission. */
 export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: AuthoredShardBindings,
   native: Parameters<typeof defineShard>[1], images: Readonly<Record<string, string>>): ShardManifest {
-  const {bindings: _declaredBindings, boot: bootData, fight: authoredFight, ...data} = parseManifestMetadata(input, slug);
+  const {bindings: _declaredBindings, boot: bootData, fight: authoredFight, ...data} = parseManifestMetadata(liftLegacyPointer(input), slug);
   const image = (path: string): string => {
     const url = images[path];
     if (url !== undefined) return url;

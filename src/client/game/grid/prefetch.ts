@@ -154,7 +154,7 @@ class GridPrefetch {
     }
   }
   private async product(id: string, quota: PrefetchQuota): Promise<void> {
-    const manifest = findTitleManifest(id), descriptor = manifest?.shardfile ?? manifest?.gridShardfile;
+    const manifest = findTitleManifest(id), descriptor = manifest?.shardfile;
     if (descriptor === undefined) return;
     const url = new URL(descriptor, location.href), base = new URL('.', url).href;
     const indexHash = import.meta.env.DEV ? null : builtIndexHash(url.pathname);
@@ -305,7 +305,7 @@ export function gridPrefetchStatus(): GridPrefetchStatus | null { return pageRun
 
 /** Every product the title list knows (G727's "everything"). */
 function everyFolder(): string[] {
-  return titleManifests().filter(row => (row.shardfile ?? row.gridShardfile) !== undefined).map(row => row.slug);
+  return titleManifests().filter(row => (row.shardfile) !== undefined).map(row => row.slug);
 }
 /** G727 / I9: the wire bytes "Download everything" still has to fetch: each product's files of this device's tier (I1's
  *  filter, as the prefetch reads them), counted once across products, less what the content cache already holds. The
@@ -319,7 +319,7 @@ export async function remainingDownloadBytes(owner?: Scope): Promise<number | nu
   let bytes = 0;
   for (const slug of everyFolder()) {
     live();
-    const manifest = findTitleManifest(slug), descriptor = manifest?.shardfile ?? manifest?.gridShardfile;
+    const manifest = findTitleManifest(slug), descriptor = manifest?.shardfile;
     if (descriptor === undefined) continue;
     const url = new URL(descriptor, location.href), indexHash = import.meta.env.DEV ? null : builtIndexHash(url.pathname);
     if (indexHash !== null) url.searchParams.set('v', indexHash.slice(0, 8));

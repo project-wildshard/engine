@@ -173,7 +173,7 @@ async function readGridEdges(url: string, identity: string, options: FolderOptio
  * manifest. Its verified product owns the far view just like a built world. */
 function farDescriptor(slug: string): string | undefined {
   const row = findShard(slug) ?? findTitleManifest(slug);
-  return row?.shardfile ?? row?.gridShardfile;
+  return row?.shardfile;
 }
 
 /**
@@ -245,7 +245,7 @@ export async function readGridFolderFar(url: string, identity: string, options: 
  * view is the baked folder's).
  */
 export function readGridShardfileNear(slug: string): Promise<GridShardfileNear | null> {
-  const manifest = findShard(slug), descriptor = manifest?.shardfile ?? manifest?.gridShardfile;
+  const manifest = findShard(slug), descriptor = manifest?.shardfile;
   if (descriptor === undefined) return Promise.resolve(null);
   const url = new URL(descriptor, location.href);
   return readGridFolderNear(url.href, slug, browserShardfileOptions(new URL('.', url).href, true));
@@ -272,7 +272,7 @@ export async function readGridFolderNear(url: string, identity: string, options:
 
 /** Equal catalogue copies share edge metadata; full product admission stays on the ordinary approach path. */
 export function gridShardfileEdges(slug: string, owner: GridFolderOwner): Promise<GridEdges> | null {
-  const manifest = findShard(slug), descriptor = manifest?.shardfile ?? manifest?.gridShardfile;
+  const manifest = findShard(slug), descriptor = manifest?.shardfile;
   if (descriptor === undefined) return null;
   if (owner.scope.disposed) return Promise.reject(new Error('Grid edge page disposed'));
   let cache = edges.get(owner.allocator);
@@ -354,7 +354,7 @@ export function gridPostCosts(allocator: ResidencyAllocator): GridPostCosts {
 export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode?: { readonly signal?: AbortSignal; readonly files?: readonly string[] }): Promise<GridFolder> | null;
 export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode: 'metadata' | 'optional-metadata'): Promise<GridFolderMetadata> | null;
 export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode?: 'metadata' | 'optional-metadata' | { readonly signal?: AbortSignal; readonly files?: readonly string[] }): Promise<GridFolder | GridFolderMetadata> | null {
-  const manifest = findShard(slug), descriptor = manifest?.shardfile ?? manifest?.gridShardfile;
+  const manifest = findShard(slug), descriptor = manifest?.shardfile;
   if (descriptor === undefined) return null;
   if (owner.scope.disposed) return Promise.reject(new Error('Grid product page disposed'));
   let cache = products.get(owner.allocator);

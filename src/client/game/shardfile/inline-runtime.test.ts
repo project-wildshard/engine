@@ -5,18 +5,19 @@ import { expect, test, vi } from 'vitest';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { inlineRuntimeArrival } from './clientSource';
 import type { ShardManifest } from '../shard/manifest';
+import { liftLegacyPointer } from '../shard/legacyPointer';
 
 const BASE = 'http://127.0.0.1:4173/';
 const LOCATION = { base: BASE };
 const candidate = (runtime: Shardfile['runtime'], slug = 'nine-dragon-stack'): Shardfile => ({ identity: { slug }, runtime }) as unknown as Shardfile;
 const declared = { binds: [] } as unknown as Shardfile['runtime'];
-const GRID = { gridShardfile: '/shardfiles/nine-dragon-stack/shard.json' };
+const GRID = { shardfile: '/shardfiles/nine-dragon-stack/shard.json' };
 const discovery = (load: unknown, data: Record<string, unknown>) => ({ version: 1, slug: 'nine-dragon-stack', data, rows: {}, native: { load } });
 const PLAN_ENTRY = { $call: 'planEntry', args: [{ retainHomeRuntime: true, stagesOwner: 'declared' }, []] };
-/** Stands in for discovery.ts `shardFromDiscovery`: the document's data as its manifest. */
+/** Stands in for discovery.ts `shardFromDiscovery`: the document's data as its manifest, an old pointer lifted (OF9b). */
 const discover = (input: unknown): ShardManifest => {
   const row = input as { slug: string; data: Record<string, unknown> };
-  return { slug: row.slug, ...row.data } as unknown as ShardManifest;
+  return { slug: row.slug, ...liftLegacyPointer(row.data) } as unknown as ShardManifest;
 };
 
 test('a candidate with no runtime keeps the inline path and reads nothing', async () => {
@@ -30,6 +31,9 @@ test('an inline runtime enters by its own same-origin client-plan discovery, as 
   const manifest = await inlineRuntimeArrival(candidate(declared), LOCATION, read, discover);
   expect(read).toHaveBeenCalledWith('http://127.0.0.1:4173/shardfiles/nine-dragon-stack/discovery.json');
   expect(manifest).toMatchObject({ slug: 'nine-dragon-stack', ...GRID });
+  // OF9b: an old product's discovery names the same descriptor under the old key
+  const old = vi.fn((_url: string) => Promise.resolve(discovery(PLAN_ENTRY, { gridShardfile: GRID.shardfile })));
+  await expect(inlineRuntimeArrival(candidate(declared), LOCATION, old, discover)).resolves.toMatchObject(GRID);
 });
 
 test('a discovery with no client-plan entry, another identity or another descriptor is refused', async () => {
@@ -41,10 +45,10 @@ test('a discovery with no client-plan entry, another identity or another descrip
   await refuse(null, 'requires its discovery client-plan entry');
   await refuse({ ...discovery(PLAN_ENTRY, GRID), slug: 'other-shard' }, 'discovery identity differs');
   await refuse(discovery(PLAN_ENTRY, {}), 'its own same-origin descriptor');
-  await refuse(discovery(PLAN_ENTRY, { gridShardfile: 'https://elsewhere.example/shardfiles/nine-dragon-stack/shard.json' }), 'its own same-origin descriptor');
-  await refuse(discovery(PLAN_ENTRY, { gridShardfile: '/shardfiles/other-shard/shard.json' }), 'its own same-origin descriptor');
-  await refuse(discovery(PLAN_ENTRY, { gridShardfile: '/shardfiles/nine-dragon-stack/shard.json?v=1' }), 'its own same-origin descriptor');
-  await refuse(discovery(PLAN_ENTRY, { ...GRID, shardfile: GRID.gridShardfile }), 'its own same-origin descriptor');
+  await refuse(discovery(PLAN_ENTRY, { shardfile: 'https://elsewhere.example/shardfiles/nine-dragon-stack/shard.json' }), 'its own same-origin descriptor');
+  await refuse(discovery(PLAN_ENTRY, { shardfile: '/shardfiles/other-shard/shard.json' }), 'its own same-origin descriptor');
+  await refuse(discovery(PLAN_ENTRY, { shardfile: '/shardfiles/nine-dragon-stack/shard.json?v=1' }), 'its own same-origin descriptor');
+  await refuse(discovery(PLAN_ENTRY, { ...GRID, gridShardfile: '/shardfiles/other-shard/shard.json' }), 'names its shardfile once');
 });
 
 test('a candidate identity that is not a plain shard folder is refused before a read', async () => {

@@ -956,6 +956,7 @@
     "src/client/game/shard/declaredTargets.ts": "client",
     "src/client/game/shard/declaredUi.ts": "client",
     "src/client/game/shard/discovery.ts": "client",
+    "src/client/game/shard/legacyPointer.ts": "client",
     "src/client/game/shard/list.ts": "client",
     "src/client/game/shard/load.ts": "client",
     "src/client/game/shard/manifest.ts": "client",

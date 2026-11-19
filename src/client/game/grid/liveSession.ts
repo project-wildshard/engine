@@ -370,7 +370,7 @@ export class LiveGridSession {
       ...(ports.prepareNeighbourTiles === undefined ? {} : { prepareNeighbour: ports.prepareNeighbourTiles }),
       prioritize: (cell) => prioritizeGridFolder(cell.slug, { allocator: ports.allocator, scope }),
       pause: () => yieldGridAdmission(scope),
-      prefetchable: (cell) => { const manifest = findShard(cell.slug); return (manifest?.shardfile ?? manifest?.gridShardfile) !== undefined; },
+      prefetchable: (cell) => { const manifest = findShard(cell.slug); return manifest?.shardfile !== undefined; },
       ...(ports.backgroundReady === undefined ? {} : { backgroundReady: ports.backgroundReady }),
       bindFrame: (frame) => { this.bind(frame); },
       gameplayReady: () => this.gameplayReady(),

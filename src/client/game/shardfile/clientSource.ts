@@ -60,7 +60,7 @@ export interface PageResidencyBoot<Admission extends MemoryAdmission = MemoryAdm
 /** GC13: the page's playing envelope: the phone tier's 1.0 GB (G65), else the shared caps' */
 export function pagePlayingBytes(tier: Tier = TIER): number { return tier === 'phone' ? PHONE_PLAYING_BYTES : CONTENT_CAPS.playing; }
 
-type PageManifest = Pick<ShardManifest, 'slug' | 'shardfile' | 'gridShardfile' | 'clientPlanRuntime' | 'runtimeCost'>;
+type PageManifest = Pick<ShardManifest, 'slug' | 'shardfile' | 'clientPlanRuntime' | 'runtimeCost'>;
 export function preparePageResidency(manifest: PageManifest, configuredSlug?: string): PageResidencyBoot<PageMemoryAdmission>;
 export function preparePageResidency(manifest: PageManifest, configuredSlug: string | undefined, memory: MemoryAdmission): PageResidencyBoot;
 export function preparePageResidency(manifest: PageManifest, configuredSlug?: string, memory: MemoryAdmission = new PageMemoryAdmission()): PageResidencyBoot {
@@ -168,9 +168,9 @@ export async function inlineRuntimeArrival(source: Shardfile, options: Pick<Fold
   if (typeof load !== 'object' || load === null || Reflect.get(load, '$call') !== 'planEntry') throw new Error('Inline runtime page requires its discovery client-plan entry');
   const manifest = discover(document), discoveredIdentity = manifest.slug.replace(/^_/u, '');
   if (discoveredIdentity !== folder) throw new Error('Inline runtime discovery identity differs');
-  // OF8: the runtime page names its descriptor once, as `shardfile` or (until M9) `gridShardfile`; naming both is refused.
-  const pointer = manifest.gridShardfile ?? manifest.shardfile, descriptor = pointer === undefined ? undefined : new URL(pointer, options.base);
-  if (manifest.shardfile !== undefined && manifest.gridShardfile !== undefined || descriptor === undefined || descriptor.origin !== url.origin
+  // OF8/OF9b: the runtime page names its descriptor once, as `shardfile` (an older product's key is lifted as discovery enters).
+  const pointer = manifest.shardfile, descriptor = pointer === undefined ? undefined : new URL(pointer, options.base);
+  if (descriptor === undefined || descriptor.origin !== url.origin
     || descriptor.pathname !== `/shardfiles/${folder}/shard.json` || descriptor.search !== '' || descriptor.hash !== '') {
     throw new Error('Inline runtime discovery must name its own same-origin descriptor');
   }
