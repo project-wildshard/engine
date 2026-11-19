@@ -203,7 +203,7 @@ async function qualify({ url, release, root, out, store, local, kind, legStarted
   const legSeconds = (Date.now() - legStarted) / 1000, overCap = budgetFinding(kind, legSeconds);
   const merged = mergeVerdict({ build, smoke, proofs, expected, selected, ...(after.build === undefined ? {} : { after: after.build }), full,
     ...(overCap === undefined ? {} : { runner: [overCap] }) });
-  const verdict = { ...smoke, ...merged, build, qa: true, kind, legSeconds,
+  const verdict = { ...smoke, ...merged, build, qa: true, kind, status: merged.hold ? 'hold' : 'pass', legSeconds,
     ...(candidate === undefined ? {} : { deploymentId: candidate.deploymentId, roomsSerial: candidate.serial, aliasBuild: candidate.aliasBuild }),
     startedAt: new Date(started).toISOString(), at: new Date().toISOString(),
     seconds: (Date.now() - started) / 1000, proofs };

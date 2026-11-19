@@ -12,10 +12,29 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { runSmoke } from '../scripts/staging-smoke.mjs';
-import { newestProfiles, saveProfiles } from '../scripts/staging-smoke/store.mjs';
+import { keepRun, newestProfiles, saveProfiles } from '../scripts/staging-smoke/store.mjs';
 
 const ROOT = resolve('tmp/staging-smoke-profiles-test');
 const HANDOFF = process.env['WS_SMOKE_HANDOFF']?.split(',');
+
+test('saving the live leg keeps candidate history only in the archive', () => {
+  const store = join(ROOT, 'leg-history');
+  const release = 'v0.1.46';
+  const verdict = (ids: string[]) => ({
+    build: 'a'.repeat(40), hold: false, findings: [], scenarios: ids.map(id => ({id, status: 'ran'})),
+  });
+  const live = verdict(['K3', 'K5']);
+  try {
+    keepRun(store, release, join(ROOT, 'candidate-empty'), verdict(['K1', 'K2', 'K5', 'K6']));
+    const archive = keepRun(store, release, join(ROOT, 'live-empty'), live);
+    expect(live.scenarios.map(s => s.id)).toEqual(['K3', 'K5']);
+    expect(live.hold).toBe(false);
+    const kept = JSON.parse(readFileSync(join(archive, 'verdict.json'), 'utf8')) as typeof live;
+    expect(kept.scenarios.map(s => s.id)).toEqual(['K1', 'K2', 'K6', 'K3', 'K5']);
+  } finally {
+    rmSync(store, {recursive: true, force: true});
+  }
+});
 
 test('two pairs stay (this release and the one before), a re-run starts from the one before, and only the same origin restores', () => {
   const store = join(ROOT, 'unit');

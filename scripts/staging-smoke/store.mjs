@@ -79,17 +79,17 @@ export function keepRun(store, release, out, verdict) {
     if (typeof f.sheet === 'string' && existsSync(f.sheet)) { cpSync(f.sheet, moved(f.sheet)); f.sheet = moved(f.sheet); }
   }
   for (const v of verdict.vision ?? []) if (typeof v.sheet === 'string' && existsSync(v.sheet)) { cpSync(v.sheet, moved(v.sheet)); v.sheet = moved(v.sheet); }
-  // the kept rows' files are in the store already
-  if (kept.length > 0) verdict.scenarios = [...kept, ...(verdict.scenarios ?? [])];
+  // The store keeps both legs. The caller still reports only the leg that ran.
+  const storedScenarios = [...kept, ...(verdict.scenarios ?? [])];
   /** @type {Record<string, number>} */
   const timeToPlay = {};
-  for (const s of verdict.scenarios ?? []) {
+  for (const s of storedScenarios) {
     if (typeof s.timeToPlay === 'number') timeToPlay[s.id] = s.timeToPlay;
     // SQ12: each K6 card's own time, keyed K6:<slug>
     if (s.id === 'K6') for (const [name, ms] of Object.entries(s.legTimes ?? {})) if (typeof ms === 'number') timeToPlay[`K6:${name}`] = ms;
   }
   writeFileSync(join(dir, 'time-to-play.json'), `${JSON.stringify(timeToPlay, null, 1)}\n`);
-  writeFileSync(join(dir, 'verdict.json'), `${JSON.stringify(verdict, null, 1)}\n`);
+  writeFileSync(join(dir, 'verdict.json'), `${JSON.stringify({...verdict, scenarios: storedScenarios}, null, 1)}\n`);
   for (const old of releases(store).slice(KEEP_RELEASES)) rmSync(old.dir, { recursive: true, force: true });
   return dir;
 }
