@@ -937,9 +937,10 @@
    "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
   },
   "nine/boot/retained-geometry": {
-   "value": 13309155,
+   "value": 15192309,
    "contentKey": "nine-dragon-stack@3",
-   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+   "commit": "eb4a3ae0de",
+   "why": "J444 hosted confirmation: CI 44475068326, 44473130939 attempt 2, 44476646646. Retained plus released geometry was exactly 44163047 B in all three cold boots. Record the median at control."
   },
   "nine/boot/live-heap": {
    "value": 216970560,
