@@ -54,8 +54,10 @@ test('offline copies and ring speculation wait for separate idle opportunities',
     completeOfflineCopy: (): Promise<void> => {calls.push('offline'); copied.resolve(true); return Promise.resolve();},
     currentSpawnDownload: () => undefined,
     ctx: {grid: {assembly: {}}}, player: {position: {}},
-    gridPrefetchOrder: (_assembly: unknown, _position: unknown, tier?: string): string => tier ?? 'native',
-    startGridPrefetch: (native: string, phone: string): void => {expect([native, phone]).toEqual(['native', 'phone']); calls.push('ring');},
+    gridPrefetch: () => Promise.resolve({
+      gridPrefetchOrder: (_assembly: unknown, _position: unknown, tier?: string): string => tier ?? 'native',
+      startGridPrefetch: (native: string, phone: string): void => {expect([native, phone]).toEqual(['native', 'phone']); calls.push('ring');},
+    }),
   });
   if (typeof run !== 'function') throw new Error('Background continuation is not callable');
   const task: Promise<unknown> = Promise.resolve(Reflect.apply(run, undefined, []));
@@ -73,7 +75,7 @@ test('a manifest entry starts no automatic offline copy or ring while playing', 
   const unexpected = (): never => {throw new Error('Manifest entry started speculative work');};
   const run: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end)}\nbackgroundDownloads`), {
     currentSpawnDownload: () => ({}), idleTurn: unexpected, completeOfflineCopy: unexpected,
-    startGridPrefetch: unexpected, startShardPrefetch: unexpected,
+    gridPrefetch: unexpected, startShardPrefetch: unexpected,
   });
   if (typeof run !== 'function') throw new Error('Background continuation is not callable');
   await Reflect.apply(run, undefined, []);

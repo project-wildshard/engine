@@ -25,7 +25,6 @@ import { useShardSteps } from '@wildshard/engine/boot/steps';
 import { startViewmodelTextures } from '@wildshard/engine/combat/view/ranged';
 import { TIER } from '@wildshard/engine/core/tier';
 import { beginLoading, type Loading } from '@wildshard/engine/ui/Loading';
-import { gridPrefetchStatus } from '../grid/prefetch';
 import { currentPageMode } from '../../../shared/game/grid/pageMode';
 import { NO_AUDIO, type LevelAudioProfile } from '@wildshard/engine/audio/levelAudio';
 
@@ -43,7 +42,9 @@ async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audi
   if (isDev() && session.arrival?.mode === 'arena') readModuleGroups(['practice.models']);
 
   const loading = beginLoading({ id: manifest.slug, name: manifest.name, trace: manifest.boot?.phone?.trace === true });
-  loading.setPrefetchSource(gridPrefetchStatus);
+  // the grid prefetch's counts, as captures read them (`__ws_gridPrefetch`, set by its first run; none yet: null), so its
+  // module stays out of the session's static closure
+  loading.setPrefetchSource(() => window.__ws_gridPrefetch?.() ?? null);
   loading.endAdmission();
   app.setState('loading');
   // The boot plan: DOWNLOAD = bytes read / bytes declared, SETUP = weighted steps (src/client/engine/boot/plan.ts).

@@ -33,7 +33,6 @@ import { textureBytes } from '@wildshard/engine/render/textureBytes';
 import { collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
-import { gridPrefetchOrder, startGridPrefetch } from '../grid/prefetch';
 import { shardArea } from '../grid/area';
 import { admittedRuntimeFolder, completeManifestCache, releaseManifestTransport } from '../shardfile/runtimeFolder';
 import { enterSkyClock } from './clockSettings';
@@ -48,6 +47,9 @@ import { downloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { waitEntryWork } from './entryReadiness';
 import { spawnViewThenNamed } from './readyFrame';
 import { slowShaderGpu } from './slowGpu';
+/** The grid's whole-set prefetch: the entry loads it with its common services (`entry.ts`), so it stays out of the
+ *  session's static closure (its raw budget) and this import resolves at once. */
+const gridPrefetch = () => import('../grid/prefetch');
 
 /** What a grid page lends the worker client (J130). */
 function workerGrid({ grid, gridLive }: Pick<Awaited<ReturnType<typeof playStage>>, 'grid' | 'gridLive'>): WorkerClientGrid | null {
@@ -483,7 +485,10 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     if (!await idleTurn(levelScope)) return;
     void completeOfflineCopy();
     if (!await idleTurn(levelScope)) return;
-    if (ctx.grid !== null) startGridPrefetch(gridPrefetchOrder(ctx.grid.assembly, player.position), gridPrefetchOrder(ctx.grid.assembly, player.position, 'phone'));
+    if (ctx.grid !== null) {
+      const { gridPrefetchOrder, startGridPrefetch } = await gridPrefetch();
+      startGridPrefetch(gridPrefetchOrder(ctx.grid.assembly, player.position), gridPrefetchOrder(ctx.grid.assembly, player.position, 'phone'));
+    }
     // Native grids already prefetch their phone ring through verified product packs.
     if (ctx.grid === null) asShell(() => { startShardPrefetch(manifest); });
   };
