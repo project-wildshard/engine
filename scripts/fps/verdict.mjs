@@ -1,5 +1,5 @@
 // DF2 / J464. Grade raw drawn frames before rounding. Incomplete evidence takes precedence over a floor miss.
-const FLOORS = [30, 60, 120];
+const FLOORS = new Set([30, 60, 120]);
 
 /** @typedef {{seconds:number, frames:number, frameMs:number[]}} Sample */
 /** @typedef {{name:string, error?:string|null, samples?:Sample[], nav?:{lostFrames?:number}}} Segment */
@@ -34,7 +34,7 @@ function grade(metrics, floor) {
 
 /** @param {Segment[]} legs @param {readonly {name:string,seconds:number}[]} route @param {number} floor */
 export function fpsVerdict(legs, route, floor) {
-  if (!FLOORS.includes(floor)) throw new Error(`Unsupported FPS floor ${floor}`);
+  if (!FLOORS.has(floor)) throw new Error(`Unsupported FPS floor ${floor}`);
   const segments = route.map((expected, index) => {
     const leg = legs[index], metrics = frameMetrics(leg?.samples ?? []);
     const error = leg?.error ?? (leg?.name !== expected.name || metrics === null ||

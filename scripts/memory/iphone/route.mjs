@@ -95,16 +95,6 @@ export function routeLegOnPage(leg) {
   const done = new Promise((resolve) => { finish = resolve; });
   let ended = false;
   /** @type {ReturnType<typeof setTimeout> | undefined} */ let timeout;
-  const end = (/** @type {string|null} */ error) => {
-    if (ended) return;
-    ended = true;
-    clearTimeout(timeout);
-    input.setHeld('move.forward', false); input.setHeld('sprint', false); input.setHeld('attack', false);
-    if (leg.fixed && performance.now() > previous) sample(performance.now());
-    nav.metres = Math.round(metres);
-    finish({ error, samples, nav, frames: game.frameCount - frames0, ms: performance.now() - t0, cap: leg.cap,
-      programs: renderer.info?.programs?.length ?? null });
-  };
   const sample = (/** @type {number} */ now) => {
     const frames = game.frameCount - seen, ring = game.frameMs.length;
     nav.lostFrames += Math.max(0, frames - ring);
@@ -120,6 +110,17 @@ export function routeLegOnPage(leg) {
       delayMs: clock?.delayMs ?? null, jitterMs: clock?.jitterMs ?? null,
       at: [Math.round((p.position.x - originX) * 10) / 10, Math.round((p.position.z - originZ) * 10) / 10] });
     previous = now;
+  };
+  const end = (/** @type {string|null} */ error) => {
+    if (ended) return;
+    ended = true;
+    clearTimeout(timeout);
+    timeout = undefined;
+    input.setHeld('move.forward', false); input.setHeld('sprint', false); input.setHeld('attack', false);
+    if (leg.fixed && performance.now() > previous) sample(performance.now());
+    nav.metres = Math.round(metres);
+    finish({ error, samples, nav, frames: game.frameCount - frames0, ms: performance.now() - t0, cap: leg.cap,
+      programs: renderer.info?.programs?.length ?? null });
   };
   const step = () => {
     if (ended) return;
@@ -163,7 +164,8 @@ export function routeLegOnPage(leg) {
           checkX = p.position.x; checkZ = p.position.z;
         }
       }
-      if (!dwelling && point !== undefined && Math.hypot(point[0] - x, point[1] - z) < reach) { at++; nav.reached++; detours = 0; }
+      const waitingForReentry = leg.dwell?.road === true && at === points.length - 1 && !nav.returned;
+      if (!dwelling && !waitingForReentry && point !== undefined && Math.hypot(point[0] - x, point[1] - z) < reach) { at++; nav.reached++; detours = 0; }
       const next = !dwelling && (leg.dwell === undefined || at !== leg.dwell.point + 1 || dwelled) ? points[at] : undefined;
       input.setHeld('move.forward', next !== undefined); input.setHeld('sprint', next !== undefined && leg.sprint === true);
       if (next !== undefined) {
