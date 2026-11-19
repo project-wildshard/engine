@@ -3,868 +3,862 @@
  "about": "BUDGET-CAPS: each budget's recorded baseline, written by node scripts/budgets/cli.mjs record (never by hand). contentKey is what the value was measured on: a shard's pinned revision (<slug>@<revision>) for its numbers, engine for the app's own. declared: an engine feature that raised this budget in the commit that wrote it (cli.mjs declare); record clears it. The soft line is value plus 10% (J444).",
  "baselines": {
   "download/phone/pine-hollow": {
-   "value": 41824808,
+   "value": 40965253,
    "contentKey": "pine-hollow@5",
-   "commit": "161063f3b4"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "download/phone/driftwood-isle": {
-   "value": 22218404,
+   "value": 22227966,
    "contentKey": "driftwood-isle@5",
-   "commit": "161063f3b4"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "download/phone/far-reach": {
-   "value": 26340742,
+   "value": 26457977,
    "contentKey": "far-reach@4",
-   "commit": "161063f3b4"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "download/phone/sunscar-dunes": {
-   "value": 12421514,
+   "value": 11426624,
    "contentKey": "sunscar-dunes@2",
-   "commit": "161063f3b4"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "download/phone/nalati-grasslands": {
-   "value": 44038111,
-   "contentKey": "nalati-grasslands@2",
-   "commit": "161063f3b4"
+   "value": 43820637,
+   "contentKey": "nalati-grasslands@4",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "download/phone/nine-dragon-stack": {
-   "value": 27202151,
+   "value": 27211533,
    "contentKey": "nine-dragon-stack@3",
-   "commit": "161063f3b4"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "js/grid-session/raw": {
-   "value": 41947,
+   "value": 41896,
    "contentKey": "engine",
-   "commit": "f31a7d3f58",
-   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "js/grid-session/gzip": {
-   "value": 14366,
+   "value": 14354,
    "contentKey": "engine",
-   "commit": "f31a7d3f58",
-   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "js/title/raw": {
-   "value": 367634,
+   "value": 368338,
    "contentKey": "engine",
-   "commit": "f31a7d3f58",
-   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "js/title/gzip": {
-   "value": 126670,
+   "value": 126790,
    "contentKey": "engine",
-   "commit": "f31a7d3f58",
-   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "js/session/raw": {
-   "value": 4401289,
+   "value": 4413316,
    "contentKey": "engine",
-   "commit": "f31a7d3f58",
-   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "js/session/gzip": {
-   "value": 1360483,
+   "value": 1365883,
    "contentKey": "engine",
-   "commit": "f31a7d3f58",
-   "why": "CI-measured on main f31a7d3f58 (budgets run 44475200178); replaces the stale local-build baselines from 43c891e6"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "ledger/brasscap-mesa/control": {
-   "value": 114712185,
-   "contentKey": "brasscap-mesa@7",
-   "commit": "dfb1f92fd",
+   "value": 63331668,
+   "contentKey": "brasscap-mesa@9",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1749456,
-    "workers": 6308399,
-    "geometry": 21595914,
-    "textures": 14187164,
-    "scene": 21582240,
+    "workers": 6448783,
+    "geometry": 14550490,
+    "textures": 14217376,
+    "scene": 528392,
     "audio": 0,
-    "loading": 46478228,
+    "loading": 23026387,
     "margin": 0
    }
   },
   "ledger/brasscap-mesa/peak": {
-   "value": 114976381,
-   "contentKey": "brasscap-mesa@7",
-   "commit": "dfb1f92fd",
+   "value": 89830521,
+   "contentKey": "brasscap-mesa@9",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1749456,
-    "workers": 6572595,
-    "geometry": 21595914,
-    "textures": 14187164,
-    "scene": 21582240,
+    "workers": 6448783,
+    "geometry": 14550490,
+    "textures": 14217376,
+    "scene": 528392,
     "audio": 0,
-    "loading": 46478228,
+    "loading": 49525240,
     "margin": 0
    }
   },
   "ledger/driftwood-isle/control": {
-   "value": 223407810,
+   "value": 184973500,
    "contentKey": "driftwood-isle@5",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1880528,
     "workers": 15048057,
-    "geometry": 43155872,
-    "textures": 59225894,
+    "geometry": 37857984,
+    "textures": 55031590,
     "scene": 0,
-    "audio": 29864263,
-    "loading": 71422412,
+    "audio": 18661903,
+    "loading": 53682654,
     "margin": 0
    }
   },
   "ledger/driftwood-isle/peak": {
-   "value": 267986562,
+   "value": 228021971,
    "contentKey": "driftwood-isle@5",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1880528,
     "workers": 15048057,
-    "geometry": 43155872,
-    "textures": 59225894,
+    "geometry": 37857984,
+    "textures": 55031590,
     "scene": 0,
-    "audio": 29864263,
-    "loading": 116001164,
+    "audio": 32977423,
+    "loading": 82415605,
     "margin": 0
    }
   },
   "ledger/far-reach/control": {
-   "value": 283175417,
+   "value": 211483552,
    "contentKey": "far-reach@4",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 0,
     "workers": 8720141,
-    "geometry": 21246196,
+    "geometry": 15393208,
     "textures": 158019576,
     "scene": 0,
     "audio": 0,
-    "loading": 92378720,
+    "loading": 26539843,
     "margin": 0
    }
   },
   "ledger/far-reach/peak": {
-   "value": 340653553,
+   "value": 332578589,
    "contentKey": "far-reach@4",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 0,
     "workers": 8720141,
-    "geometry": 21246196,
+    "geometry": 15393208,
     "textures": 158019576,
     "scene": 0,
     "audio": 0,
-    "loading": 149856856,
+    "loading": 147634880,
     "margin": 0
    }
   },
   "ledger/ink-cel-valley/control": {
-   "value": 60334140,
+   "value": 33186867,
    "contentKey": "ink-cel-valley@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
-    "workers": 7056417,
-    "geometry": 7367392,
-    "textures": 18599340,
-    "scene": 5101832,
+    "workers": 6792221,
+    "geometry": 5558720,
+    "textures": 10210740,
+    "scene": 528392,
     "audio": 0,
-    "loading": 17992983,
+    "loading": 5880618,
     "margin": 0
    }
   },
   "ledger/ink-cel-valley/peak": {
-   "value": 60334140,
+   "value": 51325164,
    "contentKey": "ink-cel-valley@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
-    "workers": 7056417,
-    "geometry": 7367392,
+    "workers": 6792221,
+    "geometry": 5558720,
     "textures": 18599340,
-    "scene": 5101832,
+    "scene": 528392,
     "audio": 0,
-    "loading": 17992983,
+    "loading": 15630315,
     "margin": 0
    }
   },
   "ledger/nalati-grasslands/control": {
-   "value": 266209973,
-   "contentKey": "nalati-grasslands@2",
-   "commit": "dfb1f92fd",
+   "value": 225721180,
+   "contentKey": "nalati-grasslands@4",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
-    "engine": 14032048,
-    "workers": 9790487,
-    "geometry": 44126019,
-    "textures": 52530214,
-    "scene": 10534008,
-    "audio": 42531482,
-    "loading": 89854931,
+    "engine": 9837744,
+    "workers": 10314783,
+    "geometry": 35834403,
+    "textures": 79911074,
+    "scene": 0,
+    "audio": 23016238,
+    "loading": 63996154,
     "margin": 0
    }
   },
   "ledger/nalati-grasslands/peak": {
-   "value": 322080017,
-   "contentKey": "nalati-grasslands@2",
-   "commit": "dfb1f92fd",
+   "value": 308955314,
+   "contentKey": "nalati-grasslands@4",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
-    "engine": 14032048,
-    "workers": 14478732,
-    "geometry": 44126019,
-    "textures": 52530214,
-    "scene": 10534008,
-    "audio": 42531482,
-    "loading": 141036730,
+    "engine": 9837744,
+    "workers": 12039869,
+    "geometry": 35834403,
+    "textures": 79911074,
+    "scene": 0,
+    "audio": 40002202,
+    "loading": 128519238,
     "margin": 0
    }
   },
   "ledger/open-plot-alien-plain/control": {
-   "value": 65190274,
+   "value": 42320099,
    "contentKey": "open-plot-alien-plain@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 7905147,
-    "geometry": 9258390,
-    "textures": 11671904,
+    "geometry": 9189566,
+    "textures": 3283316,
     "scene": 0,
-    "audio": 20620048,
-    "loading": 11518609,
+    "audio": 8044048,
+    "loading": 9681846,
     "margin": 0
    }
   },
   "ledger/open-plot-alien-plain/peak": {
-   "value": 65190274,
+   "value": 65096502,
    "contentKey": "open-plot-alien-plain@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 7905147,
-    "geometry": 9258390,
+    "geometry": 9189566,
     "textures": 11671904,
     "scene": 0,
     "audio": 20620048,
-    "loading": 11518609,
+    "loading": 11493661,
     "margin": 0
    }
   },
   "ledger/open-plot-clockwork-canyon/control": {
-   "value": 93527297,
+   "value": 62344517,
    "contentKey": "open-plot-clockwork-canyon@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10145518,
-    "geometry": 16653208,
-    "textures": 11673304,
-    "scene": 9408,
-    "audio": 24848663,
-    "loading": 25981020,
+    "geometry": 16577112,
+    "textures": 3284704,
+    "scene": 0,
+    "audio": 11744663,
+    "loading": 16376344,
     "margin": 0
    }
   },
   "ledger/open-plot-clockwork-canyon/peak": {
-   "value": 93527297,
+   "value": 86511937,
    "contentKey": "open-plot-clockwork-canyon@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10145518,
-    "geometry": 16653208,
+    "geometry": 16577112,
     "textures": 11673304,
-    "scene": 9408,
+    "scene": 0,
     "audio": 24848663,
-    "loading": 25981020,
+    "loading": 19051164,
     "margin": 0
    }
   },
   "ledger/open-plot-coral-drift/control": {
-   "value": 94311780,
+   "value": 66740272,
    "contentKey": "open-plot-coral-drift@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8885894,
-    "geometry": 22120632,
-    "textures": 12015968,
+    "geometry": 21870636,
+    "textures": 3627380,
     "scene": 0,
-    "audio": 16953574,
-    "loading": 30119536,
+    "audio": 7545574,
+    "loading": 20594612,
     "margin": 0
    }
   },
   "ledger/open-plot-coral-drift/peak": {
-   "value": 94311780,
+   "value": 89097152,
    "contentKey": "open-plot-coral-drift@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8885894,
-    "geometry": 22120632,
+    "geometry": 21870636,
     "textures": 12015968,
     "scene": 0,
     "audio": 16953574,
-    "loading": 30119536,
+    "loading": 25154904,
     "margin": 0
    }
   },
   "ledger/open-plot-desert-ruin/control": {
-   "value": 108071083,
+   "value": 74080429,
    "contentKey": "open-plot-desert-ruin@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10499964,
-    "geometry": 21104636,
-    "textures": 12347536,
+    "geometry": 20997068,
+    "textures": 3958948,
     "scene": 0,
-    "audio": 30585461,
-    "loading": 29317310,
+    "audio": 14361461,
+    "loading": 20046812,
     "margin": 0
    }
   },
   "ledger/open-plot-desert-ruin/peak": {
-   "value": 108071083,
+   "value": 103104343,
    "contentKey": "open-plot-desert-ruin@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10499964,
-    "geometry": 21104636,
+    "geometry": 20997068,
     "textures": 12347536,
     "scene": 0,
     "audio": 30585461,
-    "loading": 29317310,
+    "loading": 24458138,
     "margin": 0
    }
   },
   "ledger/open-plot-ember-forge/control": {
-   "value": 82206825,
+   "value": 64693534,
    "contentKey": "open-plot-ember-forge@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 11826643,
-    "geometry": 14667978,
-    "textures": 12056192,
+    "geometry": 14499682,
+    "textures": 12056204,
     "scene": 0,
-    "audio": 16223131,
-    "loading": 23216705,
+    "audio": 7919131,
+    "loading": 14175698,
     "margin": 0
    }
   },
   "ledger/open-plot-ember-forge/peak": {
-   "value": 82206825,
+   "value": 76718205,
    "contentKey": "open-plot-ember-forge@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 11826643,
-    "geometry": 14667978,
-    "textures": 12056192,
+    "geometry": 14499682,
+    "textures": 12056204,
     "scene": 0,
     "audio": 16223131,
-    "loading": 23216705,
+    "loading": 17896369,
     "margin": 0
    }
   },
   "ledger/open-plot-fossil-badlands/control": {
-   "value": 79785328,
+   "value": 53304123,
    "contentKey": "open-plot-fossil-badlands@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8754950,
-    "geometry": 13760904,
-    "textures": 11674648,
-    "scene": 672,
-    "audio": 23665117,
-    "loading": 17712861,
+    "geometry": 13667856,
+    "textures": 3286052,
+    "scene": 0,
+    "audio": 9841117,
+    "loading": 13537972,
     "margin": 0
    }
   },
   "ledger/open-plot-fossil-badlands/peak": {
-   "value": 79785328,
+   "value": 78083956,
    "contentKey": "open-plot-fossil-badlands@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8754950,
-    "geometry": 13760904,
+    "geometry": 13667856,
     "textures": 11674648,
-    "scene": 672,
+    "scene": 0,
     "audio": 23665117,
-    "loading": 17712861,
+    "loading": 16105209,
     "margin": 0
    }
   },
   "ledger/open-plot-frostline-peaks/control": {
-   "value": 95307055,
+   "value": 60244385,
    "contentKey": "open-plot-frostline-peaks@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10494859,
-    "geometry": 15641704,
-    "textures": 13740184,
-    "scene": 3216,
-    "audio": 21964048,
-    "loading": 29246868,
+    "geometry": 15511388,
+    "textures": 5351588,
+    "scene": 0,
+    "audio": 9580048,
+    "loading": 15090326,
     "margin": 0
    }
   },
   "ledger/open-plot-frostline-peaks/peak": {
-   "value": 95307055,
+   "value": 87739991,
    "contentKey": "open-plot-frostline-peaks@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10494859,
-    "geometry": 15641704,
+    "geometry": 15511388,
     "textures": 13740184,
-    "scene": 3216,
+    "scene": 0,
     "audio": 21964048,
-    "loading": 29246868,
+    "loading": 21813336,
     "margin": 0
    }
   },
   "ledger/open-plot-jungle-ziggurat/control": {
-   "value": 89857357,
+   "value": 68008276,
    "contentKey": "open-plot-jungle-ziggurat@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10291920,
-    "geometry": 16238272,
-    "textures": 12351648,
+    "geometry": 16083248,
+    "textures": 12351660,
     "scene": 0,
-    "audio": 20318312,
-    "loading": 26441029,
+    "audio": 9230312,
+    "loading": 15834960,
     "margin": 0
    }
   },
   "ledger/open-plot-jungle-ziggurat/peak": {
-   "value": 89857357,
+   "value": 83019877,
    "contentKey": "open-plot-jungle-ziggurat@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10291920,
-    "geometry": 16238272,
-    "textures": 12351648,
+    "geometry": 16083248,
+    "textures": 12351660,
     "scene": 0,
     "audio": 20318312,
-    "loading": 26441029,
+    "loading": 19758561,
     "margin": 0
    }
   },
   "ledger/open-plot-lantern-bayou/control": {
-   "value": 94825421,
+   "value": 75163219,
    "contentKey": "open-plot-lantern-bayou@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 9339731,
-    "geometry": 21880658,
-    "textures": 11673304,
-    "scene": 12912,
-    "audio": 18436180,
-    "loading": 29266460,
+    "geometry": 21665438,
+    "textures": 11673308,
+    "scene": 0,
+    "audio": 7924180,
+    "loading": 20344386,
     "margin": 0
    }
   },
   "ledger/open-plot-lantern-bayou/peak": {
-   "value": 94825421,
+   "value": 89784305,
    "contentKey": "open-plot-lantern-bayou@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 9339731,
-    "geometry": 21880658,
-    "textures": 11673304,
-    "scene": 12912,
+    "geometry": 21665438,
+    "textures": 11673308,
+    "scene": 0,
     "audio": 18436180,
-    "loading": 29266460,
+    "loading": 24453472,
     "margin": 0
    }
   },
   "ledger/open-plot-mosslight-ruins/control": {
-   "value": 103072386,
+   "value": 79382753,
    "contentKey": "open-plot-mosslight-ruins@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 12244499,
-    "geometry": 22341074,
-    "textures": 12466408,
-    "scene": 10272,
-    "audio": 16051118,
-    "loading": 35742839,
+    "geometry": 22164342,
+    "textures": 12466412,
+    "scene": 0,
+    "audio": 7123118,
+    "loading": 21168206,
     "margin": 0
    }
   },
   "ledger/open-plot-mosslight-ruins/peak": {
-   "value": 103072386,
+   "value": 93532486,
    "contentKey": "open-plot-mosslight-ruins@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 12244499,
-    "geometry": 22341074,
-    "textures": 12466408,
-    "scene": 10272,
+    "geometry": 22164342,
+    "textures": 12466412,
+    "scene": 0,
     "audio": 16051118,
-    "loading": 35742839,
+    "loading": 26389939,
     "margin": 0
    }
   },
   "ledger/open-plot-night-market/control": {
-   "value": 125672097,
+   "value": 91934016,
    "contentKey": "open-plot-night-market@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 13572419,
-    "geometry": 25827966,
+    "geometry": 25681954,
     "textures": 13740184,
-    "scene": 7344,
-    "audio": 24961117,
-    "loading": 43346891,
+    "scene": 0,
+    "audio": 10609117,
+    "loading": 24114166,
     "margin": 0
    }
   },
   "ledger/open-plot-night-market/peak": {
-   "value": 125672097,
+   "value": 114232837,
    "contentKey": "open-plot-night-market@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 13572419,
-    "geometry": 25827966,
+    "geometry": 25681954,
     "textures": 13740184,
-    "scene": 7344,
+    "scene": 0,
     "audio": 24961117,
-    "loading": 43346891,
+    "loading": 32060987,
     "margin": 0
    }
   },
   "ledger/open-plot-patchwork-fairground/control": {
-   "value": 76773561,
+   "value": 49982355,
    "contentKey": "open-plot-patchwork-fairground@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 9175262,
-    "geometry": 12170002,
-    "textures": 11674648,
-    "scene": 1344,
-    "audio": 21189127,
-    "loading": 18347002,
+    "geometry": 12064174,
+    "textures": 3286052,
+    "scene": 0,
+    "audio": 9045127,
+    "loading": 12195564,
     "margin": 0
    }
   },
   "ledger/open-plot-patchwork-fairground/peak": {
-   "value": 76773561,
+   "value": 72828697,
    "contentKey": "open-plot-patchwork-fairground@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 9175262,
-    "geometry": 12170002,
+    "geometry": 12064174,
     "textures": 11674648,
-    "scene": 1344,
+    "scene": 0,
     "audio": 21189127,
-    "loading": 18347002,
+    "loading": 14509310,
     "margin": 0
    }
   },
   "ledger/open-plot-saltwind-lighthouse/control": {
-   "value": 57885916,
+   "value": 32303715,
    "contentKey": "open-plot-saltwind-lighthouse@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1096368,
+    "engine": 548184,
     "workers": 6925771,
-    "geometry": 4981692,
-    "textures": 11674648,
-    "scene": 1344,
-    "audio": 22950502,
-    "loading": 7135783,
+    "geometry": 4907688,
+    "textures": 1571632,
+    "scene": 0,
+    "audio": 11382502,
+    "loading": 5871570,
     "margin": 0
    }
   },
   "ledger/open-plot-saltwind-lighthouse/peak": {
-   "value": 57885916,
+   "value": 57833272,
    "contentKey": "open-plot-saltwind-lighthouse@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 6925771,
-    "geometry": 4981692,
+    "geometry": 4907688,
     "textures": 11674648,
-    "scene": 1344,
+    "scene": 0,
     "audio": 22950502,
-    "loading": 7135783,
+    "loading": 7158487,
     "margin": 0
    }
   },
   "ledger/open-plot-sky-harbor/control": {
-   "value": 78612618,
+   "value": 54572654,
    "contentKey": "open-plot-sky-harbor@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8475370,
-    "geometry": 15761290,
-    "textures": 11674648,
-    "scene": 4704,
-    "audio": 18105574,
-    "loading": 20374856,
+    "geometry": 15679962,
+    "textures": 3286048,
+    "scene": 0,
+    "audio": 7545574,
+    "loading": 15369524,
     "margin": 0
    }
   },
   "ledger/open-plot-sky-harbor/peak": {
-   "value": 78612618,
+   "value": 76368026,
    "contentKey": "open-plot-sky-harbor@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8475370,
-    "geometry": 15761290,
+    "geometry": 15679962,
     "textures": 11674648,
-    "scene": 4704,
+    "scene": 0,
     "audio": 18105574,
-    "loading": 20374856,
+    "loading": 18216296,
     "margin": 0
    }
   },
   "ledger/open-plot-sky-race/control": {
-   "value": 82431297,
+   "value": 56512052,
    "contentKey": "open-plot-sky-race@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8608374,
-    "geometry": 15392706,
-    "textures": 11674648,
-    "scene": 2688,
-    "audio": 22430068,
-    "loading": 20106637,
+    "geometry": 15321754,
+    "textures": 3286048,
+    "scene": 0,
+    "audio": 9998068,
+    "loading": 15081632,
     "margin": 0
    }
   },
   "ledger/open-plot-sky-race/peak": {
-   "value": 82431297,
+   "value": 79932349,
    "contentKey": "open-plot-sky-race@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8608374,
-    "geometry": 15392706,
+    "geometry": 15321754,
     "textures": 11674648,
-    "scene": 2688,
+    "scene": 0,
     "audio": 22430068,
-    "loading": 20106637,
+    "loading": 17681329,
     "margin": 0
    }
   },
   "ledger/open-plot-starfall-observatory/control": {
-   "value": 89450136,
+   "value": 58380559,
    "contentKey": "open-plot-starfall-observatory@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10280755,
-    "geometry": 15723914,
-    "textures": 11673304,
-    "scene": 7344,
-    "audio": 22612180,
-    "loading": 24936463,
+    "geometry": 15646614,
+    "textures": 3284708,
+    "scene": 0,
+    "audio": 9460180,
+    "loading": 15492126,
     "margin": 0
    }
   },
   "ledger/open-plot-starfall-observatory/peak": {
-   "value": 89450136,
+   "value": 82559900,
    "contentKey": "open-plot-starfall-observatory@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10280755,
-    "geometry": 15723914,
+    "geometry": 15646614,
     "textures": 11673304,
-    "scene": 7344,
+    "scene": 0,
     "audio": 22612180,
-    "loading": 24936463,
+    "loading": 18130871,
     "margin": 0
    }
   },
   "ledger/open-plot-thin-ice/control": {
-   "value": 59494736,
+   "value": 36635290,
    "contentKey": "open-plot-thin-ice@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 6196082,
-    "geometry": 6886026,
-    "textures": 11673304,
-    "scene": 6720,
-    "audio": 21525166,
-    "loading": 8991262,
+    "geometry": 6816282,
+    "textures": 3284704,
+    "scene": 0,
+    "audio": 8661166,
+    "loading": 7460880,
     "margin": 0
    }
   },
   "ledger/open-plot-thin-ice/peak": {
-   "value": 59494736,
+   "value": 58032286,
    "contentKey": "open-plot-thin-ice@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 6196082,
-    "geometry": 6886026,
+    "geometry": 6816282,
     "textures": 11673304,
-    "scene": 6720,
+    "scene": 0,
     "audio": 21525166,
-    "loading": 8991262,
+    "loading": 7605276,
     "margin": 0
    }
   },
   "ledger/pastel-plain/control": {
-   "value": 54952078,
+   "value": 27629453,
    "contentKey": "pastel-plain@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
-    "workers": 7057146,
-    "geometry": 7367356,
-    "textures": 12977772,
-    "scene": 5101832,
+    "workers": 6858486,
+    "geometry": 5558684,
+    "textures": 4589172,
+    "scene": 528392,
     "audio": 0,
-    "loading": 18231796,
+    "loading": 5878543,
     "margin": 0
    }
   },
   "ledger/pastel-plain/peak": {
-   "value": 54952078,
+   "value": 44060070,
    "contentKey": "pastel-plain@1",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
-    "workers": 7057146,
-    "geometry": 7367356,
+    "workers": 6858486,
+    "geometry": 5558684,
     "textures": 12977772,
-    "scene": 5101832,
+    "scene": 528392,
     "audio": 0,
-    "loading": 18231796,
+    "loading": 13920560,
     "margin": 0
    }
   },
   "ledger/pine-hollow/control": {
-   "value": 372955575,
+   "value": 335072063,
    "contentKey": "pine-hollow@5",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 524288,
     "workers": 8300285,
-    "geometry": 60073161,
+    "geometry": 46564857,
     "textures": 127285900,
     "scene": 158244,
-    "audio": 46651101,
-    "loading": 127151812,
+    "audio": 22253277,
+    "loading": 127174428,
     "margin": 0
    }
   },
   "ledger/pine-hollow/peak": {
-   "value": 441106309,
+   "value": 387638428,
    "contentKey": "pine-hollow@5",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 524288,
     "workers": 10412040,
-    "geometry": 60073161,
+    "geometry": 46564857,
     "textures": 127285900,
-    "scene": 430296,
+    "scene": 324624,
     "audio": 46651101,
-    "loading": 192918739,
+    "loading": 153064834,
     "margin": 0
    }
   },
   "ledger/sunscar-dunes/control": {
-   "value": 193819449,
+   "value": 150542907,
    "contentKey": "sunscar-dunes@2",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 6414963,
-    "geometry": 12291844,
+    "geometry": 8451616,
     "textures": 81072452,
-    "scene": 5101832,
+    "scene": 528392,
     "audio": 0,
-    "loading": 84722182,
+    "loading": 49859308,
     "margin": 0
    }
   },
   "ledger/sunscar-dunes/peak": {
-   "value": 202894524,
+   "value": 191115497,
    "contentKey": "sunscar-dunes@2",
-   "commit": "dfb1f92fd",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 6414963,
-    "geometry": 12291844,
+    "geometry": 8451616,
     "textures": 81072452,
-    "scene": 5101832,
+    "scene": 528392,
     "audio": 0,
-    "loading": 93797257,
+    "loading": 90431898,
     "margin": 0
    }
   },
@@ -909,15 +903,14 @@
    "why": "STR22: first hosted memory-footprint run on main to judge the walk (44468967622 at 41d629f2), median of 3 (3.44-3.83 MB/s); the mini's 7.30 pin is not comparable"
   },
   "nine/boot/retained-geometry": {
-   "value": 15192309,
+   "value": 13225571,
    "contentKey": "nine-dragon-stack@3",
-   "commit": "eb4a3ae0de",
-   "why": "J444 hosted confirmation: CI 44475068326, 44473130939 attempt 2, 44476646646. Retained plus released geometry was exactly 44163047 B in all three cold boots. Record the median at control."
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "nine/boot/live-heap": {
-   "value": 216970560,
+   "value": 209737927,
    "contentKey": "nine-dragon-stack@3",
-   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "nine/street/triangles95": {
    "value": 904000,
@@ -1240,6 +1233,106 @@
    "contentKey": "sunscar-dunes@2",
    "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
    "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "download/phone/brasscap-mesa": {
+   "value": 8641446,
+   "contentKey": "brasscap-mesa@9",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/ink-cel-valley": {
+   "value": 3670722,
+   "contentKey": "ink-cel-valley@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-alien-plain": {
+   "value": 7437567,
+   "contentKey": "open-plot-alien-plain@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-clockwork-canyon": {
+   "value": 10007932,
+   "contentKey": "open-plot-clockwork-canyon@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-coral-drift": {
+   "value": 10020000,
+   "contentKey": "open-plot-coral-drift@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-desert-ruin": {
+   "value": 10139236,
+   "contentKey": "open-plot-desert-ruin@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-ember-forge": {
+   "value": 8583220,
+   "contentKey": "open-plot-ember-forge@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-fossil-badlands": {
+   "value": 7382220,
+   "contentKey": "open-plot-fossil-badlands@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-frostline-peaks": {
+   "value": 10112557,
+   "contentKey": "open-plot-frostline-peaks@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-jungle-ziggurat": {
+   "value": 9501885,
+   "contentKey": "open-plot-jungle-ziggurat@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-lantern-bayou": {
+   "value": 9493353,
+   "contentKey": "open-plot-lantern-bayou@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-mosslight-ruins": {
+   "value": 12342070,
+   "contentKey": "open-plot-mosslight-ruins@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-night-market": {
+   "value": 12299448,
+   "contentKey": "open-plot-night-market@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-patchwork-fairground": {
+   "value": 7070665,
+   "contentKey": "open-plot-patchwork-fairground@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-saltwind-lighthouse": {
+   "value": 6094448,
+   "contentKey": "open-plot-saltwind-lighthouse@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-sky-harbor": {
+   "value": 8191465,
+   "contentKey": "open-plot-sky-harbor@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-sky-race": {
+   "value": 8286853,
+   "contentKey": "open-plot-sky-race@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-starfall-observatory": {
+   "value": 9510563,
+   "contentKey": "open-plot-starfall-observatory@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/open-plot-thin-ice": {
+   "value": 6663130,
+   "contentKey": "open-plot-thin-ice@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+  },
+  "download/phone/pastel-plain": {
+   "value": 3670677,
+   "contentKey": "pastel-plain@1",
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   }
  }
 }
