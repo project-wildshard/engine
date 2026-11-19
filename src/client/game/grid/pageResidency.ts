@@ -106,7 +106,8 @@ export class PageResidency {
     const claim = this.claim;
     if (claim === undefined || !this.wholePage) return undefined;
     const id = `sim:${claim.instance}`, entries = this.allocator.entries(), home = entries.find(entry => entry.id === id);
-    if (home === undefined) return undefined;
+    // QA 11-19 row 55: only the measured boot claim covers; a road start released it, and an ordinary claim of the same home may hold the id
+    if (home === undefined || !this.allocator.measuredPage(id)) return undefined;
     const others = entries.reduce((sum, entry) => sum + (entry.id !== 'page:composer' && entry.coveredBy === id ? entry.bytes : 0), 0);
     return others + bytes <= home.bytes ? id : undefined;
   }
@@ -194,6 +195,8 @@ export class PageResidency {
       const entry = this.allocator.entries().find(row => row.id === id);
       if (entry?.refs !== 1) throw new Error('Home preclaim release requires its sole boot reference');
       this.bootLease?.release(); this.bootLease = undefined; releasedPending = true;
+      // QA 11-19 row 55: the measured reading went with it, so it covers nothing any more
+      this.wholePage = false;
     };
     this.claim = Object.freeze({ instance, get bytes(): number { return reading.bytes; }, allocator: this.allocator, retain, handoff, releasePending });
     return this.claim;

@@ -120,7 +120,11 @@ export class ResidencyAllocator {
    * larger current allocations increase the envelope, and the component remains a visible page-owned claim.
    * `coveredBy` names a measured whole-page home claim that already contains this component (SF57): while it lives, the
    * component charges nothing and returns its calibration credit, since that home's reading subtracted the same base. */
-  reservePageComponent(id: string, bytes: number, calibratedCredit: number, coveredBy?: string): ResidencyLease | null {
+  reservePageComponent(id: string, bytes: number, calibratedCredit: number, asked?: string): ResidencyLease | null {
+    // QA 11-19 row 55 (staging v0.1.52, "Page coverage requires a measured whole-page claim" every frame from present()): a page
+    // component whose cover no longer stands (the home's measured boot claim went, and an ordinary claim took its id) is charged
+    // uncovered, as `composerCover` charges a composer that outgrew its reading, never thrown into the render loop
+    const coveredBy = asked !== undefined && this.pageCovers(asked, id, bytes) ? asked : undefined;
     if (!Number.isSafeInteger(calibratedCredit) || calibratedCredit < 0 || calibratedCredit > CONTENT_CAPS.engineBase) throw new RangeError('Invalid engine calibration');
     const claim: ResidencyClaim & { baseCredit: number } = { id, category: 'page', bytes, owner: 'platform', needed: true, distance: 0, baseCredit: Math.min(bytes, calibratedCredit), ...(coveredBy === undefined ? {} : { coveredBy }) };
     const existing = this.entries_.get(id);
@@ -224,6 +228,16 @@ export class ResidencyAllocator {
     const entry = this.entries_.get(id);
     if (entry?.category !== 'sim' || entry.coveredBy !== undefined) throw new Error('Only a live sim claim can be a measured whole page');
     this.measured.add(id);
+  }
+
+  /** SF57: whether `id` is a live measured whole-page claim (`markMeasuredPage`), the only kind that may cover a page component. */
+  measuredPage(id: string): boolean { return this.entries_.has(id) && this.measured.has(id); }
+  /** Whether `covering` may cover page component `id` at `bytes` now (`validateCoverage`'s page rules, as a question). */
+  private pageCovers(covering: string, id: string, bytes: number): boolean {
+    const parent = this.entries_.get(covering);
+    if (parent?.category !== 'sim' || parent.coveredBy !== undefined || id === covering || !this.measured.has(covering)) return false;
+    const remaining = this.coverageRemaining(covering, id);
+    return remaining !== null && Number.isSafeInteger(bytes) && bytes <= remaining;
   }
 
   /** True while the id is resident (held by at least one lease). */
