@@ -4,7 +4,10 @@ import type { InputContextDef } from '../../../server/engine/level/context';
 import { app } from '../app/runtime';
 import type * as THREE from 'three';
 import { Game } from './Game';
-import { applyLevelTier, TIER } from './tier';
+import { applyLevelTier, TIER, TIER_CONFIG } from './tier';
+import { applyDensityLod } from '../render/densityLod';
+import { densityIn } from './graphicsQuality';
+import { graphicsMode } from './graphicsMode';
 import { readyWebGLContext } from './webglStartup';
 import { recordBootCheckpoint } from '../boot/bootTrace';
 import { issueBakedPrograms } from '../boot/earlyPrograms';
@@ -57,6 +60,7 @@ export interface World {
  */
 export async function bootstrap(step: StepRunner, level: LevelSpec, inputContexts: readonly InputContextDef[] = []): Promise<World> {
   applyLevelTier(level.tiers?.[TIER]);
+  applyDensityLod(TIER_CONFIG, TIER, densityIn(graphicsMode())); // IP34: phone Low's LOD knobs at its drawing density
   const params = new URLSearchParams(location.search);
   const num = (k: string, d: number): number => { const v = params.get(k); return v === null ? d : Number.parseFloat(v); };
   // The selected shard was resolved before main.ts removes ?chunk from a standalone PWA URL.
