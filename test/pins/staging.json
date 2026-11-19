@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "bfe1afc70e74d197ed662611e26aa6a068f9f16f735b7c6ae92be51384f6a8fb",
+  "catalogueHash": "dd0b06dd7dff14217463e397c045cca37d92084e4f5c1b5fef4cf8a1d1310d69",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -625,14 +625,6 @@
           ]
         },
         {
-          "instance": "mu9-auto-20261116",
-          "slug": "mu9-auto-20261116",
-          "cell": [
-            1,
-            3
-          ]
-        },
-        {
           "instance": "mossgate",
           "slug": "mossgate",
           "cell": [
@@ -654,22 +646,6 @@
           "cell": [
             3,
             2
-          ]
-        },
-        {
-          "instance": "cinder-orchard",
-          "slug": "cinder-orchard",
-          "cell": [
-            3,
-            1
-          ]
-        },
-        {
-          "instance": "stranger",
-          "slug": "stranger",
-          "cell": [
-            3,
-            0
           ]
         }
       ],
@@ -696,14 +672,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 10,
-        "hash": "6fd1d8de0cc063330dc2d6902c437849de53c93a801d5a006b96cced6cba9f2e"
-      },
-      {
-        "slug": "cinder-orchard",
-        "name": "Cinder Orchard",
-        "revision": 2,
-        "hash": "17bd5ad1757f833e1253ecc1ebdd2330fda49587111d1018e632adb03c314966"
+        "revision": 11,
+        "hash": "1214e5e2930ffa6b65243dce75401ecb8b5fde01a8cd86df6f17722451faff23"
       },
       {
         "slug": "driftwood-isle",
@@ -738,14 +708,8 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "revision": 3,
-        "hash": "9685906d2166b350c6251bfe6b44399b7a8692ae0d730716ad85a7156959c3d9"
-      },
-      {
-        "slug": "mu9-auto-20261116",
-        "name": "mu9-auto-20261116",
-        "revision": 1,
-        "hash": "25fa04cd98ced6a8fd14b7d267a434aab15dec3920f4d0cb30b22ba7471a9ba0"
+        "revision": 6,
+        "hash": "b1a7ffb471277b43d72e931f34abca264da04522e8260ac048d7f867208f2dba"
       },
       {
         "slug": "nalati-grasslands",
@@ -870,14 +834,8 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 6,
-        "hash": "86c0ecc51749c9969283c1ed7e0d9abf3d3f8eef08784f6b0b69b5c8fc4b883e"
-      },
-      {
-        "slug": "stranger",
-        "name": "Stranger",
-        "revision": 5,
-        "hash": "1e40f4c09089745d23eb05893a6cc149ce747bec10dc8dac634de2da7d96ac80"
+        "revision": 7,
+        "hash": "2f9c5dc6f240188e5e6c6c7c3bcbc5b25fcb2d5864a5710987fe3c78cfb8e5d5"
       },
       {
         "slug": "sunscar-dunes",
@@ -891,15 +849,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 10,
-      "hash": "6fd1d8de0cc063330dc2d6902c437849de53c93a801d5a006b96cced6cba9f2e",
-      "bytes": 21988864
-    },
-    {
-      "slug": "cinder-orchard",
-      "revision": 2,
-      "hash": "17bd5ad1757f833e1253ecc1ebdd2330fda49587111d1018e632adb03c314966",
-      "bytes": 11980800
+      "revision": 11,
+      "hash": "1214e5e2930ffa6b65243dce75401ecb8b5fde01a8cd86df6f17722451faff23",
+      "bytes": 22113792
     },
     {
       "slug": "driftwood-isle",
@@ -933,15 +885,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 3,
-      "hash": "9685906d2166b350c6251bfe6b44399b7a8692ae0d730716ad85a7156959c3d9",
-      "bytes": 19700224
-    },
-    {
-      "slug": "mu9-auto-20261116",
-      "revision": 1,
-      "hash": "25fa04cd98ced6a8fd14b7d267a434aab15dec3920f4d0cb30b22ba7471a9ba0",
-      "bytes": 436736
+      "revision": 6,
+      "hash": "b1a7ffb471277b43d72e931f34abca264da04522e8260ac048d7f867208f2dba",
+      "bytes": 19310080
     },
     {
       "slug": "nalati-grasslands",
@@ -1065,15 +1011,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 6,
-      "hash": "86c0ecc51749c9969283c1ed7e0d9abf3d3f8eef08784f6b0b69b5c8fc4b883e",
-      "bytes": 313806336
-    },
-    {
-      "slug": "stranger",
-      "revision": 5,
-      "hash": "1e40f4c09089745d23eb05893a6cc149ce747bec10dc8dac634de2da7d96ac80",
-      "bytes": 4965888
+      "revision": 7,
+      "hash": "2f9c5dc6f240188e5e6c6c7c3bcbc5b25fcb2d5864a5710987fe3c78cfb8e5d5",
+      "bytes": 314192384
     },
     {
       "slug": "sunscar-dunes",
