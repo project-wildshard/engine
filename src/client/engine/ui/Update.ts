@@ -18,7 +18,7 @@ import { engineString } from '../../../shared/engine/strings';
  */
 import { isDev, onDev } from '../core/devMode';
 import { reloadForPlayer } from './playerReload';
-import { buildLabel, checkLiveBuild, compactBuildLabel, liveBuildOf, shortBuild, workerControlled } from './buildCheck';
+import { buildLabel, checkLiveBuild, compactBuildLabel, liveBuildOf, shortBuild } from './buildCheck';
 
 
 // The update pill exists before content is selected; keep App and Three out of the entry graph.
@@ -54,6 +54,8 @@ scope.listen(el, 'click', reload);
 scope.listen(window, 'pageshow', event => { if (event.persisted) busy = false; });
 
 let newLabel = '';
+/** row 50: /version.json last said a build other than this page's is live */
+let liveNewer = false;
 /** FM5 mode 13: the last check failed (its status), until a check answers. Only a developer is told (decision 5: play is not
  *  affected); the status rides the pill's title, not its words, and the words count down to the next 5-minute poll. */
 let checkFailed: { status: number | null } | null = null;
@@ -96,22 +98,27 @@ scope.listen(window, 'ws-sw-waiting', event => {
   if (!(event instanceof CustomEvent)) return;
   const value: unknown = event.detail;
   if (typeof value !== 'object' || value === null || !('waiting' in value)) return;
-  if (value.waiting === null) dim();
+  if (value.waiting === null) { if (!liveNewer) dim(); }
   else if ('build' in value && typeof value.build === 'string') lightUp(shortBuild(value.build));
 });
 
 const check = (): Promise<unknown> => checkLiveBuild();
-// any read of /version.json (this pill's, or Settings ▸ Build's Check): a page a worker controls lights the pill only once
-// that worker has installed the build (`ws-sw-waiting` above); any other page reloads straight into it
+// any read of /version.json (this pill's, or Settings ▸ Build's Check) lights the pill when another build is live, on a page a
+// worker controls too (QA 11-19 row 50: Jake's home-screen app waited on the new worker's whole generation download, which
+// iOS kept from finishing, and never lit). The tap adopts an installed worker when there is one; otherwise it reloads, and
+// the controlling worker, told the live build (boot/sw.ts LIVE), answers that reload with the network's new page.
 scope.listen(window, 'ws-live-build', event => {
   const build = liveBuildOf(event);
   if (build !== null && checkFailed !== null) { checkFailed = null; paint(); }
-  if (build === null || workerControlled()) return;
-  if (build !== __BUILD_ID__) lightUp(shortBuild(build));
+  if (build === null) return;
+  liveNewer = build !== __BUILD_ID__;
+  if (liveNewer) lightUp(shortBuild(build));
   else dim();
 });
 void check();
 scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') void check(); });
+// row 50: a page restored from the bfcache is a foreground too
+scope.listen(window, 'pageshow', event => { if (event.persisted) void check(); });
 scope.interval(5 * 60 * 1000, () => { void check(); });
 
 // Only show while on the loading / title screen; hide once the player has entered the chunk. Players: only when a new build waits.

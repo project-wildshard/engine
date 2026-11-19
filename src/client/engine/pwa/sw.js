@@ -509,6 +509,11 @@ const bakedDocument = () => new Response(DOCUMENT, { headers: { ...DOCUMENT_HEAD
  *  document anyway (offline, or a link that never answers). */
 const NAVIGATION_WAIT_MS = 6000;
 let generationHeld = false;
+/** QA-FEEDBACK 11-19 row 50 (Jake's home-screen app sat on v0.1.50 for 15 min after 0.1.52 went live, "can't refresh"): the
+ *  build the server has live, as the page last read it from /version.json (`LIVE`), or null before any read. A newer one
+ *  means this worker's document is no longer the live shell. */
+let liveBuild = null;
+const newerLive = () => liveBuild !== null && liveBuild !== BUILD && !BUILD.startsWith(`${liveBuild}-`);
 /** Whether this build's whole generation is held (its book is written only once every file is). Only a yes is remembered. */
 async function holdsGeneration() {
   if (generationHeld) return true;
@@ -523,7 +528,9 @@ async function holdsGeneration() {
  *  way: a `/slug/<x>` stays itself.
  *  @param {Request} request */
 async function navigation(request) {
-  if (await holdsGeneration()) return bakedDocument();
+  // row 50: once a newer build is live the network's page answers, so a reload (or the next launch while this worker lives)
+  // boots the new shell instead of this worker's old one; offline, or no answer in NAVIGATION_WAIT_MS, still boots this one
+  if (await holdsGeneration() && !newerLive()) return bakedDocument();
   const waited = new Promise(resolve => { workerScope.timeout(NAVIGATION_WAIT_MS, () => { resolve(undefined); }); });
   const online = fetch(request).then(response => response.type === 'opaqueredirect' || response.ok && isHtml(response) ? response : undefined,
     () => undefined);
@@ -571,6 +578,8 @@ workerScope.listen(self, 'message', event => {
   const type = event.data?.type;
   if (type === 'BOOT_TIMING') {const id=event.source?.id, rows=bootPending.get(id) ?? [];bootPending.delete(id);event.source?.postMessage({__engineBootTiming:1,serviceWorker:true,attempt:event.data.attempt,records:rows}, []);return;}
   if (type === 'SKIP_WAITING') { event.waitUntil(self.skipWaiting()); return; }
+  // row 50: the page read /version.json; its build is what the network's page now is (src/client/engine/boot/sw.ts)
+  if (type === 'LIVE') { const build = event.data?.build; if (typeof build === 'string' && build !== '') liveBuild = build; return; }
   if (type === 'PAUSE') { pausePrecache(event.source?.id); return; }
   if (type === 'PRECACHE') {
     // Adoption waits on this reply: a build is offered as the next document's worker only once its code is held.

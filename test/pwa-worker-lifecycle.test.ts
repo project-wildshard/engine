@@ -370,6 +370,31 @@ test('STALESHELL: a worker holding its whole generation boots its own document a
   expect(f.fetch).not.toHaveBeenCalled();
 });
 
+// QA-FEEDBACK 11-19 row 50 (Jake's home-screen app sat on v0.1.50 for 15 min after v0.1.52 went live, "can't refresh to
+// 0.1.52"): a worker holding its whole generation answered every reload with its own old document until the new worker had
+// downloaded its generation. Told by the page that a newer build is live, it asks the network first.
+test('row 50: told a newer build is live, a worker holding its generation answers a reload with the network\'s new page', async () => {
+  let online = true;
+  const f = fixture(request => {
+    if (!online) return Promise.reject(new TypeError('offline'));
+    const path = new URL(request.url).pathname;
+    return Promise.resolve(path === '/' || path.startsWith('/slug/') ? page('B') : new Response(`body:${request.url}`));
+  });
+  const held = f.load('A', ['/b/A/entry-aaaaaaaa.js']); await held.dispatch('install'); await held.dispatch('activate'); await held.dispatch('message', precached);
+  // its own build live (the version.json build is the commit; the worker's is `<commit>-<stamp>`): its own document at once
+  await held.dispatch('message', { data: { type: 'LIVE', build: 'A' } as { type: string } });
+  f.fetch.mockClear();
+  expect(await (await held.dispatch('fetch', { request: nav('/slug/blender-template') }))?.text()).toBe(document);
+  expect(f.fetch).not.toHaveBeenCalled();
+  // a newer build live: the network's page, the URL kept
+  await held.dispatch('message', { data: { type: 'LIVE', build: 'B' } as { type: string } });
+  expect(await (await held.dispatch('fetch', { request: nav('/slug/blender-template') }))?.text()).toBe('<!doctype html><html><body>network page B</body></html>');
+  expect(f.fetch.mock.calls.map(([input]) => new URL(typeof input === 'string' ? input : input.url).pathname)).toEqual(['/slug/blender-template']);
+  // offline it still boots what it holds
+  online = false;
+  expect(await (await held.dispatch('fetch', { request: nav('/') }))?.text()).toBe(document);
+});
+
 test('STALESHELL: over a whole build, an update downloads its whole generation in its install, then takes over without waiting for every tab to close', async () => {
   let failing = false;
   const f = fixture(request => Promise.resolve(failing && request.url.endsWith('-bbbbbbbb.js') ? new Response('', { status: 503 }) : new Response(`body:${request.url}`)));

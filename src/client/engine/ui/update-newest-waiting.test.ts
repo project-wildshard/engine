@@ -32,7 +32,9 @@ afterEach(async () => {
   vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();
 });
 
-test('a third discovery darkens B until C is installed and stale version replies cannot relight B', async () => {
+// QA 11-19 row 50: a newer live build keeps the pill lit while its worker installs (Jake's home-screen app waited on that
+// install and never lit); the waiting worker it offers is still only the newest, and the controller is told what is live.
+test('a third discovery keeps the pill lit for C, offers B no more, and stale version replies cannot bring B back', async () => {
   vi.stubGlobal('__BUILD_ID__', 'fixture-before');
   let latest = 'fixture-second';
   const fetch = vi.fn(() => Promise.resolve(Response.json({build: latest})));
@@ -54,11 +56,12 @@ test('a third discovery darkens B until C is installed and stale version replies
   fetch.mockImplementationOnce(() => new Promise<Response>(resolve => { finishOld = resolve; }));
   document.dispatchEvent(new Event('visibilitychange'));
   latest = 'fixture-third'; document.dispatchEvent(new Event('visibilitychange'));
-  await vi.waitFor(() => { expect(wsSw.waiting).toBeNull(); expect(pill.classList.contains('newer')).toBe(false); });
+  await vi.waitFor(() => { expect(wsSw.waiting).toBeNull(); expect(active.messages).toContainEqual({type: 'LIVE', build: 'fixture-third'}); });
+  expect(pill.classList.contains('newer')).toBe(true);
   const stale = Response.json({build: 'fixture-second'}), read = vi.spyOn(stale, 'json'); finishOld(stale);
   await vi.waitFor(() => { expect(read).toHaveBeenCalled(); });
   const consumed: unknown = read.mock.results[0]?.value; await consumed; await Promise.resolve();
-  expect(pill.classList.contains('newer')).toBe(false);
+  expect(wsSw.waiting).toBeNull(); expect(pill.classList.contains('newer')).toBe(true);
   registration.waiting = third; third.state = 'installed'; third.dispatchEvent(new Event('statechange'));
   await vi.waitFor(() => { expect(wsSw.waiting).toBe(third); expect(pill.classList.contains('newer')).toBe(true); });
   expect(second.replies.length).toBeGreaterThan(0); await second.reply();

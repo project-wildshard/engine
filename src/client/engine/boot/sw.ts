@@ -145,6 +145,9 @@ function noticeActivated(w: ServiceWorker): void {
 
 function discovered(build: string): void {
   if (newestBuild !== build) { newestBuild = build; discovery++; unavailable(); }
+  // QA 11-19 row 50: the controlling worker answers navigations network-first once a newer build is live (sw.js LIVE), so
+  // a reload serves the new shell before the new worker has downloaded its generation
+  try { sw?.controller?.postMessage({ type: 'LIVE', build }); } catch { /* a retired controller serves no next navigation */ }
   const reg = watched;
   if (reg === null) return;
   if (api.waiting !== reg.waiting) unavailable();
