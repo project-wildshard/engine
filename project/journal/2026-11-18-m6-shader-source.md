@@ -24,4 +24,5 @@ The GLSL identity suite compares pinned graph output byte for byte with
 and without replay. The local production session occupied 4,396,366 raw
 bytes and 1,359,350 gzip bytes, under both caps. The old emitter remains
 the default and the fallback for the next release. The save contract
-records the new version-one device setting.
+records the new version-one device setting. The title reads only that
+setting; selecting a world with it enabled imports the renderer cache.

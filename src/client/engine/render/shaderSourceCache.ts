@@ -1,10 +1,5 @@
 import type { Scope } from '@wildshard/engine/app/scope';
-import { jsonSlot } from '../saves/slots';
 import { sha256 } from '../../../shared/engine/core/sha256';
-
-export const SHADER_SOURCE_CACHE_SLOT = 'debug.cacheShaderSources';
-const setting = jsonSlot(SHADER_SOURCE_CACHE_SLOT, 'device');
-export const shaderSourceCacheEnabled = (): boolean => setting.read() === true;
 
 type Kind = 'lower' | 'wrap' | 'finish';
 type SourceBook = Record<Kind, Record<string, unknown>>;
