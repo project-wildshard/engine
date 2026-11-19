@@ -147,6 +147,10 @@
 .ws-game-toasts { transition: transform 0.22s ease-out; }
 .ws-game-toasts .ws-game-toast:not(:last-child) { opacity: 0.72; }
 .ws-game-toasts .ws-game-toast:nth-last-child(3) { opacity: 0.45; }
+/* J473 row 5 (Jake, 2026-11-19 grill wave 4): on a phone one toast slot, top centre under the status band (ToastStack steps it
+   under the status column, the tracker and the map), above the crosshair keep-out; one toast at a time, up to two lines */
+#hud.touch .ws-game-toasts { left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100vw - 48px); align-items: center; }
+#hud.touch .ws-game-toasts .ws-game-toast { text-align: center; white-space: normal; line-height: 1.4; }
 
 /* ── damage flash + vignette ── */
 .ws-game-flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 40, 20, 0.55) 100%); opacity: 0; visibility: hidden; }
