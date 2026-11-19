@@ -1,4 +1,5 @@
 import { appIdentity } from '../../../shared/engine/app/identity';
+import { overlayChanged } from '../input/touchHolds';
 import { app } from '../app/runtime';
 import { uiScope } from './ownership';
 import { engineString } from '../../../shared/engine/strings';
@@ -166,6 +167,7 @@ export class PerfHud {
 
   /** the panel is open (or not): collect, observe the DOM, count audio */
   setOpen(open: boolean): void {
+    if (open !== this.open) overlayChanged(); // QA-FEEDBACK 11-19 row 21: the panel sits over the touch controls
     this.open = open;
     frameCost.on = open || this.rec !== null;
     this.dom.set(open || this.rec !== null);

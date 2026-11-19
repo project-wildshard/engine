@@ -14,6 +14,23 @@
  },
  "rows": [
   {
+   "id": "app.state",
+   "kind": "event",
+   "name": "app.state",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/player/TouchControls.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/app/app.ts",
+     "emits": "this.events.emit('app.state'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the app's own state machine; QA-FEEDBACK 11-19 row 21 releases the touch holds when a menu opens or closes."
+  },
+  {
    "id": "weapon.hit",
    "kind": "event",
    "name": "weapon.hit",

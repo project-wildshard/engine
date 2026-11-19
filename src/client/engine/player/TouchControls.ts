@@ -2,6 +2,7 @@ import { mountUi } from '../ui/ownership';
 import { mountBoostLook, mountBoostTag } from '../ui/hoverBoost';
 import { app } from '../app/runtime';
 import { capturePointer, listenDom, listenPage } from '../input/dom';
+import { TouchHolds, wireTouchHolds } from '../input/touchHolds';
 import type { Action, TouchStack, TouchVerbSpec } from '../input/InputService';
 import { engineString } from '../../../shared/engine/strings';
 /**
@@ -123,6 +124,7 @@ export class TouchControls {
   private readonly scope = (app.levelScope ?? app.engineScope).child('touch');
   readonly active: boolean;
   private stickPointer = -1; private lookPointer = -1; private attackPointer = -1;
+  private holds = new TouchHolds(() => undefined); // replaced by the layer's own once it mounts
   /** fingers the stick, look or attack hold whose capture the browser refused (capturePointer): released from the window too */
   private readonly uncaptured = new Set<number>();
   private stickBase = { x: 0, y: 0 };
@@ -281,19 +283,24 @@ export class TouchControls {
     };
 
     // ── stick + look: pointer events on the layer itself (buttons stop propagation; ATTACK hands its touch back via capture) ──
-    listenDom(this.scope, root, 'pointerdown', (e) => {
+    // QA-FEEDBACK 11-19 row 21: a press the stick or look ignored because it was held; if the hold proves stale on this
+    // touch's check (touchHolds.ts), the press takes the control at once
+    let waiting: PointerEvent | null = null;
+    const press = (e: PointerEvent): void => {
       if (e.pointerType === 'mouse' && !force) return;
       const zone = moveZone.getBoundingClientRect();
       const inBar = e.clientY >= zone.top, inMove = inBar && e.clientX <= zone.right;
       if (!inBar && e.clientX <= zone.right) return; // above the bar on the left: not a control surface
-      if (inMove && this.stickPointer < 0) {
+      if (inMove ? this.stickPointer >= 0 : this.lookPointer >= 0) { if (e.pointerId !== this.stickPointer && e.pointerId !== this.lookPointer) waiting = e; return; }
+      this.holds.hold(e.pointerId, e.clientX, e.clientY);
+      if (inMove) {
         this.stickPointer = e.pointerId;
         // the stick is anchored (its ring's centre, left of the ATTACK disc); a touch anywhere in the MOVE zone grabs it
         const ring = stick.getBoundingClientRect();
         this.stickBase = { x: ring.left + ring.width / 2, y: ring.top + ring.height / 2 };
         stick.classList.add('held');
         this.applyStick(e.clientX - this.stickBase.x, e.clientY - this.stickBase.y);
-      } else if (!inMove && this.lookPointer < 0) {
+      } else {
         // the whole right 55 % looks (the bar's LOOK section, the screen above it) — and never attacks. A drag that starts in
         // the bar lights the LOOK pad while it lasts.
         this.lookPointer = e.pointerId;
@@ -301,11 +308,13 @@ export class TouchControls {
         this.lookDown = { x: e.clientX, y: e.clientY }; this.lookT0 = performance.now(); this.lookInBar = inBar;
         this.flick.begin(e.clientX, e.clientY, this.lookT0);
         lookpad.classList.toggle('active', inBar);
-      } else return;
+      }
       if (!capturePointer(root, e.pointerId)) this.uncaptured.add(e.pointerId);
       e.preventDefault();
-    });
+    };
+    listenDom(this.scope, root, 'pointerdown', press);
     listenDom(this.scope, root, 'pointermove', (e) => {
+      this.holds.move(e.pointerId, e.clientX, e.clientY);
       if (e.pointerId === this.stickPointer) {
         this.applyStick(e.clientX - this.stickBase.x, e.clientY - this.stickBase.y);
       } else if (e.pointerId === this.lookPointer) {
@@ -321,7 +330,9 @@ export class TouchControls {
         this.look(dx, dy);
       }
     });
-    const release = (e: PointerEvent) => {
+    const release = (e: Pick<PointerEvent, 'pointerId' | 'type' | 'clientX' | 'clientY'>) => {
+      this.holds.lift(e.pointerId); this.uncaptured.delete(e.pointerId);
+      if (waiting?.pointerId === e.pointerId) waiting = null;
       if (e.pointerId === this.stickPointer) {
         this.stickPointer = -1;
         stick.classList.remove('held');
@@ -355,8 +366,13 @@ export class TouchControls {
     // That finger's lift can then land outside the layer, and the stick, look or attack stayed held: the next touch on it
     // was ignored ("couldn't control anything"). An uncaptured finger is released from the window as well.
     for (const type of ['pointerup', 'pointercancel'] as const) {
-      listenPage(this.scope, type, (e) => { if (this.uncaptured.delete(e.pointerId)) release(e); }, { capture: true });
+      listenPage(this.scope, type, (e) => { if (this.uncaptured.has(e.pointerId)) release(e); }, { capture: true });
     }
+    // QA-FEEDBACK 11-19 row 21: no lost lift strands a control (touchHolds.ts): page hide, blur, pagehide, a lost capture,
+    // an overlay or a menu over the layer, and a check of every hold against the fingers really down on each new touch
+    this.holds = new TouchHolds((pointerId) => { release({ pointerId, type: 'pointercancel', clientX: 0, clientY: 0 }); });
+    wireTouchHolds(this.scope, root, this.holds, () => { const w = waiting; waiting = null; if (w !== null) press(w); });
+    app.events.on('app.state', () => { this.holds.releaseAll(); }, this.scope);
 
     // ── ATTACK / FIRE: fires on touch-down; the disc then captures the touch (its move / up events bubble to the layer's
     //    handlers above), so a drag from it turns the camera while the finger is held and a still hold (melee) becomes the
@@ -366,7 +382,7 @@ export class TouchControls {
       e.stopPropagation(); e.preventDefault();
       if (e.pointerType === 'mouse' && !force) return;
       if (this.attackPointer >= 0) return; // one finger on the disc at a time
-      this.attackPointer = e.pointerId;
+      this.attackPointer = e.pointerId; this.holds.hold(e.pointerId, e.clientX, e.clientY);
       this.attackLast = { x: e.clientX, y: e.clientY }; this.attackPath = 0; this.attackT0 = performance.now();
       if (!capturePointer(attack, e.pointerId)) this.uncaptured.add(e.pointerId);
       attack.classList.add('down');
