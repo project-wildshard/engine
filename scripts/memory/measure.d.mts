@@ -36,7 +36,7 @@ export interface WebkitRun {
   ledger:{totals:Record<string,number>;unattributed:Record<string,number>;byKind:Ledger|null}|null;refused:string|null;samples:number;
   counters:Counters|null;categories:Record<'webcontent'|'gpu',Record<string,number>>|null;probe?:unknown;
 }
-export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean;instrument?:Instrument;probe?:(page:unknown,procs:BrowserProcess[])=>Promise<unknown>;world?:WorldStamp|null;walk?:number}):Promise<WebkitRun>;
+export function webkitBoot(options:{url:string;chunk:string;settleMs?:number;timeoutMs?:number;everyMs?:number;gcs?:number;reads?:number;closure?:boolean;instrument?:Instrument;probe?:(page:unknown,procs:BrowserProcess[])=>Promise<unknown>;prepare?:(context:unknown)=>Promise<void>;world?:WorldStamp|null;walk?:number}):Promise<WebkitRun>;
 export interface MicroscopeRun {host:'chromium';ready:boolean;failure:string|null;gpuDetail:{kinds:Record<string,number>;formats:Record<string,number>;owners:Record<string,number>}|null;checkpoints:{step:string;ledger:Record<string,Record<string,number>>|null;processes:DumpProcess[]}[];timeline?:StallEntry[]|null}
 export function chromiumMicroscope(options:{url:string;chunk:string;timeoutMs?:number;depth?:number;plantRetainedBuffer?:boolean;captureDumps?:boolean}):Promise<MicroscopeRun>;
 export function webkitLines(run:WebkitRun):string[];

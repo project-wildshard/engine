@@ -32,7 +32,8 @@
 // and starts no in-page server worker. `--online=pair` alternates online and standalone boots of the same build and page
 // origin, the order flipped each round. Every run names its boot; an online run that starts the in-page server worker
 // (`standalone-server`) is refused, as is a standalone run that starts none. `--round=k` starts the round count at k, so a
-// shell loop can take one pair per command, each inside the measure lock, with the order still flipping. ratchet.mjs and phone-fit.mjs refuse runs that mix boots, as they do instruments.
+// shell loop can take one pair per command, each inside the measure lock, with the order still flipping. `--online --arm2=<query>`
+// pairs the online boot with itself under a probe's URL switch (STR12's `trisprobe=half`): same build, same world. ratchet.mjs and phone-fit.mjs refuse runs that mix boots, as they do instruments.
 // The online page enters a `?chunk=` shard only where its build's catalogue gives the shard a grid cell (OF3): a shard off the
 // grid (Thin Ice and Desert Ruin, J305) lands on the title, so `--online` refuses it at once. `--place=<slug,...> --out=<file>`
 // writes the pinned catalogue with those shards on ring 3's first free cells (J314's order, from (0,3), where staging puts
@@ -362,10 +363,11 @@ export async function settledReading(page, procs, { settleMs = 2000, gcs = 2, re
 }
 
 /** One cold phone boot in native WebKit, read by the kernel.
- * @param {{url:string, chunk:string, settleMs?:number, timeoutMs?:number, everyMs?:number, gcs?:number, reads?:number, closure?:boolean, instrument?:'minimal'|'full', probe?:(page:any, procs:BrowserProcess[]) => Promise<unknown>}} options
- * `probe` runs at control after the settled reading (a probe script's own reading, kept as `probe` in the run). `walk`
+ * @param {{url:string, chunk:string, settleMs?:number, timeoutMs?:number, everyMs?:number, gcs?:number, reads?:number, closure?:boolean, instrument?:'minimal'|'full', probe?:(page:any, procs:BrowserProcess[]) => Promise<unknown>, prepare?:(context:any) => Promise<void>, world?:{release:string, key:string} | null, walk?:number}} options
+ * `probe` runs at control after the settled reading (a probe script's own reading, kept as `probe` in the run); `prepare`
+ * gets the browser context before the page opens (a probe's init scripts and save fixtures, STR11's GL census). `walk`
  * (seconds, STR18) then walks the zone's route (walk.mjs) with no forced GC and keeps its peak above settled as `walk`. */
-export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false, instrument = 'minimal', probe, world = null, walk = 0 }) {
+export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_000, everyMs = 20, gcs = 2, reads = 5, closure = false, instrument = 'minimal', probe, prepare, world = null, walk = 0 }) {
   const { webkit } = await import('../browser-playwright.mjs');
   const browser = await webkit.launch({ headless: true });
   const load = loadavg()[0];
@@ -376,6 +378,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     // as a staging or prod build does
     await context.addInitScript(WORKER_LOG);
     if (world !== null) await context.addInitScript((stamp) => { Reflect.set(globalThis, '__WS_WORLD__', stamp); }, world);
+    if (prepare) await prepare(context);
     const page = await context.newPage();
     page.setDefaultTimeout(timeoutMs);
     /** @type {string[]} */ const errors = [];
@@ -873,7 +876,9 @@ async function main(argv) {
   const arms = args.url2 ? [{ url: args.url, world: null, name: args.url }, { url: args.url2, world: null, name: args.url2 }]
     : world === null ? [{ url: args.url, world: null, name: args.url }]
       : online === 'pair' ? [{ url: world.url, world: world.stamp, name: 'online' }, { url: world.url, world: null, name: 'standalone' }]
-        : [{ url: world.url, world: world.stamp, name: 'online' }];
+        // MEMORY-STRUCTURE STR12: `--arm2=<k=v&...>` pairs the online boot with the same online boot under a probe switch
+        : args.arm2 ? [{ url: world.url, world: world.stamp, name: 'online' }, { url: `${world.url}?${args.arm2}`, world: world.stamp, name: `online ${args.arm2}` }]
+          : [{ url: world.url, world: world.stamp, name: 'online' }];
   /** @type {Awaited<ReturnType<typeof webkitBoot>>[]} */
   const webkit = [];
   /** @type {Awaited<ReturnType<typeof chromiumWalk>>[]} */
