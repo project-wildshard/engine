@@ -14,6 +14,12 @@ import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { watchFaults } from './proof-faults.mjs';
 
+/** iPhone 17 Pro portrait, as Jake holds it. */
+export const PHONE = Object.freeze({
+  viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, hasTouch: true,
+  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Mobile/15E148 Safari/604.1',
+});
+
 /** The release's read-only phone load. It reaches the real loading card with every socket and write blocked.
  * @param {string} base @param {string} build */
 export async function readOnlyPhoneLoad(base, build) {
@@ -69,12 +75,6 @@ export function capFrames() {
   /* oxlint-enable promise/prefer-await-to-callbacks */
   window.cancelAnimationFrame = (id) => { const n = live.get(id); if (n !== undefined) { cancel(n); live.delete(id); } };
 }
-
-/** iPhone 17 Pro portrait, as Jake holds it. */
-export const PHONE = Object.freeze({
-  viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, hasTouch: true,
-  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Mobile/15E148 Safari/604.1',
-});
 
 /** Runs in the page: what the player sees right now. No app probes; a private document identity distinguishes actual navigation from clock rounding.
  * @returns {Screen} */

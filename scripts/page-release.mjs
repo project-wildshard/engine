@@ -101,10 +101,10 @@ const manifest = {
   version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version,
   saveEpoch: JSON.parse(readFileSync(join(root, 'save-epoch.json'), 'utf8')).saveEpoch,
 };
-/** @param {import('./page-release/flow.mjs').Phase} name @param {import('./page-release/flow.mjs').QaVerdict} [generatedQa] */
-async function run(name, generatedQa) {
+/** @param {import('./page-release/flow.mjs').Phase} step @param {import('./page-release/flow.mjs').QaVerdict} [generatedQa] */
+async function run(step, generatedQa) {
     const qa = generatedQa ?? (value('qa') === undefined ? undefined : readQa(resolve(value('qa') ?? '')));
-    const {refusals} = await runPhase(name, {
+    const {refusals} = await runPhase(step, {
       root, channel: /** @type {any} */ (channel), build, host, releaseKey, codeRetention: true,
       packs: r2Packs({log}),
       ...(flag('content') === undefined ? {} : {content: {
@@ -142,7 +142,7 @@ async function run(name, generatedQa) {
       // the build runs in `root`, so a relative path is the caller's
       ...(value('catalogue') === undefined ? {} : {catalogue: resolve(value('catalogue') ?? '')}),
     });
-    if (refusals.length > 0) log(`DRY-RUN ${channel} ${name}: ${refusals.length} gate(s) would refuse today`);
+    if (refusals.length > 0) log(`DRY-RUN ${channel} ${step}: ${refusals.length} gate(s) would refuse today`);
 }
 try {
   for (phase of phases) {

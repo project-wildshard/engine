@@ -1,15 +1,15 @@
 // J434: stage the checked build, exercise the existing proofs and write one deploy decision.
 import { spawn } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, writeSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve as absolute } from 'node:path';
 import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
 import { readPublication } from '../server-release/sign.mjs';
 import { CHANNELS, RELEASE_PUBLIC_KEY, RefusedError, localQaGap, qaGap } from './flow.mjs';
 
 const stage = CHANNELS.staging;
-const scripts = resolve(import.meta.dirname, '..');
-const toolsRoot = resolve(scripts, '..');
+const scripts = absolute(import.meta.dirname, '..');
+const toolsRoot = absolute(scripts, '..');
 const observerFile = 'mmo-observer.json';
 /** @typedef {import('./flow.mjs').QaVerdict & {findings?: readonly import('../staging-smoke/checks.mjs').Finding[]}} DeploymentQa */
 /** @typedef {{status?:string,continuity?:string,to?:{build?:string,serial?:number}}} Observation */
@@ -42,13 +42,14 @@ function start({ file, args, cwd, out, name, observe }) {
 
 /** @param {{ root:string, out:string, shared:string }} options */
 function observeMove({ root, out, shared }) {
-  /** @type {() => void} */ let ready = () => {};
-  const baseline = new Promise(resolve => { ready = () => resolve(true); });
+  /** @type {((value: boolean) => void) | undefined} */ let ready;
+  /** @type {Promise<boolean>} */
+  const baseline = new Promise(resolve => { ready = resolve; });
   const job = start({ file: process.execPath, args: ['--import', join(scripts, 'bake-loader.mjs'),
     join(scripts, 'mmo-release-observer.mjs'), 'staging', '--seconds', '3600', '--work-dir', shared], cwd: toolsRoot, out, name: 'mmo',
     observe: row => {
-      if (row.phase === 'baseline-playing') ready();
-      if (typeof row.report === 'string' && resolve(row.report).startsWith(`${shared}/`)) {
+      if (row.phase === 'baseline-playing') ready?.(true);
+      if (typeof row.report === 'string' && absolute(row.report).startsWith(`${shared}/`)) {
         const report = read(row.report);
         if (report !== undefined) write(join(root, observerFile), report);
       }
@@ -95,7 +96,7 @@ export async function deployStaging({ root, build, release, source, out, observe
     const findings = [...(qa?.findings ?? []), ...(live?.findings ?? [])];
     if (problem !== undefined) findings.push({ scenario: step, key: 'deploy', severity: 'P1', source: 'check', text: problem });
     const hold = findings.some(row => row.severity === 'P0' || row.severity === 'P1');
-    write(reportPath, { ...(live ?? qa ?? {}), build, release, status: hold ? 'hold' : 'pass', hold, findings,
+    write(reportPath, { ...(live ?? qa), build, release, status: hold ? 'hold' : 'pass', hold, findings,
       aliasMoved, deploy: { local: localQa?.build, qualification: qa, live, observation } });
   };
   try {
