@@ -97,7 +97,7 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     let pageOrigin = '', stamp = { release: '', key: key.public };
     let serial = 0, signed = '', revision = 0, build = '', served = 0;
     const origin = join(work, 'origin'), server = join(work, 'server');
-    const shards = staging?.map(({ slug, revision }) => ({ slug, revision })) ?? [{ slug: shard, revision: 1 }];
+    const shards = staging?.map(row => ({ slug: row.slug, revision: row.revision })) ?? [{ slug: shard, revision: 1 }];
     const cells = staging === undefined ? shard : [shard, ...shards.map(row => row.slug).filter(slug => slug !== shard)].join(',');
     const secret = staging === undefined ? 'dev-world' : randomBytes(32).toString('hex');
     const books = product === undefined ? JSON.parse(run(['--input-type=module', '-e',

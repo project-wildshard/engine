@@ -10,3 +10,8 @@ Public mode uses in-memory saves and the reviewed staging snapshot
 for the client and server. The game door omits the local dev-control
 route. The local build reports the staging grid strip byte overage
 (4,817,545 versus 4,588,000). Release builds enforce the same cap.
+
+The proof served all 32 staging shards through Cloudflare. Chromium
+reached control with a live seat in Nine and Brasscap. A source
+update took 37.1 seconds to reach the public URL. A child failure
+or an interrupt closes the tunnel pair.

@@ -14,11 +14,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
-import { resolve } from 'node:path';
+import { resolve as absolute } from 'node:path';
 import { parseArgs } from 'node:util';
 import { listenLoopback } from '../../rig-listeners.mjs';
 
-const ROOT = resolve(import.meta.dirname, '../../..');
+const ROOT = absolute(import.meta.dirname, '../../..');
 
 /** The tailnet name and whether the tailnet issues HTTPS certificates. @param {string} json */
 export function tailnetName(json) {
@@ -36,6 +36,9 @@ export function quickTunnelOrigin(line) {
 
 /** @param {number} port */
 const tunnelArgs = port => ['tunnel', '--no-autoupdate', '--protocol', 'http2', '--url', `http://127.0.0.1:${String(port)}`];
+
+/** @param {AbortSignal} signal */
+const abortReason = signal => signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason));
 
 /** Wait until the signed release and game door are serving through the two public hosts.
  * @param {string} origin @param {string} socketOrigin @param {AbortSignal} signal */
@@ -61,7 +64,7 @@ async function servePublic(shard, port, socketPort, dryRun) {
   const flags = ['scripts/dev.mjs', '--staging', '--saves', 'memory', '--work', work,
     '--shard', shard, '--port', String(port), '--socket-port', String(socketPort)];
   if (dryRun) {
-    console.log(JSON.stringify({ tunnels: [port, socketPort].map(n => ['cloudflared', ...tunnelArgs(n)]),
+    console.log(JSON.stringify({ tunnels: [port, socketPort].map(n => ['cloudflared'].concat(tunnelArgs(n))),
       dev: ['node', ...flags, '--public-origin', '<page HTTPS>', '--public-socket', '<socket WSS>'] }, null, 2));
     return;
   }
@@ -77,15 +80,14 @@ async function servePublic(shard, port, socketPort, dryRun) {
     stop.signal.throwIfAborted();
     const child = spawn(bin, args, { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     children.add(child);
-    const ended = new Promise((resolve, reject) => {
-      child.once('error', reject);
+    const ended = new Promise(resolve => {
+      child.once('error', error => { stop.abort(error); resolve(undefined); });
       child.once('exit', (code, signal) => {
-        if (stop.signal.aborted) resolve(undefined);
-        else reject(new Error(`${bin} exited (${String(code ?? signal)})`));
+        // An exit at any time, even after readiness, ends the whole share.
+        stop.abort(new Error(`${bin} exited (${String(code ?? signal)})`));
+        resolve(undefined);
       });
     });
-    // An exit at any time, even after readiness, ends the whole share.
-    void ended.catch(error => { stop.abort(error); });
     return { child, ended };
   };
   /** @param {number} target */
@@ -97,7 +99,7 @@ async function servePublic(shard, port, socketPort, dryRun) {
     try {
       const origin = await Promise.race([ended, new Promise((resolve, reject) => {
         const timeout = AbortSignal.any([stop.signal, AbortSignal.timeout(30_000)]);
-        timeout.addEventListener('abort', () => { reject(timeout.reason); }, { once: true });
+        timeout.addEventListener('abort', () => { reject(abortReason(timeout)); }, { once: true });
         lines.on('line', line => {
           const found = quickTunnelOrigin(line);
           if (found !== undefined) resolve(found);
@@ -116,13 +118,13 @@ async function servePublic(shard, port, socketPort, dryRun) {
       await new Promise(resolve => { check.close(() => { resolve(undefined); }); });
     }
     const [origin, socketOrigin] = await Promise.all([tunnel(port), tunnel(socketPort)]);
-    const socket = socketOrigin.replace(/^https:/u, 'wss:') + '/';
+    const socket = `${socketOrigin.replace(/^https:/u, 'wss:')}/`;
     const { child, ended } = start(process.execPath, [...flags, '--public-origin', origin, '--public-socket', socket]);
     child.stderr?.pipe(process.stderr, { end: false });
     if (child.stdout === null) throw new Error('No dev world diagnostic stream');
     const lines = createInterface({ input: child.stdout });
     await new Promise((resolve, reject) => {
-      stop.signal.addEventListener('abort', () => { reject(stop.signal.reason); }, { once: true });
+      stop.signal.addEventListener('abort', () => { reject(abortReason(stop.signal)); }, { once: true });
       lines.on('line', line => {
         if (line.startsWith('engine dev on ')) resolve(undefined);
         else console.log(line);
@@ -132,7 +134,7 @@ async function servePublic(shard, port, socketPort, dryRun) {
     const url = new URL(`/slug/${shard}`, origin);
     console.log(`serve-local: ${url.href} (public, up in ${((performance.now() - started) / 1000).toFixed(1)} s)`);
     await Promise.race([ended, new Promise(resolve => { stop.signal.addEventListener('abort', () => { resolve(undefined); }, { once: true }); })]);
-    if (stop.signal.aborted && !(stop.signal.reason instanceof DOMException)) throw stop.signal.reason;
+    if (stop.signal.aborted && !(stop.signal.reason instanceof DOMException)) throw abortReason(stop.signal);
   } catch (error) {
     if (!stop.signal.aborted || !(stop.signal.reason instanceof DOMException)) throw error;
   } finally {
