@@ -5,7 +5,7 @@ const DAY = 86_400_000, now = Date.parse('2026-11-19T12:00:00-05:00');
 const sha = '12345678'.repeat(5), scope = 'a'.repeat(64);
 function run(id, age) {
   const created = now - age;
-  return { id, sha, created, event: 'push', branch: 'main', receipts: ['A', 'B', 'C', 'D'].map(suite => ({
+  return { id, sha, created, event: 'push', branch: 'main', receipts: ['A', 'B', 'C', 'D', 'E', 'F'].map(suite => ({
     version: 1, suite, scope, complete: true, sha, run: String(id), started: created + 1000,
     event: 'push', ref: 'refs/heads/main', build: '12345678-example', platform: 'linux', status: 0,
     signal: null, error: null, verdict: 'pass', wallMs: 30_000, budgetMs: 120_000,

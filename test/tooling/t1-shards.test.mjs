@@ -12,6 +12,7 @@ test('every actual Template spec belongs to exactly one stable suite shard', () 
     if (spec === 'online.spec.ts') expect(owners).toEqual(['D']);
     if (spec === 'phone.spec.ts') expect(owners).toEqual(['C']);
     if (spec.includes('save')) expect(owners).toEqual(['B']);
+    if (spec.startsWith('journey')) expect(owners).toEqual([spec === 'journey.spec.ts' ? 'E' : 'F']);
   }
 });
 

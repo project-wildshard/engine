@@ -11,67 +11,20 @@ import {
   touchSwipe,
 } from '../../../scripts/bugbash-probes.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
-import {
-  judge,
-  label,
-  PHONE,
-  stickMoves,
-  tapJourney,
-} from '../../../scripts/journey-proof.mjs'
+import { PHONE } from '../../../scripts/journey-proof.mjs'
+import { journey, phoneJourneys } from './journey.ts'
 
-import type { JourneyPath, Sample } from '../../../scripts/journey-proof.mjs'
-import type { Page } from '@playwright/test'
-
-// MAIN-SCREEN MS5 (J399): the same judge on all three ways in: ZONE SELECT and a card, ENTER THE MMO, and the one-zone deep
-// link; each must reach the zone's detailed full-screen loading card and play.
-async function journey(
-  page: Page,
-  run: string,
-  way: JourneyPath = 'select',
-): Promise<void> {
-  await page.goto(
-    way === 'deeplink'
-      ? '/slug/brasscap-mesa?mute=1&nolock=1'
-      : '/?mute=1&nolock=1',
-  )
-  const samples = await tapJourney(page, { card: 'brasscap-mesa', path: way })
-  const path = samples.map(
-    (row: Sample): string => `${String(row.t)}:${label(row.s)}`,
-  )
-  expect(judge(samples), `${run}: ${path.join(' ')}`).toEqual([])
-  expect(await stickMoves(page), `${run}: the stick moves the player`).toBe(
-    true,
-  )
-  await page.goto('about:blank')
-}
-
+// MAIN-SCREEN MS5 (J399): ZONE SELECT and a card, cold then warm. The other two ways in, ENTER THE MMO and the one-zone
+// deep link, are journey-ways.spec.ts (suite F): one 120 s hosted suite cannot hold all four boots (TR-4).
 test('a tapped phone journey shows only menu, loading card and play, cold and warm', async ({
   browser,
   baseURL,
 }): Promise<void> => {
-  test.setTimeout(480_000)
-  const context = await browser.newContext({
-    ...PHONE,
-    isMobile: true,
-    ...(baseURL === undefined ? {} : { baseURL }),
-  })
-  try {
-    // Brasscap is a Developer card; Developer changes no screen on this path
-    await saveFixture(context, { scope: 'device', key: 'devMode', data: true })
-    await harnessPins(context, { seed: 357 })
-    const page = await context.newPage()
-    const errors: string[] = []
-    page.on('pageerror', (error: Readonly<Error>): void => {
-      errors.push(error.message)
-    })
+  test.setTimeout(120_000)
+  await phoneJourneys(browser, baseURL, async (page): Promise<void> => {
     await journey(page, 'cold')
     await journey(page, 'warm')
-    await journey(page, 'ENTER THE MMO', 'mmo')
-    await journey(page, 'deep link', 'deeplink')
-    expect(errors).toEqual([])
-  } finally {
-    await context.close()
-  }
+  })
 })
 
 // STAGING-BUGBASH SB14 (Jake's 12:52 recording): mid-swipe on Shard Select two cards showed at once, the one off the middle

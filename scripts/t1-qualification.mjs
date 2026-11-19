@@ -7,16 +7,17 @@ import { existsSync, appendFileSync, readFileSync, readdirSync, writeFileSync } 
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { scratchDir } from './scratch-dir.mjs';
+import { T1_SHARDS } from './t1-shards.mjs';
 
 const WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
-const SUITES = ['A', 'B', 'C', 'D'];
+const SUITES = Object.keys(T1_SHARDS);
 /** @typedef {{id:number,name:string,created_at:string,expired:boolean,workflow_run?:{id:number,head_branch:string}}} GithubArtifact */
 /** Changing the suite or runner resets qualification; ordinary game changes do not.
  * @param {string} [root] */
 export function t1Scope(root = process.cwd()) {
   const files = readdirSync(resolve(root, 'src/e2e/t1')).filter(name => name.endsWith('.ts')).sort().map(name => `src/e2e/t1/${name}`);
   const digest = createHash('sha256');
-  for (const file of [...files, 'scripts/t1-shards.mjs', 'scripts/t1-batch.mjs', 'scripts/t1-ci-proof.mjs', 'scripts/t1-e2e.mjs', 'scripts/t1-runner.mjs']) digest.update(file).update('\0').update(readFileSync(resolve(root, file))).update('\0');
+  for (const file of [...files, 'scripts/t1-shards.mjs', 'scripts/t1-ci-proof.mjs', 'scripts/t1-e2e.mjs', 'scripts/t1-runner.mjs']) digest.update(file).update('\0').update(readFileSync(resolve(root, file))).update('\0');
   return digest.digest('hex');
 }
 export const t1ContentReady = () => existsSync('src/e2e/t1/content.spec.ts');
@@ -91,7 +92,7 @@ export async function readT1Qualification(env, now = Date.now()) {
   /** @type {GithubArtifact[]} */
   const candidates = [];
   for (let page = 1; page <= 5; page++) {
-    const data = await api(`actions/artifacts?name=template-e2e-A&per_page=100&page=${page}`);
+    const data = await api(`actions/artifacts?name=template-e2e-${SUITES[0]}&per_page=100&page=${page}`);
     if (!Array.isArray(data.artifacts)) throw new Error('Malformed Actions artifact list');
     const artifacts = /** @type {GithubArtifact[]} */ (data.artifacts);
     candidates.push(...artifacts.filter(row => !row.expired && row.workflow_run?.head_branch === 'main'));

@@ -23,8 +23,12 @@ export default defineConfig({
     { name: 'B', testMatch: T1_SHARDS.B },
     { name: 'C', testMatch: T1_SHARDS.C },
     { name: 'D', testMatch: T1_SHARDS.D },
+    { name: 'E', testMatch: T1_SHARDS.E },
+    { name: 'F', testMatch: T1_SHARDS.F },
   ],
   workers: 1,
+  // Per-test lines and durations on CI too (its default dot reporter loses a killed suite's partial line).
+  reporter: 'list',
   forbidOnly: process.env['CI'] !== undefined,
   timeout: 120_000,
   use: {

@@ -35,7 +35,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
       const policy = JSON.parse(readFileSync(resolve(scratch, 'qualification.json'), 'utf8'));
       reportOnly = !(process.env.CI && activeT1Gate(policy, scope, Date.now()));
     } catch { /* Missing evidence keeps reporting. */ }
-    if (suite === 'unknown') throw new Error('WS_T1_SHARD must be A, B, C or D');
+    if (suite === 'unknown') throw new Error(`WS_T1_SHARD must be one of ${Object.keys(T1_SHARDS).join(', ')}`);
     const dist = process.env.WS_T1_BUILD_DIR;
     if (dist === undefined) throw new Error('A T1 CI shard requires the shared WS_T1_BUILD_DIR');
     const candidate = JSON.parse(readFileSync(resolve(dist, 'version.json'), 'utf8')).build;

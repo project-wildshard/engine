@@ -272,68 +272,36 @@ jobs:
         if: always() && steps.code.outputs.run == 'true'
         run: node scripts/ci-pack.mjs --check-walls --job=${{ matrix.job }}
       # TEMPLATE-E2E T1E-2a: products already built Ring 1. Export those
-      # exact bytes plus the Template pin read by POI and memory-server probes.
+      # exact bytes plus Brasscap's product, read by POI and memory-server probes.
       - name: Bundle the shared Template suite build
         if: steps.pack.outputs.products == 'true'
         run: |
-          WS_LANE_NAME=template-e2e-ci node scripts/scratch-dir.mjs template-e2e-ci "Shared Ring-1 client and Template pin"
+          WS_LANE_NAME=template-e2e-ci node scripts/scratch-dir.mjs template-e2e-ci "Shared Ring-1 client and Brasscap product"
       - name: Read the actual Template qualification receipts
         id: t1-policy
         if: steps.pack.outputs.products == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/t1-qualification.mjs
-      - name: Run all Template suites on the producer runner
+      # TR-4: four suites on one runner each hit their 120 s budget (run
+      # 44461160109: A-D all killed at 130 s). Each suite takes its own runner
+      # again, consuming these exact bytes; -h stores pinned links as files.
+      - name: Archive the shared Template suite build
         if: steps.pack.outputs.products == 'true'
-        continue-on-error: ${{ steps.t1-policy.outputs.blocking != 'true' }}
-        env:
-          WS_LANE_NAME: template-e2e-ci
-          WS_T1_BUILD_DIR: dist
-        # The packed product boot installs full Chromium with --no-shell.
-        # T1's default launch needs the headless shell on this same runner.
-        run: bash scripts/ci-playwright-install.sh --only-shell chromium && node scripts/t1-batch.mjs
-      - name: Keep Template A receipt
-        if: always() && steps.pack.outputs.products == 'true'
+        run: |
+          set -- dist out/brasscap-mesa test/pins/saves tmp/template-e2e-ci/qualification.json
+          for extra in out/.ring-catalogue.json out/.slices/brasscap-mesa; do [ -e "$extra" ] && set -- "$@" "$extra"; done
+          tar -chf tmp/template-e2e-ci/products.tar "$@"
+      - name: Publish the shared Template suite build
+        if: steps.pack.outputs.products == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: template-e2e-A
-          path: tmp/template-e2e-ci/t1/receipt-A.json
-          retention-days: 7
-          if-no-files-found: ${{ steps.t1-policy.outputs.blocking == 'true' && 'error' || 'warn' }}
-      - name: Keep Template B receipt
-        if: always() && steps.pack.outputs.products == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: template-e2e-B
-          path: tmp/template-e2e-ci/t1/receipt-B.json
-          retention-days: 7
-          if-no-files-found: ${{ steps.t1-policy.outputs.blocking == 'true' && 'error' || 'warn' }}
-      - name: Keep Template C receipt
-        if: always() && steps.pack.outputs.products == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: template-e2e-C
-          path: tmp/template-e2e-ci/t1/receipt-C.json
-          retention-days: 7
-          if-no-files-found: ${{ steps.t1-policy.outputs.blocking == 'true' && 'error' || 'warn' }}
-      - name: Keep Template D receipt
-        if: always() && steps.pack.outputs.products == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: template-e2e-D
-          path: tmp/template-e2e-ci/t1/receipt-D.json
-          retention-days: 7
-          if-no-files-found: ${{ steps.t1-policy.outputs.blocking == 'true' && 'error' || 'warn' }}
-      - name: Keep failing Template traces
-        if: failure() && steps.pack.outputs.products == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: template-e2e-traces
-          path: tmp/template-e2e-ci/t1/results/**/trace.zip
-          retention-days: 7
-          if-no-files-found: ignore
+          name: template-e2e-products
+          path: tmp/template-e2e-ci/products.tar
+          retention-days: 1
+          if-no-files-found: error
 
-  # Share nine reserves products plus T1 time; no consumer needs another runner.
+  # Share nine reserves products; T1's four suites consume its build on their own runners.
   # Anchors preserve the same static checks, packed inventory and artifact policy.
   products:
     name: tests (${{ matrix.job }})
@@ -346,6 +314,60 @@ jobs:
         job: [9]
     env: *packed-env
     steps: *packed-steps
+
+  t1-e2e:
+    # TR-4 (TEMPLATE-E2E): one runner per suite. Sharing the producer's runner
+    # ran four software-GL browsers on its four cores and every suite missed
+    # its 120 s budget; the suite budget itself is unchanged (J193). The
+    # phone journey's four boots took 45 s of C's 84 s on a Mac: E and F.
+    needs: products
+    if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' && needs.products.result == 'success' }}
+    continue-on-error: ${{ needs.products.outputs.t1-blocking != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [A, B, C, D, E, F]
+    env:
+      WS_LANE_NAME: template-e2e-ci
+      WS_T1_BUILD_DIR: dist
+      WS_T1_SHARD: ${{ matrix.suite }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Own the suite scratch folder
+        run: node scripts/scratch-dir.mjs template-e2e-ci "Template suite shard"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: template-e2e-products
+          path: tmp/template-e2e-ci
+      - name: Restore the shared client and Brasscap product
+        run: |
+          tar -xf tmp/template-e2e-ci/products.tar
+          rm tmp/template-e2e-ci/products.tar
+          bash scripts/ci-playwright-install.sh --only-shell chromium
+      - name: Run this Template suite (report-only until qualified)
+        run: node scripts/t1-ci-proof.mjs
+      - name: Keep the actual exit and wall
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: template-e2e-${{ matrix.suite }}
+          path: tmp/template-e2e-ci/t1/receipt-${{ matrix.suite }}.json
+          retention-days: 7
+          if-no-files-found: ${{ needs.products.outputs.t1-blocking == 'true' && 'error' || 'warn' }}
+      # Report-only verdicts exit 0, so keep any retained failure trace.
+      - name: Keep failing Template traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: template-e2e-traces-${{ matrix.suite }}
+          path: tmp/template-e2e-ci/t1/results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
 
   nine-ring1-build:
     # NB6 needs full Nine; the packed products unit installs only its server

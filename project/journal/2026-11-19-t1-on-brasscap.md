@@ -15,3 +15,15 @@ found three real bugs, each fixed in its own commit:
 
 `inPlay` now treats a probe that throws because its level retired as
 "not in play yet". Local: A+B 7/7, C+D 16/16.
+
+## TR-4 hosted (opus-templates4)
+
+- Hosted T1 was red because J400 ran A-D on the products runner at once
+  (four software-GL browsers, four cores): all four killed at 130 s. Each
+  suite has its own runner again (t1-e2e matrix on the producer's tar).
+- Journey is two suites (E: select cold/warm + swipe; F: MMO + deep link):
+  its four boots were 45 s of C's 84 s locally. t1-batch.mjs deleted.
+- STR31's layer spec failed on Brasscap's grid page: `.ws-grid-speed`
+  composited a full-screen layer at opacity 0. Hidden at rest now.
+- Planted fault `WS_T1_FAULT=loading-stall`: only the phone loading-bar
+  spec goes red (verdict.stalls, 18 rows).

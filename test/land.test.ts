@@ -171,7 +171,7 @@ describe('ci.yml on main', () => {
     expect(evaluate(cancel, plan)).toBe('true');
   });
 
-  test('J400: nine shares keep T1 with products and reporting off the gate', () => {
+  test('J400: nine shares, T1 on its own runners, reporting off the gate', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
     // These are required execution roles, not an exhaustive gate list.
@@ -182,12 +182,16 @@ describe('ci.yml on main', () => {
     expect(packed).toContain('job: [1, 2, 3, 4, 5, 6, 7, 8]');
     expect(producer).toContain('job: [9]');
     expect(packed).toContain('--jobs=9 --job=${{ matrix.job }}');
-    expect(packed).toContain('node scripts/t1-batch.mjs');
-    // Products boot full Chromium; Template's default Playwright launch
-    // separately needs the headless shell even on a cold producer cache.
-    expect(packed).toContain('bash scripts/ci-playwright-install.sh --only-shell chromium && node scripts/t1-batch.mjs');
     expect(packed + producer).not.toMatch(/^ {4}needs:/mu);
-    for (const suite of ['A', 'B', 'C', 'D']) expect(packed).toContain('name: template-e2e-' + suite);
+    // TR-4: the producer publishes its build once; each T1 suite runs on its own runner (one runner for all four
+    // missed every 120 s budget), with the headless shell T1's default launch needs.
+    expect(packed).toContain('name: template-e2e-products');
+    const t1 = jobs.get('t1-e2e') ?? '';
+    expect(t1).toMatch(/^ {4}needs: products$/mu);
+    expect(t1).toContain('suite: [A, B, C, D, E, F]');
+    expect(t1).toContain('bash scripts/ci-playwright-install.sh --only-shell chromium');
+    expect(t1).toContain('node scripts/t1-ci-proof.mjs');
+    expect(t1).toContain('name: template-e2e-${{ matrix.suite }}');
     expect(packed).not.toContain('continue-on-error: true');
     expect(packed).not.toMatch(/Soak |Observe /u);
     const reports = readFileSync('.github/workflows/ci-reports.yml', 'utf8');
