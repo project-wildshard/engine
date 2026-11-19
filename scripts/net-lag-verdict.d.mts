@@ -24,3 +24,9 @@ export function proofVerdict(row: ProofRow, mode: 'correctness' | 'timing'): Pro
   checked: string[];
   ok: boolean;
 };
+export function b3Verdict(delays: readonly { t: number; delay: number }[], heldFrom: number, heldAfter: number, forcedEndMs?: number): {
+  delayMaxAfter10s: number | null;
+  held: number;
+  fromSeconds: number;
+  ok: boolean;
+};
