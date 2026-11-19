@@ -37,6 +37,18 @@ test('the slot wins, else the default', () => {
   slot.write(0.5); expect(densityLodOn()).toBe(DENSITY_LOD_DEFAULT);
 });
 
+test('unset, phone Low (density 1) takes the slab scale 3 and other densities stay off (IP34)', () => {
+  expect(DENSITY_LOD_DEFAULT).toBe(3);
+  expect(densityLodOn(1)).toBe(3);
+  expect(densityLodOn(1.5)).toBe(false);
+  const low = knobs();
+  applyDensityLod(low, 'phone', 1);
+  expect(low.slabFarAngle).toBeCloseTo(TIER_TABLE.phone.slabFarAngle * 3);
+  const mid = knobs();
+  applyDensityLod(mid, 'phone', 1.5);
+  expect(mid).toEqual(knobs());
+});
+
 test('a numeric pick scales the slab angles; the placed scale stays at the density', () => {
   const k = knobs();
   applyDensityLod(k, 'phone', 1, 3);

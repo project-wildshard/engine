@@ -14,3 +14,9 @@ files. Four things the phone taught us on the way:
   again after 6 s.
 - sysmon reads 6–7 MB for the page's WebContent all through a Nine boot on iOS 18.6.2, so the outside WebContent number
   is the syslog jetsam line, not sysmon. That line gave IP11 its kill line: ActiveSoft 1536 MB.
+
+## Later: phone Low takes density LOD 3 (IP34)
+
+The fresh-Safari loop ran IP34's pairs on the iPhone 13 with the IP34 control chunk overridden on staging v0.1.50.
+At `debug.densityLod` 3 Nine reached control in about 19 s and walked at about 31 fps in all three boots; off took
+35-39 s and walked at about 20 fps in the boots paired with them. `true` was mixed. Phone Low now defaults to 3.
