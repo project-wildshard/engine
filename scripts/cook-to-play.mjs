@@ -112,7 +112,7 @@ try {
     results.push({slug:index.slug,route,frames:result.frame,ms:result.elapsedMs,fetched:used,parts});
   }
   const refusals=[];
-  for(const slug of ['template','not-in-this-catalogue'])refusals.push(await uncataloguedShardCase(browser,preview.url,slug));
+  for(const slug of ['driftwood-isle','not-in-this-catalogue'])refusals.push(await uncataloguedShardCase(browser,preview.url,slug));
   const proof={sha,build,added,fetched:[...new Set(results.flatMap(result=>result.fetched))],results,refusals};
   writeFileSync(join(out,'cook-to-play.json'),JSON.stringify(proof));console.log(JSON.stringify(proof));
 } finally {

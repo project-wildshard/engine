@@ -66,7 +66,7 @@ try {
         refuseBootstrap = true;
         const loadFailure = await page.evaluate(async shellPath => {
           const {startStandalone} = /** @type {{startStandalone:(config:{slug:string,base:string,build:string,savePrefix:string,storage:Storage})=>{booted:Promise<unknown>,dispose:()=>void}}} */ (await import(shellPath));
-          const shell = startStandalone({slug:'template',base:'/shardfiles/template/',build:'bootstrap-proof',savePrefix:'bootstrap.',storage:localStorage});
+          const shell = startStandalone({slug:'brasscap-mesa',base:'/shardfiles/brasscap-mesa/',build:'bootstrap-proof',savePrefix:'bootstrap.',storage:localStorage});
           try {
             return await Promise.race([shell.booted.then(()=>false,()=>true),new Promise(resolve=>{setTimeout(()=>{resolve(false);},750);})]);
           } finally {shell.dispose();}

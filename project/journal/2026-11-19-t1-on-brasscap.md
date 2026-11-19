@@ -27,3 +27,12 @@ found three real bugs, each fixed in its own commit:
   composited a full-screen layer at opacity 0. Hidden at rest now.
 - Planted fault `WS_T1_FAULT=loading-stall`: only the phone loading-bar
   spec goes red (verdict.stalls, 18 rows).
+
+## TR-5 (opus-templates4)
+
+- Pin readers move off the template pin to brasscap-mesa: cook refusals
+  and hostile pins, packs-contract, worker bootstrap, hover-touch, and
+  nine-ring1 (Brasscap + Nine, Brasscap road filler). The uncatalogued
+  refusal names driftwood-isle (published, not in Ring 1's catalogue).
+- online-rig-ephemeral was main red: the T1 rig's retention signing
+  wanted a commit-named build; it now signs only for those.

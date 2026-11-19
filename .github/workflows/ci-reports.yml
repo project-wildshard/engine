@@ -147,7 +147,7 @@ jobs:
           tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
           rm tmp/nine-ring1/client.tar
           bash scripts/ci-playwright-install.sh chromium
-      - name: Read Template's ledger at control and at its peak
+      - name: Read Brasscap's ledger at control and at its peak
         if: steps.source.outputs.artifact == 'true'
         shell: bash
         run: node scripts/nine-ring1.mjs ledger 2>&1 | tee tmp/nine-ring1/ledger.log
@@ -158,7 +158,7 @@ jobs:
           name: memory-ledger
           path: |
             tmp/nine-ring1/ledger.log
-            tmp/nine-ring1/ledger-_template.json
+            tmp/nine-ring1/ledger-brasscap-mesa.json
           retention-days: 7
           if-no-files-found: ignore
 

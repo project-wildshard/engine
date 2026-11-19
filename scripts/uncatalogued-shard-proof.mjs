@@ -42,7 +42,7 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
   const preview=await serve(root,'',true),pool=browserPool(root,1,process.platform==='darwin'?'metal':'swiftshader');
   try {
     const browser=await pool.browser(0),cases=[];
-    for(const slug of ['template','not-in-this-catalogue'])cases.push(await uncataloguedShardCase(browser,preview.url,slug));
+    for(const slug of ['driftwood-isle','not-in-this-catalogue'])cases.push(await uncataloguedShardCase(browser,preview.url,slug));
     writeFileSync(join(out,'refusals.json'),`${JSON.stringify(cases,null,2)}\n`);console.log(JSON.stringify(cases));
   } finally {await pool.close();preview.close();}
 }

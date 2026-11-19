@@ -110,7 +110,7 @@ async function publisher(config) {
   const {ringCookInputs}=await import('./ring-cook-inputs.ts');
   const {rendererRevision}=await import('./renderer-revision.mjs');
   const pins=decode(readFileSync(join(root,'test/pins/shardfiles.json'))).shards;
-  const input=ringCookInputs(['template'],pins,process.env.WILDSHARD_PIN_CACHE??join(homedir(),'.cache/wildshard/pins'));
+  const input=ringCookInputs(['brasscap-mesa'],pins,process.env.WILDSHARD_PIN_CACHE??join(homedir(),'.cache/wildshard/pins'));
   const head=input.heads[0],base=folderStore(join(config.directory,'store'));let written=0;
   // Exercise the real S3 serializer. The recording transport holds only this
   // proof's HTTP metadata/body facts, with no request to an external service.

@@ -32,7 +32,7 @@ function entryDiagnostic() {
     probePresent: window.__wildshard !== undefined };
 }
 
-/** @param {import('playwright').Browser} browser @param {string} base @param {'template'|'road'} mode @param {string} out */
+/** @param {import('playwright').Browser} browser @param {string} base @param {'brasscap'|'road'} mode @param {string} out */
 async function run(browser, base, mode, out) {
   const context = await browser.newContext({ ...devices['iPhone 16 Pro'], serviceWorkers: 'block' });
   // These two catalogue entries are Developer-only; do not substitute the default shard when one is hidden.
@@ -56,7 +56,7 @@ async function run(browser, base, mode, out) {
   try {
     const url = new URL(base);
     for (const [key, value] of Object.entries({ tier: 'phone', touch: '1', mute: '1', nolock: '1', sw: '0' })) url.searchParams.set(key, value);
-    if (mode === 'template') url.searchParams.set('chunk', '_template');
+    if (mode === 'brasscap') url.searchParams.set('chunk', 'brasscap-mesa');
     await page.goto(url.href, { waitUntil: 'domcontentloaded' });
     const titleDeadline = Date.now() + 150000;
     phase = 'title-visible';
@@ -66,11 +66,11 @@ async function run(browser, base, mode, out) {
     phase = 'title-loading-complete';
     await page.locator('.ws-load').waitFor({ state: 'hidden', timeout: Math.max(1, titleDeadline - Date.now()) });
     phase = 'enter-world';
-    if (mode === 'template') {
+    if (mode === 'brasscap') {
       await page.locator('.ws-main-select').tap();
       // ENTER WORLD is the one entry (the shardfile, G531; QD7 LD5 removed LEGACY / SHARDFILE).
       const play = page.locator('.ws-menu-play');
-      if (await play.isDisabled()) throw new Error('ENTER WORLD disabled for the template');
+      if (await play.isDisabled()) throw new Error('ENTER WORLD disabled for Brasscap');
       await play.tap();
     } else await page.locator('.ws-main-grid').tap();
     phase = 'world-play-ready';
@@ -78,7 +78,7 @@ async function run(browser, base, mode, out) {
       const api = /** @type {import('../../src/client/engine/debug/probe').EngineProbe | undefined} */ (window.__wildshard);
       return api?.world?.game.app.state === 'play' && !document.querySelector('#hud.intro,.ws-reveal');
     }, undefined, { timeout: 150000 });
-    if (mode !== 'template') {
+    if (mode !== 'brasscap') {
       phase = 'road-pose';
       const pitch = await page.evaluate(() => {
         const exposed = window.__wildshard.shard.grid;
@@ -100,7 +100,7 @@ async function run(browser, base, mode, out) {
       const documentOrigin = await page.evaluate(gridFloorDocumentIdentity);
       phase = 'road-stage';
       await page.evaluate(`(${stageFloorGrid.toString()})(${JSON.stringify(plan)},${JSON.stringify(documentOrigin)})`);
-    } else if (await page.evaluate(() => window.__wildshard.shard.slug) !== '_template') throw new Error('Template test booted another shard');
+    } else if (await page.evaluate(() => window.__wildshard.shard.slug) !== 'brasscap-mesa') throw new Error('Brasscap test booted another shard');
     const hover = page.locator('.ws-touch-hover');
     phase = 'hover-visible';
     await hover.waitFor({ state: 'visible' });
@@ -144,7 +144,7 @@ if (!['chromium', 'webkit'].includes(engine)) throw new Error('Unknown browser e
 try {
   browser = engine === 'webkit' ? await webkit.launch() : await pool.browser(0);
   const results = [];
-  for (const mode of /** @type {const} */ (['template', 'road'])) {
+  for (const mode of /** @type {const} */ (['brasscap', 'road'])) {
     const result = await run(browser, base, mode, out); results.push(result);
     writeFileSync(join(out, `${mode}.json`), `${JSON.stringify(result, null, 2)}\n`);
     console.log(`${mode}: ${result.pass ? 'PASS' : 'FAIL'} ${result.error ?? ''}`);
