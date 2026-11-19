@@ -82,8 +82,8 @@ export function alignProcessDumps(samples, dumps) {
   if (requests.length !== ids.length) throw new Error('Chromium memory dump count does not match successful requests');
   /** @type {ReturnType<typeof processDumps>} */ const aligned = new Map();
   for (const [index, request] of requests.entries()) {
-    const dump = dumps.get(ids[index]);
-    if (dump !== undefined) aligned.set(request, dump);
+    const totals = dumps.get(ids[index]);
+    if (totals !== undefined) aligned.set(request, totals);
   }
   return aligned;
 }
@@ -132,7 +132,7 @@ export function bootMemoryVerdict(samples, dumps, { factor, budgetBytes = MEMORY
  * @param {readonly BootSample[]} samples */
 function ledgerPeak(samples) {
   const loading = samples.flatMap(({ step, ledger }) => {
-    if (step === 'ready' || ledger == null) return [];
+    if (step === 'ready' || ledger === null || ledger === undefined) return [];
     return [{ step, ...phoneFromLedger(ledger, PHONE_MODEL) }];
   });
   if (loading.length === 0) throw new Error('No loading ledger from the client: the phone estimate was not measured');
