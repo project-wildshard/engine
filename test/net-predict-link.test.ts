@@ -28,12 +28,14 @@ test('a walk over a bad link: lost commands cost nothing, the feet agree', () =>
 });
 
 test('a server shove reconverges inside the glide', () => {
+  let shoves = 0;
   const run = wirePlay(R, walk, { seconds: 4, frameMs: () => 1000 / 60, link: link(12), press: (frame, page, host) => {
     if (frame === 0) page.player.keys.add('KeyW');
     if (frame === 90) host.player.knockBack(host.player.position.x, host.player.position.z - 1, 6);
+    if (page.player.link instanceof NetPlayer) shoves = page.player.link.predictor.authoritative.shoves;
   } });
-  expect(run.corrections).toBeGreaterThanOrEqual(1);
-  expect(run.corrections).toBeLessThan(40);
+  expect(shoves).toBe(1);
+  expect(run.corrections).toBe(0);
   expect(run.feetGap).toBeLessThan(.02);
 });
 
