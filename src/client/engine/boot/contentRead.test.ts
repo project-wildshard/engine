@@ -2,6 +2,7 @@
 import { expect, test, vi } from 'vitest';
 import { ContentReadError, contentFailure, contentRetryAfterMs, readContent } from './contentRead';
 import { loadingWaitState } from '../../../shared/engine/boot/loadingWaits';
+import { lentResponse, takeLentBody } from './lentBody';
 
 const url = 'https://example.test/shardfiles/island/shape.bin';
 
@@ -276,4 +277,16 @@ test('FM6 mode 44: after RETRY a broken file is read past the HTTP cache, which 
     retry: () => { retries++; return Promise.resolve(); } });
   expect(bytes).toEqual(good); expect(retries).toBe(1);
   expect(calls.map(call => call.cache)).toEqual([undefined, 'reload', 'reload']);
+});
+
+test('IP31: a lent held file is taken whole, once, and a lent body of the wrong length is refused', async () => {
+  const held = new Uint8Array([4, 5, 6]), progress: number[] = [];
+  const bytes = await readContent(url, 3, { fetch: () => Promise.resolve(lentResponse(held, 'application/octet-stream')), read: size => { progress.push(size); } });
+  expect(bytes).toBe(held); expect(progress).toEqual([3]);
+  const response = lentResponse(new Uint8Array([7, 8]), 'application/octet-stream');
+  expect(takeLentBody(response)).toEqual(new Uint8Array([7, 8])); expect(takeLentBody(response)).toBeUndefined();
+  expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([7, 8])); // any other reader still gets the bytes
+  const short = await readContent(url, 3, { fetch: () => Promise.resolve(lentResponse(new Uint8Array([1]), 'application/octet-stream')), expectedBytes: 3, retry: error => { throw error; } })
+    .catch((error: unknown) => error);
+  expect(short).toBeInstanceOf(ContentReadError);
 });

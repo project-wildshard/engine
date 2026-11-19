@@ -766,6 +766,7 @@
     "./boot/readContentResponse": "./src/client/engine/boot/readContentResponse.ts",
     "./boot/contentRead": "./src/client/engine/boot/contentRead.ts",
     "./boot/downloadGiveUp": "./src/client/engine/boot/downloadGiveUp.ts",
+    "./boot/lentBody": "./src/client/engine/boot/lentBody.ts",
     "./boot/scratchReader": "./src/client/engine/boot/scratchReader.ts",
     "./sim/readiness": "./src/shared/engine/sim/readiness.ts",
     "./sim/shore": "./src/shared/engine/sim/shore.ts",

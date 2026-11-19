@@ -9,6 +9,7 @@ import { clearFailure, showFailure } from '@wildshard/engine/telemetry/runtime';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { scratchReader } from '@wildshard/engine/boot/scratchReader';
+import { lentResponse, loadGc } from '@wildshard/engine/boot/lentBody';
 import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { CACHE_BYTE_LIMITS, ResidentByteCache } from '@wildshard/engine/core/memoryBudget';
 import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
@@ -186,14 +187,15 @@ function installMemberLayer(): boolean {
       const bytes = await members.get(url);
       if (bytes !== null && bytes !== undefined) {
         // the Response holds its own copy: a stored member's view into its part goes now (QA 19)
-        const answer = new Response(bytes, {status: 200, headers: {'content-type': typeOf(url), 'content-length': String(bytes.length)}});
+        // IP31: lent, the one copy is the reader's own (the part's view still goes now)
+        const answer = loadGc() ? lentResponse(bytes.slice(), typeOf(url)) : new Response(bytes, {status: 200, headers: {'content-type': typeOf(url), 'content-length': String(bytes.length)}});
         dropKeptMember(url);
         return answer;
       }
       const expected = storedUrls.get(url);
       if (expected !== undefined && storeRead !== null) {
         const body = await exactCopy({...expected, url, read: storeRead});
-        if (body !== null) return new Response(body, {status: 200, headers: {'content-type': typeOf(url), 'content-length': String(body.byteLength)}});
+        if (body !== null) return loadGc() ? lentResponse(body, typeOf(url)) : new Response(body, {status: 200, headers: {'content-type': typeOf(url), 'content-length': String(body.byteLength)}});
       }
     }
     if (method !== 'GET' || own) return network(input, init);
@@ -291,6 +293,7 @@ function readMembersOf(part: SpawnPart, table: PartMembers): Promise<PartFallbac
   return read;
 }
 function memberResponse(url: URL, bytes: Uint8Array<ArrayBuffer>): Response {
+  if (loadGc()) return lentResponse(bytes.slice(), typeOf(url.pathname)); // IP31: one copy, the reader's
   return new Response(bytes, { headers: { 'content-type': typeOf(url.pathname), 'content-length': String(bytes.byteLength) } });
 }
 async function heldPartMember(url: URL): Promise<Response | null> {

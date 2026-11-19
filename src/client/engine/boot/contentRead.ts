@@ -7,6 +7,7 @@ import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { showFailure, clearFailure } from '../telemetry/runtime';
 import { clearDownloadGiveUp, downloadGiveUp, onDownloadGiveUp, type DownloadGiveUp } from './downloadGiveUp';
 import { scratchReader } from './scratchReader';
+import { takeLentBody } from './lentBody';
 
 /** A missing or interrupted transport, never a parsed-content or admission refusal. */
 export class ContentReadError extends Error {
@@ -82,6 +83,15 @@ async function body(response: Response, url: string, maximum: number, read?: (by
     throw sizeError();
   }
   received?.(response);
+  // IP31: a held file lent whole (the spawn store's `lentResponse`) is taken as it is, not streamed into a new copy
+  const whole = takeLentBody(response);
+  if (whole !== undefined) {
+    void response.body?.cancel().catch(() => undefined);
+    if (whole.byteLength > maximum || expected !== undefined && whole.byteLength !== expected) throw sizeError();
+    if (html(whole)) throw new ContentReadError(url, 'missing content (HTML response)', undefined, true);
+    bootProgress(`download:${url}`, whole.byteLength, expected ?? null, 'decoded-body-bytes'); read?.(whole.byteLength);
+    return whole;
+  }
   if (response.body === null) {
     if (expected !== undefined && expected !== 0) throw sizeError();
     return new Uint8Array();

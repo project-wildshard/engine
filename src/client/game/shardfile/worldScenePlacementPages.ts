@@ -1,5 +1,7 @@
 import { parseWorldScenePlacementPage, type WorldScenePlacementPage } from '@wildshard/format/worldScenePlacement';
 import type { WorldSceneReads } from './worldSceneReads';
+import { parseWorldScenePlacementPageText } from './placementPageText';
+import { loadGc } from '@wildshard/engine/boot/lentBody';
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { WORK_SLICE_MS } from '@wildshard/engine/core/workSlice';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -46,7 +48,12 @@ export class WorldScenePlacementPages {
   private async prepare(reads: Pick<WorldSceneReads, 'file'>, name: string): Promise<Prepared> {
     try {
       const bytes = await reads.file(name);
-      return { ok: true, bytes, page: await pageSlices.run(() => parseWorldScenePlacementPage(JSON.parse(decoder.decode(bytes)))) };
+      return { ok: true, bytes, page: await pageSlices.run(() => {
+        // IP31: under the load switch, a page is admitted from its text (EM17's path, unwired by d11afc8f until the dead
+        // buffers it waited on were cut: the lent held files are that cut)
+        const text = decoder.decode(bytes);
+        return loadGc() ? parseWorldScenePlacementPageText(text) : parseWorldScenePlacementPage(JSON.parse(text));
+      }) };
     } catch (error) { return { ok: false, error }; }
   }
   async read(name: string, bytes: Uint8Array): Promise<WorldScenePlacementPage> {
