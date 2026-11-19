@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { NetClient } from '@wildshard/engine/net/client';
-import { CHAT_FADE_MS, CHAT_FRESH_MS, cornerOpen, cornerShown, lineLook } from './chatCorner';
+import { CHAT_FADE_MS, CHAT_FRESH_MS, badgeText, cornerOpen, cornerShown, lineLook } from './chatCorner';
 import { chatDock, chatLines } from './chatLines';
 import { VOICE_GIVE_UP_MS, VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
 import { voiceUi } from './voiceUi';
@@ -448,4 +448,40 @@ test('J457 (Jake: "if you do start talking to NPCs, we hide the chat UI and we h
   delete marks['wsTalk']; await settle();
   expect(away(box)).toBe(false);
   expect(box.contains(mic)).toBe(true); expect(box.contains(tip)).toBe(true);
+});
+
+// J473 (Jake, 2026-11-19 ~17:12 Cancún: "a chat icon with a badge is nice"): on a phone the closed corner is two icons stacked
+// above MOVE, the mic over the chat icon; the input box is gone until the chat opens.
+test('J473 row 1: a phone\'s closed corner is the mic over a chat icon with an amber unread badge (9+), cleared on open', () => {
+  expect([0, 1, 9, 10, 42].map(badgeText)).toEqual(['', '1', '9', '9+', '9+']);
+  const hud = document.createElement('div'); hud.id = 'hud'; hud.className = 'touch'; document.body.append(hud);
+  const { box, field, say } = corner();
+  vi.advanceTimersByTime(500);
+  expect(box.dataset['touch']).toBe('');
+  const icon = box.querySelector<HTMLButtonElement>('#ws-chat-icon'), mic = box.querySelector('#ws-voice');
+  if (icon === null || mic === null) throw new Error('no chat icon or mic');
+  const badge = (): string => icon.querySelector('[data-badge]')?.textContent ?? '';
+  // both icons sit in the closed corner's row, the mic first (on top), the input hidden there
+  const sheet = document.head.textContent;
+  expect(sheet).toContain('#ws-chat[data-touch]:not([data-open])>form{position:relative;flex-direction:column');
+  expect(sheet).toContain('#ws-chat[data-touch]:not([data-open]) #ws-voice{order:1;width:36px;height:36px}');
+  expect(sheet).toContain('#ws-chat[data-touch]:not([data-open]) #ws-chat-icon{order:2;display:grid}');
+  expect(sheet).toMatch(/#ws-chat\[data-touch\]:not\(\[data-open\]\)>form>input\{[^}]*opacity:0;pointer-events:none/u);
+  // others' lines count; your own don't
+  say({ line: 1, from: 2, name: 'Maren', text: 'hi' });
+  say({ line: 2, from: 1, name: 'You', text: 'hey' });
+  expect(badge()).toBe('1');
+  for (let line = 3; line < 14; line++) say({ line, from: 2, name: 'Maren', text: `line ${String(line)}` });
+  expect(badge()).toBe('9+');
+  expect(icon.getAttribute('aria-label')).toBe('Open chat, 12 new');
+  // a tap on the icon opens the chat with the input focused, and clears the badge
+  icon.click();
+  expect(open(box)).toBe(true);
+  expect(document.activeElement).toBe(field);
+  expect(badge()).toBe('');
+  // lines said while it is open are read there: no badge after it closes
+  say({ line: 20, from: 2, name: 'Maren', text: 'see you' });
+  outside();
+  expect(open(box)).toBe(false);
+  expect(badge()).toBe('');
 });

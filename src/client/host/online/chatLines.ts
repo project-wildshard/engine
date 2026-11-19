@@ -2,7 +2,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { listenPage } from '@wildshard/engine/input/dom';
 import type { NetClient } from '@wildshard/engine/net/client';
-import { CHAT_FADE_MS, CHAT_FRESH_MS, CHAT_KEPT, CORNER_MARKS, cornerOpen, cornerShown, lineLook, type CornerEvent } from './chatCorner';
+import { CHAT_FADE_MS, CHAT_FRESH_MS, CHAT_KEPT, CORNER_MARKS, badgeText, cornerOpen, cornerShown, lineLook, type CornerEvent } from './chatCorner';
 
 /** Lines the calm corner can show at once (only fresh ones show there). Room chat is for a sitting of two (Q88). */
 const SHOWN = 6;
@@ -38,7 +38,7 @@ const CSS = `
 #ws-chat>[data-lines]{order:1;flex-shrink:100;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;min-height:0;overflow:hidden}
 #ws-chat>#ws-voice-peers{order:2;min-height:0;overflow:hidden}
 #ws-chat>#ws-voice-tip{order:3;min-height:0;overflow:hidden}
-#ws-chat>form{order:4;flex:none}
+#ws-chat>form{order:4;flex:none;gap:6px;align-items:center}
 #ws-chat [data-lines]>*{display:flex;gap:6px;align-items:baseline;padding:2px 6px;border-radius:6px;background:rgba(8,14,24,.8);overflow-wrap:anywhere;pointer-events:none}
 #ws-chat [data-lines]>[data-look=fresh]{animation:ws-chat-in .25s ease-out}
 @keyframes ws-chat-in{from{opacity:0;transform:translateY(4px)}}
@@ -61,6 +61,15 @@ const CSS = `
 #ws-chat[data-touch]{left:calc(env(safe-area-inset-left,0px) + 68px);width:min(calc(45vw - 76px),300px);max-height:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap) - 190px)}
 #ws-chat[data-touch][data-open]{--ws-chat-open-h:calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px);width:min(calc(100vw - 84px),440px)}
 }
+#ws-chat-icon{display:none}
+#ws-chat[data-touch]:not([data-open])>form{position:relative;flex-direction:column;align-items:flex-start;gap:6px}
+#ws-chat[data-touch]:not([data-open])>form>input{position:absolute;left:0;bottom:0;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none}
+#ws-chat[data-touch]:not([data-open]) #ws-voice{order:1;width:36px;height:36px}
+#ws-chat[data-touch]:not([data-open]) #ws-chat-icon{order:2;display:grid}
+#ws-chat-icon{flex:none;position:relative;width:36px;height:36px;padding:0;place-items:center;border-radius:50%;border:1.5px solid rgba(143,227,255,.5);background:rgba(9,22,36,.86);color:#9fb3c8;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#ws-chat-icon svg{width:19px;height:19px}
+#ws-chat-icon>[data-badge]{position:absolute;right:-5px;top:-5px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#ffc56b;color:#1c1100;font:800 10px/17px system-ui,sans-serif;text-align:center}
+#ws-chat-icon>[data-badge]:empty{display:none}
 html[data-ws-keyboard] #ws-chat[data-open]{top:calc(var(--ws-kb-bottom) - ${String(DOCK_GAP_PX)}px);bottom:auto;transform:translateY(-100%);left:calc(env(safe-area-inset-left,0px) + 6px);width:calc(100vw - 12px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:var(--ws-chat-dock,${String(DOCK_PX)}px);max-height:none;padding:6px;gap:4px;border-radius:10px}
 html[data-ws-keyboard] #ws-chat[data-open]>[data-head],html[data-ws-keyboard] #ws-chat[data-open]>#ws-voice-peers,html[data-ws-keyboard] #ws-chat[data-open]>#ws-voice-tip{display:none}
 html[data-ws-keyboard] #ws-chat[data-open]>[data-lines]{gap:2px}
@@ -89,6 +98,7 @@ function place(box: HTMLElement): void {
   const value = `${String(Math.round(Math.min(Math.max(lift, UNDER_GAP), innerHeight - CHAT_ROW_PX)))}px`;
   if (box.style.getPropertyValue('--ws-chat-lift') !== value) box.style.setProperty('--ws-chat-lift', value);
 }
+const BUBBLE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
 const REPORT = 'flex:none;margin-left:auto;padding:0 6px;border:0;background:none;color:#8fe3ff;font:inherit;font-size:11px;cursor:pointer';
 const FIELD = 'pointer-events:auto;flex:1;min-width:0;width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid rgba(143,227,255,.5);border-radius:6px;background:rgba(9,22,36,.94);color:#fff;font:16px/1.2 system-ui,sans-serif';
 
@@ -101,12 +111,22 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
   const head = document.createElement('div'), title = document.createElement('span'), close = document.createElement('button');
   const style = scope.ownNode(document.createElement('style'));
   style.textContent = CSS; document.head.append(style);
-  box.id = 'ws-chat'; list.dataset['lines'] = ''; form.style.cssText = 'display:flex;gap:6px;align-items:center;margin:0';
+  box.id = 'ws-chat'; list.dataset['lines'] = ''; form.style.cssText = 'display:flex;margin:0';
   head.dataset['head'] = ''; title.textContent = 'Chat';
   close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Close chat');
   head.append(title, close);
   field.placeholder = 'Say something'; field.enterKeyHint = 'send'; field.autocomplete = 'off'; field.style.cssText = FIELD;
-  form.append(field); box.append(head, list, form); parent.append(box);
+  // J473: on a phone the closed corner is this icon (and the mic over it); a tap opens the chat as focusing the input does
+  const icon = document.createElement('button'), badge = document.createElement('span');
+  icon.id = 'ws-chat-icon'; icon.type = 'button'; icon.innerHTML = BUBBLE; badge.dataset['badge'] = ''; icon.append(badge);
+  icon.setAttribute('aria-label', 'Open chat');
+  form.append(field, icon); box.append(head, list, form); parent.append(box);
+  /** lines others said since the chat was last open, on the icon's badge */
+  let unread = 0;
+  const count = (next: number): void => {
+    unread = next; badge.textContent = badgeText(unread);
+    icon.setAttribute('aria-label', unread > 0 ? `Open chat, ${String(unread)} new` : 'Open chat');
+  };
 
   let open = false;
   /** The keyboard's top, on a phone: the open chat ends above it (the layout viewport doesn't shrink for it on iOS). */
@@ -131,12 +151,13 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
     // the open chat keeps Escape for itself (InputService lets it be), from its input or any of its buttons
     box.toggleAttribute('data-ws-own-escape', open);
     const focused = document.activeElement;
-    if (open) { fit(); toBottom(); } else {
+    if (open) { fit(); toBottom(); count(0); } else {
       delete root.dataset['wsKbReserve'];
       if (focused instanceof HTMLElement && box.contains(focused)) focused.blur();
     }
   };
   scope.listen(field, 'focus', () => { corner('focus'); });
+  scope.listen(icon, 'click', event => { event.preventDefault(); field.focus(); corner('focus'); });
   scope.listen(close, 'click', () => { corner('close'); });
   // Escape on a focused Mute or Report button (the input's own Escape is handled below, where its keys stop)
   scope.listen(box, 'keydown', event => { if (open && event instanceof KeyboardEvent && event.key === 'Escape') { event.preventDefault(); corner('close'); } });
@@ -208,6 +229,7 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
       row.append(report);
     }
     said(row); add(row);
+    if (!open && String(from) !== own()) count(unread + 1);
   }));
   return { box, form, isOpen: () => open, shown: () => shown };
 }

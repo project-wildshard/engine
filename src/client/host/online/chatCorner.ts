@@ -18,6 +18,15 @@ export function lineLook(saidAt: number, now: number): LineLook {
   return age < CHAT_FRESH_MS ? 'fresh' : age < CHAT_FRESH_MS + CHAT_FADE_MS ? 'fading' : 'gone';
 }
 
+// J473 (Jake, 2026-11-19 ~17:12 Cancún: "I do like the idea of them being icons and not a say something input box that takes up a lot
+// of space, a chat icon with a badge is nice"): on a phone the closed corner is two icons stacked above MOVE, the mic over the chat
+// icon, and the chat icon counts the lines others said since the chat was last open.
+
+/** The chat icon's badge for `unread` lines: none at 0, the count up to 9, then 9+. */
+export function badgeText(unread: number): string {
+  return unread <= 0 ? '' : unread > 9 ? '9+' : String(unread);
+}
+
 /** What happens to the corner. `focus`: the input took focus. `inside`: a tap in the open chat. `outside`: a tap anywhere
  *  else. `close`: its × or Escape. `sent`: a line went out. `empty`: Enter on an empty input. */
 export type CornerEvent = 'focus' | 'inside' | 'outside' | 'close' | 'sent' | 'empty';
