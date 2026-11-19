@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { CRASH_LINE } from '../src/client/game/grid/budgetOverlay';
+import { CRASH_LINE, MEMORY_AMBER, MEMORY_RED } from '../src/client/game/grid/budgetOverlay';
 import { IPHONE_13_MODEL, anchorBounds, ledgerSplit, loadPhoneModel, phoneFromChromium, phoneFromLedger, phoneFromWebKit, phonePeakFromWebKit, rangeText, t90, upperOverRuns, zoneOverRuns } from '../scripts/memory/phoneModel.mjs';
 import { ANCHOR_RENDERER_MB, fitPhoneModel, lineFit } from '../scripts/memory/phone-fit.mjs';
 import { phoneLine, summaryMarkdown, traceToControl } from '../scripts/memory/measure.mjs';
@@ -22,6 +22,28 @@ test('the chip and the calibration use the one device limit, ActiveHard 2048 MiB
   expect(CRASH_LINE).toBe(2048 * 1024 ** 2);
   expect(model.limitMB).toBe(Math.round(CRASH_LINE / MB));
   expect(model.limitHighMB).toBe(model.limitMB);
+});
+
+test('EM37 derives the staircase factors from last completed decimal MB and the one process line', () => {
+  const staircase = loadPhoneModel().staircase!;
+  expect(staircase.processLineBytes).toBe(CRASH_LINE);
+  expect(MEMORY_AMBER).toBe(1.5e9);
+  expect(MEMORY_RED).toBe(1.75e9);
+  expect(Object.keys(staircase.effectiveFactors)).toHaveLength(11);
+  for (const [kind, factor] of Object.entries(staircase.effectiveFactors)) {
+    expect(factor).toBeCloseTo(CRASH_LINE / (staircase.lastCompletedMB[kind]! * MB), 3);
+  }
+});
+
+test('nominal heap and canvas receive their own factors once, with estimated cache and collider storage still pooled', () => {
+  const { staircase, ...old } = loadPhoneModel();
+  const bare = { ram: { 'cache-document': 4 * MB, physics: 3 * MB }, gpu: { geometry: 5 * MB } };
+  const counters = { ...bare, ram: { ...bare.ram, jsheap: 8 * MB, canvas: 3 * MB } };
+  const base = phoneFromLedger(bare, old), fitted = phoneFromLedger(counters, { ...old, staircase: staircase! });
+  const extra = (8 * staircase!.effectiveFactors.jsheap + 3 * staircase!.effectiveFactors.canvas2d) * MB;
+  expect(fitted.central - base.central).toBeCloseTo(extra, 5);
+  expect(fitted.high - base.high).toBeCloseTo(extra * (1 + old.ledger.missPct / 100), 5);
+  expect(phoneFromLedger(counters, old).central - base.central).toBeCloseTo(11 * MB * old.ledger.webcontent.perMB, 5);
 });
 
 test('IP11 names the unmeasured inputs and keeps the 17 Pro reading in the report', () => {
@@ -54,7 +76,14 @@ test('a 17 Pro CLI refit keeps the separate iPhone 13 entry', () => {
     const out = join(scratch, 'fit.json');
     execFileSync(process.execPath, ['scripts/memory/phone-fit.mjs', `--anchor=${anchorPath}`, `--zones=${zones.join(',')}`, `--out=${out}`]);
     expect(JSON.parse(readFileSync(out, 'utf8'))).toMatchObject({ alpha: model.alpha, scale: model.scale, limitMB: model.limitMB,
-      devices: loadPhoneModel().devices });
+      devices: loadPhoneModel().devices, staircase: loadPhoneModel().staircase });
+    const evidence = join(scratch, 'staircase.json');
+    const expected = loadPhoneModel().staircase!;
+    writeFileSync(evidence, JSON.stringify({ ...expected, effectiveFactors: {} }));
+    execFileSync(process.execPath, ['scripts/memory/phone-fit.mjs', `--staircase=${evidence}`, `--out=${out}`]);
+    expect(JSON.parse(readFileSync(out, 'utf8'))).toMatchObject({
+      alpha: model.alpha, scale: model.scale, limitMB: model.limitMB, staircase: expected,
+    });
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

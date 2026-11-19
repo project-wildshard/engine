@@ -270,5 +270,35 @@
     "pairedFootprintsFromIP9": null
    }
   }
+ },
+ "staircase": {
+  "source": "meta a0cc751f project/evidence/engine-memory/17pro-staircase-2026-11-19/staircase-17pro.jpg",
+  "processLineBytes": 2147483648,
+  "lastCompletedMB": {
+   "arraybuffer": 2048,
+   "jsheap": 1088,
+   "wasm": 2049,
+   "worker": 2112,
+   "texrgba": 2013,
+   "texcomp": 2013,
+   "glbuffer": 2048,
+   "msaa": 2147,
+   "canvas2d": 872,
+   "imagebitmap": 2013,
+   "audio": 2074
+  },
+  "effectiveFactors": {
+   "arraybuffer": 1.049,
+   "jsheap": 1.974,
+   "wasm": 1.048,
+   "worker": 1.017,
+   "texrgba": 1.067,
+   "texcomp": 1.067,
+   "glbuffer": 1.049,
+   "msaa": 1,
+   "canvas2d": 2.463,
+   "imagebitmap": 1.067,
+   "audio": 1.035
+  }
  }
 }

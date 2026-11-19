@@ -3,7 +3,7 @@ import { bootMemorySamples } from '@wildshard/engine/boot/bootTrace';
 import type { MemorySnapshot } from '@wildshard/engine/core/memoryAttribution';
 import model from '../../../../scripts/memory/phone-model.json';
 import { memorySubsystems, PHONE_MEMORY_BUDGETS, type BudgetLedger, type MemorySubsystem } from '@wildshard/engine/core/memoryBudget';
-import { phoneFromLedger, type PhoneMemoryRange } from '@wildshard/engine/core/phoneMemoryModel';
+import { phoneFromLedger, phoneFromLedgerSample, phoneLedgerSample, type PhoneMemoryRange } from '@wildshard/engine/core/phoneMemoryModel';
 import { memoryRows, type MemoryGrouping, type MemorySort } from './memoryRows';
 import type { PointsTone } from './budgetPoints';
 
@@ -31,8 +31,8 @@ export function readLoadingPeak(): number | null {
     sampledPeak = null;
   }
   if (sampledCount === samples.length) return sampledPeak;
-  for (const { ram, gpu } of samples.slice(sampledCount)) {
-    const reading = phoneFromLedger({ ram: { bytes: ram }, gpu: { bytes: gpu } }, model).central;
+  for (const sample of samples.slice(sampledCount)) {
+    const reading = phoneFromLedgerSample(sample, model).central;
     sampledPeak = Math.max(sampledPeak ?? 0, reading);
   }
   sampledCount = samples.length;
@@ -63,10 +63,13 @@ export function budgetRows(ledger: BudgetLedger): readonly { id: MemorySubsystem
   const totals = memorySubsystems(ledger);
   // EM4's blank WebContent floor. EM11 already subtracts the GPU blank floor.
   const floor = phoneFromLedger({}, model).central, browser = 16.5e6;
-  const estimate = (row: { gpu: number; ram: number }): number => phoneFromLedger({ gpu: { bytes: row.gpu }, ram: { bytes: row.ram } }, model).central - floor;
+  const { jsheap, canvas } = phoneLedgerSample(ledger);
+  const estimate = (id: MemorySubsystem): number => phoneFromLedgerSample({
+    ...totals[id], jsheap: id === 'loading' ? jsheap : 0, canvas: id === 'loading' ? canvas : 0,
+  }, model).central - floor;
   const ids = Object.keys(PHONE_MEMORY_BUDGETS) as MemorySubsystem[];
   return ids.map(id => ({ id, label: SUBSYSTEM_NAMES[id], live: totals[id].gpu + totals[id].ram,
-    estimated: estimate(totals[id]) + (id === 'browser' ? browser : id === 'engine' ? floor - browser : 0),
+    estimated: estimate(id) + (id === 'browser' ? browser : id === 'engine' ? floor - browser : 0),
     budget: PHONE_MEMORY_BUDGETS[id] }));
 }
 

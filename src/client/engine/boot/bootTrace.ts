@@ -1,5 +1,5 @@
 import { pageScope } from '../../../shared/engine/app/resources';
-import { ledgerSplit } from '../../../shared/engine/core/phoneMemoryModel';
+import { phoneLedgerSample } from '../../../shared/engine/core/phoneMemoryModel';
 import { isDev } from '../core/devMode';
 import { saveStorage } from '../saves/slots';
 /** A small durable breadcrumb for an enabled level boot. A terminated WebContent process cannot run a final handler. */
@@ -89,7 +89,7 @@ export interface BootTrace {
   bootDiagnosticJson: () => string;
   recordBootProgress: (view: ProgressView) => void;
   recordBootCheckpoint: (operation: string, facts?: Facts) => void;
-  bootMemorySamples: () => readonly ReturnType<typeof ledgerSplit>[];
+  bootMemorySamples: () => readonly ReturnType<typeof phoneLedgerSample>[];
   startBoot: (level: { id: string; name: string }, enabled?: boolean) => void;
   markBootPlanned: () => void;
   markBootHandledError: () => void;
@@ -101,7 +101,7 @@ export interface BootTrace {
   recordGpuRecovery: (reason: string) => void;
 }
 
-const NO_MEMORY_SAMPLES: readonly ReturnType<typeof ledgerSplit>[] = [];
+const NO_MEMORY_SAMPLES: readonly ReturnType<typeof phoneLedgerSample>[] = [];
 
 /**
  * One page's boot trace over its transports. The page has one (below); a test builds one per simulated page load with
@@ -111,8 +111,8 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
   let current: BootRecord | null = null;
   // Keep just the two byte totals per sample for Developer's loading maximum.
   // The bounded crash report can drop early checkpoints and follow later Explore work.
-  let loadingMemory: { active: boolean; step: string; samples: ReturnType<typeof ledgerSplit>[] } | null = null;
-  const bootMemorySamples = (): readonly ReturnType<typeof ledgerSplit>[] => loadingMemory?.samples ?? NO_MEMORY_SAMPLES;
+  let loadingMemory: { active: boolean; step: string; samples: ReturnType<typeof phoneLedgerSample>[] } | null = null;
+  const bootMemorySamples = (): readonly ReturnType<typeof phoneLedgerSample>[] => loadingMemory?.samples ?? NO_MEMORY_SAMPLES;
   /** when recordBootProgress last persisted the record (PROGRESS_WRITE_MS) */
   let progressWrittenAt = -Infinity;
   let previousLine = '';
@@ -200,7 +200,7 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
     try { return transports.ledger?.(); } catch { return undefined; }
   }
   function sampleLoadingMemory(counters: ReturnType<typeof ledgerNow>): void {
-    if (counters !== undefined) loadingMemory?.samples.push(ledgerSplit(counters));
+    if (counters !== undefined) loadingMemory?.samples.push(phoneLedgerSample(counters));
   }
   function write(key: string, value: BootRecord): void { try { storage()?.setItem(key, JSON.stringify(value)); } catch { /* storage may be unavailable */ } }
   function update(status: Status): void {

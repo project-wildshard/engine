@@ -3,6 +3,7 @@
 //
 //   node scripts/memory/phone-fit.mjs --anchor=<measure.mjs JSON of the build the phone died on> --last=compile:after
 //        --zones=<measure.mjs JSON>,... --chromium=<boot-memory-peak.mjs JSON>,... [--out=scripts/memory/phone-model.json]
+//   node scripts/memory/phone-fit.mjs --staircase=<17 Pro nominal allocation JSON> [--out=...]
 //   node scripts/memory/phone-fit.mjs --device=iPhone14,5   show report-only fit inputs and status (IP11)
 //
 // The anchor run must carry the boot trace's windows (measure.mjs records them as `traceCheckpoints`). Each zone needs
@@ -10,9 +11,9 @@
 // build. What each number means: scripts/memory/phoneModel.mjs.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { anchorBounds, ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit } from './phoneModel.mjs';
+import { KINDS, MB } from './calibration.mjs';
 import { stats } from './measure.mjs';
 
-const MB = 1e6;
 const median = (/** @type {number[]} */ xs) => stats(xs).median;
 /** The anchor's own Chromium renderer loading peaks, MB (mini-memcal 2026-11-17: v0.1.36 + Nine rev 2, Low, at "boot plan
  *  complete / compile:after"). The phone died there, so the Chromium reader's central factor never puts the lowest of
@@ -89,10 +90,28 @@ function chromiumBar(rows, floor, round) {
   return { loadingPerRenderer: { low: round(Math.min(...rows.map((r) => r.peakPhone.low / r.rendererLoadingPeak))), central: round(central), high: round(high) } };
 }
 
+/** The last completed nominal sizes, against the existing process line.
+ * A single phone tour gives effective factors, not per-kind process limits.
+ * @param {{source:string, processLineBytes:number, lastCompletedMB:Record<string,number>}} evidence
+ * @param {{limitMB:number, limitHighMB:number}} model */
+function fitStaircase(evidence, model) {
+  const { source, processLineBytes, lastCompletedMB } = evidence;
+  const lineMB = Math.round(processLineBytes / MB);
+  if (!source || !Number.isSafeInteger(processLineBytes) || lineMB !== model.limitMB || lineMB !== model.limitHighMB)
+    throw new Error('staircase must use the fitted 17 Pro process line');
+  const effectiveFactors = Object.fromEntries(KINDS.filter(kind => kind !== 'none').map(kind => {
+    const count = lastCompletedMB?.[kind];
+    if (!Number.isSafeInteger(count) || count <= 0) throw new Error(`missing positive nominal staircase MB for ${kind}`);
+    return [kind, Number((processLineBytes / (count * MB)).toFixed(3))];
+  }));
+  return { source, processLineBytes, lastCompletedMB, effectiveFactors };
+}
+
 /** @param {string[]} argv */
 function main(argv) {
   const args = Object.fromEntries(argv.map((a) => /^--([^=]+)=(.*)$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2]]));
-  const devices = loadPhoneModel().devices;
+  const current = loadPhoneModel();
+  const { devices } = current;
   if (args.device !== undefined) {
     const entry = Object.hasOwn(devices ?? {}, args.device) ? devices[args.device] : undefined;
     if (entry === undefined) throw new Error(`No report-only phone fit entry for ${args.device}`);
@@ -100,15 +119,26 @@ function main(argv) {
     return 0;
   }
   const read = (/** @type {string} */ f) => JSON.parse(readFileSync(f, 'utf8'));
+  const out = args.out ?? new URL('phone-model.json', import.meta.url).pathname;
+  const previous = (() => { try { return read(out); } catch { return current; } })();
+  if (args.anchor === undefined && args.staircase !== undefined) {
+    const staircase = fitStaircase(read(args.staircase), previous);
+    writeFileSync(out, `${JSON.stringify({ ...previous, staircase }, null, 1)}\n`);
+    console.log(JSON.stringify(staircase, null, 1));
+    return 0;
+  }
   const chromium = /** @type {Record<string, number[]>} */ ({});
   for (const f of (args.chromium ?? '').split(',').filter(Boolean)) { const run = read(f); const r = run.verdict?.rendererPeak?.bytes; if (typeof r === 'number') (chromium[run.chunk] ??= []).push(r); }
   const calibration = read(new URL('calibration.json', import.meta.url).pathname).hosts.webkit;
   const fitted = fitPhoneModel({ anchor: read(args.anchor).webkit, last: args.last ?? 'compile:after', zones: args.zones.split(',').map((f) => read(f).webkit), chromium,
-    limitMB: Number(args.limit ?? 2147), limitHighMB: Number(args['limit-high'] ?? args.limit ?? 2147), gpuFloorMB: calibration.baselineMB.gpu });
-  const out = args.out ?? new URL('phone-model.json', import.meta.url).pathname;
-  const previous = (() => { try { return read(out); } catch { return {}; } })();
+    limitMB: Number(args.limit ?? current.limitMB), limitHighMB: Number(args['limit-high'] ?? args.limit ?? current.limitHighMB), gpuFloorMB: calibration.baselineMB.gpu });
+  const sameLine = fitted.limitMB === current.limitMB && fitted.limitHighMB === current.limitHighMB;
+  const evidence = args.staircase === undefined
+    ? (sameLine ? previous.staircase ?? current.staircase : undefined)
+    : read(args.staircase);
+  const staircase = evidence === undefined ? undefined : fitStaircase(evidence, fitted);
   writeFileSync(out, `${JSON.stringify({ version: 1, note: previous.note ?? '', measured: args.measured ?? new Date().toISOString().slice(0, 10), host: previous.host ?? '',
-    ...fitted, devices: { ...devices, ...previous.devices } }, null, 1)}\n`);
+    ...fitted, devices: { ...devices, ...previous.devices }, staircase }, null, 1)}\n`);
   console.log(JSON.stringify(fitted, null, 1));
   return 0;
 }

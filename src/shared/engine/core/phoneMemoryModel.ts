@@ -13,6 +13,9 @@ export interface PhoneLedgerModel extends PhoneMemoryChain {
     missPct: number;
   }>;
   readonly peakOverSettled: PhoneMemoryRange;
+  readonly staircase?: Readonly<{
+    effectiveFactors: Readonly<{ jsheap: number; canvas2d: number }>;
+  }>;
 }
 
 /** EM11. The anchor bounds the two strategies for converting Mac process
@@ -31,14 +34,36 @@ export function ledgerSplit(counters: BudgetLedger | null | undefined): { ram: n
   return { ram: sum(counters?.ram) + sum(counters?.workers), gpu: sum(counters?.gpu) };
 }
 
+interface PhoneLedgerSample {
+  readonly ram: number;
+  readonly gpu: number;
+  readonly jsheap: number;
+  readonly canvas: number;
+}
+
+export function phoneLedgerSample(counters: BudgetLedger | null | undefined): PhoneLedgerSample {
+  return { ...ledgerSplit(counters), jsheap: counters?.ram?.['jsheap'] ?? 0, canvas: counters?.ram?.['canvas'] ?? 0 };
+}
+
 /** Fold the live ledger through EM11's domain fits. The error bar includes
  * the fit's measured miss, and the boot projection includes peak-over-settled. */
 export function phoneFromLedger(counters: BudgetLedger | null | undefined, model: PhoneLedgerModel,
   phase: 'playing' | 'loading' = 'playing'): PhoneMemoryRange {
-  const { ram, gpu } = ledgerSplit(counters), fit = model.ledger;
-  const base = phoneFromWebKit({ webcontent: (fit.webcontent.floorMB + fit.webcontent.perMB * (ram / 1e6)) * 1e6,
-    gpu: (fit.gpu.floorMB + fit.gpu.perMB * (gpu / 1e6)) * 1e6 }, model);
+  return phoneFromLedgerSample(phoneLedgerSample(counters), model, phase);
+}
+
+export function phoneFromLedgerSample(sample: PhoneLedgerSample, model: PhoneLedgerModel,
+  phase: 'playing' | 'loading' = 'playing'): PhoneMemoryRange {
+  const { ram, gpu, jsheap, canvas } = sample, fit = model.ledger;
+  const factors = model.staircase?.effectiveFactors;
+  // Apply the on-phone factors in place of the pooled RAM coefficient for nominal counts.
+  // Estimated heap charges such as cache-document stay in the pooled remainder.
+  const pooledRam = factors === undefined ? ram : ram - jsheap - canvas;
+  const calibrated = factors === undefined ? 0 : jsheap * factors.jsheap + canvas * factors.canvas2d;
+  const base = phoneFromWebKit({ webcontent: fit.webcontent.floorMB * 1e6 + fit.webcontent.perMB * pooledRam,
+    gpu: fit.gpu.floorMB * 1e6 + fit.gpu.perMB * gpu }, model);
   const miss = fit.missPct / 100;
   const ratio = phase === 'loading' ? model.peakOverSettled : { low: 1, central: 1, high: 1 };
-  return { low: base.low * (1 - miss) * ratio.low, central: base.central * ratio.central, high: base.high * (1 + miss) * ratio.high };
+  return { low: (base.low + calibrated) * (1 - miss) * ratio.low, central: (base.central + calibrated) * ratio.central,
+    high: (base.high + calibrated) * (1 + miss) * ratio.high };
 }

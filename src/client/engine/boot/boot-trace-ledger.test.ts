@@ -59,7 +59,8 @@ test('a ledger that throws leaves the checkpoint without one', () => {
 
 test('Developer loading samples survive the crash ring and stop at control', () => {
   let held = 300 * MB;
-  const ledger = vi.fn(() => ({ gpu: { texture: held }, workers: { 'decoder/wasm': 4 * MB } }));
+  const ledger = vi.fn(() => ({ gpu: { texture: held }, workers: { 'decoder/wasm': 4 * MB },
+    ram: { jsheap: 2 * MB, canvas: MB } }));
   const trace = createBootTrace({ inbox: () => Promise.resolve('ok'), deliver: () => Promise.resolve(true), ledger });
   const level = { id: 'nine-dragon-stack', name: 'Nine Dragon Stack' };
   trace.startBoot(level, false);
@@ -73,7 +74,7 @@ test('Developer loading samples survive the crash ring and stop at control', () 
   held = 10 * MB;
   for (let i = 0; i < 40; i++) trace.recordBootCheckpoint('later');
   expect(trace.bootDiagnosticJson()).not.toContain('"operation":"peak"');
-  expect(trace.bootMemorySamples()[0]).toEqual({ gpu: 300 * MB, ram: 4 * MB });
+  expect(trace.bootMemorySamples()[0]).toEqual({ gpu: 300 * MB, ram: 7 * MB, jsheap: 2 * MB, canvas: MB });
   document.dispatchEvent(new Event('ws:control-ready'));
   const samples = trace.bootMemorySamples().length;
   held = 500 * MB;

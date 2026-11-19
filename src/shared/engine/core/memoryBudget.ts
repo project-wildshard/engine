@@ -25,7 +25,7 @@ const MEMORY_BUDGET_KINDS = {
   ram: {
     'geometry-cpu': 'scene', physics: 'scene', wasm: 'workers',
     'audio-buffer': 'audio', 'audio-data': 'audio', 'audio-sprite-pcm': 'audio',
-    'array-buffer': 'loading', wire: 'loading', decode: 'loading', scratch: 'loading', 'cache-document': 'loading', canvas: 'loading', image: 'loading', 'image-bitmap': 'loading',
+    'array-buffer': 'loading', wire: 'loading', decode: 'loading', scratch: 'loading', 'cache-document': 'loading', jsheap: 'loading', canvas: 'loading', image: 'loading', 'image-bitmap': 'loading',
   },
 } as const satisfies { gpu: Record<string, MemorySubsystem>; ram: Record<OwnedKind, MemorySubsystem> & Record<string, MemorySubsystem> };
 
