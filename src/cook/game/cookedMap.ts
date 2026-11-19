@@ -69,8 +69,7 @@ class Raster {
     const area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
     if (area === 0 || !Number.isFinite(area)) return;
     const ha = a[1] ?? 0, hb = b[1] ?? 0, hc = c[1] ?? 0;
-    // a sky dome, cloud deck or backdrop card high over the cell is no ground
-    if (Math.min(ha, hb, hc) > 60) return;
+    // World tiles can contain platforms at any height. Sky and backdrop assets live outside the world file selection.
     const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx))), x1 = Math.min(size - 1, Math.ceil(Math.max(ax, bx, cx)));
     const y0 = Math.max(0, Math.floor(Math.min(ay, by, cy))), y1 = Math.min(size - 1, Math.ceil(Math.max(ay, by, cy)));
     if (x0 > x1 || y0 > y1) return;

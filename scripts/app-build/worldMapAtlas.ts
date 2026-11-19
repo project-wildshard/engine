@@ -32,18 +32,24 @@ export function folderMapBytes(root: string, slug: string): Uint8Array | null {
   return image;
 }
 
-/** Whether an encoded map is one flat colour on the Bag map (J450: Saltwind's author map), by its 32 px copy's luminance spread. */
-export async function flatMapBytes(bytes: Uint8Array): Promise<boolean> {
-  const { data, info } = await sharp(bytes, { limitInputPixels: 4096 * 4096 }).resize(32, 32, { fit: 'fill' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  let sum = 0, square = 0;
-  for (let i = 0; i < data.length; i += info.channels) { const l = 0.2126 * (data[i] ?? 0) + 0.7152 * (data[i + 1] ?? 0) + 0.0722 * (data[i + 2] ?? 0); sum += l; square += l * l; }
-  const n = data.length / info.channels;
-  return Math.sqrt(Math.max(0, square / n - (sum / n) ** 2)) < FLAT_MAP_SPREAD;
+/** An author map's visible fraction. A flat image, like Saltwind's old map, has no usable coverage. */
+async function authorMapCoverage(bytes: Uint8Array): Promise<number> {
+  const { data, info } = await sharp(bytes, { limitInputPixels: 4096 * 4096 })
+    .resize(32, 32, { fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let sum = 0, square = 0, alpha = 0;
+  for (let i = 0; i < data.length; i += info.channels) {
+    const l = 0.2126 * (data[i] ?? 0) + 0.7152 * (data[i + 1] ?? 0) + 0.0722 * (data[i + 2] ?? 0);
+    sum += l;
+    square += l * l;
+    alpha += (data[i + 3] ?? 0) / 255;
+  }
+  const n = data.length / info.channels, spread = Math.sqrt(Math.max(0, square / n - (sum / n) ** 2));
+  return spread < FLAT_MAP_SPREAD ? 0 : alpha / n;
 }
 
 let textureMean: Promise<TextureMean | undefined> | undefined;
 /** J450: the cook's own map of a built product (`src/cook/game/cookedMap.ts`), drawn from its world as the cook draws an upload's. */
-export async function folderCookedMap(root: string, slug: string): Promise<Uint8Array> {
+async function folderCookedMap(root: string, slug: string): Promise<{bytes:Uint8Array, covered:number}> {
   const folder = resolve(root, 'out', slug), header: unknown = JSON.parse(readFileSync(resolve(folder, 'shard.json'), 'utf8'));
   const index = readOutputDownloadIndex(header), sections = new Map<string, unknown>();
   for (const row of index.sections) if (row.name.startsWith('world/')) sections.set(row.name, JSON.parse(readFileSync(resolve(folder, row.path), 'utf8')));
@@ -51,7 +57,7 @@ export async function folderCookedMap(root: string, slug: string): Promise<Uint8
   await prepareGlbBuffers();
   textureMean ??= basisuTextureMean();
   const map = renderCookedMap({ files: rows, sections, read: path => new Uint8Array(readFileSync(resolve(folder, path))) }, { size: TILE * 2, texture: await textureMean });
-  return encodeMapPng(map.rgba, map.size, map.size);
+  return {bytes:encodeMapPng(map.rgba, map.size, map.size), covered:map.stats.covered};
 }
 
 /** Pack every declared product once. Repeated cells share its tile; missing map declarations get an explicit plot diagram. */
@@ -82,12 +88,14 @@ export async function writeWorldMapAtlas(root: string): Promise<void> {
   // A filtered product build (build-shardfiles --shard) leaves only its own products, and the products copy
   // (outputFolders.mjs) publishes just those: the other cells draw the plot tile. A cold atlas, none built, still refuses.
   const built = new Set(slugs.filter(builtHere));
-  // J450: a built product's tile is its author's map, or the cook's own drawing of its world when it declares none or a flat one;
-  // the plain-plot diagram is left only for a cell this build made no product for
+  // J450: keep a usable authored tile unless the world drawing covers ground that a sparse author image leaves out.
   const atlas = await bakeWorldMapAtlas(slugs, async slug => {
     if (built.size > 0 && !built.has(slug)) return null;
     const author = folderMapBytes(root, slug);
-    return author !== null && !await flatMapBytes(author) ? author : folderCookedMap(root, slug);
+    const coverage = author === null ? 0 : await authorMapCoverage(author);
+    if (coverage === 1) return author;
+    const cooked = await folderCookedMap(root, slug);
+    return coverage > 0 && coverage >= cooked.covered ? author : cooked.bytes;
   });
   const fileName = `assets/world-map-${hash(atlas.bytes).slice(0, 16)}.webp`;
   mkdirSync(dirname(join(root, WORLD_MAP_ATLAS)), { recursive: true });

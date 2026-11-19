@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync, readFileSync } from 'nod
 import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Give the fixture the same measured hash checks as the product reader.
 import { createHash } from 'node:crypto';
+import { encodeTerrainTile } from '@wildshard/format/terrainTileBytes';
 import { bakeWorldMapAtlas, folderMapBytes, writeWorldMapAtlas } from '../scripts/app-build/worldMapAtlas';
 
 test('one atlas includes every unique map with stable crops and an explicit nonblank plain-plot tile', async () => {
@@ -68,4 +69,35 @@ test('the atlas precedes the app build, and a cold atlas refuses an unbuilt prod
     } }));
     await expect(writeWorldMapAtlas(root)).rejects.toThrow(/ENOENT.*brasscap-mesa/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a mostly transparent author map yields to a world map that draws the missing ground', async () => {
+  const root = mkdtempSync(resolve('tmp', 'world-atlas-sparse-'));
+  const digest = (value: Uint8Array | string): string => createHash('sha256').update(value).digest('hex');
+  try {
+    const folder = resolve(root, 'out', 'sparse');
+    mkdirSync(folder, {recursive: true});
+    mkdirSync(resolve(root, 'src/shared/game/grid'), {recursive: true});
+    writeFileSync(resolve(root, 'src/shared/game/grid/singleplayer.json'), JSON.stringify({grid: {cells: [{slug:'sparse'}]}}));
+    const pixels = Buffer.alloc(8 * 8 * 4);
+    pixels.set([255, 255, 255, 255], 0);
+    const image = await sharp(pixels, {raw: {width: 8, height: 8, channels: 4}}).png().toBuffer();
+    const ground = encodeTerrainTile({resolution: 2, x: -250, z: -250, size: 500, heights: new Float32Array(4)});
+    const sections = [['look/map', 'map.json', {map:{image:digest(image)}}],
+      ['world/tiles', 'tiles.json', {tiles:[{lod:0,files:[digest(ground)]}]}]] as const;
+    const rows = sections.map(([name, path, value]) => {
+      const body = JSON.stringify(value);
+      writeFileSync(resolve(folder,path), body);
+      return {name,path,bytes:Buffer.byteLength(body),hash:digest(body)};
+    });
+    const files = [['map.png', image, 'png'], ['terrain.bin', ground, 'tile']] as const;
+    writeFileSync(resolve(folder, 'shard.json'), JSON.stringify({format:'wildshard.shardfile', formatVersion:2, runtime:null, schemas:[], sections:rows,
+      files:files.map(([path, bytes, kind]) => {
+        writeFileSync(resolve(folder,path), bytes);
+        return {path,hash:digest(bytes),kind,compressed:bytes.length};
+      })}));
+    await writeWorldMapAtlas(root);
+    const tile = await sharp(resolve(root, 'out/.app/world-map.webp')).stats();
+    expect(tile.channels[1]?.mean).toBeGreaterThan(70);
+  } finally { rmSync(root, {recursive:true,force:true}); }
 });

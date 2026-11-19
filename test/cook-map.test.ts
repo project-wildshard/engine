@@ -62,8 +62,8 @@ test('a map that cannot be written fails the cook step', async () => {
 });
 
 /** A one-quad GLB (a 10 m roof at 6 m) at (x, z), red, with no textures. */
-function roofGlb(x: number, z: number): Uint8Array {
-  const positions = new Float32Array([x - 5, 6, z - 5, x + 5, 6, z - 5, x + 5, 6, z + 5, x - 5, 6, z + 5]), indices = new Uint16Array([0, 2, 1, 0, 3, 2]);
+function roofGlb(x: number, z: number, y: number): Uint8Array {
+  const positions = new Float32Array([x - 5, y, z - 5, x + 5, y, z - 5, x + 5, y, z + 5, x - 5, y, z + 5]), indices = new Uint16Array([0, 2, 1, 0, 3, 2]);
   const bin = new Uint8Array(60); bin.set(new Uint8Array(positions.buffer), 0); bin.set(new Uint8Array(indices.buffer), 48);
   const json = new TextEncoder().encode(JSON.stringify({asset: {version: '2.0'}, scenes: [{nodes: [0]}], nodes: [{mesh: 0}],
     meshes: [{primitives: [{attributes: {POSITION: 0}, indices: 1, material: 0}]}], materials: [{pbrMetallicRoughness: {baseColorFactor: [0.6, 0.05, 0.03, 1]}}],
@@ -76,10 +76,10 @@ function roofGlb(x: number, z: number): Uint8Array {
   return out;
 }
 /** A flat green 500 m terrain tile, a red roof in the north-west quarter (+X, +Z) and a pool in the south-east (−X, −Z). */
-function source(withWorld: boolean): MapSource {
+function source(withWorld: boolean, roofHeight = 6): MapSource {
   const r = 9, heights = new Float32Array(r * r), colours = new Float32Array(r * r * 3);
   for (let i = 0; i < r * r; i++) { colours[i * 3] = 0.1; colours[i * 3 + 1] = 0.3; colours[i * 3 + 2] = 0.05; }
-  const files = new Map<string, Uint8Array>([['blobs/tile/t.bin', encodeTerrainTile({resolution: r, x: -250, z: -250, size: 500, heights, colours})], ['blobs/glb/roof.glb', roofGlb(120, 120)]]);
+  const files = new Map<string, Uint8Array>([['blobs/tile/t.bin', encodeTerrainTile({resolution: r, x: -250, z: -250, size: 500, heights, colours})], ['blobs/glb/roof.glb', roofGlb(120, 120, roofHeight)]]);
   const sections = new Map<string, unknown>(withWorld ? [
     ['world/tiles', {tiles: [{lod: 0, x: 0, z: 0, files: ['t', 'roof']}]}],
     ['world/water', {water: [{level: 0.5, shape: {kind: 'polygon', points: [[-100, -100], [-140, -100], [-140, -140], [-100, -140]]}}]}],
@@ -108,4 +108,10 @@ test('a zone with nothing in it shows its plot grid, never one flat colour, and 
   const png = encodeMapPng(rgba, size, size), {info} = await sharp(png).raw().toBuffer({resolveWithObject: true});
   expect([info.width, info.height]).toEqual([256, 256]);
   expect(png.length).toBeLessThan(16_000);
+});
+
+test('a platform in the world tiles draws above the old 60 metre cutoff', () => {
+  const {rgba, size} = renderCookedMap(source(true, 125), {size: 256});
+  const [red, green] = pixel(rgba, size, 120, 120);
+  expect(red).toBeGreaterThan((green ?? 0) * 2);
 });
