@@ -14,12 +14,12 @@ import { exportSeats, importSeats } from '../src/server/game/plugin/playerSeats'
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // SR11 (C8, C9): Template's whip and lantern run on the server, fed by a player's wire, as the page's runtime did before the flip.
 async function template(): Promise<HeadlessRuntimeInput> {
-  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error('Missing _template output');
+  const directory = GAMEPLAY_SLICE, product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error('Missing gameplay slice output');
   const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };

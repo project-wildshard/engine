@@ -6,13 +6,13 @@ import type { ItemPorts } from '../src/shared/engine/combat/items';
 import { declaredKitItemFamilies } from '../src/client/game/plugin/weaponFamily';
 import { installDeclaredItems, rackMeleeRows, rackToolRows } from '../src/shared/game/shardfile/items';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // SHARD-SOURCE SS-GF1a1a, the page's half: a lantern on a stand is in the page's kit locked (not drawn, not used) until its
 // taken line (or, off the wire, its stand's scene) unlocks it; a lantern the loadout carries is in hand from the start.
 const LANTERN = 'tool.template-lantern';
 test('a tool on a stand starts locked in the page\'s kit and works once unlocked', { timeout: 60_000 }, async () => {
-  const base = (await loadHeadlessFolder(builtFolder('_template'))).shardfile;
+  const base = (await loadHeadlessFolder(GAMEPLAY_SLICE)).shardfile;
   const shard: Shardfile = { ...base, items: { ...base.items, loadout: { ...base.items.loadout, tools: base.items.loadout.tools.filter(id => id !== LANTERN) } },
     targets: { ...base.targets, interactions: [...base.targets.interactions, { id: 'fixture.lantern-rack.use', at: [20, 0, 20], radius: 2, label: 'Take the lantern', scene: 'fixture.lantern-rack.take' }], itemActions: [...(base.targets.itemActions ?? []).filter(row => row.item !== LANTERN || row.action !== 3), { scene: 'fixture.lantern-rack.take', item: LANTERN, action: 3 }] } };
   const scope = new Scope('page'), aim = { origin: { x: 0, y: 1.6, z: 0 }, direction: { x: 0, y: 0, z: -1 } };

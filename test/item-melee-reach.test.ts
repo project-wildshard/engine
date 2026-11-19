@@ -7,15 +7,15 @@ import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { installDeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TEMPLATE-E2E TC-SHIP-e2: a kit melee blow reaches a body's surface, not only its middle. The Template's Barrow Warden is a
 // scale-3 body 2.25 m round, so a player who runs into it stops about 2.5 m from its middle; the iron sword's 2.2 m range
 // was measured to that middle, and on staging no swing a player could make ever landed (the sharddev test that passed put
 // the player 1.8 m away, inside the body). Here the player runs into the Warden and swings from where it stops.
 test('the iron sword lands on the Barrow Warden from where a player who runs into it stops', async () => {
-  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error('Missing _template output');
+  const directory = GAMEPLAY_SLICE, product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error('Missing gameplay slice output');
   const shard = product.shardfile;
   const server = serverInputFiles(descriptor.index.files, shard);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

@@ -3,13 +3,14 @@ import { spentUses } from '../src/client/game/shard/declaredTargets';
 import { copyPrompts } from '../src/client/game/grid/copyPrompts';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TEMPLATE-E2E TC-E4c: Mossgate's sword rack kept its "Take the iron sword" prompt after the take (WebKit probe, engine
 // 2b5af207), on the one-shard page and in a grid cell alike. A rack whose melee weapon is taken is spent, as a lever's rack
 // is (TE-ENG6), and a grid copy's prompts now drop a spent use's reach too (they had no spent check at all).
 const SWORD = 'weapon.sword-iron';
 test('a taken sword\'s rack prompt is spent, standalone and in a grid copy', { timeout: 60_000 }, async () => {
-  const shard = (await loadHeadlessFolder(builtFolder('_template'))).shardfile;
+  const shard = (await loadHeadlessFolder(GAMEPLAY_SLICE)).shardfile;
   const rack = shard.targets.interactions.find(row => (shard.targets.itemActions ?? []).some(action => action.scene === row.scene && action.item === SWORD));
   if (rack === undefined) throw new Error('Template rev 8 racks its sword');
   let taken = false;

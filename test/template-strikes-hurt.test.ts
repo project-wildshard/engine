@@ -8,19 +8,20 @@ import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
-// TEMPLATE-E2E TC-M1 (J357): each of Mossgate's three brains has a strike that hurts. The pinned Template product's cell runs
+// TEMPLATE-E2E TC-M1 (J357): each of Mossgate's three brains has a strike that hurts. The Template's frozen server slice (TR-5) runs
 // with the player standing beside one body of each: the grey blob (`pursue`), the Greyback (the patrolling elite) and a
 // mossling of the pack (`creatures.groups`). Within 20 s of sim time each one's strike lowers the player's health.
 const PLAYER = 'actor.player';
 const rapier = loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-async function product(slug: string): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array> }> {
-  const directory = builtFolder(slug), loaded = await loadHeadlessFolder(directory), descriptor = outputDescriptor(loaded.shardfile);
-  if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
+async function product(directory: string): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array> }> {
+  const loaded = await loadHeadlessFolder(directory), descriptor = outputDescriptor(loaded.shardfile);
+  if (descriptor === undefined) throw new Error(`Missing ${directory} output`);
   const server = serverInputFiles(descriptor.index.files, loaded.shardfile);
   return { shard: loaded.shardfile, assets: new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))])) };
 }
-const mossgate = product('_template');
+const mossgate = product(GAMEPLAY_SLICE);
 
 for (const id of ['grey-blob:1', 'greyback', 'mossling:1']) {
   test(`Mossgate's ${id} strikes the player beside it`, async () => {
@@ -59,7 +60,7 @@ test('with every body down, the same 20 s beside the pack hurts no one: the harm
 // Every other body (but a rusher's mates) is down first, so the harm is that one body's strike. TC-B9 (rev 7): the rushers
 // are leashed pursuers with a knife, no longer a `creatures.groups` pack, which left the arena's player no leash.
 // TC-B4c: the bandit brawler (`challenge-grazer`: a lane tackle and an arc club) is Brasscap's third brain kind.
-const brasscap = product('brasscap-mesa');
+const brasscap = product(builtFolder('brasscap-mesa'));
 for (const [id, gap] of [['bandit.camp-1.2', 2], ['bandit.rusher.1', 6], ['wyrmling.2', 2], ['brawler.1', 6]] as const) {
   test(`Brasscap's ${id} strikes the player ${String(gap)} m off`, async () => {
     const input = await brasscap;

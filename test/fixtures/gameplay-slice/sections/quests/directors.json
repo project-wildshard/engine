@@ -1,0 +1,1 @@
+{"directors":[{"id":"template.door-wave","inputs":{"doorOpen":"flag:template.door-open","waveDead":"flag:template.blob"},"script":null,"stages":[{"do":[],"id":"door"},{"do":[{"flag":{"key":"template.wave-started","value":true}}],"id":"wave","when":"doorOpen"},{"do":[{"flag":{"key":"template.wave-complete","value":true}}],"id":"complete","when":"waveDead"}],"version":2}]}

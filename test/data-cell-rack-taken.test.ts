@@ -9,14 +9,14 @@ import { EnteredEquipment } from '../src/client/game/grid/enteredEquipment';
 import { enterDataCellKit } from '../src/client/game/grid/dataCellKit';
 import type { RegionalRuntimePage } from '../src/client/game/grid/regionalRuntime';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TEMPLATE-E2E TC-SHIP-e2 (opus-te2e7, 2026-11-17): after a reload on staging v0.1.34 the Template's taken sword stayed off the
 // hotbar: the server's `weapon.sword-iron.taken` line was 1, but the grid data cell's kit matched its racked rows by the
 // weapon's page id (`declared.weapon.sword-iron`), never by the row's (`weapon.sword-iron`), so only the take itself, never a
 // taken line read at entry, brought it to hand. A taken line read at entry now unlocks it and puts it in hand.
 test('a data cell\'s racked sword comes to hand from the server\'s taken line, as after a reload', { timeout: 60_000 }, async () => {
-  const template = (await loadHeadlessFolder(builtFolder('_template'))).shardfile, scope = new Scope('data-cell-rack');
+  const template = (await loadHeadlessFolder(GAMEPLAY_SLICE)).shardfile, scope = new Scope('data-cell-rack');
   const systems: { id: string; run: (dt: number, t: number) => void }[] = [];
   const input = { bind: () => undefined, held: () => false, register: () => undefined, has: () => true, bindings: { describe: () => undefined } };
   const road = new EquipmentService(new EmptyEquipment(), { scope });

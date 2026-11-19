@@ -12,7 +12,7 @@ import type { MoverPose } from '@wildshard/format/moverPose';
 import { installDataCellMovers } from '../src/client/game/grid/dataCellMovers';
 import { moverLookKey, wirePage } from '../src/client/game/shardfile/wirePage';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TEMPLATE-E2E TC-E5b: a plain data shard (Mossgate, no client plan) in a live grid cell had no mover collider on the page, so
 // its lift drew rising and nobody could ride it. The cell's movers now stand in its physics, posed off the wire's rows, and the
@@ -22,7 +22,7 @@ afterEach(() => { wirePage.movers.clear(); wirePage.moverLooks.clear(); });
 const at = (y: number): MoverPose => ({ position: { x: 4, y, z: 4 }, euler: { x: 0, y: 0, z: 0 }, enabled: true });
 
 test('a data cell\'s lift stands where the wire poses it, and poses its look', { timeout: 60_000 }, async () => {
-  const shard = (await loadHeadlessFolder(builtFolder('_template'))).shardfile;
+  const shard = (await loadHeadlessFolder(GAMEPLAY_SLICE)).shardfile;
   // Template rev 8 ships its own lift (TC-M4b); this test drives a fixed one of the same id, so it takes the product's place.
   const others = shard.movers.filter(mover => mover.id !== LIFT);
   expect(hasDeclaredClientPage(shard)).toBe(false); // the plain data path: no client plan installs its movers

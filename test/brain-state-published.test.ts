@@ -8,6 +8,7 @@ import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TEMPLATE-E2E TC-NE24c: a declared brain's mode reaches its body's state, so the wire and the page read a creature going
 // for the player as one (they read `idle` before). Mossgate's grey blob (`pursue`), Brasscap's dust wyrmling (`ram-grazer`)
@@ -16,16 +17,18 @@ import { builtFolder } from '../src/test/game/builtFolder';
 const PLAYER = 'actor.player';
 const rapier = loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 async function product(slug: string): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array> }> {
-  const directory = builtFolder(slug), loaded = await loadHeadlessFolder(directory), descriptor = outputDescriptor(loaded.shardfile);
+  const directory = slug === GAMEPLAY ? GAMEPLAY_SLICE : builtFolder(slug), loaded = await loadHeadlessFolder(directory), descriptor = outputDescriptor(loaded.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const server = serverInputFiles(descriptor.index.files, loaded.shardfile);
   return { shard: loaded.shardfile, assets: new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))])) };
 }
 // Brasscap's catalogue slug is brasscap-mesa from TC-SHIP-a; before that it is blender-template
 const pins = (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: { slug: string }[] }).shards;
+/** The Template's grey blob, from its frozen server slice (TR-5). */
+const GAMEPLAY = 'gameplay slice';
 const BRASSCAP = pins.some(row => row.slug === 'brasscap-mesa') ? 'brasscap-mesa' : 'blender-template';
 
-for (const [slug, id, gap] of [['_template', 'grey-blob:1', 6], [BRASSCAP, 'wyrmling.2', 6], [BRASSCAP, 'brawler.1', 6]] as const) {
+for (const [slug, id, gap] of [[GAMEPLAY, 'grey-blob:1', 6], [BRASSCAP, 'wyrmling.2', 6], [BRASSCAP, 'brawler.1', 6]] as const) {
   test(`${slug}'s ${id} reads a chasing or attacking state with the player ${String(gap)} m off`, async () => {
     const input = await product(slug);
     const sim = createShardfileSim(input.shard, input.assets, { rapier: await rapier, quest: { fact: () => undefined, coins: () => undefined } });

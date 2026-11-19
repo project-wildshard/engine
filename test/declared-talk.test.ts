@@ -13,7 +13,7 @@ import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TE-ENG3: a quest-giver from rows alone (`test/fixtures/declared-talk/rows.json`), on Template's product. Its talk offers a quest;
 // the accept starts it, a region lights the lamp, the report finishes it, and it pays its coins and files its fact.
@@ -25,8 +25,8 @@ interface TalkFixture {
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The fixture is the author's rows, typed as the format reads them.
 const fixture = JSON.parse(readFileSync('test/fixtures/declared-talk/rows.json', 'utf8')) as TalkFixture;
 async function withTalk(): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array>; rapier: Awaited<ReturnType<typeof loadRapier>> }> {
-  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), base = product.shardfile, descriptor = outputDescriptor(base);
-  if (descriptor === undefined) throw new Error('Missing _template output');
+  const directory = GAMEPLAY_SLICE, product = await loadHeadlessFolder(directory), base = product.shardfile, descriptor = outputDescriptor(base);
+  if (descriptor === undefined) throw new Error('Missing gameplay slice output');
   const server = serverInputFiles(descriptor.index.files, base);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const shard: Shardfile = { ...base,

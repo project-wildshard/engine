@@ -1,0 +1,1 @@
+{"rows":{"days":[{"fixed":{"golden":17,"midday":12,"night":0,"sunset":18},"id":"template.day","presets":{"dawn":6,"dusk":18,"night":0,"noon":12},"schedule":[{"from":0,"minutes":12,"phase":"day","to":24}],"start":12,"sun":{"azimuthOffset":35,"maxElevation":60},"units":"hour"}]}}

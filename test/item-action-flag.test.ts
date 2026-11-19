@@ -9,7 +9,7 @@ import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { installDeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TEMPLATE-E2E TC-E7: an item scene's use can raise a quest flag. Mossgate's chest prompt is an item action (it refills the
 // lantern), so the kit takes it and quests never saw it: the chest paid on walk-up through a region trigger instead. With
@@ -17,8 +17,8 @@ import { builtFolder } from '../src/test/game/builtFolder';
 // and only for that player, and only at the prompt; a use the item turns away (a dead player's) raises nothing.
 const PLAYER = 'actor.player', BOT = 'actor.bot', GHOST = 'actor.ghost', CHEST = 'template.chest.open', FLAG = 'template.chest.opened';
 async function mossgate(): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array> }> {
-  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error('Missing _template output');
+  const directory = GAMEPLAY_SLICE, product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error('Missing gameplay slice output');
   const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const shard = product.shardfile, actions = shard.targets.itemActions ?? [];
   expect(actions.some(row => row.scene === CHEST)).toBe(true);

@@ -5,13 +5,13 @@ import type { ItemPorts } from '../src/shared/engine/combat/items';
 import { declaredKitItemFamilies } from '../src/client/game/plugin/weaponFamily';
 import { installDeclaredItems, rackMeleeRows } from '../src/shared/game/shardfile/items';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TEMPLATE-E2E TC-E4b, the page's half of TC-E4: Mossgate's iron sword starts on its rack. The server refused its blows until
 // the rack's take, but the page's kit unlocked it with the whip, so slot 2 drew the sword at spawn (WebKit probe, engine
 // fafee64e, 2026-11-16). A racked melee row now starts locked on the page, as a lever does, until its taken line unlocks it.
 test('a racked melee weapon starts locked in the page\'s kit; the loadout primary does not', { timeout: 60_000 }, async () => {
-  const shard = (await loadHeadlessFolder(builtFolder('_template'))).shardfile;
+  const shard = (await loadHeadlessFolder(GAMEPLAY_SLICE)).shardfile;
   const racked = rackMeleeRows(shard), primary = shard.items.loadout.primary;
   expect([...racked]).toEqual(['weapon.sword-iron']);
   const scope = new Scope('page'), aim = { origin: { x: 0, y: 1.6, z: 0 }, direction: { x: 0, y: 0, z: -1 } };

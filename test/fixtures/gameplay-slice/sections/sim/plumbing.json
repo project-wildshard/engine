@@ -1,0 +1,1 @@
+{"plumbing":{"debug":[],"input":[{"actions":[{"id":"template.lantern.toggle","keys":["KeyL"],"scene":"template.lantern.toggle"}],"id":"template.lantern","priority":20,"touch":{"action":"template.lantern.toggle","icon":"","label":"LANTERN","slot":"verb.1"}}],"knobs":[{"desktop":20,"id":"template.propCount","phone":10}],"namespace":"template"}}

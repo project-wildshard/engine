@@ -14,11 +14,13 @@ function timed(name,work){
   });
 }
 
+// The Template's door and saved field, from its frozen server slice (TEMPLATE-E2E TR-5, test/fixtures/gameplaySlice.ts).
+const GAMEPLAY='gameplay slice';
 async function folderInput(slug){
   const {loadHeadlessFolder}=await import('../../src/server/host/headlessFolder.ts');
   const {loadRapier}=await import('../../src/shared/engine/physics/rapier.ts');
   const {runtimeAssets,builtFolder}=await import('../fixtures/engine-lift/folder.ts');
-  const directory=builtFolder(slug),product=await loadHeadlessFolder(directory);
+  const directory=slug===GAMEPLAY?'test/fixtures/gameplay-slice':builtFolder(slug),product=await loadHeadlessFolder(directory);
   return {product,shard:product.shardfile,assets:runtimeAssets(product,directory),rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))};
 }
 
@@ -49,11 +51,11 @@ timed('host',async()=>{
 timed('door',async()=>{
   const {createShardfileSim}=await import('../../src/server/game/plugin/simulation.ts');
   const {leadPlayer}=await import('../../src/shared/engine/sim/leadPlayer.ts');
-  const input=await folderInput('_template'),facts=[];
+  const input=await folderInput(GAMEPLAY),facts=[];
   const sim=createShardfileSim(input.shard,input.assets,{rapier:input.rapier,quest:{fact:(...args)=>facts.push(args),coins:(...args)=>facts.push(args)}});
   try{
     const player=leadPlayer(sim.host),target=input.shard.targets.interactions.find(row=>row.scene==='template.door.toggle');
-    assert.ok(target&&sim.lane,'Actual pinned Template door and admitted scene lane must exist');
+    assert.ok(target&&sim.lane,'The Template slice\'s door and admitted scene lane must exist');
     assert.equal(sim.lane.world.publicField('template.door.open'),0);
     assert.equal(sim.interact(target.id),false,'Spawn is outside the actual door prompt');
     const [x,,z]=target.at;
@@ -94,7 +96,7 @@ timed('save-field',async()=>{
   const {leadPlayer}=await import('../../src/shared/engine/sim/leadPlayer.ts');
   const {serializeSimSnapshot,snapshotSimHostBytes,decodeSimSnapshot}=await import('../../src/shared/engine/sim/snapshot.ts');
   const {restoreSimHost}=await import('../../src/server/engine/sim/restore.ts');
-  const input=await folderInput('_template'),ports={rapier:input.rapier,quest:{fact:()=>undefined,coins:()=>undefined}};
+  const input=await folderInput(GAMEPLAY),ports={rapier:input.rapier,quest:{fact:()=>undefined,coins:()=>undefined}};
   const sim=createShardfileSim(input.shard,input.assets,ports);
   let restored,again;
   try{

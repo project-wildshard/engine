@@ -21,14 +21,14 @@ import { installStatusEffects } from '../src/server/game/shardfile/statusEffects
 import { statusLine } from '../src/shared/game/systems/effects/starterEffects';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import STARTER from '../src/shared/game/systems/effects/starterRows.json' with { type: 'json' };
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 const POISON = STARTER.find(row => row.id === 'effect.poison');
 const BLOB = 'grey-blob:1', HEAVY = 30;
 
 async function templateCell() {
-  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error('Missing _template output');
+  const directory = GAMEPLAY_SLICE, product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error('Missing gameplay slice output');
   const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));

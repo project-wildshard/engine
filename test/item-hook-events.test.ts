@@ -6,15 +6,15 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TEMPLATE-E2E TC-SHIP-e2: the Template's whip answers each swing through its item hook, whose answer is a declared event
 // on the whip's own script entity. Nothing is scheduled on that entity, so the composed lane kept every answer queued
 // forever; the 33rd swing in a room found the event queue full ("Event allowance"), the trap froze the whip's entity,
 // and from then on every swing was refused. On staging a Warden fight stopped dealing damage at 40% for every player.
 test('an item hook answers every swing, past the script event allowance', async () => {
-  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error('Missing _template output');
+  const directory = GAMEPLAY_SLICE, product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error('Missing gameplay slice output');
   const shard = product.shardfile;
   const server = serverInputFiles(descriptor.index.files, shard);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

@@ -8,7 +8,7 @@ import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { proveAuthoredGrid, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { installDeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // SHARD-SOURCE SS-GF1a1c: a tape's E on a pickup (`world.pickup`: an item scene that takes a tool off its stand and raises a
 // quest flag) runs the kit, as a data cell's page does. The author proof ran only the prompt's script scene, so the take
@@ -16,8 +16,8 @@ import { builtFolder } from '../src/test/game/builtFolder';
 const SCENE = 'fixture.lantern-rack.take', USE = 'fixture.lantern-rack.use', AT: [number, number, number] = [20, 0, 20];
 const LANTERN = 'tool.template-lantern', FLAG = 'fixture.lantern.taken';
 async function withPickup(): Promise<{ readonly shard: Shardfile; readonly assets: Map<string, Uint8Array> }> {
-  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error('Missing _template output');
+  const directory = GAMEPLAY_SLICE, product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error('Missing gameplay slice output');
   const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const base = product.shardfile;

@@ -8,9 +8,9 @@ import { leadPlayer } from "../../src/shared/engine/sim/leadPlayer.ts";
 import { journey, timed } from "./folder-journey.mjs";
 
 timed(
-  "pinned Template: walk the hut door, kill the blob, earn the quest and resume the save",
+  "Template slice (TR-5): walk the hut door, kill the blob, earn the quest and resume the save",
   async () => {
-    await journey("out/_template", async (f) => {
+    await journey("test/fixtures/gameplay-slice", async (f) => {
       f.idle(12);
       f.walkTo(-4, -9.5);
       f.tick(0, 0, [{ kind: "interact", id: "template.door.use" }]);

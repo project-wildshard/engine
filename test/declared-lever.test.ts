@@ -14,7 +14,7 @@ import { installDeclaredKitItems, type DeclaredKitItems } from '../src/server/ga
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
-import { builtFolder } from '../src/test/game/builtFolder';
+import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
 // TE-ENG2: a lever-action rifle from rows alone (`test/fixtures/declared-lever/rows.json`), on Template's product. It starts on its
 // rack; the rack's scene takes it; six rounds leave the tube, each a hitscan that lands on a declared body; R feeds one round at a time.
@@ -25,8 +25,8 @@ interface LeverFixture {
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The fixture is the author's rows, typed as the format reads them.
 const fixture = JSON.parse(readFileSync('test/fixtures/declared-lever/rows.json', 'utf8')) as LeverFixture;
 async function withLever(): Promise<HeadlessRuntimeInput> {
-  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error('Missing _template output');
+  const directory = GAMEPLAY_SLICE, product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error('Missing gameplay slice output');
   const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const base = product.shardfile;
