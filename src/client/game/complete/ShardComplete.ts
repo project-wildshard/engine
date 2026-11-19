@@ -4,12 +4,12 @@ import type { UiHandle } from '@wildshard/engine/ui/layers';
 import { uiScope, mountUi } from '@wildshard/engine/ui/ownership';
 /**
  * ShardComplete — the "<shard> complete" card (E132, mockup A: art/quest/round-2-complete-screen/A.jpg): a centred glass
- * card over the dimmed last frame. It shows the shard's title, a stats grid, the "still to find" chips and three buttons:
- * KEEP EXPLORING (primary), NEXT SHARD: <name> and TITLE SCREEN. It is data only. A shard's quest hands it a
+ * card over the dimmed last frame. It shows the shard's title, a stats grid, the "still to find" chips and one button,
+ * KEEP EXPLORING (QA-FEEDBACK 11-19 row 25, J454: TITLE SCREEN and NEXT SHARD bumped the player out of the MMO). It is data only. A shard's quest hands it a
  * `ShardCompleteData` and platform handlers. Admitted rows use complete/declared; nothing here knows a shard.
  *
  *   const card = new ShardComplete();
- *   card.open(data, { keep, next, title });   // Enter / Esc = keep
+ *   card.open(data, { keep });                // Enter / Esc = keep
  *   card.close();
  *   shardCompleteUp()                          // main.ts's frameGate: the world is frozen while a card is up
  *   setCompleteEntry({ label, open })          // the menu's Achievements tab lists it as a row that reopens the card
@@ -35,11 +35,9 @@ export interface ShardCompleteData {
   stats: CompleteStat[];
   /** what is still out there, one chip each (empty: the section is left out) */
   todo: string[];
-  /** the shard the NEXT SHARD button goes to (its display name) — none: the button is left out */
-  next?: string;
 }
 
-export interface CompleteHandlers { keep: () => void; next: () => void; title: () => void }
+export interface CompleteHandlers { keep: () => void }
 
 export interface CompleteEntry {
   /** the menu row's name ("Driftwood complete") */
@@ -90,7 +88,6 @@ export class ShardComplete {
       <div class="ws-complete-grid"></div>
       <div class="ws-complete-btns">
         <button type="button" class="ws-complete-btn pri" data-act="keep">Keep exploring<b>▸</b></button>
-        <div class="ws-complete-row2"><button type="button" class="ws-complete-btn sec" data-act="title">Title screen</button></div>
       </div>
     </div>`;
     required(root, '.ws-complete-card').setAttribute('aria-label', `${data.title} complete`);
@@ -110,17 +107,10 @@ export class ShardComplete {
       const todo = words('ws-complete-todo'); data.todo.forEach((value, index) => { if (index > 0) todo.append(document.createTextNode(' ')); todo.append(words('', value, 'span')); });
       grid.after(words('ws-complete-rule'), words('ws-complete-lab', 'Still to find'), todo);
     }
-    const row2 = required(root, '.ws-complete-row2'); row2.classList.toggle('one', data.next === undefined);
-    if (data.next !== undefined) {
-      const next = document.createElement('button'); next.type = 'button'; next.className = 'ws-complete-btn sec'; next.dataset['act'] = 'next';
-      next.append(words('', 'Next shard:', 'small'), document.createTextNode(data.next)); row2.prepend(next);
-    }
     scope.listen(root, 'click', (e) => {
       const t = e.target instanceof Element ? e.target.closest('[data-act]') : null;
       const act = t instanceof HTMLElement ? t.dataset['act'] : undefined;
       if (act === 'keep') handlers.keep();
-      else if (act === 'next') handlers.next();
-      else if (act === 'title') handlers.title();
     });
     const hud = hudRoot();
     mountUi(root, scope, hud);

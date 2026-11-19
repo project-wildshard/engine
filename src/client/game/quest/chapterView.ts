@@ -141,7 +141,7 @@ export function chapterTalkFigures(scope: Scope, talks: readonly { readonly id: 
 /** What is left of a finished story, as map markers. */
 export function completionMarkers(complete: Parameters<typeof completionProjection>[0], flags: Flags, progress: CompletionProgress | undefined,
   anchors: ReadonlyMap<string, { readonly x: number; readonly z: number }> | undefined): LiveMarker[] {
-  return completionProjection(complete, flags, progress, undefined, undefined, anchors).markers;
+  return completionProjection(complete, flags, progress, undefined, anchors).markers;
 }
 /** The contract board's page. */
 export function questBoardPage(...input: Parameters<typeof installContractBoardPage>): ReturnType<typeof installContractBoardPage> { return installContractBoardPage(...input); }
