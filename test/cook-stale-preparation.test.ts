@@ -52,16 +52,16 @@ test('a stale preparation cooks to the same bytes as the matching renderer, and 
   const tarball = writeTar(prepared(PREPARED));
   const fast = await cook(tarball, 'current', PREPARED), moved = await cook(tarball, 'stale', MOVED);
   expect(fast.report.preparation).toBe('current');
-  expect(fast.warned).not.toContain('stale preparation: template');
+  expect(fast.warned).not.toContain('stale preparation: brasscap-mesa');
   expect(moved.report.preparation).toBe('stale');
-  expect(moved.warned).toContain('stale preparation: template');
+  expect(moved.warned).toContain('stale preparation: brasscap-mesa');
   // The renderer only names the path: every part, manifest, server pack and loose mount is byte for byte the same.
   expect(Object.keys(moved.files).length).toBeGreaterThan(0);
   expect(moved.files).toEqual(fast.files);
   const {preparation: _fast, seconds: _a, ...fastRest} = fast.report, {preparation: _moved, seconds: _b, ...movedRest} = moved.report;
   expect(movedRest).toEqual(fastRest);
   // The author's recorded programs still ship at their URL, and the fence still shapes the phone's entry set.
-  expect(moved.report.loose).toContain('/programs/template.json');
+  expect(moved.report.loose).toContain('/programs/brasscap-mesa.json');
   const entry = (cooked: {report: CookReport}, dir: string): string[] => {
     const row = cooked.report.manifests.find(manifest => manifest.tier === 'phone' && manifest.set === 'entry');
     if (row === undefined) throw new Error('No phone entry manifest');
@@ -71,7 +71,7 @@ test('a stale preparation cooks to the same bytes as the matching renderer, and 
   const unfenced = await cook(writeTar(prepared(PREPARED, false)), 'stale-unfenced', MOVED);
   expect(entry(moved, 'stale').some(url => url.startsWith('/assets/stale-proof.bin'))).toBe(true);
   expect(entry(unfenced, 'stale-unfenced').some(url => url.startsWith('/assets/stale-proof.bin'))).toBe(false);
-  expect(moved.files['programs/template.json']).toBe(digest(prepared(PREPARED).get('mounts/programs/template.json') ?? new Uint8Array()));
+  expect(moved.files['programs/brasscap-mesa.json']).toBe(digest(prepared(PREPARED).get('mounts/programs/brasscap-mesa.json') ?? new Uint8Array()));
 });
 
 test('SA48: every file of the shard is in a whole set or loose at its product URL', {timeout: 60_000}, async () => {
@@ -81,7 +81,7 @@ test('SA48: every file of the shard is in a whole set or loose at its product UR
   const sets = cooked.report.manifests.filter(manifest => manifest.set === 'whole').map(row =>
     new Set((json(readFileSync(join(root, 'whole-or-loose', row.url.slice(1)))) as {files: {hash: string}[]}).files.map(file => file.hash)));
   const loose = index.files.filter(row => !sets.every(set => set.has(row.hash)));
-  // The template fixture has lazy GLBs in no read set, so this is not vacuous.
+  // The Brasscap fixture has lazy GLBs in no read set, so this is not vacuous.
   expect(loose.length).toBeGreaterThan(0);
   for (const row of loose) expect(cooked.files[join('shardfiles', index.identity.slug, row.path)]).toBe(row.hash);
 });

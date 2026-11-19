@@ -28,20 +28,20 @@ afterAll(async () => { entryScope.abort(); await preparing?.catch(() => undefine
 test('the cook worker cooks a stale preparation in its bounded child, and its index and row say so', {timeout: TEST_TIMEOUT}, async () => {
   const tarball = writeTar(prepared(PREPARED)), hash = digest(tarball), lines: string[] = [];
   const worker = (build: string, renderer?: string): ReturnType<typeof createCookWorker> => createCookWorker({build, store: folderStore(join(root, 'worker-store')),
-    source: {heads: () => Promise.resolve([{slug: 'template', hash, revision: 1}]), download: () => Promise.resolve(tarball)},
+    source: {heads: () => Promise.resolve([{slug: 'brasscap-mesa', hash, revision: 1}]), download: () => Promise.resolve(tarball)},
     serverPacks: join(root, 'worker-server'), scratch: join(root, 'worker-jobs'), log: line => { lines.push(line); },
     launcher: {root: process.cwd(), execPath: process.execPath, loader: resolve('scripts/bake-loader.mjs'), get script() { if (entry === undefined) throw new Error('Missing fixed cook entry'); return entry.script; }, wrap: [],
       limits: {seconds: CHILD_TIMEOUT_SECONDS, memoryMB: 4096, heapMB: 2048}, ...(renderer === undefined ? {} : {renderer})}});
-  const stale = await worker('moved', MOVED).cook({slug: 'template', hash});
+  const stale = await worker('moved', MOVED).cook({slug: 'brasscap-mesa', hash});
   expect(stale).toMatchObject({state: 'cooked', preparation: 'stale'});
-  expect(lines.some(line => line.includes('stale preparation: template'))).toBe(true);
+  expect(lines.some(line => line.includes('stale preparation: brasscap-mesa'))).toBe(true);
   const store = folderStore(join(root, 'worker-store'));
-  expect(json(await store.get(indexKey('moved', hash)))).toMatchObject({slug: 'template', preparation: 'stale'});
-  const fast = await worker('prepared', PREPARED).cook({slug: 'template', hash});
+  expect(json(await store.get(indexKey('moved', hash)))).toMatchObject({slug: 'brasscap-mesa', preparation: 'stale'});
+  const fast = await worker('prepared', PREPARED).cook({slug: 'brasscap-mesa', hash});
   expect(fast).toMatchObject({state: 'cooked', preparation: 'current'});
   // Same parts either way: the second build's index names exactly the first one's stored objects.
   const keys = (build: string): Promise<unknown> => store.get(indexKey(build, hash)).then(body => (json(body) as {keys: string[]}).keys);
   expect(await keys('prepared')).toEqual(await keys('moved'));
   // A host that hands its job no fingerprint still cooks: the job can't run git under --permission, so it can't call it current.
-  expect(await worker('unnamed').cook({slug: 'template', hash})).toMatchObject({state: 'cooked', preparation: 'stale'});
+  expect(await worker('unnamed').cook({slug: 'brasscap-mesa', hash})).toMatchObject({state: 'cooked', preparation: 'stale'});
 });
