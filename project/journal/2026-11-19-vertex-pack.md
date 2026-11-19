@@ -21,3 +21,5 @@ Six locked Pine pairs: GL buffers [L] 58 -> 48 MB (median, 5 of 6 settled each a
 WebContent [K] settled rose 595 -> 622 MB. The CPU-held vertex arrays are the same in both arms (22.1 MB), so the rise
 is the encoder's own garbage: every packed upload made a new owned scratch array. They now share one staging array,
 grown by doubling and let go when the task's uploads end.
+
+The new device slot `debug.vertexPack` is registered in `saves.lock.json` (check:saves stopped the first land).
