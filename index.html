@@ -2,6 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="color-scheme" content="dark" />
+    <style data-first-paint>html, body { background: #050810; color-scheme: dark; }</style>
+    <!-- QA-FEEDBACK 11-19 row 46: the block above stays the document's first bytes (the build injects after it,
+         scripts/app-build/buildIdentity.mjs afterFirstPaint), so the first paint of a slow or stalled page is the shell's
+         dark, never the white default canvas. theme-color and the manifest's colours are the same #050810. -->
     <script data-secure-door>
       // QA 2026-11-13 (Chrome on iOS): plain http is not a secure context, so there is no crypto.randomUUID, crypto.subtle or
       // service worker, and the title froze under WILDSHARD with no buttons. A public host moves to its https twin before
@@ -216,7 +221,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#34424f" />
+    <meta name="theme-color" content="#050810" />
     <!-- J236: framing A (tilt). These name the preview (solo) set; scripts/app-build/homeIcons.mjs points a production or
          staging build at its own icons/<channel>/ files and its manifest -->
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/preview/apple-touch-icon.png" />

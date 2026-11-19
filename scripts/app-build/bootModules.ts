@@ -8,6 +8,7 @@ import { bootTierFolderTotals } from './bootFolderTiers';
 import { homeExtraFiles } from './bootExtras';
 import { createHash } from 'node:crypto';
 import { writtenBundle } from './writtenBundle';
+import { afterFirstPaint } from './buildIdentity.mjs';
 
 /** Only imports actually scheduled by startSelected; title, recovery and error
  * branches elsewhere in the entry module are not home requirements. */
@@ -267,5 +268,6 @@ export function writeBootModules(outDir: string, root: string): void {
   featureRoots['boot.common']=[...ids];
   const rows = { common: bootModuleFiles(bundle, ids), client: bootModuleFiles(bundle, [client.id]), grid: bootModuleFiles(bundle, gridRoots), optional: bootModuleGroups(bundle, featureRoots), products, extras };
   const json = JSON.stringify(rows).replaceAll('<', String.raw`\u003c`);
-  writeFileSync(htmlFile, html.replace('<head>', `<head><script type="application/json" id="boot-module-files">${json}</script>`));
+  const at = afterFirstPaint(html, html.indexOf('<head>') + '<head>'.length);
+  writeFileSync(htmlFile, `${html.slice(0, at)}<script type="application/json" id="boot-module-files">${json}</script>${html.slice(at)}`);
 }

@@ -12,6 +12,9 @@ export function sourceBuildId(sha: string, now?: number): string;
 /** A web build's own folder for code, CSS and wasm (J57, J131). */
 export function codeDirectory(build: string): string;
 export const SHARED_CODE_DIRECTORY: 'b/c';
+/** QA-FEEDBACK 11-19 row 46: the offset after index.html's first-paint block (or `headEnd` when it has none), where the
+ * build injects its head-start tags. */
+export function afterFirstPaint(html: string, headEnd: number): number;
 /** FIRST-OPEN-PROGRESS: the title document's bundle tags in one inert template, written back in place in a browser tab and
  * added after `load` on a Home Screen launch, so iOS drops its still launch image for the live shell at once. */
 export function lateBootTags(html: string): string;

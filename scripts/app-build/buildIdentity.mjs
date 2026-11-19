@@ -37,6 +37,15 @@ export const codeDirectory = (build) => `b/${build}`;
  * in its own folder, and the deploy carries the old builds' graphs (MF2, J79) as before. */
 export const SHARED_CODE_DIRECTORY = 'b/c';
 
+/** QA-FEEDBACK 11-19 row 46: index.html opens its head with a first-paint block (charset, colour scheme and the dark
+ * page background, ending at `<style data-first-paint>`). What the build injects at the head's start goes after it,
+ * so the block stays in the document's first bytes. A head without the block keeps `headEnd`.
+ * @param {string} html @param {number} headEnd the offset just past `<head>` */
+export function afterFirstPaint(html, headEnd) {
+  const block = /^(?:\s*<meta\b[^>]*>)*\s*<style data-first-paint>[^<]*<\/style>/u.exec(html.slice(headEnd));
+  return block === null ? headEnd : headEnd + block[0].length;
+}
+
 /** The build pill's words for a build (src/client/engine/ui/buildCheck.ts buildLabel, which test/build-identity.test.ts
  * keeps equal): its `git describe`, else "v0.1.5 · a8144a5", either half alone when the other is unknown.
  * @param {string} build @param {{version: string, describe?: string}} release */
@@ -88,7 +97,7 @@ export function stampBuildHtml(html, build, facts) {
     tag => tag.includes('media=') ? tag : tag.replace(/\s*\/?\s*>$/u, ' media="print" onload="this.media=\'all\'">')) : html);
   const heads = [...source.matchAll(/<head(?:\s[^>]*)?>/giu)];
   if (heads.length !== 1 || heads[0]?.index === undefined) throw new Error('Missing or ambiguous document head');
-  const end = heads[0].index + heads[0][0].length;
+  const end = afterFirstPaint(source, heads[0].index + heads[0][0].length);
   if (facts !== undefined && (!/^[a-f0-9]{64}$/u.test(facts.validator) || !Array.isArray(facts.verdicts))) throw new Error('Invalid document admission facts');
   const admission = facts === undefined ? '' : `globalThis.__WS_SHARDFILE_VALIDATOR__=${JSON.stringify(facts.validator)};globalThis.__WS_SHARDFILE_VERDICTS__=${JSON.stringify(facts.verdicts).replaceAll('<', String.raw`\u003c`)};`;
   const world = facts?.world === undefined ? '' : `globalThis.__WS_WORLD__=${JSON.stringify(facts.world).replaceAll('<', String.raw`\u003c`)};`;
