@@ -61,6 +61,8 @@ declare global {
         readonly savedTick: number
         readonly savedOk: boolean
         readonly frames: number
+        readonly framesPerSecond: number
+        readonly mainMsP95: number
       })
     | undefined
   var document: {

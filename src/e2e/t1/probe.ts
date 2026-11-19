@@ -83,6 +83,22 @@ async function markPlay(page: Page, name: string): Promise<void> {
   playMarks.set(page, marks)
 }
 
+/** The page's frame rate and its frames' p95 main-thread cost as the worker client counts them: on software GL the
+ *  waits after control are page frames (TR-4b). */
+async function markRate(page: Page): Promise<void> {
+  const rate = await page
+    .evaluate((): string => {
+      const report = globalThis.__workerClient?.()
+      return report === undefined
+        ? 'rate unread'
+        : `${report.framesPerSecond.toFixed(1)} fps, p95 ${report.mainMsP95.toFixed(0)} ms`
+    })
+    .catch((): string => 'rate unread')
+  const marks = playMarks.get(page) ?? []
+  marks.push(rate)
+  playMarks.set(page, marks)
+}
+
 /** The marks the last inPlay left on this page, once. */
 function takePlayMarks(page: Page): readonly string[] {
   const marks = playMarks.get(page) ?? []
@@ -131,6 +147,7 @@ async function inPlay(page: Page): Promise<void> {
     (): boolean => (globalThis.__workerClient?.().frames ?? 0) > 30,
   )
   await markPlay(page, 'worker')
+  await markRate(page)
   await expect(page.locator('#hud.intro,.ws-reveal')).toHaveCount(0, {
     timeout: 10_000,
   })
