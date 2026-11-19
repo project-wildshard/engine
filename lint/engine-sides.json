@@ -1401,6 +1401,7 @@
     "src/server/game/shardfile/declaredKitItems.ts": "server",
     "src/server/game/shardfile/declaredPatrols.ts": "server",
     "src/server/game/shardfile/declaredRanks.ts": "server",
+    "src/server/game/shardfile/runtimeCreatures.ts": "server",
     "src/server/game/shardfile/declaredPortalRide.ts": "server",
     "src/server/game/shardfile/declaredRiding.ts": "server",
     "src/server/game/shardfile/declaredSpawnCount.ts": "server",

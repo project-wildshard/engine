@@ -1,7 +1,6 @@
 import { installDataCreatureBands } from '../shardfile/dataCreatureBands';
 import { bindCreatureSenses, installCreatureSensesContract } from '../shardfile/creatureSenses';
 import { installCreatureVolumes } from '../shardfile/creatureVolumes';
-import { sizeCreatureSpawns } from '../shardfile/creatureSizes';
 import type { CreatureVolumePose } from '@wildshard/engine/physics/creatureVolumes';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { dataPerchBrains, preflightPlainPerches } from '../shardfile/dataPerchBrains';
@@ -16,6 +15,7 @@ import { parseWorldTargets, worldTargetRules } from '@wildshard/format/worldTarg
 import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
 import { prepareNativePopulation, type NativePopulationRows } from '../shardfile/bossRow';
 import { serverReturnRows } from '../shardfile/nativeRuntimeLoans';
+import { admitRuntimeCreatures, declaredSpawnEntities, installRuntimeCreatures, keeperOwnership, nameDeclaredBodies } from '../shardfile/runtimeCreatures';
 import { parseQuestWorldReactions, type QuestWorldReactionsData } from '@wildshard/format/questInteractions';
 import { installQuestGraph, type QuestGraphPorts } from '../../../shared/game/plugin/quests';
 import { parseQuestHost, type QuestHostRow } from '@wildshard/format/questHost';
@@ -46,7 +46,6 @@ import { DEFAULT_NORMALIZED_DAY, normalizedDayClock, inNormalizedDayRange, type 
 import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
 import { waveHeight } from '@wildshard/engine/world/waves';
 import { createSimHost, type SimHost, type SimCommand, type SimHostPorts, type SimLevel, type SimStrike, type SimValue } from "@wildshard/engine/sim";
-import { buildPlatformSpawns } from "@wildshard/engine/ai/platform";
 import { addBakedTerrainCollider } from "@wildshard/engine/physics/terrainTiles";
 import { decodeTerrainTile, terrainTileHeight, type TerrainTileData } from "@wildshard/format/terrainTileBytes";
 import { fnv1a32 } from "@wildshard/format/seededRng";
@@ -74,7 +73,6 @@ import { scriptPhysicsQueries } from "@wildshard/engine/script/queries";
 import { createQuestScriptPorts, DeclaredQuests, type QuestDataPorts, type QuestScriptBindings } from "../../../shared/game/quest/declared";
 import { installDeclaredEncounters } from "../shard/declaredEncounters";
 import type { Shardfile } from "@wildshard/format/shardSchema";
-import { speciesResolver, simStrikes } from "./brain";
 import { prepareCreaturePolicies, resolveCreatureLayers } from "../shardfile/creatureLayers";
 import { installLayerHunts } from "../shardfile/layerHunts";
 import { createShardfileScriptLane, verifiedScriptModules, type ScriptModuleAssets, type ShardScriptPorts } from "../shardfile/scripts";
@@ -113,7 +111,7 @@ import { installDeclaredAttackable } from '../shardfile/declaredAttackable';
 import { declaredGrappleTick, installDeclaredGrapple } from '../shardfile/declaredGrapple';
 import type { GrappleTickContext, NativeGrapple } from '../grapple/native';
 import { installDeclaredPatrols } from '../shardfile/declaredPatrols';
-import { installDeclaredRanks, rankCreatureSpawns } from '../shardfile/declaredRanks';
+import { installDeclaredRanks } from '../shardfile/declaredRanks';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
 
 type Physics = SimHost['physics'];
@@ -153,7 +151,8 @@ export function addBakedPieces(physics: Physics, pieces: unknown): AddedPiece['c
 export const HOST_PROBE: Readonly<SimStrike> = { id: 'host.probe', shape: { kind: 'point', radius: 1 }, windup: 0.1, active: 0.1, recover: 0.2, cooldown: 0.3, range: 1, damage: 0, tags: [] };
 /**
  * A native runtime's native level (SF72): the shard's identity, the player at the runtime's own stand and speed (capped
- * by the shard's author speed), no declared entities or quests (the runtime installs its own owners), and `HOST_PROBE`.
+ * by the shard's author speed), no entities or quests (the runtime installs its own owners; `prepareRuntimeWorld` adds the
+ * declared spawns, OF19b0), and `HOST_PROBE`.
  */
 export function shardLevel(shard: Pick<Shardfile, 'identity' | 'authorCaps'>, player: SimLevel['player'], ground: SimLevel['ground']): SimLevel {
   return { version: SIM_API_VERSION, id: shard.identity.slug, seed: shard.identity.seed, ground,
@@ -217,7 +216,10 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
   const policy = recipe.population;
   const actors = policy.sources === 'actors+bosses' ? (() => { const rows = readRuntimeWorldMetadata(baked, true); return [...rows.actors, ...rows.bosses]; })() : readRuntimeWorldMetadata(baked).actors;
   const population = prepareNativePopulation(policy.seed === 'identity' ? { ...policy.rows, seed: shard.identity.seed } : policy.rows, actors, policy.owner);
-  return { level: shardLevel(shard, player, recipe.ground), ports: { ground: false, heightAt }, install: (host, context) => {
+  // OF19b0: the declared spawns stand in the native level as in an ordinary upload's, and the declared host drives them
+  const counted = countedShard(shard), keeper = keeperOwnership(policy.rows);
+  admitRuntimeCreatures(counted, sections, keeper);
+  return { level: { ...shardLevel(shard, player, recipe.ground), entities: declaredSpawnEntities(counted) }, ports: { ground: false, heightAt }, install: (host, context) => {
   const seats = scriptSeats(host), { first } = seats;
     if(sections.has('actors/return-scripts')){
       const returns=serverReturnRows(sections.get('actors/return-scripts'));
@@ -241,10 +243,12 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
       return { hooks: items.hooks(motion.scriptHost), hookTick: () => motion.scriptHost.currentTick, motion, seats };
     })();
     const ledger = ledgerPorts(context.emit);
-    return { ...environment, ledger, ...population.install(host, ledger, context.snapshot, borrowedDecisionAuthority(shard, assets, sections, {
+    const installed = population.install(host, ledger, context.snapshot, borrowedDecisionAuthority(shard, assets, sections, {
       scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, player: focusPlayer(host), groundHeightAt: host.groundHeightAt.bind(host),
       live: actor => host.entities.get(actor.entityId) === actor, fixed: (id, run, scope) => { scope.onDispose(host.onStep(id, run)); }, say: (name, args) => { sayFightView(host, name, args); },
-    })) };
+    }));
+    installRuntimeCreatures(host, counted, assets, sections, { restoring, keeper, fact: ledger.fact });
+    return { ...environment, ledger, ...installed };
   } };
 }
 export interface NativeRuntimeRecipe extends RuntimeWorldRecipe {
@@ -446,7 +450,7 @@ function shardfileSimInput(source: Shardfile, assets: ReadonlyMap<string, Uint8A
   const weapon = ports.weapon ?? HOST_PROBE;
   return {level: { version: SIM_API_VERSION, id: shard.identity.slug, seed: shard.identity.seed,
     ground: { size: 500, height: 0 }, player: { at: { x: shard.spawn.x, y: shard.spawn.y, z: shard.spawn.z }, yaw: shard.spawn.yaw, speed: Math.min(5, shard.authorCaps.speed) },
-    entities: rankCreatureSpawns(sizeCreatureSpawns(buildPlatformSpawns(shard.creatures.spawns, speciesResolver(shard.rows, shard.creatures.brains), simStrikes(shard.rows)), shard.rows, shard.creatures.spawns), shard.creatures.spawns), weapon, quests: [],
+    entities: declaredSpawnEntities(shard), weapon, quests: [],
   }, ports: { ...ports, ground: ports.ground !== false && terrain === undefined && shard.meshCollision === null && shard.entryways.some(entry => (entry.kind ?? 'ground') === 'ground'), heightAt }};
 }
 /** Install the ordinary native simulation once. */
@@ -474,16 +478,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
   const seats = scriptSeats(host), { first } = seats;
   // TE-ENG7: each declared body names its species on the wire. Set here, on create and on restore alike, and never in
   // the level's spec, so a save keeps its level fingerprint.
-  for (const spawn of shard.creatures.spawns) {
-    const body = host.entities.get(spawn.id);
-    if (body !== undefined) {
-      const species = shard.rows.species.find(row => row.id === spawn.species);
-      body.species = spawn.species;
-      body.harvest = species?.harvest ?? [];
-      body.capExempt = species?.capExempt;
-      body.rank = spawn.rank; // OF33b: its loot rolls and blows read it
-    }
-  }
+  nameDeclaredBodies(host, shard);
   if (shard.nativeGround !== null) throw new Error('Native ground retains its native runtime simulation; a flat declared proxy is forbidden');
   const levelId = shard.identity.slug;
   if (host.level.id !== levelId || host.level.seed !== shard.identity.seed || host.entities.size !== shard.creatures.spawns.length || shard.creatures.spawns.some((row) => !host.entities.has(row.id))) throw new Error('Shardfile simulation host mismatch');

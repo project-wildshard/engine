@@ -438,10 +438,10 @@ export class ShardfileClient {
     await this.phase(ctx, 'kit');
   }
 
-  private kitData(ctx: ShardContext): void {
-    if (this.mode !== 'full' || this.nativeFeatures) return;
-    const runtime = ctx.game.runtime, world = runtime?.world, presentation = this.presentation;
-    if (runtime === undefined || world === null || world === undefined || presentation === undefined) throw new Error('Shardfile requires the normal kit stage');
+  /** The declared species, their looks and swaps, and their models ready for the rows' bodies (the page draws the server's). */
+  private declareCreatures(ctx: ShardContext): void {
+    const runtime = ctx.game.runtime, presentation = this.presentation;
+    if (runtime === undefined || presentation === undefined) throw new Error('Declared creatures require the normal kit stage');
     const source = this.source;
     // TE-ENG7: two declared species on one native kind each register under a page kind of their own; rows find it by species id
     const kinds = speciesViewKinds(source.rows), pageKind = (species: string, kind: string): string => kinds.get(species) ?? kind;
@@ -458,15 +458,35 @@ export class ShardfileClient {
       ctx.rows.species({ ...row, id: `${row.id}~swap`, kind: swap.kind }); ctx.rows.speciesLook({ ...look, kind: swap.kind });
     }
     wirePage.declareSwaps(new Map(swaps.map((swap) => [pageKind(swap.species, source.rows.species.find((row) => row.id === swap.species)?.kind ?? ''), swap])), ctx.scope);
-    const sketches = compendiumSketches(source.rows, this.assets.retained);
-    for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredFolderCompendium(ctx.product, row.id, sketches) });
-    ctx.rows.lootTable(source.rows.loot);
     runtime.hooks.animalsReady = (manager) => {
       for (const spawn of source.creatures.spawns) {
         const species = source.rows.species.find((row) => row.id === spawn.species); if (species === undefined) throw new Error('Missing authored creature species');
         manager.factory.model(pageKind(species.id, species.kind), spawn.variant); continue;
       }
     };
+  }
+
+  private kitData(ctx: ShardContext): void {
+    if (this.mode !== 'full') return;
+    // ONE-FORMAT OF19b0: a client-page shard whose creatures are declared spawns (its runtime plan keeps the quest page and
+    // held melee) draws them as an ordinary upload's page does, unless a `species.program` feature owns its species
+    if (this.nativeFeatures) {
+      if (this.source.creatures.spawns.length === 0 || (this.plan?.features ?? []).some(row => row.kind === 'species.program')) return;
+      this.declareCreatures(ctx);
+      // the plan's keeper keeps its boss (until OF19c): its fight's name, as the `species.program` feature registered it
+      if (ctx.product.has('sim/runtime-plan')) {
+        const owner = ctx.product.section('sim/runtime-plan').recipe.population.owner;
+        ctx.rows.encounter({ id: owner.actor, displayName: owner.definition.name });
+      }
+      return;
+    }
+    const runtime = ctx.game.runtime, world = runtime?.world;
+    if (runtime === undefined || world === null || world === undefined) throw new Error('Shardfile requires the normal kit stage');
+    const source = this.source;
+    this.declareCreatures(ctx);
+    const sketches = compendiumSketches(source.rows, this.assets.retained);
+    for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredFolderCompendium(ctx.product, row.id, sketches) });
+    ctx.rows.lootTable(source.rows.loot);
     const player = (): NonNullable<ShardContext['app']['player']> => { const actor = ctx.app.player; if (actor === null) throw new Error('Player health has not entered play'); return actor; };
     const actor: Actor = { id: 'actor.player', get tags() { return player().tags; }, get state() { return player().state; }, get attributes() { return player().attributes; }, get alive() { return player().alive; }, applyDamage: (request) => player().applyDamage(request) };
     const aimTarget = (target: CombatTarget): ItemTarget => {

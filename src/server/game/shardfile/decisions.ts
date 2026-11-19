@@ -185,7 +185,10 @@ export class ShardDecisions {
     this.spots = targets === undefined ? new Map() : worldTargetSpots(targets);
     const nativePlan = sections.get('sim/runtime-plan');
     const nativeActors = source.runtime === null && nativePlan !== undefined ? nativeRuntimeActorIds(nativePlan) : [];
-    const registries = buildDecisionRegistries(source, this.moves, targets, nativeStrikes, declared, nativeActors);
+    // OF19b0: a converted species program keeps its exact strikes in `actors/strikes` beside the plain rows of the same ids
+    // (OF11b1). The catalogue names each id once; `this.strikes` below still runs the exact one.
+    const rootStrikes = new Set(source.rows.strikes.map(row => row.id));
+    const registries = buildDecisionRegistries(source, this.moves, targets, nativeStrikes.filter(row => !rootStrikes.has(row.id)), declared, nativeActors);
     this.registries = bodyOps === undefined ? registries : { ...registries, bodies: bodyOps.registries.bodies, colliders: bodyOps.registries.colliders };
     this.names = new Map([...this.registries.actors ?? [], [sim.player.id, DECISION_PLAYER_HANDLE] as const]); this.actors = inverse(this.names);
     this.actorHandles = [...this.names.values()];
