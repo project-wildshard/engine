@@ -524,3 +524,19 @@ test('environmental damage does not provoke an admitted neutral hunt', async () 
     expect(player.health.attributes.health).toBe(100);
   } finally { sim.host.dispose(); }
 });
+
+// ONE-FORMAT OF22b2: Driftwood's sword asks `item.reaction`; a declared hunt answers it as the island's roster does
+test('a swing staggers a declared hunt out of its charge, and an alarm wakes it without a stagger', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const sim = createShardfileSim(hunting('aggressive', 4), new Map(), { rapier });
+  try {
+    const body = sim.host.entities.get('fixture.actor');
+    if (body === undefined) throw new Error('Missing fixture body');
+    for (let i = 0; i < 180 && body.state !== 'charge'; i++) sim.host.step();
+    expect(body.state).toBe('charge');
+    expect(sim.host.events.ask('item.reaction', { kind: 'alarm' })).toEqual({ kind: 'alarm' });
+    expect(body.state).toBe('charge');
+    sim.host.events.ask('item.reaction', { kind: 'stagger', actor: body, strength: 1, running: true });
+    expect(body.state).toBe('stalk');
+  } finally { sim.host.dispose(); }
+});
