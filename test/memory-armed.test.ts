@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Check workflow wiring without starting CI.
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
-import { comparePhoneFootprint, footprintBootFor, guardZone, ledgerZones, parseArmedMemory, phoneFootprint } from '../scripts/memory/armed.mjs';
+import { comparePhoneFootprint, footprintBaseline, footprintBootFor, guardZone, ledgerZones, parseArmedMemory, phoneFootprint } from '../scripts/memory/armed.mjs';
 import { checkMemory, ratchetMargin } from '../scripts/memory/gate.mjs';
 import { loadPhoneModel } from '../scripts/memory/phoneModel.mjs';
 import { compareLedger, ledgerBudget } from '../scripts/memory/ratchet.mjs';
@@ -120,6 +120,28 @@ test('a ratchet advances only after three clean boots, to their median', async (
   expect(await checkMemory({ ...check, record: true, remeasure: noisy })).toEqual({ playing: 100_000_000 });
   expect(noisy.mock.calls).toEqual([[2], [3]]);
   expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'gate-flake', arm: 'ratchet', metric: 'playing', median: 92_000_000 }));
+});
+
+test('a native recording becomes the next ratchet without arming a zone or raising a reading', async () => {
+  const zone = 'driftwood-isle';
+  const armed = policy.readings.get(zone);
+  expect(footprintBaseline(policy.readings, undefined, zone)).toEqual(armed);
+  const first = { playing: 905_000_000, loading: 1_210_000_000 };
+  const remeasure = vi.fn(async () => [
+    { playing: 906_000_000, loading: 1_230_000_000 },
+    { playing: 907_000_000, loading: 1_220_000_000 },
+  ]);
+  const next = await checkMemory({ zone, first, remeasure, warn: vi.fn(), record: true, metrics: {
+    playing: { absolute: lines.playingBytes, baseline: arm.playingBytes },
+    loading: { absolute: lines.loadingBytes, baseline: arm.loadingBytes },
+  } });
+  expect(next).toEqual({ playing: 900_000_000, loading: 1_220_000_000 });
+  const { playing, loading } = next;
+  const saved = { [zone]: { playingBytes: playing, loadingBytes: loading } };
+  expect(footprintBaseline(policy.readings, saved, zone)).toEqual(saved[zone]);
+  expect(footprintBaseline(policy.readings, { [zone]: { ...saved[zone], playingBytes: 907_000_000 } }, zone)).toEqual(saved[zone]);
+  expect(footprintBaseline(policy.readings, { template: saved[zone] }, 'template')).toBeUndefined();
+  expect(() => footprintBaseline(policy.readings, { [zone]: { loadingBytes: 0 } }, zone)).toThrow('Invalid committed native footprint');
 });
 
 test('CI runs both armed measurement jobs without a job-level bypass, the native one in its own workflow', () => {

@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { serve } from '../parity/serve.mjs';
-import { armedMemory, comparePhoneFootprint, footprintBootFor, guardZone, ledgerZones, phoneFootprint } from './armed.mjs';
+import { armedMemory, comparePhoneFootprint, footprintBaseline, footprintBootFor, guardZone, ledgerZones, phoneFootprint } from './armed.mjs';
 import { checkMemory, memoryWarningLine } from './gate.mjs';
 import { loadPhoneModel } from './phoneModel.mjs';
 import { compareLedger, compareFootprint, footprintBoot, footprintBudget, footprintInstrument, ledgerBudget } from './ratchet.mjs';
@@ -123,7 +123,7 @@ try {
     }
 
     if (mode === 'footprint') {
-      const pinned = policy.readings.get(chunk);
+      const pinned = footprintBaseline(policy.readings, baseline.zones, chunk);
       const metrics = {
         playing: { absolute: policy.lines.playingBytes, ...(pinned && {
           baseline: pinned.playingBytes, previousMargin: Math.floor(pinned.playingBytes / 200),

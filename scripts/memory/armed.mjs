@@ -32,6 +32,25 @@ export function armedMemory() {
   return parseArmedMemory(JSON.parse(readFileSync(require.resolve(LIST), 'utf8')));
 }
 
+/** The list arms zones and provides their first readings. A committed
+ * native recording can only lower those readings.
+ * @param {ReadonlyMap<string, {playingBytes:number,loadingBytes:number}>} armed
+ * @param {Record<string, any> | undefined} recorded
+ * @param {string} zone
+ */
+export function footprintBaseline(armed, recorded, zone) {
+  const initial = armed.get(zone);
+  if (!initial || recorded === undefined || !Object.hasOwn(recorded, zone)) return initial;
+  const reading = recorded[zone];
+  if (!bytes(reading?.playingBytes) || !bytes(reading?.loadingBytes)) {
+    throw new Error(`Invalid committed native footprint for ${zone}`);
+  }
+  return {
+    playingBytes: Math.min(initial.playingBytes, reading.playingBytes),
+    loadingBytes: Math.min(initial.loadingBytes, reading.loadingBytes),
+  };
+}
+
 /** A pinned zone outside the online grid has its supported standalone
  * boot measured against the same hard lines.
  * @param {string} zone @param {ReadonlySet<string>} armed @param {ReadonlySet<string>} placed */
