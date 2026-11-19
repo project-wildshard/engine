@@ -172,6 +172,16 @@ export function setLampFollow(root: THREE.Object3D, resolve: LampFollowResolve):
 }
 const rootOf = (object: THREE.Object3D): THREE.Object3D => { let at = object; while (at.parent !== null) at = at.parent; return at; };
 
+/** meta MOSSGATE-ZONE MZ34: whether a `props.panels` panel shows now, for the lamps that name one (`lamps[].panel`). */
+export type LampPanelShown = (panel: string) => boolean;
+const lampPanels = new WeakMap<THREE.Object3D, LampPanelShown>();
+/** The page's panel lookup for the lamps drawn under `root` (its scene): a lamp naming a panel is lit only while it shows (a
+ *  brazier's fire lights with its letter's flames). Returns the undo. */
+export function setLampPanels(root: THREE.Object3D, shown: LampPanelShown): () => void {
+  lampPanels.set(root, shown);
+  return () => { if (lampPanels.get(root) === shown) lampPanels.delete(root); };
+}
+
 /** a lamp group's frame step: `time` drives the flicker, `eye` (world) picks the nearest lamps when more than `lit` exist */
 export type LampUpdate = (time: number, eye?: THREE.Vector3Like) => void;
 
@@ -186,7 +196,7 @@ export type LampUpdate = (time: number, eye?: THREE.Vector3Like) => void;
 export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAMPS, swingsOf: () => SwingField | null = currentLampSwings): THREE.Group & { update: LampUpdate | null } {
   const group = Object.assign(new THREE.Group(), { update: null as LampUpdate | null });
   group.name = 'look-light-lamps';
-  const rows = lamps.map((lamp, i) => ({ lamp, phase: i * 2.399, at: new THREE.Vector3(...lamp.at), place: new THREE.Vector3(...lamp.at), live: lamp.follow === undefined,
+  const rows = lamps.map((lamp, i) => ({ lamp, phase: i * 2.399, at: new THREE.Vector3(...lamp.at), place: new THREE.Vector3(...lamp.at), live: lamp.follow === undefined && lamp.panel === undefined,
     colour: new THREE.Color().setRGB(lamp.colour[0], lamp.colour[1], lamp.colour[2], THREE.LinearSRGBColorSpace) }));
   const pool = rows.slice(0, Math.max(0, Math.min(rows.length, lit))).map((row) => {
     const light = new THREE.PointLight(row.colour, row.live ? row.lamp.intensity : 0, row.lamp.distance, row.lamp.decay ?? 2);
@@ -195,10 +205,12 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
     return light;
   });
   const following = rows.filter((row) => row.lamp.follow !== undefined), crowded = rows.length > pool.length;
+  // MZ34: a lamp naming a panel is dark until the page says that panel shows
+  const paneled = rows.filter((row) => row.lamp.panel !== undefined);
   const flickers = rows.some((row) => (row.lamp.flicker?.amount ?? 0) > 0);
   // SHARD-SOURCE SS8c: a lamp on a swing goes where its lantern swings, round the page's swing pivot
   const swinging = rows.filter((row) => row.lamp.follow === undefined && row.lamp.swing !== undefined);
-  if (following.length === 0 && !crowded && !flickers && swinging.length === 0) return group;
+  if (following.length === 0 && paneled.length === 0 && !crowded && !flickers && swinging.length === 0) return group;
   const eyeLocal = new THREE.Vector3(), chosen: typeof rows = [], swung = new THREE.Vector3();
   group.update = (time, eye) => {
     if (swinging.length > 0) {
@@ -216,6 +228,13 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
         row.live = target !== null;
         // the bone's world matrix is renewed only inside render: renew it here, or the lamp trails a frame behind (review)
         if (target !== null) { target.updateWorldMatrix(true, false); group.updateWorldMatrix(true, false); group.worldToLocal(target.localToWorld(row.place.copy(row.at))); }
+      }
+    }
+    if (paneled.length > 0) {
+      const shown = lampPanels.get(rootOf(group));
+      for (const row of paneled) {
+        const panel = row.lamp.panel, on = panel !== undefined && shown !== undefined && shown(panel);
+        row.live = row.lamp.follow === undefined ? on : row.live && on;
       }
     }
     chosen.length = 0;

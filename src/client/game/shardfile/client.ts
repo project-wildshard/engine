@@ -1,3 +1,4 @@
+import { setLampPanels } from '@wildshard/engine/render/lookLight';
 import {readModuleGroups} from '@wildshard/engine/boot/download';
 import { whenControl } from '@wildshard/engine/boot/prefetch';
 import { forgetFinishedShaders } from '@wildshard/engine/render/shaderPatches';
@@ -752,6 +753,9 @@ export class ShardfileClient {
     installDeclaredTargets(source.targets, { panels: tiles.props?.panels ?? new Map(), colliders, read, scene, interactables: runtime.interactables, scope: ctx.scope, system: ctx.system,
       // TE-ENG6: a use that can no longer run drops its prompt: its `unless` condition holds, or its rack's lever is in hand.
       spent: spentUses(source, { read, taken: item => takenHere(item) }) });
+    // meta MOSSGATE-ZONE MZ34: a look lamp naming a panel lights while that panel shows (a brazier's fire with its flames)
+    const shownPanels: ReadonlyMap<string, { readonly visible: boolean }> = tiles.props?.panels ?? new Map();
+    ctx.scope.onDispose(setLampPanels(scene, panel => shownPanels.get(panel)?.visible ?? false));
     // SS-GP7: the one install list (races, talks, rides, a held tool's lines), on this page's wire; a grid stay walks the same list
     if (hasTalks(source) && presentation === null) throw new Error('Missing talk presentation module');
     installPlay(source, { ...playWire(), scope: ctx.scope, system: ctx.system, flags, prompts: runtime.interactables, root: ctx.root,

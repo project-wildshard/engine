@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
 import type { LookLamp } from '@wildshard/format/look-light';
-import { DESKTOP_LAMPS, PHONE_LAMPS, lampLights, lookLightManifest, setLampFollow } from './lookLight';
+import { DESKTOP_LAMPS, PHONE_LAMPS, lampLights, lookLightManifest, setLampFollow, setLampPanels } from './lookLight';
 
 const lamp = (x: number, extra: Partial<LookLamp> = {}): LookLamp => ({ at: [x, 3, 0], colour: [1, 0.6, 0.3], intensity: 5, distance: 9, ...extra });
 const lights = (group: THREE.Group): THREE.PointLight[] => group.children.filter((child): child is THREE.PointLight => child instanceof THREE.PointLight);
@@ -56,4 +56,22 @@ test('a lamp follows its actor\'s bone, and is dark while that actor is absent (
   present = false; group.update?.(0);
   expect(lights(group).map((light) => light.intensity)).toEqual([5, 0, 0]);
   undo();
+});
+
+// meta MOSSGATE-ZONE MZ34 (for MZ7, QA 11-19 rows 29, 30): a lamp naming a panel lights with it: a brazier's fire glows once its
+// letter burns, and goes dark with its flames.
+test('a lamp naming a panel is lit only while that panel shows', () => {
+  const scene = new THREE.Scene(), shown = new Set<string>();
+  const undo = setLampPanels(scene, (panel) => shown.has(panel));
+  const group = lampLights([lamp(0), lamp(4, { panel: 'mossgate.flame-a', flicker: { amount: 0, rate: 1 } }), lamp(8, { panel: 'mossgate.flame-b' })]);
+  scene.add(group);
+  expect(group.update).not.toBeNull();
+  group.update?.(0);
+  expect(litX(group), 'every brazier cold').toEqual([0]);
+  shown.add('mossgate.flame-a'); group.update?.(0);
+  expect(litX(group), 'A burns').toEqual([0, 4]);
+  shown.add('mossgate.flame-b'); shown.delete('mossgate.flame-a'); group.update?.(0);
+  expect(litX(group), 'A out, B burns').toEqual([0, 8]);
+  undo(); group.update?.(0);
+  expect(litX(group), 'no page lookup: dark').toEqual([0]);
 });

@@ -349,8 +349,8 @@ ${mist ? `
       if (owned.glow === null && ((lamps?.some((lamp) => lamp.halo !== undefined) ?? false) || motes !== null)) {
         // M4.8: the lamps' halos (one instanced draw) and the motes (one points draw), once per look like the lamps
         const glow: (THREE.Mesh | THREE.Points)[] = [];
-        // a following lamp's halo would stay at its offset: AP24b lights it, its halo waits
-        const halos = lamps === null ? null : lampHalos(lamps.filter((lamp) => lamp.follow === undefined));
+        // a following lamp's halo would stay at its offset: AP24b lights it, its halo waits; MZ34: a panel's lamp's halo would stay lit
+        const halos = lamps === null ? null : lampHalos(lamps.filter((lamp) => lamp.follow === undefined && lamp.panel === undefined));
         if (halos !== null) glow.push(halos);
         if (motes !== null) glow.push(lookMotes(motes));
         owned.glow = glow;
