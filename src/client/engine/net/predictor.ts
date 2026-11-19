@@ -24,6 +24,12 @@ export const PREDICTION_TOLERANCE = 0.02;
 const DECK_PHASE_TICKS = 3;
 /** NET-LAG NL12 (a): a grounded Y-only gap up to this, on matching XZ, is the same floor (J282: 150 to 200 ms is the design target). */
 export const GROUND_Y_SLACK = 0.05;
+/**
+ * NET-LAG NL12/NL14b1: pressed into a pocket the motor cannot leave (a bank too steep to climb beside a boulder), the feet
+ * chatter a few cm between contacts every 3 or 4 ticks, and the page and the room chatter out of step. While both say the
+ * feet are grounded and kept under this share of the asked move, a gap within STALL_SLACK is the same pocket, not a miss.
+ */
+export const STALL_FREEDOM = 0.35, STALL_SLACK = 0.05;
 /** A correction this far is a teleport: it snaps rather than glides. */
 export const PREDICTION_SNAP = 3;
 /** Room for a ride's words and its capsule's in a saved move. */
@@ -83,14 +89,14 @@ const OWNER_FLAGS: Readonly<Record<string, (s: PlayerMotionState, value: boolean
 };
 
 /** The owner block's columns as the predictor reads them, resolved once. */
-interface OwnerTable { readonly x: number; readonly y: number; readonly z: number; readonly grounded: number; readonly board: number; readonly swim: number; readonly led: number; readonly resets: number }
+interface OwnerTable { readonly x: number; readonly y: number; readonly z: number; readonly grounded: number; readonly board: number; readonly swim: number; readonly led: number; readonly resets: number; readonly freedom: number }
 function ownerTable(columns: readonly NetColumn<never>[]): OwnerTable {
   const at = (name: string): number => {
     const index = columns.findIndex(column => column.name === name);
     if (index === -1) throw new Error(`Owner block has no ${name}`);
     return index;
   };
-  return { x: at('px'), y: at('py'), z: at('pz'), grounded: at('grounded'), board: at('board'), swim: at('swim'), led: at('led'), resets: at('resets') };
+  return { x: at('px'), y: at('py'), z: at('pz'), grounded: at('grounded'), board: at('board'), swim: at('swim'), led: at('led'), resets: at('resets'), freedom: at('freedom') };
 }
 
 /** One player's prediction. */
@@ -238,7 +244,9 @@ export class Predictor {
       return false;
     }
     const x = this.value(table.x, owner) - (states[at + CAPTURED.x] ?? 0), y = this.value(table.y, owner) - (states[at + CAPTURED.y] ?? 0), z = this.value(table.z, owner) - (states[at + CAPTURED.z] ?? 0);
-    const reach = PREDICTION_TOLERANCE + DECK_PHASE_TICKS * (states[at + CAPTURED.carried] ?? 0), grounded = this.flag(table.grounded, owner) !== states[at + CAPTURED.grounded];
+    const grounded = this.flag(table.grounded, owner) !== states[at + CAPTURED.grounded];
+    const stalled = !grounded && this.flag(table.grounded, owner) === 1 && this.value(table.freedom, owner) < STALL_FREEDOM && (states[at + CAPTURED.freedom] ?? 1) < STALL_FREEDOM;
+    const reach = (stalled ? STALL_SLACK : PREDICTION_TOLERANCE) + DECK_PHASE_TICKS * (states[at + CAPTURED.carried] ?? 0);
     // NL12 (a): both on the ground, the ground decides Y; a few cm there alone is the same floor, not a miss
     const floorY = !grounded && this.flag(table.grounded, owner) === 1 && Math.abs(y) <= GROUND_Y_SLACK ? 0 : y, gap = x * x + floorY * floorY + z * z;
     if (grounded || gap > reach * reach) this.keepMiss(slot, owner);

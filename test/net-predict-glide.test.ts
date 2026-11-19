@@ -1,6 +1,7 @@
 import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
 import { GLIDE_MIN_S, GLIDE_SPEED, Predictor, PREDICTION_SNAP, type PredictedBody } from '../src/client/engine/net/predictor';
+import { floatToBits } from '../src/shared/engine/net/bits';
 import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 import type { CharacterMotor } from '../src/shared/engine/physics/CharacterMotor';
 import { createMotionState } from '../src/shared/engine/player/motionState';
@@ -36,6 +37,7 @@ function walk(gap: { x?: number; y?: number; z?: number }, fps: number): Run {
       if (!injected && due.seq >= 40) { injected = true; off.x = gap.x ?? 0; off.y = gap.y ?? 0; off.z = gap.z ?? 0; }
       owner[column('px')] = off.x; owner[column('py')] = 1 + off.y; owner[column('pz')] = due.z + off.z;
       owner[column('grounded')] = 1;
+      owner[column('freedom')] = floatToBits(1); // free feet (NL14b1's stall slack is for feet pressed in)
       predictor.reconcile(due.seq, owner);
     }
     predictor.update(dt);

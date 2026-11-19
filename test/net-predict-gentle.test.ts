@@ -1,6 +1,7 @@
 import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
 import { Predictor, type PredictedBody } from '../src/client/engine/net/predictor';
+import { floatToBits } from '../src/shared/engine/net/bits';
 import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 import type { CharacterMotor } from '../src/shared/engine/physics/CharacterMotor';
 import { createMotionState } from '../src/shared/engine/player/motionState';
@@ -21,6 +22,7 @@ function frame(gap: { x?: number; y?: number; z?: number }, grounded: boolean): 
   predictor.step({ seq: 1, viewTick: 0, steer: standing, yaw: 0, pitch: 0, buttons: 0 });
   owner[column('px')] = 5 + (gap.x ?? 0); owner[column('py')] = 1 + (gap.y ?? 0); owner[column('pz')] = 5 + (gap.z ?? 0);
   owner[column('grounded')] = grounded ? 1 : 0;
+  owner[column('freedom')] = floatToBits(1); // free feet (NL14b1's stall slack is for feet pressed in)
   const corrected = predictor.reconcile(1, owner);
   return { corrected, corrections: predictor.corrections };
 }
