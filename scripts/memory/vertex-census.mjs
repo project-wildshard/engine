@@ -10,6 +10,7 @@
 //
 //   node scripts/memory/vertex-census.mjs --dist=<built client folder> --zones=a,b|all [--out=<dir>] [--settle=3]
 //        [--url=<served client> instead of --dist: a standalone boot] [--query=<k=v&...>: a probe switch, trisprobe=half]
+//        [--top=N: keep each frame's N heaviest passes, default 3; STR14 reads every pass with --top=99]
 //
 // Writes <out>/<zone>.json (`vertex-census/1`) and prints one line per zone. Resident vertices count each vertex buffer
 // once (bytes / stride, a buffer with a position channel and no divisor); a buffer no draw has read yet has no layout and
@@ -347,7 +348,7 @@ async function main(argv) {
       const info = new Map(probed.programs.map((/** @type {any} */ p) => [p.id, { name: programName(p.vs, p.id), varyings: liveVaryings(p.vs, p.fs) }]));
       const names = new Map([...info].map(([pid, p]) => [pid, p.name]));
       const resident = residentCensus(probed.resident, names);
-      const frames = probed.frames.map((/** @type {any} */ f) => ({ n: f.n, id: f.id, draws: f.draws, triangles: f.triangles, vertices: f.vertices, three: f.three, heaviest: heaviestPasses(f, info) }));
+      const frames = probed.frames.map((/** @type {any} */ f) => ({ n: f.n, id: f.id, draws: f.draws, triangles: f.triangles, vertices: f.vertices, three: f.three, heaviest: heaviestPasses(f, info, Number(args.top ?? 3)) }));
       const glBuffers = run.ledger?.byKind?.gpu?.buffer ?? null;
       const row = { protocol: PROTOCOL, zone, query: args.query ?? null, boot: run.boot, build: run.build, date: new Date().toISOString(), spawn: probed.spawn, ledgerGpu: run.ledger?.byKind?.gpu ?? null, glBuffers, resident, frames };
       writeFileSync(join(out, `${zone}.json`), `${JSON.stringify(row, null, 1)}\n`);
