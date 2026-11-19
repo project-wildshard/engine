@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "c1a18c9b5e80c08dbf55270f21c5681fb57238e7a8b219c966643e4eedaeec03",
+  "catalogueHash": "fccf44b7c16eabf77a18b3bad76219565edf0e97ccc3b3cfc07609c52c36b883",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -870,8 +870,8 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 5,
-        "hash": "2afc6270c9534acc9d6578686bf87479c63872ac58799cef416d13b3b8b0281b"
+        "revision": 6,
+        "hash": "86c0ecc51749c9969283c1ed7e0d9abf3d3f8eef08784f6b0b69b5c8fc4b883e"
       },
       {
         "slug": "stranger",
@@ -1065,9 +1065,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 5,
-      "hash": "2afc6270c9534acc9d6578686bf87479c63872ac58799cef416d13b3b8b0281b",
-      "bytes": 337219584
+      "revision": 6,
+      "hash": "86c0ecc51749c9969283c1ed7e0d9abf3d3f8eef08784f6b0b69b5c8fc4b883e",
+      "bytes": 313806336
     },
     {
       "slug": "stranger",
