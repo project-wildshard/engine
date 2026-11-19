@@ -1,4 +1,7 @@
 name: budgets
+# BC15: the run name carries the ci run it measured; main-watch reads that run's commit to name the pusher (a
+# workflow_run's own head_sha is the default branch's tip when it starts).
+run-name: budgets for ci ${{ inputs.source_run || github.event.workflow_run.id }}
 # BUDGET-CAPS BC9 (meta docs/plans/BUDGET-CAPS-PLAN.md; J444, J445): the 10% regression check runs here, after ci, so ci's
 # verdict and the release train's green-main read never wait on it. ci's own build steps refuse only past a hard cap
 # (budgets/caps.json). This job measures the exact full pinned client ci's memory-client-build archived

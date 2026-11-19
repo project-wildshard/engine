@@ -25,7 +25,7 @@ import {setTimeout} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
 import {AMBER,parseAmber,parseAudioAmber,parseMemoryWarnings} from './test-amber.mjs';
 import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
-import {budgetReport,parseBudgetResults} from './budgets/watch.mjs';
+import {budgetReport,budgetSourceRun,parseBudgetResults} from './budgets/watch.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
@@ -63,7 +63,7 @@ export function failedNames(jobs){
   return (failed.length>0?failed:blocking).map(job=>job.name);
 }
 
-/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
+/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,display_title?:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
 /** @typedef {{id:number,sha:string,created:string,warnings?:ReturnType<typeof parseMemoryWarnings>,pusher?:string,results?:ReturnType<typeof parseBudgetResults>}} MemoryQa */
 /** A red span main-watch has reported: the first red run, when it was reported (ms), its alert, and whether the keeper
  * (buddy-engine, FS22) already has it.
@@ -270,6 +270,7 @@ export function liveIo(env=process.env){
     budgetAnnotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
       .filter(job=>job.name==='budgets')
       .map(job=>read(['api','--paginate',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`,'--jq','.[].message'])).join('\n'),
+    runSha:(/** @type {number} */id)=>String(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}`])).head_sha),
     nativeRuns:()=>sharedRuns(`${runsCache}.memory-footprint`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/memory-footprint.yml/runs?branch=main&per_page=15`])).workflow_runs)),
     memoryQa:(/** @type {MemoryQa[]} */rows)=>{
@@ -424,9 +425,13 @@ export function sweep(io,hint={}){
       /** @type {ReturnType<typeof budgetReport>} */let report={lines:[],qa:null};
       if(run.conclusion==='failure'){
         try{
-          const before=budgetRuns.find(row=>row.id<run.id&&finished(row)&&row.head_sha!==run.head_sha);
-          const pushers=[...new Set(attribute(io.commits(before?.head_sha??null,run.head_sha),who).map(row=>row.lander?.lane??'').filter(Boolean))];
-          report=budgetReport(run,parseBudgetResults(io.budgetAnnotations?.(run.id)??''),pushers);
+          // BC15: the commit a budgets run measured is its ci run's (the run name says which), not its own head_sha
+          const measured=(/** @type {Run} */row)=>{const source=budgetSourceRun(row);return source===null||io.runSha===undefined?row.head_sha:io.runSha(source);};
+          const sha=measured(run);
+          const earlier=budgetRuns.filter(row=>row.id<run.id&&finished(row));
+          const before=earlier.map(measured).find(other=>other!==sha)??null;
+          const pushers=[...new Set(attribute(io.commits(before,sha),who).map(row=>row.lander?.lane??'').filter(Boolean))];
+          report=budgetReport({...run,head_sha:sha},parseBudgetResults(io.budgetAnnotations?.(run.id)??''),pushers);
         }catch(error){
           io.receipt(`budgets results unavailable for run ${run.id}: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
           continue;

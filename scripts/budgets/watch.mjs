@@ -14,6 +14,13 @@ export function budgetResultLine(row) {
   return `BUDGET ${row.status} key=${row.key} measured=${whole(row.value)} baseline=${whole(row.baseline)} line=${whole(line)} contentKey=${row.contentKey}`;
 }
 
+/** The ci run a budgets run measured, from its run name (`budgets for ci <id>`), or null for an older run.
+ * @param {{ display_title?: string }} run */
+export function budgetSourceRun(run) {
+  const match = /^budgets for ci (\d+)$/u.exec(run.display_title ?? '');
+  return match === null ? null : Number(match[1]);
+}
+
 /** Every distinct failing result in a budgets job's annotation text. @param {string} text */
 export function parseBudgetResults(text) {
   const results = new Map();

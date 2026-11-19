@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { budgetTable, judgeAll, runCli } from '../scripts/budgets/cli.mjs';
 import { readCaps } from '../scripts/budgets/files.mjs';
-import { budgetReport, budgetResultLine, parseBudgetResults } from '../scripts/budgets/watch.mjs';
+import { budgetReport, budgetResultLine, budgetSourceRun, parseBudgetResults } from '../scripts/budgets/watch.mjs';
 import { checkShardSizes } from '../scripts/shard-size-gate.mjs';
 
 // BUDGET-CAPS BC9 (J444): a regression is never a red main or a release hold. ci (and the release train's green-main
@@ -43,6 +43,15 @@ test('a failing check prints one result line a row, which main-watch parses and 
   expect(report.lines).toEqual(['main BUDGET regressed aaaaaaaaaa download/phone/driftwood-isle 25000000 B, line 24440245 B (run 7; J444: a fix row for opus-caps, never a red main)']);
   expect(report.qa).toMatchObject({ id: 7, pusher: 'opus-caps', results });
   expect(budgetReport({ ...run, conclusion: 'success' }, results, ['opus-caps'])).toEqual({ lines: [], qa: null });
+});
+
+// BC15: a workflow_run's head_sha is the default branch's tip when it starts, not the commit it measured (run 44475200178
+// named 890b4833e2 and blamed its landers for a regression from f97bbeb..f31a7d3f5). The run name carries the ci run.
+test('a budgets run names the ci run it measured, so main-watch blames the measured commit', () => {
+  expect(readFileSync('.github/workflows/budgets.yml', 'utf8')).toContain('run-name: budgets for ci ${{ inputs.source_run || github.event.workflow_run.id }}');
+  expect(budgetSourceRun({ display_title: 'budgets for ci 44473130939' })).toBe(44_473_130_939);
+  expect(budgetSourceRun({ display_title: 'budgets' })).toBeNull();
+  expect(budgetSourceRun({})).toBeNull();
 });
 
 test('in Actions the check prints an error annotation only for a failing row, never a warning', () => {

@@ -4,3 +4,4 @@ export function budgetResultLine(row: { key: string; status: string; value: numb
 export function parseBudgetResults(text: string): BudgetResult[];
 export function budgetReport(run: { id: number; head_sha: string; created_at: string; conclusion: string | null }, results: readonly BudgetResult[], pushers: readonly string[]):
   { lines: string[]; qa: { id: number; sha: string; created: string; pusher: string; results: readonly BudgetResult[] } | null };
+export function budgetSourceRun(run: { display_title?: string }): number | null;
