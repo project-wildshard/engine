@@ -15,19 +15,23 @@ import {digest, json, MOVED, PREPARED, prepared} from './fixtures/stale-preparat
 import {compileCookWorker} from './fixtures/compileCookWorker';
 
 const root = mkdtempSync(join(tmpdir(), 'cook-stale-preparation-worker-'));
+const CHILD_TIMEOUT_SECONDS = 50;
+// The test awaits three independent child cooks. Keep the per-child limit
+// visible, with a separate aggregate watchdog for their startup and checks.
+const TEST_TIMEOUT = (3 * CHILD_TIMEOUT_SECONDS + 10) * 1000;
 const entryScope = new AbortController();
 let entry: Awaited<ReturnType<typeof compileCookWorker>> | undefined;
 let preparing: ReturnType<typeof compileCookWorker> | undefined;
 beforeAll(async () => { preparing = compileCookWorker(entryScope.signal); entry = await preparing; });
 afterAll(async () => { entryScope.abort(); await preparing?.catch(() => undefined); entry?.dispose(); rmSync(root, {recursive: true, force: true}); });
 
-test('the cook worker cooks a stale preparation in its bounded child, and its index and row say so', {timeout: 60_000}, async () => {
+test('the cook worker cooks a stale preparation in its bounded child, and its index and row say so', {timeout: TEST_TIMEOUT}, async () => {
   const tarball = writeTar(prepared(PREPARED)), hash = digest(tarball), lines: string[] = [];
   const worker = (build: string, renderer?: string): ReturnType<typeof createCookWorker> => createCookWorker({build, store: folderStore(join(root, 'worker-store')),
     source: {heads: () => Promise.resolve([{slug: 'template', hash, revision: 1}]), download: () => Promise.resolve(tarball)},
     serverPacks: join(root, 'worker-server'), scratch: join(root, 'worker-jobs'), log: line => { lines.push(line); },
     launcher: {root: process.cwd(), execPath: process.execPath, loader: resolve('scripts/bake-loader.mjs'), get script() { if (entry === undefined) throw new Error('Missing fixed cook entry'); return entry.script; }, wrap: [],
-      limits: {seconds: 50, memoryMB: 4096, heapMB: 2048}, ...(renderer === undefined ? {} : {renderer})}});
+      limits: {seconds: CHILD_TIMEOUT_SECONDS, memoryMB: 4096, heapMB: 2048}, ...(renderer === undefined ? {} : {renderer})}});
   const stale = await worker('moved', MOVED).cook({slug: 'template', hash});
   expect(stale).toMatchObject({state: 'cooked', preparation: 'stale'});
   expect(lines.some(line => line.includes('stale preparation: template'))).toBe(true);

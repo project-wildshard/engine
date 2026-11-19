@@ -22,3 +22,16 @@ readiness and every existing fixture assertion retain their deadlines.
 All 36 Python cases and three normal Vitest partitions passed. A scratch
 launcher with 14 seconds of delay at each startup passed partition one
 in 63.14 seconds. Every individual launch still used its original limit.
+
+The next peer full gate could now report the individual failures. It
+finished the stub builds and hit the launcher's 30-second readiness
+deadline on both assigned ports and port zero. The test's substitute
+Python HTTP process produced no startup output. A separate full gate
+and a focused clean gate copy both passed the same source, so a short
+run alone could provide little evidence about the peer failure.
+
+The fixtures now use the shipped preview server, including its actual
+HTTP listener and ephemeral-port announcement. The Node shim records
+the child PID for cleanup and hands off to that server. The builds are
+still stubbed, and the real detach, ownership, conflict and sharing
+checks run with the original launcher deadlines.

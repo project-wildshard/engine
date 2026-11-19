@@ -99,6 +99,8 @@ class PreviewTests(unittest.TestCase):
         shutil.copyfile(source, self.root / 'scripts/serve-build.sh')
         shutil.copyfile(HELPER, self.root / 'scripts/serve-port-lease.py')
         shutil.copyfile(os.environ.get('X15_TEST_SHARED', ROOT / 'scripts/serve-shared-preview.py'), self.root / 'scripts/serve-shared-preview.py')
+        for name in ('preview-server.mjs', 'preview-encoded-cache.mjs', 'preview-telemetry.mjs'):
+            shutil.copyfile(ROOT / 'scripts' / name, self.root / 'scripts' / name)
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         (self.root / 'source').write_text('pinned fixture')
         subprocess.run(['git', '-C', str(self.root), 'add', 'source'], check=True)
@@ -131,18 +133,9 @@ if sys.argv[1] in ('scripts/gen.mjs','scripts/build-shardfiles.mjs'):
 if sys.argv[1]=='scripts/build-app.mjs':
     os.execvp('pnpm',['pnpm','exec','vite','build',*sys.argv[2:]]) # the app build script wraps the fixture's build
 if sys.argv[1].endswith('/preview-server.mjs'):
-    import http.server,pathlib
-    args=sys.argv[2:]
-    port=int(args[args.index('--port')+1])
-    out=args[args.index('--outDir')+1]
+    import pathlib
     root=pathlib.Path(os.environ['FIXTURE_ROOT'])
     with (root/'preview-pids').open('a') as f: f.write(str(os.getpid())+'\\n')
-    os.chdir(out)
-    try: server=http.server.HTTPServer(('127.0.0.1',port),http.server.SimpleHTTPRequestHandler)
-    except OSError:
-        print('preview-server: listen EADDRINUSE',flush=True); sys.exit(1)
-    print('Local: http://127.0.0.1:'+str(server.server_address[1])+'/',flush=True)
-    server.serve_forever()
 if sys.argv[1].endswith('/build-mirror.mjs'):
     import pathlib,re
     if sys.argv[2]=='authorize':
