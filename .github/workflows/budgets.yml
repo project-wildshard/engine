@@ -94,13 +94,25 @@ jobs:
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
           node scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/budgets/ledger "${record[@]}"
+      # BUDGET-CAPS BC11: Nine's boot budgets (retained geometry, live heap) are read by ci's nine-ring1 load, which fails
+      # only on held parts or a missing reading; its budget-measures.json is judged here with the rest.
+      - name: Fetch Nine's boot measures from the source run
+        if: steps.client.outcome == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN }}
+          name: nine-ring1-load
+          path: tmp/budgets/nine
       - name: Measure the downloads and code sizes
         if: steps.client.outcome == 'success'
         run: |
           node scripts/shard-size-gate.mjs tmp/memory-ledger/preview/dist --hard-only --measures tmp/budgets/downloads.json
           inputs=(tmp/budgets/downloads.json)
-          for file in tmp/memory-ledger/preview/dist/.vite/budget-measures.json tmp/budgets/ledger/budget-measures.json; do
-            if [[ -f "$file" ]]; then inputs+=("$file"); fi
+          nine=$(find tmp/budgets/nine -name budget-measures.json 2>/dev/null | head -1 || true)
+          for file in tmp/memory-ledger/preview/dist/.vite/budget-measures.json tmp/budgets/ledger/budget-measures.json "$nine"; do
+            if [[ -n "$file" && -f "$file" ]]; then inputs+=("$file"); fi
           done
           node scripts/budgets/cli.mjs merge tmp/budgets/measures.json "${inputs[@]}"
       - name: Add the dispatched seed

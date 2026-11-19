@@ -2,27 +2,39 @@ import {expect,test} from 'vitest';
 import {BufferAttribute,BufferGeometry,InstancedMesh,InterleavedBuffer,InterleavedBufferAttribute,Mesh,MeshBasicMaterial,Scene} from 'three';
 import {bootMemoryVerdict,retainedGeometryBytes} from '../scripts/loading-flow/boot-memory-ratchet.mjs';
 
-// Mini QA 2026-11-17 row 19: the Nine load's memory ratchet (ci.yml nine-ring1, blocking)
+import {readCaps} from '../scripts/budgets/files.mjs';
+
+// Mini QA 2026-11-17 row 19: the Nine load's memory ratchet (ci.yml nine-ring1). BUDGET-CAPS BC11: held parts and a
+// missing measurement fail the load; retained geometry and the live heap go through the verdict against Nine's own
+// baseline, and a regression is a fix row in the budgets job (J444), never a red ci.
 const marks=(held:number|undefined,...released:number[])=>[
   {operation:'download:members-dropped',detail:held===undefined?{count:3}:{count:3,held}},
   ...released.map(bytes=>({operation:'memory:geometry-released',detail:{after:'readyFrame',bytes}})),
 ];
+const judging=(contentKey='nine-dragon-stack@3')=>({contentKey,budgets:{caps:readCaps(),baselines:{schema:1,about:'',baselines:{
+  'nine/boot/retained-geometry':{value:53e6,contentKey:'nine-dragon-stack@3'},'nine/boot/live-heap':{value:289.5e6,contentKey:'nine-dragon-stack@3'}}}}});
+const statuses=(verdict:ReturnType<typeof bootMemoryVerdict>)=>verdict.rows.map(row=>row.status);
+
 test('early releases pass with no held parts and both memory measurements within budget',()=>{
-  expect(bootMemoryVerdict(marks(0,13.8e6),53e6,309.6e6)).toEqual({held:0,released:13.8e6,retained:53e6,live:309.6e6,faults:[]});
-  expect(bootMemoryVerdict(marks(0),58.3e6,340e6).faults).toEqual([]);
-  expect(bootMemoryVerdict(marks(0),58.3e6+1,340e6).faults).toHaveLength(1);
+  const verdict=bootMemoryVerdict(marks(0,13.8e6),53e6,309.6e6,judging());
+  expect(verdict).toMatchObject({held:0,released:13.8e6,retained:53e6,live:309.6e6,faults:[]});
+  expect(statuses(verdict)).toEqual(['ok','ok']);
+  expect(verdict.rows.map(row=>row.key)).toEqual(['nine/boot/retained-geometry','nine/boot/live-heap']);
+  // the soft line is the baseline plus 10%: 58.3 MB of retained geometry is a regression, still no ci fault
+  const regressed=bootMemoryVerdict(marks(0),58.3e6,300e6,judging());
+  expect(statuses(regressed)).toEqual(['regressed','ok']);
+  expect(regressed.faults).toEqual([]);
 });
 
-test('held parts, high retained geometry and high live heap fail independently',()=>{
-  const verdict=bootMemoryVerdict(marks(undefined,77.6e6),117e6,367e6);
-  expect(verdict.faults).toEqual([
-    'boot memory: no download:members-dropped mark with its held count',
-    'boot memory: retained CPU geometry 117.0 MB at control, over the 58.3 MB ceiling',
-    'boot memory: live heap 367 MB at control, over the 340 MB ceiling',
-  ]);
-  expect(bootMemoryVerdict(marks(2),53e6,300e6).faults).toEqual(['boot memory: 2 spawn parts still held past the download step']);
-  expect(bootMemoryVerdict(marks(0),null,300e6).faults).toEqual(['boot memory: no retained CPU geometry measurement at control']);
-  expect(bootMemoryVerdict(marks(0),53e6,Number.NaN).faults).toHaveLength(1);
+test('held parts or a missing measurement fail the load; high geometry and heap are regressions, not faults',()=>{
+  const verdict=bootMemoryVerdict(marks(undefined,77.6e6),117e6,367e6,judging());
+  expect(verdict.faults).toEqual(['boot memory: no download:members-dropped mark with its held count']);
+  expect(statuses(verdict)).toEqual(['regressed','regressed']);
+  expect(bootMemoryVerdict(marks(2),53e6,300e6,judging()).faults).toEqual(['boot memory: 2 spawn parts still held past the download step']);
+  expect(bootMemoryVerdict(marks(0),null,300e6,judging()).faults).toEqual(['boot memory: no retained CPU geometry measurement at control']);
+  expect(bootMemoryVerdict(marks(0),53e6,Number.NaN,judging()).faults).toEqual(['boot memory: no live heap measurement at control']);
+  // a new Nine revision is new content: only the hard cap (none on record, D3) is checked
+  expect(statuses(bootMemoryVerdict(marks(0),117e6,367e6,judging('nine-dragon-stack@4')))).toEqual(['raised','raised']);
 });
 
 test('the scene census counts complete shared backing stores without restoring released arrays',()=>{

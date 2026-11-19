@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { compareFootprint, compareLedger, confirmFootprint, footprintOverLine, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, footprintBoot, ledgerBudget } from '../scripts/memory/ratchet.mjs';
+import { compareLedger, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, footprintBoot, ledgerBudget } from '../scripts/memory/ratchet.mjs';
 
 const MB = 1e6;
 const points = (held: number): Parameters<typeof ledgerBudget>[0] => [
@@ -29,26 +29,29 @@ test('each subsystem has a control reading and a separate loading high-water mar
   expect(() => ledgerBudget([{ step: 'finish', ledger: {} }])).toThrow('control ledger');
 });
 
+// BUDGET-CAPS BC11: a replay judges each phase's total through the verdict (baseline + max(10%, 5 MB)), not each
+// subsystem at 2%. boot(0)'s control total is 48 MB, so its line is 53 MB.
 test('a 20 MB retained allocation fails even when an earlier stage still owns the peak', () => {
-  expect(() => compareLedger(boot(0), [boot(20)], 'template')).toThrow(/template control loading: 50000000 B > 30600000 B/u);
+  expect(() => compareLedger(boot(0), [boot(20)], 'template')).toThrow(/template control total: 68000000 B > 53000000 B/u);
   expect(compareLedger(boot(0), [boot(0)], 'template')).toEqual(boot(0));
 });
 
 test('one over-line hosted boot is confirmed by a second reading before the zone fails', () => {
-  expect(confirmLedger(boot(0), [boot(4), boot(0)], 'template')).toEqual(boot(0));
+  expect(confirmLedger(boot(0), [boot(6), boot(0)], 'template')).toEqual(boot(0));
   expect(confirmLedger(boot(0), [boot(0)], 'template')).toEqual(boot(0));
-  expect(() => confirmLedger(boot(0), [boot(4)], 'template')).toThrow(/template control loading: 34000000 B > 30600000 B/u);
+  expect(() => confirmLedger(boot(0), [boot(6)], 'template')).toThrow(/template control total: 54000000 B > 53000000 B/u);
 });
 
 test('the guard measures a zone a second time only when its first reading is over the line', () => {
   expect(ledgerOverLine(boot(0), boot(0), 'template')).toBeNull();
-  expect(ledgerOverLine(boot(0), boot(0.5), 'template')).toBeNull();
-  expect(ledgerOverLine(boot(0), boot(4), 'template')).toMatch(/template control loading: 34000000 B > 30600000 B/u);
+  // 4 MB on a 48 MB total is under the 5 MB floor: the old 2% subsystem margin called it a failure
+  expect(ledgerOverLine(boot(0), boot(4), 'template')).toBeNull();
+  expect(ledgerOverLine(boot(0), boot(6), 'template')).toMatch(/template control total: 54000000 B > 53000000 B/u);
 });
 
 test('a hosted zone boots once when its reading is in line, twice when it is over', async () => {
   expect(await guard([0])).toEqual({ files: ['1'], booted: [1] });
-  expect(await guard([4, 0])).toEqual({ files: ['1', '2'], booted: [1, 2] });
+  expect(await guard([6, 0])).toEqual({ files: ['1', '2'], booted: [1, 2] });
   expect(await guard([20, 20])).toEqual({ files: ['1', '2'], booted: [1, 2] });
 });
 
@@ -60,7 +63,7 @@ test('a hosted boot that never reaches control is booted once more and fails onl
 
 test('a retained allocation that every reading shows still fails the zone', () => {
   expect(() => confirmLedger(boot(0), [boot(20), boot(20)], 'template'))
-    .toThrow(/2 of 2 readings over the line\n[^]*template control loading: 50000000 B > 30600000 B/u);
+    .toThrow(/2 of 2 readings over the line\n[^]*template control total: 68000000 B > 53000000 B/u);
 });
 
 test('nothing lowers itself and the tolerance never raises the baseline (BUDGET-CAPS BC6)', () => {
@@ -72,21 +75,9 @@ test('nothing lowers itself and the tolerance never raises the baseline (BUDGET-
   expect(compareLedger(baseline, [outlier, reduced, baseline], 'template')).toEqual(baseline);
 });
 
-test('native footprint compares the median with the stored upper spread', () => {
-  const baseline = footprintBudget([509, 524, 528]);
-  expect(baseline).toEqual({ settled: 524, spread: 4 });
-  expect(compareFootprint(baseline, [516, 525, 535])).toEqual(baseline);
-  expect(() => compareFootprint(baseline, [526, 530, 535])).toThrow(/530 B > 528 B/u);
+test('the native footprint settles on the median of a batch (the verdict judges it, BC11)', () => {
+  expect(footprintBudget([509, 524, 528])).toEqual({ settled: 524, spread: 4 });
   expect(() => footprintBudget([0, 524, 528])).toThrow('native WebContent');
-});
-
-test('a Template footprint batch over the line is confirmed by a second batch before it fails', () => {
-  const baseline = { settled: 539, spread: 51 };
-  expect(footprintOverLine(baseline, [565, 567, 580])).toBeNull();
-  expect(footprintOverLine(baseline, [539, 594, 600])).toMatch(/Template settled WebContent: 594 B > 590 B/u);
-  expect(confirmFootprint(baseline, [[539, 594, 600], [550, 567, 587]])).toEqual({ settled: 539, spread: 51 });
-  expect(() => confirmFootprint(baseline, [[539, 594, 600], [592, 596, 610]]))
-    .toThrow(/2 of 2 batches over the line\n[^]*594 B > 590 B[^]*596 B > 590 B/u);
 });
 
 test('a footprint baseline and its runs share one inspector mode (EM11b)', () => {

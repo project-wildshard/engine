@@ -1,8 +1,12 @@
-// EM35–EM36. Byte budgets for ledger capacity and native WebContent footprint have separate baselines.
+// EM35–EM36. Byte budgets for ledger capacity and native WebContent footprint have separate baselines. BUDGET-CAPS BC11:
+// every comparison here judges through scripts/budgets/verdict.mjs (baseline + max(10%, the cap's floor)); no margin of
+// its own. The CI gates themselves are scripts/memory/ci.mjs with ledgerVerdict.mjs; this file is the replay tool.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { memorySubsystems, PHONE_MEMORY_BUDGETS } from '../../src/shared/engine/core/memoryBudget.ts';
+import { capFor, readCaps } from '../budgets/files.mjs';
+import { verdict } from '../budgets/verdict.mjs';
 
 const SUBSYSTEMS = Object.keys(PHONE_MEMORY_BUDGETS);
 const LEDGER_PHASES = ['control', 'peak'];
@@ -36,26 +40,34 @@ export function ledgerBudget(checkpoints) {
   return { control: capacity(control), peak };
 }
 
+/** The regression floor of a ledger total, from budgets/caps.json (`ledger/*`). */
+const LEDGER_FLOOR = capFor(readCaps(), 'ledger/_')?.floor ?? 0;
+
+/** @param {Record<string, number> | undefined} phase */
+function phaseTotal(phase) {
+  let total = 0;
+  for (const kind of SUBSYSTEMS) total += byteCount(phase?.[kind]);
+  return total;
+}
+
 /**
- * Replay a historical comparison against a subsystem ledger. It never lowers the stored ledger (BUDGET-CAPS BC6:
- * nothing lowers itself; the CI gate judges the two totals through scripts/memory/ledgerVerdict.mjs).
+ * Replay a historical comparison against a subsystem ledger: each phase's total through the budget verdict, the same
+ * content on both sides (BUDGET-CAPS BC6, BC11). The subsystems are summed, not judged one by one. It never lowers the
+ * stored ledger: nothing lowers itself.
  * @param {LedgerBudget} baseline @param {readonly LedgerBudget[]} runs
  * @param {string} zone @returns {LedgerBudget}
  */
 export function compareLedger(baseline, runs, zone) {
   if (runs.length === 0) throw new Error(`${zone}: no successful ledger boots`);
-  /** @type {LedgerBudget} */
-  const next = { control: {}, peak: {} };
   const failures = [];
-  for (const phase of LEDGER_PHASES) for (const kind of SUBSYSTEMS) {
-    const previous = byteCount(baseline[phase]?.[kind]);
-    const observed = Math.max(...runs.map(run => byteCount(run[phase]?.[kind])));
-    const limit = previous + Math.floor(previous * 0.02);
-    if (observed > limit) failures.push(`${zone} ${phase} ${kind}: ${observed} B > ${limit} B (baseline ${previous} B)`);
-    next[phase][kind] = previous;
+  for (const phase of LEDGER_PHASES) {
+    const previous = phaseTotal(baseline[phase]);
+    const observed = Math.max(...runs.map(run => phaseTotal(run[phase])));
+    const result = verdict({ measure: observed, baseline: { value: previous, contentKey: zone }, hard: null, contentKey: zone, kind: 'exact', floor: LEDGER_FLOOR });
+    if (result.status === 'regressed') failures.push(`${zone} ${phase} total: ${observed} B > ${Math.ceil(Number(result.line))} B (baseline ${previous} B + max(10%, ${LEDGER_FLOOR} B))`);
   }
   if (failures.length > 0) throw new Error(failures.join('\n'));
-  return next;
+  return { control: { ...baseline.control }, peak: { ...baseline.peak } };
 }
 
 /**
@@ -110,9 +122,7 @@ export async function confirmZone({ zone, baseline, boot, read, log }) {
   return [first, await boot(2)];
 }
 
-/** Hottest run sets the extent of measured spread around the median. The
- * positive spread is kept in bytes so subsequent measurements cannot widen
- * the allowance.
+/** A batch's settled reading (its median) and the spread of its hottest run above it, for the report.
  * @param {readonly number[]} readings @returns {FootprintBudget} */
 export function footprintBudget(readings) {
   if (readings.length < 3 || readings.some(n => byteCount(n) === 0)) throw new Error('Need at least three native WebContent readings');
@@ -120,38 +130,6 @@ export function footprintBudget(readings) {
   const lower = sorted[Math.floor((sorted.length - 1) / 2)], upper = sorted[Math.ceil((sorted.length - 1) / 2)];
   const settled = Math.round((lower + upper) / 2);
   return { settled, spread: sorted.at(-1) - settled };
-}
-
-/** @param {FootprintBudget} baseline @param {readonly number[]} readings */
-export function compareFootprint(baseline, readings) {
-  const observed = footprintBudget(readings);
-  const previous = byteCount(baseline.settled), limit = previous + byteCount(baseline.spread);
-  if (observed.settled > limit) throw new Error(`Template settled WebContent: ${observed.settled} B > ${limit} B (baseline ${previous} B + ${baseline.spread} B spread)`);
-  return { settled: readings.length === 3 && readings.every(value => value <= limit) ? Math.min(previous, observed.settled) : previous, spread: baseline.spread };
-}
-
-/** The failure one batch of native boots would raise, or null when its median is inside the line.
- * @param {FootprintBudget} baseline @param {readonly number[]} readings @returns {string | null} */
-export function footprintOverLine(baseline, readings) {
-  try { compareFootprint(baseline, readings); return null; } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
-}
-
-/**
- * The hosted macOS runner's Template median moves about 24 MB from run to run (564-589 MB on unchanged code), so a batch
- * whose median is over the line can be measured once more and the replay fails only when every batch is over.
- * @param {FootprintBudget} baseline @param {readonly (readonly number[])[]} batches @returns {FootprintBudget}
- */
-export function confirmFootprint(baseline, batches) {
-  if (batches.length === 0) throw new Error('No native WebContent batches');
-  const failures = [];
-  for (const readings of batches) {
-    const failure = footprintOverLine(baseline, readings);
-    if (failure === null) return compareFootprint(baseline, readings);
-    failures.push(failure);
-  }
-  throw new Error(`Template: ${batches.length} of ${batches.length} batches over the line\n${failures.join('\n')}`);
 }
 
 /** EM11b: which Web Inspector mode the runs were read with (measure.mjs `instrument`; a run before EM11b is `full`). The
@@ -199,55 +177,40 @@ export function main(argv) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true,
     options: { mode: { type: 'string' }, baseline: { type: 'string' }, out: { type: 'string' } } });
   const mode = values.mode;
-  if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode ?? '') || positionals.length === 0 || (!values.baseline && !values.out)) {
-    throw new Error('Usage: ratchet.mjs --mode=ledger|webkit-ledger|footprint [--baseline=file] [--out=file] <measure.json>...');
+  // The Template footprint is judged by scripts/memory/ci.mjs footprint against budgets/baselines.json (BC11).
+  if (!['ledger', 'webkit-ledger'].includes(mode ?? '') || positionals.length === 0 || (!values.baseline && !values.out)) {
+    throw new Error('Usage: ratchet.mjs --mode=ledger|webkit-ledger [--baseline=file] [--out=file] <measure.json>...');
   }
   const baseline = values.baseline ? json(values.baseline) : null;
   if (baseline !== null && (baseline.version !== 1 || baseline.mode !== mode)) throw new Error('Incompatible memory baseline');
   const measurements = positionals.map(json);
   for (const doc of measurements) if (doc.protocol !== 'memory-run/1' || typeof doc.chunk !== 'string') throw new Error('Expected measure.mjs output');
-  if (mode === 'ledger' || mode === 'webkit-ledger') {
-    const instrument = mode === 'webkit-ledger' ? footprintInstrument(measurements, baseline) : undefined;
-    const boot = mode === 'webkit-ledger' ? footprintBoot(measurements, baseline) : undefined;
-    /** @type {Map<string, LedgerBudget[]>} */
-    const readings = new Map();
-    for (const doc of measurements) {
-      const rows = readings.get(doc.chunk) ?? [];
-      if (mode === 'ledger') {
-        if (doc.microscope?.ready !== true) throw new Error(`${doc.chunk}: Chromium did not reach control`);
-        rows.push(ledgerBudget(doc.microscope.checkpoints));
-      } else {
-        if (doc.chunk !== 'nine-dragon-stack' || !Array.isArray(doc.webkit) || doc.webkit.length === 0) throw new Error('Expected native WebKit Nine runs');
-        for (const run of doc.webkit) {
-          if (run.host !== 'webkit' || run.refused !== null || run.ready !== true) throw new Error('Nine did not reach control in native WebKit');
-          rows.push(ledgerBudget(run.checkpoints));
-        }
+  const instrument = mode === 'webkit-ledger' ? footprintInstrument(measurements, baseline) : undefined;
+  const boot = mode === 'webkit-ledger' ? footprintBoot(measurements, baseline) : undefined;
+  /** @type {Map<string, LedgerBudget[]>} */
+  const readings = new Map();
+  for (const doc of measurements) {
+    const rows = readings.get(doc.chunk) ?? [];
+    if (mode === 'ledger') {
+      if (doc.microscope?.ready !== true) throw new Error(`${doc.chunk}: Chromium did not reach control`);
+      rows.push(ledgerBudget(doc.microscope.checkpoints));
+    } else {
+      if (doc.chunk !== 'nine-dragon-stack' || !Array.isArray(doc.webkit) || doc.webkit.length === 0) throw new Error('Expected native WebKit Nine runs');
+      for (const run of doc.webkit) {
+        if (run.host !== 'webkit' || run.refused !== null || run.ready !== true) throw new Error('Nine did not reach control in native WebKit');
+        rows.push(ledgerBudget(run.checkpoints));
       }
-      readings.set(doc.chunk, rows);
     }
-    if (baseline !== null && !isDeepStrictEqual([...readings.keys()].sort(), Object.keys(baseline.zones).sort())) {
-      throw new Error('Measured zone coverage differs from the committed ledger baseline');
-    }
-    const zones = Object.fromEntries([...readings.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([zone, runs]) =>
-      [zone, baseline === null ? highWater(runs)
-        : (mode === 'ledger' ? confirmLedger : compareLedger)(baseline.zones[zone], runs, zone)]));
-    if (values.out) write(values.out, { version: 1, mode, instrument, boot, zones });
-    console.log(`Ledger ${baseline === null ? 'recorded' : 'passed'} for ${readings.size} zones`);
-  } else {
-    const batches = measurements.map(doc => {
-      if (doc.chunk !== '_template' || !Array.isArray(doc.webkit) || doc.webkit.length === 0) throw new Error('Expected native WebKit Template runs');
-      return doc.webkit.map((/** @type {any} */ run) => {
-        if (run.host !== 'webkit' || run.refused !== null || run.ready !== true) throw new Error('Template did not reach control in native WebKit');
-        return byteCount(run.settled?.webcontent);
-      });
-    });
-    const instrument = footprintInstrument(measurements, baseline);
-    const boot = footprintBoot(measurements, baseline);
-    const anchor = baseline === null ? footprintBudget(batches.flat()) : confirmFootprint(baseline.anchor, batches);
-    if (values.out) write(values.out, { version: 1, mode, instrument, boot, anchor });
-    const medians = batches.map(readings => footprintBudget(readings).settled).join(' B, ');
-    console.log(`Template native WebContent: median ${medians} B, baseline ${anchor.settled} B + ${anchor.spread} B`);
+    readings.set(doc.chunk, rows);
   }
+  if (baseline !== null && !isDeepStrictEqual([...readings.keys()].sort(), Object.keys(baseline.zones).sort())) {
+    throw new Error('Measured zone coverage differs from the committed ledger baseline');
+  }
+  const zones = Object.fromEntries([...readings.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([zone, runs]) =>
+    [zone, baseline === null ? highWater(runs)
+      : (mode === 'ledger' ? confirmLedger : compareLedger)(baseline.zones[zone], runs, zone)]));
+  if (values.out) write(values.out, { version: 1, mode, instrument, boot, zones });
+  console.log(`Ledger ${baseline === null ? 'recorded' : 'passed'} for ${readings.size} zones`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

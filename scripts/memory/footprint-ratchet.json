@@ -2,9 +2,5 @@
   "version": 1,
   "mode": "footprint",
   "instrument": "minimal",
-  "boot": "online",
-  "anchor": {
-    "settled": 350062176,
-    "spread": 14106576
-  }
+  "boot": "online"
 }

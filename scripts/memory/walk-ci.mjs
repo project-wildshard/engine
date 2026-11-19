@@ -1,20 +1,25 @@
 #!/usr/bin/env node
 // MEMORY-STRUCTURE STR22: the hosted walk ratchet (walkRatchet.mjs). Nine's walk on the online boot of the exact prepared
-// client, the pinned number of runs, compared with scripts/memory/walk-ratchet.json. J431: a first median over the line
-// is re-measured (as many runs again) and fails only if the re-measure agrees; a re-measure that clears it is a warning
-// naming the commit (a one-off spike: a QA row, not a red). The peak is reported, not judged, while it is bimodal. A walk
-// that never completed (runner, browser, a boot short of control) is a warning and exits 0.
+// client, the pinned number of runs, its allocation rate judged through the budget verdict (BUDGET-CAPS BC11; the
+// baseline is walk/<zone>/rate in budgets/baselines.json). J431: a first median over the line is re-measured (as many
+// runs again) and fails only if the re-measure agrees; a re-measure that clears it is a warning naming the commit (a
+// one-off spike: a QA row, not a red). The peak is reported, not judged, while it is bimodal. A walk that never
+// completed (runner, browser, a boot short of control) is a warning and exits 0.
 //   node scripts/memory/walk-ci.mjs <preview root> <output dir> [--record]
-// --record re-pins downward (repinWalk) from a passing first reading and writes the next baseline to
-// <output dir>/walk-ratchet.json; the committed one is still the line this run is judged by.
+// Every completed walk writes <output dir>/budget-measures.json with the table; `node scripts/budgets/cli.mjs record
+// --run <id>` records it. --record is accepted for the workflow's shared switch and changes nothing here.
 import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { peakLine, rateLine, repinWalk, reportedLines, walkBaseline, walkVerdict } from './walkRatchet.mjs';
+import { readBaselines, readCaps } from '../budgets/files.mjs';
+import { pinnedContentKeys } from '../shard-size-gate.mjs';
+import { reportLedger, zoneContentKey } from './ledgerVerdict.mjs';
+import { reportedLines, walkBaseline, walkRateRow, walkVerdict } from './walkRatchet.mjs';
 
 const [root, output, flag, ...extra] = process.argv.slice(2);
 if (!root || !output || extra.length > 0 || (flag !== undefined && flag !== '--record')) throw new Error('Usage: memory/walk-ci.mjs <preview root> <output> [--record]');
 const baseline = walkBaseline(), directory = absolute(output);
+const judging = { contentKey: zoneContentKey(baseline.zone, pinnedContentKeys()), budgets: { caps: readCaps(), baselines: readBaselines() } };
 mkdirSync(directory, { recursive: true });
 /** @param {string} line */
 const summary = line => { console.log(line); if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${line}\n\n`); };
@@ -35,8 +40,9 @@ async function walk(name) {
     return null;
   }
   const peaks = /** @type {number[]} */ (data.webkit.map((/** @type {any} */ r) => r.walk?.aboveSettled?.webcontent).filter((/** @type {unknown} */ v) => typeof v === 'number'));
-  const peakJudged = baseline.peak.judged ? ` (line ${mb(peakLine(baseline))})` : '';
-  summary(`Walk ratchet ${baseline.zone} (${name}, ${String(data.walk.bytesPerSecond.n)} runs): ${mb(data.walk.bytesPerSecond.median)} MB/s allocated [S] (pinned ${mb(baseline.rate.value)}, line ${mb(rateLine(baseline))}), WebContent peak ${mb(data.walk.peakAboveSettled.median)} MB above settled [K]${peakJudged}`);
+  const rate = walkRateRow(baseline, data.walk, judging);
+  const line = rate.line === null ? 'none: new content, record it' : mb(rate.line);
+  summary(`Walk ratchet ${baseline.zone} (${name}, ${String(data.walk.bytesPerSecond.n)} runs): ${mb(data.walk.bytesPerSecond.median)} MB/s allocated [S] (${rate.status}, baseline ${rate.baseline === null ? 'none' : mb(rate.baseline)} on ${rate.previousKey ?? '-'}, line ${line}), WebContent peak ${mb(data.walk.peakAboveSettled.median)} MB above settled [K]`);
   for (const line of reportedLines(baseline, data.walk, peaks)) summary(line);
   return data.walk;
 }
@@ -44,14 +50,12 @@ async function walk(name) {
 const first = await walk(`walk-${baseline.zone}.json`);
 if (first === null) summary(`Walk ratchet: ${baseline.zone} walk did not complete; reported, not judged`);
 else {
-  const over = walkVerdict(baseline, first, null).state !== 'pass';
+  const over = walkVerdict(baseline, first, null, judging).state !== 'pass';
   const again = over ? await walk(`walk-${baseline.zone}-again.json`) : null;
-  const verdict = walkVerdict(baseline, first, again);
-  if (flag === '--record' && verdict.state === 'pass') {
-    const next = join(directory, 'walk-ratchet.json');
-    writeFileSync(next, `${JSON.stringify(repinWalk(baseline, first, commit), null, 2)}\n`);
-    console.log(`next baseline: ${next}`);
-  }
+  const verdict = walkVerdict(baseline, first, again, judging);
+  // the judged reading: the re-measure's when it ran and completed, else the first
+  const judged = again?.complete === true ? again : first;
+  reportLedger({ rows: [walkRateRow(baseline, judged, judging)], mode: 'walk', directory, commit: process.env.GITHUB_SHA, summaryFile: process.env.GITHUB_STEP_SUMMARY });
   if (verdict.state === 'fail') throw new Error(`Walk ratchet (first median and its re-measure agree): ${String(verdict.failure)}`);
   if (verdict.state === 'spike') {
     // J431: a one-off spike is a warning plus a QA row naming the commit

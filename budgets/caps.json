@@ -83,6 +83,43 @@
    "floor": 5000000,
    "decision": null,
    "why": "The native WebKit memory ledger's control and peak totals a zone (Nine, BC6): the same regression check as ledger/*."
+  },
+  "footprint/*": {
+   "hard": null,
+   "unit": "bytes",
+   "kind": "noisy",
+   "floor": 5000000,
+   "decision": null,
+   "why": "The Template's settled native WebContent on the online boot (memory-footprint.yml, BC11): a regression check against its own baseline; the hard line is memory/loading/*."
+  },
+  "walk/*": {
+   "hard": null,
+   "unit": "bytes/s",
+   "kind": "noisy",
+   "floor": 83334,
+   "decision": null,
+   "why": "A zone's allocation rate over its 60 s walk (memory-footprint.yml, BC11): the floor is 5 MB over the walk. No hard cap on record (D3)."
+  },
+  "nine/boot/*": {
+   "hard": null,
+   "unit": "bytes",
+   "kind": "noisy",
+   "decision": null,
+   "why": "Nine's boot at control in ci's nine-ring1 load (BC11): CPU geometry still reachable from the scene, and the live JS heap after a full collection. No hard cap on record (D3); held spawn parts fail the load on their own."
+  },
+  "nine/street/triangles95": {
+   "hard": null,
+   "unit": "triangles",
+   "kind": "exact",
+   "decision": null,
+   "why": "NB6: the most triangles submitted at p95 in any minute of Nine's phone street walk (ci-reports, BC11). No hard cap on record (D3)."
+  },
+  "nine/street/draws95": {
+   "hard": null,
+   "unit": "draws",
+   "kind": "exact",
+   "decision": null,
+   "why": "NB6: the most draw calls at p95 in any minute of Nine's phone street walk (ci-reports, BC11). No hard cap on record (D3)."
   }
  }
 }

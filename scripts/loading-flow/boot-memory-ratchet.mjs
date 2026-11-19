@@ -4,17 +4,15 @@
 //
 // 1. No spawn part is held in memory past the download step: the store's checked copy serves a later read
 //    (`download:members-dropped`'s `held`, spawnDownload.ts, engine 653c748c).
-// 2. CPU geometry buffers still reachable from the scene at control stay under the
-//    measured 53 MB plus 10%. The old release volume is telemetry: df9005b4 frees
-//    slab buffers on upload, before the staged release marks.
-// 3. The page's live JS heap (collected) at control stays under its measured value plus a margin: 367 MB before the
-//    two cuts, 289.5 MB after (two runs within 0.1 MB). The margins are wider than the mini's spread because the hosted
-//    runner draws on SwiftShader (no multi-draw, so Nine's slabs are not merged there); tighten them from its receipts
-//    (load.json's `memory`).
+// 2. CPU geometry buffers still reachable from the scene at control, and 3. the page's live JS heap (collected) at
+//    control, are judged through the budget verdict (BUDGET-CAPS BC11, J444): nine/boot/retained-geometry and
+//    nine/boot/live-heap in budgets/baselines.json, measured on Nine's pinned revision, soft line baseline + 10%. The
+//    old hand ceilings were 58.3 MB (53 MB + 10%) and 340 MB (289.5 MB + 17%); hosted reads 13.3 MB and 217 MB.
+//    A regression is not a fault here: nine-load.mjs writes the rows to budget-measures.json, which the budgets
+//    workflow judges after ci (a fix row for the pusher, never a red ci). A new Nine revision is new content.
+import { judgeReads } from '../memory/ledgerVerdict.mjs';
 
-export const NINE_RETAINED_GEOMETRY_CEILING_BYTES = 58.3e6;
-/** the live heap ceiling at control (used + ArrayBuffer backing, after a full collection): 289.5 MB measured, plus 17% */
-export const NINE_LIVE_CEILING_BYTES = 340e6;
+export const NINE_BOOT_KEYS = Object.freeze({ retained: 'nine/boot/retained-geometry', live: 'nine/boot/live-heap' });
 
 /** Browser-side: the boot timeline's memory marks with their detail. */
 export function bootMemoryMarks() {
@@ -52,14 +50,14 @@ export function retainedGeometryBytes(scene = window.__wildshard?.world?.game.ro
 }
 
 /**
+ * The boot's faults and its two budget rows. Held parts and a missing measurement are faults (they fail the load); a
+ * measurement's verdict is a row (`over-hard` is a fault too, `regressed` is the budgets job's).
  * @param {readonly {operation: string, detail: Record<string, unknown>}[]} marks
  * @param {number | null} retained
  * @param {number} liveBytes
- * @param {{retainedCeiling?: number, liveCeiling?: number}} [limits]
+ * @param {{ contentKey: string, budgets: Parameters<typeof judgeReads>[0] }} judging
  */
-export function bootMemoryVerdict(marks, retained, liveBytes, limits = {}) {
-  const retainedCeiling = limits.retainedCeiling ?? NINE_RETAINED_GEOMETRY_CEILING_BYTES;
-  const liveCeiling = limits.liveCeiling ?? NINE_LIVE_CEILING_BYTES;
+export function bootMemoryVerdict(marks, retained, liveBytes, { contentKey, budgets }) {
   /** @type {string[]} */ const faults = [];
   const dropped = marks.find(row => row.operation === 'download:members-dropped');
   const held = typeof dropped?.detail.held === 'number' ? dropped.detail.held : null;
@@ -67,10 +65,13 @@ export function bootMemoryVerdict(marks, retained, liveBytes, limits = {}) {
   else if (held > 0) faults.push(`boot memory: ${String(held)} spawn parts still held past the download step`);
   const released = marks.filter(row => row.operation === 'memory:geometry-released')
     .reduce((sum, row) => sum + (typeof row.detail.bytes === 'number' ? row.detail.bytes : 0), 0);
+  const rows = [];
   if (retained === null || !Number.isFinite(retained) || retained < 0) faults.push('boot memory: no retained CPU geometry measurement at control');
-  else if (retained > retainedCeiling) faults.push(`boot memory: retained CPU geometry ${(retained / 1e6).toFixed(1)} MB at control, over the ${(retainedCeiling / 1e6).toFixed(1)} MB ceiling`);
-  if (!(liveBytes <= liveCeiling)) faults.push(`boot memory: live heap ${(liveBytes / 1e6).toFixed(0)} MB at control, over the ${(liveCeiling / 1e6).toFixed(0)} MB ceiling`);
-  return { held, released, retained, live: liveBytes, faults };
+  else rows.push(judgeReads(budgets, NINE_BOOT_KEYS.retained, [retained], contentKey));
+  if (!Number.isFinite(liveBytes) || liveBytes < 0) faults.push('boot memory: no live heap measurement at control');
+  else rows.push(judgeReads(budgets, NINE_BOOT_KEYS.live, [liveBytes], contentKey));
+  for (const row of rows) if (row.status === 'over-hard') faults.push(`boot memory: ${row.key} ${(row.value / 1e6).toFixed(1)} MB at control, over its ${(Number(row.hard) / 1e6).toFixed(1)} MB hard cap`);
+  return { held, released, retained, live: liveBytes, faults, rows };
 }
 
 /** The page's live heap after a full collection (Chromium CDP), used + ArrayBuffer backing.

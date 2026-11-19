@@ -1,9 +1,19 @@
 // NB6 regression ceilings, measured 2026-11-16 on NB1's street route
 // (0b9fe2d8), phone 402x874 @2, CPU x4, Nine rev 2 + 21413ff0.
-// These hold today's 0.904 M / 119 draws with noise room. NB8/NB23's
-// improvement targets remain in the plan. Never record a new baseline on red.
-export const NINE_LIMITS = Object.freeze({triangles95: 950_000, draws95: 126,
-  fps: 25, frame95: 65, gpu95: 30, controlMs: 40_000, shadersMs: 6500, firstFrameMs: 8000});
+// NB8/NB23's improvement targets remain in the plan. Never record a new baseline on red.
+// BUDGET-CAPS BC11 (J444): the submitted work, triangles and draws at p95, is judged through the budget verdict against
+// nine/street/triangles95 and nine/street/draws95 in budgets/baselines.json (0.904 M and 119 at the move; the old hand
+// ceilings were 950,000 and 126). A new Nine revision is new content. The timing limits below stay one number each:
+// they hold the physical MacBook, not content.
+import {readBaselines,readCaps} from '../budgets/files.mjs';
+import {judgeReads,zoneContentKey} from '../memory/ledgerVerdict.mjs';
+import {pinnedContentKeys} from '../shard-size-gate.mjs';
+
+export const NINE_LIMITS = Object.freeze({fps: 25, frame95: 65, gpu95: 30, controlMs: 40_000, shadersMs: 6500, firstFrameMs: 8000});
+export const NINE_STREET_KEYS = Object.freeze({triangles95: 'nine/street/triangles95', draws95: 'nine/street/draws95'});
+
+/** The committed budgets and Nine's pinned revision. */
+export const nineJudging = () => ({contentKey: zoneContentKey('nine-dragon-stack', pinnedContentKeys()), budgets: {caps: readCaps(), baselines: readBaselines()}});
 
 /** @typedef {{fps:number,p95:number,gpu95:number,draws95:number,tris95:number}} FrameSummary */
 /** @typedef {{renderer:string,seconds:number,throttle:number,dpr:number,phone:boolean,
@@ -14,8 +24,8 @@ export const NINE_LIMITS = Object.freeze({triangles95: 950_000, draws95: 126,
 /** Refuse missing evidence as well as regressions. Virtual/software GPU timing cannot be
  * compared with the physical MacBook baseline. Apple's hosted Paravirtual
  * device still reports Metal; it submits the same geometry and draws.
- * @param {NineReading} reading @returns {string[]} */
-export function nineFaults(reading) {
+ * @param {NineReading} reading @param {ReturnType<typeof nineJudging>} [judging] @returns {string[]} */
+export function nineFaults(reading, judging = nineJudging()) {
   const {play, load} = reading, faults = [];
   if (!/nine/u.test(play.route.name) || !reading.phone || reading.throttle !== 4 || reading.dpr !== 2 || play.pixelRatio !== 2 || reading.seconds < 60)
     faults.push('NB6 needs the Nine street route, phone 402x874 @2, CPU x4, at least 60 seconds');
@@ -30,10 +40,19 @@ export function nineFaults(reading) {
     if (!Number.isFinite(value) || value <= 0 || (floor ? value < limit : value > limit))
       faults.push(`NB6 ${label}: ${value} outside ${floor ? 'minimum' : 'maximum'} ${limit}`);
   };
+  /** @param {string} label @param {'tris95' | 'draws95'} field @param {string} key */
+  const work = (label, field, key) => {
+    const values = [play.all, ...play.minutes].map(minute => minute[field]);
+    values.forEach((value, i) => { if (!Number.isFinite(value) || value <= 0) faults.push(`NB6 ${i === 0 ? 'walk' : `minute ${i}`} ${label}: ${value} outside maximum`); });
+    if (values.some(value => !Number.isFinite(value) || value <= 0)) return;
+    const row = judgeReads(judging.budgets, key, [Math.max(...values)], judging.contentKey);
+    if (row.status === 'regressed' || row.status === 'over-hard')
+      faults.push(`NB6 ${label}: ${row.value} ${row.status}, line ${Math.ceil(Number(row.status === 'over-hard' ? row.hard : row.line))} (baseline ${row.baseline} on ${judging.contentKey})`);
+  };
+  work('triangles p95', 'tris95', NINE_STREET_KEYS.triangles95);
+  work('draws p95', 'draws95', NINE_STREET_KEYS.draws95);
   for (const [i, minute] of [play.all, ...play.minutes].entries()) {
     const label = i === 0 ? 'walk' : `minute ${i}`;
-    hold(`${label} triangles p95`, minute.tris95, NINE_LIMITS.triangles95);
-    hold(`${label} draws p95`, minute.draws95, NINE_LIMITS.draws95);
     if (!virtual) {
       hold(`${label} fps`, minute.fps, NINE_LIMITS.fps, true);
       hold(`${label} frame p95`, minute.p95, NINE_LIMITS.frame95);

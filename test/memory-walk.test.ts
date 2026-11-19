@@ -49,41 +49,47 @@ test('routes: Nine walks its streets, every other zone spins; a missing reading 
   expect(walkSummary([run(100),{refused:'no control'}],[sampled(10)]).complete).toBe(false);
 });
 
-test('the walk ratchet (J431): the rate fails past max(2%, 5 MB over the walk) only when a re-measure agrees; the bimodal peak is reported',async()=>{
-  const {bimodal,compareWalk,parseWalkBaseline,rateLine,repinWalk,reportedLines,walkVerdict}=await import('../scripts/memory/walkRatchet.mjs');
-  const baseline=parseWalkBaseline({version:2,mode:'walk',boot:'online',zone:'nine-dragon-stack',seconds:60,runs:3,source:'abc',
-    rate:{value:7e6,spread:0.1e6,judged:true},peak:{value:200e6,spread:300e6,judged:false,why:'bimodal'}});
+test('the walk ratchet (BC11): the rate is judged through the verdict and fails only when a re-measure agrees; the bimodal peak is reported',async()=>{
+  const {bimodal,compareWalk,parseWalkBaseline,reportedLines,walkMeasures,walkVerdict}=await import('../scripts/memory/walkRatchet.mjs');
+  const {readCaps}=await import('../scripts/budgets/files.mjs');
+  const baseline=parseWalkBaseline({version:3,mode:'walk',boot:'online',zone:'nine-dragon-stack',seconds:60,runs:3,source:'abc',
+    peak:{value:200e6,spread:300e6,judged:false,why:'bimodal'}});
+  const judging=(rate:number,contentKey='nine-dragon-stack@3')=>({contentKey,budgets:{caps:readCaps(),baselines:{schema:1,about:'',baselines:{
+    'walk/nine-dragon-stack/rate':{value:rate,contentKey:'nine-dragon-stack@3'}}}}});
+  const pinned=judging(7e6);
   const read=(rate:number,peak:number)=>({complete:true,bytesPerSecond:{median:rate,min:rate-1e5,max:rate+1e5,n:3},peakAboveSettled:{median:peak,min:peak-5e7,max:peak+5e7,n:3}});
-  // 2% of 7 MB/s over 60 s is 8.4 MB, more than 5 MB: the line is 7.14 MB/s
-  expect(rateLine(baseline)).toBeCloseTo(7.14e6,-2);
-  expect(compareWalk(baseline,read(7.13e6,900e6))).toBeNull();
-  expect(compareWalk(baseline,read(7.2e6,200e6))).toMatch(/allocation 7\.20 MB\/s > 7\.14 MB\/s/u);
-  // a slow walk's 5 MB floor: 1 MB/s pinned has 5 MB / 60 s, not 2%
-  expect(rateLine(parseWalkBaseline({...baseline,rate:{value:1e6,spread:0,judged:true}}))).toBeCloseTo(1e6+5e6/60,-1);
-  expect(walkVerdict(baseline,read(7e6,1),null).state).toBe('pass');
-  expect(walkVerdict(baseline,read(7.3e6,1),read(7.1e6,1)).state).toBe('spike');
-  expect(walkVerdict(baseline,read(7.3e6,1),null).state).toBe('spike');
-  expect(walkVerdict(baseline,read(7.3e6,1),read(7.2e6,1))).toMatchObject({state:'fail',failure:expect.stringMatching(/7\.20 MB\/s/u)});
-  // a judged peak fails past max(2%, 5 MB)
+  // the soft line is the pinned rate plus 10%: 7.7 MB/s
+  expect(compareWalk(baseline,read(7.69e6,900e6),pinned)).toBeNull();
+  expect(compareWalk(baseline,read(7.8e6,200e6),pinned)).toMatch(/allocation 7\.80 MB\/s > 7\.70 MB\/s \(regressed, pinned 7\.00 MB\/s/u);
+  // a slow walk's floor: 5 MB over the 60 s walk, more than 10% of 0.5 MB/s
+  expect(compareWalk(baseline,read(0.58e6,1),judging(0.5e6))).toBeNull();
+  expect(compareWalk(baseline,read(0.59e6,1),judging(0.5e6))).toMatch(/allocation 0\.59 MB\/s > 0\.58 MB\/s/u);
+  // a new Nine revision moves its own line
+  expect(compareWalk(baseline,read(20e6,1),judging(7e6,'nine-dragon-stack@4'))).toBeNull();
+  expect(walkVerdict(baseline,read(7e6,1),null,pinned).state).toBe('pass');
+  expect(walkVerdict(baseline,read(7.8e6,1),read(7.1e6,1),pinned).state).toBe('spike');
+  expect(walkVerdict(baseline,read(7.8e6,1),null,pinned).state).toBe('spike');
+  expect(walkVerdict(baseline,read(7.8e6,1),read(7.9e6,1),pinned)).toMatchObject({state:'fail',failure:expect.stringMatching(/7\.90 MB\/s/u)});
+  // a judged peak fails past its baseline plus max(10%, 5 MB)
   const judged=parseWalkBaseline({...baseline,peak:{value:200e6,spread:10e6,judged:true}});
-  expect(compareWalk(judged,read(7e6,205e6))).toBeNull();
-  expect(compareWalk(judged,read(7e6,206e6))).toMatch(/peak above settled 206 MB > 205 MB/u);
-  expect(()=>compareWalk(baseline,{...read(1,1),complete:false})).toThrow(/completed/u);
+  expect(compareWalk(judged,read(7e6,219e6),pinned)).toBeNull();
+  expect(compareWalk(judged,read(7e6,221e6),pinned)).toMatch(/peak above settled 221 MB > 220 MB/u);
+  expect(()=>compareWalk(baseline,{...read(1,1),complete:false},pinned)).toThrow(/completed/u);
   expect(bimodal([21e6,294e6,335e6])).toBe(true); expect(bimodal([150e6,160e6,170e6])).toBe(false);
   expect(reportedLines(baseline,read(7e6,294e6),[21e6,294e6,335e6])[0]).toMatch(/not judged: bimodal.*21, 294, 335 MB \(two modes\)/u);
   expect(reportedLines(judged,read(7e6,1),[1])).toEqual([]);
-  const next=repinWalk(baseline,read(6.5e6,300e6),'def');
-  expect(next.rate).toEqual({value:6.5e6,spread:2e5,judged:true});
-  expect(next.peak).toMatchObject({value:200e6,judged:false,why:'bimodal'});
-  // a reading not judged says why; the rate is always judged
+  // the run's measures, for scripts/budgets/cli.mjs record --run
+  expect(walkMeasures(baseline,read(6.5e6,300e6),'nine-dragon-stack@3')).toEqual({'walk/nine-dragon-stack/rate':{value:6.5e6,contentKey:'nine-dragon-stack@3'}});
+  // a reading not judged says why; the rate's baseline lives in budgets/baselines.json now
   expect(()=>parseWalkBaseline({...baseline,peak:{value:1,spread:5,judged:false}})).toThrow(/says why/u);
-  expect(()=>parseWalkBaseline({...baseline,rate:{value:1,spread:0,judged:false,why:'x'}})).toThrow(/always judged/u);
+  expect(()=>parseWalkBaseline({...baseline,version:2})).toThrow(/Invalid walk ratchet baseline/u);
 });
 
-test('the committed walk baseline parses: Nine, online, the rate judged',async()=>{
+test('the committed walk baseline parses: Nine, online, its rate recorded in budgets/baselines.json',async()=>{
   const {walkBaseline}=await import('../scripts/memory/walkRatchet.mjs');
+  const {readBaselines}=await import('../scripts/budgets/files.mjs');
   const baseline=walkBaseline();
   expect(baseline.zone).toBe('nine-dragon-stack');
-  expect(baseline.rate.judged).toBe(true);
   expect(baseline.runs).toBeGreaterThanOrEqual(3);
+  expect(readBaselines().baselines[`walk/${baseline.zone}/rate`]).toMatchObject({contentKey:expect.stringMatching(/^nine-dragon-stack@\d+$/u)});
 });

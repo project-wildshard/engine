@@ -3,11 +3,10 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { serve } from '../parity/serve.mjs';
-import { armedMemory, comparePhoneFootprint, footprintBaseline, footprintBootFor, guardZone, ledgerZones, phoneFootprint } from './armed.mjs';
-import { checkMemory, memoryWarningLine } from './gate.mjs';
+import { armedMemory, comparePhoneFootprint, footprintBootFor, footprintLines, guardZone, judgeFootprint, ledgerZones, phoneFootprint } from './armed.mjs';
 import { loadPhoneModel } from './phoneModel.mjs';
-import { compareLedger, compareFootprint, footprintBoot, footprintBudget, footprintInstrument, ledgerBudget } from './ratchet.mjs';
-import { checkLedger, ledgerFailure, reportLedger, zoneContentKey } from './ledgerVerdict.mjs';
+import { compareLedger, footprintBoot, footprintBudget, footprintInstrument, ledgerBudget } from './ratchet.mjs';
+import { checkLedger, checkReads, judgeReads, ledgerFailure, reportLedger, zoneContentKey } from './ledgerVerdict.mjs';
 import { readBaselines, readCaps } from '../budgets/files.mjs';
 import { pinnedContentKeys } from '../shard-size-gate.mjs';
 
@@ -57,9 +56,11 @@ if (baseline.version !== 1 || baseline.mode !== mode) throw new Error('Incompati
 const preview = await serve(absolute(root), '', true, { telemetryDir: join(directory, 'telemetry') });
 /** @type {Record<string, any>} */
 const recorded = {};
-// BUDGET-CAPS BC6: the ledger modes judge two totals a zone through the budget verdict; every judged row goes in one
-// table and in budget-measures.json (scripts/budgets/cli.mjs record --run reads it from the run's artifact).
-const budgets = { caps: readCaps(), baselines: readBaselines() }, pins = pinnedContentKeys();
+// BUDGET-CAPS BC6, BC11: every mode judges through the budget verdict (the ledgers on two totals a zone, the footprint on
+// each armed zone's EM11 playing and loading and the Template's settled WebContent); every judged row goes in one table
+// and in budget-measures.json (scripts/budgets/cli.mjs record --run reads it from the run's artifact). J445: the 1.0 GB
+// playing line is a target that refuses nothing; 1.5 GB loading (memory/loading/* in budgets/caps.json) is the one refusal.
+const budgets = { caps: readCaps(), baselines: readBaselines() }, pins = pinnedContentKeys(), lines = footprintLines(budgets.caps);
 /** @type {any[]} */
 const budgetRows = [];
 /** @type {string[]} */
@@ -95,7 +96,8 @@ try {
     const footprint = phoneFootprint('_template', runs, model, 'standalone');
     standaloneTemplate = `${footprintBudget(runs.map(run => run.settled.webcontent)).settled} B`;
     console.log(`Template standalone preview settled WebContent [K] ${standaloneTemplate}`);
-    comparePhoneFootprint(footprint, policy.lines);
+    const target = comparePhoneFootprint(footprint, lines);
+    if (target !== null) console.log(`_template standalone: ${target}`);
   }, console.log);
   for (const chunk of readings) await guardZone(chunk, policy.zones, async () => {
     if (!built.includes(chunk)) throw new Error('Prepared preview does not contain the zone');
@@ -121,27 +123,14 @@ try {
       const comparison = `Template settled WebContent [K] online ${footprintBudget(settled).settled} B, standalone preview ${standaloneTemplate}`;
       console.log(comparison);
       if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${comparison}\n\n`);
-      recorded.anchor = compareFootprint(baseline.anchor, settled);
+      const rows = [judgeReads(budgets, 'footprint/_template/settled', settled, zoneContentKey(chunk, pins))];
+      budgetRows.push(...rows);
+      const failure = ledgerFailure(rows);
+      if (failure !== null) ledgerFailures.push(failure);
       return;
     }
 
-    /** @param {import('./gate.mjs').Warning} warning */
-    function warn(warning) {
-      if (!policy.zones.has(chunk)) return;
-      // BUDGET-CAPS BC7: a plain log line, never a GitHub warning annotation; the job summary carries the budget table.
-      console.log(memoryWarningLine(mode, chunk, warning));
-    }
-
     if (mode === 'footprint') {
-      const pinned = footprintBaseline(policy.readings, baseline.zones, chunk);
-      const metrics = {
-        playing: { absolute: policy.lines.playingBytes, ...(pinned && {
-          baseline: pinned.playingBytes, previousMargin: Math.floor(pinned.playingBytes / 200),
-        }) },
-        loading: { absolute: policy.lines.loadingBytes, ...(pinned && {
-          baseline: pinned.loadingBytes, previousMargin: Math.floor(pinned.loadingBytes / 200),
-        }) },
-      };
       /** @param {number} count */
       const probeFootprint = async count => nativeRuns(await capture(count), count).map(run => {
         const { playing, loading } = phoneFootprint(chunk, [run], model, boot);
@@ -149,8 +138,18 @@ try {
       });
       const [first] = await probeFootprint(1);
       console.log(`${chunk}: EM11 (${boot}) upper playing ${first.playing} B, loading ${first.loading} B`);
-      const next = await checkMemory({ zone: chunk, metrics, first, remeasure: probeFootprint, warn, record });
-      recorded[chunk] = { playingBytes: next.playing, loadingBytes: next.loading };
+      const contentKey = zoneContentKey(chunk, pins);
+      const { rows } = await checkReads({ first, remeasure: probeFootprint, record,
+        judge: reads => judgeFootprint({ zone: chunk, reads, contentKey, budgets }) });
+      budgetRows.push(...rows);
+      for (const row of rows) if (row.target !== null && row.value > row.target) {
+        console.log(`${chunk}: ${row.key} ${row.value} B past the ${row.target} B target (J445: the may-crash card with Play anyway, never a refusal)`);
+      }
+      // Past the 1.5 GB loading cap refuses an armed zone now (guardZone); a regression is reported once at the end.
+      const hard = ledgerFailure(rows.filter(row => row.status === 'over-hard'));
+      if (hard !== null) throw new Error(hard);
+      const failure = ledgerFailure(rows);
+      if (failure !== null) ledgerFailures.push(failure);
       return;
     }
 
@@ -187,11 +186,10 @@ try {
     console.log(ledgerFailures.join('\n'));
     process.exitCode = 1;
   }
-  if (record) {
+  // The footprint's measures are all in budget-measures.json; the ledgers also keep their subsystem file.
+  if (record && mode !== 'footprint') {
     const outputFile = join(directory, `${mode}-ratchet.json`);
-    const { anchor = baseline.anchor, ...zones } = recorded;
-    writeFileSync(outputFile, `${JSON.stringify(mode === 'footprint'
-      ? { ...baseline, anchor, zones } : { ...baseline, zones: { ...baseline.zones, ...zones } }, null, 2)}\n`);
+    writeFileSync(outputFile, `${JSON.stringify({ ...baseline, zones: { ...baseline.zones, ...recorded } }, null, 2)}\n`);
     if (mode === 'ledger' && record) await guardZone('_template', policy.zones, async () => {
       const controlAnchor = get(outputFile).zones._template;
       if (!controlAnchor) throw new Error('No Template ledger for the negative control');
@@ -201,9 +199,9 @@ try {
       await measure([...args, '--plant-retained-buffer', `--out=${planted}`]);
       try {
         compareLedger(controlAnchor, [ledgerBudget(get(planted).microscope.checkpoints)], '_template');
-        throw new Error('Expected the retained 20 MB buffer to exceed the loading budget');
+        throw new Error('Expected the retained 20 MB buffer to push the control total past its line');
       } catch (error) {
-        if (!(error instanceof Error) || !error.message.includes('_template control loading:')) throw error;
+        if (!(error instanceof Error) || !error.message.includes('_template control total:')) throw error;
         console.log(error.message);
       }
       compareLedger(controlAnchor, [ledgerBudget(get(clean).microscope.checkpoints)], '_template');

@@ -97,9 +97,9 @@ jobs:
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
           node scripts/memory/ci.mjs webkit-ledger tmp/memory-ledger/preview tmp/memory-footprint/nine-ledger "${record[@]}"
-      # MEMORY-STRUCTURE STR22: Nine's 60 s walk on the online boot, held to scripts/memory/walk-ratchet.json (the allocation
-      # rate [S] in Chromium and WebKit's WebContent peak above settled [K]). Blocking like the armed footprints (J429): a
-      # completed worse reading fails; a walk that never completes is a warning, not a verdict.
+      # MEMORY-STRUCTURE STR22: Nine's 60 s walk on the online boot; its allocation rate [S] is judged through the budget
+      # verdict (walk/nine-dragon-stack/rate, BUDGET-CAPS BC11) and WebKit's WebContent peak above settled [K] is reported.
+      # A confirmed regression fails this advisory run (a fix row); a walk that never completes is a warning, not a verdict.
       - name: Check Nine's walk against its pinned allocation rate and peak
         if: ${{ !cancelled() && steps.native-client.outcome == 'success' }}
         env:
@@ -113,6 +113,29 @@ jobs:
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
           node scripts/memory/walk-ci.mjs tmp/memory-ledger/preview tmp/memory-footprint/walk "${record[@]}"
+      # BUDGET-CAPS BC11: every judged footprint, Nine ledger and walk row in one measures file, as a `budgets` artifact
+      # (budgets/measures.json), so a pin lane records the new content with `node scripts/budgets/cli.mjs record --run <id>`.
+      - name: Gather the budget measures
+        id: measures
+        if: always() && steps.native-client.outcome == 'success'
+        run: |
+          inputs=()
+          for file in tmp/memory-footprint/readings/budget-measures.json tmp/memory-footprint/nine-ledger/budget-measures.json tmp/memory-footprint/walk/budget-measures.json; do
+            if [[ -f "$file" ]]; then inputs+=("$file"); fi
+          done
+          if [[ ${#inputs[@]} -eq 0 ]]; then echo "::notice::no budget measures to gather"; exit 0; fi
+          mkdir -p tmp/budgets
+          node scripts/budgets/cli.mjs merge tmp/budgets/measures.json "${inputs[@]}"
+          cp tmp/budgets/measures.json tmp/memory-footprint/budget-measures.json
+      - if: always() && steps.measures.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: budgets
+          path: |
+            tmp/budgets/measures.json
+            tmp/memory-footprint/budget-measures.json
+          retention-days: 14
+          if-no-files-found: ignore
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

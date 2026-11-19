@@ -2,6 +2,8 @@
 // baselines are measurements, including for zones that still report only.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { capFor } from '../budgets/files.mjs';
+import { judgeReads } from './ledgerVerdict.mjs';
 import { zoneOverRuns } from './phoneModel.mjs';
 
 const require = createRequire(import.meta.url);
@@ -30,25 +32,6 @@ export function parseArmedMemory(value) {
 
 export function armedMemory() {
   return parseArmedMemory(JSON.parse(readFileSync(require.resolve(LIST), 'utf8')));
-}
-
-/** The list arms zones and provides their first readings. A committed
- * native recording can only lower those readings.
- * @param {ReadonlyMap<string, {playingBytes:number,loadingBytes:number}>} armed
- * @param {Record<string, any> | undefined} recorded
- * @param {string} zone
- */
-export function footprintBaseline(armed, recorded, zone) {
-  const initial = armed.get(zone);
-  if (!initial || recorded === undefined || !Object.hasOwn(recorded, zone)) return initial;
-  const reading = recorded[zone];
-  if (!bytes(reading?.playingBytes) || !bytes(reading?.loadingBytes)) {
-    throw new Error(`Invalid committed native footprint for ${zone}`);
-  }
-  return {
-    playingBytes: Math.min(initial.playingBytes, reading.playingBytes),
-    loadingBytes: Math.min(initial.loadingBytes, reading.loadingBytes),
-  };
 }
 
 /** A pinned zone outside the online grid has its supported standalone
@@ -95,10 +78,33 @@ export function phoneFootprint(zone, runs, model, boot) {
   return { playing: Math.ceil(result.playing.upper), loading: Math.ceil(result.loading.upper) };
 }
 
-/** @param {{playing:number,loading:number}} reading @param {{playingBytes:number,loadingBytes:number}} lines
- */
+/** BUDGET-CAPS BC11 (J445): the two phone lines from budgets/caps.json. Playing is a target (the may-crash card with
+ * Play anyway, never a refusal); loading is the one memory refusal.
+ * @param {import('../budgets/files.mjs').BudgetCaps} caps @returns {{playingBytes:number,loadingBytes:number}} */
+export function footprintLines(caps) {
+  const playingBytes = capFor(caps, 'memory/playing/_')?.target, loadingBytes = capFor(caps, 'memory/loading/_')?.hard;
+  if (!bytes(playingBytes) || !bytes(loadingBytes)) throw new Error('budgets/caps.json names no playing target or loading cap');
+  return { playingBytes, loadingBytes };
+}
+
+/** J445: refuse a reading past the loading line; a reading past the playing target returns a report line, else null.
+ * @param {{playing:number,loading:number}} reading @param {{playingBytes:number,loadingBytes:number}} lines @returns {string | null} */
 export function comparePhoneFootprint({ playing, loading }, lines) {
-  if (playing > lines.playingBytes || loading > lines.loadingBytes) {
-    throw new Error(`EM11 upper playing ${playing} B (line ${lines.playingBytes} B), loading ${loading} B (line ${lines.loadingBytes} B)`);
-  }
+  if (loading > lines.loadingBytes) throw new Error(`EM11 upper loading ${loading} B (line ${lines.loadingBytes} B), playing ${playing} B`);
+  return playing > lines.playingBytes
+    ? `EM11 upper playing ${playing} B, past the ${lines.playingBytes} B playing target (J445: the may-crash card with Play anyway, never a refusal)`
+    : null;
+}
+
+/** BUDGET-CAPS BC11 (J445): a zone's EM11 footprint through the verdict, from one read or three. The keys are
+ * memory/playing/<zone> (a target, no hard cap) and memory/loading/<zone> (the 1.5 GB hard cap); the baseline is the zone's
+ * own reading on its pinned revision, so a new revision moves its line and only an engine regression on the same one is
+ * a fix row.
+ * @param {{ zone: string, reads: readonly {playing:number,loading:number}[], contentKey: string,
+ *   budgets: Parameters<typeof judgeReads>[0] }} input */
+export function judgeFootprint({ zone, reads, contentKey, budgets }) {
+  return [
+    judgeReads(budgets, `memory/playing/${zone}`, reads.map(read => read.playing), contentKey),
+    judgeReads(budgets, `memory/loading/${zone}`, reads.map(read => read.loading), contentKey),
+  ];
 }

@@ -1,8 +1,9 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Check workflow wiring without starting CI.
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
-import { comparePhoneFootprint, footprintBaseline, footprintBootFor, guardZone, ledgerZones, parseArmedMemory, phoneFootprint } from '../scripts/memory/armed.mjs';
-import { checkMemory, ratchetMargin } from '../scripts/memory/gate.mjs';
+import { comparePhoneFootprint, footprintBootFor, footprintLines, guardZone, judgeFootprint, ledgerZones, parseArmedMemory, phoneFootprint } from '../scripts/memory/armed.mjs';
+import { readCaps } from '../scripts/budgets/files.mjs';
+import { checkReads, ledgerFailure } from '../scripts/memory/ledgerVerdict.mjs';
 import { loadPhoneModel } from '../scripts/memory/phoneModel.mjs';
 import { compareLedger, ledgerBudget } from '../scripts/memory/ratchet.mjs';
 
@@ -36,21 +37,21 @@ test('an armed pin outside the world uses its supported standalone boot', () => 
   expect(footprintBootFor('pine-hollow', armed, placed)).toBe('standalone');
 });
 
-test('the same subsystem breach fails only an armed zone', async () => {
-  const reading = ledgerBudget([{ step: 'control', ledger: { ram: { 'array-buffer': 1000 } } }]);
-  const regression = ledgerBudget([{ step: 'control', ledger: { ram: { 'array-buffer': 1021 } } }]);
+test('the same ledger regression fails only an armed zone', async () => {
+  const reading = ledgerBudget([{ step: 'control', ledger: { ram: { 'array-buffer': 100_000_000 } } }]);
+  const regression = ledgerBudget([{ step: 'control', ledger: { ram: { 'array-buffer': 120_000_000 } } }]);
   const compare = (): Promise<void> => {
     compareLedger(reading, [regression], 'driftwood-isle');
     return Promise.resolve();
   };
   const report = vi.fn<(line: string) => void>();
   await expect(guardZone('pine-hollow', policy.zones, compare, report)).resolves.toBeUndefined();
-  expect(report).toHaveBeenCalledWith(expect.stringContaining('control loading: 1021 B > 1020 B'));
+  expect(report).toHaveBeenCalledWith(expect.stringContaining('control total: 120000000 B > 110000000 B'));
   await expect(guardZone('driftwood-isle', policy.zones, compare, report)).rejects.toThrow('Armed memory gate for driftwood-isle');
   await expect(guardZone('driftwood-isle', policy.zones, () => Promise.reject(new Error('no reading')), report)).rejects.toThrow('no reading');
 });
 
-test('an armed zone must finish a comparable native boot and stay within both lines', async () => {
+test('J445: past the 1.0 GB playing target reports, past the 1.5 GB loading line refuses', async () => {
   const model = loadPhoneModel();
   const good = { host: 'webkit', boot: 'online', instrument: model.instrument, ready: true, refused: null,
     settled: { webcontent: 500_000_000, gpu: 200_000_000 },
@@ -59,89 +60,56 @@ test('an armed zone must finish a comparable native boot and stay within both li
   expect(() => phoneFootprint('driftwood-isle', [{ ...good, boot: 'standalone' }], model, 'online')).toThrow('missing comparable');
   expect(() => phoneFootprint('driftwood-isle', [{ ...good, ready: false }], model, 'online')).toThrow('missing comparable');
   expect(() => phoneFootprint('driftwood-isle', [{ ...good, instrument: 'full' }], model, 'online')).toThrow('missing comparable');
+  // the lines come from budgets/caps.json: memory/playing/* is J445's target, memory/loading/* the one refusal
+  expect(footprintLines(readCaps())).toEqual(lines);
+  expect(comparePhoneFootprint({ playing: lines.playingBytes, loading: 1 }, lines)).toBeNull();
+  expect(comparePhoneFootprint({ playing: lines.playingBytes + 1, loading: 1 }, lines)).toMatch(/past the 1000000000 B playing target \(J445/u);
   const report = vi.fn<(line: string) => void>();
-  for (const over of [{ playing: lines.playingBytes + 1, loading: 1 }, { playing: 1, loading: lines.loadingBytes + 1 }]) {
-    const compare = (): Promise<void> => {
-      comparePhoneFootprint(over, lines);
-      return Promise.resolve();
-    };
-    await expect(guardZone('nine-dragon-stack', policy.zones, compare, report)).resolves.toBeUndefined();
-    await expect(guardZone('driftwood-isle', policy.zones, compare, report)).rejects.toThrow('EM11 upper playing');
-  }
+  const loading = (): Promise<void> => {
+    comparePhoneFootprint({ playing: 1, loading: lines.loadingBytes + 1 }, lines);
+    return Promise.resolve();
+  };
+  await expect(guardZone('nine-dragon-stack', policy.zones, loading, report)).resolves.toBeUndefined();
+  await expect(guardZone('driftwood-isle', policy.zones, loading, report)).rejects.toThrow('EM11 upper loading');
 });
 
-test('J431 uses the larger of 2% and 5 MB over an armed reading', async () => {
-  const brasscap = 46_478_228;
-  const metrics = { 'peak.loading': { baseline: brasscap, previousMargin: Math.floor(brasscap * 0.02) } };
-  const remeasure = vi.fn(async () => [{ 'peak.loading': 52_000_000 }, { 'peak.loading': 51_800_000 }, { 'peak.loading': 47_000_000 }]);
-  const warn = vi.fn();
-  expect(ratchetMargin(brasscap)).toBe(5_000_000);
-  expect(ratchetMargin(900_000_000)).toBe(18_000_000);
-  await expect(checkMemory({ zone: 'brasscap-mesa', metrics, first: { 'peak.loading': 47_712_804 }, remeasure, warn }))
-    .resolves.toEqual({ 'peak.loading': brasscap });
-  expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'margin', metric: 'peak.loading', limit: 47_407_792 }));
-  expect(remeasure).not.toHaveBeenCalled();
-  await expect(checkMemory({ zone: 'brasscap-mesa', metrics, first: { 'peak.loading': 52_100_000 }, remeasure, warn }))
-    .rejects.toThrow('peak.loading (ratchet, median of 3): 51800000 B > 51478228 B');
-  expect(remeasure).toHaveBeenCalledExactlyOnceWith(3);
+// BUDGET-CAPS BC11 (J445): an armed zone's EM11 footprint goes through the verdict. Its baseline is the zone's own
+// reading on its pinned revision; a new revision moves the line (raised), the same one past +10% is a fix row.
+const budgets = (playing: number, loading: number, contentKey = 'far-reach@4') => ({ caps: readCaps(), baselines: { schema: 1, about: '', baselines: {
+  'memory/playing/far-reach': { value: playing, contentKey }, 'memory/loading/far-reach': { value: loading, contentKey } } } });
+const status = (rows: ReturnType<typeof judgeFootprint>) => Object.fromEntries(rows.map(row => [row.key, row.status]));
+
+test('J445: Sky Reach at 1,027 MB playing ships past the target; a new revision moves its own line', () => {
+  const armed = budgets(999_952_196, 1_415_754_105);
+  const sky = { playing: 1_027_117_876, loading: 1_370_876_896 };
+  const same = judgeFootprint({ zone: 'far-reach', reads: [sky], contentKey: 'far-reach@4', budgets: armed });
+  expect(status(same)).toEqual({ 'memory/playing/far-reach': 'ok', 'memory/loading/far-reach': 'ok' });
+  expect(same[0]).toMatchObject({ target: 1_000_000_000, value: sky.playing, reads: [sky.playing] });
+  expect(ledgerFailure(same)).toBeNull();
+  const next = judgeFootprint({ zone: 'far-reach', reads: [{ playing: 1_300_000_000, loading: 1_490_000_000 }], contentKey: 'far-reach@5', budgets: armed });
+  expect(status(next)).toEqual({ 'memory/playing/far-reach': 'raised', 'memory/loading/far-reach': 'raised' });
+  const over = judgeFootprint({ zone: 'far-reach', reads: [{ playing: 1_300_000_000, loading: 1_500_000_001 }], contentKey: 'far-reach@5', budgets: armed });
+  expect(status(over)['memory/loading/far-reach']).toBe('over-hard');
+  expect(ledgerFailure(over)).toMatch(/memory\/loading\/far-reach over-hard/u);
 });
 
-test('both absolute phone lines use three fresh boots when a first reading crosses', async () => {
-  const nearLine = { playing: 999_000_000, loading: 1_499_000_000 };
-  const over = { playing: lines.playingBytes + 10, loading: lines.loadingBytes + 20 };
-  const aboveLineBaseline = { playing: { absolute: lines.playingBytes, baseline: 1_023_500_000 },
-    loading: { absolute: lines.loadingBytes, baseline: 1_510_000_000 } };
-  const once = vi.fn(async () => [nearLine, over, nearLine]);
-  const warn = vi.fn();
-  await expect(checkMemory({ zone: 'driftwood-isle', metrics: aboveLineBaseline, first: over, remeasure: once, warn }))
-    .resolves.toEqual({ playing: 1_023_500_000, loading: 1_510_000_000 });
-  expect(once).toHaveBeenCalledExactlyOnceWith(3);
-  expect(warn).toHaveBeenCalledTimes(2);
-  expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'gate-flake', arm: 'absolute', metric: 'playing', median: nearLine.playing }));
-  expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'gate-flake', arm: 'absolute', metric: 'loading', median: nearLine.loading }));
-  const confirm = vi.fn(async () => [over, nearLine, over]);
-  await expect(checkMemory({ zone: 'driftwood-isle', metrics: aboveLineBaseline, first: over, remeasure: confirm, warn }))
-    .rejects.toThrow(/playing \(absolute, median of 3\)[^]*loading \(absolute, median of 3\)/u);
-  expect(confirm).toHaveBeenCalledExactlyOnceWith(3);
-});
-
-test('a ratchet advances only after three clean boots, to their median', async () => {
-  const metrics = { playing: { baseline: 100_000_000 } }, first = { playing: 70_000_000 };
-  const warn = vi.fn();
-  const remeasure = vi.fn(async () => [{ playing: 92_000_000 }, { playing: 97_000_000 }]);
-  const check = { zone: 'driftwood-isle', metrics, first, remeasure, warn };
-  expect(await checkMemory(check)).toEqual({ playing: 100_000_000 });
-  expect(remeasure).not.toHaveBeenCalled();
-  expect(await checkMemory({ ...check, record: true })).toEqual({ playing: 92_000_000 });
-  expect(remeasure).toHaveBeenCalledExactlyOnceWith(2);
-  const noisy = vi.fn(async (count: number) => count === 2
-    ? [{ playing: 106_000_000 }, { playing: 95_000_000 }]
-    : [{ playing: 91_000_000 }, { playing: 92_000_000 }, { playing: 93_000_000 }]);
-  expect(await checkMemory({ ...check, record: true, remeasure: noisy })).toEqual({ playing: 100_000_000 });
-  expect(noisy.mock.calls).toEqual([[2], [3]]);
-  expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'gate-flake', arm: 'ratchet', metric: 'playing', median: 92_000_000 }));
-});
-
-test('a native recording becomes the next ratchet without arming a zone or raising a reading', async () => {
-  const zone = 'driftwood-isle';
-  const armed = policy.readings.get(zone);
-  expect(footprintBaseline(policy.readings, undefined, zone)).toEqual(armed);
-  const first = { playing: 905_000_000, loading: 1_210_000_000 };
-  const remeasure = vi.fn(async () => [
-    { playing: 906_000_000, loading: 1_230_000_000 },
-    { playing: 907_000_000, loading: 1_220_000_000 },
-  ]);
-  const next = await checkMemory({ zone, first, remeasure, warn: vi.fn(), record: true, metrics: {
-    playing: { absolute: lines.playingBytes, baseline: arm.playingBytes },
-    loading: { absolute: lines.loadingBytes, baseline: arm.loadingBytes },
-  } });
-  expect(next).toEqual({ playing: 900_000_000, loading: 1_220_000_000 });
-  const { playing, loading } = next;
-  const saved = { [zone]: { playingBytes: playing, loadingBytes: loading } };
-  expect(footprintBaseline(policy.readings, saved, zone)).toEqual(saved[zone]);
-  expect(footprintBaseline(policy.readings, { [zone]: { ...saved[zone], playingBytes: 907_000_000 } }, zone)).toEqual(saved[zone]);
-  expect(footprintBaseline(policy.readings, { template: saved[zone] }, 'template')).toBeUndefined();
-  expect(() => footprintBaseline(policy.readings, { [zone]: { loadingBytes: 0 } }, zone)).toThrow('Invalid committed native footprint');
+test('an engine regression of 12% on the same revision is confirmed by three fresh reads, never on one', async () => {
+  const armed = budgets(900_000_000, 1_200_000_000), contentKey = 'far-reach@4';
+  const judge = (reads: readonly { playing: number, loading: number }[]) => judgeFootprint({ zone: 'far-reach', reads, contentKey, budgets: armed });
+  const spike = { playing: 1_008_000_000, loading: 1_210_000_000 }, calm = { playing: 905_000_000, loading: 1_205_000_000 };
+  const flake = vi.fn(async () => [calm, spike, calm]);
+  const once = await checkReads({ first: spike, remeasure: flake, judge });
+  expect(flake).toHaveBeenCalledExactlyOnceWith(3);
+  expect(ledgerFailure(once.rows)).toBeNull();
+  const leak = vi.fn(async () => [spike, calm, spike]);
+  const confirmed = await checkReads({ first: spike, remeasure: leak, judge });
+  expect(status(confirmed.rows)['memory/playing/far-reach']).toBe('regressed');
+  expect(ledgerFailure(confirmed.rows)).toMatch(/memory\/playing\/far-reach regressed \(median of 3\): 1008000000 B/u);
+  const quiet = vi.fn(async () => [calm, calm]);
+  expect((await checkReads({ first: calm, remeasure: quiet, judge })).reads).toEqual([calm]);
+  expect(quiet).not.toHaveBeenCalled();
+  expect((await checkReads({ first: calm, remeasure: quiet, judge, record: true })).reads).toEqual([calm, calm, calm]);
+  expect(quiet).toHaveBeenCalledExactlyOnceWith(2);
 });
 
 test('CI runs both armed measurement jobs without a job-level bypass, the native one in its own workflow', () => {
@@ -169,6 +137,10 @@ test('CI runs both armed measurement jobs without a job-level bypass, the native
   expect(ledger).not.toMatch(/\n {4}continue-on-error:/u);
   expect(ledger).toContain('node scripts/budgets/cli.mjs check tmp/budgets/measures.json');
   expect(native).not.toContain('continue-on-error');
+  // BC11: the native footprint, Nine's ledger and its walk leave their measures in a `budgets` artifact (record --run),
+  // and Nine's boot measures from ci's nine-ring1 load are judged in the budgets job.
+  expect(native).toContain('name: budgets');
+  expect(ledger).toContain('name: nine-ring1-load');
 });
 
 test('both native baselines require an online boot', () => {

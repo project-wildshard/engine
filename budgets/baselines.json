@@ -925,6 +925,36 @@
     "loading": 232231549,
     "margin": 0
    }
+  },
+  "footprint/_template/settled": {
+   "value": 350062176,
+   "contentKey": "template@10",
+   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+  },
+  "walk/nine-dragon-stack/rate": {
+   "value": 7298145,
+   "contentKey": "nine-dragon-stack@3",
+   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+  },
+  "nine/boot/retained-geometry": {
+   "value": 13309155,
+   "contentKey": "nine-dragon-stack@3",
+   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+  },
+  "nine/boot/live-heap": {
+   "value": 216970560,
+   "contentKey": "nine-dragon-stack@3",
+   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+  },
+  "nine/street/triangles95": {
+   "value": 904000,
+   "contentKey": "nine-dragon-stack@3",
+   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+  },
+  "nine/street/draws95": {
+   "value": 119,
+   "contentKey": "nine-dragon-stack@3",
+   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
   }
  }
 }

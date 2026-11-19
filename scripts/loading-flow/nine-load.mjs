@@ -4,6 +4,9 @@ import {devices} from "../browser-playwright.mjs";
 import {developerSettings,saveFixture,NAME_ASKED} from '../debug-settings.mjs';
 import {startStallProfile,finishStallProfile,bootTimelineEntries} from './stalls.mjs';
 import {bootMemoryMarks,bootMemoryVerdict,liveHeapBytes,retainedGeometryBytes} from './boot-memory-ratchet.mjs';
+import {readBaselines,readCaps} from '../budgets/files.mjs';
+import {reportLedger,zoneContentKey} from '../memory/ledgerVerdict.mjs';
+import {pinnedContentKeys} from '../shard-size-gate.mjs';
 
 // Hosted green total loads: 98.239-166.456 s (six runs). Reserve one
 // observed spread: ceil(166456 + (166456 - 98239)) = 235 s.
@@ -52,9 +55,12 @@ export async function assertNineLoad(browser,base,out) {
       try {
         const marks=await page.evaluate(bootMemoryMarks);
         const retained=await page.evaluate(retainedGeometryBytes);
-        memory=bootMemoryVerdict(marks,retained,await liveHeapBytes(heap));
+        const judging={contentKey:zoneContentKey('nine-dragon-stack',pinnedContentKeys()),budgets:{caps:readCaps(),baselines:readBaselines()}};
+        memory=bootMemoryVerdict(marks,retained,await liveHeapBytes(heap),judging);
       } finally {await heap.detach().catch(()=>undefined);}
       faults.push(...memory.faults);
+      // BUDGET-CAPS BC11: the two boot budgets in one table and budget-measures.json; the budgets workflow judges them
+      reportLedger({rows:memory.rows,mode:'nine-boot',directory:out,commit:process.env.GITHUB_SHA,summaryFile:process.env.GITHUB_STEP_SUMMARY});
       const receipt={...state,elapsedMs:Date.now()-started,stalls:read.stalls,memory,faults};
       writeFileSync(join(out,'load.json'),`${JSON.stringify(receipt,null,2)}\n`);
       console.log(JSON.stringify(receipt));
