@@ -103,6 +103,7 @@ import { registerInstalled } from '../shardfile/installedSides';
 import { installDeclaredRiding, type DeclaredRiding } from '../shardfile/declaredRiding';
 import { installDeclaredHostPortalRide } from '../shardfile/declaredPortalRide';
 import { installDeclaredSpawnWhen } from '../shardfile/declaredSpawnWhen';
+import { installDeclaredHolds } from '../shardfile/declaredHolds';
 import { installEncounterAdds } from '../shardfile/encounterAdds';
 import { dataScriptBrains } from '../shardfile/dataScriptBrains';
 import { countedShard, countSlots } from '../shardfile/declaredSpawnCount';
@@ -738,6 +739,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
         if (typeof state !== 'string') throw new Error('Invalid director row continuation'); director.restore(state);
       } });
     }
+    installDeclaredHolds(host, creatures.spawns); // OF19b: a `hold` row's memory field, before the brains read it
     installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataBrains, resolveCreatureLayers(shard.rows, creatures.brains));
     installDeclaredSpawnWhen(host, creatures.spawns, ports.restoring === true, countSlots(shard)); // OF29a: a `when` row stands only while it holds
     installDataRespawns(host, creatures.spawns);

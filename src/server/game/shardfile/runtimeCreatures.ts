@@ -21,6 +21,7 @@ import { dataGroundBrains } from './dataGroundBrains';
 import { installDataRespawns } from './dataRespawn';
 import { prepareDeclaredGroupBrains } from './groupRuntime';
 import { installDeclaredSpawnWhen } from './declaredSpawnWhen';
+import { installDeclaredHolds } from './declaredHolds';
 import { installDeclaredAttackable } from './declaredAttackable';
 import { installDeclaredPatrols } from './declaredPatrols';
 import { installDeclaredRanks, rankCreatureSpawns } from './declaredRanks';
@@ -104,6 +105,7 @@ export function installRuntimeCreatures(host: SimHost, shard: Shardfile, assets:
   const brains = { ...data.brains, ...dataGroundBrains(host, shard.rows, creatures.spawns), ...dataPerchBrains(host, shard, assets) };
   const groupIds = new Set(creatures.groups.map(group => group.id));
   const groups = prepareDeclaredGroupBrains(host, creatures.groups, creatures.spawns, data.groups, creatures.brains.map(brain => brain.id), []);
+  installDeclaredHolds(host, creatures.spawns);
   installDeclaredBrains(host, creatures.spawns.filter(spawn => spawn.brain === null || !groupIds.has(spawn.brain)),
     creatures.brains.filter(brain => brain.kind !== 'script'), brains, resolveCreatureLayers(shard.rows, creatures.brains));
   installDeclaredSpawnWhen(host, creatures.spawns, ports.restoring, countSlots(shard));
