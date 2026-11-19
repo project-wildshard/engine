@@ -16,3 +16,6 @@ because a workflow_run's head_sha is not the commit it measured; `budgets.yml` n
 
 The app-code baselines (js/*) were taken from a stale local build at 43c891e6; they are now the CI measure of main
 f31a7d3f58 (budgets run 44475200178), session raw 4,401,289 B.
+
+The first memory-footprint run on the verdict (44475200066, main f31a7d3f58) passed and its 55 measures were
+recorded with `record --run`: every armed zone now has its own playing and loading baseline.

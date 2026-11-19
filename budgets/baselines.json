@@ -901,41 +901,44 @@
    }
   },
   "webkit-ledger/nine-dragon-stack/control": {
-   "value": 400756227,
+   "value": 189888425,
    "contentKey": "nine-dragon-stack@3",
-   "commit": "dfb1f92fd",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58",
    "detail": {
     "browser": 2810784,
     "engine": 0,
     "workers": 2359296,
-    "geometry": 115621098,
-    "textures": 46879100,
+    "geometry": 85609700,
+    "textures": 44599836,
     "scene": 0,
-    "audio": 854400,
-    "loading": 232231549,
+    "audio": 384000,
+    "loading": 54124809,
     "margin": 0
    }
   },
   "webkit-ledger/nine-dragon-stack/peak": {
-   "value": 400756227,
+   "value": 252349089,
    "contentKey": "nine-dragon-stack@3",
-   "commit": "dfb1f92fd",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58",
    "detail": {
     "browser": 2810784,
     "engine": 0,
     "workers": 2359296,
-    "geometry": 115621098,
-    "textures": 46879100,
+    "geometry": 85609700,
+    "textures": 44599836,
     "scene": 0,
-    "audio": 854400,
-    "loading": 232231549,
+    "audio": 384000,
+    "loading": 116585473,
     "margin": 0
    }
   },
   "footprint/_template/settled": {
-   "value": 350062176,
+   "value": 354062400,
    "contentKey": "template@10",
-   "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
   },
   "walk/nine-dragon-stack/rate": {
    "value": 7298145,
@@ -962,6 +965,318 @@
    "value": 119,
    "contentKey": "nine-dragon-stack@3",
    "why": "BC11 move: the Template anchor (footprint-ratchet.json), the walk rate (walk-ratchet.json, mini 2d7dce9e), Nine's hosted boot (ci 44466052164 at a0296374991) and NB6's street (0b9fe2d8)"
+  },
+  "memory/playing/brasscap-mesa": {
+   "value": 437976392,
+   "contentKey": "brasscap-mesa@7",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/brasscap-mesa": {
+   "value": 535056921,
+   "contentKey": "brasscap-mesa@7",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/driftwood-isle": {
+   "value": 740019183,
+   "contentKey": "driftwood-isle@5",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/driftwood-isle": {
+   "value": 865478453,
+   "contentKey": "driftwood-isle@5",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/far-reach": {
+   "value": 568245477,
+   "contentKey": "far-reach@4",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/far-reach": {
+   "value": 788639786,
+   "contentKey": "far-reach@4",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/ink-cel-valley": {
+   "value": 351753586,
+   "contentKey": "ink-cel-valley@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/ink-cel-valley": {
+   "value": 462748470,
+   "contentKey": "ink-cel-valley@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/nalati-grasslands": {
+   "value": 807869579,
+   "contentKey": "nalati-grasslands@2",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/nalati-grasslands": {
+   "value": 1072828350,
+   "contentKey": "nalati-grasslands@2",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/nine-dragon-stack": {
+   "value": 756829604,
+   "contentKey": "nine-dragon-stack@3",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/nine-dragon-stack": {
+   "value": 922244199,
+   "contentKey": "nine-dragon-stack@3",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-alien-plain": {
+   "value": 337487999,
+   "contentKey": "open-plot-alien-plain@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-alien-plain": {
+   "value": 442718131,
+   "contentKey": "open-plot-alien-plain@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-clockwork-canyon": {
+   "value": 378268662,
+   "contentKey": "open-plot-clockwork-canyon@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-clockwork-canyon": {
+   "value": 487301509,
+   "contentKey": "open-plot-clockwork-canyon@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-coral-drift": {
+   "value": 380291298,
+   "contentKey": "open-plot-coral-drift@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-coral-drift": {
+   "value": 479749042,
+   "contentKey": "open-plot-coral-drift@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-desert-ruin": {
+   "value": 511808588,
+   "contentKey": "open-plot-desert-ruin@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-desert-ruin": {
+   "value": 630911818,
+   "contentKey": "open-plot-desert-ruin@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-ember-forge": {
+   "value": 367023847,
+   "contentKey": "open-plot-ember-forge@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-ember-forge": {
+   "value": 460867700,
+   "contentKey": "open-plot-ember-forge@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-fossil-badlands": {
+   "value": 355868421,
+   "contentKey": "open-plot-fossil-badlands@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-fossil-badlands": {
+   "value": 451225851,
+   "contentKey": "open-plot-fossil-badlands@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-frostline-peaks": {
+   "value": 365788407,
+   "contentKey": "open-plot-frostline-peaks@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-frostline-peaks": {
+   "value": 463211404,
+   "contentKey": "open-plot-frostline-peaks@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-jungle-ziggurat": {
+   "value": 367109367,
+   "contentKey": "open-plot-jungle-ziggurat@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-jungle-ziggurat": {
+   "value": 481017854,
+   "contentKey": "open-plot-jungle-ziggurat@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-lantern-bayou": {
+   "value": 373782932,
+   "contentKey": "open-plot-lantern-bayou@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-lantern-bayou": {
+   "value": 489824090,
+   "contentKey": "open-plot-lantern-bayou@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-mosslight-ruins": {
+   "value": 393680855,
+   "contentKey": "open-plot-mosslight-ruins@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-mosslight-ruins": {
+   "value": 493003407,
+   "contentKey": "open-plot-mosslight-ruins@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-night-market": {
+   "value": 392074674,
+   "contentKey": "open-plot-night-market@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-night-market": {
+   "value": 502003388,
+   "contentKey": "open-plot-night-market@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-patchwork-fairground": {
+   "value": 344652328,
+   "contentKey": "open-plot-patchwork-fairground@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-patchwork-fairground": {
+   "value": 460136626,
+   "contentKey": "open-plot-patchwork-fairground@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-saltwind-lighthouse": {
+   "value": 336703863,
+   "contentKey": "open-plot-saltwind-lighthouse@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-saltwind-lighthouse": {
+   "value": 453987070,
+   "contentKey": "open-plot-saltwind-lighthouse@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-sky-harbor": {
+   "value": 356769973,
+   "contentKey": "open-plot-sky-harbor@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-sky-harbor": {
+   "value": 469061977,
+   "contentKey": "open-plot-sky-harbor@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-sky-race": {
+   "value": 355277470,
+   "contentKey": "open-plot-sky-race@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-sky-race": {
+   "value": 454293651,
+   "contentKey": "open-plot-sky-race@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-starfall-observatory": {
+   "value": 358977351,
+   "contentKey": "open-plot-starfall-observatory@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-starfall-observatory": {
+   "value": 492973439,
+   "contentKey": "open-plot-starfall-observatory@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/open-plot-thin-ice": {
+   "value": 456885331,
+   "contentKey": "open-plot-thin-ice@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/open-plot-thin-ice": {
+   "value": 557266628,
+   "contentKey": "open-plot-thin-ice@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/pastel-plain": {
+   "value": 352543950,
+   "contentKey": "pastel-plain@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/pastel-plain": {
+   "value": 464838027,
+   "contentKey": "pastel-plain@1",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/pine-hollow": {
+   "value": 853139119,
+   "contentKey": "pine-hollow@5",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/pine-hollow": {
+   "value": 1160033983,
+   "contentKey": "pine-hollow@5",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/playing/sunscar-dunes": {
+   "value": 522004691,
+   "contentKey": "sunscar-dunes@2",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+  },
+  "memory/loading/sunscar-dunes": {
+   "value": 666396996,
+   "contentKey": "sunscar-dunes@2",
+   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
+   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
   }
  }
 }
