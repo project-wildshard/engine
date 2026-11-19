@@ -51,9 +51,9 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
  - **At most one full local run at a time**, for a release or to name a red: `pnpm test:fast`.
  - **The Mac mini lands the same way (J443, meta FLOW-SIMPLE FS23):** `land.mjs` defaults to push mode on every
    machine; `--local` (the full local gate) is opt-in until the mini's last full-gate land. `--hosted` is gone (FS5).
- - **`test/pins/` changes (J375)** reach main only through `land.mjs` from a plan worktree (the pre-push checks
-   `.githooks/pin-provenance.mjs`), never by `main-push.mjs`. Escape hatch when truly stuck: `ALLOW_PIN_PUSH=1`, said in
-   your receipt.
+ - **`test/pins/` changes (J375)** reach main through `land.mjs` from a plan worktree or `main-push.mjs` from
+   `engine-quickfix` (FS18), both through the push gate; the pre-push (`.githooks/pin-provenance.mjs`) refuses a hand
+   `git push`. Escape hatch when truly stuck: `ALLOW_PIN_PUSH=1`, said in your receipt.
  - **Local cross-repo proof on the mini (LOCAL-LINK, M1):** from repo-kit,
    `WS_LANE_NAME=<lane> node kit/cli/main.ts local init`, then `local link
    --consumer sharddev --production-live v0.1.2 --reason "<purpose>"` with

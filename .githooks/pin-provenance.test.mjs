@@ -92,6 +92,23 @@ describe('pin provenance (J375)', () => {
     assert.equal(checkPinPush({ cwd: w.lane, refs: line(tip, old), ciState: never, env: { WS_LAND_MAIN_PUSH: `push:${tip}` } }).ok, false);
     assert.equal(checkPinPush({ cwd: linked, refs: line(tip, old), ciState: never, env: { WS_LAND_MAIN_PUSH: `push:${old}` } }).ok, false);
   });
+  test('FS18: main-push from a clone on main passes its own HEAD; a hand push, a stale marker or a worktree does not', () => {
+    const w = world();
+    const old = w.git(w.lane, 'rev-parse', 'origin/main');
+    const tip = w.commit(w.lane, { 'test/pins/rings.json': '{"r":4}\n' }, 'pin re-record');
+    const never = () => { throw new Error('main-push must not ask Actions'); };
+    const verdict = checkPinPush({ cwd: w.lane, refs: line(tip, old), ciState: never, env: { WS_LAND_MAIN_PUSH: `main-push:${tip}` } });
+    assert.equal(verdict.ok, true);
+    assert.match(verdict.ok ? verdict.note ?? '' : '', /main-push/u);
+    // A hand `git push origin main` sets no marker: no plan branch carries these pins, so it is refused.
+    assert.equal(checkPinPush({ cwd: w.lane, refs: line(tip, old), ciState: never, env: {} }).ok, false);
+    assert.equal(checkPinPush({ cwd: w.lane, refs: line(tip, old), ciState: never, env: { WS_LAND_MAIN_PUSH: `main-push:${old}` } }).ok, false);
+    // Not on main (a plan worktree claiming main-push's marker) is refused: plans land with land.mjs.
+    const linked = join(w.lane, '.worktrees/mp-pins');
+    w.git(w.lane, 'worktree', 'add', '-b', 'plan/mp-pins', linked, old);
+    const planTip = w.commit(linked, { 'test/pins/rings.json': '{"r":5}\n' }, 'pin change');
+    assert.equal(checkPinPush({ cwd: linked, refs: line(planTip, old), ciState: never, env: { WS_LAND_MAIN_PUSH: `main-push:${planTip}` } }).ok, false);
+  });
   test('exact land: the green plan SHA itself passes', () => {
     const w = world();
     const old = w.git(w.lane, 'rev-parse', 'origin/main');

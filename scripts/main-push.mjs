@@ -240,7 +240,8 @@ export function pushMain(cwd, remote = 'origin') {
   const fd = openSync(log, 'w');
   let pushed;
   try {
-    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+    // FS18: the pre-push's pin provenance passes a test/pins change that main-push itself sends from main.
+    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_LAND_MAIN_PUSH: `main-push:${sent}` };
     pushed = spawnSync('git', ['push', remote, `${sent}:refs/heads/main`], { cwd, env, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', fd, fd] });
   } finally {
     closeSync(fd);

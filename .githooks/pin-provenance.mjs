@@ -76,6 +76,13 @@ export function checkPinPush({ cwd, refs, ciState, env = process.env }) {
       && gitDir !== common && git(cwd, ['merge-base', '--is-ancestor', old, pushed]).ok) {
       return { ok: true, note: marker === 'push' ? `plan HEAD ${pushed.slice(0, 10)} through land's push gate; main ci judges it (J422)` : `local plan HEAD ${pushed.slice(0, 10)}; full local pre-push gate follows (J400)` };
     }
+    // FS18 (meta FLOW-SIMPLE, J443): a no-plan fix re-recording a pin goes through main-push.mjs from a clone on main
+    // (engine-quickfix), the same push gate as land (J422 Decision 2). main-push names its own HEAD; a hand push has
+    // no marker and still needs a plan branch.
+    if (localOnly && env.WS_LAND_MAIN_PUSH === `main-push:${pushed}` && head === pushed && branch === 'refs/heads/main'
+      && gitDir === common && git(cwd, ['merge-base', '--is-ancestor', old, pushed]).ok) {
+      return { ok: true, note: `main HEAD ${pushed.slice(0, 10)} through main-push's push gate; main ci judges it (FS18, J422)` };
+    }
     if (env.ALLOW_PIN_PUSH === '1') return { ok: true, note: `ALLOW_PIN_PUSH=1: ${changed.length} test/pins file(s) pushed to main without a green plan branch (J375); say so in your receipt` };
     const tips = matchingPlanTips(cwd, old, pushed);
     const states = [];
@@ -110,7 +117,8 @@ function refuse(changed, why) {
       ...why,
       'J375: pin changes land like code, through a plan branch and its green CI. Do it this way:',
       '  node scripts/worktree.mjs new <slug>   (from the canonical checkout), then commit or cherry-pick the pin change there,',
-      '  then from the worktree: WS_LANE_NAME=<lane> node scripts/land.mjs   (it pushes the branch, waits for ci, lands).',
+      '  then from the worktree: WS_LANE_NAME=<lane> node scripts/land.mjs   (push gate, then main; J422).',
+      '  A no-plan fix: commit on main in engine-quickfix and WS_LANE_NAME=<lane> node scripts/main-push.mjs (FS18).',
       'Escape hatch, only when truly stuck (main red and the fix cannot wait for CI): ALLOW_PIN_PUSH=1 git push origin main,',
       'and say so in your receipt.',
     ],
