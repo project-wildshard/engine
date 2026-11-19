@@ -74,7 +74,7 @@ test('the subsystems stay in the measures for the table, the totals are what is 
   const measures = ledgerMeasures(rows);
   expect(measures['ledger/brasscap-mesa/peak']?.reads).toHaveLength(3);
   expect(measures['ledger/brasscap-mesa/peak']?.detail?.['loading']).toBe(ledger.zones[zone]?.peak['loading']);
-  expect(zoneContentKey('_template', { template: 'template@10' })).toBe('template@10');
+  expect(zoneContentKey('_proto', { proto: 'proto@10' })).toBe('proto@10');
   expect(zoneContentKey('nowhere', {})).toBe('engine');
 });
 

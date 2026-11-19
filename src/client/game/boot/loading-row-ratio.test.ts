@@ -32,7 +32,7 @@ describe('START: the first document\'s painter', () => {
   async function startRow(steps: number, rows: { url: string; decodedBodySize: number; responseStatus?: number | null }[]): Promise<{ fact: string; pct: string; bar: string }> {
     const html = readFileSync('index.html', 'utf8').replace('<script data-loading-clock>',
       `<script type="application/json" id="boot-module-files">${JSON.stringify({ common: codeFiles })}</script><script data-loading-clock>`);
-    const window = new Window({ url: 'https://launch.test/?chunk=_template&tier=phone', width: 402, height: 874, settings: {
+    const window = new Window({ url: 'https://launch.test/?chunk=brasscap-mesa&tier=phone', width: 402, height: 874, settings: {
       enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true,
       enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true } });
     windows.push(window);

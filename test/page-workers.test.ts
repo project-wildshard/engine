@@ -148,12 +148,12 @@ test('a spawn part keeps the assets\' headers and gains Content-Encoding: br; an
 const ROWS = [
   { slug: 'driftwood-isle', name: 'Driftwood Isle', biome: 'Castaway island & reef', card: { thumb: '/shardfiles/driftwood-isle/t.jpg', portrait: '/shardfiles/driftwood-isle/p.jpg', landscape: '/shardfiles/driftwood-isle/blobs/image/land.jpg' } },
   { slug: 'sky-reach', name: 'Far "Reach"', biome: '', card: { thumb: 'x', portrait: 'x', landscape: 'https://packs.wildshard.io/shardfiles/sky-reach/l.jpg' } },
-  { slug: '_template', name: 'Template shard', biome: 'Template.', card: { thumb: 'x', portrait: 'x', landscape: '/shardfiles/_template/l.jpg' } },
+  { slug: '_proto', name: 'Prototype shard', biome: 'Prototype.', card: { thumb: 'x', portrait: 'x', landscape: '/shardfiles/_proto/l.jpg' } },
   { slug: 'brasscap-mesa', name: 'Brasscap Mesa', biome: 'Mesa.', card: { thumb: 'x', portrait: 'x', landscape: '/shardfiles/brasscap-mesa/l.jpg' } },
 ]
 // late-shard: a catalogue head with a placement and no title row (the client's withCatalogueHeads card); auto-placed: SA30's grid
 // cell with no placement, which the client reads as unlisted, so a 404 here too
-const CATALOGUE = { placements: [{ slug: '_template' }, { slug: 'late-shard' }], grid: { cells: [{ slug: 'auto-placed' }] }, shards: [{ slug: 'late-shard', name: 'Late Shard' }, { slug: 'auto-placed', name: 'Auto Placed' }, { slug: 'off-grid', name: 'Off Grid' }] }
+const CATALOGUE = { placements: [{ slug: '_proto' }, { slug: 'late-shard' }], grid: { cells: [{ slug: 'auto-placed' }] }, shards: [{ slug: 'late-shard', name: 'Late Shard' }, { slug: 'auto-placed', name: 'Auto Placed' }, { slug: 'off-grid', name: 'Off Grid' }] }
 const json = (id: string, value: unknown): string => `<script type="application/json" id="${id}">${JSON.stringify(value).replaceAll('<', String.raw`\u003c`)}</script>`
 const HTML = `<!doctype html><html><head><meta charset="UTF-8" /><title>Project Wildshard</title><link rel="apple-touch-icon" href="/icons/staging/apple-touch-icon.png">${json('ws-catalogue', CATALOGUE)}${json('ws-title-rows', ROWS)}</head><body></body></html>`
 const site = (seen: string[], html = HTML): Env['ASSETS'] => ({ fetch: request => {
@@ -191,8 +191,8 @@ test('og:image is absolute: an R2 card stays as written, and a content base move
   const based = HTML.replace('</head>', `${json('boot-module-files', { contentBase: 'https://packs.wildshard.io/content/abc/' })}</head>`)
   const drift = await (await worker.fetch(new Request('https://play.wildshard.io/slug/driftwood-isle'), { ASSETS: site([], based) })).text()
   expect(og(drift)['image']).toBe('https://packs.wildshard.io/content/abc/shardfiles/driftwood-isle/blobs/image/land.jpg')
-  const template = await (await worker.fetch(new Request('https://play.wildshard.io/slug/_template'), { ASSETS: site([]) })).text()
-  expect(og(template)).toMatchObject({ title: 'Template shard', description: 'Template. Play it in your browser on Wildshard.' })
+  const proto = await (await worker.fetch(new Request('https://play.wildshard.io/slug/_proto'), { ASSETS: site([]) })).text()
+  expect(og(proto)).toMatchObject({ title: 'Prototype shard', description: 'Prototype. Play it in your browser on Wildshard.' })
 })
 
 test('a shard the catalogue added after the build unfurls with its catalogue name and the site icon', async () => {
@@ -212,8 +212,8 @@ test('HEAD and a conditional request see the same answer as GET', async () => {
 })
 
 test('an unknown slug answers 404 with no-store from the Worker; other paths are left to the assets', async () => {
-  // off-grid: a catalogue head nothing holds; auto-placed: SA30's grid cell with no placement; template: `_template`'s bare slug
-  for (const path of ['/slug/no-such-shard', '/slug/off-grid', '/slug/auto-placed', '/slug/template', '/slug/Driftwood-Isle']) {
+  // off-grid: a catalogue head nothing holds; auto-placed: SA30's grid cell with no placement; proto: `_proto`'s bare slug
+  for (const path of ['/slug/no-such-shard', '/slug/off-grid', '/slug/auto-placed', '/slug/proto', '/slug/Driftwood-Isle']) {
     const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), { ASSETS: site([]) })
     expect([response.status, response.headers.get('cache-control')], path).toEqual([404, 'no-store'])
     expect(await response.text()).not.toContain('<html')

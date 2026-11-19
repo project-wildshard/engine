@@ -43,7 +43,7 @@ test('a deploy carries the kept builds unchanged, but never one past the prune, 
 test('PZ5: a carried build carries its code only, never assets/spawn/, a grid file or other content', async () => {
   mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-code-'));
   // What staging's and play's live deploy-chunks.json name today, one of each kind, beside the build's code.
-  const content = ['assets/spawn/_template-client-desktop-54ce6c8d049d9b8c.json', 'assets/spawn/server-aaaaaaaa.json',
+  const content = ['assets/spawn/brasscap-mesa-client-desktop-54ce6c8d049d9b8c.json', 'assets/spawn/server-aaaaaaaa.json',
     'assets/grid-strip-mesh-46c94ae4.bin', 'assets/boot-far-reach-ea97d653.json', 'assets/world-map-b44497c7518e2f3f.webp',
     'assets/baked/pine-hollow/far-impostor.png', 'assets/title/driftwood-isle-portrait-e9d5c9aedd5c5920.jpg'];
   const code = ['b/old/main-aaaaaaaa.js', 'b/old/base-aaaaaaaa.css', 'b/old/standalone/basis-aaaaaaaa.wasm', 'b/c/shared-aaaaaaaa.js', 'b/old/flags.json'];

@@ -38,11 +38,11 @@ test('the title reads ahead only for a real last pick, never a guess', () => {
   const row = (slug: TitleManifest['slug'], extra: Partial<TitleManifest> = {}): TitleManifest => ({slug, name: slug, biome: '', status: 'live',
     card: {thumb: '', portrait: '', landscape: ''}, shardfile: `/shardfiles/${slug}/shard.json`, ...extra});
   const { shardfile: _none, ...unbuilt } = row('blender-template');
-  const rows = [row('driftwood-isle'), row('nalati-grasslands'), row('_template', {status: 'hidden'}), unbuilt];
+  const rows = [row('driftwood-isle'), row('nalati-grasslands'), row('brasscap-mesa', {status: 'hidden'}), unbuilt];
   expect(titlePrefetchTarget('nalati-grasslands', rows, false)).toBe('nalati-grasslands');
   expect(titlePrefetchTarget(null, rows, false)).toBeUndefined(); // S2: a first visit spends nothing on a shard nobody chose
   expect(titlePrefetchTarget('unknown', rows, true)).toBeUndefined();
   expect(titlePrefetchTarget('blender-template', rows, true)).toBeUndefined();
-  expect(titlePrefetchTarget('_template', rows, false)).toBeUndefined();
-  expect(titlePrefetchTarget('_template', rows, true)).toBe('_template');
+  expect(titlePrefetchTarget('brasscap-mesa', rows, false)).toBeUndefined();
+  expect(titlePrefetchTarget('brasscap-mesa', rows, true)).toBe('brasscap-mesa');
 });

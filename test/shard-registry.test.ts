@@ -8,7 +8,7 @@ await installCatalogueFixture();
 test('prefetch lookups retain live manifests across replacement and reinstallation', () => {
   const previous = shards(), original = previous[0];
   if (original === undefined) throw new Error('Missing installed manifest');
-  const first = { ...original, slug: '_template' as const, shardfile: '/first.json' };
+  const first = { ...original, slug: 'brasscap-mesa' as const, shardfile: '/first.json' };
   const second = { ...first, shardfile: '/second.json' }, firstList = [first], secondList = [second];
   try {
     installShards(firstList);
@@ -36,7 +36,7 @@ test('all installed slugs resolve to the original manifests', () => {
 test('reentrant slug reads retain the captured lookup and the current installed list', () => {
   const previous = shards(), original = previous[0];
   if (original === undefined) throw new Error('Missing installed manifest');
-  const nested = { ...original, slug: '_template' as const }, nestedList = [nested];
+  const nested = { ...original, slug: 'brasscap-mesa' as const }, nestedList = [nested];
   let armed = false;
   const outer = { ...nested, get slug() {
     if (armed) {
@@ -48,7 +48,7 @@ test('reentrant slug reads retain the captured lookup and the current installed 
   } };
   try {
     installShards([outer]); armed = true;
-    expect(findShard('_template')).toBe(outer);
-    expect(findShard('_template')).toBe(nested);
+    expect(findShard('brasscap-mesa')).toBe(outer);
+    expect(findShard('brasscap-mesa')).toBe(nested);
   } finally { installShards(previous); }
 });

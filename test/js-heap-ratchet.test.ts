@@ -8,8 +8,8 @@ import {expect,test} from 'vitest';
 import {sampledHeapBytes,majorHeapGCs,checkHeapRatchet} from '../scripts/memory/jsHeap.mjs';
 
 const metrics={bootAllocatedBytes:100,settledUsedBytes:50,idleBytesPerSecond:20,majorGCsPer30Seconds:2};
-const baseline=()=>({version:1,baselines:{_template:{...metrics}}});
-const row=(change:Partial<typeof metrics>={})=>({shard:'_template',metrics:{...metrics,...change}});
+const baseline=()=>({version:1,baselines:{'brasscap-mesa':{...metrics}}});
+const row=(change:Partial<typeof metrics>={})=>({shard:'brasscap-mesa',metrics:{...metrics,...change}});
 
 test('sampled allocation sums descendants, including anonymous roots and collected samples',()=>{
   expect(sampledHeapBytes({head:{selfSize:0,children:[{selfSize:12,children:[{selfSize:5,children:[]}]}]}})).toBe(17);
@@ -28,7 +28,7 @@ test('each metric independently refuses over ten percent and a rebase can never 
     expect(checkHeapRatchet([row({[key]:metrics[key]*1.01})],baseline(),true).passed).toBe(false);
   }
   expect(checkHeapRatchet([row()],baseline()).passed).toBe(true);
-  expect(checkHeapRatchet([row({bootAllocatedBytes:99})],baseline(),true).ratchet.baselines['_template']?.bootAllocatedBytes).toBe(99);
+  expect(checkHeapRatchet([row({bootAllocatedBytes:99})],baseline(),true).ratchet.baselines['brasscap-mesa']?.bootAllocatedBytes).toBe(99);
   expect(checkHeapRatchet([row()],{version:1,baselines:{}}).passed).toBe(false);
   expect(checkHeapRatchet([row()],{version:1,baselines:{}},true).passed).toBe(true);
   expect(()=>checkHeapRatchet([],baseline())).toThrow();

@@ -28,8 +28,8 @@ test('ledger by kind, stats and the boot URL',()=>{
   expect(ledgerByKind({allocations:[{domain:'gpu',kind:'texture',bytes:2},{domain:'gpu',kind:'texture',bytes:3},{domain:'ram',kind:'wasm',bytes:7}]})).toEqual({gpu:{texture:5},ram:{wasm:7}});
   expect(ledgerByKind(null)).toBeNull();
   expect(stats([100,103,101,99,102])).toEqual({n:5,median:101,min:99,max:103,spreadPct:4});
-  const url=new URL(bootURL('http://127.0.0.1:4400/','_template'));
-  expect(Object.fromEntries(url.searchParams)).toEqual({chunk:'_template',mute:'1',skipintro:'1',nolock:'1',sw:'0'});
+  const url=new URL(bootURL('http://127.0.0.1:4400/','brasscap-mesa'));
+  expect(Object.fromEntries(url.searchParams)).toEqual({chunk:'brasscap-mesa',mute:'1',skipintro:'1',nolock:'1',sw:'0'});
   expect(PROTOCOL).toBe('memory-run/1');
 });
 
@@ -45,11 +45,11 @@ test('dumps join to requests by order, not by the returned guid',()=>{
 });
 
 test('one line per checkpoint, each number tagged',()=>{
-  const run={chunk:'_template',build:'abcdef1234',ready:true,readyMs:13100,loadAverage:3,refused:null,
+  const run={chunk:'brasscap-mesa',build:'abcdef1234',ready:true,readyMs:13100,loadAverage:3,refused:null,
     checkpoints:[{step:'control',from:0,to:1,samples:1,peak:{webcontent:491e6,gpu:512e6},last:{webcontent:491e6,gpu:355e6},ledger:null}],
     settled:{webcontent:487e6,gpu:355e6},ledger:{totals:{gpu:34e6,ram:33e6},unattributed:{gpu:0,ram:0},byKind:{gpu:{texture:18e6}}}};
   const lines=webkitLines(run as never);
-  expect(lines[0]).toMatch(/^\[K\] WebKit _template build abcdef12, instrument full: ready true in 13\.1 s/u);
+  expect(lines[0]).toMatch(/^\[K\] WebKit brasscap-mesa build abcdef12, instrument full: ready true in 13\.1 s/u);
   expect(lines.some(l=>/control settled .*487 MB \[K\].*\[L\]/u.test(l))).toBe(true);
   expect(lines.at(-1)).toBe('  ledger at control by kind [L]: gpu texture 18.0');
 });

@@ -200,7 +200,7 @@ export async function preparedShardHalf(shard: OpenShardfile, wireBytes: WireByt
 }
 
 /** The shard half of every manifest: what the app build's `write` and the standalone cook share. `folder` is where the
- *  product is served; a catalogue names it by slug, and today's `_template` folder is the one that differs (`template`). */
+ *  product is served; a catalogue names it by slug, and a `_` prototype's folder (`_proto`) differs from its slug (`proto`). */
 export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (line: string) => void = () => undefined, folder: string = shard.slug, tiers: CookTiers = {}): ShardHalf {
   const prefix = `/shardfiles/${folder}/`, {index, source, sections} = shard, named = namedPlaces(sections);
   // D5-4: a preparation-only preview lists the default set alone (no stored fence), so `wildshard prepare` sees the boot's

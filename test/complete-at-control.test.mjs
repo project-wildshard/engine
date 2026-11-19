@@ -220,12 +220,12 @@ test('--frames is a whole number of seconds, 1 to 600: a window that never ends 
 
 test("a neighbour's packs are listed apart and leave the home's DL25 members alone (G828)", () => {
   const home = { shard: 'driftwood-isle', files: [{ url: '/shardfiles/driftwood-isle/shard.json' }], parts: [{ url: '/assets/spawn/parts/a.pack.br', members: [[0, 0, 1]] }] };
-  const other = { shard: '_template', files: [{ url: '/shardfiles/_template/sections/world/tiles.json' }], parts: [{ url: '/assets/spawn/parts/b.pack.br', members: [[0, 0, 1]] }] };
-  const rows = [{ at: 7, path: '/assets/spawn/_template-client-phone-1.json', manifest: other }, { at: 9, path: '/assets/spawn/driftwood-isle-client-phone-2.json', manifest: home }];
-  const { members, listedAt, packs } = splitManifests(rows, shard => shard === '_template');
+  const other = { shard: 'brasscap-mesa', files: [{ url: '/shardfiles/brasscap-mesa/sections/world/tiles.json' }], parts: [{ url: '/assets/spawn/parts/b.pack.br', members: [[0, 0, 1]] }] };
+  const rows = [{ at: 7, path: '/assets/spawn/brasscap-mesa-client-phone-1.json', manifest: other }, { at: 9, path: '/assets/spawn/driftwood-isle-client-phone-2.json', manifest: home }];
+  const { members, listedAt, packs } = splitManifests(rows, shard => shard === 'brasscap-mesa');
   expect([...members]).toEqual(['/shardfiles/driftwood-isle/shard.json']);
   expect(listedAt).toBe(9);
-  expect([...packs]).toEqual(['/assets/spawn/_template-client-phone-1.json', '/assets/spawn/parts/b.pack.br']);
+  expect([...packs]).toEqual(['/assets/spawn/brasscap-mesa-client-phone-1.json', '/assets/spawn/parts/b.pack.br']);
   // on one shard's page nothing is a neighbour, so every manifest stays DL25's
   expect(splitManifests(rows, () => false).listedAt).toBe(7);
   expect(splitManifests(rows, () => false).packs.size).toBe(0);

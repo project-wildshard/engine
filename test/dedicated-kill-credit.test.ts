@@ -92,7 +92,7 @@ test('a respawned bandit clears the world\'s death, and the killer keeps its cre
 // retired the Template product; its mosslings are read from the frozen gameplay slice (TEMPLATE-E2E TR-5).
 test('on the Template, a fresh player sees none of another player\'s mossling kills, on either seat', { timeout: 120_000 }, async () => {
   const PACK = ['mossling:1', 'mossling:2', 'mossling:3', 'mossling:4'], DEAD = PACK.map(id => `dead:${id}`);
-  const room = await DedicatedRoom.boot({ slug: '_template', build: '', bootId: 'kill-credit-template', input: await sliceInput(), now: () => clock, post });
+  const room = await DedicatedRoom.boot({ slug: 'gameplay-slice', build: '', bootId: 'kill-credit-template', input: await sliceInput(), now: () => clock, post });
   rooms.push(room);
   const first = enter(room, 'a'), watcher = enter(room, 'c'); tick(room, 5);
   clearCamp(room, 'a', PACK);

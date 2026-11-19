@@ -32,7 +32,7 @@ async function templateCell() {
   const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  return openCellWorld({ instance: '_template' }, { shard: product.shardfile, product, assets, rapier }, undefined, { saves: new SaveStore({ local: null, session: null }), lone: true, pageless: true });
+  return openCellWorld({ instance: 'gameplay-slice' }, { shard: product.shardfile, product, assets, rapier }, undefined, { saves: new SaveStore({ local: null, session: null }), lone: true, pageless: true });
 }
 
 test('in a room the whip heavy poisons a creature: the row\'s damage on the row\'s period, then it expires, and another player sees it', { timeout: 120_000 }, async () => {

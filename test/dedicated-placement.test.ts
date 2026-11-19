@@ -59,7 +59,7 @@ test('a placed cell takes an empty spot of the 7 × 7 and the next frame number;
   expect(() => placeCell({ instance: 'sa33-other', slug: 'sa33-other', cell: [1, 1] }), 'a J305 spot').toThrow(/1,1 is template-2's/u);
   expect(() => placeCell({ instance: 'sa33-twin', slug: 'driftwood-isle', cell: [1, 3] }), 'a grid shard never moves').toThrow(/already has a cell/u);
   expect(() => placeCell({ instance: 'sa33-far', slug: 'sa33-far', cell: [4, 0] }), 'radius 4 is off the grid').toThrow(/off the grid/u);
-  expect(() => placeCell({ instance: '_template', slug: 'sa33-steal', cell: [2, 3] }), 'an instance named for a grid shard would take its players').toThrow(/placed shard's name/u);
+  expect(() => placeCell({ instance: 'brasscap-mesa', slug: 'sa33-steal', cell: [2, 3] }), 'an instance named for a grid shard would take its players').toThrow(/placed shard's name/u);
   expect(() => placeCell({ instance: 'sa33-steal', slug: 'template-2', cell: [2, 3] }), 'a slug named for a grid instance').toThrow(/already has a cell/u);
   expect(placeCell({ instance: 'sa33-next', slug: 'sa33-next', cell: [1, 3] })).toBe(true);
   expect(cellFrame('sa33-next')).toBe(27);

@@ -21,7 +21,7 @@ async function mossgate(): Promise<{ readonly shard: Shardfile; readonly assets:
   const server = serverInputFiles(descriptor.index.files, product.shardfile);
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const base = product.shardfile, actions = base.targets.itemActions ?? [];
-  // the chest as sharddev's `_template` writes it since TC-E7: its item action raises the flag, no walk-up region does
+  // the chest as sharddev's retired Template wrote it since TC-E7: its item action raises the flag, no walk-up region does
   const shard: Shardfile = { ...base, targets: { ...base.targets, itemActions: actions.map(row => row.scene === CHEST ? { ...row, setsFlag: FLAG } : row) },
     quests: { ...base.quests, triggers: base.quests.triggers.filter(row => !(row.kind === 'region' && row.flag === FLAG)) } };
   return { shard, assets };

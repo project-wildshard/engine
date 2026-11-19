@@ -7,7 +7,7 @@ const pose = {name: 'road-entry', x: 0, y: 1.7, z: -241, yaw: Math.PI, pitch: 0}
 test('fixed standing inputs retain exact positions and require full coverage', () => {
   const source = {'open-plot-mosslight-ruins': [pose]};
   expect(frameFloorStanding(source, ['open-plot-mosslight-ruins'])).toEqual(source);
-  expect(frameFloorStanding({_template: [pose]}, ['_template'])).toEqual({_template: [pose]});
+  expect(frameFloorStanding({'brasscap-mesa': [pose]}, ['brasscap-mesa'])).toEqual({'brasscap-mesa': [pose]});
   expect(() => frameFloorStanding(source, ['grid'])).toThrow('exactly');
   expect(() => frameFloorStanding(source, [])).toThrow('exactly');
   expect(() => validateFrameFloorArgs(['--standing-file=tmp/poses.json'])).not.toThrow();

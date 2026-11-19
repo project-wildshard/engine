@@ -313,24 +313,24 @@ test.each([true, false])('first-party data admission retains Explore=%s without 
   } finally { installShards(previous); setActiveChunk(active.slug); }
 });
 
-// GO7, opus-tplseat: Shard select → the Template shard boots a grid page whose home is `_template`. The page admits that product
+// GO7, opus-tplseat: Shard select → the Template shard boots a grid page whose home was `_template` (`_proto` here). The page admits that product
 // here, then the grid admits the same cell through the installed manifest's descriptor (`gridShardfileFolder`) and hands the home
 // claim off at the cell's regional charge (session.ts claims it, T7). This admission lost the descriptor ("not a shardfile shard")
 // and claimed the home at the one-shard page's cost ("Home residency differs"): the template card never reached its cell.
 test('a grid page\'s data home keeps its descriptor and leaves its home claim to the grid', async () => {
-  const { source, wires } = fixture(false, 0, 1, 'template');
-  const manifest = { ...sourceManifest(source), slug: '_template', shardfile: `${base}shard.json` };
+  const { source, wires } = fixture(false, 0, 1, 'proto');
+  const manifest = { ...sourceManifest(source), slug: '_proto', shardfile: `${base}shard.json` };
   const previous = shards(), active = game.shard, residency = new PageResidency();
   try {
     installShards([manifest]);
     setPageMode('grid');
     const installed = await installManifestShardfile(manifest, options(wires), {
-      instance: 'template-2', residency, recipes: new Map(), items: new Map(), catalogue: [],
+      instance: 'proto-2', residency, recipes: new Map(), items: new Map(), catalogue: [],
       voices: () => new Map(), icon: () => { throw new Error('No fixture item'); },
     });
     expect(installed.shardfile, 'the installed manifest names its product').toBe(manifest.shardfile);
-    expect(findShard('_template')?.shardfile, 'what the grid reads for the template cell').toBe(manifest.shardfile);
-    expect(residency.allocator.has('sim:template-2'), 'the home is the grid\'s to claim, at its regional charge').toBe(false);
+    expect(findShard('_proto')?.shardfile, 'what the grid reads for the template cell').toBe(manifest.shardfile);
+    expect(residency.allocator.has('sim:proto-2'), 'the home is the grid\'s to claim, at its regional charge').toBe(false);
   } finally { setPageMode('shard'); residency.dispose(); installShards(previous); setActiveChunk(active.slug); }
 });
 

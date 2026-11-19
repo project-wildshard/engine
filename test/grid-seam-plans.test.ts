@@ -9,7 +9,7 @@ import { generatePlatform, generatePlatformSliced, type PlatformCell } from '@wi
 
 const empty = { roadHeight: 0, heights: Array.from({ length: 257 }, () => 0), colours: Array.from({ length: 257 }, () => [0.25, 0.25, 0.25]) };
 function cells(): PlatformCell[] {
-  return ['pine-hollow', 'driftwood-isle', '_template'].map((slug, i) => {
+  return ['pine-hollow', 'driftwood-isle', 'far-reach'].map((slug, i) => {
     const product = fixture.products.find(row => row.slug === slug);
     if (product === undefined) throw new Error('Missing real edge fixture');
     const observe = (edge: string) => ({ entryWidth: product.entryways.find(row => row.edge === edge)?.width ?? 0,

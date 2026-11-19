@@ -12,7 +12,7 @@ test('the ledger peak and the ledger at control, from a boot\'s checkpoints', ()
   const peak = ledgerPeak([{ step: 'page', ledger: null }, { step: 'props', ledger: { ram: { 'array-buffer': 80 * MB }, gpu: { texture: 30 * MB } } },
     { step: 'control', ledger: { ram: { 'array-buffer': 40 * MB }, workers: { 'w/wasm': 5 * MB }, gpu: { texture: 30 * MB } } }]);
   expect(peak).toMatchObject({ peak: { step: 'props', ram: 80 * MB, gpu: 30 * MB }, control: { step: 'control', ram: 45 * MB, gpu: 30 * MB } });
-  expect(ledgerPeakLines('_template', peak!)).toEqual(['LEDGER _template: control ram    45 + gpu    30 =    75 MB [L] at control; peak ram    80 + gpu    30 =   110 MB [L] at props']);
+  expect(ledgerPeakLines('brasscap-mesa', peak!)).toEqual(['LEDGER brasscap-mesa: control ram    45 + gpu    30 =    75 MB [L] at control; peak ram    80 + gpu    30 =   110 MB [L] at props']);
   expect(ledgerPeak([{ step: 'page', ledger: null }])).toBeNull();
 });
 
@@ -20,8 +20,8 @@ test('the step summary carries each run, the spread and the phone chain', () => 
   const run = { build: 'abcdef123', refused: null, settled: { webcontent: 530 * MB, gpu: 355 * MB }, counters: { ram: { a: 47 * MB }, gpu: { t: 36 * MB } },
     checkpoints: [{ step: 'props', peak: { webcontent: 680 * MB, gpu: 400 * MB } }, { step: 'control', peak: { webcontent: 600 * MB, gpu: 360 * MB } }] };
   const stats = { n: 3, median: 530 * MB, min: 520 * MB, max: 540 * MB, spreadPct: 3.8 };
-  const text = summaryMarkdown('_template', [run], { settledWebContent: stats, settledGpu: { ...stats, median: 355 * MB, spreadPct: 0.5 } }, null);
-  expect(text).toContain('### Memory: _template');
+  const text = summaryMarkdown('brasscap-mesa', [run], { settledWebContent: stats, settledGpu: { ...stats, median: 355 * MB, spreadPct: 0.5 } }, null);
+  expect(text).toContain('### Memory: brasscap-mesa');
   expect(text).toMatch(/\| 1 \| abcdef12 \| 530 \| 355 \| 680 \| 47 \/ 36 \| \d\.\d\d GB \(\d\.\d\d-\d\.\d\d\) \| \d\.\d\d GB/u);
   expect(text).toContain('Settled WebContent median 530 MB, spread 3.8% (n 3)');
 });

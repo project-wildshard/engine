@@ -4,7 +4,7 @@ import { useOwnedGridHome } from './pageShell';
 test('a compiled grid home needs its declared product; admitted data keeps its existing path', () => {
   const compiled = { slug: 'pine-hollow' as const, clientPlanRuntime: true as const, gridShardfile: 'fixture/shard.json' };
   expect(useOwnedGridHome('grid', compiled)).toBe(true);
-  expect(useOwnedGridHome('grid', { slug: '_template' }, { runtime: null })).toBe(true);
+  expect(useOwnedGridHome('grid', { slug: 'brasscap-mesa' }, { runtime: null })).toBe(true);
   expect(() => useOwnedGridHome('grid', { slug: 'pine-hollow', clientPlanRuntime: true })).toThrow('cannot be an owned region');
   expect(() => useOwnedGridHome('grid', { slug: 'pine-hollow' })).toThrow('cannot be an owned region');
 });

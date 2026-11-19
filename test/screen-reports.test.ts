@@ -217,9 +217,9 @@ walk('map-tile-missing', 'a full-map cell with no atlas tile reports once per sl
   const { ResidencyAllocator } = await import('../src/shared/game/grid/allocator');
   const { browserErrorLevel } = await import('../src/client/engine/telemetry/browserErrors');
   const scope = new Scope('atlas'), image = document.createElement('canvas');
-  const tile = await loadGridMapAtlas(scope, new ResidencyAllocator(), { url: '/a.webp', compressed: 1, width: 256, height: 256, tileSize: 256, slugs: ['_template'] },
+  const tile = await loadGridMapAtlas(scope, new ResidencyAllocator(), { url: '/a.webp', compressed: 1, width: 256, height: 256, tileSize: 256, slugs: ['brasscap-mesa'] },
     () => Promise.resolve({ image, width: 256, height: 256, close: () => undefined }));
-  expect(tile('open-plot-thin-ice')).toBeNull(); expect(tile('open-plot-thin-ice')).toBeNull(); expect(tile('_template')).not.toBeNull();
+  expect(tile('open-plot-thin-ice')).toBeNull(); expect(tile('open-plot-thin-ice')).toBeNull(); expect(tile('brasscap-mesa')).not.toBeNull();
   expect(opened()).toEqual(['map-tile-missing']);
   expect(reports[0]?.tags).toMatchObject({ system: 'grid', shard: 'open-plot-thin-ice', bootStage: 'playing', fatal: false, diagnostic: { tiles: 1 } });
   expect(browserErrorLevel(reports[0]?.error, false, 'map-tile-missing')).toBe('warning');

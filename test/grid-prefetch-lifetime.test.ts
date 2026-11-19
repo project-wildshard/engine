@@ -19,11 +19,11 @@ test('completed prefetch releases dedupe hashes after their last live reader', a
   });
   vi.stubEnv('DEV', false);
   vi.stubGlobal('__SHARDFILE_VERDICTS__', ['alpha', 'beta'].map(path => ({ path: `/${path}/index.json`, indexHash: hashImmutableBytes(new TextEncoder().encode(JSON.stringify(index))) })));
-  const title = (slug: '_template' | 'blender-template', path: string): TitleManifest => ({slug, name: slug, biome: 'test', status: 'hidden',
+  const title = (slug: 'mossgate' | 'blender-template', path: string): TitleManifest => ({slug, name: slug, biome: 'test', status: 'hidden',
     card: {thumb: '', portrait: '', landscape: ''}, shardfile: `http://localhost/${path}/index.json`});
   let previous: readonly TitleManifest[] = [];
   try {previous = titleManifests();} catch { /* This isolated test need not install runnable worlds. */ }
-  installTitleManifests([title('_template', 'alpha'), title('blender-template', 'beta')]);
+  installTitleManifests([title('mossgate', 'alpha'), title('blender-template', 'beta')]);
   let release: (() => void) | undefined;
   const pending = new Promise<void>(resolve => {release = resolve;});
   const reads: string[] = [], disk = new Map<string, Response>(), writes: string[] = [];
@@ -54,10 +54,10 @@ test('completed prefetch releases dedupe hashes after their last live reader', a
   vi.stubGlobal('fetch', fetcher);
   const has = vi.spyOn(Set.prototype, 'has'), clear = vi.spyOn(Set.prototype, 'clear');
   try {
-    startGridPrefetch(['_template', 'blender-template']);
+    startGridPrefetch(['mossgate', 'blender-template']);
     await vi.waitFor(() => {expect(reads).toContain(`http://localhost/alpha/blobs/bin/${hashes[1]}.bin`);});
     expect(gridPrefetchStatus()).toMatchObject({phase: 'running', shardfiles: 2, knownFiles: 2});
-    startGridPrefetch(['_template', 'blender-template']);
+    startGridPrefetch(['mossgate', 'blender-template']);
     if (release === undefined) throw new Error('Missing pending-file release');
     release();
     await vi.waitFor(() => {expect(gridPrefetchStatus()?.phase).toBe('done');});

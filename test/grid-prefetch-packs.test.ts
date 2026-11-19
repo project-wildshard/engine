@@ -33,18 +33,18 @@ test.each(['play', 'title', 'title-stop', 'grid-title', 'title-adopt'] as const)
   });
   vi.stubEnv('DEV', false);
   vi.stubGlobal('__SHARDFILE_VERDICTS__', [{path: '/alpha/index.json', indexHash: hashImmutableBytes(new TextEncoder().encode(JSON.stringify(index)))}]);
-  const title: TitleManifest = {slug: '_template', name: '_template', biome: 'test', status: 'hidden',
+  const title: TitleManifest = {slug: 'mossgate', name: 'mossgate', biome: 'test', status: 'hidden',
     card: {thumb: '', portrait: '', landscape: ''}, shardfile: 'http://localhost/alpha/index.json'};
   let previous: readonly TitleManifest[] = [];
   try {previous = titleManifests();} catch { /* This isolated test need not install runnable worlds. */ }
   installTitleManifests([title]);
   const reads: string[] = [], disk = new Map<string, Response>();
-  const spawn = JSON.stringify({version: 1, shard: '_template', tier: 'phone', flow: mode === 'grid-title' ? 'grid' : 'client', totalBytes: 3,
+  const spawn = JSON.stringify({version: 1, shard: 'mossgate', tier: 'phone', flow: mode === 'grid-title' ? 'grid' : 'client', totalBytes: 3,
     files: [first, second].map((bytes, i) => ({url: `/alpha/blobs/bin/${hashes[i] ?? ''}.bin`, hash: hashes[i], bytes: bytes.length}))});
   const address = {url: `/assets/spawn/template-${mode}-1234567890abcdef.json`, bytes: spawn.length, totalBytes: 3, files: 2};
   vi.stubGlobal('document', {baseURI: 'http://localhost/', getElementById: () => ({textContent: JSON.stringify({spawnManifests: {
-    cacheName: 'ws-assets-v1', client: {_template: {phone: address, desktop: address}},
-    grid: {'100': {_template: {phone: address, desktop: address}}}}})})});
+    cacheName: 'ws-assets-v1', client: {mossgate: {phone: address, desktop: address}},
+    grid: {'100': {mossgate: {phone: address, desktop: address}}}}})})});
   const urlOf = (input: RequestInfo | URL): string => input instanceof Request ? input.url : String(input);
   const cache: Cache = {
     add: () => Promise.reject(new Error('Unexpected unverified cache add')),
@@ -73,23 +73,23 @@ test.each(['play', 'title', 'title-stop', 'grid-title', 'title-adopt'] as const)
       : url.endsWith(`${hashes[1] ?? ''}.bin`) ? new Response(second) : new Response(null, {status: 404}));
   });
   try {
-    const titleRun = mode === 'play' ? null : startTitlePrefetch('_template', mode === 'grid-title' ? 'grid' : 'client', '100');
-    if (mode === 'play') startGridPrefetch(['_template']);
+    const titleRun = mode === 'play' ? null : startTitlePrefetch('mossgate', mode === 'grid-title' ? 'grid' : 'client', '100');
+    if (mode === 'play') startGridPrefetch(['mossgate']);
     else expect(titleRun).not.toBeNull();
     if (mode === 'title-adopt') {
-      const foreground = startSpawnDownload('_template', 'client', 'phone');
+      const foreground = startSpawnDownload('mossgate', 'client', 'phone');
       if (foreground === null) throw new Error('Missing foreground adoption');
-      expect(adoptCompletedSpawnDownload('_template', 'client', 'phone')).toBeNull();
+      expect(adoptCompletedSpawnDownload('mossgate', 'client', 'phone')).toBeNull();
       titleRun?.stop(); await foreground.ready;
       expect(foreground.snapshot().complete).toBe(true); expect(aborted).toBe(false);
       // A late title callback cannot start or replace the active world's job.
-      expect(startTitlePrefetch('_template')).toBeNull();
+      expect(startTitlePrefetch('mossgate')).toBeNull();
       const readsBefore = reads.length;
-      expect(adoptCompletedSpawnDownload('_template', 'client', 'phone')).toBe(foreground);
-      expect(adoptCompletedSpawnDownload('_template', 'grid', 'phone')).toBeNull();
+      expect(adoptCompletedSpawnDownload('mossgate', 'client', 'phone')).toBe(foreground);
+      expect(adoptCompletedSpawnDownload('mossgate', 'grid', 'phone')).toBeNull();
       expect(adoptCompletedSpawnDownload('absent', 'client', 'phone')).toBeNull();
       address.totalBytes++;
-      expect(adoptCompletedSpawnDownload('_template', 'client', 'phone')).toBeNull();
+      expect(adoptCompletedSpawnDownload('mossgate', 'client', 'phone')).toBeNull();
       address.totalBytes--;
       expect(reads).toHaveLength(readsBefore);
     }

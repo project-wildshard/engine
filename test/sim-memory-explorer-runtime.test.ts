@@ -51,7 +51,7 @@ function fixture(shard: string, options: {showHub?: boolean; initial?: string; c
   return {run, result, phases, sleeps, world, status: () => ({actual, exits, defaultExplores, ownExplores, worldClicks})};
 }
 
-test.each(['pine-hollow', 'driftwood-isle', '_template'])('Explorer stays in the measured %s runtime through its real HUD entry', async shard => {
+test.each(['pine-hollow', 'driftwood-isle', 'brasscap-mesa'])('Explorer stays in the measured %s runtime through its real HUD entry', async shard => {
   const f = fixture(shard);
   await f.run();
   expect(f.status()).toEqual({actual: shard, exits: 0, defaultExplores: 0, ownExplores: 1, worldClicks: 1});

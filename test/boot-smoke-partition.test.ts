@@ -6,7 +6,7 @@ const catalogue = [
   { slug: 'nine-dragon-stack', status: 'experimental', legacy: false },
   { slug: 'sunscar-dunes', status: 'experimental', legacy: false },
   { slug: 'far-reach', status: 'experimental', legacy: false },
-  { slug: '_template', status: 'hidden', legacy: false },
+  { slug: 'brasscap-mesa', status: 'hidden', legacy: false },
   { slug: 'open-plot-alien-plain', status: 'hidden', legacy: false, shardSelect: false },
   { slug: 'nine-dragon-stack-legacy', status: 'live', legacy: true },
 ];
@@ -23,7 +23,7 @@ test('the independent grid leg keeps the actual public home and the mandatory ro
   expect(bootCases(catalogue, 'grid')).toEqual([['grid', 'driftwood-isle', false]]);
   expect(bootCases(catalogue, 'developer')).toEqual([
     ['standalone', 'nine-dragon-stack', true], ['standalone', 'sunscar-dunes', true],
-    ['standalone', 'far-reach', true], ['standalone', '_template', true],
+    ['standalone', 'far-reach', true], ['standalone', 'brasscap-mesa', true],
   ]);
   expect(bootCases(catalogue, 'public')).toContainEqual(['public-policy', 'nine-dragon-stack', false]);
 });

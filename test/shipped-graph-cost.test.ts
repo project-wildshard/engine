@@ -12,7 +12,7 @@ const installed=(existsSync('out')?readdirSync('out'):[]).filter(folder=>existsS
  .map(folder=>({folder,slug:(JSON.parse(readFileSync(`out/${folder}/shard.json`,'utf8')) as {identity:{slug:string}}).identity.slug,
   hash:(JSON.parse(readFileSync(`out/${folder}/validation.json`,'utf8')) as {pin?:{hash?:string}}).pin?.hash??''}))
  .filter(row=>pinned.has(row.hash)).sort((a,b)=>a.slug.localeCompare(b.slug));
-// A product is read from its folder and reports its own slug (`out/_template` holds `template`).
+// A product is read from its folder and reports its own slug (a folder can differ from its slug).
 const products=installed.map(({folder,slug})=>({folder,slug})),reports:ShippedGraphCost[]=[];
 test('the census covers every pinned shipped product',()=>{expect(new Set(installed.map(row=>row.hash))).toEqual(pinned);expect(installed).toHaveLength(pinned.size);});
 for(const {folder,slug} of products)test(`emitted shader work for every admitted graph in ${slug}`,async()=>{

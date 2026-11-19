@@ -22,11 +22,11 @@ test('Download everything reads every product past Save-Data in a fresh run, and
   const indexes = new Map([['home', indexOf('download-home', 0)], ['far', indexOf('download-far', 1)]]);
   // no build index hashes (as in dev): the phone path keeps each checked index without rebuilding its whole product
   vi.stubEnv('DEV', true);
-  const title = (slug: '_template' | 'blender-template', path: string): TitleManifest => ({slug, name: slug, biome: 'test', status: 'hidden',
+  const title = (slug: 'mossgate' | 'blender-template', path: string): TitleManifest => ({slug, name: slug, biome: 'test', status: 'hidden',
     card: {thumb: '', portrait: '', landscape: ''}, shardfile: `http://localhost/${path}/index.json`});
   let previous: readonly TitleManifest[] = [];
   try {previous = titleManifests();} catch { /* This isolated test need not install runnable worlds. */ }
-  installTitleManifests([title('_template', 'home'), title('blender-template', 'far')]);
+  installTitleManifests([title('mossgate', 'home'), title('blender-template', 'far')]);
   const disk = new Map<string, Response>(), reads: string[] = [];
   const urlOf = (input: RequestInfo | URL): string => input instanceof Request ? input.url : String(input);
   const cache: Cache = {
@@ -54,7 +54,7 @@ test('Download everything reads every product past Save-Data in a fresh run, and
   try {
     expect(await remainingDownloadBytes()).toBe(5);
     // the background run (Save-Data on) stops before reading; the player's download then starts a fresh one
-    startGridPrefetch(['_template', 'blender-template'], ['_template']);
+    startGridPrefetch(['mossgate', 'blender-template'], ['mossgate']);
     await vi.waitFor(() => {expect(gridPrefetchStatus()?.phase).not.toBe('running');});
     expect(gridPrefetchStatus()?.reason).toBe('save-data'); // the background prefetch respects Save-Data
     const progress: [number, number][] = [];

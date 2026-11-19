@@ -33,11 +33,11 @@ test('prefetch publishes canonical URL bytes and durable progress in the worker 
   vi.stubGlobal('caches', storage); vi.stubGlobal('Worker', vi.fn(() => { throw new Error('No cache worker'); }));
   vi.stubEnv('DEV', false);
   vi.stubGlobal('__SHARDFILE_VERDICTS__', [{ path: '/product/index.json', indexHash: hashImmutableBytes(new TextEncoder().encode(JSON.stringify(index))) }]);
-  installTitleManifests([{ slug: '_template', name: 'Test', biome: 'test', status: 'hidden', card: { thumb: '', portrait: '', landscape: '' },
+  installTitleManifests([{ slug: 'mossgate', name: 'Test', biome: 'test', status: 'hidden', card: { thumb: '', portrait: '', landscape: '' },
     shardfile: 'http://localhost/product/index.json' }]);
   vi.stubGlobal('fetch', (input: RequestInfo | URL) => Promise.resolve(new URL(urlOf(input)).pathname.endsWith('/index.json') ? Response.json(index) : new Response(body)));
   try {
-    startGridPrefetch(['_template']); await vi.waitFor(() => { expect(gridPrefetchStatus()?.phase).toBe('done'); });
+    startGridPrefetch(['mossgate']); await vi.waitFor(() => { expect(gridPrefetchStatus()?.phase).toBe('done'); });
     expect(gridPrefetchStatus()).toMatchObject({ knownFiles: 1, knownBytes: 3, storedFiles: 1, storedBytes: 3, inFlightBytes: 0 });
     const held = disk.get(`http://localhost/product/blobs/bin/${hash}.bin`);
     if (held === undefined) throw new Error('Missing canonical stored response');

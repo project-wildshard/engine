@@ -10,7 +10,7 @@ const catalogue = [
   {slug:'driftwood-isle',status:'live',legacy:false},
   {slug:'sunscar-dunes',status:'experimental',legacy:false},
   {slug:'nine-dragon-stack',status:'experimental',legacy:false},
-  {slug:'_template',status:'hidden',legacy:false},
+  {slug:'brasscap-mesa',status:'hidden',legacy:false},
   {slug:'open-plot-alien-plain',status:'hidden',legacy:false,shardSelect:false},
   {slug:'nine-dragon-stack-legacy',status:'live',legacy:true},
 ];
@@ -109,7 +109,7 @@ test.each(['state', 'pixels'] as const)('a stuck %s read refuses within the unch
 });
 
 test('the Explorer leg retains every primary, including Signal and Developer-only rows, once', () => {
-  expect(explorerCases(catalogue)).toEqual(['driftwood-isle','nine-dragon-stack','sunscar-dunes','_template','open-plot-alien-plain']);
+  expect(explorerCases(catalogue)).toEqual(['driftwood-isle','nine-dragon-stack','sunscar-dunes','brasscap-mesa','open-plot-alien-plain']);
 });
 
 test('missing, failed, duplicate and black card frames refuse with their real model identity', () => {

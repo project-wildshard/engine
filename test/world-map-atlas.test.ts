@@ -64,8 +64,8 @@ test('the atlas precedes the app build, and a cold atlas refuses an unbuilt prod
   try {
     mkdirSync(resolve(root, 'src/shared/game/grid'), { recursive: true });
     writeFileSync(resolve(root, 'src/shared/game/grid/singleplayer.json'), JSON.stringify({ grid: {
-      cells: [{ slug: '_template' }, { slug: 'plain' }],
+      cells: [{ slug: 'brasscap-mesa' }, { slug: 'plain' }],
     } }));
-    await expect(writeWorldMapAtlas(root)).rejects.toThrow(/ENOENT.*_template/u);
+    await expect(writeWorldMapAtlas(root)).rejects.toThrow(/ENOENT.*brasscap-mesa/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

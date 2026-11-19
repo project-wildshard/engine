@@ -890,8 +890,8 @@ export function prefetchSpawnDownload(slug: string, tier: 'phone' | 'desktop', f
 }
 const get = (value: unknown, key: string): unknown => typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
 function bookSelection(book: unknown, slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): SpawnManifestAddress | null {
-  // Stored cooks name the product (`template`); its authored route can be
-  // `_template`. Preserve exact build rows, then use that product's cook row.
+  // Stored cooks name the product (`proto`); its authored route can be
+  // `_proto`. Preserve exact build rows, then use that product's cook row.
   const roots = flow === 'grid' ? get(get(book, flow), mode) : get(book, flow), pair = get(get(roots, slug) ?? get(roots, bareSlug(slug)), tier);
   return pair === undefined ? null : readSpawnManifestAddress(pair);
 }
@@ -909,7 +909,7 @@ function onPacks(path: string, packs: string): string {
  * page URLs: a part delivers them, and the product reads them by those. */
 function packBase(home: unknown, slug: string): string {
   const shards = get(home, 'shards'), base = get(home, 'base');
-  // a bake names a stored cook by its product slug (`template`); a placement asks by its authored one (`_template`)
+  // a bake names a stored cook by its product slug (`proto`); a placement asks by its authored one (`_proto`)
   if (Array.isArray(shards) && shards.some((row: unknown) => typeof row === 'string' && bareSlug(row) === bareSlug(slug)) && typeof base === 'string') return base;
   // PZ3: the content base (an origin, or PZ13's `content/<set>/` on one) when the boot bank names one; else this page
   return contentBase() || document.baseURI;
@@ -926,7 +926,7 @@ export function shardPackBase(slug: string): string | null {
   return packBase(get(get(bank, 'spawnManifests'), 'home'), slug);
 }
 /** DL10: a shard's recorded entry programs, or null when its cook published none. The file carries the product slug: a
- *  placement's authored `_template` reads `/programs/template.json` (a `_template.json` read 404s, TEMPLATE-E2E TE13). */
+ *  placement's authored `_proto` reads `/programs/proto.json` (an authored-name read 404s, TEMPLATE-E2E TE13). */
 export function entryProgramsURL(slug: string): string | null {
   const base = shardPackBase(slug);
   return base === null ? null : new URL(`programs/${bareSlug(slug)}.json`, base).href;

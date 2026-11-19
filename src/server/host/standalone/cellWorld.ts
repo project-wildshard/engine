@@ -78,7 +78,7 @@ export interface CellWorldOptions {
   readonly owned?: OwnedStores;
   readonly profiles?: CreatureRewardStore;
   /** The name players' goods are stored under: a room's shard, as its save rows and reward store name it. A grid cell's shard can
-   *  differ from its product's identity slug (the Template's catalogue `_template` against its product's `template`). Left out, the
+   *  differ from its product's identity slug (a `_` prototype's catalogue `_proto` against its product's `proto`). Left out, the
    *  product's identity slug. */
   readonly shard?: string;
   /** Where a player's facts go. Left out, they go in `saves`, the session's. */

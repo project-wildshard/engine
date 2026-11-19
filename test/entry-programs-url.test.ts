@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-// TEMPLATE-E2E TE-ENG12: the Template's placement keeps its authored slug (`_template`) but its cook publishes the
-// recorded programs under the product slug, so the page asked for `/programs/_template.json` and logged a 404.
+// TEMPLATE-E2E TE-ENG12: a `_` prototype's placement keeps its authored slug (`_proto`) but its cook publishes the
+// recorded programs under the product slug (`proto`); the retired Template asked for its authored file and logged a 404.
 import {expect, test} from 'vitest';
 import {entryProgramsURL} from '../src/client/game/boot/spawnDownload';
 
@@ -12,20 +12,20 @@ function bank(fields: Record<string, unknown>): void {
   document.head.append(script);
 }
 
-test('an authored `_template` reads the product file, never `_template.json`', () => {
+test('an authored `_proto` reads the product file, never `_proto.json`', () => {
   bank({});
-  expect(entryProgramsURL('_template')).toBe(new URL('programs/template.json', document.baseURI).href);
+  expect(entryProgramsURL('_proto')).toBe(new URL('programs/proto.json', document.baseURI).href);
   expect(entryProgramsURL('pine-hollow')).toBe(new URL('programs/pine-hollow.json', document.baseURI).href);
   bank({contentBase: CDN});
-  expect(entryProgramsURL('_template')).toBe(`${CDN}programs/template.json`);
+  expect(entryProgramsURL('_proto')).toBe(`${CDN}programs/proto.json`);
 });
 
 test('a cook that published no programs file asks for none, under either spelling', () => {
-  bank({entryPrograms: {template: false}});
-  expect(entryProgramsURL('_template')).toBeNull();
-  expect(entryProgramsURL('template')).toBeNull();
-  bank({entryPrograms: {template: true}, spawnManifests: {home: {shards: ['_template'], base: 'https://home.test/'}}});
-  expect(entryProgramsURL('_template')).toBe('https://home.test/programs/template.json');
-  bank({spawnManifests: {home: {shards: ['template'], base: 'https://home.test/'}}});
-  expect(entryProgramsURL('_template')).toBe('https://home.test/programs/template.json');
+  bank({entryPrograms: {proto: false}});
+  expect(entryProgramsURL('_proto')).toBeNull();
+  expect(entryProgramsURL('proto')).toBeNull();
+  bank({entryPrograms: {proto: true}, spawnManifests: {home: {shards: ['_proto'], base: 'https://home.test/'}}});
+  expect(entryProgramsURL('_proto')).toBe('https://home.test/programs/proto.json');
+  bank({spawnManifests: {home: {shards: ['proto'], base: 'https://home.test/'}}});
+  expect(entryProgramsURL('_proto')).toBe('https://home.test/programs/proto.json');
 });

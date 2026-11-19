@@ -23,9 +23,9 @@ test('arming comes from zone presence and refuses invalid policy data', () => {
 
 test('a partial recording always includes every named zone assigned to its ledger host', () => {
   const armed = new Set([...policy.zones, 'nalati-grasslands', 'nine-dragon-stack']);
-  expect(ledgerZones(['_template', 'driftwood-isle', 'nalati-grasslands', 'pine-hollow'], armed, ['_template']))
-    .toEqual(['_template', 'driftwood-isle', 'nalati-grasslands']);
-  expect(() => ledgerZones(['_template', 'pine-hollow'], armed, ['_template']))
+  expect(ledgerZones(['brasscap-mesa', 'driftwood-isle', 'nalati-grasslands', 'pine-hollow'], armed, ['brasscap-mesa']))
+    .toEqual(['brasscap-mesa', 'driftwood-isle', 'nalati-grasslands']);
+  expect(() => ledgerZones(['brasscap-mesa', 'pine-hollow'], armed, ['brasscap-mesa']))
     .toThrow('No ledger preview for driftwood-isle');
 });
 

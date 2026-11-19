@@ -62,11 +62,11 @@ describe('the catalogue a page reads', () => {
   });
 
   it('lists a placed head the build has no card for, and only that', () => {
-    const rows = [title('driftwood-isle'), title('_template')];
+    const rows = [title('driftwood-isle'), title('_proto')];
     expect(withCatalogueHeads(rows)).toBe(rows);
-    installCatalogue({...added, shards: [{...fresh, slug: 'template'}, {...fresh, slug: 'driftwood-isle'}, {...fresh, slug: 'unplaced'}, fresh]});
+    installCatalogue({...added, shards: [{...fresh, slug: 'proto'}, {...fresh, slug: 'driftwood-isle'}, {...fresh, slug: 'unplaced'}, fresh]});
     const listed = withCatalogueHeads(rows);
-    expect(listed.map(row => row.slug)).toEqual(['driftwood-isle', '_template', 'test-shard']);
+    expect(listed.map(row => row.slug)).toEqual(['driftwood-isle', '_proto', 'test-shard']);
     expect(listed[2]).toMatchObject({name: 'Test Shard', order: 99, shardfile: '/shardfiles/test-shard/shard.json'});
     installTitleManifests(listed);
     expect(titleManifests()).toBe(listed);
