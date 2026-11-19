@@ -24,6 +24,12 @@ import { outputDescriptor } from '../../../shared/game/shardfile/outputDescripto
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
 import { countedShard } from './declaredSpawnCount';
+import { DayCycle, type DayCycleClock } from '@wildshard/engine/world/dayCycle';
+import { declaredWaterBody } from '@wildshard/engine/world/water/declared';
+import { waveHeight } from '@wildshard/engine/world/waves';
+import { TOON_DAY_PRESET } from '@wildshard/format/toonLook';
+import { dayClock } from '../../../shared/game/looks/dayClock';
+import { declaredDay } from '../../../shared/game/shard/declaredRows';
 import { admitRuntimeCreatures, declaredSpawnEntities, installRuntimeCreatures, type keeperOwnership } from './runtimeCreatures';
 
 /** One prepared native world: identical to a typed runtime plan, built from data alone. */
@@ -82,6 +88,23 @@ function assemblyKeeper(shard: Shardfile, sections: ReadonlyMap<string, unknown>
   return { actors: new Set(), scripts: new Set(decisionScriptsFromSections(sections).flatMap(row => {
     const ids = Object.values(row.actors); return ids.length === 0 || ids.some(id => !declared.has(id)) ? [row.id] : []; })) };
 }
+/**
+ * OF22a1: the day and the sea a native assembly's plan names no host for, from its sections: the look's toon sky clock
+ * (`look/toon` `sky.day` over `sky.cycleSeconds`, as the page's toon sky runs it) else the first `world/days` row; the declared sea row's water
+ * (as the `water.sea` host, its swell when the row has `waves`). A plan that still names a `day.*` or `water.*` host keeps it.
+ */
+function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan): (host: SimHost) => DayCycleClock | null {
+  const shard = product.shardfile, families = new Set(plan.features.map(row => row.host.split('.')[0]));
+  const toon = families.has('day') || !product.has('look/toon') ? undefined : product.section('look/toon').sky;
+  const days = families.has('day') || toon !== undefined ? undefined : shard.rows.days[0];
+  const sea = families.has('water') ? undefined : shard.water.find(row => row.kind === 'sea');
+  const body = sea === undefined ? undefined : declaredWaterBody(structuredClone(sea));
+  return host => {
+    if (body !== undefined) host.useWater({ surfaceAt: body.restAt, ...(sea?.waves === true ? { bob: (x: number, z: number) => waveHeight(x, z, host.clock.now) } : {}) });
+    if (toon !== undefined) { const clock = new DayCycle(dayClock(TOON_DAY_PRESET, toon.day, { dusk: 'dusk' }).spec); clock.cycle = toon.cycleSeconds; return host.useDayClock(clock); }
+    return days === undefined ? null : host.useDayClock(declaredDay(days));
+  };
+}
 /** True when this product ships a native-assembly plan. */
 export function hasNativeAssembly(product: ShardFolder): boolean { return product.hasFile(NATIVE_ASSEMBLY_FILE); }
 /**
@@ -109,6 +132,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   admitRuntimeCreatures(counted, sections, keeper);
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   const declaredLevel: SimLevel = { ...level, entities: declaredSpawnEntities(counted) };
+  const world = sectionWorld(product, plan);
   const levelPorts = { ground: false as const, heightAt };
   const walk = (host: SimHost): ReturnType<typeof proveTerrainEntries> => proveTerrainEntries(host.physics, shard.entryways, heightAt, plan.entries.walk as Parameters<typeof proveTerrainEntries>[3]);
   return { level: declaredLevel, ports: levelPorts, proveEntries: host => {
@@ -120,7 +144,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   }, install: (host, context) => {
     lendReturns(host);
     recordPrimitives(host, shard, plan.features.map(row => row.host)); // OF17b1: native features name their families until M8
-    const run: AssemblyRun<C> = { host, context, input: null, day: null };
+    const run: AssemblyRun<C> = { host, context, input: null, day: world(host) };
     for (const step of steps) step(run);
     installRuntimeCreatures(host, counted, assets, sections, { restoring: context.restoring, keeper, summoned,
       fact: (name, actor) => { need(run.input, 'A declared decision grant needs the commands host').ledger.fact(name, actor); } });
