@@ -30,7 +30,7 @@
 // its world door on 18852. The fixture release is signed by the owned key only, channel production on loopback (staging for mode 46).
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
-import { constants, cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { openChaosProxy } from './chaos-proxy-core.mjs';
@@ -69,31 +69,22 @@ if (args[0] === '--prepare') {
     const pair = generateKeyPairSync('ed25519');
     writeFileSync(keyFile, JSON.stringify({ public: pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex'), private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }) }), { mode: 0o600, flag: 'wx' });
   }
-  const key = JSON.parse(readFileSync(keyFile, 'utf8')), owner = `failmode-${String(process.pid)}`;
-  const environment = { ...process.env, SERVE_OWNER: owner, WILDSHARD_RELEASE_URL: RELEASE_URL, WILDSHARD_RELEASE_KEY: key.public, VITE_API_ORIGIN: PAGE_ORIGIN };
+  const key = JSON.parse(readFileSync(keyFile, 'utf8'));
+  const environment = { ...process.env, WILDSHARD_RELEASE_URL: RELEASE_URL, WILDSHARD_RELEASE_KEY: key.public, VITE_API_ORIGIN: PAGE_ORIGIN };
   const folder = join(work, 'dist');
-  if (process.env.GITHUB_ACTIONS === 'true') {
-    // Build once with Ring 1's pins plus the pinned Driftwood client product admitted.
-    // The fixture is baked from this source and carries no live deployment. Not `build:ring`: that is a preview build
-    // (`--mode preview`, 9b2113fc2), and a preview never names a world; this one names the loopback release.
-    const output = join(ROOT, 'dist');
-    if (existsSync(output)) throw new Error('The hosted fixture needs a fresh build directory');
-    const built = spawnSync('python3', ['scripts/heavy-lane.py', 'build', '--', 'bash', '-c',
-      `node scripts/pins.ts install --ring 1 ${SHARD} && node scripts/gen.mjs --inputs-only && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs`], { cwd: ROOT,
-      env: { ...environment, GITHUB_EVENT_NAME: undefined, WS_RELEASE: '0' }, stdio: 'inherit' });
-    if (built.status !== 0) throw new Error('The hosted fixture build failed');
-    renameSync(output, folder);
-  } else {
-    const built = spawnSync('bash', ['scripts/serve-build.sh', '--shard', SHARD, '--name', 'failmode', '--hours', '1'], { cwd: ROOT, encoding: 'utf8',
-      env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
-    const out = /→ (\S+)/u.exec(built.stderr)?.[1], port = /127\.0\.0\.1:(\d+)/u.exec(built.stdout)?.[1];
-    try {
-      if (built.status !== 0 || out === undefined) throw new Error(`the build failed: ${built.stderr.slice(-2000)}`);
-      cpSync(out, folder, { recursive: true, mode: constants.COPYFILE_FICLONE, verbatimSymlinks: true, force: false, errorOnExist: true });
-    } finally {
-      if (port !== undefined) spawnSync('bash', ['scripts/serve-build.sh', 'stop', port], { cwd: ROOT, env: { ...process.env, SERVE_OWNER: owner }, stdio: 'ignore' });
-    }
-  }
+  // Build once with Ring 1's pins plus the pinned Driftwood client product admitted, on a runner and on a laptop alike.
+  // The fixture is baked from this source and carries no live deployment. Not `build:ring` nor `serve-build.sh`: both
+  // are preview builds (`--mode preview`, 9b2113fc2), and a preview never names a world; this one names the loopback release.
+  const hosted = process.env.GITHUB_ACTIONS === 'true';
+  const output = hosted ? join(ROOT, 'dist') : folder;
+  if (existsSync(output)) throw new Error(hosted ? 'The hosted fixture needs a fresh build directory' : `${folder} already holds a build: prepare into a fresh <work>`);
+  // A laptop's tree gets its whole pinned product set back afterwards: Ring 1 alone would leave the next build short.
+  const restore = hosted ? '' : ' ; status=$? ; { node scripts/pins.ts install && node scripts/gen.mjs --inputs-only; } >/dev/null || status=1 ; exit $status';
+  const built = spawnSync('python3', ['scripts/heavy-lane.py', 'build', '--', 'bash', '-c',
+    `{ node scripts/pins.ts install --ring 1 ${SHARD} && node scripts/gen.mjs --inputs-only && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs --outDir "$1"; }${restore}`,
+    'bash', output], { cwd: ROOT, env: { ...environment, GITHUB_EVENT_NAME: undefined, WS_RELEASE: '0' }, stdio: 'inherit' });
+  if (built.status !== 0) throw new Error(hosted ? 'The hosted fixture build failed' : 'The fixture build failed (or its pins did not restore)');
+  if (hosted) renameSync(output, folder);
   if (!readFileSync(join(folder, 'index.html'), 'utf8').includes(RELEASE_URL)) throw new Error('The fixture build is missing the loopback release address');
   const build = /** @type {string} */ (JSON.parse(readFileSync(join(folder, 'version.json'), 'utf8')).build);
   if (!build.startsWith(sha.slice(0, 7))) throw new Error('The fixture build is from another source SHA');
