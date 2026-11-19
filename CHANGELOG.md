@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.47 (2026-11-18)
+
+- Cook phone-ready textures for splat ground and skip redundant splat downloads during phone prefetch.
+- Draw the first world frame before warming additional content on phones.
+- Keep movement responsive against terrain banks and remove stutter when boosting on roads.
+
 ## v0.1.46 (2026-11-18)
 
 - Load the skin rigs used by spawned creatures.
