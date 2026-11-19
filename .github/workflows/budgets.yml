@@ -67,9 +67,17 @@ jobs:
           run-id: ${{ env.SOURCE_RUN }}
           name: memory-pinned-client
           path: tmp/memory-ledger
+      # A ci run of a commit from before BUDGET-CAPS (it finished after budgets.yml landed) has no budget tools: nothing
+      # to judge, not a failure (44470269761 measured afa7d6dbe and failed on a missing cli.mjs).
+      - name: Check the source commit has the budget tools
+        id: tools
+        if: steps.source.outputs.artifact == 'true'
+        run: |
+          if [[ -f scripts/budgets/cli.mjs ]]; then echo 'ok=true' >> "$GITHUB_OUTPUT"
+          else echo "::notice::source commit predates BUDGET-CAPS (no scripts/budgets/cli.mjs); nothing judged"; echo 'ok=false' >> "$GITHUB_OUTPUT"; fi
       - name: Restore the pinned preview and install Chromium
         id: client
-        if: steps.source.outputs.artifact == 'true'
+        if: steps.tools.outputs.ok == 'true'
         run: |
           tar -xf tmp/memory-ledger/client.tar
           rm tmp/memory-ledger/client.tar
