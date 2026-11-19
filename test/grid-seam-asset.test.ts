@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { readCaps } from '../scripts/budgets/files.mjs';
 import { GRID_SEAMS, gridSeamAsset, readGridSeams, writeGridSeams } from '../scripts/app-build/gridSeams.mjs';
 import { checkChunks } from '../scripts/check-chunks.mjs';
 import { writeChunkReport } from '../scripts/app-build/chunkReport.mjs';
@@ -66,26 +67,33 @@ test('the grid chunk guard refuses inline data, missing measurements and either 
   const manifest = { 'index.html': { file: 'entry.js', isEntry: true } };
   const modules = { 'entry.js': { name: 'entry', moduleIds: [], rawBytes: 40, gzBytes: 30 },
     'grid.js': { name: 'grid', moduleIds: ['src/client/game/grid/session.ts'], rawBytes: 300000, gzBytes: 50000 } };
-  const caps = { 'js/grid-session/raw': 450000, 'js/grid-session/gzip': 100000 };
+  // BUDGET-CAPS BC5: the real caps, and a baseline the grid chunk is measured against.
+  const caps = { caps: readCaps(), baselines: { schema: 1, about: '', baselines: {
+    'js/grid-session/raw': { value: 300000, contentKey: 'engine' }, 'js/grid-session/gzip': { value: 50000, contentKey: 'engine' } } } };
   expect(checkChunks(manifest, modules, {}, caps).errors).toEqual([]);
-  expect(checkChunks(manifest, { ...modules, 'grid.js': { ...modules['grid.js'], rawBytes: 3853495 } }, {}, caps).errors).toContainEqual(expect.stringContaining('grid session raw 3853495 exceeds'));
-  expect(checkChunks(manifest, { ...modules, 'grid.js': { ...modules['grid.js'], gzBytes: 100001 } }, {}, caps).errors).toContainEqual(expect.stringContaining('grid session gzip 100001 exceeds'));
-  expect(checkChunks(manifest, modules, {}).errors).toContain('missing grid session raw ceiling');
+  expect(checkChunks(manifest, { ...modules, 'grid.js': { ...modules['grid.js'], rawBytes: 3853495 } }, {}, caps).errors).toContainEqual(expect.stringContaining('grid session raw 3853495 regressed'));
+  expect(checkChunks(manifest, { ...modules, 'grid.js': { ...modules['grid.js'], gzBytes: 100001 } }, {}, caps).errors).toContainEqual(expect.stringContaining('grid session gzip 100001 regressed'));
+  expect(checkChunks(manifest, modules, {}, { ...caps, caps: { schema: 1, about: '', caps: {} } }).errors).toContain('missing grid session raw ceiling');
   expect(checkChunks(manifest, { ...modules, 'grid.js': { name: 'grid', moduleIds: modules['grid.js'].moduleIds, gzBytes: 50000 } }, {}, caps).errors).toContainEqual(expect.stringContaining('missing grid session raw bytes'));
 });
 
-test('the app build\'s chunk report refuses a grid chunk above the ratchet', async () => {
+test('the app build\'s chunk report measures the grid chunk and holds no regression (BUDGET-CAPS BC5, BC9)', async () => {
   const root = mkdtempSync(resolve('tmp/js-grid-budget-'));
   try {
-    mkdirSync(resolve(root, 'src/client/game/grid'), { recursive: true }); mkdirSync(resolve(root, 'lint'));
+    mkdirSync(resolve(root, 'src/client/game/grid'), { recursive: true }); mkdirSync(resolve(root, 'budgets'));
     writeFileSync(resolve(root, 'src/client/game/grid/session.ts'), `globalThis.grid = ${JSON.stringify('exact data'.repeat(100))};`);
-    const policy = resolve(root, 'lint/ratchet.json');
-    writeFileSync(policy, JSON.stringify({ budgets: { 'js/grid-session/raw': 10, 'js/grid-session/gzip': 10 } }));
+    writeFileSync(resolve(root, 'budgets/caps.json'), readFileSync('budgets/caps.json'));
+    const baselines = (raw: number, gzip: number): void => writeFileSync(resolve(root, 'budgets/baselines.json'), JSON.stringify({ schema: 1, about: '', baselines: {
+      'js/grid-session/raw': { value: raw, contentKey: 'engine' }, 'js/grid-session/gzip': { value: gzip, contentKey: 'engine' } } }));
+    baselines(10, 10);
     const outDir = resolve(root, 'dist'), options: InlineConfig = { root, configFile: false, logLevel: 'silent',
       build: { outDir, minify: false, manifest: true, sourcemap: 'hidden', rolldownOptions: { input: resolve(root, 'src/client/game/grid/session.ts') } } };
     await build(options);
-    expect(() => writeChunkReport(outDir, root)).toThrow('grid session raw');
-    writeFileSync(policy, JSON.stringify({ budgets: { 'js/grid-session/raw': 2000, 'js/grid-session/gzip': 1000 } }));
+    // BC9: the build refuses only past a hard cap; a regressed chunk is measured for budgets.yml, not thrown.
     expect(Object.values(writeChunkReport(outDir, root)).map(row => row.moduleIds)).toEqual([['src/client/game/grid/session.ts']]);
+    baselines(2000, 1000);
+    expect(Object.values(writeChunkReport(outDir, root)).map(row => row.moduleIds)).toEqual([['src/client/game/grid/session.ts']]);
+    const measured = JSON.parse(readFileSync(resolve(outDir, '.vite/budget-measures.json'), 'utf8')) as { measures: Record<string, { contentKey: string }> };
+    expect(measured.measures['js/grid-session/raw']?.contentKey).toBe('engine');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

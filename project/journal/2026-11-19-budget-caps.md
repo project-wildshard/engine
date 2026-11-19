@@ -32,3 +32,6 @@
   the content key is the pinned revision, so a new revision is `raised`. The
   latch, the raises list and the 60 MB number are gone; 100 MB (J338) is the
   hard cap in caps.json.
+- BC5: `check-chunks.mjs` judges `js/<label>/{raw,gzip}` against baselines.json;
+  only `js/title/raw` keeps a hard cap (J324). The build writes
+  `.vite/budget-measures.json` for the check that follows ci.

@@ -32,12 +32,6 @@
     "shardfile/sim-in-runtime": {}
   },
   "budgets": {
-    "js/title/raw": 500000,
-    "js/title/gzip": 160000,
-    "js/grid-session/raw": 300000,
-    "js/grid-session/gzip": 100000,
-    "js/session/raw": 4488690,
-    "js/session/gzip": 1361500,
     "sim-in-runtime/_template": 0,
     "sim-in-runtime/blender-template": 0,
     "sim-in-runtime/driftwood-isle": 0,

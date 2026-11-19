@@ -10,8 +10,9 @@ const budgets = (): Record<string, number> => {
   return Object.fromEntries(Object.entries(rows).filter((row): row is [string, number] => typeof row[1] === 'number'));
 };
 
-test('budget-ceilings keeps the js/* chunk ceilings when it moves the rollout ceilings out', () => {
-  const committed = budgets(), owned = Object.keys(committed).filter(key => key.startsWith('js/'));
+test('budget-ceilings keeps the other budgets when it moves the rollout ceilings out; js/* lives in budgets/ (BC5)', () => {
+  const committed = budgets(), owned = Object.keys(committed).filter(key => !/^[^./]+\.(?:phone|desktop)\.[^.]+\.[^.]+$/u.test(key));
+  expect(Object.keys(committed).filter(key => key.startsWith('js/'))).toEqual([]);
   expect(owned.length).toBeGreaterThan(0);
   // the committed budgets plus legacy rollout rows the script retires (`<shard>.<tier>.<pose>.<metric>`)
   const input = { ...committed, 'driftwood-isle.phone.spawn.draws': 120, 'pine-hollow.desktop.free.gpuMB': 900 };

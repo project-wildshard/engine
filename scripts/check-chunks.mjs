@@ -7,16 +7,42 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { capFor, readBaselines, readCaps } from './budgets/files.mjs';
+import { verdict } from './budgets/verdict.mjs';
 
-/** Also runs inside the actual build, before a preview or deploy can publish. */
-export function gridSessionBudgetErrors(modules, budgets) {
+/** BUDGET-CAPS BC5 (J444): the app's own code sizes (`js/<label>/<raw|gzip>`) are judged by the budget verdict: the hard
+ *  cap in budgets/caps.json (J324's 1 MB raw title; the rest have none on record) and the baseline in
+ *  budgets/baselines.json, content key `engine`. Growth to baseline + 10% fails unless an engine feature declared it
+ *  (`node scripts/budgets/cli.mjs declare js/<label>/<unit> --why "<feature>"`); `hardOnly` fails only past the hard cap.
+ * @typedef {{ caps: import('./budgets/files.mjs').BudgetCaps, baselines: import('./budgets/files.mjs').BudgetBaselines, hardOnly?: boolean }} ChunkBudgets */
+
+/** The committed budget files, as the build reads them. @param {{ hardOnly?: boolean }} [options] @returns {ChunkBudgets} */
+export const chunkBudgets = ({ hardOnly = false } = {}) => ({ caps: readCaps(), baselines: readBaselines(), hardOnly });
+
+/** One code-size measure judged; an error message, or null when it passes.
+ * @param {ChunkBudgets} budgets @param {string} label @param {string} unit @param {number} bytes */
+function judgeCode(budgets, label, unit, bytes) {
+  const key = `js/${label}/${unit}`, cap = capFor(budgets.caps, key), recorded = budgets.baselines.baselines[key];
+  if (cap === undefined) return { error: `missing ${label} ${unit} ceiling`, line: null };
+  const result = verdict({ measure: bytes, baseline: recorded, hard: cap.hard, contentKey: 'engine', declared: recorded?.declared !== undefined, kind: 'exact' });
+  if (result.status === 'over-hard') return { error: `${label} ${unit} ${bytes} exceeds the ${cap.hard} hard cap (${cap.decision})`, line: cap.hard };
+  if (result.status === 'regressed' && budgets.hardOnly !== true) return { error: `${label} ${unit} ${bytes} regressed: at or past ${Math.ceil(result.line ?? 0)}, its ${recorded?.value} baseline + 10%; an engine feature declares it: node scripts/budgets/cli.mjs declare ${key} --why "<feature>"`, line: result.line };
+  return { error: null, line: result.line ?? cap.hard };
+}
+
+/** Also runs inside the actual build, before a preview or deploy can publish.
+ * @param {ChunkBudgets} budgets @param {(unit: string, bytes: number, line: number | null) => void} [measure] */
+export function gridSessionBudgetErrors(modules, budgets, measure) {
   const errors = [];
   for (const [file, row] of Object.entries(modules)) if (row.moduleIds.includes('src/client/game/grid/session.ts')) {
     for (const [unit, field] of [['raw', 'rawBytes'], ['gzip', 'gzBytes']]) {
-      const cap = budgets[`js/grid-session/${unit}`];
-      if (!Number.isSafeInteger(cap) || cap <= 0) errors.push(`missing grid session ${unit} ceiling`);
+      if (capFor(budgets.caps, `js/grid-session/${unit}`) === undefined) errors.push(`missing grid session ${unit} ceiling`);
       else if (!Number.isSafeInteger(row[field]) || row[field] < 0) errors.push(`missing grid session ${unit} bytes (${file})`);
-      else if (row[field] > cap) errors.push(`grid session ${unit} ${row[field]} exceeds ${cap} (${file})`);
+      else {
+        measure?.(unit, row[field], null);
+        const { error } = judgeCode(budgets, 'grid-session', unit, row[field]);
+        if (error !== null) errors.push(`${error.replace('grid-session', 'grid session')} (${file})`);
+      }
     }
   }
   return errors;
@@ -24,12 +50,13 @@ export function gridSessionBudgetErrors(modules, budgets) {
 
 const titleRoots = ['src/client/app/entry.ts', 'src/client/engine/ui/StartTitle.ts', 'src/client/game/mainMenu.ts', 'src/client/game/grid/pageEntry.ts', 'src/client/game/travel/travel.ts'];
 const titleFormat = new Set(['accent.ts', 'admissionLimits.ts', 'builtIndexes.ts', 'contentBounds.ts', 'outputDownload.ts']);
-/** One entry's static closure (its roots' chunks and their static imports, a shared chunk counted once) against its
- *  raw / gzip ceilings in lint/ratchet.json budgets (js/<label>/raw and js/<label>/gzip) and a forbidden-module rule.
- * @param {(unit: string, bytes: number, cap: number) => void} [measure] */
+/** One entry's static closure (its roots' chunks and their static imports, a shared chunk counted once) judged as
+ *  js/<label>/raw and js/<label>/gzip (BC5), and a forbidden-module rule.
+ * @param {ChunkBudgets} budgets @param {(unit: string, bytes: number, line: number | null) => void} [measure] */
 function closureBudgetErrors(modules, budgets, label, roots, forbidden, measure) {
   const entries = Object.entries(modules), clean = id => id.replaceAll('\\', '/').split('?')[0];
-  if (!Object.hasOwn(budgets, `js/${label}/gzip`) && !entries.some(([, row]) => row.moduleIds.some(id => clean(id) === roots[0]))) return [];
+  // A report without this entry is judged only when a baseline says the entry exists (fail closed in the real build).
+  if (!Object.hasOwn(budgets.baselines.baselines, `js/${label}/gzip`) && !entries.some(([, row]) => row.moduleIds.some(id => clean(id) === roots[0]))) return [];
   const errors = [], selected = new Set();
   function visit(file) {
     if (selected.has(file)) return;
@@ -50,28 +77,30 @@ function closureBudgetErrors(modules, budgets, label, roots, forbidden, measure)
   }
   const closureComplete = errors.length === 0;
   for (const [unit, field] of [['raw', 'rawBytes'], ['gzip', 'gzBytes']]) {
-    const cap = budgets[`js/${label}/${unit}`];
-    if (!Number.isSafeInteger(cap) || cap <= 0) { errors.push(`missing ${label} ${unit} ceiling`); continue; }
+    if (capFor(budgets.caps, `js/${label}/${unit}`) === undefined) { errors.push(`missing ${label} ${unit} ceiling`); continue; }
     const before = errors.length;
     let total = 0;
     for (const file of selected) {
       const bytes = modules[file]?.[field];
       if (!Number.isSafeInteger(bytes) || bytes < 0) errors.push(`missing ${label} ${unit} bytes (${file})`); else total += bytes;
     }
-    if (closureComplete && errors.length === before) measure?.(unit, total, cap);
-    if (total > cap) errors.push(`${label} ${unit} ${total} exceeds ${cap}`);
+    if (errors.length !== before) continue;
+    const { error, line } = judgeCode(budgets, label, unit, total);
+    if (closureComplete) measure?.(unit, total, line);
+    if (error !== null) errors.push(error);
   }
   return errors;
 }
 /** Static dependencies of the original public title's explicit dynamic roots.
  * Count shared chunks once; optional settings and gameplay stay outside.
- * Ceilings 160 KB gzip / 500 KB raw (J324, Jake 2026-11-13: "A 1 megabyte title page is fine"; was 110 KB / 350 KB). */
-export function titleClosureBudgetErrors(modules, budgets) {
+ * Hard cap 1 MB raw (J324, Jake 2026-11-13: "A 1 megabyte title page is fine"); baseline + 10% otherwise (BC5).
+ * @param {ChunkBudgets} budgets @param {(unit: string, bytes: number, line: number | null) => void} [measure] */
+export function titleClosureBudgetErrors(modules, budgets, measure) {
   // C3: the title's rows are data in its document, so the cold title loads no generated module
   return closureBudgetErrors(modules, budgets, 'title', titleRoots, id => /node_modules\/(?:three|@dimforge\/rapier[^/]*)(?:\/|$)/u.test(id)
     || /^src\/shards\/.*\.[cm]?[jt]sx?$/u.test(id) || /\.generated(?:\.|$)/u.test(id)
     || /^src\/(?:client|cook|server|shared)\/engine\/(?:explore|calibrate)\//u.test(id)
-    || /\/@wildshard\/format\/src\/format\/.*\.ts$/u.test(id) && !titleFormat.has(id.slice(id.lastIndexOf('/') + 1)));
+    || /\/@wildshard\/format\/src\/format\/.*\.ts$/u.test(id) && !titleFormat.has(id.slice(id.lastIndexOf('/') + 1)), measure);
 }
 /** js-payload J10: the shard session entry's static closure (what every shardfile or grid entry loads before its shard):
  *  gzip / raw ceilings, and no shard folder's code (each shard, LEGACY included, stays behind its own dynamic root). */
@@ -80,7 +109,21 @@ export function sessionClosureBudgetErrors(modules, budgets, measure) {
     id => /^src\/shards\/.*\.[cm]?[jt]sx?$/u.test(id), measure);
 }
 
-export function checkChunks(manifest, modules, closures, budgets = {}) {
+/** Every js/* code-size measure of a chunk report, for scripts/budgets/cli.mjs (content key `engine`).
+ * @param {Record<string, any>} modules @param {ChunkBudgets} budgets */
+export function codeMeasures(modules, budgets) {
+  /** @type {Record<string, { value: number, contentKey: string }>} */
+  const measures = {};
+  const into = label => (unit, bytes) => { measures[`js/${label}/${unit}`] = { value: bytes, contentKey: 'engine' }; };
+  const open = { ...budgets, hardOnly: true };
+  gridSessionBudgetErrors(modules, open, into('grid-session'));
+  titleClosureBudgetErrors(modules, open, into('title'));
+  sessionClosureBudgetErrors(modules, open, into('session'));
+  return { measures };
+}
+
+/** @param {ChunkBudgets} budgets */
+export function checkChunks(manifest, modules, closures, budgets) {
   const errors = [];
   // SF16 keeps picker metadata; every authored template gameplay module is data loaded from its shardfile.
   const templateMetadata = new Set(['manifest.ts', 'manifest.json', 'discovery.generated.ts', 'boot/bindings.ts', 'budgets.ts', 'budgetCeilings.ts', 'data/budgets.ts', 'data/budgetCeilings.ts', 'data/spawn.ts', 'explore/art.ts'].map((path) => `src/shards/_template/${path}`));
@@ -140,9 +183,9 @@ export function checkChunks(manifest, modules, closures, budgets = {}) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const dist = resolve(process.argv[2] ?? 'dist');
+    const dist = resolve(process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? 'dist');
     const json = (path) => JSON.parse(readFileSync(path, 'utf8'));
-    const result = checkChunks(json(resolve(dist, '.vite/manifest.json')), json(resolve(dist, '.vite/chunk-modules.json')), json(resolve('src/server/game/shard/manifest-closure.generated.json')), json(resolve('lint/ratchet.json')).budgets);
+    const result = checkChunks(json(resolve(dist, '.vite/manifest.json')), json(resolve(dist, '.vite/chunk-modules.json')), json(resolve('src/server/game/shard/manifest-closure.generated.json')), chunkBudgets({ hardOnly: process.argv.includes('--hard-only') }));
     for (const row of result.table) console.log(`${row.name.padEnd(32)} ${(row.gzBytes / 1024).toFixed(1).padStart(8)} gz KB  ${String(row.modules).padStart(4)} modules  ${row.file}`);
     for (const error of result.errors) console.error(`check-chunks: ${error}`);
     if (result.errors.length > 0) process.exitCode = 1;

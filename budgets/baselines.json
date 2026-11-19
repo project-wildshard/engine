@@ -61,6 +61,870 @@
    "value": 1358266,
    "contentKey": "engine",
    "commit": "43c891e6"
+  },
+  "ledger/_template/control": {
+   "value": 91655664,
+   "contentKey": "template@10",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 344064,
+    "workers": 7257724,
+    "geometry": 15301958,
+    "textures": 17885916,
+    "scene": 13892888,
+    "audio": 0,
+    "loading": 34162330,
+    "margin": 0
+   }
+  },
+  "ledger/_template/peak": {
+   "value": 100910812,
+   "contentKey": "template@10",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 344064,
+    "workers": 7390848,
+    "geometry": 15301958,
+    "textures": 17885916,
+    "scene": 13892888,
+    "audio": 0,
+    "loading": 43284354,
+    "margin": 0
+   }
+  },
+  "ledger/brasscap-mesa/control": {
+   "value": 114712185,
+   "contentKey": "brasscap-mesa@7",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1749456,
+    "workers": 6308399,
+    "geometry": 21595914,
+    "textures": 14187164,
+    "scene": 21582240,
+    "audio": 0,
+    "loading": 46478228,
+    "margin": 0
+   }
+  },
+  "ledger/brasscap-mesa/peak": {
+   "value": 114976381,
+   "contentKey": "brasscap-mesa@7",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1749456,
+    "workers": 6572595,
+    "geometry": 21595914,
+    "textures": 14187164,
+    "scene": 21582240,
+    "audio": 0,
+    "loading": 46478228,
+    "margin": 0
+   }
+  },
+  "ledger/driftwood-isle/control": {
+   "value": 223407810,
+   "contentKey": "driftwood-isle@5",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1880528,
+    "workers": 15048057,
+    "geometry": 43155872,
+    "textures": 59225894,
+    "scene": 0,
+    "audio": 29864263,
+    "loading": 71422412,
+    "margin": 0
+   }
+  },
+  "ledger/driftwood-isle/peak": {
+   "value": 267986562,
+   "contentKey": "driftwood-isle@5",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1880528,
+    "workers": 15048057,
+    "geometry": 43155872,
+    "textures": 59225894,
+    "scene": 0,
+    "audio": 29864263,
+    "loading": 116001164,
+    "margin": 0
+   }
+  },
+  "ledger/far-reach/control": {
+   "value": 283175417,
+   "contentKey": "far-reach@4",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 0,
+    "workers": 8720141,
+    "geometry": 21246196,
+    "textures": 158019576,
+    "scene": 0,
+    "audio": 0,
+    "loading": 92378720,
+    "margin": 0
+   }
+  },
+  "ledger/far-reach/peak": {
+   "value": 340653553,
+   "contentKey": "far-reach@4",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 0,
+    "workers": 8720141,
+    "geometry": 21246196,
+    "textures": 158019576,
+    "scene": 0,
+    "audio": 0,
+    "loading": 149856856,
+    "margin": 0
+   }
+  },
+  "ledger/ink-cel-valley/control": {
+   "value": 60334140,
+   "contentKey": "ink-cel-valley@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 7056417,
+    "geometry": 7367392,
+    "textures": 18599340,
+    "scene": 5101832,
+    "audio": 0,
+    "loading": 17992983,
+    "margin": 0
+   }
+  },
+  "ledger/ink-cel-valley/peak": {
+   "value": 60334140,
+   "contentKey": "ink-cel-valley@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 7056417,
+    "geometry": 7367392,
+    "textures": 18599340,
+    "scene": 5101832,
+    "audio": 0,
+    "loading": 17992983,
+    "margin": 0
+   }
+  },
+  "ledger/nalati-grasslands/control": {
+   "value": 266209973,
+   "contentKey": "nalati-grasslands@2",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 14032048,
+    "workers": 9790487,
+    "geometry": 44126019,
+    "textures": 52530214,
+    "scene": 10534008,
+    "audio": 42531482,
+    "loading": 89854931,
+    "margin": 0
+   }
+  },
+  "ledger/nalati-grasslands/peak": {
+   "value": 322080017,
+   "contentKey": "nalati-grasslands@2",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 14032048,
+    "workers": 14478732,
+    "geometry": 44126019,
+    "textures": 52530214,
+    "scene": 10534008,
+    "audio": 42531482,
+    "loading": 141036730,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-alien-plain/control": {
+   "value": 65190274,
+   "contentKey": "open-plot-alien-plain@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 7905147,
+    "geometry": 9258390,
+    "textures": 11671904,
+    "scene": 0,
+    "audio": 20620048,
+    "loading": 11518609,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-alien-plain/peak": {
+   "value": 65190274,
+   "contentKey": "open-plot-alien-plain@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 7905147,
+    "geometry": 9258390,
+    "textures": 11671904,
+    "scene": 0,
+    "audio": 20620048,
+    "loading": 11518609,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-clockwork-canyon/control": {
+   "value": 93527297,
+   "contentKey": "open-plot-clockwork-canyon@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10145518,
+    "geometry": 16653208,
+    "textures": 11673304,
+    "scene": 9408,
+    "audio": 24848663,
+    "loading": 25981020,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-clockwork-canyon/peak": {
+   "value": 93527297,
+   "contentKey": "open-plot-clockwork-canyon@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10145518,
+    "geometry": 16653208,
+    "textures": 11673304,
+    "scene": 9408,
+    "audio": 24848663,
+    "loading": 25981020,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-coral-drift/control": {
+   "value": 94311780,
+   "contentKey": "open-plot-coral-drift@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 8885894,
+    "geometry": 22120632,
+    "textures": 12015968,
+    "scene": 0,
+    "audio": 16953574,
+    "loading": 30119536,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-coral-drift/peak": {
+   "value": 94311780,
+   "contentKey": "open-plot-coral-drift@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 8885894,
+    "geometry": 22120632,
+    "textures": 12015968,
+    "scene": 0,
+    "audio": 16953574,
+    "loading": 30119536,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-desert-ruin/control": {
+   "value": 108071083,
+   "contentKey": "open-plot-desert-ruin@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10499964,
+    "geometry": 21104636,
+    "textures": 12347536,
+    "scene": 0,
+    "audio": 30585461,
+    "loading": 29317310,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-desert-ruin/peak": {
+   "value": 108071083,
+   "contentKey": "open-plot-desert-ruin@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10499964,
+    "geometry": 21104636,
+    "textures": 12347536,
+    "scene": 0,
+    "audio": 30585461,
+    "loading": 29317310,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-ember-forge/control": {
+   "value": 82206825,
+   "contentKey": "open-plot-ember-forge@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 11826643,
+    "geometry": 14667978,
+    "textures": 12056192,
+    "scene": 0,
+    "audio": 16223131,
+    "loading": 23216705,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-ember-forge/peak": {
+   "value": 82206825,
+   "contentKey": "open-plot-ember-forge@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 11826643,
+    "geometry": 14667978,
+    "textures": 12056192,
+    "scene": 0,
+    "audio": 16223131,
+    "loading": 23216705,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-fossil-badlands/control": {
+   "value": 79785328,
+   "contentKey": "open-plot-fossil-badlands@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 8754950,
+    "geometry": 13760904,
+    "textures": 11674648,
+    "scene": 672,
+    "audio": 23665117,
+    "loading": 17712861,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-fossil-badlands/peak": {
+   "value": 79785328,
+   "contentKey": "open-plot-fossil-badlands@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 8754950,
+    "geometry": 13760904,
+    "textures": 11674648,
+    "scene": 672,
+    "audio": 23665117,
+    "loading": 17712861,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-frostline-peaks/control": {
+   "value": 95307055,
+   "contentKey": "open-plot-frostline-peaks@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10494859,
+    "geometry": 15641704,
+    "textures": 13740184,
+    "scene": 3216,
+    "audio": 21964048,
+    "loading": 29246868,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-frostline-peaks/peak": {
+   "value": 95307055,
+   "contentKey": "open-plot-frostline-peaks@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10494859,
+    "geometry": 15641704,
+    "textures": 13740184,
+    "scene": 3216,
+    "audio": 21964048,
+    "loading": 29246868,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-jungle-ziggurat/control": {
+   "value": 89857357,
+   "contentKey": "open-plot-jungle-ziggurat@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10291920,
+    "geometry": 16238272,
+    "textures": 12351648,
+    "scene": 0,
+    "audio": 20318312,
+    "loading": 26441029,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-jungle-ziggurat/peak": {
+   "value": 89857357,
+   "contentKey": "open-plot-jungle-ziggurat@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10291920,
+    "geometry": 16238272,
+    "textures": 12351648,
+    "scene": 0,
+    "audio": 20318312,
+    "loading": 26441029,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-lantern-bayou/control": {
+   "value": 94825421,
+   "contentKey": "open-plot-lantern-bayou@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 9339731,
+    "geometry": 21880658,
+    "textures": 11673304,
+    "scene": 12912,
+    "audio": 18436180,
+    "loading": 29266460,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-lantern-bayou/peak": {
+   "value": 94825421,
+   "contentKey": "open-plot-lantern-bayou@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 9339731,
+    "geometry": 21880658,
+    "textures": 11673304,
+    "scene": 12912,
+    "audio": 18436180,
+    "loading": 29266460,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-mosslight-ruins/control": {
+   "value": 103072386,
+   "contentKey": "open-plot-mosslight-ruins@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 12244499,
+    "geometry": 22341074,
+    "textures": 12466408,
+    "scene": 10272,
+    "audio": 16051118,
+    "loading": 35742839,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-mosslight-ruins/peak": {
+   "value": 103072386,
+   "contentKey": "open-plot-mosslight-ruins@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 12244499,
+    "geometry": 22341074,
+    "textures": 12466408,
+    "scene": 10272,
+    "audio": 16051118,
+    "loading": 35742839,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-night-market/control": {
+   "value": 125672097,
+   "contentKey": "open-plot-night-market@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 13572419,
+    "geometry": 25827966,
+    "textures": 13740184,
+    "scene": 7344,
+    "audio": 24961117,
+    "loading": 43346891,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-night-market/peak": {
+   "value": 125672097,
+   "contentKey": "open-plot-night-market@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 13572419,
+    "geometry": 25827966,
+    "textures": 13740184,
+    "scene": 7344,
+    "audio": 24961117,
+    "loading": 43346891,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-patchwork-fairground/control": {
+   "value": 76773561,
+   "contentKey": "open-plot-patchwork-fairground@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 9175262,
+    "geometry": 12170002,
+    "textures": 11674648,
+    "scene": 1344,
+    "audio": 21189127,
+    "loading": 18347002,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-patchwork-fairground/peak": {
+   "value": 76773561,
+   "contentKey": "open-plot-patchwork-fairground@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 9175262,
+    "geometry": 12170002,
+    "textures": 11674648,
+    "scene": 1344,
+    "audio": 21189127,
+    "loading": 18347002,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-saltwind-lighthouse/control": {
+   "value": 57885916,
+   "contentKey": "open-plot-saltwind-lighthouse@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 6925771,
+    "geometry": 4981692,
+    "textures": 11674648,
+    "scene": 1344,
+    "audio": 22950502,
+    "loading": 7135783,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-saltwind-lighthouse/peak": {
+   "value": 57885916,
+   "contentKey": "open-plot-saltwind-lighthouse@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 6925771,
+    "geometry": 4981692,
+    "textures": 11674648,
+    "scene": 1344,
+    "audio": 22950502,
+    "loading": 7135783,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-sky-harbor/control": {
+   "value": 78612618,
+   "contentKey": "open-plot-sky-harbor@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 8475370,
+    "geometry": 15761290,
+    "textures": 11674648,
+    "scene": 4704,
+    "audio": 18105574,
+    "loading": 20374856,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-sky-harbor/peak": {
+   "value": 78612618,
+   "contentKey": "open-plot-sky-harbor@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 8475370,
+    "geometry": 15761290,
+    "textures": 11674648,
+    "scene": 4704,
+    "audio": 18105574,
+    "loading": 20374856,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-sky-race/control": {
+   "value": 82431297,
+   "contentKey": "open-plot-sky-race@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 8608374,
+    "geometry": 15392706,
+    "textures": 11674648,
+    "scene": 2688,
+    "audio": 22430068,
+    "loading": 20106637,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-sky-race/peak": {
+   "value": 82431297,
+   "contentKey": "open-plot-sky-race@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 8608374,
+    "geometry": 15392706,
+    "textures": 11674648,
+    "scene": 2688,
+    "audio": 22430068,
+    "loading": 20106637,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-starfall-observatory/control": {
+   "value": 89450136,
+   "contentKey": "open-plot-starfall-observatory@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10280755,
+    "geometry": 15723914,
+    "textures": 11673304,
+    "scene": 7344,
+    "audio": 22612180,
+    "loading": 24936463,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-starfall-observatory/peak": {
+   "value": 89450136,
+   "contentKey": "open-plot-starfall-observatory@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 10280755,
+    "geometry": 15723914,
+    "textures": 11673304,
+    "scene": 7344,
+    "audio": 22612180,
+    "loading": 24936463,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-thin-ice/control": {
+   "value": 59494736,
+   "contentKey": "open-plot-thin-ice@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 6196082,
+    "geometry": 6886026,
+    "textures": 11673304,
+    "scene": 6720,
+    "audio": 21525166,
+    "loading": 8991262,
+    "margin": 0
+   }
+  },
+  "ledger/open-plot-thin-ice/peak": {
+   "value": 59494736,
+   "contentKey": "open-plot-thin-ice@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 6196082,
+    "geometry": 6886026,
+    "textures": 11673304,
+    "scene": 6720,
+    "audio": 21525166,
+    "loading": 8991262,
+    "margin": 0
+   }
+  },
+  "ledger/pastel-plain/control": {
+   "value": 54952078,
+   "contentKey": "pastel-plain@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 7057146,
+    "geometry": 7367356,
+    "textures": 12977772,
+    "scene": 5101832,
+    "audio": 0,
+    "loading": 18231796,
+    "margin": 0
+   }
+  },
+  "ledger/pastel-plain/peak": {
+   "value": 54952078,
+   "contentKey": "pastel-plain@1",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 7057146,
+    "geometry": 7367356,
+    "textures": 12977772,
+    "scene": 5101832,
+    "audio": 0,
+    "loading": 18231796,
+    "margin": 0
+   }
+  },
+  "ledger/pine-hollow/control": {
+   "value": 372955575,
+   "contentKey": "pine-hollow@5",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 524288,
+    "workers": 8300285,
+    "geometry": 60073161,
+    "textures": 127285900,
+    "scene": 158244,
+    "audio": 46651101,
+    "loading": 127151812,
+    "margin": 0
+   }
+  },
+  "ledger/pine-hollow/peak": {
+   "value": 441106309,
+   "contentKey": "pine-hollow@5",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 524288,
+    "workers": 10412040,
+    "geometry": 60073161,
+    "textures": 127285900,
+    "scene": 430296,
+    "audio": 46651101,
+    "loading": 192918739,
+    "margin": 0
+   }
+  },
+  "ledger/sunscar-dunes/control": {
+   "value": 193819449,
+   "contentKey": "sunscar-dunes@2",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 6414963,
+    "geometry": 12291844,
+    "textures": 81072452,
+    "scene": 5101832,
+    "audio": 0,
+    "loading": 84722182,
+    "margin": 0
+   }
+  },
+  "ledger/sunscar-dunes/peak": {
+   "value": 202894524,
+   "contentKey": "sunscar-dunes@2",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 1405392,
+    "workers": 6414963,
+    "geometry": 12291844,
+    "textures": 81072452,
+    "scene": 5101832,
+    "audio": 0,
+    "loading": 93797257,
+    "margin": 0
+   }
+  },
+  "webkit-ledger/nine-dragon-stack/control": {
+   "value": 400756227,
+   "contentKey": "nine-dragon-stack@3",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 0,
+    "workers": 2359296,
+    "geometry": 115621098,
+    "textures": 46879100,
+    "scene": 0,
+    "audio": 854400,
+    "loading": 232231549,
+    "margin": 0
+   }
+  },
+  "webkit-ledger/nine-dragon-stack/peak": {
+   "value": 400756227,
+   "contentKey": "nine-dragon-stack@3",
+   "commit": "dfb1f92fd",
+   "detail": {
+    "browser": 2810784,
+    "engine": 0,
+    "workers": 2359296,
+    "geometry": 115621098,
+    "textures": 46879100,
+    "scene": 0,
+    "audio": 854400,
+    "loading": 232231549,
+    "margin": 0
+   }
   }
  }
 }
