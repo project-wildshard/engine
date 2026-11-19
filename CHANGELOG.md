@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.50 (2026-11-19)
+
+- Brasscap Mesa uses revision 9, with the current Dust Wyrm.
+- Grid pages place the serpent along its trail.
+- Declared creature decisions can read the nearest player, and the server leads declared rides.
+- Kit melee reports which part a blow hit. Reviving a creature restores its parts and break channels.
+- The page accepts ownerless runtime plans for declared creature spawns.
+
 ## v0.1.49 (2026-11-19)
 
 - Native runtime plans now run the creatures declared by ordinary shard uploads.
