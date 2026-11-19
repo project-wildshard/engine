@@ -1468,6 +1468,9 @@ try {
     const row = { deadlineMs: item.deadlineMs, mode: item.mode, id: item.id, owner: item.owner, screen: item.screen, inject: item.inject, ms: Date.now() - started, ...result };
     rows.push(row);
     console.log(`${result.outcome.padEnd(18)} ${item.mode.padEnd(4)} ${item.id}${result.reason === undefined ? '' : `: ${result.reason}`}`);
+    // FM11: the receipt so far after every case, so a nightly cut off by its job's time limit still uploads what it judged
+    writeFileSync(join(out, 'receipt.json'), JSON.stringify({ schema: 'failmode-proof/1', sha, engine, browser: browserVersion, baseline, build: fixture.build,
+      phase: 'partial', judged: rows.length, of: cases.length, exit: 2, cases: rows }, null, 1));
     if (result.outcome === 'harness-fail' && !baseline) break;
   }
 } catch (error) {

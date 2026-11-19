@@ -41,7 +41,8 @@ concurrency:
 jobs:
   browser:
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ github.event_name == 'push' && 15 || 75 }}
+    # All 55 cases keep real clocks and a minute's connect wait between play cases: about two and a half hours (FM11).
+    timeout-minutes: ${{ github.event_name == 'push' && 15 || 200 }}
     env:
       WS_LANE_NAME: fm11
       SELECTION: ${{ github.event_name == 'push' && 'related' || inputs.selection || 'all' }}
