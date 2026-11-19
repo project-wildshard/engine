@@ -27,6 +27,10 @@
 .ws-quest-obj.pulse { animation: ws-quest-pulse 1.4s ease-out; }
 @keyframes ws-quest-pulse { 0% { box-shadow: 0 0 0 1px rgba(143, 227, 255, 0.9), 0 0 22px rgba(143, 227, 255, 0.65); border-color: var(--ws-cyan); } 100% { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.28); border-color: var(--ws-cyan-line); } }
 #hud.intro .ws-quest-obj { display: none; }
+/* J473 row 6 (Jake, 2026-11-19 grill wave 4: "one line under the map, 60% max, ellipsis, distance always"): on a phone the
+   tracker is one line at most 60% of the width; the name takes the ellipsis, the count and the distance never do, and nothing
+   draws past the chip's edge (a goal swap replaces the text in place, a yielding chip is gone at once: row 28) */
+#hud.touch .ws-quest-obj { max-width: 60vw; overflow: hidden; }
 
 /* ── the race clock (SHARD-SOURCE SS-MS1a3): one glass chip at the top centre while a timed run runs, then its time and best ── */
 .ws-quest-race {
