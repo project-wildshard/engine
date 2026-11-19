@@ -18,7 +18,7 @@ function fixture(shared: string): Record<string, ChunkModuleReport> {
   };
 }
 test('the session closure counts its static imports against both ceilings', () => {
-  const measurements: [string, number, number][] = [];
+  const measurements: [string, number, number | null][] = [];
   expect(sessionClosureBudgetErrors(fixture('src/client/game/shardfile/client.ts'), caps, (unit, bytes, cap) => {
     measurements.push([unit, bytes, cap]);
   })).toEqual([]);

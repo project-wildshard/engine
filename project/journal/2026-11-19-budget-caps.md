@@ -44,3 +44,5 @@
   `memory-ledger-guard`; every build gate runs hard-only. main-watch reads the
   budgets runs and files a fix row for the pusher.
 - BC10: `cli.mjs record --run <id>` records from a budgets run's artifact.
+- BC12: `PHONE_MEMORY_LOADING_CAP_BYTES` in `src/shared/engine/core/phoneMemoryCap.ts`
+  is the one 1.5e9 in engine code; a test ties it to caps.json.

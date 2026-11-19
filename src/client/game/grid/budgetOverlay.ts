@@ -25,9 +25,10 @@ import { budgetBreakdown, megabytes, PLATFORM_OWNER, readBudgetPoints, type Budg
 import type { MemoryGrouping, MemorySort } from './memoryRows';
 import type { PhoneBudgetReading, readPhoneBudget, renderMemoryPanel } from './budgetMemoryPanel';
 import './budgetOverlay.css';
+import { PHONE_MEMORY_LOADING_CAP_BYTES } from '@wildshard/engine/core/phoneMemoryCap';
 
-/** D1: the headline turns amber at this many bytes (decimal, MB = 10^6) */
-export const MEMORY_AMBER = 1.5e9;
+/** D1: the headline turns amber at this many bytes (decimal, MB = 10^6); the phone line, BC12 */
+export const MEMORY_AMBER = PHONE_MEMORY_LOADING_CAP_BYTES;
 /** D1: and red at this many */
 export const MEMORY_RED = 1.75e9;
 /** iPhone 17 Pro WebContent jetsam log, ActiveHard 2048 MiB. https://developer.apple.com/forums/thread/823061 */

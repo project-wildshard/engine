@@ -2,9 +2,10 @@ import { MemoryAdmission, type MemoryAdmissionRequest } from '@wildshard/format/
 import { MEMORY_GATES } from '@wildshard/format/contentBounds';
 import { isDev } from '@wildshard/engine/core/devMode';
 import { TIER, type Tier } from '@wildshard/engine/core/tier';
+import { PHONE_MEMORY_LOADING_CAP_BYTES } from '@wildshard/engine/core/phoneMemoryCap';
 
-/** MG3 / J431: estimates over engine's MEMORY_AMBER show a phone warning. Decimal bytes. */
-export const PHONE_MEMORY_LINE_BYTES = 1.5e9;
+/** MG3 / J431: estimates over the phone line show a phone warning. Decimal bytes (BC12: budgets/caps.json). */
+export const PHONE_MEMORY_LINE_BYTES = PHONE_MEMORY_LOADING_CAP_BYTES;
 
 interface PhoneMemoryEstimate { playing: number; loading: number }
 

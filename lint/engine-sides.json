@@ -1571,6 +1571,7 @@
     "src/shared/engine/core/memoryBudget.ts": "shared",
     "src/shared/engine/core/memoryResources.ts": "shared",
     "src/shared/engine/core/ownedBuffer.ts": "shared",
+    "src/shared/engine/core/phoneMemoryCap.ts": "shared",
     "src/shared/engine/core/workerMemory.ts": "shared",
     "src/shared/engine/core/perfLap.ts": "shared",
     "src/shared/engine/core/phoneMemoryModel.ts": "shared",
