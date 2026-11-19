@@ -2,15 +2,17 @@
 // signed deploy and code-retirement transitions over the same executable bytes.
 import { constants, cpSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { sourceBuildId } from './app-build/buildIdentity.mjs';
 
 /** @param {string} first @param {string} next */
 export function nextFailmodeDeploy(first, next) {
   const version = JSON.parse(readFileSync(join(first, 'version.json'), 'utf8'));
   const build = version.build;
-  if (typeof build !== 'string' || !/^[\w.-]+$/u.test(build)) throw new Error('Missing fixture build identity');
+  if (typeof build !== 'string' || !/^[0-9a-f]{7,40}(?:-[a-z0-9]+)?$/u.test(build)) throw new Error('Missing fixture build identity');
   const at = Date.parse(version.time);
   if (!Number.isFinite(at)) throw new Error('Missing fixture build time');
-  const nextBuild = `${build}-next`, nextTime = new Date(at + 1000).toISOString();
+  const nextAt = at + 1000;
+  const nextBuild = sourceBuildId(build.slice(0, 7), nextAt), nextTime = new Date(nextAt).toISOString();
   const from = `globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};`;
   const to = `globalThis.__WS_BUILD_ID__=${JSON.stringify(nextBuild)};`;
   if (!readFileSync(join(first, 'index.html'), 'utf8').includes(from)) throw new Error('Fixture document stamp disagrees with version.json');
@@ -19,7 +21,7 @@ export function nextFailmodeDeploy(first, next) {
     if (!file.isFile() || !file.name.endsWith('.html')) continue;
     const path = join(file.parentPath, file.name), html = readFileSync(path, 'utf8');
     if (html.includes(from)) writeFileSync(path, html.replace(from, to)
-      .replace(`globalThis.__WS_BUILT_AT__=${at};`, `globalThis.__WS_BUILT_AT__=${at + 1000};`)
+      .replace(`globalThis.__WS_BUILT_AT__=${at};`, `globalThis.__WS_BUILT_AT__=${nextAt};`)
       .replace(`name="ws-built-at" content="${version.time}"`, `name="ws-built-at" content="${nextTime}"`));
   }
   const assets = join(next, 'assets/spawn');

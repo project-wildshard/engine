@@ -18,15 +18,17 @@ test('FM11 changes the deployment documents while preserving compiled entry byte
   writeFileSync(join(code, 'entry.js'), 'globalThis.answer = 42');
   writeFileSync(join(assets, 'packs-1234567-fixture.json'), '{}');
 
-  assert.equal(nextFailmodeDeploy(first, next), '1234567-fixture-next');
+  const nextBuild = nextFailmodeDeploy(first, next);
+  assert.match(nextBuild, /^[0-9a-f]{7,40}(?:-[a-z0-9]+)?$/u);
+  assert.notEqual(nextBuild, '1234567-fixture');
   assert.equal(readFileSync(join(first, 'index.html'), 'utf8'), html);
   const document = readFileSync(join(next, 'index.html'), 'utf8');
-  assert.match(document, /__WS_BUILD_ID__="1234567-fixture-next";/u);
+  assert.match(document, new RegExp(`__WS_BUILD_ID__="${nextBuild}";`, 'u'));
   assert.match(document, /2026-11-19T05:00:01.000Z/u);
   assert.match(document, /src="\/b\/1234567-fixture\/entry.js"/u);
   assert.equal(readFileSync(join(next, 'b/1234567-fixture/entry.js'), 'utf8'), 'globalThis.answer = 42');
-  assert.equal(readFileSync(join(next, 'assets/spawn/packs-1234567-fixture-next.json'), 'utf8'), '{}');
+  assert.equal(readFileSync(join(next, `assets/spawn/packs-${nextBuild}.json`), 'utf8'), '{}');
   assert.deepEqual(JSON.parse(readFileSync(join(next, 'version.json'), 'utf8')), {
-    build: '1234567-fixture-next', time: '2026-11-19T05:00:01.000Z',
+    build: nextBuild, time: '2026-11-19T05:00:01.000Z',
   });
 });
