@@ -220,19 +220,30 @@ export interface NativePopulationRows {
   /** Original admission lifetime: per preparation or per host installation. */
   readonly admission: 'prepare' | 'install';
 }
+/** A native population's keeper and its boss encounter; null when the plan keeps no boss (its boss is a declared encounter). */
+export interface KeptPopulation {
+  readonly keeper: ReturnType<typeof installSpeciesHomes>;
+  readonly encounter: ReturnType<typeof installBossOwnerRow> | null;
+}
 /** Prepare original baked recipes and install the existing population/encounter
- * in the caller's phase. No actor, RNG draw or step runs during preparation. */
+ * in the caller's phase. No actor, RNG draw or step runs during preparation. An `owner` left out (OF19c0) installs the
+ * keeper alone: its boss, if the shard has one, is a declared encounter beside the plan. */
 export function prepareNativePopulation(rows: NativePopulationRows, baked: Parameters<typeof bakedSpecs>[0], owner: unknown): {
   readonly specs: ReturnType<typeof bakedSpecs>;
-  readonly install: (host: SimHost, ports: Omit<BossOwnerPorts, 'body'>, saved?: Parameters<typeof installSpeciesHomes>[2], decisions?: SpeciesDecisionAuthority) => ReturnType<typeof installSpeciesEncounter>;
+  readonly install: (host: SimHost, ports: Omit<BossOwnerPorts, 'body'>, saved?: Parameters<typeof installSpeciesHomes>[2], decisions?: SpeciesDecisionAuthority) => KeptPopulation;
 } {
   const specs = bakedSpecs(baked), brains = rows.admission === 'prepare' ? admitSpeciesProgram(rows.program) : null;
   const homes = rows.homes.map(row => ({ ...row, late: row.late === 'ground' ? specs.get(row.kind)?.flight === undefined : row.late ?? false }));
-  return { specs, install: (host, ports, saved, decisions) => installSpeciesEncounter(host, {
-    ...(decisions === undefined ? {} : { decisions }),
-    step: rows.step, seed: rows.seed, homes, specs, species: rows.program.species, brains: brains ?? admitSpeciesProgram(rows.program),
-    attackers: rows.attackers ?? Infinity, think: rows.think === 'legacy' ? { bands: { rate: () => 'legacy' } } : rows.think,
-    ...(rows.boss === undefined ? {} : { boss: rows.boss }), ...(rows.killY === undefined ? {} : { killY: rows.killY }),
-    ...(rows.placement === undefined ? {} : { placement: rows.placement }), ...(rows.holds === undefined ? {} : { holds: rows.holds }),
-  }, owner, ports, saved) };
+  // OF19c0: a plan whose boss moved to a declared encounter keeps no owner row; a keeper boss still needs the one that fights it
+  if (owner === undefined && rows.boss !== undefined) throw new Error('A runtime keeper boss needs its owner row');
+  return { specs, install: (host, ports, saved, decisions) => {
+    const population: SpeciesHomesSpec = {
+      ...(decisions === undefined ? {} : { decisions }),
+      step: rows.step, seed: rows.seed, homes, specs, species: rows.program.species, brains: brains ?? admitSpeciesProgram(rows.program),
+      attackers: rows.attackers ?? Infinity, think: rows.think === 'legacy' ? { bands: { rate: () => 'legacy' } } : rows.think,
+      ...(rows.boss === undefined ? {} : { boss: rows.boss }), ...(rows.killY === undefined ? {} : { killY: rows.killY }),
+      ...(rows.placement === undefined ? {} : { placement: rows.placement }), ...(rows.holds === undefined ? {} : { holds: rows.holds }),
+    };
+    return owner === undefined ? { keeper: installSpeciesHomes(host, population, saved), encounter: null } : installSpeciesEncounter(host, population, owner, ports, saved);
+  } };
 }

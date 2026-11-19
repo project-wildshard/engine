@@ -161,7 +161,7 @@ test('the Matriarch stays the keeper\'s beside declared spawns, and a body or de
     const environment = world.install(host, { restoring: false, emit: () => undefined }); environment.keeper.settle();
     host.events.answer('damage.modify', request => request?.target === leadPlayer(host).health ? null : request, host.scope);
     // summoned, the keeper's Matriarch rises and fights on her borrowed decision row while the declared bodies stand by
-    leadPlayer(host).position.set(-14, 0.1, -141); environment.encounter.summon();
+    leadPlayer(host).position.set(-14, 0.1, -141); environment.encounter?.summon();
     for (let i = 0; i < 600; i++) host.step();
     const slot = snapshotSimHost(host).adapters.find(row => row.id === 'sunscar.homes');
     const kept = v.parse(v.object({ boss: v.object({ policy: v.string() }) }), slot?.state), wire: unknown = JSON.parse(kept.boss.policy);

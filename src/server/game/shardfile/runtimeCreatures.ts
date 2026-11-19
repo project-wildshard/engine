@@ -1,8 +1,9 @@
 // ONE-FORMAT OF19b0: a native runtime plan runs declared creature rows. A shard moving off its species program (Dunes,
 // Sky Reach) keeps its runtime plan for its quest page and held melee (J367 (7)), so its creatures become declared spawns
 // beside it: the level stands them as an ordinary upload's level does, and the same declared creature host drives them.
-// The plan's keeper keeps only its boss (until OF19c), and every `sim/scripts` decision row has one owner: the keeper's
-// borrowed authority runs the rows its program's decision brains name, the declared host's `ShardDecisions` the rest.
+// The plan's keeper keeps only its boss, or nothing once its boss is a declared encounter (OF19c0), and every
+// `sim/scripts` decision row has one owner: the keeper's borrowed authority runs the rows its program's decision brains
+// name, the declared host's `ShardDecisions` the rest.
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { SimHost, SimSpawn } from '@wildshard/engine/sim';
 import { buildPlatformSpawns } from '@wildshard/engine/ai/platform';
@@ -27,6 +28,8 @@ import { installDeclaredPatrols } from './declaredPatrols';
 import { installDeclaredRanks, rankCreatureSpawns } from './declaredRanks';
 import { countSlots } from './declaredSpawnCount';
 import { decisionRuntime, ShardDecisions } from './decisions';
+import { installDeclaredEncounters } from '../shard/declaredEncounters';
+import { installEncounterAdds } from './encounterAdds';
 import type { NativePopulationRows } from './bossRow';
 
 /** The declared spawns as a level stands them: platform bodies, sized by their species, ranked. `shard` is counted. */
@@ -66,7 +69,6 @@ export function admitRuntimeCreatures(shard: Shardfile, sections: ReadonlyMap<st
   for (const row of decisionScriptsFromSections(sections)) if (keeper.scripts.has(row.id) && Object.values(row.actors).some(id => declared.has(id)))
     throw new Error(`Decision ${row.id} is the keeper's and binds a declared spawn: one decision row, one owner`);
   if (shard.crowds.length > 0) throw new Error('Declared crowds do not run beside a native runtime plan');
-  if (shard.encounters.length > 0) throw new Error('Declared encounters do not run beside a native runtime plan until its boss moves (OF19c)');
   const custom = new Set(shard.creatures.brains.filter(brain => brain.kind === 'script').map(brain => brain.id));
   if (shard.creatures.spawns.some(spawn => spawn.brain !== null && custom.has(spawn.brain))) throw new Error('Declared script brains do not run beside a native runtime plan');
 }
@@ -77,18 +79,23 @@ export interface RuntimeCreaturePorts {
   readonly keeper: ReturnType<typeof keeperOwnership>;
   /** The runtime's ledger fact port, for a decision's grant. */
   readonly fact: (name: string, actorId: string) => void;
+  /** OF19c0: the spawns the quest page summons (`{ spawn }`): their encounters wait, dormant, for `summon`. */
+  readonly summoned: ReadonlySet<string>;
 }
+/** A declared encounter beside a runtime plan, as the quest page's summon and the plan's loadout lock read it. */
+export interface RuntimeEncounter { readonly summon: () => void; readonly locked: () => boolean }
 
 /**
  * Install the declared creature host on a native runtime's host, as `bindShardfileSim` installs it for an ordinary upload:
  * senses, volumes, bands, the data host's herd, diver, ground and perch brains, groups, spawn-when rows, respawns, layer
  * hunts, patrols, ranks and attackable rows, and the decision rows bound to declared spawns. A shard with no declared
  * spawn installs nothing, so a runtime saved before OF19b0 restores unchanged. `shard` is counted (`countedShard`).
- * Script brains, crowds and declared encounters stay on the ordinary upload until their rows move (OF19c).
+ * OF19c0: declared encounters install as there too (phase adds, decision encounters); each answers the quest page's
+ * summon by its spawn's id. Script brains and crowds stay on the ordinary upload.
  */
 export function installRuntimeCreatures(host: SimHost, shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>,
-  sections: ReadonlyMap<string, unknown>, ports: RuntimeCreaturePorts): void {
-  if (shard.creatures.spawns.length === 0) return;
+  sections: ReadonlyMap<string, unknown>, ports: RuntimeCreaturePorts): ReadonlyMap<string, RuntimeEncounter> {
+  if (shard.creatures.spawns.length === 0) return new Map();
   admitRuntimeCreatures(shard, sections, ports.keeper);
   const scripts = decisionScriptsFromSections(sections);
   nameDeclaredBodies(host, shard);
@@ -114,10 +121,20 @@ export function installRuntimeCreatures(host: SimHost, shard: Shardfile, assets:
   data.install();
   // One owner per decision row: the keeper's rows stay with its borrowed authority, every other row is the declared host's
   const owned = scripts.filter(row => !ports.keeper.scripts.has(row.id));
-  if (owned.length > 0) new ShardDecisions(decisionRuntime(host), shard, assets, new Map([...sections, ['sim/scripts', owned]]), new Map(), undefined,
+  // OF19c0: declared encounters as `bindShardfileSim` installs them; one the quest page summons waits for its summon
+  const actors = new Set(owned.flatMap(row => Object.values(row.actors)));
+  const encounters = installDeclaredEncounters(host, shard.encounters, id => ({ saved: { defeated: false, rewardTaken: false, kills: 0 }, persist: () => undefined,
+    reward: () => undefined, summoned: shard.encounters.some(row => row.id === id && ports.summoned.has(row.entity)) }), undefined,
+  new Set(shard.encounters.filter(row => actors.has(row.entity)).map(row => row.id)));
+  const adds = installEncounterAdds(host, shard.encounters, creatures.spawns, encounters, ports.restoring);
+  if (owned.length > 0) new ShardDecisions(decisionRuntime(host, undefined, adds ?? undefined), shard, assets, new Map([...sections, ['sim/scripts', owned]]), encounters, undefined,
     undefined, ports.fact, ports.restoring);
   groups.install(ports.restoring);
   installDeclaredAttackable(host, shard);
   installDeclaredPatrols(host, creatures.patrols ?? [], ports.restoring);
   installDeclaredRanks(host, shard.creatures.spawns);
+  return new Map(shard.encounters.flatMap(row => {
+    const encounter = encounters.get(row.id);
+    return encounter === undefined ? [] : [[row.entity, { summon: () => { encounter.summon(); }, locked: () => encounter.boss.state === 'intro' }] as const];
+  }));
 }

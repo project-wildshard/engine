@@ -25,7 +25,9 @@ export type EncounterBounds = 'room' | 'open';
 /** Where a spawned boss waits before its fight: under every floor, as an absent declared spawn does (`declaredSpawnWhen`). */
 const ABSENT_Y = -1e4;
 /** Profile/instance persistence and rewards arrive through explicit platform ports. No shard save is imported. */
-export interface PhaseEncounterPorts { saved: BossSaved; persist: (saved: BossSaved) => void; reward: () => void; presentation?: BossPresentation }
+export interface PhaseEncounterPorts { saved: BossSaved; persist: (saved: BossSaved) => void; reward: () => void; presentation?: BossPresentation;
+  /** OF19c0: a quest page summons this fight: it waits dormant (a spawned boss out of the world) until `summon` arms it. */
+  summoned?: boolean }
 const finite = v.pipe(v.number(), v.finite(), v.minValue(0));
 const natural = v.pipe(finite, v.integer());
 const continuation = v.strictObject({ state: v.picklist(['dormant', 'armed', 'intro', 'fight', 'beat', 'victory']), phase: natural, checkpoint: natural, attempts: natural, t: finite, skipT: finite, short: v.boolean(), saved: v.strictObject({ defeated: v.boolean(), rewardTaken: v.boolean(), kills: natural }) });
@@ -136,7 +138,7 @@ export class PhaseEncounter {
       this.boss.update(1 / 60, sim.clock.now);
       this.settleSpawn();
     }, { snapshot: () => this.snapshot(), restore: (value) => { this.restore(value); } });
-    sim.scope.onDispose(() => { this.boss.disarm(); }); this.boss.arm(); this.settleSpawn();
+    sim.scope.onDispose(() => { this.boss.disarm(); }); if (ports.summoned !== true) this.boss.arm(); this.settleSpawn();
     publishEncounter(sim, spec.id, () => ({ ...NO_MOMENTS, kind: spec.kind === 'boss' ? 'boss' : 'elite', state: this.boss.state, hp: actor.hp / actor.maxHp, phase: this.boss.phase, shield: this.shield, body: actor.entityId }));
   }
   /** Damage modification and phase transitions use the existing shared combat/clock; no raw health callback is authored. */
@@ -154,6 +156,8 @@ export class PhaseEncounter {
       this.presentation.setShield(this.shield); if (phase) this.presentation.setPhase(this.boss.phase, phase.caption);
     } else if (this.boss.state === 'intro') this.presentation.showNameCard(this.spec.name, this.spec.title, saved.boss.short);
   }
+  /** OF19c0: the quest page's summon arms a fight that waits for it (a no-op once it is armed or fought). */
+  summon(): void { if (this.boss.state === 'dormant') this.boss.arm(); }
   /** Explicit death/checkpoint hook for a host that resolves death before its queued notification. */
   retry(): boolean { return this.boss.onPlayerDeath(); }
   /** Read-only batch validation; the DecisionHost commits only after every command passes. */

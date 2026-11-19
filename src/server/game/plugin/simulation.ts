@@ -15,7 +15,7 @@ import { parseWorldTargets, worldTargetRules } from '@wildshard/format/worldTarg
 import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
 import { prepareNativePopulation, type NativePopulationRows } from '../shardfile/bossRow';
 import { serverReturnRows } from '../shardfile/nativeRuntimeLoans';
-import { admitRuntimeCreatures, declaredSpawnEntities, installRuntimeCreatures, keeperOwnership, nameDeclaredBodies } from '../shardfile/runtimeCreatures';
+import { admitRuntimeCreatures, declaredSpawnEntities, installRuntimeCreatures, keeperOwnership, nameDeclaredBodies, type RuntimeEncounter } from '../shardfile/runtimeCreatures';
 import { parseQuestWorldReactions, type QuestWorldReactionsData } from '@wildshard/format/questInteractions';
 import { installQuestGraph, type QuestGraphPorts } from '../../../shared/game/plugin/quests';
 import { parseQuestHost, type QuestHostRow } from '@wildshard/format/questHost';
@@ -186,7 +186,7 @@ export function addBakedWorld(host: SimHost, pieces: unknown, terrain?: Uint8Arr
   if (board.length > 0) host.boardColliders(board);
 }
 interface RuntimeWorldRecipe {
-  readonly population: { readonly rows: NativePopulationRows; readonly sources: 'actors' | 'actors+bosses'; readonly seed: 'identity' | 'declared'; readonly owner: unknown };
+  readonly population: { readonly rows: NativePopulationRows; readonly sources: 'actors' | 'actors+bosses'; readonly seed: 'identity' | 'declared'; readonly owner?: unknown };
   readonly terrain: 'none' | 'collider'; readonly ground: SimLevel['ground'];
   readonly player: { readonly speed: number; readonly lift?: number; readonly at?: readonly [number, number, number]; readonly yaw?: number };
   readonly floor?: 'solids';
@@ -200,7 +200,7 @@ interface RuntimeWorldRecipe {
 export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, baked: unknown, recipe: RuntimeWorldRecipe, sections: ReadonlyMap<string, unknown> = outputDescriptor(shard)?.sections ?? new Map()): Promise<{
   level: SimLevel; ports: { ground: false; heightAt: (x: number, z: number) => number };
   install: (host: SimHost, context: { restoring: boolean; emit: Parameters<typeof ledgerPorts>[0]; snapshot?: Parameters<ReturnType<typeof prepareNativePopulation>['install']>[2] }) => ReturnType<ReturnType<typeof prepareNativePopulation>['install']> & { ledger: ReturnType<typeof ledgerPorts>; hooks: ReturnType<ReturnType<typeof declaredItemScriptBindings>['hooks']>;
-    hookTick: () => number; motion?: MoverRuntime; seats: ScriptSeats };
+    hookTick: () => number; motion?: MoverRuntime; seats: ScriptSeats; declared: ReadonlyMap<string, RuntimeEncounter> };
 }> {
   const { pieces } = v.parse(v.object({ pieces: v.unknown() }), baked);
   const terrain = recipe.terrain === 'collider' ? admittedTerrain(shard, assets) : undefined;
@@ -220,6 +220,8 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
   // OF19b0: the declared spawns stand in the native level as in an ordinary upload's, and the declared host drives them
   const counted = countedShard(shard), keeper = keeperOwnership(policy.rows);
   admitRuntimeCreatures(counted, sections, keeper);
+  // OF19c0: the spawns the quest page's director stages summon; their declared encounters wait for it
+  const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   return { level: { ...shardLevel(shard, player, recipe.ground), entities: declaredSpawnEntities(counted) }, ports: { ground: false, heightAt }, install: (host, context) => {
   const seats = scriptSeats(host), { first } = seats;
     if(sections.has('actors/return-scripts')){
@@ -248,8 +250,8 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
       scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, player: focusPlayer(host), groundHeightAt: host.groundHeightAt.bind(host),
       live: actor => host.entities.get(actor.entityId) === actor, fixed: (id, run, scope) => { scope.onDispose(host.onStep(id, run)); }, say: (name, args) => { sayFightView(host, name, args); },
     }));
-    installRuntimeCreatures(host, counted, assets, sections, { restoring, keeper, fact: ledger.fact });
-    return { ...environment, ledger, ...installed };
+    const declared = installRuntimeCreatures(host, counted, assets, sections, { restoring, keeper, fact: ledger.fact, summoned });
+    return { ...environment, ledger, ...installed, declared };
   } };
 }
 export interface NativeRuntimeRecipe extends RuntimeWorldRecipe {
@@ -287,7 +289,12 @@ export async function prepareRuntimePlan(shard: Shardfile, assets: ReadonlyMap<s
   const spots = metadata?.spots ?? row.quest.spots;
   if (spots === 'metadata') throw new Error('Missing admitted native quest spots');
   const plan: NativeRuntimePlan = { level: world.level, ports: world.ports, install: (host, context) => {
-    const environment = world.install(host, context), { ledger, keeper, encounter } = environment;
+    const environment = world.install(host, context), { ledger, keeper, encounter, declared } = environment;
+    // OF19c0: the plan's boss, or the declared encounters beside it, answer the quest page's summon; one locks the loadout
+    // through its intro
+    const summons = new Map<string, { readonly summon: () => void }>(declared);
+    if (encounter !== null) summons.set(parseBossOwnerRow(recipe.population.owner).actor, encounter);
+    const locked = (): boolean => encounter?.locked() === true || [...declared.values()].some(fight => fight.locked());
     const reactions = ownsTargets || row.weapon.worldReactionAction === undefined ? undefined : (() => {
       const page = quest.page;
       const declarations = page === undefined || 'version' in page ? undefined : page.world;
@@ -295,13 +302,13 @@ export async function prepareRuntimePlan(shard: Shardfile, assets: ReadonlyMap<s
       return bindQuestWorldReactions(declarations, { flags: host.flags });
     })();
     const loadout = bindNativeLoadout(host, { slots: [0], initial: 0, lower: 0, raise: 0 }, {
-      owned: () => true, lockedFor: player => encounter.locked() || (row.weapon.stowOnBoard === true && player.board.on),
+      owned: () => true, lockedFor: player => locked() || (row.weapon.stowOnBoard === true && player.board.on),
     });
     const playerCommands = context.playerCommands;
     const melee = installNativeMelee(host, weapon, weapon.native, { inputCommands: context.commands,
       enabled: () => loadout.live(0),
       ...(playerCommands === undefined ? {} : { others: { commands: player => playerCommands(player.id),
-        enabled: player => !encounter.locked() && !(row.weapon.stowOnBoard === true && player.board.on),
+        enabled: player => !locked() && !(row.weapon.stowOnBoard === true && player.board.on),
         hook: player => environment.seats.hooks(player.id).get(weapon.id) ?? null } }),
       ...(row.weapon.questWorld ? { questWorld: { row: quest, spots } } : {}),
       hook: environment.hooks.get(weapon.id) ?? null, hookTick: environment.hookTick,
@@ -315,7 +322,7 @@ export async function prepareRuntimePlan(shard: Shardfile, assets: ReadonlyMap<s
         if (command.actorId === undefined || command.value === undefined || !Number.isFinite(command.value)) throw new Error('Invalid admitted native script command');
         return { actorId: command.actorId, value: command.value, ...(command.playerId === undefined ? {} : { playerId: command.playerId }) };
       }), mechanics: { ...(environment.motion === undefined ? {} : { motion: environment.motion }),
-        encounters: new Map([[parseBossOwnerRow(recipe.population.owner).actor, encounter]]) },
+        encounters: summons },
     });
     if (ownsTargets) bindNativeWorldTargets(host, melee, questRuntime, targets, context.emit);
     // SS3: the runtime plan's world holds the scenes' solids and the boss; its held melee and quest host are the page's halves.

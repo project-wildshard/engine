@@ -33,7 +33,7 @@ test('the Matriarch guest borrows each encounter body and resumes its grounded c
   try {
     const environment = world.install(host, { restoring: false, emit: () => undefined }); environment.keeper.settle();
     host.events.answer('damage.modify', request => request?.target === leadPlayer(host).health ? null : request, host.scope);
-    leadPlayer(host).position.set(-14, 0.1, -141); environment.encounter.summon();
+    leadPlayer(host).position.set(-14, 0.1, -141); environment.encounter?.summon();
     for (let i = 0; i < 600; i++) host.step();
     const body = host.entities.get('sunscar.matriarch'); if (body === undefined) throw new Error('Encounter did not spawn its body');
     expect(policy(host)).toMatchObject({ phase: 0, fighting: true });
@@ -57,7 +57,7 @@ test('the Matriarch guest borrows each encounter body and resumes its grounded c
     expect(policy(restored)).toEqual(policy(host));
     for (let i = 0; i < 360; i++) { host.step(); restored.step(); }
     expect(policy(restored)).toEqual(policy(host));
-    expect(environment.encounter.boss.onPlayerDeath()).toBe(true);
+    expect(environment.encounter?.boss.onPlayerDeath()).toBe(true);
     for (let i = 0; i < 600; i++) host.step();
     expect(host.entities.get('sunscar.matriarch')).not.toBe(body);
     expect(policy(host)).toMatchObject({ phase: 2, fighting: true });
