@@ -2809,8 +2809,8 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
   "credit": "Music: MiniMax-Music3",
   "slots": {
    "pine": {
-    "calm": "pine-calm-8a6359d9.m4a",
-    "tension": "pine-tension-ca1a5adc.m4a",
+    "calm": "pine-calm-923e0056.m4a",
+    "tension": "pine-tension-cc014e5b.m4a",
     "bpm": 91.998,
     "beatsPerBar": 4,
     "loopStart": 6.757,
