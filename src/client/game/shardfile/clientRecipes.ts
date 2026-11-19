@@ -5,6 +5,7 @@ import { channelLookOf } from '@wildshard/engine/entities/channelLook';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { CreatureSkinClipName } from '@wildshard/format/skinData';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
+import { RIG_LOOK_RECIPE, rigLookParameters } from '@wildshard/format/rigLooks';
 import { skinSpeciesLook, type ClientSkin } from './clientSkins';
 
 /** A native catalogue recipe receives validated JSON parameters and the chosen declared species. */
@@ -41,13 +42,25 @@ function sphere(row: ShardRows['looks'][number], species: ShardRows['species'][n
     animate: ({ bones, t, alive }) => { const body = bones['body']; if (body !== undefined) { body.scale.set(1, 1, 1); body.scale[axis] = alive ? rest + Math.sin(t * frequency) * amplitude : dead; } },
   };
 }
-/** Resolve every recipe before boot; injected kit recipes, platform primitives and exported skins (`skins`, keyed by look id) remain ordinary engine views. */
-export function clientSpeciesLooks(rows: ShardRows, recipes: ReadonlyMap<string, ShardViewRecipe>, materials: ReadonlyMap<string, Material>, skins: ReadonlyMap<string, ClientSkin> = new Map()): readonly SpeciesLook[] {
+/** ONE-FORMAT OF19d2: each scene model library's rig looks by library id, their rigs preloaded (`loadClientRigLooks`). */
+export type ClientRigLooks = ReadonlyMap<string, readonly SpeciesLook[]>;
+/** A `platform.rig` look: the named library's rig look for its body (the species' kind unless the row names one). */
+function rigSpeciesLook(row: ShardRows['looks'][number], species: ShardRows['species'][number], rigs: ClientRigLooks): SpeciesLook {
+  const { library, body } = rigLookParameters(row), looks = rigs.get(library), kind = body ?? species.kind;
+  if (looks === undefined) throw new Error(`Unloaded rig library ${library}`);
+  const look = looks.find((entry) => entry.kind === kind); if (look === undefined) throw new Error(`Rig library ${library} has no body ${kind}`);
+  return look;
+}
+/** Resolve every recipe before boot; injected kit recipes, platform primitives, exported skins (`skins`, keyed by look id)
+ *  and scene library rigs (`rigs`, keyed by library id) remain ordinary engine views. */
+export function clientSpeciesLooks(rows: ShardRows, recipes: ReadonlyMap<string, ShardViewRecipe>, materials: ReadonlyMap<string, Material>, skins: ReadonlyMap<string, ClientSkin> = new Map(), rigs: ClientRigLooks = new Map()): readonly SpeciesLook[] {
   return rows.looks.map((row) => {
     const species = rows.species.find((entry) => entry.id === row.species); if (species === undefined) throw new Error('Missing view species');
     // CC28b: the body's channel-bound material terms ride the look
     const channelLook = channelLookOf(species.body), bound = channelLook === undefined ? {} : { channelLook };
     if (row.recipe === SKIN_LOOK_RECIPE) { const skin = skins.get(row.id); if (skin === undefined) throw new Error(`Unloaded skin look ${row.id}`); if (row.material !== null) throw new Error('A skin look draws with its binding material'); return { ...skinSpeciesLook(row, species, skin), ...bound }; }
+    // OF19d2: the rig draws with its own surfaces and clips; the row's species names it on the page
+    if (row.recipe === RIG_LOOK_RECIPE) return { ...rigSpeciesLook(row, species, rigs), ...bound, id: row.id, species: species.id, kind: species.kind };
     const recipe = row.recipe === 'engine.sphere' ? sphere : recipes.get(row.recipe); if (recipe === undefined) throw new Error(`Unknown creature view recipe ${row.recipe}`);
     const look = recipe(row, species);
     if (row.material === null) return { ...look, ...bound, id: row.id, species: species.id, kind: species.kind };

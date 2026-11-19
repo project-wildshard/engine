@@ -66,7 +66,9 @@ import type { GraphSources } from './clientGraphs';
 import { clientPostStack, type ClientPost } from './clientPost';
 import { loadScenePostGraphCompiler } from '@wildshard/engine/render/graphBackend';
 import { frameLookOf } from '../grid/frameLook';
-import { abilityRows, clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ShardViewRecipe } from './clientRecipes';
+import { abilityRows, clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ClientRigLooks, type ShardViewRecipe } from './clientRecipes';
+import { loadClientRigLooks } from './clientRigLooks';
+import { clientNativeBook } from './clientNativeBook';
 import { loadItemModels, loadStaticModels } from './itemModels';
 import { attachmentRefs, withAttachments } from './clientAttachments';
 import { loadClientSkins, type ClientSkin } from './clientSkins';
@@ -213,6 +215,7 @@ export class ShardfileClient {
   private presentation: Awaited<ReturnType<typeof clientMaterials>> | undefined;
   private post: ClientPost | null = null;
   private skins: ReadonlyMap<string, ClientSkin> = new Map();
+  private rigLooks: ClientRigLooks = new Map();
   private worldTiles: Awaited<ReturnType<typeof standaloneClientTiles>> | undefined;
   private items: DeclaredItems | undefined;
   private itemModels: Awaited<ReturnType<typeof loadItemModels>> = new Map();
@@ -434,6 +437,8 @@ export class ShardfileClient {
   }
 
   async kit(ctx: ShardContext): Promise<void> {
+    // OF19d2: a declared look drawn from a scene library's rig waits on that library's rigs
+    if (this.mode === 'full') this.rigLooks = await loadClientRigLooks(ctx.product, this.source.rows, ctx.scope);
     this.kitData(ctx);
     await this.phase(ctx, 'kit');
   }
@@ -450,7 +455,7 @@ export class ShardfileClient {
     const pageRows = source.rows.species.map((row) => ({ ...row, harvest: row.harvest ?? [], variants: row.variants.map((variant) => ({ ...variant, scale: [variant.scale[0], variant.scale[1]] as [number, number] })) }));
     ctx.rows.species(pageSpecies(pageRows, kinds));
     // CC28c: a body's swap look registers under its own page kind, with a copy of its species row, never its species' kind
-    const swaps = speciesSwaps(source.rows), swapped = new Map(swaps.map((swap) => [swap.look, swap])), looks = withAttachments(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins), source.rows, this.attachmentModels, presentation.materials, TIER === 'phone');
+    const swaps = speciesSwaps(source.rows), swapped = new Map(swaps.map((swap) => [swap.look, swap])), looks = withAttachments(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins, this.rigLooks), source.rows, this.attachmentModels, presentation.materials, TIER === 'phone');
     ctx.rows.speciesLook(pageSpecies(looks.filter((look) => !swapped.has(look.id)), kinds));
     for (const swap of swaps) {
       const row = pageRows.find((entry) => entry.id === swap.species), look = looks.find((entry) => entry.id === swap.look);
@@ -471,7 +476,10 @@ export class ShardfileClient {
     // ONE-FORMAT OF19b0: a client-page shard whose creatures are declared spawns (its runtime plan keeps the quest page and
     // held melee) draws them as an ordinary upload's page does, unless a `species.program` feature owns its species
     if (this.nativeFeatures) {
-      if (this.source.creatures.spawns.length === 0 || (this.plan?.features ?? []).some(row => row.kind === 'species.program')) return;
+      if ((this.plan?.features ?? []).some(row => row.kind === 'species.program')) return;
+      // OF19d2: with no `species.program` the page's species are its declared rows, registered here for `population.homes`
+      clientNativeBook(ctx).species = true;
+      if (this.source.creatures.spawns.length === 0) return;
       this.declareCreatures(ctx);
       // the plan's keeper boss, if it keeps one (OF19c0b): its fight's name, as the `species.program` feature registered it
       if (ctx.product.has('sim/runtime-plan')) {

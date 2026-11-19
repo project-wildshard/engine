@@ -1021,6 +1021,7 @@
     "src/client/game/shardfile/abilityTell.ts": "client",
     "src/client/game/shardfile/strikeFlight.ts": "client",
     "src/client/game/shardfile/clientRecipes.ts": "client",
+    "src/client/game/shardfile/clientRigLooks.ts": "client",
     "src/client/game/shardfile/clientResidency.ts": "client",
     "src/client/game/shardfile/clientReturnModules.ts": "client",
     "src/client/game/shardfile/clientRuntimeHooks.ts": "client",
