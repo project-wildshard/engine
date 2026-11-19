@@ -23,7 +23,7 @@ import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {setTimeout} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
-import {AMBER,parseAmber,parseAudioAmber} from './test-amber.mjs';
+import {AMBER,parseAmber,parseAudioAmber,parseMemoryWarnings} from './test-amber.mjs';
 import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 
 export const REPO='project-wildshard/engine';
@@ -53,7 +53,8 @@ const advisory=job=>job.name==='timings'||job.name==='quarantine'||job.name==='n
   ||nativeInfrastructure(job)!==undefined;
 
 /** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
-/** @typedef {{judged:number[],dispatched:string[]}} State */
+/** @typedef {{id:number,sha:string,created:string, warnings:ReturnType<typeof parseMemoryWarnings>}} MemoryQa */
+/** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[]}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
@@ -127,7 +128,8 @@ export function readState(file){
   if(!existsSync(file))return null;
   try{
     const value=JSON.parse(readFileSync(file,'utf8'));
-    return {judged:Array.isArray(value.judged)?value.judged.filter(Number.isSafeInteger):[],dispatched:Array.isArray(value.dispatched)?value.dispatched.filter(row=>typeof row==='string'):[]};
+    return {judged:Array.isArray(value.judged)?value.judged.filter(Number.isSafeInteger):[],dispatched:Array.isArray(value.dispatched)?value.dispatched.filter(row=>typeof row==='string'):[],
+      ...(Array.isArray(value.memoryQa)?{memoryQa:value.memoryQa}:{})};
   }catch{return null;}
 }
 
@@ -135,7 +137,7 @@ export function readState(file){
 function writeState(file,state){
   mkdirSync(dirname(file),{recursive:true});
   const temporary=`${file}.${process.pid}.tmp`;
-  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50)})}\n`);renameSync(temporary,file);
+  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{})})}\n`);renameSync(temporary,file);
 }
 
 /** One watcher at a time judges, so two never report the same run. The lock file holds its owner's pid; only a
@@ -220,8 +222,17 @@ export function liveIo(env=process.env){
     // Blocking tests own AMBER evidence. The advisory timings collector only repeats it;
     // its annotations cannot change main's verdict. Quarantine reports separately (J193).
     annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
-      .filter(job=>job.name.startsWith('tests'))
-      .map(job=>/** @type {{message:string}[]} */(JSON.parse(read(['api',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`]))).map(row=>row.message).join('\n')).join('\n'),
+      .filter(job=>job.name.startsWith('tests')||job.name==='memory-ledger-guard'||job.name===NATIVE_FOOTPRINT)
+      .map(job=>read(['api','--paginate',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`,'--jq','.[].message'])).join('\n'),
+    nativeRuns:()=>sharedRuns(`${runsCache}.memory-footprint`,()=>/** @type {Run[]} */(
+      JSON.parse(read(['api',`repos/${repo}/actions/workflows/memory-footprint.yml/runs?branch=main&per_page=15`])).workflow_runs)),
+    memoryQa:(/** @type {MemoryQa[]} */rows)=>{
+      const meta=env.WS_META_ROOT??join(homedir(),'projects/games/project-wildshard-meta');
+      const script=join(meta,'scripts/memory-gate-qa.mjs');
+      if(!existsSync(script))throw new Error('meta memory-gate QA writer is unavailable');
+      execFileSync(process.execPath,[script,JSON.stringify(rows)],{cwd:meta,encoding:'utf8',
+        stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:1<<20});
+    },
     tip:()=>{run('git',['fetch','--quiet','origin','main']);return run('git',['rev-parse','origin/main']).trim();},
     commits:(/** @type {string|null} */from,/** @type {string} */to)=>{
       try{return run('git',['rev-list','--max-count=200',from===null?to:`${from}..${to}`]).trim().split('\n').filter(Boolean);}catch{return [to];}
@@ -252,15 +263,29 @@ export function sweep(io,hint={}){
   const unlock=lock(io.state);
   try{
     const runs=io.runs();
+    let native=/** @type {Run[]} */([]);
+    try{native=io.nativeRuns?.()??[];}catch(error){
+      io.receipt(`memory footprint status unavailable: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
+    }
     let previous=readState(io.state);
     if(previous===null){
       // A followed SHA's own runs stay unjudged, so the first follow still reports its verdict.
-      const baseline=runs.filter(row=>finished(row)&&(hint.sha===undefined||row.head_sha!==hint.sha));
+      const baseline=[...runs,...native].filter(row=>finished(row)&&(hint.sha===undefined||row.head_sha!==hint.sha));
       previous={judged:baseline.map(row=>row.id),dispatched:[]};writeState(io.state,previous);
       io.receipt(`started: ${baseline.length} finished main runs taken as already judged`);
       if(hint.sha===undefined)return [];
     }
-    const verdicts=judge(runs,previous,io.tip()),state={judged:[...previous.judged],dispatched:[...previous.dispatched]};
+    const verdicts=judge(runs,previous,io.tip()),state={judged:[...previous.judged],dispatched:[...previous.dispatched],memoryQa:[...previous.memoryQa??[]]};
+    /** @param {Run} run @param {string} annotations @param {string[]} lines */
+    const memoryWarnings=(run,annotations,lines)=>{
+      const warnings=parseMemoryWarnings(annotations);
+      for(const row of warnings){
+        const detail=`${short(run.head_sha)} ${row.zone} ${row.mode} ${row.metric} ${row.arm} +${row.delta} B over ${row.limit} B at ${row.bytes} B${row.median===undefined?'':`, confirmation median ${row.median} B`} (run ${run.id}; J431)`;
+        lines.push(`main WARNING memory ${detail}`);
+        if(row.kind==='gate-flake')lines.push(`gate-flake ${detail}`);
+      }
+      if(warnings.length>0)state.memoryQa.push({id:run.id,sha:run.head_sha,created:run.created_at,warnings});
+    };
     const who=landers(io.receipts());
     // land names itself and its pane when it starts a follow, before its own receipt may be written.
     if(hint.sha!==undefined&&hint.lane!==undefined)who.set(hint.sha.slice(0,10),{lane:hint.lane,slug:who.get(hint.sha.slice(0,10))?.slug??'',pane:hint.pane});
@@ -280,11 +305,13 @@ export function sweep(io,hint={}){
         const found=commits.map(sha=>({sha,lander:who.get(sha.slice(0,10))}));
         const names=[...new Set(found.map(row=>row.lander?.lane??'').filter(Boolean))];
         const named=names.length===0?'no land receipt (pushed by hand or the queue)':names.join(', ');
+        let annotations='';
+        try{annotations=io.annotations(run.id);}catch(error){
+          if(verdict.kind==='green')lines.push(`main AMBER ${short(run.head_sha)} unknown (run ${run.id}; its annotations were unreadable: ${error instanceof Error?error.message.split('\n')[0]:String(error)})`);
+        }
         if(verdict.kind==='green'){
-          lines.push(`main green ${short(run.head_sha)} (run ${run.id}; ${range}; landed by ${named})`);
-          /** @type {{file:string,ms:number,budget:number}[]} */let ambers=[];
-          /** @type {ReturnType<typeof parseAudioAmber>} */let audio=[];
-          try{const text=io.annotations(run.id);ambers=parseAmber(text);audio=parseAudioAmber(text);}catch(error){lines.push(`main AMBER ${short(run.head_sha)} unknown (run ${run.id}; its annotations were unreadable: ${error instanceof Error?error.message.split('\n')[0]:String(error)})`);}
+          lines.unshift(`main green ${short(run.head_sha)} (run ${run.id}; ${range}; landed by ${named})`);
+          const ambers=parseAmber(annotations),audio=parseAudioAmber(annotations);
           for(const row of ambers)lines.push(`main AMBER ${short(run.head_sha)} ${row.file} ${row.ms}/${row.budget} (run ${run.id}; J295: a queue-skipping fix row today; red at ${AMBER.redFactor}x, after ${AMBER.redAfterHours} h or ${AMBER.redAfterRuns} amber main runs)`);
           const mb=(/** @type {number} */bytes)=>(bytes/1e6).toFixed(2);
           for(const row of audio)lines.push(`main AMBER ${short(run.head_sha)} audio ${row.shard} ${row.tier} ${mb(row.bytes)} MB/${mb(row.budget)} MB (run ${run.id}; J303${row.level==='red'?`, over the ${mb(row.red)} MB red line`:''}: its AUDIO-PLAN source pass; never a red main)`);
@@ -298,6 +325,7 @@ export function sweep(io,hint={}){
           for(const fixer of new Set(io.fixers()))messages.push({lane:fixer,pane:undefined,
             text:`main-watch: MAIN RED on engine main ${range} (${url}); landers ${named}; failed: ${failed}. You are the forward fixer (M2): fix forward now, or confirm a lander has it.`});
         }
+        memoryWarnings(run,annotations,lines);
       }
       state.judged.push(run.id);if(verdict.kind==='dispatch')state.dispatched.push(run.head_sha);writeState(io.state,state);
       if(verdict.kind==='dispatch')io.dispatch();
@@ -314,6 +342,22 @@ export function sweep(io,hint={}){
       if(needsBuddy&&!buddyAttempted&&buddyAlert!==undefined){
         const delivered=io.prompt('buddy-engine',buddyAlert);
         io.receipt(`main red fallback to buddy-engine ${delivered?'prompted herdr agent buddy-engine':'not delivered (herdr agent unreachable)'}`);
+      }
+    }
+    for(const run of native.filter(row=>finished(row)&&!state.judged.includes(row.id))){
+      /** @type {string[]} */const lines=[];
+      if(run.conclusion==='success'||run.conclusion==='failure'){
+        try{memoryWarnings(run,io.annotations(run.id),lines);}catch(error){
+          io.receipt(`memory footprint annotations unavailable for run ${run.id}: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
+          continue;
+        }
+      }
+      state.judged.push(run.id);writeState(io.state,state);
+      for(const line of lines)io.receipt(line);
+    }
+    if(state.memoryQa.length>0&&io.memoryQa!==undefined){
+      try{io.memoryQa(state.memoryQa);state.memoryQa=[];writeState(io.state,state);}catch(error){
+        io.receipt(`memory QA deferred: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
       }
     }
     return verdicts;

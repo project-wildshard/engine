@@ -98,3 +98,16 @@ export function parseAudioAmber(text){
     out.set(`${match[1]} ${match[2]}`,{shard:match[1],tier:match[2],bytes:Number(match[3]),budget:Number(match[4]),red:Number(match[5]),level:match[6]});
   return [...out.values()];
 }
+
+/** J431 memory warnings are recorded once per run and metric.
+ * @param {string} text */
+export function parseMemoryWarnings(text) {
+  const warnings = new Map();
+  const pattern = /\bMEMORY WARNING kind=(margin|gate-flake) mode=(ledger|webkit-ledger|footprint) zone=([a-z0-9_-]+) metric=([a-z.]+) arm=(absolute|ratchet) bytes=(\d+) limit=(\d+) delta=(\d+)(?: median=(\d+))?/gu;
+  for (const [, kind, mode, zone, metric, arm, bytes, limit, delta, median] of text.matchAll(pattern)) {
+    const finding = { kind, mode, zone, metric, arm, bytes: Number(bytes), limit: Number(limit), delta: Number(delta),
+      ...(median === undefined ? {} : { median: Number(median) }) };
+    warnings.set(`${kind} ${mode} ${zone} ${metric} ${arm}`, finding);
+  }
+  return [...warnings.values()];
+}

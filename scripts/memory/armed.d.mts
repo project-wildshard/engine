@@ -7,4 +7,4 @@ export function footprintBootFor(zone: string, armed: ReadonlySet<string>, place
 export function ledgerZones(available: readonly string[], armed: ReadonlySet<string>, requested?: readonly string[]): string[];
 export function guardZone(zone: string, armed: ReadonlySet<string>, run: () => Promise<void>, log: (line: string) => void): Promise<void>;
 export function phoneFootprint(zone: string, runs: readonly unknown[], model: unknown, boot: 'standalone' | 'online'): PhoneFootprint;
-export function comparePhoneFootprint(reading: PhoneFootprint, lines: MemoryLines, armed?: MemoryLines): void;
+export function comparePhoneFootprint(reading: PhoneFootprint, lines: MemoryLines): void;

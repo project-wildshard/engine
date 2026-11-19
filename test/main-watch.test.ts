@@ -23,10 +23,11 @@ const replay = [
 const order = ['0f24422e', '7257ca53', '6363b3f3', '652afa6c', 'aaaa1111', 'bbbb2222'].map(sha);
 const contains = (ancestor: string, descendant: string): boolean => order.indexOf(ancestor) <= order.indexOf(descendant);
 
-interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string; ambers?: Record<number, string>; agents?: string[]; prompted?: [string, string][]; fixers?: string[] }
+interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string; ambers?: Record<number, string>; agents?: string[]; prompted?: [string, string][]; fixers?: string[]; native?: ReturnType<typeof run>[]; memoryQa?: Parameters<NonNullable<ReturnType<typeof liveIo>['memoryQa']>>[0] }
 const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   repo: 'project-wildshard/engine', state: join(scratch, `${name}.json`),
   runs: () => world.runs, failed: () => ['tests (3)'], annotations: id => world.ambers?.[id] ?? '', tip: () => world.tip,
+  nativeRuns: () => world.native ?? [], memoryQa: rows => { (world.memoryQa ??= []).push(...rows); },
   commits: (from, to) => order.slice(from === null ? 0 : order.indexOf(from) + 1, order.indexOf(to) + 1).reverse(),
   contains, receipts: () => world.log, receipt: line => { world.receipts.push(line); },
   panes: () => [{ pane_id: 'w1:p2', label: 'engine plan/red-plan' }, { pane_id: 'w1:p3', cwd: '/x/engine/.worktrees/other' }],
@@ -366,4 +367,27 @@ test.each(['missing lander', 'unrecorded lander', 'configured buddy'])('A2: a re
   expect(w.prompted?.map(([agent]) => agent)).toEqual(['buddy-engine']);
   expect(w.prompted?.[0]?.[1]).toContain('fix forward now');
   expect(w.prompted?.[0]?.[1]).toContain('tests (3)');
+});
+
+test('J431 writes each memory warning and gate-flake receipt once and queues QA with the SHA', () => {
+  const w = world(replay), io = fake('memory-warning', w);
+  sweep(io);
+  w.receipts.length = 0;
+  const ci = run(42970000044, 'aaaa1111', 'success', 44);
+  const native = run(42970000045, 'aaaa1111', 'success', 45);
+  w.runs.push(ci);
+  w.native = [native];
+  const margin = 'MEMORY WARNING kind=margin mode=ledger zone=brasscap-mesa metric=peak.loading arm=ratchet bytes=47712804 limit=47407792 delta=305012';
+  const flake = 'MEMORY WARNING kind=gate-flake mode=footprint zone=pine-hollow metric=playing arm=absolute bytes=1010000000 limit=1000000000 delta=10000000 median=995000000';
+  w.ambers = { [ci.id]: `${margin}\n${margin}`, [native.id]: flake };
+  sweep(io);
+  sweep(io);
+  expect(w.receipts.filter(line => line.startsWith('main WARNING memory'))).toHaveLength(2);
+  expect(w.receipts.filter(line => line.startsWith('gate-flake'))).toEqual([
+    expect.stringContaining('pine-hollow footprint playing absolute +10000000 B'),
+  ]);
+  expect(w.memoryQa).toEqual([
+    expect.objectContaining({ id: ci.id, sha: ci.head_sha, warnings: [expect.objectContaining({ zone: 'brasscap-mesa', delta: 305012 })] }),
+    expect.objectContaining({ id: native.id, sha: native.head_sha, warnings: [expect.objectContaining({ median: 995000000 })] }),
+  ]);
 });

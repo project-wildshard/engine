@@ -10,3 +10,6 @@ export function parseAmber(text:string):{file:string;ms:number;budget:number}[];
 export function nextLedger(previous:AmberLedger|undefined,files:readonly {file:string;durationMs:number}[],options:{run:string;at:number;inventory:Set<string>|null;budget?:number}):AmberLedger;
 export function judgeWall(shard:string,ms:number,budget:number,limits?:AmberLimits):AmberVerdict;
 export function parseAudioAmber(text:string):{shard:string;tier:string;bytes:number;budget:number;red:number;level:string}[];
+
+export interface MemoryWarning {kind:string;mode:string;zone:string;metric:string;arm:string;bytes:number;limit:number;delta:number;median?:number}
+export function parseMemoryWarnings(text:string):MemoryWarning[];

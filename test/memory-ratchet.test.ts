@@ -67,7 +67,10 @@ test('clean observations ratchet down and the tolerance never raises the baselin
   const baseline = boot(0), reduced = structuredClone(baseline);
   reduced.peak.loading -= MB;
   reduced.control.geometry += 1000;
-  expect(compareLedger(baseline, [reduced], 'template')).toMatchObject({ control: { geometry: 18 * MB }, peak: { loading: 69 * MB } });
+  expect(compareLedger(baseline, [reduced], 'template')).toEqual(baseline);
+  const outlier = structuredClone(reduced); outlier.peak.loading = 42 * MB;
+  expect(compareLedger(baseline, [outlier, reduced, baseline], 'template'))
+    .toMatchObject({ control: { geometry: 18 * MB }, peak: { loading: 69 * MB } });
 });
 
 test('native footprint compares the median with the stored upper spread', () => {

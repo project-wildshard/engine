@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
 import { comparePhoneFootprint, footprintBootFor, guardZone, ledgerZones, parseArmedMemory, phoneFootprint } from '../scripts/memory/armed.mjs';
+import { checkMemory, ratchetMargin } from '../scripts/memory/gate.mjs';
 import { loadPhoneModel } from '../scripts/memory/phoneModel.mjs';
 import { compareLedger, ledgerBudget } from '../scripts/memory/ratchet.mjs';
 
@@ -69,17 +70,56 @@ test('an armed zone must finish a comparable native boot and stay within both li
   }
 });
 
-test('a measured footprint must pass the armed reading and the shared line', async () => {
-  const armed = policy.readings.get('driftwood-isle');
-  expect(armed).toBeDefined();
-  expect(() => comparePhoneFootprint({ playing: 904_500_000, loading: 1_306_500_000 }, lines, armed)).not.toThrow();
-  const report = vi.fn<(line: string) => void>();
-  for (const reading of [{ playing: 904_500_001, loading: 1 }, { playing: 1, loading: 1_306_500_001 }]) {
-    const compare = async () => { comparePhoneFootprint(reading, lines, armed); };
-    await expect(guardZone('driftwood-isle', policy.zones, compare, report)).rejects.toThrow('armed reading + 0.5%');
-  }
-  expect(() => comparePhoneFootprint({ playing: lines.playingBytes + 1, loading: 1 }, lines,
-    { playingBytes: 1_010_000_000, loadingBytes: 1_300_000_000 })).toThrow(`line ${lines.playingBytes} B`);
+test('J431 uses the larger of 2% and 5 MB over an armed reading', async () => {
+  const brasscap = 46_478_228;
+  const metrics = { 'peak.loading': { baseline: brasscap, previousMargin: Math.floor(brasscap * 0.02) } };
+  const remeasure = vi.fn(async () => [{ 'peak.loading': 52_000_000 }, { 'peak.loading': 51_800_000 }, { 'peak.loading': 47_000_000 }]);
+  const warn = vi.fn();
+  expect(ratchetMargin(brasscap)).toBe(5_000_000);
+  expect(ratchetMargin(900_000_000)).toBe(18_000_000);
+  await expect(checkMemory({ zone: 'brasscap-mesa', metrics, first: { 'peak.loading': 47_712_804 }, remeasure, warn }))
+    .resolves.toEqual({ 'peak.loading': brasscap });
+  expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'margin', metric: 'peak.loading', limit: 47_407_792 }));
+  expect(remeasure).not.toHaveBeenCalled();
+  await expect(checkMemory({ zone: 'brasscap-mesa', metrics, first: { 'peak.loading': 52_100_000 }, remeasure, warn }))
+    .rejects.toThrow('peak.loading (ratchet, median of 3): 51800000 B > 51478228 B');
+  expect(remeasure).toHaveBeenCalledExactlyOnceWith(3);
+});
+
+test('both absolute phone lines use three fresh boots when a first reading crosses', async () => {
+  const nearLine = { playing: 999_000_000, loading: 1_499_000_000 };
+  const over = { playing: lines.playingBytes + 10, loading: lines.loadingBytes + 20 };
+  const aboveLineBaseline = { playing: { absolute: lines.playingBytes, baseline: 1_023_500_000 },
+    loading: { absolute: lines.loadingBytes, baseline: 1_510_000_000 } };
+  const once = vi.fn(async () => [nearLine, over, nearLine]);
+  const warn = vi.fn();
+  await expect(checkMemory({ zone: 'driftwood-isle', metrics: aboveLineBaseline, first: over, remeasure: once, warn }))
+    .resolves.toEqual({ playing: 1_023_500_000, loading: 1_510_000_000 });
+  expect(once).toHaveBeenCalledExactlyOnceWith(3);
+  expect(warn).toHaveBeenCalledTimes(2);
+  expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'gate-flake', arm: 'absolute', metric: 'playing', median: nearLine.playing }));
+  expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'gate-flake', arm: 'absolute', metric: 'loading', median: nearLine.loading }));
+  const confirm = vi.fn(async () => [over, nearLine, over]);
+  await expect(checkMemory({ zone: 'driftwood-isle', metrics: aboveLineBaseline, first: over, remeasure: confirm, warn }))
+    .rejects.toThrow(/playing \(absolute, median of 3\)[^]*loading \(absolute, median of 3\)/u);
+  expect(confirm).toHaveBeenCalledExactlyOnceWith(3);
+});
+
+test('a ratchet advances only after three clean boots, to their median', async () => {
+  const metrics = { playing: { baseline: 100_000_000 } }, first = { playing: 70_000_000 };
+  const warn = vi.fn();
+  const remeasure = vi.fn(async () => [{ playing: 92_000_000 }, { playing: 97_000_000 }]);
+  const check = { zone: 'driftwood-isle', metrics, first, remeasure, warn };
+  expect(await checkMemory(check)).toEqual({ playing: 100_000_000 });
+  expect(remeasure).not.toHaveBeenCalled();
+  expect(await checkMemory({ ...check, record: true })).toEqual({ playing: 92_000_000 });
+  expect(remeasure).toHaveBeenCalledExactlyOnceWith(2);
+  const noisy = vi.fn(async (count: number) => count === 2
+    ? [{ playing: 106_000_000 }, { playing: 95_000_000 }]
+    : [{ playing: 91_000_000 }, { playing: 92_000_000 }, { playing: 93_000_000 }]);
+  expect(await checkMemory({ ...check, record: true, remeasure: noisy })).toEqual({ playing: 100_000_000 });
+  expect(noisy.mock.calls).toEqual([[2], [3]]);
+  expect(warn).toHaveBeenCalledWith(expect.objectContaining({ kind: 'gate-flake', arm: 'ratchet', metric: 'playing', median: 92_000_000 }));
 });
 
 test('CI runs both armed measurement jobs without a job-level bypass, the native one in its own workflow', () => {

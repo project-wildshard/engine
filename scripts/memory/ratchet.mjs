@@ -2,6 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
+import { medianOfThree } from './gate.mjs';
 import { memorySubsystems, PHONE_MEMORY_BUDGETS } from '../../src/shared/engine/core/memoryBudget.ts';
 
 const SUBSYSTEMS = Object.keys(PHONE_MEMORY_BUDGETS);
@@ -37,8 +38,8 @@ export function ledgerBudget(checkpoints) {
 }
 
 /**
- * Check every boot and ratchet to the largest observation in the same batch,
- * bounded by the previous baseline. A new budget requires a measured baseline.
+ * Replay a historical comparison. A clean three-boot cohort can lower
+ * the stored baseline to its median.
  * @param {LedgerBudget} baseline @param {readonly LedgerBudget[]} runs
  * @param {string} zone @returns {LedgerBudget}
  */
@@ -52,7 +53,8 @@ export function compareLedger(baseline, runs, zone) {
     const observed = Math.max(...runs.map(run => byteCount(run[phase]?.[kind])));
     const limit = previous + Math.floor(previous * 0.02);
     if (observed > limit) failures.push(`${zone} ${phase} ${kind}: ${observed} B > ${limit} B (baseline ${previous} B)`);
-    next[phase][kind] = Math.min(previous, observed);
+    next[phase][kind] = runs.length === 3
+      ? Math.min(previous, medianOfThree(runs.map(run => byteCount(run[phase]?.[kind])))) : previous;
   }
   if (failures.length > 0) throw new Error(failures.join('\n'));
   return next;
@@ -69,6 +71,7 @@ export function compareLedger(baseline, runs, zone) {
 export function confirmLedger(baseline, runs, zone) {
   if (runs.length === 0) throw new Error(`${zone}: no successful ledger boots`);
   const failures = [];
+  if (runs.length === 3 && runs.every(run => ledgerOverLine(baseline, run, zone) === null)) return compareLedger(baseline, runs, zone);
   for (const run of runs) {
     const failure = ledgerOverLine(baseline, run, zone);
     if (failure === null) return compareLedger(baseline, [run], zone);
@@ -126,7 +129,7 @@ export function compareFootprint(baseline, readings) {
   const observed = footprintBudget(readings);
   const previous = byteCount(baseline.settled), limit = previous + byteCount(baseline.spread);
   if (observed.settled > limit) throw new Error(`Template settled WebContent: ${observed.settled} B > ${limit} B (baseline ${previous} B + ${baseline.spread} B spread)`);
-  return { settled: Math.min(previous, observed.settled), spread: baseline.spread };
+  return { settled: readings.length === 3 && readings.every(value => value <= limit) ? Math.min(previous, observed.settled) : previous, spread: baseline.spread };
 }
 
 /** The failure one batch of native boots would raise, or null when its median is inside the line.

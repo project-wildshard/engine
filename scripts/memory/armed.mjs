@@ -49,7 +49,7 @@ export function ledgerZones(available, armed, requested = available) {
 }
 
 /** A successful comparison always emits a verdict. An armed comparison
- * refuses on any overage or unavailable reading, including during recording.
+ * refuses on a confirmed overage or unavailable reading, including during recording.
  * @param {string} zone @param {ReadonlySet<string>} armed @param {() => Promise<void>} run @param {(line:string) => void} log */
 export async function guardZone(zone, armed, run, log) {
   try { await run(); }
@@ -77,16 +77,9 @@ export function phoneFootprint(zone, runs, model, boot) {
 }
 
 /** @param {{playing:number,loading:number}} reading @param {{playingBytes:number,loadingBytes:number}} lines
- * @param {{playingBytes:number,loadingBytes:number}} [armed] */
-export function comparePhoneFootprint({ playing, loading }, lines, armed) {
+ */
+export function comparePhoneFootprint({ playing, loading }, lines) {
   if (playing > lines.playingBytes || loading > lines.loadingBytes) {
     throw new Error(`EM11 upper playing ${playing} B (line ${lines.playingBytes} B), loading ${loading} B (line ${lines.loadingBytes} B)`);
-  }
-  if (armed) {
-    const playingCeiling = armed.playingBytes + Math.floor(armed.playingBytes / 200);
-    const loadingCeiling = armed.loadingBytes + Math.floor(armed.loadingBytes / 200);
-    if (playing > playingCeiling || loading > loadingCeiling) {
-      throw new Error(`EM11 upper playing ${playing} B, loading ${loading} B exceeds armed reading + 0.5% (playing ${playingCeiling} B, loading ${loadingCeiling} B)`);
-    }
   }
 }
